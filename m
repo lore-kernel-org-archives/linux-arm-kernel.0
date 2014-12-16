@@ -1,79 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 16 Dec 2014 12:25:03 +0100
-Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <alpine.DEB.2.11.1412161013570.17382@nanos>
-References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
- <2662748.NJbkr6jW7r@vostro.rjw.lan>
- <3542278.8lcJeXLMFm@vostro.rjw.lan>
- <20141216100715.57baeb65@bbrezillon>
- <alpine.DEB.2.11.1412161013570.17382@nanos>
-Message-ID: <20141216122503.77c5632f@bbrezillon>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Tue, 16 Dec 2014 12:20:57 +0100
+Subject: [PATCH] ARM: imx: apf51dev: add gpio-backlight support
+Message-ID: <1418728857-21070-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ arch/arm/boot/dts/imx51-apf51dev.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-On Tue, 16 Dec 2014 11:03:55 +0100 (CET)
-Thomas Gleixner <tglx@linutronix.de> wrote:
-
-> On Tue, 16 Dec 2014, Boris Brezillon wrote:
-> > On Mon, 15 Dec 2014 23:48:14 +0100
-> > "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
-> > > Or even set IRFQ_NO_SUSPEND for all of the users of this interrupt and add
-> > > comments to them explaining why it is set.
-> > Actually I thought about adding a new flag (let's call it
-> > IRQF_DONT_COMPLAIN for now ;-)) to remove those warnings (or specifying
-> > IRFQ_NO_SUSPEND in all peripherals sharing the IRQ with the init
-> > timer), but after discussing the problem with Thomas I decided to go
-> > for the approach described in my cover letter.
-> > 
-> > Thomas, correct me if I'm wrong, but your concern about the
-> > IRQF_DONT_COMPLAIN approach was that it was leaving interrupt handlers
-> > of suspended devices in an active state (meaning that they could be
-> > called in "suspend" or "early resume" state), and such devices might
-> > not properly handle interrupts while being in a suspended state (clocks
-> > and regulators disabled).
-> > In at91 specific case this should not be an issue thought.
-> > 
-> > We have the same problem when setting IRFQ_NO_SUSPEND on all peripherals
-> > sharing the IRQ with the init timer.
-> > Moreover, I'd like to keep the core automatically disabling the IRQ when
-> > the PMC, RTC, watchdog or DBGU (UART) peripherals have their own
-> > dedicated IRQ (which is the case on Atmel sama5 SoCs).
-> > This implies testing for the SoC version in each of these drivers and
-> > adapting the request_irq call accordingly.
-> 
-> But still all those drivers must disable the interrupts at the device
-> level on suspend, right?
-
-Absolutely.
-
-> 
-> > Thomas, Rafael, if both of you think I should either introduce a new
-> > flag or specify IRFQ_NO_SUSPEND in all shared IRQ users, then I can go
-> > for one of this solution.
-> 
-> All of this really sucks. What about the following?
-> 
-> Install the timer interrupt as a demultiplexing interrupt.
-
-I can try to hack the AIC irqchip driver to implement this demux logic,
-but this logic can't be placed in the PIT (Periodic Interval Timer)
-driver itself, because the shared IRQ line is used by the at91 clock
-controller (PMC) which is providing the clock to the PIT device.
-This gives the following dependency graph:
-
-PIT =depends-on=> Master Clock =provided-by=> PMC =needs=> PMC IRQ.
-
-Anyway, I'll give this solution another try.
-
-Thanks for your detailed answer.
-
-Regards,
-
-Boris
-
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index c5a9a24..93d3ea1 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -16,6 +16,14 @@
+ 	model = "Armadeus Systems APF51Dev docking/development board";
+ 	compatible = "armadeus,imx51-apf51dev", "armadeus,imx51-apf51", "fsl,imx51";
+ 
++	backlight at bl1{
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_backlight>;
++		compatible = "gpio-backlight";
++		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		default-on;
++	};
++
+ 	display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+ 		interface-pix-fmt = "bgr666";
+@@ -114,6 +122,12 @@
+ 	pinctrl-0 = <&pinctrl_hog>;
+ 
+ 	imx51-apf51dev {
++		pinctrl_backlight: bl1grp {
++			fsl,pins = <
++				MX51_PAD_DI1_D1_CS__GPIO3_4 0x1F5
++			>;
++		};
++
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+ 				MX51_PAD_EIM_EB2__GPIO2_22   0x0C5
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.0.4
