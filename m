@@ -1,259 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 16 Dec 2014 09:56:45 +0100
-Subject: [PATCH 2/2] ARM: dts: kirkwood: add dts support for Seagate
- BlackArmor NAS220
-In-Reply-To: <20141215203855.GA28940@anne>
-References: <20141215203855.GA28940@anne>
-Message-ID: <20141216085645.GB1450@lunn.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Dec 2014 17:02:20 +0800
+Subject: [PATCH V3] arm: imx: correct the hardware clock gate setting for
+ shared nodes
+In-Reply-To: <1418205102-14598-1-git-send-email-b20788@freescale.com>
+References: <1418205102-14598-1-git-send-email-b20788@freescale.com>
+Message-ID: <20141216090218.GI2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 09:38:55PM +0100, Evgeni Dobrev wrote:
-> This patch adds support for Seagate BlackArmor NAS220.
-
-Hi Evgeni
-
-Thanks for the patch. It looks good apart from a few minor comments.
-
-Please could you also Cc: the mvebu maintainers, otherwise you patch
-might net be seen by the right people. I added them.
-
+On Wed, Dec 10, 2014 at 05:51:42PM +0800, Anson Huang wrote:
+> For those clk gates which hold share count, since its is_enabled
+> callback is only checking the share count rather than reading
+> the hardware register setting, in the late phase of kernel bootup,
+> the clk_disable_unused action will NOT handle the scenario of
+> share_count is 0 but the hardware setting is enabled, actually,
+> U-Boot normally enables all clk gates, then those shared clk gates
+> will be always enabled until they are used by some modules.
 > 
-> The Seagate BlackArmor NAS 220 is a NAS system based on Marvell 88f6192. It has 32MB NAND and 128MB DRAM. It has two SATA slots, one Gigabit Ethernet port, two USB 2.0 ports, two buttons and three LEDs. There is a serial port available on the CN5 connector on the board (1 - TX, 4 - RX, 6 - GND).
+> So the problem would be: when kernel boot up, the usecount cat
+> from clk tree is 0, but the clk gates actually is enabled in
+> hardware register, it will confuse user and bring unnecessary power
+> consumption.
 > 
-
-> The only functionality still not implemented is the bi-color led on
-> the front panel (status). Pins mpp22 and mpp23 control this
-> led. Setting mpp22 to high and mpp23 to low results in orange
-> color. Setting mpp22 to low and mpp23 to high results in blue color.
-
-Any thoughts how you are going to handle this? Can you have both blue
-and orange at the same time be setting both high? Or are both then
-off?
-
-> The third led is wired to show the SATA activity on the two drives.
+> This patch adds .disable_unused callback and using hardware register
+> check for .is_enabled callback of shared nodes to handle such scenario
+> in late phase of kernel boot up, then the hardware status will match the
+> clk tree info.
 > 
-> Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
-> ---
->  arch/arm/boot/dts/Makefile            |    1 +
->  arch/arm/boot/dts/kirkwood-nas220.dts |  182 +++++++++++++++++++++++++++++++++
->  2 files changed, 183 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-nas220.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 38c89ca..8b9ad1d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -132,6 +132,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
->  	kirkwood-lsxhl.dtb \
->  	kirkwood-mplcec4.dtb \
->  	kirkwood-mv88f6281gtw-ge.dtb \
-> +	kirkwood-nas220.dtb \
->  	kirkwood-net2big.dtb \
->  	kirkwood-net5big.dtb \
->  	kirkwood-netgear_readynas_duo_v2.dtb \
-> diff --git a/arch/arm/boot/dts/kirkwood-nas220.dts b/arch/arm/boot/dts/kirkwood-nas220.dts
-> new file mode 100644
-> index 0000000..1de2ac3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-nas220.dts
-> @@ -0,0 +1,182 @@
-> +/*
-> + * Device Tree file for Seagate BlackArmor NAS220
-> + *
-> + * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-Gregory is in the process of changing the license for the Marvell
-Armada SoCs. He is adding X11 license as well, so making it easier for
-other systems to reuse the DT blob. I want to see how easy it goes
-with Armada, but we may also do the same for Kirkwood sometime in the
-future. So maybe you can think about this and follow the discussion.
-
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include "kirkwood.dtsi"
-> +#include "kirkwood-6192.dtsi"
-> +
-> +/ {
-> +	model = "Seagate NAS 220";
-> +	compatible = "seagate,nas220", "marvell,kirkwood-88f6192", "marvell,kirkwood";
-> +
-> +	memory { /* 128 MB */
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x8000000>;
-> +	};
-> +
-> +        chosen {
-> +                bootargs = "console=ttyS0,115200n8";
-> +		stdout-path = &uart0;
-> +        };
-
-It looks like there is a mix of spaces and tabs. Please only use tabs
-in this file.
-
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pinctrl-0 = < &pmx_uart0
-> +				&pmx_button_reset
-> +				&pmx_button_power
-> +				>;
-> +			pinctrl-names = "default";
-> +
-> +                        pmx_act_sata0: pmx-act-sata0 {
-> +                                marvell,pins = "mpp15";
-> +                                marvell,function = "sata0";
-> +                        };
-> +                        pmx_act_sata1: pmx-act-sata1 {
-> +                                marvell,pins = "mpp16";
-> +                                marvell,function = "sata1";
-> +                        };
-> +                        pmx_power_sata0: pmx-power-sata0 {
-> +                                marvell,pins = "mpp24";
-> +                                marvell,function = "gpio";
-> +                        };
-> +                        pmx_power_sata1: pmx-power-sata1 {
-> +                                marvell,pins = "mpp28";
-> +                                marvell,function = "gpio";
-> +                        };
-> +                        pmx_button_reset: pmx-button-reset {
-> +                                marvell,pins = "mpp29";
-> +                                marvell,function = "gpio";
-> +                        };
-> +                        pmx_button_power: pmx-button-power {
-> +                                marvell,pins = "mpp26";
-> +                                marvell,function = "gpio";
-> +                        };
-> +		};
-> +
-> +		serial at 12000 {
-> +			status = "okay";
-> +		};
-> +
-> +                sata at 80000 {
-> +                        nr-ports = <2>;
-> +                        status = "okay";
-> +                };
-> +
-> +		i2c at 11000 {
-> +			status = "okay";
-> +			adt7476: adt7476a at 2e {
-> +				compatible = "adi,adt7476";
-> +				reg = <0x2e>;
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_poweroff {
-> +		compatible = "gpio-poweroff";
-> +		gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +
-> +		button at 1{
-> +			label = "Reset push button";
-> +			linux,code = <KEY_POWER>;
-> +			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-> +		};
-> +		button at 2{
-> +			label = "Power push button";
-> +			linux,code = <KEY_SLEEP>;
-> +			gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +
-> +		blue-power {
-> +			label = "nas220:blue:power";
-> +			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
-> +
-> +        regulators {
-> +                compatible = "simple-bus";
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +                pinctrl-0 = <&pmx_power_sata0 &pmx_power_sata1>;
-> +                pinctrl-names = "default";
-> +
-> +                sata0_power: regulator at 1 {
-> +                        compatible = "regulator-fixed";
-> +                        reg = <1>;
-> +                        regulator-name = "SATA0 Power";
-> +                        regulator-min-microvolt = <5000000>;
-> +                        regulator-max-microvolt = <5000000>;
-> +                        enable-active-high;
-> +                        regulator-always-on;
-> +                        regulator-boot-on;
-> +                        gpio = <&gpio0 24 0>;
-> +                };
-> +
-> +                sata1_power: regulator at 2 {
-> +                        compatible = "regulator-fixed";
-> +                        reg = <2>;
-> +                        regulator-name = "SATA1 Power";
-> +                        regulator-min-microvolt = <5000000>;
-> +                        regulator-max-microvolt = <5000000>;
-> +                        enable-active-high;
-> +                        regulator-always-on;
-> +                        regulator-boot-on;
-> +                        gpio = <&gpio0 28 0>;
-> +                };
-> +        };
-> +};
-> +
-> +&nand {
-> +	status = "okay";
-> +	partition at 0 {
-> +		label = "uboot";
-> +		reg = <0x0 0xa0000>;
-> +		read-only;
-> +	};
-> +
-> +	partition at a0000 {
-> +		label = "env";
-> +		reg = <0xa0000 0x010000>;
-> +	};
-
-Is there supposed to be a gap here?
-
-> +
-> +	partition at c0000 {
-> +		label = "uimage";
-> +		reg = <0xc0000 0x500000>;
-> +	};
-> +
-> +	partition at 5c0000 {
-> +		label = "rootfs";
-> +		reg = <0x5c0000 0x1a40000>;
-> +	};
-> +};
-> +
-> +&mdio {
-> +        status = "okay";
-> +        ethphy0: ethernet-phy at 8 {
-> +                reg = <8>;
-> +        };
-> +};
-> +
-> +&eth0 {
-> +        status = "okay";
-> +        ethernet0-port at 0 {
-> +                phy-handle = <&ethphy0>;
-> +        };
-> +};
-> +
-> -- 
-
-  Andrew
+Applied, thanks.
