@@ -1,74 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Dec 2014 09:20:15 +0100
-Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
- disable failure due to domain being gated
-In-Reply-To: <7h8ui8h7n9.fsf@deeprootsystems.com>
-References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
- <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
- <7hlhmfo1b0.fsf@deeprootsystems.com> <7h8ui8h7n9.fsf@deeprootsystems.com>
-Message-ID: <1418718015.28527.4.camel@AMDC1943>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 16 Dec 2014 09:19:22 +0100
+Subject: [PATCH 1/2] ARM: dts: kirkwood: enable phy driver for SATA
+ controller on 88f6192
+In-Reply-To: <20141215203724.GA22936@anne>
+References: <20141215203724.GA22936@anne>
+Message-ID: <20141216081922.GA1450@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-12-15 at 14:26 -0800, Kevin Hilman wrote:
-> Kevin Hilman <khilman@kernel.org> writes:
+On Mon, Dec 15, 2014 at 09:37:24PM +0100, Evgeni Dobrev wrote:
+> This patch enables the phy drivers for the SATA controller on Marvell's 88f6192. Without them it is not possible to use SATA drives attached to this processor.
 > 
-> > Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
-> >
-> >> On 09/12/14 13:59, Krzysztof Kozlowski wrote:
-> >>> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
-> >>>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
-> >>>> > clock for this block (from main clock domain) 'mau_epll' is gated then
-> >>>> > any read or write to audss registers will block.
-> >>>> > 
-> >>>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
-> >>>> > after introducing runtime PM to pl330 DMA driver. After that commit the
-> >>>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
-> >>>> > were no more users of mau_epll.
-> >>>> > 
-> >>>> > The system hang on one of steps:
-> >>>> > 1. Disabling unused clocks from audss block.
-> >>>> > 2. During audss GPIO setup (just before probing i2s0 because
-> >>>> >    samsung_pinmux_setup() tried to access memory from audss block which was
-> >>>> >    gated.
-> >>>> > 
-> >>>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
-> >>>> > 
-> >>>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >>>> > ---
-> >>>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
-> >>>> >  1 file changed, 28 insertions(+), 1 deletion(-)
-> >>>
-> >>> Sorry for pinging so quick but merge window is open and it looks like
-> >>> booting Exynos542x boards will be broken (because pl330 will no longer
-> >>> hold adma clock enabled so whole audss domain will be gated).
-> >>> 
-> >>> This is a non-intrusive workaround for that issue, as wanted by
-> >>> Sylwester:
-> >>> https://lkml.org/lkml/2014/12/5/223
-> >>> 
-> >>> Any comments on this?
-> >>
-> >> The patch looks OK to me, it would be good though if someone else
-> >> has confirmed it fixes the bug. I don't have any clock patches queued
-> >> at the moment. Perhaps you could apply it directly, Mike ?
-> >
-> > I confirm it fixes the boot hang in linux-next (next-20141210) on my
-> > exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
-> > exynos_defconfig and multi_v7_defconfig.
-> >
-> > Tested-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+This should also go to stable.
+
+     Andrew
+
+
+> ---
+>  arch/arm/boot/dts/kirkwood-6192.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> What's the status of this patch?  linux-next is still broken for several
-> Exynos5 platforms without this fix.
-
-I believe not only next is broken but also current mainline because
-runtime PM for pl330 was merged yesterday...
-
-The patch received two tested-bys (Kevin's and Javier's) and Sylwester's
-ack.
-
-Mike, could you pick the patch and send it to Linus after rc1?
-
-Best regards,
-Krzysztof
+> diff --git a/arch/arm/boot/dts/kirkwood-6192.dtsi b/arch/arm/boot/dts/kirkwood-6192.dtsi
+> index dd81508..bed2dec 100644
+> --- a/arch/arm/boot/dts/kirkwood-6192.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-6192.dtsi
+> @@ -66,6 +66,8 @@
+>  			interrupts = <21>;
+>  			clocks = <&gate_clk 14>, <&gate_clk 15>;
+>  			clock-names = "0", "1";
+> +                        phys = <&sata_phy0>, <&sata_phy1>;
+> +                        phy-names = "port0", "port1";
+>  			status = "disabled";
+>  		};
+>  
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
