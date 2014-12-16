@@ -1,124 +1,107 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 16 Dec 2014 11:03:55 +0100 (CET)
-Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
-In-Reply-To: <20141216100715.57baeb65@bbrezillon>
-References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
- <2662748.NJbkr6jW7r@vostro.rjw.lan> <3542278.8lcJeXLMFm@vostro.rjw.lan>
- <20141216100715.57baeb65@bbrezillon>
-Message-ID: <alpine.DEB.2.11.1412161013570.17382@nanos>
+From: uwe@kleine-koenig.org (=?windows-1252?Q?Uwe_Kleine-K=F6nig?=)
+Date: Tue, 16 Dec 2014 11:08:57 +0100
+Subject: [PATCHv1 1/3] rtc: rtc-isl12057: add alarm support to Intersil
+ ISL12057 RTC driver
+In-Reply-To: <db1f0eecbdc5062a61232b99699ecfa6e0a2a956.1418687005.git.arno@natisbad.org>
+References: <cover.1418687005.git.arno@natisbad.org>
+ <db1f0eecbdc5062a61232b99699ecfa6e0a2a956.1418687005.git.arno@natisbad.org>
+Message-ID: <549004B9.2060402@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Dec 2014, Boris Brezillon wrote:
-> On Mon, 15 Dec 2014 23:48:14 +0100
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
-> > Or even set IRFQ_NO_SUSPEND for all of the users of this interrupt and add
-> > comments to them explaining why it is set.
-> Actually I thought about adding a new flag (let's call it
-> IRQF_DONT_COMPLAIN for now ;-)) to remove those warnings (or specifying
-> IRFQ_NO_SUSPEND in all peripherals sharing the IRQ with the init
-> timer), but after discussing the problem with Thomas I decided to go
-> for the approach described in my cover letter.
+Hello Arnaud,
+
+On 12/16/2014 12:54 AM, Arnaud Ebalard wrote:
 > 
-> Thomas, correct me if I'm wrong, but your concern about the
-> IRQF_DONT_COMPLAIN approach was that it was leaving interrupt handlers
-> of suspended devices in an active state (meaning that they could be
-> called in "suspend" or "early resume" state), and such devices might
-> not properly handle interrupts while being in a suspended state (clocks
-> and regulators disabled).
-> In at91 specific case this should not be an issue thought.
+> This patch adds alarm support to Intersil ISL12057 driver. The chip
+> supports two separate alarms:
 > 
-> We have the same problem when setting IRFQ_NO_SUSPEND on all peripherals
-> sharing the IRQ with the init timer.
-> Moreover, I'd like to keep the core automatically disabling the IRQ when
-> the PMC, RTC, watchdog or DBGU (UART) peripherals have their own
-> dedicated IRQ (which is the case on Atmel sama5 SoCs).
-> This implies testing for the SoC version in each of these drivers and
-> adapting the request_irq call accordingly.
+>  - Alarm1: works up to one month in the future and accurate to the
+>            second, associated w/ IRQ#2 pin
+>  - Alarm2: works up to one month in the future and accurate to the
+>            minute, associated w/ IRQ#1 or IRQ#2 pin (configuable).
+> 
+> This patch only adds support for Alarm1 which allows to configure
+> the chip to generate an interrupt on IRQ#2 pin when current time
+> matches the alarm.
+> 
+> This patch was tested on a Netgear ReadyNAS 102 after some soldering
+> of the IRQ#2 pin of the RTC chip to a MPP line of the SoC (the one
+> used usually handles the reset button). The test was performed using
+> a modified .dts file reflecting this change (see below) and rtc-test.c
+> program available in Documentation/rtc.txt. This test program ran as
+> expected, which validates alarm supports, including interrupt support.
+> 
+> As a side note, the ISL12057 remains in the list of trivial devices,
+> i.e. no specific DT binding being added by this patch: i2c core
+> automatically handles extraction of IRQ line info from .dts file. For
+> instance, if one wants to reference the interrupt line for the
+> alarm in its .dts file, adding interrupt and interrupt-parent
+> properties works as expected (if the primary function of your
+> interrupt pin is not GPIO, you will need some additional pinctrl
+> properties):
+> 
+>           isl12057: isl12057 at 68 {
+>                   compatible = "isil,isl12057";
+>                   interrupt-parent = <&gpio0>;
+>                   interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
+>                   reg = <0x68>;
+>           };
+> 
+> FWIW, if someone is looking for a way to test alarm support this can
+> be done in the following way:
+> 
+>     # echo `date '+%s' -d '+ 1 minutes'` > /sys/class/rtc/rtc0/wakealarm
+>     # shutdown -h now
+> 
+> With the commands above, after a minute, the system comes back to life.
+This paragraph belongs into the 2nd patch, right?
 
-But still all those drivers must disable the interrupts at the device
-level on suspend, right?
+> diff --git a/drivers/rtc/rtc-isl12057.c b/drivers/rtc/rtc-isl12057.c
+> index 6e1fcfb5d7e6..3ec73ad7f2d8 100644
+> --- a/drivers/rtc/rtc-isl12057.c
+> +++ b/drivers/rtc/rtc-isl12057.c
+> @@ -79,8 +79,10 @@
+>  #define ISL12057_MEM_MAP_LEN	0x10
+>  
+>  struct isl12057_rtc_data {
+> +	struct rtc_device *rtc;
+>  	struct regmap *regmap;
+>  	struct mutex lock;
+> +	int irq;
+interrupts are usually unsigned values. Hmm, I see that it simplifies a
+bit here, as the function to determine the irq returns the actual value
+or a negative error. As there would be problems anyhow for irq values >
+INT_MAX probably this comment isn't that important.
 
-> Thomas, Rafael, if both of you think I should either introduce a new
-> flag or specify IRFQ_NO_SUSPEND in all shared IRQ users, then I can go
-> for one of this solution.
+> +/*
+> + * Note: as we only read from device and do not perform any update, there is
+> + * no need for an equivalent function which would try and get driver's main
+> + * lock. Here, it is safe for everyone if we just use regmap internal lock
+> + * on the device when reading.
+> + */
+> +static int _isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  {
+>  	struct isl12057_rtc_data *data = dev_get_drvdata(dev);
+>  	u8 regs[ISL12057_RTC_SEC_LEN];
+>  	unsigned int sr;
+>  	int ret;
+>  
+> -	mutex_lock(&data->lock);
+>  	ret = regmap_read(data->regmap, ISL12057_REG_SR, &sr);
+>  	if (ret) {
+>  		dev_err(dev, "%s: unable to read oscillator status flag (%d)\n",
+> @@ -187,8 +222,6 @@ static int isl12057_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  			__func__, ret);
+>  
+>  out:
+> -	mutex_unlock(&data->lock);
+> -
+>  	if (ret)
+>  		return ret;
+>  
 
-All of this really sucks. What about the following?
+Is this locking update worth a separate change?
 
-Install the timer interrupt as a demultiplexing interrupt.
-
-Create a pseudo interrupt chip, which essentially does nothing, but
-keeps track of the disabled state. Install handle_simple_irq as
-handler for those "demux" interrupts. Then have:
-
-struct data {
-       u32 unmasked;
-       u32 demuxavail;
-};
-
-static struct data demuxdata;
-
-At init time you know how many of these demux interrupts are
-available. So you set the demuxdata up, e.g. for 3 interrupts
-connected:
-
-	demuxdata.demuxavail = 0x07;
-
-You install a pointer to demuxdata for all demux interrupts as irq
-chip data and the simple handler.
-
-And in the mask/unmask handlers you do:
-
-mask(irqdata) {
-       struct data *d = irq_data_get_irq_chip_data(irqdata);
-
-       d->unmasked &= ~irqdata->mask;
-       if (!d->unmasked)
-       	  mask_demux_irq();
-}
-
-unmask(irqdata) {
-       struct data *d = irq_data_get_irq_chip_data(irqdata);
-
-       if (!d->unmasked)
-       	  unmask_demux_irq();
-       d->mask |= irqdata->mask;
-}
-
-Now the demuxhandler does:
-
-    mask = demuxdata.demuxavail & demuxdata.unmasked;
-
-    for_each_bit(bit, mask)
-    	generic_handle_irq(demuxirq_start + bit);
-
-So the handler wont be invoked for masked bits and handle_simple_irq()
-will not call the device handler if the interrupt is marked disabled.
-
-So in the suspend case all "demux" interrupts except those which are
-marked NOSUSPEND are marked disabled and the handlers wont be invoked.
-
-Locking and other details omitted.
-
-That avoids the whole flag, action, whatever business for the price of
-a really trivial demux mechanism. Everything just works. Even the irq
-storm detector will just disable the parent interrupt once all
-handlers return NONE often enough.
-
-Your device drivers just work fine, as long as they disable the
-interrupt at the device level on suspend, but they have to do that in
-any case. Aside of that detail they are completely oblivous whether
-they are connected to this "demux" chip or to a seperate irq line on
-other devices.
-
-> BTW, have you heard about other platforms/drivers impacted by this
-> WARN_ON addition, and if so how did they solve the problem ?
-
-Nothing so far. Seems not many hardware folks are that crazy.
-
-But I have no objections to make this generic infrastructure as long
-as it can be compiled out.
-
-Thanks,
-
-	tglx
+Best regards
+Uwe
