@@ -1,33 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Dec 2014 23:05:11 +0000
-Subject: [PATCHv1 1/3] rtc: rtc-isl12057: add alarm support to Intersil
- ISL12057 RTC driver
-In-Reply-To: <5490A873.1000706@kleine-koenig.org>
-References: <cover.1418687005.git.arno@natisbad.org>
- <db1f0eecbdc5062a61232b99699ecfa6e0a2a956.1418687005.git.arno@natisbad.org>
- <549004B9.2060402@kleine-koenig.org> <87vblbdcii.fsf@natisbad.org>
- <5490A873.1000706@kleine-koenig.org>
-Message-ID: <20141216230511.GV11764@sirena.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 17 Dec 2014 01:24:42 +0200
+Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
+ dt-specific callback instead of initcall
+In-Reply-To: <1921117.BkWucCVOZq@wuerfel>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <24892200.rsOlz53AM6@avalon> <1921117.BkWucCVOZq@wuerfel>
+Message-ID: <1652354.DLhQnkm7xS@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 10:47:31PM +0100, Uwe Kleine-K?nig wrote:
-> On 12/16/2014 01:07 PM, Arnaud Ebalard wrote:
+Hi Arnd,
 
-> > no, it is for this patch. I did a specific commit message for the second
-> > patch. IIRC, it also has the example if it was the meaning of your
-> > question.
+On Tuesday 16 December 2014 13:10:59 Arnd Bergmann wrote:
+> On Tuesday 16 December 2014 14:07:11 Laurent Pinchart wrote:
+> > On Tuesday 16 December 2014 12:40:28 Arnd Bergmann wrote:
+> > > On Monday 15 December 2014 18:13:23 Will Deacon wrote:
+> > > >>>> IOMMUs are not as low-level as system interrupt controllers or
+> > > >>>> system clocks. I'm beginning to agree with Thierry that they should
+> > > >>>> be treated as normal platform devices as they're not required
+> > > >>>> earlier than probe time of their bus master devices.
+> > > >>> 
+> > > >>> Well, I think you'd have to propose patches for discussion since I'm
+> > > >>> certainly not wed to the current approach; I just want something
+> > > >>> that allows of_{dma,iommu}_configure to run with the information it
+> > > >>> needs.
+> > > >> 
+> > > >> Do we need of_dma_configure() to run when the device is created, or
+> > > >> could we postpone it to just before probe time ?
+> > > > 
+> > > > I'm not sure I can answer that one... Arnd?
+> > > 
+> > > I believe we could postpone it to probe time, but I'd rather not.
+> > > The way I see the arguments in favor, we have mainly cosmetic arguments:
+> > > 
+> > > - Doing it at probe time would eliminate the ugly section magic hack
+> > > - iommu drivers could be implemented as loadable modules with platform
+> > >   drivers, for consistency with most other drivers
+> > 
+> > The main argument, from my point of view, is that handling IOMMUs are
+> > normal platform devices allow using all the kernel infrastructure that
+> > depends on a struct device. The dev_* print helpers are nice to have, but
+> > what would make a big difference is the ability to use runtime PM.
+> 
+> Right, I agree that would be nice.
+> 
+> > > On the other hand, I see:
+> > > 
+> > > - DMA configuration is traditionally done at device creation time, and
+> > >   changing that is more likely to introduce bugs than leaving it
+> > >   where it is.
+> > > 
+> > > - On a lot of machines, the IOMMU is optional, and the probe function
+> > >   cannot know the difference between an IOMMU driver that is left out
+> > >   of the kernel and one that will be initialized later, using a fixed
+> > >   entry point for initializing the IOMMU makes the behavior consistent
+> > 
+> > I'm not advocating for IOMMU support being built as a loadable module. It
+> > might be nice from a development point of view, but that's about it.
+> 
+> We'd still have to deal with deferred probing, or with ordering the iommu
+> initcalls before the dma master initcalls in some other way, so the
+> problem is not that different from loadable modules. Do you have an idea
+> for how to solve that?
 
-> Is it usual that an rtc can wake up a machine from shutdown state? I
-> thought it isn't.
+If we forbid the IOMMU driver from being compiled as a module can't we just 
+rely on deferred probing ? The bus master driver will just be reprobed after 
+the IOMMU gets probed, like for other devices.
 
-It's fairly normal when the RTC is integrated into the PMIC - the PMIC
-is typically the component initiating power on so it's easy for it to do
-so.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141216/497941e6/attachment.sig>
+This could fail in case the IOMMU device permanently fails to probe. There 
+would be something very wrong in the system in that case, Enabling the bus 
+masters totally transparently without IOMMU support could not be such a good 
+idea.
+
+-- 
+Regards,
+
+Laurent Pinchart
