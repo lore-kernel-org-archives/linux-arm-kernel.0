@@ -1,48 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 12:40:28 +0100
-Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
- instead of initcall
-In-Reply-To: <20141215181323.GX20738@arm.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <4894156.QdIh4JzSl0@avalon> <20141215181323.GX20738@arm.com>
-Message-ID: <1681211.YVY9bd22gV@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Dec 2014 11:40:56 +0000
+Subject: [PATCH] arm/rpc: avoid static keyword removal via define
+In-Reply-To: <5490146A.3000408@de.ibm.com>
+References: <1418633287-5019-1-git-send-email-borntraeger@de.ibm.com>
+ <1418633287-5019-2-git-send-email-borntraeger@de.ibm.com>
+ <5490146A.3000408@de.ibm.com>
+Message-ID: <20141216114056.GP11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 December 2014 18:13:23 Will Deacon wrote:
-> > > > IOMMUs are not as low-level as system interrupt controllers or system
-> > > > clocks. I'm beginning to agree with Thierry that they should be treated
-> > > > as normal platform devices as they're not required earlier than probe
-> > > > time of their bus master devices.
-> > > 
-> > > Well, I think you'd have to propose patches for discussion since I'm
-> > > certainly not wed to the current approach; I just want something that
-> > > allows of_{dma,iommu}_configure to run with the information it needs.
+On Tue, Dec 16, 2014 at 12:15:54PM +0100, Christian Borntraeger wrote:
+> Am 15.12.2014 um 09:48 schrieb Christian Borntraeger:
+> > commit 4486b86368d7 ("[ARM] riscpc: fix decompressor font file handling")
+> > introduced Makefile magic to avoid building a file two times. Using
+> > -Dstatic= does break some assumptions on compiler.h that were introduced
+> > for READ_ONCE.
 > > 
-> > Do we need of_dma_configure() to run when the device is created, or could we 
-> > postpone it to just before probe time ?
+> > Lets just use sed on the copy instead of using a define.
+> > 
+> > Signed-off-by: Christian Borntraeger <borntraeger@de.ibm.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
 > 
-> I'm not sure I can answer that one... Arnd?
+> This fixed the linux-next build http://kisskb.ellerman.id.au/kisskb/target/1508/
+> Unless anybody complains, I will send the pull request for the access_once tree tomorrow and I have this patch applied on top.
 
-I believe we could postpone it to probe time, but I'd rather not.
-The way I see the arguments in favor, we have mainly cosmetic arguments:
+Please give me some time to look at this.
 
-- Doing it at probe time would eliminate the ugly section magic hack
-- iommu drivers could be implemented as loadable modules with platform
-  drivers, for consistency with most other drivers
-
-On the other hand, I see:
-
-- DMA configuration is traditionally done at device creation time, and
-  changing that is more likely to introduce bugs than leaving it
-  where it is.
-- On a lot of machines, the IOMMU is optional, and the probe function
-  cannot know the difference between an IOMMU driver that is left out
-  of the kernel and one that will be initialized later, using a fixed
-  entry point for initializing the IOMMU makes the behavior consistent
-
-There is a third option in theory, which is to only enable the IOMMU
-as part of dma_set_mask(). I've done that in the past on powerpc, but
-the new approach seems cleaner.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
