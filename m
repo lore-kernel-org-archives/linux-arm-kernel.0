@@ -1,61 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 16 Dec 2014 20:33:36 +0300
-Subject: [PATCH 2/2] ahci_xgene: Fix the dma state machine lockup for
- the ATA_CMD_PACKET PIO mode command.
-In-Reply-To: <1418748575-27301-3-git-send-email-stripathi@apm.com>
-References: <1418748575-27301-1-git-send-email-stripathi@apm.com>
- <1418748575-27301-3-git-send-email-stripathi@apm.com>
-Message-ID: <54906CF0.9010908@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Dec 2014 17:50:19 +0000
+Subject: [GIT PULL] arm64: fixes for -rc1
+Message-ID: <20141216175019.GC2260@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Linus,
 
-On 12/16/2014 07:49 PM, Suman Tripathi wrote:
+Given that my availability next week is likely to be poor, here are three
+arm64 fixes to resolve some issues introduced by features merged last
+week. I was going to wait until -rc1, but it doesn't make much sense to
+sit on fixes. Please pull.
 
-> This patch addresses the issue with ATA_CMD_PACKET pio mode
-> command for enumeration and device detection with ATAPI devices.It is the
-> same issue as in patch
+Thanks,
 
-> www.spinics.net/lists/linux-ide/msg49092.html
+Will
 
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->   drivers/ata/ahci_xgene.c | 12 +++++++-----
->   1 file changed, 7 insertions(+), 5 deletions(-)
+--->8
 
-> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-> index 0ffd3c9..9730907 100644
-> --- a/drivers/ata/ahci_xgene.c
-> +++ b/drivers/ata/ahci_xgene.c
-> @@ -125,10 +125,11 @@ static int xgene_ahci_restart_engine(struct ata_port *ap)
->    * xgene_ahci_qc_issue - Issue commands to the device
->    * @qc: Command to issue
->    *
-> - * Due to Hardware errata for IDENTIFY DEVICE command, the controller cannot
-> - * clear the BSY bit after receiving the PIO setup FIS. This results in the dma
-> - * state machine goes into the CMFatalErrorUpdate state and locks up. By
-> - * restarting the dma engine, it removes the controller out of lock up state.
-> + * Due to Hardware errata for IDENTIFY DEVICE command and COMMAND PACKET
+The following changes since commit eb8a653137b7e74f7cdc01f814eb9d094a65aed9:
 
-    Just PACKET.
+  arm64: remove the unnecessary arm64_swiotlb_init() (2014-12-05 12:19:52 +0000)
 
-> + * command of ATAPI protocol set, the controller cannot clear the BSY bit
-> + * after receiving the PIO setup FIS. This results in the dma state machine
+are available in the git repository at:
 
-    DMA.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
 
-> + * goes into the CMFatalErrorUpdate state and locks up. By restarting the
+for you to fetch changes up to fb59d007a0e44e2304e4fc8cf5c20b6fda7890f3:
 
-    s/goes/going/.
+  arm64: mm: dump: don't skip final region (2014-12-11 12:08:07 +0000)
 
-> + * dma engine, it removes the controller out of lock up state.
+----------------------------------------------------------------
+arm64 fixes:
 
-    DMA again.
+Fix some fallout introduced during the merge window:
+ - Build failure when PM_SLEEP is disabled but CPU_IDLE is enabled
+ - Compiler warning from page table dumper w/ 48-bit VAs
+ - Erroneous page table truncation in reported dump
 
->    */
->   static unsigned int xgene_ahci_qc_issue(struct ata_queued_cmd *qc)
->   {
-[...]
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      arm64: psci: Fix build breakage without PM_SLEEP
 
-MBR, Sergei
+Mark Rutland (2):
+      arm64: mm: dump: fix shift warning
+      arm64: mm: dump: don't skip final region
+
+ arch/arm64/kernel/psci.c | 2 ++
+ arch/arm64/mm/dump.c     | 5 +----
+ 2 files changed, 3 insertions(+), 4 deletions(-)
