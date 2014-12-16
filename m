@@ -1,299 +1,69 @@
-From: evgeni@studio-punkt.com (Evgeni Dobrev)
-Date: Tue, 16 Dec 2014 17:37:14 +0100
-Subject: [PATCH 2/2] ARM: dts: kirkwood: add dts support for Seagate
- BlackArmor NAS220
-In-Reply-To: <20141216085645.GB1450@lunn.ch>
-References: <20141215203855.GA28940@anne>
- <20141216085645.GB1450@lunn.ch>
-Message-ID: <20141216163714.GE20170@anne>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 16 Dec 2014 11:39:51 -0500
+Subject: [PATCH 1/2] ARM: omap5/dra7xx: Fix frequency typos.
+In-Reply-To: <54903C6A.5070807@ti.com>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <5f7d841d41f6485022e07a22c332d3c8ea985bfa.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <54903C6A.5070807@ti.com>
+Message-ID: <20141216163951.GM24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Tue, Dec 16, 2014 at 09:56:45AM +0100, Andrew Lunn wrote:
-> On Mon, Dec 15, 2014 at 09:38:55PM +0100, Evgeni Dobrev wrote:
-> > This patch adds support for Seagate BlackArmor NAS220.
-> 
-> Hi Evgeni
-> 
-> Thanks for the patch. It looks good apart from a few minor comments.
-> 
-> Please could you also Cc: the mvebu maintainers, otherwise you patch
-> might net be seen by the right people. I added them.
-> 
-
-Thank you!
-
+On Tue, Dec 16, 2014 at 08:06:34AM -0600, Nishanth Menon wrote:
+> On 12/12/2014 04:08 PM, Lennart Sorensen wrote:
+> > The switch statement of the possible list of SYSCLK1 frequencies is
+> > missing a 0 in 4 out of the 7 frequencies.
 > > 
-> > The Seagate BlackArmor NAS 220 is a NAS system based on Marvell 88f6192. It has 32MB NAND and 128MB DRAM. It has two SATA slots, one Gigabit Ethernet port, two USB 2.0 ports, two buttons and three LEDs. There is a serial port available on the CN5 connector on the board (1 - TX, 4 - RX, 6 - GND).
-> > 
-> 
-> > The only functionality still not implemented is the bi-color led on
-> > the front panel (status). Pins mpp22 and mpp23 control this
-> > led. Setting mpp22 to high and mpp23 to low results in orange
-> > color. Setting mpp22 to low and mpp23 to high results in blue color.
-> 
-> Any thoughts how you are going to handle this? Can you have both blue
-> and orange at the same time be setting both high? Or are both then
-> off?
-> 
-
-The LED can be either one of the two colors or off. Swapping the polarity 
-on the two LED pins changes the color.
-
-I am currently playing with the idea to create a multicolor LED kernel 
-driver which is being controlled via GPIOs, but I still have not found 
-the proper abstraction for it. The point is, that even though this 
-functionality must currently be handled by user space (some
-combination of sysfs writes and a shell script) at the moment, the rest
-of the system is usable.
-
-> > The third led is wired to show the SATA activity on the two drives.
-> > 
-> > Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
+> > Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
 > > ---
-> >  arch/arm/boot/dts/Makefile            |    1 +
-> >  arch/arm/boot/dts/kirkwood-nas220.dts |  182 +++++++++++++++++++++++++++++++++
-> >  2 files changed, 183 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-nas220.dts
+> >  arch/arm/mach-omap2/timer.c |    8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
 > > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 38c89ca..8b9ad1d 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -132,6 +132,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
-> >  	kirkwood-lsxhl.dtb \
-> >  	kirkwood-mplcec4.dtb \
-> >  	kirkwood-mv88f6281gtw-ge.dtb \
-> > +	kirkwood-nas220.dtb \
-> >  	kirkwood-net2big.dtb \
-> >  	kirkwood-net5big.dtb \
-> >  	kirkwood-netgear_readynas_duo_v2.dtb \
-> > diff --git a/arch/arm/boot/dts/kirkwood-nas220.dts b/arch/arm/boot/dts/kirkwood-nas220.dts
-> > new file mode 100644
-> > index 0000000..1de2ac3
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-nas220.dts
-> > @@ -0,0 +1,182 @@
-> > +/*
-> > + * Device Tree file for Seagate BlackArmor NAS220
-> > + *
-> > + * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
-> > + *
-> > + * Licensed under GPLv2 or later.
-> > + */
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index 4f61148..fb0cb2b 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -513,11 +513,11 @@ static void __init realtime_counter_init(void)
+> >  	rate = clk_get_rate(sys_clk);
+> >  	/* Numerator/denumerator values refer TRM Realtime Counter section */
+> >  	switch (rate) {
+> > -	case 1200000:
+> > +	case 12000000:
+> >  		num = 64;
+> >  		den = 125;
+> >  		break;
+> > -	case 1300000:
+> > +	case 13000000:
+> >  		num = 768;
+> >  		den = 1625;
+> >  		break;
+> > @@ -529,11 +529,11 @@ static void __init realtime_counter_init(void)
+> >  		num = 192;
+> >  		den = 625;
+> >  		break;
+> > -	case 2600000:
+> > +	case 26000000:
+> >  		num = 384;
+> >  		den = 1625;
+> >  		break;
+> > -	case 2700000:
+> > +	case 27000000:
+> >  		num = 256;
+> >  		den = 1125;
+> >  		break;
+> > 
 > 
-> Gregory is in the process of changing the license for the Marvell
-> Armada SoCs. He is adding X11 license as well, so making it easier for
-> other systems to reuse the DT blob. I want to see how easy it goes
-> with Armada, but we may also do the same for Kirkwood sometime in the
-> future. So maybe you can think about this and follow the discussion.
 > 
-
-I will do that.
-
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include <dt-bindings/gpio/gpio.h>
-> > +#include <dt-bindings/input/input.h>
-> > +#include "kirkwood.dtsi"
-> > +#include "kirkwood-6192.dtsi"
-> > +
-> > +/ {
-> > +	model = "Seagate NAS 220";
-> > +	compatible = "seagate,nas220", "marvell,kirkwood-88f6192", "marvell,kirkwood";
-> > +
-> > +	memory { /* 128 MB */
-> > +		device_type = "memory";
-> > +		reg = <0x00000000 0x8000000>;
-> > +	};
-> > +
-> > +        chosen {
-> > +                bootargs = "console=ttyS0,115200n8";
-> > +		stdout-path = &uart0;
-> > +        };
+> Also please add:
+> Fixes: fa6d79d27614 ("ARM: OMAP: Add initialisation for the real-time
+> counter")
 > 
-> It looks like there is a mix of spaces and tabs. Please only use tabs
-> in this file.
+> With that,
 > 
+> Acked-by: Nishanth Menon <nm@ti.com>
 
-I will fix this.
+Should I send a new version with that added, or will someone else handle
+doing that bit?
 
-> > +
-> > +	ocp at f1000000 {
-> > +		pinctrl: pin-controller at 10000 {
-> > +			pinctrl-0 = < &pmx_uart0
-> > +				&pmx_button_reset
-> > +				&pmx_button_power
-> > +				>;
-> > +			pinctrl-names = "default";
-> > +
-> > +                        pmx_act_sata0: pmx-act-sata0 {
-> > +                                marvell,pins = "mpp15";
-> > +                                marvell,function = "sata0";
-> > +                        };
-> > +                        pmx_act_sata1: pmx-act-sata1 {
-> > +                                marvell,pins = "mpp16";
-> > +                                marvell,function = "sata1";
-> > +                        };
-> > +                        pmx_power_sata0: pmx-power-sata0 {
-> > +                                marvell,pins = "mpp24";
-> > +                                marvell,function = "gpio";
-> > +                        };
-> > +                        pmx_power_sata1: pmx-power-sata1 {
-> > +                                marvell,pins = "mpp28";
-> > +                                marvell,function = "gpio";
-> > +                        };
-> > +                        pmx_button_reset: pmx-button-reset {
-> > +                                marvell,pins = "mpp29";
-> > +                                marvell,function = "gpio";
-> > +                        };
-> > +                        pmx_button_power: pmx-button-power {
-> > +                                marvell,pins = "mpp26";
-> > +                                marvell,function = "gpio";
-> > +                        };
-> > +		};
-> > +
-> > +		serial at 12000 {
-> > +			status = "okay";
-> > +		};
-> > +
-> > +                sata at 80000 {
-> > +                        nr-ports = <2>;
-> > +                        status = "okay";
-> > +                };
-> > +
-> > +		i2c at 11000 {
-> > +			status = "okay";
-> > +			adt7476: adt7476a at 2e {
-> > +				compatible = "adi,adt7476";
-> > +				reg = <0x2e>;
-> > +			};
-> > +		};
-> > +	};
-> > +
-> > +	gpio_poweroff {
-> > +		compatible = "gpio-poweroff";
-> > +		gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
-> > +	};
-> > +
-> > +	gpio_keys {
-> > +		compatible = "gpio-keys";
-> > +
-> > +		button at 1{
-> > +			label = "Reset push button";
-> > +			linux,code = <KEY_POWER>;
-> > +			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-> > +		};
-> > +		button at 2{
-> > +			label = "Power push button";
-> > +			linux,code = <KEY_SLEEP>;
-> > +			gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
-> > +		};
-> > +	};
-> > +
-> > +	gpio-leds {
-> > +		compatible = "gpio-leds";
-> > +
-> > +		blue-power {
-> > +			label = "nas220:blue:power";
-> > +			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-> > +			linux,default-trigger = "default-on";
-> > +		};
-> > +	};
-> > +
-> > +        regulators {
-> > +                compatible = "simple-bus";
-> > +                #address-cells = <1>;
-> > +                #size-cells = <0>;
-> > +                pinctrl-0 = <&pmx_power_sata0 &pmx_power_sata1>;
-> > +                pinctrl-names = "default";
-> > +
-> > +                sata0_power: regulator at 1 {
-> > +                        compatible = "regulator-fixed";
-> > +                        reg = <1>;
-> > +                        regulator-name = "SATA0 Power";
-> > +                        regulator-min-microvolt = <5000000>;
-> > +                        regulator-max-microvolt = <5000000>;
-> > +                        enable-active-high;
-> > +                        regulator-always-on;
-> > +                        regulator-boot-on;
-> > +                        gpio = <&gpio0 24 0>;
-> > +                };
-> > +
-> > +                sata1_power: regulator at 2 {
-> > +                        compatible = "regulator-fixed";
-> > +                        reg = <2>;
-> > +                        regulator-name = "SATA1 Power";
-> > +                        regulator-min-microvolt = <5000000>;
-> > +                        regulator-max-microvolt = <5000000>;
-> > +                        enable-active-high;
-> > +                        regulator-always-on;
-> > +                        regulator-boot-on;
-> > +                        gpio = <&gpio0 28 0>;
-> > +                };
-> > +        };
-> > +};
-> > +
-> > +&nand {
-> > +	status = "okay";
-> > +	partition at 0 {
-> > +		label = "uboot";
-> > +		reg = <0x0 0xa0000>;
-> > +		read-only;
-> > +	};
-> > +
-> > +	partition at a0000 {
-> > +		label = "env";
-> > +		reg = <0xa0000 0x010000>;
-> > +	};
-> 
-> Is there supposed to be a gap here?
-> 
-
-I mirror the layout of the stock firmware here. Actually I was not sure
-how to handle the NAND layout. On one hand it has some merit if I keep
-the original layout (and a lot of the *plug device trees do it), 
-so that the system can be booted with it. On the other hand one can
-pass the NAND layout relevant to his installation via the bootloader 
-(either updating the DT blob, or via cmdline). Now that you ask I would 
-prefer to remove the layout and leave it for the user to decide.
-
-What would you recommend?
-
-> > +
-> > +	partition at c0000 {
-> > +		label = "uimage";
-> > +		reg = <0xc0000 0x500000>;
-> > +	};
-> > +
-> > +	partition at 5c0000 {
-> > +		label = "rootfs";
-> > +		reg = <0x5c0000 0x1a40000>;
-> > +	};
-> > +};
-> > +
-> > +&mdio {
-> > +        status = "okay";
-> > +        ethphy0: ethernet-phy at 8 {
-> > +                reg = <8>;
-> > +        };
-> > +};
-> > +
-> > +&eth0 {
-> > +        status = "okay";
-> > +        ethernet0-port at 0 {
-> > +                phy-handle = <&ethphy0>;
-> > +        };
-> > +};
-> > +
-> > -- 
-> 
->   Andrew
-> --
-
-Thanks for reviewing!
-
-evgeni
+-- 
+Len Sorensen
