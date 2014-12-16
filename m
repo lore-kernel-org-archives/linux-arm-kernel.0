@@ -1,78 +1,71 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Dec 2014 11:20:41 +0100
-Subject: [PATCH] ARM: at91: board-dt-sama5: add phy_fixup to override
- NAND_Tree which improperly strapp-in during the reset period.
-In-Reply-To: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
-References: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <54900779.9030509@atmel.com>
+From: richard@nod.at (Richard Weinberger)
+Date: Tue, 16 Dec 2014 11:21:13 +0100
+Subject: at91: smc configuration using DT
+In-Reply-To: <54900622.3030103@atmel.com>
+References: <548F6514.1040706@sigma-star.at> <2463675.Tt7GDs0rfe@wuerfel>
+ <548F6A71.30304@nod.at> <54900622.3030103@atmel.com>
+Message-ID: <54900799.2020804@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/12/2014 08:31, Wenyou Yang a ?crit :
-> Appearance: On some SAMA5D4EK boards, after power up, the Eth1 doesn't work.
+Am 16.12.2014 um 11:14 schrieb Nicolas Ferre:
+> Le 16/12/2014 00:10, Richard Weinberger a ?crit :
+>> Am 15.12.2014 um 23:56 schrieb Arnd Bergmann:
+>>> On Monday 15 December 2014 23:47:48 Richard Weinberger wrote:
+>>>>
+>>>> I'm sure I'm missing something.
+>>>>
+>>>> One of my boards is still using board files and uses sam9_smc_configure() to
+>>>> setup NAND timings. I'd like to convert it to DT but I fail to see how to configure the smc.
+>>>> What is the device tree equivalent of sam9_smc_configure()?
+>>>>
+>>>>
+>>>
+>>> I think it's actually missing, see the series "memory: add Atmel EBI
+>>> (External Bus Interface) driver" from Boris Brezillon.
+>>
+>> Thanks a lot for your quick reply, Arnd!
+>>
+>> arch/arm/mach-at91/board-stamp9g20.c was removed by:
+>>
+>> commit fb3642ebb52cfab8eaa52fea677abec4d92182a0
+>> Author: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Date:   Wed Nov 19 10:30:41 2014 +0100
+>>
+>>     ARM: at91: remove at91sam9260/at91sam9g20 legacy boards files
+>>
+>>     Remove old board files that use at91sam9260 or at91sam9g20 Atmel SoCs. The
+>>     device tree is mature on these SoCs. It must be used now.
+>>
+>>     Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> How can this DT work for my board without proper NAND timings?
+>>
+>> If I need Boris's patch set first I consider commit fb3642ebb a bit rude as it breaks
+>> things.
+>>
+>> *confused*,
+>> //richard
 > 
-> Reason: The PIOE2 pin is connected to the NAND_Tree# of KSZ8081,
-> But it outputs LOW during the reset period, which cause the NAND_Tree# enabled.
+> Richard,
 > 
-> Add phy_fixup() to disable NAND_Tree by overriding the Operation
-> Mode Strap Override register(i.e. Register 16h) to clear the NAND_Tree bit.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> This action was announced several months ago on the at91.com forum and
+> on this mailing-list: https://lkml.org/lkml/2014/9/10/293
+> Please read this announce message for more background.
+> Moreover, 3.19 is scheduled mid-february. It was also offered to help
+> during this transition period... So I would not call it "rude".
 
-It seems correct to me.
+I got access to this board a week ago. =)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Yes, it definitively breaks things. But as noted by Arnd, we are
+> actively working on a clean solution.
 
-Anyway, I add Florian in the loop as he is the one who proposed this
-solution. So it would have been good to have his feeling about the
-implementation...
+I'm glad to hear that.
 
-Bye,
+> In the meantime, you have the possibility to configure the SMC with
+> proper NAND timings in the bootloader(s).
 
-> ---
->  arch/arm/mach-at91/board-dt-sama5.c |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-> index 8fb9ef5..97f7367 100644
-> --- a/arch/arm/mach-at91/board-dt-sama5.c
-> +++ b/arch/arm/mach-at91/board-dt-sama5.c
-> @@ -17,6 +17,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/phy.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/phy.h>
->  
->  #include <asm/setup.h>
->  #include <asm/irq.h>
-> @@ -26,8 +27,25 @@
->  
->  #include "generic.h"
->  
-> +static int ksz8081_phy_fixup(struct phy_device *phy)
-> +{
-> +	int value;
-> +
-> +	value = phy_read(phy, 0x16);
-> +	value &= ~0x20;
-> +	phy_write(phy, 0x16, value);
-> +
-> +	return 0;
-> +}
-> +
->  static void __init sama5_dt_device_init(void)
->  {
-> +	if (of_machine_is_compatible("atmel,sama5d4ek") &&
-> +	   IS_ENABLED(CONFIG_PHYLIB)) {
-> +		phy_register_fixup_for_id("fc028000.etherne:00",
-> +						ksz8081_phy_fixup);
-> +	}
-> +
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
->  
-> 
+Yeah, that will work!
 
-
--- 
-Nicolas Ferre
+Thanks,
+//richard
