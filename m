@@ -1,112 +1,129 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Dec 2014 13:55:50 -0500
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <54907A82.6030906@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215232221.GD19261@kw.sim.vm.gnt>
- <20141216130331.GJ967@titan.lakedaemon.net>
- <20141216133719.GE19261@kw.sim.vm.gnt>
- <20141216144533.GL967@titan.lakedaemon.net>
- <54907A82.6030906@free-electrons.com>
-Message-ID: <20141216185550.GQ967@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 16 Dec 2014 12:59:52 -0600
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141216163657.GL24110@csclub.uwaterloo.ca>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
+ <20141216145856.GA23358@kahuna> <20141216163657.GL24110@csclub.uwaterloo.ca>
+Message-ID: <54908128.7040005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 07:31:30PM +0100, Gregory CLEMENT wrote:
-> On 16/12/2014 15:45, Jason Cooper wrote:
-> > On Tue, Dec 16, 2014 at 02:37:19PM +0100, Simon Guinot wrote:
-> >> On Tue, Dec 16, 2014 at 08:03:31AM -0500, Jason Cooper wrote:
-> >>> Simon,
-> >>>
-> >>> On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
-> >>>> On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
-> >>>>> The current GPL only licensing on the device tree makes it very
-> >>>>> impractical for other software components licensed under another
-> >>>>> license.
-> >>>>>
-> >>>>> In order to make it easier for them to reuse our device trees,
-> >>>>> relicense our device trees under a GPL/X11 dual-license.
-> >>>>>
-> >>>>> Cc: Andrew Lunn <andrew@lunn.ch>
-> >>>>> Cc: Arnaud Ebalard <arno@natisbad.org>
-> >>>>> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >>>>> Cc: Greg Ungerer <gerg@uclinux.org>
-> >>>>> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> >>>>> Cc: Jason Cooper <jason@lakedaemon.net>
-> >>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>>> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> >>>>> Cc: Simon Baatz <gmbnomis@gmail.com>
-> >>>>> Cc: Simon Guinot <simon.guinot@sequanux.org>
-> >>>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >>>>> Cc: Willy Tarreau <w@1wt.eu>
-> >>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>>>> ---
-> >>>>>  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
-> >>>>>  1 file changed, 37 insertions(+), 3 deletions(-)
-> >>>>
-> >>>> Hi Gregory,
-> >>>>
-> >>>> NAK for me.
-> >>>
-> >>> Well, I'm a bit surprised that this is the first one. :)  Care to
-> >>> explain why so that we can work towards an amenable compromise?
-> >>
-> >> Hi Jason,
-> >>
-> >> I am also a bit surprised to be the only one :)
-> >>
-> >> As I have no interest in a flame war either, I am not gonna elaborate
-> >> on this. But in a few words, I don't think that allowing a permissive
-> >> licence alternative is good for software sharing (which is important
-> >> to me). 
-> > 
-> > Ok, fair enough.  I just needed to know if the NAK was against the
-> > GPLv2+ part or the X11 part.  Clearly, it's the X11 part.
-> > 
-> > So let's look at what we have (trying to stick to facts):
-> > 
-> > - alienating contributors in bad (yes, this is first)
-> > - sometimes the community has to do something a minority disagrees with,
-> >   but it should be avoided, if at all possible.
-> > - devicetree is so useful, other projects are adopting it
-> > - if our binding docs are good, rewriting dts{i} isn't hard.
-> > - rewriting dts{i} can lead to fragmentation
-> > - maintaining two devicetree trees would be a pia (X11, GPLonly)
-> > - reverting/rewriting GPLonly commits is possible, but see first bullet.
-> > - Simon may not be the only contributor who disagrees with X11.
-> > - of the known consumers of dts{i}, *BSD is the only one with licensing
-> >   issues.
-> > 
-> > So our goal is to avoid fragmentation by allowing *BSD to use our dts{i}
-> > files as is.  Our secondary goal is to avoid a maintenance headache.
-> > 
-> > Options:
-> > 
-> > - Ask Simon to find an OSI-compatible license to replace X11 that:
-> >    - *BSD can use
-> >    - meets the intent of himself and other like-minded authors
-> > - Leave licensing as is, but make a statement that *using* the dts
-> >   doesn't create a derivative work under the GPL (similar to Linus'
-> >   statement re the Linux kernel, Wolfgang and U-Boot, etc).
-> > - Screw it, plow forward, and revert/rewrite GPLonly commits
-> > - Ignore the whole issue and hope it goes away.
-> > 
+On 12/16/2014 10:36 AM, Lennart Sorensen wrote:
+[...]
+>> B) Since rate switch is no longer needed, how about something like the
+>> following:
+>> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+>> index a3c0133..315d6d1 100644
+>> --- a/arch/arm/mach-omap2/control.h
+>> +++ b/arch/arm/mach-omap2/control.h
+>> @@ -286,6 +286,11 @@
+>>  #define OMAP5XXX_CONTROL_STATUS                0x134
+>>  #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
+>>  
+>> +
+>> +/* DRA7XX CONTROL CORE BOOTSTRAP */
+>> +#define DRA7_CTRL_CORE_BOOTSTRAP	0x6c4
+>> +#define DRA7_SPEEDSELECT_MASK		(0x3 << 8)
+>> +
+>>  /*
+>>   * REVISIT: This list of registers is not comprehensive - there are more
+>>   * that should be added.
 > 
-> Thanks for sum-up the situation and to offer the different choice we have.
+> I like that as a place for those.
 > 
-> > Personally, I'm in favor of the second one, and think it has the highest
-> > chance of success.  After all, ARM-based *BSD is launched from a GPL
-> > bootloader in most cases, right (U-Boot, barebox)?  Thoughts?
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index 4f61148..783d3c3 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -54,6 +54,7 @@
+>>  
+>>  #include "soc.h"
+>>  #include "common.h"
+>> +#include "control.h"
+>>  #include "powerdomain.h"
+>>  #include "omap-secure.h"
+>>  
 > 
-> Presently I would like to have the answer about the relicesing from all the
-> author in CC. Then depending the result we will see where we should go.
+> How about this version for the rest of the file.  It handles that for
+> the errata case we would like to do rate * num / den, which given how
+> small the num is will fit in 32bit and gives the best accuracy for the
+> calculation, while the non errata case the existing calculation works
+> well and fits in 32 bit for all other cases.  It just has to be moved
+> up so that the goto can skip it.  I changed sysclk to sysclk1 since on
+> the dra7xx there is in fact a sysclk1 and a sysclk2 and it is probably
+> worth keeping it clear which one this is referring to.
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index fb0cb2b..be254bf 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -511,6 +511,36 @@ static void __init realtime_counter_init(void)
+>  	}
+>  
+>  	rate = clk_get_rate(sys_clk);
+> +
+> +	if (soc_is_dra7xx()) {
+> +		/*
+> +		 * Errata i856 says the 32.768KHz crystal does not start at
+> +		 * power on, so the CPU falls back to an emulated 32KHz clock
+> +		 * based on sysclk1 / 610 instead. This causes the master counter
+> +		 * frequency to not be 6.144MHz but at sysclk1 / 610 * 375 / 2
+> +		 * (OR sysclk1 * 75 / 244)
+> +		 *
+> +		 * This affects at least the DRA7/AM572x 1.0, 1.1 revisions.
+> +		 * Of course any board built without a populated 32.768KHz
+> +	         * crystal would also need this fix even if the CPU is fixed
+> +		 * later.
+> +		 *
+> +		 * Either case can be detected by using the two speedselect bits
+> +		 * If they are not 0, then the 32.768KHz clock driving the
+> +		 * coarse counter that corrects the fine counter every time it
+> +		 * ticks is actually rate/610 rather than 32.768KHz and we
+> +		 * should compensate to avoid the 570ppm (at 20MHz, much worse
+> +		 * at other rates) too fast system time.
+> +		 */
+> +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
+> +		if (reg & DRA7_SPEEDSELECT_MASK) {
+> +			num = 75;
+> +			den = 244;
+> +			arch_timer_freq = (rate * num) / den;
+> +			goto sysclk1_based;
+> +		}
+> +	}
+> +
+>  	/* Numerator/denumerator values refer TRM Realtime Counter section */
+>  	switch (rate) {
+>  	case 12000000:
+> @@ -544,7 +574,9 @@ static void __init realtime_counter_init(void)
+>  		den = 25;
+>  		break;
+>  	}
+> +	arch_timer_freq = (rate / den) * num;
+>  
+> +sysclk1_based:
+>  	/* Program numerator and denumerator registers */
+>  	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
+>  			NUMERATOR_DENUMERATOR_MASK;
+> @@ -556,7 +588,6 @@ static void __init realtime_counter_init(void)
+>  	reg |= den;
+>  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+>  
+> -	arch_timer_freq = (rate / den) * num;
 
-Agreed.  We should keep in mind that once we have heard from everybody
-(big if), that is still only representative of armada and maybe mvebu
-ecosystem. :(  I'm starting to lean even more towards #2...
+I see why arch_timer_freq might skip the rounding error of 39, 15 and
+55 Vs existing logic which is possibly at a truncation error risk
+(without errata for sysclk 13, 26 and 27MHz).
 
-thx,
+all you'd probably need to do is cast rate, num and den to unsigned
+long and have a common computation logic.
 
-Jason.
+if you'd really want to handle truncation error, it must be a separate
+patch of it's own - I would not mix it with the errata fix.
+
+
+-- 
+Regards,
+Nishanth Menon
