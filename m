@@ -1,117 +1,63 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 17 Dec 2014 08:26:54 +0900
-Subject: [PATCHv4 5/8] ARM: dts: Add PPMU dt node for Exynos3250 SoC
-In-Reply-To: <1418772417-5164-1-git-send-email-cw00.choi@samsung.com>
-References: <1418772417-5164-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1418772417-5164-6-git-send-email-cw00.choi@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 17 Dec 2014 00:41:33 +0100
+Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
+ Cortex-M4
+In-Reply-To: <2994970.DCfUQgtmcD@wuerfel>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <1417565531-4507-12-git-send-email-stefan@agner.ch>
+ <2994970.DCfUQgtmcD@wuerfel>
+Message-ID: <6ae4dd827bf4dcc202f60e8505173d0e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU (Platform Performance Monitoring Unit) dt node
-to estimate the utilization of each IP in Exynos SoC throught DEVFREQ Event
-subsystem.
+On 2014-12-03 12:03, Arnd Bergmann wrote:
+> On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
+>> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+>> new file mode 100644
+>> index 0000000..051ee0f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+>> @@ -0,0 +1,52 @@
+>> +/*
+>> + * Device tree for Colibri VF61 Cortex-M4 support
+>> + *
+>> + * Copyright 2014 Stefan Agner
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "vf610m4.dtsi"
+>> +
+>> +/ {
+>> +       model = "VF610 Cortex-M4";
+>> +       compatible = "fsl,vf610m4";
+>> +
+>> +       chosen {
+>> +               bootargs = "console=ttyLP2,115200 ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc rw";
+>> +       };
+>> +
+> 
+> Starting with v3.19, you should be able to use the earlycon framework on
+> arm32, so it would be better to replace earlyprintk with earlycon here
+> and add a stdout-path property in chosen that points to the console
+> uart.
 
-This patch adds following PPMU dt nodes:
-- PPMU_DMC0     0x106a0000
-- PPMU_DMC1     0x106b0000
-- PPMU_RIGHTBUS 0x112A0000
-- PPMU_LEFTBUS  0x116A0000
-- PPMU_CAMIF    0x11AC0000
-- PPMU_LCD0     0x11E40000
-- PPMU_FSYS     0x12630000
-- PPMU_3D       0x13220000
-- PPMU_MFC      0x13660000
-- PPMU_CPU      0x106c0000
+I started to implement earlycon support, but something currently fails
+when earlycon tries to map the UART registers:
+[    0.000000] earlycon_map: Couldn't map 0x40027000
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi | 72 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+I traced the issue a bit further down and found that get_vm_area_caller
+returns NULL (in __arm_ioremap_pfn_caller). This happend on Linus master
+as of today (2dbfca5a181973558277b28b1f4c36362291f5e0). Do I miss
+something here?
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index c743f60..f0322f2 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -529,6 +529,78 @@
- 			compatible = "arm,cortex-a7-pmu";
- 			interrupts = <0 18 0>, <0 19 0>;
- 		};
-+
-+		ppmu_dmc0: ppmu_dmc0 at 106a0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x106a0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_dmc1: ppmu_dmc1 at 106b0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x106b0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_cpu: ppmu_cpu at 106c0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x106c0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_rightbus: ppmu_rightbus at 112a0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x112a0000 0x2000>;
-+			clocks = <&cmu CLK_PPMURIGHT>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_leftbus: ppmu_leftbus0 at 116a0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x116a0000 0x2000>;
-+			clocks = <&cmu CLK_PPMULEFT>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_camif: ppmu_camif at 11ac0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x11ac0000 0x2000>;
-+			clocks = <&cmu CLK_PPMUCAMIF>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_lcd0: ppmu_lcd0 at 11e40000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x11e40000 0x2000>;
-+			clocks = <&cmu CLK_PPMULCD0>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_fsys: ppmu_fsys at 12630000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x12630000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_g3d: ppmu_g3d at 13220000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13220000 0x2000>;
-+			clocks = <&cmu CLK_PPMUG3D>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_mfc: ppmu_mfc at 13660000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13660000 0x2000>;
-+			clocks = <&cmu CLK_PPMUMFC_L>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
- 	};
- };
- 
--- 
-1.8.5.5
+> 
+> 64 hash table entries sounds extremely small, doesn't that impact
+> performance? If you have 50MB of actual RAM available, I don't think
+> you need that.
+> 
+> 	Arnd
