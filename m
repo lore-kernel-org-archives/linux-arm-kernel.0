@@ -1,98 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Dec 2014 09:45:33 -0500
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <20141216133719.GE19261@kw.sim.vm.gnt>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215232221.GD19261@kw.sim.vm.gnt>
- <20141216130331.GJ967@titan.lakedaemon.net>
- <20141216133719.GE19261@kw.sim.vm.gnt>
-Message-ID: <20141216144533.GL967@titan.lakedaemon.net>
+From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
+Date: Tue, 16 Dec 2014 14:50:07 +0000
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB80435790DF@ALVA-EXMB04.alv.autoliv.int>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+ <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
+ <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+ <53F71D1B.8090004@gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043578CB2@ALVA-EXMB04.alv.autoliv.int>
+ <53FDB649.2070506@gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435790DF@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB8054DF9A67@ALVA-EXMB04.alv.autoliv.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 02:37:19PM +0100, Simon Guinot wrote:
-> On Tue, Dec 16, 2014 at 08:03:31AM -0500, Jason Cooper wrote:
-> > Simon,
-> > 
-> > On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
-> > > On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
-> > > > The current GPL only licensing on the device tree makes it very
-> > > > impractical for other software components licensed under another
-> > > > license.
-> > > > 
-> > > > In order to make it easier for them to reuse our device trees,
-> > > > relicense our device trees under a GPL/X11 dual-license.
-> > > > 
-> > > > Cc: Andrew Lunn <andrew@lunn.ch>
-> > > > Cc: Arnaud Ebalard <arno@natisbad.org>
-> > > > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > Cc: Greg Ungerer <gerg@uclinux.org>
-> > > > Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> > > > Cc: Jason Cooper <jason@lakedaemon.net>
-> > > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > > > Cc: Simon Baatz <gmbnomis@gmail.com>
-> > > > Cc: Simon Guinot <simon.guinot@sequanux.org>
-> > > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > > > Cc: Willy Tarreau <w@1wt.eu>
-> > > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
-> > > >  1 file changed, 37 insertions(+), 3 deletions(-)
-> > > 
-> > > Hi Gregory,
-> > > 
-> > > NAK for me.
-> > 
-> > Well, I'm a bit surprised that this is the first one. :)  Care to
-> > explain why so that we can work towards an amenable compromise?
-> 
-> Hi Jason,
-> 
-> I am also a bit surprised to be the only one :)
-> 
-> As I have no interest in a flame war either, I am not gonna elaborate
-> on this. But in a few words, I don't think that allowing a permissive
-> licence alternative is good for software sharing (which is important
-> to me). 
+Hi Russell,
 
-Ok, fair enough.  I just needed to know if the NAK was against the
-GPLv2+ part or the X11 part.  Clearly, it's the X11 part.
+> Now because things have changed during the last merge window, I've got
+> an even bigger problem sorting through that patch set and getting it
+> back into a submittable state.  I've just sent out v2 for it onto the
+> netdev at vger.kernel.org mailing list.
+>
+> The initial version (marked RFC) attracted very little interest from
+> testers, or acks.  I'd very much like to have some testing of it, so
+> if you want to try it out, I can provide you with a git URL, patches or a
+> combined patch.
+ 
+We have run v3.16 for about three months now, and many millions of ssh
+connections on eight separate systems, both without and with your network
+patches. Our conclusion is that the patches clearly reduce the number of
+network timeouts, and this is a great improvement. However, after a month
+or so of uptime, the number of timeouts began to increase again, forcing us
+to reboot the cards.
 
-So let's look at what we have (trying to stick to facts):
+Best regards,
+Mattis Lorentzon
+***************************************************************
+Consider the environment before printing this message.
 
-- alienating contributors in bad (yes, this is first)
-- sometimes the community has to do something a minority disagrees with,
-  but it should be avoided, if at all possible.
-- devicetree is so useful, other projects are adopting it
-- if our binding docs are good, rewriting dts{i} isn't hard.
-- rewriting dts{i} can lead to fragmentation
-- maintaining two devicetree trees would be a pia (X11, GPLonly)
-- reverting/rewriting GPLonly commits is possible, but see first bullet.
-- Simon may not be the only contributor who disagrees with X11.
-- of the known consumers of dts{i}, *BSD is the only one with licensing
-  issues.
-
-So our goal is to avoid fragmentation by allowing *BSD to use our dts{i}
-files as is.  Our secondary goal is to avoid a maintenance headache.
-
-Options:
-
-- Ask Simon to find an OSI-compatible license to replace X11 that:
-   - *BSD can use
-   - meets the intent of himself and other like-minded authors
-- Leave licensing as is, but make a statement that *using* the dts
-  doesn't create a derivative work under the GPL (similar to Linus'
-  statement re the Linux kernel, Wolfgang and U-Boot, etc).
-- Screw it, plow forward, and revert/rewrite GPLonly commits
-- Ignore the whole issue and hope it goes away.
-
-Personally, I'm in favor of the second one, and think it has the highest
-chance of success.  After all, ARM-based *BSD is launched from a GPL
-bootloader in most cases, right (U-Boot, barebox)?  Thoughts?
-
-thx,
-
-Jason.
+To read Autoliv's Information and Confidentiality Notice, follow this link:
+http://www.autoliv.com/disclaimer.html
+***************************************************************
