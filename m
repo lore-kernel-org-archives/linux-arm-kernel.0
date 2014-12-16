@@ -1,139 +1,113 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 17 Dec 2014 08:26:56 +0900
-Subject: [PATCHv4 7/8] ARM: dts: Add PPMU dt node for Exynos5260 SoC
+Date: Wed, 17 Dec 2014 08:26:54 +0900
+Subject: [PATCHv4 5/8] ARM: dts: Add PPMU dt node for Exynos3250 SoC
 In-Reply-To: <1418772417-5164-1-git-send-email-cw00.choi@samsung.com>
 References: <1418772417-5164-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1418772417-5164-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1418772417-5164-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PPMU (Performance Profiling Monitoring Unit) dt node
-Exynos5260 SoC.
+This patch add PPMU (Platform Performance Monitoring Unit) dt node
+to estimate the utilization of each IP in Exynos SoC throught DEVFREQ Event
+subsystem.
 
-Exynos5260 SoC has following PPMU IPs:
-- PPMU_DREX0_S0 0x10c60000
-- PPMU_DREX0_S1 0x10c70000
-- PPMU_DREX1_S0 0x10c80000
-- PPMU_DREX1_S1 0x10c90000
-- PPMU_EAGLE    0x10cc0000
-- PPMU_KFC      0x10cd0000
-- PPMU_MFC      0x11040000
-- PPMU_G3D      0x11880000
-- PPMU_FSYS     0x12220000
-- PPMU_ISP      0x13370000
-- PPMU_FICM     0x13cb0000
-- PPMU_GSCL     0x13e60000
-- PPMU_MSCL     0x13ee0000
-- PPMU_FIMD0X   0x145b0000
-- PPMU_FIMD1X   0x145c0000
-
-The drivers/devfreq/exynos/exynos5_bus.c supports the memory bus frequency/
-voltage scaling of Exynos5260 SoC with DEVFREQ framework.
+This patch adds following PPMU dt nodes:
+- PPMU_DMC0     0x106a0000
+- PPMU_DMC1     0x106b0000
+- PPMU_RIGHTBUS 0x112A0000
+- PPMU_LEFTBUS  0x116A0000
+- PPMU_CAMIF    0x11AC0000
+- PPMU_LCD0     0x11E40000
+- PPMU_FSYS     0x12630000
+- PPMU_3D       0x13220000
+- PPMU_MFC      0x13660000
+- PPMU_CPU      0x106c0000
 
 Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Jonghwan Choi <jhbird.choi@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos5260.dtsi | 90 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 90 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 72 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
-index 36da38e..26f3074 100644
---- a/arch/arm/boot/dts/exynos5260.dtsi
-+++ b/arch/arm/boot/dts/exynos5260.dtsi
-@@ -307,6 +307,96 @@
- 			fifo-depth = <64>;
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index c743f60..f0322f2 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -529,6 +529,78 @@
+ 			compatible = "arm,cortex-a7-pmu";
+ 			interrupts = <0 18 0>, <0 19 0>;
  		};
 +
-+		ppmu_drex0_s0: ppmu_drex0_s0 at 10c60000 {
++		ppmu_dmc0: ppmu_dmc0 at 106a0000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x10c60000 0x2000>;
++			reg = <0x106a0000 0x2000>;
 +			status = "disabled";
 +		};
 +
-+		ppmu_drex0_s1: ppmu_drex0_s1 at 10c70000 {
++		ppmu_dmc1: ppmu_dmc1 at 106b0000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x10c70000 0x2000>;
++			reg = <0x106b0000 0x2000>;
 +			status = "disabled";
 +		};
 +
-+		ppmu_drex1_s0: ppmu_drex1_s0 at 10c80000 {
++		ppmu_cpu: ppmu_cpu at 106c0000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x10c80000 0x2000>;
++			reg = <0x106c0000 0x2000>;
 +			status = "disabled";
 +		};
 +
-+		ppmu_drex1_s1: ppmu_drex1_s1 at 10c90000 {
++		ppmu_rightbus: ppmu_rightbus at 112a0000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x10c90000 0x2000>;
++			reg = <0x112a0000 0x2000>;
++			clocks = <&cmu CLK_PPMURIGHT>;
++			clock-names = "ppmu";
 +			status = "disabled";
 +		};
 +
-+		ppmu_eagle: ppmu_eagle at 10cc0000 {
++		ppmu_leftbus: ppmu_leftbus0 at 116a0000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x10cc0000 0x2000>;
++			reg = <0x116a0000 0x2000>;
++			clocks = <&cmu CLK_PPMULEFT>;
++			clock-names = "ppmu";
 +			status = "disabled";
 +		};
 +
-+		ppmu_kfc: ppmu_kfc at 10cd0000 {
++		ppmu_camif: ppmu_camif at 11ac0000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x10cd0000 0x2000>;
++			reg = <0x11ac0000 0x2000>;
++			clocks = <&cmu CLK_PPMUCAMIF>;
++			clock-names = "ppmu";
 +			status = "disabled";
 +		};
 +
-+		ppmu_mfc: ppmu_mfc at 11040000 {
++		ppmu_lcd0: ppmu_lcd0 at 11e40000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x11040000 0x2000>;
++			reg = <0x11e40000 0x2000>;
++			clocks = <&cmu CLK_PPMULCD0>;
++			clock-names = "ppmu";
 +			status = "disabled";
 +		};
 +
-+		ppmu_g3d: ppmu_g3d at 11880000 {
++		ppmu_fsys: ppmu_fsys at 12630000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x11880000 0x2000>;
++			reg = <0x12630000 0x2000>;
 +			status = "disabled";
 +		};
 +
-+		ppmu_fsys: ppmu_fsys at 12220000 {
++		ppmu_g3d: ppmu_g3d at 13220000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x12220000 0x2000>;
++			reg = <0x13220000 0x2000>;
++			clocks = <&cmu CLK_PPMUG3D>;
++			clock-names = "ppmu";
 +			status = "disabled";
 +		};
 +
-+		ppmu_isp: ppmu_isp at 13370000 {
++		ppmu_mfc: ppmu_mfc at 13660000 {
 +			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13370000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_fimc: ppmu_fimc at 13cb0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13cb0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_gscl: ppmu_gscl at 13e60000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13e60000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_mscl: ppmu_gscl at 13ee0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x13ee0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_fimd0x: ppmu_fimd0x at 145b0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x145b0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_fimd1x: ppmu_fimd1x at 145c0000 {
-+			compatible = "samsung,exynos-ppmu";
-+			reg = <0x145c0000 0x2000>;
++			reg = <0x13660000 0x2000>;
++			clocks = <&cmu CLK_PPMUMFC_L>;
++			clock-names = "ppmu";
 +			status = "disabled";
 +		};
  	};
