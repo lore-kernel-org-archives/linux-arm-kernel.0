@@ -1,9 +1,9 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 16 Dec 2014 18:20:50 +0200
-Subject: [PATCH 05/11] clk: ti: divider: add support for legacy divider init
+Date: Tue, 16 Dec 2014 18:20:51 +0200
+Subject: [PATCH 06/11] clk: ti: dpll: add support for legacy DPLL init
 In-Reply-To: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
 References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1418746856-17173-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1418746856-17173-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,43 +12,41 @@ DT clocks, thus add support for this.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk.c     |    3 ++
- drivers/clk/ti/clock.h   |    2 +
- drivers/clk/ti/divider.c |  132 +++++++++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 136 insertions(+), 1 deletion(-)
+ drivers/clk/ti/clk.c   |    3 ++
+ drivers/clk/ti/clock.h |    1 +
+ drivers/clk/ti/dpll.c  |  118 +++++++++++++++++++++++++++++++++++++++++++-----
+ 3 files changed, 111 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index 676dbf1..a0475e2 100644
+index a0475e2..f41a757 100644
 --- a/drivers/clk/ti/clk.c
 +++ b/drivers/clk/ti/clk.c
-@@ -214,6 +214,9 @@ struct clk __init *ti_clk_register_clk(struct ti_clk *setup)
- 	case TI_CLK_MUX:
- 		clk = ti_clk_register_mux(setup);
+@@ -228,6 +228,9 @@ struct clk __init *ti_clk_register_clk(struct ti_clk *setup)
+ 	case TI_CLK_GATE:
+ 		clk = ti_clk_register_gate(setup);
  		break;
-+	case TI_CLK_DIVIDER:
-+		clk = ti_clk_register_divider(setup);
++	case TI_CLK_DPLL:
++		clk = ti_clk_register_dpll(setup);
 +		break;
- 	case TI_CLK_FIXED_FACTOR:
- 		fixed_factor = setup->data;
- 
+ 	default:
+ 		pr_err("bad type for %s!\n", setup->name);
+ 		clk = ERR_PTR(-EINVAL);
 diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 9430dc6..fe70941 100644
+index fe70941..f4e8eb2 100644
 --- a/drivers/clk/ti/clock.h
 +++ b/drivers/clk/ti/clock.h
-@@ -156,7 +156,9 @@ struct ti_clk_dpll {
- struct clk *ti_clk_register_gate(struct ti_clk *setup);
+@@ -157,6 +157,7 @@ struct clk *ti_clk_register_gate(struct ti_clk *setup);
  struct clk *ti_clk_register_interface(struct ti_clk *setup);
  struct clk *ti_clk_register_mux(struct ti_clk *setup);
-+struct clk *ti_clk_register_divider(struct ti_clk *setup);
+ struct clk *ti_clk_register_divider(struct ti_clk *setup);
++struct clk *ti_clk_register_dpll(struct ti_clk *setup);
  
-+struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup);
+ struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup);
  struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup);
- struct clk_hw *ti_clk_build_component_mux(struct ti_clk_mux *setup);
- 
-diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
-index bff2b5b..6211893 100644
---- a/drivers/clk/ti/divider.c
-+++ b/drivers/clk/ti/divider.c
+diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+index 79791e1..0693b8b 100644
+--- a/drivers/clk/ti/dpll.c
++++ b/drivers/clk/ti/dpll.c
 @@ -21,6 +21,7 @@
  #include <linux/of.h>
  #include <linux/of_address.h>
@@ -57,150 +55,181 @@ index bff2b5b..6211893 100644
  
  #undef pr_fmt
  #define pr_fmt(fmt) "%s: " fmt, __func__
-@@ -301,6 +302,134 @@ static struct clk *_register_divider(struct device *dev, const char *name,
+@@ -115,7 +116,7 @@ static const struct clk_ops dpll_x2_ck_ops = {
+ };
+ 
+ /**
+- * ti_clk_register_dpll - low level registration of a DPLL clock
++ * _register_dpll - low level registration of a DPLL clock
+  * @hw: hardware clock definition for the clock
+  * @node: device node for the clock
+  *
+@@ -123,8 +124,8 @@ static const struct clk_ops dpll_x2_ck_ops = {
+  * clk-bypass is missing), the clock is added to retry list and
+  * the initialization is retried on later stage.
+  */
+-static void __init ti_clk_register_dpll(struct clk_hw *hw,
+-					struct device_node *node)
++static void __init _register_dpll(struct clk_hw *hw,
++				  struct device_node *node)
+ {
+ 	struct clk_hw_omap *clk_hw = to_clk_hw_omap(hw);
+ 	struct dpll_data *dd = clk_hw->dpll_data;
+@@ -136,7 +137,7 @@ static void __init ti_clk_register_dpll(struct clk_hw *hw,
+ 	if (IS_ERR(dd->clk_ref) || IS_ERR(dd->clk_bypass)) {
+ 		pr_debug("clk-ref or clk-bypass missing for %s, retry later\n",
+ 			 node->name);
+-		if (!ti_clk_retry_init(node, hw, ti_clk_register_dpll))
++		if (!ti_clk_retry_init(node, hw, _register_dpll))
+ 			return;
+ 
+ 		goto cleanup;
+@@ -160,20 +161,115 @@ cleanup:
+ 	kfree(clk_hw);
  }
  
- static struct clk_div_table *
-+_get_div_table_from_setup(struct ti_clk_divider *setup, u8 *width)
++void __iomem *_get_reg(u8 module, u16 offset)
 +{
-+	int valid_div = 0;
-+	struct clk_div_table *table;
-+	int i;
-+	int div;
-+	u32 val;
-+	u8 flags;
-+
-+	if (!setup->num_dividers) {
-+		/* Clk divider table not provided, determine min/max divs */
-+		flags = setup->flags;
-+
-+		if (flags & CLKF_INDEX_STARTS_AT_ONE)
-+			val = 1;
-+		else
-+			val = 0;
-+
-+		div = 1;
-+
-+		while (div < setup->max_div) {
-+			if (flags & CLKF_INDEX_POWER_OF_TWO)
-+				div <<= 1;
-+			else
-+				div++;
-+			val++;
-+		}
-+
-+		*width = fls(val);
-+
-+		return NULL;
-+	}
-+
-+	for (i = 0; i < setup->num_dividers; i++)
-+		if (setup->dividers[i])
-+			valid_div++;
-+
-+	table = kzalloc(sizeof(*table) * (valid_div + 1), GFP_KERNEL);
-+	if (!table)
-+		return ERR_PTR(-ENOMEM);
-+
-+	valid_div = 0;
-+	*width = 0;
-+
-+	for (i = 0; i < setup->num_dividers; i++)
-+		if (setup->dividers[i]) {
-+			table[valid_div].div = setup->dividers[i];
-+			table[valid_div].val = i;
-+			valid_div++;
-+			*width = i;
-+		}
-+
-+	*width = fls(*width);
-+
-+	return table;
-+}
-+
-+struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup)
-+{
-+	struct clk_divider *div;
-+	struct clk_omap_reg *reg;
-+
-+	if (!setup)
-+		return NULL;
-+
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div)
-+		return ERR_PTR(-ENOMEM);
-+
-+	reg = (struct clk_omap_reg *)&div->reg;
-+	reg->index = setup->module;
-+	reg->offset = setup->reg;
-+
-+	if (setup->flags & CLKF_INDEX_STARTS_AT_ONE)
-+		div->flags |= CLK_DIVIDER_ONE_BASED;
-+
-+	if (setup->flags & CLKF_INDEX_POWER_OF_TWO)
-+		div->flags |= CLK_DIVIDER_POWER_OF_TWO;
-+
-+	div->table = _get_div_table_from_setup(setup, &div->width);
-+
-+	div->shift = setup->bit_shift;
-+
-+	return &div->hw;
-+}
-+
-+struct clk *ti_clk_register_divider(struct ti_clk *setup)
-+{
-+	struct ti_clk_divider *div;
-+	struct clk_omap_reg *reg_setup;
 +	u32 reg;
-+	u8 width;
-+	u32 flags = 0;
-+	u8 div_flags = 0;
-+	struct clk_div_table *table;
-+	struct clk *clk;
-+
-+	div = setup->data;
++	struct clk_omap_reg *reg_setup;
 +
 +	reg_setup = (struct clk_omap_reg *)&reg;
 +
-+	reg_setup->index = div->module;
-+	reg_setup->offset = div->reg;
++	reg_setup->index = module;
++	reg_setup->offset = offset;
 +
-+	if (div->flags & CLKF_INDEX_STARTS_AT_ONE)
-+		div_flags |= CLK_DIVIDER_ONE_BASED;
++	return (void __iomem *)reg;
++}
 +
-+	if (div->flags & CLKF_INDEX_POWER_OF_TWO)
-+		div_flags |= CLK_DIVIDER_POWER_OF_TWO;
++struct clk *ti_clk_register_dpll(struct ti_clk *setup)
++{
++	struct clk_hw_omap *clk_hw;
++	struct clk_init_data init = { NULL };
++	struct dpll_data *dd;
++	struct clk *clk;
++	struct ti_clk_dpll *dpll;
++	const struct clk_ops *ops = &omap3_dpll_ck_ops;
++	struct clk *clk_ref;
++	struct clk *clk_bypass;
 +
-+	if (div->flags & CLKF_SET_RATE_PARENT)
-+		flags |= CLK_SET_RATE_PARENT;
++	dpll = setup->data;
 +
-+	table = _get_div_table_from_setup(div, &width);
-+	if (IS_ERR(table))
-+		return (struct clk *)table;
++	if (dpll->num_parents < 2)
++		return ERR_PTR(-EINVAL);
 +
-+	clk = _register_divider(NULL, setup->name, div->parent,
-+				flags, (void __iomem *)reg, div->bit_shift,
-+				width, div_flags, table, NULL);
++	clk_ref = clk_get_sys(NULL, dpll->parents[0]);
++	clk_bypass = clk_get_sys(NULL, dpll->parents[1]);
 +
-+	if (IS_ERR(clk))
-+		kfree(table);
++	if (IS_ERR_OR_NULL(clk_ref) || IS_ERR_OR_NULL(clk_bypass))
++		return ERR_PTR(-EAGAIN);
 +
++	dd = kzalloc(sizeof(*dd), GFP_KERNEL);
++	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
++	if (!dd || !clk_hw) {
++		clk = ERR_PTR(-ENOMEM);
++		goto cleanup;
++	}
++
++	clk_hw->dpll_data = dd;
++	clk_hw->ops = &clkhwops_omap3_dpll;
++	clk_hw->hw.init = &init;
++	clk_hw->flags = MEMMAP_ADDRESSING;
++
++	init.name = setup->name;
++	init.ops = ops;
++
++	init.num_parents = dpll->num_parents;
++	init.parent_names = dpll->parents;
++
++	dd->control_reg = _get_reg(dpll->module, dpll->control_reg);
++	dd->idlest_reg = _get_reg(dpll->module, dpll->idlest_reg);
++	dd->mult_div1_reg = _get_reg(dpll->module, dpll->mult_div1_reg);
++	dd->autoidle_reg = _get_reg(dpll->module, dpll->autoidle_reg);
++
++	dd->modes = dpll->modes;
++	dd->div1_mask = dpll->div1_mask;
++	dd->idlest_mask = dpll->idlest_mask;
++	dd->mult_mask = dpll->mult_mask;
++	dd->autoidle_mask = dpll->autoidle_mask;
++	dd->enable_mask = dpll->enable_mask;
++	dd->sddiv_mask = dpll->sddiv_mask;
++	dd->dco_mask = dpll->dco_mask;
++	dd->max_divider = dpll->max_divider;
++	dd->max_multiplier = dpll->max_multiplier;
++	dd->auto_recal_bit = dpll->auto_recal_bit;
++	dd->recal_en_bit = dpll->recal_en_bit;
++	dd->recal_st_bit = dpll->recal_st_bit;
++
++	dd->clk_ref = clk_ref;
++	dd->clk_bypass = clk_bypass;
++
++	if (dpll->flags & CLKF_CORE)
++		ops = &omap3_dpll_core_ck_ops;
++
++	if (dpll->flags & CLKF_PER)
++		ops = &omap3_dpll_per_ck_ops;
++
++	if (dpll->flags & CLKF_J_TYPE)
++		dd->flags |= DPLL_J_TYPE;
++
++	clk = clk_register(NULL, &clk_hw->hw);
++
++	if (!IS_ERR(clk))
++		return clk;
++
++cleanup:
++	kfree(dd);
++	kfree(clk_hw);
 +	return clk;
 +}
 +
-+static struct clk_div_table *
- __init ti_clk_get_div_table(struct device_node *node)
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+ 	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM33XX) || \
+ 	defined(CONFIG_SOC_AM43XX)
+ /**
+- * ti_clk_register_dpll_x2 - Registers a DPLLx2 clock
++ * _register_dpll_x2 - Registers a DPLLx2 clock
+  * @node: device node for this clock
+  * @ops: clk_ops for this clock
+  * @hw_ops: clk_hw_ops for this clock
+  *
+  * Initializes a DPLL x 2 clock from device tree data.
+  */
+-static void ti_clk_register_dpll_x2(struct device_node *node,
+-				    const struct clk_ops *ops,
+-				    const struct clk_hw_omap_ops *hw_ops)
++static void _register_dpll_x2(struct device_node *node,
++			      const struct clk_ops *ops,
++			      const struct clk_hw_omap_ops *hw_ops)
  {
- 	struct clk_div_table *table;
-@@ -455,7 +584,8 @@ static void __init of_ti_divider_clk_setup(struct device_node *node)
- 		goto cleanup;
+ 	struct clk *clk;
+ 	struct clk_init_data init = { NULL };
+@@ -303,7 +399,7 @@ static void __init of_ti_dpll_setup(struct device_node *node,
+ 	if (dpll_mode)
+ 		dd->modes = dpll_mode;
  
- 	clk = _register_divider(NULL, node->name, parent_name, flags, reg,
--				shift, width, clk_divider_flags, table, NULL);
-+				shift, width, clk_divider_flags, table,
-+				NULL);
+-	ti_clk_register_dpll(&clk_hw->hw, node);
++	_register_dpll(&clk_hw->hw, node);
+ 	return;
  
- 	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+ cleanup:
+@@ -317,7 +413,7 @@ cleanup:
+ 	defined(CONFIG_SOC_DRA7XX)
+ static void __init of_ti_omap4_dpll_x2_setup(struct device_node *node)
+ {
+-	ti_clk_register_dpll_x2(node, &dpll_x2_ck_ops, &clkhwops_omap4_dpllmx);
++	_register_dpll_x2(node, &dpll_x2_ck_ops, &clkhwops_omap4_dpllmx);
+ }
+ CLK_OF_DECLARE(ti_omap4_dpll_x2_clock, "ti,omap4-dpll-x2-clock",
+ 	       of_ti_omap4_dpll_x2_setup);
+@@ -326,7 +422,7 @@ CLK_OF_DECLARE(ti_omap4_dpll_x2_clock, "ti,omap4-dpll-x2-clock",
+ #if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+ static void __init of_ti_am3_dpll_x2_setup(struct device_node *node)
+ {
+-	ti_clk_register_dpll_x2(node, &dpll_x2_ck_ops, NULL);
++	_register_dpll_x2(node, &dpll_x2_ck_ops, NULL);
+ }
+ CLK_OF_DECLARE(ti_am3_dpll_x2_clock, "ti,am3-dpll-x2-clock",
+ 	       of_ti_am3_dpll_x2_setup);
 -- 
 1.7.9.5
