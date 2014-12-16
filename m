@@ -1,93 +1,100 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 16 Dec 2014 10:23:50 +0900
-Subject: [RFC PATCHv3 1/7] devfreq: event: Add new devfreq_event class to
- provide basic data for devfreq governor
-In-Reply-To: <1418655186.20866.5.camel@AMDC1943>
-References: <1418372852-12454-1-git-send-email-cw00.choi@samsung.com>
- <1418372852-12454-2-git-send-email-cw00.choi@samsung.com>
- <1418655186.20866.5.camel@AMDC1943>
-Message-ID: <548F89A6.7000202@samsung.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 15 Dec 2014 18:31:28 -0700
+Subject: regression: Clock changes in next-20141205 break at least omap4
+In-Reply-To: <20141216003834.GC23854@atomide.com>
+References: <20141205165539.GA30437@atomide.com>
+ <5481F79D.4010504@codeaurora.org> <20141205183849.GB30437@atomide.com>
+ <20141212194238.20398.33333@quantum>
+ <alpine.DEB.2.02.1412122310570.29716@utopia.booyaka.com>
+ <20141215220224.20398.98259@quantum> <548F7B02.1090009@nvidia.com>
+ <20141216003834.GC23854@atomide.com>
+Message-ID: <548F8B70.2060803@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 12/15/2014 05:38 PM, Tony Lindgren wrote:
+> * Paul Walmsley <pwalmsley@nvidia.com> [141215 16:23]:
+>> On 12/15/2014 03:02 PM, Mike Turquette wrote:
+>>> Quoting Paul Walmsley (2014-12-12 15:28:32)
+>>>> On Fri, 12 Dec 2014, Mike Turquette wrote:
+>>>>
+>>>>> Quoting Tony Lindgren (2014-12-05 10:38:49)
+>>>>>> * Stephen Boyd <sboyd@codeaurora.org> [141205 10:23]:
+>>>>>>> On 12/05/2014 08:55 AM, Tony Lindgren wrote:
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
+>>>>>>>> to return a clk_hw as the best parent") breaks booting at least for
+>>>>>>>> omap4.
+>>>>>>> Do you get a compilation warning in arch/arm/mach-omap2/dpll3xxx.c ?
+>>>>>> Yes so it seems.
+>>>>>>
+>>>>>>>  From what I can tell omap3_noncore_dpll_determine_rate() hasn't been
+>>>>>>> updated to take a clk_hw pointer instead of clk pointer. It was there in
+>>>>>>> the original patch and I'm not sure why Mike dropped that part while
+>>>>>>> applying.
+>>>>>> OK that makes sense, Mike should apply that part too. Note that also
+>>>>>> include/linux/clk/ti.h needs changed accordingly for struct clk_hw,
+>>>>>> which you probably had in your orignal patch too. Assuming that's there,
+>>>>>> please feel free to add:
+>>>>>>
+>>>>>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>>>> I figured out what went wrong here. When I applied Tomeu's changes the
+>>>>> OMAP stuff did not apply at all. In fact the .determine_rate callbacks
+>>>>> did not exist in clk-next. Paul merged that stuff through his tree[0]. I
+>>>>> don't know why I didn't follow up on that at the time.
+>>>>>
+>>>>> So we need to come up with a solution. Paul can take the OMAP portion of
+>>>>> Tomeu's changes[1] for OMAP, but I believe compilation will be broken in
+>>>>> his tree until it meets up with mine in linux-next. Or we could set up a
+>>>>> shared immutable branch that provides the needed changes.
+>>>>>
+>>>>> I could either set up a shared branch that includes Tomeu's changes that
+>>>>> Paul could merge (will require a rebase of the tip of my tree) or Paul
+>>>>> could provide a shared branch of the changes to dpll3xxx.c and
+>>>>> dpll4xxx.c that I could merge in.
+>>>>>
+>>>>> Or I could remove Tomeu's patches from my tree since we're right up
+>>>>> against the merge window but I would rather not do that since he has
+>>>>> worked tirelessly on this topic.
+>>>>>
+>>>>> [0] http://www.spinics.net/lists/arm-kernel/msg377288.html
+>>>>> [1] https://lkml.org/lkml/2014/12/2/70
+>>>> I don't think there's much that I can do at this point.  My tree is quite
+>>>> topologically distant from Linus's tree (pjw/omap-pending ->
+>>>> tmlind/linux-omap -> arm/arm-soc -> torvalds/linux).  So anything I do is
+>>>> high-latency.  My pull request for Tero's patches was sent to Tony a month
+>>>> ago.
+>>> Paul,
+>>>
+>>> I identified the patch in your tree that is missing in mine and, with
+>>> Tony's help, applied your for-v3.19/omap-a signed tag to my tree. With
+>>> these 5 patches in place I have applied Tero's two patches from
+>>> Friday[0].
+>>>
+>>> Paul & Tony, are you OK for me to take both of Tero's patches? I'm
+>>> already taking stuff in late so it is no trouble for me to pick up "ARM:
+>>> OMAP3: clock: fix boot breakage in legacy mode" while I'm at it.
+>>>
+>>> I'm going to let this get at least one cycle in linux-next before
+>>> sending my PR late this week. Hopefully Kevin (Cc'd) can check on the
+>>> omap boards in his autobuilder once my tree hits -next?
+>>>
+>>> Let me know if I missed anything. Thanks for the great teamwork, gang.
+>>>
+>>> [0] http://lkml.kernel.org/r/<1418390521-7541-1-git-send-email-t-kristo@ti.com>
+>>>
+>>> Regards,
+>>> Mike
+>> I think Tony's taking the second patch from Tero.
+> If it applies to what Mike has now queued, please take that too Mike:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-On 12/15/2014 11:53 PM, Krzysztof Kozlowski wrote:
-> On pi?, 2014-12-12 at 17:27 +0900, Chanwoo Choi wrote:
->> This patch add new devfreq_event class for devfreq_event device which provide
->> raw data (e.g., memory bus utilization/GPU utilization). This raw data from
->> devfreq_event data would be used for the governor of devfreq subsystem.
->> - devfreq_event device : Provide raw data for governor of existing devfreq device
->> - devfreq device       : Monitor device state and change frequency/voltage of device
->>                          using the raw data from devfreq_event device
->>
->> The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
->> for Non-CPU Devices. The devfreq device would dertermine current device state
->> using various governor (e.g., ondemand, performance, powersave). After completed
->> determination of system state, devfreq device would change the frequency/voltage
->> of devfreq device according to the result of governor.
->>
->> But, devfreq governor must need basic data which indicates current device state.
->> Existing devfreq subsystem only consider devfreq device which check current system
->> state and determine proper system state using basic data. There is no subsystem
->> for device providing basic data to devfreq device.
->>
->> The devfreq subsystem must need devfreq_event device(data-provider device) for
->> existing devfreq device. So, this patch add new devfreq_event class for
->> devfreq_event device which read various basic data(e.g, memory bus utilization,
->> GPU utilization) and provide measured data to existing devfreq device through
->> standard APIs of devfreq_event class.
->>
->> The following description explains the feature of two kind of devfreq class:
->> - devfreq class (existing)
->>  : devfreq consumer device use raw data from devfreq_event device for
->>    determining proper current system state and change voltage/frequency
->>    dynamically using various governors.
->>
->> - devfreq_event class (new)
->>  : Provide measured raw data to devfreq device for governor
->>
->> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-> [...]
-> 
->> +/**
->> + * devfreq_event_get_event() - Get event and total_event from devfreq-event dev.
->> + * @edev	: the devfreq-event device
->> + *
->> + * Note that this function get the calculated event data from devfreq-event dev
->> + * after stoping the progress of whole sequence of devfreq-event dev. Return
->> + * current event data and total_event should be stored in second parameter
->> + * (total_event).
->> + */
->> +u64 devfreq_event_get_event(struct devfreq_event_dev *edev, u64 *total_event)
->> +{
-> 
-> I think this function should return int (0 for success, negative
-> otherwise) and store the "event" under pointer passed as argument.
-> Why? Because:
-> 1. error conditions are indicated with 'return 0' but should be 'return
-> -EINVAL'
-> 2. Exynos-ppmu driver returns -EINVAL.
-> Checking for error conditions is in such case more complex than it
-> should.
+I just took a quick glance at Tero's second patch, and it looks like a 
+hack to me.  Better to fix the problem in the core CCF code if 
+possible.  I don't think there's any reason why a PLL couldn't have just 
+one parent clock.  But I'm fine with merging it as a short-term fix if 
+fixing the core code is difficult or risky.
 
-In this patchset,
-the return value (event) and *total_event of devfreq_event_get_event() should
-be used for busy_time/total_time of struct devfreq_dev_status (include/linux/devfreq.h).
-The busy_time/total_time is 'unsigned long' type.
-
-So, I'll modify the prototype of devfreq_event_get_event() as following by adding
-new 'devfreq_event_data' structure.
-
-struct devfreq_event_data {
-	u64 event;
-	u64 total_event;
-};
-
-int devfreq_event_get_event(struct devfreq_event_edev *edev, struct devfreq_event_data *edata);
-
-Best Regards,
-Chanwoo Choi
+- Paul
