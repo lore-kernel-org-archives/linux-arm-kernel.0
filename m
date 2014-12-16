@@ -1,128 +1,59 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 15 Dec 2014 19:18:16 -0700
-Subject: [RFC] ACPI on arm64 TODO List
-Message-ID: <548F9668.6080900@linaro.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 15 Dec 2014 18:18:24 -0800
+Subject: [PATCH v6 0/3] Add gpio support to Broadcom Cygnus SoC
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1418696307-19392-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Back in September 2014, a meeting was held at Linaro Connect where we
-discussed what issues remained before the arm64 ACPI core patches could
-be merged into the kernel, creating the TODO list below.  I should have
-published this list sooner; I got focused on trying to resolve some of
-the issues instead.
+This patchset contains the initial GPIO support for the Broadcom Cygnus SoC.
+Cygnus has 3 GPIO controllers: 1) the ASIU GPIO; 2) the chipCommonG GPIO;
+and 3) the ALWAYS-ON GPIO. All 3 types of GPIO controllers are supported by
+the same Cygnus GPIO driver
 
-We have made some progress on all of these items.  But, I want to make
-sure we haven't missed something.  Since this list was compiled by only
-the people in the room at Connect, it is probable we have.  I, for one,
-do not yet claim omniscience.
+Changes from v5:
+ - Get rid of DT property "linux,gpio-base". Use dynamic allocation for GPIO base
+   number
 
-So, I want to ask the ARM and ACPI communities:
+Changes from v4:
+ - Use DT property "linux,gpio-base" to define GPIO base number
+ - factorize common code to improve code readability and reduce code size
+ - remove "bcm_" prefix on function and struct names
+ - improve debugging prints
+ - default GPIO_BCM_CYGNUS to y in Kconfig (it still depends on
+   ARCH_BCM_CYGNUS). This way we do not need to select it from the
+   arch/arm/mach-bcm/Kconfig
+ - Get rid of redundant MAINTAINER entry for this driver. It will be maintained
+   by Broadcom iProc/Cygnus maintainers
+ - Update device tree document based on driver changes
 
-  -- Is this list correct?
+Changes from v3:
+ - Fix dt property tpyo
+ - Fix incorrect GPIO compatible ID in device tree binding document example
 
-  -- Is this list complete?
+Changes from v2:
+ - Consolidate different compatible IDs into "brcm,cygnus-gpio"
+ - Get rid of redundant "no-interrupt" property
 
-Below is what we currently know about; very brief notes on status are
-included.  The TL;DR versions of the TODO list and the current status
-can be found at:
+Changes from v1:
+ - Get rid of inline qualifier
+ - Get rid of redundant check in the ISR
+ - Other minor fixes to imrove code readability
 
-   https://wiki.linaro.org/LEG/Engineering/Kernel/ACPI/CoreUpstreamNotes
+Ray Jui (3):
+  gpio: Cygnus: define Broadcom Cygnus GPIO binding
+  gpio: Cygnus: add GPIO driver
+  ARM: dts: enable GPIO for Broadcom Cygnus
 
-and I'll do my best to kept that up to date.
-
-Thanks.  Any and all feedback is greatly appreciated.
-
-
-TODO List for ACPI on arm64:
-============================
-1. Define how Aarch64 OS identifies itself to firmware.
-   * Problem:
-     * _OSI method is demonstrably unreliable. On x86 Linux claims to
-       be Windows
-     * Proposal to use _OSC method as replacement is complicated and
-       creates an explosion of combinations
-   * Solution:
-     * Draft and propose OS identification rules to ABST and ASWG for
-       inclusion in ACPI spec.
-     * Draft and propose recommended practice for current ACPI 5.1 spec
-       platforms.
-   * Status: Little progress, still under investigation
-
-2. Linux must choose DT booting by default when offered both ACPI and
-   DT on arm64
-   * DONE
-
-3. Linux UEFI/ACPI testing tools must be made available
-   * Problem:
-     * Hardware/Firmware vendors do not have tools to test Linux
-       compatibility.
-     * Common problems go undetected if not tested for.
-   * Solution:
-     * Port FWTS tool and LuvOS distribution to AArch64
-     * Make LuvOS images readily available
-     * Require hardware vendors to actively test against old and new
-       kernels.
-   * Status: LuvOS and FWTS ported to arm64 and running; patches being
-     mainlined; additional test cases being written.
-
-4. Set clear expectations for those providing ACPI for use with Linux
-   * Problem:
-     * Hardware/Firmware vendors can and will create ACPI tables that
-       cannot be used by Linux without some guidance
-     * Kernel developers cannot determine whether the kernel or firmware
-       is broken without knowing what the firmware should do
-   * Solution: document the expectations, and iterate as needed.
-     Enforce when we must.
-   * Status: initial kernel text available; AMD has offered to make
-     their guidance document generic; firmware summit planned for
-     deeper discussions.
-
-5. Demonstrate the ACPI core patches work
-   * Problem: how can we be sure the patches work?
-   * Solution: verify the patches on arm64 server platforms
-   * Status:
-     * ACPI core works on at least the Foundation model, Juno, APM
-       Mustang, and AMD Seattle
-     * FWTS results will be published as soon as possible
-
-6. How does the kernel handle_DSD usage?
-   * Problem:
-     * _DSD defines key-value properties in the DT style. How do we
-       ensure _DSD bindings are well defined?
-     * How do we ensure DT and _DSD bindings remain consistent with
-       each other?
-   * Solution: public documentation for all bindings, and a process
-     for defining them
-   * Status: proposal to require patch authors to point at public
-     binding documentation; kernel Documentation/devicetree/bindings
-     remains the default if no other location exists; UEFI forum has
-     set up a binding repository.
-
-7. Why is ACPI required?
-   * Problem:
-     * arm64 maintainers still haven't been convinced that ACPI is
-       necessary.
-     * Why do hardware and OS vendors say ACPI is required?
-   * Status: Al & Grant collecting statements from OEMs to be posted
-     publicly early in the new year; firmware summit for broader
-     discussion planned.
-
-8. Platform support patches need review
-   * Problem: the core Aarch64 patches have been reviewed and are in
-     good shape, but there is not yet a good example of server platform
-     support patches that use them.
-   * Solution: Post *good* patches for multiple ACPI platforms
-   * Status: first version for AMD Seattle has been posted to the
-     public linaro-acpi mailing list for initial review (thanks,
-     Arnd), refined versions to be posted to broader lists after a
-     few iterations for basic cleanup
+ .../devicetree/bindings/gpio/brcm,cygnus-gpio.txt  |   82 +++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   30 +
+ drivers/gpio/Kconfig                               |   12 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-bcm-cygnus.c                     |  607 ++++++++++++++++++++
+ 5 files changed, 732 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/brcm,cygnus-gpio.txt
+ create mode 100644 drivers/gpio/gpio-bcm-cygnus.c
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+1.7.9.5
