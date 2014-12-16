@@ -1,34 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 10:56:16 +0100
-Subject: [PATCH v1 1/3] gpio: Add APM X-Gene standby GPIO controller driver
-In-Reply-To: <CAL4ahLfSZjmqqbQ9Xmqae_AVfFZLiUUEN+rABMwiu2_8u4mmPQ@mail.gmail.com>
-References: <1412779948-28769-1-git-send-email-yvo@apm.com>
- <2250730.N6DdkCTXkh@wuerfel>
- <CAL4ahLfSZjmqqbQ9Xmqae_AVfFZLiUUEN+rABMwiu2_8u4mmPQ@mail.gmail.com>
-Message-ID: <1878846.YCCkHOWfdd@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 16 Dec 2014 10:57:10 +0100
+Subject: [PATCH 3/4] mmc: sunxi: Reset behavior fix
+In-Reply-To: <20141216003756.15488.34861.stgit@dizzy-6.o2s.ch>
+References: <20141216003412.15488.54812.stgit@dizzy-6.o2s.ch>
+ <20141216003756.15488.34861.stgit@dizzy-6.o2s.ch>
+Message-ID: <549001F6.5080202@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 December 2014 16:43:02 Y Vo wrote:
-> >> +static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
-> >> +{
-> >> +       struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
-> >> +       struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
-> >> +       u32 data;
-> >> +
-> >> +       data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
-> >> +
-> >> +       return (data &  GPIO_MASK(gpio)) ? 1 : 0;
-> >> +}
-> >
-> > This would be actually broken, right? Maybe it's better to change the
-> > driver so that it refuses to map GPIO lines that are hardwired to
-> > the interrupt controller, until we can support that.
-> 
-> It still works if they are configure as GPIO.
-> Do you have any reference to resolve it ?
+Hi,
 
-Ok, I think I just misunderstood how this works, I assumed that you
-could not reconfigure the lines. Seems ok then.
+On 16-12-14 01:37, David Lanzend?rfer wrote:
+> When there is only one DES available the DMA performs a FIFO reset and waits until the reinitialization has been completed.
+> Disabling the SDXC_IDMAC_DES0_DIC bit prevents the DMA from sending an interrupt after it has finished this reinitialization.
+>
+> The flags SDXC_IDMAC_DES0_FD and SDXC_IDMAC_DES0_LD are both required in order to use the controller with more than one DES.
+>
+> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> Reported-by: ?? <lixiang@allwinnertech.com>
+> ---
+>   drivers/mmc/host/sunxi-mmc.c |   12 +++++++++++-
+>   1 file changed, 11 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 50bd3d2..5331c88 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -310,7 +310,17 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
+>   	}
+>
+>   	pdes[0].config |= SDXC_IDMAC_DES0_FD;
+> -	pdes[i - 1].config = SDXC_IDMAC_DES0_OWN | SDXC_IDMAC_DES0_LD;
+> +
+> +	/*
+> +	 * When there is only one DES available the DMA performs a FIFO reset and waits
+> +	 * until the reinitialization has been completed.
+> +	 * Disabling the SDXC_IDMAC_DES0_DIC bit prevents the DMA from sending an interrupt
+> +	 * after it has finished this reinitialization.
+> +	 */
+> +	pdes[i - 1].config = SDXC_IDMAC_DES0_OWN;
+> +	pdes[i - 1].config |= SDXC_IDMAC_DES0_FD;
+> +	pdes[i - 1].config |= SDXC_IDMAC_DES0_LD;
+> +	pdes[i - 1].config &= ~SDXC_IDMAC_DES0_DIC;
+>
+>   	/*
+>   	 * Avoid the io-store starting the idmac hitting io-mem before the
 
-	Arnd
+This is wrong. For one you are starting with an assignment, so you could just as well
+set all the flags you want with a single line / assignment. Besides that you're setting
+the FD flag, which should only be set for the first descriptor of a transfer, so for
+multi descriptor transfers this is wrong.
+
+Please see the patch which I send you which gets this right.
+
+Regards,
+
+Hans
