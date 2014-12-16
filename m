@@ -1,73 +1,52 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Tue, 16 Dec 2014 11:43:12 +0200
-Subject: [PATCH 4/5] PCI: qcom: Add Qualcomm PCIe controller driver
-In-Reply-To: <2577563.x0mEZJNVDQ@wuerfel>
-References: <1418404441-5518-1-git-send-email-svarbanov@mm-sol.com>
- <1418404441-5518-5-git-send-email-svarbanov@mm-sol.com>
- <2577563.x0mEZJNVDQ@wuerfel>
-Message-ID: <548FFEB0.9080604@mm-sol.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Dec 2014 09:45:27 +0000
+Subject: [PATCH v10] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
+References: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20141216094527.GC6580@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, Dec 15, 2014 at 11:47:23PM +0000, Mitchel Humpherys wrote:
+> From: Matt Wagantall <mattw@codeaurora.org>
+> 
+> It is sometimes necessary to poll a memory-mapped register until its value
+> satisfies some condition. Introduce a family of convenience macros that do
+> this. Tight-looping, sleeping, and timing out can all be accomplished using
+> these macros.
+> 
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Robert Elliott <elliott@hp.com>
+> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+> v9..10:
+>   - Actually added the comments mentioned in v8..v9 (doh!)
+> 
+> v8..v9:
+>   - Added note in comments about max sleep time (Rob Elliott)
+> 
+> v7..v8:
+>   - sorted helper macros by size (b, w, l, q)
+>   - removed some of the more esoteric (or flat-out bogus) helper macros
+> 
+> This patch was originally part of a series [1] for adding support for IOMMU
+> address translations through an ARM SMMU hardware register.  The other
+> patch in the series (the one that actually uses these macros and implements
+> said hardware address translations) was Ack'd by the driver maintainer
+> there (Will Deacon) so I've pulled this patch out to avoid resending an
+> already Ack'd patch over and over again.
+> 
+> In short, please see [1] for previous discussion and the first user of
+> these macros.
+> 
+> Will also acked this patch in [2].  I didn't retain his Ack here because I
+> added to the macro comments.
 
-Thanks for the comments!
+You can keep the ack, it still looks good to me and I'm not really fussed
+about the comments.
 
-On 12/12/2014 07:30 PM, Arnd Bergmann wrote:
-> On Friday 12 December 2014 19:14:00 Stanimir Varbanov wrote:
->> The PCIe driver reuse the Designware common code for host
->> and MSI initialization, and also program the Qualcomm
->> application specific registers.
->>
->> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> 
-> Looks nice!
-> 
->> +static int
->> +qcom_pcie_rd_own_conf(struct pcie_port *pp, int where, int size, u32 *val)
->> +{
->> +	if (where == PCI_CLASS_REVISION && size == 4) {
->> +		*val = readl(pp->dbi_base + PCI_CLASS_REVISION);
->> +		*val &= ~(0xffff << 16);
->> +		*val |= PCI_CLASS_BRIDGE_PCI << 16;
->> +		return PCIBIOS_SUCCESSFUL;
->> +	}
->> +
->> +	return dw_pcie_cfg_read(pp->dbi_base + (where & ~0x3), where,
->> +				size, val);
->> +}
-> 
-> Could you add a comment here to explain what this is for?
-
-Sure I will add a comment. The issue is that the pci device class is not
-reported correctly from the register.
-
-> 
->> +static int __init qcom_pcie_probe(struct platform_device *pdev)
->> +{
-> 
-> I think it's a bug to mark this function as __init. It breaks
-> deferred probing and detaching/reattaching the device trough sysfs.
-> 
-
-My bad, I have tried to avoid mismatch section warnings came up from
-dw_pcie_host_init() which is annotated as __init. Do you think we need
-to remove __init from dw_pcie_host_init() declaration and fix the
-drivers accordingly?
-
-> After you fix that, you can remove the __refdata below.
-> 
->> +static struct platform_driver __refdata qcom_pcie_driver = {
->> +	.probe = qcom_pcie_probe,
->> +	.remove = qcom_pcie_remove,
->> +	.driver = {
->> +		.name = "qcom-pcie",
->> +		.of_match_table = qcom_pcie_match,
->> +	},
->> +};
-> 
-> 	Arnd
-> 
-
-regards,
-Stan
+Will
