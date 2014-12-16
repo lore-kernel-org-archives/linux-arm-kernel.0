@@ -1,22 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 21:44:40 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Fixes for v3.19
-In-Reply-To: <cover.1418265122.git.horms+renesas@verge.net.au>
-References: <cover.1418265122.git.horms+renesas@verge.net.au>
-Message-ID: <3167693.rMCbHIfDnH@wuerfel>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Tue, 16 Dec 2014 20:45:25 +0000 (UTC)
+Subject: regression: Clock changes in next-20141205 break at least
+ omap4
+In-Reply-To: <20141216202301.GF11502@n2100.arm.linux.org.uk>
+References: <5481F79D.4010504@codeaurora.org>
+ <20141205183849.GB30437@atomide.com> <20141212194238.20398.33333@quantum>
+ <alpine.DEB.2.02.1412122310570.29716@utopia.booyaka.com>
+ <20141215220224.20398.98259@quantum> <548F7B02.1090009@nvidia.com>
+ <20141216003834.GC23854@atomide.com> <548F8B70.2060803@nvidia.com>
+ <5490816E.7060706@codeaurora.org> <54908F8D.2020202@nvidia.com>
+ <20141216202301.GF11502@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1412162034420.3102@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 December 2014 11:33:15 Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC defconfig fixes for v3.19.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as defconfig-for-v3.19,
-> which I have already sent a pull-request for.
-> 
+On Tue, 16 Dec 2014, Russell King - ARM Linux wrote:
 
-Pulled into the arm-soc/fixes branch, thanks!
+> On Tue, Dec 16, 2014 at 01:01:17PM -0700, Paul Walmsley wrote:
+> > So the reference clock and functional clock are (usually) required by the
+> > PLL to operate, and should therefore be required by the PLL clock driver
+> > code in the kernel; but one could claim that they aren't technically parent
+> > clocks of the PLL in a clock tree sense, since the downstream output clock
+> > isn't directly derived from either of those clocks.
+> 
+> The reference clock is the parent clock for a PLL, and the output clock 
+> is a derivative of the reference clock. The PLL maths show that very 
+> clearly.
 
-	Arnd
+The PLL's internal oscillator is the electrical source of the PLL's output 
+clock.  The reference clock is just used to discipline that internal 
+oscillator.  Even that's not necessary - the reference clock can be 
+optional on some clock source implementations, which can run the internal 
+oscillator in open-loop mode.
+
+The question of what the appropriate "parent" clock(s) should be is really 
+a question of how the software chooses to model it, and has more to do 
+with use-counts, constraints, etc.  I don't believe we have documented a 
+precise definition for what a "parent clock" is, in the Linux clock 
+framework context.
+
+
+- Paul
