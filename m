@@ -1,51 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Dec 2014 17:50:19 +0000
-Subject: [GIT PULL] arm64: fixes for -rc1
-Message-ID: <20141216175019.GC2260@arm.com>
+From: evgeni@studio-punkt.com (Evgeni Dobrev)
+Date: Tue, 16 Dec 2014 19:19:13 +0100
+Subject: [PATCH 1/2] ARM: dts: kirkwood: enable phy driver for SATA
+ controller on 88f6192
+In-Reply-To: <20141216170138.14dcabc1@free-electrons.com>
+References: <20141215203724.GA22936@anne>
+ <20141216170138.14dcabc1@free-electrons.com>
+Message-ID: <20141216181913.GF20170@anne>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello Thomas,
 
-Given that my availability next week is likely to be poor, here are three
-arm64 fixes to resolve some issues introduced by features merged last
-week. I was going to wait until -rc1, but it doesn't make much sense to
-sit on fixes. Please pull.
+On Tue, Dec 16, 2014 at 05:01:38PM +0100, Thomas Petazzoni wrote:
+> Dear Evgeni Dobrev,
+> 
+> On Mon, 15 Dec 2014 21:37:24 +0100, Evgeni Dobrev wrote:
+> > This patch enables the phy drivers for the SATA controller on Marvell's 88f6192. Without them it is not possible to use SATA drives attached to this processor.
+> 
+> Commit log text should be wrapped to some reasonable length.
+> 
 
-Thanks,
+I will fix this.
 
-Will
+> 
+> >  			interrupts = <21>;
+> >  			clocks = <&gate_clk 14>, <&gate_clk 15>;
+> >  			clock-names = "0", "1";
+> > +                        phys = <&sata_phy0>, <&sata_phy1>;
+> > +                        phy-names = "port0", "port1";
+> 
+> You should use tabs and not spaces for indentation in Device Tree files.
 
---->8
+I will resubmit. Thank you for your review.
 
-The following changes since commit eb8a653137b7e74f7cdc01f814eb9d094a65aed9:
+> 
+> Thanks!
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> --
 
-  arm64: remove the unnecessary arm64_swiotlb_init() (2014-12-05 12:19:52 +0000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to fb59d007a0e44e2304e4fc8cf5c20b6fda7890f3:
-
-  arm64: mm: dump: don't skip final region (2014-12-11 12:08:07 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-Fix some fallout introduced during the merge window:
- - Build failure when PM_SLEEP is disabled but CPU_IDLE is enabled
- - Compiler warning from page table dumper w/ 48-bit VAs
- - Erroneous page table truncation in reported dump
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      arm64: psci: Fix build breakage without PM_SLEEP
-
-Mark Rutland (2):
-      arm64: mm: dump: fix shift warning
-      arm64: mm: dump: don't skip final region
-
- arch/arm64/kernel/psci.c | 2 ++
- arch/arm64/mm/dump.c     | 5 +----
- 2 files changed, 3 insertions(+), 4 deletions(-)
+evgeni
