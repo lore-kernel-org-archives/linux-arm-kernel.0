@@ -1,63 +1,74 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 17 Dec 2014 00:41:33 +0100
-Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
- Cortex-M4
-In-Reply-To: <2994970.DCfUQgtmcD@wuerfel>
-References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <1417565531-4507-12-git-send-email-stefan@agner.ch>
- <2994970.DCfUQgtmcD@wuerfel>
-Message-ID: <6ae4dd827bf4dcc202f60e8505173d0e@agner.ch>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 17 Dec 2014 08:46:11 +0900
+Subject: [PATCHv3] clocksource: exynos_mct: Add the support for Exynos 64bit
+ SoC
+Message-ID: <1418773571-10834-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-03 12:03, Arnd Bergmann wrote:
-> On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
->> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
->> new file mode 100644
->> index 0000000..051ee0f
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
->> @@ -0,0 +1,52 @@
->> +/*
->> + * Device tree for Colibri VF61 Cortex-M4 support
->> + *
->> + * Copyright 2014 Stefan Agner
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +
->> +/dts-v1/;
->> +#include "vf610m4.dtsi"
->> +
->> +/ {
->> +       model = "VF610 Cortex-M4";
->> +       compatible = "fsl,vf610m4";
->> +
->> +       chosen {
->> +               bootargs = "console=ttyLP2,115200 ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc rw";
->> +       };
->> +
-> 
-> Starting with v3.19, you should be able to use the earlycon framework on
-> arm32, so it would be better to replace earlyprintk with earlycon here
-> and add a stdout-path property in chosen that points to the console
-> uart.
+This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+for Exynos 32bit SoC.
 
-I started to implement earlycon support, but something currently fails
-when earlycon tries to map the UART registers:
-[    0.000000] earlycon_map: Couldn't map 0x40027000
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+This patch set is tested on 64-bit Exynos SoC. I send only this patch from
+following patchst[1].
+[1] https://lkml.org/lkml/2014/12/2/134
 
-I traced the issue a bit further down and found that get_vm_area_caller
-returns NULL (in __arm_ioremap_pfn_caller). This happend on Linus master
-as of today (2dbfca5a181973558277b28b1f4c36362291f5e0). Do I miss
-something here?
+Changes from v2:
+- None
+Changes from v1:
+- Use CONFIG_ARM instead of CONFIG_ARM64
 
-> 
-> 64 hash table entries sounds extremely small, doesn't that impact
-> performance? If you have 50MB of actual RAM available, I don't think
-> you need that.
-> 
-> 	Arnd
+ drivers/clocksource/Kconfig      | 1 -
+ drivers/clocksource/exynos_mct.c | 4 ++++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 9042060..27ef3fa 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -134,7 +134,6 @@ config CLKSRC_METAG_GENERIC
+ 
+ config CLKSRC_EXYNOS_MCT
+ 	def_bool y if ARCH_EXYNOS
+-	depends on !ARM64
+ 	help
+ 	  Support for Multi Core Timer controller on Exynos SoCs.
+ 
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 9403061..b840ea1 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+ 	return exynos4_read_count_32();
+ }
+ 
++#if defined(CONFIG_ARM)
+ static struct delay_timer exynos4_delay_timer;
+ 
+ static cycles_t exynos4_read_current_timer(void)
+@@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+ 			 "cycles_t needs to move to 32-bit for ARM64 usage");
+ 	return exynos4_read_count_32();
+ }
++#endif
+ 
+ static void __init exynos4_clocksource_init(void)
+ {
+ 	exynos4_mct_frc_start();
+ 
++#if defined(CONFIG_ARM)
+ 	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+ 	exynos4_delay_timer.freq = clk_rate;
+ 	register_current_timer_delay(&exynos4_delay_timer);
++#endif
+ 
+ 	if (clocksource_register_hz(&mct_frc, clk_rate))
+ 		panic("%s: can't register clocksource\n", mct_frc.name);
+-- 
+1.8.5.5
