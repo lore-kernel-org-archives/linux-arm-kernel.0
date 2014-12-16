@@ -1,69 +1,61 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Tue, 16 Dec 2014 11:39:51 -0500
-Subject: [PATCH 1/2] ARM: omap5/dra7xx: Fix frequency typos.
-In-Reply-To: <54903C6A.5070807@ti.com>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <5f7d841d41f6485022e07a22c332d3c8ea985bfa.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <54903C6A.5070807@ti.com>
-Message-ID: <20141216163951.GM24110@csclub.uwaterloo.ca>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 16 Dec 2014 20:33:36 +0300
+Subject: [PATCH 2/2] ahci_xgene: Fix the dma state machine lockup for
+ the ATA_CMD_PACKET PIO mode command.
+In-Reply-To: <1418748575-27301-3-git-send-email-stripathi@apm.com>
+References: <1418748575-27301-1-git-send-email-stripathi@apm.com>
+ <1418748575-27301-3-git-send-email-stripathi@apm.com>
+Message-ID: <54906CF0.9010908@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 08:06:34AM -0600, Nishanth Menon wrote:
-> On 12/12/2014 04:08 PM, Lennart Sorensen wrote:
-> > The switch statement of the possible list of SYSCLK1 frequencies is
-> > missing a 0 in 4 out of the 7 frequencies.
-> > 
-> > Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
-> > ---
-> >  arch/arm/mach-omap2/timer.c |    8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index 4f61148..fb0cb2b 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -513,11 +513,11 @@ static void __init realtime_counter_init(void)
-> >  	rate = clk_get_rate(sys_clk);
-> >  	/* Numerator/denumerator values refer TRM Realtime Counter section */
-> >  	switch (rate) {
-> > -	case 1200000:
-> > +	case 12000000:
-> >  		num = 64;
-> >  		den = 125;
-> >  		break;
-> > -	case 1300000:
-> > +	case 13000000:
-> >  		num = 768;
-> >  		den = 1625;
-> >  		break;
-> > @@ -529,11 +529,11 @@ static void __init realtime_counter_init(void)
-> >  		num = 192;
-> >  		den = 625;
-> >  		break;
-> > -	case 2600000:
-> > +	case 26000000:
-> >  		num = 384;
-> >  		den = 1625;
-> >  		break;
-> > -	case 2700000:
-> > +	case 27000000:
-> >  		num = 256;
-> >  		den = 1125;
-> >  		break;
-> > 
-> 
-> 
-> Also please add:
-> Fixes: fa6d79d27614 ("ARM: OMAP: Add initialisation for the real-time
-> counter")
-> 
-> With that,
-> 
-> Acked-by: Nishanth Menon <nm@ti.com>
+Hello.
 
-Should I send a new version with that added, or will someone else handle
-doing that bit?
+On 12/16/2014 07:49 PM, Suman Tripathi wrote:
 
--- 
-Len Sorensen
+> This patch addresses the issue with ATA_CMD_PACKET pio mode
+> command for enumeration and device detection with ATAPI devices.It is the
+> same issue as in patch
+
+> www.spinics.net/lists/linux-ide/msg49092.html
+
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   drivers/ata/ahci_xgene.c | 12 +++++++-----
+>   1 file changed, 7 insertions(+), 5 deletions(-)
+
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index 0ffd3c9..9730907 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+> @@ -125,10 +125,11 @@ static int xgene_ahci_restart_engine(struct ata_port *ap)
+>    * xgene_ahci_qc_issue - Issue commands to the device
+>    * @qc: Command to issue
+>    *
+> - * Due to Hardware errata for IDENTIFY DEVICE command, the controller cannot
+> - * clear the BSY bit after receiving the PIO setup FIS. This results in the dma
+> - * state machine goes into the CMFatalErrorUpdate state and locks up. By
+> - * restarting the dma engine, it removes the controller out of lock up state.
+> + * Due to Hardware errata for IDENTIFY DEVICE command and COMMAND PACKET
+
+    Just PACKET.
+
+> + * command of ATAPI protocol set, the controller cannot clear the BSY bit
+> + * after receiving the PIO setup FIS. This results in the dma state machine
+
+    DMA.
+
+> + * goes into the CMFatalErrorUpdate state and locks up. By restarting the
+
+    s/goes/going/.
+
+> + * dma engine, it removes the controller out of lock up state.
+
+    DMA again.
+
+>    */
+>   static unsigned int xgene_ahci_qc_issue(struct ata_queued_cmd *qc)
+>   {
+[...]
+
+MBR, Sergei
