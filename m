@@ -1,101 +1,38 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 16 Dec 2014 01:21:58 +0100
-Subject: [PATCHv1 0/7] from now on, use 'isil' as prefix for Intersil
-Message-ID: <cover.1418688042.git.arno@natisbad.org>
+Date: Tue, 16 Dec 2014 01:22:55 +0100
+Subject: [PATCHv1 2/7] rtc: isl12022: deprecate use of isl in compatible
+ string for isil
+In-Reply-To: <cover.1418688042.git.arno@natisbad.org>
+References: <cover.1418688042.git.arno@natisbad.org>
+Message-ID: <7405d4a47a33693811f90a31b35444896568ba02.1418688042.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-As suggested by Jason on a v0, I made a specific series for that work,
-which intend to remove all remaining 'isl' prefix for Intersil to only
-have 'isil'. More details below.
+"isil" and "isl" prefixes are used at various locations inside the kernel
+to reference Intersil corporation. This patch is part of a series fixing
+those locations were "isl" is used in compatible strings to use the now
+expected "isil" prefix instead (NASDAQ symbol for Intersil and most used
+version). The old compatible string is kept for backward compatibility.
 
-When Intersil ISL12057 driver was introduced by commit 70e123373c05
-("rtc: Add support for Intersil ISL12057 I2C RTC chip"), the vendor
-prefix 'isl' was used instead of the expected 'isil' (Intersil
-NASDAQ symbol) and documented in vendor-prefixes.txt.
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ drivers/rtc/rtc-isl12022.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Recently, a patch from Philip Zabel (7a6540ca856a, "ARM: mvebu:
-Change vendor prefix for Intersil Corporation to isil") fixed that
-prefix in ReadyNAS devices .dts files (AFAICT, the only users of
-the driver).
-
-Then, commits 7c75c1d5e72b ("dt-bindings: Document deprecated device
-vendor name to fix related warning") and b2ea3f82e798 (dt-bindings:
-Document correct and deprecated vendor-prefix with device isl29028)
-decided to go the other way and deprecate isil in vendor-prefixes.txt
-and in isl29028.c staging driver.
-
-While trying and merge a fix I wrote for ISL12057 drivers to finish
-Philip's work, it conflicted with the two recently introduced commits,
-and revealed the issue: at the moment, there are various compatible
-strings in drivers and .dts files for Intersil products which use
-either isl or isil:
-
-$ grep -R "isil," .
-./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isil,isl29028           (deprecated, use isl)
-./drivers/staging/iio/light/isl29028.c:   { .compatible = "isil,isl29028", },/* deprecated, don't use */
-./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29018", },
-./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29023", },
-./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29035", },
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/arm/boot/dts/exynos5800-peach-pi.dts: compatible = "isil,isl29018";
-./arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi: compatible = "isil,isl1208";
-./arch/arm/boot/dts/tegra20-ventana.dts:     compatible = "isil,isl29018";
-./arch/arm/boot/dts/tegra20-seaboard.dts:    compatible = "isil,isl29018";
-./arch/arm/boot/dts/armada-xp-netgear-rn2120.dts: compatible = "isil,isl12057";
-./arch/arm/boot/dts/armada-370-netgear-rn104.dts: compatible = "isil,isl12057";
-./arch/arm/boot/dts/exynos5420-peach-pit.dts:     compatible = "isil,isl29018";
-./arch/arm/boot/dts/armada-370-netgear-rn102.dts: compatible = "isil,isl12057";
-
-$ grep -R "isl," .
-./Documentation/devicetree/bindings/regulator/isl9305.txt:- compatible: "isl,isl9305" or "isl,isl9305h"
-./Documentation/devicetree/bindings/regulator/isl9305.txt:              compatible = "isl,isl9305";
-./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isl,isl12057      Intersil ISL12057 I2C RTC Chip
-./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isl,isl29028      Intersil ISL29028 Ambient Light ....
-./drivers/regulator/isl9305.c:          { .compatible = "isl,isl9305" },
-./drivers/regulator/isl9305.c:          { .compatible = "isl,isl9305h" },
-./drivers/staging/iio/light/isl29028.c: { .compatible = "isl,isl29028", },
-./drivers/rtc/rtc-isl12057.c:           { .compatible = "isl,isl12057" },
-./drivers/rtc/rtc-isl12022.c:           { .compatible = "isl,isl12022" },
-./arch/arm/boot/dts/tegra30-cardhu.dtsi:   compatible = "isl,isl29028";
-./arch/arm/boot/dts/zynq-parallella.dts:   compatible = "isl,isl9305";
-
-AFAICT, it seems it makes sense to *definitively* settle for isil as the
-vendor prefix for Intersil, as Philip did in 7a6540ca856a: it's the NASDAQ
-symbol and this choice requires less changes than opting for isl.
-
-So, this series changes compatible strings in .dts files to use isil where
-isl was found before, and modify drivers w/ compatible strings using isl
-to add one using isil. In those cases, a comment is made that the old
-compatible string is kept for backward compatibility (w/ out-fo-tree users
-of those drivers). Additionally, it leaves only isil as prefix in
-vendor-prefixes.txt. Those changes should prevent any new inclusion of
-isl compatible strings for Intersil devices due to copy-and-paste.
-
-Arnaud Ebalard (7):
-  dt-bindings: use isil prefix for Intersil
-  rtc: isl12022: deprecate use of isl in compatible string for isil
-  rtc: isl12057: deprecate use of isl in compatible string for isil
-  staging: iio: isl29028: deprecate use of isl in compatible string for isil
-  regulator: isl9305: deprecate use of isl in compatible string for isil
-  arm: dts: zynq: update isl9305 compatible string to use isil vendor prefix
-  arm: dts: tegra: update isl29028 compatible string to use isil vendor prefix
-
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 5 ++---
- Documentation/devicetree/bindings/regulator/isl9305.txt   | 4 ++--
- Documentation/devicetree/bindings/vendor-prefixes.txt     | 3 +--
- arch/arm/boot/dts/tegra30-cardhu.dtsi                     | 2 +-
- arch/arm/boot/dts/zynq-parallella.dts                     | 2 +-
- drivers/regulator/isl9305.c                               | 6 ++++--
- drivers/rtc/rtc-isl12022.c                                | 3 ++-
- drivers/rtc/rtc-isl12057.c                                | 3 ++-
- drivers/staging/iio/light/isl29028.c                      | 4 ++--
- 9 files changed, 17 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/rtc/rtc-isl12022.c b/drivers/rtc/rtc-isl12022.c
+index ee3ba7e6b45e..f9b082784b90 100644
+--- a/drivers/rtc/rtc-isl12022.c
++++ b/drivers/rtc/rtc-isl12022.c
+@@ -275,7 +275,8 @@ static int isl12022_probe(struct i2c_client *client,
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id isl12022_dt_match[] = {
+-	{ .compatible = "isl,isl12022" },
++	{ .compatible = "isl,isl12022" }, /* for backward compat., don't use */
++	{ .compatible = "isil,isl12022" },
+ 	{ },
+ };
+ #endif
 -- 
 2.1.1
