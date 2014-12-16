@@ -1,10 +1,9 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 16 Dec 2014 18:20:52 +0200
-Subject: [PATCH 07/11] clk: ti: composite: add support for legacy composite
- clock init
+Date: Tue, 16 Dec 2014 18:20:50 +0200
+Subject: [PATCH 05/11] clk: ti: divider: add support for legacy divider init
 In-Reply-To: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
 References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1418746856-17173-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1418746856-17173-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,114 +12,195 @@ DT clocks, thus add support for this.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk.c       |    3 +++
- drivers/clk/ti/clock.h     |    1 +
- drivers/clk/ti/composite.c |   46 ++++++++++++++++++++++++++++++++++++++++----
- 3 files changed, 46 insertions(+), 4 deletions(-)
+ drivers/clk/ti/clk.c     |    3 ++
+ drivers/clk/ti/clock.h   |    2 +
+ drivers/clk/ti/divider.c |  132 +++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 136 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index f41a757..546dae4 100644
+index 676dbf1..a0475e2 100644
 --- a/drivers/clk/ti/clk.c
 +++ b/drivers/clk/ti/clk.c
-@@ -217,6 +217,9 @@ struct clk __init *ti_clk_register_clk(struct ti_clk *setup)
- 	case TI_CLK_DIVIDER:
- 		clk = ti_clk_register_divider(setup);
+@@ -214,6 +214,9 @@ struct clk __init *ti_clk_register_clk(struct ti_clk *setup)
+ 	case TI_CLK_MUX:
+ 		clk = ti_clk_register_mux(setup);
  		break;
-+	case TI_CLK_COMPOSITE:
-+		clk = ti_clk_register_composite(setup);
++	case TI_CLK_DIVIDER:
++		clk = ti_clk_register_divider(setup);
 +		break;
  	case TI_CLK_FIXED_FACTOR:
  		fixed_factor = setup->data;
  
 diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index f4e8eb2..8d9c603 100644
+index 9430dc6..fe70941 100644
 --- a/drivers/clk/ti/clock.h
 +++ b/drivers/clk/ti/clock.h
-@@ -157,6 +157,7 @@ struct clk *ti_clk_register_gate(struct ti_clk *setup);
+@@ -156,7 +156,9 @@ struct ti_clk_dpll {
+ struct clk *ti_clk_register_gate(struct ti_clk *setup);
  struct clk *ti_clk_register_interface(struct ti_clk *setup);
  struct clk *ti_clk_register_mux(struct ti_clk *setup);
- struct clk *ti_clk_register_divider(struct ti_clk *setup);
-+struct clk *ti_clk_register_composite(struct ti_clk *setup);
- struct clk *ti_clk_register_dpll(struct ti_clk *setup);
++struct clk *ti_clk_register_divider(struct ti_clk *setup);
  
- struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup);
-diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
-index 19d8980..3a9665f 100644
---- a/drivers/clk/ti/composite.c
-+++ b/drivers/clk/ti/composite.c
-@@ -23,6 +23,8 @@
++struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup);
+ struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup);
+ struct clk_hw *ti_clk_build_component_mux(struct ti_clk_mux *setup);
+ 
+diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
+index bff2b5b..6211893 100644
+--- a/drivers/clk/ti/divider.c
++++ b/drivers/clk/ti/divider.c
+@@ -21,6 +21,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
  #include <linux/clk/ti.h>
- #include <linux/list.h>
- 
 +#include "clock.h"
-+
+ 
  #undef pr_fmt
  #define pr_fmt(fmt) "%s: " fmt, __func__
+@@ -301,6 +302,134 @@ static struct clk *_register_divider(struct device *dev, const char *name,
+ }
  
-@@ -116,8 +118,44 @@ static inline struct clk_hw *_get_hw(struct clk_hw_omap_comp *clk, int idx)
- 
- #define to_clk_hw_comp(_hw) container_of(_hw, struct clk_hw_omap_comp, hw)
- 
--static void __init ti_clk_register_composite(struct clk_hw *hw,
--					     struct device_node *node)
-+struct clk *ti_clk_register_composite(struct ti_clk *setup)
+ static struct clk_div_table *
++_get_div_table_from_setup(struct ti_clk_divider *setup, u8 *width)
 +{
-+	struct ti_clk_composite *comp;
-+	struct clk_hw *gate;
-+	struct clk_hw *mux;
-+	struct clk_hw *div;
-+	int num_parents = 1;
-+	const char **parent_names = NULL;
-+	struct clk *clk;
++	int valid_div = 0;
++	struct clk_div_table *table;
++	int i;
++	int div;
++	u32 val;
++	u8 flags;
 +
-+	comp = setup->data;
++	if (!setup->num_dividers) {
++		/* Clk divider table not provided, determine min/max divs */
++		flags = setup->flags;
 +
-+	div = ti_clk_build_component_div(comp->divider);
-+	gate = ti_clk_build_component_gate(comp->gate);
-+	mux = ti_clk_build_component_mux(comp->mux);
++		if (flags & CLKF_INDEX_STARTS_AT_ONE)
++			val = 1;
++		else
++			val = 0;
 +
-+	if (div)
-+		parent_names = &comp->divider->parent;
++		div = 1;
 +
-+	if (gate)
-+		parent_names = &comp->gate->parent;
++		while (div < setup->max_div) {
++			if (flags & CLKF_INDEX_POWER_OF_TWO)
++				div <<= 1;
++			else
++				div++;
++			val++;
++		}
 +
-+	if (mux) {
-+		num_parents = comp->mux->num_parents;
-+		parent_names = comp->mux->parents;
++		*width = fls(val);
++
++		return NULL;
 +	}
 +
-+	clk = clk_register_composite(NULL, setup->name,
-+				     parent_names, num_parents, mux,
-+				     &ti_clk_mux_ops, div,
-+				     &ti_composite_divider_ops, gate,
-+				     &ti_composite_gate_ops, 0);
++	for (i = 0; i < setup->num_dividers; i++)
++		if (setup->dividers[i])
++			valid_div++;
++
++	table = kzalloc(sizeof(*table) * (valid_div + 1), GFP_KERNEL);
++	if (!table)
++		return ERR_PTR(-ENOMEM);
++
++	valid_div = 0;
++	*width = 0;
++
++	for (i = 0; i < setup->num_dividers; i++)
++		if (setup->dividers[i]) {
++			table[valid_div].div = setup->dividers[i];
++			table[valid_div].val = i;
++			valid_div++;
++			*width = i;
++		}
++
++	*width = fls(*width);
++
++	return table;
++}
++
++struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup)
++{
++	struct clk_divider *div;
++	struct clk_omap_reg *reg;
++
++	if (!setup)
++		return NULL;
++
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	reg = (struct clk_omap_reg *)&div->reg;
++	reg->index = setup->module;
++	reg->offset = setup->reg;
++
++	if (setup->flags & CLKF_INDEX_STARTS_AT_ONE)
++		div->flags |= CLK_DIVIDER_ONE_BASED;
++
++	if (setup->flags & CLKF_INDEX_POWER_OF_TWO)
++		div->flags |= CLK_DIVIDER_POWER_OF_TWO;
++
++	div->table = _get_div_table_from_setup(setup, &div->width);
++
++	div->shift = setup->bit_shift;
++
++	return &div->hw;
++}
++
++struct clk *ti_clk_register_divider(struct ti_clk *setup)
++{
++	struct ti_clk_divider *div;
++	struct clk_omap_reg *reg_setup;
++	u32 reg;
++	u8 width;
++	u32 flags = 0;
++	u8 div_flags = 0;
++	struct clk_div_table *table;
++	struct clk *clk;
++
++	div = setup->data;
++
++	reg_setup = (struct clk_omap_reg *)&reg;
++
++	reg_setup->index = div->module;
++	reg_setup->offset = div->reg;
++
++	if (div->flags & CLKF_INDEX_STARTS_AT_ONE)
++		div_flags |= CLK_DIVIDER_ONE_BASED;
++
++	if (div->flags & CLKF_INDEX_POWER_OF_TWO)
++		div_flags |= CLK_DIVIDER_POWER_OF_TWO;
++
++	if (div->flags & CLKF_SET_RATE_PARENT)
++		flags |= CLK_SET_RATE_PARENT;
++
++	table = _get_div_table_from_setup(div, &width);
++	if (IS_ERR(table))
++		return (struct clk *)table;
++
++	clk = _register_divider(NULL, setup->name, div->parent,
++				flags, (void __iomem *)reg, div->bit_shift,
++				width, div_flags, table, NULL);
++
++	if (IS_ERR(clk))
++		kfree(table);
 +
 +	return clk;
 +}
 +
-+static void __init _register_composite(struct clk_hw *hw,
-+				       struct device_node *node)
++static struct clk_div_table *
+ __init ti_clk_get_div_table(struct device_node *node)
  {
- 	struct clk *clk;
- 	struct clk_hw_omap_comp *cclk = to_clk_hw_comp(hw);
-@@ -136,7 +174,7 @@ static void __init ti_clk_register_composite(struct clk_hw *hw,
- 			pr_debug("component %s not ready for %s, retry\n",
- 				 cclk->comp_nodes[i]->name, node->name);
- 			if (!ti_clk_retry_init(node, hw,
--					       ti_clk_register_composite))
-+					       _register_composite))
- 				return;
+ 	struct clk_div_table *table;
+@@ -455,7 +584,8 @@ static void __init of_ti_divider_clk_setup(struct device_node *node)
+ 		goto cleanup;
  
- 			goto cleanup;
-@@ -216,7 +254,7 @@ static void __init of_ti_composite_clk_setup(struct device_node *node)
- 	for (i = 0; i < num_clks; i++)
- 		cclk->comp_nodes[i] = _get_component_node(node, i);
+ 	clk = _register_divider(NULL, node->name, parent_name, flags, reg,
+-				shift, width, clk_divider_flags, table, NULL);
++				shift, width, clk_divider_flags, table,
++				NULL);
  
--	ti_clk_register_composite(&cclk->hw, node);
-+	_register_composite(&cclk->hw, node);
- }
- CLK_OF_DECLARE(ti_composite_clock, "ti,composite-clock",
- 	       of_ti_composite_clk_setup);
+ 	if (!IS_ERR(clk)) {
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 -- 
 1.7.9.5
