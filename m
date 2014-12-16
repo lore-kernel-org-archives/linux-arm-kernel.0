@@ -1,41 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Dec 2014 15:09:38 -0500
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <20141216200304.GS11285@n2100.arm.linux.org.uk>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215232221.GD19261@kw.sim.vm.gnt>
- <20141216130331.GJ967@titan.lakedaemon.net>
- <20141216133719.GE19261@kw.sim.vm.gnt>
- <20141216144533.GL967@titan.lakedaemon.net>
- <54907A82.6030906@free-electrons.com>
- <20141216185550.GQ967@titan.lakedaemon.net>
- <20141216200304.GS11285@n2100.arm.linux.org.uk>
-Message-ID: <20141216200938.GR967@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Dec 2014 21:19:05 +0100
+Subject: [PATCHv1] rtc: bcm-iproc: Add support for Broadcom iproc rtc
+In-Reply-To: <54909074.2070804@broadcom.com>
+References: <1418757750-3628-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <7947905.aK8KkUx4sY@wuerfel> <54909074.2070804@broadcom.com>
+Message-ID: <1418783023.hzNZBNCmFc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 08:03:04PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 16, 2014 at 01:55:50PM -0500, Jason Cooper wrote:
-> > Agreed.  We should keep in mind that once we have heard from everybody
-> > (big if), that is still only representative of armada and maybe mvebu
-> > ecosystem. :(  I'm starting to lean even more towards #2...
-> 
-> Except I know that there are people out there who want to ship the
-> source files with their project.
-> 
-> The DT source files are integrated into the mainline Linux kernel, and
-> not everyone wants to download the Linux kernel source just to be able
-> to build the DT files for their non-Linux project.
+On Tuesday 16 December 2014 12:05:08 Arun Ramamurthy wrote:
+> On 14-12-16 11:42 AM, Arnd Bergmann wrote:
+> > On Tuesday 16 December 2014 11:22:30 arun.ramamurthy at broadcom.com wrote:
+> >> +       rtc: iproc_rtc at 0x03026000 {
+> >> +               compatible = "brcm,iproc-rtc";
+> >> +               reg =   spru_bbl:               <0x03026000 0xC>,
+> >> +                       crmu_pwr_good_status:   <0x0301C02C 0x14>,
+> >> +                       crmu_bbl_auth:          <0x03024C74 0x8>;
+> >> +               interrupts = spru_rtc_periodic: <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+> >> +                            spru_alarm:        <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
+> >
+> > The reg properties look really random, could it be that the registers
+> > are really part of some other device that contains multiple functions?
+> >
+> This RTC block is on a battery backed logic island and is accessed 
+> indirectly using the spru_bbl registers. The CRMU registers are required 
+> to read the power status and write to some authentication registers. 
+> Without writing to these authentication
+> registers, we cannot access any of the spru_bbl registers. In conclusion
+> I don't think the CRMU register accesses can be considered as another 
+> device access. Do you agree Arnd?
 
-This is why Ian created the devicetree repository:
+It sounds like CRMU is some other unit aside from the RTC. Could this
+be something like a generic system controller? I think it should
+either have its own driver or use the syscon logic if that is what
+this is.
 
-  http://xenbits.xen.org/gitweb/?p=people/ianc/device-tree-rebasing.git;a=tree
+> > Also, what do you use the labels for?
+> >
+> The labels are purely to improve readability of the device tree entry
 
-Barebox has been using this for several months at least.  That removes
-the logistical hurdle, at least.
+Please remove them then, they don't help at all.
 
-thx,
-
-Jason.
+	Arnd
