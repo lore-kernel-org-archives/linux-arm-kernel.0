@@ -1,74 +1,74 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 16 Dec 2014 14:10:25 -0800
-Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
- pm_genpd_dev_need_restore to use restore types
-In-Reply-To: <54901341.20106@samsung.com> (Marek Szyprowski's message of "Tue,
- 16 Dec 2014 12:10:57 +0100")
-References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
- <54901341.20106@samsung.com>
-Message-ID: <7h61dbdz5a.fsf@deeprootsystems.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 16 Dec 2014 23:19:08 +0100
+Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
+ Cortex-M4
+In-Reply-To: <2994970.DCfUQgtmcD@wuerfel>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <1417565531-4507-12-git-send-email-stefan@agner.ch>
+ <2994970.DCfUQgtmcD@wuerfel>
+Message-ID: <b090cb361e81d2f1be5d21d1a07e9340@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski <m.szyprowski@samsung.com> writes:
+On 2014-12-03 12:03, Arnd Bergmann wrote:
+> On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
+>> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+>> new file mode 100644
+>> index 0000000..051ee0f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+>> @@ -0,0 +1,52 @@
+>> +/*
+>> + * Device tree for Colibri VF61 Cortex-M4 support
+>> + *
+>> + * Copyright 2014 Stefan Agner
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "vf610m4.dtsi"
+>> +
+>> +/ {
+>> +       model = "VF610 Cortex-M4";
+>> +       compatible = "fsl,vf610m4";
+>> +
+>> +       chosen {
+>> +               bootargs = "console=ttyLP2,115200 ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc rw";
+>> +       };
+>> +
+> 
+> Starting with v3.19, you should be able to use the earlycon framework on
+> arm32, so it would be better to replace earlyprintk with earlycon here
+> and add a stdout-path property in chosen that points to the console
+> uart.
 
-> Hello,
->
-> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
->> Instead of using bool to restore suspended devices initially, use flags
->> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and GPD_DEV_RESTORE_FORCE.
->> The first two flags will be similar to the existing true/false functionality.
->> The third flag may be used to force restore of suspended devices
->> whenever their associated power domain is turned on.
->>
->> Currently, PD power off function powers off all the associated unused
->> devices. The functionality added in this patch is similar to it.
->>
->> This feature may be used for those devices which are always in ON state
->> if the PD associated with them is ON but may need local runtime resume
->> and suspend during PD On/Off. These devices (like clock) may not implement
->> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
->> subsystems interaction behaviour or any other reason.
->>
->> The model works like,
->>      DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
->>      /	pm_runtime_put. Its local runtime_suspend/resume is invoked via
->>     /	GPD_DEV_RESTORE_FORCE option)
->>    /
->> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
->>    \	pm_runtime_put. This in turn invokes PD On/Off)
->>     \
->>      DEV3 (Similar to DEV1)
->>
->> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->
-> The idea of adding new gen_pd flag and reusing runtime pm calls intead
-> of additional notifiers looks promising, but I have some doubts. 
+Hi Arnd,
 
-I agree, this is better than notifiers, but I have some doubts too.
+Just started looking in that a bit deeper and some question arose:
+Afaik, earlycon need to be supported by the uart driver. The fsl_lpuart,
+which is used for Vybrid's uart, does not support earlycon yet. However,
+earlyprink already works (see ./arch/arm/include/debug/vf.S). I
+understand that earlycon has the advantage of being able to be used on
+multiplatform. But earlyprintk is working really early (e.g. before
+locating the FDT), and it proved helpful for me when I started working
+on that Cortex-M4 stuff. Should earlycon replace earlyprintk completely?
 
-> don't see any guarantee that devices with GPD_DEV_RESTORE_FORCE flag
-> will be suspended after all "normal" devices and restored before
-> them. Without such assumption it will be hard to use this approach for
-> iommu related activities, because device might need to use (in its
-> suspend/resume callbacks) the functionality provided by the other
-> device with GPD_DEV_RESTORE_FORCE flag. Maybe some additional flags
-> like suspend/resume priority (or more flags) will solve somehow this
-> dependency.
+Maybe, on Vybrid, since it would be a good platform for automated !MMU
+testing, it would be nice to have earlycon which can be enabled in any
+case and would provide output even something blows up quite early... But
+I guess I would add earlycon support as part of a new patchset and just
+drop earlyprintk here for now.
 
-At a deeper level, the problem with this approach is that this is more
-generically a runtime PM dependency problem, not a genpd problem.  For
-example, what happens when the same kind of dependency exists on a
-platform using a custom PM domain instead of genpd (like ACPI.) ?
+> 64 hash table entries sounds extremely small, doesn't that impact
+> performance? If you have 50MB of actual RAM available, I don't think
+> you need that.
 
-What's needed to solve this problem is a generalized way to have runtime
-PM dependencies between devices.  Runtime PM already automatically
-handles parent devices as one type of dependent device (e.g. a parent
-device needs to be runtime PM resumed before its child.)  So what's
-needed is a generic way to other PM dependencies with the runtime PM
-core (not the genpd core.)
+Agreed. I copied that from EFM32 which is under much more memory
+pressure...
 
-If runtime PM handles the dependencies corretcly, then genpd (and any
-other PM domain) will get them "for free".
-
-Kevin
+--
+Stefan
