@@ -1,28 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 21:40:48 +0100
-Subject: [PATCH] iommu/exynos: Fix arm64 allmodconfig build
-In-Reply-To: <1418658882-14809-1-git-send-email-broonie@kernel.org>
-References: <1418658882-14809-1-git-send-email-broonie@kernel.org>
-Message-ID: <2060329.N1WYSODiQy@wuerfel>
+Date: Tue, 16 Dec 2014 21:44:40 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Fixes for v3.19
+In-Reply-To: <cover.1418265122.git.horms+renesas@verge.net.au>
+References: <cover.1418265122.git.horms+renesas@verge.net.au>
+Message-ID: <3167693.rMCbHIfDnH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 December 2014 15:54:42 Mark Brown wrote:
-> The Exynos IOMMU driver uses the ARM specific dmac_flush_range() and
-> outer_flush_range() functions. This breaks the build on arm64 allmodconfig
-> in -next since support has been merged for some Exynos ARMv8 SoCs. Add a
-> dependency on ARM to keep things building until either the driver has the
-> ARM dependencies removed or the ARMv8 architecture code implements these
-> ARM specific APIs.
+On Thursday 11 December 2014 11:33:15 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
+> Please consider these Renesas ARM based SoC defconfig fixes for v3.19.
 > 
-> Resending to the arm-soc people since the addition of the Exynos
-> platform for ARMv8 went via them, Krzysztof also sent a fix for this
-> earlier but it there's been no response.
+> This pull request is based on the previous round of
+> such requests, tagged as defconfig-for-v3.19,
+> which I have already sent a pull-request for.
 > 
 
-Applied to fixes branch, thansk!
+Pulled into the arm-soc/fixes branch, thanks!
 
 	Arnd
