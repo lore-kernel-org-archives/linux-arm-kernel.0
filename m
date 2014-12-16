@@ -1,100 +1,92 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 15 Dec 2014 18:31:28 -0700
-Subject: regression: Clock changes in next-20141205 break at least omap4
-In-Reply-To: <20141216003834.GC23854@atomide.com>
-References: <20141205165539.GA30437@atomide.com>
- <5481F79D.4010504@codeaurora.org> <20141205183849.GB30437@atomide.com>
- <20141212194238.20398.33333@quantum>
- <alpine.DEB.2.02.1412122310570.29716@utopia.booyaka.com>
- <20141215220224.20398.98259@quantum> <548F7B02.1090009@nvidia.com>
- <20141216003834.GC23854@atomide.com>
-Message-ID: <548F8B70.2060803@nvidia.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 16 Dec 2014 15:13:24 +1300
+Subject: [PATCH] dtc: Use quotes to include header files
+In-Reply-To: <7947240.7yktm8fT2X@wuerfel>
+References: <7947240.7yktm8fT2X@wuerfel>
+Message-ID: <1418696004-12829-1-git-send-email-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/15/2014 05:38 PM, Tony Lindgren wrote:
-> * Paul Walmsley <pwalmsley@nvidia.com> [141215 16:23]:
->> On 12/15/2014 03:02 PM, Mike Turquette wrote:
->>> Quoting Paul Walmsley (2014-12-12 15:28:32)
->>>> On Fri, 12 Dec 2014, Mike Turquette wrote:
->>>>
->>>>> Quoting Tony Lindgren (2014-12-05 10:38:49)
->>>>>> * Stephen Boyd <sboyd@codeaurora.org> [141205 10:23]:
->>>>>>> On 12/05/2014 08:55 AM, Tony Lindgren wrote:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
->>>>>>>> to return a clk_hw as the best parent") breaks booting at least for
->>>>>>>> omap4.
->>>>>>> Do you get a compilation warning in arch/arm/mach-omap2/dpll3xxx.c ?
->>>>>> Yes so it seems.
->>>>>>
->>>>>>>  From what I can tell omap3_noncore_dpll_determine_rate() hasn't been
->>>>>>> updated to take a clk_hw pointer instead of clk pointer. It was there in
->>>>>>> the original patch and I'm not sure why Mike dropped that part while
->>>>>>> applying.
->>>>>> OK that makes sense, Mike should apply that part too. Note that also
->>>>>> include/linux/clk/ti.h needs changed accordingly for struct clk_hw,
->>>>>> which you probably had in your orignal patch too. Assuming that's there,
->>>>>> please feel free to add:
->>>>>>
->>>>>> Acked-by: Tony Lindgren <tony@atomide.com>
->>>>> I figured out what went wrong here. When I applied Tomeu's changes the
->>>>> OMAP stuff did not apply at all. In fact the .determine_rate callbacks
->>>>> did not exist in clk-next. Paul merged that stuff through his tree[0]. I
->>>>> don't know why I didn't follow up on that at the time.
->>>>>
->>>>> So we need to come up with a solution. Paul can take the OMAP portion of
->>>>> Tomeu's changes[1] for OMAP, but I believe compilation will be broken in
->>>>> his tree until it meets up with mine in linux-next. Or we could set up a
->>>>> shared immutable branch that provides the needed changes.
->>>>>
->>>>> I could either set up a shared branch that includes Tomeu's changes that
->>>>> Paul could merge (will require a rebase of the tip of my tree) or Paul
->>>>> could provide a shared branch of the changes to dpll3xxx.c and
->>>>> dpll4xxx.c that I could merge in.
->>>>>
->>>>> Or I could remove Tomeu's patches from my tree since we're right up
->>>>> against the merge window but I would rather not do that since he has
->>>>> worked tirelessly on this topic.
->>>>>
->>>>> [0] http://www.spinics.net/lists/arm-kernel/msg377288.html
->>>>> [1] https://lkml.org/lkml/2014/12/2/70
->>>> I don't think there's much that I can do at this point.  My tree is quite
->>>> topologically distant from Linus's tree (pjw/omap-pending ->
->>>> tmlind/linux-omap -> arm/arm-soc -> torvalds/linux).  So anything I do is
->>>> high-latency.  My pull request for Tero's patches was sent to Tony a month
->>>> ago.
->>> Paul,
->>>
->>> I identified the patch in your tree that is missing in mine and, with
->>> Tony's help, applied your for-v3.19/omap-a signed tag to my tree. With
->>> these 5 patches in place I have applied Tero's two patches from
->>> Friday[0].
->>>
->>> Paul & Tony, are you OK for me to take both of Tero's patches? I'm
->>> already taking stuff in late so it is no trouble for me to pick up "ARM:
->>> OMAP3: clock: fix boot breakage in legacy mode" while I'm at it.
->>>
->>> I'm going to let this get at least one cycle in linux-next before
->>> sending my PR late this week. Hopefully Kevin (Cc'd) can check on the
->>> omap boards in his autobuilder once my tree hits -next?
->>>
->>> Let me know if I missed anything. Thanks for the great teamwork, gang.
->>>
->>> [0] http://lkml.kernel.org/r/<1418390521-7541-1-git-send-email-t-kristo@ti.com>
->>>
->>> Regards,
->>> Mike
->> I think Tony's taking the second patch from Tero.
-> If it applies to what Mike has now queued, please take that too Mike:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Currently in arch and driver code that needs early access to the
+flattened device tree it is necessary to add specific CFLAGS so that
+when scripts/dtc/libfdt/libfdt.h is included the C preprocessor is able
+to locate the libfdt versions of libfdt_env.h and fdt.h without
+generating an error.
 
-I just took a quick glance at Tero's second patch, and it looks like a 
-hack to me.  Better to fix the problem in the core CCF code if 
-possible.  I don't think there's any reason why a PLL couldn't have just 
-one parent clock.  But I'm fine with merging it as a short-term fix if 
-fixing the core code is difficult or risky.
+We already provide an alternative linux-specific
+version of libfdt_env.h and directly include scripts/dtc/libfdt/fdt.h
+so the inclusion by scripts/dtc/libfdt/libfdt.h is a no-op thanks to the
+inclusion guards.
 
-- Paul
+By using quotes in scripts/dtc/libfdt/libfdt.h it picks up fdt.h and
+libfdt_env.h from the source directory without needing to add CFLAGS for
+the sources that happen to include linux/libfdt.h.
+
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+Hi,
+
+This probably should come via git://git.jdl.com/software/dtc.git however
+this appears to be inaccessible at the moment. Is this still the
+canonical source for the device tree compiler and libfdt or has it been
+moved? How much deviation from the canonical source are we prepared to
+live with in the kernel?
+
+This came up on the arm-LKML[1]. Basically in the name of backwards
+compatibility I need to add a .dt_fixup to add some required nodes to
+the flattened device tree prior to the tree being un-flattened and
+processed. This is a trick powerpc makes use of fairly extensively and
+there are a few other instances of this.
+
+For the files that include linux/libfdt.h we currently also have to
+specify additional CFLAGS to satisfy the CPP.
+    
+  $ git grep '<linux/libfdt.h>'
+  arch/mips/cavium-octeon/octeon-platform.c:#include <linux/libfdt.h>
+  arch/mips/cavium-octeon/setup.c:#include <linux/libfdt.h>
+  arch/mips/mti-sead3/sead3-setup.c:#include <linux/libfdt.h>
+  arch/powerpc/kernel/prom.c:#include <linux/libfdt.h>
+  drivers/firmware/efi/libstub/fdt.c:#include <linux/libfdt.h>
+  drivers/of/fdt.c:#include <linux/libfdt.h>
+  drivers/of/fdt_address.c:#include <linux/libfdt.h>
+
+  $ git grep -e '-I.*dtc/libfdt'
+  arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o = -I$(src)/../../../scripts/dtc/libfdt
+  arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o = -I$(src)/../../../scripts/dtc/libfdt
+  arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o = -I$(src)/../../../scripts/dtc/libfdt
+  arch/powerpc/kernel/Makefile:CFLAGS_prom.o              = -I$(src)/../../../scripts/dtc/libfdt
+  drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o += -I$(srctree)/scripts/dtc/libfdt/
+  drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
+  drivers/of/Makefile:CFLAGS_fdt_address.o = -I$(src)/../../scripts/dtc/libfdt
+  lib/Makefile:   $(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
+    
+Simply by switching to using quotes we can avoid having this extra step.
+
+Assuming that this patch is acceptable a follow on clean up would be to
+remove the instances of CFLAGS_... listed above.
+
+Regards,
+Chris
+--
+[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310840.html
+
+ scripts/dtc/libfdt/libfdt.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
+index 73f4975..ea1ddcd 100644
+--- a/scripts/dtc/libfdt/libfdt.h
++++ b/scripts/dtc/libfdt/libfdt.h
+@@ -51,8 +51,8 @@
+  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#include <libfdt_env.h>
+-#include <fdt.h>
++#include "libfdt_env.h"
++#include "fdt.h"
+ 
+ #define FDT_FIRST_SUPPORTED_VERSION	0x10
+ #define FDT_LAST_SUPPORTED_VERSION	0x11
+-- 
+2.2.0.rc0
