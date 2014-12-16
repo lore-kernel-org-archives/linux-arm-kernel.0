@@ -1,24 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 16 Dec 2014 13:04:45 -0800
-Subject: [PATCH 2/2] clk: rockchip: use the clock ID for usbphy480m_src
-In-Reply-To: <1415863357-15680-2-git-send-email-kever.yang@rock-chips.com>
-References: <1415863357-15680-1-git-send-email-kever.yang@rock-chips.com>
- <1415863357-15680-2-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=US1eS4jj-uVFpG2hYFQ3W1D-B3D_ysaCrbee8L=dEU-g@mail.gmail.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 16 Dec 2014 16:07:14 -0500
+Subject: [PATCH V2 0/2] ARM: omap5/dra7xx counter frequency fixes
+Message-ID: <cover.1418762900.git.lsorense@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+While trying to deal with errata i856 on the dra7xx I encountered some
+obvious typos in the frequencies checked in timer.c, so those are being
+fixed in case anyone ever tries to use one of them.
 
-On Wed, Nov 12, 2014 at 11:22 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> Use the clock ID for usbphy480m_src so that we can find
-> this clock node in dts.
->
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
->
->  drivers/clk/rockchip/clk-rk3288.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Also implement a fix for errata i856.  Without the fix the time on the
+system will get ahead by 43 seconds per day if SYSCLK1 is 20MHz, which it
+is on the EVM boards as well as the other boards I am currently aware of.
+ntp declares that the system time drifts by over 500ppm (the maximum
+ntp will tolerate).
 
-Tested-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+To fix it, check the status register to determine if the 32.768KHz clock
+source is real (driven by an external crystal) or emulated (SYSCLK1 /
+610), and if it is emulated use the appropriate numerator and divisor
+to make the fine master counter match the coarse master counter (which
+is driven directly from the 32KHz clock (real or emulated) with a fixed
+multiplier of 375 / 2).  Making the fine counter run at a frequency
+different from the coarse counter is not an option, as the value in the
+fine counter is updated to match the coarse counter if they ever get
+out of sync.
+
+With 19.2MHz installed on the board, the clock runs almost 5% slow.
+
+With the change in place, ntp runs with a drift of around 3ppm on all
+boards I have tried which is well within the spec of the crystals used
+for SYSCLK1.
+
+Even if the errata is fixed in future revisions of the chip, there is
+still the option of someone purposely not connecting a 32.768KHz crystal
+to save cost or board space, and relying on the emulated clock instead,
+in which case this correction will still be necessary.
+
+Len Sorensen (2):
+  ARM: omap5/dra7xx: Fix frequency typos.
+  ARM: dra7xx: Fix counter frequency drift for AM572x errata i856.
+
+ arch/arm/mach-omap2/control.h |    4 ++++
+ arch/arm/mach-omap2/timer.c   |   44 +++++++++++++++++++++++++++++++++++------
+ 2 files changed, 42 insertions(+), 6 deletions(-)
+
+-- 
+1.7.10.4
