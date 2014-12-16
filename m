@@ -1,96 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Dec 2014 23:21:12 +0800
-Subject: [PATCHv3 5/5] ARM: sunxi: dts: Add note ps2 pins conflict with
- hdmi
-In-Reply-To: <CAEzqOZtOycU5LT8b3SHOymMpMOMExGC9PHiZ9wHtAjxR2R5+Ew@mail.gmail.com>
-References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
- <1418408748-9797-6-git-send-email-vishnupatekar0510@gmail.com>
- <CAGb2v65xpUhiMzSKu_1+JGNbg3oFdpw2EQ+JGUYkivCtG2O6gw@mail.gmail.com>
- <CAEzqOZtOycU5LT8b3SHOymMpMOMExGC9PHiZ9wHtAjxR2R5+Ew@mail.gmail.com>
-Message-ID: <CAGb2v65OFKkkFTpcDoW3OwToXdgRP6hLVCYY7CR7MYZ-VgckGA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Dec 2014 15:27:07 +0000
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <9355623.14GfrLxEB0@wuerfel>
+References: <548F9668.6080900@linaro.org>
+ <9355623.14GfrLxEB0@wuerfel>
+Message-ID: <20141216152707.GH11565@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 16, 2014 at 11:27:48AM +0000, Arnd Bergmann wrote:
+> On Monday 15 December 2014 19:18:16 Al Stone wrote:
+> > TODO List for ACPI on arm64:
+> > ============================
+> > 1. Define how Aarch64 OS identifies itself to firmware.
+> >    * Problem:
+> >      * _OSI method is demonstrably unreliable. On x86 Linux claims to
+> >        be Windows
+> >      * Proposal to use _OSC method as replacement is complicated and
+> >        creates an explosion of combinations
+> >    * Solution:
+> >      * Draft and propose OS identification rules to ABST and ASWG for
+> >        inclusion in ACPI spec.
+> >      * Draft and propose recommended practice for current ACPI 5.1 spec
+> >        platforms.
+> >    * Status: Little progress, still under investigation
+> 
+> I must have missed the problem with _OSC, it sounded like it was good
+> enough, but I have no clue about the details.
 
-On Sat, Dec 13, 2014 at 11:18 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> Hello Chen-Yu,
-> Thank you for pointing out styling error.
->
-> On Sat, Dec 13, 2014 at 7:36 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->>
->> Hi,
->>
->> On Sat, Dec 13, 2014 at 2:25 AM, VishnuPatekar
->> <vishnupatekar0510@gmail.com> wrote:
->> > 1. Please note that ps20 pins conflict with HDMI on Lime2 Board
->> > so, by deault ps20 and ps21 are disabled for Lime2 Board.
->> > There is no on board ps2 connector and these pins can be used
->> > for different purpose.
->> >
->> > Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
->> > ---
->> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts |    6 +++++-
->> >  1 file changed, 5 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> > b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> > index ed364d5..951b615 100644
->> > --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> > +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->> > @@ -112,7 +112,11 @@
->> >                         pinctrl-0 = <&uart0_pins_a>;
->> >                         status = "okay";
->> >                 };
->> > -
->> > +
->> > +               /* PS2 0 and PS2 1 are disabled by default; Please note
->> > that
->> > +               ps20 pins conflict with HDMI on Lime2 Board
->> > +               */
->> > +
->>
->> Multi-line comments should be:
->>
->> /*
->>  * line 1
->>  * line 2
->>  * ...
->>  */
->
-> Okie.
+Neither do I. It's also not entirely clear whether per-device _OSC are
+arbitrary or vendors need to go through some kind of approving process
+(as with the new _DSD process).
 
-So, in fact this patch shouldnt be needed. The LIME2 uses the dedicated
-pins for HDMI DDC. PS2 0 pins PI20 and PI21 are in fact routed to
-the GPIO-2 header. They are _not_ used for HDMI. Nothing bad should
-happen unless you also multiplex PI20/PI21 to HSCL/HDSA.
+> > 2. Linux must choose DT booting by default when offered both ACPI and
+> >    DT on arm64
+> >    * DONE
 
-If you check the schematics Olimex published and trace the HDMI lines,
-you will see that this is the case.
+I'm fine with this but just a clarification note here. We can't have
+acpi=off in the absence of DT because the system may not be able to
+report the error (no PC standard with some fixed 8250 port to fall back
+to). That's unless we print the error from the EFI_STUB before exiting
+boot services (e.g. "No Device Tree and no acpi=on; cannot boot").
 
-ChenYu
+> > 4. Set clear expectations for those providing ACPI for use with Linux
+> >    * Problem:
+> >      * Hardware/Firmware vendors can and will create ACPI tables that
+> >        cannot be used by Linux without some guidance
+> >      * Kernel developers cannot determine whether the kernel or firmware
+> >        is broken without knowing what the firmware should do
+> >    * Solution: document the expectations, and iterate as needed.
+> >      Enforce when we must.
+> >    * Status: initial kernel text available; AMD has offered to make
+> >      their guidance document generic; firmware summit planned for
+> >      deeper discussions.
+> 
+> After seeing the AMD patches, I would add to this point that we need to
+> find a way to come up with shared bindings for common hardware such as
+> the ARM pl011/pl022/pl061/pl330 IP blocks or the designware
+> i2c/spi/usb3/ahci blocks.
+> 
+> What I remember from this item on your list is actually a different
+> problem: We need to define more clearly what kinds of machines we
+> would expect ACPI support for and which machines we would not.
+> 
+> Fine-grained clock support is one such example: if anybody needs
+> to expose that through a clock driver in the kernel, we need to be
+> very clear that we will not support that kind of machine through
+> ACPI, so we don't get developers building BIOS images that will
+> never be supported. Other examples would be non-compliant PCI
+> hosts or machines that are not covered by SBSA.
 
->>
->>
->> And why is there a delete and insert for an empty line?
->> Weird... though git seems to ignore it when applying.
->
-> I used clean_patch to clear the styling error. that might have modified it.
->
->
->>
->>
->> ChenYu
->>
->> >                 i2c0: i2c at 01c2ac00 {
->> >                         pinctrl-names = "default";
->> >                         pinctrl-0 = <&i2c0_pins_a>;
->> > --
->> > 1.7.9.5
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Another example is SMP booting. The ACPI 5.1 spec mentions the parking
+protocol but I can't find a reference to the latest document. In the
+meantime, we stick to PSCI.
+
+>From a recent more private discussion I learnt that hardware or firmware
+people are not keen on reading a Linux arm-acpi.txt document, probably
+thinking it is too Linux specific. The proposal is to (longer term) move
+parts of this document (which are not Linux specific) into SBBR or maybe
+a new document for run-time requirements. Linux will still keep a
+statement about compliance with such documents and other Linux-specific
+aspects.
+
+> > 7. Why is ACPI required?
+> >    * Problem:
+> >      * arm64 maintainers still haven't been convinced that ACPI is
+> >        necessary.
+> >      * Why do hardware and OS vendors say ACPI is required?
+> >    * Status: Al & Grant collecting statements from OEMs to be posted
+> >      publicly early in the new year; firmware summit for broader
+> >      discussion planned.
+> 
+> I was particularly hoping to see better progress on this item. It
+> really shouldn't be that hard to explain why someone wants this feature.
+
+It's an "industry standard", you shouldn't question any further ;).
+
+-- 
+Catalin
