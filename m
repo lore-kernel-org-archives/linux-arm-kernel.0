@@ -1,32 +1,48 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Dec 2014 17:02:20 +0800
-Subject: [PATCH V3] arm: imx: correct the hardware clock gate setting for
- shared nodes
-In-Reply-To: <1418205102-14598-1-git-send-email-b20788@freescale.com>
-References: <1418205102-14598-1-git-send-email-b20788@freescale.com>
-Message-ID: <20141216090218.GI2411@dragon>
+Date: Tue, 16 Dec 2014 17:04:43 +0800
+Subject: [PATCH v2] ARM: i.MX53: dts: add sahara module
+In-Reply-To: <1418115412-20691-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1418115412-20691-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20141216090442.GJ2411@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 05:51:42PM +0800, Anson Huang wrote:
-> For those clk gates which hold share count, since its is_enabled
-> callback is only checking the share count rather than reading
-> the hardware register setting, in the late phase of kernel bootup,
-> the clk_disable_unused action will NOT handle the scenario of
-> share_count is 0 but the hardware setting is enabled, actually,
-> U-Boot normally enables all clk gates, then those shared clk gates
-> will be always enabled until they are used by some modules.
+On Tue, Dec 09, 2014 at 09:56:52AM +0100, Steffen Trumtrar wrote:
+> The i.MX53 has a SAHARA v4 core. Add it to the dtsi.
 > 
-> So the problem would be: when kernel boot up, the usecount cat
-> from clk tree is 0, but the clk gates actually is enabled in
-> hardware register, it will confuse user and bring unnecessary power
-> consumption.
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+> Changes since v1:
+> 	- remove status property
 > 
-> This patch adds .disable_unused callback and using hardware register
-> check for .is_enabled callback of shared nodes to handle such scenario
-> in late phase of kernel boot up, then the hardware status will match the
-> clk tree info.
+>  arch/arm/boot/dts/imx53.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index b96213ba0671..ff4fa7ecacd8 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -765,6 +765,15 @@
+>  				resets = <&src 1>;
+>  				iram = <&ocram>;
+>  			};
+> +
+> +			sahara: crypto at 63ff8000 {
+> +				compatible = "fsl,imx53-sahara";
 
-Applied, thanks.
+Is there already a driver for it in the kernel?
+
+Shawn
+
+> +				reg = <0x63ff8000 0x4000>;
+> +				interrupts = <19 20>;
+> +				clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
+> +				         <&clks IMX5_CLK_SAHARA_IPG_GATE>;
+> +				clock-names = "ipg", "ahb";
+> +			};
+>  		};
+>  
+>  		ocram: sram at f8000000 {
+> -- 
+> 2.1.3
+> 
