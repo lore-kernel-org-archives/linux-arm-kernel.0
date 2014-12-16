@@ -1,35 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Dec 2014 17:25:11 -0200
-Subject: [PATCH 1/3] ARM: imx6sx: Set PLL2 as parent of QSPI clocks
-In-Reply-To: <20141216072921.GD2411@dragon>
-References: <1417788802-13219-1-git-send-email-festevam@gmail.com>
- <20141216072921.GD2411@dragon>
-Message-ID: <CAOMZO5AdNe6LOOtvnFZZN4rBVt6rCR0urPugzqo-DyquQL9nng@mail.gmail.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 16 Dec 2014 14:27:40 -0500
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <54908128.7040005@ti.com>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca>
+ <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
+ <20141216163657.GL24110@csclub.uwaterloo.ca>
+ <54908128.7040005@ti.com>
+Message-ID: <20141216192740.GN24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+> I see why arch_timer_freq might skip the rounding error of 39, 15 and
+> 55 Vs existing logic which is possibly at a truncation error risk
+> (without errata for sysclk 13, 26 and 27MHz).
+> 
+> all you'd probably need to do is cast rate, num and den to unsigned
+> long and have a common computation logic.
 
-On Tue, Dec 16, 2014 at 5:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+If that is acceptable, then sure I can do that.  I liked avoiding casts
+in general though.
 
-> What is the original parent clock, and how does that cause a division by
-> zero error?
+> if you'd really want to handle truncation error, it must be a separate
+> patch of it's own - I would not mix it with the errata fix.
 
-The default qspi2_clk_sel contains '110' which is marked as 'reserved'
-in the reference manual.
+Well there is no error in the existing code because the rate / den
+is always a clean integer division.  The problem is introduced by the
+SYSCLK1 / 610 used by the emulated clock which is not a clean division.
 
-This causes the qspi2 to look like this in the clock tree:
+So for the existing logic, the calculation was perfect.  It is only for
+the errata case that it is a problem.
 
- dummy                                    4            4           0          0
-    qspi2_sel                             1            1           0          0
-       qspi2_pred                         1            1           0          0
-          qspi2_podf                      1            1           0          0
-             gpmi_io                      0            0           0          0
-             qspi2                        1            1           0
+So I think leaving the existing calculation but moved up works well,
+and then having the alternate order calculation only in the errata case
+seemed cleaner and avoids casts and 64bit math which I thought was
+overall desirable.
 
-A 'dummy' clock gets assigned as parent.
-
-This is will cause the division by zero when the qspi driver calls
-clk_set_rate().
-
-I will send a v2 with such explanation.
+-- 
+Len Sorensen
