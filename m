@@ -1,66 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 16 Dec 2014 17:14:35 +0100
-Subject: [PATCH v2 2/2] ARM: mediatek: dts: Add bindings for watchdog
-In-Reply-To: <548C5F1F.8070804@roeck-us.net>
-References: <1418395859-32209-1-git-send-email-matthias.bgg@gmail.com>
- <1418395859-32209-3-git-send-email-matthias.bgg@gmail.com>
- <548C5F1F.8070804@roeck-us.net>
-Message-ID: <CABuKBe+=PaJ2BuhoGGwn8V20207QU3zzWb4UGgXzwwF-AvBEPw@mail.gmail.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Tue, 16 Dec 2014 11:16:14 -0500
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <549018EC.8020207@ti.com>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca>
+ <549018EC.8020207@ti.com>
+Message-ID: <20141216161614.GK24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-13 16:45 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
-> On 12/12/2014 06:50 AM, Matthias Brugger wrote:
->>
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> ---
->>   Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 13
->> +++++++++++++
->>   1 file changed, 13 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->>
->> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->> b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->> new file mode 100644
->> index 0000000..af9eb5b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
->> @@ -0,0 +1,13 @@
->> +Mediatek SoCs Watchdog timer
->> +
->> +Required properties:
->> +
->> +- compatible : should be "mediatek,mt6589-wdt"
->
->
-> "mediatek" is undefined as vendor prefix in the current upstream code.
-> Is this vendor prefix coming in from another patch set ?
+On Tue, Dec 16, 2014 at 05:05:08PM +0530, Lokesh Vutla wrote:
+> Is this applicable for OMAP5 also?
+> If not can you drop omap5 from $subject?
 
-Strange, should be in vendor-prefix.txt [1].
-Please double check.
+DRA7xx = OMAP57xx, which to me is an omap5.  Isn't it?
 
-Thanks,
-Matthias
+And I haven't been able to get a manual for the omap54xx to confirm it,
+although it seems it does not apply to the omap54xx from what I have
+been able to gather indirectly.
 
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/vendor-prefixes.txt?id=refs/tags/v3.18#n93
+arch_timer_freq = (rate / den) * num;
 
->
-> Guenter
->
->
->> +- reg : Specifies base physical address and size of the registers.
->> +
->> +Example:
->> +
->> +wdt: watchdog at 010000000 {
->> +       compatible = "mediatek,mt6589-wdt";
->> +       reg = <0x10000000 0x18>;
->> +};
->>
->
+If I do this with the workaround I get:
 
+20000000 / 75 * 244 = 6147525
 
+where as
+
+20000000 * 244 / 75 = 6147540
+
+best value would be 6147541 with proper rounding.
+
+In the normal case the worst case is:
+
+26000000 * 384 = 9984000000
+
+That is too big for 32 bits.
+
+Now what could be done is prescale by 4 to make the worst case still
+fit in 32 bits while doing the multiplication before the division,
+so like this:
+
+arch_timer_freq = ((rate / 4) * num / den ) * 4;
+
+That gives the same result in all cases including the errata case for
+the dra7xx at 20MHz and 27MHz.  It is off by 3 in the 19.2MHz case though
+which isn't so nice.
+
+Would that be more acceptable?  I think having the arch_timer_freq
+calculated for the errata case seperately from the normal case is
+cleaner looking compared to that mess and gives a better result for the
+19.2MHz case.
 
 -- 
-motzblog.wordpress.com
+Len Sorensen
