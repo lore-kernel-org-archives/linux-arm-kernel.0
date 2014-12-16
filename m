@@ -1,1902 +1,1108 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 16 Dec 2014 22:59:57 +0100
-Subject: [PATCH 4/6] ARM: sunxi: DT: Convert the DTs to use a header for the
- pinctrl nodes
+Date: Tue, 16 Dec 2014 22:59:58 +0100
+Subject: [PATCH 5/6] ARM: sunxi: DT: Convert the DTs to use the GIC headers
 In-Reply-To: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1418767199-20957-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1418767199-20957-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl nodes require some extra opaque arguments for the pull up and drive
-strength values.
+The GIC requires some extra opaque arguments to set the IRQ type and flags.
 
-Introduce a new header file and convert the device trees to replace these
-opaque numbers by defines.
+Convert the DTs to using the common defines.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts            |   9 +-
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |   5 +-
- arch/arm/boot/dts/sun4i-a10-hackberry.dts        |   9 +-
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts       |   3 +-
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts   |   9 +-
- arch/arm/boot/dts/sun4i-a10.dtsi                 |  53 +++++-----
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  17 ++--
- arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts    |  13 +--
- arch/arm/boot/dts/sun5i-a10s.dtsi                |  37 +++----
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         |   5 +-
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |  13 +--
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |  13 +--
- arch/arm/boot/dts/sun5i-a13.dtsi                 |  25 ++---
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts        |   5 +-
- arch/arm/boot/dts/sun6i-a31-colombus.dts         |  11 ++-
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts      |  11 ++-
- arch/arm/boot/dts/sun6i-a31-m9.dts               |  13 +--
- arch/arm/boot/dts/sun6i-a31.dtsi                 |  38 ++++----
- arch/arm/boot/dts/sun7i-a20-bananapi.dts         |  13 +--
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      |   5 +-
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |  19 ++--
- arch/arm/boot/dts/sun7i-a20-hummingbird.dts      |  17 ++--
- arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts        |  19 ++--
- arch/arm/boot/dts/sun7i-a20-m3.dts               |   5 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts   |   9 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  |   9 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |   9 +-
- arch/arm/boot/dts/sun7i-a20-pcduino3.dts         |  11 ++-
- arch/arm/boot/dts/sun7i-a20.dtsi                 | 117 ++++++++++++-----------
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts      |   5 +-
- arch/arm/boot/dts/sun8i-a23.dtsi                 |  30 +++---
- arch/arm/boot/dts/sun9i-a80-optimus.dts          |   9 +-
- arch/arm/boot/dts/sun9i-a80.dtsi                 |  14 +--
- arch/arm/boot/dts/sunxi-common-regulators.dtsi   |  17 ++--
- include/dt-bindings/pinctrl/sun4i-a10.h          |  62 ++++++++++++
- 35 files changed, 380 insertions(+), 279 deletions(-)
- create mode 100644 include/dt-bindings/pinctrl/sun4i-a10.h
+ arch/arm/boot/dts/sun6i-a31.dtsi |  97 ++++++++++++++++++-----------------
+ arch/arm/boot/dts/sun7i-a20.dtsi | 106 ++++++++++++++++++++-------------------
+ arch/arm/boot/dts/sun8i-a23.dtsi |  47 +++++++++--------
+ arch/arm/boot/dts/sun9i-a80.dtsi |  52 ++++++++++---------
+ 4 files changed, 156 insertions(+), 146 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index 532ab3bd9735..b67e5be618cf 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Mele A1000";
-@@ -114,15 +115,15 @@
- 			emac_power_pin_a1000: emac_power_pin at 0 {
- 				allwinner,pins = "PH15";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_a1000: led_pins at 0 {
- 				allwinner,pins = "PH10", "PH20";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index abc3c06677d2..ba8c2e2f97b0 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -51,6 +51,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Cubietech Cubieboard";
-@@ -113,8 +114,8 @@
- 			led_pins_cubieboard: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index be1f29e50811..d3f73ea25567 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Miniand Hackberry";
-@@ -113,15 +114,15 @@
- 			hackberry_hogs: hogs at 0 {
- 				allwinner,pins = "PH19";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb2_vbus_pin_hackberry: usb2_vbus_pin at 0 {
- 					allwinner,pins = "PH12";
- 					allwinner,function = "gpio_out";
--					allwinner,drive = <0>;
--					allwinner,pull = <0>;
-+					allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+					allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-index 1db02eb3796c..eb5fd6904a69 100644
---- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "PineRiver Mini X-Plus";
-@@ -93,7 +94,7 @@
- 		pinctrl at 01c20800 {
- 			ir0_pins_a: ir0 at 0 {
- 				/* The ir receiver is not always populated */
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-index 5d9b86839f16..ab7891c43231 100644
---- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-@@ -50,6 +50,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A10-OLinuXino-LIME";
-@@ -112,15 +113,15 @@
- 			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
- 				allwinner,pins = "PC3";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_olinuxinolime: led_pins at 0 {
- 				allwinner,pins = "PH2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index e78f00d77c00..876df2f43b01 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -13,6 +13,7 @@
- #include "skeleton.dtsi"
- 
- #include <dt-bindings/dma/sun4i-a10.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	interrupt-parent = <&intc>;
-@@ -544,57 +545,57 @@
- 			pwm0_pins_a: pwm0 at 0 {
- 				allwinner,pins = "PB2";
- 				allwinner,function = "pwm";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			pwm1_pins_a: pwm1 at 0 {
- 				allwinner,pins = "PI3";
- 				allwinner,function = "pwm";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PB22", "PB23";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart0_pins_b: uart0 at 1 {
- 				allwinner,pins = "PF2", "PF4";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart1_pins_a: uart1 at 0 {
- 				allwinner,pins = "PA10", "PA11";
- 				allwinner,function = "uart1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c0_pins_a: i2c0 at 0 {
- 				allwinner,pins = "PB0", "PB1";
- 				allwinner,function = "i2c0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c1_pins_a: i2c1 at 0 {
- 				allwinner,pins = "PB18", "PB19";
- 				allwinner,function = "i2c1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c2_pins_a: i2c2 at 0 {
- 				allwinner,pins = "PB20", "PB21";
- 				allwinner,function = "i2c2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			emac_pins_a: emac0 at 0 {
-@@ -604,36 +605,36 @@
- 						"PA11", "PA12", "PA13", "PA14",
- 						"PA15", "PA16";
- 				allwinner,function = "emac";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
- 				allwinner,function = "mmc0";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			ir0_pins_a: ir0 at 0 {
- 				allwinner,pins = "PB3","PB4";
- 				allwinner,function = "ir0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			ir1_pins_a: ir1 at 0 {
- 				allwinner,pins = "PB22","PB23";
- 				allwinner,function = "ir1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index ab9b6c24efeb..34d207cfb879 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A10s-Olinuxino Micro";
-@@ -110,29 +111,29 @@
- 			mmc0_cd_pin_olinuxino_micro: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PG1";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			mmc1_cd_pin_olinuxino_micro: mmc1_cd_pin at 0 {
- 				allwinner,pins = "PG13";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PE3";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb1_vbus_pin_olinuxino_m: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PB10";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts b/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
-index da2d2535b1bc..7deddfc9df8b 100644
---- a/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts
-@@ -50,6 +50,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "R7 A10s hdmi tv-stick";
-@@ -92,22 +93,22 @@
- 			mmc0_cd_pin_r7: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PG1";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			led_pins_r7: led_pins at 0 {
- 				allwinner,pins = "PB2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb1_vbus_pin_r7: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PG13";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 1bda98868a3c..2af76954d73c 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -14,6 +14,7 @@
- #include "skeleton.dtsi"
- 
- #include <dt-bindings/dma/sun4i-a10.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	interrupt-parent = <&intc>;
-@@ -454,22 +455,22 @@
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PB19", "PB20";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart2_pins_a: uart2 at 0 {
- 				allwinner,pins = "PC18", "PC19";
- 				allwinner,function = "uart2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart3_pins_a: uart3 at 0 {
- 				allwinner,pins = "PG9", "PG10";
- 				allwinner,function = "uart3";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			emac_pins_a: emac0 at 0 {
-@@ -479,43 +480,43 @@
- 						"PA11", "PA12", "PA13", "PA14",
- 						"PA15", "PA16";
- 				allwinner,function = "emac";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c0_pins_a: i2c0 at 0 {
- 				allwinner,pins = "PB0", "PB1";
- 				allwinner,function = "i2c0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c1_pins_a: i2c1 at 0 {
- 				allwinner,pins = "PB15", "PB16";
- 				allwinner,function = "i2c1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c2_pins_a: i2c2 at 0 {
- 				allwinner,pins = "PB17", "PB18";
- 				allwinner,function = "i2c2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
- 				allwinner,function = "mmc0";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc1_pins_a: mmc1 at 0 {
- 				allwinner,pins = "PG3","PG4","PG5","PG6","PG7","PG8";
- 				allwinner,function = "mmc1";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-index bccc1bcaa868..99a5968720b4 100644
---- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -50,6 +50,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "HSG H702";
-@@ -87,8 +88,8 @@
- 			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PG0";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-index c30180794c54..64d516200dae 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -51,6 +51,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A13-Olinuxino Micro";
-@@ -84,22 +85,22 @@
- 			mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PG0";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			led_pins_olinuxinom: led_pins at 0 {
- 				allwinner,pins = "PG9";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb1_vbus_pin_olinuxinom: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PG11";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index c2f6288083ae..752d6d7f0722 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A13-Olinuxino";
-@@ -85,22 +86,22 @@
- 			mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PG0";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PG9";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb1_vbus_pin_olinuxino: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PG11";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 9a9241e9f3dd..1a1c4b4c4499 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -14,6 +14,7 @@
- #include "skeleton.dtsi"
- 
- #include <dt-bindings/dma/sun4i-a10.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	interrupt-parent = <&intc>;
-@@ -413,43 +414,43 @@
- 			uart1_pins_a: uart1 at 0 {
- 				allwinner,pins = "PE10", "PE11";
- 				allwinner,function = "uart1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart1_pins_b: uart1 at 1 {
- 				allwinner,pins = "PG3", "PG4";
- 				allwinner,function = "uart1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c0_pins_a: i2c0 at 0 {
- 				allwinner,pins = "PB0", "PB1";
- 				allwinner,function = "i2c0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c1_pins_a: i2c1 at 0 {
- 				allwinner,pins = "PB15", "PB16";
- 				allwinner,function = "i2c1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c2_pins_a: i2c2 at 0 {
- 				allwinner,pins = "PB17", "PB18";
- 				allwinner,function = "i2c2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
- 				allwinner,function = "mmc0";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-index 0d86e8cb2ca2..be9f5ee6b59e 100644
---- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Allwinner A31 APP4 EVB1 Evaluation Board";
-@@ -66,8 +67,8 @@
- 			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PH27";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-index deab8f357ad7..84630e56acd7 100644
---- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "WITS A31 Colombus Evaluation Board";
-@@ -83,21 +84,21 @@
- 
- 		pio: pinctrl at 01c20800 {
- 			mmc0_pins_a: mmc0 at 0 {
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			mmc0_cd_pin_colombus: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PA8";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			usb2_vbus_pin_colombus: usb2_vbus_pin at 0 {
- 				allwinner,pins = "PH24";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 7364d22b33dd..ebd5f7854b1b 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Merrii A31 Hummingbird";
-@@ -88,21 +89,21 @@
- 		pio: pinctrl at 01c20800 {
- 			mmc0_pins_a: mmc0 at 0 {
- 				/* external pull-ups missing for some pins */
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PA8";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PH24";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
-index 799040627ab7..517586b92e32 100644
---- a/arch/arm/boot/dts/sun6i-a31-m9.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
-@@ -50,6 +50,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Mele M9 / A1000G Quad top set box";
-@@ -87,22 +88,22 @@
- 			led_pins_m9: led_pins at 0 {
- 				allwinner,pins = "PH13";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH22";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PC27";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
 diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 9c34e92ade87..00b7e03d5d98 100644
+index 00b7e03d5d98..6fc124ee764f 100644
 --- a/arch/arm/boot/dts/sun6i-a31.dtsi
 +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
 @@ -49,6 +49,8 @@
  
  #include "skeleton.dtsi"
  
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
  / {
- 	interrupt-parent = <&gic>;
+@@ -113,10 +115,10 @@
  
-@@ -501,36 +503,36 @@
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PH20", "PH21";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c0_pins_a: i2c0 at 0 {
- 				allwinner,pins = "PH14", "PH15";
- 				allwinner,function = "i2c0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c1_pins_a: i2c1 at 0 {
- 				allwinner,pins = "PH16", "PH17";
- 				allwinner,function = "i2c1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c2_pins_a: i2c2 at 0 {
- 				allwinner,pins = "PH18", "PH19";
- 				allwinner,function = "i2c2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
- 				allwinner,function = "mmc0";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_pins_mii_a: gmac_mii at 0 {
-@@ -540,8 +542,8 @@
- 						"PA20", "PA21", "PA22", "PA23",
- 						"PA24", "PA26", "PA27";
- 				allwinner,function = "gmac";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_pins_gmii_a: gmac_gmii at 0 {
-@@ -557,8 +559,8 @@
- 				 * data lines in GMII mode run at 125MHz and
- 				 * might need a higher signal drive strength
- 				 */
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_pins_rgmii_a: gmac_rgmii at 0 {
-@@ -571,8 +573,8 @@
- 				 * data lines in RGMII mode use DDR mode
- 				 * and need a higher signal drive strength
- 				 */
--				allwinner,drive = <3>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_40_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-@@ -897,8 +899,8 @@
- 			ir_pins_a: ir at 0 {
- 				allwinner,pins = "PL4";
- 				allwinner,function = "s_ir";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
+ 	pmu {
+ 		compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
+-		interrupts = <0 120 4>,
+-			     <0 121 4>,
+-			     <0 122 4>,
+-			     <0 123 4>;
++		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
  	};
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-index e273f0e0627a..d5e5d39ff3c0 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
  
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "LeMaker Banana Pi";
-@@ -104,22 +105,22 @@
- 			mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH10";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			gmac_power_pin_bananapi: gmac_power_pin at 0 {
- 				allwinner,pins = "PH23";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_bananapi: led_pins at 0 {
- 				allwinner,pins = "PH24";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 	clocks {
+@@ -355,7 +357,7 @@
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun6i-a31-dma";
+ 			reg = <0x01c02000 0x1000>;
+-			interrupts = <0 50 4>;
++			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 6>;
+ 			resets = <&ahb1_rst 6>;
+ 			#dma-cells = <1>;
+@@ -372,7 +374,7 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 8>;
+ 			reset-names = "ahb";
+-			interrupts = <0 60 4>;
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 27ca1a16ca91..9dc4c10f682e 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -16,6 +16,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Cubietech Cubieboard2";
-@@ -63,8 +64,8 @@
- 			led_pins_cubieboard2: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -383,7 +385,7 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 9>;
+ 			reset-names = "ahb";
+-			interrupts = <0 61 4>;
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index a6e88f8ce533..673846245cd9 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -16,6 +16,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Cubietech Cubietruck";
-@@ -72,35 +73,35 @@
- 		pinctrl at 01c20800 {
- 			mmc3_pins_a: mmc3 at 0 {
- 				/* AP6210 requires pull-up */
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			vmmc3_pin_cubietruck: vmmc3_pin at 0 {
- 				allwinner,pins = "PH9";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
- 				allwinner,pins = "PH12";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_cubietruck: led_pins at 0 {
- 				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb0_vbus_pin_a: usb0_vbus_pin at 0 {
- 				allwinner,pins = "PH17";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -394,7 +396,7 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 10>;
+ 			reset-names = "ahb";
+-			interrupts = <0 62 4>;
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-index 3b8bd22296e6..4356a1709559 100644
---- a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-@@ -16,6 +16,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Merrii A20 Hummingbird";
-@@ -72,29 +73,29 @@
- 			ahci_pwr_pin_a20_hummingbird: ahci_pwr_pin at 0 {
- 				allwinner,pins = "PH15";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb1_vbus_pin_a20_hummingbird: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PH2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc3_vdd_pin_a20_hummingbird: mmc3_vdd_pin at 0 {
- 				allwinner,pins = "PH9";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_vdd_pin_a20_hummingbird: gmac_vdd_pin at 0 {
- 				allwinner,pins = "PH16";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -405,7 +407,7 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 11>;
+ 			reset-names = "ahb";
+-			interrupts = <0 63 4>;
++			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-index a422f19a0261..275e49ffb78b 100644
---- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
-@@ -50,6 +50,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "I12 / Q5 / QT840A A20 tvbox";
-@@ -100,35 +101,35 @@
- 		pinctrl at 01c20800 {
- 			mmc3_pins_a: mmc3 at 0 {
- 				/* AP6210 / AP6330 requires pull-up */
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			vmmc3_pin_i12_tvbox: vmmc3_pin at 0 {
- 				allwinner,pins = "PH2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			vmmc3_io_pin_i12_tvbox: vmmc3_io_pin at 0 {
- 				allwinner,pins = "PH12";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_power_pin_i12_tvbox: gmac_power_pin at 0 {
- 				allwinner,pins = "PH21";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_i12_tvbox: led_pins at 0 {
- 				allwinner,pins = "PH9", "PH20";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -436,7 +438,7 @@
+ 		ehci0: usb at 01c1a000 {
+ 			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
+ 			reg = <0x01c1a000 0x100>;
+-			interrupts = <0 72 4>;
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 26>;
+ 			resets = <&ahb1_rst 26>;
+ 			phys = <&usbphy 1>;
+@@ -447,7 +449,7 @@
+ 		ohci0: usb at 01c1a400 {
+ 			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
+ 			reg = <0x01c1a400 0x100>;
+-			interrupts = <0 73 4>;
++			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
+ 			resets = <&ahb1_rst 29>;
+ 			phys = <&usbphy 1>;
+@@ -458,7 +460,7 @@
+ 		ehci1: usb at 01c1b000 {
+ 			compatible = "allwinner,sun6i-a31-ehci", "generic-ehci";
+ 			reg = <0x01c1b000 0x100>;
+-			interrupts = <0 74 4>;
++			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 27>;
+ 			resets = <&ahb1_rst 27>;
+ 			phys = <&usbphy 2>;
+@@ -469,7 +471,7 @@
+ 		ohci1: usb at 01c1b400 {
+ 			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
+ 			reg = <0x01c1b400 0x100>;
+-			interrupts = <0 75 4>;
++			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 30>, <&usb_clk 17>;
+ 			resets = <&ahb1_rst 30>;
+ 			phys = <&usbphy 2>;
+@@ -480,7 +482,7 @@
+ 		ohci2: usb at 01c1c400 {
+ 			compatible = "allwinner,sun6i-a31-ohci", "generic-ohci";
+ 			reg = <0x01c1c400 0x100>;
+-			interrupts = <0 77 4>;
++			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 31>, <&usb_clk 18>;
+ 			resets = <&ahb1_rst 31>;
+ 			status = "disabled";
+@@ -489,10 +491,10 @@
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun6i-a31-pinctrl";
+ 			reg = <0x01c20800 0x400>;
+-			interrupts = <0 11 4>,
+-				     <0 15 4>,
+-				     <0 16 4>,
+-				     <0 17 4>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+@@ -599,11 +601,11 @@
+ 		timer at 01c20c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0xa0>;
+-			interrupts = <0 18 4>,
+-				     <0 19 4>,
+-				     <0 20 4>,
+-				     <0 21 4>,
+-				     <0 22 4>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&osc24M>;
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-m3.dts b/arch/arm/boot/dts/sun7i-a20-m3.dts
-index 3e40ae74f5e2..15be3ea80088 100644
---- a/arch/arm/boot/dts/sun7i-a20-m3.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-m3.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Mele M3";
-@@ -103,8 +104,8 @@
- 			led_pins_m3: led_pins at 0 {
- 				allwinner,pins = "PH20";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -615,7 +617,7 @@
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+-			interrupts = <0 0 4>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 16>;
+@@ -628,7 +630,7 @@
+ 		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+-			interrupts = <0 1 4>;
++			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 17>;
+@@ -641,7 +643,7 @@
+ 		uart2: serial at 01c28800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28800 0x400>;
+-			interrupts = <0 2 4>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 18>;
+@@ -654,7 +656,7 @@
+ 		uart3: serial at 01c28c00 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28c00 0x400>;
+-			interrupts = <0 3 4>;
++			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 19>;
+@@ -667,7 +669,7 @@
+ 		uart4: serial at 01c29000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29000 0x400>;
+-			interrupts = <0 4 4>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 20>;
+@@ -680,7 +682,7 @@
+ 		uart5: serial at 01c29400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29400 0x400>;
+-			interrupts = <0 5 4>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 21>;
+@@ -693,7 +695,7 @@
+ 		i2c0: i2c at 01c2ac00 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+-			interrupts = <0 6 4>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 0>;
+ 			resets = <&apb2_rst 0>;
+ 			status = "disabled";
+@@ -704,7 +706,7 @@
+ 		i2c1: i2c at 01c2b000 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2b000 0x400>;
+-			interrupts = <0 7 4>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 1>;
+ 			resets = <&apb2_rst 1>;
+ 			status = "disabled";
+@@ -715,7 +717,7 @@
+ 		i2c2: i2c at 01c2b400 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2b400 0x400>;
+-			interrupts = <0 8 4>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 2>;
+ 			resets = <&apb2_rst 2>;
+ 			status = "disabled";
+@@ -726,7 +728,7 @@
+ 		i2c3: i2c at 01c2b800 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2b800 0x400>;
+-			interrupts = <0 9 4>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 3>;
+ 			resets = <&apb2_rst 3>;
+ 			status = "disabled";
+@@ -737,7 +739,7 @@
+ 		gmac: ethernet at 01c30000 {
+ 			compatible = "allwinner,sun7i-a20-gmac";
+ 			reg = <0x01c30000 0x1054>;
+-			interrupts = <0 82 4>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			clocks = <&ahb1_gates 17>, <&gmac_tx_clk>;
+ 			clock-names = "stmmaceth", "allwinner_gmac_tx";
+@@ -754,10 +756,10 @@
+ 		timer at 01c60000 {
+ 			compatible = "allwinner,sun6i-a31-hstimer", "allwinner,sun7i-a20-hstimer";
+ 			reg = <0x01c60000 0x1000>;
+-			interrupts = <0 51 4>,
+-				     <0 52 4>,
+-				     <0 53 4>,
+-				     <0 54 4>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 19>;
+ 			resets = <&ahb1_rst 19>;
+ 		};
+@@ -765,7 +767,7 @@
+ 		spi0: spi at 01c68000 {
+ 			compatible = "allwinner,sun6i-a31-spi";
+ 			reg = <0x01c68000 0x1000>;
+-			interrupts = <0 65 4>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 20>, <&spi0_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma 23>, <&dma 23>;
+@@ -777,7 +779,7 @@
+ 		spi1: spi at 01c69000 {
+ 			compatible = "allwinner,sun6i-a31-spi";
+ 			reg = <0x01c69000 0x1000>;
+-			interrupts = <0 66 4>;
++			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 21>, <&spi1_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma 24>, <&dma 24>;
+@@ -789,7 +791,7 @@
+ 		spi2: spi at 01c6a000 {
+ 			compatible = "allwinner,sun6i-a31-spi";
+ 			reg = <0x01c6a000 0x1000>;
+-			interrupts = <0 67 4>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 22>, <&spi2_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma 25>, <&dma 25>;
+@@ -801,7 +803,7 @@
+ 		spi3: spi at 01c6b000 {
+ 			compatible = "allwinner,sun6i-a31-spi";
+ 			reg = <0x01c6b000 0x1000>;
+-			interrupts = <0 68 4>;
++			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 23>, <&spi3_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma 26>, <&dma 26>;
+@@ -818,13 +820,14 @@
+ 			      <0x01c86000 0x2000>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+-			interrupts = <1 9 0xf04>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-index 0423b1cbb365..f74405cd18b6 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-@@ -53,6 +53,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A20-OLinuXino-LIME";
-@@ -100,15 +101,15 @@
- 			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
- 				allwinner,pins = "PC3";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_olinuxinolime: led_pins at 0 {
- 				allwinner,pins = "PH2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 		rtc: rtc at 01f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
+-			interrupts = <0 40 4>, <0 41 4>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-index ce1e28afa2fe..7176721f6c6b 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -50,6 +50,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A20-OLinuXino-LIME2";
-@@ -97,15 +98,15 @@
- 			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
- 				allwinner,pins = "PC3";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			led_pins_olinuxinolime: led_pins at 0 {
- 				allwinner,pins = "PH2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 		nmi_intc: interrupt-controller at 01f00c0c {
+@@ -832,7 +835,7 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			reg = <0x01f00c0c 0x38>;
+-			interrupts = <0 32 4>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
  		};
  
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index abfad90c28eb..3e2979b03cf6 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -16,6 +16,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Olimex A20-Olinuxino Micro";
-@@ -90,15 +91,15 @@
- 			mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
- 				allwinner,pins = "PH11";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PH2";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <1>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-index e0aa97599cbf..30f7a11a0017 100644
---- a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
-@@ -49,9 +49,12 @@
- /dts-v1/;
- #include "sun7i-a20.dtsi"
- #include "sunxi-common-regulators.dtsi"
-+
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- 
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
- / {
- 	model = "LinkSprite pcDuino3";
- 	compatible = "linksprite,pcduino3", "allwinner,sun7i-a20";
-@@ -102,15 +105,15 @@
- 			led_pins_pcduino3: led_pins at 0 {
- 				allwinner,pins = "PH15", "PH16";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			key_pins_pcduino3: key_pins at 0 {
- 				allwinner,pins = "PH17", "PH18", "PH19";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
+ 		prcm at 01f01400 {
+@@ -886,8 +889,8 @@
+ 		r_pio: pinctrl at 01f02c00 {
+ 			compatible = "allwinner,sun6i-a31-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
+-			interrupts = <0 45 4>,
+-				     <0 46 4>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb0_gates 0>;
+ 			resets = <&apb0_rst 0>;
+ 			gpio-controller;
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 4ec6dfc87a02..02bff2390034 100644
+index 02bff2390034..853f4b758e8d 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -50,6 +50,7 @@
+@@ -49,6 +49,8 @@
+ 
  #include "skeleton.dtsi"
  
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
  #include <dt-bindings/dma/sun4i-a10.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
  
- / {
- 	interrupt-parent = <&gic>;
-@@ -657,99 +658,99 @@
- 			pwm0_pins_a: pwm0 at 0 {
- 				allwinner,pins = "PB2";
- 				allwinner,function = "pwm";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -104,16 +106,16 @@
  
- 			pwm1_pins_a: pwm1 at 0 {
- 				allwinner,pins = "PI3";
- 				allwinner,function = "pwm";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+-		interrupts = <1 13 0xf08>,
+-			     <1 14 0xf08>,
+-			     <1 11 0xf08>,
+-			     <1 10 0xf08>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
  
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PB22", "PB23";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 	pmu {
+ 		compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
+-		interrupts = <0 120 4>,
+-			     <0 121 4>;
++		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
  
- 			uart2_pins_a: uart2 at 0 {
- 				allwinner,pins = "PI16", "PI17", "PI18", "PI19";
- 				allwinner,function = "uart2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart3_pins_a: uart3 at 0 {
- 				allwinner,pins = "PG6", "PG7", "PG8", "PG9";
- 				allwinner,function = "uart3";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart3_pins_b: uart3 at 1 {
- 				allwinner,pins = "PH0", "PH1";
- 				allwinner,function = "uart3";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart4_pins_a: uart4 at 0 {
- 				allwinner,pins = "PG10", "PG11";
- 				allwinner,function = "uart4";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart5_pins_a: uart5 at 0 {
- 				allwinner,pins = "PI10", "PI11";
- 				allwinner,function = "uart5";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart6_pins_a: uart6 at 0 {
- 				allwinner,pins = "PI12", "PI13";
- 				allwinner,function = "uart6";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart7_pins_a: uart7 at 0 {
- 				allwinner,pins = "PI20", "PI21";
- 				allwinner,function = "uart7";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c0_pins_a: i2c0 at 0 {
- 				allwinner,pins = "PB0", "PB1";
- 				allwinner,function = "i2c0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c1_pins_a: i2c1 at 0 {
- 				allwinner,pins = "PB18", "PB19";
- 				allwinner,function = "i2c1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c2_pins_a: i2c2 at 0 {
- 				allwinner,pins = "PB20", "PB21";
- 				allwinner,function = "i2c2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c3_pins_a: i2c3 at 0 {
- 				allwinner,pins = "PI0", "PI1";
- 				allwinner,function = "i2c3";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			emac_pins_a: emac0 at 0 {
-@@ -759,22 +760,22 @@
- 						"PA11", "PA12", "PA13", "PA14",
- 						"PA15", "PA16";
- 				allwinner,function = "emac";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			clk_out_a_pins_a: clk_out_a at 0 {
- 				allwinner,pins = "PI12";
- 				allwinner,function = "clk_out_a";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			clk_out_b_pins_a: clk_out_b at 0 {
- 				allwinner,pins = "PI13";
- 				allwinner,function = "clk_out_b";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_pins_mii_a: gmac_mii at 0 {
-@@ -784,8 +785,8 @@
- 						"PA11", "PA12", "PA13", "PA14",
- 						"PA15", "PA16";
- 				allwinner,function = "gmac";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			gmac_pins_rgmii_a: gmac_rgmii at 0 {
-@@ -799,78 +800,78 @@
- 				 * data lines in RGMII mode use DDR mode
- 				 * and need a higher signal drive strength
- 				 */
--				allwinner,drive = <3>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_40_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			spi0_pins_a: spi0 at 0 {
- 				allwinner,pins = "PI10", "PI11", "PI12", "PI13", "PI14";
- 				allwinner,function = "spi0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			spi1_pins_a: spi1 at 0 {
- 				allwinner,pins = "PI16", "PI17", "PI18", "PI19";
- 				allwinner,function = "spi1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			spi2_pins_a: spi2 at 0 {
- 				allwinner,pins = "PC19", "PC20", "PC21", "PC22";
- 				allwinner,function = "spi2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			spi2_pins_b: spi2 at 1 {
- 				allwinner,pins = "PB14", "PB15", "PB16", "PB17";
- 				allwinner,function = "spi2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
- 				allwinner,function = "mmc0";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PH1";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			mmc2_pins_a: mmc2 at 0 {
- 				allwinner,pins = "PC6","PC7","PC8","PC9","PC10","PC11";
- 				allwinner,function = "mmc2";
--				allwinner,drive = <2>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			mmc3_pins_a: mmc3 at 0 {
- 				allwinner,pins = "PI4","PI5","PI6","PI7","PI8","PI9";
- 				allwinner,function = "mmc3";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			ir0_pins_a: ir0 at 0 {
- 				    allwinner,pins = "PB3","PB4";
- 				    allwinner,function = "ir0";
--				    allwinner,drive = <0>;
--				    allwinner,pull = <0>;
-+				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			ir1_pins_a: ir1 at 0 {
- 				    allwinner,pins = "PB22","PB23";
- 				    allwinner,function = "ir1";
--				    allwinner,drive = <0>;
--				    allwinner,pull = <0>;
-+				    allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				    allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 	clocks {
+@@ -465,13 +467,13 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			reg = <0x01c00030 0x0c>;
+-			interrupts = <0 0 4>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
  		};
  
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-index bca84ebde871..4fca7a237139 100644
---- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
- 	model = "Ippo Q8H Dual Core Tablet (v5)";
-@@ -76,8 +77,8 @@
- 			mmc0_cd_pin_q8h: mmc0_cd_pin at 0 {
- 				allwinner,pins = "PB4";
- 				allwinner,function = "gpio_in";
--				allwinner,drive = <0>;
--				allwinner,pull = <1>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun4i-a10-dma";
+ 			reg = <0x01c02000 0x1000>;
+-			interrupts = <0 27 4>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 6>;
+ 			#dma-cells = <2>;
+ 		};
+@@ -479,7 +481,7 @@
+ 		spi0: spi at 01c05000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c05000 0x1000>;
+-			interrupts = <0 10 4>;
++			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 20>, <&spi0_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma SUN4I_DMA_DEDICATED 27>,
+@@ -493,7 +495,7 @@
+ 		spi1: spi at 01c06000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c06000 0x1000>;
+-			interrupts = <0 11 4>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 21>, <&spi1_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma SUN4I_DMA_DEDICATED 9>,
+@@ -507,7 +509,7 @@
+ 		emac: ethernet at 01c0b000 {
+ 			compatible = "allwinner,sun4i-a10-emac";
+ 			reg = <0x01c0b000 0x1000>;
+-			interrupts = <0 55 4>;
++			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 17>;
+ 			status = "disabled";
+ 		};
+@@ -525,7 +527,7 @@
+ 			reg = <0x01c0f000 0x1000>;
+ 			clocks = <&ahb_gates 8>, <&mmc0_clk>;
+ 			clock-names = "ahb", "mmc";
+-			interrupts = <0 32 4>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
  		};
  
+@@ -534,7 +536,7 @@
+ 			reg = <0x01c10000 0x1000>;
+ 			clocks = <&ahb_gates 9>, <&mmc1_clk>;
+ 			clock-names = "ahb", "mmc";
+-			interrupts = <0 33 4>;
++			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -543,7 +545,7 @@
+ 			reg = <0x01c11000 0x1000>;
+ 			clocks = <&ahb_gates 10>, <&mmc2_clk>;
+ 			clock-names = "ahb", "mmc";
+-			interrupts = <0 34 4>;
++			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -552,7 +554,7 @@
+ 			reg = <0x01c12000 0x1000>;
+ 			clocks = <&ahb_gates 11>, <&mmc3_clk>;
+ 			clock-names = "ahb", "mmc";
+-			interrupts = <0 35 4>;
++			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -571,7 +573,7 @@
+ 		ehci0: usb at 01c14000 {
+ 			compatible = "allwinner,sun7i-a20-ehci", "generic-ehci";
+ 			reg = <0x01c14000 0x100>;
+-			interrupts = <0 39 4>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 1>;
+ 			phys = <&usbphy 1>;
+ 			phy-names = "usb";
+@@ -581,7 +583,7 @@
+ 		ohci0: usb at 01c14400 {
+ 			compatible = "allwinner,sun7i-a20-ohci", "generic-ohci";
+ 			reg = <0x01c14400 0x100>;
+-			interrupts = <0 64 4>;
++			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&usb_clk 6>, <&ahb_gates 2>;
+ 			phys = <&usbphy 1>;
+ 			phy-names = "usb";
+@@ -591,7 +593,7 @@
+ 		spi2: spi at 01c17000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c17000 0x1000>;
+-			interrupts = <0 12 4>;
++			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 22>, <&spi2_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma SUN4I_DMA_DEDICATED 29>,
+@@ -605,7 +607,7 @@
+ 		ahci: sata at 01c18000 {
+ 			compatible = "allwinner,sun4i-a10-ahci";
+ 			reg = <0x01c18000 0x1000>;
+-			interrupts = <0 56 4>;
++			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&pll6 0>, <&ahb_gates 25>;
+ 			status = "disabled";
+ 		};
+@@ -613,7 +615,7 @@
+ 		ehci1: usb at 01c1c000 {
+ 			compatible = "allwinner,sun7i-a20-ehci", "generic-ehci";
+ 			reg = <0x01c1c000 0x100>;
+-			interrupts = <0 40 4>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 3>;
+ 			phys = <&usbphy 2>;
+ 			phy-names = "usb";
+@@ -623,7 +625,7 @@
+ 		ohci1: usb at 01c1c400 {
+ 			compatible = "allwinner,sun7i-a20-ohci", "generic-ohci";
+ 			reg = <0x01c1c400 0x100>;
+-			interrupts = <0 65 4>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&usb_clk 7>, <&ahb_gates 4>;
+ 			phys = <&usbphy 2>;
+ 			phy-names = "usb";
+@@ -633,7 +635,7 @@
+ 		spi3: spi at 01c1f000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c1f000 0x1000>;
+-			interrupts = <0 50 4>;
++			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 23>, <&spi3_clk>;
+ 			clock-names = "ahb", "mod";
+ 			dmas = <&dma SUN4I_DMA_DEDICATED 31>,
+@@ -647,7 +649,7 @@
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun7i-a20-pinctrl";
+ 			reg = <0x01c20800 0x400>;
+-			interrupts = <0 28 4>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb0_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+@@ -878,12 +880,12 @@
+ 		timer at 01c20c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0x90>;
+-			interrupts = <0 22 4>,
+-				     <0 23 4>,
+-				     <0 24 4>,
+-				     <0 25 4>,
+-				     <0 67 4>,
+-				     <0 68 4>;
++			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&osc24M>;
+ 		};
+ 
+@@ -895,7 +897,7 @@
+ 		rtc: rtc at 01c20d00 {
+ 			compatible = "allwinner,sun7i-a20-rtc";
+ 			reg = <0x01c20d00 0x20>;
+-			interrupts = <0 24 4>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		pwm: pwm at 01c20e00 {
+@@ -910,7 +912,7 @@
+ 			compatible = "allwinner,sun4i-a10-ir";
+ 			clocks = <&apb0_gates 6>, <&ir0_clk>;
+ 			clock-names = "apb", "ir";
+-			interrupts = <0 5 4>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0x01c21800 0x40>;
+ 			status = "disabled";
+ 		};
+@@ -919,7 +921,7 @@
+ 			compatible = "allwinner,sun4i-a10-ir";
+ 			clocks = <&apb0_gates 7>, <&ir1_clk>;
+ 			clock-names = "apb", "ir";
+-			interrupts = <0 6 4>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0x01c21c00 0x40>;
+ 			status = "disabled";
+ 		};
+@@ -932,13 +934,13 @@
+ 		rtp: rtp at 01c25000 {
+ 			compatible = "allwinner,sun4i-a10-ts";
+ 			reg = <0x01c25000 0x100>;
+-			interrupts = <0 29 4>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+-			interrupts = <0 1 4>;
++			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 16>;
+@@ -948,7 +950,7 @@
+ 		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+-			interrupts = <0 2 4>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 17>;
+@@ -958,7 +960,7 @@
+ 		uart2: serial at 01c28800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28800 0x400>;
+-			interrupts = <0 3 4>;
++			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 18>;
+@@ -968,7 +970,7 @@
+ 		uart3: serial at 01c28c00 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28c00 0x400>;
+-			interrupts = <0 4 4>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 19>;
+@@ -978,7 +980,7 @@
+ 		uart4: serial at 01c29000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29000 0x400>;
+-			interrupts = <0 17 4>;
++			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 20>;
+@@ -988,7 +990,7 @@
+ 		uart5: serial at 01c29400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29400 0x400>;
+-			interrupts = <0 18 4>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 21>;
+@@ -998,7 +1000,7 @@
+ 		uart6: serial at 01c29800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29800 0x400>;
+-			interrupts = <0 19 4>;
++			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 22>;
+@@ -1008,7 +1010,7 @@
+ 		uart7: serial at 01c29c00 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29c00 0x400>;
+-			interrupts = <0 20 4>;
++			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 23>;
+@@ -1018,7 +1020,7 @@
+ 		i2c0: i2c at 01c2ac00 {
+ 			compatible = "allwinner,sun7i-a20-i2c", "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+-			interrupts = <0 7 4>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 0>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+@@ -1028,7 +1030,7 @@
+ 		i2c1: i2c at 01c2b000 {
+ 			compatible = "allwinner,sun7i-a20-i2c", "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b000 0x400>;
+-			interrupts = <0 8 4>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 1>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+@@ -1038,7 +1040,7 @@
+ 		i2c2: i2c at 01c2b400 {
+ 			compatible = "allwinner,sun7i-a20-i2c", "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b400 0x400>;
+-			interrupts = <0 9 4>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 2>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+@@ -1048,7 +1050,7 @@
+ 		i2c3: i2c at 01c2b800 {
+ 			compatible = "allwinner,sun7i-a20-i2c", "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2b800 0x400>;
+-			interrupts = <0 88 4>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 3>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+@@ -1058,7 +1060,7 @@
+ 		i2c4: i2c at 01c2c000 {
+ 			compatible = "allwinner,sun7i-a20-i2c", "allwinner,sun4i-a10-i2c";
+ 			reg = <0x01c2c000 0x400>;
+-			interrupts = <0 89 4>;
++			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 15>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+@@ -1068,7 +1070,7 @@
+ 		gmac: ethernet at 01c50000 {
+ 			compatible = "allwinner,sun7i-a20-gmac";
+ 			reg = <0x01c50000 0x10000>;
+-			interrupts = <0 85 4>;
++			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			clocks = <&ahb_gates 49>, <&gmac_tx_clk>;
+ 			clock-names = "stmmaceth", "allwinner_gmac_tx";
+@@ -1083,10 +1085,10 @@
+ 		hstimer at 01c60000 {
+ 			compatible = "allwinner,sun7i-a20-hstimer";
+ 			reg = <0x01c60000 0x1000>;
+-			interrupts = <0 81 4>,
+-				     <0 82 4>,
+-				     <0 83 4>,
+-				     <0 84 4>;
++			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb_gates 28>;
+ 		};
+ 
+@@ -1098,7 +1100,7 @@
+ 			      <0x01c86000 0x2000>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+-			interrupts = <1 9 0xf04>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 	};
+ };
 diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 30ba73285680..508efea9686f 100644
+index 508efea9686f..e470dd5dbc70 100644
 --- a/arch/arm/boot/dts/sun8i-a23.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
 @@ -49,6 +49,8 @@
  
  #include "skeleton.dtsi"
  
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
- / {
- 	interrupt-parent = <&gic>;
- 
-@@ -305,43 +307,43 @@
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PF2", "PF4";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
- 				allwinner,function = "mmc0";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc1_pins_a: mmc1 at 0 {
- 				allwinner,pins = "PG0","PG1","PG2","PG3","PG4","PG5";
- 				allwinner,function = "mmc1";
--				allwinner,drive = <2>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c0_pins_a: i2c0 at 0 {
- 				allwinner,pins = "PH2", "PH3";
- 				allwinner,function = "i2c0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c1_pins_a: i2c1 at 0 {
- 				allwinner,pins = "PH4", "PH5";
- 				allwinner,function = "i2c1";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			i2c2_pins_a: i2c2 at 0 {
- 				allwinner,pins = "PE12", "PE13";
- 				allwinner,function = "i2c2";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-@@ -562,8 +564,8 @@
- 			r_uart_pins_a: r_uart at 0 {
- 				allwinner,pins = "PL2", "PL3";
- 				allwinner,function = "s_uart";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index 8868c946e034..58f5cb346519 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -51,6 +51,7 @@
- #include "sun9i-a80.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
  
  / {
- 	model = "Merrii A80 Optimus Board";
-@@ -64,19 +65,19 @@
- 		pio: pinctrl at 06000800 {
- 			i2c3_pins_a: i2c3 at 0 {
- 				/* Enable internal pull-up */
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
- 
- 			led_pins_optimus: led-pins at 0 {
- 				allwinner,pins = "PH0", "PH1";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart4_pins_a: uart4 at 0 {
- 				/* Enable internal pull-up */
--				allwinner,pull = <1>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
+@@ -252,7 +254,7 @@
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun8i-a23-dma";
+ 			reg = <0x01c02000 0x1000>;
+-			interrupts = <0 50 4>;
++			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ahb1_gates 6>;
+ 			resets = <&ahb1_rst 6>;
+ 			#dma-cells = <1>;
+@@ -265,7 +267,7 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 8>;
+ 			reset-names = "ahb";
+-			interrupts = <0 60 4>;
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
  		};
  
+@@ -276,7 +278,7 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 9>;
+ 			reset-names = "ahb";
+-			interrupts = <0 61 4>;
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -287,16 +289,16 @@
+ 			clock-names = "ahb", "mmc";
+ 			resets = <&ahb1_rst 10>;
+ 			reset-names = "ahb";
+-			interrupts = <0 62 4>;
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun8i-a23-pinctrl";
+ 			reg = <0x01c20800 0x400>;
+-			interrupts = <0 11 4>,
+-				     <0 15 4>,
+-				     <0 17 4>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+@@ -368,21 +370,21 @@
+ 		timer at 01c20c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0xa0>;
+-			interrupts = <0 18 4>,
+-				     <0 19 4>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&osc24M>;
+ 		};
+ 
+ 		wdt0: watchdog at 01c20ca0 {
+ 			compatible = "allwinner,sun6i-a31-wdt";
+ 			reg = <0x01c20ca0 0x20>;
+-			interrupts = <0 25 4>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+-			interrupts = <0 0 4>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 16>;
+@@ -395,7 +397,7 @@
+ 		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+-			interrupts = <0 1 4>;
++			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 17>;
+@@ -408,7 +410,7 @@
+ 		uart2: serial at 01c28800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28800 0x400>;
+-			interrupts = <0 2 4>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 18>;
+@@ -421,7 +423,7 @@
+ 		uart3: serial at 01c28c00 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28c00 0x400>;
+-			interrupts = <0 3 4>;
++			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 19>;
+@@ -434,7 +436,7 @@
+ 		uart4: serial at 01c29000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c29000 0x400>;
+-			interrupts = <0 4 4>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb2_gates 20>;
+@@ -447,7 +449,7 @@
+ 		i2c0: i2c at 01c2ac00 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2ac00 0x400>;
+-			interrupts = <0 6 4>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 0>;
+ 			resets = <&apb2_rst 0>;
+ 			status = "disabled";
+@@ -458,7 +460,7 @@
+ 		i2c1: i2c at 01c2b000 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2b000 0x400>;
+-			interrupts = <0 7 4>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 1>;
+ 			resets = <&apb2_rst 1>;
+ 			status = "disabled";
+@@ -469,7 +471,7 @@
+ 		i2c2: i2c at 01c2b400 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x01c2b400 0x400>;
+-			interrupts = <0 8 4>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb2_gates 2>;
+ 			resets = <&apb2_rst 2>;
+ 			status = "disabled";
+@@ -485,13 +487,14 @@
+ 			      <0x01c86000 0x2000>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+-			interrupts = <1 9 0xf04>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
+ 		rtc: rtc at 01f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
+-			interrupts = <0 40 4>, <0 41 4>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		prcm at 01f01400 {
+@@ -541,7 +544,7 @@
+ 		r_uart: serial at 01f02800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01f02800 0x400>;
+-			interrupts = <0 38 4>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb0_gates 4>;
+@@ -552,7 +555,7 @@
+ 		r_pio: pinctrl at 01f02c00 {
+ 			compatible = "allwinner,sun8i-a23-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
+-			interrupts = <0 45 4>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb0_gates 0>;
+ 			resets = <&apb0_rst 0>;
+ 			gpio-controller;
 diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 90d0450850e9..de31b210e2c1 100644
+index de31b210e2c1..4b584cb9c2f0 100644
 --- a/arch/arm/boot/dts/sun9i-a80.dtsi
 +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
 @@ -49,6 +49,8 @@
  
  #include "skeleton64.dtsi"
  
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
- / {
- 	interrupt-parent = <&gic>;
- 
-@@ -355,22 +357,22 @@
- 			i2c3_pins_a: i2c3 at 0 {
- 				allwinner,pins = "PG10", "PG11";
- 				allwinner,function = "i2c3";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PH12", "PH13";
- 				allwinner,function = "uart0";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart4_pins_a: uart4 at 0 {
- 				allwinner,pins = "PG12", "PG13", "PG14", "PG15";
- 				allwinner,function = "uart4";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/sunxi-common-regulators.dtsi b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-index d6b7983cf16a..b1d64dd183f4 100644
---- a/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-+++ b/arch/arm/boot/dts/sunxi-common-regulators.dtsi
-@@ -48,6 +48,7 @@
-  */
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
  
  / {
- 	soc at 01c00000 {
-@@ -55,29 +56,29 @@
- 			ahci_pwr_pin_a: ahci_pwr_pin at 0 {
- 				allwinner,pins = "PB8";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb0_vbus_pin_a: usb0_vbus_pin at 0 {
- 				allwinner,pins = "PB9";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
- 				allwinner,pins = "PH6";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			usb2_vbus_pin_a: usb2_vbus_pin at 0 {
- 				allwinner,pins = "PH3";
- 				allwinner,function = "gpio_out";
--				allwinner,drive = <0>;
--				allwinner,pull = <0>;
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+@@ -293,7 +295,7 @@
+ 			      <0x01c46000 0x2000>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+-			interrupts = <1 9 0xf04>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
  		};
- 	};
-diff --git a/include/dt-bindings/pinctrl/sun4i-a10.h b/include/dt-bindings/pinctrl/sun4i-a10.h
-new file mode 100644
-index 000000000000..f7553c143b40
---- /dev/null
-+++ b/include/dt-bindings/pinctrl/sun4i-a10.h
-@@ -0,0 +1,62 @@
-+/*
-+ * Copyright 2014 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#ifndef __DT_BINDINGS_PINCTRL_SUN4I_A10_H_
-+#define __DT_BINDINGS_PINCTRL_SUN4I_A10_H_
-+
-+#define SUN4I_PINCTRL_10_MA	0
-+#define SUN4I_PINCTRL_20_MA	1
-+#define SUN4I_PINCTRL_30_MA	2
-+#define SUN4I_PINCTRL_40_MA	3
-+
-+#define SUN4I_PINCTRL_NO_PULL	0
-+#define SUN4I_PINCTRL_PULL_UP	1
-+#define SUN4I_PINCTRL_PULL_DOWN	2
-+
-+#endif /* __DT_BINDINGS_PINCTRL_SUN4I_A10_H_ */
+ 
+ 		ahb0_resets: reset at 060005a0 {
+@@ -329,12 +331,12 @@
+ 		timer at 06000c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x06000c00 0xa0>;
+-			interrupts = <0 18 4>,
+-				     <0 19 4>,
+-				     <0 20 4>,
+-				     <0 21 4>,
+-				     <0 22 4>,
+-				     <0 23 4>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 			clocks = <&osc24M>;
+ 		};
+@@ -342,11 +344,11 @@
+ 		pio: pinctrl at 06000800 {
+ 			compatible = "allwinner,sun9i-a80-pinctrl";
+ 			reg = <0x06000800 0x400>;
+-			interrupts = <0 11 4>,
+-				     <0 15 4>,
+-				     <0 16 4>,
+-				     <0 17 4>,
+-				     <0 120 4>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb0_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+@@ -379,7 +381,7 @@
+ 		uart0: serial at 07000000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x07000000 0x400>;
+-			interrupts = <0 0 4>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 16>;
+@@ -390,7 +392,7 @@
+ 		uart1: serial at 07000400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x07000400 0x400>;
+-			interrupts = <0 1 4>;
++			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 17>;
+@@ -401,7 +403,7 @@
+ 		uart2: serial at 07000800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x07000800 0x400>;
+-			interrupts = <0 2 4>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 18>;
+@@ -412,7 +414,7 @@
+ 		uart3: serial at 07000c00 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x07000c00 0x400>;
+-			interrupts = <0 3 4>;
++			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 19>;
+@@ -423,7 +425,7 @@
+ 		uart4: serial at 07001000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x07001000 0x400>;
+-			interrupts = <0 4 4>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 20>;
+@@ -434,7 +436,7 @@
+ 		uart5: serial at 07001400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x07001400 0x400>;
+-			interrupts = <0 5 4>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&apb1_gates 21>;
+@@ -445,7 +447,7 @@
+ 		i2c0: i2c at 07002800 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07002800 0x400>;
+-			interrupts = <0 6 4>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 0>;
+ 			resets = <&apb1_resets 0>;
+ 			status = "disabled";
+@@ -456,7 +458,7 @@
+ 		i2c1: i2c at 07002c00 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07002c00 0x400>;
+-			interrupts = <0 7 4>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 1>;
+ 			resets = <&apb1_resets 1>;
+ 			status = "disabled";
+@@ -467,7 +469,7 @@
+ 		i2c2: i2c at 07003000 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07003000 0x400>;
+-			interrupts = <0 8 4>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 2>;
+ 			resets = <&apb1_resets 2>;
+ 			status = "disabled";
+@@ -478,7 +480,7 @@
+ 		i2c3: i2c at 07003400 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07003400 0x400>;
+-			interrupts = <0 9 4>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 3>;
+ 			resets = <&apb1_resets 3>;
+ 			status = "disabled";
+@@ -489,7 +491,7 @@
+ 		i2c4: i2c at 07003800 {
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07003800 0x400>;
+-			interrupts = <0 10 4>;
++			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&apb1_gates 4>;
+ 			resets = <&apb1_resets 4>;
+ 			status = "disabled";
+@@ -500,13 +502,13 @@
+ 		r_wdt: watchdog at 08001000 {
+ 			compatible = "allwinner,sun6i-a31-wdt";
+ 			reg = <0x08001000 0x20>;
+-			interrupts = <0 36 4>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		r_uart: serial at 08002800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x08002800 0x400>;
+-			interrupts = <0 38 4>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&osc24M>;
 -- 
 2.2.0
