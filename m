@@ -1,58 +1,48 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 16 Dec 2014 17:08:21 +0530
-Subject: [PATCH 1/2] ARM: omap5/dra7xx: Fix frequency typos.
-In-Reply-To: <5f7d841d41f6485022e07a22c332d3c8ea985bfa.1418421100.git.lsorense@csclub.uwaterloo.ca>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <5f7d841d41f6485022e07a22c332d3c8ea985bfa.1418421100.git.lsorense@csclub.uwaterloo.ca>
-Message-ID: <549019AD.9050807@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Dec 2014 12:40:28 +0100
+Subject: [PATCH v3 18/19] iommu: exynos: init from dt-specific callback
+ instead of initcall
+In-Reply-To: <20141215181323.GX20738@arm.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <4894156.QdIh4JzSl0@avalon> <20141215181323.GX20738@arm.com>
+Message-ID: <1681211.YVY9bd22gV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Len,
-On Saturday 13 December 2014 03:38 AM, Lennart Sorensen wrote:
-> The switch statement of the possible list of SYSCLK1 frequencies is
-> missing a 0 in 4 out of the 7 frequencies.
-Indeed a good catch !!
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+On Monday 15 December 2014 18:13:23 Will Deacon wrote:
+> > > > IOMMUs are not as low-level as system interrupt controllers or system
+> > > > clocks. I'm beginning to agree with Thierry that they should be treated
+> > > > as normal platform devices as they're not required earlier than probe
+> > > > time of their bus master devices.
+> > > 
+> > > Well, I think you'd have to propose patches for discussion since I'm
+> > > certainly not wed to the current approach; I just want something that
+> > > allows of_{dma,iommu}_configure to run with the information it needs.
+> > 
+> > Do we need of_dma_configure() to run when the device is created, or could we 
+> > postpone it to just before probe time ?
+> 
+> I'm not sure I can answer that one... Arnd?
 
-Thanks and regards,
-Lokesh
-> 
-> Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
-> ---
->  arch/arm/mach-omap2/timer.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 4f61148..fb0cb2b 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -513,11 +513,11 @@ static void __init realtime_counter_init(void)
->  	rate = clk_get_rate(sys_clk);
->  	/* Numerator/denumerator values refer TRM Realtime Counter section */
->  	switch (rate) {
-> -	case 1200000:
-> +	case 12000000:
->  		num = 64;
->  		den = 125;
->  		break;
-> -	case 1300000:
-> +	case 13000000:
->  		num = 768;
->  		den = 1625;
->  		break;
-> @@ -529,11 +529,11 @@ static void __init realtime_counter_init(void)
->  		num = 192;
->  		den = 625;
->  		break;
-> -	case 2600000:
-> +	case 26000000:
->  		num = 384;
->  		den = 1625;
->  		break;
-> -	case 2700000:
-> +	case 27000000:
->  		num = 256;
->  		den = 1125;
->  		break;
-> 
+I believe we could postpone it to probe time, but I'd rather not.
+The way I see the arguments in favor, we have mainly cosmetic arguments:
+
+- Doing it at probe time would eliminate the ugly section magic hack
+- iommu drivers could be implemented as loadable modules with platform
+  drivers, for consistency with most other drivers
+
+On the other hand, I see:
+
+- DMA configuration is traditionally done at device creation time, and
+  changing that is more likely to introduce bugs than leaving it
+  where it is.
+- On a lot of machines, the IOMMU is optional, and the probe function
+  cannot know the difference between an IOMMU driver that is left out
+  of the kernel and one that will be initialized later, using a fixed
+  entry point for initializing the IOMMU makes the behavior consistent
+
+There is a third option in theory, which is to only enable the IOMMU
+as part of dma_set_mask(). I've done that in the past on powerpc, but
+the new approach seems cleaner.
+
+	Arnd
