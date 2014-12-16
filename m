@@ -1,69 +1,40 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Tue, 16 Dec 2014 08:00:42 -0500
-Subject: [Linaro-acpi] [PATCH] Mailbox: Complete wait event only if Tx was
- successful
-In-Reply-To: <20141216113602.GA21888@e103737-lin.cambridge.arm.com>
-References: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
- <548AAA95.6020001@arm.com>
- <CAJ5Y-eYFsK_heBRQUOmPXGtkLtze-NGzWKy1=0qJVV3x2EycUw@mail.gmail.com>
- <20141216113602.GA21888@e103737-lin.cambridge.arm.com>
-Message-ID: <CAJ5Y-easPFRgmH+_fGoTdJiOTa-tivMLEU0zU1ETSxOG1ptfsA@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 16 Dec 2014 11:02:41 -0200
+Subject: [PATCH v2] ARM: dts: imx6qdl: Remove OCRAM clock from VPU node
+Message-ID: <1418734961-4972-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 December 2014 at 06:36, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On Fri, Dec 12, 2014 at 05:47:26PM +0000, Ashwin Chaugule wrote:
->> On 12 December 2014 at 03:43, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> > On Thursday 11 December 2014 01:46 AM, Ashwin Chaugule wrote:
->> >>
->> >> If a wait_for_completion_timeout() call returns due to a timeout,
->> >> the mbox code can still call complete() after returning from the wait.
->> >> This can cause subsequent transmissions on a channel to fail, since
->> >> the wait_for_completion_timeout() sees the completion variable
->> >> is !=0, caused by the erroneous complete() call, and immediately
->> >> returns without waiting for the time as expected by the client.
->> >>
->> >> Fix this by calling complete() only if the TX was successful.
->> >>
->> >> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
->> >> ---
->> >>   drivers/mailbox/mailbox.c | 2 +-
->> >>   1 file changed, 1 insertion(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
->> >> index 17e9e4a..4acaddb 100644
->> >> --- a/drivers/mailbox/mailbox.c
->> >> +++ b/drivers/mailbox/mailbox.c
->> >> @@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
->> >>         if (mssg && chan->cl->tx_done)
->> >>                 chan->cl->tx_done(chan->cl, mssg, r);
->> >>
->> >> -       if (chan->cl->tx_block)
->> >> +       if ((!r) && chan->cl->tx_block)
->> >>                 complete(&chan->tx_complete);
->> >
->> >
->> > Just curious to check if there's another possible race which is
->> > a different issue.
->> >
->> > Suppose the timer fired and indicated that the Tx is complete, then
->> > it tries to execute complete while the wait_for_completion_timeout timed
->> > out. Does that make sense ?
->> >
->> > So if yes, how about adding !completion_done(..) to the check while you
->> > are at this ?
->>
->> Yea. Seems like another race condition. I'll add it along with this..
->>
->
-> Thanks !
+According to Documentation/devicetree/bindings/media/coda.txt:
 
-IIUC, it looks like adding the !completion_done() will not really fix
-this race. Once the lock inside wait_for_completion.. is released,
-completion_done() will return 0, and we'll call complete(), which is
-not what we want, since the "wait" is already over (after a timeout).
-I think the only right thing here is to increase the timeout in
-wait_for_completion_timeout(). Thoughts?
+- clock-names : Should be "ahb", "per"
 
-Cheers,
-Ashwin
+The OCRAM clock is already provided inside the ocram node, so remove the OCRAM 
+clock from the VPU node.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Rebased against the latest imx/dt branch from Shawn
+
+ arch/arm/boot/dts/imx6qdl.dtsi | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 4fc03b7..f6c6a6e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -339,9 +339,8 @@
+ 				             <0 12 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-names = "bit", "jpeg";
+ 				clocks = <&clks IMX6QDL_CLK_VPU_AXI>,
+-					 <&clks IMX6QDL_CLK_MMDC_CH0_AXI>,
+-					 <&clks IMX6QDL_CLK_OCRAM>;
+-				clock-names = "per", "ahb", "ocram";
++					 <&clks IMX6QDL_CLK_MMDC_CH0_AXI>;
++				clock-names = "per", "ahb";
+ 				resets = <&src 1>;
+ 				iram = <&ocram>;
+ 			};
+-- 
+1.9.1
