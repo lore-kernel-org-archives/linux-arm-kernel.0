@@ -1,125 +1,78 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 16 Dec 2014 18:08:32 +0800
-Subject: [PATCH net-next v9 0/3] add hisilicon hip04 ethernet driver
-In-Reply-To: <26790181.hAWQCCSkRa@wuerfel>
-References: <1418298150-4944-1-git-send-email-dingtianhong@huawei.com>
- <2708715.thQWqYuW6a@wuerfel> <548FE5E1.1090300@huawei.com>
- <26790181.hAWQCCSkRa@wuerfel>
-Message-ID: <549004A0.9010106@huawei.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 16 Dec 2014 11:20:41 +0100
+Subject: [PATCH] ARM: at91: board-dt-sama5: add phy_fixup to override
+ NAND_Tree which improperly strapp-in during the reset period.
+In-Reply-To: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
+References: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54900779.9030509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/16 16:54, Arnd Bergmann wrote:
-> On Tuesday 16 December 2014 15:57:21 Ding Tianhong wrote:
->> On 2014/12/15 21:29, Arnd Bergmann wrote:
->>> On Thursday 11 December 2014 19:42:27 Ding Tianhong wrote:
->>> @@ -381,57 +392,37 @@ static void hip04_tx_reclaim(struct net_device *ndev, bool force)
->>>  		dev_kfree_skb(priv->tx_skb[tx_tail]);
->>>  		priv->tx_skb[tx_tail] = NULL;
->>>  		tx_tail = TX_NEXT(tx_tail);
->>> -		priv->tx_count--;
->>> -
->>> -		if (priv->tx_count <= 0)
->>> -			break;
->>> +		count--;
->>>  	}
->>>  
-> ...
->>> -	queue_delayed_work(priv->wq, &priv->tx_clean_task, delta_in_ticks);
->>> +	return count;
->>
->> I think should return pkts_compl, because may break from the loop, the
->> pkts_compl may smaller than count.
+Le 11/12/2014 08:31, Wenyou Yang a ?crit :
+> Appearance: On some SAMA5D4EK boards, after power up, the Eth1 doesn't work.
 > 
-> The calling convention I used is to return the packets that are remaining
-> on the queue. Only if that is nonzero we need to reschedule the timer.
+> Reason: The PIOE2 pin is connected to the NAND_Tree# of KSZ8081,
+> But it outputs LOW during the reset period, which cause the NAND_Tree# enabled.
+> 
+> Add phy_fixup() to disable NAND_Tree by overriding the Operation
+> Mode Strap Override register(i.e. Register 16h) to clear the NAND_Tree bit.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+
+It seems correct to me.
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Anyway, I add Florian in the loop as he is the one who proposed this
+solution. So it would have been good to have his feeling about the
+implementation...
+
+Bye,
+
+> ---
+>  arch/arm/mach-at91/board-dt-sama5.c |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 8fb9ef5..97f7367 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/phy.h>
+>  #include <linux/clk-provider.h>
+> +#include <linux/phy.h>
+>  
+>  #include <asm/setup.h>
+>  #include <asm/irq.h>
+> @@ -26,8 +27,25 @@
+>  
+>  #include "generic.h"
+>  
+> +static int ksz8081_phy_fixup(struct phy_device *phy)
+> +{
+> +	int value;
+> +
+> +	value = phy_read(phy, 0x16);
+> +	value &= ~0x20;
+> +	phy_write(phy, 0x16, value);
+> +
+> +	return 0;
+> +}
+> +
+>  static void __init sama5_dt_device_init(void)
+>  {
+> +	if (of_machine_is_compatible("atmel,sama5d4ek") &&
+> +	   IS_ENABLED(CONFIG_PHYLIB)) {
+> +		phy_register_fixup_for_id("fc028000.etherne:00",
+> +						ksz8081_phy_fixup);
+> +	}
+> +
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+>  
 > 
 
-OK, agree.
 
->> and we need to add netif_tx_lock() to protect this function to avoid concurrency conflict.
-> 
-> Oh, did I miss something? The idea was that the start_xmit function only updates
-> the tx_head pointer and reads the tx_tail, while the tx_reclaim function does
-> the reverse, and writes to a different cache line, in order to allow a lockless
-> queue traversal.
-> 
-> Can you point to a specific struct member that still need to be protected by
-> the lock? Did I miss a race that would allow both functions to exit with
-> the timer disabled and entries left on the queue?
-> 
-OK, got it, no problem.
-
->>> @@ -623,8 +648,6 @@ static int hip04_mac_stop(struct net_device *ndev)
->>>  	struct hip04_priv *priv = netdev_priv(ndev);
->>>  	int i;
->>>  
->>> -	cancel_delayed_work_sync(&priv->tx_clean_task);
->>> -
->> I think we should cancle the hrtimer when closed and queue the timer when open.
-> 
-> I was expecting that force-cleaning up the tx queue would be enough for that.
-> It it not?
-> 
-> I suppose it can't hurt to cancel the timer here anyway, and maybe use
-> WARN_ON() if it's still active.
-> 
-
-Ok, I found no need to worry about this, when the dev is closed, the napi will disable and will not enter timer again.
-
-> Starting the timer after opening seems wrong though: at that point there are
-> no packets on the queue yet. The timer should always start ticking at the
-> exact point when the first packet is put on the queue while the timer is
-> not already pending.
-> 
-Ok.
-
->>>  	napi_disable(&priv->napi);
->>>  	netif_stop_queue(ndev);
->>>  	hip04_mac_disable(ndev);
->>> @@ -725,6 +748,7 @@ static int hip04_mac_probe(struct platform_device *pdev)
->>>  	struct hip04_priv *priv;
->>>  	struct resource *res;
->>>  	unsigned int irq;
->>> +	ktime_t txtime;
->>>  	int ret;
->>>  
->>>  	ndev = alloc_etherdev(sizeof(struct hip04_priv));
->>> @@ -751,6 +775,21 @@ static int hip04_mac_probe(struct platform_device *pdev)
->>>  	priv->port = arg.args[0];
->>>  	priv->chan = arg.args[1] * RX_DESC_NUM;
->>>  
->>> +	hrtimer_init(&priv->tx_coalesce_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
->>> +
->>> +	/*
->>> +	 * BQL will try to keep the TX queue as short as possible, but it can't
->>> +	 * be faster than tx_coalesce_usecs, so we need a fast timeout here,
->>> +	 * but also long enough to gather up enough frames to ensure we don't
->>> +	 * get more interrupts than necessary.
->>> +	 * 200us is enough for 16 frames of 1500 bytes at gigabit ethernet rate
->>> +	 */
->>> +	priv->tx_coalesce_frames = TX_DESC_NUM * 3 / 4;
->>> +	priv->tx_coalesce_usecs = 200;
->>> +	/* allow timer to fire after half the time at the earliest */
->>> +	txtime = ktime_set(0, priv->tx_coalesce_usecs * NSEC_PER_USEC / 2);
->>> +	hrtimer_set_expires_range(&priv->tx_coalesce_timer, txtime, txtime);
->>> +
->>
->> I think miss the line:
->>  priv->tx_coalesce_timer.function = tx_done;
-> 
-> Yes, good point.
-> 
-
-I will send v10 when the net-next open again, and these days will test this driver, thanks a lot.
-
-Ding
-
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+-- 
+Nicolas Ferre
