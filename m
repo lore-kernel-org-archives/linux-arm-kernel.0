@@ -1,36 +1,24 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 15 Dec 2014 16:08:41 -0800
-Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <2063145.N1Hk6vVF2S@wuerfel>
-References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
- <1628217.66frkAqHMc@wuerfel> <548F5433.5090901@broadcom.com>
- <2063145.N1Hk6vVF2S@wuerfel>
-Message-ID: <548F7809.1020303@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Dec 2014 00:08:22 +0000
+Subject: [PATCH v3 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <20141215235248.GA4374@google.com>
+References: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20141215235248.GA4374@google.com>
+Message-ID: <20141216000821.GM11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Dec 15, 2014 at 04:52:48PM -0700, Bjorn Helgaas wrote:
+> I provisionally applied these to my next-pci/domain branch.  This will be
+> rebased after v3.19-rc1.
+> 
+> I'd like to see acks from Thomas and/or Jason for MVEBU, and Simon for
+> R-Car.
 
+And you should also have my acked-by for the core ARM code:
 
-On 12/15/2014 1:57 PM, Arnd Bergmann wrote:
-> On Monday 15 December 2014 13:35:47 Ray Jui wrote:
->>
->> Like I said previously, dynamic GPIO allocation works fine in the
->> kernel, as long as all of our GPIO clients in the kernel use gpiod based
->> API, which is what we will enforce going forward. The only problem is
->> with some of our customers who use GPIO through sysfs and expect fixed
->> global GPIO numbers. Thinking about this more, it's probably not that
->> difficult to add a script for those customers to convert/map the GPIO
->> numbers based on readings parsed from sysfs, so I guess that's fine.
->>
->
-> I think we discussed the user space interface a number of times
-> in the past, but I forgot the outcome. Either there is already
-> a way to name gpio lines uniquely in sysfs, or there should be
-> one.
->
-> Can you reach the gpio interfaces using /sys/devices/0001234.bus/1234566.gpiocontroller/...?
->
-> 	Arnd
->
-We use entries under /sys/class/gpio/ to control GPIOs. All base, label, 
-and ngpio info specific to a GPIO controller can be found there.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
