@@ -1,33 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Dec 2014 17:01:38 +0100
-Subject: [PATCH 1/2] ARM: dts: kirkwood: enable phy driver for SATA
- controller on 88f6192
-In-Reply-To: <20141215203724.GA22936@anne>
-References: <20141215203724.GA22936@anne>
-Message-ID: <20141216170138.14dcabc1@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 16 Dec 2014 17:14:35 +0100
+Subject: [PATCH v2 2/2] ARM: mediatek: dts: Add bindings for watchdog
+In-Reply-To: <548C5F1F.8070804@roeck-us.net>
+References: <1418395859-32209-1-git-send-email-matthias.bgg@gmail.com>
+ <1418395859-32209-3-git-send-email-matthias.bgg@gmail.com>
+ <548C5F1F.8070804@roeck-us.net>
+Message-ID: <CABuKBe+=PaJ2BuhoGGwn8V20207QU3zzWb4UGgXzwwF-AvBEPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Evgeni Dobrev,
+2014-12-13 16:45 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
+> On 12/12/2014 06:50 AM, Matthias Brugger wrote:
+>>
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>   Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 13
+>> +++++++++++++
+>>   1 file changed, 13 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+>> b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+>> new file mode 100644
+>> index 0000000..af9eb5b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+>> @@ -0,0 +1,13 @@
+>> +Mediatek SoCs Watchdog timer
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : should be "mediatek,mt6589-wdt"
+>
+>
+> "mediatek" is undefined as vendor prefix in the current upstream code.
+> Is this vendor prefix coming in from another patch set ?
 
-On Mon, 15 Dec 2014 21:37:24 +0100, Evgeni Dobrev wrote:
-> This patch enables the phy drivers for the SATA controller on Marvell's 88f6192. Without them it is not possible to use SATA drives attached to this processor.
+Strange, should be in vendor-prefix.txt [1].
+Please double check.
 
-Commit log text should be wrapped to some reasonable length.
+Thanks,
+Matthias
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/vendor-prefixes.txt?id=refs/tags/v3.18#n93
+
+>
+> Guenter
+>
+>
+>> +- reg : Specifies base physical address and size of the registers.
+>> +
+>> +Example:
+>> +
+>> +wdt: watchdog at 010000000 {
+>> +       compatible = "mediatek,mt6589-wdt";
+>> +       reg = <0x10000000 0x18>;
+>> +};
+>>
+>
 
 
->  			interrupts = <21>;
->  			clocks = <&gate_clk 14>, <&gate_clk 15>;
->  			clock-names = "0", "1";
-> +                        phys = <&sata_phy0>, <&sata_phy1>;
-> +                        phy-names = "port0", "port1";
 
-You should use tabs and not spaces for indentation in Device Tree files.
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+motzblog.wordpress.com
