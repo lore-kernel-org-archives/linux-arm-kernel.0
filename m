@@ -1,40 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Dec 2014 13:08:15 +0100
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20141215180933.GW20738@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <1612493.xCj1Tx0M4k@avalon> <20141215180933.GW20738@arm.com>
-Message-ID: <2447060.c0PHi7y3cP@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 16 Dec 2014 13:56:26 +0100 (CET)
+Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
+In-Reply-To: <20141216122503.77c5632f@bbrezillon>
+References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2662748.NJbkr6jW7r@vostro.rjw.lan> <3542278.8lcJeXLMFm@vostro.rjw.lan>
+ <20141216100715.57baeb65@bbrezillon>
+ <alpine.DEB.2.11.1412161013570.17382@nanos>
+ <20141216122503.77c5632f@bbrezillon>
+Message-ID: <alpine.DEB.2.11.1412161349420.17382@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 December 2014 18:09:33 Will Deacon wrote:
-> > Using a single domain is a bit of a waste of resources in my case, so an 
-> > evolution would be to create four domains and assign devices to them based on 
-> > a policy. The policy could be fixed (round-robin for instance), or 
-> > configurable (possibly through DT, although it's really a policy, not a 
-> > hardware description).
+On Tue, 16 Dec 2014, Boris Brezillon wrote:
+> Thomas Gleixner <tglx@linutronix.de> wrote:
+> > Install the timer interrupt as a demultiplexing interrupt.
+> 
+> I can try to hack the AIC irqchip driver to implement this demux logic,
+> but this logic can't be placed in the PIT (Periodic Interval Timer)
+> driver itself, because the shared IRQ line is used by the at91 clock
+> controller (PMC) which is providing the clock to the PIT device.
+> This gives the following dependency graph:
+> 
+> PIT =depends-on=> Master Clock =provided-by=> PMC =needs=> PMC IRQ.
 
-I think in case of the ARM SMMU, we concluded that the grouping is indeed
-best done in DT, because of there is no good algorithmic way to come
-up with a set of bitmasks that make up a proper grouping into domains.
- 
-> I think having one default domain, which is home to all of the masters that
-> don't have any DMA restrictions is a good use of the hardware. That then
-> leaves you with three domains to cover VFIO, devices with DMA limitations
-> and potentially device isolation (if we had a way to describe that).
+It never can be a part of a device driver. This is a property of the
+interrupt controller which fails to provide a proper demux for this
+irq line in the first place.
 
-Yes, I agree. There are also a number of degrees to which one might want
-to enable IOMMUs at boot time:
+So you fake the demux in the irq chip driver, where you provide the
+pseudo chip and the demux logic. None of the device drivers (PIT, PMC,
+UART ...) even knows about that.
 
-- force-disable: use swiotlb only and turn off all IOMMUs or program them
-  with a static linear mapping if they cannot be disabled in hardware
-- soft-enable: use IOMMUs only for devices whose dma-mask does not cover
-  all the physical memory. This would provide the highest performance
-- force-enable: use the IOMMU for any device that has an 'iommus' property,
-  to catch any wild DMA pointer accesses.
-- secure-enable: like force-enable, but use as many separate domains as
-  possible to provide isolation between devices as well.
+|--------|             |--------|
+| AIC    |-------------| Pseudo |---- PIT
+|        |             | chip   |---- PMC
+|        |             |        |---- UART
+|        |             |--------|
+|        |--- devX
+|        |--- devY
+|        |--- devZ
+|--------|
 
-	Arnd
+So PIT, PMC and UART get interrupt numbers handed out which are
+outside of the interrupt space of AIC.
+
+Thanks,
+
+	tglx
