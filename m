@@ -1,100 +1,89 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 16 Dec 2014 10:20:40 +1000
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <548F7AD8.7050903@uclinux.org>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 15 Dec 2014 17:21:22 -0700
+Subject: regression: Clock changes in next-20141205 break at least omap4
+In-Reply-To: <20141215220224.20398.98259@quantum>
+References: <20141205165539.GA30437@atomide.com>
+ <5481F79D.4010504@codeaurora.org> <20141205183849.GB30437@atomide.com>
+ <20141212194238.20398.33333@quantum>
+ <alpine.DEB.2.02.1412122310570.29716@utopia.booyaka.com>
+ <20141215220224.20398.98259@quantum>
+Message-ID: <548F7B02.1090009@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 12/15/2014 03:02 PM, Mike Turquette wrote:
+> Quoting Paul Walmsley (2014-12-12 15:28:32)
+>> On Fri, 12 Dec 2014, Mike Turquette wrote:
+>>
+>>> Quoting Tony Lindgren (2014-12-05 10:38:49)
+>>>> * Stephen Boyd <sboyd@codeaurora.org> [141205 10:23]:
+>>>>> On 12/05/2014 08:55 AM, Tony Lindgren wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> Looks like commit 646cafc6aa4d ("clk: Change clk_ops->determine_rate
+>>>>>> to return a clk_hw as the best parent") breaks booting at least for
+>>>>>> omap4.
+>>>>> Do you get a compilation warning in arch/arm/mach-omap2/dpll3xxx.c ?
+>>>> Yes so it seems.
+>>>>
+>>>>>  From what I can tell omap3_noncore_dpll_determine_rate() hasn't been
+>>>>> updated to take a clk_hw pointer instead of clk pointer. It was there in
+>>>>> the original patch and I'm not sure why Mike dropped that part while
+>>>>> applying.
+>>>> OK that makes sense, Mike should apply that part too. Note that also
+>>>> include/linux/clk/ti.h needs changed accordingly for struct clk_hw,
+>>>> which you probably had in your orignal patch too. Assuming that's there,
+>>>> please feel free to add:
+>>>>
+>>>> Acked-by: Tony Lindgren <tony@atomide.com>
+>>> I figured out what went wrong here. When I applied Tomeu's changes the
+>>> OMAP stuff did not apply at all. In fact the .determine_rate callbacks
+>>> did not exist in clk-next. Paul merged that stuff through his tree[0]. I
+>>> don't know why I didn't follow up on that at the time.
+>>>
+>>> So we need to come up with a solution. Paul can take the OMAP portion of
+>>> Tomeu's changes[1] for OMAP, but I believe compilation will be broken in
+>>> his tree until it meets up with mine in linux-next. Or we could set up a
+>>> shared immutable branch that provides the needed changes.
+>>>
+>>> I could either set up a shared branch that includes Tomeu's changes that
+>>> Paul could merge (will require a rebase of the tip of my tree) or Paul
+>>> could provide a shared branch of the changes to dpll3xxx.c and
+>>> dpll4xxx.c that I could merge in.
+>>>
+>>> Or I could remove Tomeu's patches from my tree since we're right up
+>>> against the merge window but I would rather not do that since he has
+>>> worked tirelessly on this topic.
+>>>
+>>> [0] http://www.spinics.net/lists/arm-kernel/msg377288.html
+>>> [1] https://lkml.org/lkml/2014/12/2/70
+>> I don't think there's much that I can do at this point.  My tree is quite
+>> topologically distant from Linus's tree (pjw/omap-pending ->
+>> tmlind/linux-omap -> arm/arm-soc -> torvalds/linux).  So anything I do is
+>> high-latency.  My pull request for Tero's patches was sent to Tony a month
+>> ago.
+> Paul,
+>
+> I identified the patch in your tree that is missing in mine and, with
+> Tony's help, applied your for-v3.19/omap-a signed tag to my tree. With
+> these 5 patches in place I have applied Tero's two patches from
+> Friday[0].
+>
+> Paul & Tony, are you OK for me to take both of Tero's patches? I'm
+> already taking stuff in late so it is no trouble for me to pick up "ARM:
+> OMAP3: clock: fix boot breakage in legacy mode" while I'm at it.
+>
+> I'm going to let this get at least one cycle in linux-next before
+> sending my PR late this week. Hopefully Kevin (Cc'd) can check on the
+> omap boards in his autobuilder once my tree hits -next?
+>
+> Let me know if I missed anything. Thanks for the great teamwork, gang.
+>
+> [0] http://lkml.kernel.org/r/<1418390521-7541-1-git-send-email-t-kristo@ti.com>
+>
+> Regards,
+> Mike
 
-On 16/12/14 01:38, Gregory CLEMENT wrote:
-> The current GPL only licensing on the device tree makes it very
-> impractical for other software components licensed under another
-> license.
-> 
-> In order to make it easier for them to reuse our device trees,
-> relicense our device trees under a GPL/X11 dual-license.
-> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Arnaud Ebalard <arno@natisbad.org>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Greg Ungerer <gerg@uclinux.org>
+I think Tony's taking the second patch from Tero.
 
-I am fine with this.
-
-Acked-by: Greg Ungerer <gerg@uclinux.org>
-
-Regards
-Greg
-
-
-
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> Cc: Simon Baatz <gmbnomis@gmail.com>
-> Cc: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
->  1 file changed, 37 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 1af428602748..8a322ad57e5f 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -8,9 +8,43 @@
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   * Ben Dooks <ben.dooks@codethink.co.uk>
->   *
-> - * This file is licensed under the terms of the GNU General Public
-> - * License version 2.  This program is licensed "as is" without any
-> - * warranty of any kind, whether express or implied.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   *
->   * This file contains the definitions that are common to the Armada
->   * 370 and Armada XP SoC.
-> 
+- Paul
