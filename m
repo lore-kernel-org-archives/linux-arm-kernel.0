@@ -1,108 +1,69 @@
-From: d.safonov@partner.samsung.com (Dmitry Safonov)
-Date: Tue, 16 Dec 2014 15:57:11 +0300
-Subject: [RFC PATCH] mm: vmalloc: remove ioremap align constraint
-Message-ID: <1418734631-7933-1-git-send-email-d.safonov@partner.samsung.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Tue, 16 Dec 2014 08:00:42 -0500
+Subject: [Linaro-acpi] [PATCH] Mailbox: Complete wait event only if Tx was
+ successful
+In-Reply-To: <20141216113602.GA21888@e103737-lin.cambridge.arm.com>
+References: <1418242572-20998-1-git-send-email-ashwin.chaugule@linaro.org>
+ <548AAA95.6020001@arm.com>
+ <CAJ5Y-eYFsK_heBRQUOmPXGtkLtze-NGzWKy1=0qJVV3x2EycUw@mail.gmail.com>
+ <20141216113602.GA21888@e103737-lin.cambridge.arm.com>
+Message-ID: <CAJ5Y-easPFRgmH+_fGoTdJiOTa-tivMLEU0zU1ETSxOG1ptfsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ioremap uses __get_vm_area_node which sets alignment to fls of requested size.
-I couldn't find any reason for such big align. Does it decrease TLB misses?
-What am I missing?
+On 16 December 2014 at 06:36, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On Fri, Dec 12, 2014 at 05:47:26PM +0000, Ashwin Chaugule wrote:
+>> On 12 December 2014 at 03:43, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> > On Thursday 11 December 2014 01:46 AM, Ashwin Chaugule wrote:
+>> >>
+>> >> If a wait_for_completion_timeout() call returns due to a timeout,
+>> >> the mbox code can still call complete() after returning from the wait.
+>> >> This can cause subsequent transmissions on a channel to fail, since
+>> >> the wait_for_completion_timeout() sees the completion variable
+>> >> is !=0, caused by the erroneous complete() call, and immediately
+>> >> returns without waiting for the time as expected by the client.
+>> >>
+>> >> Fix this by calling complete() only if the TX was successful.
+>> >>
+>> >> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> >> ---
+>> >>   drivers/mailbox/mailbox.c | 2 +-
+>> >>   1 file changed, 1 insertion(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+>> >> index 17e9e4a..4acaddb 100644
+>> >> --- a/drivers/mailbox/mailbox.c
+>> >> +++ b/drivers/mailbox/mailbox.c
+>> >> @@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
+>> >>         if (mssg && chan->cl->tx_done)
+>> >>                 chan->cl->tx_done(chan->cl, mssg, r);
+>> >>
+>> >> -       if (chan->cl->tx_block)
+>> >> +       if ((!r) && chan->cl->tx_block)
+>> >>                 complete(&chan->tx_complete);
+>> >
+>> >
+>> > Just curious to check if there's another possible race which is
+>> > a different issue.
+>> >
+>> > Suppose the timer fired and indicated that the Tx is complete, then
+>> > it tries to execute complete while the wait_for_completion_timeout timed
+>> > out. Does that make sense ?
+>> >
+>> > So if yes, how about adding !completion_done(..) to the check while you
+>> > are at this ?
+>>
+>> Yea. Seems like another race condition. I'll add it along with this..
+>>
+>
+> Thanks !
 
-Alignment restriction for ioremap region was introduced with the commit:
+IIUC, it looks like adding the !completion_done() will not really fix
+this race. Once the lock inside wait_for_completion.. is released,
+completion_done() will return 0, and we'll call complete(), which is
+not what we want, since the "wait" is already over (after a timeout).
+I think the only right thing here is to increase the timeout in
+wait_for_completion_timeout(). Thoughts?
 
-> Author: James Bottomley <jejb@mulgrave.(none)>
-> Date:   Wed Jun 30 11:11:14 2004 -0500
-> 
->     Add vmalloc alignment constraints
-> 
->     vmalloc is used by ioremap() to get regions for
->     remapping I/O space.  To feed these regions back
->     into a __get_free_pages() type memory allocator,
->     they are expected to have more alignment than
->     get_vm_area() proves.  So add additional alignment
->     constraints for VM_IOREMAP.
-> 
->     Signed-off-by: James Bottomley <James.Bottomley@SteelEye.com>
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: James Bottomley <JBottomley@parallels.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Dyasly Sergey <s.dyasly@samsung.com>
-Signed-off-by: Dmitry Safonov <d.safonov@partner.samsung.com>
----
- arch/arm/include/asm/memory.h       | 5 -----
- arch/unicore32/include/asm/memory.h | 5 -----
- include/linux/vmalloc.h             | 8 --------
- mm/vmalloc.c                        | 2 --
- 4 files changed, 20 deletions(-)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 184def0..b333245 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -78,11 +78,6 @@
-  */
- #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
- 
--/*
-- * Allow 16MB-aligned ioremap pages
-- */
--#define IOREMAP_MAX_ORDER	24
--
- #else /* CONFIG_MMU */
- 
- /*
-diff --git a/arch/unicore32/include/asm/memory.h b/arch/unicore32/include/asm/memory.h
-index debafc4..ffae189 100644
---- a/arch/unicore32/include/asm/memory.h
-+++ b/arch/unicore32/include/asm/memory.h
-@@ -46,11 +46,6 @@
- #define MODULES_END		(PAGE_OFFSET)
- 
- /*
-- * Allow 16MB-aligned ioremap pages
-- */
--#define IOREMAP_MAX_ORDER	24
--
--/*
-  * Physical vs virtual RAM address space conversion.  These are
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
-index b87696f..2f428e8 100644
---- a/include/linux/vmalloc.h
-+++ b/include/linux/vmalloc.h
-@@ -18,14 +18,6 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
- #define VM_UNINITIALIZED	0x00000020	/* vm_struct is not fully initialized */
- /* bits [20..32] reserved for arch specific ioremap internals */
- 
--/*
-- * Maximum alignment for ioremap() regions.
-- * Can be overriden by arch-specific value.
-- */
--#ifndef IOREMAP_MAX_ORDER
--#define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
--#endif
--
- struct vm_struct {
- 	struct vm_struct	*next;
- 	void			*addr;
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 39c3388..c4f480dd 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -1313,8 +1313,6 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
- 	struct vm_struct *area;
- 
- 	BUG_ON(in_interrupt());
--	if (flags & VM_IOREMAP)
--		align = 1ul << clamp(fls(size), PAGE_SHIFT, IOREMAP_MAX_ORDER);
- 
- 	size = PAGE_ALIGN(size);
- 	if (unlikely(!size))
--- 
-1.9.1
+Cheers,
+Ashwin
