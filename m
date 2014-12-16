@@ -1,41 +1,56 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 16 Dec 2014 01:24:41 +0100
-Subject: [PATCHv1 7/7] arm: dts: tegra: update isl29028 compatible string to
- use isil vendor prefix
-In-Reply-To: <cover.1418688042.git.arno@natisbad.org>
-References: <cover.1418688042.git.arno@natisbad.org>
-Message-ID: <a58c1c15cd35098fc4c69355f5fee4d3a6ae75c6.1418688043.git.arno@natisbad.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 15 Dec 2014 16:28:23 -0800
+Subject: [PATCH v2 2/4] PCI: iproc: Add Broadcom iProc PCIe driver
+In-Reply-To: <2242033.mU3KpyO3Rt@wuerfel>
+References: <1418351817-14898-3-git-send-email-rjui@broadcom.com>
+ <1790462.K12S5vem48@wuerfel> <548F338F.9030203@broadcom.com>
+ <2242033.mU3KpyO3Rt@wuerfel>
+Message-ID: <548F7CA7.8070600@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-"isil" and "isl" prefixes are used at various locations inside the kernel
-to reference Intersil corporation. This patch is part of a series fixing
-those locations were "isl" is used in compatible strings to use the now
-expected "isil" prefix instead (NASDAQ symbol for Intersil and most used
-version).
 
-Note: isl29028 is an I2C device so the patch does not in fact currently
-depend on the introduction of "isil"-based compatible string in isl29028
-driver because I2C core does not check the prefix yet.
+On 12/15/2014 1:37 PM, Arnd Bergmann wrote:
+> On Monday 15 December 2014 11:16:31 Ray Jui wrote:
+>> On 12/12/2014 9:21 AM, Arnd Bergmann wrote:
+>>> On Friday 12 December 2014 09:08:48 Ray Jui wrote:
+>>> One way to solve this would be by turning the driver into a library
+>>> the same way as the pcie-dw driver, and have separate front-ends
+>>> for it for platform_device and bcma_device.
+>>>
+>> I'm fine with this solution, i.e., to introduce a common pcie-iproc core
+>> driver (just like pcie-designware) and have different front-ends
+>> depending on the device/bus type. If we end up deciding to go with this
+>> solution, I need to discuss with Hauke to come up with a plan to
+>> collaborate.
+>
+> Ok
+>
+>> But before we choose to go with that route, may I ask, what is the
+>> purpose of tying a PCIe host driver to BCMA? What benefit does BCMA give
+>> us? If we have a generic platform based PCIe driver that can work on all
+>> iProc SoCs + BCM4708 and BCM5301X with all HW specific configurations
+>> taken care of by device tree, why do we still need to use BCMA?
+>>
+>> I thought all a BCMA device here does is to auto-instantiate based on
+>> some register readings?
+>
+> Basically, DT is a hack that we only need for nondiscoverable buses.
+> As BCMA is (mostly) discoverable, we should use that, just like we do
+> for things like PCI and USB. There are clearly some limitations to
+> BCMA as well, e.g. on bcm4708 we don't have proper IRQ numbers in
+> the device list and we need to work around that using DT, but overall
+> it still seems to have more upsides than downsides to use it.
+>
+> It's also good to point other SoC makers to Broadcom as a good example
+> for how to do things they claim are impossible to do.
+>
+> 	Arnd
+>
+Okay. Fair enough. Let's go with your proposal to create a generic 
+driver pcie-iproc to be used by both bcma and platform bus. I'll 
+initiate another email thread with you, Hauke, Scott, and me. We can 
+discuss how to collaborate on that email thread.
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index cbf5a1ae0ca7..a1b682ea01bd 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -189,7 +189,7 @@
- 
- 		/* ALS and Proximity sensor */
- 		isl29028 at 44 {
--			compatible = "isl,isl29028";
-+			compatible = "isil,isl29028";
- 			reg = <0x44>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
--- 
-2.1.1
+Thanks.
