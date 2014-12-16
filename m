@@ -1,50 +1,56 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 16 Dec 2014 09:41:18 +0100
-Subject: [PATCH v5 0/3] Add support for Tegra Activity Monitor
-Message-ID: <1418719298-25314-1-git-send-email-tomeu.vizoso@collabora.com>
+Date: Tue, 16 Dec 2014 09:41:21 +0100
+Subject: [PATCH v5 3/3] ARM: tegra: Add Tegra124 ACTMON support
+In-Reply-To: <1418719298-25314-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1418719298-25314-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1418719298-25314-4-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add device node for the ACTMON block to the Tegra124 device tree.
 
-this v5 addresses a few comments from Alexandre:
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-* Clarify the units of avg_dependency_threshold
-* Remove unused references to platform_device
-* Enable and disable interrupts on governor events
-* Make sure we handle all interrupts for any of the devices we are sampling
-* Move locking to be per-actmon-device
+---
 
-These patches implement support for setting the rate of the EMC clock based on
-stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
-memory accesses (among others).
+v2:	* Add operating-points property
+---
+ arch/arm/boot/dts/tegra124.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-It depends on the following in-flight patches:
-
-* EMC driver: http://thread.gmane.org/gmane.linux.drivers.devicetree/99304
-* CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1812962
-
-I have pushed a branch here for testing:
-
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v5
-
-Regards,
-
-Tomeu
-
-Tomeu Vizoso (3):
-  of: Add binding for NVIDIA Tegra ACTMON node
-  PM / devfreq: tegra: add devfreq driver for Tegra Activity Monitor
-  ARM: tegra: Add Tegra124 ACTMON support
-
- .../devicetree/bindings/arm/tegra/actmon.txt       |  38 +
- arch/arm/boot/dts/tegra124.dtsi                    |  23 +
- drivers/devfreq/Kconfig                            |   9 +
- drivers/devfreq/Makefile                           |   1 +
- drivers/devfreq/tegra-actmon-devfreq.c             | 767 +++++++++++++++++++++
- 5 files changed, 838 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
- create mode 100644 drivers/devfreq/tegra-actmon-devfreq.c
-
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index a49e7da..9d7baa8 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -215,6 +215,29 @@
+ 		reg = <0x0 0x60007000 0x0 0x1000>;
+ 	};
+ 
++	actmon at 0,6000c800 {
++		compatible = "nvidia,tegra124-actmon";
++		reg = <0x0 0x6000c800 0x0 0x400>;
++		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_ACTMON>,
++			 <&tegra_car TEGRA124_CLK_EMC>;
++		clock-names = "actmon", "emc";
++		resets = <&tegra_car 119>;
++		reset-names = "actmon";
++		operating-points = <
++			/* KHz	uV */
++			/* TODO: Add more points below 102 MHz */
++			102000	800000
++			204000	800000
++			300000	820000
++			396000	850000
++			528000	880000
++			600000	910000
++			792000	980000
++			924000	1010000
++		>;
++	};
++
+ 	gpio: gpio at 0,6000d000 {
+ 		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
+ 		reg = <0x0 0x6000d000 0x0 0x1000>;
 -- 
 1.9.3
