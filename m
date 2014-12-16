@@ -1,56 +1,77 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 16 Dec 2014 09:41:21 +0100
-Subject: [PATCH v5 3/3] ARM: tegra: Add Tegra124 ACTMON support
-In-Reply-To: <1418719298-25314-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1418719298-25314-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1418719298-25314-4-git-send-email-tomeu.vizoso@collabora.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 16 Dec 2014 16:46:55 +0800
+Subject: [PATCH 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <20141215125932.GF462@leverpostej>
+References: <1418208602-35584-1-git-send-email-eddie.huang@mediatek.com>
+ <1418208602-35584-4-git-send-email-eddie.huang@mediatek.com>
+ <20141211180245.GE28150@leverpostej> <1418371705.423.31.camel@mtksdaap41>
+ <20141215125932.GF462@leverpostej>
+Message-ID: <1418719615.8392.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for the ACTMON block to the Tegra124 device tree.
+Hi,
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On Mon, 2014-12-15 at 12:59 +0000, Mark Rutland wrote:
+> On Fri, Dec 12, 2014 at 08:08:25AM +0000, Eddie Huang wrote:
+> > Hi Mark,
+> > 
+> > On Thu, 2014-12-11 at 18:02 +0000, Mark Rutland wrote:
+> > > Hi,
+> > > 
+> > > On Wed, Dec 10, 2014 at 10:50:01AM +0000, Eddie Huang wrote:
+> > > > Add device tree support for MT8173 SoC and evalutaion board based on it.
+> > > > 
+> > 
+> > > > +
+> > > > +	psci {
+> > > > +		compatible = "arm,psci-0.2";
+> > > > +		method = "smc";
+> > > > +	};
+> > > 
+> > > What are you using as your PSCI 0.2 implementation?
+> > > 
+> > > Is it fully compliant? (e.g. are the reset and power off functions
+> > > implemented, may CPU0 be hotplugged)?
+> > > 
+> > > Given only portions of the GIC seem to be described below, what
+> > > exception level is your kernel entered at? Per the spec it should be
+> > > EL2, but given the brokenness below with the GIC I'm suspicious.
+> > > 
+> > 
+> > Currently we only implement CPU boot, no power off, no CPU0 hotplug
+> > either. And enter kernel at EL2. Actually, we run ATF in EL3, then
+> > switch to EL2 to run lk and kernel.
+> 
+> Ok. In the absence of CPU_OFF, this is not yet a conforming PSCI 0.2
+> implementation, so I'm wary of marking this as PSCI 0.2 until that is
+> the case. Any attempt to power of CPUs will hit a BUG() in cpu_die(),
+> and we don't want that.
 
----
+We are still developing PSCI related functions, CPU_ON, CPU_OFF,
+CPU_SUSPEND are ready, others are going. PSCI 0.2 is our target although
+lacks some implements
 
-v2:	* Add operating-points property
----
- arch/arm/boot/dts/tegra124.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+> 
+> Is CPU0 hotplug planned?
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index a49e7da..9d7baa8 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -215,6 +215,29 @@
- 		reg = <0x0 0x60007000 0x0 0x1000>;
- 	};
- 
-+	actmon at 0,6000c800 {
-+		compatible = "nvidia,tegra124-actmon";
-+		reg = <0x0 0x6000c800 0x0 0x400>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_ACTMON>,
-+			 <&tegra_car TEGRA124_CLK_EMC>;
-+		clock-names = "actmon", "emc";
-+		resets = <&tegra_car 119>;
-+		reset-names = "actmon";
-+		operating-points = <
-+			/* KHz	uV */
-+			/* TODO: Add more points below 102 MHz */
-+			102000	800000
-+			204000	800000
-+			300000	820000
-+			396000	850000
-+			528000	880000
-+			600000	910000
-+			792000	980000
-+			924000	1010000
-+		>;
-+	};
-+
- 	gpio: gpio at 0,6000d000 {
- 		compatible = "nvidia,tegra124-gpio", "nvidia,tegra30-gpio";
- 		reg = <0x0 0x6000d000 0x0 0x1000>;
--- 
-1.9.3
+No
+
+> 
+> If not, does your PSCI implementation report CPU0 as
+> non-hotpluggable via MIGRATE_INFO_TYPE reporting a UP not migratable
+> trusted OS (and MIGRATE_INFO_UP_CPU reporting CPU0 as the resident CPU)?
+> 
+Will check whether add this
+
+> Are SYSTEM_OFF and SYSTEM_RESET available?
+
+No yet
+
+> 
+> Thanks,
+> Mark.
+
+Since we miss some PSCI-0.2 implements, I don't know whether I should
+remove PSCI stuff in this patch.
