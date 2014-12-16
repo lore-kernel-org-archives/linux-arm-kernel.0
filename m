@@ -1,63 +1,26 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 16 Dec 2014 09:31:07 +0100
-Subject: [PATCH v3 2/3] ARM: socfpga: Add driver for the L3 interconnect
-In-Reply-To: <20141215223440.GC27866@amd>
-References: <1417292052-12974-1-git-send-email-s.trumtrar@pengutronix.de>
- <1417292052-12974-3-git-send-email-s.trumtrar@pengutronix.de>
- <20141215223440.GC27866@amd>
-Message-ID: <20141216083107.GB13070@pengutronix.de>
+From: catalin.crenguta@gmail.com (Catalin Crenguta)
+Date: Tue, 16 Dec 2014 10:31:47 +0200
+Subject: [PATCH v4 0/6] Touchscreen performance related fixes
+In-Reply-To: <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+References: <1415941651-28962-1-git-send-email-vigneshr@ti.com>
+ <20141124115116.GA14997@linutronix.de> <547C3A95.30605@ti.com>
+ <547C3C19.5090501@linutronix.de> <547C42FF.5010700@ti.com>
+ <CAH=tA9FO5MCzE274thc-NugCNte6WdyC-Rxc6yfnuR=+6_qMbA@mail.gmail.com>
+ <548A0125.6040708@linutronix.de>
+ <CABH3fy8zCjsxARsqBf9JXOHBkzySdiqifA1KtjnGpJdBY2EikA@mail.gmail.com>
+ <912A29987EAE174BA6CF187D7CDFA9CE26FA135A@DLEE08.ent.ti.com>
+Message-ID: <CABH3fy8S1Hb9LK=ZceWgJsNvLbq8pwu00Tcj_0vE4j6QzcO+kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, Dec 12, 2014 at 4:16 PM, Griffis, Brad <bgriffis@ti.com> wrote:
+> How are you configuring ti,charge-delay in your dts?  I've seen this behavior on some custom boards where we were using a smaller charge delay (0x400) to begin with, and by upping it to 0xb000 we resolved the issue.  These patches however already specified ti,charge-delay = 0xb000 by default so this would surprise me that it's still seeing that issue.  Was the touchscreen working as expected before these new patches, or does it have issues both ways?
 
-On Mon, Dec 15, 2014 at 11:34:40PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > The L3 interconnect provides Global Programmer View (GPV) registers for every
-> > AXI master and slave on the SoC.
-> > Although this is just a bunch of bits, syscon is not the right approach for
-> > this IP core.
-> > The L3 interconnect is configured with a lot of reserved "holes" in its memory
-> > space. Just mapping this with regmap, what syscon would do, would lead to the
-> > system completely hanging, if one of those areas would be touched.
-> > One example for when this might happen is the regmap registers dump in the
-> > debugfs.
-> 
-> Could syscon be extended to take more than one range? Then, you could
-> simply list all the ranges in device tree and use syscon...
->
+It seems that because the ribbon cable has both the analog and digital
+signals, the analog signals are affected by the digital ones (hence
+the touchscreen was working OK when the display was disabled). Putting
+decoupling capacitors on X+, X-, Y+, Y- reduces the noise and the
+false events disappear.
+I'm sorry for all the noise I have generated.
 
-Well it could. The question is, if it should. I don't think it would be a good
-idea to abstract away every IP core with a syscon node, just because it works.
-
-> > diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> > index 76d6bd4da138..11db07da894f 100644
-> > --- a/drivers/soc/Kconfig
-> > +++ b/drivers/soc/Kconfig
-> > @@ -1,6 +1,7 @@
-> >  menu "SOC (System On Chip) specific Drivers"
-> 
-> SoC is usual spelling.
-> 
-
-Send patches :-)
-This is already mainline and not added here.
-
-> > @@ -0,0 +1,10 @@
-> > +#
-> > +# SoCFPGA Soc drivers
-> 
-> SoC.
-> 
-
-This however I will fix.
-
-Thanks,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
