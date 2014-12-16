@@ -1,80 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Dec 2014 17:30:29 -0200
-Subject: [PATCH v2 2/2] ARM: dts: imx6sx-sdb: Add QSPI support
-In-Reply-To: <1418758230-10246-1-git-send-email-festevam@gmail.com>
-References: <1418758230-10246-1-git-send-email-festevam@gmail.com>
-Message-ID: <1418758230-10246-2-git-send-email-festevam@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 16 Dec 2014 13:33:24 -0600
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141216192740.GN24110@csclub.uwaterloo.ca>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
+ <20141216145856.GA23358@kahuna> <20141216163657.GL24110@csclub.uwaterloo.ca>
+ <54908128.7040005@ti.com> <20141216192740.GN24110@csclub.uwaterloo.ca>
+Message-ID: <54908904.9060908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 12/16/2014 01:27 PM, Lennart Sorensen wrote:
+>> I see why arch_timer_freq might skip the rounding error of 39, 15 and
+>> 55 Vs existing logic which is possibly at a truncation error risk
+>> (without errata for sysclk 13, 26 and 27MHz).
+>>
+>> all you'd probably need to do is cast rate, num and den to unsigned
+>> long and have a common computation logic.
+> 
+> If that is acceptable, then sure I can do that.  I liked avoiding casts
+> in general though.
+> 
+>> if you'd really want to handle truncation error, it must be a separate
+>> patch of it's own - I would not mix it with the errata fix.
+> 
+> Well there is no error in the existing code because the rate / den
+> is always a clean integer division.  The problem is introduced by the
 
-imx6sx-sdb has two s25fl128s quad spi flash. Add support for them.
+key is "there is no error in existing code for existing value" :) ->
+the same code for new values will fail. and introducing (rate * num) /
+den without cast will fail for old values.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- None
+> SYSCLK1 / 610 used by the emulated clock which is not a clean division.
+> 
+> So for the existing logic, the calculation was perfect.  It is only for
+> the errata case that it is a problem.
+> 
+> So I think leaving the existing calculation but moved up works well,
+> and then having the alternate order calculation only in the errata case
+> seemed cleaner and avoids casts and 64bit math which I thought was
+> overall desirable.
 
- arch/arm/boot/dts/imx6sx-sdb.dts | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+In general using DIV_ROUND_UP and family of macros(in kernel.h) is the
+right way of doing division in similar cases in Linux kernel. And for
+the same functionality, we want a common equation - if it does not fit
+well for all values (even if we introduce new values), then we must
+come to a better equation that will work for all values. What we do
+not do is to have two equations meant for doing the same thing.
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 1e6e5cc..cdffe84 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -340,6 +340,28 @@
- 	status = "okay";
- };
- 
-+&qspi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_qspi2>;
-+	status = "okay";
-+
-+	flash0: s25fl128s at 0 {
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+	};
-+
-+	flash1: s25fl128s at 1 {
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+	};
-+};
-+
- &ssi2 {
- 	status = "okay";
- };
-@@ -524,6 +546,23 @@
- 			>;
- 		};
- 
-+		pinctrl_qspi2: qspi2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_NAND_WP_B__QSPI2_A_DATA_0     0x70f1
-+				MX6SX_PAD_NAND_READY_B__QSPI2_A_DATA_1  0x70f1
-+				MX6SX_PAD_NAND_CE0_B__QSPI2_A_DATA_2    0x70f1
-+				MX6SX_PAD_NAND_CE1_B__QSPI2_A_DATA_3    0x70f1
-+				MX6SX_PAD_NAND_CLE__QSPI2_A_SCLK        0x70f1
-+				MX6SX_PAD_NAND_ALE__QSPI2_A_SS0_B       0x70f1
-+				MX6SX_PAD_NAND_DATA01__QSPI2_B_DATA_0   0x70f1
-+				MX6SX_PAD_NAND_DATA00__QSPI2_B_DATA_1   0x70f1
-+				MX6SX_PAD_NAND_WE_B__QSPI2_B_DATA_2     0x70f1
-+				MX6SX_PAD_NAND_RE_B__QSPI2_B_DATA_3     0x70f1
-+				MX6SX_PAD_NAND_DATA02__QSPI2_B_SCLK     0x70f1
-+				MX6SX_PAD_NAND_DATA03__QSPI2_B_SS0_B    0x70f1
-+			>;
-+		};
-+
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
+
 -- 
-1.9.1
+Regards,
+Nishanth Menon
