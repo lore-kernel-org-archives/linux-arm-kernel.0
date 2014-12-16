@@ -1,58 +1,124 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 16 Dec 2014 10:57:10 +0100
-Subject: [PATCH 3/4] mmc: sunxi: Reset behavior fix
-In-Reply-To: <20141216003756.15488.34861.stgit@dizzy-6.o2s.ch>
-References: <20141216003412.15488.54812.stgit@dizzy-6.o2s.ch>
- <20141216003756.15488.34861.stgit@dizzy-6.o2s.ch>
-Message-ID: <549001F6.5080202@redhat.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 16 Dec 2014 11:03:55 +0100 (CET)
+Subject: [PATCH 0/5] ARM: at91: fix irq_pm_install_action WARNING
+In-Reply-To: <20141216100715.57baeb65@bbrezillon>
+References: <1418660152-17185-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2662748.NJbkr6jW7r@vostro.rjw.lan> <3542278.8lcJeXLMFm@vostro.rjw.lan>
+ <20141216100715.57baeb65@bbrezillon>
+Message-ID: <alpine.DEB.2.11.1412161013570.17382@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 16 Dec 2014, Boris Brezillon wrote:
+> On Mon, 15 Dec 2014 23:48:14 +0100
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+> > Or even set IRFQ_NO_SUSPEND for all of the users of this interrupt and add
+> > comments to them explaining why it is set.
+> Actually I thought about adding a new flag (let's call it
+> IRQF_DONT_COMPLAIN for now ;-)) to remove those warnings (or specifying
+> IRFQ_NO_SUSPEND in all peripherals sharing the IRQ with the init
+> timer), but after discussing the problem with Thomas I decided to go
+> for the approach described in my cover letter.
+> 
+> Thomas, correct me if I'm wrong, but your concern about the
+> IRQF_DONT_COMPLAIN approach was that it was leaving interrupt handlers
+> of suspended devices in an active state (meaning that they could be
+> called in "suspend" or "early resume" state), and such devices might
+> not properly handle interrupts while being in a suspended state (clocks
+> and regulators disabled).
+> In at91 specific case this should not be an issue thought.
+> 
+> We have the same problem when setting IRFQ_NO_SUSPEND on all peripherals
+> sharing the IRQ with the init timer.
+> Moreover, I'd like to keep the core automatically disabling the IRQ when
+> the PMC, RTC, watchdog or DBGU (UART) peripherals have their own
+> dedicated IRQ (which is the case on Atmel sama5 SoCs).
+> This implies testing for the SoC version in each of these drivers and
+> adapting the request_irq call accordingly.
 
-On 16-12-14 01:37, David Lanzend?rfer wrote:
-> When there is only one DES available the DMA performs a FIFO reset and waits until the reinitialization has been completed.
-> Disabling the SDXC_IDMAC_DES0_DIC bit prevents the DMA from sending an interrupt after it has finished this reinitialization.
->
-> The flags SDXC_IDMAC_DES0_FD and SDXC_IDMAC_DES0_LD are both required in order to use the controller with more than one DES.
->
-> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> Reported-by: ?? <lixiang@allwinnertech.com>
-> ---
->   drivers/mmc/host/sunxi-mmc.c |   12 +++++++++++-
->   1 file changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 50bd3d2..5331c88 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -310,7 +310,17 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
->   	}
->
->   	pdes[0].config |= SDXC_IDMAC_DES0_FD;
-> -	pdes[i - 1].config = SDXC_IDMAC_DES0_OWN | SDXC_IDMAC_DES0_LD;
-> +
-> +	/*
-> +	 * When there is only one DES available the DMA performs a FIFO reset and waits
-> +	 * until the reinitialization has been completed.
-> +	 * Disabling the SDXC_IDMAC_DES0_DIC bit prevents the DMA from sending an interrupt
-> +	 * after it has finished this reinitialization.
-> +	 */
-> +	pdes[i - 1].config = SDXC_IDMAC_DES0_OWN;
-> +	pdes[i - 1].config |= SDXC_IDMAC_DES0_FD;
-> +	pdes[i - 1].config |= SDXC_IDMAC_DES0_LD;
-> +	pdes[i - 1].config &= ~SDXC_IDMAC_DES0_DIC;
->
->   	/*
->   	 * Avoid the io-store starting the idmac hitting io-mem before the
+But still all those drivers must disable the interrupts at the device
+level on suspend, right?
 
-This is wrong. For one you are starting with an assignment, so you could just as well
-set all the flags you want with a single line / assignment. Besides that you're setting
-the FD flag, which should only be set for the first descriptor of a transfer, so for
-multi descriptor transfers this is wrong.
+> Thomas, Rafael, if both of you think I should either introduce a new
+> flag or specify IRFQ_NO_SUSPEND in all shared IRQ users, then I can go
+> for one of this solution.
 
-Please see the patch which I send you which gets this right.
+All of this really sucks. What about the following?
 
-Regards,
+Install the timer interrupt as a demultiplexing interrupt.
 
-Hans
+Create a pseudo interrupt chip, which essentially does nothing, but
+keeps track of the disabled state. Install handle_simple_irq as
+handler for those "demux" interrupts. Then have:
+
+struct data {
+       u32 unmasked;
+       u32 demuxavail;
+};
+
+static struct data demuxdata;
+
+At init time you know how many of these demux interrupts are
+available. So you set the demuxdata up, e.g. for 3 interrupts
+connected:
+
+	demuxdata.demuxavail = 0x07;
+
+You install a pointer to demuxdata for all demux interrupts as irq
+chip data and the simple handler.
+
+And in the mask/unmask handlers you do:
+
+mask(irqdata) {
+       struct data *d = irq_data_get_irq_chip_data(irqdata);
+
+       d->unmasked &= ~irqdata->mask;
+       if (!d->unmasked)
+       	  mask_demux_irq();
+}
+
+unmask(irqdata) {
+       struct data *d = irq_data_get_irq_chip_data(irqdata);
+
+       if (!d->unmasked)
+       	  unmask_demux_irq();
+       d->mask |= irqdata->mask;
+}
+
+Now the demuxhandler does:
+
+    mask = demuxdata.demuxavail & demuxdata.unmasked;
+
+    for_each_bit(bit, mask)
+    	generic_handle_irq(demuxirq_start + bit);
+
+So the handler wont be invoked for masked bits and handle_simple_irq()
+will not call the device handler if the interrupt is marked disabled.
+
+So in the suspend case all "demux" interrupts except those which are
+marked NOSUSPEND are marked disabled and the handlers wont be invoked.
+
+Locking and other details omitted.
+
+That avoids the whole flag, action, whatever business for the price of
+a really trivial demux mechanism. Everything just works. Even the irq
+storm detector will just disable the parent interrupt once all
+handlers return NONE often enough.
+
+Your device drivers just work fine, as long as they disable the
+interrupt at the device level on suspend, but they have to do that in
+any case. Aside of that detail they are completely oblivous whether
+they are connected to this "demux" chip or to a seperate irq line on
+other devices.
+
+> BTW, have you heard about other platforms/drivers impacted by this
+> WARN_ON addition, and if so how did they solve the problem ?
+
+Nothing so far. Seems not many hardware folks are that crazy.
+
+But I have no objections to make this generic infrastructure as long
+as it can be compiled out.
+
+Thanks,
+
+	tglx
