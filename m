@@ -1,106 +1,97 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 16 Dec 2014 22:18:26 +0100
-Subject: [PATCHv2 0/8] from now on, use 'isil' as prefix for Intersil
-Message-ID: <cover.1418763328.git.arno@natisbad.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Dec 2014 22:16:30 +0100
+Subject: [GIT PULL 1/3]
+In-Reply-To: <5499732.TPqbyGxy2W@wuerfel>
+References: <5499732.TPqbyGxy2W@wuerfel>
+Message-ID: <1472557.DTsj0nlvTo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit 8918465163171322c77a19d5258a95f56d89d2e4:
 
-As suggested by Jason on a v0, I made a specific series for that work,
-which intend to remove all remaining 'isl' prefix for Intersil to only
-have 'isil'. More details below.
+  memory: Add NVIDIA Tegra memory controller support (2014-12-04 16:11:47 +0100)
 
-When Intersil ISL12057 driver was introduced by commit 70e123373c05
-("rtc: Add support for Intersil ISL12057 I2C RTC chip"), the vendor
-prefix 'isl' was used instead of the expected 'isil' (Intersil
-NASDAQ symbol) and documented in vendor-prefixes.txt.
+are available in the git repository at:
 
-Recently, a patch from Philip Zabel (7a6540ca856a, "ARM: mvebu:
-Change vendor prefix for Intersil Corporation to isil") fixed that
-prefix in ReadyNAS devices .dts files (AFAICT, the only users of
-the driver).
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt2-for-linus
 
-Then, commits 7c75c1d5e72b ("dt-bindings: Document deprecated device
-vendor name to fix related warning") and b2ea3f82e798 (dt-bindings:
-Document correct and deprecated vendor-prefix with device isl29028)
-decided to go the other way and deprecate isil in vendor-prefixes.txt
-and in isl29028.c staging driver.
+for you to fetch changes up to 1d5f497d87c7d960c27cdc40e7563b0ae88387d3:
 
-While trying and merge a fix I wrote for ISL12057 drivers to finish
-Philip's work, it conflicted with the two recently introduced commits,
-and revealed the issue: at the moment, there are various compatible
-strings in drivers and .dts files for Intersil products which use
-either isl or isil:
+  Merge tag 'tegra-for-3.19-dt' of git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux into next/dt2 (2014-12-04 17:21:49 +0100)
 
-$ grep -R "isil," .
-./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isil,isl29028           (deprecated, use isl)
-./drivers/staging/iio/light/isl29028.c:   { .compatible = "isil,isl29028", },/* deprecated, don't use */
-./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29018", },
-./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29023", },
-./drivers/staging/iio/light/isl29018.c:   { .compatible = "isil,isl29035", },
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/powerpc/boot/dts/p1022rdk.dts:        compatible = "isil,zl6100";
-./arch/arm/boot/dts/exynos5800-peach-pi.dts: compatible = "isil,isl29018";
-./arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi: compatible = "isil,isl1208";
-./arch/arm/boot/dts/tegra20-ventana.dts:     compatible = "isil,isl29018";
-./arch/arm/boot/dts/tegra20-seaboard.dts:    compatible = "isil,isl29018";
-./arch/arm/boot/dts/armada-xp-netgear-rn2120.dts: compatible = "isil,isl12057";
-./arch/arm/boot/dts/armada-370-netgear-rn104.dts: compatible = "isil,isl12057";
-./arch/arm/boot/dts/exynos5420-peach-pit.dts:     compatible = "isil,isl29018";
-./arch/arm/boot/dts/armada-370-netgear-rn102.dts: compatible = "isil,isl12057";
+----------------------------------------------------------------
+ARM: SoC DT updates for 3.19, part 2
 
-$ grep -R "isl," .
-./Documentation/devicetree/bindings/regulator/isl9305.txt:- compatible: "isl,isl9305" or "isl,isl9305h"
-./Documentation/devicetree/bindings/regulator/isl9305.txt:              compatible = "isl,isl9305";
-./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isl,isl12057      Intersil ISL12057 I2C RTC Chip
-./Documentation/devicetree/bindings/i2c/trivial-devices.txt:isl,isl29028      Intersil ISL29028 Ambient Light ....
-./drivers/regulator/isl9305.c:          { .compatible = "isl,isl9305" },
-./drivers/regulator/isl9305.c:          { .compatible = "isl,isl9305h" },
-./drivers/staging/iio/light/isl29028.c: { .compatible = "isl,isl29028", },
-./drivers/rtc/rtc-isl12057.c:           { .compatible = "isl,isl12057" },
-./drivers/rtc/rtc-isl12022.c:           { .compatible = "isl,isl12022" },
-./arch/arm/boot/dts/tegra30-cardhu.dtsi:   compatible = "isl,isl29028";
-./arch/arm/boot/dts/zynq-parallella.dts:   compatible = "isl,isl9305";
+This is a follow-up to the early ARM SoC DT changes, with additional
+content that has external dependencies:
 
-AFAICT, it seems it makes sense to *definitively* settle for isil as the
-vendor prefix for Intersil, as Philip did in 7a6540ca856a: it's the NASDAQ
-symbol and this choice requires less changes than opting for isl.
+* The Tegra IOMMU DT support depends on changes from the iommu
+  tree, plus the contents of the arm-soc drivers branch
+* The MVEBU PHY support depends on changes from the phy tree
+* The AT91 DT support depends on changes from the RTC and
+  DMA-slave trees
 
-So, this series changes compatible strings in .dts files to use isil where
-isl was found before, and modify drivers w/ compatible strings using isl
-to add one using isil. In those cases, a comment is made that the old
-compatible string is kept for backward compatibility (w/ out-fo-tree users
-of those drivers). Additionally, it leaves only isil as prefix in
-vendor-prefixes.txt. Those changes should prevent any new inclusion of
-isl compatible strings for Intersil devices due to copy-and-paste.
+All of these changes just enable additional devices for
+existing platforms.
 
-Changes since v1:
-  - split previous patch fixing trivial-devices.txt and
-    vendor-prefixes.txt in two different patches, as suggested by Uwe
-  - fixed a space/tab issue spotted by Uwe
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: at91/dt: at91sam9rl: add rtc
 
-Arnaud Ebalard (8):
-  dt-bindings: use isil prefix for Intersil in vendor-prefixes.txt
-  dt-bindings: use isil prefix for Intersil in I2C trivial-devices.txt
-  rtc: isl12022: deprecate use of isl in compatible string for isil
-  rtc: isl12057: deprecate use of isl in compatible string for isil
-  staging: iio: isl29028: deprecate use of isl in compatible string for isil
-  regulator: isl9305: deprecate use of isl in compatible string for isil
-  arm: dts: zynq: update isl9305 compatible string to use isil vendor prefix
-  arm: dts: tegra: update isl29028 compatible string to use isil vendor prefix
+Arnd Bergmann (6):
+      Merge branch 'topic/at_xdmac' of git://git.infradead.org/users/vkoul/slave-dma into next/dt
+      Merge tag 'at91-dt2' of git://git.kernel.org/.../nferre/linux-at91 into next/dt2
+      Merge tag 'v3.18-rc4' into next/dt2
+      Merge tag 'depends/phy-dt-header' into next/dt2
+      Merge tag 'mvebu-dt-usb-phy-3.19-3' of git://git.infradead.org/linux-mvebu into next/dt2
+      Merge tag 'tegra-for-3.19-dt' of git://git.kernel.org/.../tegra/linux into next/dt2
 
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 5 ++---
- Documentation/devicetree/bindings/regulator/isl9305.txt   | 4 ++--
- Documentation/devicetree/bindings/vendor-prefixes.txt     | 3 +--
- arch/arm/boot/dts/tegra30-cardhu.dtsi                     | 2 +-
- arch/arm/boot/dts/zynq-parallella.dts                     | 2 +-
- drivers/regulator/isl9305.c                               | 6 ++++--
- drivers/rtc/rtc-isl12022.c                                | 3 ++-
- drivers/rtc/rtc-isl12057.c                                | 3 ++-
- drivers/staging/iio/light/isl29028.c                      | 4 ++--
- 9 files changed, 17 insertions(+), 15 deletions(-)
+Boris Brezillon (5):
+      ARM: at91/dt: add RTT nodes to at91 dtsis
+      ARM: at91/dt: add GPBR nodes
+      ARM: at91/dt: enable the RTT block on the sam9g20ek board
+      ARM: at91/dt: enable the RTT block on the at91sam9m10g45ek board
+      ARM: at91/dt: at91sam9g45: add ISI node
 
--- 
-2.1.1
+Gregory CLEMENT (2):
+      ARM: mvebu: add Device Tree description of USB cluster controller on Armada 375
+      ARM: mvebu: add PHY support to the dts for the USB controllers on Armada 375
+
+Jason Cooper (1):
+      Merge tag 'tags/phy-dt-header' into mvebu/dt-usb_phy
+
+Ludovic Desroches (2):
+      ARM: at91/dt: sama5d4: use macro instead of numeric value
+      ARM: at91/dt: sama5d4: add DMA support
+
+Nicolas Ferre (3):
+      Merge branch 'at91-3.19-dt' into at91-3.19-dt2
+      Merge branch 'topic/at_xdmac' of git://git.infradead.org/users/vkoul/slave-dma into at91-3.19-dt2
+      ARM: at91: fix GPLv2 wording
+
+Sean Paul (1):
+      ARM: tegra: Add APB_MISC_GP as a MIPI pad control bank
+
+Thierry Reding (7):
+      Merge branch 'for-3.19/iommu' into for-3.19/dt
+      ARM: tegra: Add memory controller support for Tegra30
+      ARM: tegra: Add memory controller support for Tegra114
+      ARM: tegra: Add memory controller support for Tegra124
+      ARM: tegra: Enable IOMMU for display controllers on Tegra30
+      ARM: tegra: Enable IOMMU for display controllers on Tegra114
+      ARM: tegra: Enable IOMMU for display controllers on Tegra124
+
+ arch/arm/boot/dts/armada-375.dtsi           | 11 +++++
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |  4 +-
+ arch/arm/boot/dts/at91sam9260.dtsi          | 14 ++++++
+ arch/arm/boot/dts/at91sam9261.dtsi          | 14 ++++++
+ arch/arm/boot/dts/at91sam9263.dtsi          | 21 ++++++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 14 ++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi          | 46 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |  9 ++++
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 21 ++++++++
+ arch/arm/boot/dts/sama5d4.dtsi              | 75 +++++++++++++++++++++++++++--
+ arch/arm/boot/dts/tegra114.dtsi             | 23 +++++----
+ arch/arm/boot/dts/tegra124.dtsi             | 19 +++++++-
+ arch/arm/boot/dts/tegra30.dtsi              | 25 +++++-----
+ 13 files changed, 267 insertions(+), 29 deletions(-)
