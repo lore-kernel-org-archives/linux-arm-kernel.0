@@ -1,25 +1,68 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 16 Dec 2014 14:24:20 +0100
-Subject: [PATCH v2] ARM: dts: imx6qdl: Remove OCRAM clock from VPU node
-In-Reply-To: <1418734961-4972-1-git-send-email-fabio.estevam@freescale.com>
-References: <1418734961-4972-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1418736260.3374.60.camel@pengutronix.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 16 Dec 2014 14:37:19 +0100
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <20141216130331.GJ967@titan.lakedaemon.net>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+ <20141215232221.GD19261@kw.sim.vm.gnt>
+ <20141216130331.GJ967@titan.lakedaemon.net>
+Message-ID: <20141216133719.GE19261@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-Am Dienstag, den 16.12.2014, 11:02 -0200 schrieb Fabio Estevam:
-> According to Documentation/devicetree/bindings/media/coda.txt:
+On Tue, Dec 16, 2014 at 08:03:31AM -0500, Jason Cooper wrote:
+> Simon,
 > 
-> - clock-names : Should be "ahb", "per"
+> On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
+> > On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
+> > > The current GPL only licensing on the device tree makes it very
+> > > impractical for other software components licensed under another
+> > > license.
+> > > 
+> > > In order to make it easier for them to reuse our device trees,
+> > > relicense our device trees under a GPL/X11 dual-license.
+> > > 
+> > > Cc: Andrew Lunn <andrew@lunn.ch>
+> > > Cc: Arnaud Ebalard <arno@natisbad.org>
+> > > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > Cc: Greg Ungerer <gerg@uclinux.org>
+> > > Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> > > Cc: Jason Cooper <jason@lakedaemon.net>
+> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> > > Cc: Simon Baatz <gmbnomis@gmail.com>
+> > > Cc: Simon Guinot <simon.guinot@sequanux.org>
+> > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > Cc: Willy Tarreau <w@1wt.eu>
+> > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > ---
+> > >  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
+> > >  1 file changed, 37 insertions(+), 3 deletions(-)
+> > 
+> > Hi Gregory,
+> > 
+> > NAK for me.
 > 
-> The OCRAM clock is already provided inside the ocram node, so remove the OCRAM 
-> clock from the VPU node.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Well, I'm a bit surprised that this is the first one. :)  Care to
+> explain why so that we can work towards an amenable compromise?
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Hi Jason,
 
-regards
-Philipp
+I am also a bit surprised to be the only one :)
+
+As I have no interest in a flame war either, I am not gonna elaborate
+on this. But in a few words, I don't think that allowing a permissive
+licence alternative is good for software sharing (which is important
+to me). 
+
+Thanks,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141216/83fd41a2/attachment.sig>
