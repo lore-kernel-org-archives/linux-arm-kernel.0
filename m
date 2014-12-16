@@ -1,31 +1,67 @@
-From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
-Date: Tue, 16 Dec 2014 01:37:51 +0100
-Subject: [PATCH 2/4] mmc: sunxi: Correcting SDXC_HARDWARE_RESET bit
-In-Reply-To: <20141216003412.15488.54812.stgit@dizzy-6.o2s.ch>
-References: <20141216003412.15488.54812.stgit@dizzy-6.o2s.ch>
-Message-ID: <20141216003750.15488.23791.stgit@dizzy-6.o2s.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Dec 2014 16:52:06 -0800
+Subject: [PATCH 2/2] ARM: OMAP3: clock: fix boot breakage in legacy mode
+In-Reply-To: <20141215225855.GB23854@atomide.com>
+References: <1418390521-7541-1-git-send-email-t-kristo@ti.com>
+ <1418390521-7541-3-git-send-email-t-kristo@ti.com>
+ <7hvblgk7q0.fsf@deeprootsystems.com> <548E9417.50502@ti.com>
+ <7hfvcgixg5.fsf@deeprootsystems.com>
+ <20141215225855.GB23854@atomide.com>
+Message-ID: <20141216005206.GD23854@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixing the register name in sunxi_mmc_reset_host since the SDXC_HARDWARE_RESET bit
-is actually located within REG_GCTRL and not REG_CMDR as it was pointed out by Allwinner.
+* Tony Lindgren <tony@atomide.com> [141215 15:04]:
+> * Kevin Hilman <khilman@kernel.org> [141215 10:26]:
+> > Tero Kristo <t-kristo@ti.com> writes:
+> > 
+> > > On 12/12/2014 09:07 PM, Kevin Hilman wrote:
+> > >> Hi Tero,
+> > >>
+> > >> Tero Kristo <t-kristo@ti.com> writes:
+> > >>
+> > >>> The new usage of determine_rate and set_rate_and_parent calls for
+> > >>> OMAP DPLLs assumes the DPLLs must have two parents defined, even
+> > >>> if it is the same clock. Legacy clock data did not fullfill this
+> > >>> requirement and caused a boot crash. Fixed by adding the missing
+> > >>> parent information to the DPLL clocks.
+> > >>>
+> > >>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > >>> Fixes: 2e1a7b014f ("ARM: OMAP3+: DPLL: use determine_rate() and...")
+> > >>> Cc: Kevin Hilman <khilman@kernel.org>
+> > >>
+> > >> I tested this on linux-next (next-20141210, same version where I found
+> > >> the bug) and this doesn't fix the boot problem.
+> > >>
+> > >> BTW, in testing this, I noticed that the OMAP clock code is still
+> > >> spitting out compile warnings[1].  These should cleaned up too.
+> > >
+> > > Did you apply both of my patches from this set?
+> > 
+> > No, I didn't.  That wasn't clear (to me) from the changelogs.
+> 
+> The first one Mike is alredy fixing in his clock branch AFAIK.
+>  
+> > > I think the DPLL fix might be required also to get this working
+> > > properly on OMAP3 legacy.
+> > 
+> > Yup, with both applied, it's now booting fine on omap3-beagle-xm legacy
+> > mode.
+> > 
+> > Tested-by: Kevin Hilman <khilman@linaro.org>
+> > 
+> > And, please add:
+> > 
+> > Reported-by: Kevin Hilman <khilman@linaro.org>
+> > 
+> > (c.f. Reported-by section in Documentation/SubmittingPatches).  
+> 
+> I'll queue the second one separately after Mike's clock changes
+> hit mainline.
 
-Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-Reported-by: ?? <lixiang@allwinnertech.com>
----
- drivers/mmc/host/sunxi-mmc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Just to update the status, Mike has applied this as it applies
+to his tree now too.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 25ba321..50bd3d2 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -252,7 +252,7 @@ static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
- 	unsigned long expire = jiffies + msecs_to_jiffies(250);
- 	u32 rval;
- 
--	mmc_writel(host, REG_CMDR, SDXC_HARDWARE_RESET);
-+	mmc_writel(host, REG_GCTRL, SDXC_HARDWARE_RESET);
- 	do {
- 		rval = mmc_readl(host, REG_GCTRL);
- 	} while (time_before(jiffies, expire) && (rval & SDXC_HARDWARE_RESET));
+Regards,
+
+Tony
