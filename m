@@ -1,55 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Dec 2014 09:34:47 -0800
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <CAGo_u6oS_xyboNZcUsQ8LFrhFhkR6yvr8r_XBj3-yTmqZnqYGA@mail.gmail.com>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <CAGo_u6oS_xyboNZcUsQ8LFrhFhkR6yvr8r_XBj3-yTmqZnqYGA@mail.gmail.com>
-Message-ID: <20141217173446.GG2950@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Dec 2014 17:39:16 +0000
+Subject: [PATCH] arm64: Fix SCTLR_EL1 initialisation
+In-Reply-To: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
+References: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20141217173915.GF30307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [141217 09:35]:
-> On Wed, Dec 17, 2014 at 11:23 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> >> twl: not initialized
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
-> >> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1410000 Vs max 1316660
-> >
-> > This seems to be some twl related init order issue, I'll take a
-> > look at this one.
-> >
-> >> omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
-> >> omap2_set_init_voltage: unable to set vdd_mpu
-> >> omap2_set_init_voltage: unable to find boot up OPP for vdd_core
-> >> omap2_set_init_voltage: unable to set vdd_core
-> >> omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
-> >> omap2_set_init_voltage: unable to set vdd_iva
-> >
-> > I believe Nishanth has some plans for these?
+On Wed, Dec 17, 2014 at 03:50:21PM +0000, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > 
+> We initialise the SCTLR_EL1 value by read-modify-writeback
+> of the desired bits, leaving the other bits (including reserved
+> bits(RESx)) untouched. However, sometimes the boot monitor could
+> leave garbage values in the RESx bits which could have different
+> implications. This patch makes sure that all the bits, including
+> the RESx bits, are set to the proper state, except for the
+> 'endianness' control bits, EE(25) & E0E(24)- which are set early
+> in the el2_setup.
 > 
-> Not in the near future. looks like converting VC/VP into regulator and
-> fit inside DT world has gone no where..
+> Updated the state of the Bit[6] in the comment to RES0 in the
+> comment.
+> 
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 
-Looks like also the "twl: not initialized" error is caused by this:
+Looks good to me:
 
-omap2_common_pm_late_init
-omap_voltage_late_init
-omap_vc_init_channel
-omap_vc_calc_vsel
-twl6030_uv_to_vsel
-twl_i2c_read
-twl_get_regmap
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Can't we fix it with pdata-quirks.c as this error is now showing up
-on at least omap3 and 4?
+Is this 3.19 material, or simply a cleanup/being cautious?
 
-Regards,
-
-Tony
+Will
