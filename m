@@ -1,42 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 16:41:33 +0100
-Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
- dt-specific callback instead of initcall
-In-Reply-To: <1652261.Tf8nxQyMRf@avalon>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <3015182.XtvMmOW5GD@wuerfel> <1652261.Tf8nxQyMRf@avalon>
-Message-ID: <2560037.PCKFDiopkL@wuerfel>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 17 Dec 2014 17:45:05 +0200
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141217152710.GT24110@csclub.uwaterloo.ca>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
+ <20141216145856.GA23358@kahuna> <54918357.8060801@ti.com>
+ <20141217145533.GS24110@csclub.uwaterloo.ca> <20141217152225.GA737@kahuna>
+ <20141217152710.GT24110@csclub.uwaterloo.ca>
+Message-ID: <5491A501.100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 16:39:02 Laurent Pinchart wrote:
-> 
-> On Wednesday 17 December 2014 15:27:36 Arnd Bergmann wrote:
-> > On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
-> > > If we forbid the IOMMU driver from being compiled as a module can't we
-> > > just rely on deferred probing ? The bus master driver will just be
-> > > reprobed after the IOMMU gets probed, like for other devices.
-> > > 
-> > > This could fail in case the IOMMU device permanently fails to probe. There
-> > > would be something very wrong in the system in that case, Enabling the bus
-> > > masters totally transparently without IOMMU support could not be such a
-> > > good idea.
-> > 
-> > I believe in the majority of cases today, the IOMMU is entirely optional.
-> > There are valid reasons for not including the IOMMU driver in the kernel,
-> > e.g. when you know that all the machines with that driver can DMA to
-> > all of their RAM and you want to avoid the overhead of IOTLB misses.
-> 
-> Should that really be controlled by compiling the IOMMU driver out, wouldn't 
-> it be better to disable the IOMMU devices in DT in that case ?
+On 12/17/2014 05:27 PM, Lennart Sorensen wrote:
+> On Wed, Dec 17, 2014 at 09:22:25AM -0600, Nishanth Menon wrote:
+>> A clock mux might do the job?
+>>
+>> value 1, 2 , 3 will imply sysclk1 / 610
+>> value of 0 implies fixed 32768
+>>
+>> soemthing like
+>> sys_clk32_crystal {
+>>                 compatible = "fixed-clock";
+>>                 clock-frequency = <32768>;
+>> }
+>>
+>> sys_clk32_pseudo {
+>>                 compatible = "fixed-clock";
+>>                 compatible = "fixed-factor-clock";
+>>                 clocks = <&sys_clkin1>;
+>>                 clock-mult = <1>;
+>>                 clock-div = <610>;
+>> }
+>>
+>> sys_32k_ck: sys_32k_ck {
+>> 	compatible = "ti,mux-clock";
+>> 	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
+>> };
+>>
+>> I think... The only issue is that the BOOTSTRAP register is not around
+>> the usual CM1,2 address region...
+>
+> OK, I like where that idea is headed.  That looks promising.
+>
 
-It's a policy decision that should only depend on the user. Modifying the
-DT is wrong here IMHO because the device is still connected to the IOMMU
-in hardware and we should correctly represent that.
+Yea clock mux can be used. However, we don't have support for DRA7 
+control module clocks in the DT yet. I have posted patches with support 
+towards this a couple of weeks back, but they need some revising.
 
-You can normally set 'iommu=off' or 'iommu=force' on the command line
-to force it on or off rather than letting the IOMMU driver decide whether
-the device turns it on. Not enabling the IOMMU at all should really just
-behave the same way as 'iommu=off', anything else would be very confusing.
+Thus, we maybe need to apply the timer patches as is for now, and fix 
+the clock tree a bit later.
 
-	Arnd
+-Tero
