@@ -1,59 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Dec 2014 11:46:02 +0000
-Subject: [PATCH boot-wrapper-aarch64] configure: Fix for --with-initrd=no
-In-Reply-To: <5490EADF.7080906@huawei.com>
-References: <5490EADF.7080906@huawei.com>
-Message-ID: <20141217114602.GA8942@leverpostej>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 17 Dec 2014 14:08:12 +0100
+Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
+ pm_genpd_dev_need_restore to use restore types
+In-Reply-To: <CADGdYn60ONwuLtcdXSegbQLgFaF-me+mZY6-LPYRQvdfmWFMdA@mail.gmail.com>
+References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
+ <54901341.20106@samsung.com>
+ <CADGdYn60ONwuLtcdXSegbQLgFaF-me+mZY6-LPYRQvdfmWFMdA@mail.gmail.com>
+Message-ID: <5491803C.4030000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 02:30:55AM +0000, Qiang Huang wrote:
-> Our configure.ac script wasn't handle --with-initrd=no, when this was passed,
-> we got error:
+Hello,
 
-The parameter to --with-initrd should be the name of the initrd to use;
-"yes" or "no" are not valid parameters. I note that the help text is
-misleading in this regard, it should probably be fixed up to say
-something like "Specify an initrd to use". 
+On 2014-12-17 03:43, amit daniel kachhap wrote:
+> On Tue, Dec 16, 2014 at 4:40 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> Hello,
+>>
+>> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
+>>> Instead of using bool to restore suspended devices initially, use flags
+>>> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and GPD_DEV_RESTORE_FORCE.
+>>> The first two flags will be similar to the existing true/false
+>>> functionality.
+>>> The third flag may be used to force restore of suspended devices
+>>> whenever their associated power domain is turned on.
+>>>
+>>> Currently, PD power off function powers off all the associated unused
+>>> devices. The functionality added in this patch is similar to it.
+>>>
+>>> This feature may be used for those devices which are always in ON state
+>>> if the PD associated with them is ON but may need local runtime resume
+>>> and suspend during PD On/Off. These devices (like clock) may not implement
+>>> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
+>>> subsystems interaction behaviour or any other reason.
+>>>
+>>> The model works like,
+>>>       DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
+>>>       /  pm_runtime_put. Its local runtime_suspend/resume is invoked via
+>>>      /   GPD_DEV_RESTORE_FORCE option)
+>>>     /
+>>> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
+>>>     \    pm_runtime_put. This in turn invokes PD On/Off)
+>>>      \
+>>>       DEV3 (Similar to DEV1)
+>>>
+>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>
+>> The idea of adding new gen_pd flag and reusing runtime pm calls intead of
+>> additional
+>> notifiers looks promising, but I have some doubts. I don't see any guarantee
+>> that
+>> devices with GPD_DEV_RESTORE_FORCE flag will be suspended after all "normal"
+>> devices
+>> and restored before them. Without such assumption it will be hard to use
+>> this approach
+>> for iommu related activities, because device might need to use (in its
+>> suspend/resume
+>> callbacks) the functionality provided by the other device with
+>> GPD_DEV_RESTORE_FORCE
+>> flag. Maybe some additional flags like suspend/resume priority (or more
+>> flags) will
+>> solve somehow this dependency.
+> Thanks for pointing this issue out. I agree that there is no priority
+> in suspending devices with this flag. But this works well in syncing
+> with power domain on/off as the devices of these types have only
+> dependency with power domain. BTW I tested this implementation with
+> your first version of IOMMU save/restore patches. Although i have not
+> posted those but they work fine. I can post those after cleaning them
+> up.
 
-While it's unlikely that someone will have an initrd called "no", this
-issue can only occur with incorrect usage of the bootwrapper configure
-script. I'd happily accept a patch fixing up the help text, though.
+Right, they will work, but mainly because right now master devices don't
+do any memory DMA operations in suspend/resume callbacks. However, to 
+propose
+it as a generic solution, the priority and the order of operations 
+should be
+somehow determined.
 
-Thanks,
-Mark.
+> Here, the ordering between various devices is taken care as they are
+> probed at different point of time(clock then IOMMU). so the suspend
+> happens in reverse probe order and resume happens in probe order. I
+> will check more on this and get back.
 
-> ...
-> aarch64-linux-gnu-ld -o linux-system.axf --script=model.lds
-> aarch64-linux-gnu-ld: cannot find no
-> make: *** [linux-system.axf] Error 1
-> 
-> Fix this by adding a line to check this.
-> And this also fixed --without-initrd.
-> 
-> Signed-off-by: Qiang Huang <h.huangqiang@huawei.com>
-> Cc: Geoff Levand <geoff@infradead.org>
-> ---
->  configure.ac | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/configure.ac b/configure.ac
-> index 929da13..553013b 100644
-> --- a/configure.ac
-> +++ b/configure.ac
-> @@ -58,6 +58,7 @@ AC_SUBST([CPU_IDS], [$C_CPU_IDS])
->  AC_ARG_WITH([initrd],
->  	AS_HELP_STRING([--with-initrd], [embed an initrd in the kernel image]),
->  	USE_INITRD=$withval)
-> +AS_IF([test "x$USE_INITRD" = "xno"], [USE_INITRD=], [])
->  AC_SUBST([FILESYSTEM], [$USE_INITRD])
->  AM_CONDITIONAL([INITRD], [test "x$USE_INITRD" != "x"])
-> 
-> -- 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Right now, it probably used the order of probing. Because iommu controllers
+are probed earlier, so they are handled before the master devices.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
