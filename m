@@ -1,59 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 20:48:29 +0100
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20141217171752.GB30307@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2299294.lPnEQgl4lK@wuerfel> <20141217171752.GB30307@arm.com>
-Message-ID: <2983977.dWWQcFZRoJ@wuerfel>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Wed, 17 Dec 2014 20:53:43 +0100
+Subject: [PATCH] ARM: at91/pit: don't suspend/resume if unused
+Message-ID: <1418846023-8581-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 17:17:52 Will Deacon wrote:
-> > > > I would hope that PCI is the only case we need to worry about for a while.
-> > > > This means we just need to come up with another property or a set of properties
-> > > > that we can put into a PCI host controller device node in order to describe
-> > > > the mapping. These properties could be iommu-specific, so we add something
-> > > > to the PCI core that calls a new iommu callback function that takes the
-> > > > device node of the PCI host and the bus/device/function number as inputs.
-> > > > 
-> > > > In arm_setup_iommu_dma_ops(), we can then do something like
-> > > > 
-> > > >   if (dev_is_pci(dev)) {
-> > > >           struct pci_dev *pdev = to_pci_dev(dev);
-> > > >           struct device_node *node;
-> > > >           unsigned int bdf;
-> > > > 
-> > > >           node = find_pci_host_bridge(pdev->bus)->parent->of_node;
-> > > >           bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
-> > > > 
-> > > >           iommu_setup_pci_dev(pdev, node, bdf);
-> > > >   }
-> > > 
-> > > The other way to do this is have the IOMMU driver check dev_is_pci(dev)
-> > > in add_device, then call an of_xlate_pci_bdf library function which could
-> > > do the translation on-demand.
-> > 
-> > We'd still need to find the device node for the host controller in
-> > common code, otherwise we don't have an of_xlate function to call.
-> 
-> I guess I was hoping that the translation code could be generic. I don't
-> really see anything special about adding a constant to a magic number to
-> obtain another magic number.
-> 
+Waiting for PIT to stop counting takes a long time:
+  1/(Master clock/prescaler/PIVR)
+= 1/(133 MHz     /16       /2^20)
+= 126 ms
 
-If that's all we need, that's fine.
+Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
+of the unused PIT device reduce (suspend time + resume time) from ~140 ms
+to ~17 ms.
 
-I was fearing that we'd get different host controllers using different
-parts of the bdf number. E.g. one might pass down just bus/device
-while another uses bus/device/function, so we'd need a shift and
-an offset.
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+ arch/arm/mach-at91/at91sam926x_time.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-As part of the AMD review I found out that their SMMU implementation
-only has 15 bits of address space, while bdf is 16 bits, so they
-cut off the top bit and get aliasing between bus 0+n and bus 128+n.
-
-Another SoC might have more aliasing if they have multiple domains.
-
-
-	Arnd
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index e3344b4..44526aa 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -106,6 +106,10 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ 
+ static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
+ {
++	/* Don't suspend PIT if unused */
++	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
++		return;
++
+ 	/* Disable timer */
+ 	pit_write(AT91_PIT_MR, 0);
+ }
+@@ -125,6 +129,10 @@ static void at91sam926x_pit_reset(void)
+ 
+ static void at91sam926x_pit_resume(struct clock_event_device *cedev)
+ {
++	/* Don't resume PIT if unused */
++	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
++		return;
++
+ 	at91sam926x_pit_reset();
+ }
+ 
+-- 
+2.1.3
