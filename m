@@ -1,418 +1,107 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 17 Dec 2014 15:43:31 +0100
-Subject: [PATCH resend v2] input: Add new sun4i-lradc-keys driver
-In-Reply-To: <1418827411-13265-1-git-send-email-hdegoede@redhat.com>
-References: <1418827411-13265-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1418827411-13265-2-git-send-email-hdegoede@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Dec 2014 14:45:18 +0000
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <3099591.NlcSS8Qjlv@wuerfel>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2447060.c0PHi7y3cP@wuerfel> <20141217120948.GB870@arm.com>
+ <3099591.NlcSS8Qjlv@wuerfel>
+Message-ID: <20141217144518.GE870@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
-specifically designed to have various (tablet) keys (ie home, back, search,
-etc). attached to it using a resistor network. This adds a driver for this.
+On Wed, Dec 17, 2014 at 02:15:12PM +0000, Arnd Bergmann wrote:
+> On Wednesday 17 December 2014 12:09:49 Will Deacon wrote:
+> > On Tue, Dec 16, 2014 at 12:08:15PM +0000, Arnd Bergmann wrote:
+> > > On Monday 15 December 2014 18:09:33 Will Deacon wrote:
+> > > > > Using a single domain is a bit of a waste of resources in my case, so an 
+> > > > > evolution would be to create four domains and assign devices to them based on 
+> > > > > a policy. The policy could be fixed (round-robin for instance), or 
+> > > > > configurable (possibly through DT, although it's really a policy, not a 
+> > > > > hardware description).
+> > > 
+> > > I think in case of the ARM SMMU, we concluded that the grouping is indeed
+> > > best done in DT, because of there is no good algorithmic way to come
+> > > up with a set of bitmasks that make up a proper grouping into domains.
+> > 
+> > I think that's a slightly different case. The `grouping' in the DT, is on a
+> > per-master basis where a master may have a set of StreamIDs, which can be
+> > expressed in a more efficient (per-IOMMU) manner that cannot easily be
+> > determined at runtime.
+> > 
+> > For iommu_group creation, that could be done in the of code by treating the
+> > master IDs as bus IDs on a per-IOMMU bus; when a new device is probed, we
+> > can look at the set of devices with intersecting IDs and create a group
+> > containing those. This is similar to walking a PCI topology to establish DMA
+> > aliases.
+> > 
+> > The problem with all of this is how we distinguish the different ID formats
+> > in the `iommus' device-tree property. For the ARM SMMU, we could have:
+> > 
+> >   (1) [easy case] A device has a list of StreamIDs
+> > 
+> >   (2) A device has a list of SMR mask/value pairs
+> 
+> I was under the impression that using the format from (2), we could
+> describe all devices that fall into (1). In the worst case, we would
+> create an iommu group that is somewhat larger than one using discrete
+> StreamID values, but I would hope that this does not cause actual
+> troubles.
 
-There are 2 channels, currently this driver only supports chan0 since there
-are no boards known to use chan1.
+The icky part is that an ARM SMMU can have one of two indexing schemes in
+hardware:
 
-This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
-a20-olinuxino-micro.
+  (1) The StreamID is used as a linear index into an (MMIO) table, which
+      has pointers to contexts (translation tables)
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
---
-Changes in v2:
--Change devicetree bindings to use a per key subnode, like gpio-keys does
----
- .../devicetree/bindings/input/sun4i-lradc-keys.txt |  62 +++++
- MAINTAINERS                                        |   7 +
- drivers/input/keyboard/Kconfig                     |  10 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/sun4i-lradc-keys.c          | 258 +++++++++++++++++++++
- 5 files changed, 338 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
- create mode 100644 drivers/input/keyboard/sun4i-lradc-keys.c
+  (2) The StreamID is matched against a mask/value pair, which generates
+      an index into the same table mentioned above
 
-diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-new file mode 100644
-index 0000000..b9c32f6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-@@ -0,0 +1,62 @@
-+Allwinner sun4i low res adc attached tablet keys
-+------------------------------------------------
-+
-+Required properties:
-+ - compatible: "allwinner,sun4i-a10-lradc-keys"
-+ - reg: mmio address range of the chip
-+ - interrupts: interrupt to which the chip is connected
-+ - vref-supply: powersupply for the lradc reference voltage
-+
-+Each key is represented as a sub-node of "allwinner,sun4i-a10-lradc-keys":
-+
-+Required subnode-properties:
-+	- label: Descriptive name of the key.
-+	- linux,code: Keycode to emit.
-+	- channel: Channel this key is attached to, mut be 0 or 1.
-+	- voltage: Voltage in ?V at lradc input when this key is pressed.
-+
-+Example:
-+
-+#include <dt-bindings/input/input.h>
-+
-+	lradc: lradc at 01c22800 {
-+		compatible = "allwinner,sun4i-a10-lradc-keys";
-+		reg = <0x01c22800 0x100>;
-+		interrupts = <31>;
-+		vref-supply = <&reg_vcc3v0>;
-+
-+		button at 191 {
-+			label = "Volume Up";
-+			linux,code = <KEY_VOLUMEUP>;
-+			channel = <0>;
-+			voltage = <191274>;
-+		};
-+
-+		button at 392 {
-+			label = "Volume Down";
-+			linux,code = <KEY_VOLUMEDOWN>;
-+			channel = <0>;
-+			voltage = <392644>;
-+		};
-+
-+		button at 601 {
-+			label = "Menu";
-+			linux,code = <KEY_MENU>;
-+			channel = <0>;
-+			voltage = <601151>;
-+		};
-+
-+		button at 795 {
-+			label = "Enter";
-+			linux,code = <KEY_ENTER>;
-+			channel = <0>;
-+			voltage = <795090>;
-+		};
-+
-+		button at 987 {
-+			label = "Home";
-+			linux,code = <KEY_HOMEPAGE>;
-+			channel = <0>;
-+			voltage = <987387>;
-+		};
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fdffe96..fb3d33e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9193,6 +9193,13 @@ F:	arch/m68k/sun3*/
- F:	arch/m68k/include/asm/sun3*
- F:	drivers/net/ethernet/i825xx/sun3*
- 
-+SUN4I LOW RES ADC ATTACHED TABLET KEYS DRIVER
-+M:	Hans de Goede <hdegoede@redhat.com>
-+L:	linux-input at vger.kernel.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
-+F:	drivers/input/keyboard/sun4i-lradc-keys.c
-+
- SUNDANCE NETWORK DRIVER
- M:	Denis Kirjanov <kda@linux-powerpc.org>
- L:	netdev at vger.kernel.org
-diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-index a3958c6..2d11b44 100644
---- a/drivers/input/keyboard/Kconfig
-+++ b/drivers/input/keyboard/Kconfig
-@@ -567,6 +567,16 @@ config KEYBOARD_STMPE
- 	  To compile this driver as a module, choose M here: the module will be
- 	  called stmpe-keypad.
- 
-+config KEYBOARD_SUN4I_LRADC
-+	tristate "Allwinner sun4i low res adc attached tablet keys support"
-+	depends on ARCH_SUNXI
-+	help
-+	  This selects support for the Allwinner low res adc attached tablet
-+	  keys found on Allwinner sunxi SoCs.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called sun4i-lradc-keys.
-+
- config KEYBOARD_DAVINCI
- 	tristate "TI DaVinci Key Scan"
- 	depends on ARCH_DAVINCI_DM365
-diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
-index 0a33456..a35269a 100644
---- a/drivers/input/keyboard/Makefile
-+++ b/drivers/input/keyboard/Makefile
-@@ -53,6 +53,7 @@ obj-$(CONFIG_KEYBOARD_SPEAR)		+= spear-keyboard.o
- obj-$(CONFIG_KEYBOARD_STMPE)		+= stmpe-keypad.o
- obj-$(CONFIG_KEYBOARD_STOWAWAY)		+= stowaway.o
- obj-$(CONFIG_KEYBOARD_ST_KEYSCAN)	+= st-keyscan.o
-+obj-$(CONFIG_KEYBOARD_SUN4I_LRADC)	+= sun4i-lradc-keys.o
- obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
- obj-$(CONFIG_KEYBOARD_TC3589X)		+= tc3589x-keypad.o
- obj-$(CONFIG_KEYBOARD_TEGRA)		+= tegra-kbc.o
-diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-new file mode 100644
-index 0000000..f11f002
---- /dev/null
-+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-@@ -0,0 +1,258 @@
-+/*
-+ * Allwinner sun4i low res adc attached tablet keys driver
-+ *
-+ * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/*
-+ * Allwinnner sunxi SoCs have a lradc which is specifically designed to have
-+ * various (tablet) keys (ie home, back, search, etc). attached to it using
-+ * a resistor network. This driver is for the keys on such boards.
-+ *
-+ * There are 2 channels, currently this driver only supports channel 0 since
-+ * there are no boards known to use channel 1.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/input.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+
-+#define LRADC_CTRL		0x00
-+#define LRADC_INTC		0x04
-+#define LRADC_INTS		0x08
-+#define LRADC_DATA0		0x0c
-+#define LRADC_DATA1		0x10
-+
-+/* LRADC_CTRL bits */
-+#define FIRST_CONVERT_DLY(x)	((x) << 24) /* 8 bits */
-+#define CHAN_SELECT(x)		((x) << 22) /* 2 bits */
-+#define CONTINUE_TIME_SEL(x)	((x) << 16) /* 4 bits */
-+#define KEY_MODE_SEL(x)		((x) << 12) /* 2 bits */
-+#define LEVELA_B_CNT(x)		((x) << 8)  /* 4 bits */
-+#define HOLD_EN(x)		((x) << 6)
-+#define LEVELB_VOL(x)		((x) << 4)  /* 2 bits */
-+#define SAMPLE_RATE(x)		((x) << 2)  /* 2 bits */
-+#define ENABLE(x)		((x) << 0)
-+
-+/* LRADC_INTC and LRADC_INTS bits */
-+#define CHAN1_KEYUP_IRQ		BIT(12)
-+#define CHAN1_ALRDY_HOLD_IRQ	BIT(11)
-+#define CHAN1_HOLD_IRQ		BIT(10)
-+#define	CHAN1_KEYDOWN_IRQ	BIT(9)
-+#define CHAN1_DATA_IRQ		BIT(8)
-+#define CHAN0_KEYUP_IRQ		BIT(4)
-+#define CHAN0_ALRDY_HOLD_IRQ	BIT(3)
-+#define CHAN0_HOLD_IRQ		BIT(2)
-+#define	CHAN0_KEYDOWN_IRQ	BIT(1)
-+#define CHAN0_DATA_IRQ		BIT(0)
-+
-+struct sun4i_lradc_keymap {
-+	u32 voltage;
-+	u32 keycode;
-+};
-+
-+struct sun4i_lradc_data {
-+	struct device *dev;
-+	struct input_dev *input;
-+	void __iomem *base;
-+	struct regulator *vref_supply;
-+	struct sun4i_lradc_keymap *chan0_map;
-+	u32 chan0_map_count;
-+	u32 chan0_keycode;
-+	u32 vref;
-+};
-+
-+static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-+{
-+	struct sun4i_lradc_data *lradc = dev_id;
-+	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
-+
-+	ints  = readl(lradc->base + LRADC_INTS);
-+
-+	/*
-+	 * lradc supports only one keypress at a time, release does not give
-+	 * any info as to which key was released, so we cache the keycode.
-+	 */
-+	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
-+		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-+		voltage = val * lradc->vref / 63;
-+
-+		for (i = 0; i < lradc->chan0_map_count; i++) {
-+			diff = abs(lradc->chan0_map[i].voltage - voltage);
-+			if (diff < closest) {
-+				closest = diff;
-+				keycode = lradc->chan0_map[i].keycode;
-+			}
-+		}
-+
-+		lradc->chan0_keycode = keycode;
-+		input_report_key(lradc->input, lradc->chan0_keycode, 1);
-+	}
-+
-+	if (ints & CHAN0_KEYUP_IRQ) {
-+		input_report_key(lradc->input, lradc->chan0_keycode, 0);
-+		lradc->chan0_keycode = 0;
-+	}
-+
-+	input_sync(lradc->input);
-+
-+	writel(ints, lradc->base + LRADC_INTS);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int sun4i_lradc_open(struct input_dev *dev)
-+{
-+	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
-+	int ret;
-+
-+	ret = regulator_enable(lradc->vref_supply);
-+	if (ret)
-+		return ret;
-+
-+	/* lradc Vref internally is divided by 2/3 */
-+	lradc->vref = regulator_get_voltage(lradc->vref_supply) * 2 / 3;
-+
-+	/*
-+	 * Set sample time to 4 ms / 250 Hz. Wait 2 * 4 ms for key to
-+	 * stabilize on press, wait (1 + 1) * 4 ms for key release
-+	 */
-+	writel(FIRST_CONVERT_DLY(2) | LEVELA_B_CNT(1) | HOLD_EN(1) |
-+		SAMPLE_RATE(0) | ENABLE(1), lradc->base + LRADC_CTRL);
-+
-+	writel(CHAN0_KEYUP_IRQ | CHAN0_KEYDOWN_IRQ, lradc->base + LRADC_INTC);
-+
-+	return 0;
-+}
-+
-+static void sun4i_lradc_close(struct input_dev *dev)
-+{
-+	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
-+
-+	/* Disable lradc, leave other settings unchanged */
-+	writel(FIRST_CONVERT_DLY(2) | LEVELA_B_CNT(1) | HOLD_EN(1) |
-+		SAMPLE_RATE(2), lradc->base + LRADC_CTRL);
-+	writel(0, lradc->base + LRADC_INTC);
-+
-+	regulator_disable(lradc->vref_supply);
-+}
-+
-+static int sun4i_lradc_probe(struct platform_device *pdev)
-+{
-+	struct sun4i_lradc_data *lradc;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *pp, *np = dev->of_node;
-+	u32 channel;
-+	int i, ret;
-+
-+	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
-+	if (!lradc)
-+		return -ENOMEM;
-+
-+	lradc->chan0_map_count = of_get_child_count(np);
-+	lradc->chan0_map = devm_kmalloc(dev, lradc->chan0_map_count *
-+				sizeof(struct sun4i_lradc_keymap), GFP_KERNEL);
-+	if (!lradc->chan0_map)
-+		return -ENOMEM;
-+
-+	i = 0;
-+	for_each_child_of_node(np, pp) {
-+		struct sun4i_lradc_keymap *map = &lradc->chan0_map[i];
-+
-+		ret = of_property_read_u32(pp, "channel", &channel);
-+		if (ret || channel != 0) {
-+			dev_err(dev, "%s: Inval channel prop\n", pp->name);
-+			return -EINVAL;
-+		}
-+
-+		ret = of_property_read_u32(pp, "voltage", &map->voltage);
-+		if (ret) {
-+			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
-+			return -EINVAL;
-+		}
-+
-+		ret = of_property_read_u32(pp, "linux,code", &map->keycode);
-+		if (ret) {
-+			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
-+			return -EINVAL;
-+		}
-+
-+		i++;
-+	}
-+
-+	lradc->vref_supply = devm_regulator_get(dev, "vref");
-+	if (IS_ERR(lradc->vref_supply))
-+		return PTR_ERR(lradc->vref_supply);
-+
-+	lradc->dev = dev;
-+	lradc->input = devm_input_allocate_device(dev);
-+	if (!lradc->input)
-+		return -ENOMEM;
-+
-+	lradc->input->name = pdev->name;
-+	lradc->input->phys = "sun4i_lradc/input0";
-+	lradc->input->open = sun4i_lradc_open;
-+	lradc->input->close = sun4i_lradc_close;
-+	lradc->input->id.bustype = BUS_HOST;
-+	lradc->input->id.vendor = 0x0001;
-+	lradc->input->id.product = 0x0001;
-+	lradc->input->id.version = 0x0100;
-+	lradc->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY);
-+	for (i = 0; i < lradc->chan0_map_count; i++)
-+		set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
-+	input_set_drvdata(lradc->input, lradc);
-+
-+	lradc->base = devm_ioremap_resource(dev,
-+			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
-+	if (IS_ERR(lradc->base))
-+		return PTR_ERR(lradc->base);
-+
-+	ret = devm_request_irq(dev, platform_get_irq(pdev, 0), sun4i_lradc_irq,
-+			       0, "sun4i-a10-lradc-keys", lradc);
-+	if (ret)
-+		return ret;
-+
-+	ret = input_register_device(lradc->input);
-+	if (ret)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, lradc);
-+	return 0;
-+}
-+
-+static const struct of_device_id sun4i_lradc_of_match[] = {
-+	{ .compatible = "allwinner,sun4i-a10-lradc-keys", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, sun4i_lradc_of_match);
-+
-+static struct platform_driver sun4i_lradc_driver = {
-+	.driver = {
-+		.name	= "sun4i-a10-lradc-keys",
-+		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
-+	},
-+	.probe	= sun4i_lradc_probe,
-+};
-+
-+module_platform_driver(sun4i_lradc_driver);
-+
-+MODULE_DESCRIPTION("Allwinner sun4i low res adc attached tablet keys driver");
-+MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
-+MODULE_LICENSE("GPL");
--- 
-2.1.0
+Currently, the driver probes ID registers at runtime to figure out which
+indexing scheme is implemented. If we start encoding scheme-specific data in
+the device-tree, then the binding will differ based on hardware properties
+that aren't otherwise described. Is there precedent for this sort of thing
+elsewhere?
+
+> If all devices on each iommu fall into either 1 or 2, but you never mix
+> the two on one iommu, this could be handled by supporting either
+> #iommu-cells=<1> or <2> in the smmu driver. That way, the xlate function
+> will know which method to apply by looking at the iommu's #iommu-cells
+> property.
+
+Yes, that would work if you're ok with the above (i.e. we never see a mix
+on the same IOMMU instance).
+
+> >   (3) A (bus) device has a range translation for a downstream bus (e.g.
+> >       a PCI host controller which needs to convert RequesterID to StreamID).
+> > 
+> > From the SMMU driver's perspective, they will all look like of_xlate calls
+> > unless we augment the generic IOMMU bindings with extra properties to
+> > identify the format. It also makes it difficult to pick a sensible value for
+> > #iommu-cells, as it depends on the format.
+> 
+> I would hope that PCI is the only case we need to worry about for a while.
+> This means we just need to come up with another property or a set of properties
+> that we can put into a PCI host controller device node in order to describe
+> the mapping. These properties could be iommu-specific, so we add something
+> to the PCI core that calls a new iommu callback function that takes the
+> device node of the PCI host and the bus/device/function number as inputs.
+> 
+> In arm_setup_iommu_dma_ops(), we can then do something like
+> 
+> 	if (dev_is_pci(dev)) {
+> 		struct pci_dev *pdev = to_pci_dev(dev);
+> 		struct device_node *node;
+> 		unsigned int bdf;
+> 
+> 		node = find_pci_host_bridge(pdev->bus)->parent->of_node;
+> 		bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
+> 
+> 		iommu_setup_pci_dev(pdev, node, bdf);
+> 	}
+
+The other way to do this is have the IOMMU driver check dev_is_pci(dev)
+in add_device, then call an of_xlate_pci_bdf library function which could
+do the translation on-demand.
+
+Will
