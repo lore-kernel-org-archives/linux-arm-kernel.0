@@ -1,36 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Dec 2014 17:39:16 +0000
-Subject: [PATCH] arm64: Fix SCTLR_EL1 initialisation
-In-Reply-To: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
-References: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20141217173915.GF30307@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 17 Dec 2014 13:02:23 -0500
+Subject: [RFC PATCH 1/2] common: dma-mapping: introduce dma_get_parent_cfg()
+ helper
+In-Reply-To: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
+References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1418839344-14393-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 03:50:21PM +0000, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> 
-> We initialise the SCTLR_EL1 value by read-modify-writeback
-> of the desired bits, leaving the other bits (including reserved
-> bits(RESx)) untouched. However, sometimes the boot monitor could
-> leave garbage values in the RESx bits which could have different
-> implications. This patch makes sure that all the bits, including
-> the RESx bits, are set to the proper state, except for the
-> 'endianness' control bits, EE(25) & E0E(24)- which are set early
-> in the el2_setup.
-> 
-> Updated the state of the Bit[6] in the comment to RES0 in the
-> comment.
-> 
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
+Now, in Kernel, parent device's DMA parameters has to be applied to
+the child as is - to enable DMA support for the device. Usually this
+is happened in places where parent device manually instantiates child
+device such as in drivers/pci/probe.c (pci_device_add() for example).
 
-Looks good to me:
+Now DMA configuration is represented in device data structure not only
+by DMA mask and DMA params, it also includes dma_pfn_offset at least.
+Hence introduce common dma_get_parent_cfg() helper to apply dma
+configuration from parent to child, and use __weak to allow arch to
+override it if needed.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/base/dma-mapping.c  |   18 ++++++++++++++++++
+ include/linux/dma-mapping.h |    3 +++
+ 2 files changed, 21 insertions(+)
 
-Is this 3.19 material, or simply a cleanup/being cautious?
-
-Will
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index 9e8bbdd..5322426 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -339,3 +339,21 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+ 	vunmap(cpu_addr);
+ }
+ #endif
++
++int __weak dma_get_parent_cfg(struct device *dev, struct device *parent)
++{
++	struct device *temp = parent;
++
++	if (!temp)
++		temp = dev->parent;
++
++	if (temp && is_device_dma_capable(temp)) {
++		dev->dma_mask	= temp->dma_mask;
++		dev->coherent_dma_mask = temp->coherent_dma_mask;
++		dev->dma_parms	= temp->dma_parms;
++		dev->dma_pfn_offset = temp->dma_pfn_offset;
++		return 0;
++	}
++	return -EINVAL;
++}
++EXPORT_SYMBOL(dma_get_parent_cfg);
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index d5d3881..eb080d6 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -127,6 +127,9 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
+ 	return dma_set_mask_and_coherent(dev, mask);
+ }
+ 
++extern int __weak dma_get_parent_cfg(struct device *dev,
++					struct device *parent);
++
+ extern u64 dma_get_required_mask(struct device *dev);
+ 
+ #ifndef set_arch_dma_coherent_ops
+-- 
+1.7.9.5
