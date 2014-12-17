@@ -1,96 +1,261 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 17 Dec 2014 02:33:15 +0000
-Subject: [PATCH v5][resend v3] of: replace Asahi Kasei Corp vendor prefix
-In-Reply-To: <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>	<20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>	<20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
- <5469CD47.3040409@cogentembedded.com>
- <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
- <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
- <5478603D.1080404@cogentembedded.com>
- <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87lhm7t37l.wl%kuninori.morimoto.gx@renesas.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Wed, 17 Dec 2014 08:13:47 +0530
+Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
+ pm_genpd_dev_need_restore to use restore types
+In-Reply-To: <54901341.20106@samsung.com>
+References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
+ <54901341.20106@samsung.com>
+Message-ID: <CADGdYn60ONwuLtcdXSegbQLgFaF-me+mZY6-LPYRQvdfmWFMdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Tue, Dec 16, 2014 at 4:40 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
+>>
+>> Instead of using bool to restore suspended devices initially, use flags
+>> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and GPD_DEV_RESTORE_FORCE.
+>> The first two flags will be similar to the existing true/false
+>> functionality.
+>> The third flag may be used to force restore of suspended devices
+>> whenever their associated power domain is turned on.
+>>
+>> Currently, PD power off function powers off all the associated unused
+>> devices. The functionality added in this patch is similar to it.
+>>
+>> This feature may be used for those devices which are always in ON state
+>> if the PD associated with them is ON but may need local runtime resume
+>> and suspend during PD On/Off. These devices (like clock) may not implement
+>> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
+>> subsystems interaction behaviour or any other reason.
+>>
+>> The model works like,
+>>      DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
+>>      /  pm_runtime_put. Its local runtime_suspend/resume is invoked via
+>>     /   GPD_DEV_RESTORE_FORCE option)
+>>    /
+>> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
+>>    \    pm_runtime_put. This in turn invokes PD On/Off)
+>>     \
+>>      DEV3 (Similar to DEV1)
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>
+>
+> The idea of adding new gen_pd flag and reusing runtime pm calls intead of
+> additional
+> notifiers looks promising, but I have some doubts. I don't see any guarantee
+> that
+> devices with GPD_DEV_RESTORE_FORCE flag will be suspended after all "normal"
+> devices
+> and restored before them. Without such assumption it will be hard to use
+> this approach
+> for iommu related activities, because device might need to use (in its
+> suspend/resume
+> callbacks) the functionality provided by the other device with
+> GPD_DEV_RESTORE_FORCE
+> flag. Maybe some additional flags like suspend/resume priority (or more
+> flags) will
+> solve somehow this dependency.
 
-Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
-by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
+Hi Marek,
 
-It went through the appropriate review process. But, almost all
-Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
-(arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
- but there are instances of "asahi-kasei,ak8975" in other dts files.
- And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
-So, we made a mistake there.
+Thanks for pointing this issue out. I agree that there is no priority
+in suspending devices with this flag. But this works well in syncing
+with power domain on/off as the devices of these types have only
+dependency with power domain. BTW I tested this implementation with
+your first version of IOMMU save/restore patches. Although i have not
+posted those but they work fine. I can post those after cleaning them
+up.
+Here, the ordering between various devices is taken care as they are
+probed at different point of time(clock then IOMMU). so the suspend
+happens in reverse probe order and resume happens in probe order. I
+will check more on this and get back.
 
-In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
-prerfix in DT file.
-(DT compatible string vendor "asahi-kasei" appears un-documented)
+Thanks,
+Amit Daniel
 
-Marking it deprecated and warning with checkpatch is certainly
-preferable. So, this patch replace "ak" to "asahi-kasei" in
-vendor-prefixes.txt. (and fixup tegra20-seaboard)
-
-OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
-doesn't care about it. Because no DT is using that today.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
----
->> Linus
-
-I had sent this patch to Linux ML and Maintainers many times,
-but, no-one cares about it.
-Can you please check and apply it ?
-
-
- .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d..ddcb4cd 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
- adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
--ak	Asahi Kasei Corp.
- allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
-@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
- apm	Applied Micro Circuits Corporation (APM)
- arm	ARM Ltd.
- armadeus	ARMadeus Systems SARL
-+asahi-kasei	Asahi Kasei Corp.
- atmel	Atmel Corporation
- auo	AU Optronics Corporation
- avago	Avago Technologies
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a1d4bf9..7f5cf80 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -405,7 +405,7 @@
- 		clock-frequency = <400000>;
- 
- 		magnetometer at c {
--			compatible = "ak,ak8975";
-+			compatible = "asahi-kasei,ak8975";
- 			reg = <0xc>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.7.9.5
+>
+>
+>> ---
+>> This work is continuation of earlier work,
+>>
+>> In V2: Completely removed notfiers and add support for huge clock list to
+>> be
+>>         suspended and restored. There was some issue in this as some
+>> clocks are
+>>         not exposed and are just initialised by bootloaders. This approach
+>>         required all of them to be exposed which is cumbersome. Also some
+>>         clock API's set_parent are disabling the original parent clocks
+>>         which is not required.
+>>         Link (https://lkml.org/lkml/2014/11/24/290)
+>>
+>> In V1: Implemented PM Domain notfier such as PD_ON_PRE, PD_ON_POST
+>>         PD_OFF_PRE and PD_OFF_POST. This was not supported and other
+>>         options suggested. link
+>> (http://www.spinics.net/lists/linux-samsung-soc/msg38442.html)
+>>
+>> This work may also assist exynos iommu pm runtime posted earlier by Marek
+>> http://lists.linaro.org/pipermail/linaro-mm-sig/2014-August/004099.html
+>>
+>>   drivers/base/power/domain.c | 40
+>> ++++++++++++++++++++++++++++++++++++----
+>>   include/linux/pm_domain.h   | 15 +++++++++++++--
+>>   2 files changed, 49 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 6a103a3..d955a05 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -49,6 +49,7 @@
+>>     static LIST_HEAD(gpd_list);
+>>   static DEFINE_MUTEX(gpd_list_lock);
+>> +static void __pm_genpd_restore_devices(struct generic_pm_domain *genpd);
+>>     static struct generic_pm_domain *pm_genpd_lookup_name(const char
+>> *domain_name)
+>>   {
+>> @@ -176,6 +177,8 @@ static int genpd_power_on(struct generic_pm_domain
+>> *genpd)
+>>         pr_warn("%s: Power-%s latency exceeded, new value %lld ns\n",
+>>                 genpd->name, "on", elapsed_ns);
+>>   +     __pm_genpd_restore_devices(genpd);
+>> +
+>>         return ret;
+>>   }
+>>   @@ -453,6 +456,24 @@ static void __pm_genpd_restore_device(struct
+>> pm_domain_data *pdd,
+>>   }
+>>     /**
+>> + * __pm_genpd_restore_devices- Restore the pre-suspend state of all
+>> device
+>> + *                             according to the restore flag.
+>> + * @genpd: PM domain the device belongs to.
+>> + */
+>> +static void __pm_genpd_restore_devices(struct generic_pm_domain *genpd)
+>> +{
+>> +       struct pm_domain_data *pdd;
+>> +       struct generic_pm_domain_data *gpd_data;
+>> +
+>> +       /* Force restore the devices according to the restore flag */
+>> +       list_for_each_entry(pdd, &genpd->dev_list, list_node) {
+>> +               gpd_data = to_gpd_data(pdd);
+>> +               if (gpd_data->force_restore == true)
+>> +                       __pm_genpd_restore_device(pdd, genpd);
+>> +       }
+>> +}
+>> +
+>> +/**
+>>    * genpd_abort_poweroff - Check if a PM domain power off should be
+>> aborted.
+>>    * @genpd: PM domain to check.
+>>    *
+>> @@ -1469,6 +1490,7 @@ int __pm_genpd_add_device(struct generic_pm_domain
+>> *genpd, struct device *dev,
+>>         gpd_data->base.dev = dev;
+>>         list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
+>>         gpd_data->need_restore = -1;
+>> +       gpd_data->force_restore = false;
+>>         gpd_data->td.constraint_changed = true;
+>>         gpd_data->td.effective_constraint_ns = -1;
+>>         mutex_unlock(&gpd_data->lock);
+>> @@ -1561,18 +1583,28 @@ int pm_genpd_remove_device(struct
+>> generic_pm_domain *genpd,
+>>   /**
+>>    * pm_genpd_dev_need_restore - Set/unset the device's "need restore"
+>> flag.
+>>    * @dev: Device to set/unset the flag for.
+>> - * @val: The new value of the device's "need restore" flag.
+>> + * @val: This can have values GPD_DEV_SUSPEND_INIT or
+>> GPD_DEV_RESTORE_INIT
+>> + *     together with GPD_DEV_RESTORE_FORCE.
+>>    */
+>> -void pm_genpd_dev_need_restore(struct device *dev, bool val)
+>> +void pm_genpd_dev_need_restore(struct device *dev, unsigned int val)
+>>   {
+>>         struct pm_subsys_data *psd;
+>> +       struct generic_pm_domain_data *pdd;
+>>         unsigned long flags;
+>>         spin_lock_irqsave(&dev->power.lock, flags);
+>>         psd = dev_to_psd(dev);
+>> -       if (psd && psd->domain_data)
+>> -               to_gpd_data(psd->domain_data)->need_restore = val ? 1 : 0;
+>> +       if (psd && psd->domain_data) {
+>> +               pdd = to_gpd_data(psd->domain_data);
+>> +               if (val & GPD_DEV_SUSPEND_INIT)
+>> +                       pdd->need_restore = 0;
+>> +               else if (val & GPD_DEV_RESTORE_INIT)
+>> +                       pdd->need_restore = 1;
+>> +
+>> +               if (val & GPD_DEV_RESTORE_FORCE)
+>> +                       pdd->force_restore = true;
+>> +       }
+>>         spin_unlock_irqrestore(&dev->power.lock, flags);
+>>   }
+>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>> index 6cd20d5..8aa74ee 100644
+>> --- a/include/linux/pm_domain.h
+>> +++ b/include/linux/pm_domain.h
+>> @@ -20,6 +20,15 @@
+>>   /* Defines used for the flags field in the struct generic_pm_domain */
+>>   #define GENPD_FLAG_PM_CLK     (1U << 0) /* PM domain uses PM clk */
+>>   +/* Defines used for the types of restore */
+>> +#define        GPD_DEV_SUSPEND_INIT    0x1     /* Initiate the device
+>> runtime as
+>> +                                          suspend/resume/suspend... */
+>> +#define        GPD_DEV_RESTORE_INIT    0x10    /* Initiate the device
+>> runtime as
+>> +                                          resume/suspend/suspend... */
+>> +#define        GPD_DEV_RESTORE_FORCE   0x100   /* Force these devices to
+>> always do
+>> +                                          resume in PD power on. Initial
+>> +                                          behaviour can be one of the
+>> above */
+>> +
+>>   enum gpd_status {
+>>         GPD_STATE_ACTIVE = 0,   /* PM domain is active */
+>>         GPD_STATE_WAIT_MASTER,  /* PM domain's master is being waited for
+>> */
+>> @@ -116,6 +125,7 @@ struct generic_pm_domain_data {
+>>         struct mutex lock;
+>>         unsigned int refcount;
+>>         int need_restore;
+>> +       bool force_restore;
+>>   };
+>>     #ifdef CONFIG_PM_GENERIC_DOMAINS
+>> @@ -140,7 +150,7 @@ extern int __pm_genpd_name_add_device(const char
+>> *domain_name,
+>>     extern int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>>                                   struct device *dev);
+>> -extern void pm_genpd_dev_need_restore(struct device *dev, bool val);
+>> +extern void pm_genpd_dev_need_restore(struct device *dev, unsigned int
+>> val);
+>>   extern int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>>                                   struct generic_pm_domain
+>> *new_subdomain);
+>>   extern int pm_genpd_add_subdomain_names(const char *master_name,
+>> @@ -187,7 +197,8 @@ static inline int pm_genpd_remove_device(struct
+>> generic_pm_domain *genpd,
+>>   {
+>>         return -ENOSYS;
+>>   }
+>> -static inline void pm_genpd_dev_need_restore(struct device *dev, bool
+>> val) {}
+>> +static inline void pm_genpd_dev_need_restore(struct device *dev,
+>> +                                               unsigned int val) {}
+>>   static inline int pm_genpd_add_subdomain(struct generic_pm_domain
+>> *genpd,
+>>                                          struct generic_pm_domain *new_sd)
+>>   {
+>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
