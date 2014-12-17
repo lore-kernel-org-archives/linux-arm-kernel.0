@@ -1,34 +1,59 @@
-From: tony.kn@samsung.com (Tony K Nadackal)
-Date: Wed, 17 Dec 2014 12:51:21 +0530
-Subject: [PATCH] [media] s5p-jpeg: Initialize cb and cr to zero.
-Message-ID: <1418800881-7428-1-git-send-email-tony.kn@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 08:32:01 +0100
+Subject: [PATCH 1/6] ARM: sunxi: DT: Convert to device tree includes
+In-Reply-To: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <2559984.DiBeGaGfHy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid garbage value written into image base address planes,
-initialize cb and cr of structure s5p_jpeg_addr to zero.
+On Tuesday 16 December 2014 22:59:54 Maxime Ripard wrote:
+> Prepare the device trees to use the C preprocessor.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
----
-This patch is created and tested on top of linux-next-20141210.
-It can be cleanly applied on media-next and kgene/for-next.
+Hi Maxime,
 
- drivers/media/platform/s5p-jpeg/jpeg-core.c | 3 +++
- 1 file changed, 3 insertions(+)
+Since you are doing a number of changes to all the sunxi files, I have
+one more request for something that has been bugging me a while:
 
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-index 91bd3e6..54fa5d9 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-@@ -1845,6 +1845,9 @@ static void exynos4_jpeg_set_img_addr(struct s5p_jpeg_ctx *ctx)
- 	struct s5p_jpeg_addr jpeg_addr;
- 	u32 pix_size, padding_bytes = 0;
- 
-+	jpeg_addr.cb = 0;
-+	jpeg_addr.cr = 0;
-+
- 	pix_size = ctx->cap_q.w * ctx->cap_q.h;
- 
- 	if (ctx->mode == S5P_JPEG_ENCODE) {
--- 
-2.2.0
+In your .dtsi files, you define devices like this:
+
+                uart0: serial at 01c28000 {
+                        compatible = "snps,dw-apb-uart";
+                        reg = <0x01c28000 0x400>;
+                        interrupts = <0 1 4>;
+                        reg-shift = <2>;
+                        reg-io-width = <4>;
+                        clocks = <&apb1_gates 16>;
+                        status = "disabled";
+                };
+
+and in the .dts files, you extend them like this:
+
+                uart0: serial at 01c28000 {
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&uart0_pins_a>;
+                        status = "okay";
+                };
+
+
+which duplicates both the node names with their full path, and
+the labels. Please use one or the other, but not both. I don't mind
+you having the full path to each device in the dts files, just drop
+all the labels in that case. Most other maintainers these days
+just use the labels like this in the dts files however:
+
+&uart0 {
+	status = "okay";
+};
+
+which also seems completely fine.
+
+I'm also a bit puzzled by all the pinctrl references you add in the .dts
+files, but it's possible I'm missing something there. Why can't you move
+these to the .dtsi files and avoid duplicating the pinctrl-0 and
+pinctrl-names properties for every .dts file? I would assume that they
+are not referenced for disabled devices.
+
+	Arnd
