@@ -1,78 +1,109 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 17 Dec 2014 02:19:45 +0200
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20141215113252.GH20738@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <6311849.8NniZ58Jf1@avalon> <20141215113252.GH20738@arm.com>
-Message-ID: <35498434.EVQZ75aAeX@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 17 Dec 2014 09:20:05 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Add MMCIF clock to device tree
+In-Reply-To: <CAMuHMdVnYa0GQx2C8rVZe2zFiPY56hxYJrE96YesL=M0dkyECQ@mail.gmail.com>
+References: <1418429364-5547-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVnYa0GQx2C8rVZe2zFiPY56hxYJrE96YesL=M0dkyECQ@mail.gmail.com>
+Message-ID: <20141217002004.GC23321@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Monday 15 December 2014 11:32:52 Will Deacon wrote:
-> On Sun, Dec 14, 2014 at 03:51:13PM +0000, Laurent Pinchart wrote:
-> > On Monday 01 December 2014 16:57:12 Will Deacon wrote:
-> > > This patch extends of_dma_configure so that it sets up the IOMMU for a
-> > > device, as well as the coherent/non-coherent DMA mapping ops.
-> > > 
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Mon, Dec 15, 2014 at 11:52:16AM +0100, Geert Uytterhoeven wrote:
+> On Sat, Dec 13, 2014 at 1:09 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> >
+> > Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> > [horms: omitted device node; only add clock]
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > ---
+> > Based on the renesas-devel-20141212-v3.18 tag of my renesas tree
+> >
+> > Depends on
+> > "[PATCH v2] ARM: shmobile: r8a7794: Add SDHI clocks to device tree"
+> > to apply cleanly.
+> >
+> > v1 [Simon Horman]
+> > * Removed portion of patch which adds device node
+> > * Renamed patch from
+> >   "ARM: shmobile: r8a7794: Add MMCIF clock and device to device tree" to
+> >   "ARM: shmobile: r8a7794: Add MMCIF clock to device tree"
+> > ---
+> >  arch/arm/boot/dts/r8a7794.dtsi            | 15 +++++++++++----
+> >  include/dt-bindings/clock/r8a7794-clock.h |  1 +
+> >  2 files changed, 12 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> > index 8794df8..fd8a19c 100644
+> > --- a/arch/arm/boot/dts/r8a7794.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> > @@ -308,6 +308,13 @@
+> >                         #clock-cells = <0>;
+> >                         clock-output-names = "sd2";
+> >                 };
+> > +               mmc0_clk: mmc0_clk at e6150240 {
+> > +                       compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+> > +                       reg = <0 0xe6150240 0 4>;
+> > +                       clocks = <&pll1_div2_clk>;
+> > +                       #clock-cells = <0>;
+> > +                       clock-output-names = "mmc0";
+> > +               };
+> >
+> >                 /* Fixed factor clocks */
+> >                 pll1_div2_clk: pll1_div2_clk {
+> > @@ -512,16 +519,16 @@
+> >                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> >                         reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+> >                         clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+> > -                                <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+> > +                                <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+> >                         #clock-cells = <1>;
+> >                         clock-indices = <
+> >                                 R8A7794_CLK_SDHI2 R8A7794_CLK_SDHI1 R8A7794_CLK_SDHI0
+> > -                               R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
+> > -                               R8A7794_CLK_USBDMAC1
+> > +                               R8A7794_CLK_CMT1 R8A7794_CLK_MMCIF0
 > 
-> [...]
+> R8A7794_CLK_MMCIF0 R8A7794_CLK_CMT1
+
+Thanks, I have queued up this patch after making that change.
+
 > 
-> > > +static void of_dma_deconfigure(struct device *dev)
-> > > +{
-> > > +	arch_teardown_dma_ops(dev);
-> > >  }
-> > >  
-> > >  /**
-> > > @@ -223,16 +234,12 @@ static struct platform_device
-> > > *of_platform_device_create_pdata( if (!dev)
-> > > 
-> > >  		goto err_clear_flag;
-> > > 
-> > > -	of_dma_configure(&dev->dev);
-> > >  	dev->dev.bus = &platform_bus_type;
-> > >  	dev->dev.platform_data = platform_data;
- > > -
-> > > -	/* We do not fill the DMA ops for platform devices by default.
-> > > -	 * This is currently the responsibility of the platform code
-> > > -	 * to do such, possibly using a device notifier
-> > > -	 */
-> > > +	of_dma_configure(&dev->dev);
-> > >  	if (of_device_add(dev) != 0) {
-> > > +		of_dma_deconfigure(&dev->dev);
-> > 
-> > Don't you also need to call of_dma_deconfigure() when the device is
-> > destroyed ? Otherwise the default domain created by arch_setup_dma_ops()
-> > will be leaked.
->
-> Something like below?
-
-Yes, something like that. This will however cause a dev_warn("Not attached") 
-message to be printed for devices that have no IOMMU, that should be fixed in 
-the arch code.
-
-> --->8
+> > +                               R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
+> >                         >;
+> >                         clock-output-names =
+> >                                 "sdhi2", "sdhi1", "sdhi0",
+> > -                               "cmt1", "usbdmac0", "usbdmac1";
+> > +                               "mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+> >                 };
+> >                 mstp7_clks: mstp7_clks at e615014c {
+> >                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> > diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+> > index f013cdc..4555b0f 100644
+> > --- a/include/dt-bindings/clock/r8a7794-clock.h
+> > +++ b/include/dt-bindings/clock/r8a7794-clock.h
+> > @@ -55,6 +55,7 @@
+> >  #define R8A7794_CLK_SDHI2              11
+> >  #define R8A7794_CLK_SDHI1              12
+> >  #define R8A7794_CLK_SDHI0              14
+> > +#define R8A7794_CLK_MMCIF0             15
+> >  #define R8A7794_CLK_CMT1               29
+> >  #define R8A7794_CLK_USBDMAC0           30
+> >  #define R8A7794_CLK_USBDMAC1           31
 > 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index b89caf8c7586..ec29c25b4fce 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -525,6 +525,7 @@ static int of_platform_device_destroy(struct device
-> *dev, void *data) amba_device_unregister(to_amba_device(dev));
->  #endif
+> Gr{oetje,eeting}s,
 > 
-> +       of_dma_deconfigure(dev);
->         of_node_clear_flag(dev->of_node, OF_POPULATED);
->         of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
->         return 0;
-
--- 
-Regards,
-
-Laurent Pinchart
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
