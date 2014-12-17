@@ -1,141 +1,101 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 17 Dec 2014 09:30:26 -0600
-Subject: [PATCH V2 2/2] ARM: dra7xx: Fix counter frequency drift for
- AM572x errata i856.
-In-Reply-To: <54914096.9060206@ti.com>
-References: <cover.1418762900.git.lsorense@csclub.uwaterloo.ca>
- <89b793993eaa492af531bd7aa9dff1f871fb4a77.1418762900.git.lsorense@csclub.uwaterloo.ca>
- <54914096.9060206@ti.com>
-Message-ID: <20141217153026.GB838@kahuna>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 16:35:29 +0100
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20141217144518.GE870@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <3099591.NlcSS8Qjlv@wuerfel> <20141217144518.GE870@arm.com>
+Message-ID: <2299294.lPnEQgl4lK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:06-20141217, Lokesh Vutla wrote:
-> Hi Len,
-> On Wednesday 17 December 2014 02:38 AM, Lennart Sorensen wrote:
-> > Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
-> > crystal is not enabled at power up.  Instead the CPU falls back to using
-> > an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
-> > 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
-> > but can also be 19.2 or 27MHz which result in much larger drift.
+On Wednesday 17 December 2014 14:45:18 Will Deacon wrote:
+> On Wed, Dec 17, 2014 at 02:15:12PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 17 December 2014 12:09:49 Will Deacon wrote:
+> > > On Tue, Dec 16, 2014 at 12:08:15PM +0000, Arnd Bergmann wrote:
+> > > > On Monday 15 December 2014 18:09:33 Will Deacon wrote:
+> > > For iommu_group creation, that could be done in the of code by treating the
+> > > master IDs as bus IDs on a per-IOMMU bus; when a new device is probed, we
+> > > can look at the set of devices with intersecting IDs and create a group
+> > > containing those. This is similar to walking a PCI topology to establish DMA
+> > > aliases.
+> > > 
+> > > The problem with all of this is how we distinguish the different ID formats
+> > > in the `iommus' device-tree property. For the ARM SMMU, we could have:
+> > > 
+> > >   (1) [easy case] A device has a list of StreamIDs
+> > > 
+> > >   (2) A device has a list of SMR mask/value pairs
 > > 
-> > Since this is used to drive the master counter at 32.768KHz * 375 /
-> > 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
-> > seconds per day, and more than the 500ppm NTP is able to tolerate.
-> > 
-> > Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
-> > is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
-> > by known that the real counter frequency can be determined and used.
-> > The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
-> Looks good to me.
-> Tested this on DRA7 evm.
+> > I was under the impression that using the format from (2), we could
+> > describe all devices that fall into (1). In the worst case, we would
+> > create an iommu group that is somewhat larger than one using discrete
+> > StreamID values, but I would hope that this does not cause actual
+> > troubles.
 > 
-> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> The icky part is that an ARM SMMU can have one of two indexing schemes in
+> hardware:
 > 
-> Thanks and regards,
-> Lokesh
+>   (1) The StreamID is used as a linear index into an (MMIO) table, which
+>       has pointers to contexts (translation tables)
 > 
-> > 
-> > Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
-> > ---
-> >  arch/arm/mach-omap2/control.h |    4 ++++
-> >  arch/arm/mach-omap2/timer.c   |   36 ++++++++++++++++++++++++++++++++++--
-> >  2 files changed, 38 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-> > index a3c0133..a80ac2d 100644
-> > --- a/arch/arm/mach-omap2/control.h
-> > +++ b/arch/arm/mach-omap2/control.h
-> > @@ -286,6 +286,10 @@
-> >  #define OMAP5XXX_CONTROL_STATUS                0x134
-> >  #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
-> >  
-> > +/* DRA7XX CONTROL CORE BOOTSTRAP */
-> > +#define DRA7_CTRL_CORE_BOOTSTRAP	0x6c4
-> > +#define DRA7_SPEEDSELECT_MASK		(0x3 << 8)
-> > +
-> >  /*
-> >   * REVISIT: This list of registers is not comprehensive - there are more
-> >   * that should be added.
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index fb0cb2b..7d45c84 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -54,6 +54,7 @@
-> >  
-> >  #include "soc.h"
-> >  #include "common.h"
-> > +#include "control.h"
-> >  #include "powerdomain.h"
-> >  #include "omap-secure.h"
-> >  
-> > @@ -496,7 +497,8 @@ static void __init realtime_counter_init(void)
-> >  	void __iomem *base;
-> >  	static struct clk *sys_clk;
-> >  	unsigned long rate;
-> > -	unsigned int reg, num, den;
-> > +	unsigned int reg;
-> > +	unsigned long long num, den;
-> >  
-> >  	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
-> >  	if (!base) {
-> > @@ -511,6 +513,35 @@ static void __init realtime_counter_init(void)
-> >  	}
-> >  
-> >  	rate = clk_get_rate(sys_clk);
-> > +
-> > +	if (soc_is_dra7xx()) {
-> > +		/*
-> > +		 * Errata i856 says the 32.768KHz crystal does not start at
-> > +		 * power on, so the CPU falls back to an emulated 32KHz clock
-> > +		 * based on sysclk / 610 instead. This causes the master counter
-> > +		 * frequency to not be 6.144MHz but at sysclk / 610 * 375 / 2
-> > +		 * (OR sysclk * 75 / 244)
-> > +		 *
-> > +		 * This affects at least the DRA7/AM572x 1.0, 1.1 revisions.
-> > +		 * Of course any board built without a populated 32.768KHz
-> > +		 * crystal would also need this fix even if the CPU is fixed
-> > +		 * later.
-> > +		 *
-> > +		 * Either case can be detected by using the two speedselect bits
-> > +		 * If they are not 0, then the 32.768KHz clock driving the
-> > +		 * coarse counter that corrects the fine counter every time it
-> > +		 * ticks is actually rate/610 rather than 32.768KHz and we
-> > +		 * should compensate to avoid the 570ppm (at 20MHz, much worse
-> > +		 * at other rates) too fast system time.
-> > +		 */
-> > +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
-> > +		if (reg & DRA7_SPEEDSELECT_MASK) {
-> > +			num = 75;
-> > +			den = 244;
-> > +			goto sysclk1_based;
-> > +		}
-> > +	}
-> > +
-> >  	/* Numerator/denumerator values refer TRM Realtime Counter section */
-> >  	switch (rate) {
-> >  	case 12000000:
-> > @@ -545,6 +576,7 @@ static void __init realtime_counter_init(void)
-> >  		break;
-> >  	}
-> >  
-> > +sysclk1_based:
-> >  	/* Program numerator and denumerator registers */
-> >  	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
-> >  			NUMERATOR_DENUMERATOR_MASK;
-> > @@ -556,7 +588,7 @@ static void __init realtime_counter_init(void)
-> >  	reg |= den;
-> >  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
-> >  
-> > -	arch_timer_freq = (rate / den) * num;
-> > +	arch_timer_freq = DIV_ROUND_UP_ULL(rate * num, den);
-> >  	set_cntfreq();
-> >  
-> >  	iounmap(base);
-> > 
+>   (2) The StreamID is matched against a mask/value pair, which generates
+>       an index into the same table mentioned above
 > 
-If tony is ok with the arch_timer_freq change in this patch, I am ok
-with it as well.
--- 
-Regards,
-Nishanth Menon
+> Currently, the driver probes ID registers at runtime to figure out which
+> indexing scheme is implemented. If we start encoding scheme-specific data in
+> the device-tree, then the binding will differ based on hardware properties
+> that aren't otherwise described. Is there precedent for this sort of thing
+> elsewhere?
+
+We should probably have different compatible strings in that case.
+Is it always hardwired which scheme gets used, or can the SMMU
+be reconfigured between the two?
+
+> > If all devices on each iommu fall into either 1 or 2, but you never mix
+> > the two on one iommu, this could be handled by supporting either
+> > #iommu-cells=<1> or <2> in the smmu driver. That way, the xlate function
+> > will know which method to apply by looking at the iommu's #iommu-cells
+> > property.
+> 
+> Yes, that would work if you're ok with the above (i.e. we never see a mix
+> on the same IOMMU instance).
+
+Ok
+
+> > >   (3) A (bus) device has a range translation for a downstream bus (e.g.
+> > >       a PCI host controller which needs to convert RequesterID to StreamID).
+> > > 
+> > > From the SMMU driver's perspective, they will all look like of_xlate calls
+> > > unless we augment the generic IOMMU bindings with extra properties to
+> > > identify the format. It also makes it difficult to pick a sensible value for
+> > > #iommu-cells, as it depends on the format.
+> > 
+> > I would hope that PCI is the only case we need to worry about for a while.
+> > This means we just need to come up with another property or a set of properties
+> > that we can put into a PCI host controller device node in order to describe
+> > the mapping. These properties could be iommu-specific, so we add something
+> > to the PCI core that calls a new iommu callback function that takes the
+> > device node of the PCI host and the bus/device/function number as inputs.
+> > 
+> > In arm_setup_iommu_dma_ops(), we can then do something like
+> > 
+> > 	if (dev_is_pci(dev)) {
+> > 		struct pci_dev *pdev = to_pci_dev(dev);
+> > 		struct device_node *node;
+> > 		unsigned int bdf;
+> > 
+> > 		node = find_pci_host_bridge(pdev->bus)->parent->of_node;
+> > 		bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
+> > 
+> > 		iommu_setup_pci_dev(pdev, node, bdf);
+> > 	}
+> 
+> The other way to do this is have the IOMMU driver check dev_is_pci(dev)
+> in add_device, then call an of_xlate_pci_bdf library function which could
+> do the translation on-demand.
+
+We'd still need to find the device node for the host controller in
+common code, otherwise we don't have an of_xlate function to call.
+
+	Arnd
