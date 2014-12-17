@@ -1,69 +1,61 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 17 Dec 2014 13:02:23 -0500
-Subject: [RFC PATCH 1/2] common: dma-mapping: introduce dma_get_parent_cfg()
- helper
+Date: Wed, 17 Dec 2014 13:02:24 -0500
+Subject: [RFC PATCH 2/2] PCI: get device dma configuration from parent
 In-Reply-To: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
 References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1418839344-14393-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1418839344-14393-3-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, in Kernel, parent device's DMA parameters has to be applied to
-the child as is - to enable DMA support for the device. Usually this
-is happened in places where parent device manually instantiates child
-device such as in drivers/pci/probe.c (pci_device_add() for example).
-
-Now DMA configuration is represented in device data structure not only
-by DMA mask and DMA params, it also includes dma_pfn_offset at least.
-Hence introduce common dma_get_parent_cfg() helper to apply dma
-configuration from parent to child, and use __weak to allow arch to
-override it if needed.
+This patch makes use of the helper function dma_get_parent_cfg() to
+get dma configuration from the parent of the root bus bridge device.
+One particular comfiguration that is required for Keystone PCI devices
+to function correctly is the dma_pfn_offset that has to be correctly
+set in the pci device's device structure in order for getting the
+dma_mask right for the device.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/base/dma-mapping.c  |   18 ++++++++++++++++++
- include/linux/dma-mapping.h |    3 +++
- 2 files changed, 21 insertions(+)
+ drivers/pci/probe.c |   20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index 9e8bbdd..5322426 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -339,3 +339,21 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
- 	vunmap(cpu_addr);
- }
- #endif
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index c8ca98c..8f4d55b 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1519,6 +1519,8 @@ static void pci_init_capabilities(struct pci_dev *dev)
+ 
+ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ {
++	struct pci_bus *temp_bus = bus;
++	struct device *parent;
+ 	int ret;
+ 
+ 	pci_configure_device(dev);
+@@ -1527,9 +1529,21 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ 	dev->dev.release = pci_release_dev;
+ 
+ 	set_dev_node(&dev->dev, pcibus_to_node(bus));
+-	dev->dev.dma_mask = &dev->dma_mask;
+-	dev->dev.dma_parms = &dev->dma_parms;
+-	dev->dev.coherent_dma_mask = 0xffffffffull;
++	/*
++	 * look for host bridge and check if the dma parameters
++	 * can be copied from parent
++	 */
++	while (!pci_is_root_bus(temp_bus))
++		temp_bus = temp_bus->parent;
 +
-+int __weak dma_get_parent_cfg(struct device *dev, struct device *parent)
-+{
-+	struct device *temp = parent;
++	parent = temp_bus->bridge->parent;
 +
-+	if (!temp)
-+		temp = dev->parent;
-+
-+	if (temp && is_device_dma_capable(temp)) {
-+		dev->dma_mask	= temp->dma_mask;
-+		dev->coherent_dma_mask = temp->coherent_dma_mask;
-+		dev->dma_parms	= temp->dma_parms;
-+		dev->dma_pfn_offset = temp->dma_pfn_offset;
-+		return 0;
++	/* override with parent dma configuration if available */
++	if (dma_get_parent_cfg(&dev->dev, parent) < 0) {
++		dev->dev.dma_mask = &dev->dma_mask;
++		dev->dev.dma_parms = &dev->dma_parms;
++		dev->dev.coherent_dma_mask = 0xffffffffull;
 +	}
-+	return -EINVAL;
-+}
-+EXPORT_SYMBOL(dma_get_parent_cfg);
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index d5d3881..eb080d6 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -127,6 +127,9 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
- 	return dma_set_mask_and_coherent(dev, mask);
- }
  
-+extern int __weak dma_get_parent_cfg(struct device *dev,
-+					struct device *parent);
-+
- extern u64 dma_get_required_mask(struct device *dev);
- 
- #ifndef set_arch_dma_coherent_ops
+ 	pci_set_dma_max_seg_size(dev, 65536);
+ 	pci_set_dma_seg_boundary(dev, 0xffffffff);
 -- 
 1.7.9.5
