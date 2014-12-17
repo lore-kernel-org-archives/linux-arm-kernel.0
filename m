@@ -1,31 +1,147 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 17 Dec 2014 22:16:09 +0900
-Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <4583974.6IftQ5bv2t@wuerfel>
-References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
- <1628217.66frkAqHMc@wuerfel>
- <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
- <4583974.6IftQ5bv2t@wuerfel>
-Message-ID: <CAAVeFu+CG82UBgsQ4+RNqitUmxxaKi0P50=fjpKCqo0_ODO3jA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 17 Dec 2014 15:21:27 +0200
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141216145856.GA23358@kahuna>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
+ <20141216145856.GA23358@kahuna>
+Message-ID: <54918357.8060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 7:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 17 December 2014 11:45:01 Alexandre Courbot wrote:
+On 12/16/2014 04:58 PM, Nishanth Menon wrote:
+> On 17:05-20141216, Lokesh Vutla wrote:
+> [...]
 >>
->> Actually we are not that far from being able to do completely without
->> any GPIO number, and maybe that's what we should aim for. I think the
->> only remaining offender is the sysfs interface. If we could reach GPIO
->> controllers through a fixed path and just export their GPIOs there, I
->> believe we would have fixed the whole issue.
+>> @@ -545,6 +546,16 @@ static void __init realtime_counter_init(void)
+>>   		break;
+>>   	}
+>>
+>> +	if (soc_is_dra7xx()) {
+>> +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
+>> +		reg = reg & DRA7_SPEEDSELECT_MASK;
+>> +
+>> +		if (reg) {
+>> +			num = 75;
+>> +			den = 244;
+>> +		}
+>> +	}
+>> +
+>>   	/* Program numerator and denumerator registers */
+>>   	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
+>>   			NUMERATOR_DENUMERATOR_MASK;
 >
-> What about the hundreds of board files and device drivers that still
-> reference hardcoded gpio numbers? The problem seems mostly solved for
-> anything that uses DT, but there are some architectures and a number
-> of ARM platforms that don't use DT and probably never will.
->
-> I would assume they could all be changed to use gpiod_lookup tables,
-> but that's a lot of work.
+> A) So, it does look like the 32k node is actually wrong then -> Tero:
+> any comments? should'nt this now be modeled based on
+> CTRL_CORE_BOOTSTRAP::SPEEDSELECT considering that clock nodes do have
+> clk mux options based on the 32k..
+> sys_32k_ck: sys_32k_ck {
+> 	#clock-cells = <0>;
+> 	compatible = "fixed-clock";
+> 	clock-frequency = <32768>;
+> };
 
-Indeed, that's not something to expect, as I replied to Russell. Sorry
-about the confusion.
+
+Yea I think the 32k clock node should be fixed based on this. Something 
+like this:
+
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -100,8 +100,10 @@
+
+         sys_32k_ck: sys_32k_ck {
+                 #clock-cells = <0>;
+-               compatible = "fixed-clock";
+-               clock-frequency = <32768>;
++               compatible = "fixed-factor-clock";
++               clocks = <&sys_clkin1>;
++               clock-mult = <1>;
++               clock-div = <610>;
+         };
+
+         virt_12000000_ck: virt_12000000_ck {
+
+
+It might be better then just query the actual clock rate from the timer 
+code.
+
+-Tero
+
+>
+> B) Since rate switch is no longer needed, how about something like the
+> following:
+> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+> index a3c0133..315d6d1 100644
+> --- a/arch/arm/mach-omap2/control.h
+> +++ b/arch/arm/mach-omap2/control.h
+> @@ -286,6 +286,11 @@
+>   #define OMAP5XXX_CONTROL_STATUS                0x134
+>   #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
+>
+> +
+> +/* DRA7XX CONTROL CORE BOOTSTRAP */
+> +#define DRA7_CTRL_CORE_BOOTSTRAP	0x6c4
+> +#define DRA7_SPEEDSELECT_MASK		(0x3 << 8)
+> +
+>   /*
+>    * REVISIT: This list of registers is not comprehensive - there are more
+>    * that should be added.
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 4f61148..783d3c3 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -54,6 +54,7 @@
+>
+>   #include "soc.h"
+>   #include "common.h"
+> +#include "control.h"
+>   #include "powerdomain.h"
+>   #include "omap-secure.h"
+>
+> @@ -511,6 +512,35 @@ static void __init realtime_counter_init(void)
+>   	}
+>
+>   	rate = clk_get_rate(sys_clk);
+> +
+> +	if (soc_is_dra7xx()) {
+> +		/*
+> +		 * Errata i856 says the 32.768KHz crystal does not start at
+> +		 * power on, so the CPU falls back in an emulated 32KHz clock
+> +		 * based on sysclk / 610 instead. This causes the master counter
+> +		 * frequency to not be 6.144MHz but at sysclk / 610  * 375 / 2
+> +		 * (OR sysclk * 75 / 244)
+> +		 *
+> +		 * This affects at least the DRA7/AM572x 1.0, 1.1 revisions.
+> +		 * Of course any board built without a populated 32.768KHz
+> +		 * crystal would also need this fix even if the CPU is fixed
+> +		 * later.
+> +		 *
+> +		 * Either case can be detected by using the two speedselect bits
+> +		 * If they are not 0, then the 32.768KHz clock driving the
+> +		 * course counter that corrects the fine counter every time it
+> +		 * ticks is actually rate/610 rather than 32.768KHz and we
+> +		 * should compensate to avoid the 570ppm (At 20MHz, much worse
+> +		 * at other rates) too fast system time.
+> +		 */
+> +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
+> +		if (reg & DRA7_SPEEDSELECT_MASK) {
+> +			num = 75;
+> +			den = 244;
+> +			goto sysclk_based;
+> +		}
+> +	}
+> +
+>   	/* Numerator/denumerator values refer TRM Realtime Counter section */
+>   	switch (rate) {
+>   	case 1200000:
+> @@ -545,6 +575,7 @@ static void __init realtime_counter_init(void)
+>   		break;
+>   	}
+>
+> +sysclk_based:
+>   	/* Program numerator and denumerator registers */
+>   	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
+>   			NUMERATOR_DENUMERATOR_MASK;
+>
