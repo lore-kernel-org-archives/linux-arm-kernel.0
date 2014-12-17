@@ -1,49 +1,71 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed, 17 Dec 2014 11:34:45 +0100
-Subject: [PATCH 4/5] PCI: designware: Add setup bus-related to pcie_host_ops
+Date: Wed, 17 Dec 2014 11:34:46 +0100
+Subject: [PATCH 5/5] PCI: st: disable IO support
 In-Reply-To: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1418812486-12394-5-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1418812486-12394-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST sti SoCs PCIe IPs are built around DesignWare IP Core.
-But in these SoCs PCIe IP doesn't support IO.
+sti SoCs PCIe IPs are built around DesignWare IP Core.
+But in these SoCs, PCIe IP doesn't support IO.
+By default, when no IO space is provided, a default one is assigned.
 
-To support this, add setup_bus() to pcie_host_ops.
+Add an empty IO resource to the bus, and disable IO by default.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/pci/host/pcie-designware.c | 3 +++
- drivers/pci/host/pcie-designware.h | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/pci/host/pci-st.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index df781cd..98e19bc 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -719,6 +719,9 @@ static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
- 	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
- 	pci_add_resource(&sys->resources, &pp->busn);
+diff --git a/drivers/pci/host/pci-st.c b/drivers/pci/host/pci-st.c
+index bd3d32d..c0d3895 100644
+--- a/drivers/pci/host/pci-st.c
++++ b/drivers/pci/host/pci-st.c
+@@ -357,9 +357,15 @@ static void st_pcie_board_reset(struct pcie_port *pp)
+ static void st_pcie_hw_setup(struct pcie_port *pp)
+ {
+ 	struct st_pcie *pcie = to_st_pcie(pp);
++	u32 val;
  
-+	if (pp->ops->setup_bus)
-+		pp->ops->setup_bus(pp, sys);
+ 	dw_pcie_setup_rc(pp);
+ 
++	/* Disable IO support */
++	val = readl_relaxed(pp->dbi_base + PCI_COMMAND);
++	val &= ~PCI_COMMAND_IO;
++	writel_relaxed(val, pp->dbi_base + PCI_COMMAND);
 +
- 	return 1;
+ 	/* Set up the config window to the top of the PCI address space */
+ 	writel_relaxed(pcie->config_window_start,
+ 		       pp->dbi_base + CFG_BASE_ADDRESS);
+@@ -445,11 +451,28 @@ static void st_pcie_host_init(struct pcie_port *pp)
+ 		st_msi_init_one(pp);
  }
  
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index d0bbd27..5c13de7 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -73,6 +73,7 @@ struct pcie_host_ops {
- 	u32 (*get_msi_addr)(struct pcie_port *pp);
- 	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
- 	void (*scan_bus)(struct pcie_port *pp);
-+	void (*setup_bus)(struct pcie_port *pp, struct pci_sys_data *sys);
- 	int (*msi_host_init)(struct pcie_port *pp, struct msi_controller *chip);
++static void st_pcie_setup_bus(struct pcie_port *pp, struct pci_sys_data *sys)
++{
++	struct resource *res;
++
++	/* This PCIe controller does not support IO, set an empty one. */
++	res = devm_kzalloc(pp->dev, sizeof(*res), GFP_KERNEL);
++	if (!res)
++		return;
++
++	res->start = 0;
++	res->end = 0;
++	res->name = "PCIe empty IO space";
++	res->flags = IORESOURCE_IO;
++	pci_add_resource(&sys->resources, res);
++}
++
+ static struct pcie_host_ops st_pcie_host_ops = {
+ 	.rd_other_conf = st_pcie_rd_other_conf,
+ 	.wr_other_conf = st_pcie_wr_other_conf,
+ 	.link_up = st_pcie_link_up,
+ 	.host_init = st_pcie_host_init,
++	.setup_bus = st_pcie_setup_bus,
  };
  
+ static int st_pcie_init(struct pcie_port *pp)
 -- 
 1.9.1
