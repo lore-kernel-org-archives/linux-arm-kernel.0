@@ -1,125 +1,70 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 17 Dec 2014 18:18:16 +0100
-Subject: [PATCH v2 05/13] rc: sunxi-cir: Add support for the larger fifo found
- on sun5i and sun6i
+Date: Wed, 17 Dec 2014 18:18:14 +0100
+Subject: [PATCH v2 03/13] ARM: sunxi: Add "allwinner, sun6i-a31s" to mach-sunxi
 In-Reply-To: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
 References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1418836704-15689-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <1418836704-15689-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the larger fifo found on sun5i and sun6i, having a separate
-compatible for the ir found on sun5i & sun6i also is useful if we ever want
-to add ir transmit support, because the sun5i & sun6i version do not have
-transmit support.
-
-Note this commits also adds checking for the end-of-packet interrupt flag
-(which was already enabled), as the fifo-data-available interrupt flag only
-gets set when the trigger-level is exceeded. So far we've been getting away
-with not doing this because of the low trigger-level, but this is something
-which we should have done since day one.
+So far the A31s is 100% compatible with the A31, still lets do the same
+as what we've done for the A13 / A10s and give it its own compatible string,
+in case we need to differentiate later.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/media/sunxi-ir.txt          |  2 +-
- drivers/media/rc/sunxi-cir.c                        | 21 ++++++++++++---------
- 2 files changed, 13 insertions(+), 10 deletions(-)
+ Documentation/arm/sunxi/README | 1 -
+ arch/arm/mach-sunxi/platsmp.c  | 3 ++-
+ arch/arm/mach-sunxi/sunxi.c    | 1 +
+ drivers/clk/sunxi/clk-sunxi.c  | 1 +
+ 4 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-index 6b70b9b..1811a06 100644
---- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-+++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-@@ -1,7 +1,7 @@
- Device-Tree bindings for SUNXI IR controller found in sunXi SoC family
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index e68d163..1fe2d7f 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -50,7 +50,6 @@ SunXi family
+           http://dl.linux-sunxi.org/A31/A3x_release_document/A31/IC/A31%20user%20manual%20V1.1%2020130630.pdf
  
- Required properties:
--- compatible	    : should be "allwinner,sun4i-a10-ir";
-+- compatible	    : "allwinner,sun4i-a10-ir" or "allwinner,sun5i-a13-ir"
- - clocks	    : list of clock specifiers, corresponding to
- 		      entries in clock-names property;
- - clock-names	    : should contain "apb" and "ir" entries;
-diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
-index 06170e0..7830aef 100644
---- a/drivers/media/rc/sunxi-cir.c
-+++ b/drivers/media/rc/sunxi-cir.c
-@@ -56,12 +56,12 @@
- #define REG_RXINT_RAI_EN		BIT(4)
+       - Allwinner A31s (sun6i)
+-        + Not Supported
+         + Datasheet
+           http://dl.linux-sunxi.org/A31/A3x_release_document/A31s/IC/A31s%20datasheet%20V1.3%2020131106.pdf
+         + User Manual
+diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
+index e44d028..b1b5b7c 100644
+--- a/arch/arm/mach-sunxi/platsmp.c
++++ b/arch/arm/mach-sunxi/platsmp.c
+@@ -120,4 +120,5 @@ static struct smp_operations sun6i_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
+ 	.smp_boot_secondary	= sun6i_smp_boot_secondary,
+ };
+-CPU_METHOD_OF_DECLARE(sun6i_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
++CPU_METHOD_OF_DECLARE(sun6i_a31_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
++CPU_METHOD_OF_DECLARE(sun6i_a31s_smp, "allwinner,sun6i-a31s", &sun6i_smp_ops);
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 1f98675..d4bb239 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -29,6 +29,7 @@ MACHINE_END
  
- /* Rx FIFO available byte level */
--#define REG_RXINT_RAL(val)    (((val) << 8) & (GENMASK(11, 8)))
-+#define REG_RXINT_RAL(val)    ((val) << 8)
- 
- /* Rx Interrupt Status */
- #define SUNXI_IR_RXSTA_REG    0x30
- /* RX FIFO Get Available Counter */
--#define REG_RXSTA_GET_AC(val) (((val) >> 8) & (GENMASK(5, 0)))
-+#define REG_RXSTA_GET_AC(val) (((val) >> 8) & (ir->fifo_size * 2 - 1))
- /* Clear all interrupt status value */
- #define REG_RXSTA_CLEARALL    0xff
- 
-@@ -72,10 +72,6 @@
- /* CIR_REG register idle threshold */
- #define REG_CIR_ITHR(val)    (((val) << 8) & (GENMASK(15, 8)))
- 
--/* Hardware supported fifo size */
--#define SUNXI_IR_FIFO_SIZE    16
--/* How many messages in FIFO trigger IRQ */
--#define TRIGGER_LEVEL         8
- /* Required frequency for IR0 or IR1 clock in CIR mode */
- #define SUNXI_IR_BASE_CLK     8000000
- /* Frequency after IR internal divider  */
-@@ -94,6 +90,7 @@ struct sunxi_ir {
- 	struct rc_dev   *rc;
- 	void __iomem    *base;
- 	int             irq;
-+	int		fifo_size;
- 	struct clk      *clk;
- 	struct clk      *apb_clk;
- 	struct reset_control *rst;
-@@ -115,11 +112,11 @@ static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
- 	/* clean all pending statuses */
- 	writel(status | REG_RXSTA_CLEARALL, ir->base + SUNXI_IR_RXSTA_REG);
- 
--	if (status & REG_RXINT_RAI_EN) {
-+	if (status & (REG_RXINT_RAI_EN | REG_RXINT_RPEI_EN)) {
- 		/* How many messages in fifo */
- 		rc  = REG_RXSTA_GET_AC(status);
- 		/* Sanity check */
--		rc = rc > SUNXI_IR_FIFO_SIZE ? SUNXI_IR_FIFO_SIZE : rc;
-+		rc = rc > ir->fifo_size ? ir->fifo_size : rc;
- 		/* If we have data */
- 		for (cnt = 0; cnt < rc; cnt++) {
- 			/* for each bit in fifo */
-@@ -156,6 +153,11 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- 	if (!ir)
- 		return -ENOMEM;
- 
-+	if (of_device_is_compatible(dn, "allwinner,sun5i-a13-ir"))
-+		ir->fifo_size = 64;
-+	else
-+		ir->fifo_size = 16;
-+
- 	/* Clock */
- 	ir->apb_clk = devm_clk_get(dev, "apb");
- 	if (IS_ERR(ir->apb_clk)) {
-@@ -271,7 +273,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- 	 * level
- 	 */
- 	writel(REG_RXINT_ROI_EN | REG_RXINT_RPEI_EN |
--	       REG_RXINT_RAI_EN | REG_RXINT_RAL(TRIGGER_LEVEL - 1),
-+	       REG_RXINT_RAI_EN | REG_RXINT_RAL(ir->fifo_size / 2 - 1),
- 	       ir->base + SUNXI_IR_RXINT_REG);
- 
- 	/* Enable IR Module */
-@@ -319,6 +321,7 @@ static int sunxi_ir_remove(struct platform_device *pdev)
- 
- static const struct of_device_id sunxi_ir_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-ir", },
-+	{ .compatible = "allwinner,sun5i-a13-ir", },
- 	{},
+ static const char * const sun6i_board_dt_compat[] = {
+ 	"allwinner,sun6i-a31",
++	"allwinner,sun6i-a31s",
+ 	NULL,
  };
  
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index a9d10b9..ee9d7f2 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -1235,6 +1235,7 @@ static void __init sun6i_init_clocks(struct device_node *node)
+ 			  ARRAY_SIZE(sun6i_critical_clocks));
+ }
+ CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
++CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+ 
+ static void __init sun9i_init_clocks(struct device_node *node)
 -- 
 2.1.0
