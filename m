@@ -1,100 +1,36 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Wed, 17 Dec 2014 20:06:48 +0530
-Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
- pm_genpd_dev_need_restore to use restore types
-In-Reply-To: <7h61dbdz5a.fsf@deeprootsystems.com>
-References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
- <54901341.20106@samsung.com> <7h61dbdz5a.fsf@deeprootsystems.com>
-Message-ID: <CADGdYn4WQ6i29ecTthu7eNUfSSQ--YESGyHcA1_9CdK-h53hxA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 17 Dec 2014 16:39:02 +0200
+Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
+ dt-specific callback instead of initcall
+In-Reply-To: <3015182.XtvMmOW5GD@wuerfel>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1652354.DLhQnkm7xS@avalon> <3015182.XtvMmOW5GD@wuerfel>
+Message-ID: <1652261.Tf8nxQyMRf@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 3:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Marek Szyprowski <m.szyprowski@samsung.com> writes:
->
->> Hello,
->>
->> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
->>> Instead of using bool to restore suspended devices initially, use flags
->>> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and GPD_DEV_RESTORE_FORCE.
->>> The first two flags will be similar to the existing true/false functionality.
->>> The third flag may be used to force restore of suspended devices
->>> whenever their associated power domain is turned on.
->>>
->>> Currently, PD power off function powers off all the associated unused
->>> devices. The functionality added in this patch is similar to it.
->>>
->>> This feature may be used for those devices which are always in ON state
->>> if the PD associated with them is ON but may need local runtime resume
->>> and suspend during PD On/Off. These devices (like clock) may not implement
->>> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
->>> subsystems interaction behaviour or any other reason.
->>>
->>> The model works like,
->>>      DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
->>>      /       pm_runtime_put. Its local runtime_suspend/resume is invoked via
->>>     /        GPD_DEV_RESTORE_FORCE option)
->>>    /
->>> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
->>>    \ pm_runtime_put. This in turn invokes PD On/Off)
->>>     \
->>>      DEV3 (Similar to DEV1)
->>>
->>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>
->> The idea of adding new gen_pd flag and reusing runtime pm calls intead
->> of additional notifiers looks promising, but I have some doubts.
->
-> I agree, this is better than notifiers, but I have some doubts too.
+Hi Arnd,
 
-Thanks,
+On Wednesday 17 December 2014 15:27:36 Arnd Bergmann wrote:
+> On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
+> > If we forbid the IOMMU driver from being compiled as a module can't we
+> > just rely on deferred probing ? The bus master driver will just be
+> > reprobed after the IOMMU gets probed, like for other devices.
+> > 
+> > This could fail in case the IOMMU device permanently fails to probe. There
+> > would be something very wrong in the system in that case, Enabling the bus
+> > masters totally transparently without IOMMU support could not be such a
+> > good idea.
+> 
+> I believe in the majority of cases today, the IOMMU is entirely optional.
+> There are valid reasons for not including the IOMMU driver in the kernel,
+> e.g. when you know that all the machines with that driver can DMA to
+> all of their RAM and you want to avoid the overhead of IOTLB misses.
 
->
->> don't see any guarantee that devices with GPD_DEV_RESTORE_FORCE flag
->> will be suspended after all "normal" devices and restored before
->> them. Without such assumption it will be hard to use this approach for
->> iommu related activities, because device might need to use (in its
->> suspend/resume callbacks) the functionality provided by the other
->> device with GPD_DEV_RESTORE_FORCE flag. Maybe some additional flags
->> like suspend/resume priority (or more flags) will solve somehow this
->> dependency.
->
-> At a deeper level, the problem with this approach is that this is more
-> generically a runtime PM dependency problem, not a genpd problem.  For
-> example, what happens when the same kind of dependency exists on a
-> platform using a custom PM domain instead of genpd (like ACPI.) ?
+Should that really be controlled by compiling the IOMMU driver out, wouldn't 
+it be better to disable the IOMMU devices in DT in that case ?
 
-This patch does not try to solve runtime PM dependencies between
-devices. As an example, if there are three devices D1, D2, D3 in a
-power domain. Device D3 would update the power domain state
-requirement using runtime PM API but devices D1 and D2 do not want to
-control the domain but just want to be notified when the power domain
-state changes.
-
->
-> What's needed to solve this problem is a generalized way to have runtime
-> PM dependencies between devices.  Runtime PM already automatically
-> handles parent devices as one type of dependent device (e.g. a parent
-> device needs to be runtime PM resumed before its child.)  So what's
-> needed is a generic way to other PM dependencies with the runtime PM
-> core (not the genpd core.)
-
-Considering the example above with three devices, device D1 and D2 are
-passive components in this power domain. These devices only need to
-know the state changes of the power domains but would not control the
-power domain themselves nor put forth constraints in the power domain
-state changes. So I did not clearly understand as to how this example
-could be solved by introducing changes in runtime PM core.
-
+-- 
 Regards,
-Amit Daniel
 
->
-> If runtime PM handles the dependencies corretcly, then genpd (and any
-> other PM domain) will get them "for free".
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Laurent Pinchart
