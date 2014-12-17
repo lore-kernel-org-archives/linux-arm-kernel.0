@@ -1,24 +1,32 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 17 Dec 2014 15:53:28 -0600
-Subject: i.mx6sx halt when enable qspi
-In-Reply-To: <CAHrpEqSVD3LK_O1iu-9ANZy54TFWHHMe7=AA9FDsboWeiX86yQ@mail.gmail.com>
-References: <CAHrpEqSVD3LK_O1iu-9ANZy54TFWHHMe7=AA9FDsboWeiX86yQ@mail.gmail.com>
-Message-ID: <CAHrpEqR0fWwsimJ4yA5o_47tCHJjSHPmXnXNk0A6jwa5s2-saA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 22:54:12 +0100
+Subject: [PATCH 5/8] watchdog: bindings: Provide ST bindings for ST's LPC
+ Watchdog device
+In-Reply-To: <1418834727-1602-6-git-send-email-lee.jones@linaro.org>
+References: <1418834727-1602-1-git-send-email-lee.jones@linaro.org>
+ <1418834727-1602-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <5479005.CEJLtxOOIa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 3:46 PM, Zhi Li <lznuaa@gmail.com> wrote:
-> Shawn:
->
->           we try to upstream some qspi patch.
->           but I found system halt at clk_set_rate in function
-> fsl_qspi_nor_setup_last
->
->           Do you have idea about why halt when change clk rate?
+On Wednesday 17 December 2014 16:45:24 Lee Jones wrote:
+> +- compatible   : Must be one of: "st,stih407-lpc" "st,stih416-lpc"
+> +                                 "st,stih415-lpc" "st,stid127-lpc"
+> +- reg          : LPC registers base address + size
+> +- interrupts    : LPC interrupt line number and associated flags
+> +- clocks       : Clock used by LPC device (See: ../clock/clock-bindings.txt)
+> +- st,lpc-mode  : The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
+> +                 ST_LPC_MODE_WDT [1].  One (and only one) mode must be
+> +                 selected.
+> 
 
-I forget maintain. I base on linux-next
-15229b5a1674f7096a547f590f2c70a2a86ae744
+I'm glad you got it to work with two drivers for the same device.
 
->
-> best regards
-> Frank Li
+With this binding, I'm still a bit unhappy about the st,lpc-mode property,
+in particular since you rely on a shared include file for something that
+can only be set in one way or another and always has to be present.
+
+Why not just use a boolean property that enforces one mode when present
+and another mode when absent?
+
+	Arnd
