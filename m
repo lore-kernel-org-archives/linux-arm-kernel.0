@@ -1,29 +1,47 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 17 Dec 2014 10:28:47 -0800
-Subject: [PATCH] ARM: defconfigs: use CONFIG_CPUFREQ_DT
-In-Reply-To: <CAKohpomS1PAO1zyQJ9bkK6eYo4vM-GMTrYwDnPcFfpvB3a+b2g@mail.gmail.com>
- (Viresh Kumar's message of "Wed, 17 Dec 2014 21:58:26 +0530")
-References: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
- <2757282.fj6z18fAYb@vostro.rjw.lan>
- <7h1to0iw76.fsf@deeprootsystems.com>
- <CAGo_u6oO+Tou2XSVr3dxn94hV0HTdYMZWz-XKK_aydwusaRBvg@mail.gmail.com>
- <CAKohpomS1PAO1zyQJ9bkK6eYo4vM-GMTrYwDnPcFfpvB3a+b2g@mail.gmail.com>
-Message-ID: <7hvbla9lls.fsf@deeprootsystems.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 17 Dec 2014 19:49:07 +0100
+Subject: [PATCH 2/8] drivers: bus: Sort Makefile entries alphabetically
+In-Reply-To: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
+References: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1418842153-17113-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar <viresh.kumar@linaro.org> writes:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - New
+---
+ drivers/bus/Makefile | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-> On 17 December 2014 at 21:31, Nishanth Menon <nm@ti.com> wrote:
->> Any chance of the following being queued for the .19 window or do we
->> wait to go through Tony?
->> https://patchwork.kernel.org/patch/5484401/
->
-> I think I have seen that as part of Arnd pull request sent today to Linus.
->
-> https://lkml.org/lkml/2014/12/16/439
-
-Right, this was initially planned for v3.19-rc, but since we were
-sending another round of pull requests, arm-soc/fixes was included.
-
-Kevin
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 2973c18cbcc27816..3cfaf2c7f25ac4f0 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -2,16 +2,16 @@
+ # Makefile for the bus drivers.
+ #
+ 
++# Interconnect bus drivers for ARM platforms
++obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
++obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
++
+ obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+-obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+-obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+-obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
++obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
++obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
+ 
+ # Interconnect bus driver for OMAP SoCs.
+ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+ 
+-# Interconnect bus drivers for ARM platforms
+-obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+-obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
+-
++obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+-- 
+1.9.1
