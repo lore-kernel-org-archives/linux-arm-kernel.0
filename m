@@ -1,58 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 16:56:53 +0100
-Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
- dt-specific callback instead of initcall
-In-Reply-To: <1418828005.3347.7.camel@pengutronix.de>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <3015182.XtvMmOW5GD@wuerfel> <1418828005.3347.7.camel@pengutronix.de>
-Message-ID: <5219064.gvW43bShnl@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 17 Dec 2014 10:01:39 -0600
+Subject: [PATCH] ARM: defconfigs: use CONFIG_CPUFREQ_DT
+In-Reply-To: <7h1to0iw76.fsf@deeprootsystems.com>
+References: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
+ <2757282.fj6z18fAYb@vostro.rjw.lan>
+ <7h1to0iw76.fsf@deeprootsystems.com>
+Message-ID: <CAGo_u6oO+Tou2XSVr3dxn94hV0HTdYMZWz-XKK_aydwusaRBvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 15:53:25 Lucas Stach wrote:
-> Am Mittwoch, den 17.12.2014, 15:27 +0100 schrieb Arnd Bergmann:
-> > On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
-> > > 
-> > > If we forbid the IOMMU driver from being compiled as a module can't we just 
-> > > rely on deferred probing ? The bus master driver will just be reprobed after 
-> > > the IOMMU gets probed, like for other devices.
-> > > 
-> > > This could fail in case the IOMMU device permanently fails to probe. There 
-> > > would be something very wrong in the system in that case, Enabling the bus 
-> > > masters totally transparently without IOMMU support could not be such a good 
-> > > idea.
-> > 
-> > I believe in the majority of cases today, the IOMMU is entirely optional.
-> > There are valid reasons for not including the IOMMU driver in the kernel,
-> > e.g. when you know that all the machines with that driver can DMA to
-> > all of their RAM and you want to avoid the overhead of IOTLB misses.
-> > 
-> This is similar to the problems we discussed with the componentized
-> device framework and in the end everybody agreed on a simple rule:
-> if the device node is enabled in the DT there must be a driver bound to
-> it before other devices depending on this node can be probed.
-> 
-> If we apply the same logic to the IOMMU situation we get two
-> possibilities to allow bypassing the IOMMU:
-> 1. completely disable the IOMMU node in the DT
-> 2. leave node enabled in DT, but add a bypass property
-> 
-> Obviously the second option still requires to have the IOMMU driver
-> available, but is more flexible. Right now everything depends on the
-> IOMMU being in passthrough mode at reset with no driver bound. If a
-> device comes around where this isn't the case thing will break with the
-> current assumptions or the first option.
-> 
-> Having the IOMMU node enabled in DT with no driver available to the
-> kernel seems like an invalid configuration which should be expected to
-> break. Exactly the same thing as with componentized devices...
+On Mon, Dec 15, 2014 at 12:50 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+>
+>> On Monday, December 15, 2014 09:48:19 AM Viresh Kumar wrote:
+>>> CONFIG_GENERIC_CPUFREQ_CPU0 disappeared with commit bbcf071969b20f
+>>> ("cpufreq: cpu0: rename driver and internals to 'cpufreq_dt'") and some
+>>> defconfigs are still using it instead of the new one.
+>>>
+>>> Use the renamed CONFIG_CPUFREQ_DT generic driver.
+>>>
+>>> Cc: <stable@vger.kernel.org>        # 3.18
+>>> Reported-by: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+>> OK, so who should be applying this?
+>>
+>
+> Normally, we take these defconfig changes through the arm-soc tree, and
+> I think that should continue, otherwise we'll be bound to have conflicts.
+>
+> Note all the pull requests for this merge window are already sent, but
+> I'll queue this up in arm-soc/fixes so it can make it during the
+> v3.19-rc cycle.
 
-One differences here is that for the IOMMU, we should generally be able
-to fall back to swiotlb (currently only on ARM64, not ARM32, until
-someone adds support). I can see your point regarding machines that
-have a mandatory IOMMU with no fallback when there is no driver, but
-we can support them by making the iommu driver selected through Kconfig
-for that platform, while still allowing other platforms to work with
-drivers left out of the kernel.
-
-	Arnd
+Any chance of the following being queued for the .19 window or do we
+wait to go through Tony?
+https://patchwork.kernel.org/patch/5484401/
