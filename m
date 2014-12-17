@@ -1,102 +1,154 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 17 Dec 2014 12:09:03 +0900
-Subject: [PATCH v4 3/4] gpio: Add find GPIO base in increasing order
-In-Reply-To: <548E5D34.6010206@gmail.com>
-References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
- <1417750722-14027-4-git-send-email-wangzhou.bry@gmail.com>
- <CAAVeFu+Hn1Fk7PDcc4wGHFyJurX0hsW1N1prnPs2j=taGQKrKw@mail.gmail.com>
- <548E5D34.6010206@gmail.com>
-Message-ID: <CAAVeFuKzY8C+dARt4U8nEFBzEmRt=j34uEnK0vsS91H6jvkkBQ@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 16 Dec 2014 19:13:50 -0800
+Subject: [PATCH] ARM: brcmstb: update CPU power management sequence
+Message-ID: <1418786030-23455-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 1:01 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
-> On 2014?12?10? 16:51, Alexandre Courbot wrote:
->>
->> On Fri, Dec 5, 2014 at 12:38 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
->>>
->>> In function gpiochip_find_base, base number of a GPIO controller
->>> is found in decreasing order. ARCH_NR_GPIOS is used to define from
->>> which number we begin to search for base number of a GPIO controller.
->>>
->>> In fact, ARCH_NR_GPIOS brings us some multiplatform problems, like:
->>> http://www.spinics.net/lists/devicetree/msg60433.html
->>>
->>> This patch adds the support to find base number of a GPIO controller
->>> in increasing order. It will assign base number from 0.
->>> A new dts property called gpio-number-forward must be add to the related
->>> GPIO dts nodes if you want it works well.
->>
->>
->> Global GPIO numbers are a Linux-only concept, so your property should
->> be named linux,gpio-number-forward.
->>
->> But even that way I don't think I like this idea. This just adds some
->> more mess to how the GPIO number space is constructed, and it is
->> already quite messy as it is. You have no guarantee over the probe
->> order of your GPIO controllers, so they may very well be probed in a
->> different order and end up with different base numbers anytime.
->>
->> Not that this is your fault - the number namespace is broken by design
->> and I don't think there is a way to fix it. The long-term solution is
->> to stop using it by switching to the gpiod interface.
->>
->> First a few questions to understand why you need your GPIOs numbered
->> this way, and if you need it at all:
->> - Can't you use the gpiod interface instead so you don't need to rely
->> on GPIO numbers?
->
->
-> Hi Alexandre,
->
-> Sorry for late. Could you give me more clue about the gpiod interface? Don't
-> we also call gpio_request() which uses GPIO number to request a
-> GPIO?
+The automatic CPU power state machine for B15 CPUs does not work
+reliably as-is. This patch implements a manual sequence in software to
+replace it.
 
-See Documentation/gpio/consumer.txt and Documentation/gpio/board.txt.
-You can obtain a GPIO descriptor without using a number by calling
-gpiod_get(). Prior to that, individual GPIOs need to be bound to
-devices and functions using either DT (preferred) or the platform
-interface. The old integer-based GPIO interface is considered
-deprecated, although still widely used. But new code should rely
-exclusively on gpiod, and we encourage people to convert existing code
-to it too.
+This was tested successfully with over 10,000 hotplug cycles of
+something like this:
 
->
->> - Do you plan to use the sysfs interface? If so then we are screwed,
->> because there is no way to use it without using global GPIO numbers.
->
->
-> I am now enabling GPIO in Hip04-d01. Maybe, I can just use
-> the default ARCH_NR_GPIOS, then users can manage GPIO through sysfs.
-> However if so, GPIO 0~127 will be mapped to GPIO 384~511.
+  echo 0 > /sys/devices/system/cpu/cpu1/online
+  echo 1 > /sys/devices/system/cpu/cpu1/online
 
-Yeah, I know that's not ideal. As a workaround, users can maybe
-identify the right gpiochip by parsing /sys/class/gpio/gpiochip* and
-comparing the "label" node. Once the right chip is found, its "base"
-entry gives the base GPIO number which can be used to export the
-desired GPIO.
+whereas the existing sequence often locks up after a few hundred cycles.
 
-We are also taking steps to come with a better sysfs interface. I will
-keep you in the loop.
+Fixes: 62639c2f5332 ("ARM: brcmstb: reintroduce SMP support")
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+---
+ arch/arm/mach-bcm/platsmp-brcmstb.c | 85 +++++++++++++++++++++++++++----------
+ 1 file changed, 63 insertions(+), 22 deletions(-)
 
->
->> This is something we should/will fix with named exported GPIOs, but we
->> are not here yet.
->>
->> As to how we can solve your problem: if you must use GPIO integers
->> (because you need to use the sysfs interface for instance), and need
->> them affected consistently, the only way I can think of is to
->> introduce a "linux,gpio-base" property that will set gpiochip->base to
->> a fixed number. It still kind of sucks, but at least it will enforce
->
->
-> Thanks for your suggestion. But setting "linux,gpio-base" will bring
-> gpio base implementation specific, and in face there is no place to gain
-> this gpio base info, not appropriate both in gpio arch code and dwapb
-> code.
-
-Yeah, besides this property did not receive a warm reception. So my
-suggestion for now is to workaround the issue using the technique
-described above, until we come with a better sysfs interface that does
-not rely on GPIO numbers. Sorry for that inconvenience.
+diff --git a/arch/arm/mach-bcm/platsmp-brcmstb.c b/arch/arm/mach-bcm/platsmp-brcmstb.c
+index 31c87a284a34..e209e6fc7caf 100644
+--- a/arch/arm/mach-bcm/platsmp-brcmstb.c
++++ b/arch/arm/mach-bcm/platsmp-brcmstb.c
+@@ -17,6 +17,7 @@
+ #include <linux/errno.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/jiffies.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/printk.h>
+@@ -94,10 +95,35 @@ static u32 pwr_ctrl_rd(u32 cpu)
+ 	return readl_relaxed(base);
+ }
+ 
+-static void pwr_ctrl_wr(u32 cpu, u32 val)
++static void pwr_ctrl_set(unsigned int cpu, u32 val, u32 mask)
+ {
+ 	void __iomem *base = pwr_ctrl_get_base(cpu);
+-	writel(val, base);
++	writel((readl(base) & mask) | val, base);
++}
++
++static void pwr_ctrl_clr(unsigned int cpu, u32 val, u32 mask)
++{
++	void __iomem *base = pwr_ctrl_get_base(cpu);
++	writel((readl(base) & mask) & ~val, base);
++}
++
++#define POLL_TMOUT_MS 500
++static int pwr_ctrl_wait_tmout(unsigned int cpu, u32 set, u32 mask)
++{
++	const unsigned long timeo = jiffies + msecs_to_jiffies(POLL_TMOUT_MS);
++	u32 tmp;
++
++	do {
++		tmp = pwr_ctrl_rd(cpu) & mask;
++		if (!set == !tmp)
++			return 0;
++	} while (time_before(jiffies, timeo));
++
++	tmp = pwr_ctrl_rd(cpu) & mask;
++	if (!set == !tmp)
++		return 0;
++
++	return -ETIMEDOUT;
+ }
+ 
+ static void cpu_rst_cfg_set(u32 cpu, int set)
+@@ -139,15 +165,22 @@ static void brcmstb_cpu_power_on(u32 cpu)
+ 	 * The secondary cores power was cut, so we must go through
+ 	 * power-on initialization.
+ 	 */
+-	u32 tmp;
++	pwr_ctrl_set(cpu, ZONE_MAN_ISO_CNTL_MASK, 0xffffff00);
++	pwr_ctrl_set(cpu, ZONE_MANUAL_CONTROL_MASK, -1);
++	pwr_ctrl_set(cpu, ZONE_RESERVED_1_MASK, -1);
+ 
+-	/* Request zone power up */
+-	pwr_ctrl_wr(cpu, ZONE_PWR_UP_REQ_MASK);
++	pwr_ctrl_set(cpu, ZONE_MAN_MEM_PWR_MASK, -1);
+ 
+-	/* Wait for the power up FSM to complete */
+-	do {
+-		tmp = pwr_ctrl_rd(cpu);
+-	} while (!(tmp & ZONE_PWR_ON_STATE_MASK));
++	if (pwr_ctrl_wait_tmout(cpu, 1, ZONE_MEM_PWR_STATE_MASK))
++		panic("ZONE_MEM_PWR_STATE_MASK set timeout");
++
++	pwr_ctrl_set(cpu, ZONE_MAN_CLKEN_MASK, -1);
++
++	if (pwr_ctrl_wait_tmout(cpu, 1, ZONE_DPG_PWR_STATE_MASK))
++		panic("ZONE_DPG_PWR_STATE_MASK set timeout");
++
++	pwr_ctrl_clr(cpu, ZONE_MAN_ISO_CNTL_MASK, -1);
++	pwr_ctrl_set(cpu, ZONE_MAN_RESET_CNTL_MASK, -1);
+ }
+ 
+ static int brcmstb_cpu_get_power_state(u32 cpu)
+@@ -174,25 +207,33 @@ static void brcmstb_cpu_die(u32 cpu)
+ 
+ static int brcmstb_cpu_kill(u32 cpu)
+ {
+-	u32 tmp;
++	/*
++	 * Ordinarily, the hardware forbids power-down of CPU0 (which is good
++	 * because it is the boot CPU), but this is not true when using BPCM
++	 * manual mode.  Consequently, we must avoid turning off CPU0 here to
++	 * ensure that TI2C master reset will work.
++	 */
++	if (cpu == 0) {
++		pr_warn("SMP: refusing to power off CPU0\n");
++		return 1;
++	}
+ 
+ 	while (per_cpu_sw_state_rd(cpu))
+ 		;
+ 
+-	/* Program zone reset */
+-	pwr_ctrl_wr(cpu, ZONE_RESET_STATE_MASK | ZONE_BLK_RST_ASSERT_MASK |
+-			      ZONE_PWR_DN_REQ_MASK);
++	pwr_ctrl_set(cpu, ZONE_MANUAL_CONTROL_MASK, -1);
++	pwr_ctrl_clr(cpu, ZONE_MAN_RESET_CNTL_MASK, -1);
++	pwr_ctrl_clr(cpu, ZONE_MAN_CLKEN_MASK, -1);
++	pwr_ctrl_set(cpu, ZONE_MAN_ISO_CNTL_MASK, -1);
++	pwr_ctrl_clr(cpu, ZONE_MAN_MEM_PWR_MASK, -1);
+ 
+-	/* Verify zone reset */
+-	tmp = pwr_ctrl_rd(cpu);
+-	if (!(tmp & ZONE_RESET_STATE_MASK))
+-		pr_err("%s: Zone reset bit for CPU %d not asserted!\n",
+-			__func__, cpu);
++	if (pwr_ctrl_wait_tmout(cpu, 0, ZONE_MEM_PWR_STATE_MASK))
++		panic("ZONE_MEM_PWR_STATE_MASK clear timeout");
+ 
+-	/* Wait for power down */
+-	do {
+-		tmp = pwr_ctrl_rd(cpu);
+-	} while (!(tmp & ZONE_PWR_OFF_STATE_MASK));
++	pwr_ctrl_clr(cpu, ZONE_RESERVED_1_MASK, -1);
++
++	if (pwr_ctrl_wait_tmout(cpu, 0, ZONE_DPG_PWR_STATE_MASK))
++		panic("ZONE_DPG_PWR_STATE_MASK clear timeout");
+ 
+ 	/* Flush pipeline before resetting CPU */
+ 	mb();
+-- 
+1.9.1
