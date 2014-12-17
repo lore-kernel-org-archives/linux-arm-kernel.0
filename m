@@ -1,64 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 17 Dec 2014 17:56:40 +0200
-Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
- AM572x errata i856.
-In-Reply-To: <20141217155359.GA26990@kahuna>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
- <20141216145856.GA23358@kahuna> <54918357.8060801@ti.com>
- <20141217145533.GS24110@csclub.uwaterloo.ca> <20141217152225.GA737@kahuna>
- <20141217152710.GT24110@csclub.uwaterloo.ca> <5491A501.100@ti.com>
- <20141217155359.GA26990@kahuna>
-Message-ID: <5491A7B8.7000804@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 16:56:53 +0100
+Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
+ dt-specific callback instead of initcall
+In-Reply-To: <1418828005.3347.7.camel@pengutronix.de>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <3015182.XtvMmOW5GD@wuerfel> <1418828005.3347.7.camel@pengutronix.de>
+Message-ID: <5219064.gvW43bShnl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2014 05:53 PM, Nishanth Menon wrote:
-> On 17:45-20141217, Tero Kristo wrote:
->> On 12/17/2014 05:27 PM, Lennart Sorensen wrote:
->>> On Wed, Dec 17, 2014 at 09:22:25AM -0600, Nishanth Menon wrote:
->>>> A clock mux might do the job?
->>>>
->>>> value 1, 2 , 3 will imply sysclk1 / 610
->>>> value of 0 implies fixed 32768
->>>>
->>>> soemthing like
->>>> sys_clk32_crystal {
->>>>                 compatible = "fixed-clock";
->>>>                 clock-frequency = <32768>;
->>>> }
->>>>
->>>> sys_clk32_pseudo {
->>>>                 compatible = "fixed-clock";
->>>>                 compatible = "fixed-factor-clock";
->>>>                 clocks = <&sys_clkin1>;
->>>>                 clock-mult = <1>;
->>>>                 clock-div = <610>;
->>>> }
->>>>
->>>> sys_32k_ck: sys_32k_ck {
->>>> 	compatible = "ti,mux-clock";
->>>> 	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
->>>> };
->>>>
->>>> I think... The only issue is that the BOOTSTRAP register is not around
->>>> the usual CM1,2 address region...
->>>
->>> OK, I like where that idea is headed.  That looks promising.
->>>
->>
->> Yea clock mux can be used. However, we don't have support for DRA7
->> control module clocks in the DT yet. I have posted patches with
->> support towards this a couple of weeks back, but they need some
->> revising.
->>
->> Thus, we maybe need to apply the timer patches as is for now, and
->> fix the clock tree a bit later.
->
-> Sounds good to me, could you propose a patch in list?
+On Wednesday 17 December 2014 15:53:25 Lucas Stach wrote:
+> Am Mittwoch, den 17.12.2014, 15:27 +0100 schrieb Arnd Bergmann:
+> > On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
+> > > 
+> > > If we forbid the IOMMU driver from being compiled as a module can't we just 
+> > > rely on deferred probing ? The bus master driver will just be reprobed after 
+> > > the IOMMU gets probed, like for other devices.
+> > > 
+> > > This could fail in case the IOMMU device permanently fails to probe. There 
+> > > would be something very wrong in the system in that case, Enabling the bus 
+> > > masters totally transparently without IOMMU support could not be such a good 
+> > > idea.
+> > 
+> > I believe in the majority of cases today, the IOMMU is entirely optional.
+> > There are valid reasons for not including the IOMMU driver in the kernel,
+> > e.g. when you know that all the machines with that driver can DMA to
+> > all of their RAM and you want to avoid the overhead of IOTLB misses.
+> > 
+> This is similar to the problems we discussed with the componentized
+> device framework and in the end everybody agreed on a simple rule:
+> if the device node is enabled in the DT there must be a driver bound to
+> it before other devices depending on this node can be probed.
+> 
+> If we apply the same logic to the IOMMU situation we get two
+> possibilities to allow bypassing the IOMMU:
+> 1. completely disable the IOMMU node in the DT
+> 2. leave node enabled in DT, but add a bypass property
+> 
+> Obviously the second option still requires to have the IOMMU driver
+> available, but is more flexible. Right now everything depends on the
+> IOMMU being in passthrough mode at reset with no driver bound. If a
+> device comes around where this isn't the case thing will break with the
+> current assumptions or the first option.
+> 
+> Having the IOMMU node enabled in DT with no driver available to the
+> kernel seems like an invalid configuration which should be expected to
+> break. Exactly the same thing as with componentized devices...
 
-Yea, I can add a patch for this to the PRCM cleanup set once I get to 
-update that.
+One differences here is that for the IOMMU, we should generally be able
+to fall back to swiotlb (currently only on ARM64, not ARM32, until
+someone adds support). I can see your point regarding machines that
+have a mandatory IOMMU with no fallback when there is no driver, but
+we can support them by making the iommu driver selected through Kconfig
+for that platform, while still allowing other platforms to work with
+drivers left out of the kernel.
 
--Tero
+	Arnd
