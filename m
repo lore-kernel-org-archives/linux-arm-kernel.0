@@ -1,20 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 17 Dec 2014 21:58:26 +0530
-Subject: [PATCH] ARM: defconfigs: use CONFIG_CPUFREQ_DT
-In-Reply-To: <CAGo_u6oO+Tou2XSVr3dxn94hV0HTdYMZWz-XKK_aydwusaRBvg@mail.gmail.com>
-References: <63217079d4b61d835fed98198ae1e3f0e6329de1.1418617005.git.viresh.kumar@linaro.org>
- <2757282.fj6z18fAYb@vostro.rjw.lan>
- <7h1to0iw76.fsf@deeprootsystems.com>
- <CAGo_u6oO+Tou2XSVr3dxn94hV0HTdYMZWz-XKK_aydwusaRBvg@mail.gmail.com>
-Message-ID: <CAKohpomS1PAO1zyQJ9bkK6eYo4vM-GMTrYwDnPcFfpvB3a+b2g@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 17 Dec 2014 16:45:20 +0000
+Subject: [PATCH 1/8] mfd: dt-bindings: Provide human readable defines for LPC
+ mode choosing
+In-Reply-To: <1418834727-1602-1-git-send-email-lee.jones@linaro.org>
+References: <1418834727-1602-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1418834727-1602-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 December 2014 at 21:31, Nishanth Menon <nm@ti.com> wrote:
-> Any chance of the following being queued for the .19 window or do we
-> wait to go through Tony?
-> https://patchwork.kernel.org/patch/5484401/
+ST's Low Power Controller can currently operate in two supported modes;
+Watchdog and Real Time Clock.  These defines will aid engineers to easily
+identify the selected mode.
 
-I think I have seen that as part of Arnd pull request sent today to Linus.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/dt-bindings/mfd/st-lpc.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 include/dt-bindings/mfd/st-lpc.h
 
-https://lkml.org/lkml/2014/12/16/439
+diff --git a/include/dt-bindings/mfd/st-lpc.h b/include/dt-bindings/mfd/st-lpc.h
+new file mode 100644
+index 0000000..e3e6c75
+--- /dev/null
++++ b/include/dt-bindings/mfd/st-lpc.h
+@@ -0,0 +1,15 @@
++/*
++ * This header provides shared DT/Driver defines for ST's LPC device
++ *
++ * Copyright (C) 2014 STMicroelectronics -- All Rights Reserved
++ *
++ * Author: Lee Jones <lee.jones@linaro.org> for STMicroelectronics
++ */
++
++#ifndef __DT_BINDINGS_ST_LPC_H__
++#define __DT_BINDINGS_ST_LPC_H__
++
++#define ST_LPC_MODE_RTC		0
++#define ST_LPC_MODE_WDT		1
++
++#endif /* __DT_BINDINGS_ST_LPC_H__ */
+-- 
+1.9.1
