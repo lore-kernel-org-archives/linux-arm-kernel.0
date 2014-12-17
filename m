@@ -1,55 +1,41 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 17 Dec 2014 17:45:05 +0200
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Wed, 17 Dec 2014 10:49:11 -0500
 Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
  AM572x errata i856.
-In-Reply-To: <20141217152710.GT24110@csclub.uwaterloo.ca>
+In-Reply-To: <5491A501.100@ti.com>
 References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
  <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <20141214044517.GD24110@csclub.uwaterloo.ca> <549018EC.8020207@ti.com>
- <20141216145856.GA23358@kahuna> <54918357.8060801@ti.com>
- <20141217145533.GS24110@csclub.uwaterloo.ca> <20141217152225.GA737@kahuna>
- <20141217152710.GT24110@csclub.uwaterloo.ca>
-Message-ID: <5491A501.100@ti.com>
+ <20141214044517.GD24110@csclub.uwaterloo.ca>
+ <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
+ <54918357.8060801@ti.com>
+ <20141217145533.GS24110@csclub.uwaterloo.ca>
+ <20141217152225.GA737@kahuna>
+ <20141217152710.GT24110@csclub.uwaterloo.ca> <5491A501.100@ti.com>
+Message-ID: <20141217154911.GU24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2014 05:27 PM, Lennart Sorensen wrote:
-> On Wed, Dec 17, 2014 at 09:22:25AM -0600, Nishanth Menon wrote:
->> A clock mux might do the job?
->>
->> value 1, 2 , 3 will imply sysclk1 / 610
->> value of 0 implies fixed 32768
->>
->> soemthing like
->> sys_clk32_crystal {
->>                 compatible = "fixed-clock";
->>                 clock-frequency = <32768>;
->> }
->>
->> sys_clk32_pseudo {
->>                 compatible = "fixed-clock";
->>                 compatible = "fixed-factor-clock";
->>                 clocks = <&sys_clkin1>;
->>                 clock-mult = <1>;
->>                 clock-div = <610>;
->> }
->>
->> sys_32k_ck: sys_32k_ck {
->> 	compatible = "ti,mux-clock";
->> 	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
->> };
->>
->> I think... The only issue is that the BOOTSTRAP register is not around
->> the usual CM1,2 address region...
->
-> OK, I like where that idea is headed.  That looks promising.
->
+On Wed, Dec 17, 2014 at 05:45:05PM +0200, Tero Kristo wrote:
+> Yea clock mux can be used. However, we don't have support for DRA7
+> control module clocks in the DT yet. I have posted patches with
+> support towards this a couple of weeks back, but they need some
+> revising.
+> 
+> Thus, we maybe need to apply the timer patches as is for now, and
+> fix the clock tree a bit later.
 
-Yea clock mux can be used. However, we don't have support for DRA7 
-control module clocks in the DT yet. I have posted patches with support 
-towards this a couple of weeks back, but they need some revising.
+Certainly the patches so far fix the system time issue.  I don't think
+anything else in the clock tree using this clock is that picky about
+the clock being of by 0.05% (when using 20MHz SYSCLK1, which I believe
+all boards so far do, other than the one board on my desk with a 19.2MHz
+clock because we wanted to see what happened).  Certainly if someone
+does build a baord using either 19.2 or 27MHz as supported in the
+documentation, then it becomes more relevant potentially.
 
-Thus, we maybe need to apply the timer patches as is for now, and fix 
-the clock tree a bit later.
+But I certainly don't consider fixing the clock tree urgent.  I think
+we can start shipping products with the clock tree in the current state
+(but we couldn't with the system time being that bad, which the patches
+so far fix).
 
--Tero
+-- 
+Len Sorensen
