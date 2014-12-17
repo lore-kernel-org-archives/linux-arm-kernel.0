@@ -1,81 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 16:38:22 +0100
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20141217150158.GF870@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <549192D2.10008@arm.com> <20141217150158.GF870@arm.com>
-Message-ID: <1926348.VsVWqO766S@wuerfel>
+From: stefan.hengelein@fau.de (Stefan Hengelein)
+Date: Wed, 17 Dec 2014 16:40:37 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove dead #elif CONFIG_S3C24XX_DMAC
+Message-ID: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 15:01:58 Will Deacon wrote:
-> On Wed, Dec 17, 2014 at 02:27:30PM +0000, Robin Murphy wrote:
-> > On 17/12/14 12:09, Will Deacon wrote:
-> > > I think that's a slightly different case. The `grouping' in the DT, is on a
-> > > per-master basis where a master may have a set of StreamIDs, which can be
-> > > expressed in a more efficient (per-IOMMU) manner that cannot easily be
-> > > determined at runtime.
-> > 
-> > I'm pretty convinced that automatic SMR allocation is solvable; I was 
-> > planning to take a look at it soon, once I've finished warming up the 
-> > dormant mathematician in me on implementing the OF group allocator. So 
-> > far I'm lucky that stream indexing is sufficient for the bits of our 
-> > hardware that actually work.
-> 
-> Hmm, a few of us have looked at that and failed, so I'm all ears if you
-> think you can do it. The main issue is that you need *complete* knowledge
-> of the allocated StreamID space before you can safely create any SMR entry
-> unless you restrict yourself to consecutive, power-of-2 sized ID regions
-> for each master (which doesn't match reality, unfortunately).
+The corresponding CPP-block can never be selected since there are
+conflicting Kconfig constraints:
+- CONFIG_S3C24XX_DMAC has a dependency on ARCH_S3C24XX
+- The surrounding CPP-block needs CONFIG_S3C64XX_DEV_SPI0 to be defined.
+  - CONFIG_S3C64XX_DEV_SPI0 is only selected by MACH_WLF_CRAGG_6410
+  - MACH_WLF_CRAGG_6410 however has a dependency on ARCH_S3C64XX
+    (through a surrounding if-statement in Kconfig)
+- ARCH_S3C64XX and ARCH_S3C24XX are mutually exclusive since they are
+  declared in the same choice and cannot be enabled at the same time.
 
-Right, scanning the entire device tree in the SMMU driver is
-definitely something to avoid.
+Hence, the innner block
+    "#elif defined(CONFIG_S3C24XX_DMAC)"
+cannot be enabled at the same time with the surrounding block
+    "#ifdef CONFIG_S3C64XX_DEV_SPI0"
+and therefore is dead.
 
-> > > The problem with all of this is how we distinguish the different ID formats
-> > > in the `iommus' device-tree property. For the ARM SMMU, we could have:
-> > >
-> > >    (1) [easy case] A device has a list of StreamIDs
-> > >
-> > >    (2) A device has a list of SMR mask/value pairs
-> > >
-> > >    (3) A (bus) device has a range translation for a downstream bus (e.g.
-> > >        a PCI host controller which needs to convert RequesterID to StreamID).
-> > >
-> > >  From the SMMU driver's perspective, they will all look like of_xlate calls
-> > > unless we augment the generic IOMMU bindings with extra properties to
-> > > identify the format. It also makes it difficult to pick a sensible value for
-> > > #iommu-cells, as it depends on the format.
-> > 
-> > I thoroughly dislike the idea, but one /could/ simply abuse the generic 
-> > bindings well within the current framework, e.g.
-> > 
-> > #1: iommus = <&smmu 0 streamID 0 0>, <&smmu 0 streamID 0 0>, ...;
-> > #2: iommus = <&smmu 1 mask value 0>;
-> > #3: iommus = <&smmu 2 start end offset>;
-> > 
-> > and have a big complicated of_xlate that knows the secret. I don't think 
-> > it would be unreasonable to constrain all masters on the same SMMU to 
-> > use the same format either - that way you can lose the type indicator 
-> > and the padding and the driver simply inspects #iommu-cells in 
-> > of_iommu_init and sets up that instance to take the right path in its 
-> > of_xlate calls later. Having a handful of single-stream-ID masters 
-> > behind the same SMMU as a whacking great bus controller with a massive 
-> > range seems like the kind of system-designer-insanity we should 
-> > emphatically NOT be looking to accommodate if we can possibly help it.
-> > 
-> > That said, for the time being I see definite use-cases for #1, which 
-> > already works, and #3, for which I really think we should be looking to 
-> > add a parallel generic "iommu-ranges" or "iommu-bus-range" binding for 
-> > bus controllers, rather than trying to overload "iommus" beyond 
-> > describing actual bus masters.
-> 
-> Yeah, let's avoid overloading the current bindings too much. Adding the
-> ranges property makes perfect sense, I'm just trying to to straighten
-> out how the "iommus" property should differ depending on the presence of
-> SMR groups.
+This (logical) defect has been found with the undertaker tool
+(https://undertaker.cs.fau.de)
 
-Is a range something that is defined in the hardware spec, or is that
-just what you expect the PCI host controllers to use? 
+Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+---
+ arch/arm/plat-samsung/devs.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 83c7d15..b38b601 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -1134,8 +1134,6 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+ 	pd.filter = pl330_filter;
+ #elif defined(CONFIG_S3C64XX_PL080)
+ 	pd.filter = pl08x_filter_id;
+-#elif defined(CONFIG_S3C24XX_DMAC)
+-	pd.filter = s3c24xx_dma_filter;
+ #endif
+ 
+ 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi0);
+-- 
+1.9.1
