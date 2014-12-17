@@ -1,52 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 17 Dec 2014 18:14:07 +0000
-Subject: [Linaro-acpi] [RFC] ACPI on arm64 TODO List
-In-Reply-To: <5490D042.3060901@linaro.org>
-References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
- <20141216154842.GI19412@leverpostej> <5490D042.3060901@linaro.org>
-Message-ID: <20141217181407.GA18416@red-moon>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 17 Dec 2014 10:14:53 -0800
+Subject: [PATCH v14 00/10] cpuidle driver for QCOM SoCs: 8064, 8074, 8084
+In-Reply-To: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Tue, 2 Dec 2014 10:39:08 -0700")
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7hegryb0te.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 12:37:22AM +0000, Al Stone wrote:
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-[...]
+> Dependent patchsets - 
+>         https://lkml.org/lkml/2014/8/4/767
+>         http://www.spinics.net/lists/linux-arm-msm/msg10799.html
+>         http://www.spinics.net/lists/linux-arm-msm/msg10795.html
+>
+> Changes since v13:
+> - Return values for idle states propagated back to the cpuidle driver.
+> - Remove static bool cpuidle_drv_init.
+> - Register cpuidle driver and cpuidle device separately.
+>  - cpuidle device registered only when the SPM for the cpu is probed.
+> - Initialization changes to ensure dynamic cpuidle devices are registered only
+>   after the cpuidle driver is registered.
+> - Removed wmb, replaced with a poll loop to ensure that the SPM registers are
+>   written before executing wfi.
+>   - Added spm_register_write_sync() for write guarantees.
+> - Removed irrelevant return value for spm_set_low_power_mode().
+> - Added comments, updated module description.
+> - Removed Reviewed-by and Acked-by on the spm and cpuidle-qcom patches.
 
-> > I am rather concerned about the relationship between items described
-> > with _DSD and ACPI's existing device model. Describing the relationship
-> > between devices and their input clocks, regulators, and so on defeats
-> > much of the benefit ACPI is marketed as providing w.r.t. abstraction of
-> > the underlying platform (and as Arnd mentioned above, that's not the
-> > kind of platform we want to support with ACPI).
-> 
-> My belief is that all those things should be set up into a known good
-> state by UEFI on initial boot.  If they need to change, say as the
-> result of going into a deeper sleep state or something, that's what
-> the ACPI power management objects are for; Linux would execute one of
-> the ACPI methods already defined by the spec to control transition to
-> the desired state, and that method would have within it the ability
-> to change whatever clocks or regulators it deems necessary.  The
-> kernel should not have to track these things.
-> 
-> If someone is describing all those relationships in _DSD, I agree that
-> is not the kind of ARM platform I think we want to deal with.  This is
-> touched on, iirc, in arm-acpi.txt, but apparently too briefly.
+I think this series should also include updates to qcom_defconfig that
+enable QCOM_PM and the cpuidle driver.
 
-I would rather rule out using _DSD to describe clocks, regulators and
-their relationships in ACPI, period. There are established ACPI methods to
-control power for devices and processors and if we adopt ACPI those must be
-used, as you say (I am not saying they are perfect, given that x86 guys
-moved away from them when they could, eg CPU idle).
+Then it will be enabled by default and get more broad testing.
 
-They can certainly be enhanced, as it is happening for idle states
-description, for instance.
-
-I understand one reason for ACPI adoption is its established way
-of handling power management for processors and devices, if for
-any reason people who want ACPI on ARM require _DSD to describe
-clocks and regulators relationships then they have to explain to us
-why they require ACPI in the first place, given that at the moment
-those clocks and regulators descriptions are non-existent in ACPI
-world.
-
-Lorenzo
+Kevin
