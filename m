@@ -1,57 +1,57 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 17 Dec 2014 15:50:21 +0000
-Subject: [PATCH] arm64: Fix SCTLR_EL1 initialisation
-Message-ID: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 16:52:40 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove dead #elif CONFIG_S3C24XX_DMAC
+In-Reply-To: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
+References: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
+Message-ID: <1921250.jGHJ6gZqGf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Wednesday 17 December 2014 16:40:37 Stefan Hengelein wrote:
+> The corresponding CPP-block can never be selected since there are
+> conflicting Kconfig constraints:
+> - CONFIG_S3C24XX_DMAC has a dependency on ARCH_S3C24XX
+> - The surrounding CPP-block needs CONFIG_S3C64XX_DEV_SPI0 to be defined.
+>   - CONFIG_S3C64XX_DEV_SPI0 is only selected by MACH_WLF_CRAGG_6410
+>   - MACH_WLF_CRAGG_6410 however has a dependency on ARCH_S3C64XX
+>     (through a surrounding if-statement in Kconfig)
+> - ARCH_S3C64XX and ARCH_S3C24XX are mutually exclusive since they are
+>   declared in the same choice and cannot be enabled at the same time.
+> 
+> Hence, the innner block
+>     "#elif defined(CONFIG_S3C24XX_DMAC)"
+> cannot be enabled at the same time with the surrounding block
+>     "#ifdef CONFIG_S3C64XX_DEV_SPI0"
+> and therefore is dead.
+> 
+> This (logical) defect has been found with the undertaker tool
+> (https://undertaker.cs.fau.de)
 
-We initialise the SCTLR_EL1 value by read-modify-writeback
-of the desired bits, leaving the other bits (including reserved
-bits(RESx)) untouched. However, sometimes the boot monitor could
-leave garbage values in the RESx bits which could have different
-implications. This patch makes sure that all the bits, including
-the RESx bits, are set to the proper state, except for the
-'endianness' control bits, EE(25) & E0E(24)- which are set early
-in the el2_setup.
+Nice catch!
 
-Updated the state of the Bit[6] in the comment to RES0 in the
-comment.
+> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+> ---
+>  arch/arm/plat-samsung/devs.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+> index 83c7d15..b38b601 100644
+> --- a/arch/arm/plat-samsung/devs.c
+> +++ b/arch/arm/plat-samsung/devs.c
+> @@ -1134,8 +1134,6 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+>  	pd.filter = pl330_filter;
+>  #elif defined(CONFIG_S3C64XX_PL080)
+>  	pd.filter = pl08x_filter_id;
+> -#elif defined(CONFIG_S3C24XX_DMAC)
+> -	pd.filter = s3c24xx_dma_filter;
+>  #endif
+>  
+>  	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi0);
+> 
 
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/mm/proc.S |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+This was introduced in 7f99ef2284b46f ("ARM: SAMSUNG: set
+s3c24xx_dma_filter for s3c64xx-spi0 device"), but never used on s3c24xx as
+far as I can tell. Heiko, can you comment on the patch? Did this
+simply get obsoleted by the DT conversion of s3c2416 and s3c2443?
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 4e778b1..f1bb1fc 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -244,14 +244,18 @@ ENTRY(__cpu_setup)
- ENDPROC(__cpu_setup)
- 
- 	/*
-+	 * We set the desired value explicitly, including those of the 
-+	 * reserved bits. The values of bits EE & E0E were set early in
-+	 * el2_setup, which are left untouched below.
-+	 *
- 	 *                 n n            T
- 	 *       U E      WT T UD     US IHBS
- 	 *       CE0      XWHW CZ     ME TEEA S
- 	 * .... .IEE .... NEAI TE.I ..AD DEN0 ACAM
--	 * 0011 0... 1101 ..0. ..0. 10.. .... .... < hardware reserved
--	 * .... .1.. .... 01.1 11.1 ..01 0001 1101 < software settings
-+	 * 0011 0... 1101 ..0. ..0. 10.. .0.. .... < hardware reserved
-+	 * .... .1.. .... 01.1 11.1 ..01 0.01 1101 < software settings
- 	 */
- 	.type	crval, #object
- crval:
--	.word	0x000802e2			// clear
--	.word	0x0405d11d			// set
-+	.word	0xfcffffff			// clear
-+	.word	0x34d5d91d			// set
--- 
-1.7.9.5
+	Arnd
