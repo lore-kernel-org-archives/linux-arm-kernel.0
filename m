@@ -1,36 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Dec 2014 18:51:55 +0000
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <20141217172333.GE23854@atomide.com>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
-Message-ID: <20141217185155.GI11502@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 17 Dec 2014 22:04:24 +0300
+Subject: DT on s3c24xx
+Message-ID: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 09:23:33AM -0800, Tony Lindgren wrote:
-> Hi,
-> 
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [141217 01:55]:
-> > Tony,
-> > 
-> > As the IOMMU stuff was merged last night, which removed a really quite
-> > horrid conflict resolution, I updated my nightly build tree from its
-> > previous state last Thursday.
-> > 
-> > Now, SDP4430 seems to be really quite broken.
-> 
-> Sigh, things are just break left and right every merge window :(
+Hi,
 
-Some of these things were present before the merge window, so they're
-less of a concern.  The biggest problem though is the ABE ASoC stuff
-exploding, which prevents my test system getting anywhere near mounting
-its rootfs.
+I'd like to port several s3c24xx to DT, and I'm stuck with s3c24xx LCD
+controller and power drivers for H1940 and RX1950.
 
-It's fine in the "combined" case, because we end up totally dead as
-far as serial console goes, but the "omap4430" kernel boot test never
-ends because the kernel doesn't stop spewing "rcu_sched stall" messages.
+Please see [1]. I want to move this function into another LCD power
+driver, but I'm not sure what to do with s3c_gpio_cfgpin(). I need to
+change pin function in runtime, and as far as I understand it should
+be handled via pinctrl driver somehow. But how?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Also please see [2] and [3]. s3c2410fb driver modifies gpio registers
+(and pinmux, they're same block on s3c24xx) directly. What would be
+best way to get rid of that?
+
+Regards
+Vasily
+
+[1] https://github.com/anarsoul/linux-2.6/blob/v3.18-anarsoul-wip/arch/arm/mach-s3c24xx/mach-h1940.c#L599
+[2] https://github.com/anarsoul/linux-2.6/blob/v3.18-anarsoul-wip/arch/arm/mach-s3c24xx/mach-h1940.c#L221
+[3] https://github.com/anarsoul/linux-2.6/blob/v3.18-anarsoul-wip/drivers/video/fbdev/s3c2410fb.c#L709
