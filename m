@@ -1,68 +1,83 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 17 Dec 2014 08:22:35 -0700
-Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <5490857A.1000808@codeaurora.org>
-References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
- <2519415.GklIQeMgWR@wuerfel> <54903DC6.8010308@linaro.org>
- <2663853.2Q3kHisMT7@wuerfel> <5490857A.1000808@codeaurora.org>
-Message-ID: <20141217152235.GA1437@linaro.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 17 Dec 2014 07:23:22 -0800
+Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
+ disable failure due to domain being gated
+In-Reply-To: <1418718015.28527.4.camel@AMDC1943>
+References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+ <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
+ <7hlhmfo1b0.fsf@deeprootsystems.com> <7h8ui8h7n9.fsf@deeprootsystems.com>
+ <1418718015.28527.4.camel@AMDC1943>
+Message-ID: <20141217152322.29014.7739@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16 2014 at 12:18 -0700, Stephen Boyd wrote:
->On 12/16/2014 06:38 AM, Arnd Bergmann wrote:
->> On Tuesday 16 December 2014 15:12:22 Daniel Lezcano wrote:
->>> At the beginning, all that become from not including mach files from the
->>> drivers directory which make sense.
->>>
->>> Perhaps it is time to write a similar mechanism for the cpuidle drivers
->>> where we can still separate the low level PM code from the generic
->>> cpuidle code.
->> That way you basically duplicate the same thing we already have, which
->> isn't much better.
->>
->> In the example of drivers/soc/qcom/spm.c, just call cpuidle_register
->> from the spm_dev_probe() function and be done with it. You already
->> have a device that is responsible for handling this, don't try to
->> construct more than you already need.
->>
->> I would assume that the same can be done for most other platforms.
->>
->> There are probably cases where the same piece of hardware is responsible
->> for both cpuidle and cpufreq, but what that means is really that you
->> should have a single driver for it that does both things. Same for
->> SMP support: if you have one register block that does both the SMP
->> bringup and the cpuidle stuff, then have *one* driver for this block
->> that does it all. There are currently a few dependencies that require
->> doing SMP bringup early during boot, but we decided years ago that those
->> are all artificial dependencies and we should be able to boot secondary
->> CPUs much later than we currently do.
->>
->
->+1. The SPM harware is used for hotplug, suspend, cpuidle, as well as
->provides a regulator for a CPU, so all these things should be done in a
->single driver. Booting secondary CPUs early is not hard here either if
->we move the smp ops into the same driver. The only downside then is that
->it can't be a module, but I would guess that we can work on making that
->possible by allowing smp ops to be inserted and removed at any time.
->
-I am not sure, just because the hardware supports multiple
-functionality, everything should go into the same file.
+Quoting Krzysztof Kozlowski (2014-12-16 00:20:15)
+> On pon, 2014-12-15 at 14:26 -0800, Kevin Hilman wrote:
+> > Kevin Hilman <khilman@kernel.org> writes:
+> > 
+> > > Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
+> > >
+> > >> On 09/12/14 13:59, Krzysztof Kozlowski wrote:
+> > >>> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
+> > >>>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
+> > >>>> > clock for this block (from main clock domain) 'mau_epll' is gated then
+> > >>>> > any read or write to audss registers will block.
+> > >>>> > 
+> > >>>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
+> > >>>> > after introducing runtime PM to pl330 DMA driver. After that commit the
+> > >>>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
+> > >>>> > were no more users of mau_epll.
+> > >>>> > 
+> > >>>> > The system hang on one of steps:
+> > >>>> > 1. Disabling unused clocks from audss block.
+> > >>>> > 2. During audss GPIO setup (just before probing i2s0 because
+> > >>>> >    samsung_pinmux_setup() tried to access memory from audss block which was
+> > >>>> >    gated.
+> > >>>> > 
+> > >>>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
+> > >>>> > 
+> > >>>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > >>>> > ---
+> > >>>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
+> > >>>> >  1 file changed, 28 insertions(+), 1 deletion(-)
+> > >>>
+> > >>> Sorry for pinging so quick but merge window is open and it looks like
+> > >>> booting Exynos542x boards will be broken (because pl330 will no longer
+> > >>> hold adma clock enabled so whole audss domain will be gated).
+> > >>> 
+> > >>> This is a non-intrusive workaround for that issue, as wanted by
+> > >>> Sylwester:
+> > >>> https://lkml.org/lkml/2014/12/5/223
+> > >>> 
+> > >>> Any comments on this?
+> > >>
+> > >> The patch looks OK to me, it would be good though if someone else
+> > >> has confirmed it fixes the bug. I don't have any clock patches queued
+> > >> at the moment. Perhaps you could apply it directly, Mike ?
+> > >
+> > > I confirm it fixes the boot hang in linux-next (next-20141210) on my
+> > > exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
+> > > exynos_defconfig and multi_v7_defconfig.
+> > >
+> > > Tested-by: Kevin Hilman <khilman@linaro.org>
+> > 
+> > What's the status of this patch?  linux-next is still broken for several
+> > Exynos5 platforms without this fix.
+> 
+> I believe not only next is broken but also current mainline because
+> runtime PM for pl330 was merged yesterday...
+> 
+> The patch received two tested-bys (Kevin's and Javier's) and Sylwester's
+> ack.
+> 
+> Mike, could you pick the patch and send it to Linus after rc1?
 
-If you think of a SPM driver as something that provides a service, you
-would see that all the functionality of cpuidle, hotplug, suspend, use
-the service and can have their own place to share their commonality. SPM
-h/w is not just for cpus. It could be a generic power controller (to an
-extent) for the cpu, cache, coherenency interface and pretty much any
-bus/clock exports the services of that device. There needs to be a
-distinction between an entity that provides the functionality and a one
-that uses it. You cannot build on additional functionality neatly if you
-have them all together.
+Will do.
 
-As such, I am quite appalled by the addition of the idle functions in
-the SPM driver, but seems like its the direction many want, hence went
-with it. But, please dont suggest using SPM driver as a dumping ground
-for all functionality that SPM may indirectly influence.
+Regards,
+Mike
 
-Thanks,
-Lina
+> 
+> Best regards,
+> Krzysztof
+> 
