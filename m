@@ -1,46 +1,59 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 17 Dec 2014 13:46:31 -0600
-Subject: [PATCH 2/2] arm: socfpga: Set share override bit of the l2 cache
- controller
-In-Reply-To: <2156186.zs80uXCLAf@wuerfel>
-References: <1416546280-12068-1-git-send-email-dinguyen@opensource.altera.com>
- <1416546280-12068-2-git-send-email-dinguyen@opensource.altera.com>
- <2156186.zs80uXCLAf@wuerfel>
-Message-ID: <5491DD97.6010303@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 20:48:29 +0100
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20141217171752.GB30307@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2299294.lPnEQgl4lK@wuerfel> <20141217171752.GB30307@arm.com>
+Message-ID: <2983977.dWWQcFZRoJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 11/21/14, 5:04 AM, Arnd Bergmann wrote:
-> On Thursday 20 November 2014 23:04:40 dinguyen at opensource.altera.com wrote:
->>
->> ---
->>  arch/arm/mach-socfpga/socfpga.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
->> index 13b1858..afc009f 100644
->> --- a/arch/arm/mach-socfpga/socfpga.c
->> +++ b/arch/arm/mach-socfpga/socfpga.c
->> @@ -105,7 +105,8 @@ static const char *altera_dt_match[] = {
->>  
->>  DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
->>         .l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
->> -                         L310_AUX_CTRL_INSTR_PREFETCH,
->> +                         L310_AUX_CTRL_INSTR_PREFETCH |
->> +                         L2C_AUX_CTRL_SHARED_OVERRIDE,
->>         .l2c_aux_mask   = ~0,
->>         .smp            = smp_ops(socfpga_smp_ops),
->>         .map_io         = socfpga_map_io,
+On Wednesday 17 December 2014 17:17:52 Will Deacon wrote:
+> > > > I would hope that PCI is the only case we need to worry about for a while.
+> > > > This means we just need to come up with another property or a set of properties
+> > > > that we can put into a PCI host controller device node in order to describe
+> > > > the mapping. These properties could be iommu-specific, so we add something
+> > > > to the PCI core that calls a new iommu callback function that takes the
+> > > > device node of the PCI host and the bus/device/function number as inputs.
+> > > > 
+> > > > In arm_setup_iommu_dma_ops(), we can then do something like
+> > > > 
+> > > >   if (dev_is_pci(dev)) {
+> > > >           struct pci_dev *pdev = to_pci_dev(dev);
+> > > >           struct device_node *node;
+> > > >           unsigned int bdf;
+> > > > 
+> > > >           node = find_pci_host_bridge(pdev->bus)->parent->of_node;
+> > > >           bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
+> > > > 
+> > > >           iommu_setup_pci_dev(pdev, node, bdf);
+> > > >   }
+> > > 
+> > > The other way to do this is have the IOMMU driver check dev_is_pci(dev)
+> > > in add_device, then call an of_xlate_pci_bdf library function which could
+> > > do the translation on-demand.
+> > 
+> > We'd still need to find the device node for the host controller in
+> > common code, otherwise we don't have an of_xlate function to call.
 > 
-> Hi Dinh,
-> 
-> Please do this by putting the appropriate proterties into the
-> l2x0 DT node instead.
+> I guess I was hoping that the translation code could be generic. I don't
+> really see anything special about adding a constant to a magic number to
+> obtain another magic number.
 > 
 
-I don't see a way to do this using the l2x0 DT node.
+If that's all we need, that's fine.
 
-Thanks,
-Dinh
+I was fearing that we'd get different host controllers using different
+parts of the bdf number. E.g. one might pass down just bus/device
+while another uses bus/device/function, so we'd need a shift and
+an offset.
+
+As part of the AMD review I found out that their SMMU implementation
+only has 15 bits of address space, while bdf is 16 bits, so they
+cut off the top bit and get aliasing between bus 0+n and bus 128+n.
+
+Another SoC might have more aliasing if they have multiple domains.
+
+
+	Arnd
