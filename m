@@ -1,24 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Dec 2014 12:44:07 -0800
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <20141217190904.GF23854@atomide.com>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk>
- <20141217190904.GF23854@atomide.com>
-Message-ID: <20141217204407.GG23854@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 17 Dec 2014 17:51:02 -0300
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5491ECB6.4050401@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [141217 11:14]:
+On 12/15/2014 12:38 PM, Gregory CLEMENT wrote:
+> Hello,
 > 
-> Also, in your 3430-LDP logs, the DMA setup_irq related "In-band Error"
-> is a mystery. I'm not seeing that with omap2plus_defconfig, but can
-> reproduce it here with your LDP .config file. Got any ideas on that one?
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an mvebu device tree.
+> 
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+> 
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+> 
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
+> 
 
-Hmm it looks like that's some CONFIG_PREEMPT related regression..
-Disablig CONFIG_PREEMPT makes it go away.
+For all those files I've contributed to:
 
-Regards,
-
-Tony
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
