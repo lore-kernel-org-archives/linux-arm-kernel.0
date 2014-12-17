@@ -1,46 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Dec 2014 11:09:05 -0800
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <20141217185155.GI11502@n2100.arm.linux.org.uk>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk>
-Message-ID: <20141217190904.GF23854@atomide.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 17 Dec 2014 20:33:13 +0100
+Subject: Enable runtime PM automatically?
+Message-ID: <CAMuHMdWY_ne+S3zKrEYqVyU8=S-at=+rGuEkYNauF4s2KaKNdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [141217 10:54]:
-> On Wed, Dec 17, 2014 at 09:23:33AM -0800, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [141217 01:55]:
-> > > Tony,
-> > > 
-> > > As the IOMMU stuff was merged last night, which removed a really quite
-> > > horrid conflict resolution, I updated my nightly build tree from its
-> > > previous state last Thursday.
-> > > 
-> > > Now, SDP4430 seems to be really quite broken.
-> > 
-> > Sigh, things are just break left and right every merge window :(
-> 
-> Some of these things were present before the merge window, so they're
-> less of a concern.  The biggest problem though is the ABE ASoC stuff
-> exploding, which prevents my test system getting anywhere near mounting
-> its rootfs.
+On Tue, Dec 16, 2014 at 11:10 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> At a deeper level, the problem with this approach is that this is more
+> generically a runtime PM dependency problem, not a genpd problem.  For
+> example, what happens when the same kind of dependency exists on a
+> platform using a custom PM domain instead of genpd (like ACPI.) ?
+>
+> What's needed to solve this problem is a generalized way to have runtime
+> PM dependencies between devices.  Runtime PM already automatically
+> handles parent devices as one type of dependent device (e.g. a parent
+> device needs to be runtime PM resumed before its child.)  So what's
+> needed is a generic way to other PM dependencies with the runtime PM
+> core (not the genpd core.)
+>
+> If runtime PM handles the dependencies corretcly, then genpd (and any
+> other PM domain) will get them "for free".
 
-Right.
- 
-> It's fine in the "combined" case, because we end up totally dead as
-> far as serial console goes, but the "omap4430" kernel boot test never
-> ends because the kernel doesn't stop spewing "rcu_sched stall" messages.
+Having the proper dependencies is not sufficient. Currently drivers have to do
+something to use runtime PM.
 
-Yeah and there are some new clock issues for sure like I posted.
+By default, runtime PM is disabled for a device
+("device.power.disable_depth = 1").
 
-Also, in your 3430-LDP logs, the DMA setup_irq related "In-band Error"
-is a mystery. I'm not seeing that with omap2plus_defconfig, but can
-reproduce it here with your LDP .config file. Got any ideas on that one?
+However, if PM domains are active, drivers must be runtime PM-aware for the
+gpd_dev_ops.start() method to be called in the first place (perhaps this is just
+one bug that's easy to fix --- the device is "assumed suspended", but can be
+used). They must
+  1. call pm_runtime_enable() to enable runtime PM for the device,
+  2. call pm_runtime_get_sync() to prevent the device from being put in a
+    low-power state at any time. This second call has the
+"side-effect" of calling
+    gpd_dev_ops.start().
 
-Regards,
+Hence, if PM domains are enabled, wouldn't it make sense to
+  1. enable runtime PM by default, for all devices (bound and unbound),
+  2. call pm_runtime_get_sync(), for all devices bound to a driver.
+Of course we have to keep track if drivers call any of the pm_runtime_*()
+methods theirselves, as that would have to move them from automatic to
+manual mode.
 
-Tony
+Would this be feasible?
+
+This would avoid the need to add minimal runtime PM support to each and every
+driver, because:
+  - its device resides in a PM domain, cfr. e.g. commit df0c6c80232f2ad4
+    ("gpio: rcar: Add minimal runtime PM support"),
+  - its device is a child of a device in a PM domain, cfr. e.g. commit
+    3a611e26e958b037 ("net/smsc911x: Add minimal runtime PM support").
+
+There's a similar issue for "transparent" buses that don't need a kernel driver
+(compatible = "simple-bus"). If they're in a PM domain, runtime PM must be
+enabled for them, so their bus devices are resumed when a child device on the
+bus is resumed by runtime PM. Having runtime PM enabled by default
+would avoid the need to add a minimal driver for the bus which just
+enables runtime PM, cfr. [PATCH v2 0/8] Add Simple Power-Managed Bus Support
+(https://lkml.org/lkml/2014/12/17/359).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
