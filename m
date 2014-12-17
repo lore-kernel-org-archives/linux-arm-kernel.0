@@ -1,74 +1,75 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Dec 2014 19:49:11 +0100
-Subject: [PATCH 6/8] ARM: shmobile: kzm9g dts: Move Ethernet node to BSC
+Date: Wed, 17 Dec 2014 19:49:08 +0100
+Subject: [PATCH 3/8] drivers: bus: Add Simple Power-Managed Bus DT Bindings
 In-Reply-To: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
 References: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1418842153-17113-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1418842153-17113-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Move the Ethernet node from the root of the device tree to the BSC node,
-as its connected to the Bus State Controller.  This allows the system to
-know the right position of the Ethernet node in the clock and PM domain
-hierarchy, and manage the clock and PM domain appropriately.
-
-Also rename the node's name from "lan9220" to "ethernet", to conform to
-ePAPR generic name recomendations.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
-  - s/confirm/conform/
-  - Moved from kzm9g-reference to kzm9g
+  - New
 ---
- arch/arm/boot/dts/sh73a0-kzm9g.dts | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
+ .../devicetree/bindings/bus/simple-pm-bus.txt      | 49 ++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/simple-pm-bus.txt
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index fce37b96394d0ee3..3e8aacb6ca1f2d06 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -84,19 +84,6 @@
- 		enable-active-high;
- 	};
- 
--	lan9220 at 10000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x10000000 0x100>;
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
--		reg-io-width = <4>;
--		smsc,irq-push-pull;
--		smsc,save-mac-address;
--		vddvario-supply = <&reg_1p8v>;
--		vdd33a-supply = <&reg_3p3v>;
--	};
--
- 	leds {
- 		compatible = "gpio-leds";
- 		led1 {
-@@ -178,6 +165,21 @@
- 	};
- };
- 
-+&bsc {
-+	ethernet at 10000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x10000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin0>;
-+		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
-+		reg-io-width = <4>;
-+		smsc,irq-push-pull;
-+		smsc,save-mac-address;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
-+	};
-+};
+diff --git a/Documentation/devicetree/bindings/bus/simple-pm-bus.txt b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+new file mode 100644
+index 0000000000000000..bc5f985fd5463afa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/simple-pm-bus.txt
+@@ -0,0 +1,49 @@
++Simple Power-Managed Bus
++========================
 +
- &cmt1 {
- 	status = "okay";
- };
++A Simple Power-Managed Bus is a transparent bus that doesn't need a real
++driver, as it's typically initialized by the boot loader.
++
++However, its bus controller is part of a PM domain, or under the control of a
++functional clock.  Hence, the bus controller's PM domain and/or clock must be
++enabled for child devices connected to the bus (either on-SoC or externally)
++to function.
++
++
++Generic compatible values and properties
++----------------------------------------
++
++Required properties:
++  - compatible: Must be at least one of the vendor-specific compatible values
++		from a vendor-specific section below, and "simple-bus" as a
++		fallback.
++
++Optional platform-specific properties for clock or PM domain control (at least
++one of them is required):
++  - clocks: Must contain a reference to the functional clock(s),
++  - power-domains: Must contain a reference to the PM domain.
++
++
++Vendor-specific compatible values and properties
++------------------------------------------------
++
++Renesas Bus State Controller (BSC):
++  - compatible: Must be an SoC-specific value, and "renesas,bsc" as a fallback.
++                SoC-specific values can be:
++		"renesas,bsc-r8a73a4" for R-Mobile APE6 (r8a73a4)
++		"renesas,bsc-sh73a0" for SH-Mobile AG5 (sh73a0)
++  - interrupts: Must contain a reference to the BSC interrupt, if available.
++
++
++Example:
++
++	bsc: bus at fec10000 {
++		compatible = "renesas,bsc-sh73a0", "renesas,bsc", "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0xfec10000 0x400>;
++		ranges = <0 0 0x20000000>;
++		interrupts = <0 39 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&zb_clk>;
++		power-domains = <&pd_a4s>;
++	};
 -- 
 1.9.1
