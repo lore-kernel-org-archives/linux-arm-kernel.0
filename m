@@ -1,50 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 22:58:47 +0100
-Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
- dt-specific callback instead of initcall
-In-Reply-To: <3147207.bM49L5sBIQ@avalon>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <2560037.PCKFDiopkL@wuerfel> <3147207.bM49L5sBIQ@avalon>
-Message-ID: <2127001.foickmBNkZ@wuerfel>
+Date: Wed, 17 Dec 2014 23:01:27 +0100
+Subject: [PATCH 2/5] PCI: st: Add Device Tree bindings for sti pcie
+In-Reply-To: <1418812486-12394-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1418812486-12394-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <2165161.8vJctS1yVa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 18:02:51 Laurent Pinchart wrote:
-> On Wednesday 17 December 2014 16:41:33 Arnd Bergmann wrote:
-> > On Wednesday 17 December 2014 16:39:02 Laurent Pinchart wrote:
-> > > On Wednesday 17 December 2014 15:27:36 Arnd Bergmann wrote:
-> > > > On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
-> > > > > If we forbid the IOMMU driver from being compiled as a module can't we
-> > > > > just rely on deferred probing ? The bus master driver will just be
-> > > > > reprobed after the IOMMU gets probed, like for other devices.
-> > > > > 
-> > > > > This could fail in case the IOMMU device permanently fails to probe.
-> > > > > There
-> > > > > would be something very wrong in the system in that case, Enabling the
-> > > > > bus
-> > > > > masters totally transparently without IOMMU support could not be such
-> > > > > a
-> > > > > good idea.
-> > > > 
-> > > > I believe in the majority of cases today, the IOMMU is entirely
-> > > > optional.
-> > > > There are valid reasons for not including the IOMMU driver in the
-> > > > kernel,
-> > > > e.g. when you know that all the machines with that driver can DMA to
-> > > > all of their RAM and you want to avoid the overhead of IOTLB misses.
-> > > 
-> > > Should that really be controlled by compiling the IOMMU driver out,
-> > > wouldn't it be better to disable the IOMMU devices in DT in that case ?
-> > 
-> > It's a policy decision that should only depend on the user. Modifying the
-> > DT is wrong here IMHO because the device is still connected to the IOMMU
-> > in hardware and we should correctly represent that.
+On Wednesday 17 December 2014 11:34:43 Gabriel FERNANDEZ wrote:
+> sti pcie is built around a Synopsis Designware PCIe IP.
 > 
-> I was thinking about setting status = "disabled" on the IOMMU nodes, not 
-> removing the IOMMU references in the bus master nodes.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> new file mode 100644
+> index 0000000..bd3488f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> @@ -0,0 +1,53 @@
+> +STMicroelectronics STi PCIe controller
+> +
+> +This PCIe host controller is based on the Synopsis Designware PCIe IP
+> +and thus inherits all the common properties defined in designware-pcie.txt.
+> +
+> +Required properties:
+> + - compatible: "st,stih407-pcie"
+> + - reg: base address and length of the pcie controller, mem-window address
+> +   and length available to the controller.
+> + - interrupts: A list of interrupt outputs of the controller.
+> + - interrupt-names: Must include the following entries:
+> +   "msi": STi interrupt that is asserted when an MSI is received
 
-But that still requires a modification of the DT. The hardware is the
-same, so I don't see why we should update the dtb based on kernel
-configuration.
+You should specify that only one interrupt may be present.
+If you extend the binding, you will need to describe what the
+second one is as well.
+
+> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
+> +   offset for IP configuration.
+> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
+> +   Associated names must be "powerdown" and "softreset".
+> + - phys, phy-names: the phandle for the PHY device.
+> +   Associated name must be "pcie_phy"
+
+Names should not have underscores in them in general. "pcie-phy" would
+be fine, but just "pcie" seems good enough, unless there are existing
+drivers that have established a specific naming.
+
 
 	Arnd
