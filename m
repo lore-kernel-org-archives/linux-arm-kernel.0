@@ -1,77 +1,59 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Wed, 17 Dec 2014 20:45:56 +0100
-Subject: [PATCH] arm/rpc: avoid static keyword removal via define
-In-Reply-To: <20141217165450.GW11285@n2100.arm.linux.org.uk>
-References: <1418633287-5019-1-git-send-email-borntraeger@de.ibm.com>
- <1418633287-5019-2-git-send-email-borntraeger@de.ibm.com>
- <5490146A.3000408@de.ibm.com> <20141216114056.GP11285@n2100.arm.linux.org.uk>
- <5491A16A.7050101@de.ibm.com> <20141217165450.GW11285@n2100.arm.linux.org.uk>
-Message-ID: <5491DD74.3060000@de.ibm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 17 Dec 2014 20:58:36 +0100
+Subject: [PATCHv9 0/2] Add Allwinner SoCs PWM support
+In-Reply-To: <546B4DF5.9020100@schinagl.nl>
+References: <1415200545-26238-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <546B4DF5.9020100@schinagl.nl>
+Message-ID: <20141217195836.GD4885@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.12.2014 um 17:54 schrieb Russell King - ARM Linux:
-> On Wed, Dec 17, 2014 at 04:29:46PM +0100, Christian Borntraeger wrote:
->> Am 16.12.2014 um 12:40 schrieb Russell King - ARM Linux:
->>> On Tue, Dec 16, 2014 at 12:15:54PM +0100, Christian Borntraeger wrote:
->>>> Am 15.12.2014 um 09:48 schrieb Christian Borntraeger:
->>>>> commit 4486b86368d7 ("[ARM] riscpc: fix decompressor font file handling")
->>>>> introduced Makefile magic to avoid building a file two times. Using
->>>>> -Dstatic= does break some assumptions on compiler.h that were introduced
->>>>> for READ_ONCE.
->>>>>
->>>>> Lets just use sed on the copy instead of using a define.
->>>>>
->>>>> Signed-off-by: Christian Borntraeger <borntraeger@de.ibm.com>
->>>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>>
->>>> This fixed the linux-next build http://kisskb.ellerman.id.au/kisskb/target/1508/
->>>> Unless anybody complains, I will send the pull request for the access_once tree tomorrow and I have this patch applied on top.
->>>
->>> Please give me some time to look at this.
->>
->> >From all builds, the only problematic case was the rpc_defconfig.
->> So only CONFIG_ARCH_ACORN is affected.
->>
->> As I said, I want to send this series this merge window, so if you
->> do not find the time to look into this before rc1, what about removing
->> this patch from my queue and we solve this later? 
->> Acorn Risc CPU is probably not the hottest platform right now, so if we 
->> fix this in rc2 or rc3 this might be ok - I guess.
+Hi,
+
+I finally got some time to work on that again.
+
+On 18/11/2014 at 14:47:33 +0100, Olliver Schinagl wrote :
+> What I get from the datasheet is, that sun4i and sun5i are exactly the same,
+> with the exception that sun5i only has 1 PWM (~exposed~). I belive that is
+> easily solved with the bindings by having allwinner-sun4i and allwinner
+> sun5i bindings if I'm not mistaken.
 > 
-> How does compiler.h get included when building font.o?
+> As for sun7i compared to the other ones, according to disp_lcd.c sun5i and
+> sun7i should behave exactly the same. This is contradicting to the
+> datasheet, where sun4i and sun5i are the same.
 > 
-> Since I haven't seen your patch series, I guess it gets included somehow
-> via linux/types.h ?
+> So what are the major differences that I can see between the 3? sun4i
+> defines the PWM prescaler register value 0b1111 as being undefined, and
+> sun5i and sun7i as /1? Did you verify this (I haven't I admit, i bumped into
+> this while looking for your patch ;-) )? I wouldn't be supprised if it where
+> a typo on allwinners end in the datasheet ... disp_lcd.c stops at 72000 for
+> the last entry. We should just check sun4i, sun5i and sun7i hardware to see
+> if it behaves the same with a prescaler of 0b1111, which I would not be
+> totally surprised if it did.
+> 
+> The other difference I notice is that sun7i and sun5i use 16bit period
+> register where sun4i uses a 8bit register. This is probably the only reason
+> why they put a #ifdef in disp_lcd.c, calculations turn out differently. I
+> don't recognize this behavior at all in your driver however. I do think they
+> that there is a difference here, since they did split up the original driver
+> here because of this difference.
 > 
 
-The patch series can be found here
-https://lkml.org/lkml/2014/12/11/209
-or
-https://git.kernel.org/cgit/linux/kernel/git/borntraeger/linux.git/commit/?h=linux-next
+That is something I overlooked and I can't test at all, I only have a
+cubietruck. Did you have some time to test on a sun4i?
+
+But, from the only datasheet I have access to [1], page 56:
+Each channel has a dedicated internal 16-bit up counter. If the counter
+reaches the value stored in the channel period register, it resets. At
+the beginning of a count period cycle, the PWMOUT is set to active state
+and count from 0x0000
+
+So I would say that they all have a 16bits period.
 
 
-font.i has
+[1] http://dl.linux-sunxi.org/A10/A10%20Datasheet%20-%20v1.21%20%282012-04-06%29.pdf
 
-[..]
-# 5 "./arch/arm/include/asm/types.h" 2
-# 5 "include/uapi/linux/types.h" 2
-# 13 "include/uapi/linux/types.h"
-# 1 "./include/uapi/linux/posix_types.h" 1
-
-# 1 "include/linux/stddef.h" 1
-
-# 1 "include/uapi/linux/stddef.h" 1
-# 1 "include/linux/compiler.h" 1
-# 54 "include/linux/compiler.h"
-# 1 "include/linux/compiler-gcc.h" 1
-# 106 "include/linux/compiler-gcc.h"
-# 1 "include/linux/compiler-gcc4.h" 1
-# 107 "include/linux/compiler-gcc.h" 2
-# 55 "include/linux/compiler.h" 2
-# 79 "include/linux/compiler.h"
-[..]
-
-But I fail to follow that chain when I walk manually. Maybe its too late in the evening.
-
-Christian
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
