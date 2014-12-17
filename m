@@ -1,70 +1,50 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 17 Dec 2014 18:18:14 +0100
-Subject: [PATCH v2 03/13] ARM: sunxi: Add "allwinner, sun6i-a31s" to mach-sunxi
+Date: Wed, 17 Dec 2014 18:18:18 +0100
+Subject: [PATCH v2 07/13] mfd: sun6i-prcm: Add support for the ir-clk
 In-Reply-To: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
 References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1418836704-15689-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1418836704-15689-8-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far the A31s is 100% compatible with the A31, still lets do the same
-as what we've done for the A13 / A10s and give it its own compatible string,
-in case we need to differentiate later.
+Add support for the ir-clk which is part of the sun6i SoC prcm module.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- Documentation/arm/sunxi/README | 1 -
- arch/arm/mach-sunxi/platsmp.c  | 3 ++-
- arch/arm/mach-sunxi/sunxi.c    | 1 +
- drivers/clk/sunxi/clk-sunxi.c  | 1 +
- 4 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/mfd/sun6i-prcm.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index e68d163..1fe2d7f 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -50,7 +50,6 @@ SunXi family
-           http://dl.linux-sunxi.org/A31/A3x_release_document/A31/IC/A31%20user%20manual%20V1.1%2020130630.pdf
- 
-       - Allwinner A31s (sun6i)
--        + Not Supported
-         + Datasheet
-           http://dl.linux-sunxi.org/A31/A3x_release_document/A31s/IC/A31s%20datasheet%20V1.3%2020131106.pdf
-         + User Manual
-diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-index e44d028..b1b5b7c 100644
---- a/arch/arm/mach-sunxi/platsmp.c
-+++ b/arch/arm/mach-sunxi/platsmp.c
-@@ -120,4 +120,5 @@ static struct smp_operations sun6i_smp_ops __initdata = {
- 	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
- 	.smp_boot_secondary	= sun6i_smp_boot_secondary,
- };
--CPU_METHOD_OF_DECLARE(sun6i_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
-+CPU_METHOD_OF_DECLARE(sun6i_a31_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
-+CPU_METHOD_OF_DECLARE(sun6i_a31s_smp, "allwinner,sun6i-a31s", &sun6i_smp_ops);
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 1f98675..d4bb239 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -29,6 +29,7 @@ MACHINE_END
- 
- static const char * const sun6i_board_dt_compat[] = {
- 	"allwinner,sun6i-a31",
-+	"allwinner,sun6i-a31s",
- 	NULL,
+diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+index 2f2e9f0..1911731 100644
+--- a/drivers/mfd/sun6i-prcm.c
++++ b/drivers/mfd/sun6i-prcm.c
+@@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
+ 	},
  };
  
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index a9d10b9..ee9d7f2 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1235,6 +1235,7 @@ static void __init sun6i_init_clocks(struct device_node *node)
- 			  ARRAY_SIZE(sun6i_critical_clocks));
- }
- CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
-+CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
- CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
- 
- static void __init sun9i_init_clocks(struct device_node *node)
++static const struct resource sun6i_a31_ir_clk_res[] = {
++	{
++		.start = 0x54,
++		.end = 0x57,
++		.flags = IORESOURCE_MEM,
++	},
++};
++
+ static const struct resource sun6i_a31_apb0_rstc_res[] = {
+ 	{
+ 		.start = 0xb0,
+@@ -69,6 +77,12 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
+ 		.resources = sun6i_a31_apb0_gates_clk_res,
+ 	},
+ 	{
++		.name = "sun6i-a31-ir-clk",
++		.of_compatible = "allwinner,sun4i-a10-mod0-clk",
++		.num_resources = ARRAY_SIZE(sun6i_a31_ir_clk_res),
++		.resources = sun6i_a31_ir_clk_res,
++	},
++	{
+ 		.name = "sun6i-a31-apb0-clock-reset",
+ 		.of_compatible = "allwinner,sun6i-a31-clock-reset",
+ 		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
 -- 
 2.1.0
