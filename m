@@ -1,27 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Dec 2014 10:44:28 +0000
-Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
-References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
- <1918116.UxUgDPTmcq@wuerfel>
- <CAAVeFuL2MKRA7YLm_wsyftNy-sxgEYPrmqBm8XTRZQb66YF-qw@mail.gmail.com>
- <1628217.66frkAqHMc@wuerfel>
- <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
-Message-ID: <20141217104428.GV11285@n2100.arm.linux.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 Dec 2014 18:54:03 +0800
+Subject: [PATCH v2 0/4] clk: sunxi: mmc: Last bits of phase handling
+In-Reply-To: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v672ozg8BREGY9Fyxs9QrkM8ksVpwK7EdC0WK8X2GfBx8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 11:45:01AM +0900, Alexandre Courbot wrote:
-> Actually we are not that far from being able to do completely without
-> any GPIO number, and maybe that's what we should aim for. I think the
-> only remaining offender is the sysfs interface.
+Hi,
 
-And that is a user API, and there's lots of users of it (eg, on Raspberry
-Pi platforms.)  So changing it isn't going to be easy - I'd say that it's
-impractical.
+On Wed, Dec 17, 2014 at 5:38 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> These are the last patches of the serie converting the custom phase
+> API to the proper common clock framework API.
+>
+> These patches have already been discussed in length, only the patch 1
+> is new and should ease the handling of our MMC clocks.
+>
+> Thanks,
+> Maxime
+>
+> Changes from v1:
+>   - Fixed memory leak when a phase clock registration fails
+>   - Moved the spinlock declaration
+>   - Updated the DT bindings docs
+>
+> Maxime Ripard (4):
+>   clk: sunxi: Rework MMC phase clocks
+>   ARM: sunxi: dt: Add sample and output mmc clocks
+>   mmc: sunxi: Convert MMC driver to the standard clock phase API
+>   clk: sunxi: Remove custom phase function
 
-What you're suggesting would be like re-numbering Linux syscalls.
+Apart from the minor comments, whole series is
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+
+Also tested on my Cubieboard, Cubieboard2, Hummingbird A31,
+and HSG H702 (A13 tablet).
+
+
+ChenYu
+
+>
+>  Documentation/devicetree/bindings/clock/sunxi.txt  |   7 +-
+>  .../devicetree/bindings/mmc/sunxi-mmc.txt          |   8 +-
+>  arch/arm/boot/dts/sun4i-a10.dtsi                   |  72 +++++++----
+>  arch/arm/boot/dts/sun5i-a10s.dtsi                  |  54 ++++++---
+>  arch/arm/boot/dts/sun5i-a13.dtsi                   |  44 +++++--
+>  arch/arm/boot/dts/sun6i-a31.dtsi                   |  72 +++++++----
+>  arch/arm/boot/dts/sun7i-a20.dtsi                   |  72 +++++++----
+>  arch/arm/boot/dts/sun8i-a23.dtsi                   |  54 ++++++---
+>  drivers/clk/sunxi/clk-mod0.c                       | 131 +++++++++++----------
+>  drivers/clk/sunxi/clk-sunxi.c                      |  37 ------
+>  drivers/mmc/host/sunxi-mmc.c                       |  72 +++++++----
+>  include/linux/clk/sunxi.h                          |  22 ----
+>  12 files changed, 392 insertions(+), 253 deletions(-)
+>  delete mode 100644 include/linux/clk/sunxi.h
+>
+> --
+> 2.2.0
+>
