@@ -1,123 +1,229 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Wed, 17 Dec 2014 20:26:56 +0530
-Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
- pm_genpd_dev_need_restore to use restore types
-In-Reply-To: <5491803C.4030000@samsung.com>
-References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
- <54901341.20106@samsung.com>
- <CADGdYn60ONwuLtcdXSegbQLgFaF-me+mZY6-LPYRQvdfmWFMdA@mail.gmail.com>
- <5491803C.4030000@samsung.com>
-Message-ID: <CADGdYn6DbPb7DuyRvZChE-oZL_z_8c-wCbjY-nw8NeeoD=ejuw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Dec 2014 15:01:29 +0000
+Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <20141217143305.GC8942@leverpostej>
+References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
+ <1418825853-10934-4-git-send-email-eddie.huang@mediatek.com>
+ <20141217143305.GC8942@leverpostej>
+Message-ID: <54919AC9.2090306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 6:38 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
->
-> On 2014-12-17 03:43, amit daniel kachhap wrote:
+On 17/12/14 14:33, Mark Rutland wrote:
+> On Wed, Dec 17, 2014 at 02:17:32PM +0000, Eddie Huang wrote:
+>> Add device tree support for MT8173 SoC and evaluation board based on it.
 >>
->> On Tue, Dec 16, 2014 at 4:40 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->>>
->>> Hello,
->>>
->>> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
->>>>
->>>> Instead of using bool to restore suspended devices initially, use flags
->>>> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and
->>>> GPD_DEV_RESTORE_FORCE.
->>>> The first two flags will be similar to the existing true/false
->>>> functionality.
->>>> The third flag may be used to force restore of suspended devices
->>>> whenever their associated power domain is turned on.
->>>>
->>>> Currently, PD power off function powers off all the associated unused
->>>> devices. The functionality added in this patch is similar to it.
->>>>
->>>> This feature may be used for those devices which are always in ON state
->>>> if the PD associated with them is ON but may need local runtime resume
->>>> and suspend during PD On/Off. These devices (like clock) may not
->>>> implement
->>>> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
->>>> subsystems interaction behaviour or any other reason.
->>>>
->>>> The model works like,
->>>>       DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
->>>>       /  pm_runtime_put. Its local runtime_suspend/resume is invoked via
->>>>      /   GPD_DEV_RESTORE_FORCE option)
->>>>     /
->>>> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
->>>>     \    pm_runtime_put. This in turn invokes PD On/Off)
->>>>      \
->>>>       DEV3 (Similar to DEV1)
->>>>
->>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>>
->>>
->>> The idea of adding new gen_pd flag and reusing runtime pm calls intead of
->>> additional
->>> notifiers looks promising, but I have some doubts. I don't see any
->>> guarantee
->>> that
->>> devices with GPD_DEV_RESTORE_FORCE flag will be suspended after all
->>> "normal"
->>> devices
->>> and restored before them. Without such assumption it will be hard to use
->>> this approach
->>> for iommu related activities, because device might need to use (in its
->>> suspend/resume
->>> callbacks) the functionality provided by the other device with
->>> GPD_DEV_RESTORE_FORCE
->>> flag. Maybe some additional flags like suspend/resume priority (or more
->>> flags) will
->>> solve somehow this dependency.
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> ---
+>>  arch/arm64/boot/dts/Makefile       |   1 +
+>>  arch/arm64/boot/dts/mt8173-evb.dts |  34 +++++++++
+>>  arch/arm64/boot/dts/mt8173.dtsi    | 152 +++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 187 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/mt8173-evb.dts
+>>  create mode 100644 arch/arm64/boot/dts/mt8173.dtsi
 >>
->> Thanks for pointing this issue out. I agree that there is no priority
->> in suspending devices with this flag. But this works well in syncing
->> with power domain on/off as the devices of these types have only
->> dependency with power domain. BTW I tested this implementation with
->> your first version of IOMMU save/restore patches. Although i have not
->> posted those but they work fine. I can post those after cleaning them
->> up.
->
->
-> Right, they will work, but mainly because right now master devices don't
-> do any memory DMA operations in suspend/resume callbacks. However, to
-> propose
-> it as a generic solution, the priority and the order of operations should be
-> somehow determined.
-Hi,
+>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+>> index f8001a6..db7661e 100644
+>> --- a/arch/arm64/boot/dts/Makefile
+>> +++ b/arch/arm64/boot/dts/Makefile
+>> @@ -1,3 +1,4 @@
+>> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+>>  dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+>>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>> diff --git a/arch/arm64/boot/dts/mt8173-evb.dts b/arch/arm64/boot/dts/mt8173-evb.dts
+>> new file mode 100644
+>> index 0000000..b8b2621
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/mt8173-evb.dts
+>> @@ -0,0 +1,34 @@
+>> +/*
+>> + * Copyright (c) 2014 MediaTek Inc.
+>> + * Author: Eddie Huang <eddie.huang@mediatek.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "mt8173.dtsi"
+>> +
+>> +/ {
+>> +	model = "mediatek,mt8173-evb";
+>> +
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +		serial1 = &uart1;
+>> +		serial2 = &uart2;
+>> +		serial3 = &uart3;
+>> +	};
+>> +
+>> +	memory at 40000000 {
+>> +		device_type = "memory";
+>> +		reg = <0 0x40000000 0 0x80000000>;
+>> +	};
+>> +
+>> +	chosen { };
+>> +};
+>> diff --git a/arch/arm64/boot/dts/mt8173.dtsi b/arch/arm64/boot/dts/mt8173.dtsi
+>> new file mode 100644
+>> index 0000000..41c1441
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/mt8173.dtsi
+>> @@ -0,0 +1,152 @@
+>> +/*
+>> + * Copyright (c) 2014 MediaTek Inc.
+>> + * Author: Eddie Huang <eddie.huang@mediatek.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +/ {
+>> +	compatible = "mediatek,mt8173";
+>> +	interrupt-parent = <&sysirq>;
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
+>> +
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu-map {
+>> +			cluster0 {
+>> +				core0 {
+>> +					cpu = <&cpu0>;
+>> +				};
+>> +				core1 {
+>> +					cpu = <&cpu1>;
+>> +				};
+>> +			};
+>> +
+>> +			cluster1 {
+>> +				core0 {
+>> +					cpu = <&cpu2>;
+>> +				};
+>> +				core1 {
+>> +					cpu = <&cpu3>;
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53";
+>> +			reg = <0x000>;
+>> +		};
+>> +
+>> +		cpu1: cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a53";
+>> +			reg = <0x001>;
+>> +			enable-method = "psci";
+>> +		};
+>> +
+>> +		cpu2: cpu at 2 {
+> 
+> The unit-address should be 100 rather than 2, matching the reg property.
+> This should be 'cpu at 100'.
+> 
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a57";
+>> +			reg = <0x100>;
+>> +			enable-method = "psci";
+>> +		};
+>> +
+>> +		cpu3: cpu at 3 {
+> 
+> Similarly this should be 'cpu at 101'.
+> 
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a57";
+>> +			reg = <0x101>;
+>> +			enable-method = "psci";
+>> +		};
+>> +	};
+>> +
+>> +	psci {
+>> +		compatible = "arm,psci";
+>> +		method = "smc";
+>> +		cpu_suspend   = <0x84000001>;
+>> +		cpu_off	      = <0x84000002>;
+>> +		cpu_on	      = <0x84000003>;
+>> +		affinity_info = <0x84000004>;
+>> +	};
+> 
+> There is no AFFINITY_INFO function prior to PSCI 0.2, and
+> 'affinity_info' does not exist in the "arm,psci" binding.
+> 
+> I take it hotplug has been tested for all but CPU0?
+> 
+>> +
+>> +	uart_clk: dummy26m {
+>> +		compatible = "fixed-clock";
+>> +		clock-frequency = <26000000>;
+>> +		#clock-cells = <0>;
+>> +	};
+>> +
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupt-parent = <&gic>;
+>> +		interrupts = <1 13 0xf08>,
+>> +			     <1 14 0xf08>,
+>> +			     <1 11 0xf08>,
+>> +			     <1 10 0xf08>;
+>> +	};
+>> +
+>> +	soc {
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		compatible = "simple-bus";
+>> +		ranges;
+>> +
+>> +		sysirq: intpol-controller at 10200620 {
+>> +			compatible = "mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq";
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <3>;
+>> +			interrupt-parent = <&gic>;
+>> +			reg = <0 0x10200620 0 0x20>;
+>> +		};
+>> +
+>> +		gic: interrupt-controller at 10220000 {
+>> +			compatible = "arm,gic-400";
+>> +			#interrupt-cells = <3>;
+>> +			interrupt-parent = <&gic>;
+>> +			interrupt-controller;
+>> +			reg = <0 0x10221000 0 0x1000>,
+>> +			      <0 0x10222000 0 0x1000>,
+>> +			      <0 0x10224000 0 0x2000>,
+>> +			      <0 0x10226000 0 0x2000>;
+>> +			interrupts = <1 9 0xf04>;
+>> +		};
+> 
+> I don't think these reg entries are quite right; GICC should be 8k long.
+> 
+> Marc?
 
-I feel this behavior is analogous to system sleep where the devices
-suspend/resume are called based on initialization types like early
-init, pre core, post core , late init etc.
-These types handle the priority and interdependency among devices. So,
-In my opinion we can use the same for power domain also. if these
-types are not sufficient enough than it may be considered for future
-work.
+Indeed, as described in the documentation:
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/CHDIFAEE.html
 
-Regards,
-Amit Daniel
+Also it is worth noticing that given how GICV is placed, it will never
+work with 64K pages and virtualization. Pretty sad.
 
->
->> Here, the ordering between various devices is taken care as they are
->> probed at different point of time(clock then IOMMU). so the suspend
->> happens in reverse probe order and resume happens in probe order. I
->> will check more on this and get back.
->
->
-> Right now, it probably used the order of probing. Because iommu controllers
-> are probed earlier, so they are handled before the master devices.
->
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
