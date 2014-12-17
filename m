@@ -1,85 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 17 Dec 2014 09:22:25 -0600
-Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
- AM572x errata i856.
-In-Reply-To: <20141217145533.GS24110@csclub.uwaterloo.ca>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <20141214044517.GD24110@csclub.uwaterloo.ca>
- <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
- <54918357.8060801@ti.com>
- <20141217145533.GS24110@csclub.uwaterloo.ca>
-Message-ID: <20141217152225.GA737@kahuna>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 17 Dec 2014 08:22:35 -0700
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <5490857A.1000808@codeaurora.org>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <2519415.GklIQeMgWR@wuerfel> <54903DC6.8010308@linaro.org>
+ <2663853.2Q3kHisMT7@wuerfel> <5490857A.1000808@codeaurora.org>
+Message-ID: <20141217152235.GA1437@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:55-20141217, Lennart Sorensen wrote:
-> On Wed, Dec 17, 2014 at 03:21:27PM +0200, Tero Kristo wrote:
-> > Yea I think the 32k clock node should be fixed based on this.
-> > Something like this:
-> > 
-> > --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> > +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> > @@ -100,8 +100,10 @@
-> > 
-> >         sys_32k_ck: sys_32k_ck {
-> >                 #clock-cells = <0>;
-> > -               compatible = "fixed-clock";
-> > -               clock-frequency = <32768>;
-> > +               compatible = "fixed-factor-clock";
-> > +               clocks = <&sys_clkin1>;
-> > +               clock-mult = <1>;
-> > +               clock-div = <610>;
-> >         };
-> > 
-> >         virt_12000000_ck: virt_12000000_ck {
-> > 
-> > 
-> > It might be better then just query the actual clock rate from the
-> > timer code.
-> 
-> But it is only SYSCLK1 / 610 if the DRA7_CTRL_CORE_BOOTSTRAP register
-> says it is.  Otherwise is is in fact 32768Hz.  I certainly would expect
-> that if another revision of the chip is made (and even for the single
-> core AM571x chips when they are done) will have this fixed and will work
-> with the external 32.768KHz crystal, if it is present.
-> 
-> So how does one make the dtb reflect what the state of the CPU actually
-> is?
-> 
-> The errata even says that if SYSCLK1 is 26MHz (not a supported option
-> in the manual), then the 32.768KHz crystal does work and the counter
-> frequency will in fact be 6.144MHz like it should be.
-> 
-> So just changing the dtb is not an option.
+On Tue, Dec 16 2014 at 12:18 -0700, Stephen Boyd wrote:
+>On 12/16/2014 06:38 AM, Arnd Bergmann wrote:
+>> On Tuesday 16 December 2014 15:12:22 Daniel Lezcano wrote:
+>>> At the beginning, all that become from not including mach files from the
+>>> drivers directory which make sense.
+>>>
+>>> Perhaps it is time to write a similar mechanism for the cpuidle drivers
+>>> where we can still separate the low level PM code from the generic
+>>> cpuidle code.
+>> That way you basically duplicate the same thing we already have, which
+>> isn't much better.
+>>
+>> In the example of drivers/soc/qcom/spm.c, just call cpuidle_register
+>> from the spm_dev_probe() function and be done with it. You already
+>> have a device that is responsible for handling this, don't try to
+>> construct more than you already need.
+>>
+>> I would assume that the same can be done for most other platforms.
+>>
+>> There are probably cases where the same piece of hardware is responsible
+>> for both cpuidle and cpufreq, but what that means is really that you
+>> should have a single driver for it that does both things. Same for
+>> SMP support: if you have one register block that does both the SMP
+>> bringup and the cpuidle stuff, then have *one* driver for this block
+>> that does it all. There are currently a few dependencies that require
+>> doing SMP bringup early during boot, but we decided years ago that those
+>> are all artificial dependencies and we should be able to boot secondary
+>> CPUs much later than we currently do.
+>>
+>
+>+1. The SPM harware is used for hotplug, suspend, cpuidle, as well as
+>provides a regulator for a CPU, so all these things should be done in a
+>single driver. Booting secondary CPUs early is not hard here either if
+>we move the smp ops into the same driver. The only downside then is that
+>it can't be a module, but I would guess that we can work on making that
+>possible by allowing smp ops to be inserted and removed at any time.
+>
+I am not sure, just because the hardware supports multiple
+functionality, everything should go into the same file.
 
-A clock mux might do the job?
+If you think of a SPM driver as something that provides a service, you
+would see that all the functionality of cpuidle, hotplug, suspend, use
+the service and can have their own place to share their commonality. SPM
+h/w is not just for cpus. It could be a generic power controller (to an
+extent) for the cpu, cache, coherenency interface and pretty much any
+bus/clock exports the services of that device. There needs to be a
+distinction between an entity that provides the functionality and a one
+that uses it. You cannot build on additional functionality neatly if you
+have them all together.
 
-value 1, 2 , 3 will imply sysclk1 / 610
-value of 0 implies fixed 32768
+As such, I am quite appalled by the addition of the idle functions in
+the SPM driver, but seems like its the direction many want, hence went
+with it. But, please dont suggest using SPM driver as a dumping ground
+for all functionality that SPM may indirectly influence.
 
-soemthing like
-sys_clk32_crystal {
-               compatible = "fixed-clock";
-               clock-frequency = <32768>;
-}
-
-sys_clk32_pseudo {
-               compatible = "fixed-clock";
-               compatible = "fixed-factor-clock";
-               clocks = <&sys_clkin1>;
-               clock-mult = <1>;
-               clock-div = <610>;
-}
-
-sys_32k_ck: sys_32k_ck {
-	compatible = "ti,mux-clock";
-	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
-};
-
-I think... The only issue is that the BOOTSTRAP register is not around
-the usual CM1,2 address region...
-
--- 
-Regards,
-Nishanth Menon
+Thanks,
+Lina
