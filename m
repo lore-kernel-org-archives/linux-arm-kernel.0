@@ -1,43 +1,44 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 17 Dec 2014 09:32:11 -0800
-Subject: [PATCH resend v2] input: Add new sun4i-lradc-keys driver
-In-Reply-To: <1418827411-13265-2-git-send-email-hdegoede@redhat.com>
-References: <1418827411-13265-1-git-send-email-hdegoede@redhat.com>
- <1418827411-13265-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <1918972.jFlKNuYrbH@dtor-glaptop>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 17 Dec 2014 11:33:03 -0600
+Subject: OMAP 4430 SDP: rather sick with recent kernels
+In-Reply-To: <20141217172333.GE23854@atomide.com>
+References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
+ <20141217172333.GE23854@atomide.com>
+Message-ID: <CAGo_u6oS_xyboNZcUsQ8LFrhFhkR6yvr8r_XBj3-yTmqZnqYGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 17, 2014 03:43:31 PM Hans de Goede wrote:
-> +       /*
-> +        * lradc supports only one keypress at a time, release does not give
-> +        * any info as to which key was released, so we cache the keycode.
-> +        */
-> +       if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
-> +               val = readl(lradc->base + LRADC_DATA0) & 0x3f;
-> +               voltage = val * lradc->vref / 63;
-> +
-> +               for (i = 0; i < lradc->chan0_map_count; i++) {
-> +                       diff = abs(lradc->chan0_map[i].voltage - voltage);
-> +                       if (diff < closest) {
-> +                               closest = diff;
-> +                               keycode = lradc->chan0_map[i].keycode;
-> +                       }
-> +               }
-> +
-> +               lradc->chan0_keycode = keycode;
-> +               input_report_key(lradc->input, lradc->chan0_keycode, 1);
-> +       }
-> +
-> +       if (ints & CHAN0_KEYUP_IRQ) {
-> +               input_report_key(lradc->input, lradc->chan0_keycode, 0);
-> +               lradc->chan0_keycode = 0;
-> +       }
+On Wed, Dec 17, 2014 at 11:23 AM, Tony Lindgren <tony@atomide.com> wrote:
+>
+>> twl: not initialized
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1375000 Vs max 1316660
+>> twl6030_uv_to_vsel:OUT OF RANGE! non mapped vsel for 1410000 Vs max 1316660
+>
+> This seems to be some twl related init order issue, I'll take a
+> look at this one.
+>
+>> omap2_set_init_voltage: unable to find boot up OPP for vdd_mpu
+>> omap2_set_init_voltage: unable to set vdd_mpu
+>> omap2_set_init_voltage: unable to find boot up OPP for vdd_core
+>> omap2_set_init_voltage: unable to set vdd_core
+>> omap2_set_init_voltage: unable to find boot up OPP for vdd_iva
+>> omap2_set_init_voltage: unable to set vdd_iva
+>
+> I believe Nishanth has some plans for these?
 
-Can release and press be reported simultaneously? Should we process release 
-first?
 
-Thanks.
+Not in the near future. looks like converting VC/VP into regulator and
+fit inside DT world has gone no where..
+
+Regards,
+Nishanth Menon
 
 -- 
-Dmitry
+---
+Regards,
+Nishanth Menon
