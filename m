@@ -1,30 +1,49 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed, 17 Dec 2014 11:34:41 +0100
-Subject: [PATCH 0/5] PCI: st: provide support for dw pcie
-Message-ID: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+Date: Wed, 17 Dec 2014 11:34:45 +0100
+Subject: [PATCH 4/5] PCI: designware: Add setup bus-related to pcie_host_ops
+In-Reply-To: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1418812486-12394-5-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set introduces a STMicroelectronics PCIe controler.
-It's based on designware PCIe driver.
+ST sti SoCs PCIe IPs are built around DesignWare IP Core.
+But in these SoCs PCIe IP doesn't support IO.
 
-Gabriel Fernandez (5):
-  ARM: STi: Kconfig update for PCIe support
-  PCI: st: Add Device Tree bindings for sti pcie
-  PCI: st: Provide support for the sti PCIe controller
-  PCI: designware: Add setup bus-related to pcie_host_ops
-  PCI: st: disable IO support
+To support this, add setup_bus() to pcie_host_ops.
 
- Documentation/devicetree/bindings/pci/st-pcie.txt |  53 ++
- arch/arm/mach-sti/Kconfig                         |   2 +
- drivers/pci/host/Kconfig                          |   5 +
- drivers/pci/host/Makefile                         |   1 +
- drivers/pci/host/pci-st.c                         | 736 ++++++++++++++++++++++
- drivers/pci/host/pcie-designware.c                |   3 +
- drivers/pci/host/pcie-designware.h                |   1 +
- 7 files changed, 801 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
- create mode 100644 drivers/pci/host/pci-st.c
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ drivers/pci/host/pcie-designware.c | 3 +++
+ drivers/pci/host/pcie-designware.h | 1 +
+ 2 files changed, 4 insertions(+)
 
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index df781cd..98e19bc 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -719,6 +719,9 @@ static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
+ 	pci_add_resource(&sys->resources, &pp->busn);
+ 
++	if (pp->ops->setup_bus)
++		pp->ops->setup_bus(pp, sys);
++
+ 	return 1;
+ }
+ 
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index d0bbd27..5c13de7 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -73,6 +73,7 @@ struct pcie_host_ops {
+ 	u32 (*get_msi_addr)(struct pcie_port *pp);
+ 	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
+ 	void (*scan_bus)(struct pcie_port *pp);
++	void (*setup_bus)(struct pcie_port *pp, struct pci_sys_data *sys);
+ 	int (*msi_host_init)(struct pcie_port *pp, struct msi_controller *chip);
+ };
+ 
 -- 
 1.9.1
