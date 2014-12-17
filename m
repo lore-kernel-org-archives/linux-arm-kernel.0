@@ -1,50 +1,98 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 17 Dec 2014 18:18:18 +0100
-Subject: [PATCH v2 07/13] mfd: sun6i-prcm: Add support for the ir-clk
+Date: Wed, 17 Dec 2014 18:18:17 +0100
+Subject: [PATCH v2 06/13] clk: sunxi: Make the mod0 clk driver also a platform
+ driver
 In-Reply-To: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
 References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1418836704-15689-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <1418836704-15689-7-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the ir-clk which is part of the sun6i SoC prcm module.
+With the prcm in sun6i (and some later SoCs) some mod0 clocks are instantiated
+through the mfd framework, and as such do not work with of_clk_declare, since
+they do not have registers assigned to them yet at of_clk_declare init time.
+
+Silence the error on not finding registers in the of_clk_declare mod0 clk
+setup method, and also register mod0-clk support as a platform driver to work
+properly with mfd instantiated mod0 clocks.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/mfd/sun6i-prcm.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/clk/sunxi/clk-mod0.c | 41 ++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 36 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-index 2f2e9f0..1911731 100644
---- a/drivers/mfd/sun6i-prcm.c
-+++ b/drivers/mfd/sun6i-prcm.c
-@@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
- 	},
+diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+index 658d74f..7ddab6f 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
++++ b/drivers/clk/sunxi/clk-mod0.c
+@@ -17,6 +17,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/of_address.h>
++#include <linux/platform_device.h>
+ 
+ #include "clk-factors.h"
+ 
+@@ -67,7 +68,7 @@ static struct clk_factors_config sun4i_a10_mod0_config = {
+ 	.pwidth = 2,
  };
  
-+static const struct resource sun6i_a31_ir_clk_res[] = {
-+	{
-+		.start = 0x54,
-+		.end = 0x57,
-+		.flags = IORESOURCE_MEM,
-+	},
+-static const struct factors_data sun4i_a10_mod0_data __initconst = {
++static const struct factors_data sun4i_a10_mod0_data = {
+ 	.enable = 31,
+ 	.mux = 24,
+ 	.muxmask = BIT(1) | BIT(0),
+@@ -82,17 +83,47 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
+ 	void __iomem *reg;
+ 
+ 	reg = of_iomap(node, 0);
+-	if (!reg) {
+-		pr_err("Could not get registers for mod0-clk: %s\n",
+-		       node->name);
++	if (!reg)
+ 		return;
+-	}
+ 
+ 	sunxi_factors_register(node, &sun4i_a10_mod0_data,
+ 			       &sun4i_a10_mod0_lock, reg);
+ }
+ CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
+ 
++static int sun4i_a10_mod0_clk_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *r;
++	void __iomem *reg;
++
++	if (!np)
++		return -ENODEV;
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg = devm_ioremap_resource(&pdev->dev, r);
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
++
++	sunxi_factors_register(np, &sun4i_a10_mod0_data,
++			       &sun4i_a10_mod0_lock, reg);
++	return 0;
++}
++
++static const struct of_device_id sun4i_a10_mod0_clk_dt_ids[] = {
++	{ .compatible = "allwinner,sun4i-a10-mod0-clk" },
++	{ /* sentinel */ }
 +};
 +
- static const struct resource sun6i_a31_apb0_rstc_res[] = {
- 	{
- 		.start = 0xb0,
-@@ -69,6 +77,12 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
- 		.resources = sun6i_a31_apb0_gates_clk_res,
- 	},
- 	{
-+		.name = "sun6i-a31-ir-clk",
-+		.of_compatible = "allwinner,sun4i-a10-mod0-clk",
-+		.num_resources = ARRAY_SIZE(sun6i_a31_ir_clk_res),
-+		.resources = sun6i_a31_ir_clk_res,
++static struct platform_driver sun4i_a10_mod0_clk_driver = {
++	.driver = {
++		.name = "sun4i-a10-mod0-clk",
++		.of_match_table = sun4i_a10_mod0_clk_dt_ids,
 +	},
-+	{
- 		.name = "sun6i-a31-apb0-clock-reset",
- 		.of_compatible = "allwinner,sun6i-a31-clock-reset",
- 		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
++	.probe = sun4i_a10_mod0_clk_probe,
++};
++module_platform_driver(sun4i_a10_mod0_clk_driver);
++
+ static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
+ 
+ static void __init sun5i_a13_mbus_setup(struct device_node *node)
 -- 
 2.1.0
