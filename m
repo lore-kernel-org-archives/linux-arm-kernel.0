@@ -1,74 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Dec 2014 17:17:52 +0000
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <2299294.lPnEQgl4lK@wuerfel>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <3099591.NlcSS8Qjlv@wuerfel> <20141217144518.GE870@arm.com>
- <2299294.lPnEQgl4lK@wuerfel>
-Message-ID: <20141217171752.GB30307@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 17 Dec 2014 18:18:12 +0100
+Subject: [PATCH v2 01/13] pinctrl: sun6i: Add some missing functions
+In-Reply-To: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
+References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1418836704-15689-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 03:35:29PM +0000, Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 14:45:18 Will Deacon wrote:
-> > On Wed, Dec 17, 2014 at 02:15:12PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 17 December 2014 12:09:49 Will Deacon wrote:
-> > The icky part is that an ARM SMMU can have one of two indexing schemes in
-> > hardware:
-> > 
-> >   (1) The StreamID is used as a linear index into an (MMIO) table, which
-> >       has pointers to contexts (translation tables)
-> > 
-> >   (2) The StreamID is matched against a mask/value pair, which generates
-> >       an index into the same table mentioned above
-> > 
-> > Currently, the driver probes ID registers at runtime to figure out which
-> > indexing scheme is implemented. If we start encoding scheme-specific data in
-> > the device-tree, then the binding will differ based on hardware properties
-> > that aren't otherwise described. Is there precedent for this sort of thing
-> > elsewhere?
-> 
-> We should probably have different compatible strings in that case.
-> Is it always hardwired which scheme gets used, or can the SMMU
-> be reconfigured between the two?
+While working on pinctrl for the A31s, I noticed that function 4 of
+PA15 - PA18 was missing, add these.
 
-It's a hard-wired thing that is advertised in a read-only ID register. I'm
-not too keen on a different compatible string for that, because there are
-all sorts of features like this that could quickly get messy. How about
-using #iommu-cells to distinguish between them, as Robin suggested? If
-iommu-cells is #2, then we're going to be using stream-matching and fail
-the probe if it's not supported by the IOMMU.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Drop the changes to the muxing of i2c3 this was based on
+ "A31s Datasheet v1.40.pdf", but all other A31 related info puts them at the
+ pins where we already have them, so leave this as is
+---
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> > > I would hope that PCI is the only case we need to worry about for a while.
-> > > This means we just need to come up with another property or a set of properties
-> > > that we can put into a PCI host controller device node in order to describe
-> > > the mapping. These properties could be iommu-specific, so we add something
-> > > to the PCI core that calls a new iommu callback function that takes the
-> > > device node of the PCI host and the bus/device/function number as inputs.
-> > > 
-> > > In arm_setup_iommu_dma_ops(), we can then do something like
-> > > 
-> > > 	if (dev_is_pci(dev)) {
-> > > 		struct pci_dev *pdev = to_pci_dev(dev);
-> > > 		struct device_node *node;
-> > > 		unsigned int bdf;
-> > > 
-> > > 		node = find_pci_host_bridge(pdev->bus)->parent->of_node;
-> > > 		bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
-> > > 
-> > > 		iommu_setup_pci_dev(pdev, node, bdf);
-> > > 	}
-> > 
-> > The other way to do this is have the IOMMU driver check dev_is_pci(dev)
-> > in add_device, then call an of_xlate_pci_bdf library function which could
-> > do the translation on-demand.
-> 
-> We'd still need to find the device node for the host controller in
-> common code, otherwise we don't have an of_xlate function to call.
-
-I guess I was hoping that the translation code could be generic. I don't
-really see anything special about adding a constant to a magic number to
-obtain another magic number.
-
-Will
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+index f42858e..18038f0 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+@@ -134,24 +134,28 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD4 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D15 */
++		  SUNXI_FUNCTION(0x4, "clk_out_a"),
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD5 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D16 */
++		  SUNXI_FUNCTION(0x4, "dmic"),		/* CLK */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD6 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D17 */
++		  SUNXI_FUNCTION(0x4, "dmic"),		/* DIN */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* RXD7 */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* D18 */
++		  SUNXI_FUNCTION(0x4, "clk_out_b"),
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+@@ -207,6 +211,7 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "gmac"),		/* MDC */
+ 		  SUNXI_FUNCTION(0x3, "lcd1"),		/* HSYNC */
++		  SUNXI_FUNCTION(0x4, "clk_out_c"),
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 26)),	/* PA_EINT26 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 27),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+-- 
+2.1.0
