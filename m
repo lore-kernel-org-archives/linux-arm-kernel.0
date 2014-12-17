@@ -1,48 +1,141 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Wed, 17 Dec 2014 10:27:10 -0500
-Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 17 Dec 2014 09:30:26 -0600
+Subject: [PATCH V2 2/2] ARM: dra7xx: Fix counter frequency drift for
  AM572x errata i856.
-In-Reply-To: <20141217152225.GA737@kahuna>
-References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
- <20141214044517.GD24110@csclub.uwaterloo.ca>
- <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
- <54918357.8060801@ti.com>
- <20141217145533.GS24110@csclub.uwaterloo.ca>
- <20141217152225.GA737@kahuna>
-Message-ID: <20141217152710.GT24110@csclub.uwaterloo.ca>
+In-Reply-To: <54914096.9060206@ti.com>
+References: <cover.1418762900.git.lsorense@csclub.uwaterloo.ca>
+ <89b793993eaa492af531bd7aa9dff1f871fb4a77.1418762900.git.lsorense@csclub.uwaterloo.ca>
+ <54914096.9060206@ti.com>
+Message-ID: <20141217153026.GB838@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 09:22:25AM -0600, Nishanth Menon wrote:
-> A clock mux might do the job?
+On 14:06-20141217, Lokesh Vutla wrote:
+> Hi Len,
+> On Wednesday 17 December 2014 02:38 AM, Lennart Sorensen wrote:
+> > Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
+> > crystal is not enabled at power up.  Instead the CPU falls back to using
+> > an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
+> > 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
+> > but can also be 19.2 or 27MHz which result in much larger drift.
+> > 
+> > Since this is used to drive the master counter at 32.768KHz * 375 /
+> > 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
+> > seconds per day, and more than the 500ppm NTP is able to tolerate.
+> > 
+> > Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
+> > is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
+> > by known that the real counter frequency can be determined and used.
+> > The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
+> Looks good to me.
+> Tested this on DRA7 evm.
 > 
-> value 1, 2 , 3 will imply sysclk1 / 610
-> value of 0 implies fixed 32768
+> Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
 > 
-> soemthing like
-> sys_clk32_crystal {
->                compatible = "fixed-clock";
->                clock-frequency = <32768>;
-> }
+> Thanks and regards,
+> Lokesh
 > 
-> sys_clk32_pseudo {
->                compatible = "fixed-clock";
->                compatible = "fixed-factor-clock";
->                clocks = <&sys_clkin1>;
->                clock-mult = <1>;
->                clock-div = <610>;
-> }
+> > 
+> > Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
+> > ---
+> >  arch/arm/mach-omap2/control.h |    4 ++++
+> >  arch/arm/mach-omap2/timer.c   |   36 ++++++++++++++++++++++++++++++++++--
+> >  2 files changed, 38 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+> > index a3c0133..a80ac2d 100644
+> > --- a/arch/arm/mach-omap2/control.h
+> > +++ b/arch/arm/mach-omap2/control.h
+> > @@ -286,6 +286,10 @@
+> >  #define OMAP5XXX_CONTROL_STATUS                0x134
+> >  #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
+> >  
+> > +/* DRA7XX CONTROL CORE BOOTSTRAP */
+> > +#define DRA7_CTRL_CORE_BOOTSTRAP	0x6c4
+> > +#define DRA7_SPEEDSELECT_MASK		(0x3 << 8)
+> > +
+> >  /*
+> >   * REVISIT: This list of registers is not comprehensive - there are more
+> >   * that should be added.
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index fb0cb2b..7d45c84 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -54,6 +54,7 @@
+> >  
+> >  #include "soc.h"
+> >  #include "common.h"
+> > +#include "control.h"
+> >  #include "powerdomain.h"
+> >  #include "omap-secure.h"
+> >  
+> > @@ -496,7 +497,8 @@ static void __init realtime_counter_init(void)
+> >  	void __iomem *base;
+> >  	static struct clk *sys_clk;
+> >  	unsigned long rate;
+> > -	unsigned int reg, num, den;
+> > +	unsigned int reg;
+> > +	unsigned long long num, den;
+> >  
+> >  	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
+> >  	if (!base) {
+> > @@ -511,6 +513,35 @@ static void __init realtime_counter_init(void)
+> >  	}
+> >  
+> >  	rate = clk_get_rate(sys_clk);
+> > +
+> > +	if (soc_is_dra7xx()) {
+> > +		/*
+> > +		 * Errata i856 says the 32.768KHz crystal does not start at
+> > +		 * power on, so the CPU falls back to an emulated 32KHz clock
+> > +		 * based on sysclk / 610 instead. This causes the master counter
+> > +		 * frequency to not be 6.144MHz but at sysclk / 610 * 375 / 2
+> > +		 * (OR sysclk * 75 / 244)
+> > +		 *
+> > +		 * This affects at least the DRA7/AM572x 1.0, 1.1 revisions.
+> > +		 * Of course any board built without a populated 32.768KHz
+> > +		 * crystal would also need this fix even if the CPU is fixed
+> > +		 * later.
+> > +		 *
+> > +		 * Either case can be detected by using the two speedselect bits
+> > +		 * If they are not 0, then the 32.768KHz clock driving the
+> > +		 * coarse counter that corrects the fine counter every time it
+> > +		 * ticks is actually rate/610 rather than 32.768KHz and we
+> > +		 * should compensate to avoid the 570ppm (at 20MHz, much worse
+> > +		 * at other rates) too fast system time.
+> > +		 */
+> > +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
+> > +		if (reg & DRA7_SPEEDSELECT_MASK) {
+> > +			num = 75;
+> > +			den = 244;
+> > +			goto sysclk1_based;
+> > +		}
+> > +	}
+> > +
+> >  	/* Numerator/denumerator values refer TRM Realtime Counter section */
+> >  	switch (rate) {
+> >  	case 12000000:
+> > @@ -545,6 +576,7 @@ static void __init realtime_counter_init(void)
+> >  		break;
+> >  	}
+> >  
+> > +sysclk1_based:
+> >  	/* Program numerator and denumerator registers */
+> >  	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
+> >  			NUMERATOR_DENUMERATOR_MASK;
+> > @@ -556,7 +588,7 @@ static void __init realtime_counter_init(void)
+> >  	reg |= den;
+> >  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+> >  
+> > -	arch_timer_freq = (rate / den) * num;
+> > +	arch_timer_freq = DIV_ROUND_UP_ULL(rate * num, den);
+> >  	set_cntfreq();
+> >  
+> >  	iounmap(base);
+> > 
 > 
-> sys_32k_ck: sys_32k_ck {
-> 	compatible = "ti,mux-clock";
-> 	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
-> };
-> 
-> I think... The only issue is that the BOOTSTRAP register is not around
-> the usual CM1,2 address region...
-
-OK, I like where that idea is headed.  That looks promising.
-
+If tony is ok with the arch_timer_freq change in this patch, I am ok
+with it as well.
 -- 
-Len Sorensen
+Regards,
+Nishanth Menon
