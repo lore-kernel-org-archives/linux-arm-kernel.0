@@ -1,117 +1,66 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Tue, 16 Dec 2014 17:37:22 -0700
-Subject: [Linaro-acpi] [RFC] ACPI on arm64 TODO List
-In-Reply-To: <20141216154842.GI19412@leverpostej>
-References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
- <20141216154842.GI19412@leverpostej>
-Message-ID: <5490D042.3060901@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 17 Dec 2014 09:45:56 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Add DU clocks to device tree
+Message-ID: <1418777156-25994-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/16/2014 08:48 AM, Mark Rutland wrote:
->>> 4. Set clear expectations for those providing ACPI for use with Linux
->>>    * Problem:
->>>      * Hardware/Firmware vendors can and will create ACPI tables that
->>>        cannot be used by Linux without some guidance
->>>      * Kernel developers cannot determine whether the kernel or firmware
->>>        is broken without knowing what the firmware should do
->>>    * Solution: document the expectations, and iterate as needed.
->>>      Enforce when we must.
->>>    * Status: initial kernel text available; AMD has offered to make
->>>      their guidance document generic; firmware summit planned for
->>>      deeper discussions.
->>
->> After seeing the AMD patches, I would add to this point that we need to
->> find a way to come up with shared bindings for common hardware such as
->> the ARM pl011/pl022/pl061/pl330 IP blocks or the designware
->> i2c/spi/usb3/ahci blocks.
->>
->> What I remember from this item on your list is actually a different
->> problem: We need to define more clearly what kinds of machines we
->> would expect ACPI support for and which machines we would not.
->>
->> Fine-grained clock support is one such example: if anybody needs
->> to expose that through a clock driver in the kernel, we need to be
->> very clear that we will not support that kind of machine through
->> ACPI, so we don't get developers building BIOS images that will
->> never be supported. Other examples would be non-compliant PCI
->> hosts or machines that are not covered by SBSA.
-> 
-> [...]
-> 
->>> 6. How does the kernel handle_DSD usage?
->>>    * Problem:
->>>      * _DSD defines key-value properties in the DT style. How do we
->>>        ensure _DSD bindings are well defined?
->>>      * How do we ensure DT and _DSD bindings remain consistent with
->>>        each other?
->>>    * Solution: public documentation for all bindings, and a process
->>>      for defining them
->>>    * Status: proposal to require patch authors to point at public
->>>      binding documentation; kernel Documentation/devicetree/bindings
->>>      remains the default if no other location exists; UEFI forum has
->>>      set up a binding repository.
->>
->> I think we also need to make a decision here on whether we want to use
->> PRP0001 devices on ARM64 servers, and to what degree. I would prefer
->> if we could either make them required for any devices that already have
->> a DT binding and that are not part of the official ACPI spec, or we
->> decide to not use them at all and make any PRP0001 usage a testcase
->> failure.
-> 
-> I am rather concerned about the relationship between items described
-> with _DSD and ACPI's existing device model. Describing the relationship
-> between devices and their input clocks, regulators, and so on defeats
-> much of the benefit ACPI is marketed as providing w.r.t. abstraction of
-> the underlying platform (and as Arnd mentioned above, that's not the
-> kind of platform we want to support with ACPI).
+From: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
 
-My belief is that all those things should be set up into a known good
-state by UEFI on initial boot.  If they need to change, say as the
-result of going into a deeper sleep state or something, that's what
-the ACPI power management objects are for; Linux would execute one of
-the ACPI methods already defined by the spec to control transition to
-the desired state, and that method would have within it the ability
-to change whatever clocks or regulators it deems necessary.  The
-kernel should not have to track these things.
+Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+[horms: Resolved conflicts]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-If someone is describing all those relationships in _DSD, I agree that
-is not the kind of ARM platform I think we want to deal with.  This is
-touched on, iirc, in arm-acpi.txt, but apparently too briefly.
+---
 
-> I have not seen good guidelines on the usage of _DSD in that respect,
-> and I'm worried we'll end up with clock controllers half-owned by AML
-> and half-owned by the kernel's clock framework, and this separation
-> varying from board to board (and FW revision to FW revision). I think
-> that needs to be clarified at the ACPI spec level in addition to
-> anything we have in the kernel documentation.
+[Simon Horman]
+Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
+---
+ arch/arm/boot/dts/r8a7794.dtsi            | 7 +++++--
+ include/dt-bindings/clock/r8a7794-clock.h | 2 ++
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-Hrm.  The spec (section 6.2.5) basically says that there exists a
-thing called _DSD and that when invoked, it returns a UUID followed
-by a data structure.  A separate document (on http://www.uefi.org/acpi)
-for each UUID defines the data structure it corresponds to.  The only
-one defined so far is for device properties:
-
-
-http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
-
-I think you are suggesting good guidelines for both, yes?  The usage
-of new UUIDs and data structures, along with the usage of device
-properties for the UUID we have, right?  I've been trying to write
-such a thing but all I've accomplished so far is throwing away a
-couple of drafts that got ugly.  I'll keep at it, though.
-
-> I'm still of the opinion that conflating _DSD and DT is a bad idea.
-
-Could you explain your usage of "conflating" here?  I think I understand
-what you mean, but I'd rather be sure.
-
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8f78da5..063bf56 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -535,7 +535,8 @@
+ 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+ 			clocks = <&mp_clk>, <&mp_clk>,
+ 				 <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
+-				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>;
++				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				 <&zx_clk>, <&zx_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				R8A7794_CLK_EHCI R8A7794_CLK_HSUSB
+@@ -543,11 +544,13 @@
+ 				R8A7794_CLK_SCIF4 R8A7794_CLK_HSCIF1 R8A7794_CLK_HSCIF0
+ 				R8A7794_CLK_SCIF3 R8A7794_CLK_SCIF2 R8A7794_CLK_SCIF1
+ 				R8A7794_CLK_SCIF0
++				R8A7794_CLK_DU1 R8A7794_CLK_DU0
+ 			>;
+ 			clock-output-names =
+ 				"ehci", "hsusb",
+ 				"hscif2", "scif5", "scif4", "hscif1", "hscif0",
+-				"scif3", "scif2", "scif1", "scif0";
++				"scif3", "scif2", "scif1", "scif0",
++				"du1", "du0";
+ 		};
+ 		mstp8_clks: mstp8_clks at e6150990 {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index d633230..d5cfe62 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -76,6 +76,8 @@
+ #define R8A7794_CLK_SCIF2		19
+ #define R8A7794_CLK_SCIF1		20
+ #define R8A7794_CLK_SCIF0		21
++#define R8A7794_CLK_DU1			23
++#define R8A7794_CLK_DU0			24
+ 
+ /* MSTP8 */
+ #define R8A7794_CLK_VIN1		10
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+2.1.3
