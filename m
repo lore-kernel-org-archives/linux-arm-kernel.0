@@ -1,136 +1,233 @@
-From: tony.kn@samsung.com (Tony K Nadackal)
-Date: Wed, 17 Dec 2014 11:55:12 +0530
-Subject: [PATCH] [media] s5p-jpeg: Fix crash in jpeg isr due to multiple
- interrupts.
-Message-ID: <1418797512-30226-1-git-send-email-tony.kn@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 Dec 2014 14:58:33 +0800
+Subject: [PATCH v2 1/4] clk: sunxi: Rework MMC phase clocks
+In-Reply-To: <1418765936-12542-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1418765936-12542-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64J2Gp1gUh4AKH-1tjg94AcAarFZ5tJc_pr6FC71pJ6Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of corrupt images, multiple interrupts may occur
-due to different error scenarios.
+Hi,
 
-Since we are removing the src and dest buffers in the first
-interrupt itself, crash occurs in the second error interrupts.
+On Wed, Dec 17, 2014 at 5:38 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Instead of having three different clocks for the main MMC clock and the two
+> phase sub-clocks, which involved having three different drivers sharing the
+> same register, rework it to have the same single driver registering three
+> different clocks.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   7 +-
+>  drivers/clk/sunxi/clk-mod0.c                      | 131 ++++++++++++----------
+>  2 files changed, 74 insertions(+), 64 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 9dc4f55a04ad..8c60433a7fc9 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -55,8 +55,7 @@ Required properties:
+>         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>         "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+>         "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+> -       "allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
+> -       "allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
+> +       "allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+>         "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+>         "allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
+>         "allwinner,sun7i-a20-out-clk" - for the external output clocks
+> @@ -95,6 +94,10 @@ For "allwinner,sun6i-a31-pll6-clk", there are 2 outputs. The first output
+>  is the normal PLL6 output, or "pll6". The second output is rate doubled
+>  PLL6, or "pll6x2".
+>
+> +The "allwinner,sun4i-a10-mmc-clk" has three different outputs: the
+> +main clock, with the ID 0, and the output and sample clocks, with the
+> +IDs 1 and 2, respectively.
+> +
 
-Disable the global interrupt before we start processing
-the interrupt avoid the crash.
+Could you also update the mmc/mod0 clock example in the bindings?
+Currently it is an mmc module clock using the mod0 compatible.
 
-Disable System interrupt in isr to avoid the crash below.
+Thanks.
 
-Unable to handle kernel NULL pointer dereference at virtual address 000000c8
-pgd = ffffffc0007db000
-[000000c8] *pgd=00000000fb006003, *pud=00000000fb006003, *pmd=00000000fb007003, *pte=0060000011001707
-Internal error: Oops: 96000007 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.18.0-next-20141210+ #22
-Hardware name: Samsung Exynos7 Espresso board based on EXYNOS7 (DT)
-task: ffffffc00075e5c0 ti: ffffffc00074c000 task.ti: ffffffc00074c000
-PC is at exynos4_jpeg_irq+0x30/0x15c
-LR is at exynos4_jpeg_irq+0x2c/0x15c
-pc : [<ffffffc00040873c>] lr : [<ffffffc000408738>] pstate: 800001c5
-sp : ffffffc00074fc60
-x29: ffffffc00074fc60 x28: 0000004040000000
-x27: ffffffc000673928 x26: ffffffc000673940
-x25: ffffffc0007a030c x24: ffffffc0bb20a400
-x23: 0000000000000030 x22: ffffffc0ba56ba40
-x21: 0000000000000000 x20: 0000000000000000
-x19: ffffffc0ba56ba18 x18: 0000000000000000
-x17: 0000000000000000 x16: ffffffc00018b508
-x15: 0000000000000000 x14: 0000000000000000
-x13: 0098968000000000 x12: 0000000000989680
-x11: 0000000000000004 x10: 0101010101010101
-x9 : 00000020a285a9ea x8 : ffffffc0007af880
-x7 : ffffffc0bac001a8 x6 : ffffffc0bac00000
-x5 : 00000000fffffffa x4 : ffffffc00040870c
-x3 : 0000000000000003 x2 : 0000000000010003
-x1 : 0000000000010002 x0 : 0000000000000000
+ChenYu
 
-Process swapper/0 (pid: 0, stack limit = 0xffffffc00074c058)
-Stack: (0xffffffc00074fc60 to 0xffffffc000750000)
-fc60: 0074fca0 ffffffc0 000e4508 ffffffc0 bb225300 ffffffc0 bb20a494 ffffffc0
-fc80: 00000000 00000000 00000000 00000000 00000030 00000000 000f8c6c ffffffc0
-fca0: 0074fd00 ffffffc0 000e4644 ffffffc0 bb20a400 ffffffc0 bb20a494 ffffffc0
-fcc0: 00776a00 ffffffc0 00670da8 ffffffc0 00000000 00000000 00000001 00000000
-fce0: bb008000 ffffffc0 407db000 00000000 00081230 ffffffc0 000e4638 ffffffc0
-fd00: 0074fd40 ffffffc0 000e7338 ffffffc0 bb20a400 ffffffc0 bb20a494 ffffffc0
-fd20: 00776a00 ffffffc0 000e7280 ffffffc0 bb225300 ffffffc0 000e72e0 ffffffc0
-fd40: 0074fd70 ffffffc0 000e3d60 ffffffc0 00000030 00000000 00743000 ffffffc0
-fd60: 0066e000 ffffffc0 006c2000 ffffffc0 0074fd90 ffffffc0 000e3e90 ffffffc0
-fd80: 007437c8 ffffffc0 000e3e6c ffffffc0 0074fdf0 ffffffc0 00082404 ffffffc0
-fda0: 0074fe20 ffffffc0 0075a000 ffffffc0 0000200c ffffff80 00002010 ffffff80
-fdc0: 60000145 00000000 00672cc8 ffffffc0 407d9000 00000000 befb9b40 ffffffc0
-fde0: 0074fe20 ffffffc0 000001d2 00000000 0074ff40 ffffffc0 00085da8 ffffffc0
-fe00: 00758584 ffffffc0 0052c000 ffffffc0 0074ff40 ffffffc0 00087114 ffffffc0
-fe20: 00000000 00000000 0074ff50 ffffffc0 0067d760 ffffffc0 befb9adc ffffffc0
-fe40: 00000001 00000000 d4414200 00000020 d6a39c00 00000020 007a6a18 ffffffc0
-fe60: 0075eb00 ffffffc0 0074fd60 ffffffc0 ffffc185 00000000 00000020 00000000
-fe80: 0052d340 ffffffc0 00000030 00000000 fffffffe 0fffffff 00000000 00000000
-fea0: 0018b508 ffffffc0 00000000 00000000 00000000 00000000 00758584 ffffffc0
-fec0: 0052c000 ffffffc0 006c24e8 ffffffc0 007a030a ffffffc0 00000001 00000000
-fee0: 00672cc8 ffffffc0 407d9000 00000000 407db000 00000000 00081230 ffffffc0
-ff00: 40000000 00000040 0074ff40 ffffffc0 00087110 ffffffc0 0074ff40 ffffffc0
-ff20: 00087114 ffffffc0 60000145 00000000 00758584 ffffffc0 0052c000 ffffffc0
-ff40: 0074ff50 ffffffc0 000db568 ffffffc0 0074ff90 ffffffc0 00515fdc ffffffc0
-ff60: 00758000 ffffffc0 007a3000 ffffffc0 007a3000 ffffffc0 befc8940 ffffffc0
-ff80: 40760000 00000000 40000000 00000000 0074ffb0 ffffffc0 006ff998 ffffffc0
-ffa0: 00000002 00000000 006ff988 ffffffc0 00000000 00000000 400826c0 00000000
-ffc0: 8f03a688 00000000 00000e11 00000000 48000000 00000000 410fd030 00000000
-ffe0: 0072c250 ffffffc0 00000000 00000000 00000000 00000000 00000000 00000000
-Call trace:
-[<ffffffc00040873c>] exynos4_jpeg_irq+0x30/0x15c
-[<ffffffc0000e4504>] handle_irq_event_percpu+0x6c/0x160
-[<ffffffc0000e4640>] handle_irq_event+0x48/0x78
-[<ffffffc0000e7334>] handle_fasteoi_irq+0xe0/0x198
-[<ffffffc0000e3d5c>] generic_handle_irq+0x24/0x40
-[<ffffffc0000e3e8c>] __handle_domain_irq+0x80/0xf0
-[<ffffffc000082400>] gic_handle_irq+0x30/0x80
-Exception stack(0xffffffc00074fe00 to 0xffffffc00074ff20)
-fe00: 00758584 ffffffc0 0052c000 ffffffc0 0074ff40 ffffffc0 00087114 ffffffc0
-fe20: 00000000 00000000 0074ff50 ffffffc0 0067d760 ffffffc0 befb9adc ffffffc0
-fe40: 00000001 00000000 d4414200 00000020 d6a39c00 00000020 007a6a18 ffffffc0
-fe60: 0075eb00 ffffffc0 0074fd60 ffffffc0 ffffc185 00000000 00000020 00000000
-fe80: 0052d340 ffffffc0 00000030 00000000 fffffffe 0fffffff 00000000 00000000
-fea0: 0018b508 ffffffc0 00000000 00000000 00000000 00000000 00758584 ffffffc0
-fec0: 0052c000 ffffffc0 006c24e8 ffffffc0 007a030a ffffffc0 00000001 00000000
-fee0: 00672cc8 ffffffc0 407d9000 00000000 407db000 00000000 00081230 ffffffc0
-ff00: 40000000 00000040 0074ff40 ffffffc0 00087110 ffffffc0 0074ff40 ffffffc0
-[<ffffffc000085da4>] el1_irq+0x64/0xd8
-[<ffffffc0000db564>] cpu_startup_entry+0x118/0x168
-[<ffffffc000515fd8>] rest_init+0x7c/0x88
-[<ffffffc0006ff994>] start_kernel+0x3a8/0x3bc
-Code: 94045c34 f9406e60 97ffdc74 aa0003f4 (f9406400)
----[ end trace fa6dc0ea2efad21f ]---
-Kernel panic - not syncing: Fatal exception in interrupt
----[ end Kernel panic - not syncing: Fatal exception in interrupt
-
-Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
----
-This patch is created and tested on top of linux-next-20141210.
-It can be cleanly applied on media-next and kgene/for-next.
-
- drivers/media/platform/s5p-jpeg/jpeg-core.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-index 12f7452..91bd3e6 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-@@ -1933,6 +1933,7 @@ static void exynos4_jpeg_device_run(void *priv)
- 		exynos4_jpeg_set_dec_bitstream_size(jpeg->regs, bitstream_size);
- 	}
- 
-+	exynos4_jpeg_set_sys_int_enable(jpeg->regs, 1);
- 	exynos4_jpeg_set_enc_dec_mode(jpeg->regs, ctx->mode);
- 
- 	spin_unlock_irqrestore(&ctx->jpeg->slock, flags);
-@@ -2313,6 +2314,8 @@ static irqreturn_t exynos4_jpeg_irq(int irq, void *priv)
- 
- 	spin_lock(&jpeg->slock);
- 
-+	exynos4_jpeg_set_sys_int_enable(jpeg->regs, 0);
-+
- 	curr_ctx = v4l2_m2m_get_curr_priv(jpeg->m2m_dev);
- 
- 	src_vb = v4l2_m2m_src_buf_remove(curr_ctx->fh.m2m_ctx);
--- 
-2.2.0
+>  For example:
+>
+>  osc24M: clk at 01c20050 {
+> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> index 658d74f39451..4ac52c703818 100644
+> --- a/drivers/clk/sunxi/clk-mod0.c
+> +++ b/drivers/clk/sunxi/clk-mod0.c
+> @@ -115,14 +115,10 @@ static void __init sun5i_a13_mbus_setup(struct device_node *node)
+>  }
+>  CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
+>
+> -struct mmc_phase_data {
+> -       u8      offset;
+> -};
+> -
+>  struct mmc_phase {
+>         struct clk_hw           hw;
+> +       u8                      offset;
+>         void __iomem            *reg;
+> -       struct mmc_phase_data   *data;
+>         spinlock_t              *lock;
+>  };
+>
+> @@ -138,7 +134,7 @@ static int mmc_get_phase(struct clk_hw *hw)
+>         u8 delay;
+>
+>         value = readl(phase->reg);
+> -       delay = (value >> phase->data->offset) & 0x3;
+> +       delay = (value >> phase->offset) & 0x3;
+>
+>         if (!delay)
+>                 return 180;
+> @@ -226,8 +222,8 @@ static int mmc_set_phase(struct clk_hw *hw, int degrees)
+>
+>         spin_lock_irqsave(phase->lock, flags);
+>         value = readl(phase->reg);
+> -       value &= ~GENMASK(phase->data->offset + 3, phase->data->offset);
+> -       value |= delay << phase->data->offset;
+> +       value &= ~GENMASK(phase->offset + 3, phase->offset);
+> +       value |= delay << phase->offset;
+>         writel(value, phase->reg);
+>         spin_unlock_irqrestore(phase->lock, flags);
+>
+> @@ -239,66 +235,77 @@ static const struct clk_ops mmc_clk_ops = {
+>         .set_phase      = mmc_set_phase,
+>  };
+>
+> -static void __init sun4i_a10_mmc_phase_setup(struct device_node *node,
+> -                                            struct mmc_phase_data *data)
+> -{
+> -       const char *parent_names[1] = { of_clk_get_parent_name(node, 0) };
+> -       struct clk_init_data init = {
+> -               .num_parents    = 1,
+> -               .parent_names   = parent_names,
+> -               .ops            = &mmc_clk_ops,
+> -       };
+> -
+> -       struct mmc_phase *phase;
+> -       struct clk *clk;
+> -
+> -       phase = kmalloc(sizeof(*phase), GFP_KERNEL);
+> -       if (!phase)
+> -               return;
+> -
+> -       phase->hw.init = &init;
+> +static DEFINE_SPINLOCK(sun4i_a10_mmc_lock);
+>
+> -       phase->reg = of_iomap(node, 0);
+> -       if (!phase->reg)
+> -               goto err_free;
+> +static void __init sun4i_a10_mmc_setup(struct device_node *node)
+> +{
+> +       struct clk_onecell_data *clk_data;
+> +       const char *parent;
+> +       void __iomem *reg;
+> +       int i;
+>
+> -       phase->data = data;
+> -       phase->lock = &sun4i_a10_mod0_lock;
+> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +       if (IS_ERR(reg)) {
+> +               pr_err("Couldn't map the %s clock registers\n", node->name);
+> +               return;
+> +       }
+>
+> -       if (of_property_read_string(node, "clock-output-names", &init.name))
+> -               init.name = node->name;
+> +       clk_data = kmalloc(sizeof(*clk_data), GFP_KERNEL);
+> +       if (!clk_data)
+> +               return;
+>
+> -       clk = clk_register(NULL, &phase->hw);
+> -       if (IS_ERR(clk))
+> -               goto err_unmap;
+> +       clk_data->clks = kcalloc(3, sizeof(*clk_data->clks), GFP_KERNEL);
+> +       if (!clk_data->clks)
+> +               goto err_free_data;
+> +
+> +       clk_data->clk_num = 3;
+> +       clk_data->clks[0] = sunxi_factors_register(node,
+> +                                                  &sun4i_a10_mod0_data,
+> +                                                  &sun4i_a10_mmc_lock, reg);
+> +       if (!clk_data->clks[0])
+> +               goto err_free_clks;
+> +
+> +       parent = __clk_get_name(clk_data->clks[0]);
+> +
+> +       for (i = 1; i < 3; i++) {
+> +               struct clk_init_data init = {
+> +                       .num_parents    = 1,
+> +                       .parent_names   = &parent,
+> +                       .ops            = &mmc_clk_ops,
+> +               };
+> +               struct mmc_phase *phase;
+> +
+> +               phase = kmalloc(sizeof(*phase), GFP_KERNEL);
+> +               if (!phase)
+> +                       continue;
+> +
+> +               phase->hw.init = &init;
+> +               phase->reg = reg;
+> +               phase->lock = &sun4i_a10_mmc_lock;
+> +
+> +               if (i == 1)
+> +                       phase->offset = 8;
+> +               else
+> +                       phase->offset = 20;
+> +
+> +               if (of_property_read_string_index(node, "clock-output-names",
+> +                                                 i, &init.name))
+> +                       init.name = node->name;
+> +
+> +               clk_data->clks[i] = clk_register(NULL, &phase->hw);
+> +               if (IS_ERR(clk_data->clks[i])) {
+> +                       kfree(phase);
+> +                       continue;
+> +               }
+> +       }
+>
+> -       of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>
+>         return;
+>
+> -err_unmap:
+> -       iounmap(phase->reg);
+> -err_free:
+> -       kfree(phase);
+> -}
+> -
+> -
+> -static struct mmc_phase_data mmc_output_clk = {
+> -       .offset = 8,
+> -};
+> -
+> -static struct mmc_phase_data mmc_sample_clk = {
+> -       .offset = 20,
+> -};
+> -
+> -static void __init sun4i_a10_mmc_output_setup(struct device_node *node)
+> -{
+> -       sun4i_a10_mmc_phase_setup(node, &mmc_output_clk);
+> -}
+> -CLK_OF_DECLARE(sun4i_a10_mmc_output, "allwinner,sun4i-a10-mmc-output-clk", sun4i_a10_mmc_output_setup);
+> -
+> -static void __init sun4i_a10_mmc_sample_setup(struct device_node *node)
+> -{
+> -       sun4i_a10_mmc_phase_setup(node, &mmc_sample_clk);
+> +err_free_clks:
+> +       kfree(clk_data->clks);
+> +err_free_data:
+> +       kfree(clk_data);
+>  }
+> -CLK_OF_DECLARE(sun4i_a10_mmc_sample, "allwinner,sun4i-a10-mmc-sample-clk", sun4i_a10_mmc_sample_setup);
+> +CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
+> --
+> 2.2.0
+>
