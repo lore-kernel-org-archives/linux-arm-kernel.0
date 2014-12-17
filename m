@@ -1,209 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 17 Dec 2014 12:17:36 +0800
-Subject: [PATCH v2 3/4] mmc: sunxi: Convert MMC driver to the standard
- clock phase API
-In-Reply-To: <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
- <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 17 Dec 2014 12:23:19 +0800
+Subject: [PATCH V2] ARM: imx: remove unnecessary setting for DSM
+Message-ID: <1418790199-12919-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now we support DSM in OCRAM for all i.MX6 SoCs,
+the resume entry point is set in asm code of
+suspend-imx6.S, so no need to set the resume
+entry point for SRC in pre-suspend flow.
 
-On Wed, Dec 17, 2014 at 5:38 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Now that we have proper support to use the generic phase API in our clock
-> driver, switch the MMC driver to use it.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Acked-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> ---
->  .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
->  drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
->  2 files changed, 53 insertions(+), 27 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> index 91b3a3467150..4bf41d833804 100644
-> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
->  Required properties:
->   - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
->   - reg : mmc controller base registers
-> - - clocks : a list with 2 phandle + clock specifier pairs
-> - - clock-names : must contain "ahb" and "mmc"
-> + - clocks : a list with 4 phandle + clock specifier pairs
-> + - clock-names : must contain "ahb", "mmc", "output" and "sample"
->   - interrupts : mmc controller interrupt
->
->  Optional properties:
-> @@ -25,8 +25,8 @@ Examples:
->         mmc0: mmc at 01c0f000 {
->                 compatible = "allwinner,sun5i-a13-mmc";
->                 reg = <0x01c0f000 0x1000>;
-> -               clocks = <&ahb_gates 8>, <&mmc0_clk>;
-> -               clock-names = "ahb", "mod";
-> +               clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
-> +               clock-names = "ahb", "mod", "output", "sample";
->                 interrupts = <0 32 4>;
->                 status = "disabled";
->         };
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index d1663b3c4143..afe20c322e55 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -22,7 +22,6 @@
->
->  #include <linux/clk.h>
->  #include <linux/clk-private.h>
-> -#include <linux/clk/sunxi.h>
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/pm-imx6.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-This conflicts with
-
-    05e07d8 mmc: sunxi: Remove unused includes of linux/clk-private.h
-
-when applied over
-
-    a0eda58 (linux-next/master) Add linux-next specific files for 20141216
-
->
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
-> @@ -230,6 +229,8 @@ struct sunxi_mmc_host {
->         /* clock management */
->         struct clk      *clk_ahb;
->         struct clk      *clk_mmc;
-> +       struct clk      *clk_sample;
-> +       struct clk      *clk_output;
->
->         /* irq */
->         spinlock_t      lock;
-> @@ -617,7 +618,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->  static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                                   struct mmc_ios *ios)
->  {
-> -       u32 rate, oclk_dly, rval, sclk_dly, src_clk;
-> +       u32 rate, oclk_dly, rval, sclk_dly;
->         int ret;
->
->         rate = clk_round_rate(host->clk_mmc, ios->clock);
-> @@ -643,34 +644,31 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->
->         /* determine delays */
->         if (rate <= 400000) {
-> -               oclk_dly = 0;
-> -               sclk_dly = 7;
-> +               oclk_dly = 180;
-> +               sclk_dly = 42;
-
-42 seems like an odd number. Maybe 45?
-
->         } else if (rate <= 25000000) {
-> -               oclk_dly = 0;
-> -               sclk_dly = 5;
-> +               oclk_dly = 180;
-> +               sclk_dly = 75;
->         } else if (rate <= 50000000) {
->                 if (ios->timing == MMC_TIMING_UHS_DDR50) {
-> -                       oclk_dly = 2;
-> -                       sclk_dly = 4;
-> +                       oclk_dly = 60;
-> +                       sclk_dly = 120;
->                 } else {
-> -                       oclk_dly = 3;
-> -                       sclk_dly = 5;
-> +                       oclk_dly = 90;
-> +                       sclk_dly = 150;
->                 }
-> +       } else if (rate <= 100000000) {
-> +               oclk_dly = 6;
-> +               sclk_dly = 24;
-> +       } else if (rate <= 200000000) {
-> +               oclk_dly = 3;
-> +               sclk_dly = 12;
->         } else {
-> -               /* rate > 50000000 */
-> -               oclk_dly = 2;
-> -               sclk_dly = 4;
-> +               return -EINVAL;
->         }
->
-> -       src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
-> -       if (src_clk >= 300000000 && src_clk <= 400000000) {
-> -               if (oclk_dly)
-> -                       oclk_dly--;
-> -               if (sclk_dly)
-> -                       sclk_dly--;
-> -       }
-> -
-> -       clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
-> +       clk_set_phase(host->clk_sample, sclk_dly);
-> +       clk_set_phase(host->clk_output, oclk_dly);
->
->         return sunxi_mmc_oclk_onoff(host, 1);
->  }
-> @@ -909,6 +907,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->                 return PTR_ERR(host->clk_mmc);
->         }
->
-> +       host->clk_output = devm_clk_get(&pdev->dev, "output");
-> +       if (IS_ERR(host->clk_output)) {
-> +               dev_err(&pdev->dev, "Could not get output clock\n");
-> +               return PTR_ERR(host->clk_output);
-> +       }
-> +
-> +       host->clk_sample = devm_clk_get(&pdev->dev, "sample");
-> +       if (IS_ERR(host->clk_sample)) {
-> +               dev_err(&pdev->dev, "Could not get sample clock\n");
-> +               return PTR_ERR(host->clk_sample);
-> +       }
-> +
->         host->reset = devm_reset_control_get(&pdev->dev, "ahb");
->
->         ret = clk_prepare_enable(host->clk_ahb);
-> @@ -923,11 +933,23 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->                 goto error_disable_clk_ahb;
->         }
->
-> +       ret = clk_prepare_enable(host->clk_output);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
-> +               goto error_disable_clk_mmc;
-> +       }
-> +
-> +       ret = clk_prepare_enable(host->clk_sample);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
-> +               goto error_disable_clk_output;
-> +       }
-> +
->         if (!IS_ERR(host->reset)) {
->                 ret = reset_control_deassert(host->reset);
->                 if (ret) {
->                         dev_err(&pdev->dev, "reset err %d\n", ret);
-> -                       goto error_disable_clk_mmc;
-> +                       goto error_disable_clk_sample;
->                 }
->         }
->
-> @@ -946,6 +968,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->  error_assert_reset:
->         if (!IS_ERR(host->reset))
->                 reset_control_assert(host->reset);
-> +error_disable_clk_sample:
-> +       clk_disable_unprepare(host->clk_sample);
-> +error_disable_clk_output:
-> +       clk_disable_unprepare(host->clk_output);
->  error_disable_clk_mmc:
->         clk_disable_unprepare(host->clk_mmc);
->  error_disable_clk_ahb:
-> --
-> 2.2.0
->
-
-Otherwise looks good. Thanks!
-
-
-ChenYu
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index c653dd4..671e2a9 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -363,7 +363,6 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 			imx6q_enable_rbc(true);
+ 		imx_gpc_pre_suspend(true);
+ 		imx_anatop_pre_suspend();
+-		imx_set_cpu_jump(0, v7_cpu_resume);
+ 		/* Zzz ... */
+ 		cpu_suspend(0, imx6q_suspend_finish);
+ 		if (cpu_is_imx6q() || cpu_is_imx6dl())
+-- 
+1.9.1
