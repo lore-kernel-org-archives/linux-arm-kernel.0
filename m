@@ -1,100 +1,209 @@
-From: yvo@apm.com (Y Vo)
-Date: Wed, 17 Dec 2014 10:55:49 +0700
-Subject: [PATCH v2 3/3] arm64:dts: Add APM X-Gene standby GPIO controller DTS
- entries
-In-Reply-To: <1418788549-27108-1-git-send-email-yvo@apm.com>
-References: <1418788549-27108-1-git-send-email-yvo@apm.com>
-Message-ID: <1418788549-27108-4-git-send-email-yvo@apm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 Dec 2014 12:17:36 +0800
+Subject: [PATCH v2 3/4] mmc: sunxi: Convert MMC driver to the standard
+ clock phase API
+In-Reply-To: <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add standby domain gpio controller for APM X-Gene SoC platform.
+Hi,
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi | 13 +++++++++++++
- drivers/gpio/gpio-xgene-sb.c       | 18 +++---------------
- 2 files changed, 16 insertions(+), 15 deletions(-)
+On Wed, Dec 17, 2014 at 5:38 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Now that we have proper support to use the generic phase API in our clock
+> driver, switch the MMC driver to use it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> ---
+>  .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
+>  drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
+>  2 files changed, 53 insertions(+), 27 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> index 91b3a3467150..4bf41d833804 100644
+> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> @@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
+>  Required properties:
+>   - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
+>   - reg : mmc controller base registers
+> - - clocks : a list with 2 phandle + clock specifier pairs
+> - - clock-names : must contain "ahb" and "mmc"
+> + - clocks : a list with 4 phandle + clock specifier pairs
+> + - clock-names : must contain "ahb", "mmc", "output" and "sample"
+>   - interrupts : mmc controller interrupt
+>
+>  Optional properties:
+> @@ -25,8 +25,8 @@ Examples:
+>         mmc0: mmc at 01c0f000 {
+>                 compatible = "allwinner,sun5i-a13-mmc";
+>                 reg = <0x01c0f000 0x1000>;
+> -               clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> -               clock-names = "ahb", "mod";
+> +               clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
+> +               clock-names = "ahb", "mod", "output", "sample";
+>                 interrupts = <0 32 4>;
+>                 status = "disabled";
+>         };
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index d1663b3c4143..afe20c322e55 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -22,7 +22,6 @@
+>
+>  #include <linux/clk.h>
+>  #include <linux/clk-private.h>
+> -#include <linux/clk/sunxi.h>
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 295c72d..e2454a2 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -587,6 +587,19 @@
- 			phy-names = "sata-phy";
- 		};
- 
-+		sbgpio: sbgpio at 17001000{
-+			compatible = "apm,xgene-gpio-sb";
-+			reg = <0x0 0x17001000 0x0 0x400>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupts = 	<0x0 0x28 0x1>,
-+					<0x0 0x29 0x1>,
-+					<0x0 0x2a 0x1>,
-+					<0x0 0x2b 0x1>,
-+					<0x0 0x2c 0x1>,
-+					<0x0 0x2d 0x1>;
-+		};
-+
- 		rtc: rtc at 10510000 {
- 			compatible = "apm,xgene-rtc";
- 			reg = <0x0 0x10510000 0x0 0x400>;
-diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
-index 7668626..425234b 100644
---- a/drivers/gpio/gpio-xgene-sb.c
-+++ b/drivers/gpio/gpio-xgene-sb.c
-@@ -44,14 +44,10 @@
- #define MPA_GPIO_SEL_LO			0x0294
- #define MPA_GPIO_SEL_HIGH		0x029c
- 
--#define GICD_SPI_BASE			0x78010000
--#define GICD_SPIR1			0x00000d08
--
- struct xgene_gpio_sb {
- 	struct of_mm_gpio_chip mm;
- 	u32 *irq;
- 	u32 nirq;
--	void __iomem *gic_regs;
- 	spinlock_t lock; /* mutual exclusion */
- };
- 
-@@ -75,14 +71,9 @@ static void xgene_gpio_set_bit(void __iomem *reg, u32 gpio, int val)
- static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
- {
- 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
--	struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
- 	u32 data;
- 
--	if (chip->irq[gpio]) {
--		data = ioread32(chip->gic_regs + GICD_SPIR1);
--	} else {
--		data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
--	}
-+	data = ioread32(mm_gc->regs + MPA_GPIO_IN_ADDR);
- 
- 	return (data &  GPIO_MASK(gpio)) ? 1 : 0;
- }
-@@ -167,10 +158,6 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
- 	mm->gc.ngpio = XGENE_MAX_GPIO_DS;
- 	apm_gc->nirq = XGENE_MAX_GPIO_DS_IRQ;
- 
--	apm_gc->gic_regs = ioremap(GICD_SPI_BASE, 16);
--	if (!apm_gc->gic_regs)
--		return -ENOMEM;
--
- 	apm_gc->irq = devm_kzalloc(&pdev->dev, sizeof(u32) * XGENE_MAX_GPIO_DS,
- 				   GFP_KERNEL);
- 	if (!apm_gc->irq)
-@@ -202,7 +189,8 @@ static int xgene_gpio_sb_remove(struct platform_device *pdev)
- {
- 	struct of_mm_gpio_chip *mm = platform_get_drvdata(pdev);
- 
--	return gpiochip_remove(&mm->gc);
-+	gpiochip_remove(&mm->gc);
-+	return 0;
- }
- 
- static const struct of_device_id xgene_gpio_sb_of_match[] = {
--- 
-2.2.0
+This conflicts with
+
+    05e07d8 mmc: sunxi: Remove unused includes of linux/clk-private.h
+
+when applied over
+
+    a0eda58 (linux-next/master) Add linux-next specific files for 20141216
+
+>
+>  #include <linux/gpio.h>
+>  #include <linux/platform_device.h>
+> @@ -230,6 +229,8 @@ struct sunxi_mmc_host {
+>         /* clock management */
+>         struct clk      *clk_ahb;
+>         struct clk      *clk_mmc;
+> +       struct clk      *clk_sample;
+> +       struct clk      *clk_output;
+>
+>         /* irq */
+>         spinlock_t      lock;
+> @@ -617,7 +618,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>  static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>                                   struct mmc_ios *ios)
+>  {
+> -       u32 rate, oclk_dly, rval, sclk_dly, src_clk;
+> +       u32 rate, oclk_dly, rval, sclk_dly;
+>         int ret;
+>
+>         rate = clk_round_rate(host->clk_mmc, ios->clock);
+> @@ -643,34 +644,31 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>
+>         /* determine delays */
+>         if (rate <= 400000) {
+> -               oclk_dly = 0;
+> -               sclk_dly = 7;
+> +               oclk_dly = 180;
+> +               sclk_dly = 42;
+
+42 seems like an odd number. Maybe 45?
+
+>         } else if (rate <= 25000000) {
+> -               oclk_dly = 0;
+> -               sclk_dly = 5;
+> +               oclk_dly = 180;
+> +               sclk_dly = 75;
+>         } else if (rate <= 50000000) {
+>                 if (ios->timing == MMC_TIMING_UHS_DDR50) {
+> -                       oclk_dly = 2;
+> -                       sclk_dly = 4;
+> +                       oclk_dly = 60;
+> +                       sclk_dly = 120;
+>                 } else {
+> -                       oclk_dly = 3;
+> -                       sclk_dly = 5;
+> +                       oclk_dly = 90;
+> +                       sclk_dly = 150;
+>                 }
+> +       } else if (rate <= 100000000) {
+> +               oclk_dly = 6;
+> +               sclk_dly = 24;
+> +       } else if (rate <= 200000000) {
+> +               oclk_dly = 3;
+> +               sclk_dly = 12;
+>         } else {
+> -               /* rate > 50000000 */
+> -               oclk_dly = 2;
+> -               sclk_dly = 4;
+> +               return -EINVAL;
+>         }
+>
+> -       src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
+> -       if (src_clk >= 300000000 && src_clk <= 400000000) {
+> -               if (oclk_dly)
+> -                       oclk_dly--;
+> -               if (sclk_dly)
+> -                       sclk_dly--;
+> -       }
+> -
+> -       clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
+> +       clk_set_phase(host->clk_sample, sclk_dly);
+> +       clk_set_phase(host->clk_output, oclk_dly);
+>
+>         return sunxi_mmc_oclk_onoff(host, 1);
+>  }
+> @@ -909,6 +907,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+>                 return PTR_ERR(host->clk_mmc);
+>         }
+>
+> +       host->clk_output = devm_clk_get(&pdev->dev, "output");
+> +       if (IS_ERR(host->clk_output)) {
+> +               dev_err(&pdev->dev, "Could not get output clock\n");
+> +               return PTR_ERR(host->clk_output);
+> +       }
+> +
+> +       host->clk_sample = devm_clk_get(&pdev->dev, "sample");
+> +       if (IS_ERR(host->clk_sample)) {
+> +               dev_err(&pdev->dev, "Could not get sample clock\n");
+> +               return PTR_ERR(host->clk_sample);
+> +       }
+> +
+>         host->reset = devm_reset_control_get(&pdev->dev, "ahb");
+>
+>         ret = clk_prepare_enable(host->clk_ahb);
+> @@ -923,11 +933,23 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+>                 goto error_disable_clk_ahb;
+>         }
+>
+> +       ret = clk_prepare_enable(host->clk_output);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
+> +               goto error_disable_clk_mmc;
+> +       }
+> +
+> +       ret = clk_prepare_enable(host->clk_sample);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
+> +               goto error_disable_clk_output;
+> +       }
+> +
+>         if (!IS_ERR(host->reset)) {
+>                 ret = reset_control_deassert(host->reset);
+>                 if (ret) {
+>                         dev_err(&pdev->dev, "reset err %d\n", ret);
+> -                       goto error_disable_clk_mmc;
+> +                       goto error_disable_clk_sample;
+>                 }
+>         }
+>
+> @@ -946,6 +968,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+>  error_assert_reset:
+>         if (!IS_ERR(host->reset))
+>                 reset_control_assert(host->reset);
+> +error_disable_clk_sample:
+> +       clk_disable_unprepare(host->clk_sample);
+> +error_disable_clk_output:
+> +       clk_disable_unprepare(host->clk_output);
+>  error_disable_clk_mmc:
+>         clk_disable_unprepare(host->clk_mmc);
+>  error_disable_clk_ahb:
+> --
+> 2.2.0
+>
+
+Otherwise looks good. Thanks!
+
+
+ChenYu
