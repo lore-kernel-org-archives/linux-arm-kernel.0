@@ -1,55 +1,55 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 17 Dec 2014 15:53:25 +0100
-Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
- dt-specific callback instead of initcall
-In-Reply-To: <3015182.XtvMmOW5GD@wuerfel>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1921117.BkWucCVOZq@wuerfel> <1652354.DLhQnkm7xS@avalon>
- <3015182.XtvMmOW5GD@wuerfel>
-Message-ID: <1418828005.3347.7.camel@pengutronix.de>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Wed, 17 Dec 2014 09:55:33 -0500
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <54918357.8060801@ti.com>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca>
+ <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
+ <54918357.8060801@ti.com>
+Message-ID: <20141217145533.GS24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 17.12.2014, 15:27 +0100 schrieb Arnd Bergmann:
-> On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
-> > 
-> > If we forbid the IOMMU driver from being compiled as a module can't we just 
-> > rely on deferred probing ? The bus master driver will just be reprobed after 
-> > the IOMMU gets probed, like for other devices.
-> > 
-> > This could fail in case the IOMMU device permanently fails to probe. There 
-> > would be something very wrong in the system in that case, Enabling the bus 
-> > masters totally transparently without IOMMU support could not be such a good 
-> > idea.
+On Wed, Dec 17, 2014 at 03:21:27PM +0200, Tero Kristo wrote:
+> Yea I think the 32k clock node should be fixed based on this.
+> Something like this:
 > 
-> I believe in the majority of cases today, the IOMMU is entirely optional.
-> There are valid reasons for not including the IOMMU driver in the kernel,
-> e.g. when you know that all the machines with that driver can DMA to
-> all of their RAM and you want to avoid the overhead of IOTLB misses.
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -100,8 +100,10 @@
 > 
-This is similar to the problems we discussed with the componentized
-device framework and in the end everybody agreed on a simple rule:
-if the device node is enabled in the DT there must be a driver bound to
-it before other devices depending on this node can be probed.
+>         sys_32k_ck: sys_32k_ck {
+>                 #clock-cells = <0>;
+> -               compatible = "fixed-clock";
+> -               clock-frequency = <32768>;
+> +               compatible = "fixed-factor-clock";
+> +               clocks = <&sys_clkin1>;
+> +               clock-mult = <1>;
+> +               clock-div = <610>;
+>         };
+> 
+>         virt_12000000_ck: virt_12000000_ck {
+> 
+> 
+> It might be better then just query the actual clock rate from the
+> timer code.
 
-If we apply the same logic to the IOMMU situation we get two
-possibilities to allow bypassing the IOMMU:
-1. completely disable the IOMMU node in the DT
-2. leave node enabled in DT, but add a bypass property
+But it is only SYSCLK1 / 610 if the DRA7_CTRL_CORE_BOOTSTRAP register
+says it is.  Otherwise is is in fact 32768Hz.  I certainly would expect
+that if another revision of the chip is made (and even for the single
+core AM571x chips when they are done) will have this fixed and will work
+with the external 32.768KHz crystal, if it is present.
 
-Obviously the second option still requires to have the IOMMU driver
-available, but is more flexible. Right now everything depends on the
-IOMMU being in passthrough mode at reset with no driver bound. If a
-device comes around where this isn't the case thing will break with the
-current assumptions or the first option.
+So how does one make the dtb reflect what the state of the CPU actually
+is?
 
-Having the IOMMU node enabled in DT with no driver available to the
-kernel seems like an invalid configuration which should be expected to
-break. Exactly the same thing as with componentized devices...
+The errata even says that if SYSCLK1 is 26MHz (not a supported option
+in the manual), then the 32.768KHz crystal does work and the counter
+frequency will in fact be 6.144MHz like it should be.
 
-Regards,
-Lucas
+So just changing the dtb is not an option.
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Len Sorensen
