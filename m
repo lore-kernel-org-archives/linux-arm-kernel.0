@@ -1,90 +1,40 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 17 Dec 2014 14:08:12 +0100
-Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
- pm_genpd_dev_need_restore to use restore types
-In-Reply-To: <CADGdYn60ONwuLtcdXSegbQLgFaF-me+mZY6-LPYRQvdfmWFMdA@mail.gmail.com>
-References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
- <54901341.20106@samsung.com>
- <CADGdYn60ONwuLtcdXSegbQLgFaF-me+mZY6-LPYRQvdfmWFMdA@mail.gmail.com>
-Message-ID: <5491803C.4030000@samsung.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 17 Dec 2014 22:13:26 +0900
+Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
+In-Reply-To: <20141217104428.GV11285@n2100.arm.linux.org.uk>
+References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
+ <1918116.UxUgDPTmcq@wuerfel>
+ <CAAVeFuL2MKRA7YLm_wsyftNy-sxgEYPrmqBm8XTRZQb66YF-qw@mail.gmail.com>
+ <1628217.66frkAqHMc@wuerfel>
+ <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
+ <20141217104428.GV11285@n2100.arm.linux.org.uk>
+Message-ID: <CAAVeFuL1QEaFMkC1qQ42EEWU_=_KCyO=_waq-7eshPrVY58m0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Dec 17, 2014 at 7:44 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Dec 17, 2014 at 11:45:01AM +0900, Alexandre Courbot wrote:
+>> Actually we are not that far from being able to do completely without
+>> any GPIO number, and maybe that's what we should aim for. I think the
+>> only remaining offender is the sysfs interface.
+>
+> And that is a user API, and there's lots of users of it (eg, on Raspberry
+> Pi platforms.)  So changing it isn't going to be easy - I'd say that it's
+> impractical.
+>
+> What you're suggesting would be like re-numbering Linux syscalls.
 
-On 2014-12-17 03:43, amit daniel kachhap wrote:
-> On Tue, Dec 16, 2014 at 4:40 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Hello,
->>
->> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
->>> Instead of using bool to restore suspended devices initially, use flags
->>> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and GPD_DEV_RESTORE_FORCE.
->>> The first two flags will be similar to the existing true/false
->>> functionality.
->>> The third flag may be used to force restore of suspended devices
->>> whenever their associated power domain is turned on.
->>>
->>> Currently, PD power off function powers off all the associated unused
->>> devices. The functionality added in this patch is similar to it.
->>>
->>> This feature may be used for those devices which are always in ON state
->>> if the PD associated with them is ON but may need local runtime resume
->>> and suspend during PD On/Off. These devices (like clock) may not implement
->>> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
->>> subsystems interaction behaviour or any other reason.
->>>
->>> The model works like,
->>>       DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
->>>       /  pm_runtime_put. Its local runtime_suspend/resume is invoked via
->>>      /   GPD_DEV_RESTORE_FORCE option)
->>>     /
->>> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
->>>     \    pm_runtime_put. This in turn invokes PD On/Off)
->>>      \
->>>       DEV3 (Similar to DEV1)
->>>
->>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->>
->> The idea of adding new gen_pd flag and reusing runtime pm calls intead of
->> additional
->> notifiers looks promising, but I have some doubts. I don't see any guarantee
->> that
->> devices with GPD_DEV_RESTORE_FORCE flag will be suspended after all "normal"
->> devices
->> and restored before them. Without such assumption it will be hard to use
->> this approach
->> for iommu related activities, because device might need to use (in its
->> suspend/resume
->> callbacks) the functionality provided by the other device with
->> GPD_DEV_RESTORE_FORCE
->> flag. Maybe some additional flags like suspend/resume priority (or more
->> flags) will
->> solve somehow this dependency.
-> Thanks for pointing this issue out. I agree that there is no priority
-> in suspending devices with this flag. But this works well in syncing
-> with power domain on/off as the devices of these types have only
-> dependency with power domain. BTW I tested this implementation with
-> your first version of IOMMU save/restore patches. Although i have not
-> posted those but they work fine. I can post those after cleaning them
-> up.
+Uh, I expressed myself poorly. What I intended to say is that once we
+have a sysfs alternative that does not rely on GPIO numbers (and thus
+have the same feature coverage as the integer interface), we can
+require new platforms to exclusively rely on gpiod/sysfs2, and
+encourage older users to switch to it if they have an issue with the
+way integers are handled or need one of the new features.
 
-Right, they will work, but mainly because right now master devices don't
-do any memory DMA operations in suspend/resume callbacks. However, to 
-propose
-it as a generic solution, the priority and the order of operations 
-should be
-somehow determined.
-
-> Here, the ordering between various devices is taken care as they are
-> probed at different point of time(clock then IOMMU). so the suspend
-> happens in reverse probe order and resume happens in probe order. I
-> will check more on this and get back.
-
-Right now, it probably used the order of probing. Because iommu controllers
-are probed earlier, so they are handled before the master devices.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+I don't foresee that we will ever be able to retire the integer
+interface, however I would like to be able to say "your problem will
+be solved if you switch to gpiod" instead of having to juggle with
+potentially conflicting integer range requirements from different
+platforms. Right now the only thing that prevents us to say that is
+the lack of a consistent sysfs interface.
