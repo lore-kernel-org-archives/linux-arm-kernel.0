@@ -1,83 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 17 Dec 2014 07:23:22 -0800
-Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
- disable failure due to domain being gated
-In-Reply-To: <1418718015.28527.4.camel@AMDC1943>
-References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
- <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
- <7hlhmfo1b0.fsf@deeprootsystems.com> <7h8ui8h7n9.fsf@deeprootsystems.com>
- <1418718015.28527.4.camel@AMDC1943>
-Message-ID: <20141217152322.29014.7739@quantum>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Wed, 17 Dec 2014 10:27:10 -0500
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141217152225.GA737@kahuna>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca>
+ <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
+ <54918357.8060801@ti.com>
+ <20141217145533.GS24110@csclub.uwaterloo.ca>
+ <20141217152225.GA737@kahuna>
+Message-ID: <20141217152710.GT24110@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Krzysztof Kozlowski (2014-12-16 00:20:15)
-> On pon, 2014-12-15 at 14:26 -0800, Kevin Hilman wrote:
-> > Kevin Hilman <khilman@kernel.org> writes:
-> > 
-> > > Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
-> > >
-> > >> On 09/12/14 13:59, Krzysztof Kozlowski wrote:
-> > >>> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
-> > >>>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
-> > >>>> > clock for this block (from main clock domain) 'mau_epll' is gated then
-> > >>>> > any read or write to audss registers will block.
-> > >>>> > 
-> > >>>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
-> > >>>> > after introducing runtime PM to pl330 DMA driver. After that commit the
-> > >>>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
-> > >>>> > were no more users of mau_epll.
-> > >>>> > 
-> > >>>> > The system hang on one of steps:
-> > >>>> > 1. Disabling unused clocks from audss block.
-> > >>>> > 2. During audss GPIO setup (just before probing i2s0 because
-> > >>>> >    samsung_pinmux_setup() tried to access memory from audss block which was
-> > >>>> >    gated.
-> > >>>> > 
-> > >>>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
-> > >>>> > 
-> > >>>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > >>>> > ---
-> > >>>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
-> > >>>> >  1 file changed, 28 insertions(+), 1 deletion(-)
-> > >>>
-> > >>> Sorry for pinging so quick but merge window is open and it looks like
-> > >>> booting Exynos542x boards will be broken (because pl330 will no longer
-> > >>> hold adma clock enabled so whole audss domain will be gated).
-> > >>> 
-> > >>> This is a non-intrusive workaround for that issue, as wanted by
-> > >>> Sylwester:
-> > >>> https://lkml.org/lkml/2014/12/5/223
-> > >>> 
-> > >>> Any comments on this?
-> > >>
-> > >> The patch looks OK to me, it would be good though if someone else
-> > >> has confirmed it fixes the bug. I don't have any clock patches queued
-> > >> at the moment. Perhaps you could apply it directly, Mike ?
-> > >
-> > > I confirm it fixes the boot hang in linux-next (next-20141210) on my
-> > > exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
-> > > exynos_defconfig and multi_v7_defconfig.
-> > >
-> > > Tested-by: Kevin Hilman <khilman@linaro.org>
-> > 
-> > What's the status of this patch?  linux-next is still broken for several
-> > Exynos5 platforms without this fix.
+On Wed, Dec 17, 2014 at 09:22:25AM -0600, Nishanth Menon wrote:
+> A clock mux might do the job?
 > 
-> I believe not only next is broken but also current mainline because
-> runtime PM for pl330 was merged yesterday...
+> value 1, 2 , 3 will imply sysclk1 / 610
+> value of 0 implies fixed 32768
 > 
-> The patch received two tested-bys (Kevin's and Javier's) and Sylwester's
-> ack.
+> soemthing like
+> sys_clk32_crystal {
+>                compatible = "fixed-clock";
+>                clock-frequency = <32768>;
+> }
 > 
-> Mike, could you pick the patch and send it to Linus after rc1?
+> sys_clk32_pseudo {
+>                compatible = "fixed-clock";
+>                compatible = "fixed-factor-clock";
+>                clocks = <&sys_clkin1>;
+>                clock-mult = <1>;
+>                clock-div = <610>;
+> }
+> 
+> sys_32k_ck: sys_32k_ck {
+> 	compatible = "ti,mux-clock";
+> 	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
+> };
+> 
+> I think... The only issue is that the BOOTSTRAP register is not around
+> the usual CM1,2 address region...
 
-Will do.
+OK, I like where that idea is headed.  That looks promising.
 
-Regards,
-Mike
-
-> 
-> Best regards,
-> Krzysztof
-> 
+-- 
+Len Sorensen
