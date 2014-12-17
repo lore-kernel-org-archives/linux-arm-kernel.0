@@ -1,133 +1,166 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 17 Dec 2014 14:06:38 +0530
-Subject: [PATCH V2 2/2] ARM: dra7xx: Fix counter frequency drift for AM572x
- errata i856.
-In-Reply-To: <89b793993eaa492af531bd7aa9dff1f871fb4a77.1418762900.git.lsorense@csclub.uwaterloo.ca>
-References: <cover.1418762900.git.lsorense@csclub.uwaterloo.ca>
- <89b793993eaa492af531bd7aa9dff1f871fb4a77.1418762900.git.lsorense@csclub.uwaterloo.ca>
-Message-ID: <54914096.9060206@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 17 Dec 2014 09:56:13 +0100
+Subject: [PATCH v6] ARM: zImage: add support for ARMv7-M
+Message-ID: <1418806573-14897-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Len,
-On Wednesday 17 December 2014 02:38 AM, Lennart Sorensen wrote:
-> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
-> crystal is not enabled at power up.  Instead the CPU falls back to using
-> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
-> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
-> but can also be 19.2 or 27MHz which result in much larger drift.
-> 
-> Since this is used to drive the master counter at 32.768KHz * 375 /
-> 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
-> seconds per day, and more than the 500ppm NTP is able to tolerate.
-> 
-> Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
-> is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
-> by known that the real counter frequency can be determined and used.
-> The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
-Looks good to me.
-Tested this on DRA7 evm.
+From: Joachim Eastwood <manabian@gmail.com>
 
-Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+This patch makes it possible to enter zImage in Thumb mode for ARMv7-M
+(Cortex-M) CPUs that do not support ARM mode. The kernel entry is also
+made in Thumb mode.
 
-Thanks and regards,
-Lokesh
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+[ukl: fix spelling in commit log, return early in call_cache_fn]
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-> 
-> Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
-> ---
->  arch/arm/mach-omap2/control.h |    4 ++++
->  arch/arm/mach-omap2/timer.c   |   36 ++++++++++++++++++++++++++++++++++--
->  2 files changed, 38 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-> index a3c0133..a80ac2d 100644
-> --- a/arch/arm/mach-omap2/control.h
-> +++ b/arch/arm/mach-omap2/control.h
-> @@ -286,6 +286,10 @@
->  #define OMAP5XXX_CONTROL_STATUS                0x134
->  #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
->  
-> +/* DRA7XX CONTROL CORE BOOTSTRAP */
-> +#define DRA7_CTRL_CORE_BOOTSTRAP	0x6c4
-> +#define DRA7_SPEEDSELECT_MASK		(0x3 << 8)
-> +
->  /*
->   * REVISIT: This list of registers is not comprehensive - there are more
->   * that should be added.
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index fb0cb2b..7d45c84 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -54,6 +54,7 @@
->  
->  #include "soc.h"
->  #include "common.h"
-> +#include "control.h"
->  #include "powerdomain.h"
->  #include "omap-secure.h"
->  
-> @@ -496,7 +497,8 @@ static void __init realtime_counter_init(void)
->  	void __iomem *base;
->  	static struct clk *sys_clk;
->  	unsigned long rate;
-> -	unsigned int reg, num, den;
-> +	unsigned int reg;
-> +	unsigned long long num, den;
->  
->  	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
->  	if (!base) {
-> @@ -511,6 +513,35 @@ static void __init realtime_counter_init(void)
->  	}
->  
->  	rate = clk_get_rate(sys_clk);
-> +
-> +	if (soc_is_dra7xx()) {
-> +		/*
-> +		 * Errata i856 says the 32.768KHz crystal does not start at
-> +		 * power on, so the CPU falls back to an emulated 32KHz clock
-> +		 * based on sysclk / 610 instead. This causes the master counter
-> +		 * frequency to not be 6.144MHz but at sysclk / 610 * 375 / 2
-> +		 * (OR sysclk * 75 / 244)
-> +		 *
-> +		 * This affects at least the DRA7/AM572x 1.0, 1.1 revisions.
-> +		 * Of course any board built without a populated 32.768KHz
-> +		 * crystal would also need this fix even if the CPU is fixed
-> +		 * later.
-> +		 *
-> +		 * Either case can be detected by using the two speedselect bits
-> +		 * If they are not 0, then the 32.768KHz clock driving the
-> +		 * coarse counter that corrects the fine counter every time it
-> +		 * ticks is actually rate/610 rather than 32.768KHz and we
-> +		 * should compensate to avoid the 570ppm (at 20MHz, much worse
-> +		 * at other rates) too fast system time.
-> +		 */
-> +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
-> +		if (reg & DRA7_SPEEDSELECT_MASK) {
-> +			num = 75;
-> +			den = 244;
-> +			goto sysclk1_based;
-> +		}
-> +	}
-> +
->  	/* Numerator/denumerator values refer TRM Realtime Counter section */
->  	switch (rate) {
->  	case 12000000:
-> @@ -545,6 +576,7 @@ static void __init realtime_counter_init(void)
->  		break;
->  	}
->  
-> +sysclk1_based:
->  	/* Program numerator and denumerator registers */
->  	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
->  			NUMERATOR_DENUMERATOR_MASK;
-> @@ -556,7 +588,7 @@ static void __init realtime_counter_init(void)
->  	reg |= den;
->  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
->  
-> -	arch_timer_freq = (rate / den) * num;
-> +	arch_timer_freq = DIV_ROUND_UP_ULL(rate * num, den);
->  	set_cntfreq();
->  
->  	iounmap(base);
-> 
+I just picked up Joachim's patch and fixed the small concerns I had in
+the last round.
+
+I thought about adding a wrapper for accessing the CPUID registers that
+are located in cp15 on v7-A/R and memory mapped on v7-M. The
+corresponding registers and their address are as follows:
+
+name		cp15 reg [1] on -A/R	address on -M
+MIDR/CPUID  	CRm=c0, opc2=0  	0xe000ed00              
+PFR0   		CRm=c1, opc2=0  	0xe000ed40
+PFR1   		CRm=c1, opc2=1  	0xe000ed44
+DFR0   		CRm=c1, opc2=2  	0xe000ed48
+AFR0   		CRm=c1, opc2=3  	0xe000ed4c
+MMFR0  		CRm=c1, opc2=4  	0xe000ed50
+MMFR1  		CRm=c1, opc2=5  	0xe000ed54
+MMFR2  		CRm=c1, opc2=6  	0xe000ed58
+MMFR3  		CRm=c1, opc2=7  	0xe000ed5c
+ISAR0  		CRm=c2, opc2=0  	0xe000ed60
+ISAR1  		CRm=c2, opc2=1  	0xe000ed64
+ISAR2  		CRm=c2, opc2=2  	0xe000ed68
+ISAR3  		CRm=c2, opc2=3  	0xe000ed6c
+ISAR4  		CRm=c2, opc2=4  	0xe000ed70
+ISAR5  		CRm=c2, opc2=5  	0xe000ed74
+
+But there is no nice translation and as cache handling is implementation
+defined on v7-M anyhow there is not much use and I decided to just
+return early in the cache function.
+
+This patch is only compile tested as I don't have a machine with enough
+RAM to run a non-XIP kernel, so Tested-by tags are welcome.
+
+Best regards
+Uwe
+
+[1] all have in common: CRn=c0, opc1=0, so only CRm and opc2 are listed
+
+ arch/arm/boot/compressed/head.S | 33 +++++++++++++++++++++++++++------
+ arch/arm/include/asm/unified.h  |  8 ++++++++
+ 2 files changed, 35 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 68be9017593d..3788eedabb15 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -10,8 +10,11 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/v7m.h>
++
++ AR_CLASS(	.arch	armv7-a	)
++ M_CLASS(	.arch	armv7-m	)
+ 
+-	.arch	armv7-a
+ /*
+  * Debugging stuff
+  *
+@@ -114,7 +117,12 @@
+  * sort out different calling conventions
+  */
+ 		.align
+-		.arm				@ Always enter in ARM state
++		/*
++		 * Always enter in ARM state for CPUs that support the ARM ISA.
++		 * As of today (2014) that's exactly the members of the A and R
++		 * classes.
++		 */
++ AR_CLASS(	.arm	)
+ start:
+ 		.type	start,#function
+ 		.rept	7
+@@ -132,14 +140,15 @@ start:
+ 
+  THUMB(		.thumb			)
+ 1:
+- ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
+-		mrs	r9, cpsr
++ ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
++ AR_CLASS(	mrs	r9, cpsr	)
+ #ifdef CONFIG_ARM_VIRT_EXT
+ 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+ #endif
+ 		mov	r7, r1			@ save architecture ID
+ 		mov	r8, r2			@ save atags pointer
+ 
++#ifndef CONFIG_CPU_V7M
+ 		/*
+ 		 * Booting from Angel - need to enter SVC mode and disable
+ 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
+@@ -155,6 +164,7 @@ not_angel:
+ 		safe_svcmode_maskall r0
+ 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
+ 						@ SPSR
++#endif
+ 		/*
+ 		 * Note that some cache flushing and other stuff may
+ 		 * be needed here - is there an Angel SWI call for this?
+@@ -789,6 +799,16 @@ __common_mmu_cache_on:
+ call_cache_fn:	adr	r12, proc_types
+ #ifdef CONFIG_CPU_CP15
+ 		mrc	p15, 0, r9, c0, c0	@ get processor ID
++#elif defined(CONFIG_CPU_V7M)
++		/*
++		 * On v7-M the processor id is located in the V7M_SCB_CPUID
++		 * register, but as cache handling is IMPLEMENTATION DEFINED on
++		 * v7-M (if existant at all) we just return early here.
++		 * If V7M_SCB_CPUID were used the cpu ID functions (i.e.
++		 * __armv7_mmu_cache_{on,off,flush}) would be selected which
++		 * use cp15 registers that are not implemented on v7-M.
++		 */
++		bx	lr
+ #else
+ 		ldr	r9, =CONFIG_PROCESSOR_ID
+ #endif
+@@ -1289,8 +1309,9 @@ __hyp_reentry_vectors:
+ 
+ __enter_kernel:
+ 		mov	r0, #0			@ must be 0
+- ARM(		mov	pc, r4	)		@ call kernel
+- THUMB(		bx	r4	)		@ entry point is always ARM
++ ARM(		mov	pc, r4		)	@ call kernel
++ M_CLASS(	add	r4, r4, #1	)	@ enter in Thumb mode for M class
++ THUMB(		bx	r4		)	@ entry point is always ARM for A/R classes
+ 
+ reloc_code_end:
+ 
+diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
+index b88beaba6b4a..200f9a7cd623 100644
+--- a/arch/arm/include/asm/unified.h
++++ b/arch/arm/include/asm/unified.h
+@@ -24,6 +24,14 @@
+ 	.syntax unified
+ #endif
+ 
++#ifdef CONFIG_CPU_V7M
++#define AR_CLASS(x...)
++#define M_CLASS(x...)	x
++#else
++#define AR_CLASS(x...)	x
++#define M_CLASS(x...)
++#endif
++
+ #ifdef CONFIG_THUMB2_KERNEL
+ 
+ #if __GNUC__ < 4
+-- 
+2.1.3
