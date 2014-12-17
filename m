@@ -1,36 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 15:35:35 +0100
-Subject: [PATCH v2 0/4] Add basic support for Mediatek MT8173 SoC
-In-Reply-To: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
-References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1808813.15ih7rDt4r@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 17 Dec 2014 12:36:14 -0200
+Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
+In-Reply-To: <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
+References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
+ <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
+Message-ID: <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 22:17:29 Eddie Huang wrote:
-> MT8173 is a SoC based on 64bit ARMv8 architecture. It contains 2 CA53 + 2 CA57 cores. MT8173 share many HW IP with MT8135 and other MT65xx series. This patchset was tested on MT8173 engineer sample, and boot to shell ok.
-> 
-> This series contains document bindings, device tree, defconfig, and one sysirq modification for MT8173.
-> 
-> Changes in v2:
-> 
-> 1. Modify mt8173.dtsi and mt8173-evb.dts according to Mark Rutland's comment, change cpu-maps, psci, clock, GIC properties.
-> 2. Modify irq-mtk-sysirq.c according to Arnd Bergmann's comment to calculate irq number from reg range.
-> 
-> 
+Hi Tim,
 
-Looks good to me,
+On Fri, Oct 31, 2014 at 2:27 AM, Tim Harvey <tharvey@gateworks.com> wrote:
+> When an external PMIC is used for VDD_SOC and VDD_ARM you can save power by
+> bypassing the internal LDO's provided by the anantop regulator as long as
+> you are running less than 1.2GHz. If running at 1.2GHz the IMX6 datasheets
+> state that you must use the internal LDO's to reduce ripple on the suplies.
+>
+> A failure to bypass the LDO's when using an external PMIC will result in an
+> extra voltage drop (~125mV) between VDD_ARM_IN and VDD_ARM and VDD_SOC_IN and
+> VDD_SOC which violates the voltages specificed by the datasheets.
+>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 51 +++++++++++++++++++++++++++++++++++++++++
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Shouldn't the LDO bypass support be added into the anatop regulator
+driver instead?
 
-In the 3.19 merge window, we had a few problems with new arm64 platforms,
-as it wasn't entirely clear to us who is a maintainer and whether patches
-were sent for review or inclusion. I see no problem including your series
-in 3.20, but we probably need to figure out the best process for making
-sure we don't miss it.
-
-For now, I'd suggest we do this the same way as the arm32 patches, and
-you send them to Matthias for inclusion in his tree, who will then
-send a pull request for an arm64 branch.
-
-	Arnd
+What if someone wants to use LDO bypass and not use the cpufreq driver?
