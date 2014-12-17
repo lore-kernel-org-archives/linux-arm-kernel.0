@@ -1,36 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 17 Dec 2014 16:39:02 +0200
-Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
- dt-specific callback instead of initcall
-In-Reply-To: <3015182.XtvMmOW5GD@wuerfel>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1652354.DLhQnkm7xS@avalon> <3015182.XtvMmOW5GD@wuerfel>
-Message-ID: <1652261.Tf8nxQyMRf@avalon>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 17 Dec 2014 15:39:37 +0100
+Subject: [PATCH] phy-sun4i-usb: Change disconnect threshold value for sun6i
+Message-ID: <1418827177-13182-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The allwinner SDK uses a value of 3 for the disconnect threshold setting on
+sun6i, do the same in the kernel.
 
-On Wednesday 17 December 2014 15:27:36 Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
-> > If we forbid the IOMMU driver from being compiled as a module can't we
-> > just rely on deferred probing ? The bus master driver will just be
-> > reprobed after the IOMMU gets probed, like for other devices.
-> > 
-> > This could fail in case the IOMMU device permanently fails to probe. There
-> > would be something very wrong in the system in that case, Enabling the bus
-> > masters totally transparently without IOMMU support could not be such a
-> > good idea.
-> 
-> I believe in the majority of cases today, the IOMMU is entirely optional.
-> There are valid reasons for not including the IOMMU driver in the kernel,
-> e.g. when you know that all the machines with that driver can DMA to
-> all of their RAM and you want to avoid the overhead of IOTLB misses.
+In my previous experience with sun5i problems getting the threshold right
+is important to avoid usb2 devices being unplugged sometimes going unnoticed.
 
-Should that really be controlled by compiling the IOMMU driver out, wouldn't 
-it be better to disable the IOMMU devices in DT in that case ?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/phy/phy-sun4i-usb.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index fb02a67..a2b08f3c 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -244,7 +244,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	else
+ 		data->num_phys = 3;
+ 
+-	if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy"))
++	if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy") ||
++	    of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+ 		data->disc_thresh = 3;
+ 	else
+ 		data->disc_thresh = 2;
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.0
