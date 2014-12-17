@@ -1,64 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 17 Dec 2014 18:54:03 +0800
-Subject: [PATCH v2 0/4] clk: sunxi: mmc: Last bits of phase handling
-In-Reply-To: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v672ozg8BREGY9Fyxs9QrkM8ksVpwK7EdC0WK8X2GfBx8w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 11:57:06 +0100
+Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
+ Cortex-M4
+In-Reply-To: <b090cb361e81d2f1be5d21d1a07e9340@agner.ch>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <2994970.DCfUQgtmcD@wuerfel> <b090cb361e81d2f1be5d21d1a07e9340@agner.ch>
+Message-ID: <2673866.7fjSqeaHyh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 16 December 2014 23:19:08 Stefan Agner wrote:
+> On 2014-12-03 12:03, Arnd Bergmann wrote:
+> > On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
 
-On Wed, Dec 17, 2014 at 5:38 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> These are the last patches of the serie converting the custom phase
-> API to the proper common clock framework API.
->
-> These patches have already been discussed in length, only the patch 1
-> is new and should ease the handling of our MMC clocks.
->
-> Thanks,
-> Maxime
->
-> Changes from v1:
->   - Fixed memory leak when a phase clock registration fails
->   - Moved the spinlock declaration
->   - Updated the DT bindings docs
->
-> Maxime Ripard (4):
->   clk: sunxi: Rework MMC phase clocks
->   ARM: sunxi: dt: Add sample and output mmc clocks
->   mmc: sunxi: Convert MMC driver to the standard clock phase API
->   clk: sunxi: Remove custom phase function
+> Just started looking in that a bit deeper and some question arose:
+> Afaik, earlycon need to be supported by the uart driver. The fsl_lpuart,
+> which is used for Vybrid's uart, does not support earlycon yet. However,
+> earlyprink already works (see ./arch/arm/include/debug/vf.S). I
+> understand that earlycon has the advantage of being able to be used on
+> multiplatform. But earlyprintk is working really early (e.g. before
+> locating the FDT), and it proved helpful for me when I started working
+> on that Cortex-M4 stuff. Should earlycon replace earlyprintk completely?
 
-Apart from the minor comments, whole series is
+earlyprintk will stay around for debugging early boot problems, but
+with working earlycon support, there should no longer be a reason to
+enable it by default.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> Maybe, on Vybrid, since it would be a good platform for automated !MMU
+> testing, it would be nice to have earlycon which can be enabled in any
+> case and would provide output even something blows up quite early... But
+> I guess I would add earlycon support as part of a new patchset and just
+> drop earlyprintk here for now.
 
-Also tested on my Cubieboard, Cubieboard2, Hummingbird A31,
-and HSG H702 (A13 tablet).
+Yes, I think that would be good.
 
+> > 64 hash table entries sounds extremely small, doesn't that impact
+> > performance? If you have 50MB of actual RAM available, I don't think
+> > you need that.
+> 
+> Agreed. I copied that from EFM32 which is under much more memory
+> pressure...
 
-ChenYu
-
->
->  Documentation/devicetree/bindings/clock/sunxi.txt  |   7 +-
->  .../devicetree/bindings/mmc/sunxi-mmc.txt          |   8 +-
->  arch/arm/boot/dts/sun4i-a10.dtsi                   |  72 +++++++----
->  arch/arm/boot/dts/sun5i-a10s.dtsi                  |  54 ++++++---
->  arch/arm/boot/dts/sun5i-a13.dtsi                   |  44 +++++--
->  arch/arm/boot/dts/sun6i-a31.dtsi                   |  72 +++++++----
->  arch/arm/boot/dts/sun7i-a20.dtsi                   |  72 +++++++----
->  arch/arm/boot/dts/sun8i-a23.dtsi                   |  54 ++++++---
->  drivers/clk/sunxi/clk-mod0.c                       | 131 +++++++++++----------
->  drivers/clk/sunxi/clk-sunxi.c                      |  37 ------
->  drivers/mmc/host/sunxi-mmc.c                       |  72 +++++++----
->  include/linux/clk/sunxi.h                          |  22 ----
->  12 files changed, 392 insertions(+), 253 deletions(-)
->  delete mode 100644 include/linux/clk/sunxi.h
->
-> --
-> 2.2.0
->
+Ok.
+	
+	Arnd
