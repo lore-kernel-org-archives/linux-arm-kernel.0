@@ -1,43 +1,65 @@
-From: yvo@apm.com (Y Vo)
-Date: Wed, 17 Dec 2014 12:10:50 +0700
-Subject: [PATCH v2 RESEND 3/3] arm64:dts: Add APM X-Gene standby GPIO
- controller DTS entries
-In-Reply-To: <1418793050-26927-1-git-send-email-yvo@apm.com>
-References: <1418793050-26927-1-git-send-email-yvo@apm.com>
-Message-ID: <1418793050-26927-4-git-send-email-yvo@apm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 17 Dec 2014 13:36:37 +0800
+Subject: [PATCH v16 1/8] ARM: probes: move all probe code to dedicate
+ directory
+In-Reply-To: <548AC8BD.5090602@hitachi.com>
+References: <1418292276-75255-1-git-send-email-wangnan0@huawei.com>
+ <1418292276-75255-2-git-send-email-wangnan0@huawei.com>
+ <548AC8BD.5090602@hitachi.com>
+Message-ID: <54911665.3070601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add standby domain gpio controller for APM X-Gene SoC platform.
+Hi Russell,
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Could you please collect this patch and merge it into your repository first? Due
+to this is a source tree layout modification, others may work on original files
+and experiences unneed conflicts.
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 295c72d..e2454a2 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -587,6 +587,19 @@
- 			phy-names = "sata-phy";
- 		};
- 
-+		sbgpio: sbgpio at 17001000{
-+			compatible = "apm,xgene-gpio-sb";
-+			reg = <0x0 0x17001000 0x0 0x400>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupts = 	<0x0 0x28 0x1>,
-+					<0x0 0x29 0x1>,
-+					<0x0 0x2a 0x1>,
-+					<0x0 0x2b 0x1>,
-+					<0x0 0x2c 0x1>,
-+					<0x0 0x2d 0x1>;
-+		};
-+
- 		rtc: rtc at 10510000 {
- 			compatible = "apm,xgene-rtc";
- 			reg = <0x0 0x10510000 0x0 0x400>;
--- 
-2.2.0
+Thank you.
+
+On 2014/12/12 18:51, Masami Hiramatsu wrote:
+> (2014/12/11 19:04), Wang Nan wrote:
+>> In discussion on LKML (https://lkml.org/lkml/2014/11/28/158), Russell
+>> King suggests to move all probe related code to arch/arm/probes. This
+>> patch does the work. Due to dependency on 'arch/arm/kernel/patch.h', this
+>> patch also moves patch.h to 'arch/arm/include/asm/patch.h', and related
+>> '#include' directives are also midified to '#include <asm/patch.h>'.
+>>
+>> Following is an overview of this patch:
+>>
+>>  ./arch/arm/kernel/               ./arch/arm/probes/
+>>  |-- Makefile                     |-- Makefile
+>>  |-- probes-arm.c          ==>    |-- decode-arm.c
+>>  |-- probes-arm.h          ==>    |-- decode-arm.h
+>>  |-- probes-thumb.c        ==>    |-- decode-thumb.c
+>>  |-- probes-thumb.h        ==>    |-- decode-thumb.h
+>>  |-- probes.c              ==>    |-- decode.c
+>>  |-- probes.h              ==>    |-- decode.h
+>>  |                                |-- kprobes
+>>  |                                |   |-- Makefile
+>>  |-- kprobes-arm.c         ==>    |   |-- actions-arm.c
+>>  |-- kprobes-common.c      ==>    |   |-- actions-common.c
+>>  |-- kprobes-thumb.c       ==>    |   |-- actions-thumb.c
+>>  |-- kprobes.c             ==>    |   |-- core.c
+>>  |-- kprobes.h             ==>    |   |-- core.h
+>>  |-- kprobes-test-arm.c    ==>    |   |-- test-arm.c
+>>  |-- kprobes-test.c        ==>    |   |-- test-core.c
+>>  |-- kprobes-test.h        ==>    |   |-- test-core.h
+>>  |-- kprobes-test-thumb.c  ==>    |   `-- test-thumb.c
+>>  |                                `-- uprobes
+>>  |                                    |-- Makefile
+>>  |-- uprobes-arm.c         ==>        |-- actions-arm.c
+>>  |-- uprobes.c             ==>        |-- core.c
+>>  |-- uprobes.h             ==>        `-- core.h
+>>  |
+>>  `-- patch.h               ==>    arch/arm/include/asm/patch.h
+>>
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> 
+> It looks good to me :)
+> 
+> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> 
+> Thanks!
+> 
