@@ -1,35 +1,47 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Wed, 17 Dec 2014 14:01:31 +0000
-Subject: [PATCH 5/5] PCI: st: disable IO support
-In-Reply-To: <1418812486-12394-6-git-send-email-gabriel.fernandez@linaro.org>
-References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
- <1418812486-12394-6-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20141217140131.607a1ac7@lxorguk.ukuu.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 17 Dec 2014 14:04:04 +0000
+Subject: [PATCH v14 03/10] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <549181F0.3010408@linaro.org>
+References: <1417541958-56907-1-git-send-email-lina.iyer@linaro.org>
+ <2519415.GklIQeMgWR@wuerfel> <54903DC6.8010308@linaro.org>
+ <2663853.2Q3kHisMT7@wuerfel> <549181F0.3010408@linaro.org>
+Message-ID: <20141217140404.GB11998@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Dec 2014 11:34:46 +0100
-Gabriel FERNANDEZ <gabriel.fernandez@st.com> wrote:
+On Wed, Dec 17, 2014 at 01:15:28PM +0000, Daniel Lezcano wrote:
 
-> sti SoCs PCIe IPs are built around DesignWare IP Core.
-> But in these SoCs, PCIe IP doesn't support IO.
-> By default, when no IO space is provided, a default one is assigned.
+[...]
+
+> > I would assume that the same can be done for most other platforms.
+> >
+> > There are probably cases where the same piece of hardware is responsible
+> > for both cpuidle and cpufreq, but what that means is really that you
+> > should have a single driver for it that does both things. Same for
+> > SMP support: if you have one register block that does both the SMP
+> > bringup and the cpuidle stuff, then have *one* driver for this block
+> > that does it all. There are currently a few dependencies that require
+> > doing SMP bringup early during boot, but we decided years ago that those
+> > are all artificial dependencies and we should be able to boot secondary
+> > CPUs much later than we currently do.
 > 
-> Add an empty IO resource to the bus, and disable IO by default.
+> I agree with this point and given the number of drivers, the easiest way 
+> to do that is to create cpu pm ops as I gave in the previous email and 
+> reuse them for cpu hotplug/bringup. And I believe that is possible if we 
+> continue our approach by splitting the low level pm code from the 
+> cpuidle driver.
+> 
+> What about doing something simple ? Like creating a struct 
+> arm_cpu_pm_ops variable visible from everywhere and filled by the 
+> different platform ?
 
-As a point of PCI pedantry I don't think this is quite sufficient. PCI
-has a weird corner case where I/O resources are implied rather than
-allocated.
+I agree with this approach, which by the way consists in defining
+cpu operations as ARM64 does and use those from cpuidle, suspend and
+hotplug code. The MCPM interface does that already, probably we should
+enhance/rename it since people think it must be used for multicluster
+power management whereas it is a pretty generic [drivers -> mach] code
+interface (I am talking about the API, not the synchronization scheme),
+and can certainly be extended/refactored according to new platforms need.
 
-For IDE/SATA you may need to something like
-
-	if (class == PCI_CLASS_STORAGE_IDE) {
-		u8 progif;
-		pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
-		progif |= 5;
-		pci_write_config_byte(dev, PCI_CLASS_PROG, &progif);
-	}
-
-so that any adapter is kicked out of legacy mode and doesn't get implied
-I/O resources and interrupts. I don't know if that case matters for your
-usage.
+Thanks,
+Lorenzo
