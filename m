@@ -1,36 +1,30 @@
-From: tony.kn@samsung.com (Tony K Nadackal)
-Date: Wed, 17 Dec 2014 13:09:36 +0530
-Subject: [PATCH] arm64: dts: Add jpeg device node for Exynos7
-Message-ID: <1418801976-22820-1-git-send-email-tony.kn@samsung.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 17 Dec 2014 08:58:23 +0100
+Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <CAOMZO5CQjpYtrNTT65-ikJua4N_osYj4UVgm3EV+sEvVWF59cg@mail.gmail.com>
+References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>	<201412141712.12589.marex@denx.de>	<1638147247.144508.1418577377536.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+ <CAOMZO5CQjpYtrNTT65-ikJua4N_osYj4UVgm3EV+sEvVWF59cg@mail.gmail.com>
+Message-ID: <5491379F.3090607@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add jpeg device node for Exynos7
+Hi Fabio,
 
-Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos7.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Am 17.12.2014 um 03:44 schrieb Fabio Estevam:
+> Hi Stefan,
+>
+> On Sun, Dec 14, 2014 at 3:16 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>
+>> Btw i hope this patch also fixes a SPI communication issue with our hardware
+>> which forces us to bypass ref_io1 for ssp2.
+> Does this patch fix the SPI issue?
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index 332537c..db3561f 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -562,6 +562,15 @@
- 			clocks = <&clock_peric0 PCLK_PWM>;
- 			clock-names = "timers";
- 		};
-+
-+		jpeg: jpeg_codec at 15020000 {
-+			compatible = "samsung,exynos7-jpeg";
-+			reg = <0x15020000 0x1000>;
-+			interrupts = <0 434 0>;
-+			clocks = <&clock_mscl ACLK_JPEG>;
-+			clock-names = "jpeg";
-+			status = "disabled";
-+		};
- 	};
- };
- 
--- 
-2.2.0
+unfortunately not. If the 3.19-rc1 has been released, i send the fixed
+patch.
+
+I've the theory that's an initialization issue. I've never heard of SPI
+problems from the U-Boot users and we are using imx-bootlets.
+
+I'll try to test it with U-Boot.
+
+Stefan
