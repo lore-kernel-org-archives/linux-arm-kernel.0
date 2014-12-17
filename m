@@ -1,56 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 22:56:47 +0100
-Subject: [RFC PATCH 1/2] common: dma-mapping: introduce
- dma_get_parent_cfg() helper
-In-Reply-To: <1418839344-14393-2-git-send-email-m-karicheri2@ti.com>
-References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
- <1418839344-14393-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1949667.gMcOLHe7Sk@wuerfel>
+Date: Wed, 17 Dec 2014 22:58:47 +0100
+Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
+ dt-specific callback instead of initcall
+In-Reply-To: <3147207.bM49L5sBIQ@avalon>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <2560037.PCKFDiopkL@wuerfel> <3147207.bM49L5sBIQ@avalon>
+Message-ID: <2127001.foickmBNkZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 13:02:23 Murali Karicheri wrote:
-> Now, in Kernel, parent device's DMA parameters has to be applied to
-> the child as is - to enable DMA support for the device. Usually this
-> is happened in places where parent device manually instantiates child
-> device such as in drivers/pci/probe.c (pci_device_add() for example).
+On Wednesday 17 December 2014 18:02:51 Laurent Pinchart wrote:
+> On Wednesday 17 December 2014 16:41:33 Arnd Bergmann wrote:
+> > On Wednesday 17 December 2014 16:39:02 Laurent Pinchart wrote:
+> > > On Wednesday 17 December 2014 15:27:36 Arnd Bergmann wrote:
+> > > > On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
+> > > > > If we forbid the IOMMU driver from being compiled as a module can't we
+> > > > > just rely on deferred probing ? The bus master driver will just be
+> > > > > reprobed after the IOMMU gets probed, like for other devices.
+> > > > > 
+> > > > > This could fail in case the IOMMU device permanently fails to probe.
+> > > > > There
+> > > > > would be something very wrong in the system in that case, Enabling the
+> > > > > bus
+> > > > > masters totally transparently without IOMMU support could not be such
+> > > > > a
+> > > > > good idea.
+> > > > 
+> > > > I believe in the majority of cases today, the IOMMU is entirely
+> > > > optional.
+> > > > There are valid reasons for not including the IOMMU driver in the
+> > > > kernel,
+> > > > e.g. when you know that all the machines with that driver can DMA to
+> > > > all of their RAM and you want to avoid the overhead of IOTLB misses.
+> > > 
+> > > Should that really be controlled by compiling the IOMMU driver out,
+> > > wouldn't it be better to disable the IOMMU devices in DT in that case ?
+> > 
+> > It's a policy decision that should only depend on the user. Modifying the
+> > DT is wrong here IMHO because the device is still connected to the IOMMU
+> > in hardware and we should correctly represent that.
 > 
-> Now DMA configuration is represented in device data structure not only
-> by DMA mask and DMA params, it also includes dma_pfn_offset at least.
-> Hence introduce common dma_get_parent_cfg() helper to apply dma
-> configuration from parent to child, and use __weak to allow arch to
-> override it if needed.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  drivers/base/dma-mapping.c  |   18 ++++++++++++++++++
->  include/linux/dma-mapping.h |    3 +++
->  2 files changed, 21 insertions(+)
-> 
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index 9e8bbdd..5322426 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -339,3 +339,21 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
->  	vunmap(cpu_addr);
->  }
->  #endif
-> +
-> +int __weak dma_get_parent_cfg(struct device *dev, struct device *parent)
-> +{
-> +	struct device *temp = parent;
-> +
-> +	if (!temp)
-> +		temp = dev->parent;
-> +
-> +	if (temp && is_device_dma_capable(temp)) {
-> +		dev->dma_mask	= temp->dma_mask;
-> +		dev->coherent_dma_mask = temp->coherent_dma_mask;
+> I was thinking about setting status = "disabled" on the IOMMU nodes, not 
+> removing the IOMMU references in the bus master nodes.
 
-As discussed, setting the pointers like this is always wrong,
-so don't do it.
-
-What's wrong with using arch_setup_dma_ops() from PCI as suggested
-previously?
+But that still requires a modification of the DT. The hardware is the
+same, so I don't see why we should update the dtb based on kernel
+configuration.
 
 	Arnd
