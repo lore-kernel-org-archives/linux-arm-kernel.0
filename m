@@ -1,52 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Dec 2014 17:20:00 +0000
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <1926348.VsVWqO766S@wuerfel>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <549192D2.10008@arm.com> <20141217150158.GF870@arm.com>
- <1926348.VsVWqO766S@wuerfel>
-Message-ID: <20141217172000.GC30307@arm.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Wed, 17 Dec 2014 15:20:17 +0100
+Subject: [PATCH] arm/rpc: avoid static keyword removal via define
+In-Reply-To: <20141216114056.GP11285@n2100.arm.linux.org.uk>
+References: <1418633287-5019-1-git-send-email-borntraeger@de.ibm.com>
+ <1418633287-5019-2-git-send-email-borntraeger@de.ibm.com>
+ <5490146A.3000408@de.ibm.com> <20141216114056.GP11285@n2100.arm.linux.org.uk>
+Message-ID: <54919121.7070405@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 03:38:22PM +0000, Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 15:01:58 Will Deacon wrote:
-> > On Wed, Dec 17, 2014 at 02:27:30PM +0000, Robin Murphy wrote:
-> > > I thoroughly dislike the idea, but one /could/ simply abuse the generic 
-> > > bindings well within the current framework, e.g.
-> > > 
-> > > #1: iommus = <&smmu 0 streamID 0 0>, <&smmu 0 streamID 0 0>, ...;
-> > > #2: iommus = <&smmu 1 mask value 0>;
-> > > #3: iommus = <&smmu 2 start end offset>;
-> > > 
-> > > and have a big complicated of_xlate that knows the secret. I don't think 
-> > > it would be unreasonable to constrain all masters on the same SMMU to 
-> > > use the same format either - that way you can lose the type indicator 
-> > > and the padding and the driver simply inspects #iommu-cells in 
-> > > of_iommu_init and sets up that instance to take the right path in its 
-> > > of_xlate calls later. Having a handful of single-stream-ID masters 
-> > > behind the same SMMU as a whacking great bus controller with a massive 
-> > > range seems like the kind of system-designer-insanity we should 
-> > > emphatically NOT be looking to accommodate if we can possibly help it.
-> > > 
-> > > That said, for the time being I see definite use-cases for #1, which 
-> > > already works, and #3, for which I really think we should be looking to 
-> > > add a parallel generic "iommu-ranges" or "iommu-bus-range" binding for 
-> > > bus controllers, rather than trying to overload "iommus" beyond 
-> > > describing actual bus masters.
-> > 
-> > Yeah, let's avoid overloading the current bindings too much. Adding the
-> > ranges property makes perfect sense, I'm just trying to to straighten
-> > out how the "iommus" property should differ depending on the presence of
-> > SMR groups.
+Am 16.12.2014 um 12:40 schrieb Russell King - ARM Linux:
+> On Tue, Dec 16, 2014 at 12:15:54PM +0100, Christian Borntraeger wrote:
+>> Am 15.12.2014 um 09:48 schrieb Christian Borntraeger:
+>>> commit 4486b86368d7 ("[ARM] riscpc: fix decompressor font file handling")
+>>> introduced Makefile magic to avoid building a file two times. Using
+>>> -Dstatic= does break some assumptions on compiler.h that were introduced
+>>> for READ_ONCE.
+>>>
+>>> Lets just use sed on the copy instead of using a define.
+>>>
+>>> Signed-off-by: Christian Borntraeger <borntraeger@de.ibm.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>
+>> This fixed the linux-next build http://kisskb.ellerman.id.au/kisskb/target/1508/
+>> Unless anybody complains, I will send the pull request for the access_once tree tomorrow and I have this patch applied on top.
 > 
-> Is a range something that is defined in the hardware spec, or is that
-> just what you expect the PCI host controllers to use? 
+> Please give me some time to look at this.
 
-The range would be a Linux-ism for converting a bus ID on bus foo (e.g. a
-requester ID on a PCI bus) into a master ID for the IOMMU for that bus
-(e.g. a stream ID for an ARM SMMU). However, I don't think the code doing
-that mapping really needs knowledge about what the IDs represent.
+>From all builds, the only problematic case was the rpc_defconfig.
+As I said, I want to send this series this merge window, so if you dont find the time to look into this before rc1, I can remove this patch from my queue and we solve this later?
 
-Will
+Christian
