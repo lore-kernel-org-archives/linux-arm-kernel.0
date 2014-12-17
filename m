@@ -1,52 +1,97 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 17 Dec 2014 22:26:24 +0000
-Subject: [RFC] ACPI on arm64 TODO List
-In-Reply-To: <9355623.14GfrLxEB0@wuerfel>
-References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
-Message-ID: <CACxGe6vRN2Tc97=Sx05gri02goxBaHnZm30hR37q=002agFLAA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Dec 2014 23:33:27 +0100
+Subject: [PATCH 1/6] ARM: sunxi: DT: Convert to device tree includes
+In-Reply-To: <20141217213358.GR4337@lukather>
+References: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
+ <2559984.DiBeGaGfHy@wuerfel> <20141217213358.GR4337@lukather>
+Message-ID: <1992510.V86iv1hrWK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 11:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 15 December 2014 19:18:16 Al Stone wrote:
->> 6. How does the kernel handle_DSD usage?
->>    * Problem:
->>      * _DSD defines key-value properties in the DT style. How do we
->>        ensure _DSD bindings are well defined?
->>      * How do we ensure DT and _DSD bindings remain consistent with
->>        each other?
->>    * Solution: public documentation for all bindings, and a process
->>      for defining them
->>    * Status: proposal to require patch authors to point at public
->>      binding documentation; kernel Documentation/devicetree/bindings
->>      remains the default if no other location exists; UEFI forum has
->>      set up a binding repository.
->
-> I think we also need to make a decision here on whether we want to use
-> PRP0001 devices on ARM64 servers, and to what degree. I would prefer
-> if we could either make them required for any devices that already have
-> a DT binding and that are not part of the official ACPI spec, or we
-> decide to not use them at all and make any PRP0001 usage a testcase
-> failure.
+On Wednesday 17 December 2014 22:33:58 Maxime Ripard wrote:
+> Hi Arnd,
+> 
+> On Wed, Dec 17, 2014 at 08:32:01AM +0100, Arnd Bergmann wrote:
+> > On Tuesday 16 December 2014 22:59:54 Maxime Ripard wrote:
+> > > Prepare the device trees to use the C preprocessor.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > 
+> > Hi Maxime,
+> > 
+> > Since you are doing a number of changes to all the sunxi files, I have
+> > one more request for something that has been bugging me a while:
+> > 
+> > In your .dtsi files, you define devices like this:
+> > 
+> >                 uart0: serial at 01c28000 {
+> >                         compatible = "snps,dw-apb-uart";
+> >                         reg = <0x01c28000 0x400>;
+> >                         interrupts = <0 1 4>;
+> >                         reg-shift = <2>;
+> >                         reg-io-width = <4>;
+> >                         clocks = <&apb1_gates 16>;
+> >                         status = "disabled";
+> >                 };
+> > 
+> > and in the .dts files, you extend them like this:
+> > 
+> >                 uart0: serial at 01c28000 {
+> >                         pinctrl-names = "default";
+> >                         pinctrl-0 = <&uart0_pins_a>;
+> >                         status = "okay";
+> >                 };
+> > 
+> > 
+> > which duplicates both the node names with their full path, and
+> > the labels. Please use one or the other, but not both. I don't mind
+> > you having the full path to each device in the dts files, just drop
+> > all the labels in that case.
+> 
+> I don't know, maybe it's just a matter of personnal taste, but I do
+> find convenient to have the labels in the DTS as well, so that
+> whenever you need to use a label (for a phandle for example), you
+> don't have to lookup in the DTSI if you have the node in the DTS.
 
-Hmmm... having rules specifically for Aarch64 doesn't make a whole lot
-of sense. Whatever rules we choose for PRP0001 should apply equally
-regardless of architecture.
+But the redundancy seems overly redundant and unnecessary ;-)
 
->> 7. Why is ACPI required?
->>    * Problem:
->>      * arm64 maintainers still haven't been convinced that ACPI is
->>        necessary.
->>      * Why do hardware and OS vendors say ACPI is required?
->>    * Status: Al & Grant collecting statements from OEMs to be posted
->>      publicly early in the new year; firmware summit for broader
->>      discussion planned.
->
-> I was particularly hoping to see better progress on this item. It
-> really shouldn't be that hard to explain why someone wants this feature.
+What you describe will only work for nodes you already list in the
+dts file, not for those that are left untouched.
 
-I've written something up in as a reply on the firmware summit thread.
-I'm going to rework it to be a standalone document and post it
-publicly. I hope that should resolve this issue.
+As far as I can tell, almost all phandle references you have are either
+pointing to devices you never define in a dts file, or those you never
+define in a dtsi file:
 
-g.
+git grep \& arch/arm/boot/dts/sun*.dts | cut -f 2 -d\& | cut -f 1 -d\  | cut -f 1 -d \> | sort -u | while read i ; do echo  ` git grep -w $i: arch/arm/boot/dts/sun*.dts  | wc -l` ` git grep -w $i: arch/arm/boot/dts/sun*.dtsi  | wc -l` $i ; done
+
+> > Most other maintainers these days just use the labels like this in
+> > the dts files however:
+> > 
+> > &uart0 {
+> > 	status = "okay";
+> > };
+> > 
+> > which also seems completely fine.
+> 
+> If that's the current trend, I'll add that to my todo-list, but I
+> believe it's orthogonal to these patches.
+
+It's orthogonal, I'm just mentioning it because it makes me cringe
+whenever I look at these files, and because you already touch
+almost every device in your dts files, so you will have to deal with
+merge conflicts already, and it's better to do it all at once.
+
+> > I'm also a bit puzzled by all the pinctrl references you add in the .dts
+> > files, but it's possible I'm missing something there. Why can't you move
+> > these to the .dtsi files and avoid duplicating the pinctrl-0 and
+> > pinctrl-names properties for every .dts file? I would assume that they
+> > are not referenced for disabled devices.
+> 
+> The pinctrl nodes we reference are in the DTS. However, each pin of
+> each controller is most of the time available on several pins of the
+> package, so we don't have any way to enforce a default at the SoC
+> level.
+
+Ah, makes sense.
+
+	Arnd
