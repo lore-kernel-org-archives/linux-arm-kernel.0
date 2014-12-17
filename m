@@ -1,29 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 17 Dec 2014 21:16:22 +0100
-Subject: at91: dt: dma usage
-In-Reply-To: <54477097.1050909@aksignal.cz>
-References: <e2dd545ccf0051e1089b1a313205547c44df5c12.1413190828.git.jiri.prchal@aksignal.cz>
- <20141014122423.GA2797@ldesroches-Latitude-E6320>
- <54468C1B.9070500@atmel.com> <54477097.1050909@aksignal.cz>
-Message-ID: <20141217201622.GE4885@piout.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Dec 2014 12:44:07 -0800
+Subject: OMAP 4430 SDP: rather sick with recent kernels
+In-Reply-To: <20141217190904.GF23854@atomide.com>
+References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
+ <20141217172333.GE23854@atomide.com>
+ <20141217185155.GI11502@n2100.arm.linux.org.uk>
+ <20141217190904.GF23854@atomide.com>
+Message-ID: <20141217204407.GG23854@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Tony Lindgren <tony@atomide.com> [141217 11:14]:
+> 
+> Also, in your 3430-LDP logs, the DMA setup_irq related "In-band Error"
+> is a mystery. I'm not seeing that with omap2plus_defconfig, but can
+> reproduce it here with your LDP .config file. Got any ideas on that one?
 
-On 22/10/2014 at 10:53:43 +0200, Ji?? Prchal wrote :
-> in fact that in at91sam chips has a lot of peripherals but only 2*8 dma channels
-> and as my patch in last week "at91: sam9x5 dt: add usart dma definitions to dt"
-> adds only dma definitions, not make to use them, leave it on board definition,
-> shouldn't do the same all other peripherals definitions?
-> I think that I2C, SPI are not as necessary as USART, but thous are always "on".
+Hmm it looks like that's some CONFIG_PREEMPT related regression..
+Disablig CONFIG_PREEMPT makes it go away.
 
-Not much discussion happened on that and I have the feeling this is
-something we have to sort out. Until the dma driver are able to allocate
-channels dynamically, it is true that this may be something we shouldn't
-enable in the dtsi and let people activate dma in the board dts.
+Regards,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tony
