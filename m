@@ -1,28 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 11:26:40 +0100
-Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
-References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
- <1628217.66frkAqHMc@wuerfel>
- <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
-Message-ID: <4583974.6IftQ5bv2t@wuerfel>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed, 17 Dec 2014 11:34:42 +0100
+Subject: [PATCH 1/5] ARM: STi: Kconfig update for PCIe support
+In-Reply-To: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1418812486-12394-2-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 11:45:01 Alexandre Courbot wrote:
-> 
-> Actually we are not that far from being able to do completely without
-> any GPIO number, and maybe that's what we should aim for. I think the
-> only remaining offender is the sysfs interface. If we could reach GPIO
-> controllers through a fixed path and just export their GPIOs there, I
-> believe we would have fixed the whole issue.
+Update Kconfig:
+- MIGHT_HAVE_PCI
+- PCI_DOMAINS
 
-What about the hundreds of board files and device drivers that still
-reference hardcoded gpio numbers? The problem seems mostly solved for
-anything that uses DT, but there are some architectures and a number
-of ARM platforms that don't use DT and probably never will.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/mach-sti/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I would assume they could all be changed to use gpiod_lookup tables,
-but that's a lot of work.
-
-	Arnd
+diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+index 8825bc9..d1e563c 100644
+--- a/arch/arm/mach-sti/Kconfig
++++ b/arch/arm/mach-sti/Kconfig
+@@ -8,6 +8,8 @@ menuconfig ARCH_STI
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select HAVE_ARM_SCU if SMP
+ 	select ARCH_REQUIRE_GPIOLIB
++	select PCI_DOMAINS if PCI
++	select MIGHT_HAVE_PCI
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
+ 	select ARM_ERRATA_775420
+-- 
+1.9.1
