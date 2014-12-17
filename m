@@ -1,108 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Dec 2014 15:01:58 +0000
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <549192D2.10008@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <1612493.xCj1Tx0M4k@avalon> <20141215180933.GW20738@arm.com>
- <2447060.c0PHi7y3cP@wuerfel> <20141217120948.GB870@arm.com>
- <549192D2.10008@arm.com>
-Message-ID: <20141217150158.GF870@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 17 Dec 2014 09:22:25 -0600
+Subject: [PATCH 2/2] ARM: omap5/dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141217145533.GS24110@csclub.uwaterloo.ca>
+References: <cover.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <358281a880ccd89873efeea75edaa6c953eac2bd.1418421100.git.lsorense@csclub.uwaterloo.ca>
+ <20141214044517.GD24110@csclub.uwaterloo.ca>
+ <549018EC.8020207@ti.com> <20141216145856.GA23358@kahuna>
+ <54918357.8060801@ti.com>
+ <20141217145533.GS24110@csclub.uwaterloo.ca>
+Message-ID: <20141217152225.GA737@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 02:27:30PM +0000, Robin Murphy wrote:
-> On 17/12/14 12:09, Will Deacon wrote:
-> > On Tue, Dec 16, 2014 at 12:08:15PM +0000, Arnd Bergmann wrote:
-> >> On Monday 15 December 2014 18:09:33 Will Deacon wrote:
-> >>>> Using a single domain is a bit of a waste of resources in my case, so an
-> >>>> evolution would be to create four domains and assign devices to them based on
-> >>>> a policy. The policy could be fixed (round-robin for instance), or
-> >>>> configurable (possibly through DT, although it's really a policy, not a
-> >>>> hardware description).
-> >>
-> >> I think in case of the ARM SMMU, we concluded that the grouping is indeed
-> >> best done in DT, because of there is no good algorithmic way to come
-> >> up with a set of bitmasks that make up a proper grouping into domains.
-> >
-> > I think that's a slightly different case. The `grouping' in the DT, is on a
-> > per-master basis where a master may have a set of StreamIDs, which can be
-> > expressed in a more efficient (per-IOMMU) manner that cannot easily be
-> > determined at runtime.
+On 09:55-20141217, Lennart Sorensen wrote:
+> On Wed, Dec 17, 2014 at 03:21:27PM +0200, Tero Kristo wrote:
+> > Yea I think the 32k clock node should be fixed based on this.
+> > Something like this:
+> > 
+> > --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> > +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> > @@ -100,8 +100,10 @@
+> > 
+> >         sys_32k_ck: sys_32k_ck {
+> >                 #clock-cells = <0>;
+> > -               compatible = "fixed-clock";
+> > -               clock-frequency = <32768>;
+> > +               compatible = "fixed-factor-clock";
+> > +               clocks = <&sys_clkin1>;
+> > +               clock-mult = <1>;
+> > +               clock-div = <610>;
+> >         };
+> > 
+> >         virt_12000000_ck: virt_12000000_ck {
+> > 
+> > 
+> > It might be better then just query the actual clock rate from the
+> > timer code.
 > 
-> I'm pretty convinced that automatic SMR allocation is solvable; I was 
-> planning to take a look at it soon, once I've finished warming up the 
-> dormant mathematician in me on implementing the OF group allocator. So 
-> far I'm lucky that stream indexing is sufficient for the bits of our 
-> hardware that actually work.
-
-Hmm, a few of us have looked at that and failed, so I'm all ears if you
-think you can do it. The main issue is that you need *complete* knowledge
-of the allocated StreamID space before you can safely create any SMR entry
-unless you restrict yourself to consecutive, power-of-2 sized ID regions
-for each master (which doesn't match reality, unfortunately).
-
-> > For iommu_group creation, that could be done in the of code by treating the
-> > master IDs as bus IDs on a per-IOMMU bus; when a new device is probed, we
-> > can look at the set of devices with intersecting IDs and create a group
-> > containing those. This is similar to walking a PCI topology to establish DMA
-> > aliases.
+> But it is only SYSCLK1 / 610 if the DRA7_CTRL_CORE_BOOTSTRAP register
+> says it is.  Otherwise is is in fact 32768Hz.  I certainly would expect
+> that if another revision of the chip is made (and even for the single
+> core AM571x chips when they are done) will have this fixed and will work
+> with the external 32.768KHz crystal, if it is present.
 > 
-> Thanks to the USB EHCI/OHCI device model I have this prototyped already, 
-> via having the IOMMU driver register an arbitrary ID of its own choosing 
-> per of_xlate call, such that any devices claiming the same ID must be in 
-> the same group (i.e. the driver can perform its own 
-> translation/abstraction between the DT master ID and the "bus ID" for 
-> grouping). The tricky missing bit for the SMMU driver itself is 
-> reprogramming the S2CRs dynamically as devices are added to/removed from 
-> a group - with that solved I don't see much need left for any explicit 
-> grouping in DT.
-
-Hmm, is it actually safe to reprogram those on-the-fly? In particular, the
-spec says "SMMUv1 does not provide any special support for updating context
-bank state." whilst SMMUv2 isn't much better...
-
-> > The problem with all of this is how we distinguish the different ID formats
-> > in the `iommus' device-tree property. For the ARM SMMU, we could have:
-> >
-> >    (1) [easy case] A device has a list of StreamIDs
-> >
-> >    (2) A device has a list of SMR mask/value pairs
-> >
-> >    (3) A (bus) device has a range translation for a downstream bus (e.g.
-> >        a PCI host controller which needs to convert RequesterID to StreamID).
-> >
-> >  From the SMMU driver's perspective, they will all look like of_xlate calls
-> > unless we augment the generic IOMMU bindings with extra properties to
-> > identify the format. It also makes it difficult to pick a sensible value for
-> > #iommu-cells, as it depends on the format.
+> So how does one make the dtb reflect what the state of the CPU actually
+> is?
 > 
-> I thoroughly dislike the idea, but one /could/ simply abuse the generic 
-> bindings well within the current framework, e.g.
+> The errata even says that if SYSCLK1 is 26MHz (not a supported option
+> in the manual), then the 32.768KHz crystal does work and the counter
+> frequency will in fact be 6.144MHz like it should be.
 > 
-> #1: iommus = <&smmu 0 streamID 0 0>, <&smmu 0 streamID 0 0>, ...;
-> #2: iommus = <&smmu 1 mask value 0>;
-> #3: iommus = <&smmu 2 start end offset>;
-> 
-> and have a big complicated of_xlate that knows the secret. I don't think 
-> it would be unreasonable to constrain all masters on the same SMMU to 
-> use the same format either - that way you can lose the type indicator 
-> and the padding and the driver simply inspects #iommu-cells in 
-> of_iommu_init and sets up that instance to take the right path in its 
-> of_xlate calls later. Having a handful of single-stream-ID masters 
-> behind the same SMMU as a whacking great bus controller with a massive 
-> range seems like the kind of system-designer-insanity we should 
-> emphatically NOT be looking to accommodate if we can possibly help it.
-> 
-> That said, for the time being I see definite use-cases for #1, which 
-> already works, and #3, for which I really think we should be looking to 
-> add a parallel generic "iommu-ranges" or "iommu-bus-range" binding for 
-> bus controllers, rather than trying to overload "iommus" beyond 
-> describing actual bus masters.
+> So just changing the dtb is not an option.
 
-Yeah, let's avoid overloading the current bindings too much. Adding the
-ranges property makes perfect sense, I'm just trying to to straighten
-out how the "iommus" property should differ depending on the presence of
-SMR groups.
+A clock mux might do the job?
 
-Will
+value 1, 2 , 3 will imply sysclk1 / 610
+value of 0 implies fixed 32768
+
+soemthing like
+sys_clk32_crystal {
+               compatible = "fixed-clock";
+               clock-frequency = <32768>;
+}
+
+sys_clk32_pseudo {
+               compatible = "fixed-clock";
+               compatible = "fixed-factor-clock";
+               clocks = <&sys_clkin1>;
+               clock-mult = <1>;
+               clock-div = <610>;
+}
+
+sys_32k_ck: sys_32k_ck {
+	compatible = "ti,mux-clock";
+	clocks = <&sys_clk32_crystal>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>, <&sys_clk32_pseudo>;
+};
+
+I think... The only issue is that the BOOTSTRAP register is not around
+the usual CM1,2 address region...
+
+-- 
+Regards,
+Nishanth Menon
