@@ -1,49 +1,77 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Wed, 17 Dec 2014 20:53:43 +0100
-Subject: [PATCH] ARM: at91/pit: don't suspend/resume if unused
-Message-ID: <1418846023-8581-1-git-send-email-sylvain.rochet@finsecur.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Wed, 17 Dec 2014 20:45:56 +0100
+Subject: [PATCH] arm/rpc: avoid static keyword removal via define
+In-Reply-To: <20141217165450.GW11285@n2100.arm.linux.org.uk>
+References: <1418633287-5019-1-git-send-email-borntraeger@de.ibm.com>
+ <1418633287-5019-2-git-send-email-borntraeger@de.ibm.com>
+ <5490146A.3000408@de.ibm.com> <20141216114056.GP11285@n2100.arm.linux.org.uk>
+ <5491A16A.7050101@de.ibm.com> <20141217165450.GW11285@n2100.arm.linux.org.uk>
+Message-ID: <5491DD74.3060000@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Waiting for PIT to stop counting takes a long time:
-  1/(Master clock/prescaler/PIVR)
-= 1/(133 MHz     /16       /2^20)
-= 126 ms
+Am 17.12.2014 um 17:54 schrieb Russell King - ARM Linux:
+> On Wed, Dec 17, 2014 at 04:29:46PM +0100, Christian Borntraeger wrote:
+>> Am 16.12.2014 um 12:40 schrieb Russell King - ARM Linux:
+>>> On Tue, Dec 16, 2014 at 12:15:54PM +0100, Christian Borntraeger wrote:
+>>>> Am 15.12.2014 um 09:48 schrieb Christian Borntraeger:
+>>>>> commit 4486b86368d7 ("[ARM] riscpc: fix decompressor font file handling")
+>>>>> introduced Makefile magic to avoid building a file two times. Using
+>>>>> -Dstatic= does break some assumptions on compiler.h that were introduced
+>>>>> for READ_ONCE.
+>>>>>
+>>>>> Lets just use sed on the copy instead of using a define.
+>>>>>
+>>>>> Signed-off-by: Christian Borntraeger <borntraeger@de.ibm.com>
+>>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>>
+>>>> This fixed the linux-next build http://kisskb.ellerman.id.au/kisskb/target/1508/
+>>>> Unless anybody complains, I will send the pull request for the access_once tree tomorrow and I have this patch applied on top.
+>>>
+>>> Please give me some time to look at this.
+>>
+>> >From all builds, the only problematic case was the rpc_defconfig.
+>> So only CONFIG_ARCH_ACORN is affected.
+>>
+>> As I said, I want to send this series this merge window, so if you
+>> do not find the time to look into this before rc1, what about removing
+>> this patch from my queue and we solve this later? 
+>> Acorn Risc CPU is probably not the hottest platform right now, so if we 
+>> fix this in rc2 or rc3 this might be ok - I guess.
+> 
+> How does compiler.h get included when building font.o?
+> 
+> Since I haven't seen your patch series, I guess it gets included somehow
+> via linux/types.h ?
+> 
 
-Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
-of the unused PIT device reduce (suspend time + resume time) from ~140 ms
-to ~17 ms.
+The patch series can be found here
+https://lkml.org/lkml/2014/12/11/209
+or
+https://git.kernel.org/cgit/linux/kernel/git/borntraeger/linux.git/commit/?h=linux-next
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
- arch/arm/mach-at91/at91sam926x_time.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index e3344b4..44526aa 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -106,6 +106,10 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 
- static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
- {
-+	/* Don't suspend PIT if unused */
-+	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
-+		return;
-+
- 	/* Disable timer */
- 	pit_write(AT91_PIT_MR, 0);
- }
-@@ -125,6 +129,10 @@ static void at91sam926x_pit_reset(void)
- 
- static void at91sam926x_pit_resume(struct clock_event_device *cedev)
- {
-+	/* Don't resume PIT if unused */
-+	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
-+		return;
-+
- 	at91sam926x_pit_reset();
- }
- 
--- 
-2.1.3
+font.i has
+
+[..]
+# 5 "./arch/arm/include/asm/types.h" 2
+# 5 "include/uapi/linux/types.h" 2
+# 13 "include/uapi/linux/types.h"
+# 1 "./include/uapi/linux/posix_types.h" 1
+
+# 1 "include/linux/stddef.h" 1
+
+# 1 "include/uapi/linux/stddef.h" 1
+# 1 "include/linux/compiler.h" 1
+# 54 "include/linux/compiler.h"
+# 1 "include/linux/compiler-gcc.h" 1
+# 106 "include/linux/compiler-gcc.h"
+# 1 "include/linux/compiler-gcc4.h" 1
+# 107 "include/linux/compiler-gcc.h" 2
+# 55 "include/linux/compiler.h" 2
+# 79 "include/linux/compiler.h"
+[..]
+
+But I fail to follow that chain when I walk manually. Maybe its too late in the evening.
+
+Christian
