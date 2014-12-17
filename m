@@ -1,229 +1,108 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Dec 2014 15:01:29 +0000
-Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <20141217143305.GC8942@leverpostej>
-References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
- <1418825853-10934-4-git-send-email-eddie.huang@mediatek.com>
- <20141217143305.GC8942@leverpostej>
-Message-ID: <54919AC9.2090306@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Dec 2014 15:01:58 +0000
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <549192D2.10008@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1612493.xCj1Tx0M4k@avalon> <20141215180933.GW20738@arm.com>
+ <2447060.c0PHi7y3cP@wuerfel> <20141217120948.GB870@arm.com>
+ <549192D2.10008@arm.com>
+Message-ID: <20141217150158.GF870@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/14 14:33, Mark Rutland wrote:
-> On Wed, Dec 17, 2014 at 02:17:32PM +0000, Eddie Huang wrote:
->> Add device tree support for MT8173 SoC and evaluation board based on it.
->>
->> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->> ---
->>  arch/arm64/boot/dts/Makefile       |   1 +
->>  arch/arm64/boot/dts/mt8173-evb.dts |  34 +++++++++
->>  arch/arm64/boot/dts/mt8173.dtsi    | 152 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 187 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/mt8173-evb.dts
->>  create mode 100644 arch/arm64/boot/dts/mt8173.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index f8001a6..db7661e 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,3 +1,4 @@
->> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
->>  dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->> diff --git a/arch/arm64/boot/dts/mt8173-evb.dts b/arch/arm64/boot/dts/mt8173-evb.dts
->> new file mode 100644
->> index 0000000..b8b2621
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/mt8173-evb.dts
->> @@ -0,0 +1,34 @@
->> +/*
->> + * Copyright (c) 2014 MediaTek Inc.
->> + * Author: Eddie Huang <eddie.huang@mediatek.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +/dts-v1/;
->> +#include "mt8173.dtsi"
->> +
->> +/ {
->> +	model = "mediatek,mt8173-evb";
->> +
->> +	aliases {
->> +		serial0 = &uart0;
->> +		serial1 = &uart1;
->> +		serial2 = &uart2;
->> +		serial3 = &uart3;
->> +	};
->> +
->> +	memory at 40000000 {
->> +		device_type = "memory";
->> +		reg = <0 0x40000000 0 0x80000000>;
->> +	};
->> +
->> +	chosen { };
->> +};
->> diff --git a/arch/arm64/boot/dts/mt8173.dtsi b/arch/arm64/boot/dts/mt8173.dtsi
->> new file mode 100644
->> index 0000000..41c1441
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/mt8173.dtsi
->> @@ -0,0 +1,152 @@
->> +/*
->> + * Copyright (c) 2014 MediaTek Inc.
->> + * Author: Eddie Huang <eddie.huang@mediatek.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +/ {
->> +	compatible = "mediatek,mt8173";
->> +	interrupt-parent = <&sysirq>;
->> +	#address-cells = <2>;
->> +	#size-cells = <2>;
->> +
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		cpu-map {
->> +			cluster0 {
->> +				core0 {
->> +					cpu = <&cpu0>;
->> +				};
->> +				core1 {
->> +					cpu = <&cpu1>;
->> +				};
->> +			};
->> +
->> +			cluster1 {
->> +				core0 {
->> +					cpu = <&cpu2>;
->> +				};
->> +				core1 {
->> +					cpu = <&cpu3>;
->> +				};
->> +			};
->> +		};
->> +
->> +		cpu0: cpu at 0 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53";
->> +			reg = <0x000>;
->> +		};
->> +
->> +		cpu1: cpu at 1 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53";
->> +			reg = <0x001>;
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu2: cpu at 2 {
+On Wed, Dec 17, 2014 at 02:27:30PM +0000, Robin Murphy wrote:
+> On 17/12/14 12:09, Will Deacon wrote:
+> > On Tue, Dec 16, 2014 at 12:08:15PM +0000, Arnd Bergmann wrote:
+> >> On Monday 15 December 2014 18:09:33 Will Deacon wrote:
+> >>>> Using a single domain is a bit of a waste of resources in my case, so an
+> >>>> evolution would be to create four domains and assign devices to them based on
+> >>>> a policy. The policy could be fixed (round-robin for instance), or
+> >>>> configurable (possibly through DT, although it's really a policy, not a
+> >>>> hardware description).
+> >>
+> >> I think in case of the ARM SMMU, we concluded that the grouping is indeed
+> >> best done in DT, because of there is no good algorithmic way to come
+> >> up with a set of bitmasks that make up a proper grouping into domains.
+> >
+> > I think that's a slightly different case. The `grouping' in the DT, is on a
+> > per-master basis where a master may have a set of StreamIDs, which can be
+> > expressed in a more efficient (per-IOMMU) manner that cannot easily be
+> > determined at runtime.
 > 
-> The unit-address should be 100 rather than 2, matching the reg property.
-> This should be 'cpu at 100'.
-> 
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a57";
->> +			reg = <0x100>;
->> +			enable-method = "psci";
->> +		};
->> +
->> +		cpu3: cpu at 3 {
-> 
-> Similarly this should be 'cpu at 101'.
-> 
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a57";
->> +			reg = <0x101>;
->> +			enable-method = "psci";
->> +		};
->> +	};
->> +
->> +	psci {
->> +		compatible = "arm,psci";
->> +		method = "smc";
->> +		cpu_suspend   = <0x84000001>;
->> +		cpu_off	      = <0x84000002>;
->> +		cpu_on	      = <0x84000003>;
->> +		affinity_info = <0x84000004>;
->> +	};
-> 
-> There is no AFFINITY_INFO function prior to PSCI 0.2, and
-> 'affinity_info' does not exist in the "arm,psci" binding.
-> 
-> I take it hotplug has been tested for all but CPU0?
-> 
->> +
->> +	uart_clk: dummy26m {
->> +		compatible = "fixed-clock";
->> +		clock-frequency = <26000000>;
->> +		#clock-cells = <0>;
->> +	};
->> +
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupt-parent = <&gic>;
->> +		interrupts = <1 13 0xf08>,
->> +			     <1 14 0xf08>,
->> +			     <1 11 0xf08>,
->> +			     <1 10 0xf08>;
->> +	};
->> +
->> +	soc {
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		compatible = "simple-bus";
->> +		ranges;
->> +
->> +		sysirq: intpol-controller at 10200620 {
->> +			compatible = "mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq";
->> +			interrupt-controller;
->> +			#interrupt-cells = <3>;
->> +			interrupt-parent = <&gic>;
->> +			reg = <0 0x10200620 0 0x20>;
->> +		};
->> +
->> +		gic: interrupt-controller at 10220000 {
->> +			compatible = "arm,gic-400";
->> +			#interrupt-cells = <3>;
->> +			interrupt-parent = <&gic>;
->> +			interrupt-controller;
->> +			reg = <0 0x10221000 0 0x1000>,
->> +			      <0 0x10222000 0 0x1000>,
->> +			      <0 0x10224000 0 0x2000>,
->> +			      <0 0x10226000 0 0x2000>;
->> +			interrupts = <1 9 0xf04>;
->> +		};
-> 
-> I don't think these reg entries are quite right; GICC should be 8k long.
-> 
-> Marc?
+> I'm pretty convinced that automatic SMR allocation is solvable; I was 
+> planning to take a look at it soon, once I've finished warming up the 
+> dormant mathematician in me on implementing the OF group allocator. So 
+> far I'm lucky that stream indexing is sufficient for the bits of our 
+> hardware that actually work.
 
-Indeed, as described in the documentation:
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/CHDIFAEE.html
+Hmm, a few of us have looked at that and failed, so I'm all ears if you
+think you can do it. The main issue is that you need *complete* knowledge
+of the allocated StreamID space before you can safely create any SMR entry
+unless you restrict yourself to consecutive, power-of-2 sized ID regions
+for each master (which doesn't match reality, unfortunately).
 
-Also it is worth noticing that given how GICV is placed, it will never
-work with 64K pages and virtualization. Pretty sad.
+> > For iommu_group creation, that could be done in the of code by treating the
+> > master IDs as bus IDs on a per-IOMMU bus; when a new device is probed, we
+> > can look at the set of devices with intersecting IDs and create a group
+> > containing those. This is similar to walking a PCI topology to establish DMA
+> > aliases.
+> 
+> Thanks to the USB EHCI/OHCI device model I have this prototyped already, 
+> via having the IOMMU driver register an arbitrary ID of its own choosing 
+> per of_xlate call, such that any devices claiming the same ID must be in 
+> the same group (i.e. the driver can perform its own 
+> translation/abstraction between the DT master ID and the "bus ID" for 
+> grouping). The tricky missing bit for the SMMU driver itself is 
+> reprogramming the S2CRs dynamically as devices are added to/removed from 
+> a group - with that solved I don't see much need left for any explicit 
+> grouping in DT.
 
-Thanks,
+Hmm, is it actually safe to reprogram those on-the-fly? In particular, the
+spec says "SMMUv1 does not provide any special support for updating context
+bank state." whilst SMMUv2 isn't much better...
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> > The problem with all of this is how we distinguish the different ID formats
+> > in the `iommus' device-tree property. For the ARM SMMU, we could have:
+> >
+> >    (1) [easy case] A device has a list of StreamIDs
+> >
+> >    (2) A device has a list of SMR mask/value pairs
+> >
+> >    (3) A (bus) device has a range translation for a downstream bus (e.g.
+> >        a PCI host controller which needs to convert RequesterID to StreamID).
+> >
+> >  From the SMMU driver's perspective, they will all look like of_xlate calls
+> > unless we augment the generic IOMMU bindings with extra properties to
+> > identify the format. It also makes it difficult to pick a sensible value for
+> > #iommu-cells, as it depends on the format.
+> 
+> I thoroughly dislike the idea, but one /could/ simply abuse the generic 
+> bindings well within the current framework, e.g.
+> 
+> #1: iommus = <&smmu 0 streamID 0 0>, <&smmu 0 streamID 0 0>, ...;
+> #2: iommus = <&smmu 1 mask value 0>;
+> #3: iommus = <&smmu 2 start end offset>;
+> 
+> and have a big complicated of_xlate that knows the secret. I don't think 
+> it would be unreasonable to constrain all masters on the same SMMU to 
+> use the same format either - that way you can lose the type indicator 
+> and the padding and the driver simply inspects #iommu-cells in 
+> of_iommu_init and sets up that instance to take the right path in its 
+> of_xlate calls later. Having a handful of single-stream-ID masters 
+> behind the same SMMU as a whacking great bus controller with a massive 
+> range seems like the kind of system-designer-insanity we should 
+> emphatically NOT be looking to accommodate if we can possibly help it.
+> 
+> That said, for the time being I see definite use-cases for #1, which 
+> already works, and #3, for which I really think we should be looking to 
+> add a parallel generic "iommu-ranges" or "iommu-bus-range" binding for 
+> bus controllers, rather than trying to overload "iommus" beyond 
+> describing actual bus masters.
+
+Yeah, let's avoid overloading the current bindings too much. Adding the
+ranges property makes perfect sense, I'm just trying to to straighten
+out how the "iommus" property should differ depending on the presence of
+SMR groups.
+
+Will
