@@ -1,166 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 17 Dec 2014 09:56:13 +0100
-Subject: [PATCH v6] ARM: zImage: add support for ARMv7-M
-Message-ID: <1418806573-14897-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Wed, 17 Dec 2014 09:08:44 +0000
+Subject: [Linaro-acpi] [RFC] ACPI on arm64 TODO List
+In-Reply-To: <5490D042.3060901@linaro.org>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <20141216154842.GI19412@leverpostej> <5490D042.3060901@linaro.org>
+Message-ID: <CAGCh1+mEVsdVxnyBdoHg1LfY4=frL8_S=bD=jTepLbcxJKcDQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joachim Eastwood <manabian@gmail.com>
+On 17 December 2014 at 00:37, Al Stone <al.stone@linaro.org> wrote:
+>> I have not seen good guidelines on the usage of _DSD in that respect,
+>> and I'm worried we'll end up with clock controllers half-owned by AML
+>> and half-owned by the kernel's clock framework, and this separation
+>> varying from board to board (and FW revision to FW revision). I think
+>> that needs to be clarified at the ACPI spec level in addition to
+>> anything we have in the kernel documentation.
+>
+> Hrm.  The spec (section 6.2.5) basically says that there exists a
+> thing called _DSD and that when invoked, it returns a UUID followed
+> by a data structure.  A separate document (on http://www.uefi.org/acpi)
+> for each UUID defines the data structure it corresponds to.  The only
+> one defined so far is for device properties:
+>
+>
+> http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
+>
+> I think you are suggesting good guidelines for both, yes?  The usage
+> of new UUIDs and data structures, along with the usage of device
+> properties for the UUID we have, right?  I've been trying to write
+> such a thing but all I've accomplished so far is throwing away a
+> couple of drafts that got ugly.  I'll keep at it, though.
+>
 
-This patch makes it possible to enter zImage in Thumb mode for ARMv7-M
-(Cortex-M) CPUs that do not support ARM mode. The kernel entry is also
-made in Thumb mode.
+Of course the way the spec is written also gives us the option, if the
+OEMs and kernel guys and MS all agree on a different format for
+aarch64 then all that is needed is a new UUID and we are no longer
+tied to trying to insert DT into ACPI. I personally think this is the
+way to go, I do not like the blindly copying DT into ACPI. I suspect
+the information that a ACPI platform "needs" is probably significantly
+simplified compared to some of the DT bindings.
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-[ukl: fix spelling in commit log, return early in call_cache_fn]
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-I just picked up Joachim's patch and fixed the small concerns I had in
-the last round.
-
-I thought about adding a wrapper for accessing the CPUID registers that
-are located in cp15 on v7-A/R and memory mapped on v7-M. The
-corresponding registers and their address are as follows:
-
-name		cp15 reg [1] on -A/R	address on -M
-MIDR/CPUID  	CRm=c0, opc2=0  	0xe000ed00              
-PFR0   		CRm=c1, opc2=0  	0xe000ed40
-PFR1   		CRm=c1, opc2=1  	0xe000ed44
-DFR0   		CRm=c1, opc2=2  	0xe000ed48
-AFR0   		CRm=c1, opc2=3  	0xe000ed4c
-MMFR0  		CRm=c1, opc2=4  	0xe000ed50
-MMFR1  		CRm=c1, opc2=5  	0xe000ed54
-MMFR2  		CRm=c1, opc2=6  	0xe000ed58
-MMFR3  		CRm=c1, opc2=7  	0xe000ed5c
-ISAR0  		CRm=c2, opc2=0  	0xe000ed60
-ISAR1  		CRm=c2, opc2=1  	0xe000ed64
-ISAR2  		CRm=c2, opc2=2  	0xe000ed68
-ISAR3  		CRm=c2, opc2=3  	0xe000ed6c
-ISAR4  		CRm=c2, opc2=4  	0xe000ed70
-ISAR5  		CRm=c2, opc2=5  	0xe000ed74
-
-But there is no nice translation and as cache handling is implementation
-defined on v7-M anyhow there is not much use and I decided to just
-return early in the cache function.
-
-This patch is only compile tested as I don't have a machine with enough
-RAM to run a non-XIP kernel, so Tested-by tags are welcome.
-
-Best regards
-Uwe
-
-[1] all have in common: CRn=c0, opc1=0, so only CRm and opc2 are listed
-
- arch/arm/boot/compressed/head.S | 33 +++++++++++++++++++++++++++------
- arch/arm/include/asm/unified.h  |  8 ++++++++
- 2 files changed, 35 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 68be9017593d..3788eedabb15 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -10,8 +10,11 @@
-  */
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/v7m.h>
-+
-+ AR_CLASS(	.arch	armv7-a	)
-+ M_CLASS(	.arch	armv7-m	)
- 
--	.arch	armv7-a
- /*
-  * Debugging stuff
-  *
-@@ -114,7 +117,12 @@
-  * sort out different calling conventions
-  */
- 		.align
--		.arm				@ Always enter in ARM state
-+		/*
-+		 * Always enter in ARM state for CPUs that support the ARM ISA.
-+		 * As of today (2014) that's exactly the members of the A and R
-+		 * classes.
-+		 */
-+ AR_CLASS(	.arm	)
- start:
- 		.type	start,#function
- 		.rept	7
-@@ -132,14 +140,15 @@ start:
- 
-  THUMB(		.thumb			)
- 1:
-- ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
--		mrs	r9, cpsr
-+ ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
-+ AR_CLASS(	mrs	r9, cpsr	)
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
- #endif
- 		mov	r7, r1			@ save architecture ID
- 		mov	r8, r2			@ save atags pointer
- 
-+#ifndef CONFIG_CPU_V7M
- 		/*
- 		 * Booting from Angel - need to enter SVC mode and disable
- 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
-@@ -155,6 +164,7 @@ not_angel:
- 		safe_svcmode_maskall r0
- 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
- 						@ SPSR
-+#endif
- 		/*
- 		 * Note that some cache flushing and other stuff may
- 		 * be needed here - is there an Angel SWI call for this?
-@@ -789,6 +799,16 @@ __common_mmu_cache_on:
- call_cache_fn:	adr	r12, proc_types
- #ifdef CONFIG_CPU_CP15
- 		mrc	p15, 0, r9, c0, c0	@ get processor ID
-+#elif defined(CONFIG_CPU_V7M)
-+		/*
-+		 * On v7-M the processor id is located in the V7M_SCB_CPUID
-+		 * register, but as cache handling is IMPLEMENTATION DEFINED on
-+		 * v7-M (if existant at all) we just return early here.
-+		 * If V7M_SCB_CPUID were used the cpu ID functions (i.e.
-+		 * __armv7_mmu_cache_{on,off,flush}) would be selected which
-+		 * use cp15 registers that are not implemented on v7-M.
-+		 */
-+		bx	lr
- #else
- 		ldr	r9, =CONFIG_PROCESSOR_ID
- #endif
-@@ -1289,8 +1309,9 @@ __hyp_reentry_vectors:
- 
- __enter_kernel:
- 		mov	r0, #0			@ must be 0
-- ARM(		mov	pc, r4	)		@ call kernel
-- THUMB(		bx	r4	)		@ entry point is always ARM
-+ ARM(		mov	pc, r4		)	@ call kernel
-+ M_CLASS(	add	r4, r4, #1	)	@ enter in Thumb mode for M class
-+ THUMB(		bx	r4		)	@ entry point is always ARM for A/R classes
- 
- reloc_code_end:
- 
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index b88beaba6b4a..200f9a7cd623 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -24,6 +24,14 @@
- 	.syntax unified
- #endif
- 
-+#ifdef CONFIG_CPU_V7M
-+#define AR_CLASS(x...)
-+#define M_CLASS(x...)	x
-+#else
-+#define AR_CLASS(x...)	x
-+#define M_CLASS(x...)
-+#endif
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 
- #if __GNUC__ < 4
--- 
-2.1.3
+Graeme
