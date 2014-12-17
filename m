@@ -1,83 +1,388 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Dec 2014 15:15:12 +0100
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20141217120948.GB870@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2447060.c0PHi7y3cP@wuerfel> <20141217120948.GB870@arm.com>
-Message-ID: <3099591.NlcSS8Qjlv@wuerfel>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 17 Dec 2014 15:15:44 +0100
+Subject: [PATCH] [media] s5p-jpeg: Adding Exynos7 Jpeg variant support
+In-Reply-To: <1418801229-7532-1-git-send-email-tony.kn@samsung.com>
+References: <1418801229-7532-1-git-send-email-tony.kn@samsung.com>
+Message-ID: <54919010.8020507@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 12:09:49 Will Deacon wrote:
-> On Tue, Dec 16, 2014 at 12:08:15PM +0000, Arnd Bergmann wrote:
-> > On Monday 15 December 2014 18:09:33 Will Deacon wrote:
-> > > > Using a single domain is a bit of a waste of resources in my case, so an 
-> > > > evolution would be to create four domains and assign devices to them based on 
-> > > > a policy. The policy could be fixed (round-robin for instance), or 
-> > > > configurable (possibly through DT, although it's really a policy, not a 
-> > > > hardware description).
-> > 
-> > I think in case of the ARM SMMU, we concluded that the grouping is indeed
-> > best done in DT, because of there is no good algorithmic way to come
-> > up with a set of bitmasks that make up a proper grouping into domains.
-> 
-> I think that's a slightly different case. The `grouping' in the DT, is on a
-> per-master basis where a master may have a set of StreamIDs, which can be
-> expressed in a more efficient (per-IOMMU) manner that cannot easily be
-> determined at runtime.
-> 
-> For iommu_group creation, that could be done in the of code by treating the
-> master IDs as bus IDs on a per-IOMMU bus; when a new device is probed, we
-> can look at the set of devices with intersecting IDs and create a group
-> containing those. This is similar to walking a PCI topology to establish DMA
-> aliases.
-> 
-> The problem with all of this is how we distinguish the different ID formats
-> in the `iommus' device-tree property. For the ARM SMMU, we could have:
-> 
->   (1) [easy case] A device has a list of StreamIDs
-> 
->   (2) A device has a list of SMR mask/value pairs
+Hi Tony,
 
-I was under the impression that using the format from (2), we could
-describe all devices that fall into (1). In the worst case, we would
-create an iommu group that is somewhat larger than one using discrete
-StreamID values, but I would hope that this does not cause actual
-troubles.
+Thanks for the patches.
 
-If all devices on each iommu fall into either 1 or 2, but you never mix
-the two on one iommu, this could be handled by supporting either
-#iommu-cells=<1> or <2> in the smmu driver. That way, the xlate function
-will know which method to apply by looking at the iommu's #iommu-cells
-property.
+Please process them with scripts/checkpatch.pl as you will be submitting
+the next version - they contain many coding style related issues.
 
->   (3) A (bus) device has a range translation for a downstream bus (e.g.
->       a PCI host controller which needs to convert RequesterID to StreamID).
-> 
-> From the SMMU driver's perspective, they will all look like of_xlate calls
-> unless we augment the generic IOMMU bindings with extra properties to
-> identify the format. It also makes it difficult to pick a sensible value for
-> #iommu-cells, as it depends on the format.
+My remaining comments below.
 
-I would hope that PCI is the only case we need to worry about for a while.
-This means we just need to come up with another property or a set of properties
-that we can put into a PCI host controller device node in order to describe
-the mapping. These properties could be iommu-specific, so we add something
-to the PCI core that calls a new iommu callback function that takes the
-device node of the PCI host and the bus/device/function number as inputs.
+On 12/17/2014 08:27 AM, Tony K Nadackal wrote:
+> Fimp_jpeg used in Exynos7 is a revised version. Some register
+> configurations are slightly different from Jpeg in Exynos4.
+> Added one more variant SJPEG_EXYNOS7 to handle these differences.
+>
+> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> ---
+> This patch is created and tested on top of linux-next-20141210.
+> It can be cleanly applied on media-next and kgene/for-next.
+>
+>   .../bindings/media/exynos-jpeg-codec.txt           |  2 +-
+>   drivers/media/platform/s5p-jpeg/jpeg-core.c        | 69 +++++++++++++++++++---
+>   drivers/media/platform/s5p-jpeg/jpeg-core.h        |  1 +
+>   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c  | 33 ++++++-----
+>   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h  |  8 ++-
+>   drivers/media/platform/s5p-jpeg/jpeg-regs.h        | 17 ++++--
+>   6 files changed, 98 insertions(+), 32 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> index bf52ed4..cd19417 100644
+> --- a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> +++ b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> @@ -4,7 +4,7 @@ Required properties:
+>
+>   - compatible	: should be one of:
+>   		  "samsung,s5pv210-jpeg", "samsung,exynos4210-jpeg",
+> -		  "samsung,exynos3250-jpeg";
+> +		  "samsung,exynos3250-jpeg", "samsung,exynos7-jpeg";
+>   - reg		: address and length of the JPEG codec IP register set;
+>   - interrupts	: specifies the JPEG codec IP interrupt;
+>   - clock-names   : should contain:
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+> index 54fa5d9..ad42a4e 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+> @@ -1225,8 +1225,9 @@ static int s5p_jpeg_try_fmt_vid_cap(struct file *file, void *priv,
+>   		return -EINVAL;
+>   	}
+>
+> -	if ((ctx->jpeg->variant->version != SJPEG_EXYNOS4) ||
+> -	    (ctx->mode != S5P_JPEG_DECODE))
+> +	if (((ctx->jpeg->variant->version != SJPEG_EXYNOS4) &&
+> +		(ctx->jpeg->variant->version != SJPEG_EXYNOS7)) ||
+> +		(ctx->mode != S5P_JPEG_DECODE))
+>   		goto exit;
+>
+>   	/*
+> @@ -1349,7 +1350,8 @@ static int s5p_jpeg_s_fmt(struct s5p_jpeg_ctx *ct, struct v4l2_format *f)
+>   		 * the JPEG_IMAGE_SIZE register. In order to avoid sysmmu
+>   		 * page fault calculate proper buffer size in such a case.
+>   		 */
+> -		if (ct->jpeg->variant->version == SJPEG_EXYNOS4 &&
+> +		if (((ct->jpeg->variant->version == SJPEG_EXYNOS4) ||
+> +			(ct->jpeg->variant->version == SJPEG_EXYNOS7)) &&
+>   		    f_type == FMT_TYPE_OUTPUT && ct->mode == S5P_JPEG_ENCODE)
+>   			q_data->size = exynos4_jpeg_get_output_buffer_size(ct,
+>   							f,
+> @@ -1901,7 +1903,6 @@ static void exynos4_jpeg_device_run(void *priv)
+>
+>   	if (ctx->mode == S5P_JPEG_ENCODE) {
+>   		exynos4_jpeg_sw_reset(jpeg->regs);
+> -		exynos4_jpeg_set_interrupt(jpeg->regs);
+>   		exynos4_jpeg_set_huf_table_enable(jpeg->regs, 1);
+>
+>   		exynos4_jpeg_set_huff_tbl(jpeg->regs);
+> @@ -1918,20 +1919,60 @@ static void exynos4_jpeg_device_run(void *priv)
+>   		exynos4_jpeg_set_stream_size(jpeg->regs, ctx->cap_q.w,
+>   							ctx->cap_q.h);
+>
+> -		exynos4_jpeg_set_enc_out_fmt(jpeg->regs, ctx->subsampling);
+> -		exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->out_q.fmt->fourcc);
+> +		if (ctx->jpeg->variant->version == SJPEG_EXYNOS7) {
+> +			exynos4_jpeg_set_interrupt(jpeg->regs, SJPEG_EXYNOS7);
+> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
+> +					ctx->subsampling, EXYNOS7_ENC_FMT_MASK);
+> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
+> +					ctx->out_q.fmt->fourcc,
+> +					EXYNOS7_SWAP_CHROMA_SHIFT);
+> +		} else {
+> +			exynos4_jpeg_set_interrupt(jpeg->regs, SJPEG_EXYNOS4);
+> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
+> +					ctx->subsampling, EXYNOS4_ENC_FMT_MASK);
+> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
+> +					ctx->out_q.fmt->fourcc,
+> +					EXYNOS4_SWAP_CHROMA_SHIFT);
+> +		}
+> +
 
-In arm_setup_iommu_dma_ops(), we can then do something like
+I'd implement it this way:
 
-	if (dev_is_pci(dev)) {
-		struct pci_dev *pdev = to_pci_dev(dev);
-		struct device_node *node;
-		unsigned int bdf;
+exynos4_jpeg_set_interrupt(jpeg->regs, ctx->jpeg->variant->version);
+exynos4_jpeg_set_enc_out_fmt(jpeg->regs, ctx->subsampling, 	
+			(ctx->jpeg->variant->version == SJPEG_EXYNOS4) ?
+				EXYNOS4_ENC_FMT_MASK :
+				EXYNOS7_ENC_FMT_MASK);
+exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->out_q.fmt->fourcc,
+			(ctx->jpeg->variant->version == SJPEG_EXYNOS4) ?
+				EXYNOS4_SWAP_CHROMA_SHIFT :
+				EXYNOS7_SWAP_CHROMA_SHIFT);
 
-		node = find_pci_host_bridge(pdev->bus)->parent->of_node;
-		bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
+>   		exynos4_jpeg_set_img_addr(ctx);
+>   		exynos4_jpeg_set_jpeg_addr(ctx);
+>   		exynos4_jpeg_set_encode_hoff_cnt(jpeg->regs,
+>   							ctx->out_q.fmt->fourcc);
+>   	} else {
+>   		exynos4_jpeg_sw_reset(jpeg->regs);
+> -		exynos4_jpeg_set_interrupt(jpeg->regs);
+>   		exynos4_jpeg_set_img_addr(ctx);
+>   		exynos4_jpeg_set_jpeg_addr(ctx);
+> -		exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->cap_q.fmt->fourcc);
+>
+> -		bitstream_size = DIV_ROUND_UP(ctx->out_q.size, 32);
+> +		if (ctx->jpeg->variant->version == SJPEG_EXYNOS7) {
+> +			exynos4_jpeg_set_interrupt(jpeg->regs, SJPEG_EXYNOS7);
+> +			exynos4_jpeg_set_huff_tbl(jpeg->regs);
+> +			exynos4_jpeg_set_huf_table_enable(jpeg->regs, 1);
+> +
+> +			/*
+> +			 * JPEG IP allows storing 4 quantization tables
+> +			 * We fill table 0 for luma and table 1 for chroma
+> +			 */
+> +			exynos4_jpeg_set_qtbl_lum(jpeg->regs,
+> +							ctx->compr_quality);
+> +			exynos4_jpeg_set_qtbl_chr(jpeg->regs,
+> +							ctx->compr_quality);
 
-		iommu_setup_pci_dev(pdev, node, bdf);
-	}
+Is it really required to setup quantization tables for encoding?
 
-	Arnd
+> +			exynos4_jpeg_set_stream_size(jpeg->regs, ctx->cap_q.w,
+> +					ctx->cap_q.h);
+
+For exynos4 this function writes the number of samples per line and
+number lines of the resulting JPEG image and is used only during
+encoding. Is the semantics of the related register different in case of
+Exynos7?
+
+> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
+> +					ctx->subsampling, EXYNOS7_ENC_FMT_MASK);
+> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
+> +					ctx->cap_q.fmt->fourcc,
+> +					EXYNOS7_SWAP_CHROMA_SHIFT);
+> +			bitstream_size = DIV_ROUND_UP(ctx->out_q.size, 16);
+> +		} else {
+> +			exynos4_jpeg_set_interrupt(jpeg->regs, SJPEG_EXYNOS4);
+> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
+> +					ctx->cap_q.fmt->fourcc,
+> +					EXYNOS4_SWAP_CHROMA_SHIFT);
+> +			bitstream_size = DIV_ROUND_UP(ctx->out_q.size, 32);
+> +		}
+>
+>   		exynos4_jpeg_set_dec_bitstream_size(jpeg->regs, bitstream_size);
+>   	}
+> @@ -2729,6 +2770,13 @@ static struct s5p_jpeg_variant exynos4_jpeg_drvdata = {
+>   	.fmt_ver_flag	= SJPEG_FMT_FLAG_EXYNOS4,
+>   };
+>
+> +static struct s5p_jpeg_variant exynos7_jpeg_drvdata = {
+> +	.version	= SJPEG_EXYNOS7,
+> +	.jpeg_irq	= exynos4_jpeg_irq,
+> +	.m2m_ops	= &exynos4_jpeg_m2m_ops,
+> +	.fmt_ver_flag	= SJPEG_FMT_FLAG_EXYNOS4,
+> +};
+> +
+>   static const struct of_device_id samsung_jpeg_match[] = {
+>   	{
+>   		.compatible = "samsung,s5pv210-jpeg",
+> @@ -2742,6 +2790,9 @@ static const struct of_device_id samsung_jpeg_match[] = {
+>   	}, {
+>   		.compatible = "samsung,exynos4212-jpeg",
+>   		.data = &exynos4_jpeg_drvdata,
+> +	}, {
+> +		.compatible = "samsung,exynos7-jpeg",
+> +		.data = &exynos7_jpeg_drvdata,
+>   	},
+>   	{},
+>   };
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.h b/drivers/media/platform/s5p-jpeg/jpeg-core.h
+> index 764b32d..734710a 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.h
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.h
+> @@ -71,6 +71,7 @@
+>   #define SJPEG_S5P		1
+>   #define SJPEG_EXYNOS3250	2
+>   #define SJPEG_EXYNOS4		3
+> +#define SJPEG_EXYNOS7		4
+
+As you adding a new variant I propose to turn these macros into enum.
+
+>   enum exynos4_jpeg_result {
+>   	OK_ENC_OR_DEC,
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> index e53f13a..2611259 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> @@ -49,7 +49,8 @@ void exynos4_jpeg_set_enc_dec_mode(void __iomem *base, unsigned int mode)
+>   	}
+>   }
+>
+> -void exynos4_jpeg_set_img_fmt(void __iomem *base, unsigned int img_fmt)
+> +void exynos4_jpeg_set_img_fmt(void __iomem *base, unsigned int img_fmt,
+> +					unsigned int shift)
+>   {
+>   	unsigned int reg;
+>
+> @@ -71,48 +72,48 @@ void exynos4_jpeg_set_img_fmt(void __iomem *base, unsigned int img_fmt)
+>   	case V4L2_PIX_FMT_NV24:
+>   		reg = reg | EXYNOS4_ENC_YUV_444_IMG |
+>   				EXYNOS4_YUV_444_IP_YUV_444_2P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CBCR;
+> +				EXYNOS_SWAP_CHROMA_CBCR(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_NV42:
+>   		reg = reg | EXYNOS4_ENC_YUV_444_IMG |
+>   				EXYNOS4_YUV_444_IP_YUV_444_2P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CRCB;
+> +				EXYNOS_SWAP_CHROMA_CRCB(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_YUYV:
+>   		reg = reg | EXYNOS4_DEC_YUV_422_IMG |
+>   				EXYNOS4_YUV_422_IP_YUV_422_1P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CBCR;
+> +				EXYNOS_SWAP_CHROMA_CBCR(shift);
+>   		break;
+>
+>   	case V4L2_PIX_FMT_YVYU:
+>   		reg = reg | EXYNOS4_DEC_YUV_422_IMG |
+>   				EXYNOS4_YUV_422_IP_YUV_422_1P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CRCB;
+> +				EXYNOS_SWAP_CHROMA_CRCB(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_NV16:
+>   		reg = reg | EXYNOS4_DEC_YUV_422_IMG |
+>   				EXYNOS4_YUV_422_IP_YUV_422_2P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CBCR;
+> +				EXYNOS_SWAP_CHROMA_CBCR(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_NV61:
+>   		reg = reg | EXYNOS4_DEC_YUV_422_IMG |
+>   				EXYNOS4_YUV_422_IP_YUV_422_2P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CRCB;
+> +				EXYNOS_SWAP_CHROMA_CRCB(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_NV12:
+>   		reg = reg | EXYNOS4_DEC_YUV_420_IMG |
+>   				EXYNOS4_YUV_420_IP_YUV_420_2P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CBCR;
+> +				EXYNOS_SWAP_CHROMA_CBCR(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_NV21:
+>   		reg = reg | EXYNOS4_DEC_YUV_420_IMG |
+>   				EXYNOS4_YUV_420_IP_YUV_420_2P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CRCB;
+> +				EXYNOS_SWAP_CHROMA_CRCB(shift);
+>   		break;
+>   	case V4L2_PIX_FMT_YUV420:
+>   		reg = reg | EXYNOS4_DEC_YUV_420_IMG |
+>   				EXYNOS4_YUV_420_IP_YUV_420_3P_IMG |
+> -				EXYNOS4_SWAP_CHROMA_CBCR;
+> +				EXYNOS_SWAP_CHROMA_CBCR(shift);
+>   		break;
+>   	default:
+>   		break;
+> @@ -122,12 +123,13 @@ void exynos4_jpeg_set_img_fmt(void __iomem *base, unsigned int img_fmt)
+>   	writel(reg, base + EXYNOS4_IMG_FMT_REG);
+>   }
+>
+> -void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt)
+> +void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt,
+> +					unsigned int mask)
+>   {
+>   	unsigned int reg;
+>
+>   	reg = readl(base + EXYNOS4_IMG_FMT_REG) &
+> -			~EXYNOS4_ENC_FMT_MASK; /* clear enc format */
+> +			~EXYNOS_ENC_FMT_MASK(mask); /* clear enc format */
+>
+>   	switch (out_fmt) {
+>   	case V4L2_JPEG_CHROMA_SUBSAMPLING_GRAY:
+> @@ -153,9 +155,12 @@ void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt)
+>   	writel(reg, base + EXYNOS4_IMG_FMT_REG);
+>   }
+>
+> -void exynos4_jpeg_set_interrupt(void __iomem *base)
+> +void exynos4_jpeg_set_interrupt(void __iomem *base, unsigned int version)
+>   {
+> -	writel(EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
+> +	unsigned int reg;
+> +
+> +	reg = readl(base + EXYNOS4_INT_EN_REG) & ~EXYNOS4_INT_EN_MASK(version);
+> +	writel(EXYNOS4_INT_EN_ALL(version), base + EXYNOS4_INT_EN_REG);
+>   }
+
+I believe that adding readl is a fix. I'd enclose it into separate
+patch and explain its merit.
+
+>   unsigned int exynos4_jpeg_get_int_status(void __iomem *base)
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h
+> index c228d28..b425199 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h
+> @@ -15,10 +15,12 @@
+>
+>   void exynos4_jpeg_sw_reset(void __iomem *base);
+>   void exynos4_jpeg_set_enc_dec_mode(void __iomem *base, unsigned int mode);
+> -void exynos4_jpeg_set_img_fmt(void __iomem *base, unsigned int img_fmt);
+> -void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt);
+> +void exynos4_jpeg_set_img_fmt(void __iomem *base, unsigned int img_fmt,
+> +					unsigned int shift);
+> +void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt,
+> +							unsigned int mask);
+>   void exynos4_jpeg_set_enc_tbl(void __iomem *base);
+> -void exynos4_jpeg_set_interrupt(void __iomem *base);
+> +void exynos4_jpeg_set_interrupt(void __iomem *base, unsigned int variant);
+>   unsigned int exynos4_jpeg_get_int_status(void __iomem *base);
+>   void exynos4_jpeg_set_huf_table_enable(void __iomem *base, int value);
+>   void exynos4_jpeg_set_sys_int_enable(void __iomem *base, int value);
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-regs.h b/drivers/media/platform/s5p-jpeg/jpeg-regs.h
+> index 050fc44..08bef4e 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-regs.h
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-regs.h
+> @@ -230,13 +230,15 @@
+>   #define EXYNOS4_SOFT_RESET_HI		(1 << 29)
+>
+>   /* JPEG INT Register bit */
+> -#define EXYNOS4_INT_EN_MASK		(0x1f << 0)
+> +#define EXYNOS4_INT_EN_MASK(version)	(((version) == SJPEG_EXYNOS7) \
+> +						? (0x1ff << 0) : (0x1f << 0))
+>   #define EXYNOS4_PROT_ERR_INT_EN		(1 << 0)
+>   #define EXYNOS4_IMG_COMPLETION_INT_EN	(1 << 1)
+>   #define EXYNOS4_DEC_INVALID_FORMAT_EN	(1 << 2)
+>   #define EXYNOS4_MULTI_SCAN_ERROR_EN	(1 << 3)
+>   #define EXYNOS4_FRAME_ERR_EN		(1 << 4)
+> -#define EXYNOS4_INT_EN_ALL		(0x1f << 0)
+> +#define EXYNOS4_INT_EN_ALL(version)    (((version) == SJPEG_EXYNOS7) \
+> +						? (0x1b6 << 0) : (0x1f << 0))
+>
+>   #define EXYNOS4_MOD_REG_PROC_ENC	(0 << 3)
+>   #define EXYNOS4_MOD_REG_PROC_DEC	(1 << 3)
+> @@ -294,8 +296,11 @@
+>   #define EXYNOS4_YUV_420_IP_YUV_420_2P_IMG	(4 << EXYNOS4_YUV_420_IP_SHIFT)
+>   #define EXYNOS4_YUV_420_IP_YUV_420_3P_IMG	(5 << EXYNOS4_YUV_420_IP_SHIFT)
+>
+> +#define EXYNOS4_ENC_FMT_MASK			3
+> +#define EXYNOS7_ENC_FMT_MASK			7
+>   #define EXYNOS4_ENC_FMT_SHIFT			24
+> -#define EXYNOS4_ENC_FMT_MASK			(3 << EXYNOS4_ENC_FMT_SHIFT)
+> +#define EXYNOS_ENC_FMT_MASK(mask)		((mask) \
+> +						<< EXYNOS4_ENC_FMT_SHIFT)
+>   #define EXYNOS4_ENC_FMT_GRAY			(0 << EXYNOS4_ENC_FMT_SHIFT)
+>   #define EXYNOS4_ENC_FMT_YUV_444			(1 << EXYNOS4_ENC_FMT_SHIFT)
+>   #define EXYNOS4_ENC_FMT_YUV_422			(2 << EXYNOS4_ENC_FMT_SHIFT)
+> @@ -303,8 +308,10 @@
+>
+>   #define EXYNOS4_JPEG_DECODED_IMG_FMT_MASK	0x03
+>
+> -#define EXYNOS4_SWAP_CHROMA_CRCB		(1 << 26)
+> -#define EXYNOS4_SWAP_CHROMA_CBCR		(0 << 26)
+> +#define EXYNOS7_SWAP_CHROMA_SHIFT		27
+> +#define EXYNOS4_SWAP_CHROMA_SHIFT		26
+> +#define EXYNOS_SWAP_CHROMA_CRCB(shift)		(1 << (shift))
+> +#define EXYNOS_SWAP_CHROMA_CBCR(shift)		(0 << (shift))
+>
+>   /* JPEG HUFF count Register bit */
+>   #define EXYNOS4_HUFF_COUNT_MASK			0xffff
+>
+
+
+-- 
+Best Regards,
+Jacek Anaszewski
