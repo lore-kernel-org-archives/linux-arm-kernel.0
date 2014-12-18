@@ -1,50 +1,125 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 18 Dec 2014 17:19:34 +0100
-Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <5492F9A4.3070805@i2se.com>
-References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
- <201412171700.52323.marex@denx.de> <5492F9A4.3070805@i2se.com>
-Message-ID: <201412181719.34334.marex@denx.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 18 Dec 2014 18:15:40 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <54930BBC.4060602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 18, 2014 at 04:58:28 PM, Stefan Wahren wrote:
-> Hi Marek,
+Hi Jason, Andrew, Thomas, Ezequiel, Arnaud, Greg, Ben, Philipp, Simon and Uwe
 
-Hello Stefan,
 
-> Am 17.12.2014 um 17:00 schrieb Marek Vasut:
-> > On Wednesday, December 17, 2014 at 08:58:23 AM, Stefan Wahren wrote:
-> >> Hi Fabio,
-> >> 
-> >> Am 17.12.2014 um 03:44 schrieb Fabio Estevam:
-> >>> Hi Stefan,
-> >>> 
-> >>> On Sun, Dec 14, 2014 at 3:16 PM, Stefan Wahren <stefan.wahren@i2se.com>
-> > 
-> > wrote:
-> >>>> Btw i hope this patch also fixes a SPI communication issue with our
-> >>>> hardware which forces us to bypass ref_io1 for ssp2.
-> >>> 
-> >>> Does this patch fix the SPI issue?
-> >> 
-> >> unfortunately not. If the 3.19-rc1 has been released, i send the fixed
-> >> patch.
-> >> 
-> >> I've the theory that's an initialization issue. I've never heard of SPI
-> >> problems from the U-Boot users and we are using imx-bootlets.
-> >> 
-> >> I'll try to test it with U-Boot.
-> > 
-> > Please keep me in the loop, I'd be interested in what you find. Thanks!
-> > 
-> > Best regards,
-> > Marek Vasut
+
+On 15/12/2014 16:38, Gregory CLEMENT wrote:
+> Hello,
 > 
-> i tested it with U-Boot, but the issue still exists. If there is any
-> progress, i'll inform you.
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an mvebu device tree.
+> 
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+> 
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+> 
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
 
-Thanks!
+Andrew, Thomas, Ezequiel, Arnaud, Greg, Ben, Philipp, Simon and Uwe, thanks
+for your acked-by. Many files are now ready to be relicensed.
 
-Best regards,
-Marek Vasut
+Jason at the end it seems you didn't ack or nack the patches were you
+were CC. You expressed some concerns about the GPLv2+ move but I don't know
+if it is something that prevents you to give your acked-by.
+
+Thanks,
+
+Gregory
+
+> 
+> Thanks a lot,
+> 
+> Gregory
+> 
+> Gregory CLEMENT (27):
+>   ARM: mvebu: armada-370-db: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-370: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-370-mirabox: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-370-netgear-rn102: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-370-netgear-rn104: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-370-rd: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-370-synology-ds213j: Relicense the device tree
+>     under GPLv2+/X11
+>   ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-375-db: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-380: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-385: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-385-rd: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-xp-axpwifiap: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-db: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-xp-gp: Relicense the device tree under GPLv2+/X11
+>   ARM: mvebu: armada-xp-lenovo-ix4-300d: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-matrix: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-mv78230: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-mv78260: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-mv78460: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-netgear-rn2120: Relicense the device tree under
+>     GPLv2+/X11
+>   ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree
+>     under GPLv2+/X11
+>   ARM: mvebu: armada-xp-synology-ds414: Relicense the device tree under
+>     GPLv2+/X11
+> 
+>  arch/arm/boot/dts/armada-370-db.dts              | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-370-mirabox.dts         | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts   | 41 +++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts   | 41 +++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-370-rd.dts              | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-370-synology-ds213j.dts | 41 +++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-370-xp.dtsi             | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-370.dtsi                | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-375-db.dts              | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-375.dtsi                | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-380.dtsi                | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-385-db.dts              | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-385-rd.dts              | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-385.dtsi                | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-38x.dtsi                | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-db.dts               | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-gp.dts               | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 41 +++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-xp-matrix.dts           | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 41 +++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 40 +++++++++++++++++++++--
+>  arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 41 +++++++++++++++++++++---
+>  arch/arm/boot/dts/armada-xp.dtsi                 | 40 +++++++++++++++++++++--
+>  27 files changed, 999 insertions(+), 87 deletions(-)
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
