@@ -1,75 +1,51 @@
-From: h.huangqiang@huawei.com (Qiang Huang)
-Date: Wed, 17 Dec 2014 18:58:30 -0800
-Subject: [PATCH boot-wrapper-aarch64] configure: Fix for --with-initrd=no
-In-Reply-To: <20141217114602.GA8942@leverpostej>
-References: <5490EADF.7080906@huawei.com> <20141217114602.GA8942@leverpostej>
-Message-ID: <549242D6.5050106@huawei.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Wed, 17 Dec 2014 23:57:05 -0500
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <20141217092505.GA9475@e104818-lin.cambridge.arm.com>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <20141216152707.GH11565@e104818-lin.cambridge.arm.com>
+ <5490C83A.2080600@linaro.org>
+ <20141217092505.GA9475@e104818-lin.cambridge.arm.com>
+Message-ID: <54925EA1.1030901@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/12/17 3:46, Mark Rutland wrote:
-> On Wed, Dec 17, 2014 at 02:30:55AM +0000, Qiang Huang wrote:
->> Our configure.ac script wasn't handle --with-initrd=no, when this was passed,
->> we got error:
-> 
-> The parameter to --with-initrd should be the name of the initrd to use;
-> "yes" or "no" are not valid parameters. I note that the help text is
-> misleading in this regard, it should probably be fixed up to say
-> something like "Specify an initrd to use". 
+On 12/17/14, 4:25 AM, Catalin Marinas wrote:
+> On Wed, Dec 17, 2014 at 12:03:06AM +0000, Al Stone wrote:
 
-Yeah, sorry I didn't see the help message, I just thought this should
-be the standard way.
+>> That being said, the early systems still don't provide PSCI.
 
-According to autoconf's man page:
-https://www.gnu.org/software/autoconf/manual/autoconf-2.65/html_node/External-Software.html
+Clarification: some early systems are capable of PSCI but the firmware 
+was in progress (and thus they implemented the Parking Protocol 
+initially but will do full PSCI) - for example AMD Seattle - while one 
+other implementation is unable to provide PSCI and will only do Parking 
+Protocol. Both are trivially supportable through bits in the ACPI MADT.
 
-All packages should support --with-package=no and --with-package=yes
-and --without-package, these should be the standard usage right?
-Seems if we follow these usage, lots of entries needs to be modified,
-so maybe we can just leave them as they were?
+>> They will
+>> at some point in the future, but not now.  Regardless, I think it's
+>> reasonable for us to say that if you want ACPI support, PSCI must be
+>> used for secondary CPU startup.  People can hack something up to get
+>> the parking protocol to work on development branches if they want, but
+>> I personally see no need to get that into the kernel -- and it needs
+>> to be said explicitly in arm-acpi.txt.
 
-> 
-> While it's unlikely that someone will have an initrd called "no", this
-> issue can only occur with incorrect usage of the bootwrapper configure
-> script. I'd happily accept a patch fixing up the help text, though.
-> 
-> Thanks,
-> Mark.
-> 
->> ...
->> aarch64-linux-gnu-ld -o linux-system.axf --script=model.lds
->> aarch64-linux-gnu-ld: cannot find no
->> make: *** [linux-system.axf] Error 1
->>
->> Fix this by adding a line to check this.
->> And this also fixed --without-initrd.
->>
->> Signed-off-by: Qiang Huang <h.huangqiang@huawei.com>
->> Cc: Geoff Levand <geoff@infradead.org>
->> ---
->>  configure.ac | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/configure.ac b/configure.ac
->> index 929da13..553013b 100644
->> --- a/configure.ac
->> +++ b/configure.ac
->> @@ -58,6 +58,7 @@ AC_SUBST([CPU_IDS], [$C_CPU_IDS])
->>  AC_ARG_WITH([initrd],
->>  	AS_HELP_STRING([--with-initrd], [embed an initrd in the kernel image]),
->>  	USE_INITRD=$withval)
->> +AS_IF([test "x$USE_INITRD" = "xno"], [USE_INITRD=], [])
->>  AC_SUBST([FILESYSTEM], [$USE_INITRD])
->>  AM_CONDITIONAL([INITRD], [test "x$USE_INITRD" != "x"])
->>
->> -- 
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> .
-> 
+That could be ok for upstream - it's up to you guys - but note that 
+there will be some early hardware that doesn't do PSCI. I've sat on 
+*everyone* over the past couple of years behind the scenes to ensure 
+that all future designs will do PSCI, but this takes time to realize.
+
+> I'm fine with this. But note that it pretty much rules out the APM
+> boards (I think we ruled them out a few times already) which don't have
+> an EL3 to host PSCI firmware. EL2 is not suitable as it is likely that
+> we want this level for KVM or Xen rather than platform firmware.
+
+The gen1 APM boards work great with UEFI and ACPI using the Parking 
+Protocol. It's trivial to support, and it's a fairly constrained since 
+everyone is headed toward PSCI. Personally I consider it unfair to 
+punish the first guy out of the gate for something that was standardized 
+after they made their design. My recommendation would be to get the 
+relevant document updated in the public repository. Patches that 
+implement Parking Protocol are already in existence/working well as an 
+alternative to PSCI (which is always preferred if available).
+
+Jon.
