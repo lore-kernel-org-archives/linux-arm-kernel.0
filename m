@@ -1,35 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Dec 2014 19:38:07 +0000
-Subject: Help on kvm_tlb_flush_vmid_ipa usage
-In-Reply-To: <54932A97.3060103@samsung.com>
-References: <54932A97.3060103@samsung.com>
-Message-ID: <54932D1F.5060209@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Dec 2014 19:40:15 +0000
+Subject: [PATCH] clk: rockchip: fix rk3288 cpuclk core dividers
+In-Reply-To: <1590307.oZ7E5cNY8h@phil>
+References: <1590307.oZ7E5cNY8h@phil>
+Message-ID: <20141218194015.GC11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/14 19:27, Mario Smarduch wrote:
-> When this function is called IPA address is used. Looking at the HYP
-> implementation it uses the IPA directly in tlbi instructions. But
-> reading the TLB maintnance instruction syntax, bit [35:0] should be
-> set to IPA[47:12]. I traced the source code but don't see the
-> adjustment. I must be missing something given this function is
-> fundamental to KVM MMU.
+On Thu, Dec 18, 2014 at 08:22:34PM +0100, Heiko St?bner wrote:
+> Commit 0e5bdb3f9fa5 (clk: rockchip: switch to using the new cpuclk type
+> for armclk) didn't take into account that the divider used on rk3288
+> are of the (n+1) type.
+> 
+> The rk3066 and rk3188 socs use more complex divider types making it
+> necessary for the list-elements to be the real register-values to write.
+> 
+> Therefore reduce divider values in the table accordingly so that they
+> really are the values that should be written to the registers.
+> 
+> Reported-by: Sonny Rao <sonnyrao@chromium.org>
+> Fixes: 0e5bdb3f9fa5
 
-Ermmm... Someone (that is, I) needs a brown paper back again.
+The correct format for this is:
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index b72aa9f..a767f6a 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	 * Instead, we invalidate Stage-2 for this IPA, and the
- 	 * whole of Stage-1. Weep...
- 	 */
-+	lsr	x1, x1, #12
- 	tlbi	ipas2e1is, x1
- 	/*
- 	 * We have to ensure completion of the invalidation at Stage-2,
+Fixes: <12-digits-of-sha> ("<commit-comment>")
 
-	M.
+where everything between and including the <> gets replaced.  The () and ""
+stay.  In other words:
+
+Fixes: 0e5bdb3f9fa5 ("clk: rockchip: switch to using the new cpuclk type for armclk")
+
+Thanks.
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
