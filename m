@@ -1,71 +1,69 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Dec 2014 22:36:14 +0200
-Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
- dt-specific callback instead of initcall
-In-Reply-To: <5219064.gvW43bShnl@wuerfel>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1418828005.3347.7.camel@pengutronix.de> <5219064.gvW43bShnl@wuerfel>
-Message-ID: <1518515.QutUfiWrAf@avalon>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 18 Dec 2014 21:36:31 +0100
+Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
+ Cortex-M4
+In-Reply-To: <2615697.uVqMY8zKot@wuerfel>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <2994970.DCfUQgtmcD@wuerfel> <6ae4dd827bf4dcc202f60e8505173d0e@agner.ch>
+ <2615697.uVqMY8zKot@wuerfel>
+Message-ID: <44e9d518da24fb0c910de464269b8551@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wednesday 17 December 2014 16:56:53 Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 15:53:25 Lucas Stach wrote:
-> > Am Mittwoch, den 17.12.2014, 15:27 +0100 schrieb Arnd Bergmann:
-> >> On Wednesday 17 December 2014 01:24:42 Laurent Pinchart wrote:
-> >>> If we forbid the IOMMU driver from being compiled as a module can't we
-> >>> just rely on deferred probing ? The bus master driver will just be
-> >>> reprobed after the IOMMU gets probed, like for other devices.
-> >>> 
-> >>> This could fail in case the IOMMU device permanently fails to probe.
-> >>> There would be something very wrong in the system in that case,
-> >>> Enabling the bus masters totally transparently without IOMMU support
-> >>> could not be such a good idea.
-> >> 
-> >> I believe in the majority of cases today, the IOMMU is entirely
-> >> optional. There are valid reasons for not including the IOMMU driver in
-> >> the kernel, e.g. when you know that all the machines with that driver
-> >> can DMA to all of their RAM and you want to avoid the overhead of IOTLB
-> >> misses.
-> > 
-> > This is similar to the problems we discussed with the componentized
-> > device framework and in the end everybody agreed on a simple rule:
-> > if the device node is enabled in the DT there must be a driver bound to
-> > it before other devices depending on this node can be probed.
-> > 
-> > If we apply the same logic to the IOMMU situation we get two
-> > possibilities to allow bypassing the IOMMU:
-> > 1. completely disable the IOMMU node in the DT
-> > 2. leave node enabled in DT, but add a bypass property
-> > 
-> > Obviously the second option still requires to have the IOMMU driver
-> > available, but is more flexible. Right now everything depends on the
-> > IOMMU being in passthrough mode at reset with no driver bound. If a
-> > device comes around where this isn't the case thing will break with the
-> > current assumptions or the first option.
-> > 
-> > Having the IOMMU node enabled in DT with no driver available to the
-> > kernel seems like an invalid configuration which should be expected to
-> > break. Exactly the same thing as with componentized devices...
+On 2014-12-17 13:31, Arnd Bergmann wrote:
+> On Wednesday 17 December 2014 00:41:33 Stefan Agner wrote:
+>> On 2014-12-03 12:03, Arnd Bergmann wrote:
+>> > On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
+>> >> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
+>> >> new file mode 100644
+>> >> index 0000000..051ee0f
+>> >> --- /dev/null
+>> >> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
+>> >> @@ -0,0 +1,52 @@
+>> >> +/*
+>> >> + * Device tree for Colibri VF61 Cortex-M4 support
+>> >> + *
+>> >> + * Copyright 2014 Stefan Agner
+>> >> + *
+>> >> + * This program is free software; you can redistribute it and/or modify
+>> >> + * it under the terms of the GNU General Public License as published by
+>> >> + * the Free Software Foundation; either version 2 of the License, or
+>> >> + * (at your option) any later version.
+>> >> + */
+>> >> +
+>> >> +/dts-v1/;
+>> >> +#include "vf610m4.dtsi"
+>> >> +
+>> >> +/ {
+>> >> +       model = "VF610 Cortex-M4";
+>> >> +       compatible = "fsl,vf610m4";
+>> >> +
+>> >> +       chosen {
+>> >> +               bootargs = "console=ttyLP2,115200 ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc rw";
+>> >> +       };
+>> >> +
+>> >
+>> > Starting with v3.19, you should be able to use the earlycon framework on
+>> > arm32, so it would be better to replace earlyprintk with earlycon here
+>> > and add a stdout-path property in chosen that points to the console
+>> > uart.
+>>
+>> I started to implement earlycon support, but something currently fails
+>> when earlycon tries to map the UART registers:
+>> [    0.000000] earlycon_map: Couldn't map 0x40027000
+>>
+>> I traced the issue a bit further down and found that get_vm_area_caller
+>> returns NULL (in __arm_ioremap_pfn_caller). This happend on Linus master
+>> as of today (2dbfca5a181973558277b28b1f4c36362291f5e0). Do I miss
+>> something here?
 > 
-> One differences here is that for the IOMMU, we should generally be able
-> to fall back to swiotlb
+> Hmm, I fear the arm32 FIX_EARLYCON_MEM support ended up not making it
+> into 3.19 after all. :(
 
-Or to nothing at all if the device can DMA to the allocated memory directly.
+Is it because early_ioremap and fixmap still missing for arm32?
+According to Rob's patchset from spring fixmap is required, there is
+something in this tree:
+https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=arm-fixmap
 
-> (currently only on ARM64, not ARM32, until someone adds support). I can see
-> your point regarding machines that have a mandatory IOMMU with no fallback
-> when there is no driver, but we can support them by making the iommu driver
-> selected through Kconfig for that platform, while still allowing other
-> platforms to work with drivers left out of the kernel.
-
-The question is how to tell the kernel not to wait for an IOMMU that will 
-never be there. Would a kernel command line argument be an acceptable solution 
-or do we need something more automatic ?
-
--- 
-Regards,
-
-Laurent Pinchart
+--
+Stefan
