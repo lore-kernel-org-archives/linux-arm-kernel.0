@@ -1,56 +1,114 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 18 Dec 2014 09:46:00 -0800
-Subject: [PATCH] i2c: rk3x: Account for repeated start time requirement
-In-Reply-To: <1418325511-16648-1-git-send-email-dianders@chromium.org>
-References: <1418325511-16648-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAD=FV=Vt3q_7g=SmnV5ZCd-Evr_17BTMR9LWsFax8qOwtkSw6Q@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 18 Dec 2014 18:47:12 +0100
+Subject: [PATCH] tty: serial: 8250: omap: add ttySx console if the user didn't
+In-Reply-To: <20141205135133.37fb96f6@lxorguk.ukuu.org.uk>
+References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
+ <20141129094823.GA10840@linutronix.de>
+ <20141129173418.GY2817@atomide.com>
+ <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
+ <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
+ <20141202015118.GA1891@saruman>
+ <20141205135133.37fb96f6@lxorguk.ukuu.org.uk>
+Message-ID: <20141218174712.GA26632@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch invokes add_preferred_console() with ttyS based on ttyO
+arguments if the user didn't specify it on its own. This ensures that
+the user will see the kernel booting on his serial console in case he
+forgot to update the command line.
 
-On Thu, Dec 11, 2014 at 11:18 AM, Doug Anderson <dianders@chromium.org> wrote:
-> On Rockchip I2C the controller drops SDA low in the repeated start
-> condition at half the SCL high time.
->
-> If we want to meet timing requirements, that means we need to hold SCL
-> high for (4.7us * 2) when we're sending a repeated start (.6us * 2 for
-> Fast-mode).  That lets us achieve minimum tSU;STA.  However, we don't
-> want to always hold SCL high for that long because we'd never be able
-> to make 100kHz or 400kHz speeds.
->
-> Let's fix this by doing our clock calculations twice: once taking the
-> above into account and once running at normal speeds.  We'll use the
-> slower speed when sending the start bit and the normal speed
-> otherwise.
->
-> Note: we really only need the conservative timing when sending
-> _repeated_ starts, not when sending the first start.  We don't account
-> for this so technically the first start bit will be longer too.
-> ...well, except in the case when we use the combined write/read
-> optimization which doesn't use the same code.
->
-> As part of this change we needed to account for the SDA falling time.
-> The specification indicates that this should be the same, but we'll
-> follow Designware and add a binding.  Note that we deviate from
-> Designware and assign the default SDA falling time to be the same as
-> the SCL falling time, which is incredibly likely.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> Note: This is based on Addy's patch (i2c: rk3x: fix bug that cause
-> measured high_ns doesn't meet I2C specification) that can be found at
-> <https://patchwork.kernel.org/patch/5475331/>.
->
->  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  7 +-
->  drivers/i2c/busses/i2c-rk3x.c                      | 90 +++++++++++++++++-----
->  2 files changed, 74 insertions(+), 23 deletions(-)
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
 
-So apparently the person who tested this for me got mixed up and told
-me it was good, but it wasn't.  :(
+While trying to to make a proxy driver like Alan suggested I wasn't sure
+how to obtain the ttyS console via "official" API. Then I stumbled upon
+update_console_cmdline() and then add_preferred_console(). 
 
-I've sent up a new version.  I've tested it myself this time but
-certainly would appreciate any extra testing folks can do on it...
-See <https://patchwork.kernel.org/patch/5515551/>
+ drivers/tty/serial/8250/8250_omap.c | 40 +++++++++++++++++++++++++++++++++++++
+ drivers/tty/serial/8250/Kconfig     | 19 ++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
--Doug
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index 336602eb453e..78401fbc823b 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -1248,6 +1248,46 @@ static int omap8250_runtime_resume(struct device *dev)
+ }
+ #endif
+ 
++#ifdef CONFIG_SERIAL_8250_OMAP_TTYO_FIXUP
++static int __init omap8250_console_fixup(void)
++{
++	char *omap_str;
++	char *options;
++	u8 idx;
++
++	if (strstr(boot_command_line, "console=ttyS"))
++		/* user set a ttyS based name for the console */
++		return 0;
++
++	omap_str = strstr(boot_command_line, "console=ttyO");
++	if (!omap_str)
++		/* user did not set ttyO based console, so we don't care */
++		return 0;
++
++	omap_str += 12;
++	if ('0' <= *omap_str && *omap_str <= '9')
++		idx = *omap_str - '0';
++	else
++		return 0;
++
++	omap_str++;
++	if (omap_str[0] == ',') {
++		omap_str++;
++		options = omap_str;
++	} else {
++		options = NULL;
++	}
++
++	add_preferred_console("ttyS", idx, options);
++	pr_err("WARNING: Your 'console=ttyO%d' has been replaced by 'ttyS%d'\n",
++	       idx, idx);
++	pr_err("This ensures that you still see kernel messages. Please\n");
++	pr_err("update your kernel commandline.\n");
++	return 0;
++}
++console_initcall(omap8250_console_fixup);
++#endif
++
+ static const struct dev_pm_ops omap8250_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(omap8250_suspend, omap8250_resume)
+ 	SET_RUNTIME_PM_OPS(omap8250_runtime_suspend,
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index 0fcbcd29502f..87adf08b9b6b 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -308,6 +308,25 @@ config SERIAL_8250_OMAP
+ 
+ 	  This driver uses ttyS instead of ttyO.
+ 
++config SERIAL_8250_OMAP_TTYO_FIXUP
++	bool "Replace ttyO with ttyS"
++	depends on SERIAL_8250_OMAP=y && SERIAL_8250_CONSOLE
++	default y
++	help
++	  This option replaces the "console=ttyO" argument with the matching
++	  ttyS argument if the user did not specified it on the command line.
++	  This ensures that the user can see the kernel output during boot
++	  which he wouldn't see otherwise. The getty has still to be configured
++	  for ttyS instead of ttyO regardless of this option.
++	  This option is intended for people who "automatically" enable this
++	  driver without knowing that this driver requires a different console=
++	  argument. If you read this, please keep this option disabled and
++	  instead update your kernel command line. If you prepare a kernel for a
++	  distribution or other kind of larger user base then you probably want
++	  to keep this option enabled. Otherwise people might complain about a
++	  not booting kernel because the serial console remains silent in case
++	  they forgot to update the command line.
++
+ config SERIAL_8250_FINTEK
+ 	tristate "Support for Fintek F81216A LPC to 4 UART"
+ 	depends on SERIAL_8250 && PNP
+-- 
+2.1.3
