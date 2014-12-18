@@ -1,50 +1,140 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Dec 2014 23:44:22 +0100
-Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
- Cortex-M4
-In-Reply-To: <44e9d518da24fb0c910de464269b8551@agner.ch>
-References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <2615697.uVqMY8zKot@wuerfel> <44e9d518da24fb0c910de464269b8551@agner.ch>
-Message-ID: <2375016.nxLFC8UMcD@wuerfel>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 18 Dec 2014 14:48:10 -0800
+Subject: [PATCH v0] ARMv8:mm:Support the DEBUG_PAGEALLOC
+In-Reply-To: <5490E123.8060904@linaro.org>
+References: <1414382488-916-1-git-send-email-zhichang.yuan@linaro.org>
+ <544EC65E.4060009@codeaurora.org> <544F338A.2060600@linaro.org>
+ <545168C9.4010206@codeaurora.org> <5490E123.8060904@linaro.org>
+Message-ID: <549359AA.8000006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 December 2014 21:36:31 Stefan Agner wrote:
-> On 2014-12-17 13:31, Arnd Bergmann wrote:
-> > On Wednesday 17 December 2014 00:41:33 Stefan Agner wrote:
-> >> On 2014-12-03 12:03, Arnd Bergmann wrote:
-> >> > Starting with v3.19, you should be able to use the earlycon framework on
-> >> > arm32, so it would be better to replace earlyprintk with earlycon here
-> >> > and add a stdout-path property in chosen that points to the console
-> >> > uart.
-> >>
-> >> I started to implement earlycon support, but something currently fails
-> >> when earlycon tries to map the UART registers:
-> >> [    0.000000] earlycon_map: Couldn't map 0x40027000
-> >>
-> >> I traced the issue a bit further down and found that get_vm_area_caller
-> >> returns NULL (in __arm_ioremap_pfn_caller). This happend on Linus master
-> >> as of today (2dbfca5a181973558277b28b1f4c36362291f5e0). Do I miss
-> >> something here?
-> > 
-> > Hmm, I fear the arm32 FIX_EARLYCON_MEM support ended up not making it
-> > into 3.19 after all. 
-> 
-> Is it because early_ioremap and fixmap still missing for arm32?
-> According to Rob's patchset from spring fixmap is required, there is
-> something in this tree:
-> https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=arm-fixmap
+Hi,
 
-Right, that's the one, thanks for finding that again. There are five
-patches on that branch. The first three got merged, and the one we
-need is just the last one (ARM: fixmap early permanent mapping support),
-but the implementation depends on the previous patch (arm: add
-early_ioremap support).
+On 12/16/2014 5:49 PM, zhichang.yuan wrote:
+> Hi, Laura,
+>
+>
+> On 2014?10?30? 06:23, Laura Abbott wrote:
+>> On 10/27/2014 11:11 PM, zhichang.yuan wrote:
+>>> Hi, Laura,
+>>>
+>>> Thanks for your comments!
+>>>
+>>>
+>>>
+>> ...
+>>>>> +}
+>>>>> +
+>>>>> +void kernel_map_pages(struct page *page, int numpages, int enable)
+>>>>> +{
+>>>>> +    unsigned long start_addr, end_addr, addr;
+>>>>> +    unsigned int level;
+>>>>> +
+>>>>> +    pte_t *kpte;
+>>>>> +    pteval_t old_pval, new_pval;
+>>>>> +
+>>>>> +    int i, counter = 0;
+>>>>> +
+>>>>> +    /*no highmem in ARMv8. */
+>>>>> +    addr = start_addr = (unsigned long)page_address(page);
+>>>>> +    end_addr = start_addr + (numpages << PAGE_SHIFT);
+>>>>> +
+>>>>> +    for (i = 0; i < numpages; addr += PAGE_SIZE, i++) {
+>>>>> +        kpte = lookup_kaddress(addr, &level);
+>>>>> +        /*
+>>>>> +        * skip the memory holes. it is impossible if the input
+>>>>> +        * parameter is valid.
+>>>>> +        */
+>>>>> +        if (unlikely(!kpte || pte_none(*kpte))) {
+>>>>> +            pr_err("Have no kernel linear mapping for 0x%0lx\n", addr);
+>>>>> +            break;
+>>>>> +        }
+>>>>> +
+>>>>> +        if (level != PG_LEVEL_PAGE) {
+>>>>> +            pr_err("Page entry for 0x%0lx is not PAGE LEVEL(%d)\n",
+>>>>> +                addr, level);
+>>>>> +            break;
+>>>>> +        }
+>>>>> +
+>>>>> +        old_pval = pte_val(*kpte);
+>>>>> +        new_pval = (enable) ? (old_pval | PTE_VALID) :
+>>>>> +            (old_pval & (~PTE_VALID));
+>>>>> +        if (unlikely(new_pval == old_pval)) {
+>>>>> +            pr_warn("Page %s: same pte value at 0x%llx",
+>>>>> +                (enable) ? "alloc" : "free", old_pval);
+>>>>> +            continue;
+>>>>> +        }
+>>>>> +
+>>>>> +        set_pte(kpte, __pte(new_pval));
+>>>>> +        counter++;
+>>>>> +    }
+>>>>> +
+>>>>> +    if (counter)
+>>>>> +        flush_tlb_kernel_range(start_addr, end_addr);
+>>>>> +}
+>>>>
+>>>> We already have some of this infrastructure to set page attributes
+>>>> in arch/arm64/mm/pageattr.c . We should be leveraging that for
+>>>> kernel_map_pages.
+>>>>
+>>> There is no pageattr.c for ARMv8. In X86, it exists.
+>>> Do you mean pmd_modify?
+>>>
+>>
+>> It was added to the kernel fairly recently
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=11d91a770f1fff44dafdf88d6089a3451f99c9b6
+>>
+>
+> I browsed the pageattr.c, the functions which modify the page table entry attributes are good. But the base
+> function, change_memory_common, is limited for module memory space. It will make the relative functions are
+> not common. Can we do some changes on it?
+>
+> thanks,
+> -Zhichang
+>
 
-I was hoping we'd see both of them in 3.19, but apparently Rob didn't
-submit the latest version. If you don't mind, could you try forward-porting
-them to the latest kernel and then submit them for inclusion? You could
-also try adapting the last patch to work without the early_ioremap
-support that we don't really need that urgently on arm32.
+Yes, we should be able to adjust the bounds check there. The
+checks there are currently broken[1] anyways. I'd suggest
+changing it to something like this (to be folded in)
 
-	Arnd
+----8<----
+
+ From 8cc4cd7c72fc5ada01e44d943d00e0209c4304aa Mon Sep 17 00:00:00 2001
+From: Laura Abbott <lauraa@codeaurora.org>
+Date: Thu, 18 Dec 2014 14:45:19 -0800
+Subject: [PATCH] arm64: Update set memory_bounds_check
+
+Change-Id: Id2f308c44d49117aca18fe725f8f2f33ae6a5075
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+  arch/arm64/mm/pageattr.c | 9 +++++++--
+  1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index bb0ea94..0516cbc 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -51,8 +51,13 @@ static int change_memory_common(unsigned long addr, int numpages,
+  		WARN_ON_ONCE(1);
+  	}
+  
+-	if (!is_module_address(start) || !is_module_address(end - 1))
+-		return -EINVAL;
++	if (!IS_ENABLED(DEBUG_PAGEALLOC)) {
++		if (start < MODULES_VADDR || start >= MODULES_END)
++			return -EINVAL;
++
++		if (end < MODULES_VADDR || end >= MODULES_END)
++			return -EINVAL;
++	}
+  
+  	data.set_mask = set_mask;
+  	data.clear_mask = clear_mask;
+
+--
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/307839.html  
+--
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
