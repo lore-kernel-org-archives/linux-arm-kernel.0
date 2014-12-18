@@ -1,41 +1,48 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 18 Dec 2014 16:58:28 +0100
-Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <201412171700.52323.marex@denx.de>
-References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
- <CAOMZO5CQjpYtrNTT65-ikJua4N_osYj4UVgm3EV+sEvVWF59cg@mail.gmail.com>
- <5491379F.3090607@i2se.com> <201412171700.52323.marex@denx.de>
-Message-ID: <5492F9A4.3070805@i2se.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 18 Dec 2014 08:00:14 -0800
+Subject: [PATCH 6/8] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <20141218082652.GP13885@x1>
+References: <1418834727-1602-1-git-send-email-lee.jones@linaro.org>
+ <1418834727-1602-7-git-send-email-lee.jones@linaro.org>
+ <20141217180251.GA29914@roeck-us.net> <20141218082652.GP13885@x1>
+Message-ID: <20141218160014.GA16015@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Thu, Dec 18, 2014 at 08:26:52AM +0000, Lee Jones wrote:
+> On Wed, 17 Dec 2014, Guenter Roeck wrote:
+> > On Wed, Dec 17, 2014 at 04:45:25PM +0000, Lee Jones wrote:
+> > > Signed-off-by: David Paris <david.paris@st.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Hi Lee and David,
+> > 
+> > I still have a couple of comments below. Sorry I didn't catch those earlier.
+> > 
+> > Thanks,
+> > Guenter
+> > 
+> > > ---
+> > >  drivers/watchdog/Kconfig  |  13 ++
+> > >  drivers/watchdog/Makefile |   1 +
+> > >  drivers/watchdog/st_wdt.c | 323 ++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 337 insertions(+)
+> > >  create mode 100644 drivers/watchdog/st_wdt.c
+> 
+> Chopping all the crud.
+> 
+> [...]
+> 
+> > > +static struct of_device_id st_wdog_match[] = {
+> > > +	{
+> > > +		.compatible = "st,stih407-lpc",
+> > > +		.data = (void *)&stih407_syscfg,
+> > 
+> > Nitpick: typecast to and from void * is not necessary.
+> 
+> Actually that's not true, but it is superfluous in this case.
+> 
+Point taken. Would you agree to a more detailed "typecasting a pointer
+to and from void * is not necessary" ?
 
-Am 17.12.2014 um 17:00 schrieb Marek Vasut:
-> On Wednesday, December 17, 2014 at 08:58:23 AM, Stefan Wahren wrote:
->> Hi Fabio,
->>
->> Am 17.12.2014 um 03:44 schrieb Fabio Estevam:
->>> Hi Stefan,
->>>
->>> On Sun, Dec 14, 2014 at 3:16 PM, Stefan Wahren <stefan.wahren@i2se.com> 
-> wrote:
->>>> Btw i hope this patch also fixes a SPI communication issue with our
->>>> hardware which forces us to bypass ref_io1 for ssp2.
->>> Does this patch fix the SPI issue?
->> unfortunately not. If the 3.19-rc1 has been released, i send the fixed
->> patch.
->>
->> I've the theory that's an initialization issue. I've never heard of SPI
->> problems from the U-Boot users and we are using imx-bootlets.
->>
->> I'll try to test it with U-Boot.
-> Please keep me in the loop, I'd be interested in what you find. Thanks!
->
-> Best regards,
-> Marek Vasut
-
-i tested it with U-Boot, but the issue still exists. If there is any
-progress, i'll inform you.
-
-Stefan
+Guenter
