@@ -1,58 +1,35 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 18 Dec 2014 20:31:53 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <1418637710.4443.11.camel@linux-0dmf.site>
-References: <20141213223727.GA13894@amd>
- <1418637710.4443.11.camel@linux-0dmf.site>
-Message-ID: <20141218193153.GA27832@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Dec 2014 19:38:07 +0000
+Subject: Help on kvm_tlb_flush_vmid_ipa usage
+In-Reply-To: <54932A97.3060103@samsung.com>
+References: <54932A97.3060103@samsung.com>
+Message-ID: <54932D1F.5060209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 18/12/14 19:27, Mario Smarduch wrote:
+> When this function is called IPA address is used. Looking at the HYP
+> implementation it uses the IPA directly in tlbi instructions. But
+> reading the TLB maintnance instruction syntax, bit [35:0] should be
+> set to IPA[47:12]. I traced the source code but don't see the
+> adjustment. I must be missing something given this function is
+> fundamental to KVM MMU.
 
-> > +	h4p_simple_send_frame(info, skb);
-> > +
-> > +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
-> > +						       msecs_to_jiffies(1000))) {
-> > +		printk("h4p: negotiation did not return\n");
-> 
-> Memory leak in the error case
+Ermmm... Someone (that is, I) needs a brown paper back again.
 
-And memory leak in the normal case, too, no? Fixed.
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index b72aa9f..a767f6a 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	 * Instead, we invalidate Stage-2 for this IPA, and the
+ 	 * whole of Stage-1. Weep...
+ 	 */
++	lsr	x1, x1, #12
+ 	tlbi	ipas2e1is, x1
+ 	/*
+ 	 * We have to ensure completion of the invalidation at Stage-2,
 
-> > +	case H4_ACL_PKT:
-> > +		acl_hdr = (struct hci_acl_hdr *)skb->data;
-> > +		retval = le16_to_cpu(acl_hdr->dlen);
-> 
-> Could you explain, why only this needs endianness converted?
-
-This one is 16 bit, the others I checked are 8 bit.
-
-> > +static void h4p_rx_tasklet(unsigned long data)
-> > +{
-> > +	u8 byte;
-> > +	struct h4p_info *info = (struct h4p_info *)data;
-> > +
-> > +	BT_DBG("tasklet woke up");
-> > +	BT_DBG("rx_tasklet woke up");
-> 
-> Isn't this a bit redundant?
-
-Fixed.
-
-> > +	struct sk_buff *skb;
-> > +	struct h4p_info *info = (struct h4p_info *)data;
-> > +
-> > +	BT_DBG("tasklet woke up");
-> > +	BT_DBG("tx_tasklet woke up");
-> 
-> Doubled?
-
-Fixed.
-
-Thanks,
-									Pavel
-
+	M.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jazz is not dead. It just smells funny...
