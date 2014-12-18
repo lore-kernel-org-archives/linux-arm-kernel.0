@@ -1,67 +1,58 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 18 Dec 2014 15:11:33 +0800
-Subject: [PATCH RFC v2 11/14] ARM: dts: imx6qdl-sabresd: Add support for TRULY
- TFT480800-16-E MIPI DSI panel
+Date: Thu, 18 Dec 2014 15:11:34 +0800
+Subject: [PATCH RFC v2 12/14] ARM: imx_v6_v7_defconfig: Cleanup for imx drm
+ being moved out of staging
 In-Reply-To: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
 References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418886696-11636-12-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418886696-11636-13-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TRULY TFT480800-16-E panel is driven by the Himax HX8369A driver IC.
-The driver IC supports several display/control interface modes, including
-the MIPI DSI video mode and command mode.
+The new imx_v6_v7_defconfig is generated in this way:
+* make ARCH=arm imx_v6_v7_defconfig
+* make ARCH=arm savedefconfig
+* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v1->v2:
- * To address Thierry Reding's comments, remove several unnecessary
-   properties as they can be implied by the compatible string.
- * Fix the compatible string.
- * Remove the display-timings node from the panel node as it can be
-   implied by the compatible string as well.
- * Remove the status property as it is unneeded.
+ * None.
 
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index baf2f00..658bde9 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -482,6 +482,13 @@
- 				MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
- 			>;
- 		};
-+
-+		pinctrl_mipi_panel: mipipanelgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x1b0b0
-+				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x1b0b0
-+			>;
-+		};
- 	};
- 
- 	gpio_leds {
-@@ -518,6 +525,19 @@
- 	};
- };
- 
-+&mipi_dsi {
-+	status = "okay";
-+
-+	panel {
-+		compatible = "truly,tft480800-16-e-dsi";
-+		reg = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_mipi_panel>;
-+		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
-+		bs2-gpios = <&gpio6 14 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
- &pcie {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pcie>;
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6790f1b..0dbd0c3 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -192,7 +192,13 @@ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+-CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_DRM_IMX=y
++CONFIG_DRM_IMX_FB_HELPER=y
++CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
++CONFIG_DRM_IMX_TVE=y
++CONFIG_DRM_IMX_LDB=y
++CONFIG_DRM_IMX_IPUV3=y
++CONFIG_DRM_IMX_HDMI=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+ CONFIG_LCD_PLATFORM=y
+@@ -249,13 +255,6 @@ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_FSL_EDMA=y
+ CONFIG_STAGING=y
+-CONFIG_DRM_IMX=y
+-CONFIG_DRM_IMX_FB_HELPER=y
+-CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+-CONFIG_DRM_IMX_TVE=y
+-CONFIG_DRM_IMX_LDB=y
+-CONFIG_DRM_IMX_IPUV3=y
+-CONFIG_DRM_IMX_HDMI=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_PWM=y
+ CONFIG_PWM_IMX=y
 -- 
 2.1.0
