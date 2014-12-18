@@ -1,53 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Dec 2014 14:22:05 +0000
-Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
-In-Reply-To: <CAJ+vNU3PQYCE4tABUiqU+vGkGqBEqdVKz25W88-ByOQZxunVLw@mail.gmail.com>
-References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
- <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
- <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
- <CAJ+vNU3PQYCE4tABUiqU+vGkGqBEqdVKz25W88-ByOQZxunVLw@mail.gmail.com>
-Message-ID: <20141218142205.GZ11764@sirena.org.uk>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Thu, 18 Dec 2014 09:36:15 -0500
+Subject: [Linaro-acpi] [RFC] ACPI on arm64 TODO List
+In-Reply-To: <54926052.5000105@jonmasters.org>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <20141216154842.GI19412@leverpostej> <5490D042.3060901@linaro.org>
+ <54926052.5000105@jonmasters.org>
+Message-ID: <5492E65F.1010301@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 06:11:15AM -0800, Tim Harvey wrote:
-> On Wed, Dec 17, 2014 at 6:36 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Fri, Oct 31, 2014 at 2:27 AM, Tim Harvey <tharvey@gateworks.com> wrote:
-> >> When an external PMIC is used for VDD_SOC and VDD_ARM you can save power by
-> >> bypassing the internal LDO's provided by the anantop regulator as long as
-> >> you are running less than 1.2GHz. If running at 1.2GHz the IMX6 datasheets
-> >> state that you must use the internal LDO's to reduce ripple on the suplies.
-> >>
-> >> A failure to bypass the LDO's when using an external PMIC will result in an
-> >> extra voltage drop (~125mV) between VDD_ARM_IN and VDD_ARM and VDD_SOC_IN and
-> >> VDD_SOC which violates the voltages specificed by the datasheets.
+On 12/18/14, 12:04 AM, Jon Masters wrote:
+> On 12/16/14, 7:37 PM, Al Stone wrote:
+>> On 12/16/2014 08:48 AM, Mark Rutland wrote:
+>
+>>> I am rather concerned about the relationship between items described
+>>> with _DSD and ACPI's existing device model. Describing the relationship
+>>> between devices and their input clocks, regulators, and so on defeats
+>>> much of the benefit ACPI is marketed as providing w.r.t. abstraction of
+>>> the underlying platform (and as Arnd mentioned above, that's not the
+>>> kind of platform we want to support with ACPI).
+>>
+>> My belief is that all those things should be set up into a known good
+>> state by UEFI on initial boot.
+>
+> Correct. There should never be a situation in which any clocks are
+> explicitly exposed in the DSDT. Clock state should be set as a side
+> effect of calling ACPI methods to transition device state. _DSD is
+> intended to implement simple additions to the core spec, such as
+> metadata describing the MAC address, interface type, and PHY on a
+> network device. But it should never be used to expose clock nets.
+>
+> I've spoken with nearly everyone building a 64-bit ARM server using ACPI
+> and in nearly every case also reviewed their tables. Nobody is going to
+> be so foolish on day one. The trick to some of the ongoing
+> discussion/planning is to ensure that guidance prevents mistakes later.
 
-This description doesn't make much sense - there must of course always
-be an external power source for the SoC and the discussion of bypassing
-also suggests that it's not just a case of disconnecting the internal
-LDOs.
+Btw a little clarification. RH of course has commercial relations with 
+many of those building first/second/third generation 64-bit ARM server 
+designs. In that capacity we have reviewed nearly every SoC design as 
+well as the firmware platform (including ACPI tables). We have a vested 
+interest in ensuring that nobody builds anything that is crazy, and 
+we're not the only OS vendor that is working to ensure such sanity.
 
-> What is needed is to determine if the cpu vddsoc and vddarm regulators
-> are both 'not' the same as the anatop provided regulators (then we
-> bypass the anatop regulators) so I need to do such a check after all
-> regulators are registered. Perhaps I need to have a late_init call (or
-> some other init call that happens after all regulators are
-> registered).
-
-> Phillipp/Mark - what are your thoughts here? Do the regulator core
-> functions regulator_is_same() [1] and regulator_is_bypass() [2] I
-> propose make sense to determine if regulators are the same and in
-> bypass mode and overcome the detection issues Phillipp discussed in a
-> previous thread [3]?
-
-Please provide a clear description of what's actually going on here.
-What does the hardware actually look like and what is being configured?
-You're telling me the solution you've decided on, not what the problem
-that this is supposed to solve is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141218/2741c50e/attachment.sig>
+Jon.
