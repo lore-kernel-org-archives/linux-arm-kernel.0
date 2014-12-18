@@ -1,63 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Dec 2014 14:39:41 +0100
-Subject: [PATCH v4 1/3] ARM: at91: Add Special Function Registers binding
- documentation
-In-Reply-To: <1418895952-18186-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1418895952-18186-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5492D91D.1060200@atmel.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 18 Dec 2014 14:39:38 +0100
+Subject: Weird/Unneeded call to msleep in exynos_mipi_dsi_wr_data in
+ exynos_mipi_dsi_common.c
+In-Reply-To: <5492D80E.3010906@gmail.com>
+References: <54920A54.2060608@gmail.com> <5492ABE7.1060900@samsung.com>
+ <5492D80E.3010906@gmail.com>
+Message-ID: <1418909978.2236.0.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/12/2014 10:45, Alexandre Belloni a ?crit :
-> The special function registers gather some registers that allow to tweak
-> features provided by IPs controlled through another register range.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Am Donnerstag, den 18.12.2014, 08:35 -0500 schrieb nick:
+> Krzysztof,
+> If we look at the code for this function, it already is handling the data correctly. In addition  the locks 
+> seem to be better protection then msleep. Further more is no reason for this delay as we are neither resetting 
+> the hardware or waiting for the hardware here so why is it needed? I don't have Exynos based hardware lying
+> around through to test it.
 
-It seems okay. For the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+If you can't test it, don't touch it. It's that simple.
 
-And stacked on top of at91-3.20-dt.
-
-But I will modify the size of the reg property to 0x60.
-
-Thanks, bye.
-
-> ---
-> Changes in v4:
->  - corrected the chip list
-> 
->  Documentation/devicetree/bindings/arm/atmel-at91.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index 562cda9d86d9..f39e312531f0 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -136,3 +136,20 @@ Example:
->  		compatible = "atmel,at91sam9260-rstc";
->  		reg = <0xfffffd00 0x10>;
->  	};
-> +
-> +Special Function Registers (SFR)
-> +
-> +Special Function Registers (SFR) manage specific aspects of the integrated
-> +memory, bridge implementations, processor and other functionality not controlled
-> +elsewhere.
-> +
-> +required properties:
-> +- compatible: Should be "atmel,<chip>-sfr", "syscon".
-> +  <chip> can be "sama5d3" or "sama5d4".
-> +- reg: Should contain registers location and length
-> +
-> +	sfr at f0038000 {
-> +		compatible = "atmel,sama5d3-sfr", "syscon";
-> +		reg = <0xf0038000 0x4000>;
-> +	};
-> +
-> 
-
-
+Regards,
+Lucas
 -- 
-Nicolas Ferre
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
