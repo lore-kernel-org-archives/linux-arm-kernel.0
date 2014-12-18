@@ -1,86 +1,119 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 18 Dec 2014 10:27:26 +0800
-Subject: [PATCH v4 5/5] media: ov2640: dt: add the device tree binding document
-In-Reply-To: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
-References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Thu, 18 Dec 2014 10:46:33 +0800
+Subject: [PATCH RFC 09/15] drm: imx: Add MIPI DSI host controller driver
+In-Reply-To: <20141217104049.GU11285@n2100.arm.linux.org.uk>
+References: <1418200648-32656-1-git-send-email-Ying.Liu@freescale.com>
+ <1418200648-32656-10-git-send-email-Ying.Liu@freescale.com>
+ <20141210131640.GD23558@ulmo.nvidia.com> <54915081.6020508@freescale.com>
+ <20141217104049.GU11285@n2100.arm.linux.org.uk>
+Message-ID: <54924009.8040207@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the document for ov2640 dt.
+Hi Russell,
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-v3 -> v4:
-  1. remove aggsigned-clocks as it's general.
-  2. refine the explation.
+On 12/17/2014 06:40 PM, Russell King - ARM Linux wrote:
+> On Wed, Dec 17, 2014 at 05:44:33PM +0800, Liu Ying wrote:
+>> Hi Thierry,
+>>
+>> Sorry for the late response.
+>> I tried to address almost all your comments locally first.
+>> More feedback below.
+>>
+>> On 12/10/2014 09:16 PM, Thierry Reding wrote:
+>>> On Wed, Dec 10, 2014 at 04:37:22PM +0800, Liu Ying wrote:
+>>>> +static int check_status(struct imx_mipi_dsi *dsi, u32 reg, u32 status,
+>>>> +			int timeout, bool to_set)
+>>>> +{
+>>>> +	u32 val;
+>>>> +	bool out = false;
+>>>> +
+>>>> +	val = dsi_read(dsi, reg);
+>>>> +	for (;;) {
+>>>> +		out = to_set ? (val & status) : !(val & status);
+>>>> +		if (out)
+>>>> +			break;
+>>>> +
+>>>> +		if (!timeout--)
+>>>> +			return -EFAULT;
+>>>> +
+>>>> +		msleep(1);
+>>>> +		val = dsi_read(dsi, reg);
+>>>> +	}
+>>>> +	return 0;
+>>>> +}
+>>>
+>>> You should probably use a properly timed loop here. msleep() isn't
+>>> guaranteed to return after exactly one millisecond, so your timeout is
+>>> never going to be accurate. Something like the following would be better
+>>> in my opinion:
+>>>
+>>> 	timeout = jiffies + msecs_to_jiffies(timeout);
+>>>
+>>> 	while (time_before(jiffies, timeout)) {
+>>> 		...
+>>> 	}
+>>>
+>>> Also timeout should be unsigned long in that case.
+>>
+>> Accepted.
+>
+> Actually, that's a bad example: what we want to do is to assess success
+> after we wait, before we decide that something has failed.  In other
+> words, we don't want to wait, and decide that we failed without first
+> checking for success.
+>
+> In any case, returning -EFAULT is not sane: EFAULT doesn't mean "fault"
+> it means "Bad address", and it is returned to userspace to mean that
+> userspace passed the kernel a bad address.  That definition does /not/
+> fit what's going on here.
+>
+> 	timeout = jiffies + msecs_to_jiffies(timeout);
+>
+> 	do {
+> 		val = dsi_read(dsi, reg);
+> 		out = to_set ? (val & status) : !(val & status);
+> 		if (out)
+> 			break;
+>
+> 		if (time_is_after_jiffies(timeout))
 
-v2 -> v3:
-  1. fix incorrect description.
-  2. Add assigned-clocks & assigned-clock-rates.
-  3. resetb pin should be ACTIVE_LOW.
+time_is_after_jiffies(a) is defined as time_before(jiffies, a).
 
-v1 -> v2:
-  1. change the compatible string to be consistent with verdor file.
-  2. change the clock and pins' name.
-  3. add missed pinctrl in example.
+So, this line should be changed to
 
- .../devicetree/bindings/media/i2c/ov2640.txt       | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+	if (time_after(jiffies, timeout))
 
-diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-new file mode 100644
-index 0000000..de11ebb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-@@ -0,0 +1,46 @@
-+* Omnivision ov2640 CMOS sensor
-+
-+The Omnivision OV2640 sensor support multiple resolutions output, such as
-+CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
-+output format.
-+
-+Required Properties:
-+- compatible: Must be "ovti,ov2640"
-+- clocks: reference to the xvclk input clock.
-+- clock-names: Must be "xvclk".
-+
-+Optional Properties:
-+- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
-+- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
-+
-+The device node must contain one 'port' child node for its digital output
-+video port, in accordance with the video interface bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+
-+	i2c1: i2c at f0018000 {
-+		ov2640: camera at 0x30 {
-+			compatible = "ovti,ov2640";
-+			reg = <0x30>;
-+
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn &pinctrl_ov2640_resetb>;
-+
-+			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
-+			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
-+
-+			clocks = <&pck1>;
-+			clock-names = "xvclk";
-+
-+			assigned-clocks = <&pck1>;
-+			assigned-clock-rates = <25000000>;
-+
-+			port {
-+				ov2640_0: endpoint {
-+					remote-endpoint = <&isi_0>;
-+					bus-width = <8>;
-+				};
-+			};
-+		};
-+	};
--- 
-1.9.1
+Right?
+
+> 			return -ETIMEDOUT;
+>
+> 		msleep(1);
+> 	} while (1);
+>
+> 	return 0;
+>
+> would be better: we only fail immediately after we have checked whether
+> we succeeded, and we also do the first check immediately.
+>
+
+Does this one look better?  I use cpu_relax() instead of msleep(1).
+
+         expire = jiffies + msecs_to_jiffies(timeout);
+         for (;;) {
+                 val = dsi_read(dsi, reg);
+                 out = to_set ? (val & status) : !(val & status);
+                 if (out)
+                         break;
+
+                 if (time_after(jiffies, expire))
+                         return -ETIMEDOUT;
+
+                 cpu_relax();
+         }
+
+	return 0;
+
+Regards,
+
+Liu Ying
