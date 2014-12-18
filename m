@@ -1,47 +1,38 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 18 Dec 2014 11:55:56 -0800
-Subject: Help on kvm_tlb_flush_vmid_ipa usage
-In-Reply-To: <54932D1F.5060209@arm.com>
-References: <54932A97.3060103@samsung.com> <54932D1F.5060209@arm.com>
-Message-ID: <5493314C.8010400@samsung.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Thu, 18 Dec 2014 14:01:29 -0600
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <54933299.9030902@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2014 11:38 AM, Marc Zyngier wrote:
-> On 18/12/14 19:27, Mario Smarduch wrote:
->> When this function is called IPA address is used. Looking at the HYP
->> implementation it uses the IPA directly in tlbi instructions. But
->> reading the TLB maintnance instruction syntax, bit [35:0] should be
->> set to IPA[47:12]. I traced the source code but don't see the
->> adjustment. I must be missing something given this function is
->> fundamental to KVM MMU.
-> 
-> Ermmm... Someone (that is, I) needs a brown paper back again.
-> 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index b72aa9f..a767f6a 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->  	 * Instead, we invalidate Stage-2 for this IPA, and the
->  	 * whole of Stage-1. Weep...
->  	 */
-> +	lsr	x1, x1, #12
->  	tlbi	ipas2e1is, x1
->  	/*
->  	 * We have to ensure completion of the invalidation at Stage-2,
-> 
-> 	M.
-> 
+On 10/17/2014 8:37 AM, Hanjun Guo wrote:
 
-Marc,
-  thanks.
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+>
+> Add documentation for the guidelines of how to use ACPI
+> on ARM64.
+>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>   Documentation/arm64/arm-acpi.txt |  323
+> ++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 323 insertions(+)
+>   create mode 100644 Documentation/arm64/arm-acpi.txt
+>[...]
 
-Another question, is how do you handle a huge tlb
-do you need to zero out any PMD/PUD mask
-bits or just pass it in as is. The manual says
-MMU can figure out which bits are treated as
-0 for 16/64KB pages, can same thing be assumed
-for huge pages?
+AMD has reviewed this document, and currently implements ACPI table in 
+the firmware for AMD Seattle platform based on the documentation 
+published here:
 
-- Mario
+http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf
+
+Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+
+Thank you,
+
+Suravee
