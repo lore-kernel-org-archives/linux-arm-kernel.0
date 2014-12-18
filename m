@@ -1,65 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Dec 2014 15:08:36 +0100
-Subject: [PATCH] ARM: at91/pit: don't suspend/resume if unused
-In-Reply-To: <1418846023-8581-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1418846023-8581-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <5492DFE4.6020409@atmel.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 18 Dec 2014 06:11:15 -0800
+Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
+In-Reply-To: <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
+References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
+ <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
+ <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
+Message-ID: <CAJ+vNU3PQYCE4tABUiqU+vGkGqBEqdVKz25W88-ByOQZxunVLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 17/12/2014 20:53, Sylvain Rochet a ?crit :
-> Waiting for PIT to stop counting takes a long time:
->   1/(Master clock/prescaler/PIVR)
-> = 1/(133 MHz     /16       /2^20)
-> = 126 ms
-> 
-> Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
-> of the unused PIT device reduce (suspend time + resume time) from ~140 ms
-> to ~17 ms.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+On Wed, Dec 17, 2014 at 6:36 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Tim,
+>
+> On Fri, Oct 31, 2014 at 2:27 AM, Tim Harvey <tharvey@gateworks.com> wrote:
+>> When an external PMIC is used for VDD_SOC and VDD_ARM you can save power by
+>> bypassing the internal LDO's provided by the anantop regulator as long as
+>> you are running less than 1.2GHz. If running at 1.2GHz the IMX6 datasheets
+>> state that you must use the internal LDO's to reduce ripple on the suplies.
+>>
+>> A failure to bypass the LDO's when using an external PMIC will result in an
+>> extra voltage drop (~125mV) between VDD_ARM_IN and VDD_ARM and VDD_SOC_IN and
+>> VDD_SOC which violates the voltages specificed by the datasheets.
+>>
+>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+>> Cc: Shawn Guo <shawn.guo@freescale.com>
+>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>> ---
+>>  drivers/cpufreq/imx6q-cpufreq.c | 51 +++++++++++++++++++++++++++++++++++++++++
+>
+> Shouldn't the LDO bypass support be added into the anatop regulator
+> driver instead?
+>
+> What if someone wants to use LDO bypass and not use the cpufreq driver?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Fabio,
 
-I also moved these changes to the new clocksource PIT driver. Cf. the
-patch I've just sent titled: (clocksource: timer-atmel-pit: don't
-suspend/resume if unused) (preserving your authorship of course).
+That does make sense perhaps - I'm just not sure the best way to do it.
 
-Thanks. Bye.
+What is needed is to determine if the cpu vddsoc and vddarm regulators
+are both 'not' the same as the anatop provided regulators (then we
+bypass the anatop regulators) so I need to do such a check after all
+regulators are registered. Perhaps I need to have a late_init call (or
+some other init call that happens after all regulators are
+registered).
 
+Phillipp/Mark - what are your thoughts here? Do the regulator core
+functions regulator_is_same() [1] and regulator_is_bypass() [2] I
+propose make sense to determine if regulators are the same and in
+bypass mode and overcome the detection issues Phillipp discussed in a
+previous thread [3]?
 
-> ---
->  arch/arm/mach-at91/at91sam926x_time.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-> index e3344b4..44526aa 100644
-> --- a/arch/arm/mach-at91/at91sam926x_time.c
-> +++ b/arch/arm/mach-at91/at91sam926x_time.c
-> @@ -106,6 +106,10 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
->  
->  static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
->  {
-> +	/* Don't suspend PIT if unused */
-> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
-> +		return;
-> +
->  	/* Disable timer */
->  	pit_write(AT91_PIT_MR, 0);
->  }
-> @@ -125,6 +129,10 @@ static void at91sam926x_pit_reset(void)
->  
->  static void at91sam926x_pit_resume(struct clock_event_device *cedev)
->  {
-> +	/* Don't resume PIT if unused */
-> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
-> +		return;
-> +
->  	at91sam926x_pit_reset();
->  }
->  
-> 
+[1] http://article.gmane.org/gmane.linux.kernel/1818320/
+[2] http://article.gmane.org/gmane.linux.kernel/1818324/
+[3] http://thread.gmane.org/gmane.linux.ports.arm.kernel/359856
 
+Regards,
 
--- 
-Nicolas Ferre
+Tim
