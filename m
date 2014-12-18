@@ -1,70 +1,37 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 17 Dec 2014 18:14:41 -0800
-Subject: [PATCH 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <1418867992-3550-2-git-send-email-jonathar@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1418867992-3550-1-git-send-email-jonathar@broadcom.com>
- <1418867992-3550-2-git-send-email-jonathar@broadcom.com>
-Message-ID: <1418868881.28384.8.camel@perches.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 18 Dec 2014 10:27:21 +0800
+Subject: [PATCH v4 0/5] media: ov2640: add device tree support
+Message-ID: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-17 at 17:59 -0800, Jonathan Richardson wrote:
-> Add initial version of the Broadcom touchscreen driver.
+This patch series add device tree support for ov2640. And also add
+the document for the devicetree properties.
 
-trivia:
+v3->v4:
+  1. refined the dt document.
+  2. Add Laurent's acked-by.
 
-> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
+v2->v3:
+  1. fix the gpiod_xxx api usage as we use reset pin as ACTIVE_LOW.
+  2. update the devicetree binding document.
 
-> +/* Bit values for REGCTL2 */
-> +#define TS_CONTROLLER_EN_BIT    (1 << 16)
-> +#define TS_CONTROLLER_AVGDATA_SHIFT 8
-> +#define TS_CONTROLLER_AVGDATA_MASK (0x7 << TS_CONTROLLER_AVGDATA_SHIFT)
-> +#define TS_CONTROLLER_PWR_LDO   (1<<5)
-> +#define TS_CONTROLLER_PWR_ADC   (1<<4)
-> +#define TS_CONTROLLER_PWR_BGP   (1<<3)
-> +#define TS_CONTROLLER_PWR_TS    (1<<2)
-> +#define TS_WIRE_MODE_BIT        (1<<1)
+v1 -> v2:
+  1.  modified the dt bindings according to Laurent's suggestion.
+  2. add a fix patch for soc_camera. Otherwise the .reset() function won't work.
 
-Be nicer to use the same spacing around <<
-or maybe use the BIT macro.
+Josh Wu (5):
+  media: soc-camera: use icd->control instead of icd->pdev for reset()
+  media: ov2640: add async probe function
+  media: ov2640: add primary dt support
+  media: ov2640: add a master clock for sensor
+  media: ov2640: dt: add the device tree binding document
 
-[]
+ .../devicetree/bindings/media/i2c/ov2640.txt       |  46 +++++++
+ drivers/media/i2c/soc_camera/ov2640.c              | 141 ++++++++++++++++++---
+ drivers/media/platform/soc_camera/soc_camera.c     |   8 +-
+ 3 files changed, 175 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
 
-> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
-> +{
-> +	int ret;
-> +	u32 val;
-> +	struct device *dev = &priv->pdev->dev;
-> +
-> +	priv->cfg_params = default_config;
-> +
-> +	ret = of_property_read_u32(np, "scanning_period", &val);
-> +	if (ret >= 0) {
-> +		if ((1 <= val) && (val <= 256))
-> +			priv->cfg_params.scanning_period = val;
-> +		else {
-> +			dev_err(dev, "scanning_period must be [1-256]");
-> +			return -EINVAL;
-> +		}
-
-ret is never used so I'd probably remove it
-from all these blocks.
-
-It's probably be nicer to invert the logic ald
-remove the else.
-
-There's a missing terminating newline too.
-
-Something like:
-
-	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
-		if (val < 1 || val > 256) {
-			dev_err(dev, "scanning_period must be [1-256]\n");
-			return -EINVAL;
-		}
-		priv->cfg_params.scanning_period = val;
-	}
-
-etc...
+-- 
+1.9.1
