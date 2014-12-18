@@ -1,198 +1,121 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 18 Dec 2014 09:51:53 -0800
-Subject: [PATCH v3] input: Add new sun4i-lradc-keys driver
-In-Reply-To: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
-References: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141218175153.GA34618@dtor-ws>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 18 Dec 2014 18:56:46 +0100
+Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
+ tree under GPLv2+/X11
+In-Reply-To: <20141215232221.GD19261@kw.sim.vm.gnt>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
+ <20141215232221.GD19261@kw.sim.vm.gnt>
+Message-ID: <20141218175646.GF19261@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Thu, Dec 18, 2014 at 11:23:13AM +0100, Hans de Goede wrote:
-> Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
-> specifically designed to have various (tablet) keys (ie home, back, search,
-> etc). attached to it using a resistor network. This adds a driver for this.
+On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
+> On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
+> > The current GPL only licensing on the device tree makes it very
+> > impractical for other software components licensed under another
+> > license.
+> > 
+> > In order to make it easier for them to reuse our device trees,
+> > relicense our device trees under a GPL/X11 dual-license.
+> > 
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Arnaud Ebalard <arno@natisbad.org>
+> > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Cc: Greg Ungerer <gerg@uclinux.org>
+> > Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> > Cc: Simon Baatz <gmbnomis@gmail.com>
+> > Cc: Simon Guinot <simon.guinot@sequanux.org>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Willy Tarreau <w@1wt.eu>
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
+> >  1 file changed, 37 insertions(+), 3 deletions(-)
 > 
-> There are 2 channels, currently this driver only supports chan0 since there
-> are no boards known to use chan1.
+> Hi Gregory,
 > 
-> This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
-> a20-olinuxino-micro.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> --
-> Changes in v2:
-> -Change devicetree bindings to use a per key subnode, like gpio-keys does
-> Changes in v3:
-> -Handle keyup irq flag before irqdown, in case we get both at once
+> NAK for me.
 
-Thank you for making changes. Can you please tell me if the driver still
-works if you drop the patch below on top of it? The changes are:
+After some thoughts I changed my mind about this. I can't see no point
+in forcing people to rewrite a commit for a single line which is even
+not covered by my copyright...
 
-- split DT parsing into a separate function;
-- make sure keymap is not empty;
-- change 'ret' variable to 'error'; 
+Then, for the armada-370-xp.dtsi file:
 
-Thanks!
+Acked-by: Simon Guinot <simon.guinot@sequanux.org>
 
--- 
-Dmitry
+Simon
 
-Input: sun4i-lradc-keys - misc changes
+> > 
+> > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> > index 1af428602748..8a322ad57e5f 100644
+> > --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> > +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> > @@ -8,9 +8,43 @@
+> >   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >   * Ben Dooks <ben.dooks@codethink.co.uk>
+> >   *
+> > - * This file is licensed under the terms of the GNU General Public
+> > - * License version 2.  This program is licensed "as is" without any
+> > - * warranty of any kind, whether express or implied.
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> >   *
+> >   * This file contains the definitions that are common to the Armada
+> >   * 370 and Armada XP SoC.
+> > -- 
+> > 1.9.1
 
-From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- drivers/input/keyboard/sun4i-lradc-keys.c |   87 +++++++++++++++++++----------
- 1 file changed, 57 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-index 06d5c69..cc8f7dd 100644
---- a/drivers/input/keyboard/sun4i-lradc-keys.c
-+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-@@ -122,11 +122,11 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
- static int sun4i_lradc_open(struct input_dev *dev)
- {
- 	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
--	int ret;
-+	int error;
- 
--	ret = regulator_enable(lradc->vref_supply);
--	if (ret)
--		return ret;
-+	error = regulator_enable(lradc->vref_supply);
-+	if (error)
-+		return error;
- 
- 	/* lradc Vref internally is divided by 2/3 */
- 	lradc->vref = regulator_get_voltage(lradc->vref_supply) * 2 / 3;
-@@ -155,42 +155,48 @@ static void sun4i_lradc_close(struct input_dev *dev)
- 	regulator_disable(lradc->vref_supply);
- }
- 
--static int sun4i_lradc_probe(struct platform_device *pdev)
-+static int sun4i_lradc_load_dt_keymap(struct device *dev,
-+				      struct sun4i_lradc_data *lradc)
- {
--	struct sun4i_lradc_data *lradc;
--	struct device *dev = &pdev->dev;
--	struct device_node *pp, *np = dev->of_node;
--	u32 channel;
--	int i, ret;
-+	struct device_node *np, *pp;
-+	int i;
-+	int error;
- 
--	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
--	if (!lradc)
--		return -ENOMEM;
-+	np = dev->of_node;
-+	if (!np)
-+		return -EINVAL;
- 
- 	lradc->chan0_map_count = of_get_child_count(np);
--	lradc->chan0_map = devm_kmalloc(dev, lradc->chan0_map_count *
--				sizeof(struct sun4i_lradc_keymap), GFP_KERNEL);
-+	if (lradc->chan0_map_count == 0) {
-+		dev_err(dev, "keymap is missing in device tree\n");
-+		return -EINVAL;
-+	}
-+
-+	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
-+					      sizeof(struct sun4i_lradc_keymap),
-+					      GFP_KERNEL);
- 	if (!lradc->chan0_map)
- 		return -ENOMEM;
- 
- 	i = 0;
- 	for_each_child_of_node(np, pp) {
- 		struct sun4i_lradc_keymap *map = &lradc->chan0_map[i];
-+		u32 channel;
- 
--		ret = of_property_read_u32(pp, "channel", &channel);
--		if (ret || channel != 0) {
-+		error = of_property_read_u32(pp, "channel", &channel);
-+		if (error || channel != 0) {
- 			dev_err(dev, "%s: Inval channel prop\n", pp->name);
- 			return -EINVAL;
- 		}
- 
--		ret = of_property_read_u32(pp, "voltage", &map->voltage);
--		if (ret) {
-+		error = of_property_read_u32(pp, "voltage", &map->voltage);
-+		if (error) {
- 			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
- 			return -EINVAL;
- 		}
- 
--		ret = of_property_read_u32(pp, "linux,code", &map->keycode);
--		if (ret) {
-+		error = of_property_read_u32(pp, "linux,code", &map->keycode);
-+		if (error) {
- 			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
- 			return -EINVAL;
- 		}
-@@ -198,6 +204,24 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
- 		i++;
- 	}
- 
-+	return 0;
-+}
-+
-+static int sun4i_lradc_probe(struct platform_device *pdev)
-+{
-+	struct sun4i_lradc_data *lradc;
-+	struct device *dev = &pdev->dev;
-+	int i;
-+	int error;
-+
-+	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
-+	if (!lradc)
-+		return -ENOMEM;
-+
-+	error = sun4i_lradc_load_dt_keymap(dev, lradc);
-+	if (error)
-+		return error;
-+
- 	lradc->vref_supply = devm_regulator_get(dev, "vref");
- 	if (IS_ERR(lradc->vref_supply))
- 		return PTR_ERR(lradc->vref_supply);
-@@ -215,9 +239,11 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
- 	lradc->input->id.vendor = 0x0001;
- 	lradc->input->id.product = 0x0001;
- 	lradc->input->id.version = 0x0100;
--	lradc->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY);
-+
-+	__set_bit(EV_KEY, lradc->input->evbit);
- 	for (i = 0; i < lradc->chan0_map_count; i++)
--		set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
-+		__set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
-+
- 	input_set_drvdata(lradc->input, lradc);
- 
- 	lradc->base = devm_ioremap_resource(dev,
-@@ -225,14 +251,15 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
- 	if (IS_ERR(lradc->base))
- 		return PTR_ERR(lradc->base);
- 
--	ret = devm_request_irq(dev, platform_get_irq(pdev, 0), sun4i_lradc_irq,
--			       0, "sun4i-a10-lradc-keys", lradc);
--	if (ret)
--		return ret;
-+	error = devm_request_irq(dev, platform_get_irq(pdev, 0),
-+				 sun4i_lradc_irq, 0,
-+				 "sun4i-a10-lradc-keys", lradc);
-+	if (error)
-+		return error;
- 
--	ret = input_register_device(lradc->input);
--	if (ret)
--		return ret;
-+	error = input_register_device(lradc->input);
-+	if (error)
-+		return error;
- 
- 	platform_set_drvdata(pdev, lradc);
- 	return 0;
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141218/15d43a2f/attachment.sig>
