@@ -1,34 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Dec 2014 11:49:49 +0000
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 18 Dec 2014 11:48:31 +0000
 Subject: OMAP 4430 SDP: rather sick with recent kernels
 In-Reply-To: <20141218101618.GJ11502@n2100.arm.linux.org.uk>
 References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
  <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk>
- <5491F0B6.4090904@ti.com>
+ <20141217185155.GI11502@n2100.arm.linux.org.uk> <5491F0B6.4090904@ti.com>
  <20141218101618.GJ11502@n2100.arm.linux.org.uk>
-Message-ID: <20141218114949.GY11764@sirena.org.uk>
+Message-ID: <0625abeb83cd4ed88fdb38754b6a3086@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 10:16:18AM +0000, Russell King - ARM Linux wrote:
-
+Russel King wrote:
+*snip*
+> Now, we have this call to snd_soc_of_parse_audio_routing(), which
+> allocates some memory, copies the old routes into it, and then adds
+> to them from DT.  That explains why the pointer and number of routes
+> are different - there's 19 routes in omap4-sdp.dts - 17 + 19 = 36.
 > So that doesn't work - but importantly, it does point towards a
 > possible culpret - snd_soc_of_parse_audio_routing().
-
+> 
 > This is obvious when you stop and think about what it's doing, this is
 > truely where this bug lies, and it /is/ in generic ASoC code.
-
+> 
 > The problem is that this function doesn't consider the implications of
 > deferred probing.  Let's see what happens if we defer, and re-do the
 > ABE initialisation, including calling this function:
+> 
+> 17 + 19 = 36. - first probe
+> 17 + 19 + 19 = 55. - second probe
+> 
+> Oh - that works in terms of the number, and it would also explain why
+> the table has been screwed - because the second time we memcpy(), we're
+> memcpy()ing from data which was allocated via devm_kzalloc(), and thus
+> would have been freed after the first failed probe.
+> 
+> Mark - this is a core ASoC problem.
 
-Right, spot on - I'll send a revert for that upstream.  Thanks for
-tracking this down.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141218/d29f4884/attachment.sig>
+Sorry about this, I wasn't even aware of deferred probing when I wrote
+f8781db8aeb1. From my point of view, it is certainly possible to solve this
+in the card driver which needs to add card dapm routes instead. So, a
+revert is fine by me, if no better solution comes up.
+
+Cheers,
+Peter
