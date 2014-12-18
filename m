@@ -1,44 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Dec 2014 23:35:04 +0100
-Subject: [PATCH] arch: arm: mach-msm: smd.c: Remove some unused functions
-In-Reply-To: <20141218220128.GA10615@fifo99.com>
-References: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <CAFo99gbPKw4uHY_QqyZ495O9QLKL69HQyJmQUKNaGQTNqsG-mw@mail.gmail.com>
- <20141218220128.GA10615@fifo99.com>
-Message-ID: <6909946.FWqDZQSxq2@wuerfel>
+Date: Thu, 18 Dec 2014 23:44:22 +0100
+Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
+ Cortex-M4
+In-Reply-To: <44e9d518da24fb0c910de464269b8551@agner.ch>
+References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
+ <2615697.uVqMY8zKot@wuerfel> <44e9d518da24fb0c910de464269b8551@agner.ch>
+Message-ID: <2375016.nxLFC8UMcD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 December 2014 22:01:28 dwalker at fifo99.com wrote:
-> On Tue, Dec 16, 2014 at 12:20:43AM +0100, Rickard Strandqvist wrote:
-> > Hi
+On Thursday 18 December 2014 21:36:31 Stefan Agner wrote:
+> On 2014-12-17 13:31, Arnd Bergmann wrote:
+> > On Wednesday 17 December 2014 00:41:33 Stefan Agner wrote:
+> >> On 2014-12-03 12:03, Arnd Bergmann wrote:
+> >> > Starting with v3.19, you should be able to use the earlycon framework on
+> >> > arm32, so it would be better to replace earlyprintk with earlycon here
+> >> > and add a stdout-path property in chosen that points to the console
+> >> > uart.
+> >>
+> >> I started to implement earlycon support, but something currently fails
+> >> when earlycon tries to map the UART registers:
+> >> [    0.000000] earlycon_map: Couldn't map 0x40027000
+> >>
+> >> I traced the issue a bit further down and found that get_vm_area_caller
+> >> returns NULL (in __arm_ioremap_pfn_caller). This happend on Linus master
+> >> as of today (2dbfca5a181973558277b28b1f4c36362291f5e0). Do I miss
+> >> something here?
 > > 
-> > My script looks for the same function name, so if they then would be
-> > named exactly the same, they would come up.
-> > 
-> > But I can not even find drivers/staging/dream/   or is this really new code?
+> > Hmm, I fear the arm32 FIX_EARLYCON_MEM support ended up not making it
+> > into 3.19 after all. 
 > 
-> Maybe it was deleted already ..
+> Is it because early_ioremap and fixmap still missing for arm32?
+> According to Rob's patchset from spring fixmap is required, there is
+> something in this tree:
+> https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=arm-fixmap
 
-It's been gone for over four years, after nobody worked on cleaning it up
-for a while before that:
+Right, that's the one, thanks for finding that again. There are five
+patches on that branch. The first three got merged, and the one we
+need is just the last one (ARM: fixmap early permanent mapping support),
+but the implementation depends on the previous patch (arm: add
+early_ioremap support).
 
-commit 3414df8ca38b203c8a5ad8efc32d4a3836a0596d
-Author: Greg Kroah-Hartman <gregkh@suse.de>
-Date:   Fri Oct 29 12:42:18 2010 -0700
-
-    Staging: dream: remove dream driver and arch from tree
-    
-    This code is stalled, with no one working on it anymore, and the main
-    msm code is now going through the proper channels to get merged
-    correctly.
-    
-    So remove it as it contains a number of kernel information leaks and it
-    is doubtful if it even still builds anymore.
-    
-    Acked-by: Pavel Machek <pavel@ucw.cz>
-    Acked-by: Bryan Huntsman <bryanh@codeaurora.org>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
-
+I was hoping we'd see both of them in 3.19, but apparently Rob didn't
+submit the latest version. If you don't mind, could you try forward-porting
+them to the latest kernel and then submit them for inclusion? You could
+also try adapting the last patch to work without the early_ioremap
+support that we don't really need that urgently on arm32.
 
 	Arnd
