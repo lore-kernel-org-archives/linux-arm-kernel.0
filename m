@@ -1,91 +1,66 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 17 Dec 2014 22:58:48 -0800
-Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
- disable failure due to domain being gated
-In-Reply-To: <20141217152322.29014.7739@quantum>
-References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
- <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
- <7hlhmfo1b0.fsf@deeprootsystems.com> <7h8ui8h7n9.fsf@deeprootsystems.com>
- <1418718015.28527.4.camel@AMDC1943> <20141217152322.29014.7739@quantum>
-Message-ID: <20141218065848.29014.24886@quantum>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 18 Dec 2014 15:00:49 +0800
+Subject: [PATCH v2 02/11] ARM: dts: sun9i: Add mmc module clock nodes for A80
+In-Reply-To: <1418886058-8145-1-git-send-email-wens@csie.org>
+References: <1418886058-8145-1-git-send-email-wens@csie.org>
+Message-ID: <1418886058-8145-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mike Turquette (2014-12-17 07:23:22)
-> Quoting Krzysztof Kozlowski (2014-12-16 00:20:15)
-> > On pon, 2014-12-15 at 14:26 -0800, Kevin Hilman wrote:
-> > > Kevin Hilman <khilman@kernel.org> writes:
-> > > 
-> > > > Sylwester Nawrocki <s.nawrocki@samsung.com> writes:
-> > > >
-> > > >> On 09/12/14 13:59, Krzysztof Kozlowski wrote:
-> > > >>> On pi?, 2014-12-05 at 15:15 +0100, Krzysztof Kozlowski wrote:
-> > > >>>> > Audio subsystem clocks are located in separate block. On Exynos 5420 if
-> > > >>>> > clock for this block (from main clock domain) 'mau_epll' is gated then
-> > > >>>> > any read or write to audss registers will block.
-> > > >>>> > 
-> > > >>>> > This kind of boot hang was observed on Arndale Octa and Peach Pi/Pit
-> > > >>>> > after introducing runtime PM to pl330 DMA driver. After that commit the
-> > > >>>> > 'mau_epll' was gated, because the "amba" clock was disabled and there
-> > > >>>> > were no more users of mau_epll.
-> > > >>>> > 
-> > > >>>> > The system hang on one of steps:
-> > > >>>> > 1. Disabling unused clocks from audss block.
-> > > >>>> > 2. During audss GPIO setup (just before probing i2s0 because
-> > > >>>> >    samsung_pinmux_setup() tried to access memory from audss block which was
-> > > >>>> >    gated.
-> > > >>>> > 
-> > > >>>> > Add a workaround for this by enabling the 'mau_epll' clock in probe.
-> > > >>>> > 
-> > > >>>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > >>>> > ---
-> > > >>>> >  drivers/clk/samsung/clk-exynos-audss.c | 29 ++++++++++++++++++++++++++++-
-> > > >>>> >  1 file changed, 28 insertions(+), 1 deletion(-)
-> > > >>>
-> > > >>> Sorry for pinging so quick but merge window is open and it looks like
-> > > >>> booting Exynos542x boards will be broken (because pl330 will no longer
-> > > >>> hold adma clock enabled so whole audss domain will be gated).
-> > > >>> 
-> > > >>> This is a non-intrusive workaround for that issue, as wanted by
-> > > >>> Sylwester:
-> > > >>> https://lkml.org/lkml/2014/12/5/223
-> > > >>> 
-> > > >>> Any comments on this?
-> > > >>
-> > > >> The patch looks OK to me, it would be good though if someone else
-> > > >> has confirmed it fixes the bug. I don't have any clock patches queued
-> > > >> at the moment. Perhaps you could apply it directly, Mike ?
-> > > >
-> > > > I confirm it fixes the boot hang in linux-next (next-20141210) on my
-> > > > exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
-> > > > exynos_defconfig and multi_v7_defconfig.
-> > > >
-> > > > Tested-by: Kevin Hilman <khilman@linaro.org>
-> > > 
-> > > What's the status of this patch?  linux-next is still broken for several
-> > > Exynos5 platforms without this fix.
-> > 
-> > I believe not only next is broken but also current mainline because
-> > runtime PM for pl330 was merged yesterday...
-> > 
-> > The patch received two tested-bys (Kevin's and Javier's) and Sylwester's
-> > ack.
-> > 
-> > Mike, could you pick the patch and send it to Linus after rc1?
-> 
-> Will do.
+The mmc module clocks are A80 specific module 0 (storage) type clocks.
 
-To be clear, I pulled this into clk-next towards -rc1, so it won't need
-to go through as an -rc fix.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-Regards,
-Mike
-
-> 
-> Regards,
-> Mike
-> 
-> > 
-> > Best regards,
-> > Krzysztof
-> > 
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 494714f..b595d9e 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -215,6 +215,42 @@
+ 			clock-output-names = "cci400";
+ 		};
+ 
++		mmc0_clk: clk at 06000410 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun9i-a80-mmc-clk";
++			reg = <0x06000410 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc0", "mmc0_output",
++					     "mmc0_sample";
++		};
++
++		mmc1_clk: clk at 06000414 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun9i-a80-mmc-clk";
++			reg = <0x06000414 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc1", "mmc1_output",
++					     "mmc1_sample";
++		};
++
++		mmc2_clk: clk at 06000418 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun9i-a80-mmc-clk";
++			reg = <0x06000418 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc2", "mmc2_output",
++					     "mmc2_sample";
++		};
++
++		mmc3_clk: clk at 0600041c {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun9i-a80-mmc-clk";
++			reg = <0x0600041c 0x4>;
++			clocks = <&osc24M>, <&pll4>;
++			clock-output-names = "mmc3", "mmc3_output",
++					     "mmc3_sample";
++		};
++
+ 		ahb0_gates: clk at 06000580 {
+ 			#clock-cells = <1>;
+ 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
+-- 
+2.1.3
