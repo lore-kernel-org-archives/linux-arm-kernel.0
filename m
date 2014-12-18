@@ -1,101 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Dec 2014 13:56 +0200
-Subject: [PATCH v4 5/5] media: ov2640: dt: add the device tree binding
- document
-In-Reply-To: <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
-References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
- <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
-Message-ID: <2071990.alIc7byK3Q@avalon>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 18 Dec 2014 13:57:21 +0200
+Subject: [PATCH] video/logo: prevent use of logos after they have been freed
+Message-ID: <1418903842-22450-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hi,
 
-Thank you for the patch.
+The fbdev logo seems to be rather messed up when deferred probing is happening.
+This is a quick fix for the problem.
 
-On Thursday 18 December 2014 10:27:26 Josh Wu wrote:
-> Add the document for ov2640 dt.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+The code in the logo.c is quite scary, using __init_refok to silence warnings
+about accessing __initdata from non-init context.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Another option would be to make the logos not __initdata, but I think that's
+not acceptable.
 
-> ---
-> v3 -> v4:
->   1. remove aggsigned-clocks as it's general.
->   2. refine the explation.
-> 
-> v2 -> v3:
->   1. fix incorrect description.
->   2. Add assigned-clocks & assigned-clock-rates.
->   3. resetb pin should be ACTIVE_LOW.
-> 
-> v1 -> v2:
->   1. change the compatible string to be consistent with verdor file.
->   2. change the clock and pins' name.
->   3. add missed pinctrl in example.
-> 
->  .../devicetree/bindings/media/i2c/ov2640.txt       | 46 +++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
-> 100644
-> index 0000000..de11ebb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
-> @@ -0,0 +1,46 @@
-> +* Omnivision ov2640 CMOS sensor
-> +
-> +The Omnivision OV2640 sensor support multiple resolutions output, such as
-> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
-> +output format.
-> +
-> +Required Properties:
-> +- compatible: Must be "ovti,ov2640"
-> +- clocks: reference to the xvclk input clock.
-> +- clock-names: Must be "xvclk".
-> +
-> +Optional Properties:
-> +- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
-> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
-> +
-> +The device node must contain one 'port' child node for its digital output
-> +video port, in accordance with the video interface bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Example:
-> +
-> +	i2c1: i2c at f0018000 {
-> +		ov2640: camera at 0x30 {
-> +			compatible = "ovti,ov2640";
-> +			reg = <0x30>;
-> +
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn 
-&pinctrl_ov2640_resetb>;
-> +
-> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
-> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
-> +
-> +			clocks = <&pck1>;
-> +			clock-names = "xvclk";
-> +
-> +			assigned-clocks = <&pck1>;
-> +			assigned-clock-rates = <25000000>;
-> +
-> +			port {
-> +				ov2640_0: endpoint {
-> +					remote-endpoint = <&isi_0>;
-> +					bus-width = <8>;
-> +				};
-> +			};
-> +		};
-> +	};
+Any ideas for a nicer way to fix this issue?
+
+ Tomi
+
+Tomi Valkeinen (1):
+  video/logo: prevent use of logos after they have been freed
+
+ drivers/video/logo/logo.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
 -- 
-Regards,
-
-Laurent Pinchart
+2.2.0
