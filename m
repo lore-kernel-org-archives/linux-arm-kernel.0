@@ -1,195 +1,41 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 18 Dec 2014 16:23:52 +0900
-Subject: [PATCHv4 1/8] devfreq: event: Add new devfreq_event class to
- provide basic data for devfreq governor
-In-Reply-To: <1527528755.303581418883865069.JavaMail.weblogic@epmlwas01d>
-References: <1527528755.303581418883865069.JavaMail.weblogic@epmlwas01d>
-Message-ID: <54928108.5080603@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 18 Dec 2014 08:52:05 +0100
+Subject: DT on s3c24xx
+In-Reply-To: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
+References: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
+Message-ID: <20141218075205.GB10857@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Myungjoo,
+Hello,
 
-Thanks for your review.
+[Cc += linusw, linux-gpio]
 
-On 12/18/2014 03:24 PM, MyungJoo Ham wrote:
-> Hi Chanwoo,
+On Wed, Dec 17, 2014 at 10:04:24PM +0300, Vasily Khoruzhick wrote:
+> I'd like to port several s3c24xx to DT, and I'm stuck with s3c24xx LCD
+> controller and power drivers for H1940 and RX1950.
 > 
-> I love the idea and I now have a little mechanical issues in your code.
-> 
->> ---
->>  drivers/devfreq/Kconfig         |   2 +
->>  drivers/devfreq/Makefile        |   5 +-
->>  drivers/devfreq/devfreq-event.c | 449 ++++++++++++++++++++++++++++++++++++++++
->>  drivers/devfreq/event/Makefile  |   1 +
->>  include/linux/devfreq.h         | 160 ++++++++++++++
->>  5 files changed, 616 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/devfreq/devfreq-event.c
->>  create mode 100644 drivers/devfreq/event/Makefile
->>
->> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
->> index faf4e70..4d15b62 100644
->> --- a/drivers/devfreq/Kconfig
->> +++ b/drivers/devfreq/Kconfig
->> @@ -87,4 +87,6 @@ config ARM_EXYNOS5_BUS_DEVFREQ
->>  	  It reads PPMU counters of memory controllers and adjusts the
->>  	  operating frequencies and voltages with OPP support.
->>  
->> +comment "DEVFREQ Event Drivers"
->> +
->>  endif # PM_DEVFREQ
->> diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
->> index 16138c9..a1ffabe 100644
->> --- a/drivers/devfreq/Makefile
->> +++ b/drivers/devfreq/Makefile
->> @@ -1,4 +1,4 @@
->> -obj-$(CONFIG_PM_DEVFREQ)	+= devfreq.o
->> +obj-$(CONFIG_PM_DEVFREQ)		+= devfreq.o devfreq-event.o
->>  obj-$(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)	+= governor_simpleondemand.o
->>  obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+= governor_performance.o
->>  obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
->> @@ -7,3 +7,6 @@ obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
->>  # DEVFREQ Drivers
->>  obj-$(CONFIG_ARM_EXYNOS4_BUS_DEVFREQ)	+= exynos/
->>  obj-$(CONFIG_ARM_EXYNOS5_BUS_DEVFREQ)	+= exynos/
->> +
->> +# DEVFREQ Event Drivers
->> +obj-$(CONFIG_PM_DEVFREQ)		+= event/
->>
-> 
-> It looks getting mature fast.
-> However, I would like to suggest you to
-> 
-> allow not to compile devfreq-event.c and not include its compiled object
->   if devfreq.c is required but devfreq-event.c is not required.
->   (e.g., add CONFIG_PM_DEVFREQ_EVENT and let it be enabled when needed)
->   just a little concern for lightweight devices.
->     (this change might require a bit more work on the header as well)
->   - Or do you think devfreq-event.c will become almost mandatory for
->    most devfreq drivers?
+> Please see [1]. I want to move this function into another LCD power
+> driver, but I'm not sure what to do with s3c_gpio_cfgpin(). I need to
+> change pin function in runtime, and as far as I understand it should
+> be handled via pinctrl driver somehow. But how?
+You can pass >1 pinctrl setups to a node:
 
-I agree your opinion.
-I'll add CONFIG_PM_DEVFREQ_EVENT according to your comment.
+	somedevice {
+		pinctrl-names = "default", "foo", "bar";
+		pinctrl-0 = <&pinctrl_somedevice_default>;
+		pinctrl-1 = <&pinctrl_somedevice_foo>;
+		pinctrl-2 = <&pinctrl_somedevice_bar>;
+		cfg-gpios = <&gpio4 12 3>, <&gpio2 7 5>;
+	};
 
-> 
-> 
-> [snip]
-> 
->> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
->> new file mode 100644
->> index 0000000..0e1948e
->> --- /dev/null
->> +++ b/drivers/devfreq/devfreq-event.c
->> @@ -0,0 +1,449 @@
->> +/*
->> + * devfreq-event: Generic DEVFREQ Event class driver
-> 
-> DEVFREQ is a generic DVFS mechanism (or subsystem).
-> 
-> Plus, I thought devfreq-event is considered to be a "framework"
-> for devfreq event class drivers. Am I mistaken?
+Then I think you can fiddle with pinctrl_select_state(). For the gpios
+you can then use the standard gpiod_{request,direction_{in,out}put}
+combo.
 
-You're right. just "class driver" description is not proper.
-I'll modify the description of devfreq-event.c as following:
-or If you have other opinion, would you please let me know about it?
+Best regards
+Uwe
 
-	devfreq-event: DEVFREQ-Event Framework to provide raw data of Non-CPU Devices.
-
-
-> [snip]
-> 
->> +struct devfreq_event_dev *devfreq_event_add_edev(struct device *dev,
->> +                                               struct devfreq_event_desc *desc)
->> +{
->> +       struct devfreq_event_dev *edev;
->> +       static atomic_t event_no = ATOMIC_INIT(0);
->> +       int ret;
->> +
->> +       if (!dev || !desc)
->> +               return ERR_PTR(-EINVAL);
->> +
->> +       if (!desc->name || !desc->ops)
->> +               return ERR_PTR(-EINVAL);
->> +
->> +       if (!desc->ops->set_event || !desc->ops->get_event)
->> +               return ERR_PTR(-EINVAL);
->> +
->> +       edev = devm_kzalloc(dev, sizeof(*edev), GFP_KERNEL);
->> +       if (!edev)
->> +               return ERR_PTR(-ENOMEM);
->> +
->> +       mutex_lock(&devfreq_event_list_lock);
-> 
-> You seem to lock that global lock too long. That lock is only required
-> while you operate the list. The data to be protected by this mutex is
-> devfreq_event_list. Until the new entry is added to the list, the new
-> entry is free from protection. (may be delayed right before list_add)
-
-OK. I'll move global lock right before calling list_add() on below.
-
-> 
->> +       mutex_init(&edev->lock);
->> +       edev->desc = desc;
->> +       edev->dev.parent = dev;
->> +       edev->dev.class = devfreq_event_class;
->> +       edev->dev.release = devfreq_event_release_edev;
->> +
->> +       dev_set_name(&edev->dev, "event.%d", atomic_inc_return(&event_no) - 1);
->> +       ret = device_register(&edev->dev);
->> +       if (ret < 0) {
->> +               put_device(&edev->dev);
->> +               mutex_unlock(&devfreq_event_list_lock);
->> +               return ERR_PTR(ret);
->> +       }
->> +       dev_set_drvdata(&edev->dev, edev);
->> +
->> +       INIT_LIST_HEAD(&edev->node);
->> +       list_add(&edev->node, &devfreq_event_list);
->> +       mutex_unlock(&devfreq_event_list_lock);
->> +
->> +       return edev;
->> +}
-> 
-> 
-> 
-> [snip / reversed maybe.. sorry]
-> 
->> +/**
->> + * devfreq_event_is_enabled() - Check whether devfreq-event dev is enabled or
->> + *                             not.
->> + * @edev       : the devfreq-event device
->> + *
->> + * Note that this function check whether devfreq-event dev is enabled or not.
->> + * If return true, the devfreq-event dev is enabeld. If return false, the
->> + * devfreq-event dev is disabled.
->> + */
->> +bool devfreq_event_is_enabled(struct devfreq_event_dev *edev)
->> +{
->> +       bool enabled = false;
->> +
->> +       if (!edev || !edev->desc)
->> +               return enabled;
->> +
->> +       mutex_lock(&edev->lock);
->> +
->> +       if (edev->enable_count > 0)
->> +               enabled = true;
->> +
->> +       if (edev->desc->ops && edev->desc->ops->is_enabled)
->> +               enabled |= edev->desc->ops->is_enabled(edev);
-> 
-> What does it mean when enabled_count > 0 and ops->is_enabled() is false? or..
-> What does it mean when enabled_count = 0 and ops->is_enabled() is true?
-> 
-> If you do enable_count in the subsystem, why would we rely on
-> ops->is_enabled()? Are you assuming that a device MAY turn itself off
-> without any kernel control (ops->disable()) and it is still a correct
-> behabior?
-
-You're right. devfreq_event_is_enabled() has ambiguous operation according to your comment.
-
-I'll only control the enable_count in the subsystem without ops->is_enabled()
-and then remove the is_enabled function in the structre devfreq_event_ops.
-
-Best Regards,
-Chanwoo Choi
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
