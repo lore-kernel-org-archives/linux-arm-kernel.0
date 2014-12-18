@@ -1,39 +1,40 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 18 Dec 2014 13:21:54 -0800
-Subject: [PATCH] optimize ktime_divns for constant divisors
-In-Reply-To: <2110446.Lbe6oKjkNj@wuerfel>
-References: <alpine.LFD.2.11.1412031424150.470@knanqh.ubzr>
- <alpine.LFD.2.11.1412051251280.470@knanqh.ubzr>
- <2110446.Lbe6oKjkNj@wuerfel>
-Message-ID: <CALAqxLVzOAeOj8Rdo9=owEQ8Jy=-J1jQbaPoqxZqYJBdbwFTwA@mail.gmail.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Thu, 18 Dec 2014 22:23:30 +0100
+Subject: AT91 slow clock mode regression/fixes, improvement proposal
+In-Reply-To: <20141218203904.GA25215@gradator.net>
+References: <20141218203904.GA25215@gradator.net>
+Message-ID: <20141218212330.GA19367@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 5, 2014 at 1:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 05 December 2014 13:00:22 Nicolas Pitre wrote:
->>
->> BTW this is worth applying despite the on-going discussion with Arnd
->> on a separate optimization.
->
-> Agreed
->
->> On Wed, 3 Dec 2014, Nicolas Pitre wrote:
->>
->> > At least on ARM, do_div() is optimized to turn constant divisors into
->> > an inline multiplication by the reciprocal value at compile time.
->> > However this optimization is missed entirely whenever ktime_divns() is
->> > used and the slow out-of-line division code is used all the time.
->> >
->> > Let ktime_divns() use do_div() inline whenever the divisor is constant
->> > and small enough.  This will make things like ktime_to_us() and
->> > ktime_to_ms() much faster.
->> >
->> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Hello,
 
+On Thu, Dec 18, 2014 at 09:39:04PM +0100, Sylvain Rochet wrote:
+> 
+> About e0c8ba9b0ec3154e87da747098ee56e96ca3cee6:
+> 
+> I have mixed feeling about moving the PLL enabling from slow clock mode 
+> to master clock mode. Starting PLL is almost all about waiting, waiting, 
+> and waiting until they are stable enough to be used, the few CPU 
+> instructions required to switch ON the PLL is nothing compared to the 
+> wait time.
+> 
+> To be sure I benchmarked the required time to set up the UTMI PLL (using 
+> a GPIO + scope) on my AT91SAM9G35-CM module in both slow clock and 
+> master clock mode, I found out the required time to start up the PLL is, 
+> as expected, -exactly- the same.
+> 
+> But, previously, we were waiting with the CPU in slow clock mode, when 
+> the CPU power consumption is very very low, now we are waiting when the 
+> CPU is in full speed, which is worse.
+> 
+> Or, I am missing something ?
 
-Ok, I've queued the original patch up for testing.
+Responding myself on this point, just did further mesurements, and... 
+well, this can be discarded. I didn't notice at first that PLL startup 
+time are only about to take ~500 us, which is a negligible amount of 
+time and is actually a bit faster (just a bit) on master clock. I 
+really should have checked the timing as well with PLL start up 
+disabled, sorry :)
 
-thanks
--john
+Sylvain
