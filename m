@@ -1,39 +1,42 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 Dec 2014 15:00:55 +0800
-Subject: [PATCH v2 08/11] ARM: dts: sun9i: Add pinmux setting for mmc0
+Date: Thu, 18 Dec 2014 15:00:52 +0800
+Subject: [PATCH v2 05/11] ARM: dts: sun9i: Add mmc config clock nodes
 In-Reply-To: <1418886058-8145-1-git-send-email-wens@csie.org>
 References: <1418886058-8145-1-git-send-email-wens@csie.org>
-Message-ID: <1418886058-8145-9-git-send-email-wens@csie.org>
+Message-ID: <1418886058-8145-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc0 is only available on port F, and is always used with a 4 bit wide
-bus for the onboard micro-sd slot.
+Add the device tree nodes for the mmc config clock nodes.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 87198b1..b42e2e7 100644
+index eb3f91b..cd09de2 100644
 --- a/arch/arm/boot/dts/sun9i-a80.dtsi
 +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -466,6 +466,14 @@
- 				allwinner,pull = <0>;
- 			};
+@@ -329,6 +329,19 @@
+ 		 */
+ 		ranges = <0 0 0 0x20000000>;
  
-+			mmc0_pins: mmc0 {
-+				allwinner,pins = "PF0", "PF1" ,"PF2", "PF3",
-+						 "PF4", "PF5";
-+				allwinner,function = "mmc0";
-+				allwinner,drive = <2>;
-+				allwinner,pull = <0>;
-+			};
++		mmc_config_clk: clk at 01c13000 {
++			compatible = "allwinner,sun9i-a80-mmc-config-clk";
++			reg = <0x01c13000 0x10>;
++			clocks = <&ahb0_gates 8>;
++			clock-names = "ahb";
++			resets = <&ahb0_resets 8>;
++			reset-names = "ahb";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			clock-output-names = "mmc0_config", "mmc1_config",
++					     "mmc2_config", "mmc3_config";
++		};
 +
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PH12", "PH13";
- 				allwinner,function = "uart0";
+ 		gic: interrupt-controller at 01c41000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c41000 0x1000>,
 -- 
 2.1.3
