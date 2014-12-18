@@ -1,114 +1,175 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 18 Dec 2014 01:58:55 +0100
-Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
- pm_genpd_dev_need_restore to use restore types
-In-Reply-To: <7h4msub0ca.fsf@deeprootsystems.com>
-References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
- <CADGdYn4WQ6i29ecTthu7eNUfSSQ--YESGyHcA1_9CdK-h53hxA@mail.gmail.com>
- <7h4msub0ca.fsf@deeprootsystems.com>
-Message-ID: <5418986.E58ik2Q1Hm@vostro.rjw.lan>
+Date: Thu, 18 Dec 2014 02:32:30 +0100
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <2249350.4v5So9DQ9Z@avalon>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <CAAFQd5BO0cU-cbGMGg5aJ79Th-8a-QC0Qces9cuuGPvwUc5yhw@mail.gmail.com>
+ <2249350.4v5So9DQ9Z@avalon>
+Message-ID: <1727491.gphUuq12bL@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 17, 2014 10:25:09 AM Kevin Hilman wrote:
-> amit daniel kachhap <amit.daniel@samsung.com> writes:
+On Wednesday, December 17, 2014 02:15:31 AM Laurent Pinchart wrote:
+> Hi Tomasz,
 > 
-> > On Wed, Dec 17, 2014 at 3:40 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> >> Marek Szyprowski <m.szyprowski@samsung.com> writes:
-> >>
-> >>> Hello,
-> >>>
-> >>> On 2014-12-13 17:51, Amit Daniel Kachhap wrote:
-> >>>> Instead of using bool to restore suspended devices initially, use flags
-> >>>> like GPD_DEV_SUSPEND_INIT, GPD_DEV_RESTORE_INIT and GPD_DEV_RESTORE_FORCE.
-> >>>> The first two flags will be similar to the existing true/false functionality.
-> >>>> The third flag may be used to force restore of suspended devices
-> >>>> whenever their associated power domain is turned on.
-> >>>>
-> >>>> Currently, PD power off function powers off all the associated unused
-> >>>> devices. The functionality added in this patch is similar to it.
-> >>>>
-> >>>> This feature may be used for those devices which are always in ON state
-> >>>> if the PD associated with them is ON but may need local runtime resume
-> >>>> and suspend during PD On/Off. These devices (like clock) may not implement
-> >>>> complete pm_runtime calls such as pm_runtime_get/pm_runtime_put due to
-> >>>> subsystems interaction behaviour or any other reason.
-> >>>>
-> >>>> The model works like,
-> >>>>      DEV1 (Attaches itself with PD but no calls to pm_runtime_get and
-> >>>>      /       pm_runtime_put. Its local runtime_suspend/resume is invoked via
-> >>>>     /        GPD_DEV_RESTORE_FORCE option)
-> >>>>    /
-> >>>> PD -- DEV2 (Implements complete PM runtime and calls pm_runtime_get and
-> >>>>    \ pm_runtime_put. This in turn invokes PD On/Off)
-> >>>>     \
-> >>>>      DEV3 (Similar to DEV1)
-> >>>>
-> >>>> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> >>>
-> >>> The idea of adding new gen_pd flag and reusing runtime pm calls intead
-> >>> of additional notifiers looks promising, but I have some doubts.
-> >>
-> >> I agree, this is better than notifiers, but I have some doubts too.
-> >
-> > Thanks,
-> >
-> >>
-> >>> don't see any guarantee that devices with GPD_DEV_RESTORE_FORCE flag
-> >>> will be suspended after all "normal" devices and restored before
-> >>> them. Without such assumption it will be hard to use this approach for
-> >>> iommu related activities, because device might need to use (in its
-> >>> suspend/resume callbacks) the functionality provided by the other
-> >>> device with GPD_DEV_RESTORE_FORCE flag. Maybe some additional flags
-> >>> like suspend/resume priority (or more flags) will solve somehow this
-> >>> dependency.
-> >>
-> >> At a deeper level, the problem with this approach is that this is more
-> >> generically a runtime PM dependency problem, not a genpd problem.  For
-> >> example, what happens when the same kind of dependency exists on a
-> >> platform using a custom PM domain instead of genpd (like ACPI.) ?
-> >
-> > This patch does not try to solve runtime PM dependencies between
-> > devices. As an example, if there are three devices D1, D2, D3 in a
-> > power domain. Device D3 would update the power domain state
-> > requirement using runtime PM API but devices D1 and D2 do not want to
-> > control the domain but just want to be notified when the power domain
-> > state changes.
+> On Tuesday 16 December 2014 11:18:33 Tomasz Figa wrote:
+> > On Tue, Dec 16, 2014 at 4:53 AM, Laurent Pinchart wrote:
+> > > On Monday 15 December 2014 11:39:01 Tomasz Figa wrote:
+> > >> On Sat, Dec 13, 2014 at 5:47 AM, Laurent Pinchart wrote:
+> > >>> On Friday 12 December 2014 13:15:51 Tomasz Figa wrote:
+> > >>>> On Fri, Dec 12, 2014 at 5:48 AM, Rafael J. Wysocki wrote:
+> > >>>>> On Thursday, December 11, 2014 04:51:37 PM Ulf Hansson wrote:
+> > >>>>>> On 11 December 2014 at 16:31, Kevin Hilman wrote:
+> > >>>>>>> [+ Laurent Pinchart]
+> > >>>>>>> 
+> > >>>>>>> Tomasz Figa <tfiga@chromium.org> writes:
+> > >>>>>>>> On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson wrote:
+> > >>>>>>> [...]
+> > >>>>>>> 
+> > >>>>>>>>>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct
+> > >>>>>>>>>> platform_device *pdev)
+> > >>>>>>>>>>                 return -ENXIO;
+> > >>>>>>>>>>         }
+> > >>>>>>>>>> 
+> > >>>>>>>>>> +       pm_runtime_no_callbacks(dev);
+> > >>>>>>>>>> +       pm_runtime_enable(dev);
+> > >>>>>>>>>> +
+> > >>>>>>>>>> +       /* Synchronize state of the domain with driver data. */
+> > >>>>>>>>>> +       pm_runtime_get_sync(dev);
+> > >>>>>>>>>> +       iommu->is_powered = true;
+> > >>>>>>>>> 
+> > >>>>>>>>> Doesn't the runtime PM status reflect the value of "is_powered",
+> > >>>>>>>>> thus why do you need to have a copy of it? Could it perpahps be
+> > >>>>>>>>> that you try to cope with the case when CONFIG_PM is unset?
+> > >>>>>>>> 
+> > >>>>>>>> It's worth noting that this driver fully relies on status of other
+> > >>>>>>>> devices in the power domain the IOMMU is in and does not enforce
+> > >>>>>>>> the status on its own. So in general, as far as my understanding
+> > >>>>>>>> of PM runtime subsystem, the status of the IOMMU device will be
+> > >>>>>>>> always suspended, because nobody will call pm_runtime_get() on it
+> > >>>>>>>> (except the get and put pair in probe). So is_powered is here to
+> > >>>>>>>> track status of the domain, not the device. Feel free to suggest a
+> > >>>>>>>> better way, though.
+> > >>>>>>> 
+> > >>>>>>> I still don't like these notifiers.  I think they add ways to
+> > >>>>>>> bypass having proper runtime PM implemented for devices/subsystems.
+> > >>>>>> 
+> > >>>>>> I do agree, but I haven't found another good solution to the
+> > >>>>>> problem.
+> > >>>>> 
+> > >>>>> For the record, I'm not liking this mostly because it "fixes" a
+> > >>>>> generic problem in a way that's hidden in the genpd code and very
+> > >>>>> indirect.
+> > >>>> 
+> > >>>> Well, that's true. This is indeed a generic problem of PM dependencies
+> > >>>> between devices (other than those represented by parent-child
+> > >>>> relation), which in fact doesn't have much to do with genpd, but
+> > >>>> rather with those devices directly. It is just that genpd is the most
+> > >>>> convenient location to solve this in current code and in a simple way.
+> > >>>> In other words, I see this solution as a reasonable way to get the
+> > >>>> problem solved quickly for now, so that we can start thinking about a
+> > >>>> more elegant solution.
+> > >>>> 
+> > >>>>>>> From a high-level, the IOMMU is just another device inside the PM
+> > >>>>>>> domain, so ideally it should be doing it's own _get() and _put()
+> > >>>>>>> calls so the PM domain code would just do the right thing without
+> > >>>>>>> the need for notifiers.
+> > >>>>>> 
+> > >>>>>> As I understand it, the IOMMU (or for other similar cases)
+> > >>>>>> shouldn't be doing any get() and put() at all because there are no
+> > >>>>>> IO API to serve request from.
+> > >>> 
+> > >>> Speaking purely from an IOMMU point of view that's not entirely tree.
+> > >>> IOMMU drivers expose map and unmap operations, so they can track
+> > >>> whether any memory is mapped. From a bus master point of view the IOMMU
+> > >>> map and unmap operations are hidden by the DMA mapping API. The IOMMU
+> > >>> can thus track the existence of mappings without any IOMMU awareness in
+> > >>> the bus master driver.
+> > >>> 
+> > >>> If no mapping exist the IOMMU shouldn't receive any translation
+> > >>> request. An IOMMU driver could thus call pm_runtime_get_sync() in the
+> > >>> map handler when creating the first mapping, and pm_runtime_put() in
+> > >>> the unmap handler when tearing the last mapping down.
+> > >>> 
+> > >>> One could argue that the IOMMU would end up being powered more often
+> > >>> than strictly needed, as bus masters drivers, even when written
+> > >>> properly, could keep mappings around at times they don't perform bus
+> > >>> access. This is true, and that's an argument I've raised during the
+> > >>> last kernel summit. The general response (including Linus Torvald's)
+> > >>> was that micro-optimizing power management might not be worth it, and
+> > >>> that measurements proving that the gain is worth it are required before
+> > >>> introducing new APIs to solve the problem. I can't disagree with that
+> > >>> argument.
+> > >> 
+> > >> This would be a micro optimization if the IOMMU was located in its own
+> > >> power domain. Unfortunately in most cases it is not, so keeping all
+> > >> the devices in the domain powered on, because one of them have a
+> > >> mapping created doesn't sound like a good idea.
+> > >> 
+> > >> Moreover, most of the drivers will keep the mapping for much longer
+> > >> than one run cycle. Please take a look at V4L2's videobuf2 subsystem
+> > >> (which I guess you are more familiar with than me;)), which will keep
+> > >> MMAP buffers mapped in IOMMU address space for their whole lifetime. I
+> > >> believe similar is the case for DRM drivers.
+> > > 
+> > > Yes, but that doesn't mean it gets out of control. Buffers shouldn't be
+> > > allocated if they won't be used. Granted, they could be preallocated (or
+> > > rather premapped) slightly before being used, but in sane use cases that
+> > > shouldn't be long before the hardware needs to be turned on.
+> > 
+> > Assuming that we don't have a third party, called "user", involved.
 > 
-> Yes, I understand that.  
+> Who needs that ? :-D
 > 
-> The question is: what do you do when you have the same dependency
-> problem and you're not using genpd (for example, some SoCs have
-> implmeented their own PM domains, and ACPI devices are managed by their
-> own PM domain, not genpd.)
+> > A simple use case is video playback pause. Usually all the software state
+> > (including output buffers that can be used as reference for decoding next
+> > frames) needs to be preserved to continue decoding after resume, but it
+> > would be nice to power off the decoder, if it is unused for some period. In
+> > addition, we would like the pause/resume operation to be fast, so
+> > unmapping/freeing buffers and then exactly the opposite on resume doesn't
+> > sound like a good idea.
 > 
-> >> What's needed to solve this problem is a generalized way to have runtime
-> >> PM dependencies between devices.  Runtime PM already automatically
-> >> handles parent devices as one type of dependent device (e.g. a parent
-> >> device needs to be runtime PM resumed before its child.)  So what's
-> >> needed is a generic way to other PM dependencies with the runtime PM
-> >> core (not the genpd core.)
-> >
-> > Considering the example above with three devices, device D1 and D2 are
-> > passive components in this power domain. These devices only need to
-> > know the state changes of the power domains but would not control the
-> > power domain themselves nor put forth constraints in the power domain
-> > state changes. So I did not clearly understand as to how this example
-> > could be solved by introducing changes in runtime PM core.
-> 
-> Your solution only solves the problems for devices managed by genpd.
-> 
-> If I understood your example correctly, what you really want to solve
-> this problem more generically is to be able to tell the runtime PM core
-> that D3 has a dependency on D1 and D2.  Then, whenver the runtime PM
-> core is doing get/put operations for D3, it needs to also do them for D1
-> and D2.
-> 
-> This will accomplish the same as your proposed approach, but work for
-> any devices in any PM domains.
+> OK, then we have one possible use case. I expect people to still want to see 
+> power consumption numbers though.
 
-Plus, it is not limited to runtime PM, really.  It affects system suspend
-too.
+Well, we have them, kind of.
+
+In the ACPI world there's something called _DEP which gives us a list of devices
+depended on by the given one.  Those may be devices whose drivers provide so
+called "operation region" handling which means that an ACPI method executed for
+the dependent device may access a device it depends on indirectly.  Because of
+that indirection we basically need the devices listed by _DEP to be "on" whenever
+the dependent device is "on" or things may break in nasty ways otherwise.
+
+Now, on (some) Intel SoCs some devices listed by _DEP cannot be "on" all the
+time, because the lowest-power states of the whole SoC cannot be used then,
+which makes hours of battery life of a difference.
+
+This isn't exactly the same problem, but it maps to the IOMMU one quite well IMO.
+
+> You can call me annoying, but I'm not sure whether a generic PM dependency 
+> implementation, while it could be a good idea in general, is the best solution 
+> here, especially if the bus master and the IOMMU are in a different power 
+> domain. The bus master could provide functions that don't require DMA access. 
+> For instance a camera controller could feed its output to the display 
+> directly, without going through memory. In that case we probably don't want to 
+> power the IOMMU and its complete power domain on when using the camera 
+> controller in that mode.
+
+That's a fair point, but it really boils down to energy usage numbers again.
+
+> One alternative solution would be to extend the DMA mapping API with two 
+> functions to signal that DMA is about to be started and that DMA has now 
+> finished. It might be considered too ad-hoc though.
+
+It would be better to be able to reference count the DMA engine from the
+bus master IMO and arguably you can use the runtime PM framework for that.
+Namely, give bus masters someting like
+
+	pm_runtime_get_my_DMA_engine(bus_master_device)
+	pm_runtime_put_my_DMA_engine(bus_master_device)
+
+and let them call these as they see fit.
 
 
 -- 
