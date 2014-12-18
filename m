@@ -1,39 +1,31 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 18 Dec 2014 17:44:49 -0300
-Subject: GPMC clock question
-Message-ID: <54933CC1.9010301@vanguardiasur.com.ar>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 18 Dec 2014 14:59:51 -0600
+Subject: [PATCH 0/4] pinctrl: qcom: Add multiple copy support
+Message-ID: <1418936395-14623-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony, Roger:
+These patches add multiple copy support for functions which require additional
+mux configurations on specific Qualcomm processor pincontrol blocks.  Functions
+which may have multiple copies are slimbus, mi2s, pdm, pcie, and GSBI.
 
-As far as I can see, the GPMC interface clock (GPMC_FCLK) is not
-properly modeled in the devicetree. Instead, hwmod magic seems to be used.
+Andy Gross (4):
+  pinctrl: qcom: Add multiple copy base support
+  pinctrl: qcom: ipq8064: Add multi copy support
+  pinctrl: qcom: apq8064: Add multi copy support
+  pinctrl: qcom: msm8960: Add multi copy support
 
-arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c:
-struct omap_hwmod_ocp_if am33xx_l3_s__gpmc = {
-        .master         = &am33xx_l3_s_hwmod,
-        .slave          = &am33xx_gpmc_hwmod,
-        .clk            = "l3s_gclk",
-        .addr           = am33xx_gpmc_addr_space,
-        .user           = OCP_USER_MPU,
-};
+ .../bindings/pinctrl/qcom,apq8064-pinctrl.txt      |    3 +-
+ .../bindings/pinctrl/qcom,ipq8064-pinctrl.txt      |   16 +-
+ .../bindings/pinctrl/qcom,msm8960-pinctrl.txt      |   19 +-
+ drivers/pinctrl/qcom/pinctrl-apq8064.c             |   29 ++-
+ drivers/pinctrl/qcom/pinctrl-ipq8064.c             |  244 ++++++++++++++------
+ drivers/pinctrl/qcom/pinctrl-msm.c                 |   10 +
+ drivers/pinctrl/qcom/pinctrl-msm.h                 |    4 +
+ drivers/pinctrl/qcom/pinctrl-msm8960.c             |   32 ++-
+ 8 files changed, 257 insertions(+), 100 deletions(-)
 
-I'd like to know what would be the appropriate DT model for this clock.
-Perhaps, as child of CORE_M4_CLK, divided by 2:
-
-gpmc_fclk: gpmc_fclk {
-                #clock-cells = <0>;
-                compatible = "fixed-factor-clock";
-                clocks = <&dpll_core_m4_ck>;
-                clock-mult = <1>;
-                clock-div = <2>;
-        };
-
-How does it look? Also, I'm wondering if this works OK when used with
-the hwmod stuff.
-
-Thanks a lot in advance!
 -- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+Qualcomm Innovation Center, Inc
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
