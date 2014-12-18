@@ -1,69 +1,126 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 18 Dec 2014 21:36:31 +0100
-Subject: [PATCH 11/12] ARM: dts: add support for Vybrid running on
- Cortex-M4
-In-Reply-To: <2615697.uVqMY8zKot@wuerfel>
-References: <1417565531-4507-1-git-send-email-stefan@agner.ch>
- <2994970.DCfUQgtmcD@wuerfel> <6ae4dd827bf4dcc202f60e8505173d0e@agner.ch>
- <2615697.uVqMY8zKot@wuerfel>
-Message-ID: <44e9d518da24fb0c910de464269b8551@agner.ch>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Thu, 18 Dec 2014 21:39:04 +0100
+Subject: AT91 slow clock mode regression/fixes, improvement proposal
+Message-ID: <20141218203904.GA25215@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-17 13:31, Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 00:41:33 Stefan Agner wrote:
->> On 2014-12-03 12:03, Arnd Bergmann wrote:
->> > On Wednesday 03 December 2014 01:12:10 Stefan Agner wrote:
->> >> diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
->> >> new file mode 100644
->> >> index 0000000..051ee0f
->> >> --- /dev/null
->> >> +++ b/arch/arm/boot/dts/vf610m4-colibri.dts
->> >> @@ -0,0 +1,52 @@
->> >> +/*
->> >> + * Device tree for Colibri VF61 Cortex-M4 support
->> >> + *
->> >> + * Copyright 2014 Stefan Agner
->> >> + *
->> >> + * This program is free software; you can redistribute it and/or modify
->> >> + * it under the terms of the GNU General Public License as published by
->> >> + * the Free Software Foundation; either version 2 of the License, or
->> >> + * (at your option) any later version.
->> >> + */
->> >> +
->> >> +/dts-v1/;
->> >> +#include "vf610m4.dtsi"
->> >> +
->> >> +/ {
->> >> +       model = "VF610 Cortex-M4";
->> >> +       compatible = "fsl,vf610m4";
->> >> +
->> >> +       chosen {
->> >> +               bootargs = "console=ttyLP2,115200 ihash_entries=64 dhash_entries=64 earlyprintk clk_ignore_unused init=/linuxrc rw";
->> >> +       };
->> >> +
->> >
->> > Starting with v3.19, you should be able to use the earlycon framework on
->> > arm32, so it would be better to replace earlyprintk with earlycon here
->> > and add a stdout-path property in chosen that points to the console
->> > uart.
->>
->> I started to implement earlycon support, but something currently fails
->> when earlycon tries to map the UART registers:
->> [    0.000000] earlycon_map: Couldn't map 0x40027000
->>
->> I traced the issue a bit further down and found that get_vm_area_caller
->> returns NULL (in __arm_ioremap_pfn_caller). This happend on Linus master
->> as of today (2dbfca5a181973558277b28b1f4c36362291f5e0). Do I miss
->> something here?
-> 
-> Hmm, I fear the arm32 FIX_EARLYCON_MEM support ended up not making it
-> into 3.19 after all. :(
+Hello Wenyou,
 
-Is it because early_ioremap and fixmap still missing for arm32?
-According to Rob's patchset from spring fixmap is required, there is
-something in this tree:
-https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=arm-fixmap
+You worked recently on AT91 slow clock mode in the linux4sam/linux-at91 
+master branch, however I am seeing regressions on a AT91SAM9G35-EK board 
+concerning the following commit-id:
 
---
-Stefan
+e0c8ba9b0ec3154e87da747098ee56e96ca3cee6
+  pm: at91: pm_slowclock: move disable/enable PLLB out of the route
+
+cc4dc9885103af3b3262f7ac2b6aa887df1618b3
+  pm: at91: pm_slowclock: improvement to disable the UTMI PLL
+
+
+
+About cc4dc9885103af3b3262f7ac2b6aa887df1618b3:
+
+The assembly look wrong for me, it seems you can't have two following 
+labels with the same identifier, so:
+
+/* Turn on UTMI PLL */
+cmp flag, #1
+bne 1f
+  (...)
+1:
+(...)
+1:
+wait_pllblock
+
+Is actually jumping to wait_pllblock before enabling PLLB instead of 
+skipping UTMI PLL. Unfortunately the compiler does not warn about that.
+
+
+
+About e0c8ba9b0ec3154e87da747098ee56e96ca3cee6:
+
+I have mixed feeling about moving the PLL enabling from slow clock mode 
+to master clock mode. Starting PLL is almost all about waiting, waiting, 
+and waiting until they are stable enough to be used, the few CPU 
+instructions required to switch ON the PLL is nothing compared to the 
+wait time.
+
+To be sure I benchmarked the required time to set up the UTMI PLL (using 
+a GPIO + scope) on my AT91SAM9G35-CM module in both slow clock and 
+master clock mode, I found out the required time to start up the PLL is, 
+as expected, -exactly- the same.
+
+But, previously, we were waiting with the CPU in slow clock mode, when 
+the CPU power consumption is very very low, now we are waiting when the 
+CPU is in full speed, which is worse.
+
+Or, I am missing something ?
+
+
+Anyway, if we wait for the PLL in master clock mode we *MUST* increase 
+the PLL timeout a lot, with the current code I guess we are leaving the 
+resume code when the PLL are not yet ready at all since we are only 
+waiting out of a 1000 iteration loop on master clock.
+
+(Note that I didn't get fooled by that and I disabled the timeout when I 
+checked the UPLL start time.)
+
+
+
+Furthermore, it looks like MCKRDY_TIMEOUT set to 1000 is not enough, my board 
+crashes in about 1 wake up to 10 with this value and works perfectly 
+fine with 4000.
+
+
+I have attached a patch that do the following:
+
+ * Increase MCKRDY_TIMEOUT from 1000 to 4000 so my board don't crash.
+ * Fix the assembly on the "Turn on UTMI PLL" part
+ * Increase timeouts for PLLB and UPLL
+
+
+However I still disagree with this patch (this is why I didn't do a pull 
+request ;-), I am proposing doing a patch set that:
+
+ * Increase MCKRDY_TIMEOUT from 1000 to 4000 so my board don't crash, I 
+   would be happy to have a feed back on this with your boards ;-)
+ * Fix the assembly on the "Turn on UTMI PLL" part
+ * Move back PLLB and UPLL to slow clock mode to save power
+
+What do you think ?
+
+
+I have also mixed feeling about those timeouts, is it really useful in 
+the wild ?  We don't event catch the timeout event to do something else 
+if it happens, we still switch to the master clock whatever happened or 
+even worse we continue even if AT91_PMC_MCKRDY isn't set? which is why I 
+am having hard fault. In my opinion this is the watchdog job to handle 
+those cases cleanly, there is nothing much we can do if something fail 
+other than waiting a watchdog reset.
+
+(Yeah, I know the watchdog is hard to use with sleep mode on AT91 chip, 
+I have a work in progress about using the RTC to wake up before the 
+watchdog expire to clear the watchdog and go back to sleep as fast as 
+possible without resuming all the devices. It works, but I am still not 
+happy at all with what I did for now.)
+
+Therefore I am also proposing to remove all the timeout.
+
+
+By the way, I don't know for other AT91 boards (or without DT, or 
+something else), but the UTMI PLL suspend/resume seem unnecessary for 
+me, the USB driver is already disabling the USB PLL when suspending, 
+could you confirm ?
+
+
+
+Regards,
+Sylvain
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-AT91-PM-slow-clock-mode-fixes.patch
+Type: text/x-diff
+Size: 1769 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141218/2a3e922f/attachment-0001.bin>
