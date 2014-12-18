@@ -1,121 +1,191 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 18 Dec 2014 20:03:58 +0100
-Subject: [PATCH] ARM: SAMSUNG: remove dead #elif CONFIG_S3C24XX_DMAC
-In-Reply-To: <CABv5NL_SLyY9-yookdTVdNXzCmUEqJ_QB6ofzw_q0H7Vcwbzfg@mail.gmail.com>
-References: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
- <2864831.LEPnyFh3Il@phil>
- <CABv5NL_SLyY9-yookdTVdNXzCmUEqJ_QB6ofzw_q0H7Vcwbzfg@mail.gmail.com>
-Message-ID: <1645416.VNQj8YWB7M@phil>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Dec 2014 21:12:34 +0200
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <1727491.gphUuq12bL@vostro.rjw.lan>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <2249350.4v5So9DQ9Z@avalon> <1727491.gphUuq12bL@vostro.rjw.lan>
+Message-ID: <1462052.lBvkDoBROR@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Rafael,
 
-Am Donnerstag, 18. Dezember 2014, 14:43:01 schrieb Stefan Hengelein:
-> So you actually tested the code I removed in the patch? can you
-> provide a configuration that compiles that piece of code?
+On Thursday 18 December 2014 02:32:30 Rafael J. Wysocki wrote:
+> On Wednesday, December 17, 2014 02:15:31 AM Laurent Pinchart wrote:
+> > On Tuesday 16 December 2014 11:18:33 Tomasz Figa wrote:
+> >> On Tue, Dec 16, 2014 at 4:53 AM, Laurent Pinchart wrote:
+> >>> On Monday 15 December 2014 11:39:01 Tomasz Figa wrote:
+> >>>> On Sat, Dec 13, 2014 at 5:47 AM, Laurent Pinchart wrote:
+> >>>>> On Friday 12 December 2014 13:15:51 Tomasz Figa wrote:
+> >>>>>> On Fri, Dec 12, 2014 at 5:48 AM, Rafael J. Wysocki wrote:
+> >>>>>>> On Thursday, December 11, 2014 04:51:37 PM Ulf Hansson wrote:
+> >>>>>>>> On 11 December 2014 at 16:31, Kevin Hilman wrote:
+> >>>>>>>>> Tomasz Figa <tfiga@chromium.org> writes:
+> >>>>>>>>>> On Thu, Dec 11, 2014 at 8:58 PM, Ulf Hansson wrote:
+> >>>>>>>>> [...]
+> >>>>>>>>> 
+> >>>>>>>>>>>> @@ -988,11 +1107,28 @@ static int rk_iommu_probe(struct
+> >>>>>>>>>>>> platform_device *pdev)
+> >>>>>>>>>>>>                 return -ENXIO;
+> >>>>>>>>>>>>         }
+> >>>>>>>>>>>> 
+> >>>>>>>>>>>> +       pm_runtime_no_callbacks(dev);
+> >>>>>>>>>>>> +       pm_runtime_enable(dev);
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +       /* Synchronize state of the domain with driver data.
+> >>>>>>>>>>>> */
+> >>>>>>>>>>>> +       pm_runtime_get_sync(dev);
+> >>>>>>>>>>>> +       iommu->is_powered = true;
+> >>>>>>>>>>> 
+> >>>>>>>>>>> Doesn't the runtime PM status reflect the value of
+> >>>>>>>>>>> "is_powered", thus why do you need to have a copy of it? Could
+> >>>>>>>>>>> it perpahps be that you try to cope with the case when
+> >>>>>>>>>>> CONFIG_PM is unset?
+> >>>>>>>>>> 
+> >>>>>>>>>> It's worth noting that this driver fully relies on status of
+> >>>>>>>>>> other devices in the power domain the IOMMU is in and does not
+> >>>>>>>>>> enforce the status on its own. So in general, as far as my
+> >>>>>>>>>> understanding of PM runtime subsystem, the status of the IOMMU
+> >>>>>>>>>> device will be always suspended, because nobody will call
+> >>>>>>>>>> pm_runtime_get() on it (except the get and put pair in probe).
+> >>>>>>>>>> So is_powered is here to track status of the domain, not the
+> >>>>>>>>>> device. Feel free to suggest a better way, though.
+> >>>>>>>>> 
+> >>>>>>>>> I still don't like these notifiers.  I think they add ways to
+> >>>>>>>>> bypass having proper runtime PM implemented for
+> >>>>>>>>> devices/subsystems.
+> >>>>>>>> 
+> >>>>>>>> I do agree, but I haven't found another good solution to the
+> >>>>>>>> problem.
+> >>>>>>> 
+> >>>>>>> For the record, I'm not liking this mostly because it "fixes" a
+> >>>>>>> generic problem in a way that's hidden in the genpd code and very
+> >>>>>>> indirect.
+> >>>>>> 
+> >>>>>> Well, that's true. This is indeed a generic problem of PM
+> >>>>>> dependencies between devices (other than those represented by
+> >>>>>> parent-child relation), which in fact doesn't have much to do with
+> >>>>>> genpd, but rather with those devices directly. It is just that
+> >>>>>> genpd is the most convenient location to solve this in current code
+> >>>>>> and in a simple way. In other words, I see this solution as a
+> >>>>>> reasonable way to get the problem solved quickly for now, so that
+> >>>>>> we can start thinking about a more elegant solution.
+> >>>>>> 
+> >>>>>>>>> From a high-level, the IOMMU is just another device inside the
+> >>>>>>>>> PM domain, so ideally it should be doing it's own _get() and
+> >>>>>>>>> _put() calls so the PM domain code would just do the right thing
+> >>>>>>>>> without the need for notifiers.
+> >>>>>>>> 
+> >>>>>>>> As I understand it, the IOMMU (or for other similar cases)
+> >>>>>>>> shouldn't be doing any get() and put() at all because there are
+> >>>>>>>> no IO API to serve request from.
+> >>>>> 
+> >>>>> Speaking purely from an IOMMU point of view that's not entirely
+> >>>>> tree. IOMMU drivers expose map and unmap operations, so they can
+> >>>>> track whether any memory is mapped. From a bus master point of view
+> >>>>> the IOMMU map and unmap operations are hidden by the DMA mapping
+> >>>>> API. The IOMMU can thus track the existence of mappings without any
+> >>>>> IOMMU awareness in the bus master driver.
+> >>>>> 
+> >>>>> If no mapping exist the IOMMU shouldn't receive any translation
+> >>>>> request. An IOMMU driver could thus call pm_runtime_get_sync() in
+> >>>>> the map handler when creating the first mapping, and
+> >>>>> pm_runtime_put() in the unmap handler when tearing the last mapping
+> >>>>> down.
+> >>>>> 
+> >>>>> One could argue that the IOMMU would end up being powered more often
+> >>>>> than strictly needed, as bus masters drivers, even when written
+> >>>>> properly, could keep mappings around at times they don't perform bus
+> >>>>> access. This is true, and that's an argument I've raised during the
+> >>>>> last kernel summit. The general response (including Linus Torvald's)
+> >>>>> was that micro-optimizing power management might not be worth it,
+> >>>>> and that measurements proving that the gain is worth it are required
+> >>>>> before introducing new APIs to solve the problem. I can't disagree
+> >>>>> with that argument.
+> >>>> 
+> >>>> This would be a micro optimization if the IOMMU was located in its
+> >>>> own power domain. Unfortunately in most cases it is not, so keeping
+> >>>> all the devices in the domain powered on, because one of them have a
+> >>>> mapping created doesn't sound like a good idea.
+> >>>> 
+> >>>> Moreover, most of the drivers will keep the mapping for much longer
+> >>>> than one run cycle. Please take a look at V4L2's videobuf2 subsystem
+> >>>> (which I guess you are more familiar with than me;)), which will keep
+> >>>> MMAP buffers mapped in IOMMU address space for their whole lifetime.
+> >>>> I believe similar is the case for DRM drivers.
+> >>> 
+> >>> Yes, but that doesn't mean it gets out of control. Buffers shouldn't
+> >>> be allocated if they won't be used. Granted, they could be
+> >>> preallocated (or rather premapped) slightly before being used, but in
+> >>> sane use cases that shouldn't be long before the hardware needs to be
+> >>> turned on.
+> >> 
+> >> Assuming that we don't have a third party, called "user", involved.
+> > 
+> > Who needs that ? :-D
+> > 
+> >> A simple use case is video playback pause. Usually all the software
+> >> state (including output buffers that can be used as reference for
+> >> decoding next frames) needs to be preserved to continue decoding after
+> >> resume, but it would be nice to power off the decoder, if it is unused
+> >> for some period. In addition, we would like the pause/resume operation
+> >> to be fast, so unmapping/freeing buffers and then exactly the opposite
+> >> on resume doesn't sound like a good idea.
+> > 
+> > OK, then we have one possible use case. I expect people to still want to
+> > see power consumption numbers though.
+> 
+> Well, we have them, kind of.
+> 
+> In the ACPI world there's something called _DEP which gives us a list of
+> devices depended on by the given one.  Those may be devices whose drivers
+> provide so called "operation region" handling which means that an ACPI
+> method executed for the dependent device may access a device it depends on
+> indirectly.  Because of that indirection we basically need the devices
+> listed by _DEP to be "on" whenever the dependent device is "on" or things
+> may break in nasty ways otherwise.
+> 
+> Now, on (some) Intel SoCs some devices listed by _DEP cannot be "on" all the
+> time, because the lowest-power states of the whole SoC cannot be used then,
+> which makes hours of battery life of a difference.
+> 
+> This isn't exactly the same problem, but it maps to the IOMMU one quite well
+> IMO.
 
-Yep, one of my boards (Asus eeeReader DR-900) was actually able to transmit
-stuff via the libertas spi wifi driver using the s3c64xx-spi driver.
+Agreed, that's certainly a use case for a power dependency implementation.
 
-The smdk2416 is currently the only board for the s3c2416 in the kernel. I don't
-know if it had actual spi devices connected, but if it had, a suitable diff would
-look something like the diff below. Of course hooking up spi devices would
-work the same in any out-of-tree board for the supported socs.
+> > You can call me annoying, but I'm not sure whether a generic PM dependency
+> > implementation, while it could be a good idea in general, is the best
+> > solution here, especially if the bus master and the IOMMU are in a
+> > different power domain. The bus master could provide functions that don't
+> > require DMA access. For instance a camera controller could feed its
+> > output to the display directly, without going through memory. In that
+> > case we probably don't want to power the IOMMU and its complete power
+> > domain on when using the camera controller in that mode.
+> 
+> That's a fair point, but it really boils down to energy usage numbers again.
+>
+> > One alternative solution would be to extend the DMA mapping API with two
+> > functions to signal that DMA is about to be started and that DMA has now
+> > finished. It might be considered too ad-hoc though.
+> 
+> It would be better to be able to reference count the DMA engine from the
+> bus master IMO and arguably you can use the runtime PM framework for that.
+> Namely, give bus masters someting like
+> 
+> 	pm_runtime_get_my_DMA_engine(bus_master_device)
+> 	pm_runtime_put_my_DMA_engine(bus_master_device)
+> 
+> and let them call these as they see fit.
 
+Please note that we're not talking about DMA engines here, but about IOMMUs. 
+DMA is involved through the DMA mapping API which hides the IOMMU completely 
+from the bus master drivers, not the DMA engine API.
 
-For people reading along, the s3c24xx spi distribution is as follows:
-s3c2410, s3c2412, s3c2440: (I think) two s3c24xx-spi
-s3c2443: one s3c64xx-spi and one s3c24xx-spi
-s3c2416: one s3c64xx-spi
-s3c2450: two s3c64xx-spi
+Exposing the IOMMU is something we want to avoid, but DMA mapping start/stop 
+operations could certainly be implemented.
 
+-- 
+Regards,
 
-Heiko
-
-
------------- 8< ------------
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 9eb2229..5210e5d 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -419,6 +419,8 @@ config MACH_SMDK2416
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_NAND
- 	select S3C_DEV_USB_HOST
-+	select S3C64XX_DEV_SPI0
-+	select S3C2443_SETUP_SPI
- 	help
- 	  Say Y here if you are using an SMDK2416
- 
-diff --git a/arch/arm/mach-s3c24xx/mach-smdk2416.c b/arch/arm/mach-s3c24xx/mach-smdk2416.c
-index 86394f7..b6c6ff4 100644
---- a/arch/arm/mach-s3c24xx/mach-smdk2416.c
-+++ b/arch/arm/mach-s3c24xx/mach-smdk2416.c
-@@ -52,6 +52,9 @@
- #include <linux/platform_data/s3c-hsudc.h>
- #include <plat/samsung-time.h>
- 
-+#include <linux/spi/spi.h>
-+#include <linux/platform_data/spi-s3c64xx.h>
-+
- #include <plat/fb.h>
- 
- #include "common.h"
-@@ -207,6 +210,26 @@ static struct s3c_sdhci_platdata smdk2416_hsmmc1_pdata __initdata = {
- 	.cd_type		= S3C_SDHCI_CD_NONE,
- };
- 
-+struct s3c64xx_spi_csinfo libertas_cs_info = {
-+	.fb_delay = 0,
-+	.line = 128, /* gpio cs line */
-+};
-+
-+
-+static struct spi_board_info spi_board_info[] = {
-+    {
-+	.modalias		= "libertas_spi",
-+	.max_speed_hz		= 1200000,
-+	.bus_num		= 0,
-+	.irq			= 12, /* some interrupt number */
-+	.chip_select		= 0,
-+	.mode			= SPI_MODE_3,
-+	.controller_data	= &libertas_cs_info,
-+/*	.platform_data		= &foo1_pdata, */
-+    },
-+};
-+
-+
- static struct platform_device *smdk2416_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s3c_device_wdt,
-@@ -216,6 +239,7 @@ static struct platform_device *smdk2416_devices[] __initdata = {
- 	&s3c_device_hsmmc1,
- 	&s3c_device_usb_hsudc,
- 	&s3c2443_device_dma,
-+	&s3c64xx_device_spi0,
- };
- 
- static void __init smdk2416_init_time(void)
-@@ -250,6 +274,9 @@ static void __init smdk2416_machine_init(void)
- 	gpio_request(S3C2410_GPB(1), "Display Reset");
- 	gpio_direction_output(S3C2410_GPB(1), 1);
- 
-+	s3c64xx_spi0_set_platdata(NULL, 0, ARRAY_SIZE(spi_board_info));
-+	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
-+
- 	platform_add_devices(smdk2416_devices, ARRAY_SIZE(smdk2416_devices));
- 	smdk_machine_init();
- }
-diff --git a/arch/arm/mach-s3c24xx/setup-spi.c b/arch/arm/mach-s3c24xx/setup-spi.c
-index 3d47e02..d66c4e0 100644
---- a/arch/arm/mach-s3c24xx/setup-spi.c
-+++ b/arch/arm/mach-s3c24xx/setup-spi.c
-@@ -16,6 +16,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/regs-gpio.h>
-+#include <mach/gpio-samsung.h>
- 
- #ifdef CONFIG_S3C64XX_DEV_SPI0
- int s3c64xx_spi0_cfg_gpio(void)
+Laurent Pinchart
