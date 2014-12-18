@@ -1,114 +1,198 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 18 Dec 2014 18:47:12 +0100
-Subject: [PATCH] tty: serial: 8250: omap: add ttySx console if the user didn't
-In-Reply-To: <20141205135133.37fb96f6@lxorguk.ukuu.org.uk>
-References: <1417039306-2384-1-git-send-email-bigeasy@linutronix.de>
- <20141129094823.GA10840@linutronix.de>
- <20141129173418.GY2817@atomide.com>
- <20141201140914.728aaa46@lxorguk.ukuu.org.uk>
- <20141201231338.GA14524@fuloong-minipc.musicnaut.iki.fi>
- <20141202015118.GA1891@saruman>
- <20141205135133.37fb96f6@lxorguk.ukuu.org.uk>
-Message-ID: <20141218174712.GA26632@linutronix.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 18 Dec 2014 09:51:53 -0800
+Subject: [PATCH v3] input: Add new sun4i-lradc-keys driver
+In-Reply-To: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
+References: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141218175153.GA34618@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch invokes add_preferred_console() with ttyS based on ttyO
-arguments if the user didn't specify it on its own. This ensures that
-the user will see the kernel booting on his serial console in case he
-forgot to update the command line.
+Hi Hans,
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+On Thu, Dec 18, 2014 at 11:23:13AM +0100, Hans de Goede wrote:
+> Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
+> specifically designed to have various (tablet) keys (ie home, back, search,
+> etc). attached to it using a resistor network. This adds a driver for this.
+> 
+> There are 2 channels, currently this driver only supports chan0 since there
+> are no boards known to use chan1.
+> 
+> This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
+> a20-olinuxino-micro.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> --
+> Changes in v2:
+> -Change devicetree bindings to use a per key subnode, like gpio-keys does
+> Changes in v3:
+> -Handle keyup irq flag before irqdown, in case we get both at once
+
+Thank you for making changes. Can you please tell me if the driver still
+works if you drop the patch below on top of it? The changes are:
+
+- split DT parsing into a separate function;
+- make sure keymap is not empty;
+- change 'ret' variable to 'error'; 
+
+Thanks!
+
+-- 
+Dmitry
+
+Input: sun4i-lradc-keys - misc changes
+
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
+ drivers/input/keyboard/sun4i-lradc-keys.c |   87 +++++++++++++++++++----------
+ 1 file changed, 57 insertions(+), 30 deletions(-)
 
-While trying to to make a proxy driver like Alan suggested I wasn't sure
-how to obtain the ttyS console via "official" API. Then I stumbled upon
-update_console_cmdline() and then add_preferred_console(). 
-
- drivers/tty/serial/8250/8250_omap.c | 40 +++++++++++++++++++++++++++++++++++++
- drivers/tty/serial/8250/Kconfig     | 19 ++++++++++++++++++
- 2 files changed, 59 insertions(+)
-
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index 336602eb453e..78401fbc823b 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -1248,6 +1248,46 @@ static int omap8250_runtime_resume(struct device *dev)
- }
- #endif
+diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
+index 06d5c69..cc8f7dd 100644
+--- a/drivers/input/keyboard/sun4i-lradc-keys.c
++++ b/drivers/input/keyboard/sun4i-lradc-keys.c
+@@ -122,11 +122,11 @@ static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+ static int sun4i_lradc_open(struct input_dev *dev)
+ {
+ 	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
+-	int ret;
++	int error;
  
-+#ifdef CONFIG_SERIAL_8250_OMAP_TTYO_FIXUP
-+static int __init omap8250_console_fixup(void)
-+{
-+	char *omap_str;
-+	char *options;
-+	u8 idx;
-+
-+	if (strstr(boot_command_line, "console=ttyS"))
-+		/* user set a ttyS based name for the console */
-+		return 0;
-+
-+	omap_str = strstr(boot_command_line, "console=ttyO");
-+	if (!omap_str)
-+		/* user did not set ttyO based console, so we don't care */
-+		return 0;
-+
-+	omap_str += 12;
-+	if ('0' <= *omap_str && *omap_str <= '9')
-+		idx = *omap_str - '0';
-+	else
-+		return 0;
-+
-+	omap_str++;
-+	if (omap_str[0] == ',') {
-+		omap_str++;
-+		options = omap_str;
-+	} else {
-+		options = NULL;
+-	ret = regulator_enable(lradc->vref_supply);
+-	if (ret)
+-		return ret;
++	error = regulator_enable(lradc->vref_supply);
++	if (error)
++		return error;
+ 
+ 	/* lradc Vref internally is divided by 2/3 */
+ 	lradc->vref = regulator_get_voltage(lradc->vref_supply) * 2 / 3;
+@@ -155,42 +155,48 @@ static void sun4i_lradc_close(struct input_dev *dev)
+ 	regulator_disable(lradc->vref_supply);
+ }
+ 
+-static int sun4i_lradc_probe(struct platform_device *pdev)
++static int sun4i_lradc_load_dt_keymap(struct device *dev,
++				      struct sun4i_lradc_data *lradc)
+ {
+-	struct sun4i_lradc_data *lradc;
+-	struct device *dev = &pdev->dev;
+-	struct device_node *pp, *np = dev->of_node;
+-	u32 channel;
+-	int i, ret;
++	struct device_node *np, *pp;
++	int i;
++	int error;
+ 
+-	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
+-	if (!lradc)
+-		return -ENOMEM;
++	np = dev->of_node;
++	if (!np)
++		return -EINVAL;
+ 
+ 	lradc->chan0_map_count = of_get_child_count(np);
+-	lradc->chan0_map = devm_kmalloc(dev, lradc->chan0_map_count *
+-				sizeof(struct sun4i_lradc_keymap), GFP_KERNEL);
++	if (lradc->chan0_map_count == 0) {
++		dev_err(dev, "keymap is missing in device tree\n");
++		return -EINVAL;
 +	}
 +
-+	add_preferred_console("ttyS", idx, options);
-+	pr_err("WARNING: Your 'console=ttyO%d' has been replaced by 'ttyS%d'\n",
-+	       idx, idx);
-+	pr_err("This ensures that you still see kernel messages. Please\n");
-+	pr_err("update your kernel commandline.\n");
++	lradc->chan0_map = devm_kmalloc_array(dev, lradc->chan0_map_count,
++					      sizeof(struct sun4i_lradc_keymap),
++					      GFP_KERNEL);
+ 	if (!lradc->chan0_map)
+ 		return -ENOMEM;
+ 
+ 	i = 0;
+ 	for_each_child_of_node(np, pp) {
+ 		struct sun4i_lradc_keymap *map = &lradc->chan0_map[i];
++		u32 channel;
+ 
+-		ret = of_property_read_u32(pp, "channel", &channel);
+-		if (ret || channel != 0) {
++		error = of_property_read_u32(pp, "channel", &channel);
++		if (error || channel != 0) {
+ 			dev_err(dev, "%s: Inval channel prop\n", pp->name);
+ 			return -EINVAL;
+ 		}
+ 
+-		ret = of_property_read_u32(pp, "voltage", &map->voltage);
+-		if (ret) {
++		error = of_property_read_u32(pp, "voltage", &map->voltage);
++		if (error) {
+ 			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
+ 			return -EINVAL;
+ 		}
+ 
+-		ret = of_property_read_u32(pp, "linux,code", &map->keycode);
+-		if (ret) {
++		error = of_property_read_u32(pp, "linux,code", &map->keycode);
++		if (error) {
+ 			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
+ 			return -EINVAL;
+ 		}
+@@ -198,6 +204,24 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+ 		i++;
+ 	}
+ 
 +	return 0;
 +}
-+console_initcall(omap8250_console_fixup);
-+#endif
 +
- static const struct dev_pm_ops omap8250_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(omap8250_suspend, omap8250_resume)
- 	SET_RUNTIME_PM_OPS(omap8250_runtime_suspend,
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index 0fcbcd29502f..87adf08b9b6b 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -308,6 +308,25 @@ config SERIAL_8250_OMAP
- 
- 	  This driver uses ttyS instead of ttyO.
- 
-+config SERIAL_8250_OMAP_TTYO_FIXUP
-+	bool "Replace ttyO with ttyS"
-+	depends on SERIAL_8250_OMAP=y && SERIAL_8250_CONSOLE
-+	default y
-+	help
-+	  This option replaces the "console=ttyO" argument with the matching
-+	  ttyS argument if the user did not specified it on the command line.
-+	  This ensures that the user can see the kernel output during boot
-+	  which he wouldn't see otherwise. The getty has still to be configured
-+	  for ttyS instead of ttyO regardless of this option.
-+	  This option is intended for people who "automatically" enable this
-+	  driver without knowing that this driver requires a different console=
-+	  argument. If you read this, please keep this option disabled and
-+	  instead update your kernel command line. If you prepare a kernel for a
-+	  distribution or other kind of larger user base then you probably want
-+	  to keep this option enabled. Otherwise people might complain about a
-+	  not booting kernel because the serial console remains silent in case
-+	  they forgot to update the command line.
++static int sun4i_lradc_probe(struct platform_device *pdev)
++{
++	struct sun4i_lradc_data *lradc;
++	struct device *dev = &pdev->dev;
++	int i;
++	int error;
 +
- config SERIAL_8250_FINTEK
- 	tristate "Support for Fintek F81216A LPC to 4 UART"
- 	depends on SERIAL_8250 && PNP
--- 
-2.1.3
++	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
++	if (!lradc)
++		return -ENOMEM;
++
++	error = sun4i_lradc_load_dt_keymap(dev, lradc);
++	if (error)
++		return error;
++
+ 	lradc->vref_supply = devm_regulator_get(dev, "vref");
+ 	if (IS_ERR(lradc->vref_supply))
+ 		return PTR_ERR(lradc->vref_supply);
+@@ -215,9 +239,11 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+ 	lradc->input->id.vendor = 0x0001;
+ 	lradc->input->id.product = 0x0001;
+ 	lradc->input->id.version = 0x0100;
+-	lradc->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY);
++
++	__set_bit(EV_KEY, lradc->input->evbit);
+ 	for (i = 0; i < lradc->chan0_map_count; i++)
+-		set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
++		__set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
++
+ 	input_set_drvdata(lradc->input, lradc);
+ 
+ 	lradc->base = devm_ioremap_resource(dev,
+@@ -225,14 +251,15 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(lradc->base))
+ 		return PTR_ERR(lradc->base);
+ 
+-	ret = devm_request_irq(dev, platform_get_irq(pdev, 0), sun4i_lradc_irq,
+-			       0, "sun4i-a10-lradc-keys", lradc);
+-	if (ret)
+-		return ret;
++	error = devm_request_irq(dev, platform_get_irq(pdev, 0),
++				 sun4i_lradc_irq, 0,
++				 "sun4i-a10-lradc-keys", lradc);
++	if (error)
++		return error;
+ 
+-	ret = input_register_device(lradc->input);
+-	if (ret)
+-		return ret;
++	error = input_register_device(lradc->input);
++	if (error)
++		return error;
+ 
+ 	platform_set_drvdata(pdev, lradc);
+ 	return 0;
