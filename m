@@ -1,82 +1,58 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 18 Dec 2014 18:12:58 -0500
-Subject: [PATCH v3 0/2] arm: pcibios: remove pci_sys_data domain
-In-Reply-To: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <54935F7A.7000206@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Dec 2014 00:21:59 +0100
+Subject: [Linaro-mm-sig] [PATCH v3 18/19] iommu: exynos: init from
+ dt-specific callback instead of initcall
+In-Reply-To: <1518515.QutUfiWrAf@avalon>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <5219064.gvW43bShnl@wuerfel> <1518515.QutUfiWrAf@avalon>
+Message-ID: <1793344.bWpPveHxzq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2014 06:29 AM, Lorenzo Pieralisi wrote:
-> This patchset is a v3 of a previous posting:
->
-> http://www.spinics.net/lists/linux-pci/msg36502.html
->
-> v2 =>  v3
->
-> - Rebased on top of this patch dependency
->    http://www.spinics.net/lists/linux-pci/msg36631.html
->
-> v1 =>  v2 changelog
->
-> - Removed stale hw_pci domain member
-> - Reworked pci-mvebu domain handling according to review
-> - Rebased against 3.18-rc3 and updated the logs
-> - Dropped RFC status
->
-> Original cover letter:
-> ----
-> This patchset is a first RFC stab at removing the dependency on pci_sys_data
-> domain field on ARM platforms and by replacing it with generic code that
-> stashes the domain value in the pci_bus control structure, introduced in
->
-> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
->
-> commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> ("PCI: Add generic domain handling")
->
-> All the drivers converted (apart from PCIe designware, tested on iMX6SL)
-> were only compile tested for lack of HW, so along some comments, testing
-> and verifying that patchset does not break any existing platform are
-> very appreciated.
->
-> Code in drivers/pci/pci-mvebu.c has been changed to add a domain
-> number to PCI resources by using the nr value coming from the setup
-> pcibios32 callback, which may not be correct and should be considered
-> a temporary solution waiting for review comments.
->
-> The patchset removes entirely the pci_sys_data.domain field, since its
-> usage is removed at the same time in the respective host controllers
-> and ARM is made to select the configuration option
-> CONFIG_PCI_DOMAINS_GENERIC by default, which compiles a domain_nr in the
-> pci_bus structure so that the pci_domain_nr() look-up can rely on it.
->
-Lorenzo,
+On Thursday 18 December 2014 22:36:14 Laurent Pinchart wrote:
+> 
+> > (currently only on ARM64, not ARM32, until someone adds support). I can see
+> > your point regarding machines that have a mandatory IOMMU with no fallback
+> > when there is no driver, but we can support them by making the iommu driver
+> > selected through Kconfig for that platform, while still allowing other
+> > platforms to work with drivers left out of the kernel.
+> 
+> The question is how to tell the kernel not to wait for an IOMMU that will 
+> never be there. Would a kernel command line argument be an acceptable solution 
+> or do we need something more automatic ?
 
-I am assuming this is transparent to the user drivers of designware core 
-such as pci-keystone as CONFIG_PCI_DOMAINS_GENERIC is enabled by default 
-by ARM. Is this true ?
+I would hope that we can find an automatic solution without relying on
+the command line.
 
-Murali
+Unfortunately, I also remembered one case in support of what Lucas mentioned
+and that would break this: There is at least one SoC that uses cache-coherent
+DMA only when the IOMMU (ARM SMMU IIRC)is enabled, but is non-coherent
+otherwise. We can't really express that in DT, so we actually do rely on
+the IOMMU driver to be present on this machine when any "iommus" properties
+are used, as they would always come in combination with "dma-coherent"
+properties that are otherwise wrong.
 
->
-> Lorenzo Pieralisi (2):
->    arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain
->    arm: pcibios: move to generic PCI domains
->
->   arch/arm/Kconfig                   |  3 +++
->   arch/arm/include/asm/mach/pci.h    |  6 ------
->   arch/arm/include/asm/pci.h         |  7 -------
->   arch/arm/kernel/bios32.c           |  3 ---
->   arch/arm/mach-cns3xxx/pcie.c       | 40 ++++++++++++++++----------------------
->   drivers/pci/host/pci-mvebu.c       | 15 ++------------
->   drivers/pci/host/pcie-designware.c |  3 ---
->   drivers/pci/host/pcie-rcar.c       |  3 ---
->   8 files changed, 22 insertions(+), 58 deletions(-)
->
+We can still enforce this by requiring the smmu driver to be built into
+the kernel on this platform, but simply saying that the device cannot
+support DMA as long as there is an iommus property but no driver for
+it does make a lot of sense.
 
+Note that there are more than two ways that the kernel could treat
+the situation of probing a device with a valid iommus reference but
+no driver loaded for the iommu:
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+a) assume all iommu drivers are initialized early, so use linear or
+   swiotlb dma_map_ops, and probe the driver normally. This breaks
+   the scenario with conditionally coherent devices, and requires doing
+   the iommu init early
+b) assume all iommu drivers are initialized early, so disallow any DMA
+   by setting a zero dma_mask but allow the driver to be probed using
+   polling I/O mode (useful for slow devices like UART or SPI)
+   This breaks devices that require DMA but can fall back to linear
+   or swiotlb mappings, and requires doing the iommu init early.
+c) defer probing until an iommu driver is gets initialized. This breaks
+   both the cases where we could fall back to a sane behavior without
+   iommu, but it would let us use a proper driver with regular power
+   management etc.
+
+	Arnd
