@@ -1,41 +1,195 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 18 Dec 2014 15:11:35 +0800
-Subject: [PATCH RFC v2 13/14] ARM: imx_v6_v7_defconfig: Add support for MIPI
- DSI host controller
-In-Reply-To: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
-References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418886696-11636-14-git-send-email-Ying.Liu@freescale.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 18 Dec 2014 16:23:52 +0900
+Subject: [PATCHv4 1/8] devfreq: event: Add new devfreq_event class to
+ provide basic data for devfreq governor
+In-Reply-To: <1527528755.303581418883865069.JavaMail.weblogic@epmlwas01d>
+References: <1527528755.303581418883865069.JavaMail.weblogic@epmlwas01d>
+Message-ID: <54928108.5080603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for MIPI DSI host controller.
+Dear Myungjoo,
 
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm menuconfig and manually choose to build in
-  the MIPI DSI host controller driver
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+Thanks for your review.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
-v1->v2:
- * None.
+On 12/18/2014 03:24 PM, MyungJoo Ham wrote:
+> Hi Chanwoo,
+> 
+> I love the idea and I now have a little mechanical issues in your code.
+> 
+>> ---
+>>  drivers/devfreq/Kconfig         |   2 +
+>>  drivers/devfreq/Makefile        |   5 +-
+>>  drivers/devfreq/devfreq-event.c | 449 ++++++++++++++++++++++++++++++++++++++++
+>>  drivers/devfreq/event/Makefile  |   1 +
+>>  include/linux/devfreq.h         | 160 ++++++++++++++
+>>  5 files changed, 616 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/devfreq/devfreq-event.c
+>>  create mode 100644 drivers/devfreq/event/Makefile
+>>
+>> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+>> index faf4e70..4d15b62 100644
+>> --- a/drivers/devfreq/Kconfig
+>> +++ b/drivers/devfreq/Kconfig
+>> @@ -87,4 +87,6 @@ config ARM_EXYNOS5_BUS_DEVFREQ
+>>  	  It reads PPMU counters of memory controllers and adjusts the
+>>  	  operating frequencies and voltages with OPP support.
+>>  
+>> +comment "DEVFREQ Event Drivers"
+>> +
+>>  endif # PM_DEVFREQ
+>> diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
+>> index 16138c9..a1ffabe 100644
+>> --- a/drivers/devfreq/Makefile
+>> +++ b/drivers/devfreq/Makefile
+>> @@ -1,4 +1,4 @@
+>> -obj-$(CONFIG_PM_DEVFREQ)	+= devfreq.o
+>> +obj-$(CONFIG_PM_DEVFREQ)		+= devfreq.o devfreq-event.o
+>>  obj-$(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)	+= governor_simpleondemand.o
+>>  obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+= governor_performance.o
+>>  obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
+>> @@ -7,3 +7,6 @@ obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
+>>  # DEVFREQ Drivers
+>>  obj-$(CONFIG_ARM_EXYNOS4_BUS_DEVFREQ)	+= exynos/
+>>  obj-$(CONFIG_ARM_EXYNOS5_BUS_DEVFREQ)	+= exynos/
+>> +
+>> +# DEVFREQ Event Drivers
+>> +obj-$(CONFIG_PM_DEVFREQ)		+= event/
+>>
+> 
+> It looks getting mature fast.
+> However, I would like to suggest you to
+> 
+> allow not to compile devfreq-event.c and not include its compiled object
+>   if devfreq.c is required but devfreq-event.c is not required.
+>   (e.g., add CONFIG_PM_DEVFREQ_EVENT and let it be enabled when needed)
+>   just a little concern for lightweight devices.
+>     (this change might require a bit more work on the header as well)
+>   - Or do you think devfreq-event.c will become almost mandatory for
+>    most devfreq drivers?
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+I agree your opinion.
+I'll add CONFIG_PM_DEVFREQ_EVENT according to your comment.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0dbd0c3..3e0e589 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -199,6 +199,7 @@ CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_IPUV3=y
- CONFIG_DRM_IMX_HDMI=y
-+CONFIG_DRM_IMX_MIPI_DSI=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
--- 
-2.1.0
+> 
+> 
+> [snip]
+> 
+>> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
+>> new file mode 100644
+>> index 0000000..0e1948e
+>> --- /dev/null
+>> +++ b/drivers/devfreq/devfreq-event.c
+>> @@ -0,0 +1,449 @@
+>> +/*
+>> + * devfreq-event: Generic DEVFREQ Event class driver
+> 
+> DEVFREQ is a generic DVFS mechanism (or subsystem).
+> 
+> Plus, I thought devfreq-event is considered to be a "framework"
+> for devfreq event class drivers. Am I mistaken?
+
+You're right. just "class driver" description is not proper.
+I'll modify the description of devfreq-event.c as following:
+or If you have other opinion, would you please let me know about it?
+
+	devfreq-event: DEVFREQ-Event Framework to provide raw data of Non-CPU Devices.
+
+
+> [snip]
+> 
+>> +struct devfreq_event_dev *devfreq_event_add_edev(struct device *dev,
+>> +                                               struct devfreq_event_desc *desc)
+>> +{
+>> +       struct devfreq_event_dev *edev;
+>> +       static atomic_t event_no = ATOMIC_INIT(0);
+>> +       int ret;
+>> +
+>> +       if (!dev || !desc)
+>> +               return ERR_PTR(-EINVAL);
+>> +
+>> +       if (!desc->name || !desc->ops)
+>> +               return ERR_PTR(-EINVAL);
+>> +
+>> +       if (!desc->ops->set_event || !desc->ops->get_event)
+>> +               return ERR_PTR(-EINVAL);
+>> +
+>> +       edev = devm_kzalloc(dev, sizeof(*edev), GFP_KERNEL);
+>> +       if (!edev)
+>> +               return ERR_PTR(-ENOMEM);
+>> +
+>> +       mutex_lock(&devfreq_event_list_lock);
+> 
+> You seem to lock that global lock too long. That lock is only required
+> while you operate the list. The data to be protected by this mutex is
+> devfreq_event_list. Until the new entry is added to the list, the new
+> entry is free from protection. (may be delayed right before list_add)
+
+OK. I'll move global lock right before calling list_add() on below.
+
+> 
+>> +       mutex_init(&edev->lock);
+>> +       edev->desc = desc;
+>> +       edev->dev.parent = dev;
+>> +       edev->dev.class = devfreq_event_class;
+>> +       edev->dev.release = devfreq_event_release_edev;
+>> +
+>> +       dev_set_name(&edev->dev, "event.%d", atomic_inc_return(&event_no) - 1);
+>> +       ret = device_register(&edev->dev);
+>> +       if (ret < 0) {
+>> +               put_device(&edev->dev);
+>> +               mutex_unlock(&devfreq_event_list_lock);
+>> +               return ERR_PTR(ret);
+>> +       }
+>> +       dev_set_drvdata(&edev->dev, edev);
+>> +
+>> +       INIT_LIST_HEAD(&edev->node);
+>> +       list_add(&edev->node, &devfreq_event_list);
+>> +       mutex_unlock(&devfreq_event_list_lock);
+>> +
+>> +       return edev;
+>> +}
+> 
+> 
+> 
+> [snip / reversed maybe.. sorry]
+> 
+>> +/**
+>> + * devfreq_event_is_enabled() - Check whether devfreq-event dev is enabled or
+>> + *                             not.
+>> + * @edev       : the devfreq-event device
+>> + *
+>> + * Note that this function check whether devfreq-event dev is enabled or not.
+>> + * If return true, the devfreq-event dev is enabeld. If return false, the
+>> + * devfreq-event dev is disabled.
+>> + */
+>> +bool devfreq_event_is_enabled(struct devfreq_event_dev *edev)
+>> +{
+>> +       bool enabled = false;
+>> +
+>> +       if (!edev || !edev->desc)
+>> +               return enabled;
+>> +
+>> +       mutex_lock(&edev->lock);
+>> +
+>> +       if (edev->enable_count > 0)
+>> +               enabled = true;
+>> +
+>> +       if (edev->desc->ops && edev->desc->ops->is_enabled)
+>> +               enabled |= edev->desc->ops->is_enabled(edev);
+> 
+> What does it mean when enabled_count > 0 and ops->is_enabled() is false? or..
+> What does it mean when enabled_count = 0 and ops->is_enabled() is true?
+> 
+> If you do enable_count in the subsystem, why would we rely on
+> ops->is_enabled()? Are you assuming that a device MAY turn itself off
+> without any kernel control (ops->disable()) and it is still a correct
+> behabior?
+
+You're right. devfreq_event_is_enabled() has ambiguous operation according to your comment.
+
+I'll only control the enable_count in the subsystem without ops->is_enabled()
+and then remove the is_enabled function in the structre devfreq_event_ops.
+
+Best Regards,
+Chanwoo Choi
