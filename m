@@ -1,123 +1,71 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 18 Dec 2014 18:59:04 +0100
-Subject: [PATCH 08/27] ARM: mvebu: armada-370-xp: Relicense the device
- tree under GPLv2+/X11
-In-Reply-To: <20141218175646.GF19261@kw.sim.vm.gnt>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <1418657915-22775-9-git-send-email-gregory.clement@free-electrons.com>
- <20141215232221.GD19261@kw.sim.vm.gnt> <20141218175646.GF19261@kw.sim.vm.gnt>
-Message-ID: <549315E8.8080909@free-electrons.com>
+Date: Thu, 18 Dec 2014 19:13:03 +0100
+Subject: [PATCH 4/6] ARM: mvebu: remove conflicting muxing on Armada 370 DB
+In-Reply-To: <20141107031542.GB3698@titan.lakedaemon.net>
+References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1414512524-24466-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20141107031542.GB3698@titan.lakedaemon.net>
+Message-ID: <5493192F.8060004@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Jason,
 
-On 18/12/2014 18:56, Simon Guinot wrote:
-> On Tue, Dec 16, 2014 at 12:22:21AM +0100, Simon Guinot wrote:
->> On Mon, Dec 15, 2014 at 04:38:16PM +0100, Gregory CLEMENT wrote:
->>> The current GPL only licensing on the device tree makes it very
->>> impractical for other software components licensed under another
->>> license.
->>>
->>> In order to make it easier for them to reuse our device trees,
->>> relicense our device trees under a GPL/X11 dual-license.
->>>
->>> Cc: Andrew Lunn <andrew@lunn.ch>
->>> Cc: Arnaud Ebalard <arno@natisbad.org>
->>> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>> Cc: Greg Ungerer <gerg@uclinux.org>
->>> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->>> Cc: Simon Baatz <gmbnomis@gmail.com>
->>> Cc: Simon Guinot <simon.guinot@sequanux.org>
->>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Cc: Willy Tarreau <w@1wt.eu>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> ---
->>>  arch/arm/boot/dts/armada-370-xp.dtsi | 40 +++++++++++++++++++++++++++++++++---
->>>  1 file changed, 37 insertions(+), 3 deletions(-)
+On 07/11/2014 04:15, Jason Cooper wrote:
+> On Tue, Oct 28, 2014 at 05:08:42PM +0100, Thomas Petazzoni wrote:
+>> Back when audio was enabled, the muxing of some MPP pins was causing
+>> problems. However, since commit fea038ed55ae ("ARM: mvebu: Add proper
+>> pin muxing on the Armada 370 DB board"), those problematic MPP pins
+>> have been assigned a proper muxing for the Ethernet interfaces. This
+>> proper muxing is now conflicting with the hog pins muxing that had
+>> been added as part of 249f3822509b ("ARM: mvebu: add audio support to
+>> Armada 370 DB").
 >>
->> Hi Gregory,
+>> Therefore, this commit simply removes the hog pins muxing, which
+>> solves a warning a boot time due to the conflicting muxing
+>> requirements.
 >>
->> NAK for me.
+>> Fixes: fea038ed55ae ("ARM: mvebu: Add proper pin muxing on the Armada 370 DB board")
+>> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/armada-370-db.dts | 24 ------------------------
+>>  1 file changed, 24 deletions(-)
 > 
-> After some thoughts I changed my mind about this. I can't see no point
-> in forcing people to rewrite a commit for a single line which is even
-> not covered by my copyright...
+> Patches 5 and 6 applied to mvebu/dt with Andrew's Ack.
+> 
+> I didn't Cc this one to stable since it is only removing a warning.
 
-Many thanks! I highly appreciate your good will :)
+Actually it didn't just remove a warning. As explained with the patch
+I sent yesterday: "[PATCH] ARM: mvebu: Fix pinctrl configuration for
+Armada 370 DB", it also allows to use the first Ethernet Giga port on
+the Armada 370 DB board.
 
-> 
-> Then, for the armada-370-xp.dtsi file:
-> 
-> Acked-by: Simon Guinot <simon.guinot@sequanux.org>
-> 
-> Simon
-> 
->>>
->>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
->>> index 1af428602748..8a322ad57e5f 100644
->>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
->>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
->>> @@ -8,9 +8,43 @@
->>>   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>   * Ben Dooks <ben.dooks@codethink.co.uk>
->>>   *
->>> - * This file is licensed under the terms of the GNU General Public
->>> - * License version 2.  This program is licensed "as is" without any
->>> - * warranty of any kind, whether express or implied.
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This file is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This file is distributed in the hope that it will be useful
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>>   *
->>>   * This file contains the definitions that are common to the Armada
->>>   * 370 and Armada XP SoC.
->>> -- 
->>> 1.9.1
-> 
-> 
-> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Later on, if needed, someone can request it be backported and the Fixes
+> tag will assist with that.
+
+Thanks for you offer and indeed I am not sure on how to do it, so your
+help will be appreciate :)
+
+I thought that I could forward to stable the patch sent by Thomas. I also thought
+that adding the commit id used in linus tree and why we need it should be enough. Am
+I right?
+
+For 3.18 it seemed doable, but the bug on the Ethernet port was
+introduced by the commit 49f3822509b74f8c8d0731aeb7ccea065376c9b ("ARM:
+mvebu: add audio support to Armada 370 DB" in 3.14.")
+
+So this patch won't be enough we also need the one sent by Ezequiel:
+fea038ed55ae ("ARM: mvebu: Add proper pin muxing on the Armada 370 DB
+board"). Then in this case I would have to add the line:
+
+Cc: <stable@vger.kernel.org> # 3.14.x: fea038ed55ae ARM: mvebu: Add
+proper pin muxing on the Armada 370 DB board
+
+
+Thanks,
+
+Gregory
 
 
 -- 
