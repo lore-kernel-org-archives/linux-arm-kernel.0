@@ -1,74 +1,100 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 Dec 2014 15:00:51 +0800
-Subject: [PATCH v2 04/11] ARM: dts: sun9i: Add clock-indices property for bus
- gate clocks
-In-Reply-To: <1418886058-8145-1-git-send-email-wens@csie.org>
-References: <1418886058-8145-1-git-send-email-wens@csie.org>
-Message-ID: <1418886058-8145-5-git-send-email-wens@csie.org>
+Date: Thu, 18 Dec 2014 15:00:47 +0800
+Subject: [PATCH v2 00/11] ARM: sun9i: Enable MMC support on Allwinner A80
+Message-ID: <1418886058-8145-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_clk_get_parent_name() uses the clock-indices property to resolve
-clock phandle arguments in case that the argument index does not
-match the clock-output-names sequence.
+Hi Maxime,
 
-This is the case on sunxi, where we use the actual bit index as the
-argument to the phandle. Add the clock-indices property so that
-of_clk_get_parent_name() resolves the names correctly.
+This is v2 of the sun9i mmc series. It is based on your v2 of your
+sunxi mmc phase clocks series. The clock bits will conflict with
+Hans' work on the mod0 clock. The DT bits might conflict with your
+header conversion series. Assuming this series is OK, how would
+you like to proceed?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+This series enables MMC support on the A80 using existing drivers
+we have. The A80 has 4 MMC controllers. These controllers share
+a common clock gate and reset control, which are then sub-divided
+to each controller.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index b595d9e..eb3f91b 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -256,6 +256,9 @@
- 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
- 			reg = <0x06000580 0x4>;
- 			clocks = <&ahb0>;
-+			clock-indices = <0>, <1>, <3>, <5>, <8>, <12>, <13>,
-+					<14>, <15>, <16>, <18>, <20>, <21>,
-+					<22>, <23>;
- 			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
- 					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
- 					"ahb0_nand0", "ahb0_sdram",
-@@ -269,6 +272,7 @@
- 			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
- 			reg = <0x06000584 0x4>;
- 			clocks = <&ahb1>;
-+			clock-indices = <0>, <1>, <17>, <21>, <22>, <23>, <24>;
- 			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
- 					"ahb1_gmac", "ahb1_msgbox",
- 					"ahb1_spinlock", "ahb1_hstimer",
-@@ -280,6 +284,8 @@
- 			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
- 			reg = <0x06000588 0x4>;
- 			clocks = <&ahb2>;
-+			clock-indices = <0>, <1>, <2>, <4>, <5>, <7>, <8>,
-+					<11>;
- 			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
- 					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
- 					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
-@@ -290,6 +296,8 @@
- 			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
- 			reg = <0x06000590 0x4>;
- 			clocks = <&apb0>;
-+			clock-indices = <1>, <5>, <11>, <12>, <13>, <15>,
-+					<17>, <18>, <19>;
- 			clock-output-names = "apb0_spdif", "apb0_pio",
- 					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
- 					"apb0_lradc", "apb0_gpadc", "apb0_twd",
-@@ -301,6 +309,8 @@
- 			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
- 			reg = <0x06000594 0x4>;
- 			clocks = <&apb1>;
-+			clock-indices = <0>, <1>, <2>, <3>, <4>,
-+					<16>, <17>, <18>, <19>, <20>, <21>;
- 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
- 					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
- 					"apb1_uart0", "apb1_uart1",
+The phase clocks are the same as the older SoCs, so it should be
+straight forward to add them with the rest of the sunxi family.
+I did find that Allwinner's kernel uses different delay values
+for the A80, but so far I've not run into any issues using the
+mainline kernel.
+
+Patch 1 adds module 0 type clock support for the A80. These are
+essentially the same as mod0 clocks on other Allwinner SoCs, except
+for the wider mux bits.
+
+Patch 2 adds mmc mod clocks to the DTSI.
+
+Patch 3 adds support for the mmc config (term from user manual) clocks.
+This is the part that breaks out the clock gates and reset controls
+for each controller. This is implemented as a platform driver, as
+the shared reset control must be de-asserted for any of either this
+or the mmc blocks to work.
+
+Patch 4 adds clock-indices properties to the AHB/APB gate clocks.
+This is needed for of_clk_get_parent_name to work properly, as we
+use bit indices instead of counting the entries.
+
+Patch 5 adds the mmc config clock nodes to the DTSI.
+
+Patch 6 changes sunxi-common-regulators.dtsi to use labels to
+reference the pio node.
+
+Patch 7 adds the mmc controller nodes to the DTSI.
+
+Patch 8 and 10 add the pinmux settings for mmc0 and mmc2.
+
+Patch 9 and 11 enable mmc0 and mmc2 on the A80 Optimus Board.
+
+Kudos to Andreas for figuring out all the DT bits. His SoB
+is on the relevant patches.
+
+Changes since v1:
+
+  - Use sunxi-common-regulators.dtsi for vmmc regulator
+  - Rebased onto sunxi mmc phase clock series v2
+  - Use new multi-output mmc module clock style
+  - Rename sun9i mmc config clock name and compatible
+  - Make mmc2_pins include all pins needed, and change
+    name to mmc2_8bit_pins
+  - Add spaces between pin names in mmc pins
+  - Add clk_prepare_enable()/clk_disable_unprepare() calls to
+    reset control ops for the mmc config clock
+  - Use DIV_ROUND_UP when calculating number of clocks in sun9i
+    mmc config clock probe function
+  - Add required properties and outputs section for sun9i mmc
+    config clock in bindings doc; also add an example
+
+Cheers
+ChenYu Tsai
+
+Chen-Yu Tsai (11):
+  clk: sunxi: Add mod0 and mmc module clock support for A80
+  ARM: dts: sun9i: Add mmc module clock nodes for A80
+  clk: sunxi: Add driver for A80 MMC config clocks/resets
+  ARM: dts: sun9i: Add clock-indices property for bus gate clocks
+  ARM: dts: sun9i: Add mmc config clock nodes
+  ARM: dts: sunxi: Use label to reference pio in sunxi-common-regulators
+  ARM: dts: sun9i: Add mmc controller nodes to the A80 dtsi
+  ARM: dts: sun9i: Add pinmux setting for mmc0
+  ARM: dts: sun9i: Enable mmc0 on A80 Optimus Board
+  ARM: dts: sun9i: Add 8 bit mmc pinmux setting for mmc2
+  ARM: dts: sun9i: Enable mmc2 on A80 Optimus Board
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  30 ++-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts           |  27 +++
+ arch/arm/boot/dts/sun9i-a80.dtsi                  | 124 ++++++++++++
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi    |  54 +++---
+ drivers/clk/sunxi/Makefile                        |   1 +
+ drivers/clk/sunxi/clk-mod0.c                      |  99 ++++++++++
+ drivers/clk/sunxi/clk-sun9i-mmc.c                 | 222 ++++++++++++++++++++++
+ 7 files changed, 527 insertions(+), 30 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
+
 -- 
 2.1.3
