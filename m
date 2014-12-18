@@ -1,46 +1,82 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 19 Dec 2014 00:13:10 +0100
-Subject: [PATCH] ALSA: atmel: fix building the ac97 driver for
- at91-multiplatform
-Message-ID: <1418944390-27719-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 18 Dec 2014 18:12:58 -0500
+Subject: [PATCH v3 0/2] arm: pcibios: remove pci_sys_data domain
+In-Reply-To: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <54935F7A.7000206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+On 11/21/2014 06:29 AM, Lorenzo Pieralisi wrote:
+> This patchset is a v3 of a previous posting:
+>
+> http://www.spinics.net/lists/linux-pci/msg36502.html
+>
+> v2 =>  v3
+>
+> - Rebased on top of this patch dependency
+>    http://www.spinics.net/lists/linux-pci/msg36631.html
+>
+> v1 =>  v2 changelog
+>
+> - Removed stale hw_pci domain member
+> - Reworked pci-mvebu domain handling according to review
+> - Rebased against 3.18-rc3 and updated the logs
+> - Dropped RFC status
+>
+> Original cover letter:
+> ----
+> This patchset is a first RFC stab at removing the dependency on pci_sys_data
+> domain field on ARM platforms and by replacing it with generic code that
+> stashes the domain value in the pci_bus control structure, introduced in
+>
+> commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
+> ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
+>
+> commit 670ba0c8883b576d0aec28bd7a838358a4be1
+> ("PCI: Add generic domain handling")
+>
+> All the drivers converted (apart from PCIe designware, tested on iMX6SL)
+> were only compile tested for lack of HW, so along some comments, testing
+> and verifying that patchset does not break any existing platform are
+> very appreciated.
+>
+> Code in drivers/pci/pci-mvebu.c has been changed to add a domain
+> number to PCI resources by using the nr value coming from the setup
+> pcibios32 callback, which may not be correct and should be considered
+> a temporary solution waiting for review comments.
+>
+> The patchset removes entirely the pci_sys_data.domain field, since its
+> usage is removed at the same time in the respective host controllers
+> and ARM is made to select the configuration option
+> CONFIG_PCI_DOMAINS_GENERIC by default, which compiles a domain_nr in the
+> pci_bus structure so that the pci_domain_nr() look-up can rely on it.
+>
+Lorenzo,
 
-at91 will no longer export the mach/cpu.h and mach/hardware.h header files
-in the future, which would break building the atmel ac97c driver.
+I am assuming this is transparent to the user drivers of designware core 
+such as pci-keystone as CONFIG_PCI_DOMAINS_GENERIC is enabled by default 
+by ARM. Is this true ?
 
-Since the cpu_is_* check is only used to find out whether we are running
-on avr32 or arm/at91, we can hardcode that check in the ARM case.
+Murali
 
-Unfortunately the driver is missing other work to be useful again on ARM,
-if anyone wants to actually use it, they need to add a DT binding, and
-the driver should really be converted to use the ASoC framework.
+>
+> Lorenzo Pieralisi (2):
+>    arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain
+>    arm: pcibios: move to generic PCI domains
+>
+>   arch/arm/Kconfig                   |  3 +++
+>   arch/arm/include/asm/mach/pci.h    |  6 ------
+>   arch/arm/include/asm/pci.h         |  7 -------
+>   arch/arm/kernel/bios32.c           |  3 ---
+>   arch/arm/mach-cns3xxx/pcie.c       | 40 ++++++++++++++++----------------------
+>   drivers/pci/host/pci-mvebu.c       | 15 ++------------
+>   drivers/pci/host/pcie-designware.c |  3 ---
+>   drivers/pci/host/pcie-rcar.c       |  3 ---
+>   8 files changed, 22 insertions(+), 58 deletions(-)
+>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
----
- sound/atmel/ac97c.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
-index b59427d5a697..83975f8d5947 100644
---- a/sound/atmel/ac97c.c
-+++ b/sound/atmel/ac97c.c
-@@ -34,10 +34,10 @@
- #include <linux/platform_data/dma-dw.h>
- #include <linux/dma/dw.h>
- 
-+#ifdef CONFIG_AVR32
- #include <mach/cpu.h>
--
--#ifdef CONFIG_ARCH_AT91
--#include <mach/hardware.h>
-+#else
-+#define cpu_is_at32ap7000() (0)
- #endif
- 
- #include "ac97c.h"
 -- 
-2.1.0
+Murali Karicheri
+Linux Kernel, Texas Instruments
