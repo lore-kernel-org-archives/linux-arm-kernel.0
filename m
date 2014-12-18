@@ -1,83 +1,344 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Dec 2014 10:23:48 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Add DU clocks to device tree
-In-Reply-To: <1418777156-25994-1-git-send-email-horms+renesas@verge.net.au>
-References: <1418777156-25994-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20141218012348.GA4768@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 17 Dec 2014 17:37:17 -0800
+Subject: [PATCH v3 1/2] watchdog: Add driver for Mediatek watchdog
+In-Reply-To: <1418851085-17787-2-git-send-email-matthias.bgg@gmail.com>
+References: <1418851085-17787-1-git-send-email-matthias.bgg@gmail.com>
+ <1418851085-17787-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <20141218013717.GA9855@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 09:45:56AM +0900, Simon Horman wrote:
-> From: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
+On Wed, Dec 17, 2014 at 10:18:04PM +0100, Matthias Brugger wrote:
+> This patch adds a driver for the Mediatek SoC integrated
+> watchdog. This driver supports watchdog and software reset
+> for mt65xx and mt81xx SoCs.
 > 
-> Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
-> [horms: Resolved conflicts]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-It appears that this patch and r8a7791.dtsi use zx_clk as the parent
-clock for the DU clocks. However, r8a7790.dtsi, uses zs_clk as the parent
-clock. Its unclear to me if this is intentional or not.
-
-I also notice, on inspection of the datasheet, that there is no DU1 clock
-on the r8a7794. So it seems that portion of this patch should be removed.
-
-> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
+>  drivers/watchdog/Kconfig   |  10 ++
+>  drivers/watchdog/Makefile  |   1 +
+>  drivers/watchdog/mtk_wdt.c | 256 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 267 insertions(+)
+>  create mode 100644 drivers/watchdog/mtk_wdt.c
 > 
-> [Simon Horman]
-> Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi            | 7 +++++--
->  include/dt-bindings/clock/r8a7794-clock.h | 2 ++
->  2 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 8f78da5..063bf56 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -535,7 +535,8 @@
->  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
->  			clocks = <&mp_clk>, <&mp_clk>,
->  				 <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
-> -				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>;
-> +				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
-> +				 <&zx_clk>, <&zx_clk>;
->  			#clock-cells = <1>;
->  			clock-indices = <
->  				R8A7794_CLK_EHCI R8A7794_CLK_HSUSB
-> @@ -543,11 +544,13 @@
->  				R8A7794_CLK_SCIF4 R8A7794_CLK_HSCIF1 R8A7794_CLK_HSCIF0
->  				R8A7794_CLK_SCIF3 R8A7794_CLK_SCIF2 R8A7794_CLK_SCIF1
->  				R8A7794_CLK_SCIF0
-> +				R8A7794_CLK_DU1 R8A7794_CLK_DU0
->  			>;
->  			clock-output-names =
->  				"ehci", "hsusb",
->  				"hscif2", "scif5", "scif4", "hscif1", "hscif0",
-> -				"scif3", "scif2", "scif1", "scif0";
-> +				"scif3", "scif2", "scif1", "scif0",
-> +				"du1", "du0";
->  		};
->  		mstp8_clks: mstp8_clks at e6150990 {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-> diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-> index d633230..d5cfe62 100644
-> --- a/include/dt-bindings/clock/r8a7794-clock.h
-> +++ b/include/dt-bindings/clock/r8a7794-clock.h
-> @@ -76,6 +76,8 @@
->  #define R8A7794_CLK_SCIF2		19
->  #define R8A7794_CLK_SCIF1		20
->  #define R8A7794_CLK_SCIF0		21
-> +#define R8A7794_CLK_DU1			23
-> +#define R8A7794_CLK_DU0			24
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index d0107d4..fcbca1b 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -505,6 +505,16 @@ config MESON_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called meson_wdt.
 >  
->  /* MSTP8 */
->  #define R8A7794_CLK_VIN1		10
+> +config MEDIATEK_WATCHDOG
+> +	tristate "Mediatek SoCs watchdog support"
+> +	depends on ARCH_MEDIATEK
+> +	select WATCHDOG_CORE
+> +	help
+> +	  Say Y here to include support for the watchdog timer
+> +	  in Mediatek SoCs.
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called mtk_wdt.
+> +
+>  # AVR32 Architecture
+>  
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index c569ec8..0d4821f 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -63,6 +63,7 @@ obj-$(CONFIG_QCOM_WDT) += qcom-wdt.o
+>  obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
+>  obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>  obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
+> +obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
+>  
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
+> new file mode 100644
+> index 0000000..33bf763
+> --- /dev/null
+> +++ b/drivers/watchdog/mtk_wdt.c
+> @@ -0,0 +1,256 @@
+> +/*
+> + * Mediatek Watchdog Driver
+> + *
+> + * Copyright (C) 2014 Matthias Brugger
+> + *
+> + * Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Based on sunxi_wdt.c
+> + */
+> +
+> +#include <linux/clk.h>
+
+Is this include needed ?
+
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/moduleparam.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/types.h>
+> +#include <linux/watchdog.h>
+> +#include <linux/notifier.h>
+> +#include <linux/reboot.h>
+> +#include <linux/delay.h>
+> +
+> +#define WDT_MAX_TIMEOUT		31
+> +#define WDT_MIN_TIMEOUT		1
+> +#define WDT_LENGTH_TIMEOUT(n)	((n) << 5)
+> +
+> +#define WDT_LENGTH		0x04
+> +#define WDT_LENGTH_KEY		0x8
+> +
+> +#define WDT_RST			0x08
+> +#define WDT_RST_RELOAD		0x1971
+> +
+> +#define WDT_MODE		0x00
+> +#define WDT_MODE_EN		(1 << 0)
+> +#define WDT_MODE_EXT_POL_LOW	(0 << 1)
+> +#define WDT_MODE_EXT_POL_HIGH	(1 << 1)
+> +#define WDT_MODE_EXRST_EN	(1 << 2)
+> +#define WDT_MODE_IRQ_EN		(1 << 3)
+> +#define WDT_MODE_AUTO_START	(1 << 4)
+> +#define WDT_MODE_DUAL_EN	(1 << 6)
+> +#define WDT_MODE_KEY		0x22000000
+> +
+> +#define WDT_SWRST		0x14
+> +#define WDT_SWRST_KEY		0x1209
+> +
+> +#define DRV_NAME		"mtk-wdt"
+> +#define DRV_VERSION		"1.0"
+> +
+> +static bool nowayout = WATCHDOG_NOWAYOUT;
+> +static unsigned int timeout = WDT_MAX_TIMEOUT;
+> +
+> +struct mtk_wdt_dev {
+> +	struct watchdog_device wdt_dev;
+> +	void __iomem *wdt_base;
+> +	struct notifier_block restart_handler;
+> +};
+> +
+> +static int mtk_reset_handler(struct notifier_block *this, unsigned long mode,
+> +				void *cmd)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = container_of(this,
+> +						       struct mtk_wdt_dev,
+> +						       restart_handler);
+
+I don't really understand the indentation logic you are using.
+Can you make it consistent ?
+
+I would suggest to align with '(' in the previous line.
+
+> +	void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +
+> +	/* Reset system */
+> +	writel(WDT_SWRST_KEY, wdt_base + WDT_SWRST);
+> +
+> +	while (1) {
+> +		mdelay(5);
+> +		writel(WDT_SWRST_KEY, wdt_base + WDT_SWRST);
+
+By switching those two lines you can remove the initial writel().
+
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static int mtk_wdt_ping(struct watchdog_device *wdt_dev)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +	void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +
+> +	iowrite32(WDT_RST_RELOAD, wdt_base + WDT_RST);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_wdt_set_timeout(struct watchdog_device *wdt_dev,
+> +				unsigned int timeout)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +	void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +	u32 reg;
+> +
+> +	mtk_wdt->wdt_dev.timeout = timeout;
+
+	wdt_dev->timeout = timeout;
+
+would be less complex.
+
+> +
+> +	/*
+> +	 * One bit is the value of 512 ticks
+> +	 * The clock has 32 KHz
+> +	 */
+> +	reg = WDT_LENGTH_TIMEOUT(timeout << 6) | WDT_LENGTH_KEY;
+> +	iowrite32(reg, wdt_base + WDT_LENGTH);
+> +
+> +	mtk_wdt_ping(wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_wdt_stop(struct watchdog_device *wdt_dev)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +	void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +	u32 reg;
+> +
+> +	reg = readl(wdt_base + WDT_MODE);
+> +	reg &= ~(WDT_MODE_EN);
+
+Unnecessary ( )
+
+> +	iowrite32(reg, wdt_base + WDT_MODE);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_wdt_start(struct watchdog_device *wdt_dev)
+> +{
+> +	u32 reg;
+> +	struct mtk_wdt_dev *mtk_wdt = watchdog_get_drvdata(wdt_dev);
+> +	void __iomem *wdt_base = mtk_wdt->wdt_base;
+> +	u32 ret;
+> +
+> +	ret = mtk_wdt_set_timeout(&mtk_wdt->wdt_dev,
+> +			mtk_wdt->wdt_dev.timeout);
+
+Why not just wdt_dev and wdt_dev->timeout ?
+
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	reg = ioread32(wdt_base + WDT_MODE);
+> +	reg &= ~(WDT_MODE_IRQ_EN | WDT_MODE_DUAL_EN);
+> +	reg |= (WDT_MODE_EN | WDT_MODE_KEY);
+> +	iowrite32(reg, wdt_base + WDT_MODE);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct watchdog_info mtk_wdt_info = {
+> +	.identity	= DRV_NAME,
+> +	.options	= WDIOF_SETTIMEOUT |
+> +			  WDIOF_KEEPALIVEPING |
+> +			  WDIOF_MAGICCLOSE,
+> +};
+> +
+> +static const struct watchdog_ops mtk_wdt_ops = {
+> +	.owner		= THIS_MODULE,
+> +	.start		= mtk_wdt_start,
+> +	.stop		= mtk_wdt_stop,
+> +	.ping		= mtk_wdt_ping,
+> +	.set_timeout	= mtk_wdt_set_timeout,
+> +};
+> +
+> +static int mtk_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt;
+> +	struct resource *res;
+> +	int err;
+> +
+> +	mtk_wdt = devm_kzalloc(&pdev->dev, sizeof(*mtk_wdt), GFP_KERNEL);
+> +	if (!mtk_wdt)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, mtk_wdt);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	mtk_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(mtk_wdt->wdt_base))
+> +		return PTR_ERR(mtk_wdt->wdt_base);
+> +
+> +	mtk_wdt->wdt_dev.info = &mtk_wdt_info;
+> +	mtk_wdt->wdt_dev.ops = &mtk_wdt_ops;
+> +	mtk_wdt->wdt_dev.timeout = WDT_MAX_TIMEOUT;
+> +	mtk_wdt->wdt_dev.max_timeout = WDT_MAX_TIMEOUT;
+> +	mtk_wdt->wdt_dev.min_timeout = WDT_MIN_TIMEOUT;
+> +	mtk_wdt->wdt_dev.parent = &pdev->dev;
+> +
+> +	watchdog_init_timeout(&mtk_wdt->wdt_dev, timeout, &pdev->dev);
+> +	watchdog_set_nowayout(&mtk_wdt->wdt_dev, nowayout);
+> +
+> +	watchdog_set_drvdata(&mtk_wdt->wdt_dev, mtk_wdt);
+> +
+> +	mtk_wdt_stop(&mtk_wdt->wdt_dev);
+> +
+> +	err = watchdog_register_device(&mtk_wdt->wdt_dev);
+> +	if (unlikely(err))
+> +		return err;
+> +
+> +	mtk_wdt->restart_handler.notifier_call = mtk_reset_handler;
+> +	mtk_wdt->restart_handler.priority = 128;
+> +	err = register_restart_handler(&mtk_wdt->restart_handler);
+> +	if (err)
+> +		dev_warn(&pdev->dev,
+> +			"cannot register restart handler (err=%d)\n", err);
+> +
+> +	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
+> +			mtk_wdt->wdt_dev.timeout, nowayout);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = platform_get_drvdata(pdev);
+> +
+> +	unregister_restart_handler(&mtk_wdt->restart_handler);
+> +
+> +	watchdog_unregister_device(&mtk_wdt->wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id mtk_wdt_dt_ids[] = {
+> +	{ .compatible = "mediatek,mt6589-wdt" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mtk_wdt_dt_ids);
+> +
+> +static struct platform_driver mtk_wdt_driver = {
+> +	.probe		= mtk_wdt_probe,
+> +	.remove		= mtk_wdt_remove,
+> +	.driver		= {
+> +		.owner		= THIS_MODULE,
+> +		.name		= DRV_NAME,
+> +		.of_match_table	= mtk_wdt_dt_ids,
+> +	},
+> +};
+> +
+> +module_platform_driver(mtk_wdt_driver);
+> +
+> +module_param(timeout, uint, 0);
+> +MODULE_PARM_DESC(timeout, "Watchdog heartbeat in seconds");
+> +
+> +module_param(nowayout, bool, 0);
+> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+> +			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Matthias Brugger <matthias.bgg@gmail.com>");
+> +MODULE_DESCRIPTION("Mediatek WatchDog Timer Driver");
+> +MODULE_VERSION(DRV_VERSION);
 > -- 
-> 2.1.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.9.1
 > 
