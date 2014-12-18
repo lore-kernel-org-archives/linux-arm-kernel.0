@@ -1,30 +1,35 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 18 Dec 2014 13:27:04 +0000
-Subject: [PATCH 2/4] arm64: GICv3: change unsigned types for AArch32
- compatibility
-In-Reply-To: <1418307788-17977-3-git-send-email-jean-philippe.brucker@arm.com>
-References: <1418307788-17977-1-git-send-email-jean-philippe.brucker@arm.com>
- <1418307788-17977-3-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <5492D628.50708@arm.com>
+From: xerofoify@gmail.com (nick)
+Date: Thu, 18 Dec 2014 08:35:10 -0500
+Subject: Weird/Unneeded call to msleep in exynos_mipi_dsi_wr_data in
+ exynos_mipi_dsi_common.c
+In-Reply-To: <5492ABE7.1060900@samsung.com>
+References: <54920A54.2060608@gmail.com> <5492ABE7.1060900@samsung.com>
+Message-ID: <5492D80E.3010906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
-
-On 11/12/14 14:23, Jean-Philippe Brucker wrote:
-> -static int gic_populate_rdist(void)
-> +static int __init gic_populate_rdist(void)
-              ^^^^^^
-This change breaks cpu hotplug. Is it intentional?
-
-Vladimir
-
->  {
-> -     u64 mpidr = cpu_logical_map(smp_processor_id());
-> +     unsigned long mpidr = cpu_logical_map(smp_processor_id());
->       u64 typer;
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
-
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+Krzysztof,
+If we look at the code for this function, it already is handling the data correctly. In addition  the locks 
+seem to be better protection then msleep. Further more is no reason for this delay as we are neither resetting 
+the hardware or waiting for the hardware here so why is it needed? I don't have Exynos based hardware lying
+around through to test it.
+Nick
+On 2014-12-18 05:26 AM, Krzysztof Koz?owski wrote:
+> On 17.12.2014 23:57, nick wrote:
+>> Greetings Fellow Maintainers,
+>> Sorry if I wasting your time but it seems there is a unneeded call to msleep
+> 
+> Hi,
+> 
+> 1. Please describe exactly why do you think this is not needed.
+> 2. Do you have Exynos-based hardware to test your changes?
+> 
+> Best regards,
+> Krzysztof
+> 
+>> and rather trivial fix me to fix in the file,exynos_mipi_dsi_common.c for the function,exynos_mipi_dsi_wr_data . If there is a valid reason for this call please let me known when any of you  have some free time. Otherwise I will send in a patch to remove this unneeded
+>> call to msleep.
+>> Thanks,
+>> Nick  
+> 
+> 
