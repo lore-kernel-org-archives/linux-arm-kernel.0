@@ -1,62 +1,96 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 18 Dec 2014 10:27:22 +0800
-Subject: [PATCH v4 1/5] media: soc-camera: use icd->control instead of
- icd->pdev for reset()
+Date: Thu, 18 Dec 2014 10:27:23 +0800
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
 In-Reply-To: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
 References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1418869646-17071-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-icd->control is the sub device dev, i.e. i2c device.
-icd->pdev is the soc camera device's device.
+To support async probe for ov2640, we need remove the code to get 'mclk'
+in ov2640_probe() function. oterwise, if soc_camera host is not probed
+in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
+function.
 
-To be consitent with power() function, we will call reset() with
-icd->control as well.
+So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
+soc_camera_set_power() function.
+
+And if soc_camera host is probed, the when ov2640_s_power() is called,
+then we can get the 'mclk' and that make us enable/disable soc_camera
+host's clock as well.
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
-v3->v4:
-  none
+v3 -> v4:
+v2 -> v3:
+v1 -> v2:
+  no changes.
 
-v2->v3:
-  1. check whether icd->control is NULL or not.
+ drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
 
- drivers/media/platform/soc_camera/soc_camera.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
-index f4be2a1..7e6b914 100644
---- a/drivers/media/platform/soc_camera/soc_camera.c
-+++ b/drivers/media/platform/soc_camera/soc_camera.c
-@@ -688,7 +688,8 @@ static int soc_camera_open(struct file *file)
+diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+index 1fdce2f..9ee910d 100644
+--- a/drivers/media/i2c/soc_camera/ov2640.c
++++ b/drivers/media/i2c/soc_camera/ov2640.c
+@@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+ 	struct ov2640_priv *priv = to_ov2640(client);
++	struct v4l2_clk *clk;
++
++	if (!priv->clk) {
++		clk = v4l2_clk_get(&client->dev, "mclk");
++		if (IS_ERR(clk))
++			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
++		else
++			priv->clk = clk;
++	}
  
- 		/* The camera could have been already on, try to reset */
- 		if (sdesc->subdev_desc.reset)
--			sdesc->subdev_desc.reset(icd->pdev);
-+			if (icd->control)
-+				sdesc->subdev_desc.reset(icd->control);
+ 	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+ }
+@@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
+ 	if (priv->hdl.error)
+ 		return priv->hdl.error;
  
- 		ret = soc_camera_add_device(icd);
- 		if (ret < 0) {
-@@ -1175,7 +1176,8 @@ static void scan_add_host(struct soc_camera_host *ici)
+-	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+-	if (IS_ERR(priv->clk)) {
+-		ret = PTR_ERR(priv->clk);
+-		goto eclkget;
+-	}
+-
+ 	ret = ov2640_video_probe(client);
+ 	if (ret) {
+-		v4l2_clk_put(priv->clk);
+-eclkget:
+-		v4l2_ctrl_handler_free(&priv->hdl);
++		goto evideoprobe;
+ 	} else {
+ 		dev_info(&adapter->dev, "OV2640 Probed\n");
+ 	}
  
- 			/* The camera could have been already on, try to reset */
- 			if (ssdd->reset)
--				ssdd->reset(icd->pdev);
-+				if (icd->control)
-+					ssdd->reset(icd->control);
++	ret = v4l2_async_register_subdev(&priv->subdev);
++	if (ret < 0)
++		goto evideoprobe;
++
++	return 0;
++
++evideoprobe:
++	v4l2_ctrl_handler_free(&priv->hdl);
+ 	return ret;
+ }
  
- 			icd->parent = ici->v4l2_dev.dev;
+@@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
+ {
+ 	struct ov2640_priv       *priv = to_ov2640(client);
  
-@@ -1461,7 +1463,7 @@ static int soc_camera_async_bound(struct v4l2_async_notifier *notifier,
- 				memcpy(&sdesc->subdev_desc, ssdd,
- 				       sizeof(sdesc->subdev_desc));
- 				if (ssdd->reset)
--					ssdd->reset(icd->pdev);
-+					ssdd->reset(&client->dev);
- 			}
- 
- 			icd->control = &client->dev;
+-	v4l2_clk_put(priv->clk);
++	v4l2_async_unregister_subdev(&priv->subdev);
++	if (priv->clk)
++		v4l2_clk_put(priv->clk);
+ 	v4l2_device_unregister_subdev(&priv->subdev);
+ 	v4l2_ctrl_handler_free(&priv->hdl);
+ 	return 0;
 -- 
 1.9.1
