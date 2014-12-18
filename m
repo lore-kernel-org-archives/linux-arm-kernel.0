@@ -1,118 +1,419 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Dec 2014 10:16:18 +0000
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <5491F0B6.4090904@ti.com>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk>
- <5491F0B6.4090904@ti.com>
-Message-ID: <20141218101618.GJ11502@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 18 Dec 2014 11:23:13 +0100
+Subject: [PATCH v3] input: Add new sun4i-lradc-keys driver
+Message-ID: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 11:08:06PM +0200, Jyri Sarha wrote:
-> I tried booting my 4460 Panda - which is the closest thing to 4430SDP that
-> I've got - on next-20141217, but I could not get it to the point where the
-> omap-abe-twl6040 probed. It probably is the problem you are talking about as
-> the hang does not happen if I disable ASoC ABE all together, right?
-> 
-> I'll take a deeper look at it tomorrow, as Peter is not working ATM.
+Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
+specifically designed to have various (tablet) keys (ie home, back, search,
+etc). attached to it using a resistor network. This adds a driver for this.
 
-Digging into this at my end:
+There are 2 channels, currently this driver only supports chan0 since there
+are no boards known to use chan1.
 
-[<c02c8698>] (snd_soc_instantiate_card) from [<c02c95f0>] (snd_soc_register_card+0x344/0x424)
- r10:0000005c r9:00000000 r8:00000620 r7:ce437630 r6:ce437630 r5:00000002
- r4:c05cae58
+This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
+a20-olinuxino-micro.
 
-c02c95e8:       e1a00004        mov     r0, r4
-c02c95ec:       ebfffc29        bl      c02c8698 <snd_soc_instantiate_card>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+--
+Changes in v2:
+-Change devicetree bindings to use a per key subnode, like gpio-keys does
+Changes in v3:
+-Handle keyup irq flag before irqdown, in case we get both at once
+---
+ .../devicetree/bindings/input/sun4i-lradc-keys.txt |  62 +++++
+ MAINTAINERS                                        |   7 +
+ drivers/input/keyboard/Kconfig                     |  10 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/sun4i-lradc-keys.c          | 259 +++++++++++++++++++++
+ 5 files changed, 339 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+ create mode 100644 drivers/input/keyboard/sun4i-lradc-keys.c
 
-So 'card' is 0xc05cae58, which is correct: c05cae58 d omap_abe_card
-
-[<c02cc0ec>] (snd_soc_dapm_add_routes) from [<c02c8f40>] (snd_soc_instantiate_card+0x8a8/0xc14)
- r10:00000000 r9:00000000 r8:ce437010 r7:ce437630 r6:00000002 r5:c05cb0bc
- r4:c05cae58
-
-c02c8f28:       e594110c        ldr     r1, [r4, #268]  ; 0x10c
-c02c8f2c:       e3510000        cmp     r1, #0
-c02c8f30:       0a000002        beq     c02c8f40 <snd_soc_instantiate_card+0x8a8>
-c02c8f34:       e51b0044        ldr     r0, [fp, #-68]  ; 0x44
-c02c8f38:       e5942110        ldr     r2, [r4, #272]  ; 0x110
-c02c8f3c:       eb000c6a        bl      c02cc0ec <snd_soc_dapm_add_routes>
-
-This corresponds with:
-
-        if (card->dapm_routes)
-                snd_soc_dapm_add_routes(&card->dapm, card->dapm_routes,
-                                        card->num_dapm_routes);
-
-Again, we see r4 is the omap_abe_card, and the code is loading dapm_routes
-and num_dapm_routes.  The dump of this in the vmlinux file gives:
-
-c05cae58 <omap_abe_card>:
-        ...
-c05caf5c:       c045d098        umaalgt sp, r5, r8, r0
-c05caf60:       0000000a        andeq   r0, r0, sl
-c05caf64:       c045d6a4        subgt   sp, r5, r4, lsr #13
-c05caf68:       00000011        andeq   r0, r0, r1, lsl r0
-
-and 0x10c/0x110 gives 0xc045d6a4  / 17.  c045d6a4 r audio_map
-So that looks fine.
-
-[<c02cbf08>] (snd_soc_dapm_add_route) from [<c02cc134>] (snd_soc_dapm_add_routes+0x48/0xac)
- r10:c0458801 r9:00000000 r8:00000037 r7:00000000 r6:00000000 r5:c05cafb8
- r4:ce57b420
-
-c02cc0ec <snd_soc_dapm_add_routes>:
-c02cc0fc:       e1a05000        mov     r5, r0
-c02cc104:       e1a04001        mov     r4, r1
-c02cc108:       e3a07000        mov     r7, #0
-c02cc114:       e1a08002        mov     r8, r2
-c02cc118:       e2844010        add     r4, r4, #16
-c02cc120:       e1a06007        mov     r6, r7
-c02cc128:       ea00000f        b       c02cc16c <snd_soc_dapm_add_routes+0x80>
-
-c02cc12c:       e1a00005        mov     r0, r5
-c02cc130:       ebffff74        bl      c02cbf08 <snd_soc_dapm_add_route>
-c02cc134:       e2509000        subs    r9, r0, #0
-c02cc138:       aa000009        bge     c02cc164 <snd_soc_dapm_add_routes+0x78>
-...
-c02cc168:       e2844010        add     r4, r4, #16
-c02cc16c:       e1560008        cmp     r6, r8
-c02cc170:       e2441010        sub     r1, r4, #16
-c02cc174:       baffffec        blt     c02cc12c <snd_soc_dapm_add_routes+0x40>
-
-Here, r5 is &card->dapm.  r4 should be card->dapm_routes, possibly
-incremented by 16 up to 17 times, which should be in the range of
-0xc045d6a4 - 0xc045d7b4, but it isn't, it's 0xce57b420.
-
-Also, r8 is card->num_dapm_routes, which should be 17, but it's 0x37
-(55).  The index is r6, and at least that's sensibly at zero.
-
-Now, we have this call to snd_soc_of_parse_audio_routing(), which
-allocates some memory, copies the old routes into it, and then adds
-to them from DT.  That explains why the pointer and number of routes
-are different - there's 19 routes in omap4-sdp.dts - 17 + 19 = 36.
-So that doesn't work - but importantly, it does point towards a
-possible culpret - snd_soc_of_parse_audio_routing().
-
-This is obvious when you stop and think about what it's doing, this is
-truely where this bug lies, and it /is/ in generic ASoC code.
-
-The problem is that this function doesn't consider the implications of
-deferred probing.  Let's see what happens if we defer, and re-do the
-ABE initialisation, including calling this function:
-
-17 + 19 = 36. - first probe
-17 + 19 + 19 = 55. - second probe
-
-Oh - that works in terms of the number, and it would also explain why
-the table has been screwed - because the second time we memcpy(), we're
-memcpy()ing from data which was allocated via devm_kzalloc(), and thus
-would have been freed after the first failed probe.
-
-Mark - this is a core ASoC problem.
-
+diff --git a/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+new file mode 100644
+index 0000000..b9c32f6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
+@@ -0,0 +1,62 @@
++Allwinner sun4i low res adc attached tablet keys
++------------------------------------------------
++
++Required properties:
++ - compatible: "allwinner,sun4i-a10-lradc-keys"
++ - reg: mmio address range of the chip
++ - interrupts: interrupt to which the chip is connected
++ - vref-supply: powersupply for the lradc reference voltage
++
++Each key is represented as a sub-node of "allwinner,sun4i-a10-lradc-keys":
++
++Required subnode-properties:
++	- label: Descriptive name of the key.
++	- linux,code: Keycode to emit.
++	- channel: Channel this key is attached to, mut be 0 or 1.
++	- voltage: Voltage in ?V at lradc input when this key is pressed.
++
++Example:
++
++#include <dt-bindings/input/input.h>
++
++	lradc: lradc at 01c22800 {
++		compatible = "allwinner,sun4i-a10-lradc-keys";
++		reg = <0x01c22800 0x100>;
++		interrupts = <31>;
++		vref-supply = <&reg_vcc3v0>;
++
++		button at 191 {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			channel = <0>;
++			voltage = <191274>;
++		};
++
++		button at 392 {
++			label = "Volume Down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			channel = <0>;
++			voltage = <392644>;
++		};
++
++		button at 601 {
++			label = "Menu";
++			linux,code = <KEY_MENU>;
++			channel = <0>;
++			voltage = <601151>;
++		};
++
++		button at 795 {
++			label = "Enter";
++			linux,code = <KEY_ENTER>;
++			channel = <0>;
++			voltage = <795090>;
++		};
++
++		button at 987 {
++			label = "Home";
++			linux,code = <KEY_HOMEPAGE>;
++			channel = <0>;
++			voltage = <987387>;
++		};
++	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4507a7e..7e8939c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9209,6 +9209,13 @@ F:	arch/m68k/sun3*/
+ F:	arch/m68k/include/asm/sun3*
+ F:	drivers/net/ethernet/i825xx/sun3*
+ 
++SUN4I LOW RES ADC ATTACHED TABLET KEYS DRIVER
++M:	Hans de Goede <hdegoede@redhat.com>
++L:	linux-input at vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/input/sun4i-lradc-keys.txt
++F:	drivers/input/keyboard/sun4i-lradc-keys.c
++
+ SUNDANCE NETWORK DRIVER
+ M:	Denis Kirjanov <kda@linux-powerpc.org>
+ L:	netdev at vger.kernel.org
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index 96ee26c..8df4f0e 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -567,6 +567,16 @@ config KEYBOARD_STMPE
+ 	  To compile this driver as a module, choose M here: the module will be
+ 	  called stmpe-keypad.
+ 
++config KEYBOARD_SUN4I_LRADC
++	tristate "Allwinner sun4i low res adc attached tablet keys support"
++	depends on ARCH_SUNXI
++	help
++	  This selects support for the Allwinner low res adc attached tablet
++	  keys found on Allwinner sunxi SoCs.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called sun4i-lradc-keys.
++
+ config KEYBOARD_DAVINCI
+ 	tristate "TI DaVinci Key Scan"
+ 	depends on ARCH_DAVINCI_DM365
+diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
+index febafa5..4707678 100644
+--- a/drivers/input/keyboard/Makefile
++++ b/drivers/input/keyboard/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_KEYBOARD_SPEAR)		+= spear-keyboard.o
+ obj-$(CONFIG_KEYBOARD_STMPE)		+= stmpe-keypad.o
+ obj-$(CONFIG_KEYBOARD_STOWAWAY)		+= stowaway.o
+ obj-$(CONFIG_KEYBOARD_ST_KEYSCAN)	+= st-keyscan.o
++obj-$(CONFIG_KEYBOARD_SUN4I_LRADC)	+= sun4i-lradc-keys.o
+ obj-$(CONFIG_KEYBOARD_SUNKBD)		+= sunkbd.o
+ obj-$(CONFIG_KEYBOARD_TC3589X)		+= tc3589x-keypad.o
+ obj-$(CONFIG_KEYBOARD_TEGRA)		+= tegra-kbc.o
+diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
+new file mode 100644
+index 0000000..06d5c69
+--- /dev/null
++++ b/drivers/input/keyboard/sun4i-lradc-keys.c
+@@ -0,0 +1,259 @@
++/*
++ * Allwinner sun4i low res adc attached tablet keys driver
++ *
++ * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/*
++ * Allwinnner sunxi SoCs have a lradc which is specifically designed to have
++ * various (tablet) keys (ie home, back, search, etc). attached to it using
++ * a resistor network. This driver is for the keys on such boards.
++ *
++ * There are 2 channels, currently this driver only supports channel 0 since
++ * there are no boards known to use channel 1.
++ */
++
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/input.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
++#include <linux/slab.h>
++
++#define LRADC_CTRL		0x00
++#define LRADC_INTC		0x04
++#define LRADC_INTS		0x08
++#define LRADC_DATA0		0x0c
++#define LRADC_DATA1		0x10
++
++/* LRADC_CTRL bits */
++#define FIRST_CONVERT_DLY(x)	((x) << 24) /* 8 bits */
++#define CHAN_SELECT(x)		((x) << 22) /* 2 bits */
++#define CONTINUE_TIME_SEL(x)	((x) << 16) /* 4 bits */
++#define KEY_MODE_SEL(x)		((x) << 12) /* 2 bits */
++#define LEVELA_B_CNT(x)		((x) << 8)  /* 4 bits */
++#define HOLD_EN(x)		((x) << 6)
++#define LEVELB_VOL(x)		((x) << 4)  /* 2 bits */
++#define SAMPLE_RATE(x)		((x) << 2)  /* 2 bits */
++#define ENABLE(x)		((x) << 0)
++
++/* LRADC_INTC and LRADC_INTS bits */
++#define CHAN1_KEYUP_IRQ		BIT(12)
++#define CHAN1_ALRDY_HOLD_IRQ	BIT(11)
++#define CHAN1_HOLD_IRQ		BIT(10)
++#define	CHAN1_KEYDOWN_IRQ	BIT(9)
++#define CHAN1_DATA_IRQ		BIT(8)
++#define CHAN0_KEYUP_IRQ		BIT(4)
++#define CHAN0_ALRDY_HOLD_IRQ	BIT(3)
++#define CHAN0_HOLD_IRQ		BIT(2)
++#define	CHAN0_KEYDOWN_IRQ	BIT(1)
++#define CHAN0_DATA_IRQ		BIT(0)
++
++struct sun4i_lradc_keymap {
++	u32 voltage;
++	u32 keycode;
++};
++
++struct sun4i_lradc_data {
++	struct device *dev;
++	struct input_dev *input;
++	void __iomem *base;
++	struct regulator *vref_supply;
++	struct sun4i_lradc_keymap *chan0_map;
++	u32 chan0_map_count;
++	u32 chan0_keycode;
++	u32 vref;
++};
++
++static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
++{
++	struct sun4i_lradc_data *lradc = dev_id;
++	u32 i, ints, val, voltage, diff, keycode = 0, closest = 0xffffffff;
++
++	ints  = readl(lradc->base + LRADC_INTS);
++
++	/*
++	 * lradc supports only one keypress at a time, release does not give
++	 * any info as to which key was released, so we cache the keycode.
++	 */
++
++	if (ints & CHAN0_KEYUP_IRQ) {
++		input_report_key(lradc->input, lradc->chan0_keycode, 0);
++		lradc->chan0_keycode = 0;
++	}
++
++	if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
++		val = readl(lradc->base + LRADC_DATA0) & 0x3f;
++		voltage = val * lradc->vref / 63;
++
++		for (i = 0; i < lradc->chan0_map_count; i++) {
++			diff = abs(lradc->chan0_map[i].voltage - voltage);
++			if (diff < closest) {
++				closest = diff;
++				keycode = lradc->chan0_map[i].keycode;
++			}
++		}
++
++		lradc->chan0_keycode = keycode;
++		input_report_key(lradc->input, lradc->chan0_keycode, 1);
++	}
++
++	input_sync(lradc->input);
++
++	writel(ints, lradc->base + LRADC_INTS);
++
++	return IRQ_HANDLED;
++}
++
++static int sun4i_lradc_open(struct input_dev *dev)
++{
++	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
++	int ret;
++
++	ret = regulator_enable(lradc->vref_supply);
++	if (ret)
++		return ret;
++
++	/* lradc Vref internally is divided by 2/3 */
++	lradc->vref = regulator_get_voltage(lradc->vref_supply) * 2 / 3;
++
++	/*
++	 * Set sample time to 4 ms / 250 Hz. Wait 2 * 4 ms for key to
++	 * stabilize on press, wait (1 + 1) * 4 ms for key release
++	 */
++	writel(FIRST_CONVERT_DLY(2) | LEVELA_B_CNT(1) | HOLD_EN(1) |
++		SAMPLE_RATE(0) | ENABLE(1), lradc->base + LRADC_CTRL);
++
++	writel(CHAN0_KEYUP_IRQ | CHAN0_KEYDOWN_IRQ, lradc->base + LRADC_INTC);
++
++	return 0;
++}
++
++static void sun4i_lradc_close(struct input_dev *dev)
++{
++	struct sun4i_lradc_data *lradc = input_get_drvdata(dev);
++
++	/* Disable lradc, leave other settings unchanged */
++	writel(FIRST_CONVERT_DLY(2) | LEVELA_B_CNT(1) | HOLD_EN(1) |
++		SAMPLE_RATE(2), lradc->base + LRADC_CTRL);
++	writel(0, lradc->base + LRADC_INTC);
++
++	regulator_disable(lradc->vref_supply);
++}
++
++static int sun4i_lradc_probe(struct platform_device *pdev)
++{
++	struct sun4i_lradc_data *lradc;
++	struct device *dev = &pdev->dev;
++	struct device_node *pp, *np = dev->of_node;
++	u32 channel;
++	int i, ret;
++
++	lradc = devm_kzalloc(dev, sizeof(struct sun4i_lradc_data), GFP_KERNEL);
++	if (!lradc)
++		return -ENOMEM;
++
++	lradc->chan0_map_count = of_get_child_count(np);
++	lradc->chan0_map = devm_kmalloc(dev, lradc->chan0_map_count *
++				sizeof(struct sun4i_lradc_keymap), GFP_KERNEL);
++	if (!lradc->chan0_map)
++		return -ENOMEM;
++
++	i = 0;
++	for_each_child_of_node(np, pp) {
++		struct sun4i_lradc_keymap *map = &lradc->chan0_map[i];
++
++		ret = of_property_read_u32(pp, "channel", &channel);
++		if (ret || channel != 0) {
++			dev_err(dev, "%s: Inval channel prop\n", pp->name);
++			return -EINVAL;
++		}
++
++		ret = of_property_read_u32(pp, "voltage", &map->voltage);
++		if (ret) {
++			dev_err(dev, "%s: Inval voltage prop\n", pp->name);
++			return -EINVAL;
++		}
++
++		ret = of_property_read_u32(pp, "linux,code", &map->keycode);
++		if (ret) {
++			dev_err(dev, "%s: Inval linux,code prop\n", pp->name);
++			return -EINVAL;
++		}
++
++		i++;
++	}
++
++	lradc->vref_supply = devm_regulator_get(dev, "vref");
++	if (IS_ERR(lradc->vref_supply))
++		return PTR_ERR(lradc->vref_supply);
++
++	lradc->dev = dev;
++	lradc->input = devm_input_allocate_device(dev);
++	if (!lradc->input)
++		return -ENOMEM;
++
++	lradc->input->name = pdev->name;
++	lradc->input->phys = "sun4i_lradc/input0";
++	lradc->input->open = sun4i_lradc_open;
++	lradc->input->close = sun4i_lradc_close;
++	lradc->input->id.bustype = BUS_HOST;
++	lradc->input->id.vendor = 0x0001;
++	lradc->input->id.product = 0x0001;
++	lradc->input->id.version = 0x0100;
++	lradc->input->evbit[0] =  BIT(EV_SYN) | BIT(EV_KEY);
++	for (i = 0; i < lradc->chan0_map_count; i++)
++		set_bit(lradc->chan0_map[i].keycode, lradc->input->keybit);
++	input_set_drvdata(lradc->input, lradc);
++
++	lradc->base = devm_ioremap_resource(dev,
++			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
++	if (IS_ERR(lradc->base))
++		return PTR_ERR(lradc->base);
++
++	ret = devm_request_irq(dev, platform_get_irq(pdev, 0), sun4i_lradc_irq,
++			       0, "sun4i-a10-lradc-keys", lradc);
++	if (ret)
++		return ret;
++
++	ret = input_register_device(lradc->input);
++	if (ret)
++		return ret;
++
++	platform_set_drvdata(pdev, lradc);
++	return 0;
++}
++
++static const struct of_device_id sun4i_lradc_of_match[] = {
++	{ .compatible = "allwinner,sun4i-a10-lradc-keys", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, sun4i_lradc_of_match);
++
++static struct platform_driver sun4i_lradc_driver = {
++	.driver = {
++		.name	= "sun4i-a10-lradc-keys",
++		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
++	},
++	.probe	= sun4i_lradc_probe,
++};
++
++module_platform_driver(sun4i_lradc_driver);
++
++MODULE_DESCRIPTION("Allwinner sun4i low res adc attached tablet keys driver");
++MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
++MODULE_LICENSE("GPL");
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
