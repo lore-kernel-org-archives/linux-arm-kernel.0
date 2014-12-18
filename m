@@ -1,26 +1,40 @@
-From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Thu, 18 Dec 2014 11:26:47 +0100
-Subject: Weird/Unneeded call to msleep in exynos_mipi_dsi_wr_data in
- exynos_mipi_dsi_common.c
-In-Reply-To: <54920A54.2060608@gmail.com>
-References: <54920A54.2060608@gmail.com>
-Message-ID: <5492ABE7.1060900@samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 18 Dec 2014 11:31:15 +0100
+Subject: [PATCH RFC v2 05/14] ARM: imx6q: clk: Add the video_27m clock
+In-Reply-To: <1418886696-11636-6-git-send-email-Ying.Liu@freescale.com>
+References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
+ <1418886696-11636-6-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418898675.4212.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.12.2014 23:57, nick wrote:
-> Greetings Fellow Maintainers,
-> Sorry if I wasting your time but it seems there is a unneeded call to msleep
+Am Donnerstag, den 18.12.2014, 15:11 +0800 schrieb Liu Ying:
+> This patch supports the video_27m clock which is a fixed factor
+> clock of the pll3_pfd1_540m clock.
+> 
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+> v1->v2:
+>  * None.
+> 
+>  arch/arm/mach-imx/clk-imx6q.c             | 1 +
+>  include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
+>  2 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index 4e79da7..9470df3 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -246,6 +246,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+>  	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
+>  	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
+> +	clk[IMX6QDL_CLK_VIDEO_27M] = imx_clk_fixed_factor("video_27m", "pll3_pfd1_540m", 1, 20);
 
-Hi,
+The HDMI TX isfr clock input is sourced from video_27m, too, according
+to Table 33-1 "HDMI clocks".
+I think the parent of clk[IMX6QDL_CLK_HDMI_ISFR] should be changed from
+"pll3_pfd1_540m" to "video_27m", then.
 
-1. Please describe exactly why do you think this is not needed.
-2. Do you have Exynos-based hardware to test your changes?
-
-Best regards,
-Krzysztof
-
-> and rather trivial fix me to fix in the file,exynos_mipi_dsi_common.c for the function,exynos_mipi_dsi_wr_data . If there is a valid reason for this call please let me known when any of you  have some free time. Otherwise I will send in a patch to remove this unneeded
-> call to msleep.
-> Thanks,
-> Nick  
+regards
+Philipp
