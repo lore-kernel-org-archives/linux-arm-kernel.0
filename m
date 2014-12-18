@@ -1,69 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 18 Dec 2014 08:41:29 +0000
-Subject: [PATCH v2 07/13] mfd: sun6i-prcm: Add support for the ir-clk
-In-Reply-To: <1418836704-15689-8-git-send-email-hdegoede@redhat.com>
-References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-8-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141218084129.GT13885@x1>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 18 Dec 2014 09:42:14 +0100
+Subject: [PATCH resend v2] input: Add new sun4i-lradc-keys driver
+In-Reply-To: <1918972.jFlKNuYrbH@dtor-glaptop>
+References: <1418827411-13265-1-git-send-email-hdegoede@redhat.com>
+ <1418827411-13265-2-git-send-email-hdegoede@redhat.com>
+ <1918972.jFlKNuYrbH@dtor-glaptop>
+Message-ID: <54929366.7050002@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Dec 2014, Hans de Goede wrote:
+Hi,
 
-> Add support for the ir-clk which is part of the sun6i SoC prcm module.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/mfd/sun6i-prcm.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+On 17-12-14 18:32, Dmitry Torokhov wrote:
+> On Wednesday, December 17, 2014 03:43:31 PM Hans de Goede wrote:
+>> +       /*
+>> +        * lradc supports only one keypress at a time, release does not give
+>> +        * any info as to which key was released, so we cache the keycode.
+>> +        */
+>> +       if ((ints & CHAN0_KEYDOWN_IRQ) && lradc->chan0_keycode == 0) {
+>> +               val = readl(lradc->base + LRADC_DATA0) & 0x3f;
+>> +               voltage = val * lradc->vref / 63;
+>> +
+>> +               for (i = 0; i < lradc->chan0_map_count; i++) {
+>> +                       diff = abs(lradc->chan0_map[i].voltage - voltage);
+>> +                       if (diff < closest) {
+>> +                               closest = diff;
+>> +                               keycode = lradc->chan0_map[i].keycode;
+>> +                       }
+>> +               }
+>> +
+>> +               lradc->chan0_keycode = keycode;
+>> +               input_report_key(lradc->input, lradc->chan0_keycode, 1);
+>> +       }
+>> +
+>> +       if (ints & CHAN0_KEYUP_IRQ) {
+>> +               input_report_key(lradc->input, lradc->chan0_keycode, 0);
+>> +               lradc->chan0_keycode = 0;
+>> +       }
+>
+> Can release and press be reported simultaneously? Should we process release
+> first?
 
-Pretty standard stuff (
+Good question, I guess if we are somehow really slow with processing the interrupt
+that this may happen. So I'll do a v3 swapping the 2.
 
-> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
-> index 2f2e9f0..1911731 100644
-> --- a/drivers/mfd/sun6i-prcm.c
-> +++ b/drivers/mfd/sun6i-prcm.c
-> @@ -41,6 +41,14 @@ static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
->  	},
->  };
->  
-> +static const struct resource sun6i_a31_ir_clk_res[] = {
-> +	{
-> +		.start = 0x54,
-> +		.end = 0x57,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +};
+Regards,
 
-I'm still unkeen on this registers not being defined -- but whateveer!
-
->  static const struct resource sun6i_a31_apb0_rstc_res[] = {
->  	{
->  		.start = 0xb0,
-> @@ -69,6 +77,12 @@ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
->  		.resources = sun6i_a31_apb0_gates_clk_res,
->  	},
->  	{
-> +		.name = "sun6i-a31-ir-clk",
-> +		.of_compatible = "allwinner,sun4i-a10-mod0-clk",
-> +		.num_resources = ARRAY_SIZE(sun6i_a31_ir_clk_res),
-> +		.resources = sun6i_a31_ir_clk_res,
-> +	},
-> +	{
->  		.name = "sun6i-a31-apb0-clock-reset",
->  		.of_compatible = "allwinner,sun6i-a31-clock-reset",
->  		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
-
-This is all pretty standard stuff:
-
-For my own reference:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Do you do  you expect this patch to be handled?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Hans
