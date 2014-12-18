@@ -1,37 +1,62 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 18 Dec 2014 10:27:21 +0800
-Subject: [PATCH v4 0/5] media: ov2640: add device tree support
-Message-ID: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+Date: Thu, 18 Dec 2014 10:27:22 +0800
+Subject: [PATCH v4 1/5] media: soc-camera: use icd->control instead of
+ icd->pdev for reset()
+In-Reply-To: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418869646-17071-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add device tree support for ov2640. And also add
-the document for the devicetree properties.
+icd->control is the sub device dev, i.e. i2c device.
+icd->pdev is the soc camera device's device.
 
+To be consitent with power() function, we will call reset() with
+icd->control as well.
+
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 v3->v4:
-  1. refined the dt document.
-  2. Add Laurent's acked-by.
+  none
 
 v2->v3:
-  1. fix the gpiod_xxx api usage as we use reset pin as ACTIVE_LOW.
-  2. update the devicetree binding document.
+  1. check whether icd->control is NULL or not.
 
-v1 -> v2:
-  1.  modified the dt bindings according to Laurent's suggestion.
-  2. add a fix patch for soc_camera. Otherwise the .reset() function won't work.
+ drivers/media/platform/soc_camera/soc_camera.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Josh Wu (5):
-  media: soc-camera: use icd->control instead of icd->pdev for reset()
-  media: ov2640: add async probe function
-  media: ov2640: add primary dt support
-  media: ov2640: add a master clock for sensor
-  media: ov2640: dt: add the device tree binding document
-
- .../devicetree/bindings/media/i2c/ov2640.txt       |  46 +++++++
- drivers/media/i2c/soc_camera/ov2640.c              | 141 ++++++++++++++++++---
- drivers/media/platform/soc_camera/soc_camera.c     |   8 +-
- 3 files changed, 175 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
-
+diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
+index f4be2a1..7e6b914 100644
+--- a/drivers/media/platform/soc_camera/soc_camera.c
++++ b/drivers/media/platform/soc_camera/soc_camera.c
+@@ -688,7 +688,8 @@ static int soc_camera_open(struct file *file)
+ 
+ 		/* The camera could have been already on, try to reset */
+ 		if (sdesc->subdev_desc.reset)
+-			sdesc->subdev_desc.reset(icd->pdev);
++			if (icd->control)
++				sdesc->subdev_desc.reset(icd->control);
+ 
+ 		ret = soc_camera_add_device(icd);
+ 		if (ret < 0) {
+@@ -1175,7 +1176,8 @@ static void scan_add_host(struct soc_camera_host *ici)
+ 
+ 			/* The camera could have been already on, try to reset */
+ 			if (ssdd->reset)
+-				ssdd->reset(icd->pdev);
++				if (icd->control)
++					ssdd->reset(icd->control);
+ 
+ 			icd->parent = ici->v4l2_dev.dev;
+ 
+@@ -1461,7 +1463,7 @@ static int soc_camera_async_bound(struct v4l2_async_notifier *notifier,
+ 				memcpy(&sdesc->subdev_desc, ssdd,
+ 				       sizeof(sdesc->subdev_desc));
+ 				if (ssdd->reset)
+-					ssdd->reset(icd->pdev);
++					ssdd->reset(&client->dev);
+ 			}
+ 
+ 			icd->control = &client->dev;
 -- 
 1.9.1
