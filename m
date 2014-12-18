@@ -1,41 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 18 Dec 2014 08:52:05 +0100
-Subject: DT on s3c24xx
-In-Reply-To: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
-References: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
-Message-ID: <20141218075205.GB10857@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 18 Dec 2014 08:13:34 +0000
+Subject: [PATCH 5/8] watchdog: bindings: Provide ST bindings for ST's LPC
+ Watchdog device
+In-Reply-To: <5479005.CEJLtxOOIa@wuerfel>
+References: <1418834727-1602-1-git-send-email-lee.jones@linaro.org>
+ <1418834727-1602-6-git-send-email-lee.jones@linaro.org>
+ <5479005.CEJLtxOOIa@wuerfel>
+Message-ID: <20141218081334.GO13885@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 17 Dec 2014, Arnd Bergmann wrote:
 
-[Cc += linusw, linux-gpio]
-
-On Wed, Dec 17, 2014 at 10:04:24PM +0300, Vasily Khoruzhick wrote:
-> I'd like to port several s3c24xx to DT, and I'm stuck with s3c24xx LCD
-> controller and power drivers for H1940 and RX1950.
+> On Wednesday 17 December 2014 16:45:24 Lee Jones wrote:
+> > +- compatible   : Must be one of: "st,stih407-lpc" "st,stih416-lpc"
+> > +                                 "st,stih415-lpc" "st,stid127-lpc"
+> > +- reg          : LPC registers base address + size
+> > +- interrupts    : LPC interrupt line number and associated flags
+> > +- clocks       : Clock used by LPC device (See: ../clock/clock-bindings.txt)
+> > +- st,lpc-mode  : The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
+> > +                 ST_LPC_MODE_WDT [1].  One (and only one) mode must be
+> > +                 selected.
+> > 
 > 
-> Please see [1]. I want to move this function into another LCD power
-> driver, but I'm not sure what to do with s3c_gpio_cfgpin(). I need to
-> change pin function in runtime, and as far as I understand it should
-> be handled via pinctrl driver somehow. But how?
-You can pass >1 pinctrl setups to a node:
+> I'm glad you got it to work with two drivers for the same device.
+> 
+> With this binding, I'm still a bit unhappy about the st,lpc-mode property,
+> in particular since you rely on a shared include file for something that
+> can only be set in one way or another and always has to be present.
+> 
+> Why not just use a boolean property that enforces one mode when present
+> and another mode when absent?
 
-	somedevice {
-		pinctrl-names = "default", "foo", "bar";
-		pinctrl-0 = <&pinctrl_somedevice_default>;
-		pinctrl-1 = <&pinctrl_somedevice_foo>;
-		pinctrl-2 = <&pinctrl_somedevice_bar>;
-		cfg-gpios = <&gpio4 12 3>, <&gpio2 7 5>;
-	};
+There is nothing stopping me from doing that, and it was a
+consideration.  I concluded that this method would be more explicit
+however.  Both when describing our choices in DT and at a functional
+level within each of the drivers.
 
-Then I think you can fiddle with pinctrl_select_state(). For the gpios
-you can then use the standard gpiod_{request,direction_{in,out}put}
-combo.
-
-Best regards
-Uwe
+Let me know if you fundamentally disagree and I can fix-up.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
