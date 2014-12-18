@@ -1,100 +1,86 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 18 Dec 2014 10:27:25 +0800
-Subject: [PATCH v4 4/5] media: ov2640: add a master clock for sensor
+Date: Thu, 18 Dec 2014 10:27:26 +0800
+Subject: [PATCH v4 5/5] media: ov2640: dt: add the device tree binding document
 In-Reply-To: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
 References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1418869646-17071-5-git-send-email-josh.wu@atmel.com>
+Message-ID: <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The master clock (xvclk) is mandatory. It's a common clock framework clock.
-It can make sensor output a pixel clock to the camera interface.
+Add the document for ov2640 dt.
 
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 v3 -> v4:
-  1. Add Laurent's acked by.
+  1. remove aggsigned-clocks as it's general.
+  2. refine the explation.
 
 v2 -> v3:
-  1. should return PTR_ERR().
+  1. fix incorrect description.
+  2. Add assigned-clocks & assigned-clock-rates.
+  3. resetb pin should be ACTIVE_LOW.
 
 v1 -> v2:
-  1. change the clock's name.
-  2. Make the clock is mandatory.
+  1. change the compatible string to be consistent with verdor file.
+  2. change the clock and pins' name.
+  3. add missed pinctrl in example.
 
- drivers/media/i2c/soc_camera/ov2640.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/media/i2c/ov2640.txt       | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
 
-diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
-index 4c2868c..1d68bcf 100644
---- a/drivers/media/i2c/soc_camera/ov2640.c
-+++ b/drivers/media/i2c/soc_camera/ov2640.c
-@@ -13,6 +13,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/i2c.h>
-@@ -31,6 +32,7 @@
- 
- #define VAL_SET(x, mask, rshift, lshift)  \
- 		((((x) >> rshift) & mask) << lshift)
+diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+new file mode 100644
+index 0000000..de11ebb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+@@ -0,0 +1,46 @@
++* Omnivision ov2640 CMOS sensor
 +
- /*
-  * DSP registers
-  * register offset for BANK_SEL == BANK_SEL_DSP
-@@ -284,6 +286,7 @@ struct ov2640_priv {
- 	struct v4l2_ctrl_handler	hdl;
- 	u32	cfmt_code;
- 	struct v4l2_clk			*clk;
-+	struct clk			*master_clk;
- 	const struct ov2640_win_size	*win;
- 
- 	struct soc_camera_subdev_desc	ssdd_dt;
-@@ -746,6 +749,7 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
- 	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
- 	struct ov2640_priv *priv = to_ov2640(client);
- 	struct v4l2_clk *clk;
-+	int ret;
- 
- 	if (!priv->clk) {
- 		clk = v4l2_clk_get(&client->dev, "mclk");
-@@ -755,7 +759,20 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
- 			priv->clk = clk;
- 	}
- 
--	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
-+	if (on) {
-+		ret = clk_prepare_enable(priv->master_clk);
-+		if (ret)
-+			return ret;
-+	} else {
-+		clk_disable_unprepare(priv->master_clk);
-+	}
++The Omnivision OV2640 sensor support multiple resolutions output, such as
++CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
++output format.
 +
-+	ret = soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
++Required Properties:
++- compatible: Must be "ovti,ov2640"
++- clocks: reference to the xvclk input clock.
++- clock-names: Must be "xvclk".
 +
-+	if (ret && on)
-+		clk_disable_unprepare(priv->master_clk);
++Optional Properties:
++- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
++- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
 +
-+	return ret;
- }
- 
- /* Select the nearest higher resolution for capture */
-@@ -1145,6 +1162,10 @@ static int ov2640_probe(struct i2c_client *client,
- 			return ret;
- 	}
- 
-+	priv->master_clk = devm_clk_get(&client->dev, "xvclk");
-+	if (IS_ERR(priv->master_clk))
-+		return PTR_ERR(priv->master_clk);
++The device node must contain one 'port' child node for its digital output
++video port, in accordance with the video interface bindings defined in
++Documentation/devicetree/bindings/media/video-interfaces.txt.
 +
- 	v4l2_i2c_subdev_init(&priv->subdev, client, &ov2640_subdev_ops);
- 	v4l2_ctrl_handler_init(&priv->hdl, 2);
- 	v4l2_ctrl_new_std(&priv->hdl, &ov2640_ctrl_ops,
++Example:
++
++	i2c1: i2c at f0018000 {
++		ov2640: camera at 0x30 {
++			compatible = "ovti,ov2640";
++			reg = <0x30>;
++
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn &pinctrl_ov2640_resetb>;
++
++			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
++			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
++
++			clocks = <&pck1>;
++			clock-names = "xvclk";
++
++			assigned-clocks = <&pck1>;
++			assigned-clock-rates = <25000000>;
++
++			port {
++				ov2640_0: endpoint {
++					remote-endpoint = <&isi_0>;
++					bus-width = <8>;
++				};
++			};
++		};
++	};
 -- 
 1.9.1
