@@ -1,54 +1,94 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 18 Dec 2014 22:42:22 +0900
-Subject: DT on s3c24xx
-In-Reply-To: <CA+E=qVeU4hEX2x9uAPfgqEgpxvA7bUBWqWJtBJdbP=RK6ghfEQ@mail.gmail.com>
-References: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
- <20141218075205.GB10857@pengutronix.de>
- <CA+E=qVeU4hEX2x9uAPfgqEgpxvA7bUBWqWJtBJdbP=RK6ghfEQ@mail.gmail.com>
-Message-ID: <CAAVeFu+ZZChxk4djpd-TqK_JB5GcHaKNUxA0O3g14ptOnKQccg@mail.gmail.com>
+From: stefan.hengelein@fau.de (Stefan Hengelein)
+Date: Thu, 18 Dec 2014 14:43:01 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove dead #elif CONFIG_S3C24XX_DMAC
+In-Reply-To: <2864831.LEPnyFh3Il@phil>
+References: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
+ <1921250.jGHJ6gZqGf@wuerfel> <2864831.LEPnyFh3Il@phil>
+Message-ID: <CABv5NL_SLyY9-yookdTVdNXzCmUEqJ_QB6ofzw_q0H7Vcwbzfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 5:34 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> On Thu, Dec 18, 2014 at 10:52 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
->> Hello,
->
-> Hi Uwe,
->
->> [Cc += linusw, linux-gpio]
->>
->> On Wed, Dec 17, 2014 at 10:04:24PM +0300, Vasily Khoruzhick wrote:
->>> I'd like to port several s3c24xx to DT, and I'm stuck with s3c24xx LCD
->>> controller and power drivers for H1940 and RX1950.
->>>
->>> Please see [1]. I want to move this function into another LCD power
->>> driver, but I'm not sure what to do with s3c_gpio_cfgpin(). I need to
->>> change pin function in runtime, and as far as I understand it should
->>> be handled via pinctrl driver somehow. But how?
->> You can pass >1 pinctrl setups to a node:
->>
->>         somedevice {
->>                 pinctrl-names = "default", "foo", "bar";
->>                 pinctrl-0 = <&pinctrl_somedevice_default>;
->>                 pinctrl-1 = <&pinctrl_somedevice_foo>;
->>                 pinctrl-2 = <&pinctrl_somedevice_bar>;
->>                 cfg-gpios = <&gpio4 12 3>, <&gpio2 7 5>;
->>         };
->>
->> Then I think you can fiddle with pinctrl_select_state(). For the gpios
->> you can then use the standard gpiod_{request,direction_{in,out}put}
->> combo.
->
-> Thanks for you response!
->
-> Can I change pin function after gpio was requested? In low-power state
-> (i.e. when display is disabled) it's gpio driving some level,
-> and in active state it's some LCD controller pin (don't remember which
-> one exactly)
+So you actually tested the code I removed in the patch? can you
+provide a configuration that compiles that piece of code?
 
-If your driver can release the GPIO and change the pinctrl when
-switching to active state (and change the pinctrl again and request
-the GPIO when switching to low-power state) then this should be
-doable. I suspect the switch is made by the same driver anyway, isn't
-it?
+2014-12-17 17:16 GMT+01:00 Heiko St?bner <heiko@sntech.de>:
+> Am Mittwoch, 17. Dezember 2014, 16:52:40 schrieb Arnd Bergmann:
+>> On Wednesday 17 December 2014 16:40:37 Stefan Hengelein wrote:
+>> > The corresponding CPP-block can never be selected since there are
+>> > conflicting Kconfig constraints:
+>> > - CONFIG_S3C24XX_DMAC has a dependency on ARCH_S3C24XX
+>> > - The surrounding CPP-block needs CONFIG_S3C64XX_DEV_SPI0 to be defined.
+>> >
+>> >   - CONFIG_S3C64XX_DEV_SPI0 is only selected by MACH_WLF_CRAGG_6410
+>> >   - MACH_WLF_CRAGG_6410 however has a dependency on ARCH_S3C64XX
+>> >
+>> >     (through a surrounding if-statement in Kconfig)
+>> >
+>> > - ARCH_S3C64XX and ARCH_S3C24XX are mutually exclusive since they are
+>> >
+>> >   declared in the same choice and cannot be enabled at the same time.
+>> >
+>> > Hence, the innner block
+>> >
+>> >     "#elif defined(CONFIG_S3C24XX_DMAC)"
+>> >
+>> > cannot be enabled at the same time with the surrounding block
+>> >
+>> >     "#ifdef CONFIG_S3C64XX_DEV_SPI0"
+>> >
+>> > and therefore is dead.
+>> >
+>> > This (logical) defect has been found with the undertaker tool
+>> > (https://undertaker.cs.fau.de)
+>>
+>> Nice catch!
+>>
+>> > Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+>> > ---
+>> >
+>> >  arch/arm/plat-samsung/devs.c | 2 --
+>> >  1 file changed, 2 deletions(-)
+>> >
+>> > diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+>> > index 83c7d15..b38b601 100644
+>> > --- a/arch/arm/plat-samsung/devs.c
+>> > +++ b/arch/arm/plat-samsung/devs.c
+>> > @@ -1134,8 +1134,6 @@ void __init s3c64xx_spi0_set_platdata(int
+>> > (*cfg_gpio)(void), int src_clk_nr,>
+>> >     pd.filter = pl330_filter;
+>> >
+>> >  #elif defined(CONFIG_S3C64XX_PL080)
+>> >
+>> >     pd.filter = pl08x_filter_id;
+>> >
+>> > -#elif defined(CONFIG_S3C24XX_DMAC)
+>> > -   pd.filter = s3c24xx_dma_filter;
+>> >
+>> >  #endif
+>> >
+>> >     s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi0);
+>>
+>> This was introduced in 7f99ef2284b46f ("ARM: SAMSUNG: set
+>> s3c24xx_dma_filter for s3c64xx-spi0 device"), but never used on s3c24xx as
+>> far as I can tell. Heiko, can you comment on the patch? Did this
+>> simply get obsoleted by the DT conversion of s3c2416 and s3c2443?
+>
+> We just have no in-tree users currently.
+>
+> The S3C2416 and S3C2450 use the same type of spi controllers as the s3c64xx.
+> When writing the s3c24xx dma driver I also used this to test the driver. The
+> change was necessary to make the driver talk to my s3c2416 device, so it made
+> sense at the time.
+>
+> As the s3c24xx-dma driver currently is still lacking dt support [burried
+> somewhere on my todo list], board files are also currently the only way to do
+> fast spi on those at all.
+>
+> So removing this is dependent on how hard we want to make it for downstream
+> users [there seem to be a small number of those]. If this were part of
+> removing all non-dt cruft from the driver after s3c64xx migrated to be dt-only
+> I wouldn't object, but as it only affects the 2 lines of s3c24xx support,
+> personally I'd like to keep it around :-) .
+>
+>
+> Heiko
