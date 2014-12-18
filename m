@@ -1,60 +1,73 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 18 Dec 2014 14:25:21 -0800
-Subject: Help on kvm_tlb_flush_vmid_ipa usage
-In-Reply-To: <54932D1F.5060209@arm.com>
-References: <54932A97.3060103@samsung.com> <54932D1F.5060209@arm.com>
-Message-ID: <54935451.6090405@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Dec 2014 23:29:25 +0100
+Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <1418940425-2017-2-git-send-email-m-karicheri2@ti.com>
+References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
+ <1418940425-2017-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <21520995.3ITgVmVTeV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2014 11:38 AM, Marc Zyngier wrote:
-> On 18/12/14 19:27, Mario Smarduch wrote:
->> When this function is called IPA address is used. Looking at the HYP
->> implementation it uses the IPA directly in tlbi instructions. But
->> reading the TLB maintnance instruction syntax, bit [35:0] should be
->> set to IPA[47:12]. I traced the source code but don't see the
->> adjustment. I must be missing something given this function is
->> fundamental to KVM MMU.
+On Thursday 18 December 2014 17:07:04 Murali Karicheri wrote:
+> Add of_pci_dma_configure() to allow updating the dma configuration
+> of the pci device using the configuration from the parent of
+> the root bridge device.
 > 
-> Ermmm... Someone (that is, I) needs a brown paper back again.
-> 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index b72aa9f..a767f6a 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->  	 * Instead, we invalidate Stage-2 for this IPA, and the
->  	 * whole of Stage-1. Weep...
->  	 */
-> +	lsr	x1, x1, #12
->  	tlbi	ipas2e1is, x1
->  	/*
->  	 * We have to ensure completion of the invalidation at Stage-2,
-> 
-> 	M.
-> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Hi Marc,
-  fwiw I re-ran the test that halts the host (on foundation
-model) with a guest booted, panic has gone away.
+Much better!
 
-BUG: Bad page state in process K20nfsserver  pfn:ff818
-page:ffff7c7fc37e4540 count:-3 mapcount:0 mapping:          (null) index:0x0
-flags: 0x0()
-page dumped because: nonzero _count
-Modules linked in:
-CPU: 1 PID: 761 Comm: K20nfsserver Not tainted 3.18.0-rc2+ #55
-Call trace:
-[<ffff800000087244>] dump_backtrace+0x0/0x12c
-[<ffff800000087380>] show_stack+0x10/0x1c
-[<ffff8000003ce804>] dump_stack+0x74/0x98
-[<ffff80000011bdc4>] bad_page+0xdc/0x12c
-[<ffff80000011ecc4>] get_page_from_freelist+0x4b4/0x600
-[<ffff80000011eeec>] __alloc_pages_nodemask+0xdc/0x780
-[<ffff80000011f5a4>] __get_free_pages+0x14/0x5c
-[<ffff80000011f5fc>] get_zeroed_page+0x10/0x1c
-[<ffff8000000903fc>] pgd_alloc+0xc/0x18
-[<ffff8000000a13a0>] mm_init+0xcc/0x12c
-[<ffff8000000a17f8>] mm_alloc+0x44/0x54
-[<ffff800000166cbc>] do_execve+0x1a8/0x49c
-[<ffff8000001671bc>] SyS_execve+0x1c/0x2c
+There is one detail that we should get right from the start here,
+which is currently wrong in the platform device code, but I have so
+far not dared change it:
+
+> +	/*
+> +	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+> +	 * the correct supported dma_mask.
+> +	 */
+> +	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+
+The 32-bit mask is indeed correct as the default for almost all cases,
+and we must not set it larger than DMA_BIT_MASK(32). There is one
+corner case though, which happens on some shmobile machines that have
+a 31-bit mask on the PCI host, and I think we should use that as the
+default.
+
+> +	/*
+> +	 * Set it to coherent_dma_mask by default if the architecture
+> +	 * code has not set it.
+> +	 */
+> +	if (!dev->dma_mask)
+> +		dev->dma_mask = &dev->coherent_dma_mask;
+> +
+> +	ret = of_dma_get_range(parent_np, &dma_addr, &paddr, &size);
+> +	if (ret < 0) {
+> +		dma_addr = offset = 0;
+> +		size = dev->coherent_dma_mask;
+
+Can you check one thing here? I believe the size argument as returned
+from of_dma_get_range is inclusive (e.g. 0x100000000), while the coherent
+mask by definition is exlusive (e.g. 0xffffffff), so the size needs to
+be adapted here. I haven't checked all the code here though, so I may
+be wrong.
+
+> +	} else {
+> +		offset = PFN_DOWN(paddr - dma_addr);
+> +		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> +	}
+> +	dev->dma_pfn_offset = offset;
+> +
+> +	coherent = of_dma_is_coherent(parent_np);
+> +	dev_dbg(dev, "device is%sdma coherent\n",
+> +		coherent ? " " : " not ");
+> +
+> +	arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
+
+Basically, I would use limit the size argument we pass into
+arch_setup_dma_ops to the minimum of 'size' and 'dma_mask' here,
+after converting into the same format. We should make sure we do the
+same thing for platform_device as well, so it might be better to do
+it inside of arch_setup_dma_ops instead.
+
+	Arnd
