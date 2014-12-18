@@ -1,45 +1,101 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 18 Dec 2014 11:48:31 +0000
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <20141218101618.GJ11502@n2100.arm.linux.org.uk>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk> <5491F0B6.4090904@ti.com>
- <20141218101618.GJ11502@n2100.arm.linux.org.uk>
-Message-ID: <0625abeb83cd4ed88fdb38754b6a3086@EMAIL.axentia.se>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Dec 2014 13:56 +0200
+Subject: [PATCH v4 5/5] media: ov2640: dt: add the device tree binding
+ document
+In-Reply-To: <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
+Message-ID: <2071990.alIc7byK3Q@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russel King wrote:
-*snip*
-> Now, we have this call to snd_soc_of_parse_audio_routing(), which
-> allocates some memory, copies the old routes into it, and then adds
-> to them from DT.  That explains why the pointer and number of routes
-> are different - there's 19 routes in omap4-sdp.dts - 17 + 19 = 36.
-> So that doesn't work - but importantly, it does point towards a
-> possible culpret - snd_soc_of_parse_audio_routing().
-> 
-> This is obvious when you stop and think about what it's doing, this is
-> truely where this bug lies, and it /is/ in generic ASoC code.
-> 
-> The problem is that this function doesn't consider the implications of
-> deferred probing.  Let's see what happens if we defer, and re-do the
-> ABE initialisation, including calling this function:
-> 
-> 17 + 19 = 36. - first probe
-> 17 + 19 + 19 = 55. - second probe
-> 
-> Oh - that works in terms of the number, and it would also explain why
-> the table has been screwed - because the second time we memcpy(), we're
-> memcpy()ing from data which was allocated via devm_kzalloc(), and thus
-> would have been freed after the first failed probe.
-> 
-> Mark - this is a core ASoC problem.
+Hi Josh,
 
-Sorry about this, I wasn't even aware of deferred probing when I wrote
-f8781db8aeb1. From my point of view, it is certainly possible to solve this
-in the card driver which needs to add card dapm routes instead. So, a
-revert is fine by me, if no better solution comes up.
+Thank you for the patch.
 
-Cheers,
-Peter
+On Thursday 18 December 2014 10:27:26 Josh Wu wrote:
+> Add the document for ov2640 dt.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v3 -> v4:
+>   1. remove aggsigned-clocks as it's general.
+>   2. refine the explation.
+> 
+> v2 -> v3:
+>   1. fix incorrect description.
+>   2. Add assigned-clocks & assigned-clock-rates.
+>   3. resetb pin should be ACTIVE_LOW.
+> 
+> v1 -> v2:
+>   1. change the compatible string to be consistent with verdor file.
+>   2. change the clock and pins' name.
+>   3. add missed pinctrl in example.
+> 
+>  .../devicetree/bindings/media/i2c/ov2640.txt       | 46 +++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> b/Documentation/devicetree/bindings/media/i2c/ov2640.txt new file mode
+> 100644
+> index 0000000..de11ebb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
+> @@ -0,0 +1,46 @@
+> +* Omnivision ov2640 CMOS sensor
+> +
+> +The Omnivision OV2640 sensor support multiple resolutions output, such as
+> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
+> +output format.
+> +
+> +Required Properties:
+> +- compatible: Must be "ovti,ov2640"
+> +- clocks: reference to the xvclk input clock.
+> +- clock-names: Must be "xvclk".
+> +
+> +Optional Properties:
+> +- resetb-gpios: reference to the GPIO connected to the resetb pin, if any.
+> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
+> +
+> +The device node must contain one 'port' child node for its digital output
+> +video port, in accordance with the video interface bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Example:
+> +
+> +	i2c1: i2c at f0018000 {
+> +		ov2640: camera at 0x30 {
+> +			compatible = "ovti,ov2640";
+> +			reg = <0x30>;
+> +
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_pck1 &pinctrl_ov2640_pwdn 
+&pinctrl_ov2640_resetb>;
+> +
+> +			resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
+> +			pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
+> +
+> +			clocks = <&pck1>;
+> +			clock-names = "xvclk";
+> +
+> +			assigned-clocks = <&pck1>;
+> +			assigned-clock-rates = <25000000>;
+> +
+> +			port {
+> +				ov2640_0: endpoint {
+> +					remote-endpoint = <&isi_0>;
+> +					bus-width = <8>;
+> +				};
+> +			};
+> +		};
+> +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
