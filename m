@@ -1,100 +1,175 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 Dec 2014 15:00:47 +0800
-Subject: [PATCH v2 00/11] ARM: sun9i: Enable MMC support on Allwinner A80
-Message-ID: <1418886058-8145-1-git-send-email-wens@csie.org>
+Date: Thu, 18 Dec 2014 15:00:48 +0800
+Subject: [PATCH v2 01/11] clk: sunxi: Add mod0 and mmc module clock support
+ for A80
+In-Reply-To: <1418886058-8145-1-git-send-email-wens@csie.org>
+References: <1418886058-8145-1-git-send-email-wens@csie.org>
+Message-ID: <1418886058-8145-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The module 0 style clocks, or storage module clocks as named in the
+official SDK, are almost the same as the module 0 clocks on earlier
+Allwinner SoCs. The only difference is wider mux register bits.
 
-This is v2 of the sun9i mmc series. It is based on your v2 of your
-sunxi mmc phase clocks series. The clock bits will conflict with
-Hans' work on the mod0 clock. The DT bits might conflict with your
-header conversion series. Assuming this series is OK, how would
-you like to proceed?
+As with earlier Allwinner SoCs, mmc module clocks are a special case
+of mod0 clocks, with phase controls for 2 child clocks, output and
+sample.
 
-This series enables MMC support on the A80 using existing drivers
-we have. The A80 has 4 MMC controllers. These controllers share
-a common clock gate and reset control, which are then sub-divided
-to each controller.
+This patch adds support for both.
 
-The phase clocks are the same as the older SoCs, so it should be
-straight forward to add them with the rest of the sunxi family.
-I did find that Allwinner's kernel uses different delay values
-for the A80, but so far I've not run into any issues using the
-mainline kernel.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/clock/sunxi.txt |  7 +-
+ drivers/clk/sunxi/clk-mod0.c                      | 99 +++++++++++++++++++++++
+ 2 files changed, 104 insertions(+), 2 deletions(-)
 
-Patch 1 adds module 0 type clock support for the A80. These are
-essentially the same as mod0 clocks on other Allwinner SoCs, except
-for the wider mux bits.
-
-Patch 2 adds mmc mod clocks to the DTSI.
-
-Patch 3 adds support for the mmc config (term from user manual) clocks.
-This is the part that breaks out the clock gates and reset controls
-for each controller. This is implemented as a platform driver, as
-the shared reset control must be de-asserted for any of either this
-or the mmc blocks to work.
-
-Patch 4 adds clock-indices properties to the AHB/APB gate clocks.
-This is needed for of_clk_get_parent_name to work properly, as we
-use bit indices instead of counting the entries.
-
-Patch 5 adds the mmc config clock nodes to the DTSI.
-
-Patch 6 changes sunxi-common-regulators.dtsi to use labels to
-reference the pio node.
-
-Patch 7 adds the mmc controller nodes to the DTSI.
-
-Patch 8 and 10 add the pinmux settings for mmc0 and mmc2.
-
-Patch 9 and 11 enable mmc0 and mmc2 on the A80 Optimus Board.
-
-Kudos to Andreas for figuring out all the DT bits. His SoB
-is on the relevant patches.
-
-Changes since v1:
-
-  - Use sunxi-common-regulators.dtsi for vmmc regulator
-  - Rebased onto sunxi mmc phase clock series v2
-  - Use new multi-output mmc module clock style
-  - Rename sun9i mmc config clock name and compatible
-  - Make mmc2_pins include all pins needed, and change
-    name to mmc2_8bit_pins
-  - Add spaces between pin names in mmc pins
-  - Add clk_prepare_enable()/clk_disable_unprepare() calls to
-    reset control ops for the mmc config clock
-  - Use DIV_ROUND_UP when calculating number of clocks in sun9i
-    mmc config clock probe function
-  - Add required properties and outputs section for sun9i mmc
-    config clock in bindings doc; also add an example
-
-Cheers
-ChenYu Tsai
-
-Chen-Yu Tsai (11):
-  clk: sunxi: Add mod0 and mmc module clock support for A80
-  ARM: dts: sun9i: Add mmc module clock nodes for A80
-  clk: sunxi: Add driver for A80 MMC config clocks/resets
-  ARM: dts: sun9i: Add clock-indices property for bus gate clocks
-  ARM: dts: sun9i: Add mmc config clock nodes
-  ARM: dts: sunxi: Use label to reference pio in sunxi-common-regulators
-  ARM: dts: sun9i: Add mmc controller nodes to the A80 dtsi
-  ARM: dts: sun9i: Add pinmux setting for mmc0
-  ARM: dts: sun9i: Enable mmc0 on A80 Optimus Board
-  ARM: dts: sun9i: Add 8 bit mmc pinmux setting for mmc2
-  ARM: dts: sun9i: Enable mmc2 on A80 Optimus Board
-
- Documentation/devicetree/bindings/clock/sunxi.txt |  30 ++-
- arch/arm/boot/dts/sun9i-a80-optimus.dts           |  27 +++
- arch/arm/boot/dts/sun9i-a80.dtsi                  | 124 ++++++++++++
- arch/arm/boot/dts/sunxi-common-regulators.dtsi    |  54 +++---
- drivers/clk/sunxi/Makefile                        |   1 +
- drivers/clk/sunxi/clk-mod0.c                      |  99 ++++++++++
- drivers/clk/sunxi/clk-sun9i-mmc.c                 | 222 ++++++++++++++++++++++
- 7 files changed, 527 insertions(+), 30 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
-
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 8c60433..b660bdb 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -56,7 +56,9 @@ Required properties:
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+ 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
++	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
+ 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
++	"allwinner,sun9i-a80-mod0-clk" - for module 0 (storage) clocks on A80
+ 	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+ 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+@@ -72,7 +74,8 @@ Required properties for all clocks:
+ - #clock-cells : from common clock binding; shall be set to 0 except for
+ 	the following compatibles where it shall be set to 1:
+ 	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk",
+-	"allwinner,sun4i-pll6-clk", "allwinner,sun6i-a31-pll6-clk"
++	"allwinner,sun4i-pll6-clk", "allwinner,sun6i-a31-pll6-clk",
++	"allwinner,*-usb-clk", "allwinner,*-mmc-clk"
+ - clock-output-names : shall be the corresponding names of the outputs.
+ 	If the clock module only has one output, the name shall be the
+ 	module name.
+@@ -94,7 +97,7 @@ For "allwinner,sun6i-a31-pll6-clk", there are 2 outputs. The first output
+ is the normal PLL6 output, or "pll6". The second output is rate doubled
+ PLL6, or "pll6x2".
+ 
+-The "allwinner,sun4i-a10-mmc-clk" has three different outputs: the
++The "allwinner,*-mmc-clk" clocks have three different outputs: the
+ main clock, with the ID 0, and the output and sample clocks, with the
+ IDs 1 and 2, respectively.
+ 
+diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+index 4ac52c7..ef36e89 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
++++ b/drivers/clk/sunxi/clk-mod0.c
+@@ -93,6 +93,30 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
+ }
+ CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
+ 
++static const struct factors_data sun9i_a80_mod0_data __initconst = {
++	.enable = 31,
++	.mux = 24,
++	.muxmask = BIT(3) | BIT(2) | BIT(1) | BIT(0),
++	.table = &sun4i_a10_mod0_config,
++	.getter = sun4i_a10_get_mod0_factors,
++};
++
++static void __init sun9i_a80_mod0_setup(struct device_node *node)
++{
++	void __iomem *reg;
++
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (!reg) {
++		pr_err("Could not get registers for mod0-clk: %s\n",
++		       node->name);
++		return;
++	}
++
++	sunxi_factors_register(node, &sun9i_a80_mod0_data,
++			       &sun4i_a10_mod0_lock, reg);
++}
++CLK_OF_DECLARE(sun9i_a80_mod0, "allwinner,sun9i-a80-mod0-clk", sun9i_a80_mod0_setup);
++
+ static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
+ 
+ static void __init sun5i_a13_mbus_setup(struct device_node *node)
+@@ -309,3 +333,78 @@ err_free_data:
+ 	kfree(clk_data);
+ }
+ CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
++
++static DEFINE_SPINLOCK(sun9i_a80_mmc_lock);
++
++static void __init sun9i_a80_mmc_setup(struct device_node *node)
++{
++	struct clk_onecell_data *clk_data;
++	const char *parent;
++	void __iomem *reg;
++	int i;
++
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (IS_ERR(reg)) {
++		pr_err("Couldn't map the %s clock registers\n", node->name);
++		return;
++	}
++
++	clk_data = kmalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		return;
++
++	clk_data->clks = kcalloc(3, sizeof(*clk_data->clks), GFP_KERNEL);
++	if (!clk_data->clks)
++		goto err_free_data;
++
++	clk_data->clk_num = 3;
++	clk_data->clks[0] = sunxi_factors_register(node,
++						   &sun9i_a80_mod0_data,
++						   &sun9i_a80_mmc_lock, reg);
++	if (!clk_data->clks[0])
++		goto err_free_clks;
++
++	parent = __clk_get_name(clk_data->clks[0]);
++
++	for (i = 1; i < 3; i++) {
++		struct clk_init_data init = {
++			.num_parents	= 1,
++			.parent_names	= &parent,
++			.ops		= &mmc_clk_ops,
++		};
++		struct mmc_phase *phase;
++
++		phase = kmalloc(sizeof(*phase), GFP_KERNEL);
++		if (!phase)
++			continue;
++
++		phase->hw.init = &init;
++		phase->reg = reg;
++		phase->lock = &sun9i_a80_mmc_lock;
++
++		if (i == 1)
++			phase->offset = 8;
++		else
++			phase->offset = 20;
++
++		if (of_property_read_string_index(node, "clock-output-names",
++						  i, &init.name))
++			init.name = node->name;
++
++		clk_data->clks[i] = clk_register(NULL, &phase->hw);
++		if (IS_ERR(clk_data->clks[i])) {
++			kfree(phase);
++			continue;
++		}
++	}
++
++	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++
++	return;
++
++err_free_clks:
++	kfree(clk_data->clks);
++err_free_data:
++	kfree(clk_data);
++}
++CLK_OF_DECLARE(sun9i_a80_mmc, "allwinner,sun9i-a80-mmc-clk", sun9i_a80_mmc_setup);
 -- 
 2.1.3
