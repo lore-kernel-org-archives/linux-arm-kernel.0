@@ -1,22 +1,134 @@
-From: dwalker@fifo99.com (dwalker at fifo99.com)
-Date: Thu, 18 Dec 2014 22:01:28 +0000
-Subject: [PATCH] arch: arm: mach-msm: smd.c: Remove some unused functions
-In-Reply-To: <CAFo99gbPKw4uHY_QqyZ495O9QLKL69HQyJmQUKNaGQTNqsG-mw@mail.gmail.com>
-References: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <20141209144602.GB5376@fifo99.com>
- <CAFo99gbPKw4uHY_QqyZ495O9QLKL69HQyJmQUKNaGQTNqsG-mw@mail.gmail.com>
-Message-ID: <20141218220128.GA10615@fifo99.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 18 Dec 2014 17:07:04 -0500
+Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
+References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1418940425-2017-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 12:20:43AM +0100, Rickard Strandqvist wrote:
-> Hi
-> 
-> My script looks for the same function name, so if they then would be
-> named exactly the same, they would come up.
-> 
-> But I can not even find drivers/staging/dream/   or is this really new code?
+Add of_pci_dma_configure() to allow updating the dma configuration
+of the pci device using the configuration from the parent of
+the root bridge device.
 
-Maybe it was deleted already ..
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/of/of_pci.c    |   71 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_pci.h |   12 ++++++++
+ 2 files changed, 83 insertions(+)
 
-Daniel
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 88471d3..966b418 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -229,6 +229,77 @@ parse_failed:
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
++
++/**
++ * of_get_pci_root_bridge_parent - Helper function to get the OF node of
++ *		the root bridge's parent
++ * @dev: ptr to pci_dev struct of the pci device
++ *
++ * This function will traverse the bus up to the root bus starting with
++ * the child and return the of node ptr to bridge device's parent device.
++ */
++struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
++{
++	struct pci_bus *bus = dev->bus;
++	struct device *bridge;
++
++	while (!pci_is_root_bus(bus))
++		bus = bus->parent;
++	bridge = bus->bridge;
++
++	return bridge->parent->of_node;
++}
++EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
++
++/**
++ * of_pci_dma_configure - Setup DMA configuration
++ * @dev: ptr to pci_dev struct of the pci device
++ *
++ * Try to get PCI devices's DMA configuration from DT and update it
++ * accordingly. This is similar to of_dma_configure() in of/platform.c
++ */
++void of_pci_dma_configure(struct pci_dev *pci_dev)
++{
++	struct device *dev = &pci_dev->dev;
++	u64 dma_addr, paddr, size;
++	struct device_node *parent_np;
++	unsigned long offset;
++	bool coherent;
++	int ret;
++
++	parent_np = of_get_pci_root_bridge_parent(pci_dev);
++
++	/*
++	 * Set default dma-mask to 32 bit. Drivers are expected to setup
++	 * the correct supported dma_mask.
++	 */
++	dev->coherent_dma_mask = DMA_BIT_MASK(32);
++
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++
++	ret = of_dma_get_range(parent_np, &dma_addr, &paddr, &size);
++	if (ret < 0) {
++		dma_addr = offset = 0;
++		size = dev->coherent_dma_mask;
++	} else {
++		offset = PFN_DOWN(paddr - dma_addr);
++		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
++	}
++	dev->dma_pfn_offset = offset;
++
++	coherent = of_dma_is_coherent(parent_np);
++	dev_dbg(dev, "device is%sdma coherent\n",
++		coherent ? " " : " not ");
++
++	arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
++}
++EXPORT_SYMBOL_GPL(of_pci_dma_configure);
++
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ #ifdef CONFIG_PCI_MSI
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index ce0e5ab..0465a2a 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -16,6 +16,8 @@ int of_pci_get_devfn(struct device_node *np);
+ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ int of_get_pci_domain_nr(struct device_node *node);
++struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev);
++void of_pci_dma_configure(struct pci_dev *pci_dev);
+ #else
+ static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+ {
+@@ -50,6 +52,16 @@ of_get_pci_domain_nr(struct device_node *node)
+ {
+ 	return -1;
+ }
++
++static inline struct device_node
++*of_get_pci_root_bridge_parent(struct pci_dev *dev)
++{
++	return NULL;
++}
++
++static inline void of_pci_dma_configure(struct pci_dev *pci_dev)
++{
++}
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS)
+-- 
+1.7.9.5
