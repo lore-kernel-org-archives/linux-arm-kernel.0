@@ -1,75 +1,119 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 18 Dec 2014 13:29:47 -0800
-Subject: Enable runtime PM automatically?
-In-Reply-To: <CAMuHMdWY_ne+S3zKrEYqVyU8=S-at=+rGuEkYNauF4s2KaKNdw@mail.gmail.com>
- (Geert Uytterhoeven's message of "Wed, 17 Dec 2014 20:33:13 +0100")
-References: <CAMuHMdWY_ne+S3zKrEYqVyU8=S-at=+rGuEkYNauF4s2KaKNdw@mail.gmail.com>
-Message-ID: <7hppbg63zo.fsf@deeprootsystems.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 18 Dec 2014 22:59:50 +0100 (CET)
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+Hi Josh,
 
-> On Tue, Dec 16, 2014 at 11:10 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> At a deeper level, the problem with this approach is that this is more
->> generically a runtime PM dependency problem, not a genpd problem.  For
->> example, what happens when the same kind of dependency exists on a
->> platform using a custom PM domain instead of genpd (like ACPI.) ?
->>
->> What's needed to solve this problem is a generalized way to have runtime
->> PM dependencies between devices.  Runtime PM already automatically
->> handles parent devices as one type of dependent device (e.g. a parent
->> device needs to be runtime PM resumed before its child.)  So what's
->> needed is a generic way to other PM dependencies with the runtime PM
->> core (not the genpd core.)
->>
->> If runtime PM handles the dependencies corretcly, then genpd (and any
->> other PM domain) will get them "for free".
->
-> Having the proper dependencies is not sufficient. Currently drivers have to do
-> something to use runtime PM.
+Thanks for your patches!
 
-Well, yes.  I've been assuming runtime-PM aware drivers.  But I agree
-with the goal of not having to assume that.
+On Thu, 18 Dec 2014, Josh Wu wrote:
 
-> By default, runtime PM is disabled for a device
-> ("device.power.disable_depth = 1").
->
-> However, if PM domains are active, drivers must be runtime PM-aware for the
-> gpd_dev_ops.start() method to be called in the first place (perhaps this is just
-> one bug that's easy to fix --- the device is "assumed suspended", but can be
-> used). They must
->   1. call pm_runtime_enable() to enable runtime PM for the device,
->   2. call pm_runtime_get_sync() to prevent the device from being put in a
->     low-power state at any time. This second call has the
-> "side-effect" of calling
->     gpd_dev_ops.start().
->
-> Hence, if PM domains are enabled, wouldn't it make sense to
->   1. enable runtime PM by default, for all devices (bound and unbound),
->   2. call pm_runtime_get_sync(), for all devices bound to a driver.
-> Of course we have to keep track if drivers call any of the pm_runtime_*()
-> methods theirselves, as that would have to move them from automatic to
-> manual mode.
->
-> Would this be feasible?
+> To support async probe for ov2640, we need remove the code to get 'mclk'
+> in ov2640_probe() function. oterwise, if soc_camera host is not probed
+> in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
+> function.
+> 
+> So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+> function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
+> soc_camera_set_power() function.
+> 
+> And if soc_camera host is probed, the when ov2640_s_power() is called,
+> then we can get the 'mclk' and that make us enable/disable soc_camera
+> host's clock as well.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> v3 -> v4:
+> v2 -> v3:
+> v1 -> v2:
+>   no changes.
+> 
+>  drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
+>  1 file changed, 21 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+> index 1fdce2f..9ee910d 100644
+> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+>  	struct i2c_client *client = v4l2_get_subdevdata(sd);
+>  	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+>  	struct ov2640_priv *priv = to_ov2640(client);
+> +	struct v4l2_clk *clk;
+> +
+> +	if (!priv->clk) {
+> +		clk = v4l2_clk_get(&client->dev, "mclk");
+> +		if (IS_ERR(clk))
+> +			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
+> +		else
+> +			priv->clk = clk;
+> +	}
+>  
+>  	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+>  }
+> @@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
+>  	if (priv->hdl.error)
+>  		return priv->hdl.error;
+>  
+> -	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+> -	if (IS_ERR(priv->clk)) {
+> -		ret = PTR_ERR(priv->clk);
+> -		goto eclkget;
+> -	}
+> -
+>  	ret = ov2640_video_probe(client);
 
-We have to be careful about where the PM core's _get_sync() call goes.
+The first thing the above ov2640_video_probe() function will do is call 
+ov2640_s_power(), which will request the clock. So, by moving requesting 
+the clock from ov2640_probe() to ov2640_s_power() doesn't change how 
+probing will be performed, am I right? Or are there any other patched, 
+that change that, that I'm overseeing?
 
-Because you're talking about "bound" devices, I guess you mean after the
-driver probes?  Otherwise, it gets tricky if the _get_sync() is before
-the driver probes, because the device driver may have work it wants to
-do in its runtime PM callbacks, which are not initialized/available
-before the driver probes.  Doing this before probe also makes it rather
-difficult to know for sure the actual physical state of the device, and
-make sure it matches the runtime PM state of the device.  Rafael
-mentioned this also, and I'm not sure how we can be sure of the physical
-state.
+If I'm right, then I would propose an approach, already used in other 
+drivers instead of this one: return -EPROBE_DEFER if the clock isn't 
+available during probing. See ef6672ea35b5bb64ab42e18c1a1ffc717c31588a for 
+an example. Or did I misunderstand anything?
 
-Some thoughts: devices without drivers would be runtime resumed by the
-core, but will never be suspended, so the PM domain will never shut
-down.  I guess the core will have to keep track of the devices it
-automatically runtime resumed and decide to runtime suspend them too?
-Hmm, where would that go?
+Thanks
+Guennadi
 
-Kevin
+>  	if (ret) {
+> -		v4l2_clk_put(priv->clk);
+> -eclkget:
+> -		v4l2_ctrl_handler_free(&priv->hdl);
+> +		goto evideoprobe;
+>  	} else {
+>  		dev_info(&adapter->dev, "OV2640 Probed\n");
+>  	}
+>  
+> +	ret = v4l2_async_register_subdev(&priv->subdev);
+> +	if (ret < 0)
+> +		goto evideoprobe;
+> +
+> +	return 0;
+> +
+> +evideoprobe:
+> +	v4l2_ctrl_handler_free(&priv->hdl);
+>  	return ret;
+>  }
+>  
+> @@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
+>  {
+>  	struct ov2640_priv       *priv = to_ov2640(client);
+>  
+> -	v4l2_clk_put(priv->clk);
+> +	v4l2_async_unregister_subdev(&priv->subdev);
+> +	if (priv->clk)
+> +		v4l2_clk_put(priv->clk);
+>  	v4l2_device_unregister_subdev(&priv->subdev);
+>  	v4l2_ctrl_handler_free(&priv->hdl);
+>  	return 0;
+> -- 
+> 1.9.1
+> 
