@@ -1,60 +1,196 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Dec 2014 09:55:49 +0000
-Subject: [RFC] ACPI on arm64 TODO List
-In-Reply-To: <54925EA1.1030901@jonmasters.org>
-References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
- <20141216152707.GH11565@e104818-lin.cambridge.arm.com>
- <5490C83A.2080600@linaro.org>
- <20141217092505.GA9475@e104818-lin.cambridge.arm.com>
- <54925EA1.1030901@jonmasters.org>
-Message-ID: <20141218095549.GA19484@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 18 Dec 2014 09:59:45 +0000
+Subject: [PATCH v2] arm64: kernel: remove ARM64_CPU_SUSPEND config option
+Message-ID: <1418896785-21929-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 04:57:05AM +0000, Jon Masters wrote:
-> On 12/17/14, 4:25 AM, Catalin Marinas wrote:
-> > On Wed, Dec 17, 2014 at 12:03:06AM +0000, Al Stone wrote:
-> >> They will
-> >> at some point in the future, but not now.  Regardless, I think it's
-> >> reasonable for us to say that if you want ACPI support, PSCI must be
-> >> used for secondary CPU startup.  People can hack something up to get
-> >> the parking protocol to work on development branches if they want, but
-> >> I personally see no need to get that into the kernel -- and it needs
-> >> to be said explicitly in arm-acpi.txt.
-[...]
-> > I'm fine with this. But note that it pretty much rules out the APM
-> > boards (I think we ruled them out a few times already) which don't have
-> > an EL3 to host PSCI firmware. EL2 is not suitable as it is likely that
-> > we want this level for KVM or Xen rather than platform firmware.
-> 
-> The gen1 APM boards work great with UEFI and ACPI using the Parking 
-> Protocol. It's trivial to support, and it's a fairly constrained since 
-> everyone is headed toward PSCI. Personally I consider it unfair to 
-> punish the first guy out of the gate for something that was standardized 
-> after they made their design.
+ARM64_CPU_SUSPEND config option was introduced to make code providing
+context save/restore selectable only on platforms requiring power
+management capabilities.
 
-Most of the complaints about the APM ACPI support were around drivers,
-clocks rather than the parking protocol. On the latter, we complained
-when Hanjun posted core patches that did not match the documentation and
-the (old) parking protocol spec was not suitable to AArch64 either.
+Currently ARM64_CPU_SUSPEND depends on the PM_SLEEP config option which
+in turn is set by the SUSPEND config option.
 
-> My recommendation would be to get the 
-> relevant document updated in the public repository.
+The introduction of CPU_IDLE for arm64 requires that code configured
+by ARM64_CPU_SUSPEND (context save/restore) should be compiled in
+in order to enable the CPU idle driver to rely on CPU operations
+carrying out context save/restore.
 
-This should be stronger than just a "recommendation".
+The ARM64_CPUIDLE config option (ARM64 generic idle driver) is therefore
+forced to select ARM64_CPU_SUSPEND, even if there may be (ie PM_SLEEP)
+failed dependencies, which is not a clean way of handling the kernel
+configuration option.
 
-> Patches that 
-> implement Parking Protocol are already in existence/working well as an 
-> alternative to PSCI (which is always preferred if available).
+For these reasons, this patch removes the ARM64_CPU_SUSPEND config option
+and makes the context save/restore dependent on CPU_PM, which is selected
+whenever either SUSPEND or CPU_IDLE are configured, cleaning up dependencies
+in the process.
 
-Let's hope they match the new spec ;).
+This way, code previously configured through ARM64_CPU_SUSPEND is
+compiled in whenever a power management subsystem requires it to be
+present in the kernel (SUSPEND || CPU_IDLE), which is the behaviour
+expected on ARM64 kernels.
 
-What the parking protocol doesn't cover (last time I looked) is a way to
-return CPUs to firmware for hotplug or CPUidle. On non-PSCI platforms
-this would need to be done with SoC-specific code implementing (part of)
-the cpu_operations back-end. Technically, I think there are solutions to
-standardise such CPU return to firmware but it's debatable whether it's
-worth the effort given the long term PSCI recommendation.
+The cpu_suspend and cpu_init_idle CPU operations are added only if
+CPU_IDLE is selected, since they are CPU_IDLE specific methods and
+should be grouped and defined accordingly.
 
+PSCI CPU operations are updated to reflect the introduced changes.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+v1 => v2
+
+- Rebased on top of
+  commit e5e62d475274 ("arm64: psci: Fix build breakage without PM_SLEEP")
+
+ arch/arm64/Kconfig                | 3 ---
+ arch/arm64/include/asm/cpu_ops.h  | 8 ++++----
+ arch/arm64/kernel/Makefile        | 2 +-
+ arch/arm64/kernel/asm-offsets.c   | 2 +-
+ arch/arm64/kernel/hw_breakpoint.c | 2 +-
+ arch/arm64/kernel/psci.c          | 2 --
+ arch/arm64/mm/proc.S              | 2 +-
+ drivers/cpuidle/Kconfig.arm64     | 1 -
+ 8 files changed, 8 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b1f9a20..9ac078f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -627,9 +627,6 @@ source "kernel/power/Kconfig"
+ config ARCH_SUSPEND_POSSIBLE
+ 	def_bool y
+ 
+-config ARM64_CPU_SUSPEND
+-	def_bool PM_SLEEP
+-
+ endmenu
+ 
+ menu "CPU Power Management"
+diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+index 6f8e2ef..da301ee 100644
+--- a/arch/arm64/include/asm/cpu_ops.h
++++ b/arch/arm64/include/asm/cpu_ops.h
+@@ -28,8 +28,6 @@ struct device_node;
+  *		enable-method property.
+  * @cpu_init:	Reads any data necessary for a specific enable-method from the
+  *		devicetree, for a given cpu node and proposed logical id.
+- * @cpu_init_idle: Reads any data necessary to initialize CPU idle states from
+- *		devicetree, for a given cpu node and proposed logical id.
+  * @cpu_prepare: Early one-time preparation step for a cpu. If there is a
+  *		mechanism for doing so, tests whether it is possible to boot
+  *		the given CPU.
+@@ -42,6 +40,8 @@ struct device_node;
+  * @cpu_die:	Makes a cpu leave the kernel. Must not fail. Called from the
+  *		cpu being killed.
+  * @cpu_kill:  Ensures a cpu has left the kernel. Called from another cpu.
++ * @cpu_init_idle: Reads any data necessary to initialize CPU idle states from
++ *		devicetree, for a given cpu node and proposed logical id.
+  * @cpu_suspend: Suspends a cpu and saves the required context. May fail owing
+  *               to wrong parameters or error conditions. Called from the
+  *               CPU being suspended. Must be called with IRQs disabled.
+@@ -49,7 +49,6 @@ struct device_node;
+ struct cpu_operations {
+ 	const char	*name;
+ 	int		(*cpu_init)(struct device_node *, unsigned int);
+-	int		(*cpu_init_idle)(struct device_node *, unsigned int);
+ 	int		(*cpu_prepare)(unsigned int);
+ 	int		(*cpu_boot)(unsigned int);
+ 	void		(*cpu_postboot)(void);
+@@ -58,7 +57,8 @@ struct cpu_operations {
+ 	void		(*cpu_die)(unsigned int cpu);
+ 	int		(*cpu_kill)(unsigned int cpu);
+ #endif
+-#ifdef CONFIG_ARM64_CPU_SUSPEND
++#ifdef CONFIG_CPU_IDLE
++	int		(*cpu_init_idle)(struct device_node *, unsigned int);
+ 	int		(*cpu_suspend)(unsigned long);
+ #endif
+ };
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index eaa77ed..0622599 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -27,7 +27,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+-arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
++arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 9a9fce0..a2ae194 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -152,7 +152,7 @@ int main(void)
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+   DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
+ #endif
+-#ifdef CONFIG_ARM64_CPU_SUSPEND
++#ifdef CONFIG_CPU_PM
+   DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+   DEFINE(CPU_CTX_SP,		offsetof(struct cpu_suspend_ctx, sp));
+   DEFINE(MPIDR_HASH_MASK,	offsetof(struct mpidr_hash, mask));
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index df1cf15..98bbe06 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -894,7 +894,7 @@ static struct notifier_block hw_breakpoint_reset_nb = {
+ 	.notifier_call = hw_breakpoint_reset_notify,
+ };
+ 
+-#ifdef CONFIG_ARM64_CPU_SUSPEND
++#ifdef CONFIG_CPU_PM
+ extern void cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *));
+ #else
+ static inline void cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index f1dbca7..3425f31 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -540,8 +540,6 @@ const struct cpu_operations cpu_psci_ops = {
+ 	.name		= "psci",
+ #ifdef CONFIG_CPU_IDLE
+ 	.cpu_init_idle	= cpu_psci_cpu_init_idle,
+-#endif
+-#ifdef CONFIG_ARM64_CPU_SUSPEND
+ 	.cpu_suspend	= cpu_psci_cpu_suspend,
+ #endif
+ #ifdef CONFIG_SMP
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 4e778b1..1257835 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -102,7 +102,7 @@ ENTRY(cpu_do_idle)
+ 	ret
+ ENDPROC(cpu_do_idle)
+ 
+-#ifdef CONFIG_ARM64_CPU_SUSPEND
++#ifdef CONFIG_CPU_PM
+ /**
+  * cpu_do_suspend - save CPU registers context
+  *
+diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
+index d0a08ed..6effb36 100644
+--- a/drivers/cpuidle/Kconfig.arm64
++++ b/drivers/cpuidle/Kconfig.arm64
+@@ -4,7 +4,6 @@
+ 
+ config ARM64_CPUIDLE
+ 	bool "Generic ARM64 CPU idle Driver"
+-	select ARM64_CPU_SUSPEND
+ 	select DT_IDLE_STATES
+ 	help
+ 	  Select this to enable generic cpuidle driver for ARM64.
 -- 
-Catalin
+2.1.2
