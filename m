@@ -1,119 +1,121 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 18 Dec 2014 14:02:17 -0500
-Subject: [RFC PATCH 1/2] common: dma-mapping: introduce
- dma_get_parent_cfg() helper
-In-Reply-To: <2935351.ba8Au9y4fE@wuerfel>
-References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
- <1949667.gMcOLHe7Sk@wuerfel> <549210BB.9080603@ti.com>
- <2935351.ba8Au9y4fE@wuerfel>
-Message-ID: <549324B9.2030506@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 18 Dec 2014 20:03:58 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove dead #elif CONFIG_S3C24XX_DMAC
+In-Reply-To: <CABv5NL_SLyY9-yookdTVdNXzCmUEqJ_QB6ofzw_q0H7Vcwbzfg@mail.gmail.com>
+References: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
+ <2864831.LEPnyFh3Il@phil>
+ <CABv5NL_SLyY9-yookdTVdNXzCmUEqJ_QB6ofzw_q0H7Vcwbzfg@mail.gmail.com>
+Message-ID: <1645416.VNQj8YWB7M@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2014 07:09 PM, Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 18:24:43 Murali Karicheri wrote:
->> On 12/17/2014 04:56 PM, Arnd Bergmann wrote:
->>> On Wednesday 17 December 2014 13:02:23 Murali Karicheri wrote:
->>>
->>> What's wrong with using arch_setup_dma_ops() from PCI as suggested
->>> previously?
->>>
->
-> +Will Deacon
->
->> I had originally written a code based on that line as below. But
->> dma-ranges property is also used by ppc and other architectures in the
->> pci device DT node. So I wasn't sure how this code impact PCI driver
->> functionality on those platforms. Hence used a simpler change as all
->> that is needed for keystone is to get the dma_pfn_offset rightly set in
->> the pci slave device.
->
-> But in your patch, you don't call arch_setup_dma_ops() at all.
->
->> Initially I had a function implemented as below for this in of_pci.c.
->>
->> + * of_pci_dma_configure - Setup DMA configuration for a pci device
->> + * @dev:       pci device to apply DMA configuration
->> + *
->> + * Try to get devices's DMA configuration from DT and update it
->> + * accordingly. This is a similar to of_dma_configure() for platform
->> + * devices.
->> + *
->> + */
->> +void of_pci_dma_configure(struct pci_dev *dev)
->> +{
->> +       struct device *host_bridge, *parent;
->> +       struct pci_bus *bus = dev->bus;
->> +       u64 dma_addr, paddr, size;
->> +       int ret;
->> +
->> +       while (!pci_is_root_bus(bus))
->> +               bus = bus->parent;
->> +       host_bridge = bus->bridge;
->> +
->> +       parent = host_bridge->parent;
->> +       if (parent->of_node) {
->
-> so far it looks good, although we may want to introduce
-> a helper function to get the of_node.
+Hi Stefan,
 
-Will add
+Am Donnerstag, 18. Dezember 2014, 14:43:01 schrieb Stefan Hengelein:
+> So you actually tested the code I removed in the patch? can you
+> provide a configuration that compiles that piece of code?
 
->
->> +               /*
->> +                * if dma-coherent property exist, call arch hook to setup
->> +                * dma coherent operations.
->> +                */
->> +               if (of_dma_is_coherent(parent->of_node)) {
->> +                       set_arch_dma_coherent_ops(&dev->dev);
->> +                       dev_info(&dev->dev, "device is dma coherent\n");
->> +               }
->
-> set_arch_dma_coherent_ops no longer exists. Just keep the flag in a
-> local variable
+Yep, one of my boards (Asus eeeReader DR-900) was actually able to transmit
+stuff via the libertas spi wifi driver using the s3c64xx-spi driver.
 
-Ok.
-
->
->> +               /*
->> +                * if dma-ranges property doesn't exist - just return else
->> +                * setup the dma offset
->> +                */
->> +               ret = of_dma_get_range(parent->of_node,&dma_addr,
->> &paddr,&size);
->> +               if (ret<  0) {
->> +                       dev_info(&dev->dev, "no dma range information to
->> setup\n");
->> +                       printk("no dma range information to setup\n");
->> +                       return;
->> +               }
->> +
->> +               /* DMA ranges found. Calculate and set dma_pfn_offset */
->> +               dev->dev.dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
->> +               dev_info(&dev->dev, "dma_pfn_offset(%#08lx)\n",
->> dev->dev.dma_pfn_offset);
->
-> Same for the offset and size here, then pass all of the above into
-> arch_setup_dma_ops. This is also where we need to hook up the iommu
-> support once we decide how to make that work with the ARM SMMU.
-
-Ok. I will make this similar to of_dma_configure() that can be called 
-from pci/probe.c
-
-Murali
->
-> Will, I think we may have a problem on ARM64 now, since we only replaced
-> set_arch_dma_coherent_ops on ARM32 but not ARM64. Can you send a fix for
-> this? Without that, we don't have any coherent operations on ARM64 any
-> more, unless I'm missing something.
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The smdk2416 is currently the only board for the s3c2416 in the kernel. I don't
+know if it had actual spi devices connected, but if it had, a suitable diff would
+look something like the diff below. Of course hooking up spi devices would
+work the same in any out-of-tree board for the supported socs.
 
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+For people reading along, the s3c24xx spi distribution is as follows:
+s3c2410, s3c2412, s3c2440: (I think) two s3c24xx-spi
+s3c2443: one s3c64xx-spi and one s3c24xx-spi
+s3c2416: one s3c64xx-spi
+s3c2450: two s3c64xx-spi
+
+
+Heiko
+
+
+------------ 8< ------------
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 9eb2229..5210e5d 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -419,6 +419,8 @@ config MACH_SMDK2416
+ 	select S3C_DEV_HSMMC1
+ 	select S3C_DEV_NAND
+ 	select S3C_DEV_USB_HOST
++	select S3C64XX_DEV_SPI0
++	select S3C2443_SETUP_SPI
+ 	help
+ 	  Say Y here if you are using an SMDK2416
+ 
+diff --git a/arch/arm/mach-s3c24xx/mach-smdk2416.c b/arch/arm/mach-s3c24xx/mach-smdk2416.c
+index 86394f7..b6c6ff4 100644
+--- a/arch/arm/mach-s3c24xx/mach-smdk2416.c
++++ b/arch/arm/mach-s3c24xx/mach-smdk2416.c
+@@ -52,6 +52,9 @@
+ #include <linux/platform_data/s3c-hsudc.h>
+ #include <plat/samsung-time.h>
+ 
++#include <linux/spi/spi.h>
++#include <linux/platform_data/spi-s3c64xx.h>
++
+ #include <plat/fb.h>
+ 
+ #include "common.h"
+@@ -207,6 +210,26 @@ static struct s3c_sdhci_platdata smdk2416_hsmmc1_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_NONE,
+ };
+ 
++struct s3c64xx_spi_csinfo libertas_cs_info = {
++	.fb_delay = 0,
++	.line = 128, /* gpio cs line */
++};
++
++
++static struct spi_board_info spi_board_info[] = {
++    {
++	.modalias		= "libertas_spi",
++	.max_speed_hz		= 1200000,
++	.bus_num		= 0,
++	.irq			= 12, /* some interrupt number */
++	.chip_select		= 0,
++	.mode			= SPI_MODE_3,
++	.controller_data	= &libertas_cs_info,
++/*	.platform_data		= &foo1_pdata, */
++    },
++};
++
++
+ static struct platform_device *smdk2416_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_wdt,
+@@ -216,6 +239,7 @@ static struct platform_device *smdk2416_devices[] __initdata = {
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_usb_hsudc,
+ 	&s3c2443_device_dma,
++	&s3c64xx_device_spi0,
+ };
+ 
+ static void __init smdk2416_init_time(void)
+@@ -250,6 +274,9 @@ static void __init smdk2416_machine_init(void)
+ 	gpio_request(S3C2410_GPB(1), "Display Reset");
+ 	gpio_direction_output(S3C2410_GPB(1), 1);
+ 
++	s3c64xx_spi0_set_platdata(NULL, 0, ARRAY_SIZE(spi_board_info));
++	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
++
+ 	platform_add_devices(smdk2416_devices, ARRAY_SIZE(smdk2416_devices));
+ 	smdk_machine_init();
+ }
+diff --git a/arch/arm/mach-s3c24xx/setup-spi.c b/arch/arm/mach-s3c24xx/setup-spi.c
+index 3d47e02..d66c4e0 100644
+--- a/arch/arm/mach-s3c24xx/setup-spi.c
++++ b/arch/arm/mach-s3c24xx/setup-spi.c
+@@ -16,6 +16,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/regs-gpio.h>
++#include <mach/gpio-samsung.h>
+ 
+ #ifdef CONFIG_S3C64XX_DEV_SPI0
+ int s3c64xx_spi0_cfg_gpio(void)
