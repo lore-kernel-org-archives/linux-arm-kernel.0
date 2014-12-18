@@ -1,70 +1,57 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 18 Dec 2014 16:33:20 +0800
-Subject: [PATCH 1/2] tty: serial: 8250_mtk: Add earlycon
-In-Reply-To: <1418891601-53769-1-git-send-email-eddie.huang@mediatek.com>
-References: <1418891601-53769-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1418891601-53769-2-git-send-email-eddie.huang@mediatek.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 18 Dec 2014 11:34:15 +0300
+Subject: DT on s3c24xx
+In-Reply-To: <20141218075205.GB10857@pengutronix.de>
+References: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
+ <20141218075205.GB10857@pengutronix.de>
+Message-ID: <CA+E=qVeU4hEX2x9uAPfgqEgpxvA7bUBWqWJtBJdbP=RK6ghfEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mediatek UART has highspeed register, but 8250_early.c doesn't
-support this, so add earlycon in 8250_mtk.c
+On Thu, Dec 18, 2014 at 10:52 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- drivers/tty/serial/8250/8250_mtk.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+Hi Uwe,
 
-diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-index de7aae5..65dd569 100644
---- a/drivers/tty/serial/8250/8250_mtk.c
-+++ b/drivers/tty/serial/8250/8250_mtk.c
-@@ -23,6 +23,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/serial_8250.h>
- #include <linux/serial_reg.h>
-+#include <linux/console.h>
- 
- #include "8250.h"
- 
-@@ -289,6 +290,38 @@ static struct platform_driver mtk8250_platform_driver = {
- };
- module_platform_driver(mtk8250_platform_driver);
- 
-+#define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
-+
-+static void __init mtk8250_serial_putc(struct uart_port *port, int c)
-+{
-+	while ((readl(port->membase + (UART_LSR << 2)) & BOTH_EMPTY) !=
-+		BOTH_EMPTY)
-+		;
-+	writel(c, port->membase + (UART_TX << 2));
-+}
-+
-+static void __init early_mtk8250_write(struct console *console,
-+					const char *s, unsigned int count)
-+{
-+	struct earlycon_device *dev = console->data;
-+
-+	uart_console_write(&dev->port, s, count, mtk8250_serial_putc);
-+}
-+
-+static int __init early_mtk8250_setup(struct earlycon_device *device,
-+					const char *options)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = early_mtk8250_write;
-+
-+	return 0;
-+}
-+
-+EARLYCON_DECLARE(mtk8250, early_mtk8250_setup);
-+OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
-+
- MODULE_AUTHOR("Matthias Brugger");
- MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("Mediatek 8250 serial port driver");
--- 
-1.8.1.1.dirty
+> [Cc += linusw, linux-gpio]
+>
+> On Wed, Dec 17, 2014 at 10:04:24PM +0300, Vasily Khoruzhick wrote:
+>> I'd like to port several s3c24xx to DT, and I'm stuck with s3c24xx LCD
+>> controller and power drivers for H1940 and RX1950.
+>>
+>> Please see [1]. I want to move this function into another LCD power
+>> driver, but I'm not sure what to do with s3c_gpio_cfgpin(). I need to
+>> change pin function in runtime, and as far as I understand it should
+>> be handled via pinctrl driver somehow. But how?
+> You can pass >1 pinctrl setups to a node:
+>
+>         somedevice {
+>                 pinctrl-names = "default", "foo", "bar";
+>                 pinctrl-0 = <&pinctrl_somedevice_default>;
+>                 pinctrl-1 = <&pinctrl_somedevice_foo>;
+>                 pinctrl-2 = <&pinctrl_somedevice_bar>;
+>                 cfg-gpios = <&gpio4 12 3>, <&gpio2 7 5>;
+>         };
+>
+> Then I think you can fiddle with pinctrl_select_state(). For the gpios
+> you can then use the standard gpiod_{request,direction_{in,out}put}
+> combo.
+
+Thanks for you response!
+
+Can I change pin function after gpio was requested? In low-power state
+(i.e. when display is disabled) it's gpio driving some level,
+and in active state it's some LCD controller pin (don't remember which
+one exactly)
+
+Regards,
+Vasily
+
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
