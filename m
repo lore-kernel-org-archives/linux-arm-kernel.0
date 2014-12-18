@@ -1,39 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Dec 2014 15:53:14 +0100
-Subject: DT on s3c24xx
-In-Reply-To: <CA+E=qVeU4hEX2x9uAPfgqEgpxvA7bUBWqWJtBJdbP=RK6ghfEQ@mail.gmail.com>
-References: <CA+E=qVf4nT5x-fRFBu=Wv_VKUnEMAEP4GgJG8em8NyUFkwtbPg@mail.gmail.com>
- <20141218075205.GB10857@pengutronix.de>
- <CA+E=qVeU4hEX2x9uAPfgqEgpxvA7bUBWqWJtBJdbP=RK6ghfEQ@mail.gmail.com>
-Message-ID: <CACRpkdZumW0bZhc7xK_bes1A7Vuw5QYF2wgG86g0f4-5fJ97Lg@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 18 Dec 2014 16:58:28 +0100
+Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <201412171700.52323.marex@denx.de>
+References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5CQjpYtrNTT65-ikJua4N_osYj4UVgm3EV+sEvVWF59cg@mail.gmail.com>
+ <5491379F.3090607@i2se.com> <201412171700.52323.marex@denx.de>
+Message-ID: <5492F9A4.3070805@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 9:34 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+Hi Marek,
 
-> Can I change pin function after gpio was requested? In low-power state
-> (i.e. when display is disabled) it's gpio driving some level,
-> and in active state it's some LCD controller pin (don't remember which
-> one exactly)
+Am 17.12.2014 um 17:00 schrieb Marek Vasut:
+> On Wednesday, December 17, 2014 at 08:58:23 AM, Stefan Wahren wrote:
+>> Hi Fabio,
+>>
+>> Am 17.12.2014 um 03:44 schrieb Fabio Estevam:
+>>> Hi Stefan,
+>>>
+>>> On Sun, Dec 14, 2014 at 3:16 PM, Stefan Wahren <stefan.wahren@i2se.com> 
+> wrote:
+>>>> Btw i hope this patch also fixes a SPI communication issue with our
+>>>> hardware which forces us to bypass ref_io1 for ssp2.
+>>> Does this patch fix the SPI issue?
+>> unfortunately not. If the 3.19-rc1 has been released, i send the fixed
+>> patch.
+>>
+>> I've the theory that's an initialization issue. I've never heard of SPI
+>> problems from the U-Boot users and we are using imx-bootlets.
+>>
+>> I'll try to test it with U-Boot.
+> Please keep me in the loop, I'd be interested in what you find. Thanks!
+>
+> Best regards,
+> Marek Vasut
 
-Please read the section named "GPIO mode pitfalls" in
-Documentation/pinctrl.txt very closely.
+i tested it with U-Boot, but the issue still exists. If there is any
+progress, i'll inform you.
 
-Two ways:
-
-- You can use the GPIO and pin control interface to the same
-  hardware in parallel. There is no blocking this since there
-  is hardware out that that actually allow this. NOT
-  RECOMMENDED.
-
-- If the "GPIO mode" mentioned is only about e.g. grounding
-  the pins in a low power state and then not really about using
-  them as GPIO, extend the pin controller to be able to e.g.
-  ground the pins with PIN_CONFIG_OUTPUT or
-  PIN_CONFIG_LOW_POWER_MODE if you use
-  generic bindings.
-
-If the usecase is low power, the latter approach is recommended.
-
-Yours,
-Linus Walleij
+Stefan
