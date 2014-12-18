@@ -1,27 +1,97 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Wed, 17 Dec 2014 15:25:09 -0800
-Subject: [PATCH] ARM: brcmstb: update CPU power management sequence
-In-Reply-To: <1418786030-23455-1-git-send-email-computersforpeace@gmail.com>
-References: <1418786030-23455-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <CADtm3G5ZaOsJ_pvY2ho0yYhbhbqtCwsPZfnEc0rwhCBC1ho16g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Dec 2014 01:09:17 +0100
+Subject: [RFC PATCH 1/2] common: dma-mapping: introduce
+ dma_get_parent_cfg() helper
+In-Reply-To: <549210BB.9080603@ti.com>
+References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
+ <1949667.gMcOLHe7Sk@wuerfel> <549210BB.9080603@ti.com>
+Message-ID: <2935351.ba8Au9y4fE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 7:13 PM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> The automatic CPU power state machine for B15 CPUs does not work
-> reliably as-is. This patch implements a manual sequence in software to
-> replace it.
->
-> This was tested successfully with over 10,000 hotplug cycles of
-> something like this:
->
->   echo 0 > /sys/devices/system/cpu/cpu1/online
->   echo 1 > /sys/devices/system/cpu/cpu1/online
->
-> whereas the existing sequence often locks up after a few hundred cycles.
->
-> Fixes: 62639c2f5332 ("ARM: brcmstb: reintroduce SMP support")
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+On Wednesday 17 December 2014 18:24:43 Murali Karicheri wrote:
+> On 12/17/2014 04:56 PM, Arnd Bergmann wrote:
+> > On Wednesday 17 December 2014 13:02:23 Murali Karicheri wrote:
+> >
+> > What's wrong with using arch_setup_dma_ops() from PCI as suggested
+> > previously?
+> >
 
-Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
++Will Deacon
+
+> I had originally written a code based on that line as below. But 
+> dma-ranges property is also used by ppc and other architectures in the 
+> pci device DT node. So I wasn't sure how this code impact PCI driver 
+> functionality on those platforms. Hence used a simpler change as all 
+> that is needed for keystone is to get the dma_pfn_offset rightly set in 
+> the pci slave device.
+
+But in your patch, you don't call arch_setup_dma_ops() at all.
+
+> Initially I had a function implemented as below for this in of_pci.c.
+> 
+> + * of_pci_dma_configure - Setup DMA configuration for a pci device
+> + * @dev:       pci device to apply DMA configuration
+> + *
+> + * Try to get devices's DMA configuration from DT and update it
+> + * accordingly. This is a similar to of_dma_configure() for platform
+> + * devices.
+> + *
+> + */
+> +void of_pci_dma_configure(struct pci_dev *dev)
+> +{
+> +       struct device *host_bridge, *parent;
+> +       struct pci_bus *bus = dev->bus;
+> +       u64 dma_addr, paddr, size;
+> +       int ret;
+> +
+> +       while (!pci_is_root_bus(bus))
+> +               bus = bus->parent;
+> +       host_bridge = bus->bridge;
+> +
+> +       parent = host_bridge->parent;
+> +       if (parent->of_node) {
+
+so far it looks good, although we may want to introduce
+a helper function to get the of_node.
+
+> +               /*
+> +                * if dma-coherent property exist, call arch hook to setup
+> +                * dma coherent operations.
+> +                */
+> +               if (of_dma_is_coherent(parent->of_node)) {
+> +                       set_arch_dma_coherent_ops(&dev->dev);
+> +                       dev_info(&dev->dev, "device is dma coherent\n");
+> +               }
+
+set_arch_dma_coherent_ops no longer exists. Just keep the flag in a
+local variable
+
+> +               /*
+> +                * if dma-ranges property doesn't exist - just return else
+> +                * setup the dma offset
+> +                */
+> +               ret = of_dma_get_range(parent->of_node, &dma_addr, 
+> &paddr, &size);
+> +               if (ret < 0) {
+> +                       dev_info(&dev->dev, "no dma range information to 
+> setup\n");
+> +                       printk("no dma range information to setup\n");
+> +                       return;
+> +               }
+> +
+> +               /* DMA ranges found. Calculate and set dma_pfn_offset */
+> +               dev->dev.dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+> +               dev_info(&dev->dev, "dma_pfn_offset(%#08lx)\n", 
+> dev->dev.dma_pfn_offset);
+
+Same for the offset and size here, then pass all of the above into
+arch_setup_dma_ops. This is also where we need to hook up the iommu
+support once we decide how to make that work with the ARM SMMU.
+
+Will, I think we may have a problem on ARM64 now, since we only replaced
+set_arch_dma_coherent_ops on ARM32 but not ARM64. Can you send a fix for
+this? Without that, we don't have any coherent operations on ARM64 any
+more, unless I'm missing something.
+
+	Arnd
