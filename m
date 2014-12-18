@@ -1,101 +1,33 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 18 Dec 2014 14:04:02 -0600
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CAOZdJXWaQk+f6MLngDzdmUU8x=4cPrt9kpJG6L529MhV0uQwdA@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 18 Dec 2014 21:10:43 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <20141218193153.GA27832@amd>
+References: <20141213223727.GA13894@amd>
+ <1418637710.4443.11.camel@linux-0dmf.site>
+ <20141218193153.GA27832@amd>
+Message-ID: <20141218201043.GA15240@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 17, 2014 at 8:37 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+Hi!
+On Thu 2014-12-18 20:31:53, Pavel Machek wrote:
+> Hi!
+> 
+> > > +	h4p_simple_send_frame(info, skb);
+> > > +
+> > > +	if (!wait_for_completion_interruptible_timeout(&info->init_completion,
+> > > +						       msecs_to_jiffies(1000))) {
+> > > +		printk("h4p: negotiation did not return\n");
+> > 
+> > Memory leak in the error case
+> 
+> And memory leak in the normal case, too, no? Fixed.
 
-> If acpi=force is used, the kernel
-> +will ONLY use device configuration information contained in the ACPI tables.
+Actually, no, h4p_simple_send_frame passes skb to network stack, and
+it should free it as neccessary.
 
-Based on this statement, ...
-
-> +In order for the kernel to load and use ACPI tables, the UEFI implementation
-> +MUST set the ACPI_20_TABLE_GUID to point to the RSDP table (the table with
-> +the ACPI signature "RSD PTR ").  If this pointer is incorrect and acpi=force
-> +is used, the kernel will disable ACPI and try to use DT to boot.
-
-wouldn't it be more correct to say "If this pointer is incorrect OR
-acpi=force is used"?
-
-> +Forum provides a mechanism for registering such bindings [URL TBD by ASWG]
-
-Did you intend to replace the text in []?
-
-> +so that they may be used on any operating system supporting ACPI.  Device
-> +properties that have not been registered with the UEFI Forum should not be
-> +used.
-
-Blech.  I guess it's necessary, but the information needs to be documented here.
-
-> +Drivers should look for device properties in the _DSD object ONLY; the _DSD
-> +object is described in the ACPI specification section 6.2.5, but more
-> +specifically, use the _DSD Device Properties UUID:
-> +
-> +   -- UUID: daffd814-6eba-4d8c-8a91-bc9bbf4aa301
-> +
-> +   -- http://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf)
-
-Extra ) here.
-
-> +The kernel has an interface for looking up device properties in a manner
-> +independent of whether DT or ACPI is being used and that interface should
-> +be used; it can eliminate some duplication of code paths in driver probing
-> +functions and discourage divergence between DT bindings and ACPI device
-> +properties.
-
-How about a pointer to the documentation for this method?
-
-> +Such code in _PS? methods will of course be very platform specific.  But,
-
-I would use _PSx instead of _PS? here.
-
-> +this allows the driver to abstract out the interface for operating the device
-> +and avoid having to read special non-standard values from ACPI tables. Further,
-> +abstracting the use of these resources allows the hardware to change over time
-> +without requiring updates to the driver.
-> +
-> +
-> +Clocks
-> +------
-> +ACPI makes the assumption that clocks are initialized by the firmware --
-> +UEFI, in this case -- to some working value before control is handed over
-> +to the kernel.  This has implications for devices such as UARTs, or SoC
-> +driven LCD displays, for example.
-
-SOC-driven should be hyphenated.
-
-> +When the kernel boots, the clock is assumed to be set to reasonable
-
-to A reasonable
-
-> +working value.  If for some reason the frequency needs to change -- e.g.,
-> +throttling for power management -- the device driver should expect that
-> +process to be abstracted out into some ACPI method that can be invoked
-> +(please see the ACPI specification for further recommendations on standard
-> +methods to be expected).  If is not, there is no direct way for ACPI to
-
-If IT is not
-
-> +control the clocks.
-> +
-> +
-> +Driver Recommendations
-> +----------------------
-> +DO NOT remove any DT handling when adding ACPI support for a driver.  The
-> +same device may be used on many different systems.
-> +
-> +DO try to structure the driver so that it is data driven.  That is, set up
-
-data-driven
-
-
+								Pavel
+								
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
