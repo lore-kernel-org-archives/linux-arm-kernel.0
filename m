@@ -1,53 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Dec 2014 08:41:23 -0800
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <20141217172333.GE23854@atomide.com>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
-Message-ID: <20141218164122.GH23854@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 18 Dec 2014 17:19:34 +0100
+Subject: [PATCH RFC] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <5492F9A4.3070805@i2se.com>
+References: <1418570933-21585-1-git-send-email-stefan.wahren@i2se.com>
+ <201412171700.52323.marex@denx.de> <5492F9A4.3070805@i2se.com>
+Message-ID: <201412181719.34334.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [141217 09:28]:
-> 
-> And then there are these too in the current mainline that are
-> clock related:
-> 
-> omap4xxx_dt_clk_init: failed to configure ABE DPLL!
-> ...
-> clock: dpll_abe_ck failed transition to 'locked'
-> clock: dpll_abe_ck failed transition to 'locked'
-> clock: dpll_abe_ck failed transition to 'locked'
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:851 clk_disable+0x24/0x30()
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-09274-g53c5279 #699
-> Hardware name: Generic OMAP4 (Flattened Device Tree)
-> [<c00154b4>] (unwind_backtrace) from [<c0011b7c>] (show_stack+0x10/0x14)
-> [<c0011b7c>] (show_stack) from [<c05d5068>] (dump_stack+0x80/0x9c)
-> [<c05d5068>] (dump_stack) from [<c003e104>] (warn_slowpath_common+0x78/0xb4)
-> [<c003e104>] (warn_slowpath_common) from [<c003e15c>] (warn_slowpath_null+ 0x1c/0x24)
-> [<c003e15c>] (warn_slowpath_null) from [<c04dfc1c>] (clk_disable+0x24/0x30)
-> [<c04dfc1c>] (clk_disable) from [<c0024ea0>] (_disable_clocks+0x18/0x68)
-> [<c0024ea0>] (_disable_clocks) from [<c0026410>] (_idle+0x15c/0x240)
-> [<c0026410>] (_idle) from [<c086fc48>] (_setup+0x174/0x22c)
-> [<c086fc48>] (_setup) from [<c002684c>] (omap_hwmod_for_each+0x30/0x5c)
-> [<c002684c>] (omap_hwmod_for_each) from [<c0870054>] (__omap_hwmod_setup_all+0x30/0x40)
-> [<c0870054>] (__omap_hwmod_setup_all) from [<c00089e4>] (do_one_initcall+0x80/0x1d8)
-> [<c00089e4>] (do_one_initcall) from [<c0862ea4>] (kernel_init_freeable+0x1f4/0x2cc)
-> [<c0862ea4>] (kernel_init_freeable) from [<c05cf184>] (kernel_init+0x8/0xe4)
-> [<c05cf184>] (kernel_init) from [<c000e8e8>] (ret_from_fork+0x14/0x2c)
-> ---[ end trace f0d1b75165d8ef11 ]---
-> clock: dpll_abe_ck failed transition to 'locked'
-> clock: dpll_abe_ck failed transition to 'locked'
-> ...
-> 
-> Tero & Tomi, can you please look into these clock issues above?
+On Thursday, December 18, 2014 at 04:58:28 PM, Stefan Wahren wrote:
+> Hi Marek,
 
-FYI, looks like merging Mike's pending clk-next to current mainline
-somehow fixes the clock issues above. It seems the audio changes
-depended on changes in clk-next?
+Hello Stefan,
 
-Regards,
+> Am 17.12.2014 um 17:00 schrieb Marek Vasut:
+> > On Wednesday, December 17, 2014 at 08:58:23 AM, Stefan Wahren wrote:
+> >> Hi Fabio,
+> >> 
+> >> Am 17.12.2014 um 03:44 schrieb Fabio Estevam:
+> >>> Hi Stefan,
+> >>> 
+> >>> On Sun, Dec 14, 2014 at 3:16 PM, Stefan Wahren <stefan.wahren@i2se.com>
+> > 
+> > wrote:
+> >>>> Btw i hope this patch also fixes a SPI communication issue with our
+> >>>> hardware which forces us to bypass ref_io1 for ssp2.
+> >>> 
+> >>> Does this patch fix the SPI issue?
+> >> 
+> >> unfortunately not. If the 3.19-rc1 has been released, i send the fixed
+> >> patch.
+> >> 
+> >> I've the theory that's an initialization issue. I've never heard of SPI
+> >> problems from the U-Boot users and we are using imx-bootlets.
+> >> 
+> >> I'll try to test it with U-Boot.
+> > 
+> > Please keep me in the loop, I'd be interested in what you find. Thanks!
+> > 
+> > Best regards,
+> > Marek Vasut
+> 
+> i tested it with U-Boot, but the issue still exists. If there is any
+> progress, i'll inform you.
 
-Tony
+Thanks!
+
+Best regards,
+Marek Vasut
