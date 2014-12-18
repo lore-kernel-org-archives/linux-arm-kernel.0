@@ -1,42 +1,65 @@
-From: xerofoify@gmail.com (nick)
-Date: Thu, 18 Dec 2014 09:08:05 -0500
-Subject: Weird/Unneeded call to msleep in exynos_mipi_dsi_wr_data in
- exynos_mipi_dsi_common.c
-In-Reply-To: <5492DF0D.3080607@ti.com>
-References: <54920A54.2060608@gmail.com> <5492ABE7.1060900@samsung.com>	
- <5492D80E.3010906@gmail.com> <1418909978.2236.0.camel@pengutronix.de>
- <5492DB1A.2020704@gmail.com> <5492DF0D.3080607@ti.com>
-Message-ID: <5492DFC5.4060202@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 18 Dec 2014 15:08:36 +0100
+Subject: [PATCH] ARM: at91/pit: don't suspend/resume if unused
+In-Reply-To: <1418846023-8581-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1418846023-8581-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <5492DFE4.6020409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 17/12/2014 20:53, Sylvain Rochet a ?crit :
+> Waiting for PIT to stop counting takes a long time:
+>   1/(Master clock/prescaler/PIVR)
+> = 1/(133 MHz     /16       /2^20)
+> = 126 ms
+> 
+> Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
+> of the unused PIT device reduce (suspend time + resume time) from ~140 ms
+> to ~17 ms.
+> 
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I also moved these changes to the new clocksource PIT driver. Cf. the
+patch I've just sent titled: (clocksource: timer-atmel-pit: don't
+suspend/resume if unused) (preserving your authorship of course).
+
+Thanks. Bye.
 
 
-On 2014-12-18 09:05 AM, Tomi Valkeinen wrote:
-> On 18/12/14 15:48, nick wrote:
->> Lucas,
->> That's fair do you known of anyone who does have the hardware so we can test my patch. If you do then we can get this fixed rather
->> easily.
->> Cheers Nick 
->>
->> On 2014-12-18 08:39 AM, Lucas Stach wrote:
->>> Am Donnerstag, den 18.12.2014, 08:35 -0500 schrieb nick:
->>>> Krzysztof,
->>>> If we look at the code for this function, it already is handling the data correctly. In addition  the locks 
->>>> seem to be better protection then msleep. Further more is no reason for this delay as we are neither resetting 
->>>> the hardware or waiting for the hardware here so why is it needed? I don't have Exynos based hardware lying
->>>> around through to test it.
->>>
->>> If you can't test it, don't touch it. It's that simple.
+> ---
+>  arch/arm/mach-at91/at91sam926x_time.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> There seems to be multiple msleep(20)s in exynos_mipi_dsi_common.c, a
-> few with /* FIXME */ and a few without any comments. Looks like bad (but
-> relatively harmless) code to me, but as Lucas said, if you can't test
-> it, don't touch it.
+> diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+> index e3344b4..44526aa 100644
+> --- a/arch/arm/mach-at91/at91sam926x_time.c
+> +++ b/arch/arm/mach-at91/at91sam926x_time.c
+> @@ -106,6 +106,10 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+>  
+>  static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
+>  {
+> +	/* Don't suspend PIT if unused */
+> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
+> +		return;
+> +
+>  	/* Disable timer */
+>  	pit_write(AT91_PIT_MR, 0);
+>  }
+> @@ -125,6 +129,10 @@ static void at91sam926x_pit_reset(void)
+>  
+>  static void at91sam926x_pit_resume(struct clock_event_device *cedev)
+>  {
+> +	/* Don't resume PIT if unused */
+> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
+> +		return;
+> +
+>  	at91sam926x_pit_reset();
+>  }
+>  
 > 
->  Tomi
-> 
-> 
-Tomi,
-That is totally fair, sorry for wasting your time :(. I was just trying to help out.
-Cheers Nick 
+
+
+-- 
+Nicolas Ferre
