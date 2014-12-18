@@ -1,32 +1,48 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 18 Dec 2014 15:11:25 +0800
-Subject: [PATCH RFC v2 03/14] of: Add vendor prefix for Truly Semiconductors
- Limited
+Date: Thu, 18 Dec 2014 15:11:27 +0800
+Subject: [PATCH RFC v2 05/14] ARM: imx6q: clk: Add the video_27m clock
 In-Reply-To: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
 References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418886696-11636-4-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418886696-11636-6-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch supports the video_27m clock which is a fixed factor
+clock of the pll3_pfd1_540m clock.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v1->v2:
  * None.
 
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-imx/clk-imx6q.c             | 1 +
+ include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 3cee528..8257f3a 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -158,6 +158,7 @@ tlm	Trusted Logic Mobility
- toradex	Toradex AG
- toshiba	Toshiba Corporation
- toumaz	Toumaz
-+truly	Truly Semiconductors Limited
- usi	Universal Scientific Industrial Co., Ltd.
- v3	V3 Semiconductor
- variscite	Variscite Ltd.
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4e79da7..9470df3 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -246,6 +246,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+ 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
+ 	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
++	clk[IMX6QDL_CLK_VIDEO_27M] = imx_clk_fixed_factor("video_27m", "pll3_pfd1_540m", 1, 20);
+ 	if (cpu_is_imx6dl()) {
+ 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
+ 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
+diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
+index b690cdb..25625bf 100644
+--- a/include/dt-bindings/clock/imx6qdl-clock.h
++++ b/include/dt-bindings/clock/imx6qdl-clock.h
+@@ -248,6 +248,7 @@
+ #define IMX6QDL_PLL6_BYPASS			235
+ #define IMX6QDL_PLL7_BYPASS			236
+ #define IMX6QDL_CLK_GPT_3M			237
+-#define IMX6QDL_CLK_END				238
++#define IMX6QDL_CLK_VIDEO_27M			238
++#define IMX6QDL_CLK_END				239
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
 -- 
 2.1.0
