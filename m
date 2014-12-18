@@ -1,62 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 18 Dec 2014 23:43:03 +0300
-Subject: [PATCH] ARM: shmobile: r8a7791: add MLB+ clock
-Message-ID: <7846462.yepFC759KH@wasted.cogentembedded.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 18 Dec 2014 17:44:49 -0300
+Subject: GPMC clock question
+Message-ID: <54933CC1.9010301@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
+Tony, Roger:
 
-Add MLB+ clock to R8A7791 device tree.
+As far as I can see, the GPMC interface clock (GPMC_FCLK) is not
+properly modeled in the devicetree. Instead, hwmod magic seems to be used.
 
-Signed-off-by: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
-[Sergei: rebased, renamed, added changelog]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+arch/arm/mach-omap2/omap_hwmod_33xx_43xx_interconnect_data.c:
+struct omap_hwmod_ocp_if am33xx_l3_s__gpmc = {
+        .master         = &am33xx_l3_s_hwmod,
+        .slave          = &am33xx_gpmc_hwmod,
+        .clk            = "l3s_gclk",
+        .addr           = am33xx_gpmc_addr_space,
+        .user           = OCP_USER_MPU,
+};
 
----
-This patch is against 'renesas-devel-20141218-v3.18' tag of Simon Horman's
-'renesas.git' repo.
+I'd like to know what would be the appropriate DT model for this clock.
+Perhaps, as child of CORE_M4_CLK, divided by 2:
 
- arch/arm/boot/dts/r8a7791.dtsi            |   10 +++++-----
- include/dt-bindings/clock/r8a7791-clock.h |    1 +
- 2 files changed, 6 insertions(+), 5 deletions(-)
+gpmc_fclk: gpmc_fclk {
+                #clock-cells = <0>;
+                compatible = "fixed-factor-clock";
+                clocks = <&dpll_core_m4_ck>;
+                clock-mult = <1>;
+                clock-div = <2>;
+        };
 
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1154,17 +1154,17 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>,
--				 <&zs_clk>, <&zs_clk>;
-+			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
-+			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
--				R8A7791_CLK_IPMMU_SGX
-+				R8A7791_CLK_IPMMU_SGX R8A7791_CLK_MLB
- 				R8A7791_CLK_VIN2 R8A7791_CLK_VIN1 R8A7791_CLK_VIN0
- 				R8A7791_CLK_ETHER R8A7791_CLK_SATA1 R8A7791_CLK_SATA0
- 			>;
- 			clock-output-names =
--				"ipmmu_sgx", "vin2", "vin1", "vin0", "ether", "sata1",
--				"sata0";
-+				"ipmmu_sgx", "mlb", "vin2", "vin1", "vin0", "ether",
-+				"sata1", "sata0";
- 		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
-Index: renesas/include/dt-bindings/clock/r8a7791-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7791-clock.h
-@@ -92,6 +92,7 @@
- 
- /* MSTP8 */
- #define R8A7791_CLK_IPMMU_SGX		0
-+#define R8A7791_CLK_MLB			2
- #define R8A7791_CLK_VIN2		9
- #define R8A7791_CLK_VIN1		10
- #define R8A7791_CLK_VIN0		11
+How does it look? Also, I'm wondering if this works OK when used with
+the hwmod stuff.
+
+Thanks a lot in advance!
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
