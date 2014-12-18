@@ -1,48 +1,102 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Thu, 18 Dec 2014 15:11:27 +0800
-Subject: [PATCH RFC v2 05/14] ARM: imx6q: clk: Add the video_27m clock
+Date: Thu, 18 Dec 2014 15:11:28 +0800
+Subject: [PATCH RFC v2 06/14] ARM: dts: imx6qdl: Move existing MIPI DSI ports
+ into a new 'ports' node
 In-Reply-To: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
 References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1418886696-11636-6-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1418886696-11636-7-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports the video_27m clock which is a fixed factor
-clock of the pll3_pfd1_540m clock.
+The MIPI DSI node contains some ports which represent possible DRM CRTCs
+it can connect with.  Each port has a 'reg' property embedded.  This
+property will be wrongly interpretted by the MIPI DSI bus driver, because
+the driver will take each subnode which contains a 'reg' property as a
+DSI peripheral device.  This patch moves the existing MIPI DSI ports into
+a new 'ports' node so that the MIPI DSI bus driver may distinguish its
+DSI peripheral device(s) from the existing ports.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v1->v2:
- * None.
+ * Newly added, as suggested by Thierry Reding.
 
- arch/arm/mach-imx/clk-imx6q.c             | 1 +
- include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6q.dtsi   | 20 +++++++++++---------
+ arch/arm/boot/dts/imx6qdl.dtsi | 23 ++++++++++++++---------
+ 2 files changed, 25 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 4e79da7..9470df3 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -246,6 +246,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
- 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
- 	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
-+	clk[IMX6QDL_CLK_VIDEO_27M] = imx_clk_fixed_factor("video_27m", "pll3_pfd1_540m", 1, 20);
- 	if (cpu_is_imx6dl()) {
- 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
- 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index b690cdb..25625bf 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -248,6 +248,7 @@
- #define IMX6QDL_PLL6_BYPASS			235
- #define IMX6QDL_PLL7_BYPASS			236
- #define IMX6QDL_CLK_GPT_3M			237
--#define IMX6QDL_CLK_END				238
-+#define IMX6QDL_CLK_VIDEO_27M			238
-+#define IMX6QDL_CLK_END				239
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9f3646..9c0990b 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -292,19 +292,21 @@
+ };
  
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
+ &mipi_dsi {
+-	port at 2 {
+-		reg = <2>;
++	ports {
++		port at 2 {
++			reg = <2>;
+ 
+-		mipi_mux_2: endpoint {
+-			remote-endpoint = <&ipu2_di0_mipi>;
++			mipi_mux_2: endpoint {
++				remote-endpoint = <&ipu2_di0_mipi>;
++			};
+ 		};
+-	};
+ 
+-	port at 3 {
+-		reg = <3>;
++		port at 3 {
++			reg = <3>;
+ 
+-		mipi_mux_3: endpoint {
+-			remote-endpoint = <&ipu2_di1_mipi>;
++			mipi_mux_3: endpoint {
++				remote-endpoint = <&ipu2_di1_mipi>;
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 9596ed5..96bf2a0 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1009,19 +1009,24 @@
+ 				reg = <0x021e0000 0x4000>;
+ 				status = "disabled";
+ 
+-				port at 0 {
+-					reg = <0>;
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 0 {
++						reg = <0>;
+ 
+-					mipi_mux_0: endpoint {
+-						remote-endpoint = <&ipu1_di0_mipi>;
++						mipi_mux_0: endpoint {
++							remote-endpoint = <&ipu1_di0_mipi>;
++						};
+ 					};
+-				};
+ 
+-				port at 1 {
+-					reg = <1>;
++					port at 1 {
++						reg = <1>;
+ 
+-					mipi_mux_1: endpoint {
+-						remote-endpoint = <&ipu1_di1_mipi>;
++						mipi_mux_1: endpoint {
++							remote-endpoint = <&ipu1_di1_mipi>;
++						};
+ 					};
+ 				};
+ 			};
 -- 
 2.1.0
