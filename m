@@ -1,75 +1,119 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 18 Dec 2014 19:13:03 +0100
-Subject: [PATCH 4/6] ARM: mvebu: remove conflicting muxing on Armada 370 DB
-In-Reply-To: <20141107031542.GB3698@titan.lakedaemon.net>
-References: <1414512524-24466-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1414512524-24466-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141107031542.GB3698@titan.lakedaemon.net>
-Message-ID: <5493192F.8060004@free-electrons.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 18 Dec 2014 14:02:17 -0500
+Subject: [RFC PATCH 1/2] common: dma-mapping: introduce
+ dma_get_parent_cfg() helper
+In-Reply-To: <2935351.ba8Au9y4fE@wuerfel>
+References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
+ <1949667.gMcOLHe7Sk@wuerfel> <549210BB.9080603@ti.com>
+ <2935351.ba8Au9y4fE@wuerfel>
+Message-ID: <549324B9.2030506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On 07/11/2014 04:15, Jason Cooper wrote:
-> On Tue, Oct 28, 2014 at 05:08:42PM +0100, Thomas Petazzoni wrote:
->> Back when audio was enabled, the muxing of some MPP pins was causing
->> problems. However, since commit fea038ed55ae ("ARM: mvebu: Add proper
->> pin muxing on the Armada 370 DB board"), those problematic MPP pins
->> have been assigned a proper muxing for the Ethernet interfaces. This
->> proper muxing is now conflicting with the hog pins muxing that had
->> been added as part of 249f3822509b ("ARM: mvebu: add audio support to
->> Armada 370 DB").
+On 12/17/2014 07:09 PM, Arnd Bergmann wrote:
+> On Wednesday 17 December 2014 18:24:43 Murali Karicheri wrote:
+>> On 12/17/2014 04:56 PM, Arnd Bergmann wrote:
+>>> On Wednesday 17 December 2014 13:02:23 Murali Karicheri wrote:
+>>>
+>>> What's wrong with using arch_setup_dma_ops() from PCI as suggested
+>>> previously?
+>>>
+>
+> +Will Deacon
+>
+>> I had originally written a code based on that line as below. But
+>> dma-ranges property is also used by ppc and other architectures in the
+>> pci device DT node. So I wasn't sure how this code impact PCI driver
+>> functionality on those platforms. Hence used a simpler change as all
+>> that is needed for keystone is to get the dma_pfn_offset rightly set in
+>> the pci slave device.
+>
+> But in your patch, you don't call arch_setup_dma_ops() at all.
+>
+>> Initially I had a function implemented as below for this in of_pci.c.
 >>
->> Therefore, this commit simply removes the hog pins muxing, which
->> solves a warning a boot time due to the conflicting muxing
->> requirements.
->>
->> Fixes: fea038ed55ae ("ARM: mvebu: Add proper pin muxing on the Armada 370 DB board")
->> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/armada-370-db.dts | 24 ------------------------
->>  1 file changed, 24 deletions(-)
-> 
-> Patches 5 and 6 applied to mvebu/dt with Andrew's Ack.
-> 
-> I didn't Cc this one to stable since it is only removing a warning.
+>> + * of_pci_dma_configure - Setup DMA configuration for a pci device
+>> + * @dev:       pci device to apply DMA configuration
+>> + *
+>> + * Try to get devices's DMA configuration from DT and update it
+>> + * accordingly. This is a similar to of_dma_configure() for platform
+>> + * devices.
+>> + *
+>> + */
+>> +void of_pci_dma_configure(struct pci_dev *dev)
+>> +{
+>> +       struct device *host_bridge, *parent;
+>> +       struct pci_bus *bus = dev->bus;
+>> +       u64 dma_addr, paddr, size;
+>> +       int ret;
+>> +
+>> +       while (!pci_is_root_bus(bus))
+>> +               bus = bus->parent;
+>> +       host_bridge = bus->bridge;
+>> +
+>> +       parent = host_bridge->parent;
+>> +       if (parent->of_node) {
+>
+> so far it looks good, although we may want to introduce
+> a helper function to get the of_node.
 
-Actually it didn't just remove a warning. As explained with the patch
-I sent yesterday: "[PATCH] ARM: mvebu: Fix pinctrl configuration for
-Armada 370 DB", it also allows to use the first Ethernet Giga port on
-the Armada 370 DB board.
+Will add
 
-> Later on, if needed, someone can request it be backported and the Fixes
-> tag will assist with that.
+>
+>> +               /*
+>> +                * if dma-coherent property exist, call arch hook to setup
+>> +                * dma coherent operations.
+>> +                */
+>> +               if (of_dma_is_coherent(parent->of_node)) {
+>> +                       set_arch_dma_coherent_ops(&dev->dev);
+>> +                       dev_info(&dev->dev, "device is dma coherent\n");
+>> +               }
+>
+> set_arch_dma_coherent_ops no longer exists. Just keep the flag in a
+> local variable
 
-Thanks for you offer and indeed I am not sure on how to do it, so your
-help will be appreciate :)
+Ok.
 
-I thought that I could forward to stable the patch sent by Thomas. I also thought
-that adding the commit id used in linus tree and why we need it should be enough. Am
-I right?
+>
+>> +               /*
+>> +                * if dma-ranges property doesn't exist - just return else
+>> +                * setup the dma offset
+>> +                */
+>> +               ret = of_dma_get_range(parent->of_node,&dma_addr,
+>> &paddr,&size);
+>> +               if (ret<  0) {
+>> +                       dev_info(&dev->dev, "no dma range information to
+>> setup\n");
+>> +                       printk("no dma range information to setup\n");
+>> +                       return;
+>> +               }
+>> +
+>> +               /* DMA ranges found. Calculate and set dma_pfn_offset */
+>> +               dev->dev.dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+>> +               dev_info(&dev->dev, "dma_pfn_offset(%#08lx)\n",
+>> dev->dev.dma_pfn_offset);
+>
+> Same for the offset and size here, then pass all of the above into
+> arch_setup_dma_ops. This is also where we need to hook up the iommu
+> support once we decide how to make that work with the ARM SMMU.
 
-For 3.18 it seemed doable, but the bug on the Ethernet port was
-introduced by the commit 49f3822509b74f8c8d0731aeb7ccea065376c9b ("ARM:
-mvebu: add audio support to Armada 370 DB" in 3.14.")
+Ok. I will make this similar to of_dma_configure() that can be called 
+from pci/probe.c
 
-So this patch won't be enough we also need the one sent by Ezequiel:
-fea038ed55ae ("ARM: mvebu: Add proper pin muxing on the Armada 370 DB
-board"). Then in this case I would have to add the line:
-
-Cc: <stable@vger.kernel.org> # 3.14.x: fea038ed55ae ARM: mvebu: Add
-proper pin muxing on the Armada 370 DB board
-
-
-Thanks,
-
-Gregory
+Murali
+>
+> Will, I think we may have a problem on ARM64 now, since we only replaced
+> set_arch_dma_coherent_ops on ARM32 but not ARM64. Can you send a fix for
+> this? Without that, we don't have any coherent operations on ARM64 any
+> more, unless I'm missing something.
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Murali Karicheri
+Linux Kernel, Texas Instruments
