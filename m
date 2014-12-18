@@ -1,57 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
+From: catalin.marinas@arm.com (Catalin Marinas)
 Date: Thu, 18 Dec 2014 17:20:12 +0000
-Subject: [PATCH 6/8] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
-In-Reply-To: <20141218160014.GA16015@roeck-us.net>
-References: <1418834727-1602-1-git-send-email-lee.jones@linaro.org>
- <1418834727-1602-7-git-send-email-lee.jones@linaro.org>
- <20141217180251.GA29914@roeck-us.net> <20141218082652.GP13885@x1>
- <20141218160014.GA16015@roeck-us.net>
-Message-ID: <20141218172012.GC4525@x1>
+Subject: [RFC PATCH 1/2] common: dma-mapping: introduce
+ dma_get_parent_cfg() helper
+In-Reply-To: <2935351.ba8Au9y4fE@wuerfel>
+References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
+ <1949667.gMcOLHe7Sk@wuerfel> <549210BB.9080603@ti.com>
+ <2935351.ba8Au9y4fE@wuerfel>
+Message-ID: <20141218172011.GB20963@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Dec 2014, Guenter Roeck wrote:
+On Thu, Dec 18, 2014 at 12:09:17AM +0000, Arnd Bergmann wrote:
+> Will, I think we may have a problem on ARM64 now, since we only replaced
+> set_arch_dma_coherent_ops on ARM32 but not ARM64. Can you send a fix for
+> this? Without that, we don't have any coherent operations on ARM64 any
+> more, unless I'm missing something.
 
-> On Thu, Dec 18, 2014 at 08:26:52AM +0000, Lee Jones wrote:
-> > On Wed, 17 Dec 2014, Guenter Roeck wrote:
-> > > On Wed, Dec 17, 2014 at 04:45:25PM +0000, Lee Jones wrote:
-> > > > Signed-off-by: David Paris <david.paris@st.com>
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > Hi Lee and David,
-> > > 
-> > > I still have a couple of comments below. Sorry I didn't catch those earlier.
-> > > 
-> > > Thanks,
-> > > Guenter
-> > > 
-> > > > ---
-> > > >  drivers/watchdog/Kconfig  |  13 ++
-> > > >  drivers/watchdog/Makefile |   1 +
-> > > >  drivers/watchdog/st_wdt.c | 323 ++++++++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 337 insertions(+)
-> > > >  create mode 100644 drivers/watchdog/st_wdt.c
-> > 
-> > Chopping all the crud.
-> > 
-> > [...]
-> > 
-> > > > +static struct of_device_id st_wdog_match[] = {
-> > > > +	{
-> > > > +		.compatible = "st,stih407-lpc",
-> > > > +		.data = (void *)&stih407_syscfg,
-> > > 
-> > > Nitpick: typecast to and from void * is not necessary.
-> > 
-> > Actually that's not true, but it is superfluous in this case.
-> > 
-> Point taken. Would you agree to a more detailed "typecasting a pointer
-> to and from void * is not necessary" ?
+Good point, I think Will forgot about arm64 (weird ;)).
 
-Sure, why not? ;)
+I'll push this out since Will is on holiday, probably shortly after
+-rc1.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-----8<--------------------------------------------
+
+>From 40ec7fd94b4efbd5d74185a062433f71c6576e20 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Thu, 18 Dec 2014 17:13:49 +0000
+Subject: [PATCH] arm64: Replace set_arch_dma_coherent_ops with
+ arch_setup_dma_ops
+
+Commit a3a60f81ee6f (dma-mapping: replace set_arch_dma_coherent_ops with
+arch_setup_dma_ops) changes the of_dma_configure() arch dma_ops callback
+to arch_setup_dma_ops but only the arch/arm code is updated. Subsequent
+commit 97890ba9289c (dma-mapping: detect and configure IOMMU in
+of_dma_configure) changes the arch_setup_dma_ops() prototype further to
+handle iommu. The patch makes the corresponding arm64 changes.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/dma-mapping.h | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index d34189bceff7..9ce3e680ae1c 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -52,13 +52,14 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+ 	dev->archdata.dma_ops = ops;
+ }
+ 
+-static inline int set_arch_dma_coherent_ops(struct device *dev)
++static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
++				      struct iommu_ops *iommu, bool coherent)
+ {
+-	dev->archdata.dma_coherent = true;
+-	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+-	return 0;
++	dev->archdata.dma_coherent = coherent;
++	if (coherent)
++		set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+ }
+-#define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
++#define arch_setup_dma_ops	arch_setup_dma_ops
+ 
+ /* do not use this function in a driver */
+ static inline bool is_device_dma_coherent(struct device *dev)
