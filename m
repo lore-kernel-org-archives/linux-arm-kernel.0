@@ -1,37 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Dec 2014 19:40:15 +0000
-Subject: [PATCH] clk: rockchip: fix rk3288 cpuclk core dividers
-In-Reply-To: <1590307.oZ7E5cNY8h@phil>
-References: <1590307.oZ7E5cNY8h@phil>
-Message-ID: <20141218194015.GC11285@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 18 Dec 2014 21:45:22 +0200
+Subject: [PATCH 0/3] UART driver for Conexat Digicolor SoCs
+Message-ID: <cover.1418930377.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 08:22:34PM +0100, Heiko St?bner wrote:
-> Commit 0e5bdb3f9fa5 (clk: rockchip: switch to using the new cpuclk type
-> for armclk) didn't take into account that the divider used on rk3288
-> are of the (n+1) type.
-> 
-> The rk3066 and rk3188 socs use more complex divider types making it
-> necessary for the list-elements to be the real register-values to write.
-> 
-> Therefore reduce divider values in the table accordingly so that they
-> really are the values that should be written to the registers.
-> 
-> Reported-by: Sonny Rao <sonnyrao@chromium.org>
-> Fixes: 0e5bdb3f9fa5
+This set of patches adds a driver for the peripheral known as USART of the
+Conexant CX92755 SoC. The CX92755 is one an ARM based SoC series known as
+Digicolor. USART apparently stands for Universal Synchronous/Asynchronous
+Receiver/Transmitter. Besides plain UART, the USART can also do SPI and
+I2S. Here we only add a UART driver, others may follow later.
 
-The correct format for this is:
+CX92755 is based on Cortex-A8. I plan to post ARM basic platform support code
+(along with clocksource and interrupt controller drivers) in the coming few
+days.
 
-Fixes: <12-digits-of-sha> ("<commit-comment>")
+Baruch Siach (3):
+  devicetree: bindings: add Conexant vendor prefix
+  serial: driver for Conexant Digicolor USART
+  serial: add device tree binding documentation for Conexant USART
 
-where everything between and including the <> gets replaced.  The () and ""
-stay.  In other words:
-
-Fixes: 0e5bdb3f9fa5 ("clk: rockchip: switch to using the new cpuclk type for armclk")
-
-Thanks.
+ .../devicetree/bindings/serial/digicolor-usart.txt |  27 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ drivers/tty/serial/Kconfig                         |  15 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/digicolor-usart.c               | 563 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 6 files changed, 610 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/digicolor-usart.txt
+ create mode 100644 drivers/tty/serial/digicolor-usart.c
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
