@@ -1,31 +1,68 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 18 Dec 2014 16:36:14 -0800
-Subject: [PATCH 1/3] mmc: dw_mmc: dt-binding: Add tuning related things
-In-Reply-To: <1418943663-10012-2-git-send-email-amstan@chromium.org>
-References: <1418943663-10012-1-git-send-email-amstan@chromium.org>
- <1418943663-10012-2-git-send-email-amstan@chromium.org>
-Message-ID: <CAD=FV=U_Qqjp6U7Nbu4RwjPf52sv6WHq6-oU3ktuMB67=F8Q0A@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 19 Dec 2014 09:39:33 +0900
+Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add Audio DMAC,
+ PWM and Thermal clocks to device tree
+Message-ID: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alex,
+This is based on the MSTP5 clocks in the r8a7791 device tree.
+The main difference being that the r8a7794 does not have an Audio DMAC1
+clock.
 
-On Thu, Dec 18, 2014 at 3:01 PM, Alexandru M Stan <amstan@chromium.org> wrote:
-> Add ciu_drv, ciu_sample clocks and default-sample-phase. This will later be used
-> by tuning code.
->
-> We do not touch ciu_drive (and by extension define default-drive-phase). Drive
-> phase is mostly used to define minimum hold times, while one could write some
-> code to determine what phase meets the minimum hold time (ex 10 degrees) this
-> will not work with the current clock phase framework (which floors angles, so
-> we'll get 0 deg, and there's no way to know what resolution the floors happen
-> at). We assume that the default drive angles set by the hardware are good enough.
->
-> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-> Suggested-by: Heiko Stuebner <heiko@sntech.de>
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> ---
->  Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+---
+Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
+
+N.B: The R-Car Gen2 v1.8.0 BSP uses zs_clk whereas this patch uses hp_clk
+     as the parent clock for the Audio DMAC clock.
+
+     In that regard this patch follows the pattern used in mainline for the
+     r8a7790 and r8a7791 SoCs.
+
+     The BSP's parent clock is consistent for the r8a7790, r8a7791, r8a7793
+     and r8a7794 SoCs.
+
+     Support for the r8a7793 SoC is not present in mainline.
+---
+ arch/arm/boot/dts/r8a7794.dtsi            | 11 +++++++++++
+ include/dt-bindings/clock/r8a7794-clock.h |  1 +
+ 2 files changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 063bf56..7a03166 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -530,6 +530,17 @@
+ 			        "sdhi2", "sdhi1", "sdhi0",
+ 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+ 		};
++		mstp5_clks: mstp5_clks at e6150144 {
++			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
++			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A7794_CLK_AUDIO_DMAC0
++				R8A7794_CLK_THERMAL R8A7794_CLK_PWM
++			>;
++			clock-output-names = "audmac0", "thermal", "pwm";
++		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index d5cfe62..58fa44d 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -61,6 +61,7 @@
+ #define R8A7794_CLK_USBDMAC1		31
+ 
+ /* MSTP5 */
++#define R8A7794_CLK_AUDIO_DMAC0		2
+ #define R8A7794_CLK_THERMAL		22
+ #define R8A7794_CLK_PWM			23
+ 
+-- 
+2.1.3
