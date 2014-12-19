@@ -1,35 +1,31 @@
 From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 19 Dec 2014 09:51:38 +0100
-Subject: [PATCH 1/3] ARM: at91/dt: add matrix node in at91sam9263 dtsi
-In-Reply-To: <1418979100-13243-1-git-send-email-alexanders83@web.de>
-References: <1418979100-13243-1-git-send-email-alexanders83@web.de>
-Message-ID: <1418979100-13243-2-git-send-email-alexanders83@web.de>
+Date: Fri, 19 Dec 2014 09:51:37 +0100
+Subject: [PATCH 0/3] add Atmel EBI (External Bus Interface) DT nodes for
+ AT91SAM9263
+Message-ID: <1418979100-13243-1-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add matrix node in at91sam9263 dtsi so that it can be referenced by other
-devices.
+This is based on and requires Boris' work on an EBI driver for AT91. Please
+refer to https://lkml.org/lkml/2014/12/3/806.
+The reason I added no pinctrl is that those pins from EBI1 in my case are not
+muxable. They are fixed so there is nothing I can test here.
+I used this patchset and the EBI to configure a PSRAM to be used by the
+atmel_lcdfb driver which works so far.
+This also means EBI0 is rather untested, but it should behave like EBI1 if
+the numbers are correct.
 
-Signed-off-by: Alexander Stein <alexanders83@web.de>
----
- arch/arm/boot/dts/at91sam9263.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Best regards,
+Alexander
 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index fd8d242..8cc5337 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -356,6 +356,11 @@
- 				reg = <0xffffe800 0x200>;
- 			};
- 
-+			matrix: matrix at ffffec00 {
-+				compatible = "atmel,at91sam9263-matrix", "syscon";
-+				reg = <0xffffec00 0x200>;
-+			};
-+
- 			pit: timer at fffffd30 {
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xfffffd30 0xf>;
+Alexander Stein (3):
+  ARM: at91/dt: add matrix node in at91sam9263 dtsi
+  ARM: at91/dt: add SMC0/1  nodes in at91sam9263 dtsi
+  ARM: at91/dt: add EBI (External Bus Interface) node in at91sam9263
+    dtsi
+
+ arch/arm/boot/dts/at91sam9263.dtsi | 44 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
 -- 
 2.2.1
