@@ -1,108 +1,70 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 19 Dec 2014 09:17:42 +0000
-Subject: [PATCH] arm64: psci: Support generic pm suspend withtout CPUIDLE
- subsystem's help.
-In-Reply-To: <1418967174-23943-1-git-send-email-jonghwa3.lee@samsung.com>
-References: <1418967174-23943-1-git-send-email-jonghwa3.lee@samsung.com>
-Message-ID: <20141219091742.GB13641@red-moon>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 19 Dec 2014 11:18:02 +0200
+Subject: [PATCH 1/2] CLK: TI: remove 'ick' alias for 'omapdss_dss' device
+Message-ID: <1418980683-26825-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 19, 2014 at 05:32:54AM +0000, Jonghwa Lee wrote:
-> Current psci's cpu_suspend callback can be used only when common cpu idle
-> configuration is enabled. However, it's also needed for system which only
-> uses generic pm suspend not cpu idle. This patch modifies psci driver to
-> support both of cases.
-> 
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+The omapdss_dss driver has not used 'ick' clock for a long time, and
+thus the clock alias for 'ick' is not needed and can be removed.
 
-NAK. Apart from:
+On OMAP4 the 'dss_fck' clock was recently removed, and as 'ick' was an
+alias for 'dss_fck', it causes a warning:
 
-1) being buggy (how can you use your code when both SUSPEND and CPUidle
-   are on)
-2) not providing a patch to show how you use the API
+ti_dt_clocks_register: failed to lookup clock node dss_fck
 
-that's not how I planned to implement system suspend, bear with me for
-a couple of days and I will post an RFC publicly beginning of January.
+This patch removes that warning.
 
-Amit already posted a different solution and I've already replied to him:
-http://www.spinics.net/lists/arm-kernel/msg373447.html
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ drivers/clk/ti/clk-2xxx.c | 1 -
+ drivers/clk/ti/clk-3xxx.c | 2 --
+ drivers/clk/ti/clk-44xx.c | 1 -
+ 3 files changed, 4 deletions(-)
 
-Lorenzo
-
-> ---
->  arch/arm64/kernel/psci.c |   41 +++++++++++++++++++++++++++++------------
->  1 file changed, 29 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index f1dbca7..06d5527 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -35,6 +35,13 @@
->  #define PSCI_POWER_STATE_TYPE_STANDBY		0
->  #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
->  
-> +enum psci_affinity_level {
-> +	PSCI_AFFINITY_LEVEL_0,
-> +	PSCI_AFFINITY_LEVEL_1,
-> +	PSCI_AFFINITY_LEVEL_2,
-> +	PSCI_AFFINITY_LEVEL_3,
-> +};
-> +
->  struct psci_power_state {
->  	u16	id;
->  	u8	type;
-> @@ -513,27 +520,37 @@ static int psci_suspend_finisher(unsigned long index)
->  {
->  	struct psci_power_state *state = __this_cpu_read(psci_power_state);
->  
-> +	/* Generic PM suspend without CPUIDLE functionality */
-> +	if (!state) {
-> +		struct psci_power_state s = {
-> +			.affinity_level = PSCI_AFFINITY_LEVEL_3,
-> +			.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> +		};
-> +		return psci_ops.cpu_suspend(s, virt_to_phys(cpu_resume));
-> +	}
-> +
->  	return psci_ops.cpu_suspend(state[index - 1],
->  				    virt_to_phys(cpu_resume));
->  }
->  
->  static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->  {
-> -	int ret;
->  	struct psci_power_state *state = __this_cpu_read(psci_power_state);
-> -	/*
-> -	 * idle state index 0 corresponds to wfi, should never be called
-> -	 * from the cpu_suspend operations
-> -	 */
-> -	if (WARN_ON_ONCE(!index))
-> -		return -EINVAL;
->  
-> -	if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
-> -		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-> -	else
-> -		ret = __cpu_suspend(index, psci_suspend_finisher);
-> +	if (state) {
-> +		if (WARN_ON_ONCE(!index))
-> +			return -EINVAL;
-> +
-> +		/*
-> +		 * If idle state initialization is successfully done,
-> +		 * idle state index 0 corresponds to wfi, should never be
-> +		 * called from the cpu_suspend operations
-> +		 */
-> +		if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
-> +			return psci_ops.cpu_suspend(state[index - 1], 0);
-> +	}
->  
-> -	return ret;
-> +	return __cpu_suspend(index, psci_suspend_finisher);
->  }
->  
->  const struct cpu_operations cpu_psci_ops = {
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/drivers/clk/ti/clk-2xxx.c b/drivers/clk/ti/clk-2xxx.c
+index c808ab3d2bb2..e3656851b2e0 100644
+--- a/drivers/clk/ti/clk-2xxx.c
++++ b/drivers/clk/ti/clk-2xxx.c
+@@ -48,7 +48,6 @@ static struct ti_dt_clk omap2xxx_clks[] = {
+ 	DT_CLK(NULL, "gfx_3d_fck", "gfx_3d_fck"),
+ 	DT_CLK(NULL, "gfx_2d_fck", "gfx_2d_fck"),
+ 	DT_CLK(NULL, "gfx_ick", "gfx_ick"),
+-	DT_CLK("omapdss_dss", "ick", "dss_ick"),
+ 	DT_CLK(NULL, "dss_ick", "dss_ick"),
+ 	DT_CLK(NULL, "dss1_fck", "dss1_fck"),
+ 	DT_CLK(NULL, "dss2_fck", "dss2_fck"),
+diff --git a/drivers/clk/ti/clk-3xxx.c b/drivers/clk/ti/clk-3xxx.c
+index 0d1750a8aea4..2ff8b60f62f3 100644
+--- a/drivers/clk/ti/clk-3xxx.c
++++ b/drivers/clk/ti/clk-3xxx.c
+@@ -265,7 +265,6 @@ static struct ti_dt_clk omap3430es1_clks[] = {
+ 	DT_CLK(NULL, "ssi_ick", "ssi_ick_3430es1"),
+ 	DT_CLK(NULL, "usb_l4_ick", "usb_l4_ick"),
+ 	DT_CLK(NULL, "dss1_alwon_fck", "dss1_alwon_fck_3430es1"),
+-	DT_CLK("omapdss_dss", "ick", "dss_ick_3430es1"),
+ 	DT_CLK(NULL, "dss_ick", "dss_ick_3430es1"),
+ 	{ .node_name = NULL },
+ };
+@@ -284,7 +283,6 @@ static struct ti_dt_clk omap36xx_am35xx_omap3430es2plus_clks[] = {
+ 	DT_CLK(NULL, "mmchs3_ick", "mmchs3_ick"),
+ 	DT_CLK(NULL, "mmchs3_fck", "mmchs3_fck"),
+ 	DT_CLK(NULL, "dss1_alwon_fck", "dss1_alwon_fck_3430es2"),
+-	DT_CLK("omapdss_dss", "ick", "dss_ick_3430es2"),
+ 	DT_CLK(NULL, "dss_ick", "dss_ick_3430es2"),
+ 	DT_CLK(NULL, "usbhost_120m_fck", "usbhost_120m_fck"),
+ 	DT_CLK(NULL, "usbhost_48m_fck", "usbhost_48m_fck"),
+diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
+index 02517a8206bd..35a0f01bbaf4 100644
+--- a/drivers/clk/ti/clk-44xx.c
++++ b/drivers/clk/ti/clk-44xx.c
+@@ -127,7 +127,6 @@ static struct ti_dt_clk omap44xx_clks[] = {
+ 	DT_CLK(NULL, "dss_dss_clk", "dss_dss_clk"),
+ 	DT_CLK(NULL, "dss_48mhz_clk", "dss_48mhz_clk"),
+ 	DT_CLK(NULL, "dss_fck", "dss_fck"),
+-	DT_CLK("omapdss_dss", "ick", "dss_fck"),
+ 	DT_CLK(NULL, "fdif_fck", "fdif_fck"),
+ 	DT_CLK(NULL, "gpio1_dbclk", "gpio1_dbclk"),
+ 	DT_CLK(NULL, "gpio2_dbclk", "gpio2_dbclk"),
+-- 
+2.2.0
