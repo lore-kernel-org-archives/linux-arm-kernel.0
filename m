@@ -1,96 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 19 Dec 2014 09:19:42 +0000
-Subject: [PATCH v3 0/2] arm: pcibios: remove pci_sys_data domain
-In-Reply-To: <54935F7A.7000206@ti.com>
-References: <1416569367-29409-1-git-send-email-lorenzo.pieralisi@arm.com>
- <54935F7A.7000206@ti.com>
-Message-ID: <20141219091933.GC13641@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Dec 2014 09:31:11 +0000
+Subject: Help on kvm_tlb_flush_vmid_ipa usage
+In-Reply-To: <54935451.6090405@samsung.com>
+References: <54932A97.3060103@samsung.com> <54932D1F.5060209@arm.com>
+ <54935451.6090405@samsung.com>
+Message-ID: <5493F05F.9090002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 11:12:58PM +0000, Murali Karicheri wrote:
-> On 11/21/2014 06:29 AM, Lorenzo Pieralisi wrote:
-> > This patchset is a v3 of a previous posting:
-> >
-> > http://www.spinics.net/lists/linux-pci/msg36502.html
-> >
-> > v2 =>  v3
-> >
-> > - Rebased on top of this patch dependency
-> >    http://www.spinics.net/lists/linux-pci/msg36631.html
-> >
-> > v1 =>  v2 changelog
-> >
-> > - Removed stale hw_pci domain member
-> > - Reworked pci-mvebu domain handling according to review
-> > - Rebased against 3.18-rc3 and updated the logs
-> > - Dropped RFC status
-> >
-> > Original cover letter:
-> > ----
-> > This patchset is a first RFC stab at removing the dependency on pci_sys_data
-> > domain field on ARM platforms and by replacing it with generic code that
-> > stashes the domain value in the pci_bus control structure, introduced in
-> >
-> > commit 41e5c0f81d3e676d671d96a0a1fafb27abfbd9
-> > ("of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()")
-> >
-> > commit 670ba0c8883b576d0aec28bd7a838358a4be1
-> > ("PCI: Add generic domain handling")
-> >
-> > All the drivers converted (apart from PCIe designware, tested on iMX6SL)
-> > were only compile tested for lack of HW, so along some comments, testing
-> > and verifying that patchset does not break any existing platform are
-> > very appreciated.
-> >
-> > Code in drivers/pci/pci-mvebu.c has been changed to add a domain
-> > number to PCI resources by using the nr value coming from the setup
-> > pcibios32 callback, which may not be correct and should be considered
-> > a temporary solution waiting for review comments.
-> >
-> > The patchset removes entirely the pci_sys_data.domain field, since its
-> > usage is removed at the same time in the respective host controllers
-> > and ARM is made to select the configuration option
-> > CONFIG_PCI_DOMAINS_GENERIC by default, which compiles a domain_nr in the
-> > pci_bus structure so that the pci_domain_nr() look-up can rely on it.
-> >
-> Lorenzo,
+On 18/12/14 22:25, Mario Smarduch wrote:
+> On 12/18/2014 11:38 AM, Marc Zyngier wrote:
+>> On 18/12/14 19:27, Mario Smarduch wrote:
+>>> When this function is called IPA address is used. Looking at the HYP
+>>> implementation it uses the IPA directly in tlbi instructions. But
+>>> reading the TLB maintnance instruction syntax, bit [35:0] should be
+>>> set to IPA[47:12]. I traced the source code but don't see the
+>>> adjustment. I must be missing something given this function is
+>>> fundamental to KVM MMU.
+>>
+>> Ermmm... Someone (that is, I) needs a brown paper back again.
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index b72aa9f..a767f6a 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>>  	 * Instead, we invalidate Stage-2 for this IPA, and the
+>>  	 * whole of Stage-1. Weep...
+>>  	 */
+>> +	lsr	x1, x1, #12
+>>  	tlbi	ipas2e1is, x1
+>>  	/*
+>>  	 * We have to ensure completion of the invalidation at Stage-2,
+>>
+>> 	M.
+>>
 > 
-> I am assuming this is transparent to the user drivers of designware core 
-> such as pci-keystone as CONFIG_PCI_DOMAINS_GENERIC is enabled by default 
-> by ARM. Is this true ?
+> Hi Marc,
+>   fwiw I re-ran the test that halts the host (on foundation
+> model) with a guest booted, panic has gone away.
+> 
+> BUG: Bad page state in process K20nfsserver  pfn:ff818
+> page:ffff7c7fc37e4540 count:-3 mapcount:0 mapping:          (null) index:0x0
+> flags: 0x0()
+> page dumped because: nonzero _count
+> Modules linked in:
+> CPU: 1 PID: 761 Comm: K20nfsserver Not tainted 3.18.0-rc2+ #55
+> Call trace:
+> [<ffff800000087244>] dump_backtrace+0x0/0x12c
+> [<ffff800000087380>] show_stack+0x10/0x1c
+> [<ffff8000003ce804>] dump_stack+0x74/0x98
+> [<ffff80000011bdc4>] bad_page+0xdc/0x12c
+> [<ffff80000011ecc4>] get_page_from_freelist+0x4b4/0x600
+> [<ffff80000011eeec>] __alloc_pages_nodemask+0xdc/0x780
+> [<ffff80000011f5a4>] __get_free_pages+0x14/0x5c
+> [<ffff80000011f5fc>] get_zeroed_page+0x10/0x1c
+> [<ffff8000000903fc>] pgd_alloc+0xc/0x18
+> [<ffff8000000a13a0>] mm_init+0xcc/0x12c
+> [<ffff8000000a17f8>] mm_alloc+0x44/0x54
+> [<ffff800000166cbc>] do_execve+0x1a8/0x49c
+> [<ffff8000001671bc>] SyS_execve+0x1c/0x2c
+> 
 
-See Arnd's reply. Testing and relative tag very appreciated if you have
-time.
+Absolutely amazing that we managed to run for so long with such a bug. I
+suppose we rarely update page table entries, and most implementations
+don't use split TLBs (where this instruction is useful).
 
-Thank you !
-Lorenzo
+Thanks a lot for reporting this bug, I'll repost a proper fix today.
 
-> 
-> Murali
-> 
-> >
-> > Lorenzo Pieralisi (2):
-> >    arm: cns3xxx: pci: remove artificial dependency on pci_sys_data domain
-> >    arm: pcibios: move to generic PCI domains
-> >
-> >   arch/arm/Kconfig                   |  3 +++
-> >   arch/arm/include/asm/mach/pci.h    |  6 ------
-> >   arch/arm/include/asm/pci.h         |  7 -------
-> >   arch/arm/kernel/bios32.c           |  3 ---
-> >   arch/arm/mach-cns3xxx/pcie.c       | 40 ++++++++++++++++----------------------
-> >   drivers/pci/host/pci-mvebu.c       | 15 ++------------
-> >   drivers/pci/host/pcie-designware.c |  3 ---
-> >   drivers/pci/host/pcie-rcar.c       |  3 ---
-> >   8 files changed, 22 insertions(+), 58 deletions(-)
-> >
-> 
-> 
-> -- 
-> Murali Karicheri
-> Linux Kernel, Texas Instruments
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
