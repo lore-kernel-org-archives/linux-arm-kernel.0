@@ -1,33 +1,27 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Dec 2014 18:50:00 +0100
-Subject: [PATCH v2 3/4] mmc: sunxi: Convert MMC driver to the standard
- clock phase API
-In-Reply-To: <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
-References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
- <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
-Message-ID: <20141219175000.GM4820@lukather>
+Date: Fri, 19 Dec 2014 18:57:57 +0100
+Subject: [PATCH] ARM: dts: sunxi: Fix usb-phy support for sun4i/sun5i
+In-Reply-To: <1418901035-22900-1-git-send-email-wens@csie.org>
+References: <1418901035-22900-1-git-send-email-wens@csie.org>
+Message-ID: <20141219175757.GN4820@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 12:17:36PM +0800, Chen-Yu Tsai wrote:
-> >         /* determine delays */
-> >         if (rate <= 400000) {
-> > -               oclk_dly = 0;
-> > -               sclk_dly = 7;
-> > +               oclk_dly = 180;
-> > +               sclk_dly = 42;
+On Thu, Dec 18, 2014 at 07:10:35PM +0800, Chen-Yu Tsai wrote:
+> usbphy0 support in the sunxi usb-phy driver has been merged, but the
+> dtsi's for sun4i/sun5i haven't been updated. This results in the phy
+> driver failing to load, breaking usb support.
 > 
-> 42 seems like an odd number. Maybe 45?
+> Fixes: 6827a46f5994 ('phy: sun4i: add support for USB phy0')
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> Hi Maxime,
+> 
+> The phy-sun4i-usb usbphy0 update is merged into Linus's tree.
+> Please queue this one for 3.19 fixes.
 
-If the rate is at 400kHz, that means that the clock in muxed from the
-24M, with a divider of 60.
-
-That means that we can outphase the clocks only by a multiple of 6
-(360 / 60). 7 * 6 = 42.
-
-Depending on how the rounding goes, 45 might work too, but if we wan't
-to be conservative, 42 doesn't change anything, 45 does.
+Applied, thanks!
 
 Maxime
 
@@ -41,4 +35,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/ed8963eb/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/f2ae0d21/attachment-0001.sig>
