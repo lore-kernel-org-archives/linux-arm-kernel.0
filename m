@@ -1,57 +1,46 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 19 Dec 2014 17:00:14 -0500
-Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
- SoC) EVMs
-In-Reply-To: <20141219211816.GH10857@pengutronix.de>
-References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
-Message-ID: <54949FEE.8070808@ti.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 19 Dec 2014 23:25:51 +0100
+Subject: [PATCH 4/4] PM: Eliminate CONFIG_PM_RUNTIME
+In-Reply-To: <7h1tnv2tu9.fsf@deeprootsystems.com>
+References: <472992175.g1ArEYGFPo@vostro.rjw.lan>
+ <9470157.PyHoGoSGz1@vostro.rjw.lan> <7h1tnv2tu9.fsf@deeprootsystems.com>
+Message-ID: <1504884.AVoVpOfIGf@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2014 04:18 PM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Fri, Dec 19, 2014 at 03:55:50PM -0500, Murali Karicheri wrote:
->> I have pulled the latest master from
->> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and
->> tried booting on keystone k2hk and k2e EVM. The boot hangs with
->> following log. Has anyone seen this? Keystone is an ARM v7 cortex
->> A15 SMP platform. I am assuming master branch is broken for ARM v7
->> and someone is working to address this. v3.18 booted up fine on my
->> EVM.
->>
->> Any idea?
-> You forgot to attach the log?! So no, I don't have any idea. Did you
-> bisect?
->
-> Best regards
-> Uwe
->
-Just see below if I enable debug earlyprintk
+On Friday, December 19, 2014 01:49:34 PM Kevin Hilman wrote:
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+> 
+> [...]
+> 
+> > Fixed up patch is appended, thanks!
+> >
+> >
+> > ---
+> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > Subject: PM: Eliminate CONFIG_PM_RUNTIME
+> >
+> > Having switched over all of the users of CONFIG_PM_RUNTIME to use
+> > CONFIG_PM directly, turn the latter into a user-selectable option
+> > and drop the former entirely from the tree.
+> >
+> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> 
+> I assume you're planning to get this in early in the v3.19-rc cycle,
+> correct?  That way we can hopefully avoid conflicts with the various
+> defconfig changes we're taking through the arm-soc tree.
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.18.0-11757-gd790be3 
-(a0868495 at ares-ubuntu) (gcc version 4.7.3 20130226 (prerelease) 
-(crosstool-NG linaro-1.13.1-4.7-2013.03-20130313 - Linaro GCC 2013.03) ) 
-#1 SMP PREEMPT Fri Dec 19 15:53:47 EST 2014
-[    0.000000] CPU: ARMv7 Processor [412fc0f4] revision 4 (ARMv7), 
-cr=30c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction 
-cache
-[    0.000000] Machine model: Texas Instruments Keystone 2 Edison EVM
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Switching to high address space at 0x800000000
-[    0.000000] WARNING: unsafe modification of in-place page tables - 
-tainting kernel
-[    0.000000] cma: Reserved 16 MiB at 0x000000085f000000
-[    0.000000] Forcing write-allocate cache policy for SMP
-[    0.000000] Memory policy: Data cache writealloc
+I'm going to send a pull request with these changes tomorrow.
 
-I am currently doing a git bisect to find the offending commit.
+> Also, thanks for taking care of all the tree-wide changes.  This is a
+> great change.
 
-Murali
+Thanks!
+
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
