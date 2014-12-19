@@ -1,61 +1,142 @@
-From: ronald.wahl@raritan.com (Ronald Wahl)
-Date: Fri, 19 Dec 2014 15:02:04 +0100
-Subject: [RESEND PATCH] usb: gadget: at91_udc: move prepare clk into
- process context
-In-Reply-To: <20141219135123.GA2620@charon>
-References: <1416411447-31112-1-git-send-email-nicolas.ferre@atmel.com>
- <20141120195049.GF23217@saruman> <20141219135123.GA2620@charon>
-Message-ID: <54942FDC.8030404@raritan.com>
+From: stefan.hengelein@fau.de (Stefan Hengelein)
+Date: Fri, 19 Dec 2014 15:15:09 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove dead #elif CONFIG_S3C24XX_DMAC
+In-Reply-To: <1645416.VNQj8YWB7M@phil>
+References: <1418830837-7422-1-git-send-email-stefan.hengelein@fau.de>
+ <2864831.LEPnyFh3Il@phil>
+ <CABv5NL_SLyY9-yookdTVdNXzCmUEqJ_QB6ofzw_q0H7Vcwbzfg@mail.gmail.com>
+ <1645416.VNQj8YWB7M@phil>
+Message-ID: <CABv5NL_GisHMZVK03M3j_cGMVcoZ7L+Czt5TP2Sp4abBeUxuCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.12.2014 14:51, Luis Henriques wrote:
-> Hi Felipe,
->
-> On Thu, Nov 20, 2014 at 01:50:49PM -0600, Felipe Balbi wrote:
->> On Wed, Nov 19, 2014 at 04:37:27PM +0100, Nicolas Ferre wrote:
->>> From: Ronald Wahl <ronald.wahl@raritan.com>
->>>
->>> Commit 7628083227b6bc4a7e33d7c381d7a4e558424b6b (usb: gadget: at91_udc:
->>> prepare clk before calling enable) added clock preparation in interrupt
->>> context. This is not allowed as it might sleep. Also setting the clock
->>> rate is unsafe to call from there for the same reason. Move clock
->>> preparation and setting clock rate into process context (at91udc_probe).
->>>
->>> Signed-off-by: Ronald Wahl <ronald.wahl@raritan.com>
->>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Cc: Felipe Balbi <balbi@ti.com>
->>> Cc: <stable@vger.kernel.org> # v3.17+
->>> ---
->>> Hi Felipe,
->>>
->>> I forgot to answer you on this patch. So I resend it now with the proper
->>> "stable" tag. You can also queue it during this -rc phase if you feel it is
->>> still possible.
->>
->> I think it's late for v3.18, so it'll go on v3.19 and get backported to
->> 3.17 and 3.18. Sorry :-s
->>
->
-> Although this commit (b2ba27a5c56f "usb: gadget: at91_udc: move
-> prepare clk into process context") is tagged for stable v3.17+, it
-> seems like it could be applied to earlier kernels.
->
-> 3.16, 3.13 and 3.12 seem to be affected by the same issue (and they
-> all include commit 7628083227b6 "usb: gadget: at91_udc: prepare clk
-> before calling enable").  Is there any reason for not applying it in
-> these trees?
+>From what i can see, the block was already dead when it was introduced.
+d2193ce2 changed the "if ARCH_S3C64XX" into the Kconfig file itself,
+before it was around the source statement in arch/arm/Kconfig
 
-Not to forget 3.14 (LTS) which was the branch where I primarily found 
-the issue...
+if there are really just downstream users that explicitly have to add
+a statement to select S3C64XX_DEV_SPI0 and therefore add the
+possibility to enable the block i want to remove, i'd argue that these
+downstream users could also add the block itself. I'm not sure how
+intuitive it might be for downstream users to add a select in Kconfig
+to enable their machine to communicate with a device, but i'm also not
+familiar with the hardware we're talking about.
 
-- ron
+However, i'd prefer to have a consistent upstream state and leave
+these problems to downstream users, but that's for the Maintainer to
+decide :)
 
--- 
-Ronald Wahl - ronald.wahl at raritan.com - Phone +49 375271349-0 Fax -99
-Raritan Deutschland GmbH, Kornmarkt 7, 08056 Zwickau, Germany
-USt-IdNr. DE813094160, Steuer-Nr. 227/117/01749
-Amtsgericht Chemnitz HRB 23605
-Gesch?ftsf?hrung: Stuart Hopper, Ralf Ploenes
+
+
+2014-12-18 20:03 GMT+01:00 Heiko St?bner <heiko@sntech.de>:
+> Hi Stefan,
+>
+> Am Donnerstag, 18. Dezember 2014, 14:43:01 schrieb Stefan Hengelein:
+>> So you actually tested the code I removed in the patch? can you
+>> provide a configuration that compiles that piece of code?
+>
+> Yep, one of my boards (Asus eeeReader DR-900) was actually able to transmit
+> stuff via the libertas spi wifi driver using the s3c64xx-spi driver.
+>
+> The smdk2416 is currently the only board for the s3c2416 in the kernel. I don't
+> know if it had actual spi devices connected, but if it had, a suitable diff would
+> look something like the diff below. Of course hooking up spi devices would
+> work the same in any out-of-tree board for the supported socs.
+>
+>
+> For people reading along, the s3c24xx spi distribution is as follows:
+> s3c2410, s3c2412, s3c2440: (I think) two s3c24xx-spi
+> s3c2443: one s3c64xx-spi and one s3c24xx-spi
+> s3c2416: one s3c64xx-spi
+> s3c2450: two s3c64xx-spi
+>
+>
+> Heiko
+>
+>
+> ------------ 8< ------------
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+> index 9eb2229..5210e5d 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -419,6 +419,8 @@ config MACH_SMDK2416
+>         select S3C_DEV_HSMMC1
+>         select S3C_DEV_NAND
+>         select S3C_DEV_USB_HOST
+> +       select S3C64XX_DEV_SPI0
+> +       select S3C2443_SETUP_SPI
+>         help
+>           Say Y here if you are using an SMDK2416
+>
+> diff --git a/arch/arm/mach-s3c24xx/mach-smdk2416.c b/arch/arm/mach-s3c24xx/mach-smdk2416.c
+> index 86394f7..b6c6ff4 100644
+> --- a/arch/arm/mach-s3c24xx/mach-smdk2416.c
+> +++ b/arch/arm/mach-s3c24xx/mach-smdk2416.c
+> @@ -52,6 +52,9 @@
+>  #include <linux/platform_data/s3c-hsudc.h>
+>  #include <plat/samsung-time.h>
+>
+> +#include <linux/spi/spi.h>
+> +#include <linux/platform_data/spi-s3c64xx.h>
+> +
+>  #include <plat/fb.h>
+>
+>  #include "common.h"
+> @@ -207,6 +210,26 @@ static struct s3c_sdhci_platdata smdk2416_hsmmc1_pdata __initdata = {
+>         .cd_type                = S3C_SDHCI_CD_NONE,
+>  };
+>
+> +struct s3c64xx_spi_csinfo libertas_cs_info = {
+> +       .fb_delay = 0,
+> +       .line = 128, /* gpio cs line */
+> +};
+> +
+> +
+> +static struct spi_board_info spi_board_info[] = {
+> +    {
+> +       .modalias               = "libertas_spi",
+> +       .max_speed_hz           = 1200000,
+> +       .bus_num                = 0,
+> +       .irq                    = 12, /* some interrupt number */
+> +       .chip_select            = 0,
+> +       .mode                   = SPI_MODE_3,
+> +       .controller_data        = &libertas_cs_info,
+> +/*     .platform_data          = &foo1_pdata, */
+> +    },
+> +};
+> +
+> +
+>  static struct platform_device *smdk2416_devices[] __initdata = {
+>         &s3c_device_fb,
+>         &s3c_device_wdt,
+> @@ -216,6 +239,7 @@ static struct platform_device *smdk2416_devices[] __initdata = {
+>         &s3c_device_hsmmc1,
+>         &s3c_device_usb_hsudc,
+>         &s3c2443_device_dma,
+> +       &s3c64xx_device_spi0,
+>  };
+>
+>  static void __init smdk2416_init_time(void)
+> @@ -250,6 +274,9 @@ static void __init smdk2416_machine_init(void)
+>         gpio_request(S3C2410_GPB(1), "Display Reset");
+>         gpio_direction_output(S3C2410_GPB(1), 1);
+>
+> +       s3c64xx_spi0_set_platdata(NULL, 0, ARRAY_SIZE(spi_board_info));
+> +       spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
+> +
+>         platform_add_devices(smdk2416_devices, ARRAY_SIZE(smdk2416_devices));
+>         smdk_machine_init();
+>  }
+> diff --git a/arch/arm/mach-s3c24xx/setup-spi.c b/arch/arm/mach-s3c24xx/setup-spi.c
+> index 3d47e02..d66c4e0 100644
+> --- a/arch/arm/mach-s3c24xx/setup-spi.c
+> +++ b/arch/arm/mach-s3c24xx/setup-spi.c
+> @@ -16,6 +16,7 @@
+>
+>  #include <mach/hardware.h>
+>  #include <mach/regs-gpio.h>
+> +#include <mach/gpio-samsung.h>
+>
+>  #ifdef CONFIG_S3C64XX_DEV_SPI0
+>  int s3c64xx_spi0_cfg_gpio(void)
+>
