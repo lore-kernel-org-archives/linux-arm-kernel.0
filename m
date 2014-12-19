@@ -1,72 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Dec 2014 19:17:08 +0100
-Subject: [linux-sunxi] [PATCH v2 04/13] rc: sunxi-cir: Add support for an
- optional reset controller
-In-Reply-To: <54929552.8090707@redhat.com>
+Date: Fri, 19 Dec 2014 19:24:05 +0100
+Subject: [PATCH v2 06/13] clk: sunxi: Make the mod0 clk driver also a
+ platform driver
+In-Reply-To: <1418836704-15689-7-git-send-email-hdegoede@redhat.com>
 References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-5-git-send-email-hdegoede@redhat.com>
- <CAGb2v65BW7NABQXK877DkMNqDdBeuZ55wQHFkTexbWACFC4zFA@mail.gmail.com>
- <54929552.8090707@redhat.com>
-Message-ID: <20141219181708.GQ4820@lukather>
+ <1418836704-15689-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141219182405.GU4820@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Dec 18, 2014 at 09:50:26AM +0100, Hans de Goede wrote:
-> Hi,
+On Wed, Dec 17, 2014 at 06:18:17PM +0100, Hans de Goede wrote:
+> With the prcm in sun6i (and some later SoCs) some mod0 clocks are instantiated
+> through the mfd framework, and as such do not work with of_clk_declare, since
+> they do not have registers assigned to them yet at of_clk_declare init time.
 > 
-> On 18-12-14 03:48, Chen-Yu Tsai wrote:
-> >Hi,
-> >
-> >On Thu, Dec 18, 2014 at 1:18 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>On sun6i the cir block is attached to the reset controller, add support
-> >>for de-asserting the reset if a reset controller is specified in dt.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> >>Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>---
-> >>  .../devicetree/bindings/media/sunxi-ir.txt         |  2 ++
-> >>  drivers/media/rc/sunxi-cir.c                       | 25 ++++++++++++++++++++--
-> >>  2 files changed, 25 insertions(+), 2 deletions(-)
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> >>index 23dd5ad..6b70b9b 100644
-> >>--- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> >>+++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-> >>@@ -10,6 +10,7 @@ Required properties:
-> >>
-> >>  Optional properties:
-> >>  - linux,rc-map-name : Remote control map name.
-> >>+- resets : phandle + reset specifier pair
-> >
-> >Should it be optional? Or should we use a sun6i compatible with
-> >a mandatory reset phandle? I mean, the driver/hardware is not
-> >going to work with the reset missing on sun6i.
-> >
-> >Seems we are doing it one way for some of our drivers, and
-> >the other (optional) way for more generic ones, like USB.
+> Silence the error on not finding registers in the of_clk_declare mod0 clk
+> setup method, and also register mod0-clk support as a platform driver to work
+> properly with mfd instantiated mod0 clocks.
 > 
-> I do not believe that we should add a new compatible just because
-> the reset line of a block is hooked up differently. It is the
-> exact same ip-block. Only now the reset is not controlled
-> through the apb-gate, but controlled separately.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/clk/sunxi/clk-mod0.c | 41 ++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 36 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> index 658d74f..7ddab6f 100644
+> --- a/drivers/clk/sunxi/clk-mod0.c
+> +++ b/drivers/clk/sunxi/clk-mod0.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+>  
+>  #include "clk-factors.h"
+>  
+> @@ -67,7 +68,7 @@ static struct clk_factors_config sun4i_a10_mod0_config = {
+>  	.pwidth = 2,
+>  };
+>  
+> -static const struct factors_data sun4i_a10_mod0_data __initconst = {
+> +static const struct factors_data sun4i_a10_mod0_data = {
+>  	.enable = 31,
+>  	.mux = 24,
+>  	.muxmask = BIT(1) | BIT(0),
+> @@ -82,17 +83,47 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
+>  	void __iomem *reg;
+>  
+>  	reg = of_iomap(node, 0);
+> -	if (!reg) {
+> -		pr_err("Could not get registers for mod0-clk: %s\n",
+> -		       node->name);
+> +	if (!reg)
+>  		return;
+> -	}
 
-He has a point though. Your driver might very well probe nicely and
-everything, but still wouldn't be functional at all because the reset
-line wouldn't have been specified in the DT.
+A comment here would be nice to mention that this is intentional.
 
-The easiest way to deal with that would be in the bindings doc to
-update it with a compatible for the A31, and mentionning that the
-reset property is mandatory there.
-
-Note that the code itself might not change at all though. I'd just
-like to avoid any potential breaking of the DT bindings themselves. If
-we further want to refine the code, we can do that however we want.
-
-I have a slight preference for a clean error if reset is missing, but
-I won't get in the way just for that.
+It looks good otherwise, thanks!
 
 Maxime
 
@@ -80,4 +73,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/00535c7e/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/ce97fb5e/attachment-0001.sig>
