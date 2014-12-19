@@ -1,84 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 Dec 2014 18:11:56 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <20141219170328.GA967@titan.lakedaemon.net>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <54930BBC.4060602@free-electrons.com>
- <20141218191528.GY967@titan.lakedaemon.net>
- <549437DD.7040602@free-electrons.com>
- <20141219160230.GZ967@titan.lakedaemon.net>
- <54944DAC.1000709@free-electrons.com>
- <20141219170328.GA967@titan.lakedaemon.net>
-Message-ID: <54945C5C.2080801@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 19 Dec 2014 17:03:47 +0000
+Subject: [PATCH] arm64: kernel: fix __cpu_suspend mm switch on warm-boot
+Message-ID: <1419008627-1918-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/2014 18:03, Jason Cooper wrote:
-> On Fri, Dec 19, 2014 at 05:09:16PM +0100, Gregory CLEMENT wrote:
->> On 19/12/2014 17:02, Jason Cooper wrote:
->>> On Fri, Dec 19, 2014 at 03:36:13PM +0100, Gregory CLEMENT wrote:
->>>> On 18/12/2014 20:15, Jason Cooper wrote:
->>>>> On Thu, Dec 18, 2014 at 06:15:40PM +0100, Gregory CLEMENT wrote:
->>>>> ...
->>>>>> Jason at the end it seems you didn't ack or nack the patches were you
->>>>>> were CC. You expressed some concerns about the GPLv2+ move but I don't know
->>>>>> if it is something that prevents you to give your acked-by.
->>>>>
->>>>> Oops.  :)  I figured my S-o-B when applying would be sufficient.  That
->>>>> decision was before we decided on Andrew applying patches this time
->>>>> around...
->>>>>
->>>>> For all my dts{i} contributions:
->>>>>
->>>>> Acked-by: Jason Cooper <jason@lakedaemon.net>
->>>>
->>>> Thanks :)
->>>>
->>>>>
->>>>> Due to all the merge commits over time and whatnot, it's probably best
->>>>> to put my Ack on all the patches in this series...
->>>>
->>>> OK no problem. By the way, I take care of collecting all the acked-by and
->>>> once it will be done I will either sent the updated patch set with all the
->>>> acked-by or maybe just I will create a branch to pull if it is easier to handle.
->>>
->>> Ok, that'll be up to Andrew.
->>>
->>> Once we have the last few stragglers, and assuming there are no more
->>> NAKs, here's what I'd like to do:
->>>
->>> Regrettably, we'll have to revert Simon's dts contributions.  I say
->>
->> You missed the email he sent yesterday, finally Simon changed his mind
->> and gave his acked-by.
-> 
-> Indeed, that was for the oneliner change in the armada-370-xp.dtsi file.
-> I got a bit ahead of myself, but I'm looking towards kirkwood, orion5x,
-> dove, which brings up:
-> 
-> 18ba7e4fe51d ARM: Kirkwood: add DT support for d2 Network v2
-> 2d4cd2cafaea ARM: Kirkwood: allow to use netxbig DTSI for d2net_v2 DTS
-> a96cc303e42a ARM: mvebu: update the SATA compatible string for Armada 370/XP
-> d3dde4df4483 ARM: Kirkwood: update Network Space Mini v2 description
-> 98d4f2acb91a ARM: Kirkwood: DT board setup for CloudBox
-> 4ea931e07d77 ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
-> 7f9871d9d30f ARM: kirkwood: DT board setup for Network Space Mini v2
-> ca7d94524ab3 ARM: kirkwood: DT board setup for Network Space Lite v2
-> ecee1e47ab42 ARM: kirkwood: DT board setup for Network Space v2 and parents
-> 
+On arm64 the TTBR0_EL1 register is set to either the reserved TTBR0
+page tables on boot or to the active_mm mappings belonging to user space
+processes, it must never be set to swapper_pg_dir page tables mappings.
 
-OK I understand your concern now. About dove and kirkwood, did you notice that
-some files didn't have any license?
+When a CPU is booted its active_mm is set to init_mm even though its
+TTBR0_EL1 points at the reserved TTBR0 page mappings. This implies
+that when __cpu_suspend is triggered the active_mm can point at
+init_mm even if the current TTBR0_EL1 register contains the reserved
+TTBR0_EL1 mappings.
 
-Especially none of the dove files have a license.
+Therefore, the mm save and restore executed in __cpu_suspend might
+turn out to be erroneous in that, if the current->active_mm corresponds
+to init_mm, on resume from low power it ends up restoring in the
+TTBR0_EL1 the init_mm mappings that are global and can cause speculation
+of TLB entries which end up being propagated to user space.
 
-Thanks,
+This patch fixes the issue by checking the active_mm pointer before
+restoring the TTBR0 mappings. If the current active_mm == &init_mm,
+the code sets the TTBR0_EL1 to the reserved TTBR0 mapping instead of
+switching back to the active_mm, which is the expected behaviour
+corresponding to the TTBR0_EL1 settings when __cpu_suspend was entered.
 
-Gregory
+Fixes: 95322526ef62 ("arm64: kernel: cpu_{suspend/resume} implementation")
+Cc: <stable@vger.kernel.org> # 3.14+: 18ab7db
+Cc: <stable@vger.kernel.org> # 3.14+: 714f599
+Cc: <stable@vger.kernel.org> # 3.14+: c3684fb
+Cc: <stable@vger.kernel.org> # 3.14+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/kernel/suspend.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 3771b72..2d6b606 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -5,6 +5,7 @@
+ #include <asm/debug-monitors.h>
+ #include <asm/pgtable.h>
+ #include <asm/memory.h>
++#include <asm/mmu_context.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/tlbflush.h>
+@@ -98,7 +99,18 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	 */
+ 	ret = __cpu_suspend_enter(arg, fn);
+ 	if (ret == 0) {
+-		cpu_switch_mm(mm->pgd, mm);
++		/*
++		 * We are resuming from reset with TTBR0_EL1 set to the
++		 * idmap to enable the MMU; restore the active_mm mappings in
++		 * TTBR0_EL1 unless the active_mm == &init_mm, in which case
++		 * the thread entered __cpu_suspend with TTBR0_EL1 set to
++		 * reserved TTBR0 page tables and should be restored as such.
++		 */
++		if (mm == &init_mm)
++			cpu_set_reserved_ttbr0();
++		else
++			cpu_switch_mm(mm->pgd, mm);
++
+ 		flush_tlb_all();
+ 
+ 		/*
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.2
