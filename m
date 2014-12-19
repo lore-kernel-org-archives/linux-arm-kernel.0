@@ -1,69 +1,60 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Fri, 19 Dec 2014 16:26:25 +0100
-Subject: AT91 slow clock mode regression/fixes, improvement proposal
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
-References: <20141218203904.GA25215@gradator.net>
- <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
-Message-ID: <20141219152625.GA30666@gradator.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 19 Dec 2014 11:02:30 -0500
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <549437DD.7040602@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <54930BBC.4060602@free-electrons.com>
+ <20141218191528.GY967@titan.lakedaemon.net>
+ <549437DD.7040602@free-electrons.com>
+Message-ID: <20141219160230.GZ967@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
-
-
-On Fri, Dec 19, 2014 at 02:50:04AM +0000, Yang, Wenyou wrote:
+On Fri, Dec 19, 2014 at 03:36:13PM +0100, Gregory CLEMENT wrote:
+> On 18/12/2014 20:15, Jason Cooper wrote:
+> > On Thu, Dec 18, 2014 at 06:15:40PM +0100, Gregory CLEMENT wrote:
+> > ...
+> >> Jason at the end it seems you didn't ack or nack the patches were you
+> >> were CC. You expressed some concerns about the GPLv2+ move but I don't know
+> >> if it is something that prevents you to give your acked-by.
 > > 
-> > Is actually jumping to wait_pllblock before enabling PLLB instead of skipping UTMI
-> > PLL. Unfortunately the compiler does not warn about that.
+> > Oops.  :)  I figured my S-o-B when applying would be sufficient.  That
+> > decision was before we decided on Andrew applying patches this time
+> > around...
+> > 
+> > For all my dts{i} contributions:
+> > 
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
 > 
-> Thanks. I will check it
-
-Fixed in proposed patch (UPLL code removed).
-
-
-> > Furthermore, it looks like MCKRDY_TIMEOUT set to 1000 is not enough, my board
-> > crashes in about 1 wake up to 10 with this value and works perfectly
-> > fine with 4000.
+> Thanks :)
 > 
-> I also encountered this issue.
-
-Fixed in proposed patch, since we don't timeout anymore.
-
-
-> Moreover the Main Crystal Oscillator Startup Time seems not enough 
-> too, not sure, I am confirming it.
-
-This is OK for me, CKGR_MOR.MOSCXTST is set to 8:  (1/32768)*8*8 = 1.95 ms
-
-I checked with a scope on XTAL of the AT91SAM9G35-CM module, 2 ms is 
-about twice enough waiting time.
-
-
-> > Therefore I am also proposing to remove all the timeout.
+> > 
+> > Due to all the merge commits over time and whatnot, it's probably best
+> > to put my Ack on all the patches in this series...
 > 
-> Good idea, but I still worry the deadlock without timeout. Maybe 
-> increasing timeout is better.
+> OK no problem. By the way, I take care of collecting all the acked-by and
+> once it will be done I will either sent the updated patch set with all the
+> acked-by or maybe just I will create a branch to pull if it is easier to handle.
 
-This is just a test request patch, I am first trying without timeout to 
-get some feedback. It works well for me, at least, but this isn't 
-convicing myself enough :-)
+Ok, that'll be up to Andrew.
 
+Once we have the last few stragglers, and assuming there are no more
+NAKs, here's what I'd like to do:
 
-> > By the way, I don't know for other AT91 boards (or without DT, or
-> > something else), but the UTMI PLL suspend/resume seem unnecessary for
-> > me, the USB driver is already disabling the USB PLL when suspending,
-> > could you confirm ?
-> Yes, I agree.
+Regrettably, we'll have to revert Simon's dts contributions.  I say
+'regret' in that I regret having to potentially discourage a valuable
+contributor.  I *don't* regret him sticking to his guns.  :)
 
-Removed.
+As for what to do after that, I think we (the core mvebu folks) should
+*not* rewrite the Lacie dts files.  That just seems hinky to me.
 
-
-> Remove disabling the PLLB code as well.  
-
-Done, but my SoC don't have a PLLB, so I can't check myself, could you 
-check if "AT91: PM - Suspend-to-RAM with PLL B running" does not fire on 
-PLL B enabled board ?
+If there's community interest, someone will crop up who copies one of
+the dual licensed dts files and modifies it to boot his/her Lacie board.
+When they submit a patch, we'll DCO/SoB double check them and apply the
+patch(es).
 
 
-Regards,
-Sylvain
+thx,
+
+Jason.
