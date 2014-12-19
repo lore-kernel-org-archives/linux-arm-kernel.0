@@ -1,41 +1,74 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 19 Dec 2014 13:49:34 -0800
-Subject: [PATCH 4/4] PM: Eliminate CONFIG_PM_RUNTIME
-In-Reply-To: <9470157.PyHoGoSGz1@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Fri, 19 Dec 2014 22:41:54 +0100")
-References: <472992175.g1ArEYGFPo@vostro.rjw.lan>
- <2635409.SWsBMlb9s4@vostro.rjw.lan>
- <CAMuHMdUn3KSTdh4nFL=G54SM7NWpQsmeg1GYYRz=+uXH9rbEGg@mail.gmail.com>
- <9470157.PyHoGoSGz1@vostro.rjw.lan>
-Message-ID: <7h1tnv2tu9.fsf@deeprootsystems.com>
+Date: Fri, 19 Dec 2014 13:52:52 -0800
+Subject: Enable runtime PM automatically?
+In-Reply-To: <CAMuHMdWmy82=cnoSVD3gdEu=5Ttr1j-PJv6EXKYwbR3o_FEDiA@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Fri, 19 Dec 2014 08:59:53 +0100")
+References: <CAMuHMdWY_ne+S3zKrEYqVyU8=S-at=+rGuEkYNauF4s2KaKNdw@mail.gmail.com>
+ <7hppbg63zo.fsf@deeprootsystems.com>
+ <CAMuHMdWmy82=cnoSVD3gdEu=5Ttr1j-PJv6EXKYwbR3o_FEDiA@mail.gmail.com>
+Message-ID: <7hsigb1f4b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
 [...]
 
-> Fixed up patch is appended, thanks!
+> On Thu, Dec 18, 2014 at 10:29 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>> However, if PM domains are active, drivers must be runtime PM-aware for the
+>>> gpd_dev_ops.start() method to be called in the first place (perhaps this is just
+>>> one bug that's easy to fix --- the device is "assumed suspended", but can be
+>>> used). They must
+>>>   1. call pm_runtime_enable() to enable runtime PM for the device,
+>>>   2. call pm_runtime_get_sync() to prevent the device from being put in a
+>>>     low-power state at any time. This second call has the
+>>> "side-effect" of calling
+>>>     gpd_dev_ops.start().
+>>>
+>>> Hence, if PM domains are enabled, wouldn't it make sense to
+>>>   1. enable runtime PM by default, for all devices (bound and unbound),
+>>>   2. call pm_runtime_get_sync(), for all devices bound to a driver.
+>>> Of course we have to keep track if drivers call any of the pm_runtime_*()
+>>> methods theirselves, as that would have to move them from automatic to
+>>> manual mode.
+>>>
+>>> Would this be feasible?
+>>
+>> We have to be careful about where the PM core's _get_sync() call goes.
+>>
+>> Because you're talking about "bound" devices, I guess you mean after the
+>> driver probes?  Otherwise, it gets tricky if the _get_sync() is before
+>> the driver probes, because the device driver may have work it wants to
+>> do in its runtime PM callbacks, which are not initialized/available
+>> before the driver probes.  Doing this before probe also makes it rather
+>> difficult to know for sure the actual physical state of the device, and
+>> make sure it matches the runtime PM state of the device.  Rafael
+>> mentioned this also, and I'm not sure how we can be sure of the physical
+>> state.
 >
->
-> ---
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Subject: PM: Eliminate CONFIG_PM_RUNTIME
->
-> Having switched over all of the users of CONFIG_PM_RUNTIME to use
-> CONFIG_PM directly, turn the latter into a user-selectable option
-> and drop the former entirely from the tree.
->
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Yes, it's complicated by the fact that there are multiple sets of callbacks
+> (PM domain, device type, class type, bus type, driver).
+> However, the PM domain one has the highest priority, and is always
+> (also for devices not bound to a driver) available.
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+Yes, but if a _get_sync() is called on a device which has not yet setup
+its callbacks (e.g. before it has been probed), then the device may not
+be properly initialized, and we may not be able to know its physical state.
 
-I assume you're planning to get this in early in the v3.19-rc cycle,
-correct?  That way we can hopefully avoid conflicts with the various
-defconfig changes we're taking through the arm-soc tree.
+>> Some thoughts: devices without drivers would be runtime resumed by the
+>> core, but will never be suspended, so the PM domain will never shut
+>> down.  I guess the core will have to keep track of the devices it
+>> automatically runtime resumed and decide to runtime suspend them too?
+>> Hmm, where would that go?
+>
+> No, devices without a driver just need to become runtime PM enabled.
+> They will only be resumed when a dependent device (e.g. a child) is resumed,
+> and are suspended again after all dependents are suspended. That's how
+> simple-pm-bus behaves.
 
-Also, thanks for taking care of all the tree-wide changes.  This is a
-great change.
+Ah, OK.  I thought you were proposing to _enable() and _get_sync() those
+devices.
+
+Thanks for the clarification,
 
 Kevin
