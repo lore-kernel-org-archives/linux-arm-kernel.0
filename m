@@ -1,74 +1,44 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 19 Dec 2014 13:52:52 -0800
-Subject: Enable runtime PM automatically?
-In-Reply-To: <CAMuHMdWmy82=cnoSVD3gdEu=5Ttr1j-PJv6EXKYwbR3o_FEDiA@mail.gmail.com>
- (Geert Uytterhoeven's message of "Fri, 19 Dec 2014 08:59:53 +0100")
-References: <CAMuHMdWY_ne+S3zKrEYqVyU8=S-at=+rGuEkYNauF4s2KaKNdw@mail.gmail.com>
- <7hppbg63zo.fsf@deeprootsystems.com>
- <CAMuHMdWmy82=cnoSVD3gdEu=5Ttr1j-PJv6EXKYwbR3o_FEDiA@mail.gmail.com>
-Message-ID: <7hsigb1f4b.fsf@deeprootsystems.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 Dec 2014 18:50:00 +0100
+Subject: [PATCH v2 3/4] mmc: sunxi: Convert MMC driver to the standard
+ clock phase API
+In-Reply-To: <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
+References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
+Message-ID: <20141219175000.GM4820@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+On Wed, Dec 17, 2014 at 12:17:36PM +0800, Chen-Yu Tsai wrote:
+> >         /* determine delays */
+> >         if (rate <= 400000) {
+> > -               oclk_dly = 0;
+> > -               sclk_dly = 7;
+> > +               oclk_dly = 180;
+> > +               sclk_dly = 42;
+> 
+> 42 seems like an odd number. Maybe 45?
 
-[...]
+If the rate is at 400kHz, that means that the clock in muxed from the
+24M, with a divider of 60.
 
-> On Thu, Dec 18, 2014 at 10:29 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>> However, if PM domains are active, drivers must be runtime PM-aware for the
->>> gpd_dev_ops.start() method to be called in the first place (perhaps this is just
->>> one bug that's easy to fix --- the device is "assumed suspended", but can be
->>> used). They must
->>>   1. call pm_runtime_enable() to enable runtime PM for the device,
->>>   2. call pm_runtime_get_sync() to prevent the device from being put in a
->>>     low-power state at any time. This second call has the
->>> "side-effect" of calling
->>>     gpd_dev_ops.start().
->>>
->>> Hence, if PM domains are enabled, wouldn't it make sense to
->>>   1. enable runtime PM by default, for all devices (bound and unbound),
->>>   2. call pm_runtime_get_sync(), for all devices bound to a driver.
->>> Of course we have to keep track if drivers call any of the pm_runtime_*()
->>> methods theirselves, as that would have to move them from automatic to
->>> manual mode.
->>>
->>> Would this be feasible?
->>
->> We have to be careful about where the PM core's _get_sync() call goes.
->>
->> Because you're talking about "bound" devices, I guess you mean after the
->> driver probes?  Otherwise, it gets tricky if the _get_sync() is before
->> the driver probes, because the device driver may have work it wants to
->> do in its runtime PM callbacks, which are not initialized/available
->> before the driver probes.  Doing this before probe also makes it rather
->> difficult to know for sure the actual physical state of the device, and
->> make sure it matches the runtime PM state of the device.  Rafael
->> mentioned this also, and I'm not sure how we can be sure of the physical
->> state.
->
-> Yes, it's complicated by the fact that there are multiple sets of callbacks
-> (PM domain, device type, class type, bus type, driver).
-> However, the PM domain one has the highest priority, and is always
-> (also for devices not bound to a driver) available.
+That means that we can outphase the clocks only by a multiple of 6
+(360 / 60). 7 * 6 = 42.
 
-Yes, but if a _get_sync() is called on a device which has not yet setup
-its callbacks (e.g. before it has been probed), then the device may not
-be properly initialized, and we may not be able to know its physical state.
+Depending on how the rounding goes, 45 might work too, but if we wan't
+to be conservative, 42 doesn't change anything, 45 does.
 
->> Some thoughts: devices without drivers would be runtime resumed by the
->> core, but will never be suspended, so the PM domain will never shut
->> down.  I guess the core will have to keep track of the devices it
->> automatically runtime resumed and decide to runtime suspend them too?
->> Hmm, where would that go?
->
-> No, devices without a driver just need to become runtime PM enabled.
-> They will only be resumed when a dependent device (e.g. a child) is resumed,
-> and are suspended again after all dependents are suspended. That's how
-> simple-pm-bus behaves.
+Maxime
 
-Ah, OK.  I thought you were proposing to _enable() and _get_sync() those
-devices.
-
-Thanks for the clarification,
-
-Kevin
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/ed8963eb/attachment-0001.sig>
