@@ -1,313 +1,154 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Fri, 19 Dec 2014 13:53:22 +0800
-Subject: [PATCH RFC v2 08/14] drm: imx: Add MIPI DSI host controller driver
-In-Reply-To: <1418902740.4212.46.camel@pengutronix.de>
-References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
- <1418886696-11636-9-git-send-email-Ying.Liu@freescale.com>
- <1418902740.4212.46.camel@pengutronix.de>
-Message-ID: <5493BD52.8070804@freescale.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 19 Dec 2014 14:11:52 +0800
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
+Message-ID: <5493C1A8.4050204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2014 07:39 PM, Philipp Zabel wrote:
-> Am Donnerstag, den 18.12.2014, 15:11 +0800 schrieb Liu Ying:
->> This patch adds i.MX MIPI DSI host controller driver support.
->> Currently, the driver supports the burst with sync pulses mode only.
+Hi, Guennadi
+
+Thanks for the review.
+
+On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
+> Hi Josh,
+>
+> Thanks for your patches!
+>
+> On Thu, 18 Dec 2014, Josh Wu wrote:
+>
+>> To support async probe for ov2640, we need remove the code to get 'mclk'
+>> in ov2640_probe() function. oterwise, if soc_camera host is not probed
+>> in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
+>> function.
 >>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+>> function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
+>> soc_camera_set_power() function.
+>>
+>> And if soc_camera host is probed, the when ov2640_s_power() is called,
+>> then we can get the 'mclk' and that make us enable/disable soc_camera
+>> host's clock as well.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 >> ---
->> v1->v2:
->>   * Address almost all comments from Thierry Reding and Russell.
->>   * Update the DT documentation to remove the display-timings node in the panel node.
->>   * Update the DT documentation to state that the nodes which represent the possible
->>     DRM CRTCs the controller may connect with should be placed in the node "ports".
->>   * Remove the flag 'enabled' from the struct imx_mipi_dsi.
->>   * Move the format_to_bpp() function in v1 to the common DRM MIPI DSI driver.
->>   * Improve the way we wait for check status for DPHY and command packet transfer.
->>   * Improve the DPMS support for the encoder.
->>   * Split the functions of ->host_attach() and ->mode_valid() clearly as suggested by
->>     Thierry Reding.
->>   * Improve the logics in imx_mipi_dsi_dcs_long_write().
->>   * Enable/disable the pllref_clk and pllref_gate_clk at the component binding/unbinding
->>     stages to help remove the flag 'enabled'.
->>   * Update the module license to be "GPL".
->>   * Other minor changes, such as coding style issues and macro naming issues.
+>> v3 -> v4:
+>> v2 -> v3:
+>> v1 -> v2:
+>>    no changes.
 >>
->>   .../devicetree/bindings/drm/imx/mipi_dsi.txt       |   78 ++
->>   drivers/gpu/drm/imx/Kconfig                        |    6 +
->>   drivers/gpu/drm/imx/Makefile                       |    1 +
->>   drivers/gpu/drm/imx/imx-mipi-dsi.c                 | 1056 ++++++++++++++++++++
->>   4 files changed, 1141 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
->>   create mode 100644 drivers/gpu/drm/imx/imx-mipi-dsi.c
+>>   drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
+>>   1 file changed, 21 insertions(+), 10 deletions(-)
 >>
->> diff --git a/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt b/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
->> new file mode 100644
->> index 0000000..892ed62
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
->> @@ -0,0 +1,78 @@
->> +Device-Tree bindings for MIPI DSI host controller
+>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
+>> index 1fdce2f..9ee910d 100644
+>> --- a/drivers/media/i2c/soc_camera/ov2640.c
+>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+>> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
+>>   	struct i2c_client *client = v4l2_get_subdevdata(sd);
+>>   	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+>>   	struct ov2640_priv *priv = to_ov2640(client);
+>> +	struct v4l2_clk *clk;
 >> +
->> +MIPI DSI host controller
->> +========================
->> +
->> +The MIPI DSI host controller is a Synopsys DesignWare IP.
->> +It is a digital core that implements all protocol functions defined
->> +in the MIPI DSI specification, providing an interface between the
->> +system and the MIPI DPHY, and allowing communication with a MIPI DSI
->> +compliant display.
->> +
->> +Required properties:
->> + - #address-cells: Should be <1>.
->> + - #size-cells: Should be <0>.
->> + - compatible: Should be "fsl,imx6q-mipi-dsi" for i.MX6q/sdl SoCs.
->
-> If this is a Synopsys DesignWare IP core as the HDMI TX, I think the
-> compatible should reflect that. How about a second compatible
-> "snps,dw-mipi-dsi"?
-
-Ok, I'll add this second compatible string.
-
->
->> + - reg: Physical base address of the controller and length of memory
->> +         mapped region.
->> + - interrupts: The controller's interrupt number to the CPU(s).
->> + - gpr: Should be <&gpr>.
->> +         The phandle points to the iomuxc-gpr region containing the
->> +         multiplexer control register for the controller.
->> + - clocks, clock-names: Phandles to the controller pllref, pllref_gate
->> +           and core_cfg clocks, as described in [1] and [2].
->> +
->> +Required sub-nodes:
->> + - ports: This node may contain up to four port nodes with endpoint
->> +   definitions as defined in [3], corresponding to the four inputs to
->> +   the controller multiplexer.
->> + - A node to represent a DSI peripheral as described in [4].
->> +
->> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +[2] Documentation/devicetree/bindings/clock/imx6q-clock.txt
->> +[3] Documentation/devicetree/bindings/media/video-interfaces.txt
->> +[4] Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
->> +
->> +example:
->> +	gpr: iomuxc-gpr at 020e0000 {
->> +		/* ... */
->> +	};
->> +
->> +	mipi_dsi: mipi at 021e0000 {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		compatible = "fsl,imx6q-mipi-dsi";
->> +		reg = <0x021e0000 0x4000>;
->> +		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
->> +		gpr = <&gpr>;
->> +		clocks = <&clks IMX6QDL_CLK_VIDEO_27M>,
->> +			 <&clks IMX6QDL_CLK_HSI_TX>,
->> +			 <&clks IMX6QDL_CLK_HSI_TX>;
->> +		clock-names = "pllref", "pllref_gate", "core_cfg";
->
-> Not sure about this. Are those names from the Synopsys documentation?
-
-No, I don't think it's from there.
-
->
-> According to Table 41-1 in the i.MX6Q Reference Manual, this module has
-> 6 clock inputs:
->   - ac_clk_125m (from ahb_clk_root)
->   - pixel_clk (from axi_clk_root)
->   - cfg_clk and pll_refclk (from video_27m)
->   - ips_clk and ipg_clk_s (from ipg_clk_root)
-> The CCM chapter says that of these, "ac_clk_125m", "cfg_clk", ips_clk",
-> and "pll_refclk" are gated by a single bit called
-> "mipi_core_cfg_clk_enable", that is clk[CLK_HSI_TX].
-> If that is correct, I see no reason for the "pllref_gate" clock.
-> I suppose two clocks "pllref" and "cfg" should suffice.
-
-Using the two clocks makes the code look like this, perhaps:
-
-       clocks = <&clks IMX6QDL_CLK_VIDEO_27M>,
-                <&clks IMX6QDL_CLK_HSI_TX>;
-       clock-names = "pllref", "core_cfg";
-
-Then, it seems that I have no way to disable the pllref clock if
-using the clock tree after applying this patch set?
-
-
-Or, perhaps, this one?
-
-       clocks = <&clks IMX6QDL_CLK_HSI_TX>,
-                <&clks IMX6QDL_CLK_HSI_TX>;
-       clock-names = "pllref", "core_cfg";
-
-This only uses the gate clock hsi_tx.  The current clock tree states
-that it comes from:
-
-      pll3_120m ->
-                  | -> hsi_tx_sel -> hsi_tx_podf -> hsi_tx
-pll2_pfd2_396m ->
-
-So, I can not get the correct pllref clock frequency with this tree.
-The pllref clock should be derived from the video_27m clock.
-
-
-The way I decided to use the three clocks is:
-1) PLL related
-* pllref clock only cares about the pll reference rate(the frequency).
-   And, the frequency does matter as it has an impact on the lane clock
-   frequency.
-* pllref_gate is a gate clock and it only cares about the gate.
-
-2) register configuration related
-* core_cfg is a gate clock and it only cares about the gate.
-Usually, the register configuration clock frequency is not so important
-and the gate is what we really need.
-
-I am currently not strong on the way I used.  I am open to any better
-solution.
-
->
-> Maybe HSI_TX should be split up into multiple shared gate clocks that
-> all set the mipi_core_cfg clock bits (see below).
-
-Yes, maybe.
-If that's the case, do we need to add two gate clocks in the DT node to
-represent cfg_gate and pllref_gate respectively?
-
->
->> diff --git a/drivers/gpu/drm/imx/Kconfig b/drivers/gpu/drm/imx/Kconfig
->> index 82fb758..03f04fb 100644
->> --- a/drivers/gpu/drm/imx/Kconfig
->> +++ b/drivers/gpu/drm/imx/Kconfig
->> @@ -51,3 +51,9 @@ config DRM_IMX_HDMI
->>   	depends on DRM_IMX
->>   	help
->>   	  Choose this if you want to use HDMI on i.MX6.
->> +
->> +config DRM_IMX_MIPI_DSI
->> +	tristate "Freescale i.MX DRM MIPI DSI"
->> +	depends on DRM_IMX && MFD_SYSCON
->> +	help
->> +	  Choose this if you want to use MIPI DSI on i.MX6.
->> diff --git a/drivers/gpu/drm/imx/Makefile b/drivers/gpu/drm/imx/Makefile
->> index 582c438..4571d52 100644
->> --- a/drivers/gpu/drm/imx/Makefile
->> +++ b/drivers/gpu/drm/imx/Makefile
->> @@ -10,3 +10,4 @@ obj-$(CONFIG_DRM_IMX_LDB) += imx-ldb.o
->>   imx-ipuv3-crtc-objs  := ipuv3-crtc.o ipuv3-plane.o
->>   obj-$(CONFIG_DRM_IMX_IPUV3)	+= imx-ipuv3-crtc.o
->>   obj-$(CONFIG_DRM_IMX_HDMI) += imx-hdmi.o
->> +obj-$(CONFIG_DRM_IMX_MIPI_DSI) += imx-mipi-dsi.o
->> diff --git a/drivers/gpu/drm/imx/imx-mipi-dsi.c b/drivers/gpu/drm/imx/imx-mipi-dsi.c
->> new file mode 100644
->> index 0000000..1cb4328
->> --- /dev/null
->> +++ b/drivers/gpu/drm/imx/imx-mipi-dsi.c
-> [...]
->> +static int imx_mipi_dsi_bind(struct device *dev, struct device *master, void *data)
->> +{
->> +	struct platform_device *pdev = to_platform_device(dev);
->> +	struct drm_device *drm = data;
->> +	struct device_node *np = dev->of_node;
->> +	struct imx_mipi_dsi *dsi;
->> +	struct resource *res;
->> +	u32 val;
->> +	int ret;
->> +
->> +	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
->> +	if (!dsi)
->> +		return -ENOMEM;
->> +
->> +	dsi->dev = dev;
->> +	dsi->dsi_host.ops = &imx_mipi_dsi_host_ops;
->> +	dsi->dsi_host.dev = dev;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	dsi->base = devm_ioremap_resource(dev, res);
->> +	if (IS_ERR(dsi->base))
->> +		return PTR_ERR(dsi->base);
->> +
->> +	dsi->regmap = syscon_regmap_lookup_by_phandle(np, "gpr");
->> +	if (IS_ERR(dsi->regmap))
->> +		return PTR_ERR(dsi->regmap);
->> +
->> +	dsi->pllref_clk = devm_clk_get(dev, "pllref");
->> +	if (IS_ERR(dsi->pllref_clk)) {
->> +		ret = PTR_ERR(dsi->pllref_clk);
->> +		dev_err(dev, "Unable to get pll reference clock: %d\n", ret);
->> +		return ret;
+>> +	if (!priv->clk) {
+>> +		clk = v4l2_clk_get(&client->dev, "mclk");
+>> +		if (IS_ERR(clk))
+>> +			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
+>> +		else
+>> +			priv->clk = clk;
 >> +	}
->> +	clk_prepare_enable(dsi->pllref_clk);
+>>   
+>>   	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
+>>   }
+>> @@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
+>>   	if (priv->hdl.error)
+>>   		return priv->hdl.error;
+>>   
+>> -	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+>> -	if (IS_ERR(priv->clk)) {
+>> -		ret = PTR_ERR(priv->clk);
+>> -		goto eclkget;
+>> -	}
+>> -
+>>   	ret = ov2640_video_probe(client);
+> The first thing the above ov2640_video_probe() function will do is call
+> ov2640_s_power(), which will request the clock. So, by moving requesting
+> the clock from ov2640_probe() to ov2640_s_power() doesn't change how
+> probing will be performed, am I right?
+yes, you are right. In this patch, the "mclk" will requested by 
+ov2640_s_power().
+
+The reason why I put the getting "mclk" code from ov2640_probe() to 
+ov2640_s_power() is : as the "mclk" here is camera host's peripheral 
+clock. That means ov2640 still can be probed properly (read ov2640 id) 
+even no "mclk". So when I move this code to ov2640_s_power(), otherwise 
+the ov2640_probe() will be failed or DEFER_PROBE.
+
+Is this true for all camera host? If it's not true, then I think use 
+-EPROBE_DEFER would be a proper way.
+
+
+> Or are there any other patched,
+> that change that, that I'm overseeing?
+>
+> If I'm right, then I would propose an approach, already used in other
+> drivers instead of this one: return -EPROBE_DEFER if the clock isn't
+> available during probing. See ef6672ea35b5bb64ab42e18c1a1ffc717c31588a for
+> an example. Or did I misunderstand anything?
+Actually months ago I already done a version of ov2640 patch which use 
+-EPROBE_DEFER way.
+
+But now I think the ov2640 can be probed correctly without "mclk", so it 
+is no need to return -EPROBE_DEFER.
+And the v4l2 asyn API can handle the synchronization of host. So I 
+prefer to use this way.
+What do you think about this?
+
+Best Regards,
+Josh Wu
+
+>
+> Thanks
+> Guennadi
+>
+>>   	if (ret) {
+>> -		v4l2_clk_put(priv->clk);
+>> -eclkget:
+>> -		v4l2_ctrl_handler_free(&priv->hdl);
+>> +		goto evideoprobe;
+>>   	} else {
+>>   		dev_info(&adapter->dev, "OV2640 Probed\n");
+>>   	}
+>>   
+>> +	ret = v4l2_async_register_subdev(&priv->subdev);
+>> +	if (ret < 0)
+>> +		goto evideoprobe;
 >> +
->> +	dsi->pllref_gate_clk = devm_clk_get(dev, "pllref_gate");
->> +	if (IS_ERR(dsi->pllref_gate_clk)) {
->> +		ret = PTR_ERR(dsi->pllref_gate_clk);
->> +		dev_err(dev, "Unable to get pll reference gate clock: %d\n", ret);
->> +		return ret;
->> +	}
->> +	clk_prepare_enable(dsi->pllref_gate_clk);
->
-> As said above, I don't think this clock is needed, or is it?
-
-Perhaps, we need it.
-
->
-> If enabling pllref_clk doesn't actually enable the 27m clock input to
-> the mipi dsi core because it is still gated by hsi_tx, maybe the clock
-> tree should be fixed and hsi_tx turned into multiple
-> imx_clk_gate2_shared clocks.
-
-According to the CCM chapter, the video_27m clock is gated by the hsi_tx
-clock.  You mentioned this above, as well.
-
->
+>> +	return 0;
 >> +
->> +	dsi->cfg_clk = devm_clk_get(dev, "core_cfg");
->> +	if (IS_ERR(dsi->cfg_clk)) {
->> +		ret = PTR_ERR(dsi->cfg_clk);
->> +		dev_err(dev, "Unable to get configuration clock: %d\n", ret);
->
-> And leave pllref enabled?
-
-As I mentioned in the v1-> v2 change log, I enable/disable the 
-pllref_clk and pllref_gate_clk at the component binding/unbinding stages 
-to help remove the flag 'enabled' introduced in v1.
-
-I referred to the i.MX HDMI driver which enables/disables the isfr clock 
-and the iahb clock at the component binding/unbinding stages.
-
-I may try to handle the clock enablement/disablement more decently and
-avoid using the flag 'enable'.
-
->
->> +		return ret;
->> +	}
->> +
->> +	clk_prepare_enable(dsi->cfg_clk);
->> +	val = dsi_read(dsi, DSI_VERSION);
->> +	clk_disable_unprepare(dsi->cfg_clk);
->> +
->> +	dev_info(dev, "version number is 0x%08x\n", val);
->> +
->> +	ret = imx_mipi_dsi_register(drm, dsi);
->> +	if (ret)
->
-> Same here.
-
-You meant that the pllref_gate clock is left enabled above, right?
-
-Regards,
-Liu Ying
-
->
->> +		return ret;
->> +
->> +	dev_set_drvdata(dev, dsi);
->> +
->> +	return mipi_dsi_host_register(&dsi->dsi_host);
->> +}
-> [...]
->
-> regards
-> Philipp
->
+>> +evideoprobe:
+>> +	v4l2_ctrl_handler_free(&priv->hdl);
+>>   	return ret;
+>>   }
+>>   
+>> @@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
+>>   {
+>>   	struct ov2640_priv       *priv = to_ov2640(client);
+>>   
+>> -	v4l2_clk_put(priv->clk);
+>> +	v4l2_async_unregister_subdev(&priv->subdev);
+>> +	if (priv->clk)
+>> +		v4l2_clk_put(priv->clk);
+>>   	v4l2_device_unregister_subdev(&priv->subdev);
+>>   	v4l2_ctrl_handler_free(&priv->hdl);
+>>   	return 0;
+>> -- 
+>> 1.9.1
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
