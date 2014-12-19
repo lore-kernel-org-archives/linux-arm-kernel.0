@@ -1,204 +1,133 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 19 Dec 2014 11:17:26 +0100
-Subject: [PATCH RFC v2 08/14] drm: imx: Add MIPI DSI host controller driver
-In-Reply-To: <5493BD52.8070804@freescale.com>
-References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
- <1418886696-11636-9-git-send-email-Ying.Liu@freescale.com>
- <1418902740.4212.46.camel@pengutronix.de> <5493BD52.8070804@freescale.com>
-Message-ID: <1418984246.3165.45.camel@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 19 Dec 2014 11:26:45 +0100
+Subject: [PATCH v2] mmc: sdhci-sirf: add sirf tuning function (cmd 19)
+In-Reply-To: <1417694960-5664-1-git-send-email-21cnbao@gmail.com>
+References: <1417694960-5664-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CAPDyKFpLunVm7eJMuTVGixPnvUzgTdn=ZA1-Ee6qf3xTOJA0hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liu,
-
-Am Freitag, den 19.12.2014, 13:53 +0800 schrieb Liu Ying:
-[...]
-> >> +	mipi_dsi: mipi at 021e0000 {
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +		compatible = "fsl,imx6q-mipi-dsi";
-> >> +		reg = <0x021e0000 0x4000>;
-> >> +		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
-> >> +		gpr = <&gpr>;
-> >> +		clocks = <&clks IMX6QDL_CLK_VIDEO_27M>,
-> >> +			 <&clks IMX6QDL_CLK_HSI_TX>,
-> >> +			 <&clks IMX6QDL_CLK_HSI_TX>;
-> >> +		clock-names = "pllref", "pllref_gate", "core_cfg";
-> >
-> > Not sure about this. Are those names from the Synopsys documentation?
-> 
-> No, I don't think it's from there.
-
-Do you have access to it? I'd like to see the proper names used if
-possible, considering this IP core will be used on other SoCs, too.
-
-> > According to Table 41-1 in the i.MX6Q Reference Manual, this module has
-> > 6 clock inputs:
-> >   - ac_clk_125m (from ahb_clk_root)
-> >   - pixel_clk (from axi_clk_root)
-> >   - cfg_clk and pll_refclk (from video_27m)
-> >   - ips_clk and ipg_clk_s (from ipg_clk_root)
-> > The CCM chapter says that of these, "ac_clk_125m", "cfg_clk", ips_clk",
-> > and "pll_refclk" are gated by a single bit called
-> > "mipi_core_cfg_clk_enable", that is clk[CLK_HSI_TX].
-> > If that is correct, I see no reason for the "pllref_gate" clock.
-> > I suppose two clocks "pllref" and "cfg" should suffice.
-> 
-> Using the two clocks makes the code look like this, perhaps:
-> 
->        clocks = <&clks IMX6QDL_CLK_VIDEO_27M>,
->                 <&clks IMX6QDL_CLK_HSI_TX>;
->        clock-names = "pllref", "core_cfg";
-> 
-> Then, it seems that I have no way to disable the pllref clock if
-> using the clock tree after applying this patch set?
-
-Correct. In my opinion we should put a new gate clock in the clock path
-between video_27m and the pllref input triggers the same bit as hsi_tx,
-see below.
-
-> Or, perhaps, this one?
-> 
->        clocks = <&clks IMX6QDL_CLK_HSI_TX>,
->                 <&clks IMX6QDL_CLK_HSI_TX>;
->        clock-names = "pllref", "core_cfg";
-> 
-> This only uses the gate clock hsi_tx.  The current clock tree states
-> that it comes from:
-> 
->       pll3_120m ->
->                   | -> hsi_tx_sel -> hsi_tx_podf -> hsi_tx
-> pll2_pfd2_396m ->
-> 
-> So, I can not get the correct pllref clock frequency with this tree.
-> The pllref clock should be derived from the video_27m clock.
-
-According to the i.MX6 reference manual, the cfg clock also is derived
-from video_27m, so both have the wrong rate if connected to hsi_tx (yes,
-for cfg we don't care about the rate).
-
-Currently we have this:
-
-pll2_pfd2_396m -> hsi_tx_sel -> hsi_tx_podf -> hsi_tx
-pll3_pfd1_540m -> video_27m -> hdmi_isfr
-
-- hsi_tx_podf represents the hsi_tx_clk_root at its output.
-- hsi_tx represents the gate between hsi_tx_clk_root and the tx_ref_clk
-  input to the MIPI_HSI module, which is controlled by the
-  mipi_core_cfg_clk_enable bit.
-- video_27m represents the video_27m_clk_root at its output.
-
-I'd say we should turn hsi_tx into a shared gate clock and add a new
-shared gate clock using the same gate bit. Maybe name it mipi_core_cfg,
-after the gating bit in the CCM.
-
-pll2_pfd2_396m -> hsi_tx_sel -> hsi_tx_podf -> hsi_tx
-pll3_pfd1_540m -> video_27m -> mipi_core_cfg
-pll3_pfd1_540m -> video_27m -> hdmi_isfr
-
-- mipi_core_cfg represents the gate between video_27_clk_root and the
-  cfg_clk and pllref_clk inputs to the MIPI_DSI module, which is also
-  controlled by the mipi_core_cfg_clk_enable bit.
-
-> The way I decided to use the three clocks is:
-> 1) PLL related
-> * pllref clock only cares about the pll reference rate(the frequency).
->    And, the frequency does matter as it has an impact on the lane clock
->    frequency.
-> * pllref_gate is a gate clock and it only cares about the gate.
+On 4 December 2014 at 13:09, Barry Song <21cnbao@gmail.com> wrote:
+> From: Minda Chen <Minda.Chen@csr.com>
 >
-> 2) register configuration related
-> * core_cfg is a gate clock and it only cares about the gate.
-> Usually, the register configuration clock frequency is not so important
-> and the gate is what we really need.
-> 
-> I am currently not strong on the way I used.  I am open to any better
-> solution.
+> Add manual tuning function in CSR atlas7 SoC. It is mainly used
+> for the UHS-I SD card working SDR50 SDR104 mode.
+>
+> The tuning principle can be seen in SD spec part1 v3.01 4.2.4.5
+> (tuning command).
+>
+> SD host send the cmd19 and set the delay value(0-127).
+> and the sdcard return 64 bytes data. If the data is same with
+> the tuning data. The delay value is valid. Execute this commmand
+> 128 times. And calculate the longest window of the valid values.
+> The value in the middle of this window is the best value.
+>
+> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Since cfg is a real clock input to the MIPI DSI IP, that's ok. But the
-two pllref entries in reality are one and the same clock input.
+Thanks! Queued for 3.20.
 
-> > Maybe HSI_TX should be split up into multiple shared gate clocks that
-> > all set the mipi_core_cfg clock bits (see below).
-> 
-> Yes, maybe.
-> If that's the case, do we need to add two gate clocks in the DT node to
-> represent cfg_gate and pllref_gate respectively?
+I adopted the call for mmc_send_tuning() to take the host instead of
+the card as parameter.
 
-I'd say yes. While on i.MX6 it could be represented by a single clock
-because both have the same rate and use the same gate bit, that doesn't
-have to be the case on other SoCs. With my suggestion above, that would
-be:
+Kind regards
+Uffe
 
-	clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
-		 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
-	clock-names = "pllref", "cfg";
-
-> >> diff --git a/drivers/gpu/drm/imx/Kconfig b/drivers/gpu/drm/imx/Kconfig
-[...]
-> >> +static int imx_mipi_dsi_bind(struct device *dev, struct device *master, void *data)
-> >> +{
-[...]
-> >> +	dsi->pllref_clk = devm_clk_get(dev, "pllref");
-> >> +	if (IS_ERR(dsi->pllref_clk)) {
-> >> +		ret = PTR_ERR(dsi->pllref_clk);
-> >> +		dev_err(dev, "Unable to get pll reference clock: %d\n", ret);
-> >> +		return ret;
-> >> +	}
-> >> +	clk_prepare_enable(dsi->pllref_clk);
-
-What I mean below is this: Here you enable pllref ...
-
-[...]
-> >> +	dsi->cfg_clk = devm_clk_get(dev, "core_cfg");
-> >> +	if (IS_ERR(dsi->cfg_clk)) {
-> >> +		ret = PTR_ERR(dsi->cfg_clk);
-> >> +		dev_err(dev, "Unable to get configuration clock: %d\n", ret);
-> >
-> > And leave pllref enabled?
-> 
-> As I mentioned in the v1-> v2 change log, I enable/disable the 
-> pllref_clk and pllref_gate_clk at the component binding/unbinding stages 
-> to help remove the flag 'enabled' introduced in v1.
-> 
-> I referred to the i.MX HDMI driver which enables/disables the isfr clock 
-> and the iahb clock at the component binding/unbinding stages.
-> 
-> I may try to handle the clock enablement/disablement more decently and
-> avoid using the flag 'enable'.
-> 
-> >
-> >> +		return ret;
-
-... and here you return with an error without disabling pllref again. If
-the bind fails, unbind won't be called, and the clock stays enabled. For
-reference, see how imx-hdmi unprepare_disables its iahb/isfr clocks in
-the bind function's error path.
-
-> >> +	}
-> >> +
-> >> +	clk_prepare_enable(dsi->cfg_clk);
-> >> +	val = dsi_read(dsi, DSI_VERSION);
-> >> +	clk_disable_unprepare(dsi->cfg_clk);
-> >> +
-> >> +	dev_info(dev, "version number is 0x%08x\n", val);
-> >> +
-> >> +	ret = imx_mipi_dsi_register(drm, dsi);
-> >> +	if (ret)
-> >
-> > Same here.
-> 
-> You meant that the pllref_gate clock is left enabled above, right?
-
-Yes.
-
-> Regards,
-> Liu Ying
-> 
-> >
-> >> +		return ret;
-
-This return with an error leaves the pllref enabled.
-
-regards
-Philipp
+> ---
+>  drivers/mmc/host/sdhci-sirf.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+> index dd29d47..e458d18 100644
+> --- a/drivers/mmc/host/sdhci-sirf.c
+> +++ b/drivers/mmc/host/sdhci-sirf.c
+> @@ -15,7 +15,9 @@
+>  #include <linux/mmc/slot-gpio.h>
+>  #include "sdhci-pltfm.h"
+>
+> +#define SDHCI_CLK_DELAY_SETTING 0x4C
+>  #define SDHCI_SIRF_8BITBUS BIT(3)
+> +#define SIRF_TUNING_COUNT 128
+>
+>  struct sdhci_sirf_priv {
+>         struct clk *clk;
+> @@ -49,7 +51,76 @@ static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
+>         sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+>  }
+>
+> +static int sdhci_sirf_execute_tuning(struct sdhci_host *host, u32 opcode)
+> +{
+> +       int tuning_seq_cnt = 3;
+> +       u8 phase, tuned_phases[SIRF_TUNING_COUNT];
+> +       u8 tuned_phase_cnt = 0;
+> +       int rc, longest_range = 0;
+> +       int start = -1, end = 0, tuning_value = -1, range = 0;
+> +       u16 clock_setting;
+> +       struct mmc_host *mmc = host->mmc;
+> +
+> +       clock_setting = sdhci_readw(host, SDHCI_CLK_DELAY_SETTING);
+> +       clock_setting &= ~0x3fff;
+> +
+> +retry:
+> +       phase = 0;
+> +       do {
+> +               sdhci_writel(host,
+> +                       clock_setting | phase | (phase << 7) | (phase << 16),
+> +                       SDHCI_CLK_DELAY_SETTING);
+> +
+> +               if (!mmc_send_tuning(mmc->card)) {
+> +                       /* Tuning is successful at this tuning point */
+> +                       tuned_phases[tuned_phase_cnt++] = phase;
+> +                       dev_dbg(mmc_dev(mmc), "%s: Found good phase = %d\n",
+> +                                mmc_hostname(mmc), phase);
+> +                       if (start == -1)
+> +                               start = phase;
+> +                       end = phase;
+> +                       range++;
+> +                       if (phase == (SIRF_TUNING_COUNT - 1)
+> +                               && range > longest_range)
+> +                               tuning_value = (start + end) / 2;
+> +               } else {
+> +                       dev_dbg(mmc_dev(mmc), "%s: Found bad phase = %d\n",
+> +                                mmc_hostname(mmc), phase);
+> +                       if (range > longest_range) {
+> +                               tuning_value = (start + end) / 2;
+> +                               longest_range = range;
+> +                       }
+> +                       start = -1;
+> +                       end = range = 0;
+> +               }
+> +       } while (++phase < ARRAY_SIZE(tuned_phases));
+> +
+> +       if (tuned_phase_cnt && tuning_value > 0) {
+> +               /*
+> +                * Finally set the selected phase in delay
+> +                * line hw block.
+> +                */
+> +               phase = tuning_value;
+> +               sdhci_writel(host,
+> +                       clock_setting | phase | (phase << 7) | (phase << 16),
+> +                       SDHCI_CLK_DELAY_SETTING);
+> +
+> +               dev_dbg(mmc_dev(mmc), "%s: Setting the tuning phase to %d\n",
+> +                        mmc_hostname(mmc), phase);
+> +       } else {
+> +               if (--tuning_seq_cnt)
+> +                       goto retry;
+> +               /* Tuning failed */
+> +               dev_dbg(mmc_dev(mmc), "%s: No tuning point found\n",
+> +                      mmc_hostname(mmc));
+> +               rc = -EIO;
+> +       }
+> +
+> +       return rc;
+> +}
+> +
+>  static struct sdhci_ops sdhci_sirf_ops = {
+> +       .platform_execute_tuning = sdhci_sirf_execute_tuning,
+>         .set_clock = sdhci_set_clock,
+>         .get_max_clock  = sdhci_sirf_get_max_clk,
+>         .set_bus_width = sdhci_sirf_set_bus_width,
+> --
+> 2.2.0
+>
