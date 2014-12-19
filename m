@@ -1,125 +1,593 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Fri, 19 Dec 2014 15:46:23 +0800
-Subject: [PATCH RFC v2 00/14] Add support for i.MX MIPI DSI DRM driver
-In-Reply-To: <59cf2641.8c29.14a614058be.Coremail.andyshrk@163.com>
-References: <1418886696-11636-1-git-send-email-Ying.Liu@freescale.com>
- <59cf2641.8c29.14a614058be.Coremail.andyshrk@163.com>
-Message-ID: <5493D7CF.1020304@freescale.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 19 Dec 2014 08:44:57 +0100
+Subject: [PATCH 4/4] PM: Eliminate CONFIG_PM_RUNTIME
+In-Reply-To: <2635409.SWsBMlb9s4@vostro.rjw.lan>
+References: <472992175.g1ArEYGFPo@vostro.rjw.lan>
+ <2635409.SWsBMlb9s4@vostro.rjw.lan>
+Message-ID: <CAPDyKFqMFLdsiybZjN8Uf=H6P9e3-a04nfaEv6VbW7nbTXY14Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On 19 December 2014 at 03:03, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>
+> Having switched over all of the users of CONFIG_PM_RUNTIME to use
+> CONFIG_PM directly, turn the latter into a user-selectable option
+> and drop the former entirely from the tree.
+>
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-On 12/19/2014 02:33 PM, Andy Yan wrote:
-> Hi Liu Ying:
->
->   I foud Rockchip RK618 (a mfd function device with mipi dsi?lvds
-> transmitter?HDMI TX?and audio codec?and
-> controlled by the SOC from i2c ) have the same register layout with your
-> i.MX MIPI DSI?which means RK618 MIPI
-> DSI also have the Synopsys compatible DSI IP?So Would you please make
-> this drives more platform independent?
->
+I am impressed , in this short period of time we managed to remove all
+*PM_RUNTIME" configurations! Great work!
 
-I may try to place the Synopsys DesignWare MIPI DSI driver in the
-drm/bridge directory and make it as less platform-dependant as
-possible.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-I have no access to the Rockchip RK618 chip and it's reference menu.
-You probably may add the Rockchip part support later.
-
-Regards,
-Liu Ying
-
+> ---
+>  arch/arm/configs/ape6evm_defconfig         |    2 +-
+>  arch/arm/configs/armadillo800eva_defconfig |    2 +-
+>  arch/arm/configs/bcm_defconfig             |    2 +-
+>  arch/arm/configs/bockw_defconfig           |    2 +-
+>  arch/arm/configs/davinci_all_defconfig     |    2 +-
+>  arch/arm/configs/exynos_defconfig          |    2 +-
+>  arch/arm/configs/ezx_defconfig             |    2 +-
+>  arch/arm/configs/hisi_defconfig            |    2 +-
+>  arch/arm/configs/imote2_defconfig          |    2 +-
+>  arch/arm/configs/imx_v6_v7_defconfig       |    2 +-
+>  arch/arm/configs/keystone_defconfig        |    2 +-
+>  arch/arm/configs/kzm9g_defconfig           |    2 +-
+>  arch/arm/configs/lager_defconfig           |    2 +-
+>  arch/arm/configs/mackerel_defconfig        |    2 +-
+>  arch/arm/configs/marzen_defconfig          |    2 +-
+>  arch/arm/configs/omap1_defconfig           |    2 +-
+>  arch/arm/configs/prima2_defconfig          |    2 +-
+>  arch/arm/configs/sama5_defconfig           |    2 +-
+>  arch/arm/configs/shmobile_defconfig        |    2 +-
+>  arch/arm/configs/sunxi_defconfig           |    2 +-
+>  arch/arm/configs/tegra_defconfig           |    2 +-
+>  arch/arm/configs/u8500_defconfig           |    2 +-
+>  arch/arm/configs/vt8500_v6_v7_defconfig    |    2 +-
+>  arch/arm/mach-omap2/Kconfig                |    6 +++---
+>  arch/mips/configs/db1xxx_defconfig         |    2 +-
+>  arch/mips/configs/lemote2f_defconfig       |    2 +-
+>  arch/mips/configs/loongson3_defconfig      |    2 +-
+>  arch/mips/configs/nlm_xlp_defconfig        |    2 +-
+>  arch/mips/configs/nlm_xlr_defconfig        |    2 +-
+>  arch/powerpc/configs/ps3_defconfig         |    2 +-
+>  arch/sh/Kconfig                            |    2 +-
+>  arch/sh/configs/apsh4ad0a_defconfig        |    2 +-
+>  arch/sh/configs/sdk7786_defconfig          |    2 +-
+>  drivers/usb/host/isp1760-hcd.c             |    2 +-
+>  drivers/usb/host/oxu210hp-hcd.c            |    2 +-
+>  include/linux/devfreq.h                    |    2 +-
+>  kernel/power/Kconfig                       |   16 ++++++----------
+>  37 files changed, 44 insertions(+), 48 deletions(-)
 >
+> Index: linux-pm/arch/arm/configs/ape6evm_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/ape6evm_defconfig
+> +++ linux-pm/arch/arm/configs/ape6evm_defconfig
+> @@ -33,7 +33,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  CONFIG_BINFMT_MISC=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/armadillo800eva_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/armadillo800eva_defconfig
+> +++ linux-pm/arch/arm/configs/armadillo800eva_defconfig
+> @@ -43,7 +43,7 @@ CONFIG_KEXEC=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/bcm_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/bcm_defconfig
+> +++ linux-pm/arch/arm/configs/bcm_defconfig
+> @@ -39,7 +39,7 @@ CONFIG_CPU_IDLE=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_PACKET_DIAG=y
+> Index: linux-pm/arch/arm/configs/bockw_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/bockw_defconfig
+> +++ linux-pm/arch/arm/configs/bockw_defconfig
+> @@ -29,7 +29,7 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_VFP=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/davinci_all_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/davinci_all_defconfig
+> +++ linux-pm/arch/arm/configs/davinci_all_defconfig
+> @@ -49,7 +49,7 @@ CONFIG_CPU_FREQ_GOV_PERFORMANCE=m
+>  CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+>  CONFIG_CPU_FREQ_GOV_ONDEMAND=m
+>  CONFIG_CPU_IDLE=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/exynos_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/exynos_defconfig
+> +++ linux-pm/arch/arm/configs/exynos_defconfig
+> @@ -27,7 +27,7 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/ezx_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/ezx_defconfig
+> +++ linux-pm/arch/arm/configs/ezx_defconfig
+> @@ -39,7 +39,7 @@ CONFIG_BINFMT_AOUT=m
+>  CONFIG_BINFMT_MISC=m
+>  CONFIG_PM=y
+>  CONFIG_APM_EMULATION=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/hisi_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/hisi_defconfig
+> +++ linux-pm/arch/arm/configs/hisi_defconfig
+> @@ -18,7 +18,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_NEON=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/imote2_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/imote2_defconfig
+> +++ linux-pm/arch/arm/configs/imote2_defconfig
+> @@ -31,7 +31,7 @@ CONFIG_BINFMT_AOUT=m
+>  CONFIG_BINFMT_MISC=m
+>  CONFIG_PM=y
+>  CONFIG_APM_EMULATION=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/imx_v6_v7_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/imx_v6_v7_defconfig
+> +++ linux-pm/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -54,7 +54,7 @@ CONFIG_ARM_IMX6Q_CPUFREQ=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  CONFIG_BINFMT_MISC=m
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+>  CONFIG_PM_TEST_SUSPEND=y
+>  CONFIG_NET=y
+> Index: linux-pm/arch/arm/configs/keystone_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/keystone_defconfig
+> +++ linux-pm/arch/arm/configs/keystone_defconfig
+> @@ -30,7 +30,7 @@ CONFIG_HIGHMEM=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_SUSPEND is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/kzm9g_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/kzm9g_defconfig
+> +++ linux-pm/arch/arm/configs/kzm9g_defconfig
+> @@ -43,7 +43,7 @@ CONFIG_KEXEC=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/lager_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/lager_defconfig
+> +++ linux-pm/arch/arm/configs/lager_defconfig
+> @@ -37,7 +37,7 @@ CONFIG_AUTO_ZRELADDR=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/mackerel_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/mackerel_defconfig
+> +++ linux-pm/arch/arm/configs/mackerel_defconfig
+> @@ -28,7 +28,7 @@ CONFIG_KEXEC=y
+>  CONFIG_VFP=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+>  CONFIG_PM=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/marzen_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/marzen_defconfig
+> +++ linux-pm/arch/arm/configs/marzen_defconfig
+> @@ -33,7 +33,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_VFP=y
+>  CONFIG_KEXEC=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/omap1_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/omap1_defconfig
+> +++ linux-pm/arch/arm/configs/omap1_defconfig
+> @@ -63,7 +63,7 @@ CONFIG_FPE_NWFPE=y
+>  CONFIG_BINFMT_MISC=y
+>  CONFIG_PM=y
+>  # CONFIG_SUSPEND is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/prima2_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/prima2_defconfig
+> +++ linux-pm/arch/arm/configs/prima2_defconfig
+> @@ -18,7 +18,7 @@ CONFIG_PREEMPT=y
+>  CONFIG_AEABI=y
+>  CONFIG_KEXEC=y
+>  CONFIG_BINFMT_MISC=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_BLK_DEV_RAM=y
+> Index: linux-pm/arch/arm/configs/sama5_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/sama5_defconfig
+> +++ linux-pm/arch/arm/configs/sama5_defconfig
+> @@ -32,7 +32,7 @@ CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  CONFIG_KERNEL_MODE_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+>  CONFIG_PM_ADVANCED_DEBUG=y
+>  CONFIG_NET=y
+> Index: linux-pm/arch/arm/configs/shmobile_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/shmobile_defconfig
+> +++ linux-pm/arch/arm/configs/shmobile_defconfig
+> @@ -39,7 +39,7 @@ CONFIG_KEXEC=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/sunxi_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/sunxi_defconfig
+> +++ linux-pm/arch/arm/configs/sunxi_defconfig
+> @@ -11,7 +11,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/tegra_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/tegra_defconfig
+> +++ linux-pm/arch/arm/configs/tegra_defconfig
+> @@ -46,7 +46,7 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/u8500_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/u8500_defconfig
+> +++ linux-pm/arch/arm/configs/u8500_defconfig
+> @@ -25,7 +25,7 @@ CONFIG_CPU_IDLE=y
+>  CONFIG_ARM_U8500_CPUIDLE=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/arm/configs/vt8500_v6_v7_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/configs/vt8500_v6_v7_defconfig
+> +++ linux-pm/arch/arm/configs/vt8500_v6_v7_defconfig
+> @@ -16,7 +16,7 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_UNIX=y
+>  CONFIG_INET=y
+> Index: linux-pm/arch/mips/configs/db1xxx_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/mips/configs/db1xxx_defconfig
+> +++ linux-pm/arch/mips/configs/db1xxx_defconfig
+> @@ -36,7 +36,7 @@ CONFIG_PCI=y
+>  CONFIG_PCI_REALLOC_ENABLE_AUTO=y
+>  CONFIG_PCCARD=y
+>  CONFIG_PCMCIA_ALCHEMY_DEVBOARD=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_PACKET_DIAG=y
+> Index: linux-pm/arch/mips/configs/lemote2f_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/mips/configs/lemote2f_defconfig
+> +++ linux-pm/arch/mips/configs/lemote2f_defconfig
+> @@ -37,7 +37,7 @@ CONFIG_MIPS32_N32=y
+>  CONFIG_PM=y
+>  CONFIG_HIBERNATION=y
+>  CONFIG_PM_STD_PARTITION="/dev/hda3"
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_CPU_FREQ=y
+>  CONFIG_CPU_FREQ_DEBUG=y
+>  CONFIG_CPU_FREQ_STAT=m
+> Index: linux-pm/arch/mips/configs/loongson3_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/mips/configs/loongson3_defconfig
+> +++ linux-pm/arch/mips/configs/loongson3_defconfig
+> @@ -58,7 +58,7 @@ CONFIG_BINFMT_MISC=m
+>  CONFIG_MIPS32_COMPAT=y
+>  CONFIG_MIPS32_O32=y
+>  CONFIG_MIPS32_N32=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> Index: linux-pm/arch/mips/configs/nlm_xlp_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/mips/configs/nlm_xlp_defconfig
+> +++ linux-pm/arch/mips/configs/nlm_xlp_defconfig
+> @@ -61,7 +61,7 @@ CONFIG_BINFMT_MISC=y
+>  CONFIG_MIPS32_COMPAT=y
+>  CONFIG_MIPS32_O32=y
+>  CONFIG_MIPS32_N32=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+> Index: linux-pm/arch/mips/configs/nlm_xlr_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/mips/configs/nlm_xlr_defconfig
+> +++ linux-pm/arch/mips/configs/nlm_xlr_defconfig
+> @@ -41,7 +41,7 @@ CONFIG_PCI=y
+>  CONFIG_PCI_MSI=y
+>  CONFIG_PCI_DEBUG=y
+>  CONFIG_BINFMT_MISC=m
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+> Index: linux-pm/arch/powerpc/configs/ps3_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/powerpc/configs/ps3_defconfig
+> +++ linux-pm/arch/powerpc/configs/ps3_defconfig
+> @@ -36,7 +36,7 @@ CONFIG_KEXEC=y
+>  CONFIG_SCHED_SMT=y
+>  CONFIG_CMDLINE_BOOL=y
+>  CONFIG_CMDLINE=""
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+>  # CONFIG_SECCOMP is not set
+>  # CONFIG_PCI is not set
+> Index: linux-pm/arch/sh/configs/apsh4ad0a_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/sh/configs/apsh4ad0a_defconfig
+> +++ linux-pm/arch/sh/configs/apsh4ad0a_defconfig
+> @@ -47,7 +47,7 @@ CONFIG_PREEMPT=y
+>  CONFIG_BINFMT_MISC=y
+>  CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+> Index: linux-pm/arch/sh/configs/sdk7786_defconfig
+> ===================================================================
+> --- linux-pm.orig/arch/sh/configs/sdk7786_defconfig
+> +++ linux-pm/arch/sh/configs/sdk7786_defconfig
+> @@ -82,7 +82,7 @@ CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS=y
+>  CONFIG_BINFMT_MISC=y
+>  CONFIG_PM=y
+>  CONFIG_PM_DEBUG=y
+> -CONFIG_PM_RUNTIME=y
+> +CONFIG_PM=y
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+> Index: linux-pm/arch/arm/mach-omap2/Kconfig
+> ===================================================================
+> --- linux-pm.orig/arch/arm/mach-omap2/Kconfig
+> +++ linux-pm/arch/arm/mach-omap2/Kconfig
+> @@ -15,7 +15,7 @@ config ARCH_OMAP3
+>         select ARM_CPU_SUSPEND if PM
+>         select OMAP_INTERCONNECT
+>         select PM_OPP if PM
+> -       select PM_RUNTIME if CPU_IDLE
+> +       select PM if CPU_IDLE
+>         select SOC_HAS_OMAP2_SDRC
 >
+>  config ARCH_OMAP4
+> @@ -32,7 +32,7 @@ config ARCH_OMAP4
+>         select PL310_ERRATA_588369 if CACHE_L2X0
+>         select PL310_ERRATA_727915 if CACHE_L2X0
+>         select PM_OPP if PM
+> -       select PM_RUNTIME if CPU_IDLE
+> +       select PM if CPU_IDLE
+>         select ARM_ERRATA_754322
+>         select ARM_ERRATA_775420
 >
-> At 2014-12-18 15:11:22, "Liu Ying" <Ying.Liu@freescale.com> wrote:
->>Hi,
->>
->>This series addressed almost all comments from Thierry Redding and Russell
->>on v1.
->>
->>This series adds support for i.MX MIPI DSI DRM driver.
->>Currently, the MIPI DSI driver only supports the burst with sync pulse mode.
->>
->>This series also includes a DRM panel driver for the Truly TFT480800-16-E panel
->>which is driven by the Himax HX8369A driver IC.  The driver IC data sheet could
->>be found at [1].  As mentioned by the data sheet, the driver IC supports several
->>interface modes.  Currently, the DRM panel driver only supports the MIPI DSI video
->>mode.  New interface modes could be added later(perhaps, just like the way the DRM
->>simple panel driver supports both MIPI DSI interface panels and simple(parallel)
->>interface panels).
->>
->>The MIPI DSI feature is tested on i.MX6Q SabreSD board and i.MX6DL SabreSD board.
->>The MIPI DSI display could be enabled directly on i.MX6Q SabreSD board after
->>applying this series, because the 26.4MHz pixel clock the panel requires could be
->>derived from the IPU HSP clock(264MHz) with an integer divider.
->>On i.MX6DL SabreSD board, we need to manually disable the LVDS and HDMI displays in
->>the device tree blob, since the i.MX6DL IPU HSP clock is 198MHz at present, which
->>makes the pixel clock share the PLL5 video clock source with the LVDS and HDMI,
->>thus, the panel cannot get the pixel clock rate it wants.
->>
->>Patch 01/15 is needed to get a precise pixel clock rate(26.4MHz) from the PLL5 video
->>clock.  If we don't have this patch, the pixel clock rate is about 20MHz, which
->>causes a horitonal shift on the display image.
->>
->>This series can be applied on the drm-next branch.
->>
->>[1] http://www.allshore.com/pdf/Himax_HX8369-A.pdf
->>
->>Liu Ying (14):
->>  clk: divider: Correct parent clk round rate if no bestdiv is normally
->>    found
->>  of: Add vendor prefix for Himax Technologies Inc.
->>  of: Add vendor prefix for Truly Semiconductors Limited
->>  ARM: imx6q: Add GPR3 MIPI muxing control register field shift bits
->>    definition
->>  ARM: imx6q: clk: Add the video_27m clock
->>  ARM: dts: imx6qdl: Move existing MIPI DSI ports into a new 'ports'
->>    node
->>  drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
->>  drm: imx: Add MIPI DSI host controller driver
->>  drm: panel: Add support for Himax HX8369A MIPI DSI panel
->>  ARM: dtsi: imx6qdl: Add support for MIPI DSI host controller
->>  ARM: dts: imx6qdl-sabresd: Add support for TRULY TFT480800-16-E MIPI
->>    DSI panel
->>  ARM: imx_v6_v7_defconfig: Cleanup for imx drm being moved out of
->>    staging
->>  ARM: imx_v6_v7_defconfig: Add support for MIPI DSI host controller
->>  ARM: imx_v6_v7_defconfig: Add support for Himax HX8369A panel
->>
->> .../devicetree/bindings/drm/imx/mipi_dsi.txt       |   78 ++
->> .../devicetree/bindings/panel/himax,hx8369a.txt    |   41 +
->> .../devicetree/bindings/vendor-prefixes.txt        |    2 +
->> arch/arm/boot/dts/imx6q.dtsi                       |   20 +-
->> arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   20 +
->> arch/arm/boot/dts/imx6qdl.dtsi                     |   30 +-
->> arch/arm/configs/imx_v6_v7_defconfig               |   17 +-
->> arch/arm/mach-imx/clk-imx6q.c                      |    1 +
->> drivers/clk/clk-divider.c                          |    3 +-
->> drivers/gpu/drm/imx/Kconfig                        |    6 +
->> drivers/gpu/drm/imx/Makefile                       |    1 +
->> drivers/gpu/drm/imx/imx-mipi-dsi.c                 | 1056 ++++++++++++++++++++
->> drivers/gpu/drm/panel/Kconfig                      |    5 +
->> drivers/gpu/drm/panel/Makefile                     |    1 +
->> drivers/gpu/drm/panel/panel-himax-hx8369a.c        |  573 +++++++++++
->> include/drm/drm_mipi_dsi.h                         |   14 +
->> include/dt-bindings/clock/imx6qdl-clock.h          |    3 +-
->> include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |    1 +
->> 18 files changed, 1844 insertions(+), 28 deletions(-)
->> create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
->> create mode 100644 Documentation/devicetree/bindings/panel/himax,hx8369a.txt
->> create mode 100644 drivers/gpu/drm/imx/imx-mipi-dsi.c
->> create mode 100644 drivers/gpu/drm/panel/panel-himax-hx8369a.c
->>
->>--
->>2.1.0
->>
->>_______________________________________________
->>dri-devel mailing list
->>dri-devel at lists.freedesktop.org
->>http://lists.freedesktop.org/mailman/listinfo/dri-devel
+> @@ -103,7 +103,7 @@ config ARCH_OMAP2PLUS_TYPICAL
+>         select I2C_OMAP
+>         select MENELAUS if ARCH_OMAP2
+>         select NEON if CPU_V7
+> -       select PM_RUNTIME
+> +       select PM
+>         select REGULATOR
+>         select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+>         select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+> Index: linux-pm/arch/sh/Kconfig
+> ===================================================================
+> --- linux-pm.orig/arch/sh/Kconfig
+> +++ linux-pm/arch/sh/Kconfig
+> @@ -223,7 +223,7 @@ config CPU_SHX3
+>  config ARCH_SHMOBILE
+>         bool
+>         select ARCH_SUSPEND_POSSIBLE
+> -       select PM_RUNTIME
+> +       select PM
 >
+>  config CPU_HAS_PMU
+>         depends on CPU_SH4 || CPU_SH4A
+> Index: linux-pm/drivers/usb/host/isp1760-hcd.c
+> ===================================================================
+> --- linux-pm.orig/drivers/usb/host/isp1760-hcd.c
+> +++ linux-pm/drivers/usb/host/isp1760-hcd.c
+> @@ -1739,7 +1739,7 @@ static int isp1760_hub_status_data(struc
+>         int retval = 1;
+>         unsigned long flags;
 >
+> -       /* if !PM_RUNTIME, root hub timers won't get shut down ... */
+> +       /* if !PM, root hub timers won't get shut down ... */
+>         if (!HC_IS_RUNNING(hcd->state))
+>                 return 0;
+>
+> Index: linux-pm/drivers/usb/host/oxu210hp-hcd.c
+> ===================================================================
+> --- linux-pm.orig/drivers/usb/host/oxu210hp-hcd.c
+> +++ linux-pm/drivers/usb/host/oxu210hp-hcd.c
+> @@ -3087,7 +3087,7 @@ static int oxu_hub_status_data(struct us
+>         int ports, i, retval = 1;
+>         unsigned long flags;
+>
+> -       /* if !PM_RUNTIME, root hub timers won't get shut down ... */
+> +       /* if !PM, root hub timers won't get shut down ... */
+>         if (!HC_IS_RUNNING(hcd->state))
+>                 return 0;
+>
+> Index: linux-pm/include/linux/devfreq.h
+> ===================================================================
+> --- linux-pm.orig/include/linux/devfreq.h
+> +++ linux-pm/include/linux/devfreq.h
+> @@ -188,7 +188,7 @@ extern struct devfreq *devm_devfreq_add_
+>  extern void devm_devfreq_remove_device(struct device *dev,
+>                                   struct devfreq *devfreq);
+>
+> -/* Supposed to be called by PM_SLEEP/PM_RUNTIME callbacks */
+> +/* Supposed to be called by PM callbacks */
+>  extern int devfreq_suspend_device(struct devfreq *devfreq);
+>  extern int devfreq_resume_device(struct devfreq *devfreq);
+>
+> Index: linux-pm/kernel/power/Kconfig
+> ===================================================================
+> --- linux-pm.orig/kernel/power/Kconfig
+> +++ linux-pm/kernel/power/Kconfig
+> @@ -94,7 +94,7 @@ config PM_STD_PARTITION
+>  config PM_SLEEP
+>         def_bool y
+>         depends on SUSPEND || HIBERNATE_CALLBACKS
+> -       select PM_RUNTIME
+> +       select PM
+>
+>  config PM_SLEEP_SMP
+>         def_bool y
+> @@ -130,23 +130,19 @@ config PM_WAKELOCKS_GC
+>         depends on PM_WAKELOCKS
+>         default y
+>
+> -config PM_RUNTIME
+> -       bool "Run-time PM core functionality"
+> +config PM
+> +       bool "Device power management core functionality"
+>         ---help---
+>           Enable functionality allowing I/O devices to be put into energy-saving
+> -         (low power) states at run time (or autosuspended) after a specified
+> -         period of inactivity and woken up in response to a hardware-generated
+> +         (low power) states, for example after a specified period of inactivity
+> +         (autosuspended), and woken up in response to a hardware-generated
+>           wake-up event or a driver's request.
+>
+>           Hardware support is generally required for this functionality to work
+>           and the bus type drivers of the buses the devices are on are
+> -         responsible for the actual handling of the autosuspend requests and
+> +         responsible for the actual handling of device suspend requests and
+>           wake-up events.
+>
+> -config PM
+> -       def_bool y
+> -       depends on PM_SLEEP || PM_RUNTIME
+> -
+>  config PM_DEBUG
+>         bool "Power Management Debug Support"
+>         depends on PM
 >
