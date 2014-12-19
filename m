@@ -1,21 +1,22 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 19 Dec 2014 11:56:48 -0800
-Subject: [PATCH 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <549481C5.7050802@broadcom.com>
-References: <549481C5.7050802@broadcom.com>
-Message-ID: <3710249.R7buLtFklK@dtor-glaptop>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 19 Dec 2014 15:55:50 -0500
+Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15 SoC)
+ EVMs
+Message-ID: <549490D6.3090804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 19, 2014 11:51:33 AM Jonathan Richardson wrote:
-> Thanks Joe. I'll send out a new patch set with your suggestions/fixes
-> shortly.
+Hi,
 
-You can also drop the remove() code since we clear drvdata automatically and 
-input device is managed so does not need to be unregistered explicitly.
+I have pulled the latest master from 
+git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and 
+tried booting on keystone k2hk and k2e EVM. The boot hangs with 
+following log. Has anyone seen this? Keystone is an ARM v7 cortex A15 
+SMP platform. I am assuming master branch is broken for ARM v7 and 
+someone is working to address this. v3.18 booted up fine on my EVM.
 
-Thanks.
+Any idea?
 
 -- 
-Dmitry
+Murali Karicheri
+Linux Kernel, Texas Instruments
