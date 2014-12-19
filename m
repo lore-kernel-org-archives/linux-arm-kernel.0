@@ -1,68 +1,63 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Dec 2014 09:39:33 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add Audio DMAC,
- PWM and Thermal clocks to device tree
-Message-ID: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
+From: minchan@kernel.org (Minchan Kim)
+Date: Fri, 19 Dec 2014 10:04:52 +0900
+Subject: [RFC] MADV_FREE doesn't work when doesn't have swap partition
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103EDAF89E14C@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+ <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
+ <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
+ <20141208114601.GA28846@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
+ <CALYGNiMEytHuND37f+hNdMKqCPzN0k_uha6CaeL_fyzrj-obNQ@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B31408@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E14C@CNBJMBX05.corpusers.net>
+Message-ID: <20141219010452.GC1538@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is based on the MSTP5 clocks in the r8a7791 device tree.
-The main difference being that the r8a7794 does not have an Audio DMAC1
-clock.
+On Thu, Dec 18, 2014 at 11:50:01AM +0800, Wang, Yalin wrote:
+> I notice this commit:
+> mm: support madvise(MADV_FREE),
+> 
+> it can free clean anonymous pages directly,
+> doesn't need pageout to swap partition,
+> 
+> but I found it doesn't work on my platform,
+> which don't enable any swap partitions.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Current implementation, if there is no empty slot in swap, it does
+instant free instead of delayed free. Look at madvise_vma.
 
----
-Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
+> 
+> I make a change for this.
+> Just to explain my issue clearly,
+> Do we need some other checks to still scan anonymous pages even
+> Don't have swap partition but have clean anonymous pages?
 
-N.B: The R-Car Gen2 v1.8.0 BSP uses zs_clk whereas this patch uses hp_clk
-     as the parent clock for the Audio DMAC clock.
+There is a few places we should consider if you want to scan anonymous page
+withotu swap. Refer 69c854817566 and 74e3f3c3391d.
 
-     In that regard this patch follows the pattern used in mainline for the
-     r8a7790 and r8a7791 SoCs.
+However, it's not simple at the moment. If we reenable anonymous scan without swap,
+it would make much regress of reclaim. So my direction is move normal anonymos pages
+into unevictable LRU list because they're real unevictable without swap and
+put delayed freeing pages into anon LRU list and age them.
 
-     The BSP's parent clock is consistent for the r8a7790, r8a7791, r8a7793
-     and r8a7794 SoCs.
+> ---
+> diff --git a/mm/vmscan.c b/mm/vmscan.c
+> index 5e8772b..8258f3a 100644
+> --- a/mm/vmscan.c
+> +++ b/mm/vmscan.c
+> @@ -1941,7 +1941,7 @@ static void get_scan_count(struct lruvec *lruvec, int swappiness,
+>                 force_scan = true;
+> 
+>         /* If we have no swap space, do not bother scanning anon pages. */
+> -       if (!sc->may_swap || (get_nr_swap_pages() <= 0)) {
+> +       if (!sc->may_swap) {
+>                 scan_balance = SCAN_FILE;
+>                 goto out;
+>         }
 
-     Support for the r8a7793 SoC is not present in mainline.
----
- arch/arm/boot/dts/r8a7794.dtsi            | 11 +++++++++++
- include/dt-bindings/clock/r8a7794-clock.h |  1 +
- 2 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 063bf56..7a03166 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -530,6 +530,17 @@
- 			        "sdhi2", "sdhi1", "sdhi0",
- 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
- 		};
-+		mstp5_clks: mstp5_clks at e6150144 {
-+			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
-+			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				R8A7794_CLK_AUDIO_DMAC0
-+				R8A7794_CLK_THERMAL R8A7794_CLK_PWM
-+			>;
-+			clock-output-names = "audmac0", "thermal", "pwm";
-+		};
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index d5cfe62..58fa44d 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -61,6 +61,7 @@
- #define R8A7794_CLK_USBDMAC1		31
- 
- /* MSTP5 */
-+#define R8A7794_CLK_AUDIO_DMAC0		2
- #define R8A7794_CLK_THERMAL		22
- #define R8A7794_CLK_PWM			23
- 
 -- 
-2.1.3
+Kind regards,
+Minchan Kim
