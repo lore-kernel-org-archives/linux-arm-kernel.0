@@ -1,248 +1,48 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 19 Dec 2014 14:55:30 +0100
-Subject: [PATCH v2 10/16] ASoC: samsung: i2s: Protect more registers with a
- spinlock
+Date: Fri, 19 Dec 2014 14:55:31 +0100
+Subject: [PATCH v2 11/16] ASoC: samsung: odroidx2: Handle I2S CDCLK clock
+ conditionally
 In-Reply-To: <1418997336-17777-1-git-send-email-s.nawrocki@samsung.com>
 References: <1418997336-17777-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1418997336-17777-11-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1418997336-17777-12-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure the I2SMOD, I2SPSR registers, which are also exposed through
-clk API are only accessed with the i2s->spinlock spinlock held.
+In order to support old DTs we check the codec device node if it
+contains "clocks" property and only if it doesn't (which indicates
+an old DT) we proceed with enabling the CDCLK clock by means of
+the set_sysclk() callback.  For new DTs which use the common clock
+bindings for CDCLK that clock is supposed to be handled outside
+the sound machine driver.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- sound/soc/samsung/i2s.c |   81 +++++++++++++++++++++++++++++------------------
- 1 file changed, 51 insertions(+), 30 deletions(-)
+ sound/soc/samsung/odroidx2_max98090.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index b5b6b1e..49ba623 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -472,17 +472,22 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- {
- 	struct i2s_dai *i2s = to_info(dai);
- 	struct i2s_dai *other = get_other_dai(i2s);
--	u32 mod = readl(i2s->addr + I2SMOD);
- 	const struct samsung_i2s_variant_regs *i2s_regs = i2s->variant_regs;
- 	unsigned int cdcon_mask = 1 << i2s_regs->cdclkcon_off;
- 	unsigned int rsrc_mask = 1 << i2s_regs->rclksrc_off;
-+	u32 mod, mask, val = 0;
+diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
+index d7640e7..5a87794 100644
+--- a/sound/soc/samsung/odroidx2_max98090.c
++++ b/sound/soc/samsung/odroidx2_max98090.c
+@@ -21,6 +21,8 @@ struct odroidx2_drv_data {
+ /* The I2S CDCLK output clock frequency for the MAX98090 codec */
+ #define MAX98090_MCLK 19200000
+ 
++static struct snd_soc_dai_link odroidx2_dai[];
 +
-+	spin_lock(i2s->lock);
-+	mod = readl(i2s->addr + I2SMOD);
-+	spin_unlock(i2s->lock);
- 
- 	switch (clk_id) {
- 	case SAMSUNG_I2S_OPCLK:
--		mod &= ~MOD_OPCLK_MASK;
--		mod |= dir;
-+		mask = MOD_OPCLK_MASK;
-+		val = dir;
- 		break;
- 	case SAMSUNG_I2S_CDCLK:
-+		mask = 1 << i2s_regs->cdclkcon_off;
- 		/* Shouldn't matter in GATING(CLOCK_IN) mode */
- 		if (dir == SND_SOC_CLOCK_IN)
- 			rfs = 0;
-@@ -499,15 +504,15 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 		}
- 
- 		if (dir == SND_SOC_CLOCK_IN)
--			mod |= 1 << i2s_regs->cdclkcon_off;
--		else
--			mod &= ~(1 << i2s_regs->cdclkcon_off);
-+			val = 1 << i2s_regs->cdclkcon_off;
- 
- 		i2s->rfs = rfs;
- 		break;
- 
- 	case SAMSUNG_I2S_RCLKSRC_0: /* clock corrsponding to IISMOD[10] := 0 */
- 	case SAMSUNG_I2S_RCLKSRC_1: /* clock corrsponding to IISMOD[10] := 1 */
-+		mask = 1 << i2s_regs->rclksrc_off;
-+
- 		if ((i2s->quirks & QUIRK_NO_MUXPSR)
- 				|| (clk_id == SAMSUNG_I2S_RCLKSRC_0))
- 			clk_id = 0;
-@@ -557,18 +562,19 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
- 			return 0;
- 		}
- 
--		if (clk_id == 0)
--			mod &= ~(1 << i2s_regs->rclksrc_off);
--		else
--			mod |= 1 << i2s_regs->rclksrc_off;
--
-+		if (clk_id == 1)
-+			val = 1 << i2s_regs->rclksrc_off;
- 		break;
- 	default:
- 		dev_err(&i2s->pdev->dev, "We don't serve that!\n");
- 		return -EINVAL;
- 	}
- 
-+	spin_lock(i2s->lock);
-+	mod = readl(i2s->addr + I2SMOD);
-+	mod = (mod & ~mask) | val;
- 	writel(mod, i2s->addr + I2SMOD);
-+	spin_unlock(i2s->lock);
- 
- 	return 0;
- }
-@@ -577,9 +583,8 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
- 	unsigned int fmt)
+ static int odroidx2_late_probe(struct snd_soc_card *card)
  {
- 	struct i2s_dai *i2s = to_info(dai);
--	u32 mod = readl(i2s->addr + I2SMOD);
- 	int lrp_shift, sdf_shift, sdf_mask, lrp_rlow, mod_slave;
--	u32 tmp = 0;
-+	u32 mod, tmp = 0;
+ 	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
+@@ -29,7 +31,9 @@ static int odroidx2_late_probe(struct snd_soc_card *card)
  
- 	lrp_shift = i2s->variant_regs->lrp_off;
- 	sdf_shift = i2s->variant_regs->sdf_off;
-@@ -639,12 +644,15 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
- 		return -EINVAL;
- 	}
- 
-+	spin_lock(i2s->lock);
-+	mod = readl(i2s->addr + I2SMOD);
- 	/*
- 	 * Don't change the I2S mode if any controller is active on this
- 	 * channel.
- 	 */
- 	if (any_active(i2s) &&
- 		((mod & (sdf_mask | lrp_rlow | mod_slave)) != tmp)) {
-+		spin_unlock(i2s->lock);
- 		dev_err(&i2s->pdev->dev,
- 				"%s:%d Other DAI busy\n", __func__, __LINE__);
- 		return -EAGAIN;
-@@ -653,6 +661,7 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
- 	mod &= ~(sdf_mask | lrp_rlow | mod_slave);
- 	mod |= tmp;
- 	writel(mod, i2s->addr + I2SMOD);
-+	spin_unlock(i2s->lock);
- 
- 	return 0;
- }
-@@ -661,16 +670,16 @@ static int i2s_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
- {
- 	struct i2s_dai *i2s = to_info(dai);
--	u32 mod = readl(i2s->addr + I2SMOD);
-+	u32 mod, mask = 0, val = 0;
- 
- 	if (!is_secondary(i2s))
--		mod &= ~(MOD_DC2_EN | MOD_DC1_EN);
-+		mask |= (MOD_DC2_EN | MOD_DC1_EN);
- 
- 	switch (params_channels(params)) {
- 	case 6:
--		mod |= MOD_DC2_EN;
-+		val |= MOD_DC2_EN;
- 	case 4:
--		mod |= MOD_DC1_EN;
-+		val |= MOD_DC1_EN;
- 		break;
- 	case 2:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-@@ -692,44 +701,49 @@ static int i2s_hw_params(struct snd_pcm_substream *substream,
- 	}
- 
- 	if (is_secondary(i2s))
--		mod &= ~MOD_BLCS_MASK;
-+		mask |= MOD_BLCS_MASK;
- 	else
--		mod &= ~MOD_BLCP_MASK;
-+		mask |= MOD_BLCP_MASK;
- 
- 	if (is_manager(i2s))
--		mod &= ~MOD_BLC_MASK;
-+		mask |= MOD_BLC_MASK;
- 
- 	switch (params_width(params)) {
- 	case 8:
- 		if (is_secondary(i2s))
--			mod |= MOD_BLCS_8BIT;
-+			val |= MOD_BLCS_8BIT;
- 		else
--			mod |= MOD_BLCP_8BIT;
-+			val |= MOD_BLCP_8BIT;
- 		if (is_manager(i2s))
--			mod |= MOD_BLC_8BIT;
-+			val |= MOD_BLC_8BIT;
- 		break;
- 	case 16:
- 		if (is_secondary(i2s))
--			mod |= MOD_BLCS_16BIT;
-+			val |= MOD_BLCS_16BIT;
- 		else
--			mod |= MOD_BLCP_16BIT;
-+			val |= MOD_BLCP_16BIT;
- 		if (is_manager(i2s))
--			mod |= MOD_BLC_16BIT;
-+			val |= MOD_BLC_16BIT;
- 		break;
- 	case 24:
- 		if (is_secondary(i2s))
--			mod |= MOD_BLCS_24BIT;
-+			val |= MOD_BLCS_24BIT;
- 		else
--			mod |= MOD_BLCP_24BIT;
-+			val |= MOD_BLCP_24BIT;
- 		if (is_manager(i2s))
--			mod |= MOD_BLC_24BIT;
-+			val |= MOD_BLC_24BIT;
- 		break;
- 	default:
- 		dev_err(&i2s->pdev->dev, "Format(%d) not supported\n",
- 				params_format(params));
- 		return -EINVAL;
- 	}
+ 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
+ 						SND_SOC_CLOCK_IN);
+-	if (ret < 0)
 +
-+	spin_lock(i2s->lock);
-+	mod = readl(i2s->addr + I2SMOD);
-+	mod = (mod & ~mask) | val;
- 	writel(mod, i2s->addr + I2SMOD);
-+	spin_unlock(i2s->lock);
++	if (ret < 0 || of_find_property(odroidx2_dai[0].codec_of_node,
++					"clocks", NULL))
+ 		return ret;
  
- 	samsung_asoc_init_dma_data(dai, &i2s->dma_playback, &i2s->dma_capture);
- 
-@@ -979,6 +993,7 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
- {
- 	struct i2s_dai *i2s = to_info(dai);
- 	struct i2s_dai *other = get_other_dai(i2s);
-+	unsigned long flags;
- 
- 	if (is_secondary(i2s)) { /* If this is probe on the secondary DAI */
- 		samsung_asoc_init_dma_data(dai, &other->sec_dai->dma_playback,
-@@ -999,11 +1014,14 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
- 	i2s->rfs = 0;
- 	i2s->bfs = 0;
- 	i2s->rclk_srcrate = 0;
-+
-+	spin_lock_irqsave(i2s->lock, flags);
- 	i2s_txctrl(i2s, 0);
- 	i2s_rxctrl(i2s, 0);
- 	i2s_fifo(i2s, FIC_TXFLUSH);
- 	i2s_fifo(other, FIC_TXFLUSH);
- 	i2s_fifo(i2s, FIC_RXFLUSH);
-+	spin_unlock_irqrestore(i2s->lock, flags);
- 
- 	/* Gate CDCLK by default */
- 	if (!is_opened(other))
-@@ -1018,8 +1036,11 @@ static int samsung_i2s_dai_remove(struct snd_soc_dai *dai)
- 	struct i2s_dai *i2s = snd_soc_dai_get_drvdata(dai);
- 
- 	if (!is_secondary(i2s)) {
--		if (i2s->quirks & QUIRK_NEED_RSTCLR)
-+		if (i2s->quirks & QUIRK_NEED_RSTCLR) {
-+			spin_lock(i2s->lock);
- 			writel(0, i2s->addr + I2SCON);
-+			spin_unlock(i2s->lock);
-+		}
- 	}
- 
- 	return 0;
+ 	/* Set the cpu DAI configuration in order to use CDCLK */
 -- 
 1.7.9.5
