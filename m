@@ -1,15 +1,15 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Dec 2014 19:25:58 +0100
-Subject: [PATCH v2 09/13] ARM: dts: sun6i: Add ir node
-In-Reply-To: <1418836704-15689-10-git-send-email-hdegoede@redhat.com>
+Date: Fri, 19 Dec 2014 19:25:31 +0100
+Subject: [PATCH v2 08/13] ARM: dts: sun6i: Add ir_clk node
+In-Reply-To: <1418836704-15689-9-git-send-email-hdegoede@redhat.com>
 References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-10-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141219182558.GW4820@lukather>
+ <1418836704-15689-9-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141219182531.GV4820@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 06:18:20PM +0100, Hans de Goede wrote:
-> Add a node for the ir receiver found on the A31.
+On Wed, Dec 17, 2014 at 06:18:19PM +0100, Hans de Goede wrote:
+> Add an ir_clk sub-node to the prcm node.
 > 
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
@@ -27,4 +27,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/04d2e66c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/44dc3b7e/attachment-0001.sig>
