@@ -1,88 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 19 Dec 2014 10:50:00 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <97C706D6-765B-446A-8180-600F5FB6C68B@holtmann.org>
-References: <20141213223727.GA13894@amd>
- <97C706D6-765B-446A-8180-600F5FB6C68B@holtmann.org>
-Message-ID: <20141219095000.GA24703@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Dec 2014 09:35:26 +0000
+Subject: Help on kvm_tlb_flush_vmid_ipa usage
+In-Reply-To: <5493314C.8010400@samsung.com>
+References: <54932A97.3060103@samsung.com> <54932D1F.5060209@arm.com>
+ <5493314C.8010400@samsung.com>
+Message-ID: <5493F15E.1030403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> And you want to set the QUIRK_INVALID_BADDR. At least you want to do that in the final submission.
+On 18/12/14 19:55, Mario Smarduch wrote:
+> On 12/18/2014 11:38 AM, Marc Zyngier wrote:
+>> On 18/12/14 19:27, Mario Smarduch wrote:
+>>> When this function is called IPA address is used. Looking at the HYP
+>>> implementation it uses the IPA directly in tlbi instructions. But
+>>> reading the TLB maintnance instruction syntax, bit [35:0] should be
+>>> set to IPA[47:12]. I traced the source code but don't see the
+>>> adjustment. I must be missing something given this function is
+>>> fundamental to KVM MMU.
+>>
+>> Ermmm... Someone (that is, I) needs a brown paper back again.
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index b72aa9f..a767f6a 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+>>  	 * Instead, we invalidate Stage-2 for this IPA, and the
+>>  	 * whole of Stage-1. Weep...
+>>  	 */
+>> +	lsr	x1, x1, #12
+>>  	tlbi	ipas2e1is, x1
+>>  	/*
+>>  	 * We have to ensure completion of the invalidation at Stage-2,
+>>
+>> 	M.
+>>
 > 
-
-Ok, I found out that I can do it and result works, provided that I do
-hciconfig hci0 up/down first.
-
-I have trouble understanding... h4p_hci_open() seems to be called as
-soon as I insmod the driver. Who does that? Is it some kind of udev
-magic?
-
-...
-> > +#include "hci_h4p.h"
-> > +
-> > +#define BT_DBG(a...) do {} while(0)
+> Marc,
+>   thanks.
 > 
-> Why is this needed? BT_DBG is hooked up with dynamic debug.
-...
+> Another question, is how do you handle a huge tlb do you need to zero
+> out any PMD/PUD mask bits or just pass it in as is. The manual says 
+> MMU can figure out which bits are treated as 0 for 16/64KB pages, can
+> same thing be assumed for huge pages?
 
-I did all the changes as requested. Thanks. I did't see harm in
-include guards, but I removed them; it is not important.
-
-> > +	if (info->rx_count == 0) {
-> > +		/* H4+ devices should always send word aligned packets */
-> > +		if (!(info->rx_skb->len % 2))
-> > +			info->garbage_bytes++;
-> > +		h4p_recv_frame(info, info->rx_skb);
-> 
-> The h4p_recv_frame should maybe done inline here since it only handles 2 exception packets. Also to make it easy, just leave the function if (info->rx_count).
-> 
-> This packet processing feels like a bit of spaghetti code. I think that is better handled in a proper function that goes through it and not with many tiny sub functions.
->
-
-Well, CodingStyle says something about functions that should be kept
-short... And when manually inlined, the inner function would have to
-be made less readable, as it uses return to shortcut processing. 
-
-
-To use __hci_cmd_sync()
-
-> > +
-> > +	SET_HCIDEV_DEV(hdev, info->dev);
-> > +
-> > +	if (hci_register_dev(hdev) >= 0)
-> > +		return 0;
-> > +
-> > +	dev_err(info->dev, "hci_register failed %s.\n", hdev->name);
-> > +	hci_free_dev(info->hdev);
-> > +	return -ENODEV;
-> > +}
-> 
-> And normally this is folded into the probe handling and not in a
-> separate function.
-
-The probe function is too long, already...
-
-> > +#include <linux/delay.h>
-> > +#include <linux/clk.h>
-> > +
-> > +#include <linux/io.h>
-> > +
-> > +#include "hci_h4p.h"
-> 
-> Why is this a separate file? And if so, why not all UART specific details are in this file. Including bunch of the defines you have in the header.
-> 
-
-Well, you wanted less global functions, so I moved some as inlines to
-headers. I guess I can merge nokia_core and nokia_uart if really wanted.
-
-I did rest of requested changes.
+Indeed. The MMU will simply try to match the address with the TLBs,
+taking into account how much the actual entry is covering (1G, 2M, 4K).
 
 Thanks,
-									Pavel
 
+	M.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jazz is not dead. It just smells funny...
