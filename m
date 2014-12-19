@@ -1,32 +1,41 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 19 Dec 2014 18:04:50 +0530
-Subject: [PATCH] ARM: OMAP2+: hwmod: print error if wait_target_ready() failed
-Message-ID: <1418992490-2901-1-git-send-email-lokeshvutla@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 19 Dec 2014 21:04:42 +0800
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54933299.9030902@amd.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+ <54933299.9030902@amd.com>
+Message-ID: <5494226A.4040006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed pr_debug to pr_err when hwmod returns an error when enabling
-a module.
+On 2014?12?19? 04:01, Suravee Suthikulanit wrote:
+> On 10/17/2014 8:37 AM, Hanjun Guo wrote:
+>
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> Add documentation for the guidelines of how to use ACPI
+>> on ARM64.
+>>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   Documentation/arm64/arm-acpi.txt |  323
+>> ++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 323 insertions(+)
+>>   create mode 100644 Documentation/arm64/arm-acpi.txt
+>> [...]
+>
+> AMD has reviewed this document, and currently implements ACPI table in
+> the firmware for AMD Seattle platform based on the documentation
+> published here:
+>
+> http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf
+>
+>
+> Reviewed-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thank you very much, Suravee.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index cbb908d..06157af 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2155,8 +2155,8 @@ static int _enable(struct omap_hwmod *oh)
- 		if (soc_ops.disable_module)
- 			soc_ops.disable_module(oh);
- 		_disable_clocks(oh);
--		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
--			 oh->name, r);
-+		pr_err("omap_hwmod: %s: _wait_target_ready failed: %d\n",
-+		       oh->name, r);
- 
- 		if (oh->clkdm)
- 			clkdm_hwmod_disable(oh->clkdm, oh);
--- 
-1.9.1
+Hanjun
