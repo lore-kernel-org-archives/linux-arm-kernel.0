@@ -1,56 +1,46 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 19 Dec 2014 03:17:32 +0100
-Subject: [PATCH RFC v3 1/2] PM / Domains: Extend API
- pm_genpd_dev_need_restore to use restore types
-In-Reply-To: <5492A6DE.5020704@samsung.com>
-References: <1418489518-7252-1-git-send-email-amit.daniel@samsung.com>
- <5418986.E58ik2Q1Hm@vostro.rjw.lan> <5492A6DE.5020704@samsung.com>
-Message-ID: <4455852.nsjCIYrEMg@vostro.rjw.lan>
+Date: Fri, 19 Dec 2014 03:27:35 +0100
+Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
+In-Reply-To: <1649547.QECLmuJenN@avalon>
+References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
+ <7hppbg7j9r.fsf@deeprootsystems.com> <1649547.QECLmuJenN@avalon>
+Message-ID: <8712967.RZO6JKCTcJ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 18, 2014 11:05:18 AM Sylwester Nawrocki wrote:
-> On 18/12/14 01:58, Rafael J. Wysocki wrote:
-> >>>> What's needed to solve this problem is a generalized way to have runtime
-> >>>> > >> PM dependencies between devices.  Runtime PM already automatically
-> >>>> > >> handles parent devices as one type of dependent device (e.g. a parent
-> >>>> > >> device needs to be runtime PM resumed before its child.)  So what's
-> >>>> > >> needed is a generic way to other PM dependencies with the runtime PM
-> >>>> > >> core (not the genpd core.)
-> >>> > >
-> >>> > > Considering the example above with three devices, device D1 and D2 are
-> >>> > > passive components in this power domain. These devices only need to
-> >>> > > know the state changes of the power domains but would not control the
-> >>> > > power domain themselves nor put forth constraints in the power domain
-> >>> > > state changes. So I did not clearly understand as to how this example
-> >>> > > could be solved by introducing changes in runtime PM core.
-> >> > 
-> >> > Your solution only solves the problems for devices managed by genpd.
-> >> > 
-> >> > If I understood your example correctly, what you really want to solve
-> >> > this problem more generically is to be able to tell the runtime PM core
-> >> > that D3 has a dependency on D1 and D2.  Then, whenver the runtime PM
-> >> > core is doing get/put operations for D3, it needs to also do them for D1
-> >> > and D2.
+On Thursday, December 18, 2014 11:28:58 PM Laurent Pinchart wrote:
+> Hi Kevin,
 > 
-> Indeed, I think it would solve most of the problems if we were able to
-> model the PM dependencies between devices which would then be handled
-> in the PM core.  I recall something like this has been proposed a while
-> ago [1].
 
-Exactly.
+[cut]
 
-And I'm going to revive it in a slightly simplified form.
+> > >> 
+> > >> It would be better to be able to reference count the DMA engine from the
+> > >> bus master IMO and arguably you can use the runtime PM framework for
+> > >> that. Namely, give bus masters someting like
+> > >> 
+> > >> 	pm_runtime_get_my_DMA_engine(bus_master_device)
+> > >> 	pm_runtime_put_my_DMA_engine(bus_master_device)
+> > >> 
+> > >> and let them call these as they see fit.
+> > > 
+> > > Please note that we're not talking about DMA engines here, but about
+> > > IOMMUs. DMA is involved through the DMA mapping API which hides the IOMMU
+> > > completely from the bus master drivers, not the DMA engine API.
+> > > 
+> > > Exposing the IOMMU is something we want to avoid, but DMA mapping
+> > > start/stop operations could certainly be implemented.
+> > 
+> > The problem with that is it only solves the IOMMU problem.  We have a
+> > more generic PM dependency problem of which this IOMMU example is only a
+> > subset, so I think we need a more generic solution.
+> 
+> I agree that a more generic solution is needed at least to support ACPI _DEP, 
+> but that might not be optimal in the IOMMU use case as explained above.
 
-> >> > This will accomplish the same as your proposed approach, but work for
-> >> > any devices in any PM domains.
-> >
-> > Plus, it is not limited to runtime PM, really.  It affects system suspend
-> > too.
-> 
-> [1] https://lkml.org/lkml/2009/8/26/485
-> 
-> 
+Well, since we need it anyway, why don't we implement it and then figure out
+if anything more specific needs to be done for the IOMMU case?
+
 
 -- 
 I speak only for myself.
