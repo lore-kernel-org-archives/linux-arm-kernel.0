@@ -1,47 +1,38 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 19 Dec 2014 14:26:55 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
-Message-ID: <1419028015.25129.14.camel@perches.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 19 Dec 2014 14:46:41 -0800
+Subject: [PATCHv4] INPUT: Route keyboard LEDs through the generic LEDs
+ layer.
+In-Reply-To: <20141210010214.GZ3074@type.youpi.perso.aquilenet.fr>
+References: <20141210010214.GZ3074@type.youpi.perso.aquilenet.fr>
+Message-ID: <20141219144641.3a549feb1ee5f2b9400f62cb@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
-> Add initial version of the Broadcom touchscreen driver.
+On Wed, 10 Dec 2014 02:02:14 +0100 Samuel Thibault <samuel.thibault@ens-lyon.org> wrote:
 
-more trivia:
+> This permits to reassign keyboard LEDs to something else than keyboard "leds"
+> state, by adding keyboard led and modifier triggers connected to a series
+> of VT input LEDs, themselves connected to VT input triggers, which
+> per-input device LEDs use by default.  Userland can thus easily change the LED
+> behavior of (a priori) all input devices, or of particular input devices.
+> 
+> This also permits to fix #7063 from userland by using a modifier to implement
+> proper CapsLock behavior and have the keyboard caps lock led show that modifier
+> state.
+> 
+> [ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
+> [blogic at openwrt.org: CONFIG_INPUT_LEDS stubs should be static inline]
+> [akpm at linux-foundation.org: remove unneeded `extern', fix comment layout]
+> Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+> Signed-off-by: Evan Broder <evan@ebroder.net>
+> Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+> Tested-by: Pavel Machek <pavel@ucw.cz>
+> Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> ---
+> Changed in this version:
+> - Use kcalloc instead of kzalloc
+> - to avoid any mutex order violation, defer LED update into a work callback.
 
-> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
-[]
-> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
-> +{
-> +	u32 val;
-[]
-> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
-> +		if (val < 0 || val > 255) {
-> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.debounce_timeout = val;
-
-Doesn't the compiler generate a warning message
-about an impossible "unsigned < 0" test for all
-of these "val < 0" uses?
-
-> +	}
-> +
-> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
-> +		if (val < 0 || val > 11) {
-[]
-> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
-> +		if (val < 0 || val > 255) {
-[]
-> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
-> +		if (val < 0 || val > 8) {
-[]
-> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
-> +		if (val < 0 || val > 31) {
+Confused.  This patch is identical to the one that's presently in -mm.
