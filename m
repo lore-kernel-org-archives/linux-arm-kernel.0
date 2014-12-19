@@ -1,57 +1,22 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Fri, 19 Dec 2014 15:03:20 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <1419028015.25129.14.camel@perches.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
- <1419028015.25129.14.camel@perches.com>
-Message-ID: <5494AEB8.8060606@broadcom.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Fri, 19 Dec 2014 23:59:33 +0100
+Subject: [PATCHv4] INPUT: Route keyboard LEDs through the generic LEDs
+ layer.
+In-Reply-To: <20141219144641.3a549feb1ee5f2b9400f62cb@linux-foundation.org>
+References: <20141210010214.GZ3074@type.youpi.perso.aquilenet.fr>
+ <20141219144641.3a549feb1ee5f2b9400f62cb@linux-foundation.org>
+Message-ID: <20141219225933.GD3049@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-12-19 02:26 PM, Joe Perches wrote:
-> On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
->> Add initial version of the Broadcom touchscreen driver.
+Andrew Morton, le Fri 19 Dec 2014 14:46:41 -0800, a ?crit :
+> > Changed in this version:
+> > - Use kcalloc instead of kzalloc
+> > - to avoid any mutex order violation, defer LED update into a work callback.
 > 
-> more trivia:
-> 
->> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
-> []
->> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
->> +{
->> +	u32 val;
-> []
->> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
->> +		if (val < 0 || val > 255) {
->> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
->> +			return -EINVAL;
->> +		}
->> +		priv->cfg_params.debounce_timeout = val;
-> 
-> Doesn't the compiler generate a warning message
-> about an impossible "unsigned < 0" test for all
-> of these "val < 0" uses?
-> 
+> Confused.  This patch is identical to the one that's presently in -mm.
 
-Actually no it doesn't. The gcc output shows that neither -Wtype-limits
-nor -Wextra are used to compile that file. I assume this is because
-there would be just too many warnings.
+Well, yes: I'm submitting the latest version of this patch to Dmitry,
+i.e. including the fixes that happened in the -mm tree.
 
-
->> +	}
->> +
->> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
->> +		if (val < 0 || val > 11) {
-> []
->> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
->> +		if (val < 0 || val > 255) {
-> []
->> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
->> +		if (val < 0 || val > 8) {
-> []
->> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
->> +		if (val < 0 || val > 31) {
-> 
-> 
+Samuel
