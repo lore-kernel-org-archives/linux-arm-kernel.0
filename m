@@ -1,41 +1,34 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 19 Dec 2014 17:21:58 +0100
-Subject: [PATCH] clk: samsung: exynos7: Add clocks for MSCL block
-In-Reply-To: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
-References: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
-Message-ID: <549450A6.9020205@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 19 Dec 2014 16:23:43 +0000
+Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
+In-Reply-To: <CAJ+vNU1YQWGFaEm8w8wtaFvUy1jig26jW3+3teMFHLB_oFyn8Q@mail.gmail.com>
+References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
+ <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
+ <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
+ <CAJ+vNU3PQYCE4tABUiqU+vGkGqBEqdVKz25W88-ByOQZxunVLw@mail.gmail.com>
+ <20141218142205.GZ11764@sirena.org.uk>
+ <CAJ+vNU1YQWGFaEm8w8wtaFvUy1jig26jW3+3teMFHLB_oFyn8Q@mail.gmail.com>
+Message-ID: <20141219162343.GF11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Dec 19, 2014 at 08:17:41AM -0800, Tim Harvey wrote:
 
-On 17/12/14 08:33, Tony K Nadackal wrote:
-> Add clock support for the MSCL block for Exynos7.
-> 
-> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
-> ---
->  .../devicetree/bindings/clock/exynos7-clock.txt    |   1 +
->  drivers/clk/samsung/clk-exynos7.c                  | 124 +++++++++++++++++++++
->  include/dt-bindings/clock/exynos7-clk.h            |  40 ++++++-
->  3 files changed, 164 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/exynos7-clock.txt b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-> index 6d3d5f8..d0e048c 100644
-> --- a/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-> @@ -34,6 +34,7 @@ Required Properties for Clock Controller:
->  	- "samsung,exynos7-clock-peris"
->  	- "samsung,exynos7-clock-fsys0"
->  	- "samsung,exynos7-clock-fsys1"
-> +	- "samsung,exynos7-clock-mscl"
+> frequency setpoint. If however you have an external PMIC that is
+> capable of adjusting the VDD_ARM and VDD_SOC to the IMX6 and an
+> appropriate regulator driver is capable of doing so, you must
+> configure the cpu nodes vddarm and vddsoc regulators to those provided
+> by your PMIC and 'bypass' the internal LDO's by setting their scaling
 
-I can't see anything controversial in the patch, but I've got some doubts
-regarding the compatible string. Is there a SoC named just "Exynos7"?
-If not, what are exact SoC names the "samsung,exynos7-clock-mscl" compatible
-is supposed to cover ?
-It would be good to list in this file the exact SoCs names this binding applies
-to, unless there is indeed Exynos7 SoC.
+You're describing the implementation again, not the system.  Describe
+the system then if you want to describe the solution you've come up with
+for modelling it do so separately.
 
---
-Thanks,
-Sylwester
+Please also try to use paragraphs to break up what you're saying a bit.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/e93f6f4b/attachment-0001.sig>
