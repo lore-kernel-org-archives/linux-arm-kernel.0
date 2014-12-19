@@ -1,154 +1,134 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 19 Dec 2014 14:11:52 +0800
-Subject: [PATCH v4 2/5] media: ov2640: add async probe function
-In-Reply-To: <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
-References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
- <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
-Message-ID: <5493C1A8.4050204@atmel.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 19 Dec 2014 15:46:06 +0900
+Subject: [PATCHv4 1/8] devfreq: event: Add new devfreq_event class to
+ provide basic data for devfreq governor
+In-Reply-To: <1107836838.16761418955089663.JavaMail.weblogic@epmlwas08d>
+References: <1107836838.16761418955089663.JavaMail.weblogic@epmlwas08d>
+Message-ID: <5493C9AE.1020202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
+Dear Myungjoo,
 
-Thanks for the review.
-
-On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
-> Hi Josh,
->
-> Thanks for your patches!
->
-> On Thu, 18 Dec 2014, Josh Wu wrote:
->
->> To support async probe for ov2640, we need remove the code to get 'mclk'
->> in ov2640_probe() function. oterwise, if soc_camera host is not probed
->> in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
->> function.
->>
->> So in this patch, we move such 'mclk' getting code to ov2640_s_power()
->> function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
->> soc_camera_set_power() function.
->>
->> And if soc_camera host is probed, the when ov2640_s_power() is called,
->> then we can get the 'mclk' and that make us enable/disable soc_camera
->> host's clock as well.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->> v3 -> v4:
->> v2 -> v3:
->> v1 -> v2:
->>    no changes.
->>
->>   drivers/media/i2c/soc_camera/ov2640.c | 31 +++++++++++++++++++++----------
->>   1 file changed, 21 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/media/i2c/soc_camera/ov2640.c b/drivers/media/i2c/soc_camera/ov2640.c
->> index 1fdce2f..9ee910d 100644
->> --- a/drivers/media/i2c/soc_camera/ov2640.c
->> +++ b/drivers/media/i2c/soc_camera/ov2640.c
->> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int on)
->>   	struct i2c_client *client = v4l2_get_subdevdata(sd);
->>   	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
->>   	struct ov2640_priv *priv = to_ov2640(client);
->> +	struct v4l2_clk *clk;
->> +
->> +	if (!priv->clk) {
->> +		clk = v4l2_clk_get(&client->dev, "mclk");
->> +		if (IS_ERR(clk))
->> +			dev_warn(&client->dev, "Cannot get the mclk. maybe soc-camera host is not probed yet.\n");
->> +		else
->> +			priv->clk = clk;
->> +	}
+On 12/19/2014 11:11 AM, MyungJoo Ham wrote:
 >>   
->>   	return soc_camera_set_power(&client->dev, ssdd, priv->clk, on);
->>   }
->> @@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
->>   	if (priv->hdl.error)
->>   		return priv->hdl.error;
->>   
->> -	priv->clk = v4l2_clk_get(&client->dev, "mclk");
->> -	if (IS_ERR(priv->clk)) {
->> -		ret = PTR_ERR(priv->clk);
->> -		goto eclkget;
->> -	}
->> -
->>   	ret = ov2640_video_probe(client);
-> The first thing the above ov2640_video_probe() function will do is call
-> ov2640_s_power(), which will request the clock. So, by moving requesting
-> the clock from ov2640_probe() to ov2640_s_power() doesn't change how
-> probing will be performed, am I right?
-yes, you are right. In this patch, the "mclk" will requested by 
-ov2640_s_power().
+>>  Dear Myungjoo,
+>>
+>> Thanks for your review.
+>>
+>> On 12/18/2014 03:24 PM, MyungJoo Ham wrote:
+>>> Hi Chanwoo,
+>>>
+>>> I love the idea and I now have a little mechanical issues in your code.
+>>>
+>>>> ---
+>>>>  drivers/devfreq/Kconfig         |   2 +
+>>>>  drivers/devfreq/Makefile        |   5 +-
+>>>>  drivers/devfreq/devfreq-event.c | 449 ++++++++++++++++++++++++++++++++++++++++
+>>>>  drivers/devfreq/event/Makefile  |   1 +
+>>>>  include/linux/devfreq.h         | 160 ++++++++++++++
+>>>>  5 files changed, 616 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 drivers/devfreq/devfreq-event.c
+>>>>  create mode 100644 drivers/devfreq/event/Makefile
+>>>>
+> 
+> []
+> 
+>>
+>>>
+>>>
+>>> [snip]
+>>>
+>>>> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
+>>>> new file mode 100644
+>>>> index 0000000..0e1948e
+>>>> --- /dev/null
+>>>> +++ b/drivers/devfreq/devfreq-event.c
+>>>> @@ -0,0 +1,449 @@
+>>>> +/*
+>>>> + * devfreq-event: Generic DEVFREQ Event class driver
+>>>
+>>> DEVFREQ is a generic DVFS mechanism (or subsystem).
+>>>
+>>> Plus, I thought devfreq-event is considered to be a "framework"
+>>> for devfreq event class drivers. Am I mistaken?
+>>
+>> You're right. just "class driver" description is not proper.
+>> I'll modify the description of devfreq-event.c as following:
+>> or If you have other opinion, would you please let me know about it?
+>>
+>> 	devfreq-event: DEVFREQ-Event Framework to provide raw data of Non-CPU Devices.
+> 
+> devfreq-event: a framework to provide raw data and events of devfreq devices
+> 
+> should be enough.
 
-The reason why I put the getting "mclk" code from ov2640_probe() to 
-ov2640_s_power() is : as the "mclk" here is camera host's peripheral 
-clock. That means ov2640 still can be probed properly (read ov2640 id) 
-even no "mclk". So when I move this code to ov2640_s_power(), otherwise 
-the ov2640_probe() will be failed or DEFER_PROBE.
+OK, I'll modify it.
 
-Is this true for all camera host? If it's not true, then I think use 
--EPROBE_DEFER would be a proper way.
+> 
+> 
+> []
+>>> [snip / reversed maybe.. sorry]
+>>>
+>>>> +/**
+>>>> + * devfreq_event_is_enabled() - Check whether devfreq-event dev is enabled or
+>>>> + *                             not.
+>>>> + * @edev       : the devfreq-event device
+>>>> + *
+>>>> + * Note that this function check whether devfreq-event dev is enabled or not.
+>>>> + * If return true, the devfreq-event dev is enabeld. If return false, the
+>>>> + * devfreq-event dev is disabled.
+>>>> + */
+>>>> +bool devfreq_event_is_enabled(struct devfreq_event_dev *edev)
+>>>> +{
+>>>> +       bool enabled = false;
+>>>> +
+>>>> +       if (!edev || !edev->desc)
+>>>> +               return enabled;
+>>>> +
+>>>> +       mutex_lock(&edev->lock);
+>>>> +
+>>>> +       if (edev->enable_count > 0)
+>>>> +               enabled = true;
+>>>> +
+>>>> +       if (edev->desc->ops && edev->desc->ops->is_enabled)
+>>>> +               enabled |= edev->desc->ops->is_enabled(edev);
+>>>
+>>> What does it mean when enabled_count > 0 and ops->is_enabled() is false? or..
+>>> What does it mean when enabled_count = 0 and ops->is_enabled() is true?
+>>>
+>>> If you do enable_count in the subsystem, why would we rely on
+>>> ops->is_enabled()? Are you assuming that a device MAY turn itself off
+>>> without any kernel control (ops->disable()) and it is still a correct
+>>> behabior?
+>>
+>> You're right. devfreq_event_is_enabled() has ambiguous operation according to your comment.
+>>
+>> I'll only control the enable_count in the subsystem without ops->is_enabled()
+>> and then remove the is_enabled function in the structre devfreq_event_ops.
+>>
+>> Best Regards,
+>> Chanwoo Choi
+>>
+> 
+> [Off-Topic]
+> 
+> The name of devfreq-event may look quite intersecting with irq-driven governors,
+> which are being proposed these days.
+> 
+> Although they may look intersecting, we can have them independently;
+> this as a sub-class and that as a governor. And we can consider to
+> provide a common infrastructure for irq-driven mechanisms in devfreq or
+> devfreq-event when we irq-driven DVFS become more general, which I
+> expect in 2 ~ 3 years.
+> 
+> So for now, both can go independently.
 
+I understand your opinion.
+I want to handle the devfreq-event framework independently from irq-driven governor.
 
-> Or are there any other patched,
-> that change that, that I'm overseeing?
->
-> If I'm right, then I would propose an approach, already used in other
-> drivers instead of this one: return -EPROBE_DEFER if the clock isn't
-> available during probing. See ef6672ea35b5bb64ab42e18c1a1ffc717c31588a for
-> an example. Or did I misunderstand anything?
-Actually months ago I already done a version of ov2640 patch which use 
--EPROBE_DEFER way.
-
-But now I think the ov2640 can be probed correctly without "mclk", so it 
-is no need to return -EPROBE_DEFER.
-And the v4l2 asyn API can handle the synchronization of host. So I 
-prefer to use this way.
-What do you think about this?
+After completing the devfreq-event and the support for exynos-busfreq dt,
+If you agree, I'll consider how to implement irq-driven governor as the devfreq governor.
 
 Best Regards,
-Josh Wu
-
->
-> Thanks
-> Guennadi
->
->>   	if (ret) {
->> -		v4l2_clk_put(priv->clk);
->> -eclkget:
->> -		v4l2_ctrl_handler_free(&priv->hdl);
->> +		goto evideoprobe;
->>   	} else {
->>   		dev_info(&adapter->dev, "OV2640 Probed\n");
->>   	}
->>   
->> +	ret = v4l2_async_register_subdev(&priv->subdev);
->> +	if (ret < 0)
->> +		goto evideoprobe;
->> +
->> +	return 0;
->> +
->> +evideoprobe:
->> +	v4l2_ctrl_handler_free(&priv->hdl);
->>   	return ret;
->>   }
->>   
->> @@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client *client)
->>   {
->>   	struct ov2640_priv       *priv = to_ov2640(client);
->>   
->> -	v4l2_clk_put(priv->clk);
->> +	v4l2_async_unregister_subdev(&priv->subdev);
->> +	if (priv->clk)
->> +		v4l2_clk_put(priv->clk);
->>   	v4l2_device_unregister_subdev(&priv->subdev);
->>   	v4l2_ctrl_handler_free(&priv->hdl);
->>   	return 0;
->> -- 
->> 1.9.1
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Chanwoo Choi
