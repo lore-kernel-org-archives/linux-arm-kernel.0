@@ -1,61 +1,55 @@
 From: andrew.jackson@arm.com (Andrew Jackson)
-Date: Fri, 19 Dec 2014 16:18:09 +0000
-Subject: [PATCH v3 5/5] ASoC: dwc: Add documentation for I2S DT
+Date: Fri, 19 Dec 2014 16:18:05 +0000
+Subject: [PATCH v3 1/5] ASoC: dwc: Ensure FIFOs are flushed to prevent channel
+ swap
 In-Reply-To: <cover.1418826016.git.Andrew.Jackson@arm.com>
 References: <cover.1418826016.git.Andrew.Jackson@arm.com>
-Message-ID: <2842090b2c7a8a98aed0cfa02addcef0b2e8ec6b.1418826016.git.Andrew.Jackson@arm.com>
+Message-ID: <8f40608d5665e80bfd3e9723784ec3bc2078e0d2.1418826016.git.Andrew.Jackson@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Jackson <Andrew.Jackson@arm.com>
 
-Add documentation for Designware I2S hardware block.  The block requires
-two clocks (one for audio sampling, the other for APB) and DMA channels
-for receive and transmit.
+Flush the FIFOs when the stream is prepared for use.  This avoids
+an inadvertent swapping of the left/right channels if the FIFOs are
+not empty at startup.
 
 Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
 ---
- .../devicetree/bindings/sound/designware-i2s.txt   |   32 ++++++++++++++++++++
- 1 files changed, 32 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/designware-i2s.txt
+ sound/soc/dwc/designware_i2s.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/designware-i2s.txt b/Documentation/devicetree/bindings/sound/designware-i2s.txt
-new file mode 100644
-index 0000000..cdee591
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/designware-i2s.txt
-@@ -0,0 +1,32 @@
-+DesignWare I2S controller
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index f81e747..5c13303 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -263,6 +263,19 @@ static void dw_i2s_shutdown(struct snd_pcm_substream *substream,
+ 	snd_soc_dai_set_dma_data(dai, substream, NULL);
+ }
+ 
++static int dw_i2s_prepare(struct snd_pcm_substream *substream,
++			  struct snd_soc_dai *dai)
++{
++	struct dw_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
 +
-+Required properties:
-+ - compatible : Must be "snps,designware-i2s"
-+ - reg : Must contain I2S core's registers location and length
-+ - clocks : Pairs of phandle and specifier referencing the controller's clocks.
-+   The controller expects two clocks, the clock used for the APB interface and
-+   the clock used as the sampling rate reference clock sample.
-+ - clock-names : "apb_plck" for the clock to the APB interface, "i2sclk" for the sample
-+   rate reference clock.
-+ - dmas: Pairs of phandle and specifier for the DMA channels that are used by
-+   the core. The core expects one or two dma channels, one for transmit and one for
-+   receive.
-+ - dma-names : "tx" for the transmit channel, "rx" for the receive channel.
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		i2s_write_reg(dev->i2s_base, TXFFR, 1);
++	else
++		i2s_write_reg(dev->i2s_base, RXFFR, 1);
 +
-+For more details on the 'dma', 'dma-names', 'clock' and 'clock-names' properties
-+please check:
-+	* resource-names.txt
-+	* clock/clock-bindings.txt
-+	* dma/dma.txt
++	return 0;
++}
 +
-+Example:
-+
-+	soc_i2s: i2s at 7ff90000 {
-+		compatible = "snps,designware-i2s";
-+		reg = <0x0 0x7ff90000 0x0 0x1000>;
-+		clocks = <&scpi_i2sclk 0>, <&soc_refclk100mhz>;
-+		clock-names = "i2sclk", "apb_pclk";
-+		#sound-dai-cells = <0>;
-+		dmas = <&dma0 5>;
-+		dma-names = "tx";
-+	};
+ static int dw_i2s_trigger(struct snd_pcm_substream *substream,
+ 		int cmd, struct snd_soc_dai *dai)
+ {
+@@ -294,6 +307,7 @@ static struct snd_soc_dai_ops dw_i2s_dai_ops = {
+ 	.startup	= dw_i2s_startup,
+ 	.shutdown	= dw_i2s_shutdown,
+ 	.hw_params	= dw_i2s_hw_params,
++	.prepare	= dw_i2s_prepare,
+ 	.trigger	= dw_i2s_trigger,
+ };
+ 
 -- 
 1.7.1
