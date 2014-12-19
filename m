@@ -1,73 +1,88 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Dec 2014 09:31:11 +0000
-Subject: Help on kvm_tlb_flush_vmid_ipa usage
-In-Reply-To: <54935451.6090405@samsung.com>
-References: <54932A97.3060103@samsung.com> <54932D1F.5060209@arm.com>
- <54935451.6090405@samsung.com>
-Message-ID: <5493F05F.9090002@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 19 Dec 2014 10:50:00 +0100
+Subject: bluetooth: Add hci_h4p driver
+In-Reply-To: <97C706D6-765B-446A-8180-600F5FB6C68B@holtmann.org>
+References: <20141213223727.GA13894@amd>
+ <97C706D6-765B-446A-8180-600F5FB6C68B@holtmann.org>
+Message-ID: <20141219095000.GA24703@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/12/14 22:25, Mario Smarduch wrote:
-> On 12/18/2014 11:38 AM, Marc Zyngier wrote:
->> On 18/12/14 19:27, Mario Smarduch wrote:
->>> When this function is called IPA address is used. Looking at the HYP
->>> implementation it uses the IPA directly in tlbi instructions. But
->>> reading the TLB maintnance instruction syntax, bit [35:0] should be
->>> set to IPA[47:12]. I traced the source code but don't see the
->>> adjustment. I must be missing something given this function is
->>> fundamental to KVM MMU.
->>
->> Ermmm... Someone (that is, I) needs a brown paper back again.
->>
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index b72aa9f..a767f6a 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
->>  	 * Instead, we invalidate Stage-2 for this IPA, and the
->>  	 * whole of Stage-1. Weep...
->>  	 */
->> +	lsr	x1, x1, #12
->>  	tlbi	ipas2e1is, x1
->>  	/*
->>  	 * We have to ensure completion of the invalidation at Stage-2,
->>
->> 	M.
->>
-> 
-> Hi Marc,
->   fwiw I re-ran the test that halts the host (on foundation
-> model) with a guest booted, panic has gone away.
-> 
-> BUG: Bad page state in process K20nfsserver  pfn:ff818
-> page:ffff7c7fc37e4540 count:-3 mapcount:0 mapping:          (null) index:0x0
-> flags: 0x0()
-> page dumped because: nonzero _count
-> Modules linked in:
-> CPU: 1 PID: 761 Comm: K20nfsserver Not tainted 3.18.0-rc2+ #55
-> Call trace:
-> [<ffff800000087244>] dump_backtrace+0x0/0x12c
-> [<ffff800000087380>] show_stack+0x10/0x1c
-> [<ffff8000003ce804>] dump_stack+0x74/0x98
-> [<ffff80000011bdc4>] bad_page+0xdc/0x12c
-> [<ffff80000011ecc4>] get_page_from_freelist+0x4b4/0x600
-> [<ffff80000011eeec>] __alloc_pages_nodemask+0xdc/0x780
-> [<ffff80000011f5a4>] __get_free_pages+0x14/0x5c
-> [<ffff80000011f5fc>] get_zeroed_page+0x10/0x1c
-> [<ffff8000000903fc>] pgd_alloc+0xc/0x18
-> [<ffff8000000a13a0>] mm_init+0xcc/0x12c
-> [<ffff8000000a17f8>] mm_alloc+0x44/0x54
-> [<ffff800000166cbc>] do_execve+0x1a8/0x49c
-> [<ffff8000001671bc>] SyS_execve+0x1c/0x2c
+Hi!
+
+> And you want to set the QUIRK_INVALID_BADDR. At least you want to do that in the final submission.
 > 
 
-Absolutely amazing that we managed to run for so long with such a bug. I
-suppose we rarely update page table entries, and most implementations
-don't use split TLBs (where this instruction is useful).
+Ok, I found out that I can do it and result works, provided that I do
+hciconfig hci0 up/down first.
 
-Thanks a lot for reporting this bug, I'll repost a proper fix today.
+I have trouble understanding... h4p_hci_open() seems to be called as
+soon as I insmod the driver. Who does that? Is it some kind of udev
+magic?
 
-	M.
+...
+> > +#include "hci_h4p.h"
+> > +
+> > +#define BT_DBG(a...) do {} while(0)
+> 
+> Why is this needed? BT_DBG is hooked up with dynamic debug.
+...
+
+I did all the changes as requested. Thanks. I did't see harm in
+include guards, but I removed them; it is not important.
+
+> > +	if (info->rx_count == 0) {
+> > +		/* H4+ devices should always send word aligned packets */
+> > +		if (!(info->rx_skb->len % 2))
+> > +			info->garbage_bytes++;
+> > +		h4p_recv_frame(info, info->rx_skb);
+> 
+> The h4p_recv_frame should maybe done inline here since it only handles 2 exception packets. Also to make it easy, just leave the function if (info->rx_count).
+> 
+> This packet processing feels like a bit of spaghetti code. I think that is better handled in a proper function that goes through it and not with many tiny sub functions.
+>
+
+Well, CodingStyle says something about functions that should be kept
+short... And when manually inlined, the inner function would have to
+be made less readable, as it uses return to shortcut processing. 
+
+
+To use __hci_cmd_sync()
+
+> > +
+> > +	SET_HCIDEV_DEV(hdev, info->dev);
+> > +
+> > +	if (hci_register_dev(hdev) >= 0)
+> > +		return 0;
+> > +
+> > +	dev_err(info->dev, "hci_register failed %s.\n", hdev->name);
+> > +	hci_free_dev(info->hdev);
+> > +	return -ENODEV;
+> > +}
+> 
+> And normally this is folded into the probe handling and not in a
+> separate function.
+
+The probe function is too long, already...
+
+> > +#include <linux/delay.h>
+> > +#include <linux/clk.h>
+> > +
+> > +#include <linux/io.h>
+> > +
+> > +#include "hci_h4p.h"
+> 
+> Why is this a separate file? And if so, why not all UART specific details are in this file. Including bunch of the defines you have in the header.
+> 
+
+Well, you wanted less global functions, so I moved some as inlines to
+headers. I guess I can merge nokia_core and nokia_uart if really wanted.
+
+I did rest of requested changes.
+
+Thanks,
+									Pavel
+
 -- 
-Jazz is not dead. It just smells funny...
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
