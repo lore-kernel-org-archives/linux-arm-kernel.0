@@ -1,111 +1,82 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 19 Dec 2014 11:02:26 -0800
-Subject: [PATCH v5 0/4] Fixes for SDIO interrupts for dw_mmc
-In-Reply-To: <CAPDyKFpxvE4x_-PV=KN0HKY5cNug-ss9m5KCjNdebR1LDOJi5w@mail.gmail.com>
-References: <1417563767-32181-1-git-send-email-dianders@chromium.org>
- <CAPDyKFpxvE4x_-PV=KN0HKY5cNug-ss9m5KCjNdebR1LDOJi5w@mail.gmail.com>
-Message-ID: <CAD=FV=UCyOXfMqu_MYbd5pKOpgXPB87LQ7hCegeeY9vzsy6QAg@mail.gmail.com>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Fri, 19 Dec 2014 11:51:33 -0800
+Subject: [PATCH 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <1418868881.28384.8.camel@perches.com>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1418867992-3550-1-git-send-email-jonathar@broadcom.com>
+ <1418867992-3550-2-git-send-email-jonathar@broadcom.com>
+ <1418868881.28384.8.camel@perches.com>
+Message-ID: <549481C5.7050802@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+Thanks Joe. I'll send out a new patch set with your suggestions/fixes
+shortly.
 
-On Fri, Dec 19, 2014 at 2:17 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 3 December 2014 at 00:42, Doug Anderson <dianders@chromium.org> wrote:
->> Bing Zhao at Marvell found a problem with dw_mmc where interrupts
->> weren't firing sometimes.  He tracked it down to a read-modify-write
->> problem with the INTMASK.  These patches fix the problem.
->>
->> Note: I've picked up a > 1-year old series here to make another
->> attempt at landing it upstream.  These patches have been in shipping
->> Chromebooks for the last year.  Note that v3 to v4 has no changes
->> other than a rebase and a small commit message update.
->>
->> The first two patches extend the "init_card()" mechanism of MMC core
->> to actually be called for all card types, not just SDIO.  That could
->> be applied any time and should fix at least one longstanding bug
->> (untested).
->>
->> The third patch is a cleanup patch to use init_card() to move things
->> around a bit so we don't need to handle SDIO cards in such a strange
->> place.  On earlier versions of this patch Seungwon brought up a few
->> points which I have _not_ addressed.  See
->> <https://patchwork.kernel.org/patch/3049071/>.  Other than talk of
->> cards with out of band interrupts maybe being able to gate their
->> clocks, he wanted to use MMC_QUIRK_BROKEN_CLK_GATING.  I didn't do
->> that because of the ordering of init_card() and when the quirks are
->> set.  Some users of init_card() like pandora_wl1251_init_card() rely
->> on it being called very early in the process.
->> pandora_wl1251_init_card() hardcodes a vendor and device and thus need
->> to be called super early.  On the other hand the code that adds quirks
->> _reads_ the vendor and device.  It can't possibly move before
->> init_card().  If folks are willing to take an additional host op of
->> init_card_late() I can certainly go that way, though.
->>
->> The fourth patch is (I think) reviewed and ready to go assuming the
->> other two land.
->
-> I have queued this up for 3.20.
-
-Thanks!
-
-
-> It was a bit hard to follow the
-> updated the revisions, please don't send patches "in-reply-to" for
-> future sets.
-
-Very strange.  I didn't send out anything in-reply-to other than what
-git-send-email usually does.  I believe I had:
-
-[0] - no in reply to.
- [1] - in reply to [0]
- [2] - in reply to [0]
- [3] - in reply to [0]
- [4] - in reply to [0]
-
-Is there some other way you'd prefer?
-
-Looking full headers in <https://patchwork.kernel.org/patch/5425241/>,
-I confirm it is "in-reply-to"
-"1417563767-32181-1-git-send-email-dianders at chromium.org".  Patchwork
-doesn't keep cover letters, but you can see at
-<http://www.spinics.net/lists/linux-mmc/msg29699.html>) that there is
-no in-reply-to.
-
-I'm more than happy to adjust my workflow if you can give me some
-specifics.  Thanks!  :)
-
-
-> In v5, I don't find a patch 1/4. Anyway, I have taken patch 2->4.
-
-Ah, maybe because it wasn't sent to linux-mmc?  I messed that up and
-will try to do better in the future.  Sorry.  :(  You were in the To
-line, though.  You can see at
-<https://patchwork.kernel.org/patch/5425241/>.
-
-Do you want me to repost it and CC linux-mmc with Tony's Ack?
-
----
-
-Note: patchwork seems to find all my patches:
-
-pwclient list -w dianders at chromium.org -p ""
-
-5425241 New          [v5,1/4] ARM: OMAP2+: Make sure
-pandora_wl1251_init_card() applies to SDIO only
-5425291 New          [v5,1/4] ARM: OMAP2+: Make sure
-pandora_wl1251_init_card() applies to SDIO only
-5425311 New          [v5,1/4] ARM: OMAP2+: Make sure
-pandora_wl1251_init_card() applies to SDIO only
-5425231 New          [v5,2/4] mmc: core: Support the optional
-init_card() callback for MMC and SD
-5425301 New          [v5,2/4] mmc: core: Support the optional
-init_card() callback for MMC and SD
-5425271 New          [v5,3/4] mmc: dw_mmc: Cleanup disable of low
-power mode w/ SDIO interrupts
-5425281 New          [v5,3/4] mmc: dw_mmc: Cleanup disable of low
-power mode w/ SDIO interrupts
-5425251 New          [v5,4/4] mmc: dw_mmc: Protect read-modify-write
-of INTMASK with a lock
-5425261 New          [v5,4/4] mmc: dw_mmc: Protect read-modify-write
-of INTMASK with a lock
+On 14-12-17 06:14 PM, Joe Perches wrote:
+> On Wed, 2014-12-17 at 17:59 -0800, Jonathan Richardson wrote:
+>> Add initial version of the Broadcom touchscreen driver.
+> 
+> trivia:
+> 
+>> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
+> 
+>> +/* Bit values for REGCTL2 */
+>> +#define TS_CONTROLLER_EN_BIT    (1 << 16)
+>> +#define TS_CONTROLLER_AVGDATA_SHIFT 8
+>> +#define TS_CONTROLLER_AVGDATA_MASK (0x7 << TS_CONTROLLER_AVGDATA_SHIFT)
+>> +#define TS_CONTROLLER_PWR_LDO   (1<<5)
+>> +#define TS_CONTROLLER_PWR_ADC   (1<<4)
+>> +#define TS_CONTROLLER_PWR_BGP   (1<<3)
+>> +#define TS_CONTROLLER_PWR_TS    (1<<2)
+>> +#define TS_WIRE_MODE_BIT        (1<<1)
+> 
+> Be nicer to use the same spacing around <<
+> or maybe use the BIT macro.
+> 
+> []
+> 
+>> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
+>> +{
+>> +	int ret;
+>> +	u32 val;
+>> +	struct device *dev = &priv->pdev->dev;
+>> +
+>> +	priv->cfg_params = default_config;
+>> +
+>> +	ret = of_property_read_u32(np, "scanning_period", &val);
+>> +	if (ret >= 0) {
+>> +		if ((1 <= val) && (val <= 256))
+>> +			priv->cfg_params.scanning_period = val;
+>> +		else {
+>> +			dev_err(dev, "scanning_period must be [1-256]");
+>> +			return -EINVAL;
+>> +		}
+> 
+> ret is never used so I'd probably remove it
+> from all these blocks.
+> 
+> It's probably be nicer to invert the logic ald
+> remove the else.
+> 
+> There's a missing terminating newline too.
+> 
+> Something like:
+> 
+> 	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
+> 		if (val < 1 || val > 256) {
+> 			dev_err(dev, "scanning_period must be [1-256]\n");
+> 			return -EINVAL;
+> 		}
+> 		priv->cfg_params.scanning_period = val;
+> 	}
+> 
+> etc...
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
