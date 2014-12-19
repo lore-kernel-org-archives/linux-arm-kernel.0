@@ -1,80 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Dec 2014 18:35:20 +0100
-Subject: [PATCH v2 3/4] mmc: sunxi: Convert MMC driver to the standard
- clock phase API
-In-Reply-To: <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
+Date: Fri, 19 Dec 2014 18:35:49 +0100
+Subject: [PATCH v2 1/4] clk: sunxi: Rework MMC phase clocks
+In-Reply-To: <CAGb2v64J2Gp1gUh4AKH-1tjg94AcAarFZ5tJc_pr6FC71pJ6Rw@mail.gmail.com>
 References: <1418765936-12542-1-git-send-email-maxime.ripard@free-electrons.com>
- <1418765936-12542-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64iWS65t31JP_YRTigGBi5+eaJX60s7nNjv87gt2aojXw@mail.gmail.com>
-Message-ID: <20141219173520.GK4820@lukather>
+ <1418765936-12542-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64J2Gp1gUh4AKH-1tjg94AcAarFZ5tJc_pr6FC71pJ6Rw@mail.gmail.com>
+Message-ID: <20141219173549.GL4820@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Dec 17, 2014 at 12:17:36PM +0800, Chen-Yu Tsai wrote:
+On Wed, Dec 17, 2014 at 02:58:33PM +0800, Chen-Yu Tsai wrote:
 > Hi,
 > 
 > On Wed, Dec 17, 2014 at 5:38 AM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > Now that we have proper support to use the generic phase API in our clock
-> > driver, switch the MMC driver to use it.
+> > Instead of having three different clocks for the main MMC clock and the two
+> > phase sub-clocks, which involved having three different drivers sharing the
+> > same register, rework it to have the same single driver registering three
+> > different clocks.
 > >
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Acked-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
 > > ---
-> >  .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
-> >  drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
-> >  2 files changed, 53 insertions(+), 27 deletions(-)
+> >  Documentation/devicetree/bindings/clock/sunxi.txt |   7 +-
+> >  drivers/clk/sunxi/clk-mod0.c                      | 131 ++++++++++++----------
+> >  2 files changed, 74 insertions(+), 64 deletions(-)
 > >
-> > diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> > index 91b3a3467150..4bf41d833804 100644
-> > --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> > @@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
-> >  Required properties:
-> >   - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
-> >   - reg : mmc controller base registers
-> > - - clocks : a list with 2 phandle + clock specifier pairs
-> > - - clock-names : must contain "ahb" and "mmc"
-> > + - clocks : a list with 4 phandle + clock specifier pairs
-> > + - clock-names : must contain "ahb", "mmc", "output" and "sample"
-> >   - interrupts : mmc controller interrupt
+> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > index 9dc4f55a04ad..8c60433a7fc9 100644
+> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > @@ -55,8 +55,7 @@ Required properties:
+> >         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+> >         "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+> >         "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+> > -       "allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
+> > -       "allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
+> > +       "allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+> >         "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+> >         "allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
+> >         "allwinner,sun7i-a20-out-clk" - for the external output clocks
+> > @@ -95,6 +94,10 @@ For "allwinner,sun6i-a31-pll6-clk", there are 2 outputs. The first output
+> >  is the normal PLL6 output, or "pll6". The second output is rate doubled
+> >  PLL6, or "pll6x2".
 > >
-> >  Optional properties:
-> > @@ -25,8 +25,8 @@ Examples:
-> >         mmc0: mmc at 01c0f000 {
-> >                 compatible = "allwinner,sun5i-a13-mmc";
-> >                 reg = <0x01c0f000 0x1000>;
-> > -               clocks = <&ahb_gates 8>, <&mmc0_clk>;
-> > -               clock-names = "ahb", "mod";
-> > +               clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
-> > +               clock-names = "ahb", "mod", "output", "sample";
-> >                 interrupts = <0 32 4>;
-> >                 status = "disabled";
-> >         };
-> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> > index d1663b3c4143..afe20c322e55 100644
-> > --- a/drivers/mmc/host/sunxi-mmc.c
-> > +++ b/drivers/mmc/host/sunxi-mmc.c
-> > @@ -22,7 +22,6 @@
-> >
-> >  #include <linux/clk.h>
-> >  #include <linux/clk-private.h>
-> > -#include <linux/clk/sunxi.h>
+> > +The "allwinner,sun4i-a10-mmc-clk" has three different outputs: the
+> > +main clock, with the ID 0, and the output and sample clocks, with the
+> > +IDs 1 and 2, respectively.
+> > +
 > 
-> This conflicts with
-> 
->     05e07d8 mmc: sunxi: Remove unused includes of linux/clk-private.h
-> 
-> when applied over
-> 
->     a0eda58 (linux-next/master) Add linux-next specific files for 20141216
+> Could you also update the mmc/mod0 clock example in the bindings?
+> Currently it is an mmc module clock using the mod0 compatible.
 
-Thanks for the warning :)
-
-It's a pretty trivial conflict though, and I'll be the one merging it.
+I'll do that, yep.
 
 Maxime
 
@@ -88,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/ebab5b2a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/1aafcd8d/attachment.sig>
