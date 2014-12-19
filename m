@@ -1,86 +1,166 @@
 From: andrew.jackson@arm.com (Andrew Jackson)
-Date: Fri, 19 Dec 2014 16:18:07 +0000
-Subject: [PATCH v3 3/5] ASoC: dwc: Reorder code in preparation for DT support
+Date: Fri, 19 Dec 2014 16:18:08 +0000
+Subject: [PATCH v3 4/5] ASoC: dwc: Add devicetree support for Designware I2S
 In-Reply-To: <cover.1418826016.git.Andrew.Jackson@arm.com>
 References: <cover.1418826016.git.Andrew.Jackson@arm.com>
-Message-ID: <cc0f212c245beaefa542194cabe5cf5ebfc81fd3.1418826016.git.Andrew.Jackson@arm.com>
+Message-ID: <9699e11a566938b8d1821f9be3df3276d57cd979.1418826016.git.Andrew.Jackson@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Jackson <Andrew.Jackson@arm.com>
 
-Move code that configures the DAI and DMA into a separate function.  This
-reduces the size of the dw_i2s_probe function and will make it easier to
-add support for device tree to the driver.
+Allow the driver to be configured through a device tree rather than platform
+data.  When using device-tree, read the I2S block's configuration from the
+relevant registers: this reduces the amount of information required in
+the device tree.
 
 Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
 ---
- sound/soc/dwc/designware_i2s.c |   73 +++++++++++++++++++++------------------
- 1 files changed, 39 insertions(+), 34 deletions(-)
+ sound/soc/dwc/Kconfig          |    1 +
+ sound/soc/dwc/designware_i2s.c |  199 ++++++++++++++++++++++++++++++++++------
+ 2 files changed, 171 insertions(+), 29 deletions(-)
 
+diff --git a/sound/soc/dwc/Kconfig b/sound/soc/dwc/Kconfig
+index e334900..d50e085 100644
+--- a/sound/soc/dwc/Kconfig
++++ b/sound/soc/dwc/Kconfig
+@@ -1,6 +1,7 @@
+ config SND_DESIGNWARE_I2S
+ 	tristate "Synopsys I2S Device Driver"
+ 	depends on CLKDEV_LOOKUP
++	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	help
+ 	 Say Y or M if you want to add support for I2S driver for
+ 	 Synopsys desigwnware I2S device. The device supports upto
 diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
-index 2ba1e2e..06d3a34 100644
+index 06d3a34..7905c52 100644
 --- a/sound/soc/dwc/designware_i2s.c
 +++ b/sound/soc/dwc/designware_i2s.c
-@@ -335,13 +335,47 @@ static int dw_i2s_resume(struct snd_soc_dai *dai)
+@@ -22,6 +22,7 @@
+ #include <sound/pcm.h>
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
++#include <sound/dmaengine_pcm.h>
+ 
+ /* common register for all channel */
+ #define IER		0x000
+@@ -54,9 +55,35 @@
+ #define I2S_COMP_VERSION	0x01F8
+ #define I2S_COMP_TYPE		0x01FC
+ 
++/*
++ * Component parameter register fields - define the I2S block's
++ * configuration.
++ */
++#define	COMP1_TX_WORDSIZE_3(r)	(((r) & GENMASK(27, 25)) >> 25)
++#define	COMP1_TX_WORDSIZE_2(r)	(((r) & GENMASK(24, 22)) >> 22)
++#define	COMP1_TX_WORDSIZE_1(r)	(((r) & GENMASK(21, 19)) >> 19)
++#define	COMP1_TX_WORDSIZE_0(r)	(((r) & GENMASK(18, 16)) >> 16)
++#define	COMP1_TX_CHANNELS(r)	(((r) & GENMASK(10, 9)) >> 9)
++#define	COMP1_RX_CHANNELS(r)	(((r) & GENMASK(8, 7)) >> 7)
++#define	COMP1_RX_ENABLED(r)	(((r) & BIT(6)) >> 6)
++#define	COMP1_TX_ENABLED(r)	(((r) & BIT(5)) >> 5)
++#define	COMP1_MODE_EN(r)	(((r) & BIT(4)) >> 4)
++#define	COMP1_FIFO_DEPTH_GLOBAL(r)	(((r) & GENMASK(3, 2)) >> 2)
++#define	COMP1_APB_DATA_WIDTH(r)	(((r) & GENMASK(1, 0)) >> 0)
++
++#define	COMP2_RX_WORDSIZE_3(r)	(((r) & GENMASK(12, 10)) >> 10)
++#define	COMP2_RX_WORDSIZE_2(r)	(((r) & GENMASK(9, 7)) >> 7)
++#define	COMP2_RX_WORDSIZE_1(r)	(((r) & GENMASK(5, 3)) >> 3)
++#define	COMP2_RX_WORDSIZE_0(r)	(((r) & GENMASK(2, 0)) >> 0)
++
+ #define MAX_CHANNEL_NUM		8
+ #define MIN_CHANNEL_NUM		2
+ 
++union snd_dma_data {
++	struct i2s_dma_data pd;
++	struct snd_dmaengine_dai_dma_data dt;
++};
++
+ struct dw_i2s_dev {
+ 	void __iomem *i2s_base;
+ 	struct clk *clk;
+@@ -65,8 +92,8 @@ struct dw_i2s_dev {
+ 	struct device *dev;
+ 
+ 	/* data related to DMA transfers b/w i2s and DMAC */
+-	struct i2s_dma_data play_dma_data;
+-	struct i2s_dma_data capture_dma_data;
++	union snd_dma_data play_dma_data;
++	union snd_dma_data capture_dma_data;
+ 	struct i2s_clk_config_data config;
+ 	int (*i2s_clk_cfg)(struct i2s_clk_config_data *config);
+ };
+@@ -153,7 +180,7 @@ static int dw_i2s_startup(struct snd_pcm_substream *substream,
+ 		struct snd_soc_dai *cpu_dai)
+ {
+ 	struct dw_i2s_dev *dev = snd_soc_dai_get_drvdata(cpu_dai);
+-	struct i2s_dma_data *dma_data = NULL;
++	union snd_dma_data *dma_data = NULL;
+ 
+ 	if (!(dev->capability & DWC_I2S_RECORD) &&
+ 			(substream->stream == SNDRV_PCM_STREAM_CAPTURE))
+@@ -242,13 +269,18 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	config->sample_rate = params_rate(params);
+ 
+-	if (!dev->i2s_clk_cfg)
+-		return -EINVAL;
++	if (dev->i2s_clk_cfg) {
++		ret = dev->i2s_clk_cfg(config);
++		if (ret < 0) {
++			dev_err(dev->dev, "runtime audio clk config fail\n");
++			return ret;
++		}
++	} else {
++		u32	bitclk;
+ 
+-	ret = dev->i2s_clk_cfg(config);
+-	if (ret < 0) {
+-		dev_err(dev->dev, "runtime audio clk config fail\n");
+-		return ret;
++		/* TODO: Validate sample rate against permissible set */
++		bitclk = config->sample_rate * config->data_width * 2;
++		clk_set_rate(dev->clk, bitclk);
+ 	}
+ 
+ 	return 0;
+@@ -335,6 +367,31 @@ static int dw_i2s_resume(struct snd_soc_dai *dai)
  #define dw_i2s_resume	NULL
  #endif
  
-+static void dw_configure_dai_by_pd(struct dw_i2s_dev *dev,
-+				   struct snd_soc_dai_driver *dw_i2s_dai,
-+				   struct resource *res,
-+				   const struct i2s_platform_data *pdata)
-+{
-+	/* Set DMA slaves info */
++/* Maximum resolution of a channel - not uniformly spaced */
++static const u32 fifo_width[] = {
++	12, 16, 20, 24, 32, 0, 0, 0
++};
 +
-+	dev->play_dma_data.data = pdata->play_dma_data;
-+	dev->capture_dma_data.data = pdata->capture_dma_data;
-+	dev->play_dma_data.addr = res->start + I2S_TXDMA;
-+	dev->capture_dma_data.addr = res->start + I2S_RXDMA;
-+	dev->play_dma_data.max_burst = 16;
-+	dev->capture_dma_data.max_burst = 16;
-+	dev->play_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	dev->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	dev->play_dma_data.filter = pdata->filter;
-+	dev->capture_dma_data.filter = pdata->filter;
++/* Width of (DMA) bus */
++static const u32 bus_widths[] = {
++	DMA_SLAVE_BUSWIDTH_1_BYTE,
++	DMA_SLAVE_BUSWIDTH_2_BYTES,
++	DMA_SLAVE_BUSWIDTH_4_BYTES,
++	DMA_SLAVE_BUSWIDTH_UNDEFINED
++};
 +
-+	if (pdata->cap & DWC_I2S_PLAY) {
-+		dev_dbg(dev->dev, " designware: play supported\n");
-+		dw_i2s_dai->playback.channels_min = MIN_CHANNEL_NUM;
-+		dw_i2s_dai->playback.channels_max = pdata->channel;
-+		dw_i2s_dai->playback.formats = pdata->snd_fmts;
-+		dw_i2s_dai->playback.rates = pdata->snd_rates;
-+	}
++/* PCM format to support channel resolution */
++static const u32 formats[] = {
++	SNDRV_PCM_FMTBIT_S16_LE,
++	SNDRV_PCM_FMTBIT_S16_LE,
++	SNDRV_PCM_FMTBIT_S24_LE,
++	SNDRV_PCM_FMTBIT_S24_LE,
++	SNDRV_PCM_FMTBIT_S32_LE,
++	0,
++	0,
++	0
++};
 +
-+	if (pdata->cap & DWC_I2S_RECORD) {
-+		dev_dbg(dev->dev, "designware: record supported\n");
-+		dw_i2s_dai->capture.channels_min = MIN_CHANNEL_NUM;
-+		dw_i2s_dai->capture.channels_max = pdata->channel;
-+		dw_i2s_dai->capture.formats = pdata->snd_fmts;
-+		dw_i2s_dai->capture.rates = pdata->snd_rates;
-+	}
-+}
-+
- static int dw_i2s_probe(struct platform_device *pdev)
+ static void dw_configure_dai_by_pd(struct dw_i2s_dev *dev,
+ 				   struct snd_soc_dai_driver *dw_i2s_dai,
+ 				   struct resource *res,
+@@ -342,16 +399,16 @@ static void dw_configure_dai_by_pd(struct dw_i2s_dev *dev,
  {
- 	const struct i2s_platform_data *pdata = pdev->dev.platform_data;
- 	struct dw_i2s_dev *dev;
- 	struct resource *res;
- 	int ret;
--	unsigned int cap;
- 	struct snd_soc_dai_driver *dw_i2s_dai;
+ 	/* Set DMA slaves info */
  
- 	if (!pdata) {
-@@ -368,23 +402,11 @@ static int dw_i2s_probe(struct platform_device *pdev)
- 	if (IS_ERR(dev->i2s_base))
- 		return PTR_ERR(dev->i2s_base);
- 
--	cap = pdata->cap;
--	dev->capability = cap;
--	dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
--
--	/* Set DMA slaves info */
--
 -	dev->play_dma_data.data = pdata->play_dma_data;
 -	dev->capture_dma_data.data = pdata->capture_dma_data;
 -	dev->play_dma_data.addr = res->start + I2S_TXDMA;
@@ -91,37 +171,164 @@ index 2ba1e2e..06d3a34 100644
 -	dev->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
 -	dev->play_dma_data.filter = pdata->filter;
 -	dev->capture_dma_data.filter = pdata->filter;
-+	dev->dev = &pdev->dev;
-+	dw_configure_dai_by_pd(dev, dw_i2s_dai, res, pdata);
++	dev->play_dma_data.pd.data = pdata->play_dma_data;
++	dev->capture_dma_data.pd.data = pdata->capture_dma_data;
++	dev->play_dma_data.pd.addr = res->start + I2S_TXDMA;
++	dev->capture_dma_data.pd.addr = res->start + I2S_RXDMA;
++	dev->play_dma_data.pd.max_burst = 16;
++	dev->capture_dma_data.pd.max_burst = 16;
++	dev->play_dma_data.pd.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++	dev->capture_dma_data.pd.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++	dev->play_dma_data.pd.filter = pdata->filter;
++	dev->capture_dma_data.pd.filter = pdata->filter;
  
-+	dev->capability = pdata->cap;
-+	dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
- 	dev->clk = clk_get(&pdev->dev, NULL);
+ 	if (pdata->cap & DWC_I2S_PLAY) {
+ 		dev_dbg(dev->dev, " designware: play supported\n");
+@@ -370,6 +427,59 @@ static void dw_configure_dai_by_pd(struct dw_i2s_dev *dev,
+ 	}
+ }
+ 
++static void dw_configure_dai_by_dt(struct dw_i2s_dev *dev,
++				   struct snd_soc_dai_driver *dw_i2s_dai,
++				   struct resource *res)
++{
++	/*
++	 * Read component parameter registers to extract
++	 * the I2S block's configuration.
++	 */
++	u32 comp1 = i2s_read_reg(dev->i2s_base, I2S_COMP_PARAM_1);
++	u32 comp2 = i2s_read_reg(dev->i2s_base, I2S_COMP_PARAM_2);
++	u32 bus_width = bus_widths[COMP1_APB_DATA_WIDTH(comp1)];
++	u32 fifo_depth = 1 << (1 + COMP1_FIFO_DEPTH_GLOBAL(comp1));
++	u32 max_size;
++
++	/*
++	 * All channels' hardware configuration assumed to be the same.
++	 */
++	if (COMP1_TX_ENABLED(comp1)) {
++		dev_dbg(dev->dev, "playback capable\n");
++
++		dev->capability |= DWC_I2S_PLAY;
++		max_size = COMP1_TX_WORDSIZE_0(comp1);
++		dev->play_dma_data.dt.addr = res->start + I2S_TXDMA;
++		dev->play_dma_data.dt.addr_width = bus_width;
++		dev->play_dma_data.dt.chan_name = "TX";
++		dev->play_dma_data.dt.fifo_size = fifo_depth *
++			(fifo_width[max_size]) >> 8;
++		dev->play_dma_data.dt.maxburst = 16;
++		dw_i2s_dai->playback.channels_min = MIN_CHANNEL_NUM;
++		dw_i2s_dai->playback.channels_max =
++				1 << (COMP1_TX_CHANNELS(comp1) + 1);
++		dw_i2s_dai->playback.formats = formats[max_size];
++		dw_i2s_dai->playback.rates = SNDRV_PCM_RATE_8000_192000;
++	}
++	if (COMP1_RX_ENABLED(comp1)) {
++		dev_dbg(dev->dev, "record capable\n");
++
++		dev->capability |= DWC_I2S_RECORD;
++		max_size = COMP2_RX_WORDSIZE_0(comp2);
++		dev->capture_dma_data.dt.addr = res->start + I2S_RXDMA;
++		dev->capture_dma_data.dt.addr_width = bus_width;
++		dev->capture_dma_data.dt.chan_name = "RX";
++		dev->capture_dma_data.dt.fifo_size = fifo_depth *
++			(fifo_width[max_size] >> 8);
++		dev->capture_dma_data.dt.maxburst = 16;
++		dw_i2s_dai->capture.channels_min = MIN_CHANNEL_NUM;
++		dw_i2s_dai->capture.channels_max =
++				1 << (COMP1_RX_CHANNELS(comp1) + 1);
++		dw_i2s_dai->capture.formats = formats[max_size];
++		dw_i2s_dai->capture.rates = SNDRV_PCM_RATE_8000_192000;
++	}
++}
++
+ static int dw_i2s_probe(struct platform_device *pdev)
+ {
+ 	const struct i2s_platform_data *pdata = pdev->dev.platform_data;
+@@ -378,11 +488,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 	int ret;
+ 	struct snd_soc_dai_driver *dw_i2s_dai;
+ 
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "Invalid platform data\n");
+-		return -EINVAL;
+-	}
+-
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_warn(&pdev->dev, "kzalloc fail\n");
+@@ -403,13 +508,28 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 		return PTR_ERR(dev->i2s_base);
+ 
+ 	dev->dev = &pdev->dev;
+-	dw_configure_dai_by_pd(dev, dw_i2s_dai, res, pdata);
++	if (pdata) {
++		dw_configure_dai_by_pd(dev, dw_i2s_dai, res, pdata);
++
++		dev->capability = pdata->cap;
++		dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
++		if (!dev->i2s_clk_cfg) {
++			dev_err(&pdev->dev, "no clock configure method\n");
++			return -ENODEV;
++		}
+ 
+-	dev->capability = pdata->cap;
+-	dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
+-	dev->clk = clk_get(&pdev->dev, NULL);
++		dev->clk = clk_get(&pdev->dev, NULL);
++	} else {
++		dw_configure_dai_by_dt(dev, dw_i2s_dai, res);
++
++		dev->clk = devm_clk_get(&pdev->dev, "i2sclk");
++	}
  	if (IS_ERR(dev->clk))
- 		return  PTR_ERR(dev->clk);
-@@ -393,23 +415,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_clk_put;
+-		return  PTR_ERR(dev->clk);
++		return PTR_ERR(dev->clk);
++
++	ret = clk_prepare(dev->clk);
++	if (ret < 0)
++		goto err_clk_put;
  
--	if (cap & DWC_I2S_PLAY) {
--		dev_dbg(&pdev->dev, " designware: play supported\n");
--		dw_i2s_dai->playback.channels_min = MIN_CHANNEL_NUM;
--		dw_i2s_dai->playback.channels_max = pdata->channel;
--		dw_i2s_dai->playback.formats = pdata->snd_fmts;
--		dw_i2s_dai->playback.rates = pdata->snd_rates;
--	}
--
--	if (cap & DWC_I2S_RECORD) {
--		dev_dbg(&pdev->dev, "designware: record supported\n");
--		dw_i2s_dai->capture.channels_min = MIN_CHANNEL_NUM;
--		dw_i2s_dai->capture.channels_max = pdata->channel;
--		dw_i2s_dai->capture.formats = pdata->snd_fmts;
--		dw_i2s_dai->capture.rates = pdata->snd_rates;
--	}
--
--	dev->dev = &pdev->dev;
- 	dev_set_drvdata(&pdev->dev, dev);
- 	ret = snd_soc_register_component(&pdev->dev, &dw_i2s_component,
- 					 dw_i2s_dai, 1);
+ 	ret = clk_enable(dev->clk);
+ 	if (ret < 0)
+@@ -423,6 +543,15 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 		goto err_clk_disable;
+ 	}
+ 
++	if (!pdata) {
++		ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"Could not register PCM: %d\n", ret);
++			return ret;
++		}
++	}
++
+ 	return 0;
+ 
+ err_clk_disable:
+@@ -443,11 +572,23 @@ static int dw_i2s_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id dw_i2s_of_match[] = {
++	{ .compatible = "snps,designware-i2s",	 },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, dw_i2s_of_match);
++#endif
++
+ static struct platform_driver dw_i2s_driver = {
+ 	.probe		= dw_i2s_probe,
+ 	.remove		= dw_i2s_remove,
+ 	.driver		= {
+ 		.name	= "designware-i2s",
++#ifdef CONFIG_OF
++		.of_match_table = dw_i2s_of_match,
++#endif
+ 	},
+ };
+ 
 -- 
 1.7.1
