@@ -1,34 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 19 Dec 2014 16:23:43 +0000
-Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
-In-Reply-To: <CAJ+vNU1YQWGFaEm8w8wtaFvUy1jig26jW3+3teMFHLB_oFyn8Q@mail.gmail.com>
-References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
- <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
- <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
- <CAJ+vNU3PQYCE4tABUiqU+vGkGqBEqdVKz25W88-ByOQZxunVLw@mail.gmail.com>
- <20141218142205.GZ11764@sirena.org.uk>
- <CAJ+vNU1YQWGFaEm8w8wtaFvUy1jig26jW3+3teMFHLB_oFyn8Q@mail.gmail.com>
-Message-ID: <20141219162343.GF11764@sirena.org.uk>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Fri, 19 Dec 2014 16:45:35 +0000 (UTC)
+Subject: regression: Clock changes in next-20141205 break at least
+ omap4
+In-Reply-To: <5491703A.2080506@ti.com>
+References: <20141212194238.20398.33333@quantum>
+ <alpine.DEB.2.02.1412122310570.29716@utopia.booyaka.com>
+ <20141215220224.20398.98259@quantum> <548F7B02.1090009@nvidia.com>
+ <20141216003834.GC23854@atomide.com> <548F8B70.2060803@nvidia.com>
+ <5490816E.7060706@codeaurora.org> <54908F8D.2020202@nvidia.com>
+ <20141216202301.GF11502@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1412162034420.3102@utopia.booyaka.com>
+ <20141216205754.GG11502@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1412162159270.3102@utopia.booyaka.com>
+ <1418809957.3347.1.camel@pengutronix.de> <5491703A.2080506@ti.com>
+Message-ID: <alpine.DEB.2.02.1412191641310.3102@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 19, 2014 at 08:17:41AM -0800, Tim Harvey wrote:
+On Wed, 17 Dec 2014, Tero Kristo wrote:
 
-> frequency setpoint. If however you have an external PMIC that is
-> capable of adjusting the VDD_ARM and VDD_SOC to the IMX6 and an
-> appropriate regulator driver is capable of doing so, you must
-> configure the cpu nodes vddarm and vddsoc regulators to those provided
-> by your PMIC and 'bypass' the internal LDO's by setting their scaling
+> The dual parent issue required by the DPLL code is caused by the introduction
+> of determine-rate / set-parent / set-rate-and-parent logic to OMAP DPPLs. I
+> took a short-cut here, making the assumption that every DPLL has both of these
+> clocks defined (which basically they do have, as every DPLL technically has
+> both reference and bypass clocks, but which can be the same clock => thus the
+> declaration itself is missing in some cases.) The clock data is modelled like
+> this for every other TI SoC (which use DT clock data), except for omap3 legacy
+> clock data, thus the patch to tweak the clock data itself. It would be much
+> harder to modify the clock code itself to take this into account, rather than
+> just add the missing parents to the clock data, thus the approach taken in the
+> patch. We can of course discuss whether it is okay to have DPLLs modelled as
+> they are right now. I think them as composite clocks containing mux, gate and
+> divider/multiplier logic within a single black box, we could split them up,
+> but I don't see much need for that. If it works, don't break it.
+> 
+> Regarding the omap3 clock data patch, I have also just posted new patch set
+> that will move the omap3 legacy clock data under clock driver, until we figure
+> out what to finally do with this (use the DT clocks, or introduce loadable
+> clock data modules or something.) Thus, the data patch is kind of a temporary
+> one, or thats the intention at least, but I wouldn't call it a hack. It is
+> there to fix the issues introduced by the set-parent / set-rate-and-parent
+> logic, which was required by the changes to the core clock set-rate.
 
-You're describing the implementation again, not the system.  Describe
-the system then if you want to describe the solution you've come up with
-for modelling it do so separately.
+OK, I understand now why the OMAP3 clock DT data takes two of the same 
+clock - one is for the reference and one is for bypass.  So I retract my 
+earlier statement about it being a hack, and am fine with Tero's original 
+patch.
 
-Please also try to use paragraphs to break up what you're saying a bit.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/e93f6f4b/attachment-0001.sig>
+I suppose I should resuscitate the uImage booter for the OMAP3 boards here 
+at least.  I dropped those out of the testbed thinking that we'd switch 
+over to DT-only fairly quickly; that turned out not to be the case.
+
+
+- Paul
