@@ -1,48 +1,83 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 19 Dec 2014 14:55:31 +0100
-Subject: [PATCH v2 11/16] ASoC: samsung: odroidx2: Handle I2S CDCLK clock
- conditionally
+Date: Fri, 19 Dec 2014 14:55:32 +0100
+Subject: [PATCH v2 12/16] ASoC: samsung: i2s: Add clk provider DT binding
+ documentation
 In-Reply-To: <1418997336-17777-1-git-send-email-s.nawrocki@samsung.com>
 References: <1418997336-17777-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1418997336-17777-12-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1418997336-17777-13-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support old DTs we check the codec device node if it
-contains "clocks" property and only if it doesn't (which indicates
-an old DT) we proceed with enabling the CDCLK clock by means of
-the set_sysclk() callback.  For new DTs which use the common clock
-bindings for CDCLK that clock is supposed to be handled outside
-the sound machine driver.
+The new DT properties required for the I2S device node to be referred
+as a clock provider and corresponding clock indices definition is added.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- sound/soc/samsung/odroidx2_max98090.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   22 ++++++++++++++++++++
+ include/dt-bindings/sound/samsung-i2s.h            |    8 +++++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 include/dt-bindings/sound/samsung-i2s.h
 
-diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
-index d7640e7..5a87794 100644
---- a/sound/soc/samsung/odroidx2_max98090.c
-+++ b/sound/soc/samsung/odroidx2_max98090.c
-@@ -21,6 +21,8 @@ struct odroidx2_drv_data {
- /* The I2S CDCLK output clock frequency for the MAX98090 codec */
- #define MAX98090_MCLK 19200000
- 
-+static struct snd_soc_dai_link odroidx2_dai[];
+diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+index d188296..09e0e18 100644
+--- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
+@@ -33,6 +33,25 @@ Required SoC Specific Properties:
+   "iis" is the i2s bus clock and i2s_opclk0, i2s_opclk1 are sources of the root
+   clk. i2s0 has internal mux to select the source of root clk and i2s1 and i2s2
+   doesn't have any such mux.
++- #clock-cells: should be 1, this property must be present if the I2S device
++  is a clock provider in terms of the common clock bindings, described in
++  ../clock/clock-bindings.txt.
++- clock-output-names: from the common clock bindings, names of the CDCLK
++  I2S output clocks, suggested values are "i2s_cdclk0", "i2s_cdclk1",
++  "i2s_cdclk3" for the I2S0, I2S1, I2S2 devices recpectively.
 +
- static int odroidx2_late_probe(struct snd_soc_card *card)
- {
- 	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
-@@ -29,7 +31,9 @@ static int odroidx2_late_probe(struct snd_soc_card *card)
- 
- 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
- 						SND_SOC_CLOCK_IN);
--	if (ret < 0)
++There are following clocks available at the I2S device nodes:
++ CLK_I2S_CDCLK    - the CDCLK (CODECLKO) gate clock,
++ CLK_I2S_RCLK_PSR - the RCLK prescaler divider clock (corresponding to the
++		    IISPSR register),
++ CLK_I2S_RCLK_SRC - the RCLKSRC mux clock (corresponding to RCLKSRC bit in
++		    IISMOD register).
 +
-+	if (ret < 0 || of_find_property(odroidx2_dai[0].codec_of_node,
-+					"clocks", NULL))
- 		return ret;
++Refer to the SoC datasheet for availability of the above clocks.
++The CLK_I2S_RCLK_PSR and CLK_I2S_RCLK_SRC clocks are usually only available
++in the IIS Multi Audio Interface (I2S0).
++Note: Old DTs may not have the #clock-cells, clock-output-names properties
++and then not use the I2S node as a clock supplier.
  
- 	/* Set the cpu DAI configuration in order to use CDCLK */
+ Optional SoC Specific Properties:
+ 
+@@ -41,6 +60,7 @@ Optional SoC Specific Properties:
+ - pinctrl-0: Should specify pin control groups used for this controller.
+ - pinctrl-names: Should contain only one value - "default".
+ 
++
+ Example:
+ 
+ i2s0: i2s at 03830000 {
+@@ -54,6 +74,8 @@ i2s0: i2s at 03830000 {
+ 		<&clock_audss EXYNOS_I2S_BUS>,
+ 		<&clock_audss EXYNOS_SCLK_I2S>;
+ 	clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
++	#clock-cells;
++	clock-output-names = "i2s_cdclk0";
+ 	samsung,idma-addr = <0x03000000>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2s0_bus>;
+diff --git a/include/dt-bindings/sound/samsung-i2s.h b/include/dt-bindings/sound/samsung-i2s.h
+new file mode 100644
+index 0000000..0c69818d
+--- /dev/null
++++ b/include/dt-bindings/sound/samsung-i2s.h
+@@ -0,0 +1,8 @@
++#ifndef _DT_BINDINGS_SAMSUNG_I2S_H
++#define _DT_BINDINGS_SAMSUNG_I2S_H
++
++#define CLK_I2S_CDCLK		0
++#define CLK_I2S_RCLK_SRC	1
++#define CLK_I2S_RCLK_PSR	2
++
++#endif /* _DT_BINDINGS_SAMSUNG_I2S_H */
 -- 
 1.7.9.5
