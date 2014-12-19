@@ -1,120 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Dec 2014 19:34:50 +0100
-Subject: [PATCH v2 12/13] ARM: dts: sun6i: Add sun6i-a31s.dtsi
-In-Reply-To: <1418836704-15689-13-git-send-email-hdegoede@redhat.com>
-References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-13-git-send-email-hdegoede@redhat.com>
-Message-ID: <20141219183450.GZ4820@lukather>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 19 Dec 2014 17:00:14 -0500
+Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
+ SoC) EVMs
+In-Reply-To: <20141219211816.GH10857@pengutronix.de>
+References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
+Message-ID: <54949FEE.8070808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 06:18:23PM +0100, Hans de Goede wrote:
-> Add a dtsi file for A31s based boards.
-> 
-> Since the  A31s is the same die as the A31 in a different package, this dtsi
-> simply includes sun6i-a31.dtsi and then overrides the pinctrl compatible to
-> reflect the different package, everything else is identical.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -include sun6i-a31.dtsi and override the pinctrl compatible, rather then
->  copying everything
-> ---
->  arch/arm/boot/dts/sun6i-a31s.dtsi | 62 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun6i-a31s.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sun6i-a31s.dtsi b/arch/arm/boot/dts/sun6i-a31s.dtsi
-> new file mode 100644
-> index 0000000..d0bd2b9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun6i-a31s.dtsi
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/*
-> + * The A31s is the same die as the A31 in a different package, this is
-> + * reflected by it having different pinctrl compatible everything else is
-> + * identical.
-> + */
-> +
-> +/include/ "sun6i-a31.dtsi"
-> +
-> +/ {
-> +	soc at 01c00000 {
-> +		pio: pinctrl at 01c20800 {
-> +			compatible = "allwinner,sun6i-a31s-pinctrl";
-> +		};
-> +	};
-> +};
+On 12/19/2014 04:18 PM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Fri, Dec 19, 2014 at 03:55:50PM -0500, Murali Karicheri wrote:
+>> I have pulled the latest master from
+>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and
+>> tried booting on keystone k2hk and k2e EVM. The boot hangs with
+>> following log. Has anyone seen this? Keystone is an ARM v7 cortex
+>> A15 SMP platform. I am assuming master branch is broken for ARM v7
+>> and someone is working to address this. v3.18 booted up fine on my
+>> EVM.
+>>
+>> Any idea?
+> You forgot to attach the log?! So no, I don't have any idea. Did you
+> bisect?
+>
+> Best regards
+> Uwe
+>
+Just see below if I enable debug earlyprintk
 
-Given your previous changes, you should also update the enable-method.
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 3.18.0-11757-gd790be3 
+(a0868495 at ares-ubuntu) (gcc version 4.7.3 20130226 (prerelease) 
+(crosstool-NG linaro-1.13.1-4.7-2013.03-20130313 - Linaro GCC 2013.03) ) 
+#1 SMP PREEMPT Fri Dec 19 15:53:47 EST 2014
+[    0.000000] CPU: ARMv7 Processor [412fc0f4] revision 4 (ARMv7), 
+cr=30c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction 
+cache
+[    0.000000] Machine model: Texas Instruments Keystone 2 Edison EVM
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] Switching to high address space at 0x800000000
+[    0.000000] WARNING: unsafe modification of in-place page tables - 
+tainting kernel
+[    0.000000] cma: Reserved 16 MiB at 0x000000085f000000
+[    0.000000] Forcing write-allocate cache policy for SMP
+[    0.000000] Memory policy: Data cache writealloc
 
-Also, for this patch and the next one, Arnd just warned me that we
-shouldn't duplicate the DT path, and that we should switch to the new
-trend on using label references (like what TI or Amlogic does for
-example).
+I am currently doing a git bisect to find the offending commit.
 
-I'll take care on converting the existing users, but could you repost
-these patches with this ?
-
-Thanks,
-Maxime
+Murali
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141219/e5f9100b/attachment.sig>
+Murali Karicheri
+Linux Kernel, Texas Instruments
