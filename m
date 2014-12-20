@@ -1,46 +1,83 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 20 Dec 2014 11:44:37 +0100
-Subject: [PATCH v3] input: Add new sun4i-lradc-keys driver
-In-Reply-To: <20141218175153.GA34618@dtor-ws>
-References: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
- <20141218175153.GA34618@dtor-ws>
-Message-ID: <54955315.3030603@redhat.com>
+From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
+Date: Sat, 20 Dec 2014 13:38:36 +0100
+Subject: [PATCH] arch: arm: plat-samsung: setup-camif.c: Remove some unused
+ functions
+Message-ID: <1419079116-31868-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+Removes some functions that are not used anywhere:
+s3c_camif_gpio_put() s3c_camif_gpio_get()
 
-On 18-12-14 18:51, Dmitry Torokhov wrote:
-> Hi Hans,
->
-> On Thu, Dec 18, 2014 at 11:23:13AM +0100, Hans de Goede wrote:
->> Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
->> specifically designed to have various (tablet) keys (ie home, back, search,
->> etc). attached to it using a resistor network. This adds a driver for this.
->>
->> There are 2 channels, currently this driver only supports chan0 since there
->> are no boards known to use chan1.
->>
->> This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
->> a20-olinuxino-micro.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> --
->> Changes in v2:
->> -Change devicetree bindings to use a per key subnode, like gpio-keys does
->> Changes in v3:
->> -Handle keyup irq flag before irqdown, in case we get both at once
->
-> Thank you for making changes. Can you please tell me if the driver still
-> works if you drop the patch below on top of it? The changes are:
->
-> - split DT parsing into a separate function;
-> - make sure keymap is not empty;
-> - change 'ret' variable to 'error';
+This was partially found by using a static code analysis program called cppcheck.
 
-The proposed changes look good, and I've given them a test-spin and everything
-still works fine.
+Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+---
+ arch/arm/plat-samsung/setup-camif.c |   41 -----------------------------------
+ include/media/s3c_camif.h           |    4 ----
+ 2 files changed, 45 deletions(-)
 
-Thanks & Regards,
-
-Hans
+diff --git a/arch/arm/plat-samsung/setup-camif.c b/arch/arm/plat-samsung/setup-camif.c
+index 72d8edb..3a56ee3 100644
+--- a/arch/arm/plat-samsung/setup-camif.c
++++ b/arch/arm/plat-samsung/setup-camif.c
+@@ -28,44 +28,3 @@ static void camif_get_gpios(int *gpio_start, int *gpio_reset)
+ 	*gpio_reset = S3C64XX_GPF(3);
+ #endif
+ }
+-
+-int s3c_camif_gpio_get(void)
+-{
+-	int gpio_start, gpio_reset;
+-	int ret, i;
+-
+-	camif_get_gpios(&gpio_start, &gpio_reset);
+-
+-	for (i = 0; i < S3C_CAMIF_NUM_GPIOS; i++) {
+-		int gpio = gpio_start + i;
+-
+-		if (gpio == gpio_reset)
+-			continue;
+-
+-		ret = gpio_request(gpio, "camif");
+-		if (!ret)
+-			ret = s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		if (ret) {
+-			pr_err("failed to configure GPIO %d\n", gpio);
+-			for (--i; i >= 0; i--)
+-				gpio_free(gpio--);
+-			return ret;
+-		}
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-	}
+-
+-	return 0;
+-}
+-
+-void s3c_camif_gpio_put(void)
+-{
+-	int i, gpio_start, gpio_reset;
+-
+-	camif_get_gpios(&gpio_start, &gpio_reset);
+-
+-	for (i = 0; i < S3C_CAMIF_NUM_GPIOS; i++) {
+-		int gpio = gpio_start + i;
+-		if (gpio != gpio_reset)
+-			gpio_free(gpio);
+-	}
+-}
+diff --git a/include/media/s3c_camif.h b/include/media/s3c_camif.h
+index df96c2c..aa2f851 100644
+--- a/include/media/s3c_camif.h
++++ b/include/media/s3c_camif.h
+@@ -38,8 +38,4 @@ struct s3c_camif_plat_data {
+ 	int (*gpio_put)(void);
+ };
+ 
+-/* Platform default helper functions */
+-int s3c_camif_gpio_get(void);
+-int s3c_camif_gpio_put(void);
+-
+ #endif /* MEDIA_S3C_CAMIF_ */
+-- 
+1.7.10.4
