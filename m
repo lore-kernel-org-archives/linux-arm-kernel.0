@@ -1,33 +1,47 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sat, 20 Dec 2014 17:36:15 +0100
+From: jmmahler@gmail.com (Jeremiah Mahler)
+Date: Sat, 20 Dec 2014 08:50:45 -0800
 Subject: [PATCH] scsi: arm: cumana_1.c:  Remove unused function
-Message-ID: <1419093375-8016-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+In-Reply-To: <1419093375-8016-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1419093375-8016-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20141220165045.GA5013@hudson.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the function cumanascsi_setup() that is not used anywhere.
+On Sat, Dec 20, 2014 at 05:36:15PM +0100, Rickard Strandqvist wrote:
+> Remove the function cumanascsi_setup() that is not used anywhere.
+> 
+> This was partially found by using a static code analysis program called cppcheck.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+> ---
+>  drivers/scsi/arm/cumana_1.c |    4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
+> index 8ef810a..7c90d9c 100644
+> --- a/drivers/scsi/arm/cumana_1.c
+> +++ b/drivers/scsi/arm/cumana_1.c
+> @@ -38,10 +38,6 @@
+>  
+>  #include "../NCR5380.h"
+>  
+> -void cumanascsi_setup(char *str, int *ints)
+> -{
+> -}
+> -
+>  const char *cumanascsi_info(struct Scsi_Host *spnt)
+>  {
+>  	return "";
+[...]
 
-This was partially found by using a static code analysis program called cppcheck.
+You can blame Linus for this one :-)
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- drivers/scsi/arm/cumana_1.c |    4 ----
- 1 file changed, 4 deletions(-)
+~/linux-next$ git blame -L 38,40 drivers/scsi/arm/cumana_1.c 
+^1da177e (Linus Torvalds 2005-04-16 15:20:36 -0700 38) void
+cumanascsi_setup(char *str, int *ints)
+^1da177e (Linus Torvalds 2005-04-16 15:20:36 -0700 39) {
+^1da177e (Linus Torvalds 2005-04-16 15:20:36 -0700 40) }
+~/linux-next$
 
-diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
-index 8ef810a..7c90d9c 100644
---- a/drivers/scsi/arm/cumana_1.c
-+++ b/drivers/scsi/arm/cumana_1.c
-@@ -38,10 +38,6 @@
- 
- #include "../NCR5380.h"
- 
--void cumanascsi_setup(char *str, int *ints)
--{
--}
--
- const char *cumanascsi_info(struct Scsi_Host *spnt)
- {
- 	return "";
 -- 
-1.7.10.4
+- Jeremiah Mahler
