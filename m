@@ -1,24 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 20 Dec 2014 21:07:53 +0100
-Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <54919AC9.2090306@arm.com>
-References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
- <20141217143305.GC8942@leverpostej> <54919AC9.2090306@arm.com>
-Message-ID: <3669965.zfJEHTFEBI@wuerfel>
+Date: Sat, 20 Dec 2014 21:21:10 +0100
+Subject: [PATCH] ALSA: atmel: fix building the ac97 driver for
+ at91-multiplatform
+In-Reply-To: <20141219170221.GU4885@piout.net>
+References: <1418944390-27719-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <54943BF8.4050008@cogentembedded.com> <20141219170221.GU4885@piout.net>
+Message-ID: <1638172.tTanQ3d90c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 December 2014 15:01:29 Marc Zyngier wrote:
+On Friday 19 December 2014 18:02:21 Alexandre Belloni wrote:
+> Arnd,
 > 
-> Indeed, as described in the documentation:
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/CHDIFAEE.html
+> On 19/12/2014 at 17:53:44 +0300, Sergei Shtylyov wrote :
+> > >+#define cpu_is_at32ap7000() (0)
+> > 
+> >    () around 0 not needed at all.
+> > 
 > 
-> Also it is worth noticing that given how GICV is placed, it will never
-> work with 64K pages and virtualization. Pretty sad.
+> Do you want me to fix that and resubmit? I don't have strong opinion
+> about this.
 
-Does this mean no VGIC support on this platform so you have to emulate it
-in order to run virtual machines with 64K pages, or does it mean that
-it's impossible to use that way because you can't emulate it?
+Yes, no point debating over this. I copied the definition from
+arch/arm/mach-at91/include/mach/cpu.h and didn't want to do any
+style changes, otherwise I'd probably have turned it into an
+inline function, but any version that works is fine with me.
 
 	Arnd
