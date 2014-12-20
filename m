@@ -1,49 +1,62 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 20 Dec 2014 21:01:06 +0200
-Subject: [RFC PATCH 2/2] iommu: rockchip: Handle system-wide and runtime PM
-In-Reply-To: <8712967.RZO6JKCTcJ@vostro.rjw.lan>
-References: <1418286387-9663-1-git-send-email-tfiga@chromium.org>
- <1649547.QECLmuJenN@avalon> <8712967.RZO6JKCTcJ@vostro.rjw.lan>
-Message-ID: <3922440.p7KFeqxHrO@avalon>
+Date: Sat, 20 Dec 2014 21:07:33 +0200
+Subject: [PING] [PATCH FOR v3.19 - v2] iommu/ipmmu-vmsa: change IOMMU_EXEC
+ to IOMMU_NOEXEC
+In-Reply-To: <1418668873-5091-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1418668873-5091-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <7279717.KWmNDRjuSk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Joerg,
 
-On Friday 19 December 2014 03:27:35 Rafael J. Wysocki wrote:
-> On Thursday, December 18, 2014 11:28:58 PM Laurent Pinchart wrote:
-> > Hi Kevin,
-> 
-> [cut]
-> 
->>>>> It would be better to be able to reference count the DMA engine from
->>>>> the bus master IMO and arguably you can use the runtime PM framework
->>>>> for that. Namely, give bus masters someting like
->>>>> 
->>>>> 	pm_runtime_get_my_DMA_engine(bus_master_device)
->>>>> 	pm_runtime_put_my_DMA_engine(bus_master_device)
->>>>> 
->>>>> and let them call these as they see fit.
->>>> 
->>>> Please note that we're not talking about DMA engines here, but about
->>>> IOMMUs. DMA is involved through the DMA mapping API which hides the
->>>> IOMMU completely from the bus master drivers, not the DMA engine API.
->>>> 
->>>> Exposing the IOMMU is something we want to avoid, but DMA mapping
->>>> start/stop operations could certainly be implemented.
->>> 
->>> The problem with that is it only solves the IOMMU problem.  We have a
->>> more generic PM dependency problem of which this IOMMU example is only a
->>> subset, so I think we need a more generic solution.
->> 
->> I agree that a more generic solution is needed at least to support ACPI
->> _DEP, but that might not be optimal in the IOMMU use case as explained
->> above.
->
-> Well, since we need it anyway, why don't we implement it and then figure out
-> if anything more specific needs to be done for the IOMMU case?
+Ping ?
 
-Patches are welcome ;-)
+On Monday 15 December 2014 20:41:13 Laurent Pinchart wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Commit a720b41c41f5a7e4 ("iommu/arm-smmu: change IOMMU_EXEC to
+> IOMMU_NOEXEC") has inverted and replaced the IOMMU_EXEC flag with
+> IOMMU_NOEXEC. Update the driver accordingly.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/iommu/ipmmu-vmsa.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> Changes since v1:
+> 
+> - Rewrote the commit message
+> 
+> Joerg, this is a compilation breakage fix for v3.19. Could you please take
+> it in your tree and submit it early during the -rc cycle ?
+> 
+> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+> index 68dfb0f..7486931 100644
+> --- a/drivers/iommu/ipmmu-vmsa.c
+> +++ b/drivers/iommu/ipmmu-vmsa.c
+> @@ -558,7 +558,7 @@ static pmd_t *ipmmu_alloc_pmd(struct ipmmu_vmsa_device
+> *mmu, pgd_t *pgd,
+> 
+>  static u64 ipmmu_page_prot(unsigned int prot, u64 type)
+>  {
+> -	u64 pgprot = ARM_VMSA_PTE_XN | ARM_VMSA_PTE_nG | ARM_VMSA_PTE_AF
+> +	u64 pgprot = ARM_VMSA_PTE_nG | ARM_VMSA_PTE_AF
+> 
+>  		   | ARM_VMSA_PTE_SH_IS | ARM_VMSA_PTE_AP_UNPRIV
+>  		   | ARM_VMSA_PTE_NS | type;
+> 
+> @@ -568,8 +568,8 @@ static u64 ipmmu_page_prot(unsigned int prot, u64 type)
+>  	if (prot & IOMMU_CACHE)
+>  		pgprot |= IMMAIR_ATTR_IDX_WBRWA << ARM_VMSA_PTE_ATTRINDX_SHIFT;
+> 
+> -	if (prot & IOMMU_EXEC)
+> -		pgprot &= ~ARM_VMSA_PTE_XN;
+> +	if (prot & IOMMU_NOEXEC)
+> +		pgprot |= ARM_VMSA_PTE_XN;
+>  	else if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
+>  		/* If no access create a faulting entry to avoid TLB fills. */
+>  		pgprot &= ~ARM_VMSA_PTE_PAGE;
 
 -- 
 Regards,
