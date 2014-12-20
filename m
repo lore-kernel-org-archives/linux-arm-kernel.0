@@ -1,48 +1,30 @@
-From: dwalker@fifo99.com (dwalker at fifo99.com)
-Date: Sat, 20 Dec 2014 22:46:07 +0000
-Subject: ***UNCHECKED*** Re: [PATCH] arch: arm: mach-msm: smd.c: Remove
- some unused functions
-In-Reply-To: <6909946.FWqDZQSxq2@wuerfel>
-References: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <CAFo99gbPKw4uHY_QqyZ495O9QLKL69HQyJmQUKNaGQTNqsG-mw@mail.gmail.com>
- <20141218220128.GA10615@fifo99.com> <6909946.FWqDZQSxq2@wuerfel>
-Message-ID: <20141220224607.GA4466@fifo99.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Sat, 20 Dec 2014 22:54:52 +0000
+Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <3669965.zfJEHTFEBI@wuerfel>
+References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
+ <20141217143305.GC8942@leverpostej> <54919AC9.2090306@arm.com>
+ <3669965.zfJEHTFEBI@wuerfel>
+Message-ID: <CAFEAcA-+2G_F1Qp30BipY=wq-HdXSvKv0OArOJBcp8fGg0hPMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 11:35:04PM +0100, Arnd Bergmann wrote:
-> On Thursday 18 December 2014 22:01:28 dwalker at fifo99.com wrote:
-> > On Tue, Dec 16, 2014 at 12:20:43AM +0100, Rickard Strandqvist wrote:
-> > > Hi
-> > > 
-> > > My script looks for the same function name, so if they then would be
-> > > named exactly the same, they would come up.
-> > > 
-> > > But I can not even find drivers/staging/dream/   or is this really new code?
-> > 
-> > Maybe it was deleted already ..
-> 
-> It's been gone for over four years, after nobody worked on cleaning it up
-> for a while before that:
-> 
-> commit 3414df8ca38b203c8a5ad8efc32d4a3836a0596d
-> Author: Greg Kroah-Hartman <gregkh@suse.de>
-> Date:   Fri Oct 29 12:42:18 2010 -0700
-> 
->     Staging: dream: remove dream driver and arch from tree
->     
->     This code is stalled, with no one working on it anymore, and the main
->     msm code is now going through the proper channels to get merged
->     correctly.
->     
->     So remove it as it contains a number of kernel information leaks and it
->     is doubtful if it even still builds anymore.
->     
->     Acked-by: Pavel Machek <pavel@ucw.cz>
->     Acked-by: Bryan Huntsman <bryanh@codeaurora.org>
->     Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+On 20 December 2014 at 20:07, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 17 December 2014 15:01:29 Marc Zyngier wrote:
+>> Also it is worth noticing that given how GICV is placed, it will never
+>> work with 64K pages and virtualization. Pretty sad.
+>
+> Does this mean no VGIC support on this platform so you have to emulate it
+> in order to run virtual machines with 64K pages, or does it mean that
+> it's impossible to use that way because you can't emulate it?
 
+Currently having the guest use the generic timer requires an
+in-kernel GIC, because we don't provide an ABI for having the
+kernel say "here is a generic timer interrupt for the userspace
+emulated GIC". And at least for QEMU userspace the "virt" board
+doesn't provide any other kind of timer, so you'd need to add one
+if you wanted to use a userspace GIC. So for practical purposes
+"out-of-kernel GIC" is not a supported config for KVM+QEMU.
 
-Yeah, somehow still ended up in my 3.18 tree. Must have been a "git reset".
-
-Daniel
+-- PMM
