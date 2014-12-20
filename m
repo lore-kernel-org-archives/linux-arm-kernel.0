@@ -1,95 +1,48 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 20 Dec 2014 23:48:09 +0100
-Subject: [PATCH v6] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <5495CA13.3010700@vanguardiasur.com.ar>
-References: <1418806573-14897-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <cfd1c941b379d2e47b0a8d1469161179@agner.ch>
- <5495CA13.3010700@vanguardiasur.com.ar>
-Message-ID: <7aece5b7b3ad0df1386a99d1f18574d1@agner.ch>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Sat, 20 Dec 2014 22:46:07 +0000
+Subject: ***UNCHECKED*** Re: [PATCH] arch: arm: mach-msm: smd.c: Remove
+ some unused functions
+In-Reply-To: <6909946.FWqDZQSxq2@wuerfel>
+References: <1417914740-8390-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <CAFo99gbPKw4uHY_QqyZ495O9QLKL69HQyJmQUKNaGQTNqsG-mw@mail.gmail.com>
+ <20141218220128.GA10615@fifo99.com> <6909946.FWqDZQSxq2@wuerfel>
+Message-ID: <20141220224607.GA4466@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-20 20:12, Ezequiel Garcia wrote:
-> Stefan,
+On Thu, Dec 18, 2014 at 11:35:04PM +0100, Arnd Bergmann wrote:
+> On Thursday 18 December 2014 22:01:28 dwalker at fifo99.com wrote:
+> > On Tue, Dec 16, 2014 at 12:20:43AM +0100, Rickard Strandqvist wrote:
+> > > Hi
+> > > 
+> > > My script looks for the same function name, so if they then would be
+> > > named exactly the same, they would come up.
+> > > 
+> > > But I can not even find drivers/staging/dream/   or is this really new code?
+> > 
+> > Maybe it was deleted already ..
 > 
-> On 12/20/2014 10:33 AM, Stefan Agner wrote:
->> On 2014-12-17 09:56, Uwe Kleine-K?nig wrote:
->>> From: Joachim Eastwood <manabian@gmail.com>
->>>
->>> This patch makes it possible to enter zImage in Thumb mode for ARMv7-M
->>> (Cortex-M) CPUs that do not support ARM mode. The kernel entry is also
->>> made in Thumb mode.
->>>
->>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->>> [ukl: fix spelling in commit log, return early in call_cache_fn]
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>> ---
->>> Hello,
->>>
->>> I just picked up Joachim's patch and fixed the small concerns I had in
->>> the last round.
->>>
->>> I thought about adding a wrapper for accessing the CPUID registers that
->>> are located in cp15 on v7-A/R and memory mapped on v7-M. The
->>> corresponding registers and their address are as follows:
->>>
->>> name		cp15 reg [1] on -A/R	address on -M
->>> MIDR/CPUID  	CRm=c0, opc2=0  	0xe000ed00
->>> PFR0   		CRm=c1, opc2=0  	0xe000ed40
->>> PFR1   		CRm=c1, opc2=1  	0xe000ed44
->>> DFR0   		CRm=c1, opc2=2  	0xe000ed48
->>> AFR0   		CRm=c1, opc2=3  	0xe000ed4c
->>> MMFR0  		CRm=c1, opc2=4  	0xe000ed50
->>> MMFR1  		CRm=c1, opc2=5  	0xe000ed54
->>> MMFR2  		CRm=c1, opc2=6  	0xe000ed58
->>> MMFR3  		CRm=c1, opc2=7  	0xe000ed5c
->>> ISAR0  		CRm=c2, opc2=0  	0xe000ed60
->>> ISAR1  		CRm=c2, opc2=1  	0xe000ed64
->>> ISAR2  		CRm=c2, opc2=2  	0xe000ed68
->>> ISAR3  		CRm=c2, opc2=3  	0xe000ed6c
->>> ISAR4  		CRm=c2, opc2=4  	0xe000ed70
->>> ISAR5  		CRm=c2, opc2=5  	0xe000ed74
->>>
->>> But there is no nice translation and as cache handling is implementation
->>> defined on v7-M anyhow there is not much use and I decided to just
->>> return early in the cache function.
->>>
->>> This patch is only compile tested as I don't have a machine with enough
->>> RAM to run a non-XIP kernel, so Tested-by tags are welcome.
->>
->> Hi Uwe,
->>
->> Tried the patch on Vybrid's M4 CPU. Since the M4 has full access to the
->> DDR3 RAM, it is even possible to use AUTO_ZRELADDR for both CPU's: The
->> Colibri VF61 has 256MB of RAM: A5 relocates to 0x80008000, M4 to
->> 0x88008000.
->>
->> The uncompressing stage seems to work fine, however it seems I hit a
->> different bug which is triggered by using the zImage: Freeing the memory
->> location used by the compressed image seems to fail:
->>
+> It's been gone for over four years, after nobody worked on cleaning it up
+> for a while before that:
 > 
-> Does this happen systematically for you?
-
-Yes, that happens all the time, same address.
-
+> commit 3414df8ca38b203c8a5ad8efc32d4a3836a0596d
+> Author: Greg Kroah-Hartman <gregkh@suse.de>
+> Date:   Fri Oct 29 12:42:18 2010 -0700
 > 
-> I tried this patch on a LPC4337 based board, and came across very
-> strange and random memory corruptions, ranging from hitting strange
-> WARN(), BUG(), to OOM, to unhandled exceptions.
-> 
-> Rebuilding the kernel caused the different results (perhaps due to link
-> differences?).
-> 
-> The problem is this machine is not yet mainlined, so I'm not yet sure
-> it's this patch the one to blame.
+>     Staging: dream: remove dream driver and arch from tree
+>     
+>     This code is stalled, with no one working on it anymore, and the main
+>     msm code is now going through the proper channels to get merged
+>     correctly.
+>     
+>     So remove it as it contains a number of kernel information leaks and it
+>     is doubtful if it even still builds anymore.
+>     
+>     Acked-by: Pavel Machek <pavel@ucw.cz>
+>     Acked-by: Bryan Huntsman <bryanh@codeaurora.org>
+>     Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
 
-Does it happen for you with xipImage?
 
-I had some issues with kuser helpers, which now are disabled by default
-for non-MMU systems:
+Yeah, somehow still ended up in my 3.18 tree. Must have been a "git reset".
 
-http://www.spinics.net/lists/arm-kernel/msg374425.html
-
---
-Stefan
+Daniel
