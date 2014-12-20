@@ -1,103 +1,46 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 20 Dec 2014 11:36:49 +0100
-Subject: [PATCH v3] clk: sunxi: Make the mod0 clk driver also a platform driver
-Message-ID: <1419071809-22457-1-git-send-email-hdegoede@redhat.com>
+Date: Sat, 20 Dec 2014 11:44:37 +0100
+Subject: [PATCH v3] input: Add new sun4i-lradc-keys driver
+In-Reply-To: <20141218175153.GA34618@dtor-ws>
+References: <1418898193-9160-1-git-send-email-hdegoede@redhat.com>
+ <20141218175153.GA34618@dtor-ws>
+Message-ID: <54955315.3030603@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the prcm in sun6i (and some later SoCs) some mod0 clocks are instantiated
-through the mfd framework, and as such do not work with of_clk_declare, since
-they do not have registers assigned to them yet at of_clk_declare init time.
+Hi Dmitry,
 
-Silence the error on not finding registers in the of_clk_declare mod0 clk
-setup method, and also register mod0-clk support as a platform driver to work
-properly with mfd instantiated mod0 clocks.
+On 18-12-14 18:51, Dmitry Torokhov wrote:
+> Hi Hans,
+>
+> On Thu, Dec 18, 2014 at 11:23:13AM +0100, Hans de Goede wrote:
+>> Allwinnner sunxi SoCs have a low resolution adc (called lradc) which is
+>> specifically designed to have various (tablet) keys (ie home, back, search,
+>> etc). attached to it using a resistor network. This adds a driver for this.
+>>
+>> There are 2 channels, currently this driver only supports chan0 since there
+>> are no boards known to use chan1.
+>>
+>> This has been tested on an olimex a10s-olinuxino-micro, a13-olinuxino, and
+>> a20-olinuxino-micro.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> --
+>> Changes in v2:
+>> -Change devicetree bindings to use a per key subnode, like gpio-keys does
+>> Changes in v3:
+>> -Handle keyup irq flag before irqdown, in case we get both at once
+>
+> Thank you for making changes. Can you please tell me if the driver still
+> works if you drop the patch below on top of it? The changes are:
+>
+> - split DT parsing into a separate function;
+> - make sure keymap is not empty;
+> - change 'ret' variable to 'error';
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--New patch in v2 of the sun6i ir support patch-set
-Changes in v3:
--Add a comment why sun4i_a10_mod0_setup does not log an error when of_iomap
- fails to get the regs
----
- drivers/clk/sunxi/clk-mod0.c | 43 ++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 40 insertions(+), 3 deletions(-)
+The proposed changes look good, and I've given them a test-spin and everything
+still works fine.
 
-diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-index 658d74f..bf8fcd8 100644
---- a/drivers/clk/sunxi/clk-mod0.c
-+++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -17,6 +17,7 @@
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/of_address.h>
-+#include <linux/platform_device.h>
- 
- #include "clk-factors.h"
- 
-@@ -67,7 +68,7 @@ static struct clk_factors_config sun4i_a10_mod0_config = {
- 	.pwidth = 2,
- };
- 
--static const struct factors_data sun4i_a10_mod0_data __initconst = {
-+static const struct factors_data sun4i_a10_mod0_data = {
- 	.enable = 31,
- 	.mux = 24,
- 	.muxmask = BIT(1) | BIT(0),
-@@ -83,8 +84,11 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
- 
- 	reg = of_iomap(node, 0);
- 	if (!reg) {
--		pr_err("Could not get registers for mod0-clk: %s\n",
--		       node->name);
-+		/*
-+		 * This happens with mod0 clk nodes instantiated through
-+		 * mfd, as those do not have their resources assigned at
-+		 * CLK_OF_DECLARE time yet, so do not print an error.
-+		 */
- 		return;
- 	}
- 
-@@ -93,6 +97,39 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
- }
- CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
- 
-+static int sun4i_a10_mod0_clk_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct resource *r;
-+	void __iomem *reg;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	sunxi_factors_register(np, &sun4i_a10_mod0_data,
-+			       &sun4i_a10_mod0_lock, reg);
-+	return 0;
-+}
-+
-+static const struct of_device_id sun4i_a10_mod0_clk_dt_ids[] = {
-+	{ .compatible = "allwinner,sun4i-a10-mod0-clk" },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver sun4i_a10_mod0_clk_driver = {
-+	.driver = {
-+		.name = "sun4i-a10-mod0-clk",
-+		.of_match_table = sun4i_a10_mod0_clk_dt_ids,
-+	},
-+	.probe = sun4i_a10_mod0_clk_probe,
-+};
-+module_platform_driver(sun4i_a10_mod0_clk_driver);
-+
- static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
- 
- static void __init sun5i_a13_mbus_setup(struct device_node *node)
--- 
-2.1.0
+Thanks & Regards,
+
+Hans
