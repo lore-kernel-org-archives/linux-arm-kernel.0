@@ -1,77 +1,27 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 21 Dec 2014 10:42:00 +0000
-Subject: [RFC PATCH 1/2] common: dma-mapping: introduce
- dma_get_parent_cfg() helper
-In-Reply-To: <20141218172011.GB20963@e104818-lin.cambridge.arm.com>
-References: <1418839344-14393-1-git-send-email-m-karicheri2@ti.com>
- <1949667.gMcOLHe7Sk@wuerfel> <549210BB.9080603@ti.com>
- <2935351.ba8Au9y4fE@wuerfel>
- <20141218172011.GB20963@e104818-lin.cambridge.arm.com>
-Message-ID: <20141221104200.GG23242@arm.com>
+Date: Sun, 21 Dec 2014 10:50:43 +0000
+Subject: [PATCH] arm64: kernel: fix __cpu_suspend mm switch on warm-boot
+In-Reply-To: <1419008627-1918-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1419008627-1918-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20141221105042.GI23242@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 18, 2014 at 05:20:12PM +0000, Catalin Marinas wrote:
-> On Thu, Dec 18, 2014 at 12:09:17AM +0000, Arnd Bergmann wrote:
-> > Will, I think we may have a problem on ARM64 now, since we only replaced
-> > set_arch_dma_coherent_ops on ARM32 but not ARM64. Can you send a fix for
-> > this? Without that, we don't have any coherent operations on ARM64 any
-> > more, unless I'm missing something.
+On Fri, Dec 19, 2014 at 05:03:47PM +0000, Lorenzo Pieralisi wrote:
+> On arm64 the TTBR0_EL1 register is set to either the reserved TTBR0
+> page tables on boot or to the active_mm mappings belonging to user space
+> processes, it must never be set to swapper_pg_dir page tables mappings.
 > 
-> Good point, I think Will forgot about arm64 (weird ;)).
+> When a CPU is booted its active_mm is set to init_mm even though its
+> TTBR0_EL1 points at the reserved TTBR0 page mappings. This implies
+> that when __cpu_suspend is triggered the active_mm can point at
+> init_mm even if the current TTBR0_EL1 register contains the reserved
+> TTBR0_EL1 mappings.
 
-Oops, I think arm64 didn't implement set_arch_dma_coherent_ops when I
-started that series and I forgot to refresh it.
-
-> I'll push this out since Will is on holiday, probably shortly after
-> -rc1.
-> 
-> -----8<--------------------------------------------
-> 
-> From 40ec7fd94b4efbd5d74185a062433f71c6576e20 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Thu, 18 Dec 2014 17:13:49 +0000
-> Subject: [PATCH] arm64: Replace set_arch_dma_coherent_ops with
->  arch_setup_dma_ops
-> 
-> Commit a3a60f81ee6f (dma-mapping: replace set_arch_dma_coherent_ops with
-> arch_setup_dma_ops) changes the of_dma_configure() arch dma_ops callback
-> to arch_setup_dma_ops but only the arch/arm code is updated. Subsequent
-> commit 97890ba9289c (dma-mapping: detect and configure IOMMU in
-> of_dma_configure) changes the arch_setup_dma_ops() prototype further to
-> handle iommu. The patch makes the corresponding arm64 changes.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/dma-mapping.h | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index d34189bceff7..9ce3e680ae1c 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -52,13 +52,14 @@ static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
->  	dev->archdata.dma_ops = ops;
->  }
->  
-> -static inline int set_arch_dma_coherent_ops(struct device *dev)
-> +static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +				      struct iommu_ops *iommu, bool coherent)
->  {
-> -	dev->archdata.dma_coherent = true;
-> -	set_dma_ops(dev, &coherent_swiotlb_dma_ops);
-> -	return 0;
-> +	dev->archdata.dma_coherent = coherent;
-> +	if (coherent)
-> +		set_dma_ops(dev, &coherent_swiotlb_dma_ops);
->  }
-> -#define set_arch_dma_coherent_ops	set_arch_dma_coherent_ops
-> +#define arch_setup_dma_ops	arch_setup_dma_ops
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks for fixing this.
+In reality, this is only an issue on the ASID rollover path, right? I
+had grand plans to remove the use of a reserved ttbr value from that
+code entirely. Obviously that shouldn't hold up this fix, but it would be
+nice to understand the relationship (i.e. whether or not I can revert this
+patch if/when I improve the ASID allocator).
 
 Will
