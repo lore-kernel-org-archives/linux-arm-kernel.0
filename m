@@ -1,45 +1,45 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Dec 2014 13:38:34 +0100
-Subject: [PATCH] ARM: dts: add gpio_poweroff support for Iomega ix2-200
-In-Reply-To: <1418236841-15277-1-git-send-email-richard.kunze@web.de>
-References: <1418236841-15277-1-git-send-email-richard.kunze@web.de>
-Message-ID: <20141221123834.GB29218@lunn.ch>
+Date: Sun, 21 Dec 2014 13:43:44 +0100
+Subject: [PATCH v2 1/1] ARM: dts: kirkwood: enable phy driver for SATA
+ controller on 88f6192
+In-Reply-To: <20141216182217.GA20696@anne>
+References: <20141215203724.GA22936@anne>
+ <20141216182217.GA20696@anne>
+Message-ID: <20141221124344.GA29602@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 07:40:41PM +0100, Richard Kunze wrote:
-> Iomega ix2-200 can be powered off via GPIO 0 pin 17,
-> this patch wires up the gpio-poweroff driver to do it.
+On Tue, Dec 16, 2014 at 07:22:18PM +0100, Evgeni Dobrev wrote:
+> This patch enables the phy drivers for the SATA controller on Marvell's 88f6192.
+> Without them it is not possible to use SATA drives attached to this processor.
 > 
-> Signed-off-by: Richard Kunze <richard.kunze@web.de>
+> Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
 
-Hi Richard
+Hi Evgeni
 
 Added to mvebu/dt
 
       Andrew
 
 > ---
->  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/boot/dts/kirkwood-6192.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> index 05291f3..7aeddcd 100644
-> --- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> +++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> @@ -169,6 +169,10 @@
->  			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+> diff --git a/arch/arm/boot/dts/kirkwood-6192.dtsi b/arch/arm/boot/dts/kirkwood-6192.dtsi
+> index dd81508..9e6e9e2 100644
+> --- a/arch/arm/boot/dts/kirkwood-6192.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-6192.dtsi
+> @@ -66,6 +66,8 @@
+>  			interrupts = <21>;
+>  			clocks = <&gate_clk 14>, <&gate_clk 15>;
+>  			clock-names = "0", "1";
+> +			phys = <&sata_phy0>, <&sata_phy1>;
+> +			phy-names = "port0", "port1";
+>  			status = "disabled";
 >  		};
->  	};
-> +	gpio-poweroff {
-> +		compatible = "gpio-poweroff";
-> +		gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
-> +	};
->  };
 >  
->  &nand {
 > -- 
-> 1.9.1
+> 1.7.10.4
 > 
 > 
 > _______________________________________________
