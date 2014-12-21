@@ -1,71 +1,73 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Sun, 21 Dec 2014 00:39:31 +0100
-Subject: bluetooth: Add hci_h4p driver
-In-Reply-To: <20141220154850.GA28390@amd>
-References: <20141213223727.GA13894@amd>
- <97C706D6-765B-446A-8180-600F5FB6C68B@holtmann.org>
- <20141219095000.GA24703@amd>
- <7DC7F8DF-CBC7-47CE-8B6F-5BA19ADBB3B6@holtmann.org>
- <20141220154850.GA28390@amd>
-Message-ID: <5AC947DA-87BA-48B7-ABB8-7663B3D3E844@holtmann.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 21 Dec 2014 10:04:51 +0000
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <2983977.dWWQcFZRoJ@wuerfel>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <2299294.lPnEQgl4lK@wuerfel> <20141217171752.GB30307@arm.com>
+ <2983977.dWWQcFZRoJ@wuerfel>
+Message-ID: <20141221100451.GA23242@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
->>> I have trouble understanding... h4p_hci_open() seems to be called as
->>> soon as I insmod the driver. Who does that? Is it some kind of udev
->>> magic?
->> 
->> As soon as you do hci_register_dev, it will bring up the device and run the basic initialization. That is needed to get the address, version information and features. Otherwise the mgmt interface can not work. We need basic information about the device.
->> 
->> So what the kernel will do internally when you find a device is bring it up, get the basics and then bring it back down (in case nobody uses it). See hci_power_on work.
->> 
+On Wed, Dec 17, 2014 at 07:48:29PM +0000, Arnd Bergmann wrote:
+> On Wednesday 17 December 2014 17:17:52 Will Deacon wrote:
+> > > > > I would hope that PCI is the only case we need to worry about for a while.
+> > > > > This means we just need to come up with another property or a set of properties
+> > > > > that we can put into a PCI host controller device node in order to describe
+> > > > > the mapping. These properties could be iommu-specific, so we add something
+> > > > > to the PCI core that calls a new iommu callback function that takes the
+> > > > > device node of the PCI host and the bus/device/function number as inputs.
+> > > > > 
+> > > > > In arm_setup_iommu_dma_ops(), we can then do something like
+> > > > > 
+> > > > >   if (dev_is_pci(dev)) {
+> > > > >           struct pci_dev *pdev = to_pci_dev(dev);
+> > > > >           struct device_node *node;
+> > > > >           unsigned int bdf;
+> > > > > 
+> > > > >           node = find_pci_host_bridge(pdev->bus)->parent->of_node;
+> > > > >           bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
+> > > > > 
+> > > > >           iommu_setup_pci_dev(pdev, node, bdf);
+> > > > >   }
+> > > > 
+> > > > The other way to do this is have the IOMMU driver check dev_is_pci(dev)
+> > > > in add_device, then call an of_xlate_pci_bdf library function which could
+> > > > do the translation on-demand.
+> > > 
+> > > We'd still need to find the device node for the host controller in
+> > > common code, otherwise we don't have an of_xlate function to call.
+> > 
+> > I guess I was hoping that the translation code could be generic. I don't
+> > really see anything special about adding a constant to a magic number to
+> > obtain another magic number.
+> > 
 > 
-> Aha, slightly unexpected, but it matches observations. Good.
-
-we are at Bluetooth 4.2 specification now. Thinks got a lot more complicated these days.
-
+> If that's all we need, that's fine.
 > 
->>> To use __hci_cmd_sync()
->>> 
->>>>> +
->>>>> +	SET_HCIDEV_DEV(hdev, info->dev);
->>>>> +
->>>>> +	if (hci_register_dev(hdev) >= 0)
->>>>> +		return 0;
->>>>> +
->>>>> +	dev_err(info->dev, "hci_register failed %s.\n", hdev->name);
->>>>> +	hci_free_dev(info->hdev);
->>>>> +	return -ENODEV;
->>>>> +}
->>>> 
->>>> And normally this is folded into the probe handling and not in a
->>>> separate function.
->>> 
->>> The probe function is too long, already...
->> 
->> Have you compared it to other functions. Normally probe() functions in general are all pretty long since they have to do tons of stuff. Having all in one function means you can read through it at once.
->> 
-> 
-> Ok.
-> 
->>>>> +#include "hci_h4p.h"
->>>> 
->>>> Why is this a separate file? And if so, why not all UART specific details are in this file. Including bunch of the defines you have in the header.
->>>> 
->>> 
->>> Well, you wanted less global functions, so I moved some as inlines to
->>> headers. I guess I can merge nokia_core and nokia_uart if really wanted.
->> 
->> Would this become easier when some of the OMAP specific stuff is moved out of this driver? If that is possible.
->> 
-> 
-> Yes, I can investigate further cleanups. But original plan was to
-> merge it and then clean up the rest. Could we do that, please?
+> I was fearing that we'd get different host controllers using different
+> parts of the bdf number. E.g. one might pass down just bus/device
+> while another uses bus/device/function, so we'd need a shift and
+> an offset.
 
-You need to fix all these small details. There are tons of whitespace damages, indentation issues, trailing whitespaces and what not. Even if they were in the original driver to begin this, they can not be in a driver submitted these days.
+We could still encode that as adding a constant, modulo the streamid
+width though, right? I agree that it would be nasty, because we'd have to
+list a whole bunch of offsets for each function rather than group things
+into ranges. Still, it gives us something to start with.
 
-Regards
+FWIW, this (adding an offset) is also the direction that the ACPI IORT
+description is going in, so at least we have parity there.
 
-Marcel
+> As part of the AMD review I found out that their SMMU implementation
+> only has 15 bits of address space, while bdf is 16 bits, so they
+> cut off the top bit and get aliasing between bus 0+n and bus 128+n.
+> 
+> Another SoC might have more aliasing if they have multiple domains.
+
+This particular aliasing is probably going to be pretty common; the ARM
+SMMU typically only supports 15-bit StreamIDs (there is an extension to
+16-bit, but I haven't seen one built yet and the driver doesn't even support
+it).
+
+Will
