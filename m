@@ -1,43 +1,42 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 21 Dec 2014 12:14:39 +0100
-Subject: [PATCH 0/3] add Atmel EBI (External Bus Interface) DT nodes for
- AT91SAM9263
-In-Reply-To: <1418979100-13243-1-git-send-email-alexanders83@web.de>
-References: <1418979100-13243-1-git-send-email-alexanders83@web.de>
-Message-ID: <20141221111439.GA14733@piout.net>
+Date: Sun, 21 Dec 2014 12:18:09 +0100
+Subject: [PATCH v2] ALSA: atmel: fix building the ac97 driver for
+ at91-multiplatform
+Message-ID: <1419160689-20447-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The whole series is
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+From: Arnd Bergmann <arnd@arndb.de>
 
-On 19/12/2014 at 09:51:37 +0100, Alexander Stein wrote :
-> This is based on and requires Boris' work on an EBI driver for AT91. Please
-> refer to https://lkml.org/lkml/2014/12/3/806.
-> The reason I added no pinctrl is that those pins from EBI1 in my case are not
-> muxable. They are fixed so there is nothing I can test here.
-> I used this patchset and the EBI to configure a PSRAM to be used by the
-> atmel_lcdfb driver which works so far.
-> This also means EBI0 is rather untested, but it should behave like EBI1 if
-> the numbers are correct.
-> 
-> Best regards,
-> Alexander
-> 
-> Alexander Stein (3):
->   ARM: at91/dt: add matrix node in at91sam9263 dtsi
->   ARM: at91/dt: add SMC0/1  nodes in at91sam9263 dtsi
->   ARM: at91/dt: add EBI (External Bus Interface) node in at91sam9263
->     dtsi
-> 
->  arch/arm/boot/dts/at91sam9263.dtsi | 44 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
-> 
-> -- 
-> 2.2.1
-> 
+at91 will no longer export the mach/cpu.h and mach/hardware.h header files
+in the future, which would break building the atmel ac97c driver.
 
+Since the cpu_is_* check is only used to find out whether we are running
+on avr32 or arm/at91, we can hardcode that check in the ARM case.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
+---
+ sound/atmel/ac97c.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+index b59427d5a697..83975f8d5947 100644
+--- a/sound/atmel/ac97c.c
++++ b/sound/atmel/ac97c.c
+@@ -34,10 +34,10 @@
+ #include <linux/platform_data/dma-dw.h>
+ #include <linux/dma/dw.h>
+ 
++#ifdef CONFIG_AVR32
+ #include <mach/cpu.h>
+-
+-#ifdef CONFIG_ARCH_AT91
+-#include <mach/hardware.h>
++#else
++#define cpu_is_at32ap7000() 0
+ #endif
+ 
+ #include "ac97c.h"
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.0
