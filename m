@@ -1,172 +1,206 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 21 Dec 2014 13:46:39 +0000
-Subject: [PATCH] clk: mxs: Fix invalid 32-bit access to frac registers
-Message-ID: <1419169599-24791-1-git-send-email-stefan.wahren@i2se.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 21 Dec 2014 14:51:18 +0100
+Subject: [PATCH] ARM: dove: fix legacy dove IRQ numbers for 3.18
+In-Reply-To: <E1XyOJv-0003kd-2y@rmk-PC.arm.linux.org.uk>
+References: <E1XyOJv-0003kd-2y@rmk-PC.arm.linux.org.uk>
+Message-ID: <20141221135118.GA30212@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to i.MX23 and i.MX28 reference manual the fractional
-clock control registers must be addressed by byte instructions.
+On Tue, Dec 09, 2014 at 05:11:31PM +0000, Russell King wrote:
+> v3.18 changed handle_IRQ() to call __handle_domain_irq(), which now
+> rejects attempts to deliver IRQ0.  Since IRQ 0 is used as the timer
+> interrupt (just like the PIT on x86), this causes boot to fail as the
+> bogomips calibration never completes.
+> 
+> Fix this by shuffling all interrupts up by one.
+> 
+> Fixes: a71b092a9c68 ("ARM: Convert handle_IRQ to use __handle_domain_irq")
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This patch fixes the erroneous 32-bit access to these registers
-and extends the comment in the init functions.
+Hi Russell
 
-Btw the imx23 init now uses a R-M-W sequence just like imx28 init
-to avoid any clock glitches.
+Do you want to take this though your tree? Or should we take it
+through mvebu?
 
-The changes has been tested only with a i.MX28 board, because i don't
-have access to an i.MX23 board.
+Thanks
+	Andrew
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/clk/mxs/clk-imx23.c |   11 ++++++++---
- drivers/clk/mxs/clk-imx28.c |   19 +++++++++++++------
- drivers/clk/mxs/clk-ref.c   |   19 ++++++++++---------
- 3 files changed, 31 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-index 9fc9359..a084566 100644
---- a/drivers/clk/mxs/clk-imx23.c
-+++ b/drivers/clk/mxs/clk-imx23.c
-@@ -46,11 +46,13 @@ static void __iomem *digctrl;
- #define BP_CLKSEQ_BYPASS_SAIF	0
- #define BP_CLKSEQ_BYPASS_SSP	5
- #define BP_SAIF_DIV_FRAC_EN	16
--#define BP_FRAC_IOFRAC		24
-+
-+#define FRAC_IO	3
- 
- static void __init clk_misc_init(void)
- {
- 	u32 val;
-+	u8 frac;
- 
- 	/* Gate off cpu clock in WFI for power saving */
- 	writel_relaxed(1 << BP_CPU_INTERRUPT_WAIT, CPU + SET);
-@@ -72,9 +74,12 @@ static void __init clk_misc_init(void)
- 	/*
- 	 * 480 MHz seems too high to be ssp clock source directly,
- 	 * so set frac to get a 288 MHz ref_io.
-+	 * According to reference manual we must access frac bytewise.
- 	 */
--	writel_relaxed(0x3f << BP_FRAC_IOFRAC, FRAC + CLR);
--	writel_relaxed(30 << BP_FRAC_IOFRAC, FRAC + SET);
-+	frac = readb_relaxed(FRAC + FRAC_IO);
-+	frac &= ~0x3f;
-+	frac |= 30;
-+	writeb_relaxed(frac, FRAC + FRAC_IO);
- }
- 
- static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
-diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
-index a6c3501..c541377 100644
---- a/drivers/clk/mxs/clk-imx28.c
-+++ b/drivers/clk/mxs/clk-imx28.c
-@@ -53,8 +53,9 @@ static void __iomem *clkctrl;
- #define BP_ENET_SLEEP		31
- #define BP_CLKSEQ_BYPASS_SAIF0	0
- #define BP_CLKSEQ_BYPASS_SSP0	3
--#define BP_FRAC0_IO1FRAC	16
--#define BP_FRAC0_IO0FRAC	24
-+
-+#define FRAC0_IO1	2
-+#define FRAC0_IO0	3
- 
- static void __iomem *digctrl;
- #define DIGCTRL digctrl
-@@ -85,6 +86,7 @@ int mxs_saif_clkmux_select(unsigned int clkmux)
- static void __init clk_misc_init(void)
- {
- 	u32 val;
-+	u8 frac;
- 
- 	/* Gate off cpu clock in WFI for power saving */
- 	writel_relaxed(1 << BP_CPU_INTERRUPT_WAIT, CPU + SET);
-@@ -118,11 +120,16 @@ static void __init clk_misc_init(void)
- 	/*
- 	 * 480 MHz seems too high to be ssp clock source directly,
- 	 * so set frac0 to get a 288 MHz ref_io0 and ref_io1.
-+	 * According to reference manual we must access frac0 bytewise.
- 	 */
--	val = readl_relaxed(FRAC0);
--	val &= ~((0x3f << BP_FRAC0_IO0FRAC) | (0x3f << BP_FRAC0_IO1FRAC));
--	val |= (30 << BP_FRAC0_IO0FRAC) | (30 << BP_FRAC0_IO1FRAC);
--	writel_relaxed(val, FRAC0);
-+	frac = readb_relaxed(FRAC0 + FRAC0_IO0);
-+	frac &= ~0x3f;
-+	frac |= 30;
-+	writeb_relaxed(frac, FRAC0 + FRAC0_IO0);
-+	frac = readb_relaxed(FRAC0 + FRAC0_IO1);
-+	frac &= ~0x3f;
-+	frac |= 30;
-+	writeb_relaxed(frac, FRAC0 + FRAC0_IO1);
- }
- 
- static const char *sel_cpu[]  __initconst = { "ref_cpu", "ref_xtal", };
-diff --git a/drivers/clk/mxs/clk-ref.c b/drivers/clk/mxs/clk-ref.c
-index 4adeed6..bdecec1 100644
---- a/drivers/clk/mxs/clk-ref.c
-+++ b/drivers/clk/mxs/clk-ref.c
-@@ -16,6 +16,8 @@
- #include <linux/slab.h>
- #include "clk.h"
- 
-+#define BF_CLKGATE	BIT(7)
-+
- /**
-  * struct clk_ref - mxs reference clock
-  * @hw: clk_hw for the reference clock
-@@ -39,7 +41,7 @@ static int clk_ref_enable(struct clk_hw *hw)
- {
- 	struct clk_ref *ref = to_clk_ref(hw);
- 
--	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + CLR);
-+	writeb(BF_CLKGATE, ref->reg + ref->idx + CLR);
- 
- 	return 0;
- }
-@@ -48,7 +50,7 @@ static void clk_ref_disable(struct clk_hw *hw)
- {
- 	struct clk_ref *ref = to_clk_ref(hw);
- 
--	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + SET);
-+	writeb(BF_CLKGATE, ref->reg + ref->idx + SET);
- }
- 
- static unsigned long clk_ref_recalc_rate(struct clk_hw *hw,
-@@ -56,7 +58,7 @@ static unsigned long clk_ref_recalc_rate(struct clk_hw *hw,
- {
- 	struct clk_ref *ref = to_clk_ref(hw);
- 	u64 tmp = parent_rate;
--	u8 frac = (readl_relaxed(ref->reg) >> (ref->idx * 8)) & 0x3f;
-+	u8 frac = readb(ref->reg + ref->idx) & 0x3f;
- 
- 	tmp *= 18;
- 	do_div(tmp, frac);
-@@ -93,8 +95,7 @@ static int clk_ref_set_rate(struct clk_hw *hw, unsigned long rate,
- 	struct clk_ref *ref = to_clk_ref(hw);
- 	unsigned long flags;
- 	u64 tmp = parent_rate;
--	u32 val;
--	u8 frac, shift = ref->idx * 8;
-+	u8 frac, val;
- 
- 	tmp = tmp * 18 + rate / 2;
- 	do_div(tmp, rate);
-@@ -107,10 +108,10 @@ static int clk_ref_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	spin_lock_irqsave(&mxs_lock, flags);
- 
--	val = readl_relaxed(ref->reg);
--	val &= ~(0x3f << shift);
--	val |= frac << shift;
--	writel_relaxed(val, ref->reg);
-+	val = readb(ref->reg + ref->idx);
-+	val &= ~0x3f;
-+	val |= frac;
-+	writeb(val, ref->reg + ref->idx);
- 
- 	spin_unlock_irqrestore(&mxs_lock, flags);
- 
--- 
-1.7.9.5
+> ---
+>  arch/arm/mach-dove/include/mach/irqs.h | 118 ++++++++++++++++-----------------
+>  arch/arm/mach-dove/irq.c               |   8 +--
+>  2 files changed, 63 insertions(+), 63 deletions(-)
+> 
+> diff --git a/arch/arm/mach-dove/include/mach/irqs.h b/arch/arm/mach-dove/include/mach/irqs.h
+> index 0c5ee443d801..2db09f1cf1fc 100644
+> --- a/arch/arm/mach-dove/include/mach/irqs.h
+> +++ b/arch/arm/mach-dove/include/mach/irqs.h
+> @@ -14,73 +14,73 @@
+>  /*
+>   * Dove Low Interrupt Controller
+>   */
+> -#define IRQ_DOVE_BRIDGE		0
+> -#define IRQ_DOVE_H2C		1
+> -#define IRQ_DOVE_C2H		2
+> -#define IRQ_DOVE_NAND		3
+> -#define IRQ_DOVE_PDMA		4
+> -#define IRQ_DOVE_SPI1		5
+> -#define IRQ_DOVE_SPI0		6
+> -#define IRQ_DOVE_UART_0		7
+> -#define IRQ_DOVE_UART_1		8
+> -#define IRQ_DOVE_UART_2		9
+> -#define IRQ_DOVE_UART_3		10
+> -#define IRQ_DOVE_I2C		11
+> -#define IRQ_DOVE_GPIO_0_7	12
+> -#define IRQ_DOVE_GPIO_8_15	13
+> -#define IRQ_DOVE_GPIO_16_23	14
+> -#define IRQ_DOVE_PCIE0_ERR	15
+> -#define IRQ_DOVE_PCIE0		16
+> -#define IRQ_DOVE_PCIE1_ERR	17
+> -#define IRQ_DOVE_PCIE1		18
+> -#define IRQ_DOVE_I2S0		19
+> -#define IRQ_DOVE_I2S0_ERR	20
+> -#define IRQ_DOVE_I2S1		21
+> -#define IRQ_DOVE_I2S1_ERR	22
+> -#define IRQ_DOVE_USB_ERR	23
+> -#define IRQ_DOVE_USB0		24
+> -#define IRQ_DOVE_USB1		25
+> -#define IRQ_DOVE_GE00_RX	26
+> -#define IRQ_DOVE_GE00_TX	27
+> -#define IRQ_DOVE_GE00_MISC	28
+> -#define IRQ_DOVE_GE00_SUM	29
+> -#define IRQ_DOVE_GE00_ERR	30
+> -#define IRQ_DOVE_CRYPTO		31
+> +#define IRQ_DOVE_BRIDGE		(1 + 0)
+> +#define IRQ_DOVE_H2C		(1 + 1)
+> +#define IRQ_DOVE_C2H		(1 + 2)
+> +#define IRQ_DOVE_NAND		(1 + 3)
+> +#define IRQ_DOVE_PDMA		(1 + 4)
+> +#define IRQ_DOVE_SPI1		(1 + 5)
+> +#define IRQ_DOVE_SPI0		(1 + 6)
+> +#define IRQ_DOVE_UART_0		(1 + 7)
+> +#define IRQ_DOVE_UART_1		(1 + 8)
+> +#define IRQ_DOVE_UART_2		(1 + 9)
+> +#define IRQ_DOVE_UART_3		(1 + 10)
+> +#define IRQ_DOVE_I2C		(1 + 11)
+> +#define IRQ_DOVE_GPIO_0_7	(1 + 12)
+> +#define IRQ_DOVE_GPIO_8_15	(1 + 13)
+> +#define IRQ_DOVE_GPIO_16_23	(1 + 14)
+> +#define IRQ_DOVE_PCIE0_ERR	(1 + 15)
+> +#define IRQ_DOVE_PCIE0		(1 + 16)
+> +#define IRQ_DOVE_PCIE1_ERR	(1 + 17)
+> +#define IRQ_DOVE_PCIE1		(1 + 18)
+> +#define IRQ_DOVE_I2S0		(1 + 19)
+> +#define IRQ_DOVE_I2S0_ERR	(1 + 20)
+> +#define IRQ_DOVE_I2S1		(1 + 21)
+> +#define IRQ_DOVE_I2S1_ERR	(1 + 22)
+> +#define IRQ_DOVE_USB_ERR	(1 + 23)
+> +#define IRQ_DOVE_USB0		(1 + 24)
+> +#define IRQ_DOVE_USB1		(1 + 25)
+> +#define IRQ_DOVE_GE00_RX	(1 + 26)
+> +#define IRQ_DOVE_GE00_TX	(1 + 27)
+> +#define IRQ_DOVE_GE00_MISC	(1 + 28)
+> +#define IRQ_DOVE_GE00_SUM	(1 + 29)
+> +#define IRQ_DOVE_GE00_ERR	(1 + 30)
+> +#define IRQ_DOVE_CRYPTO		(1 + 31)
+>  
+>  /*
+>   * Dove High Interrupt Controller
+>   */
+> -#define IRQ_DOVE_AC97		32
+> -#define IRQ_DOVE_PMU		33
+> -#define IRQ_DOVE_CAM		34
+> -#define IRQ_DOVE_SDIO0		35
+> -#define IRQ_DOVE_SDIO1		36
+> -#define IRQ_DOVE_SDIO0_WAKEUP	37
+> -#define IRQ_DOVE_SDIO1_WAKEUP	38
+> -#define IRQ_DOVE_XOR_00		39
+> -#define IRQ_DOVE_XOR_01		40
+> -#define IRQ_DOVE_XOR0_ERR	41
+> -#define IRQ_DOVE_XOR_10		42
+> -#define IRQ_DOVE_XOR_11		43
+> -#define IRQ_DOVE_XOR1_ERR	44
+> -#define IRQ_DOVE_LCD_DCON	45
+> -#define IRQ_DOVE_LCD1		46
+> -#define IRQ_DOVE_LCD0		47
+> -#define IRQ_DOVE_GPU		48
+> -#define IRQ_DOVE_PERFORM_MNTR	49
+> -#define IRQ_DOVE_VMETA_DMA1	51
+> -#define IRQ_DOVE_SSP_TIMER	54
+> -#define IRQ_DOVE_SSP		55
+> -#define IRQ_DOVE_MC_L2_ERR	56
+> -#define IRQ_DOVE_CRYPTO_ERR	59
+> -#define IRQ_DOVE_GPIO_24_31	60
+> -#define IRQ_DOVE_HIGH_GPIO	61
+> -#define IRQ_DOVE_SATA		62
+> +#define IRQ_DOVE_AC97		(1 + 32)
+> +#define IRQ_DOVE_PMU		(1 + 33)
+> +#define IRQ_DOVE_CAM		(1 + 34)
+> +#define IRQ_DOVE_SDIO0		(1 + 35)
+> +#define IRQ_DOVE_SDIO1		(1 + 36)
+> +#define IRQ_DOVE_SDIO0_WAKEUP	(1 + 37)
+> +#define IRQ_DOVE_SDIO1_WAKEUP	(1 + 38)
+> +#define IRQ_DOVE_XOR_00		(1 + 39)
+> +#define IRQ_DOVE_XOR_01		(1 + 40)
+> +#define IRQ_DOVE_XOR0_ERR	(1 + 41)
+> +#define IRQ_DOVE_XOR_10		(1 + 42)
+> +#define IRQ_DOVE_XOR_11		(1 + 43)
+> +#define IRQ_DOVE_XOR1_ERR	(1 + 44)
+> +#define IRQ_DOVE_LCD_DCON	(1 + 45)
+> +#define IRQ_DOVE_LCD1		(1 + 46)
+> +#define IRQ_DOVE_LCD0		(1 + 47)
+> +#define IRQ_DOVE_GPU		(1 + 48)
+> +#define IRQ_DOVE_PERFORM_MNTR	(1 + 49)
+> +#define IRQ_DOVE_VMETA_DMA1	(1 + 51)
+> +#define IRQ_DOVE_SSP_TIMER	(1 + 54)
+> +#define IRQ_DOVE_SSP		(1 + 55)
+> +#define IRQ_DOVE_MC_L2_ERR	(1 + 56)
+> +#define IRQ_DOVE_CRYPTO_ERR	(1 + 59)
+> +#define IRQ_DOVE_GPIO_24_31	(1 + 60)
+> +#define IRQ_DOVE_HIGH_GPIO	(1 + 61)
+> +#define IRQ_DOVE_SATA		(1 + 62)
+>  
+>  /*
+>   * DOVE General Purpose Pins
+>   */
+> -#define IRQ_DOVE_GPIO_START	64
+> +#define IRQ_DOVE_GPIO_START	65
+>  #define NR_GPIO_IRQS		64
+>  
+>  /*
+> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+> index 01ae4da3d8b4..2be572595a10 100644
+> --- a/arch/arm/mach-dove/irq.c
+> +++ b/arch/arm/mach-dove/irq.c
+> @@ -55,14 +55,14 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
+>  	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
+>  	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
+>  	if (stat) {
+> -		unsigned int hwirq = __fls(stat);
+> +		unsigned int hwirq = 1 + __fls(stat);
+>  		handle_IRQ(hwirq, regs);
+>  		return;
+>  	}
+>  	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
+>  	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
+>  	if (stat) {
+> -		unsigned int hwirq = 32 + __fls(stat);
+> +		unsigned int hwirq = 33 + __fls(stat);
+>  		handle_IRQ(hwirq, regs);
+>  		return;
+>  	}
+> @@ -71,8 +71,8 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
+>  
+>  void __init dove_init_irq(void)
+>  {
+> -	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+> -	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+> +	orion_irq_init(1, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+> +	orion_irq_init(33, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+>  
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+>  	set_handle_irq(dove_legacy_handle_irq);
+> -- 
+> 1.8.3.1
+> 
+> 
