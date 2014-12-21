@@ -1,144 +1,123 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 21 Dec 2014 23:39:41 +0100
-Subject: [PATCH v2 12/13] ARM: dts: sun6i: Add sun6i-a31s.dtsi
-In-Reply-To: <54954E77.4070302@redhat.com>
-References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-13-git-send-email-hdegoede@redhat.com>
- <20141219183450.GZ4820@lukather> <54954E77.4070302@redhat.com>
-Message-ID: <20141221223941.GC4820@lukather>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Mon, 22 Dec 2014 01:52:33 +0300
+Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for tegra_resume()
+ location store
+Message-ID: <1419202392-1159-1-git-send-email-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 20, 2014 at 11:24:55AM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 19-12-14 19:34, Maxime Ripard wrote:
-> >On Wed, Dec 17, 2014 at 06:18:23PM +0100, Hans de Goede wrote:
-> >>Add a dtsi file for A31s based boards.
-> >>
-> >>Since the  A31s is the same die as the A31 in a different package, this dtsi
-> >>simply includes sun6i-a31.dtsi and then overrides the pinctrl compatible to
-> >>reflect the different package, everything else is identical.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >>Changes in v2:
-> >>-include sun6i-a31.dtsi and override the pinctrl compatible, rather then
-> >>  copying everything
-> >>---
-> >>  arch/arm/boot/dts/sun6i-a31s.dtsi | 62 +++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 62 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/sun6i-a31s.dtsi
-> >>
-> >>diff --git a/arch/arm/boot/dts/sun6i-a31s.dtsi b/arch/arm/boot/dts/sun6i-a31s.dtsi
-> >>new file mode 100644
-> >>index 0000000..d0bd2b9
-> >>--- /dev/null
-> >>+++ b/arch/arm/boot/dts/sun6i-a31s.dtsi
-> >>@@ -0,0 +1,62 @@
-> >>+/*
-> >>+ * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
-> >>+ *
-> >>+ * This file is dual-licensed: you can use it either under the terms
-> >>+ * of the GPL or the X11 license, at your option. Note that this dual
-> >>+ * licensing only applies to this file, and not this project as a
-> >>+ * whole.
-> >>+ *
-> >>+ *  a) This library is free software; you can redistribute it and/or
-> >>+ *     modify it under the terms of the GNU General Public License as
-> >>+ *     published by the Free Software Foundation; either version 2 of the
-> >>+ *     License, or (at your option) any later version.
-> >>+ *
-> >>+ *     This library is distributed in the hope that it will be useful,
-> >>+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>+ *     GNU General Public License for more details.
-> >>+ *
-> >>+ *     You should have received a copy of the GNU General Public
-> >>+ *     License along with this library; if not, write to the Free
-> >>+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> >>+ *     MA 02110-1301 USA
-> >>+ *
-> >>+ * Or, alternatively,
-> >>+ *
-> >>+ *  b) Permission is hereby granted, free of charge, to any person
-> >>+ *     obtaining a copy of this software and associated documentation
-> >>+ *     files (the "Software"), to deal in the Software without
-> >>+ *     restriction, including without limitation the rights to use,
-> >>+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-> >>+ *     sell copies of the Software, and to permit persons to whom the
-> >>+ *     Software is furnished to do so, subject to the following
-> >>+ *     conditions:
-> >>+ *
-> >>+ *     The above copyright notice and this permission notice shall be
-> >>+ *     included in all copies or substantial portions of the Software.
-> >>+ *
-> >>+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> >>+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> >>+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> >>+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> >>+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> >>+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> >>+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> >>+ *     OTHER DEALINGS IN THE SOFTWARE.
-> >>+ */
-> >>+
-> >>+/*
-> >>+ * The A31s is the same die as the A31 in a different package, this is
-> >>+ * reflected by it having different pinctrl compatible everything else is
-> >>+ * identical.
-> >>+ */
-> >>+
-> >>+/include/ "sun6i-a31.dtsi"
-> >>+
-> >>+/ {
-> >>+	soc at 01c00000 {
-> >>+		pio: pinctrl at 01c20800 {
-> >>+			compatible = "allwinner,sun6i-a31s-pinctrl";
-> >>+		};
-> >>+	};
-> >>+};
-> >
-> >Given your previous changes, you should also update the enable-method.
-> 
-> I've not added a new compatible for the enable-method, given that
-> this is the exact same die, so the 2 are 100?% compatible, just like you
-> insisted that "allwinner,sun4i-a10-mod0-clk" should be used for the ir-clk
-> since it was 100% compatible to that I believe that the enable method
-> should use the existing compatible and not invent a new one for something
-> which is 100% compatible.
+Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed tegra_resume()
+location storing from late to early and as result broke suspend on tegra20.
+PMC scratch register 41 was used by tegra lp1 suspend core code for storing
+physical memory address of common resume function and in the same time used by
+tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
+strict order of scratch register use. Fix it by using scratch 40 instead of 41
+for tegra_resume() location store.
 
-Yeah, you have a point and I agree, but your patch 3 does add a
-CPU_METHOD_OF_DECLARE for the A31s.
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+Fixes: 7232398abc6a (ARM: tegra: Convert PMC to a driver)
+Cc: <stable@vger.kernel.org> # v3.17+
+---
+I see 2 other solutions:
 
-Since I was going to push the branch now that 3.19-rc1 is out, do you
-want me to edit your patch before doing so?
+1) Replace PMC driver PM ops with syscore
+2) Move tegra_resume() storing back to tegra arch suspend code
 
+For me originally proposed solution looks best, but I'm not aware of any special
+use of scratch 40 outside kernel and bootloader, so please let me know if there
+is any issue with it. It works just fine on my tablet.
 
-> >Also, for this patch and the next one, Arnd just warned me that we
-> >shouldn't duplicate the DT path, and that we should switch to the new
-> >trend on using label references (like what TI or Amlogic does for
-> >example).
-> 
-> Ok, so something like this, right ?  :
-> 
-> &pio {
-> 	compatible = "allwinner,sun6i-a31s-pinctrl";
-> };
+ arch/arm/mach-tegra/sleep-tegra20.S | 4 ++--
+ arch/arm/mach-tegra/sleep-tegra30.S | 4 ++--
+ arch/arm/mach-tegra/sleep.h         | 1 +
+ drivers/soc/tegra/pmc.c             | 6 +++---
+ 4 files changed, 8 insertions(+), 7 deletions(-)
 
-Yep.
-
-Thanks!
-Maxime
-
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index be4bc5f..3574785 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -327,7 +327,7 @@ tegra20_iram_start:
+  * system clock running on the same PLL that it suspended at), and
+  * jumps to tegra_resume to restore virtual addressing and PLLX.
+  * The physical address of tegra_resume expected to be stored in
+- * PMC_SCRATCH41.
++ * PMC_SCRATCH40.
+  *
+  * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_LPx_RESUME_AREA.
+  */
+@@ -401,7 +401,7 @@ exit_selfrefresh_loop:
+ 	str	r1, [r0, #EMC_REQ_CTRL]
+ 
+ 	mov32	r0, TEGRA_PMC_BASE
+-	ldr	r0, [r0, #PMC_SCRATCH41]
++	ldr	r0, [r0, #PMC_SCRATCH40]
+ 	ret	r0			@ jump to tegra_resume
+ ENDPROC(tegra20_lp1_reset)
+ 
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 5d8d13a..234959c 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -314,7 +314,7 @@ tegra30_iram_start:
+  * system clock running on the same PLL that it suspended at), and
+  * jumps to tegra_resume to restore virtual addressing.
+  * The physical address of tegra_resume expected to be stored in
+- * PMC_SCRATCH41.
++ * PMC_SCRATCH40.
+  *
+  * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_LPx_RESUME_AREA.
+  */
+@@ -529,7 +529,7 @@ zcal_done:
+ __no_dual_emc_chanl:
+ 
+ 	mov32	r0, TEGRA_PMC_BASE
+-	ldr	r0, [r0, #PMC_SCRATCH41]
++	ldr	r0, [r0, #PMC_SCRATCH40]
+ 	ret	r0			@ jump to tegra_resume
+ ENDPROC(tegra30_lp1_reset)
+ 
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 92d46ec..23c42d0 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -33,6 +33,7 @@
+ #define PMC_SCRATCH37	0x130
+ #define PMC_SCRATCH38	0x134
+ #define PMC_SCRATCH39	0x138
++#define PMC_SCRATCH40	0x13C
+ #define PMC_SCRATCH41	0x140
+ 
+ #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index a2c0ceb..51bfdeb 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -68,7 +68,7 @@
+ #define PMC_CPUPWRGOOD_TIMER		0xc8
+ #define PMC_CPUPWROFF_TIMER		0xcc
+ 
+-#define PMC_SCRATCH41			0x140
++#define PMC_SCRATCH40			0x13C
+ 
+ #define IO_DPD_REQ			0x1b8
+ #define  IO_DPD_REQ_CODE_IDLE		(0 << 30)
+@@ -742,14 +742,14 @@ static int tegra_pmc_probe(struct platform_device *pdev)
+ #ifdef CONFIG_PM_SLEEP
+ static int tegra_pmc_suspend(struct device *dev)
+ {
+-	tegra_pmc_writel(virt_to_phys(tegra_resume), PMC_SCRATCH41);
++	tegra_pmc_writel(virt_to_phys(tegra_resume), PMC_SCRATCH40);
+ 
+ 	return 0;
+ }
+ 
+ static int tegra_pmc_resume(struct device *dev)
+ {
+-	tegra_pmc_writel(0x0, PMC_SCRATCH41);
++	tegra_pmc_writel(0x0, PMC_SCRATCH40);
+ 
+ 	return 0;
+ }
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141221/13c6bf6a/attachment.sig>
+2.2.0
