@@ -1,52 +1,105 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 21 Dec 2014 22:50:15 +0100
-Subject: [PATCH] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <1419169599-24791-1-git-send-email-stefan.wahren@i2se.com>
-References: <1419169599-24791-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <201412212250.16007.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 21 Dec 2014 18:50:00 -0500
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <20141219181616.GG19261@kw.sim.vm.gnt>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+ <54930BBC.4060602@free-electrons.com>
+ <20141218191528.GY967@titan.lakedaemon.net>
+ <549437DD.7040602@free-electrons.com>
+ <20141219160230.GZ967@titan.lakedaemon.net>
+ <54944DAC.1000709@free-electrons.com>
+ <20141219170328.GA967@titan.lakedaemon.net>
+ <54945C5C.2080801@free-electrons.com>
+ <20141219174300.GB967@titan.lakedaemon.net>
+ <20141219181616.GG19261@kw.sim.vm.gnt>
+Message-ID: <20141221235000.GC28117@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, December 21, 2014 at 02:46:39 PM, Stefan Wahren wrote:
-
-Hi!
-
-[...]
-
-> diff --git a/drivers/clk/mxs/clk-ref.c b/drivers/clk/mxs/clk-ref.c
-> index 4adeed6..bdecec1 100644
-> --- a/drivers/clk/mxs/clk-ref.c
-> +++ b/drivers/clk/mxs/clk-ref.c
-> @@ -16,6 +16,8 @@
->  #include <linux/slab.h>
->  #include "clk.h"
+On Fri, Dec 19, 2014 at 07:16:16PM +0100, Simon Guinot wrote:
+> On Fri, Dec 19, 2014 at 12:43:00PM -0500, Jason Cooper wrote:
+> > On Fri, Dec 19, 2014 at 06:11:56PM +0100, Gregory CLEMENT wrote:
+> > > On 19/12/2014 18:03, Jason Cooper wrote:
+> > > > On Fri, Dec 19, 2014 at 05:09:16PM +0100, Gregory CLEMENT wrote:
+> > > >> On 19/12/2014 17:02, Jason Cooper wrote:
+> > > >>> On Fri, Dec 19, 2014 at 03:36:13PM +0100, Gregory CLEMENT wrote:
+> > > >>>> On 18/12/2014 20:15, Jason Cooper wrote:
+> > > >>>>> On Thu, Dec 18, 2014 at 06:15:40PM +0100, Gregory CLEMENT wrote:
+> > > >>>>> ...
+> > > >>>>>> Jason at the end it seems you didn't ack or nack the patches were you
+> > > >>>>>> were CC. You expressed some concerns about the GPLv2+ move but I don't know
+> > > >>>>>> if it is something that prevents you to give your acked-by.
+> > > >>>>>
+> > > >>>>> Oops.  :)  I figured my S-o-B when applying would be sufficient.  That
+> > > >>>>> decision was before we decided on Andrew applying patches this time
+> > > >>>>> around...
+> > > >>>>>
+> > > >>>>> For all my dts{i} contributions:
+> > > >>>>>
+> > > >>>>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > > >>>>
+> > > >>>> Thanks :)
+> > > >>>>
+> > > >>>>>
+> > > >>>>> Due to all the merge commits over time and whatnot, it's probably best
+> > > >>>>> to put my Ack on all the patches in this series...
+> > > >>>>
+> > > >>>> OK no problem. By the way, I take care of collecting all the acked-by and
+> > > >>>> once it will be done I will either sent the updated patch set with all the
+> > > >>>> acked-by or maybe just I will create a branch to pull if it is easier to handle.
+> > > >>>
+> > > >>> Ok, that'll be up to Andrew.
+> > > >>>
+> > > >>> Once we have the last few stragglers, and assuming there are no more
+> > > >>> NAKs, here's what I'd like to do:
+> > > >>>
+> > > >>> Regrettably, we'll have to revert Simon's dts contributions.  I say
+> > > >>
+> > > >> You missed the email he sent yesterday, finally Simon changed his mind
+> > > >> and gave his acked-by.
+> > > > 
+> > > > Indeed, that was for the oneliner change in the armada-370-xp.dtsi file.
+> > > > I got a bit ahead of myself, but I'm looking towards kirkwood, orion5x,
+> > > > dove, which brings up:
+> > > > 
+> > > > 18ba7e4fe51d ARM: Kirkwood: add DT support for d2 Network v2
+> > > > 2d4cd2cafaea ARM: Kirkwood: allow to use netxbig DTSI for d2net_v2 DTS
+> > > > a96cc303e42a ARM: mvebu: update the SATA compatible string for Armada 370/XP
+> > > > d3dde4df4483 ARM: Kirkwood: update Network Space Mini v2 description
+> > > > 98d4f2acb91a ARM: Kirkwood: DT board setup for CloudBox
+> > > > 4ea931e07d77 ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
+> > > > 7f9871d9d30f ARM: kirkwood: DT board setup for Network Space Mini v2
+> > > > ca7d94524ab3 ARM: kirkwood: DT board setup for Network Space Lite v2
+> > > > ecee1e47ab42 ARM: kirkwood: DT board setup for Network Space v2 and parents
+> > > > 
+> > > 
+> > > OK I understand your concern now. About dove and kirkwood, did you notice that
+> > > some files didn't have any license?
+> > 
+> > Yes.
+> > 
+> > > Especially none of the dove files have a license.
+> > 
+> > Yes, we'll cross that bridge when we get there.  I suspect it then falls
+> > under the over-arching license of the project.  Regardless, we'll still
+> > need Acks from all contributors.
 > 
-> +#define BF_CLKGATE	BIT(7)
-> +
->  /**
->   * struct clk_ref - mxs reference clock
->   * @hw: clk_hw for the reference clock
-> @@ -39,7 +41,7 @@ static int clk_ref_enable(struct clk_hw *hw)
->  {
->  	struct clk_ref *ref = to_clk_ref(hw);
+> Hi Jason,
 > 
-> -	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + CLR);
-> +	writeb(BF_CLKGATE, ref->reg + ref->idx + CLR);
+> What is the problem with keeping the LaCie DTS files under GPLv2+ only ?
 
-Should this be writeb_relaxed() maybe ?
+Converting armada-* to dual license is just a small part of the
+overarching effort to convert *all* the devicetree files to dual
+license.  So, eventually, we'll be doing the same with kirkwood, dove
+and orion5x dts{i} files.  Perhaps even during this merge window.
 
->  	return 0;
->  }
-> @@ -48,7 +50,7 @@ static void clk_ref_disable(struct clk_hw *hw)
->  {
->  	struct clk_ref *ref = to_clk_ref(hw);
-> 
-> -	writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + SET);
-> +	writeb(BF_CLKGATE, ref->reg + ref->idx + SET);
+In the long term, we're attempting to provide one neutral place [1] for
+the bootloaders and kernels to pull devicetrees from and contribute
+changes back to.
 
-Same here and all around the place ?
+hth,
 
-Other than that, it looks pretty OK :)
+Jason.
 
-Best regards,
-Marek Vasut
+[1] git://xenbits.xen.org/people/ianc/device-tree-rebasing.git
