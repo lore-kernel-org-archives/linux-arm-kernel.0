@@ -1,47 +1,48 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Dec 2014 13:32:11 +0100
-Subject: [PATCH] ARM: dts: use all remaining MTD space foor rootfs of
- Iomega ix2-200
-In-Reply-To: <1418586819-29680-1-git-send-email-richard.kunze@web.de>
-References: <20141210203740.GD23599@lunn.ch>
- <1418586819-29680-1-git-send-email-richard.kunze@web.de>
-Message-ID: <20141221123211.GA29218@lunn.ch>
+Date: Sun, 21 Dec 2014 13:38:34 +0100
+Subject: [PATCH] ARM: dts: add gpio_poweroff support for Iomega ix2-200
+In-Reply-To: <1418236841-15277-1-git-send-email-richard.kunze@web.de>
+References: <1418236841-15277-1-git-send-email-richard.kunze@web.de>
+Message-ID: <20141221123834.GB29218@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 14, 2014 at 08:53:39PM +0100, Richard Kunze wrote:
-> The original MTD partition layout for the Iomega ix2-200 leaves most of the 
-> available space unused. This patch changes the layout to use all remaining
-> MTD space after the partitions for u-boot/u-boot-env and the kernel uimage
-> as a "rootfs" partition.
+On Wed, Dec 10, 2014 at 07:40:41PM +0100, Richard Kunze wrote:
+> Iomega ix2-200 can be powered off via GPIO 0 pin 17,
+> this patch wires up the gpio-poweroff driver to do it.
 > 
 > Signed-off-by: Richard Kunze <richard.kunze@web.de>
 
 Hi Richard
 
-Applied to mvebu/dt.
+Added to mvebu/dt
 
-	Andrew
+      Andrew
 
 > ---
->  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> index 7aeddcd..8474bff 100644
+> index 05291f3..7aeddcd 100644
 > --- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
 > +++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> @@ -196,8 +196,8 @@
+> @@ -169,6 +169,10 @@
+>  			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+>  		};
 >  	};
->  
->  	partition at 400000 {
-> -		label = "uInitrd";
-> -		reg = <0x540000 0x1000000>;
-> +		label = "rootfs";
-> +		reg = <0x400000 0x1C00000>;
->  	};
+> +	gpio-poweroff {
+> +		compatible = "gpio-poweroff";
+> +		gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+> +	};
 >  };
 >  
+>  &nand {
 > -- 
 > 1.9.1
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
