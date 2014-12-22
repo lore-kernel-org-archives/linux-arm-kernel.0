@@ -1,69 +1,69 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 22 Dec 2014 18:32:07 +0800
-Subject: [PATCH v4 5/5] media: ov2640: dt: add the device tree binding
- document
-In-Reply-To: <5492C4E3.4050401@samsung.com>
-References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
- <1418869646-17071-6-git-send-email-josh.wu@atmel.com>
- <5492C4E3.4050401@samsung.com>
-Message-ID: <5497F327.4040903@atmel.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 22 Dec 2014 11:50:07 +0100
+Subject: [PATCH v8 2/3] mfd: qcom-rpm: Driver for the Qualcomm RPM
+In-Reply-To: <1417038661-30209-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1417038661-30209-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1419245407.30945.35.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sylwester
+Hi Bjorn,
 
-On 12/18/2014 8:13 PM, Sylwester Nawrocki wrote:
-> Hi Josh,
->
-> On 18/12/14 03:27, Josh Wu wrote:
->> Add the document for ov2640 dt.
->>
->> Cc: devicetree at vger.kernel.org
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Thanks.
+On Wed, 2014-11-26 at 13:51 -0800, Bjorn Andersson wrote:
+> Driver for the Resource Power Manager (RPM) found in Qualcomm 8660, 8960
+> and 8064 based devices. The driver exposes resources that child drivers
+> can operate on; to implementing regulator, clock and bus frequency
+> drivers.
+> 
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
+> 
+> Lee, since your Acked-by earlier I've folded in the part of the RFC where I add
+> an extra parameter to qcom_rpm_write(). Part of that this is unchanged.
+> 
+>  drivers/mfd/Kconfig          |  14 ++
+>  drivers/mfd/Makefile         |   1 +
+>  drivers/mfd/qcom_rpm.c       | 581 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/qcom_rpm.h |  13 +
+>  4 files changed, 609 insertions(+)
+>  create mode 100644 drivers/mfd/qcom_rpm.c
+>  create mode 100644 include/linux/mfd/qcom_rpm.h
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 1456ea7..b6bcb79 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -567,6 +567,20 @@ config MFD_PM8921_CORE
+>  	  Say M here if you want to include support for PM8921 chip as a module.
+>  	  This will build a module called "pm8921-core".
+>  
+> +config MFD_QCOM_RPM
+> +	tristate "Qualcomm Resource Power Manager (RPM)"
+> +	depends on ARCH_QCOM && OF
+> +	help
+> +	  If you say yes to this option, support will be included for the
+> +	  Resource Power Manager system found in the Qualcomm 8660, 8960 and
+> +	  8064 based devices.
+> +
+> +	  This is required to access many regulators, clocks and bus
+> +	  frequencies controlled by the RPM on these devices.
+> +
+> +	  Say M here if you want to include support for the Qualcomm RPM as a
+> +	  module. This will build a module called "qcom_rpm".
+> +
 
->
-> It seems "ovti" is not in the list of vendor prefixes. You may want
-> to send a patch adding it to Documentation/devicetree/bindings/
-> vendor-prefixes.txt.
->
-> Just few minor comments below..
->
->>   .../devicetree/bindings/media/i2c/ov2640.txt       | 46 ++++++++++++++++++++++
->>   1 file changed, 46 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/media/i2c/ov2640.txt
->>
->> diff --git a/Documentation/devicetree/bindings/media/i2c/ov2640.txt b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
->> new file mode 100644
->> index 0000000..de11ebb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/media/i2c/ov2640.txt
->> @@ -0,0 +1,46 @@
->> +* Omnivision ov2640 CMOS sensor
-> s/ov2640/OV2640 ?
+The Qualcomm RPM regulator driver (see Kconfig symbol
+REGULATOR_QCOM_RPM) was added in v3.18. It depends on the above symbol,
+so it has not yet gotten build coverage. Even manual hacks like
+    make -C ../.. M=$PWD CONFIG_REGULATOR_QCOM_RPM=m qcom_rpm-regulator.ko
 
-OK.
->
->> +
->> +The Omnivision OV2640 sensor support multiple resolutions output, such as
->> +CIF, SVGA, UXGA. It also can support YUV422/420, RGB565/555 or raw RGB
->> +output format.
->> +
->> +Required Properties:
->> +- compatible: Must be "ovti,ov2640"
-> I believe it is preferred to put it as "Should contain", rather than
-> "Must be".
-I don't have a strong opinion here. After check many documents, it seems 
-many people use "Should be".
-Is it okay?
+won't work for that driver, because it includes linux/mfd/qcom_rpm.h,
+which is not part of the tree.
 
-Best Regards,
-Josh Wu
+It seems there's no generally agreed upon guideline for situations like
+this. So I guess it's up to Mark to decide how long the tree should
+include an unbuildable driver.
 
->
->> +- clocks: reference to the xvclk input clock.
->> +- clock-names: Must be "xvclk".
-> --
-> Regards,
-> Sylwester
+
+Paul Bolle
