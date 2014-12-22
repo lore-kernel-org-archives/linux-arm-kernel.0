@@ -1,32 +1,59 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 22 Dec 2014 16:59:32 +0000
-Subject: [PATCH 3.19-rc1 v14 1/8] arm: cnx3xxx: Remove spurious default for
- DEBUG_CNS3xxx
-In-Reply-To: <1419267445-8330-1-git-send-email-daniel.thompson@linaro.org>
-References: <1419267445-8330-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1419267572-23981-1-git-send-email-daniel.thompson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Dec 2014 17:04:12 +0000
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <54897528.4030804@samsung.com>
+References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
+ <20141209165746.GA29935@kahuna> <54881589.20105@samsung.com>
+ <20141211092945.GE11502@n2100.arm.linux.org.uk>
+ <54897528.4030804@samsung.com>
+Message-ID: <20141222170411.GL11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default value for DEBUG_CNS3XXX appears twice. This patch removes
-the one with the wrong sort order.
+On Thu, Dec 11, 2014 at 11:42:48AM +0100, Marek Szyprowski wrote:
+> On 2014-12-11 10:29, Russell King - ARM Linux wrote:
+> >On Wed, Dec 10, 2014 at 10:42:33AM +0100, Marek Szyprowski wrote:
+> >>I assume that now it won't be possible to get l2c patches back to -next,
+> >>so I will resend them (again...) with the omap related fix.
+> >What, you mean you don't know the fundamental rules of kernel development?
+> >
+> >No one should ever dump any new code into linux-next during a merge
+> >window which is not a fix for a regression or a bug fix, period.
+> >
+> >Linus has in the past taken a snapshot of linux-next at the beginning
+> >of a merge window, and then threatened to refuse to merge anything that
+> >wasn't in his local snapshot, or which doesn't qualify as the above.
+> >
+> >So no, it won't be possible, because I play by the community rules when
+> >it comes to what gets merged and at what time in the cycle.
+> 
+> I know the rules. It was just my whining, that it is yet another release
+> cycle
+> that got missed. It is really disappointing, that those patches have been
+> floating for months and noone found issues related to different order of
+> initialization. It took way to long to get them scheduled for testing in
+> -next.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Kconfig.debug | 1 -
- 1 file changed, 1 deletion(-)
+Right, so - we're now at -rc1, and we should see about queuing this up
+sooner rather than later - in its fixed form.  From what I can see,
+there's been little progress on the OMAP problem.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5ddd4906f7a7..c5648cc1466d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1269,7 +1269,6 @@ config DEBUG_UART_PHYS
- 				DEBUG_S3C2410_UART2)
- 	default 0x78000000 if DEBUG_CNS3XXX
- 	default 0x7c0003f8 if FOOTBRIDGE
--	default 0x78000000 if DEBUG_CNS3XXX
- 	default 0x80010000 if DEBUG_ASM9260_UART
- 	default 0x80070000 if DEBUG_IMX23_UART
- 	default 0x80074000 if DEBUG_IMX28_UART
+Nishanth - can we push OMAP over to using the generic DT L2C
+initialisation (the one from init_IRQ in arch/arm/kernel/irq.c) and
+kill the SoC specific stuff in arch/arm/mach-omap2/omap4-common.c ?
+
+>From what I can see, in the DT case, the only thing which is used
+there is the ioremap() to provide omap4_get_l2cache_base() with
+something to return.  Everything else - the initialisation of the
+l2c_write_sec pointer, and the aux mask and values - can be specified
+via the machine_desc struct.
+
+That only leaves the non-DT stuff to worry about this, and from what I
+understand, that's going to be removed soon.  If we're going to keep
+the non-DT stuff, we should implement a new machine_desc hook for it
+instead of hijacking one of the existing callbacks.
+
 -- 
-1.9.3
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
