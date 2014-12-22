@@ -1,67 +1,174 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 22 Dec 2014 01:30:11 +0100 (CET)
-Subject: [PATCH] clk: mxs: Fix invalid 32-bit access to frac registers
-In-Reply-To: <201412212250.16007.marex@denx.de>
-References: <1419169599-24791-1-git-send-email-stefan.wahren@i2se.com>
- <201412212250.16007.marex@denx.de>
-Message-ID: <1033288193.576178.1419208211101.JavaMail.open-xchange@oxbaltgw03.schlund.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 22 Dec 2014 10:15:19 +0800
+Subject: [PATCH v2 03/11] clk: sunxi: Add driver for A80 MMC config
+ clocks/resets
+In-Reply-To: <20141219180759.GP4820@lukather>
+References: <1418886058-8145-1-git-send-email-wens@csie.org>
+ <1418886058-8145-4-git-send-email-wens@csie.org>
+ <20141219180759.GP4820@lukather>
+Message-ID: <CAGb2v64c9ZgyUhzneyK3Gqh8XS=qT682_eKZe3_BYm48JMqCNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Sat, Dec 20, 2014 at 2:08 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Dec 18, 2014 at 03:00:50PM +0800, Chen-Yu Tsai wrote:
+>> +static int sun9i_a80_mmc_config_clk_probe(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     struct sun9i_mmc_clk_data *data;
+>> +     struct clk_onecell_data *clk_data;
+>> +     const char *clk_name = np->name;
+>> +     const char *clk_parent;
+>> +     struct resource *r;
+>> +     int count, i, ret;
+>> +
+>> +     data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +     if (!data)
+>> +             return -ENOMEM;
+>> +
+>> +     spin_lock_init(&data->lock);
+>> +
+>> +     r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     /* one clock/reset pair per word */
+>> +     count = DIV_ROUND_UP((r->end - r->start + 1), SUN9I_MMC_WIDTH);
+>> +     data->membase = devm_ioremap_resource(&pdev->dev, r);
+>> +     if (IS_ERR(data->membase))
+>> +             return PTR_ERR(data->membase);
+>> +
+>> +     clk_data = &data->clk_data;
+>> +     clk_data->clk_num = count;
+>> +     clk_data->clks = devm_kcalloc(&pdev->dev, count, sizeof(struct clk *),
+>
+> Hmmm, are you sure of that sizeof?
 
-> Marek Vasut <marex@denx.de> hat am 21. Dezember 2014 um 22:50 geschrieben:
->
->
-> On Sunday, December 21, 2014 at 02:46:39 PM, Stefan Wahren wrote:
->
-> Hi!
->
-> [...]
->
-> > diff --git a/drivers/clk/mxs/clk-ref.c b/drivers/clk/mxs/clk-ref.c
-> > index 4adeed6..bdecec1 100644
-> > --- a/drivers/clk/mxs/clk-ref.c
-> > +++ b/drivers/clk/mxs/clk-ref.c
-> > @@ -16,6 +16,8 @@
-> > #include <linux/slab.h>
-> > #include "clk.h"
-> >
-> > +#define BF_CLKGATE BIT(7)
-> > +
-> > /**
-> > * struct clk_ref - mxs reference clock
-> > * @hw: clk_hw for the reference clock
-> > @@ -39,7 +41,7 @@ static int clk_ref_enable(struct clk_hw *hw)
-> > {
-> > struct clk_ref *ref = to_clk_ref(hw);
-> >
-> > - writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + CLR);
-> > + writeb(BF_CLKGATE, ref->reg + ref->idx + CLR);
->
-> Should this be writeb_relaxed() maybe ?
->
-> > return 0;
-> > }
-> > @@ -48,7 +50,7 @@ static void clk_ref_disable(struct clk_hw *hw)
-> > {
-> > struct clk_ref *ref = to_clk_ref(hw);
-> >
-> > - writel_relaxed(1 << ((ref->idx + 1) * 8 - 1), ref->reg + SET);
-> > + writeb(BF_CLKGATE, ref->reg + ref->idx + SET);
->
-> Same here and all around the place ?
+Quite sure. Code in clk-sunxi.c for gates:
 
-okay, i will fix it in V2.
+    clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
 
->
-> Other than that, it looks pretty OK :)
+Note I'm using kcalloc here.
 
-Fine
+Also definition for clk_data:
+
+    struct clk_onecell_data {
+            struct clk **clks;
+            unsigned int clk_num;
+    };
 
 >
-> Best regards,
-> Marek Vasut
+>> +                                   GFP_KERNEL);
+>> +     if (!clk_data->clks)
+>> +             return -ENOMEM;
+>> +
+>> +     clk_parent = of_clk_get_parent_name(np, 0);
+>> +     if (!clk_parent)
+>> +             return -EINVAL;
+>> +
+>> +     data->clk = devm_clk_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(data->clk)) {
+>> +             dev_err(&pdev->dev, "Could not get clock\n");
+>> +             return PTR_ERR(data->clk);
+>> +     }
+>> +
+>> +     data->reset = devm_reset_control_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(data->reset)) {
+>> +             dev_err(&pdev->dev, "Could not get reset control\n");
+>> +             return PTR_ERR(data->reset);
+>> +     }
+>> +
+>> +     ret = reset_control_deassert(data->reset);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "Reset deassert err %d\n", ret);
+>> +             return ret;
+>> +     }
+>> +
+>> +     for (i = 0; i < count; i++) {
+>> +             of_property_read_string_index(np, "clock-output-names",
+>> +                                           i, &clk_name);
+>> +
+>> +             clk_data->clks[i] = clk_register_gate(&pdev->dev, clk_name,
+>> +                                                   clk_parent, 0,
+>> +                                                   data->membase + SUN9I_MMC_WIDTH * i,
+>> +                                                   SUN9I_MMC_GATE_BIT, 0,
+>> +                                                   &data->lock);
+>> +
+>> +             if (IS_ERR(clk_data->clks[i])) {
+>> +                     ret = PTR_ERR(clk_data->clks[i]);
+>> +                     goto err_clk_register;
+>> +             }
+>> +     }
+>> +
+>> +     ret = of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+>> +     if (ret)
+>> +             goto err_clk_provider;
+>> +
+>> +     data->rcdev.owner = THIS_MODULE;
+>> +     data->rcdev.nr_resets = count;
+>> +     data->rcdev.ops = &sun9i_mmc_reset_ops;
+>> +     data->rcdev.of_node = pdev->dev.of_node;
+>> +
+>> +     ret = reset_controller_register(&data->rcdev);
+>> +     if (ret)
+>> +             goto err_rc_reg;
+>> +
+>> +     platform_set_drvdata(pdev, data);
+>> +
+>> +     return 0;
+>> +
+>> +err_rc_reg:
+>> +     of_clk_del_provider(np);
+>> +
+>> +err_clk_provider:
+>> +     for (i = 0; i < count; i++)
+>> +             clk_unregister(clk_data->clks[i]);
+>> +
+>> +err_clk_register:
+>> +     reset_control_assert(data->reset);
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static int sun9i_a80_mmc_config_clk_remove(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     struct sun9i_mmc_clk_data *data = platform_get_drvdata(pdev);
+>> +     struct clk_onecell_data *clk_data = &data->clk_data;
+>> +     int i;
+>> +
+>> +     reset_controller_unregister(&data->rcdev);
+>> +     of_clk_del_provider(np);
+>> +     for (i = 0; i < clk_data->clk_num; i++)
+>> +             clk_unregister(clk_data->clks[i]);
+>> +
+>> +     reset_control_assert(data->reset);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct of_device_id sun9i_a80_mmc_config_clk_dt_ids[] = {
+>> +     { .compatible = "allwinner,sun9i-a80-mmc-config-clk" },
+>> +     { /* sentinel */ }
+>> +};
+>> +
+>> +static struct platform_driver sun9i_a80_mmc_config_clk_driver = {
+>> +     .driver = {
+>> +             .name = "sun9i-a80-mmc-config-clk",
+>> +             .of_match_table = sun9i_a80_mmc_config_clk_dt_ids,
+>> +     },
+>> +     .probe = sun9i_a80_mmc_config_clk_probe,
+>> +     .remove = sun9i_a80_mmc_config_clk_remove,
+>> +};
+>> +module_platform_driver(sun9i_a80_mmc_config_clk_driver);
+>> +
+>> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+>> +MODULE_DESCRIPTION("Allwinner A80 MMC clock/reset Driver");
+>> +MODULE_LICENSE("GPL v2");
+>> --
+>> 2.1.3
+>>
+>
+> It looks fine otherwise. Thanks!
 
-Best regards
-Stefan
+Thanks!
+
+ChenYu
