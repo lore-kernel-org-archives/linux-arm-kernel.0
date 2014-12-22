@@ -1,43 +1,40 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 22 Dec 2014 19:16:54 +0200
-Subject: [PATCH 3.19-rc1 v14 1/8] arm: cnx3xxx: Remove spurious default
- for DEBUG_CNS3xxx
-In-Reply-To: <1419267572-23981-1-git-send-email-daniel.thompson@linaro.org>
-References: <1419267445-8330-1-git-send-email-daniel.thompson@linaro.org>
- <1419267572-23981-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20141222171654.GB6400@tarshish>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Mon, 22 Dec 2014 20:27:55 +0300
+Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for tegra_resume()
+ location store
+In-Reply-To: <54984429.8040905@wwwdotorg.org>
+References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
+ <54984429.8040905@wwwdotorg.org>
+Message-ID: <5498549B.8070101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Mon, Dec 22, 2014 at 04:59:32PM +0000, Daniel Thompson wrote:
-> The default value for DEBUG_CNS3XXX appears twice. This patch removes
-> the one with the wrong sort order.
-
-In Subject s/cnx3xxx/cns3xxx/
-
-baruch
-
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm/Kconfig.debug | 1 -
->  1 file changed, 1 deletion(-)
+22.12.2014 19:17, Stephen Warren ?????:
+> On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
+>> Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
+>> tegra_resume()
+>> location storing from late to early and as result broke suspend on tegra20.
+>> PMC scratch register 41 was used by tegra lp1 suspend core code for storing
+>> physical memory address of common resume function and in the same time used by
+>> tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
+>> strict order of scratch register use. Fix it by using scratch 40 instead of 41
+>> for tegra_resume() location store.
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 5ddd4906f7a7..c5648cc1466d 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1269,7 +1269,6 @@ config DEBUG_UART_PHYS
->  				DEBUG_S3C2410_UART2)
->  	default 0x78000000 if DEBUG_CNS3XXX
->  	default 0x7c0003f8 if FOOTBRIDGE
-> -	default 0x78000000 if DEBUG_CNS3XXX
->  	default 0x80010000 if DEBUG_ASM9260_UART
->  	default 0x80070000 if DEBUG_IMX23_UART
->  	default 0x80074000 if DEBUG_IMX28_UART
+> You likely can't simply change the PMC scratch register usage arbitrarily;
+> specific registers are designated for specific purposes, and code outside the
+> Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
+> those specific values being in those registers. Without significant research,
+> I'd suggest not changing the PMC scratch register usage.
+
+Sure, that's why I asked to verify if scratch register 40 is in use in the
+comment after commit message. I've checked that u-boot doesn't use it (since
+upstream kernel doesn't care about any other bootloader), but no idea about
+secure monitor. It's definitely safer to avoid changing scratch regs usage, I
+thought that proposed solution would be best from the pure code point of view.
+So, I'm considering your answer as a rejection of the patch (please, let me know
+if I'm wrong) and will prepare another one. Btw, it would be nice to have
+scratch registers usage publicly documented somewhere (on "Tegra Public
+Application Notes" webpage for example), if it's possible, of course.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Dmitry
