@@ -1,43 +1,30 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Dec 2014 15:03:33 +0100
-Subject: [PATCH v3 0/3] mmc: dw_mmc: update host driver with minor fixes
-In-Reply-To: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
-References: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CAPDyKFrpds3Qg7ZKtJkWHsAGThBLUk3GdUhg9iD9U6xS3zwccg@mail.gmail.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Mon, 22 Dec 2014 14:08:44 +0000
+Subject: [PATCH v3 2/5] ASoC: dwc: Iterate over all channels
+In-Reply-To: <20141222135301.GQ17800@sirena.org.uk>
+References: <cover.1418826016.git.Andrew.Jackson@arm.com>
+ <67cea1f0a74c333ec2048c7796cda37302d45e95.1418826016.git.Andrew.Jackson@arm.com>
+ <20141222135301.GQ17800@sirena.org.uk>
+Message-ID: <549825EC.80505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 December 2014 at 13:12, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> This series is part of [1] which are send by Seungwon jeon few months back.
-> when he attempted to add HS400 support for exynos dw_mmc host controller.
-> Since then these patches are just sitting idle.
-> This is my attempt to land some of the changes which are generic, and performance
-> booter on dw_mmc host controller.
->
-> These patches are already ACKed by Jaehoon Chung.
->
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg27903.html
->
-> Changes in v3:
->       None, just a rebase on ulf's next branch.
->
->
-> Seungwon Jeon (3):
->   mmc: dw_mmc: fix the max_blk_count in IDMAC
->   mmc: dw_mmc: exynos: don't use if clock isn't available
->   mmc: dw_mmc: exynos: move definitions to header file
->
->  drivers/mmc/host/dw_mmc-exynos.c |   59 +++++++++-----------------------------
->  drivers/mmc/host/dw_mmc-exynos.h |   56 ++++++++++++++++++++++++++++++++++++
->  drivers/mmc/host/dw_mmc.c        |    4 +--
->  3 files changed, 71 insertions(+), 48 deletions(-)
->  create mode 100644 drivers/mmc/host/dw_mmc-exynos.h
->
-> --
-> 1.7.9.5
->
+On 12/22/14 13:53, Mark Brown wrote:
+> On Fri, Dec 19, 2014 at 04:18:06PM +0000, Andrew Jackson wrote:
+> 
+>> The Designware core can be configured with up to four stereo channels.
+>> Each stereo channel is individually configured so, when the driver's
+>> hw_params call is made, each requested stereo channel has to be
+>> programmed.
+> 
+> This is quite unclear to someone who doesn't know the hardware, is this
+> a bug fix or a new feature?  It looks like it's a fix...
+> 
 
-Thanks! Applied for next.
+It is a fix.  In the Designware core, each stereo channel is configured
+individually.  So, when hw_params is called to configure N channels, 
+N/2 stereo channels need to be configured in the core.  The existing
+code doesn't do this and will only configure the highest numbered 
+channel.
 
-Kind regards
-Uffe
+    Andrew
