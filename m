@@ -1,69 +1,30 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 22 Dec 2014 09:39:45 +0000
-Subject: [PATCH 3.19-rc1 v3] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1419241185-31317-1-git-send-email-daniel.thompson@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 22 Dec 2014 10:45:12 +0100
+Subject: [PATCH 1/4] ARM: at91: remove at91sam9263 legacy board support
+In-Reply-To: <1419240528.30945.12.camel@x220>
+References: <cover.1416392687.git.nicolas.ferre@atmel.com>
+ <cf26d39a4a251662dbc363092b319b788d223a7b.1416392687.git.nicolas.ferre@atmel.com>
+ <1417434775.30245.29.camel@x220> <547C92A1.8000902@atmel.com>
+ <1419240528.30945.12.camel@x220>
+Message-ID: <20141222094512.GA4194@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the overflow threshold for a counter is set above or near the
-0xffffffff boundary then the kernel may lose track of the overflow
-causing only events that occur *after* the overflow to be recorded.
-Specifically the problem occurs when the value of the performance counter
-overtakes its original programmed value due to wrap around.
+Hi Paul,
 
-Typical solutions to this problem are either to avoid programming in
-values likely to be overtaken or to treat the overflow bit as the 33rd
-bit of the counter.
+On 22/12/2014 at 10:28:48 +0100, Paul Bolle wrote :
+> > So, I suggest to get rid of them during 3.19-rc phase.
+> 
+> There's still an entry for RTC_DRV_AT91SAM9_RTT in next-20141221 (and
+> v3.19-rc1). So this I send this message as a reminder that this cleanup
+> is still needed.
+> 
 
-Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
-during irqsave sections (context switches for example) so instead we take
-the simpler approach of avoiding values likely to be overtaken.
+Thanks for the reminder, the pull request was actually waiting for
+3.19-rc1 to get released before being sent. This should be solved in the
+next rc.
 
-We set the limit to half of max_period because this matches the limit
-imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
-rate for large threshold values, however even with a very fast counter
-ticking at 4GHz the interrupt rate would only be ~1Hz.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
-
-Notes:
-    v3:
-    
-    * Rebased on 3.19-rc1 and dropped the arm64 patches (which are
-      already upstream).
-    
-    v2:
-    
-    * Remove the redundant cast to s64 (Will Deacon).
-    
-
- arch/arm/kernel/perf_event.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index f7c65adaa428..557e128e4df0 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -116,8 +116,14 @@ int armpmu_event_set_period(struct perf_event *event)
- 		ret = 1;
- 	}
-
--	if (left > (s64)armpmu->max_period)
--		left = armpmu->max_period;
-+	/*
-+	 * Limit the maximum period to prevent the counter value
-+	 * from overtaking the one we are about to program. In
-+	 * effect we are reducing max_period to account for
-+	 * interrupt latency (and we are being very conservative).
-+	 */
-+	if (left > (armpmu->max_period >> 1))
-+		left = armpmu->max_period >> 1;
-
- 	local64_set(&hwc->prev_count, (u64)-left);
-
---
-1.9.3
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
