@@ -1,66 +1,43 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 23 Dec 2014 00:11:37 +0900
-Subject: [PATCH] arm64: mm: Add pgd_page to support RCU fast_gup
-In-Reply-To: <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
-References: <11B98DF8-2B98-414B-88E5-14C97ADAA60E@gmail.com>
- <20141221105633.GJ23242@arm.com>
- <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
-Message-ID: <374BBC79-DD7B-4FEC-A1B3-DD6D14ED30A8@gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 22 Dec 2014 16:11:30 +0100
+Subject: [PATCH v6 2/3] of: Add for_each_endpoint_of_node helper macro
+In-Reply-To: <1419261091-29888-1-git-send-email-p.zabel@pengutronix.de>
+References: <1419261091-29888-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1419261091-29888-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 22, 2014, at 9:30 PM, Catalin Marinas wrote:
-> On Sun, Dec 21, 2014 at 10:56:33AM +0000, Will Deacon wrote:
->> On Sat, Dec 20, 2014 at 12:49:40AM +0000, Jungseok Lee wrote:
->>> This patch adds pgd_page definition in order to keep supporting
->>> HAVE_GENERIC_RCU_GUP configuration. In addition, it changes pud_page
->>> expression to align with pmd_page for readability.
->>> 
->>> An introduction of pgd_page resolves the following build breakage
->>> under 4KB + 4Level memory management combo.
->>> 
->>> mm/gup.c: In function 'gup_huge_pgd':
->>> mm/gup.c:889:2: error: implicit declaration of function 'pgd_page' [-Werror=implicit-function-declaration]
->>>  head = pgd_page(orig);
->>>  ^
->>> mm/gup.c:889:7: warning: assignment makes pointer from integer without a cast
->>>  head = pgd_page(orig);
->>> 
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Steve Capper <steve.capper@linaro.org>
->>> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
->>> ---
->>> arch/arm64/include/asm/pgtable.h | 4 +++-
->>> 1 file changed, 3 insertions(+), 1 deletion(-)
->>> 
->>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->>> index df22314..a1fe927 100644
->>> --- a/arch/arm64/include/asm/pgtable.h
->>> +++ b/arch/arm64/include/asm/pgtable.h
->>> @@ -401,7 +401,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
->>> 	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
->>> }
->>> 
->>> -#define pud_page(pud)           pmd_page(pud_pmd(pud))
->>> +#define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
->> 
->> It would be cleaner to use pud_pfn here, otherwise we end up passing a
->> physical address with the lower attributes present to __phys_to_pfn, which
->> "knows" to shift them away.
-> 
-> It looks like we did the same with pmd_page() but not with pte_page(),
-> the latter using pte_pfn().
-> 
-> It's not a problem with lower attributes because they are within the
-> first 12 bits, so the shifting gets rid of them. For pmd/pud/pgd, bits
-> above 12 and up to the actual address must be 0.
-> 
-> I agree with changing all of them to use pte/pmd/pud/pgd_pfn but I'm
-> inclined to merge this patch now to fix the kernel build and we'll look
-> at the clean-up after Christmas.
+Note that while of_graph_get_next_endpoint decrements the reference count
+of the child node passed to it, of_node_put(child) still has to be called
+manually when breaking out of the loop.
 
-Either way, I'm fine.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ include/linux/of_graph.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Best Regards
-Jungseok Lee
+diff --git a/include/linux/of_graph.h b/include/linux/of_graph.h
+index befef42..e43442e 100644
+--- a/include/linux/of_graph.h
++++ b/include/linux/of_graph.h
+@@ -26,6 +26,17 @@ struct of_endpoint {
+ 	const struct device_node *local_node;
+ };
+ 
++/**
++ * for_each_endpoint_of_node - iterate over every endpoint in a device node
++ * @parent: parent device node containing ports and endpoints
++ * @child: loop variable pointing to the current endpoint node
++ *
++ * When breaking out of the loop, of_node_put(child) has to be called manually.
++ */
++#define for_each_endpoint_of_node(parent, child) \
++	for (child = of_graph_get_next_endpoint(parent, NULL); child != NULL; \
++	     child = of_graph_get_next_endpoint(parent, child))
++
+ #ifdef CONFIG_OF
+ int of_graph_parse_endpoint(const struct device_node *node,
+ 				struct of_endpoint *endpoint);
+-- 
+2.1.4
