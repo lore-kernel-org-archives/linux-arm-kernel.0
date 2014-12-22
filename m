@@ -1,83 +1,208 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 22 Dec 2014 16:11:31 +0100
-Subject: [PATCH v6 3/3] of: Add of_graph_get_port_by_id function
+Date: Mon, 22 Dec 2014 16:11:29 +0100
+Subject: [PATCH v6 1/3] of: Decrement refcount of previous endpoint in
+ of_graph_get_next_endpoint
 In-Reply-To: <1419261091-29888-1-git-send-email-p.zabel@pengutronix.de>
 References: <1419261091-29888-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1419261091-29888-4-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1419261091-29888-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a function to get a port device tree node by port id,
-or reg property value.
+Decrementing the reference count of the previous endpoint node allows to
+use the of_graph_get_next_endpoint function in a for_each_... style macro.
+All current users of this function that pass a non-NULL prev parameter
+(that is, soc_camera and imx-drm) are changed to not decrement the passed
+prev argument's refcount themselves.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 ---
- drivers/of/base.c        | 26 ++++++++++++++++++++++++++
- include/linux/of_graph.h |  7 +++++++
- 2 files changed, 33 insertions(+)
+Changes since v5:
+ - Rebased onto v3.19-rc1
+ - Added coresight and rcar-du
+---
+ drivers/coresight/of_coresight.c               | 13 ++-----------
+ drivers/gpu/drm/imx/imx-drm-core.c             | 13 ++-----------
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c          | 15 ++++-----------
+ drivers/media/platform/soc_camera/soc_camera.c |  3 ++-
+ drivers/of/base.c                              |  9 +--------
+ 5 files changed, 11 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index aac66df..c816299 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -2080,6 +2080,32 @@ int of_graph_parse_endpoint(const struct device_node *node,
- EXPORT_SYMBOL(of_graph_parse_endpoint);
- 
- /**
-+ * of_graph_get_port_by_id() - get the port matching a given id
-+ * @parent: pointer to the parent device node
-+ * @id: id of the port
-+ *
-+ * Return: A 'port' node pointer with refcount incremented. The caller
-+ * has to use of_node_put() on it when done.
-+ */
-+struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id)
-+{
-+	struct device_node *port;
-+
-+	for_each_child_of_node(node, port) {
-+		u32 port_id = 0;
-+
-+		if (of_node_cmp(port->name, "port") != 0)
-+			continue;
-+		of_property_read_u32(port, "reg", &port_id);
-+		if (id == port_id)
-+			return port;
-+	}
-+
-+	return NULL;
-+}
-+EXPORT_SYMBOL(of_graph_get_port_by_id);
-+
-+/**
-  * of_graph_get_next_endpoint() - get next endpoint node
-  * @parent: pointer to the parent device node
-  * @prev: previous endpoint node, or NULL to get first
-diff --git a/include/linux/of_graph.h b/include/linux/of_graph.h
-index e43442e..3c1c95a 100644
---- a/include/linux/of_graph.h
-+++ b/include/linux/of_graph.h
-@@ -40,6 +40,7 @@ struct of_endpoint {
- #ifdef CONFIG_OF
- int of_graph_parse_endpoint(const struct device_node *node,
- 				struct of_endpoint *endpoint);
-+struct device_node *of_graph_get_port_by_id(struct device_node *node, u32 id);
- struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
- 					struct device_node *previous);
- struct device_node *of_graph_get_remote_port_parent(
-@@ -53,6 +54,12 @@ static inline int of_graph_parse_endpoint(const struct device_node *node,
- 	return -ENOSYS;
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index 5030c07..349c88b 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -52,15 +52,6 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
+ 			       endpoint, of_dev_node_match);
  }
  
-+static inline struct device_node *of_graph_get_port_by_id(
-+					struct device_node *node, u32 id)
-+{
-+	return NULL;
-+}
+-static struct device_node *of_get_coresight_endpoint(
+-		const struct device_node *parent, struct device_node *prev)
+-{
+-	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
+-
+-	of_node_put(prev);
+-	return node;
+-}
+-
+ static void of_coresight_get_ports(struct device_node *node,
+ 				   int *nr_inport, int *nr_outport)
+ {
+@@ -68,7 +59,7 @@ static void of_coresight_get_ports(struct device_node *node,
+ 	int in = 0, out = 0;
+ 
+ 	do {
+-		ep = of_get_coresight_endpoint(node, ep);
++		ep = of_graph_get_next_endpoint(node, ep);
+ 		if (!ep)
+ 			break;
+ 
+@@ -140,7 +131,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 		/* Iterate through each port to discover topology */
+ 		do {
+ 			/* Get a handle on a port */
+-			ep = of_get_coresight_endpoint(node, ep);
++			ep = of_graph_get_next_endpoint(node, ep);
+ 			if (!ep)
+ 				break;
+ 
+diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
+index b250130..fed627d 100644
+--- a/drivers/gpu/drm/imx/imx-drm-core.c
++++ b/drivers/gpu/drm/imx/imx-drm-core.c
+@@ -436,15 +436,6 @@ static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
+ 	return 0;
+ }
+ 
+-static struct device_node *imx_drm_of_get_next_endpoint(
+-		const struct device_node *parent, struct device_node *prev)
+-{
+-	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
+-
+-	of_node_put(prev);
+-	return node;
+-}
+-
+ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np)
+ {
+@@ -456,7 +447,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	for (i = 0; ; i++) {
+ 		u32 mask;
+ 
+-		ep = imx_drm_of_get_next_endpoint(np, ep);
++		ep = of_graph_get_next_endpoint(np, ep);
+ 		if (!ep)
+ 			break;
+ 
+@@ -504,7 +495,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
+ 		return -EINVAL;
+ 
+ 	do {
+-		ep = imx_drm_of_get_next_endpoint(node, ep);
++		ep = of_graph_get_next_endpoint(node, ep);
+ 		if (!ep)
+ 			break;
+ 
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+index 0c5ee61..480c4d9 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+@@ -206,7 +206,7 @@ static int rcar_du_encoders_init_one(struct rcar_du_device *rcdu,
+ 	enum rcar_du_encoder_type enc_type = RCAR_DU_ENCODER_NONE;
+ 	struct device_node *connector = NULL;
+ 	struct device_node *encoder = NULL;
+-	struct device_node *prev = NULL;
++	struct device_node *ep_node = NULL;
+ 	struct device_node *entity_ep_node;
+ 	struct device_node *entity;
+ 	int ret;
+@@ -225,11 +225,7 @@ static int rcar_du_encoders_init_one(struct rcar_du_device *rcdu,
+ 	entity_ep_node = of_parse_phandle(ep->local_node, "remote-endpoint", 0);
+ 
+ 	while (1) {
+-		struct device_node *ep_node;
+-
+-		ep_node = of_graph_get_next_endpoint(entity, prev);
+-		of_node_put(prev);
+-		prev = ep_node;
++		ep_node = of_graph_get_next_endpoint(entity, ep_node);
+ 
+ 		if (!ep_node)
+ 			break;
+@@ -300,7 +296,7 @@ static int rcar_du_encoders_init_one(struct rcar_du_device *rcdu,
+ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
+ {
+ 	struct device_node *np = rcdu->dev->of_node;
+-	struct device_node *prev = NULL;
++	struct device_node *ep_node = NULL;
+ 	unsigned int num_encoders = 0;
+ 
+ 	/*
+@@ -308,15 +304,12 @@ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
+ 	 * pipeline.
+ 	 */
+ 	while (1) {
+-		struct device_node *ep_node;
+ 		enum rcar_du_output output;
+ 		struct of_endpoint ep;
+ 		unsigned int i;
+ 		int ret;
+ 
+-		ep_node = of_graph_get_next_endpoint(np, prev);
+-		of_node_put(prev);
+-		prev = ep_node;
++		ep_node = of_graph_get_next_endpoint(np, ep_node);
+ 
+ 		if (ep_node == NULL)
+ 			break;
+diff --git a/drivers/media/platform/soc_camera/soc_camera.c b/drivers/media/platform/soc_camera/soc_camera.c
+index b3db51c..289b637 100644
+--- a/drivers/media/platform/soc_camera/soc_camera.c
++++ b/drivers/media/platform/soc_camera/soc_camera.c
+@@ -1710,7 +1710,6 @@ static void scan_of_host(struct soc_camera_host *ici)
+ 		if (!i)
+ 			soc_of_bind(ici, epn, ren->parent);
+ 
+-		of_node_put(epn);
+ 		of_node_put(ren);
+ 
+ 		if (i) {
+@@ -1718,6 +1717,8 @@ static void scan_of_host(struct soc_camera_host *ici)
+ 			break;
+ 		}
+ 	}
 +
- static inline struct device_node *of_graph_get_next_endpoint(
- 					const struct device_node *parent,
- 					struct device_node *previous)
++	of_node_put(epn);
+ }
+ 
+ #else
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 36536b6..aac66df 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -2085,8 +2085,7 @@ EXPORT_SYMBOL(of_graph_parse_endpoint);
+  * @prev: previous endpoint node, or NULL to get first
+  *
+  * Return: An 'endpoint' node pointer with refcount incremented. Refcount
+- * of the passed @prev node is not decremented, the caller have to use
+- * of_node_put() on it when done.
++ * of the passed @prev node is decremented.
+  */
+ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
+ 					struct device_node *prev)
+@@ -2122,12 +2121,6 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
+ 		if (WARN_ONCE(!port, "%s(): endpoint %s has no parent node\n",
+ 			      __func__, prev->full_name))
+ 			return NULL;
+-
+-		/*
+-		 * Avoid dropping prev node refcount to 0 when getting the next
+-		 * child below.
+-		 */
+-		of_node_get(prev);
+ 	}
+ 
+ 	while (1) {
 -- 
 2.1.4
