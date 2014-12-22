@@ -1,40 +1,48 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Mon, 22 Dec 2014 11:01:55 +0800
-Subject: [PATCH 18/28] thermal: drop owner assignment from platform_drivers
-In-Reply-To: <1419196495-9626-19-git-send-email-wsa@the-dreams.de>
-References: <1419196495-9626-1-git-send-email-wsa@the-dreams.de>
- <1419196495-9626-19-git-send-email-wsa@the-dreams.de>
-Message-ID: <1419217315.22607.15.camel@rzhang1-toshiba>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Mon, 22 Dec 2014 12:17:29 +0900
+Subject: [PATCH v2] ARM: mm: fix size rounding-down of arm_add_memory()
+ function
+Message-ID: <1419218249-5744-1-git-send-email-yamada.m@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-12-21 at 22:14 +0100, Wolfram Sang wrote:
-> This platform_driver does not need to set an owner, it will be populated by the
-> driver core.
-> 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+The current rounding of "size" is wrong:
 
-both PATCH 18/28 and 19/28 look good to me. applied.
+ - If "start" is sufficiently near the next page boundary, "size"
+   is decremented by more than enough and the last page is lost.
 
-thanks,
-rui
-> ---
-> Generated with coccinelle. SmPL file is in the introductory msg. The big
-> cleanup was pulled in this merge window. This series catches the bits fallen
-> through. The patches shall go in via the subsystem trees.
-> 
->  drivers/thermal/rockchip_thermal.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index 1bcddfc60e91..9c6ce548e363 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -677,7 +677,6 @@ static SIMPLE_DEV_PM_OPS(rockchip_thermal_pm_ops,
->  static struct platform_driver rockchip_thermal_driver = {
->  	.driver = {
->  		.name = "rockchip-thermal",
-> -		.owner = THIS_MODULE,
->  		.pm = &rockchip_thermal_pm_ops,
->  		.of_match_table = of_rockchip_thermal_match,
->  	},
+ - If "size" is sufficiently small, it is wrapped around and gets
+   a bogus value.
+
+Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+
+Changes in v2:
+ - Avoid wrap around of "size"
+
+ arch/arm/kernel/setup.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index f9c8639..d13f185 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -657,10 +657,13 @@ int __init arm_add_memory(u64 start, u64 size)
+ 
+ 	/*
+ 	 * Ensure that start/size are aligned to a page boundary.
+-	 * Size is appropriately rounded down, start is rounded up.
++	 * Size is rounded down, start is rounded up.
+ 	 */
+-	size -= start & ~PAGE_MASK;
+ 	aligned_start = PAGE_ALIGN(start);
++	if (aligned_start > start + size)
++		size = 0;
++	else
++		size -= aligned_start - start;
+ 
+ #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
+ 	if (aligned_start > ULONG_MAX) {
+-- 
+1.9.1
