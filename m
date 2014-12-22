@@ -1,69 +1,47 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 22 Dec 2014 11:50:07 +0100
-Subject: [PATCH v8 2/3] mfd: qcom-rpm: Driver for the Qualcomm RPM
-In-Reply-To: <1417038661-30209-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1417038661-30209-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1417038661-30209-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1419245407.30945.35.camel@x220>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 22 Dec 2014 11:55:31 +0100 (CET)
+Subject: [PATCH] ARM: dts: imx28-evk: remove duplicate property
+In-Reply-To: <CAOMZO5Cr2Or5O0c0xjL2Z_Gj6HDGk5vhRckVYw6Q58U+JoZOfQ@mail.gmail.com>
+References: <1412715639-9565-1-git-send-email-mhei@heimpold.de>
+ <CAOMZO5Cr2Or5O0c0xjL2Z_Gj6HDGk5vhRckVYw6Q58U+JoZOfQ@mail.gmail.com>
+Message-ID: <102569001.493493.1419245731445.JavaMail.open-xchange@oxbaltgw00.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Shawn,
 
-On Wed, 2014-11-26 at 13:51 -0800, Bjorn Andersson wrote:
-> Driver for the Resource Power Manager (RPM) found in Qualcomm 8660, 8960
-> and 8064 based devices. The driver exposes resources that child drivers
-> can operate on; to implementing regulator, clock and bus frequency
-> drivers.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
-> 
-> Lee, since your Acked-by earlier I've folded in the part of the RFC where I add
-> an extra parameter to qcom_rpm_write(). Part of that this is unchanged.
-> 
->  drivers/mfd/Kconfig          |  14 ++
->  drivers/mfd/Makefile         |   1 +
->  drivers/mfd/qcom_rpm.c       | 581 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/qcom_rpm.h |  13 +
->  4 files changed, 609 insertions(+)
->  create mode 100644 drivers/mfd/qcom_rpm.c
->  create mode 100644 include/linux/mfd/qcom_rpm.h
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 1456ea7..b6bcb79 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -567,6 +567,20 @@ config MFD_PM8921_CORE
->  	  Say M here if you want to include support for PM8921 chip as a module.
->  	  This will build a module called "pm8921-core".
->  
-> +config MFD_QCOM_RPM
-> +	tristate "Qualcomm Resource Power Manager (RPM)"
-> +	depends on ARCH_QCOM && OF
-> +	help
-> +	  If you say yes to this option, support will be included for the
-> +	  Resource Power Manager system found in the Qualcomm 8660, 8960 and
-> +	  8064 based devices.
-> +
-> +	  This is required to access many regulators, clocks and bus
-> +	  frequencies controlled by the RPM on these devices.
-> +
-> +	  Say M here if you want to include support for the Qualcomm RPM as a
-> +	  module. This will build a module called "qcom_rpm".
-> +
+[Fix Shawn's mail address]
 
-The Qualcomm RPM regulator driver (see Kconfig symbol
-REGULATOR_QCOM_RPM) was added in v3.18. It depends on the above symbol,
-so it has not yet gotten build coverage. Even manual hacks like
-    make -C ../.. M=$PWD CONFIG_REGULATOR_QCOM_RPM=m qcom_rpm-regulator.ko
+> Fabio Estevam <festevam@gmail.com> hat am 8. Oktober 2014 um 02:18
+> geschrieben:
+>
+>
+> On Tue, Oct 7, 2014 at 6:00 PM, Michael Heimpold <mhei@heimpold.de> wrote:
+> > Seems to be a left-over from an automatic merge.
+> >
+> > Signed-off-by: Michael Heimpold <mhei@heimpold.de>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > arch/arm/boot/dts/imx28-evk.dts | 1 -
+> > 1 file changed, 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx28-evk.dts
+> > b/arch/arm/boot/dts/imx28-evk.dts
+> > index 09664fc..2944d39 100644
+> > --- a/arch/arm/boot/dts/imx28-evk.dts
+> > +++ b/arch/arm/boot/dts/imx28-evk.dts
+> > @@ -182,7 +182,6 @@
+> > };
+> >
+> > lradc at 80050000 {
+> > - fsl,lradc-touchscreen-wires = <4>;
+>
+> Thanks
+>
+> Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+>
 
-won't work for that driver, because it includes linux/mfd/qcom_rpm.h,
-which is not part of the tree.
+did you get this patch?
 
-It seems there's no generally agreed upon guideline for situations like
-this. So I guess it's up to Mark to decide how long the tree should
-include an unbuildable driver.
-
-
-Paul Bolle
+Best regards
+Stefan Wahren
