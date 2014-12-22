@@ -1,208 +1,80 @@
-From: evgeni@studio-punkt.com (Evgeni Dobrev)
-Date: Mon, 22 Dec 2014 09:04:45 +0100
-Subject: [PATCH v2 1/1] add support for Seagate BlackArmor NAS220
-In-Reply-To: <20141215203855.GA28940@anne>
-References: <20141215203855.GA28940@anne>
-Message-ID: <20141222080445.GA15292@anne>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 22 Dec 2014 08:32:15 +0000
+Subject: AT91 slow clock mode regression/fixes, improvement proposal
+In-Reply-To: <20141219152625.GA30666@gradator.net>
+References: <20141218203904.GA25215@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
+ <20141219152625.GA30666@gradator.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFCB6CA0@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Seagate BlackArmor NAS220.
+Hi Sylvain,
 
-The Seagate BlackArmor NAS 220 is a NAS system based on Marvell 88f6192. It has
-32MB NAND and 128MB DRAM. It has two SATA slots, one Gigabit Ethernet port, two
-USB 2.0 ports, two buttons and three LEDs. There is a serial port available on
-the CN5 connector on the board (1 - TX, 4 - RX, 6 - GND).
+> 
+> On Fri, Dec 19, 2014 at 02:50:04AM +0000, Yang, Wenyou wrote:
+> > >
+> > > Is actually jumping to wait_pllblock before enabling PLLB instead of
+> > > skipping UTMI PLL. Unfortunately the compiler does not warn about that.
+> >
+> > Thanks. I will check it
+> 
+> Fixed in proposed patch (UPLL code removed).
+> 
+> 
+> > > Furthermore, it looks like MCKRDY_TIMEOUT set to 1000 is not enough,
+> > > my board crashes in about 1 wake up to 10 with this value and works
+> > > perfectly fine with 4000.
+> >
+> > I also encountered this issue.
+> 
+> Fixed in proposed patch, since we don't timeout anymore.
+I am verifying this patch. I still insist on remain the timeout.
 
-The only functionality still not implemented is the bi-color led on the front
-panel (status). Pins mpp22 and mpp23 control this led. Setting mpp22 to high and
-mpp23 to low results in orange color. Setting mpp22 to low and mpp23 to high
-results in blue color.
+> 
+> 
+> > Moreover the Main Crystal Oscillator Startup Time seems not enough
+> > too, not sure, I am confirming it.
+> 
+> This is OK for me, CKGR_MOR.MOSCXTST is set to 8:  (1/32768)*8*8 = 1.95 ms
+> 
+> I checked with a scope on XTAL of the AT91SAM9G35-CM module, 2 ms is about
+> twice enough waiting time.
+Yes, you are right. Thanks.
 
-The third led is wired to show the SATA activity on the two drives.
+> 
+> 
+> > > Therefore I am also proposing to remove all the timeout.
+> >
+> > Good idea, but I still worry the deadlock without timeout. Maybe
+> > increasing timeout is better.
+> 
+> This is just a test request patch, I am first trying without timeout to
+> get some feedback. It works well for me, at least, but this isn't
+> convicing myself enough :-)
+> 
+> 
+> > > By the way, I don't know for other AT91 boards (or without DT, or
+> > > something else), but the UTMI PLL suspend/resume seem unnecessary for
+> > > me, the USB driver is already disabling the USB PLL when suspending,
+> > > could you confirm ?
+> > Yes, I agree.
+> 
+> Removed.
+> 
+> 
+> > Remove disabling the PLLB code as well.
+> 
+> Done, but my SoC don't have a PLLB, so I can't check myself, could you
+> check if "AT91: PM - Suspend-to-RAM with PLL B running" does not fire on
+> PLL B enabled board ?
+I will check.
 
-Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
----
- arch/arm/boot/dts/Makefile            |    1 +
- arch/arm/boot/dts/kirkwood-nas220.dts |  158 +++++++++++++++++++++++++++++++++
- 2 files changed, 159 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-nas220.dts
+> 
+> 
+> Regards,
+> Sylvain
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 38c89ca..8b9ad1d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -132,6 +132,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
- 	kirkwood-lsxhl.dtb \
- 	kirkwood-mplcec4.dtb \
- 	kirkwood-mv88f6281gtw-ge.dtb \
-+	kirkwood-nas220.dtb \
- 	kirkwood-net2big.dtb \
- 	kirkwood-net5big.dtb \
- 	kirkwood-netgear_readynas_duo_v2.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-nas220.dts b/arch/arm/boot/dts/kirkwood-nas220.dts
-new file mode 100644
-index 0000000..43c9bbc
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-nas220.dts
-@@ -0,0 +1,158 @@
-+/*
-+ * Device Tree file for Seagate BlackArmor NAS220
-+ *
-+ * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6192.dtsi"
-+
-+/ {
-+	model = "Seagate NAS 220";
-+	compatible = "seagate,nas220","marvell,kirkwood-88f6192","marvell,kirkwood";
-+
-+	memory { /* 128 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+		stdout-path = &uart0;
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pin-controller at 10000 {
-+			pinctrl-0 = <&pmx_uart0
-+				     &pmx_button_reset
-+				     &pmx_button_power>;
-+			pinctrl-names = "default";
-+
-+			pmx_act_sata0: pmx-act-sata0 {
-+				marvell,pins = "mpp15";
-+				marvell,function = "sata0";
-+			};
-+			pmx_act_sata1: pmx-act-sata1 {
-+				marvell,pins = "mpp16";
-+				marvell,function = "sata1";
-+			};
-+			pmx_power_sata0: pmx-power-sata0 {
-+				marvell,pins = "mpp24";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_sata1: pmx-power-sata1 {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_reset: pmx-button-reset {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_power: pmx-button-power {
-+				marvell,pins = "mpp26";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		serial at 12000 {
-+			status = "okay";
-+		};
-+
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+			adt7476: adt7476a at 2e {
-+				compatible = "adi,adt7476";
-+				reg = <0x2e>;
-+			};
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		button at 1{
-+			label = "Reset push button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 2{
-+			label = "Power push button";
-+			linux,code = <KEY_SLEEP>;
-+			gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		blue-power {
-+			label = "nas220:blue:power";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_power_sata0 &pmx_power_sata1>;
-+		pinctrl-names = "default";
-+
-+		sata0_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "SATA0 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 24 0>;
-+		};
-+
-+		sata1_power: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "SATA1 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 28 0>;
-+		};
-+	};
-+};
-+
-+&nand {
-+	status = "okay";
-+};
-+
-+&mdio {
-+	status = "okay";
-+	ethphy0: ethernet-phy at 8 {
-+		 reg = <8>;
-+	 };
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
--- 
-1.7.10.4
+
+Best Regard,
+Wenyou Yang
