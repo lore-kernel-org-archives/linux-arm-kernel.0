@@ -1,104 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Dec 2014 20:43:24 +0100
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <549858E4.4050500@ti.com>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <21520995.3ITgVmVTeV@wuerfel> <549858E4.4050500@ti.com>
-Message-ID: <11285984.OK9CqQGmjZ@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 22 Dec 2014 14:38:54 -0600
+Subject: [PATCH] ARM: dts: am437x-sk-evm: Hook dcdc2 as the cpu0-supply
+In-Reply-To: <1417706679-22294-1-git-send-email-balbi@ti.com>
+References: <1417706679-22294-1-git-send-email-balbi@ti.com>
+Message-ID: <20141222203854.GD3083@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 December 2014 12:46:12 Murali Karicheri wrote:
-> On 12/18/2014 05:29 PM, Arnd Bergmann wrote:
-> > On Thursday 18 December 2014 17:07:04 Murali Karicheri wrote:
-> >> Add of_pci_dma_configure() to allow updating the dma configuration
-> >> of the pci device using the configuration from the parent of
-> >> the root bridge device.
-> >> +	/*
-> >> +	 * Set it to coherent_dma_mask by default if the architecture
-> >> +	 * code has not set it.
-> >> +	 */
-> >> +	if (!dev->dma_mask)
-> >> +		dev->dma_mask =&dev->coherent_dma_mask;
-> >> +
-> >> +	ret = of_dma_get_range(parent_np,&dma_addr,&paddr,&size);
-> >> +	if (ret<  0) {
-> >> +		dma_addr = offset = 0;
-> >> +		size = dev->coherent_dma_mask;
-> >
-> > Can you check one thing here? I believe the size argument as returned
-> > from of_dma_get_range is inclusive (e.g. 0x100000000), while the coherent
-> > mask by definition is exlusive (e.g. 0xffffffff), so the size needs to
-> > be adapted here. I haven't checked all the code here though, so I may
-> > be wrong.
+On Thu, Dec 04, 2014 at 09:24:39AM -0600, Felipe Balbi wrote:
+> From: Dave Gerlach <d-gerlach@ti.com>
 > 
-> size returned by of_dma_get_range() is inclusive as you indicated. Fromt 
-> the grep of dma-ranges in arch/arm/boot/dts, I see
+> Hook dcdc2 as the cpu0-supply.
 > 
-> arch/arm/boot/dts/keystone.dtsi:		dma-ranges = <0x80000000 0x8 
-> 0x00000000 0x80000000>;
-> arch/arm/boot/dts/keystone.dtsi:			dma-ranges;
-> arch/arm/boot/dts/r8a7790.dtsi:		dma-ranges = <0x42000000 0 0x40000000 0 
-> 0x40000000 0 0x80000000
-> arch/arm/boot/dts/integratorap.dts:	dma-ranges = <0x80000000 0x0 
-> 0x80000000>;
-> arch/arm/boot/dts/r8a7791.dtsi:		dma-ranges = <0x42000000 0 0x40000000 0 
-> 0x40000000 0 0x80000000
-> 
-> So I guess I need to change the code to
-> 
->  >> +	ret = of_dma_get_range(parent_np,&dma_addr,&paddr,&size);
->  >> +	if (ret<  0) {
->  >> +		dma_addr = offset = 0;
->  >> +		size = dev->coherent_dma_mask + 1;
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Right.
+btw, before sending this, I tested on my AM437x Starter Kit, so
 
-> >> +	} else {
-> >> +		offset = PFN_DOWN(paddr - dma_addr);
-> >> +		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> >> +	}
-> >> +	dev->dma_pfn_offset = offset;
-> >> +
-> >> +	coherent = of_dma_is_coherent(parent_np);
-> >> +	dev_dbg(dev, "device is%sdma coherent\n",
-> >> +		coherent ? " " : " not ");
-> >> +
-> >> +	arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
-> >
-> > Basically, I would use limit the size argument we pass into
-> > arch_setup_dma_ops to the minimum of 'size' and 'dma_mask' here,
-> > after converting into the same format. We should make sure we do the
-> > same thing for platform_device as well, so it might be better to do
-> > it inside of arch_setup_dma_ops instead.
-> 
-> Do you think following changes will work?
-> 
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64 
-> dma_base, u64 size,
->                          struct iommu_ops *iommu, bool coherent)
->   {
->          struct dma_map_ops *dma_ops;
-> +       u64 temp_size = min((*(dev->dma_mask) + 1), size);
-> 
->          dev->archdata.dma_coherent = coherent;
-> -       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
-> +       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
-> 
-> If you agree, I will post v1 of the patch with these updates. Let me 
-> know. I did some basic tests on Keystone with these changes and it works 
-> fine.
+Tested-by: Felipe Balbi <balbi@ti.com>
 
-It's not exactly what I meant. My main point was that we need to limit
-dev->dma_mask to (size-1) here, but you are not touching that. We can
-either change the two functions in which we first assign the dma_mask
-(platform and pci bus), or set it again in arch_setup_dma_ops (on each
-architecture implementing it), either way would work. Someone else
-might have a stronger opinion on that matter.
+> ---
+>  arch/arm/boot/dts/am437x-sk-evm.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+> index 87aa4f3..f7f77a7 100644
+> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+> @@ -611,3 +611,7 @@
+>  &wdt {
+>  	status = "okay";
+>  };
+> +
+> +&cpu {
+> +	cpu0-supply = <&dcdc2>;
+> +};
+> -- 
+> 2.1.0.GIT
+> 
 
-For arm_setup_iommu_dma_ops, passing the original size is probably
-best.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141222/f957efd8/attachment.sig>
