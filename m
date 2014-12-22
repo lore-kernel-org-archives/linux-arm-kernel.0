@@ -1,48 +1,106 @@
-From: yamada.m@jp.panasonic.com (Masahiro Yamada)
-Date: Mon, 22 Dec 2014 12:17:29 +0900
-Subject: [PATCH v2] ARM: mm: fix size rounding-down of arm_add_memory()
- function
-Message-ID: <1419218249-5744-1-git-send-email-yamada.m@jp.panasonic.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Mon, 22 Dec 2014 09:00:45 +0530
+Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
+ controller.
+In-Reply-To: <CAGb2v659jEj7cxPCu1UNPb-p6iaH6Sjcp4LCgsBOyBh-odSUhw@mail.gmail.com>
+References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
+ <548C1E7D.1000005@redhat.com>
+ <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
+ <548D5207.8030004@redhat.com>
+ <CAEzqOZsWSpd_r3Oc=PBVw3NQH-_1V9JXtC2H4tZ3U6nCN_Z7aA@mail.gmail.com>
+ <548EFA9F.4080208@redhat.com>
+ <CAGb2v659jEj7cxPCu1UNPb-p6iaH6Sjcp4LCgsBOyBh-odSUhw@mail.gmail.com>
+Message-ID: <CAEzqOZsV_KYio1EYEk885KPT0Q=HTWUOzrrzf-fB1ssJkx=e6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current rounding of "size" is wrong:
+Sorry for delayed response.
 
- - If "start" is sufficiently near the next page boundary, "size"
-   is decremented by more than enough and the last page is lost.
+Thanks, Chen-Yu.
+So, I'll keep ps2 enabled for Lime2 board without any comment.
 
- - If "size" is sufficiently small, it is wrapped around and gets
-   a bogus value.
-
-Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
-
-Changes in v2:
- - Avoid wrap around of "size"
-
- arch/arm/kernel/setup.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index f9c8639..d13f185 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -657,10 +657,13 @@ int __init arm_add_memory(u64 start, u64 size)
- 
- 	/*
- 	 * Ensure that start/size are aligned to a page boundary.
--	 * Size is appropriately rounded down, start is rounded up.
-+	 * Size is rounded down, start is rounded up.
- 	 */
--	size -= start & ~PAGE_MASK;
- 	aligned_start = PAGE_ALIGN(start);
-+	if (aligned_start > start + size)
-+		size = 0;
-+	else
-+		size -= aligned_start - start;
- 
- #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
- 	if (aligned_start > ULONG_MAX) {
--- 
-1.9.1
+On Mon, Dec 15, 2014 at 9:11 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi,
+>
+> On Mon, Dec 15, 2014 at 11:13 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>>
+>> On 15-12-14 15:13, Vishnu Patekar wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Sun, Dec 14, 2014 at 2:31 PM, Hans de Goede <hdegoede@redhat.com>
+>>> wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On 13-12-14 21:01, Vishnu Patekar wrote:
+>>>>>
+>>>>>
+>>>>> Hello Hans,
+>>>>> Please find my comments inlined.
+>>>>>
+>>>>> On 12/13/14, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>>
+>>>>>>
+>>>>>> Hi VishnuPatekar,
+>>>>>>
+>>>>>> The patch mangling for this set seems to have gone a bit wrong I'm
+>>>>>> afraid
+>>>>>
+>>>>>
+>>>>>
+>>>>> No, this time I've corrected it. Infact, last version of patch did not
+>>>>> used the status bit error macros.
+>>>>>
+>>>>>> a lot of the patches have my fixup commit messages (which should have
+>>>>>> disappeared when squashing in the patches), please replace those by
+>>>>>> proper
+>>>>>> commit messages describing what the patch actually does.
+>>>>>
+>>>>>
+>>>>> Yes, [PATCHv3 3/5] uses fixup. I'll correct it.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Also the adding of the commented nodes for the lime2 seems to be gone
+>>>>>> entirely
+>>>>>> from the set, instead now only a comment about the conflict with the
+>>>>>> hdmi
+>>>>>> pins is added, but it is above the i2c node instead of above a ps2
+>>>>>> node.
+>>>>>>
+>>>>> Maxime's suggested that we should not add commented nodes specially
+>>>>> when its trivial to apply. And just note saying ps20 pins conflict
+>>>>> with HDMI.
+>>>>
+>>>>
+>>>>
+>>>> Ah, I see.
+>>>>
+>>>>> Should I remove the this comment as well?
+>>>>> Or
+>>>>> Put this note in start of DTS file?
+>>>>
+>>>>
+>>>>
+>>>> The comment should be added to where the pinctrl bits are, not to the
+>>>> lime2
+>>>> file, ps0 will conflict with hdmi on all boards.
+>>>
+>>>
+>>> Well, In that case,PS2_0 pins conflicts with HDMI, PS2_1 pins
+>>> conflicts with LCD. Every pin has multiplexing.
+>>
+>>
+>> Almost every A10 board has a hdmi connector, and only the hdmi ddc pins
+>> are multiplexed, so this is sort of special, but yes if we do not have
+>> the commented nodes in the dts file, then this comment can be dropped too
+>> I guess.
+>
+> All the HDMI pins have dedicated pins. In addition, the DDC pins are
+> multiplexed. On the Lime, the dedicated pins (ball # R23, R22) are
+> used. I just checked the schematics. There should be no conflict.
+>
+> ChenYu
