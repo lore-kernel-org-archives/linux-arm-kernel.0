@@ -1,33 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 Dec 2014 11:07:19 +0000
-Subject: [PATCH] arm64: kernel: fix __cpu_suspend mm switch on warm-boot
-In-Reply-To: <20141221154846.GA24545@arm.com>
-References: <1419008627-1918-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141221105042.GI23242@arm.com>
- <20141221115636.GA15288@e104818-lin.cambridge.arm.com>
- <20141221154846.GA24545@arm.com>
-Message-ID: <20141222110719.GB20269@e104818-lin.cambridge.arm.com>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Mon, 22 Dec 2014 19:23:18 +0800
+Subject: [PATCH 1/2] arm:kvm correct prototype to make sparse happy
+Message-ID: <1419247399-26113-1-git-send-email-van.freenix@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 21, 2014 at 03:48:48PM +0000, Will Deacon wrote:
-> On Sun, Dec 21, 2014 at 11:56:36AM +0000, Catalin Marinas wrote:
-> > The problem on arm64 is that swapper_pg_dir only contains kernel
-> > mappings, never user mappings, so it is not meant to be ever written to
-> > TTBR0_EL1 (unlike arm32 where swapper covers the whole 4GB range). Once
-> > you write swapper_pg_dir to TTBR0_EL1 (which is active_mm for the idle
-> > thread after secondary boot, until the first switch to user space), you
-> > end up with global kernel mappings in the user address space that never
-> > go away with an ASID switch.
-> 
-> Ok, so the problem arises when we go idle from a kernel thread, or something
-> like that?
+Warning message:
+arch/arm/kvm/arm.c:85:17:
+error: symbol 'kvm_get_running_vcpus' redeclared with different type
+(originally declared at ./arch/arm/include/asm/kvm_host.h :190) -
+different address spaces
 
-It's only if there has been no other switch to a user thread since boot.
-Kernel threads don't have an mm, so the active_mm is inherited from the
-previous thread. The only time when we have active_mm == &init_mm is for
-the idle thread after (secondary) boot and subsequent kernel threads
-until the first switch to a user one.
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+CC: Gleb Natapov <gleb@kernel.org>
+CC: Paolo Bonzini <pbonzini@redhat.com>
+CC: Christoffer Dall <christoffer.dall@linaro.org>
+CC: Marc Zyngier <marc.zyngier@arm.com>
+CC: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/include/asm/kvm_host.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 53036e2..219d025 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -187,7 +187,7 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
+ }
+ 
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+-struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+ 
+ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+ unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
 -- 
-Catalin
+1.8.4
