@@ -1,30 +1,47 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 22 Dec 2014 10:35:09 -0500
-Subject: [PATCH] dma-mapping: fix debug print to display correct dma_pfn_offset
-Message-ID: <1419262509-9811-1-git-send-email-m-karicheri2@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Dec 2014 21:08:22 +0530
+Subject: [PATCH 06/28] dma: drop owner assignment from platform_drivers
+In-Reply-To: <1419196495-9626-7-git-send-email-wsa@the-dreams.de>
+References: <1419196495-9626-1-git-send-email-wsa@the-dreams.de>
+ <1419196495-9626-7-git-send-email-wsa@the-dreams.de>
+Message-ID: <20141222153822.GP16827@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix the dev_dbg to display the offset which is the calculated
-dma_pfn_offset value and set later in the code.
+On Sun, Dec 21, 2014 at 10:14:27PM +0100, Wolfram Sang wrote:
+> This platform_driver does not need to set an owner, it will be populated by the
+> driver core.
+> 
+After susbstem name if fixed
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/of/platform.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 5b33c6a..a54ec10 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -188,7 +188,7 @@ static void of_dma_configure(struct device *dev)
- 		size = dev->coherent_dma_mask;
- 	} else {
- 		offset = PFN_DOWN(paddr - dma_addr);
--		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-+		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
- 	}
- 	dev->dma_pfn_offset = offset;
- 
 -- 
-1.7.9.5
+~Vinod
+
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+> Generated with coccinelle. SmPL file is in the introductory msg. The big
+> cleanup was pulled in this merge window. This series catches the bits fallen
+> through. The patches shall go in via the subsystem trees.
+> 
+>  drivers/dma/at_xdmac.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+> index b60d77a22df6..1c4c96b7e2bf 100644
+> --- a/drivers/dma/at_xdmac.c
+> +++ b/drivers/dma/at_xdmac.c
+> @@ -1507,7 +1507,6 @@ static struct platform_driver at_xdmac_driver = {
+>  	.remove		= at_xdmac_remove,
+>  	.driver = {
+>  		.name		= "at_xdmac",
+> -		.owner		= THIS_MODULE,
+>  		.of_match_table	= of_match_ptr(atmel_xdmac_dt_ids),
+>  		.pm		= &atmel_xdmac_dev_pm_ops,
+>  	}
+> -- 
+> 2.1.3
+> 
+
+-- 
