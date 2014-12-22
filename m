@@ -1,171 +1,54 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 22 Dec 2014 10:28:48 +0100
-Subject: [PATCH 1/4] ARM: at91: remove at91sam9263 legacy board support
-In-Reply-To: <547C92A1.8000902@atmel.com>
-References: <cover.1416392687.git.nicolas.ferre@atmel.com>
- <cf26d39a4a251662dbc363092b319b788d223a7b.1416392687.git.nicolas.ferre@atmel.com>
- <1417434775.30245.29.camel@x220> <547C92A1.8000902@atmel.com>
-Message-ID: <1419240528.30945.12.camel@x220>
+From: songjun.wu@atmel.com (Songjun Wu)
+Date: Mon, 22 Dec 2014 17:26:14 +0800
+Subject: [PATCH] USB: gadget: udc: atmel: fix possible oops when unloading
+ module
+Message-ID: <1419240374-12179-1-git-send-email-songjun.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-12-01 at 17:09 +0100, Nicolas Ferre wrote:
-> Le 01/12/2014 12:52, Paul Bolle a ?crit :
-> > On Wed, 2014-11-19 at 11:31 +0100, Nicolas Ferre wrote:
-> >> Remove legacy support for at91sam9rl boards.
-> >> This include board files removal plus all legacy code for non DT boards
-> >> support.
-> >> Use the Device Tree for running this board with newer kernels.
-> >>
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >> ---
-> > 
-> > There's some further cleanup possible after this patch. I noticed that
-> > when it landed in today's linux-next (ie, next-20141201) as commit
-> > 4403ac46edcd ("ARM: at91: remove at91sam9263 legacy board support").
-> > 
-> >>  arch/arm/configs/at91sam9263_defconfig   |  151 ---
-> >>  arch/arm/mach-at91/Kconfig.non_dt        |   21 -
-> >>  arch/arm/mach-at91/Makefile              |    4 -
-> >>  arch/arm/mach-at91/at91sam9263.c         |  399 --------
-> >>  arch/arm/mach-at91/at91sam9263_devices.c | 1538 ------------------------------
-> >>  arch/arm/mach-at91/board-sam9263ek.c     |  493 ----------
-> >>  6 files changed, 2606 deletions(-)
-> >>  delete mode 100644 arch/arm/configs/at91sam9263_defconfig
-> >>  delete mode 100644 arch/arm/mach-at91/at91sam9263_devices.c
-> >>  delete mode 100644 arch/arm/mach-at91/board-sam9263ek.c
-> >>
-> >> [...]
-> >> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> >> deleted file mode 100644
-> >> index cef0e2f57068..000000000000
-> >> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> >> +++ /dev/null
-> >> [...]
-> >> -/* --------------------------------------------------------------------
-> >> - *  RTT
-> >> - * -------------------------------------------------------------------- */
-> >> -
-> >> -static struct resource rtt0_resources[] = {
-> >> -	{
-> >> -		.start	= AT91SAM9263_BASE_RTT0,
-> >> -		.end	= AT91SAM9263_BASE_RTT0 + SZ_16 - 1,
-> >> -		.flags	= IORESOURCE_MEM,
-> >> -	}, {
-> >> -		.flags	= IORESOURCE_MEM,
-> >> -	}, {
-> >> -		.flags  = IORESOURCE_IRQ,
-> >> -	}
-> >> -};
-> >> -
-> >> -static struct platform_device at91sam9263_rtt0_device = {
-> >> -	.name		= "at91_rtt",
-> >> -	.id		= 0,
-> >> -	.resource	= rtt0_resources,
-> >> -};
-> >> -
-> >> -static struct resource rtt1_resources[] = {
-> >> -	{
-> >> -		.start	= AT91SAM9263_BASE_RTT1,
-> >> -		.end	= AT91SAM9263_BASE_RTT1 + SZ_16 - 1,
-> >> -		.flags	= IORESOURCE_MEM,
-> >> -	}, {
-> >> -		.flags	= IORESOURCE_MEM,
-> >> -	}, {
-> >> -		.flags  = IORESOURCE_IRQ,
-> >> -	}
-> >> -};
-> >> -
-> >> -static struct platform_device at91sam9263_rtt1_device = {
-> >> -	.name		= "at91_rtt",
-> >> -	.id		= 1,
-> >> -	.resource	= rtt1_resources,
-> >> -};
-> >> -
-> >> -#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-> >> -static void __init at91_add_device_rtt_rtc(void)
-> >> -{
-> >> -	struct platform_device *pdev;
-> >> -	struct resource *r;
-> >> -
-> >> -	switch (CONFIG_RTC_DRV_AT91SAM9_RTT) {
-> > 
-> > This and...
-> > 
-> >> -	case 0:
-> >> -		/*
-> >> -		 * The second resource is needed only for the chosen RTT:
-> >> -		 * GPBR will serve as the storage for RTC time offset
-> >> -		 */
-> >> -		at91sam9263_rtt0_device.num_resources = 3;
-> >> -		at91sam9263_rtt1_device.num_resources = 1;
-> >> -		pdev = &at91sam9263_rtt0_device;
-> >> -		r = rtt0_resources;
-> >> -		break;
-> >> -	case 1:
-> >> -		at91sam9263_rtt0_device.num_resources = 1;
-> >> -		at91sam9263_rtt1_device.num_resources = 3;
-> >> -		pdev = &at91sam9263_rtt1_device;
-> >> -		r = rtt1_resources;
-> >> -		break;
-> >> -	default:
-> >> -		pr_err("at91sam9263: only supports 2 RTT (%d)\n",
-> >> -		       CONFIG_RTC_DRV_AT91SAM9_RTT);
-> > 
-> > this are the only places were the Kconfig symbol RTC_DRV_AT91SAM9_RTT
-> > was used. It is useless now. That matches its help text, that reads:
-> >     This option is only relevant for legacy board support and
-> >     won't be used when booting a DT board.
-> > 
-> >> -		return;
-> >> -	}
-> >> -
-> >> -	pdev->name = "rtc-at91sam9";
-> >> -	r[1].start = AT91SAM9263_BASE_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
-> >> -	r[1].end = r[1].start + 3;
-> >> -	r[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-> >> -	r[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
-> >> -}
-> >> -#else
-> >> -static void __init at91_add_device_rtt_rtc(void)
-> >> -{
-> >> -	/* Only one resource is needed: RTT not used as RTC */
-> >> -	at91sam9263_rtt0_device.num_resources = 1;
-> >> -	at91sam9263_rtt1_device.num_resources = 1;
-> >> -}
-> >> -#endif
-> >> -
-> >> -static void __init at91_add_device_rtt(void)
-> >> -{
-> >> -	at91_add_device_rtt_rtc();
-> >> -	platform_device_register(&at91sam9263_rtt0_device);
-> >> -	platform_device_register(&at91sam9263_rtt1_device);
-> >> -}
-> > 
-> > Is a patch to remove that symbol from drivers/rtc/Kconfig queued
-> > somewhere?
-> 
-> Hi Paul,
-> 
-> In fact these config options are flagged as being useless for !DT. As
-> the modifications of this Kconfig (in a "drivers" branch) and the
-> removal of !DT boards (in a "cleaup" branch) will happen in 3.19, I was
-> planning to come back to these 2 options by removing them later in order
-> to avoid to solve a merge conflict.
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/rtc/Kconfig?id=3969eb48ad7f3f3bef61f5474b7214e601fd2d75
-> 
-> As you can see in the commit above, they have been properly tagged by Boris.
+When unloading the module, the urb request will be dequeued
+and the completion routine will be excuted.
+If no urb packet, the urb request will not be added to the endpoint queue
+and the completion routine pointer in urb request is NULL.
+Accessing to the NULL function pointer will cause the oops issue.
+Add the code to check the urb request is in the endpoint queue or not.
+If the urb request is not in the endpoint queue, a negative error code
+will be returned.
 
-Yes, those two lines were noticed by me (see above). 
+Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-> So, I suggest to get rid of them during 3.19-rc phase.
-
-There's still an entry for RTC_DRV_AT91SAM9_RTT in next-20141221 (and
-v3.19-rc1). So this I send this message as a reminder that this cleanup
-is still needed.
-
-Thanks,
-
-
-Paul Bolle
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index ce88237..48629cc 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -828,7 +828,7 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
+ {
+ 	struct usba_ep *ep = to_usba_ep(_ep);
+ 	struct usba_udc *udc = ep->udc;
+-	struct usba_request *req = to_usba_req(_req);
++	struct usba_request *req;
+ 	unsigned long flags;
+ 	u32 status;
+ 
+@@ -837,6 +837,16 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
+ 
+ 	spin_lock_irqsave(&udc->lock, flags);
+ 
++	list_for_each_entry(req, &ep->queue, queue) {
++		if (&req->req == _req)
++			break;
++	}
++
++	if (&req->req != _req) {
++		spin_unlock_irqrestore(&udc->lock, flags);
++		return -EINVAL;
++	}
++
+ 	if (req->using_dma) {
+ 		/*
+ 		 * If this request is currently being transferred,
+-- 
+1.7.9.5
