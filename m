@@ -1,32 +1,71 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 Dec 2014 20:14:35 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <20141222112933.GK19261@kw.sim.vm.gnt>
-References: <20141218191528.GY967@titan.lakedaemon.net>
- <549437DD.7040602@free-electrons.com>
- <20141219160230.GZ967@titan.lakedaemon.net>
- <54944DAC.1000709@free-electrons.com>
- <20141219170328.GA967@titan.lakedaemon.net>
- <54945C5C.2080801@free-electrons.com>
- <20141219174300.GB967@titan.lakedaemon.net>
- <20141219181616.GG19261@kw.sim.vm.gnt>
- <20141221235000.GC28117@titan.lakedaemon.net>
- <20141222112933.GK19261@kw.sim.vm.gnt>
-Message-ID: <20141222191435.GI32716@lunn.ch>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 22 Dec 2014 11:31:48 -0800
+Subject: [PATCH] clk: rockchip: rk3288: Make s2r reliable by switching PLLs to
+ slow mode
+Message-ID: <1419276708-28294-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > In the long term, we're attempting to provide one neutral place [1] for
-> > the bootloaders and kernels to pull devicetrees from and contribute
-> > changes back to.
-> 
-> OK, let's see if I understand correctly.
-> 
-> If I don't agree with the GPLv2+/x11 relicensing, then support for
-> almost all the LaCie boards will be removed from the Linux kernel (maybe
-> during the next merge window) ? Is that correct ?
+We've been seeing some crashes at resume time on rk3288-based systems.
+On some machines they simply never wake up from suspend.  Symptoms
+include:
 
-I would NAK such a removal. 
+- System clearly got to sleep OK.  Power consumption is low, the PWM
+  for the PWM regulator has stopped, and the "global_pwroff" output
+  shows that the system is down.
 
-	   Andrew
+- When system tries to wake up power consumption goes up.
+
+- No kernel resume code (which was left in PMU SRAM) ran.  We added
+  some basic logging to this code (write to a location in SRAM right
+  at resume time) and didn't see the logging run.
+
+It appears that we can fix the problem by slowing down APLL before we
+suspend.  On the system I tested things seemed reliable if I disabled
+1.8GHz and 1.7GHz.  The Mask ROM itself tries to slow things down
+(which is why PLLs are in slow mode by the time we get to the kernel),
+but apparently it is crashing before it even gets there.
+
+We'll be super paranoid and not just go down to 1.6GHz but we'll match
+what the Mask ROM seems to be doing and go into slow mode.  We'll also
+be safe and put all PLLs (not just APLL) into slow mode (well, except
+DPLL which is needed for SDRAM).  We'll even put NPLL into slow mode
+which the Mask ROM didn't do (not that it's used for much important
+stuff at early resume time).
+
+Note that the old Rockchip reference code did something just like
+this, though they jammed it into pm.c instead of putting it in the
+syscore ops of the clock driver.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index ac6be7c..8cf4210 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -805,6 +805,20 @@ static int rk3288_clk_suspend(void)
+ 		rk3288_saved_cru_regs[i] =
+ 				readl_relaxed(rk3288_cru_base + reg_id);
+ 	}
++
++	/*
++	 * Switch PLLs other than DPLL (for SDRAM) to slow mode to
++	 * avoid crashes on resume. The Mask ROM on the system will
++	 * put APLL, CPLL, and GPLL into slow mode at resume time
++	 * anyway (which is why we restore them), but we might not
++	 * even make it to the Mask ROM if this isn't done at suspend
++	 * time.
++	 *
++	 * NOTE: only APLL truly matters here, but we'll do them all.
++	 */
++
++	writel_relaxed(0xf3030000, rk3288_cru_base + RK3288_MODE_CON);
++
+ 	return 0;
+ }
+ 
+-- 
+2.2.0.rc0.207.ga3a616c
