@@ -1,40 +1,35 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Mon, 22 Dec 2014 20:27:55 +0300
-Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for tegra_resume()
- location store
-In-Reply-To: <54984429.8040905@wwwdotorg.org>
-References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
- <54984429.8040905@wwwdotorg.org>
-Message-ID: <5498549B.8070101@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Dec 2014 17:28:38 +0000
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <CAGo_u6pKUj9x8sCFY0wJCVDkBjT77xetu+XZ+DqWTjEWnvZePA@mail.gmail.com>
+References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
+ <20141209165746.GA29935@kahuna> <54881589.20105@samsung.com>
+ <20141211092945.GE11502@n2100.arm.linux.org.uk>
+ <54897528.4030804@samsung.com>
+ <20141222170411.GL11502@n2100.arm.linux.org.uk>
+ <CAGo_u6pKUj9x8sCFY0wJCVDkBjT77xetu+XZ+DqWTjEWnvZePA@mail.gmail.com>
+Message-ID: <20141222172838.GM11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-22.12.2014 19:17, Stephen Warren ?????:
-> On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
->> Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
->> tegra_resume()
->> location storing from late to early and as result broke suspend on tegra20.
->> PMC scratch register 41 was used by tegra lp1 suspend core code for storing
->> physical memory address of common resume function and in the same time used by
->> tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
->> strict order of scratch register use. Fix it by using scratch 40 instead of 41
->> for tegra_resume() location store.
+On Mon, Dec 22, 2014 at 11:12:42AM -0600, Nishanth Menon wrote:
+> On Mon, Dec 22, 2014 at 11:04 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > That only leaves the non-DT stuff to worry about this, and from what I
+> > understand, that's going to be removed soon.  If we're going to keep
+> > the non-DT stuff, we should implement a new machine_desc hook for it
+> > instead of hijacking one of the existing callbacks.
 > 
-> You likely can't simply change the PMC scratch register usage arbitrarily;
-> specific registers are designated for specific purposes, and code outside the
-> Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
-> those specific values being in those registers. Without significant research,
-> I'd suggest not changing the PMC scratch register usage.
+> none of the PL310 support requires non-DT. PL310 is needed for OMAP4
+> and AM437x both of which are DT only.
 
-Sure, that's why I asked to verify if scratch register 40 is in use in the
-comment after commit message. I've checked that u-boot doesn't use it (since
-upstream kernel doesn't care about any other bootloader), but no idea about
-secure monitor. It's definitely safer to avoid changing scratch regs usage, I
-thought that proposed solution would be best from the pure code point of view.
-So, I'm considering your answer as a rejection of the patch (please, let me know
-if I'm wrong) and will prepare another one. Btw, it would be nice to have
-scratch registers usage publicly documented somewhere (on "Tegra Public
-Application Notes" webpage for example), if it's possible, of course.
+Right, so the simple answer for the time being is to kill most of
+omap_l2_cache_init(), leaving just the ioremap() behind.  Everything
+else can go into the machine_desc structures, and OMAP4 and AM437x
+can both benefit from initialising the L2 cache at exactly the same
+point as most other platforms.
 
 -- 
-Dmitry
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
