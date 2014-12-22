@@ -1,63 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Dec 2014 00:07:57 +0100
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <1723662.JYr5muIJha@wuerfel>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <54989DDE.3060409@ti.com> <1723662.JYr5muIJha@wuerfel>
-Message-ID: <5090769.jqAkiDgYu7@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Dec 2014 23:29:53 +0000
+Subject: FP register corruption in Exynos 4210 (Cortex-A9)
+In-Reply-To: <54989F43.5070100@gmail.com>
+References: <54345FA7.9030606@gmail.com> <54370A1E.6070707@gmail.com>
+ <20141009223244.GJ5182@n2100.arm.linux.org.uk>
+ <1879331.AWtSrdvUyc@wuerfel>
+ <20141010100146.GM5182@n2100.arm.linux.org.uk>
+ <54989F43.5070100@gmail.com>
+Message-ID: <20141222232953.GO11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 December 2014 23:44:52 Arnd Bergmann wrote:
-> On Monday 22 December 2014 17:40:30 Murali Karicheri wrote:
-> > On 12/22/2014 05:24 PM, Arnd Bergmann wrote:
-> > > On Monday 22 December 2014 16:40:43 Murali Karicheri wrote:
-> > >>>> +++ b/arch/arm/mm/dma-mapping.c
-> > >>>> @@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64
-> > >>>> dma_base, u64 size,
-> > >>>>                            struct iommu_ops *iommu, bool coherent)
-> > >>>>     {
-> > >>>>            struct dma_map_ops *dma_ops;
-> > >>>> +       u64 temp_size = min((*(dev->dma_mask) + 1), size);
-> > >>>>
-> > >>>>            dev->archdata.dma_coherent = coherent;
-> > >>>> -       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
-> > >>>> +       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
-> > >>>>
-> > >>>> If you agree, I will post v1 of the patch with these updates. Let me
-> > >>>> know. I did some basic tests on Keystone with these changes and it works
-> > >>>> fine.
-> > >>>
-> > >>> It's not exactly what I meant. My main point was that we need to limit
-> > >>> dev->dma_mask to (size-1) here, but you are not touching that.
-> > >>
-> > >> if you mean overriding the dev->dma_mask to min((*dev->dma_mask),
-> > >> size-1), then I am getting the error "Coherent DMA mask 0x7fffffff (pfn
-> > >> 0x780000-0x800000) covers a smaller range of system memory than the DMA
-> > >> zone pfn 0x0-0x880000) when the devices on Keystone tries to set the dma
-> > >> mask. Something wrong and I need to look into the code.
-> > >
-> > > Right, it sounds like the offset was applied incorrectly at some point.
-> > >
-> > > What are the DMA zone size and the phys-offset?
-> > 2G and 0x8_0000_0000. This limit the usable DMA size to 2G on Keystone, 
-> > I believe you shouldn't be limiting the dma mask to size-1 in this case, 
-> > right? The DT setup the dma-range to have a size of 2G (0x80000000).
-> 
-> No, the problem is something else: the pfn range that we calculate for the
-> coherent DMA mask should have been 0x800000-0x880000, not 0x780000-0x800000,
-> so we would exactly match the ZONE_DMA.
+On Mon, Dec 22, 2014 at 07:46:27PM -0300, Lanchon wrote:
+> however under some circumstances the kernel did the wrong thing: it didn't
+> reload the registers even though it was needed, probably because the
+> hardware had been powered down and had lost state without the tracking code
+> getting word of it. just disabling the optimization made the kernel solid.
 
-I gave it some more thought, and concluded that the size that gets passed
-down is not really the right value to be compared to a mask if the dma-capable
-area starts at a nonzero bus address.
+Right, so mainline kernel's don't exhibit the behaviour...
 
-In your case, bus addresses 0x80000000-0xffffffff are valid for DMA, so
-the mask must be 0xffffffff to forbid any DMA to addresses larger than
-0x100000000, not 0x7fffffff which would not be enough to cover any RAM.
+> a couple of days later the root cause seems to have been identified and
+> fixed. i describe the whole thing here:
+> http://forum.xda-developers.com/galaxy-s2/development-derivatives/kernel-fpbug-stable-4-x-kernel-galaxy-t2978088
 
-I guess the dma_mask should be 'min((*dev->dma_mask), dma_base + size - 1)'
-here.
+... because it's a local issue with cpuidle not calling the appropriate
+CPU PM functions, and that means there's no patches that we need to deal
+with for mainline kernels, right?
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
