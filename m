@@ -1,72 +1,82 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 22 Dec 2014 14:09:46 -0700
-Subject: [PATCH v6 1/3] of: Decrement refcount of previous endpoint in
- of_graph_get_next_endpoint
-In-Reply-To: <1419261091-29888-2-git-send-email-p.zabel@pengutronix.de>
-References: <1419261091-29888-1-git-send-email-p.zabel@pengutronix.de>
- <1419261091-29888-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CANLsYkydZGBQa2KXyVsjp3PaAvfBtOSf+qa0yVdzidJbxcQybw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Dec 2014 22:14:32 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <20141222112933.GK19261@kw.sim.vm.gnt>
+References: <54930BBC.4060602@free-electrons.com>
+ <20141221235000.GC28117@titan.lakedaemon.net>
+ <20141222112933.GK19261@kw.sim.vm.gnt>
+Message-ID: <6219619.yRPYbqr6Sm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 December 2014 at 08:11, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Decrementing the reference count of the previous endpoint node allows to
-> use the of_graph_get_next_endpoint function in a for_each_... style macro.
-> All current users of this function that pass a non-NULL prev parameter
-> (that is, soc_camera and imx-drm) are changed to not decrement the passed
-> prev argument's refcount themselves.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> ---
-> Changes since v5:
->  - Rebased onto v3.19-rc1
->  - Added coresight and rcar-du
-> ---
->  drivers/coresight/of_coresight.c               | 13 ++-----------
->  drivers/gpu/drm/imx/imx-drm-core.c             | 13 ++-----------
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c          | 15 ++++-----------
->  drivers/media/platform/soc_camera/soc_camera.c |  3 ++-
->  drivers/of/base.c                              |  9 +--------
->  5 files changed, 11 insertions(+), 42 deletions(-)
->
-> diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-> index 5030c07..349c88b 100644
-> --- a/drivers/coresight/of_coresight.c
-> +++ b/drivers/coresight/of_coresight.c
-> @@ -52,15 +52,6 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
->                                endpoint, of_dev_node_match);
->  }
->
-> -static struct device_node *of_get_coresight_endpoint(
-> -               const struct device_node *parent, struct device_node *prev)
-> -{
-> -       struct device_node *node = of_graph_get_next_endpoint(parent, prev);
-> -
-> -       of_node_put(prev);
-> -       return node;
-> -}
-> -
->  static void of_coresight_get_ports(struct device_node *node,
->                                    int *nr_inport, int *nr_outport)
->  {
-> @@ -68,7 +59,7 @@ static void of_coresight_get_ports(struct device_node *node,
->         int in = 0, out = 0;
->
->         do {
-> -               ep = of_get_coresight_endpoint(node, ep);
-> +               ep = of_graph_get_next_endpoint(node, ep);
->                 if (!ep)
->                         break;
->
-> @@ -140,7 +131,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
->                 /* Iterate through each port to discover topology */
->                 do {
->                         /* Get a handle on a port */
-> -                       ep = of_get_coresight_endpoint(node, ep);
-> +                       ep = of_graph_get_next_endpoint(node, ep);
->                         if (!ep)
->                                 break;
->
+On Monday 22 December 2014 12:29:33 Simon Guinot wrote:
+> On Sun, Dec 21, 2014 at 06:50:00PM -0500, Jason Cooper wrote:
+> > On Fri, Dec 19, 2014 at 07:16:16PM +0100, Simon Guinot wrote:
+> > > > > Especially none of the dove files have a license.
+> > > > 
+> > > > Yes, we'll cross that bridge when we get there.  I suspect it then falls
+> > > > under the over-arching license of the project.  Regardless, we'll still
+> > > > need Acks from all contributors.
+> > > 
+> > > Hi Jason,
+> > > 
+> > > What is the problem with keeping the LaCie DTS files under GPLv2+ only ?
+> > 
+> > Converting armada-* to dual license is just a small part of the
+> > overarching effort to convert *all* the devicetree files to dual
+> > license.  So, eventually, we'll be doing the same with kirkwood, dove
+> > and orion5x dts{i} files.  Perhaps even during this merge window.
+> > 
+> > In the long term, we're attempting to provide one neutral place [1] for
+> > the bootloaders and kernels to pull devicetrees from and contribute
+> > changes back to.
+> 
+> OK, let's see if I understand correctly.
+> 
+> If I don't agree with the GPLv2+/x11 relicensing, then support for
+> almost all the LaCie boards will be removed from the Linux kernel (maybe
+> during the next merge window) ? Is that correct ?
 
-I tested this in my tree - ack.
+Definitely not during the next merge window. Eventually the plan is
+to remove *all* dts files from the kernel, but we're a long way
+away from that.
+
+There is already a mirror of the dts files at
+http://xenbits.xen.org/gitweb/?p=people/ianc/device-tree-rebasing.git;a=summary
+which is hosting files that are meant to be shared with Xen, which is
+also under the GPL, and supports a lot of the same hardware that Linux
+supports, but also depends on passing the correct (modified) dtb blobs
+to the Dom0 kernel.
+
+The current setup works ok for Xen, but occasionally there are requests
+for having the files shared more broadly, e.g. with FreeBSD and with boot
+loaders that might be non-GPL but are used to boot Linux and that want
+to ship with a default dtb for a platform they run on.
+
+> Since all the LaCie boards DTS are at least based on my work (except for
+> the Orion ED Mini v2), I think there is 12 files concerned here. See the
+> command output: grep -l lacie *.dts | wc -l.
+> 
+> The oldest of this boards have been supported by the Linux kernel since
+> the 2.6.32 release. Also some of this boards are still widely used...
+> 
+> You know, it is quite a statement you are sending here: The GPLv2+
+> licences are not good enough to get an ARM-based board supported by
+> the Linux kernel, while it has always been the case until now. Are all
+> the maintainers SoC, ARM SoC, ARM and Linux well aligned with that ?
+
+I think you just misunderstood.
+
+> Is there any way we can keep the LaCie DTS files licenced under GPLv2+
+> _and_ still distributed with the others. Anyone would be free to choose
+> to use them (or not), in respect of the licence terms.
+
+What I suspect will happen is that we end up with multiple repositories
+for dts files, e.g. one that contains all files that are GPL-compatible
+and another one that contains the subset that is licensed under more
+permissive licenses such as the X11 or some BSD license. I don't see
+a reason for Linux to stop supporting the former, but it would be nice
+to have a larger shared subset.
+
+	Arnd
