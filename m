@@ -1,35 +1,342 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Dec 2014 17:28:38 +0000
-Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
- Refactor the driver to use commit-like)
-In-Reply-To: <CAGo_u6pKUj9x8sCFY0wJCVDkBjT77xetu+XZ+DqWTjEWnvZePA@mail.gmail.com>
-References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
- <20141209165746.GA29935@kahuna> <54881589.20105@samsung.com>
- <20141211092945.GE11502@n2100.arm.linux.org.uk>
- <54897528.4030804@samsung.com>
- <20141222170411.GL11502@n2100.arm.linux.org.uk>
- <CAGo_u6pKUj9x8sCFY0wJCVDkBjT77xetu+XZ+DqWTjEWnvZePA@mail.gmail.com>
-Message-ID: <20141222172838.GM11502@n2100.arm.linux.org.uk>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 22 Dec 2014 11:29:21 -0600
+Subject: [PATCH] ARM: dts: imx6dl-udoo: Add board support based off imx6q-udoo
+Message-ID: <1419269361-6095-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 11:12:42AM -0600, Nishanth Menon wrote:
-> On Mon, Dec 22, 2014 at 11:04 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > That only leaves the non-DT stuff to worry about this, and from what I
-> > understand, that's going to be removed soon.  If we're going to keep
-> > the non-DT stuff, we should implement a new machine_desc hook for it
-> > instead of hijacking one of the existing callbacks.
-> 
-> none of the PL310 support requires non-DT. PL310 is needed for OMAP4
-> and AM437x both of which are DT only.
+For more information about the Udoo boards:
+http://www.udoo.org/
 
-Right, so the simple answer for the time being is to kill most of
-omap_l2_cache_init(), leaving just the ioremap() behind.  Everything
-else can go into the machine_desc structures, and OMAP4 and AM437x
-can both benefit from initialising the L2 cache at exactly the same
-point as most other platforms.
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+CC: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/imx6dl-udoo.dts   |  18 +++++
+ arch/arm/boot/dts/imx6q-udoo.dts    | 124 +--------------------------------
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi | 134 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 154 insertions(+), 123 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6dl-udoo.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-udoo.dtsi
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 91bd5bd..6a6ecdb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -234,6 +234,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6dl-tx6dl-comtft.dtb \
+ 	imx6dl-tx6u-801x.dtb \
+ 	imx6dl-tx6u-811x.dtb \
++	imx6dl-udoo.dtb \
+ 	imx6dl-wandboard.dtb \
+ 	imx6dl-wandboard-revb1.dtb \
+ 	imx6q-arm2.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-udoo.dts b/arch/arm/boot/dts/imx6dl-udoo.dts
+new file mode 100644
+index 0000000..a4d2ef2
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-udoo.dts
+@@ -0,0 +1,18 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++/dts-v1/;
++#include "imx6dl.dtsi"
++#include "imx6qdl-udoo.dtsi"
++
++/ {
++	model = "Udoo i.MX6 Dual Board";
++	compatible = "udoo,imx6dl-udoo", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-udoo.dts b/arch/arm/boot/dts/imx6q-udoo.dts
+index e3bff2a..c3e64ff 100644
+--- a/arch/arm/boot/dts/imx6q-udoo.dts
++++ b/arch/arm/boot/dts/imx6q-udoo.dts
+@@ -8,137 +8,15 @@
+  * published by the Free Software Foundation.
+  *
+  */
+-
+ /dts-v1/;
+ #include "imx6q.dtsi"
++#include "imx6qdl-udoo.dtsi"
+ 
+ / {
+ 	model = "Udoo i.MX6 Quad Board";
+ 	compatible = "udoo,imx6q-udoo", "fsl,imx6q";
+-
+-	chosen {
+-		stdout-path = &uart2;
+-	};
+-
+-	memory {
+-		reg = <0x10000000 0x40000000>;
+-	};
+-
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_usb_h1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			enable-active-high;
+-			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
+-			gpio = <&gpio7 12 0>;
+-		};
+-	};
+-};
+-
+-&fec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_enet>;
+-	phy-mode = "rgmii";
+-	status = "okay";
+-};
+-
+-&hdmi {
+-	ddc-i2c-bus = <&i2c2>;
+-	status = "okay";
+-};
+-
+-&i2c2 {
+-	clock-frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c2>;
+-	status = "okay";
+-};
+-
+-&iomuxc {
+-	imx6q-udoo {
+-		pinctrl_enet: enetgrp {
+-			fsl,pins = <
+-				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
+-				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
+-				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
+-				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+-				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+-				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
+-			>;
+-		};
+-
+-		pinctrl_i2c2: i2c2grp {
+-			fsl,pins = <
+-				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
+-				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
+-			>;
+-		};
+-
+-		pinctrl_uart2: uart2grp {
+-			fsl,pins = <
+-				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
+-				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
+-			>;
+-		};
+-
+-		pinctrl_usbh: usbhgrp {
+-			fsl,pins = <
+-				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
+-				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
+-			>;
+-		};
+-
+-		pinctrl_usdhc3: usdhc3grp {
+-			fsl,pins = <
+-				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
+-				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
+-				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
+-				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
+-				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
+-				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
+-			>;
+-		};
+-	};
+ };
+ 
+ &sata {
+ 	status = "okay";
+ };
+-
+-&uart2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart2>;
+-	status = "okay";
+-};
+-
+-&usbh1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usbh>;
+-	vbus-supply = <&reg_usb_h1_vbus>;
+-	clocks = <&clks 201>;
+-	status = "okay";
+-};
+-
+-&usdhc3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc3>;
+-	non-removable;
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+new file mode 100644
+index 0000000..1211da8
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+@@ -0,0 +1,134 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++/ {
++	chosen {
++		stdout-path = &uart2;
++	};
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_usb_h1_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "usb_h1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
++			gpio = <&gpio7 12 0>;
++		};
++	};
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&iomuxc {
++	imx6q-udoo {
++		pinctrl_enet: enetgrp {
++			fsl,pins = <
++				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
++				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
++				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
++				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
++				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
++				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
++				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
++				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
++				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
++				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
++				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
++				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
++				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
++				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
++				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_usbh: usbhgrp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
++				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
++			>;
++		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
++				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
++			>;
++		};
++	};
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&usbh1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbh>;
++	vbus-supply = <&reg_usb_h1_vbus>;
++	clocks = <&clks 201>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	non-removable;
++	status = "okay";
++};
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
