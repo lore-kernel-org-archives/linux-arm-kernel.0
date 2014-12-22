@@ -1,50 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Dec 2014 14:38:54 -0600
-Subject: [PATCH] ARM: dts: am437x-sk-evm: Hook dcdc2 as the cpu0-supply
-In-Reply-To: <1417706679-22294-1-git-send-email-balbi@ti.com>
-References: <1417706679-22294-1-git-send-email-balbi@ti.com>
-Message-ID: <20141222203854.GD3083@saruman>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 22 Dec 2014 14:09:46 -0700
+Subject: [PATCH v6 1/3] of: Decrement refcount of previous endpoint in
+ of_graph_get_next_endpoint
+In-Reply-To: <1419261091-29888-2-git-send-email-p.zabel@pengutronix.de>
+References: <1419261091-29888-1-git-send-email-p.zabel@pengutronix.de>
+ <1419261091-29888-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CANLsYkydZGBQa2KXyVsjp3PaAvfBtOSf+qa0yVdzidJbxcQybw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 04, 2014 at 09:24:39AM -0600, Felipe Balbi wrote:
-> From: Dave Gerlach <d-gerlach@ti.com>
-> 
-> Hook dcdc2 as the cpu0-supply.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-
-btw, before sending this, I tested on my AM437x Starter Kit, so
-
-Tested-by: Felipe Balbi <balbi@ti.com>
-
+On 22 December 2014 at 08:11, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Decrementing the reference count of the previous endpoint node allows to
+> use the of_graph_get_next_endpoint function in a for_each_... style macro.
+> All current users of this function that pass a non-NULL prev parameter
+> (that is, soc_camera and imx-drm) are changed to not decrement the passed
+> prev argument's refcount themselves.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 > ---
->  arch/arm/boot/dts/am437x-sk-evm.dts | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-> index 87aa4f3..f7f77a7 100644
-> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-> @@ -611,3 +611,7 @@
->  &wdt {
->  	status = "okay";
->  };
-> +
-> +&cpu {
-> +	cpu0-supply = <&dcdc2>;
-> +};
-> -- 
-> 2.1.0.GIT
-> 
+> Changes since v5:
+>  - Rebased onto v3.19-rc1
+>  - Added coresight and rcar-du
+> ---
+>  drivers/coresight/of_coresight.c               | 13 ++-----------
+>  drivers/gpu/drm/imx/imx-drm-core.c             | 13 ++-----------
+>  drivers/gpu/drm/rcar-du/rcar_du_kms.c          | 15 ++++-----------
+>  drivers/media/platform/soc_camera/soc_camera.c |  3 ++-
+>  drivers/of/base.c                              |  9 +--------
+>  5 files changed, 11 insertions(+), 42 deletions(-)
+>
+> diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+> index 5030c07..349c88b 100644
+> --- a/drivers/coresight/of_coresight.c
+> +++ b/drivers/coresight/of_coresight.c
+> @@ -52,15 +52,6 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
+>                                endpoint, of_dev_node_match);
+>  }
+>
+> -static struct device_node *of_get_coresight_endpoint(
+> -               const struct device_node *parent, struct device_node *prev)
+> -{
+> -       struct device_node *node = of_graph_get_next_endpoint(parent, prev);
+> -
+> -       of_node_put(prev);
+> -       return node;
+> -}
+> -
+>  static void of_coresight_get_ports(struct device_node *node,
+>                                    int *nr_inport, int *nr_outport)
+>  {
+> @@ -68,7 +59,7 @@ static void of_coresight_get_ports(struct device_node *node,
+>         int in = 0, out = 0;
+>
+>         do {
+> -               ep = of_get_coresight_endpoint(node, ep);
+> +               ep = of_graph_get_next_endpoint(node, ep);
+>                 if (!ep)
+>                         break;
+>
+> @@ -140,7 +131,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+>                 /* Iterate through each port to discover topology */
+>                 do {
+>                         /* Get a handle on a port */
+> -                       ep = of_get_coresight_endpoint(node, ep);
+> +                       ep = of_graph_get_next_endpoint(node, ep);
+>                         if (!ep)
+>                                 break;
+>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141222/f957efd8/attachment.sig>
+I tested this in my tree - ack.
