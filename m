@@ -1,103 +1,64 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 22 Dec 2014 10:47:29 -0800
-Subject: [PATCH] pinctrl: rockchip: Avoid losing interrupts when supporting
- both edges
-Message-ID: <1419274049-5069-1-git-send-email-dianders@chromium.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Dec 2014 19:08:34 +0000
+Subject: [PATCH 0/8] arm64: improved memory map handling for /dev/mem, ACPI etc
+Message-ID: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was seeing cases where I was losing interrupts when inserting and
-removing SD cards.  Sometimes the card would get "stuck" in the
-inserted state.
+This series was split off from the UEFI virtmap for kexec series that I posted
+earlier today. The main purpose is to deal with the need to classify memory
+ranges as RAM or non-RAM in a consistent and comprehensive manner. This series
+applies on top of the other series.
 
-I believe that the problem was related to the code to handle the case
-where we needed both rising and falling edges.  This code would
-disable the interrupt as the polarity was switched.  If an interrupt
-came at the wrong time it could be lost.
+Patch #1 avoids an early panic if the UEFI memory map is available but UEFI
+support itself fails to initialize. In this case, there is no need to panic
+early, and we have a better chance of being able to inform the user if we deal
+with this error condition at a later time.
 
-We'll match what the gpio-dwapb.c driver does upstream and change the
-interrupt polarity without disabling things.
+Patch #2 adds iomem resource registration of UEFI memory regions. This is
+necessary because otherwise, drivers could potentially claim regions that
+are in active use by the firmware. This applies to both MMIO (NOR flash, RTC)
+and RAM ranges (runtime services code and data).
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/pinctrl/pinctrl-rockchip.c | 45 +++++++++++++++++---------------------
- 1 file changed, 20 insertions(+), 25 deletions(-)
+Patch #3-6 adds support to UEFI and non-UEFI code paths to record all memory
+known to the system in the 'physmem' memblock table (if enabled). This fulfils
+a need in the /dev/mem and (upcoming) ACPI layers to be able to classify ranges
+as being backed by normal RAM even if they are not covered by the 'memory'
+memblock table, and are hence not covered by the linear direct mapping.
+The physmem code is pre-existing code that only needs minor tweaking to be made
+suitable for this purpose.
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 3c22dbe..43eacc9 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -1398,10 +1398,7 @@ static void rockchip_irq_demux(unsigned int irq, struct irq_desc *desc)
- {
- 	struct irq_chip *chip = irq_get_chip(irq);
- 	struct rockchip_pin_bank *bank = irq_get_handler_data(irq);
--	u32 polarity = 0, data = 0;
- 	u32 pend;
--	bool edge_changed = false;
--	unsigned long flags;
- 
- 	dev_dbg(bank->drvdata->dev, "got irq for bank %s\n", bank->name);
- 
-@@ -1409,12 +1406,6 @@ static void rockchip_irq_demux(unsigned int irq, struct irq_desc *desc)
- 
- 	pend = readl_relaxed(bank->reg_base + GPIO_INT_STATUS);
- 
--	if (bank->toggle_edge_mode) {
--		polarity = readl_relaxed(bank->reg_base +
--					 GPIO_INT_POLARITY);
--		data = readl_relaxed(bank->reg_base + GPIO_EXT_PORT);
--	}
--
- 	while (pend) {
- 		unsigned int virq;
- 
-@@ -1434,27 +1425,31 @@ static void rockchip_irq_demux(unsigned int irq, struct irq_desc *desc)
- 		 * needs manual intervention.
- 		 */
- 		if (bank->toggle_edge_mode & BIT(irq)) {
--			if (data & BIT(irq))
--				polarity &= ~BIT(irq);
--			else
--				polarity |= BIT(irq);
-+			u32 data, data_old, polarity;
-+			unsigned long flags;
- 
--			edge_changed = true;
--		}
-+			data = readl_relaxed(bank->reg_base + GPIO_EXT_PORT);
-+			do {
-+				spin_lock_irqsave(&bank->slock, flags);
- 
--		generic_handle_irq(virq);
--	}
-+				polarity = readl_relaxed(bank->reg_base +
-+							 GPIO_INT_POLARITY);
-+				if (data & BIT(irq))
-+					polarity &= ~BIT(irq);
-+				else
-+					polarity |= BIT(irq);
-+				writel(polarity,
-+				       bank->reg_base + GPIO_INT_POLARITY);
- 
--	if (bank->toggle_edge_mode && edge_changed) {
--		/* Interrupt params should only be set with ints disabled */
--		spin_lock_irqsave(&bank->slock, flags);
-+				spin_unlock_irqrestore(&bank->slock, flags);
- 
--		data = readl_relaxed(bank->reg_base + GPIO_INTEN);
--		writel_relaxed(0, bank->reg_base + GPIO_INTEN);
--		writel(polarity, bank->reg_base + GPIO_INT_POLARITY);
--		writel(data, bank->reg_base + GPIO_INTEN);
-+				data_old = data;
-+				data = readl_relaxed(bank->reg_base +
-+						     GPIO_EXT_PORT);
-+			} while ((data & BIT(irq)) != (data_old & BIT(irq)));
-+		}
- 
--		spin_unlock_irqrestore(&bank->slock, flags);
-+		generic_handle_irq(virq);
- 	}
- 
- 	chained_irq_exit(chip, desc);
+Patch #7 enables the 'physmem' memblock table for arm64, and wires it into the
+handling of /dev/mem mappings, both to decide whether it should be mapped as
+MT_NORMAL, and whether read-write access can be allowed. (Non-RAM regions can
+be mapped read-write as long as they are not claimed by a driver in the iomem
+resource table. RAM regions can only be mapped read-only, and only if they are
+not covered by the 'memory' memblock table, and hence not covered by the linear
+mapping)
+
+Finally, patch #8 changes the way the virtual memory map is handled by the
+early UEFI code. Specifically, it memblock_remove()s rather than _reserves()
+UEFI reserved RAM regions, so that they are removed entirely from the linear
+mapping.
+
+Ard Biesheuvel (8):
+  arm64/efi: use UEFI memory map unconditionally if available
+  arm64/efi: register UEFI reserved regions as iomem resources
+  memblock: add physmem to memblock_dump_all() output
+  memblock: introduce memblock_add_phys() and memblock_is_physmem()
+  of: fdt: register physmem in early_init_dt_scan_memory()
+  arm64/efi: register physmem in reserve_regions()
+  arm64: use 'physmem' memblock to improve CONFIG_STRICT_DEVMEM handling
+  arm64/efi: memblock_remove rather than _reserve UEFI reserved RAM
+
+ arch/arm64/Kconfig       |  1 +
+ arch/arm64/kernel/efi.c  | 82 +++++++++++++++++++++++++++++++++++++++---------
+ arch/arm64/mm/mmap.c     |  2 +-
+ arch/arm64/mm/mmu.c      | 15 ++++++++-
+ drivers/of/fdt.c         |  1 +
+ include/linux/memblock.h | 10 ++++++
+ mm/memblock.c            | 18 +++++++++++
+ 7 files changed, 113 insertions(+), 16 deletions(-)
+
 -- 
-2.2.0.rc0.207.ga3a616c
+1.8.3.2
