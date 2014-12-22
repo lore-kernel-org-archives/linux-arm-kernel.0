@@ -1,32 +1,47 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Dec 2014 19:08:39 +0000
-Subject: [PATCH 5/8] of: fdt: register physmem in early_init_dt_scan_memory()
+Date: Mon, 22 Dec 2014 19:08:40 +0000
+Subject: [PATCH 6/8] arm64/efi: register physmem in reserve_regions()
 In-Reply-To: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1419275322-29811-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1419275322-29811-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes early_init_dt_scan_memory() so that all memory
-covered by DT memory nodes is registered in the 'physmem' memblock
-table if CONFIG_HAVE_MEMBLOCK_PHYS_MAP is enabled.
+After traversing the UEFI memory map to discover the regions that are backed
+by normal RAM, register the resulting minimal memory map into the physmem
+memblock table.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/of/fdt.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/kernel/efi.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 510074226d57..6e59c2168536 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -894,6 +894,7 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
- 		    (unsigned long long)size);
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index ba5fe66c3634..b1b816ecf3b3 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -155,6 +155,7 @@ static __init void reserve_regions(void)
+ {
+ 	efi_memory_desc_t *md;
+ 	u64 paddr, npages, size;
++	struct memblock_region *r;
  
- 		early_init_dt_add_memory_arch(base, size);
-+		memblock_add_phys(base, size);
+ 	if (uefi_debug)
+ 		pr_info("Processing EFI memory map:\n");
+@@ -187,6 +188,14 @@ static __init void reserve_regions(void)
+ 			pr_cont("\n");
  	}
  
- 	return 0;
++	/*
++	 * After memblock has stitched all the regions together, copy the
++	 * resulting map of physical memory from the memory memblock table into
++	 * the physmem memblock table.
++	 */
++	for_each_memblock(memory, r)
++		memblock_add_phys(r->base, r->size);
++
+ 	set_bit(EFI_MEMMAP, &efi.flags);
+ }
+ 
 -- 
 1.8.3.2
