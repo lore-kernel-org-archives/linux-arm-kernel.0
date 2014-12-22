@@ -1,146 +1,234 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Mon, 22 Dec 2014 15:40:48 +0530
-Subject: [PATCH v3 1/5] arm64: Kprobes with single stepping support
-In-Reply-To: <1416292375-29560-2-git-send-email-dave.long@linaro.org>
-References: <1416292375-29560-1-git-send-email-dave.long@linaro.org>
- <1416292375-29560-2-git-send-email-dave.long@linaro.org>
-Message-ID: <CAHM4w1n4MZ7o2M9ZV+6ZO1QAXWZkFi5fvPfjStY9Xdc+=tgyRg@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 22 Dec 2014 18:27:01 +0800
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <Pine.LNX.4.64.1412192307320.21176@axis700.grange>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
+ <5493C1A8.4050204@atmel.com>
+ <Pine.LNX.4.64.1412192307320.21176@axis700.grange>
+Message-ID: <5497F1F5.7000505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi, Guennadi
 
-On Tue, Nov 18, 2014 at 12:02 PM, David Long <dave.long@linaro.org> wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+On 12/20/2014 6:16 AM, Guennadi Liakhovetski wrote:
+> On Fri, 19 Dec 2014, Josh Wu wrote:
 >
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
+>> Hi, Guennadi
+>>
+>> Thanks for the review.
+>>
+>> On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
+>>> Hi Josh,
+>>>
+>>> Thanks for your patches!
+>>>
+>>> On Thu, 18 Dec 2014, Josh Wu wrote:
+>>>
+>>>> To support async probe for ov2640, we need remove the code to get 'mclk'
+>>>> in ov2640_probe() function. oterwise, if soc_camera host is not probed
+>>>> in the moment, then we will fail to get 'mclk' and quit the ov2640_probe()
+>>>> function.
+>>>>
+>>>> So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+>>>> function. That make ov2640 survive, as we can pass a NULL (priv-clk) to
+>>>> soc_camera_set_power() function.
+>>>>
+>>>> And if soc_camera host is probed, the when ov2640_s_power() is called,
+>>>> then we can get the 'mclk' and that make us enable/disable soc_camera
+>>>> host's clock as well.
+>>>>
+>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>>> ---
+>>>> v3 -> v4:
+>>>> v2 -> v3:
+>>>> v1 -> v2:
+>>>>     no changes.
+>>>>
+>>>>    drivers/media/i2c/soc_camera/ov2640.c | 31
+>>>> +++++++++++++++++++++----------
+>>>>    1 file changed, 21 insertions(+), 10 deletions(-)
+>>>>
+>>>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+>>>> b/drivers/media/i2c/soc_camera/ov2640.c
+>>>> index 1fdce2f..9ee910d 100644
+>>>> --- a/drivers/media/i2c/soc_camera/ov2640.c
+>>>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+>>>> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd, int
+>>>> on)
+>>>>    	struct i2c_client *client = v4l2_get_subdevdata(sd);
+>>>>    	struct soc_camera_subdev_desc *ssdd = soc_camera_i2c_to_desc(client);
+>>>>    	struct ov2640_priv *priv = to_ov2640(client);
+>>>> +	struct v4l2_clk *clk;
+>>>> +
+>>>> +	if (!priv->clk) {
+>>>> +		clk = v4l2_clk_get(&client->dev, "mclk");
+>>>> +		if (IS_ERR(clk))
+>>>> +			dev_warn(&client->dev, "Cannot get the mclk. maybe
+>>>> soc-camera host is not probed yet.\n");
+>>>> +		else
+>>>> +			priv->clk = clk;
+>>>> +	}
+>>>>      	return soc_camera_set_power(&client->dev, ssdd, priv->clk,
+>>>> on);
+>>>>    }
 
-Some part of the code can be reused for uprobes as well. I think,
-there would still be next
-revision. So, if you can re-factor those parts in v4.
+Just let me explained a little more details at first:
 
-[...]
+As my understanding, current the priv->clk is a v4l2_clk: mclk, which is 
+a wrapper clock in soc_camera.c.
+it can make soc_camera to call camera host's clock_start() clock_stop().
+As in ov2640, the real mck (pck1) is in ov2640 dt node (xvclk). So the 
+camera host's clock_start()/stop() only need to enable/disable his 
+peripheral clock.
 
+That is the motivation I want ov2640 be probed even without "mclk".
 
-> +++ b/arch/arm64/include/asm/probes.h
-> @@ -0,0 +1,50 @@
-> +/*
-> + * arch/arm64/include/asm/probes.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + */
-> +#ifndef _ARM_PROBES_H
-> +#define _ARM_PROBES_H
-> +
-> +struct kprobe;
-> +struct arch_specific_insn;
-> +
-> +typedef u32 kprobe_opcode_t;
-> +typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
-> +typedef unsigned long
-> +(kprobes_condition_check_t)(struct kprobe *p, struct pt_regs *);
+> Ok, think about this: you check whether priv->clk is set on each
+> .s_power() call, which is already a bit awkward.
+yes, it is.
 
-To be used for uprobe:
-p->opcode and p->ainsn can be passed in stead of p.
+> Such approach can be used
+> when there's no other way to perform a one-time action, but here we have
+> one. But never mind, that's not the main problem. If priv->clk isn't set,
+> you try to acquire it. But during probing, when this function is called
+> for the first time clock isn't available yet, but you still want to
+> succeed probing. So, you just issue a warning and continue. But then later
+> an application opens the camera, .s_power() is called again, but for some
+> reason the clock might still be not available, and this time you should
+> fail.
 
-> +typedef void
-> +(kprobes_prepare_t)(struct kprobe *, struct arch_specific_insn *);
+> But you don't, you succeed and then you'll fail somewhere later,
+> presumably, with a timeout waiting for frames. Am I right?
+if the clock (v4l2 clock: mclk) is not available, then, there is no 
+camera host available.
+So the system should have no v4l2 device found.
+I think in this case the application cannot call the camera sensor 
+.s_power() via v4l2 ioctl.
+So the timeout case should not happened.
 
-ditto.. can pass p->opcode in stead of p.
-
-> +typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
-> +
-> +enum pc_restore_type {
-> +       NO_RESTORE,
-> +       RESTORE_PC,
-> +};
-> +
-> +struct kprobe_pc_restore {
-> +       enum pc_restore_type type;
-> +       unsigned long addr;
-> +};
-> +
-> +/* architecture specific copy of original instruction */
-> +struct arch_specific_insn {
-> +       kprobe_opcode_t *insn;
-> +       kprobes_pstate_check_t *pstate_cc;
-> +       kprobes_condition_check_t *check_condn;
-> +       kprobes_prepare_t *prepare;
-> +       kprobes_handler_t *handler;
-> +       /* restore address after step xol */
-> +       struct kprobe_pc_restore restore;
-> +};
-
-Probably it would be better to keep name as probe_xxxx in stead of kprobe_xxxx.
-
-> +
-> +#endif
-
-[...]
-
-> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
-
-I think most of the stuff of this file can be used for uprobe. So what
-about keeping
-name as probes-arm64.c
-
-
-> new file mode 100644
-> index 0000000..30d1c14
-
-[...]
-
-[...]
-
-> +enum kprobe_insn __kprobes
-> +arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
-> +{
-> +       return kprobe_decode_insn(insn, asi, aarch64_decode_table);
-> +}
-
-may be we can replace kprobe to probe for the above function as well.
-
-
-[...]
-
-
-
-> +/*
-> + * arch/arm64/kernel/kprobes.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + */
-> +
-> +#ifndef _ARM_KERNEL_KPROBES_H
-> +#define _ARM_KERNEL_KPROBES_H
-> +
-> +/* BRK opcodes with ESR encoding  */
-> +#define BRK64_ESR_MASK         0xFFFF
-> +#define BRK64_ESR_KPROBES      0x0004
-> +#define BRK64_OPCODE_KPROBES   0xD4200080      /* "brk 0x4" */
-> +#define ARCH64_NOP_OPCODE      0xD503201F
-
-Probably these definitions can be kept in asm/insn.h. There we can add another
-BRK64_OPCODE_UPROBES with different brk code.
+>
+>>>> @@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client *client,
+>>>>    	if (priv->hdl.error)
+>>>>    		return priv->hdl.error;
+>>>>    -	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+>>>> -	if (IS_ERR(priv->clk)) {
+>>>> -		ret = PTR_ERR(priv->clk);
+>>>> -		goto eclkget;
+>>>> -	}
+>>>> -
+>>>>    	ret = ov2640_video_probe(client);
+>>> The first thing the above ov2640_video_probe() function will do is call
+>>> ov2640_s_power(), which will request the clock. So, by moving requesting
+>>> the clock from ov2640_probe() to ov2640_s_power() doesn't change how
+>>> probing will be performed, am I right?
+>> yes, you are right. In this patch, the "mclk" will requested by
+>> ov2640_s_power().
+>>
+>> The reason why I put the getting "mclk" code from ov2640_probe() to
+>> ov2640_s_power() is : as the "mclk" here is camera host's peripheral clock.
+>> That means ov2640 still can be probed properly (read ov2640 id) even no
+>> "mclk". So when I move this code to ov2640_s_power(), otherwise the
+>> ov2640_probe() will be failed or DEFER_PROBE.
+>>
+>> Is this true for all camera host? If it's not true, then I think use
+>> -EPROBE_DEFER would be a proper way.
+> Sorry, not sure what your question is.
+Sorry, I don't make me clear here.
+My question should be: Are all the camera host's clock_start()/stop() 
+only operate their peripheral clock?
 
 
-~Pratyush
+> And I'm not sure ov2640's registers
+> can be accessed with no running clock.
+No, it seems there is a misunderstanding here.
+
+I didn't mean ov2640 can be probed without xvclk.
+What I try to say is the ov2640 can be probed without camera host's 
+peripheral clock.
+
+>   I think some camera sensors can do
+> this, but I have no idea about this one. How did you verify? Is it
+> mentioned in a datasheet? Or did you really disconnected (grounded) the
+> sensor clock input and tried to access its reqisters?
+
+> If you just
+> verified, that it's working without requesting the clock, are you sure
+> your clock output isn't running permanently all the time anyway?
+I didn't verify the those method as I only probed the ov2640 without ISI 
+enabled. ISI peripheral clock is disabled and etc.
+
+
+> Thanks
+> Guennadi
+>
+>>
+>>> Or are there any other patched,
+>>> that change that, that I'm overseeing?
+>>>
+>>> If I'm right, then I would propose an approach, already used in other
+>>> drivers instead of this one: return -EPROBE_DEFER if the clock isn't
+>>> available during probing. See ef6672ea35b5bb64ab42e18c1a1ffc717c31588a for
+>>> an example. Or did I misunderstand anything?
+I can implement with your method. like in probe() function, request the 
+v4l2_clk "mclk", if failed then return -EPROBE_DEFER.
+But I remember you mentioned that you will remove the v4l2 clock in 
+future. See ff5430de commit message.
+So I just want to not so depends on the v4l2_clk "mclk".
+
+Best Regards,
+Josh Wu
+
+>> Actually months ago I already done a version of ov2640 patch which use
+>> -EPROBE_DEFER way.
+>>
+>> But now I think the ov2640 can be probed correctly without "mclk", so it is no
+>> need to return -EPROBE_DEFER.
+>> And the v4l2 asyn API can handle the synchronization of host. So I prefer to
+>> use this way.
+>> What do you think about this?
+>>
+>> Best Regards,
+>> Josh Wu
+>>
+>>> Thanks
+>>> Guennadi
+>>>
+>>>>    	if (ret) {
+>>>> -		v4l2_clk_put(priv->clk);
+>>>> -eclkget:
+>>>> -		v4l2_ctrl_handler_free(&priv->hdl);
+>>>> +		goto evideoprobe;
+>>>>    	} else {
+>>>>    		dev_info(&adapter->dev, "OV2640 Probed\n");
+>>>>    	}
+>>>>    +	ret = v4l2_async_register_subdev(&priv->subdev);
+>>>> +	if (ret < 0)
+>>>> +		goto evideoprobe;
+>>>> +
+>>>> +	return 0;
+>>>> +
+>>>> +evideoprobe:
+>>>> +	v4l2_ctrl_handler_free(&priv->hdl);
+>>>>    	return ret;
+>>>>    }
+>>>>    @@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client
+>>>> *client)
+>>>>    {
+>>>>    	struct ov2640_priv       *priv = to_ov2640(client);
+>>>>    -	v4l2_clk_put(priv->clk);
+>>>> +	v4l2_async_unregister_subdev(&priv->subdev);
+>>>> +	if (priv->clk)
+>>>> +		v4l2_clk_put(priv->clk);
+>>>>    	v4l2_device_unregister_subdev(&priv->subdev);
+>>>>    	v4l2_ctrl_handler_free(&priv->hdl);
+>>>>    	return 0;
+>>>> -- 
+>>>> 1.9.1
+>>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
