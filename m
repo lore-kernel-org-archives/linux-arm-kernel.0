@@ -1,87 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Dec 2014 19:08:41 +0000
-Subject: [PATCH 7/8] arm64: use 'physmem' memblock to improve
- CONFIG_STRICT_DEVMEM handling
-In-Reply-To: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1419275322-29811-8-git-send-email-ard.biesheuvel@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 22 Dec 2014 20:14:35 +0100
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <20141222112933.GK19261@kw.sim.vm.gnt>
+References: <20141218191528.GY967@titan.lakedaemon.net>
+ <549437DD.7040602@free-electrons.com>
+ <20141219160230.GZ967@titan.lakedaemon.net>
+ <54944DAC.1000709@free-electrons.com>
+ <20141219170328.GA967@titan.lakedaemon.net>
+ <54945C5C.2080801@free-electrons.com>
+ <20141219174300.GB967@titan.lakedaemon.net>
+ <20141219181616.GG19261@kw.sim.vm.gnt>
+ <20141221235000.GC28117@titan.lakedaemon.net>
+ <20141222112933.GK19261@kw.sim.vm.gnt>
+Message-ID: <20141222191435.GI32716@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'physmem' memblock table allows us to classify memory as RAM even
-if it is not covered by the ordinary 'memory' memblock table.
+> > In the long term, we're attempting to provide one neutral place [1] for
+> > the bootloaders and kernels to pull devicetrees from and contribute
+> > changes back to.
+> 
+> OK, let's see if I understand correctly.
+> 
+> If I don't agree with the GPLv2+/x11 relicensing, then support for
+> almost all the LaCie boards will be removed from the Linux kernel (maybe
+> during the next merge window) ? Is that correct ?
 
-Under CONFIG_STRICT_DEVMEM, we can use this to:
-- allow read-only access to parts of RAM that are not considered memory
-  by the kernel, this is mainly intended for exposing UEFI configuration
-  tables such as SMBIOS to userland;
-- avoid using non-cached mappings for those parts of RAM, as it may
-  result in mismatched attributes.
+I would NAK such a removal. 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig   |  1 +
- arch/arm64/mm/mmap.c |  2 +-
- arch/arm64/mm/mmu.c  | 15 ++++++++++++++-
- 3 files changed, 16 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b1f9a20a3677..86902f8d8e36 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -60,6 +60,7 @@ config ARM64
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
- 	select HAVE_MEMBLOCK
-+	select HAVE_MEMBLOCK_PHYS_MAP
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
-diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-index 54922d1275b8..9f558ab41f39 100644
---- a/arch/arm64/mm/mmap.c
-+++ b/arch/arm64/mm/mmap.c
-@@ -126,7 +126,7 @@ int devmem_is_allowed(unsigned long pfn)
- {
- 	if (iomem_is_exclusive(pfn << PAGE_SHIFT))
- 		return 0;
--	if (!page_is_ram(pfn))
-+	if (!pfn_valid(pfn))
- 		return 1;
- 	return 0;
- }
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 328638548871..083be3de1a87 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -122,7 +122,7 @@ early_param("cachepolicy", early_cachepolicy);
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
- {
--	if (!pfn_valid(pfn))
-+	if (!memblock_is_physmem(PFN_PHYS(pfn)))
- 		return pgprot_noncached(vma_prot);
- 	else if (file->f_flags & O_SYNC)
- 		return pgprot_writecombine(vma_prot);
-@@ -130,6 +130,19 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- }
- EXPORT_SYMBOL(phys_mem_access_prot);
- 
-+/*
-+ * This definition of phys_mem_access_prot_allowed() overrides
-+ * the __weak definition in drivers/char/mem.c
-+ */
-+int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
-+				 unsigned long size, pgprot_t *prot)
-+{
-+	/* Disallow read-write access to system RAM */
-+	if (memblock_is_physmem(PFN_PHYS(pfn)) && pgprot_val(*prot) & PTE_WRITE)
-+		return 0;
-+	return 1;
-+}
-+
- static void __init *early_alloc(unsigned long sz)
- {
- 	void *ptr = __va(memblock_alloc(sz, sz));
--- 
-1.8.3.2
+	   Andrew
