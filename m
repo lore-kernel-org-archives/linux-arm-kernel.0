@@ -1,51 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Dec 2014 23:44:52 +0100
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <54989DDE.3060409@ti.com>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <2285493.QXo0OxClZ5@wuerfel> <54989DDE.3060409@ti.com>
-Message-ID: <1723662.JYr5muIJha@wuerfel>
+From: lanchon@gmail.com (Lanchon)
+Date: Mon, 22 Dec 2014 19:46:27 -0300
+Subject: FP register corruption in Exynos 4210 (Cortex-A9)
+In-Reply-To: <20141010100146.GM5182@n2100.arm.linux.org.uk>
+References: <54345FA7.9030606@gmail.com> <54370A1E.6070707@gmail.com>
+ <20141009223244.GJ5182@n2100.arm.linux.org.uk> <1879331.AWtSrdvUyc@wuerfel>
+ <20141010100146.GM5182@n2100.arm.linux.org.uk>
+Message-ID: <54989F43.5070100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 December 2014 17:40:30 Murali Karicheri wrote:
-> On 12/22/2014 05:24 PM, Arnd Bergmann wrote:
-> > On Monday 22 December 2014 16:40:43 Murali Karicheri wrote:
-> >>>> +++ b/arch/arm/mm/dma-mapping.c
-> >>>> @@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64
-> >>>> dma_base, u64 size,
-> >>>>                            struct iommu_ops *iommu, bool coherent)
-> >>>>     {
-> >>>>            struct dma_map_ops *dma_ops;
-> >>>> +       u64 temp_size = min((*(dev->dma_mask) + 1), size);
-> >>>>
-> >>>>            dev->archdata.dma_coherent = coherent;
-> >>>> -       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
-> >>>> +       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
-> >>>>
-> >>>> If you agree, I will post v1 of the patch with these updates. Let me
-> >>>> know. I did some basic tests on Keystone with these changes and it works
-> >>>> fine.
-> >>>
-> >>> It's not exactly what I meant. My main point was that we need to limit
-> >>> dev->dma_mask to (size-1) here, but you are not touching that.
-> >>
-> >> if you mean overriding the dev->dma_mask to min((*dev->dma_mask),
-> >> size-1), then I am getting the error "Coherent DMA mask 0x7fffffff (pfn
-> >> 0x780000-0x800000) covers a smaller range of system memory than the DMA
-> >> zone pfn 0x0-0x880000) when the devices on Keystone tries to set the dma
-> >> mask. Something wrong and I need to look into the code.
-> >
-> > Right, it sounds like the offset was applied incorrectly at some point.
-> >
-> > What are the DMA zone size and the phys-offset?
-> 2G and 0x8_0000_0000. This limit the usable DMA size to 2G on Keystone, 
-> I believe you shouldn't be limiting the dma mask to size-1 in this case, 
-> right? The DT setup the dma-range to have a size of 2G (0x80000000).
 
-No, the problem is something else: the pfn range that we calculate for the
-coherent DMA mask should have been 0x800000-0x880000, not 0x780000-0x800000,
-so we would exactly match the ZONE_DMA.
+On 10/10/2014 07:01 AM, Russell King - ARM Linux wrote:
+> On Fri, Oct 10, 2014 at 11:45:34AM +0200, Arnd Bergmann wrote:
+>> On Thursday 09 October 2014 23:32:44 Russell King - ARM Linux wrote:
+>>>> there is a new piece of information:
+>>>> the FP corruption seems to only happen in these android devices if the
+>>>> display is off. the charger may be connected or not, but if the display
+>>>> is on, the corruption won't happen.
+>>>>
+>>>> i wonder if the kernel could be turning off the FPU and then back on
+>>>> without saving the FPU state. i would think corruption would be seen
+>>>> more often then.
+>>> No.  We don't "turn off" the VFP.  We disable and enable access to VFP
+>>> via the coprocessor access register.  If the VFP access is disabled and
+>>> then re-enabled, all state is preserved.
+>>>
+>>> The only time which state would be lost is if (eg) we hot-unplug the
+>>> entire CPU, but that first requires a context switch which implies that
+>>> the state will already be saved.
+>> Could the problem be caused by a bug in the exynos CPU suspend/resume
+>> path then? E.g. if we go to sleep with VFP access disabled but it
+>> comes back with VFP access enabled (or vice versa) that could lead
+>> to the wrong register state being seen by the user space application.
+> Well, an interesting test would be to save out the entire VFP state
+> both before and after the pread64 call, and then inspect that to
+> determine whether it is a single register or multiple registers
+> which are being corrupted.
+>
+> However, looking at the mainline code, we do the right thing with the
+> CPU PM infrastructure, and that is called appropriately by the exynos
+> CPU idle driver.
+>
+> So, another possible test for Lanchon would be to see whether disabling
+> CPU idle support fixes the problem.
+>
 
-	Arnd
+hi again! thank you all for your help. i sort of disappeared, i'm very 
+sorry about that.
+
+i never mentioned it here, but the fact was that i didn't have a device 
+to test on. so all i could do was post test code and ask users for their 
+help. at some point no one was helping; i waited for test results but 
+they never happened, so i got frustrated and abandoned the project.
+
+but recently interest built up again and we were able to progress and 
+finally fix this, so i'm writing to let you know how it turned out.
+
+so remember there was random userland VFP register corruption. the VFP 
+state was not being corrupted in the registers nor in the saved state in 
+ram. what happened was: the kernel tracks the leftover state in the VFP 
+once the eager state save is done. in the lazy restore trap, the kernel 
+optimizes away the state load and instead only enables the VFP if it can 
+prove that the leftover state in the VFP hardware matches the process 
+state saved in ram.
+
+however under some circumstances the kernel did the wrong thing: it 
+didn't reload the registers even though it was needed, probably because 
+the hardware had been powered down and had lost state without the 
+tracking code getting word of it. just disabling the optimization made 
+the kernel solid.
+
+a couple of days later the root cause seems to have been identified and 
+fixed. i describe the whole thing here:
+http://forum.xda-developers.com/galaxy-s2/development-derivatives/kernel-fpbug-stable-4-x-kernel-galaxy-t2978088
+
+once again, thank you for all your help.
+
+kind regards
+Lanchon
