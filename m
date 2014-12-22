@@ -1,431 +1,54 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Dec 2014 16:30:14 -0600
-Subject: [PATCH] arm: boot: dts: add support for AM437x IDK
-Message-ID: <1419287414-28689-1-git-send-email-balbi@ti.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 22 Dec 2014 17:40:30 -0500
+Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
+ dma configuration
+In-Reply-To: <2285493.QXo0OxClZ5@wuerfel>
+References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
+ <11285984.OK9CqQGmjZ@wuerfel> <54988FDB.8000108@ti.com>
+ <2285493.QXo0OxClZ5@wuerfel>
+Message-ID: <54989DDE.3060409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AM437x Industrial Development Kit (IDK) is
-an application development platform targeted at
-industrial communication and control applications.
+On 12/22/2014 05:24 PM, Arnd Bergmann wrote:
+> On Monday 22 December 2014 16:40:43 Murali Karicheri wrote:
+>>>> +++ b/arch/arm/mm/dma-mapping.c
+>>>> @@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64
+>>>> dma_base, u64 size,
+>>>>                            struct iommu_ops *iommu, bool coherent)
+>>>>     {
+>>>>            struct dma_map_ops *dma_ops;
+>>>> +       u64 temp_size = min((*(dev->dma_mask) + 1), size);
+>>>>
+>>>>            dev->archdata.dma_coherent = coherent;
+>>>> -       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+>>>> +       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
+>>>>
+>>>> If you agree, I will post v1 of the patch with these updates. Let me
+>>>> know. I did some basic tests on Keystone with these changes and it works
+>>>> fine.
+>>>
+>>> It's not exactly what I meant. My main point was that we need to limit
+>>> dev->dma_mask to (size-1) here, but you are not touching that.
+>>
+>> if you mean overriding the dev->dma_mask to min((*dev->dma_mask),
+>> size-1), then I am getting the error "Coherent DMA mask 0x7fffffff (pfn
+>> 0x780000-0x800000) covers a smaller range of system memory than the DMA
+>> zone pfn 0x0-0x880000) when the devices on Keystone tries to set the dma
+>> mask. Something wrong and I need to look into the code.
+>
+> Right, it sounds like the offset was applied incorrectly at some point.
+>
+> What are the DMA zone size and the phys-offset?
+2G and 0x8_0000_0000. This limit the usable DMA size to 2G on Keystone, 
+I believe you shouldn't be limiting the dma mask to size-1 in this case, 
+right? The DT setup the dma-range to have a size of 2G (0x80000000).
 
-It comes with a 3-phase motor driver, PROFINET,
-PROFIBUS and a few other industrial communication
-interfaces.
+Murali
+>
+> 	Arnd
 
-The board has 1GiB of DDR3 RAM, QSPI NOR flash,
-a 100% discrete power design (no PMIC) and an
-on-board 2MP camera (not supported with Linux
-as of this writing).
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
-
-boot log: http://hastebin.com/oxinotuzur
-
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/am437x-idk-evm.dts | 381 +++++++++++++++++++++++++++++++++++
- 2 files changed, 382 insertions(+)
- create mode 100644 arch/arm/boot/dts/am437x-idk-evm.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd..1b2c7de 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -366,6 +366,7 @@ dtb-$(CONFIG_ARCH_OMAP4) += omap4-duovero-parlor.dtb \
- 	omap4-var-stk-om44.dtb
- dtb-$(CONFIG_SOC_AM43XX) += am43x-epos-evm.dtb \
- 	am437x-sk-evm.dtb \
-+	am437x-idk-evm.dtb \
- 	am437x-gp-evm.dtb
- dtb-$(CONFIG_SOC_OMAP5) += omap5-cm-t54.dtb \
- 	omap5-sbc-t54.dtb \
-diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
-new file mode 100644
-index 0000000..b52dd0a
---- /dev/null
-+++ b/arch/arm/boot/dts/am437x-idk-evm.dts
-@@ -0,0 +1,381 @@
-+/*
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "am4372.dtsi"
-+#include <dt-bindings/pinctrl/am43xx.h>
-+#include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "TI AM437x Industrial Development Kit";
-+	compatible = "ti,am437x-idk-evm","ti,am4372","ti,am43";
-+
-+	v24_0d: fixed-regulator-v24_0d {
-+		compatible = "regulator-fixed";
-+		regulator-name = "V24_0D";
-+		regulator-min-microvolt = <24000000>;
-+		regulator-max-microvolt = <24000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	v3_3d: fixed-regulator-v3_3d {
-+		compatible = "regulator-fixed";
-+		regulator-name = "V3_3D";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&v24_0d>;
-+	};
-+
-+	vdd_corereg: fixed-regulator-vdd_corereg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDD_COREREG";
-+		regulator-min-microvolt = <1100000>;
-+		regulator-max-microvolt = <1100000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&v24_0d>;
-+	};
-+
-+	vdd_core: fixed-regulator-vdd_core {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDD_CORE";
-+		regulator-min-microvolt = <1100000>;
-+		regulator-max-microvolt = <1100000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vdd_corereg>;
-+	};
-+
-+	v1_8dreg: fixed-regulator-v1_8dreg{
-+		compatible = "regulator-fixed";
-+		regulator-name = "V1_8DREG";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&v24_0d>;
-+	};
-+
-+	v1_8d: fixed-regulator-v1_8d{
-+		compatible = "regulator-fixed";
-+		regulator-name = "V1_8D";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&v1_8dreg>;
-+	};
-+
-+	v1_5dreg: fixed-regulator-v1_5dreg{
-+		compatible = "regulator-fixed";
-+		regulator-name = "V1_5DREG";
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&v24_0d>;
-+	};
-+
-+	v1_5d: fixed-regulator-v1_5d{
-+		compatible = "regulator-fixed";
-+		regulator-name = "V1_5D";
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&v1_5dreg>;
-+	};
-+};
-+
-+&am43xx_pinmux {
-+	i2c0_pins_default: i2c0_pins_default {
-+		pinctrl-single,pins = <
-+			0x188 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0) /* i2c0_sda.i2c0_sda */
-+			0x18c (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0) /* i2c0_scl.i2c0_scl */
-+		>;
-+	};
-+
-+	i2c0_pins_sleep: i2c0_pins_sleep {
-+		pinctrl-single,pins = <
-+			0x188 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x18c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	i2c1_pins_default: i2c1_pins_default {
-+		pinctrl-single,pins = <
-+			0x15c (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE2) /* spi0_cs0.i2c1_scl */
-+			0x158 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE2) /* spi0_d1.i2c1_sda */
-+		>;
-+	};
-+
-+	i2c1_pins_sleep: i2c1_pins_sleep {
-+		pinctrl-single,pins = <
-+			0x15c (PIN_INPUT_PULLDOWN | MUX_MODE7) /* spi0_cs0.i2c1_scl */
-+			0x158 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* spi0_d1.i2c1_sda */
-+		>;
-+	};
-+
-+	mmc1_pins_default: pinmux_mmc1_pins_default {
-+		pinctrl-single,pins = <
-+			0x100 (PIN_INPUT | MUX_MODE0) /* mmc0_clk.mmc0_clk */
-+			0x104 (PIN_INPUT | MUX_MODE0) /* mmc0_cmd.mmc0_cmd */
-+			0x1f0 (PIN_INPUT | MUX_MODE0) /* mmc0_dat3.mmc0_dat3 */
-+			0x1f4 (PIN_INPUT | MUX_MODE0) /* mmc0_dat2.mmc0_dat2 */
-+			0x1f8 (PIN_INPUT | MUX_MODE0) /* mmc0_dat1.mmc0_dat1 */
-+			0x1fc (PIN_INPUT | MUX_MODE0) /* mmc0_dat0.mmc0_dat0 */
-+			0x160 (PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
-+		>;
-+	};
-+
-+	mmc1_pins_sleep: pinmux_mmc1_pins_sleep {
-+		pinctrl-single,pins = <
-+			0x100 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x104 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x1f0 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x1f4 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x1f8 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x1fc (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x160 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	ecap0_pins_default: backlight_pins_default {
-+		pinctrl-single,pins = <
-+			0x164 (PIN_OUTPUT | MUX_MODE0) /* ecap0_in_pwm0_out.ecap0_in_pwm0_out */
-+		>;
-+	};
-+
-+	cpsw_default: cpsw_default {
-+		pinctrl-single,pins = <
-+			0x12c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txclk.rgmii1_tclk */
-+			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_tctl */
-+			0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td0 */
-+			0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td1 */
-+			0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td2 */
-+			0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td3 */
-+			0x130 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxclk.rmii1_rclk */
-+			0x118 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxdv.rgmii1_rctl */
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rd0 */
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rd1 */
-+			0x138 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rd2 */
-+			0x134 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rd3 */
-+		>;
-+	};
-+
-+	cpsw_sleep: cpsw_sleep {
-+		pinctrl-single,pins = <
-+			0x12c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x120 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x130 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x134 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	davinci_mdio_default: davinci_mdio_default {
-+		pinctrl-single,pins = <
-+			/* MDIO */
-+			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-+			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-+		>;
-+	};
-+
-+	davinci_mdio_sleep: davinci_mdio_sleep {
-+		pinctrl-single,pins = <
-+			/* MDIO reset value */
-+			0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	qspi_pins_default: qspi_pins_default {
-+		pinctrl-single,pins = <
-+			0x7c (PIN_OUTPUT_PULLUP | MUX_MODE3)	/* gpmc_csn0.qspi_csn */
-+			0x88 (PIN_OUTPUT | MUX_MODE2)		/* gpmc_csn3.qspi_clk */
-+			0x90 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_advn_ale.qspi_d0 */
-+			0x94 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_oen_ren.qspi_d1 */
-+			0x98 (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_wen.qspi_d2 */
-+			0x9c (PIN_INPUT_PULLUP | MUX_MODE3)	/* gpmc_be0n_cle.qspi_d3 */
-+		>;
-+	};
-+
-+	qspi_pins_sleep: qspi_pins_sleep{
-+		pinctrl-single,pins = <
-+			0x7c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x88 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x90 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x94 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x98 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x9c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&i2c0_pins_default>;
-+	pinctrl-1 = <&i2c0_pins_default>;
-+	clock-frequency = <400000>;
-+
-+	at24 at 50 {
-+		compatible = "at24,24c256";
-+		pagesize = <64>;
-+		reg = <0x50>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&i2c1_pins_default>;
-+	pinctrl-1 = <&i2c1_pins_default>;
-+	clock-frequency = <400000>;
-+
-+	tps: tps62362 at 60 {
-+		compatible = "ti,tps62362";
-+		regulator-name = "VDD_MPU";
-+		regulator-min-microvolt = <950000>;
-+		regulator-max-microvolt = <1330000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+		ti,vsel0-state-high;
-+		ti,vsel1-state-high;
-+		vin-supply = <&v3_3d>;
-+	};
-+};
-+
-+&epwmss0 {
-+	status = "okay";
-+};
-+
-+&ecap0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ecap0_pins_default>;
-+};
-+
-+&gpio0 {
-+	status = "okay";
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&gpio5 {
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+	pinctrl-1 = <&mmc1_pins_sleep>;
-+	vmmc-supply = <&v3_3d>;
-+	bus-width = <4>;
-+	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&qspi {
-+	status = "okay";
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&qspi_pins_default>;
-+	pinctrl-1 = <&qspi_pins_sleep>;
-+
-+	spi-max-frequency = <48000000>;
-+	m25p80 at 0 {
-+		compatible = "mx66l51235l";
-+		spi-max-frequency = <48000000>;
-+		reg = <0>;
-+		spi-cpol;
-+		spi-cpha;
-+		spi-tx-bus-width = <1>;
-+		spi-rx-bus-width = <4>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		/*
-+		 * MTD partition table.  The ROM checks the first 512KiB for a
-+		 * valid file to boot(XIP).
-+		 */
-+		partition at 0 {
-+			label = "QSPI.U_BOOT";
-+			reg = <0x00000000 0x000080000>;
-+		};
-+		partition at 1 {
-+			label = "QSPI.U_BOOT.backup";
-+			reg = <0x00080000 0x00080000>;
-+		};
-+		partition at 2 {
-+			label = "QSPI.U-BOOT-SPL_OS";
-+			reg = <0x00100000 0x00010000>;
-+		};
-+		partition at 3 {
-+			label = "QSPI.U_BOOT_ENV";
-+			reg = <0x00110000 0x00010000>;
-+		};
-+		partition at 4 {
-+			label = "QSPI.U-BOOT-ENV.backup";
-+			reg = <0x00120000 0x00010000>;
-+		};
-+		partition at 5 {
-+			label = "QSPI.KERNEL";
-+			reg = <0x00130000 0x0800000>;
-+		};
-+		partition at 6 {
-+			label = "QSPI.FILESYSTEM";
-+			reg = <0x00930000 0x36D0000>;
-+		};
-+	};
-+};
-+
-+&mac {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&cpsw_default>;
-+	pinctrl-1 = <&cpsw_sleep>;
-+	status = "okay";
-+};
-+
-+&davinci_mdio {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&davinci_mdio_default>;
-+	pinctrl-1 = <&davinci_mdio_sleep>;
-+	status = "okay";
-+};
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "rgmii";
-+};
-+
-+&rtc {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
-+
-+&cpu {
-+	cpu0-supply = <&tps>;
-+};
 -- 
-2.2.0
+Murali Karicheri
+Linux Kernel, Texas Instruments
