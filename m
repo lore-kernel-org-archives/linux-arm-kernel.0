@@ -1,122 +1,38 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 22 Dec 2014 12:46:12 -0500
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
- dma configuration
-In-Reply-To: <21520995.3ITgVmVTeV@wuerfel>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <1418940425-2017-2-git-send-email-m-karicheri2@ti.com>
- <21520995.3ITgVmVTeV@wuerfel>
-Message-ID: <549858E4.4050500@ti.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 22 Dec 2014 11:48:19 -0600
+Subject: [PATCH] ARM: dts: imx6dl-udoo: Add board support based off
+ imx6q-udoo
+In-Reply-To: <CAOMZO5ByFrTFoPUeRPBYxjB74Xn1BPQXzDxSaa+SiW_Ks5JZOw@mail.gmail.com>
+References: <1419269361-6095-1-git-send-email-robertcnelson@gmail.com>
+ <CAOMZO5ByFrTFoPUeRPBYxjB74Xn1BPQXzDxSaa+SiW_Ks5JZOw@mail.gmail.com>
+Message-ID: <CAOCHtYgr3uXkmZgBmmy_KDQxjCrnbE5WyR5d+ONRXJABj=xNUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2014 05:29 PM, Arnd Bergmann wrote:
-> On Thursday 18 December 2014 17:07:04 Murali Karicheri wrote:
->> Add of_pci_dma_configure() to allow updating the dma configuration
->> of the pci device using the configuration from the parent of
->> the root bridge device.
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+On Mon, Dec 22, 2014 at 11:41 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Mon, Dec 22, 2014 at 3:29 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
 >
-> Much better!
->
-> There is one detail that we should get right from the start here,
-> which is currently wrong in the platform device code, but I have so
-> far not dared change it:
->
->> +	/*
->> +	 * Set default dma-mask to 32 bit. Drivers are expected to setup
->> +	 * the correct supported dma_mask.
->> +	 */
->> +	dev->coherent_dma_mask = DMA_BIT_MASK(32);
->
-> The 32-bit mask is indeed correct as the default for almost all cases,
-> and we must not set it larger than DMA_BIT_MASK(32). There is one
-> corner case though, which happens on some shmobile machines that have
-> a 31-bit mask on the PCI host, and I think we should use that as the
-> default.
->
->> +	/*
->> +	 * Set it to coherent_dma_mask by default if the architecture
->> +	 * code has not set it.
->> +	 */
->> +	if (!dev->dma_mask)
->> +		dev->dma_mask =&dev->coherent_dma_mask;
+>> +/dts-v1/;
+>> +#include "imx6dl.dtsi"
+>> +#include "imx6qdl-udoo.dtsi"
 >> +
->> +	ret = of_dma_get_range(parent_np,&dma_addr,&paddr,&size);
->> +	if (ret<  0) {
->> +		dma_addr = offset = 0;
->> +		size = dev->coherent_dma_mask;
+>> +/ {
+>> +       model = "Udoo i.MX6 Dual Board";
 >
-> Can you check one thing here? I believe the size argument as returned
-> from of_dma_get_range is inclusive (e.g. 0x100000000), while the coherent
-> mask by definition is exlusive (e.g. 0xffffffff), so the size needs to
-> be adapted here. I haven't checked all the code here though, so I may
-> be wrong.
-
-size returned by of_dma_get_range() is inclusive as you indicated. Fromt 
-the grep of dma-ranges in arch/arm/boot/dts, I see
-
-arch/arm/boot/dts/keystone.dtsi:		dma-ranges = <0x80000000 0x8 
-0x00000000 0x80000000>;
-arch/arm/boot/dts/keystone.dtsi:			dma-ranges;
-arch/arm/boot/dts/r8a7790.dtsi:		dma-ranges = <0x42000000 0 0x40000000 0 
-0x40000000 0 0x80000000
-arch/arm/boot/dts/integratorap.dts:	dma-ranges = <0x80000000 0x0 
-0x80000000>;
-arch/arm/boot/dts/r8a7791.dtsi:		dma-ranges = <0x42000000 0 0x40000000 0 
-0x40000000 0 0x80000000
-
-So I guess I need to change the code to
-
- >> +	ret = of_dma_get_range(parent_np,&dma_addr,&paddr,&size);
- >> +	if (ret<  0) {
- >> +		dma_addr = offset = 0;
- >> +		size = dev->coherent_dma_mask + 1;
-
+> It would be better to use "Udoo i.MX6 Dual-lite Board" in order to
+> avoid confusion with the i.MX6 Dual variant.
 >
->> +	} else {
->> +		offset = PFN_DOWN(paddr - dma_addr);
->> +		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
->> +	}
->> +	dev->dma_pfn_offset = offset;
->> +
->> +	coherent = of_dma_is_coherent(parent_np);
->> +	dev_dbg(dev, "device is%sdma coherent\n",
->> +		coherent ? " " : " not ");
->> +
->> +	arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
+> Other than that:
 >
-> Basically, I would use limit the size argument we pass into
-> arch_setup_dma_ops to the minimum of 'size' and 'dma_mask' here,
-> after converting into the same format. We should make sure we do the
-> same thing for platform_device as well, so it might be better to do
-> it inside of arch_setup_dma_ops instead.
+> Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Do you think following changes will work?
+True! That would correctly match the other dual-lite boards on mainline too.
 
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64 
-dma_base, u64 size,
-                         struct iommu_ops *iommu, bool coherent)
-  {
-         struct dma_map_ops *dma_ops;
-+       u64 temp_size = min((*(dev->dma_mask) + 1), size);
+Shawn, if you want me to respin the patch i will, otherwise can you
+tweak that line?
 
-         dev->archdata.dma_coherent = coherent;
--       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
-+       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
-
-If you agree, I will post v1 of the patch with these updates. Let me 
-know. I did some basic tests on Keystone with these changes and it works 
-fine.
-
-Murali
-
->
-> 	Arnd
-
+Regards,
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Robert Nelson
+http://www.rcn-ee.com/
