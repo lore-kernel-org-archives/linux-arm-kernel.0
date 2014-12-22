@@ -1,91 +1,141 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Dec 2014 14:36:01 +0100
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20141221100451.GA23242@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <2983977.dWWQcFZRoJ@wuerfel> <20141221100451.GA23242@arm.com>
-Message-ID: <7693528.krAZff0s6I@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 22 Dec 2014 14:46:12 +0100
+Subject: [PATCH v2 12/13] ARM: dts: sun6i: Add sun6i-a31s.dtsi
+In-Reply-To: <20141221223941.GC4820@lukather>
+References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
+ <1418836704-15689-13-git-send-email-hdegoede@redhat.com>
+ <20141219183450.GZ4820@lukather> <54954E77.4070302@redhat.com>
+ <20141221223941.GC4820@lukather>
+Message-ID: <549820A4.9090900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 21 December 2014 10:04:51 Will Deacon wrote:
-> On Wed, Dec 17, 2014 at 07:48:29PM +0000, Arnd Bergmann wrote:
-> > On Wednesday 17 December 2014 17:17:52 Will Deacon wrote:
-> > > > > > I would hope that PCI is the only case we need to worry about for a while.
-> > > > > > This means we just need to come up with another property or a set of properties
-> > > > > > that we can put into a PCI host controller device node in order to describe
-> > > > > > the mapping. These properties could be iommu-specific, so we add something
-> > > > > > to the PCI core that calls a new iommu callback function that takes the
-> > > > > > device node of the PCI host and the bus/device/function number as inputs.
-> > > > > > 
-> > > > > > In arm_setup_iommu_dma_ops(), we can then do something like
-> > > > > > 
-> > > > > >   if (dev_is_pci(dev)) {
-> > > > > >           struct pci_dev *pdev = to_pci_dev(dev);
-> > > > > >           struct device_node *node;
-> > > > > >           unsigned int bdf;
-> > > > > > 
-> > > > > >           node = find_pci_host_bridge(pdev->bus)->parent->of_node;
-> > > > > >           bdf = PCI_DEVID(pdev->bus->number, dev->devfn);
-> > > > > > 
-> > > > > >           iommu_setup_pci_dev(pdev, node, bdf);
-> > > > > >   }
-> > > > > 
-> > > > > The other way to do this is have the IOMMU driver check dev_is_pci(dev)
-> > > > > in add_device, then call an of_xlate_pci_bdf library function which could
-> > > > > do the translation on-demand.
-> > > > 
-> > > > We'd still need to find the device node for the host controller in
-> > > > common code, otherwise we don't have an of_xlate function to call.
-> > > 
-> > > I guess I was hoping that the translation code could be generic. I don't
-> > > really see anything special about adding a constant to a magic number to
-> > > obtain another magic number.
-> > > 
-> > 
-> > If that's all we need, that's fine.
-> > 
-> > I was fearing that we'd get different host controllers using different
-> > parts of the bdf number. E.g. one might pass down just bus/device
-> > while another uses bus/device/function, so we'd need a shift and
-> > an offset.
-> 
-> We could still encode that as adding a constant, modulo the streamid
-> width though, right? I agree that it would be nasty, because we'd have to
-> list a whole bunch of offsets for each function rather than group things
-> into ranges. Still, it gives us something to start with.
-> 
-> FWIW, this (adding an offset) is also the direction that the ACPI IORT
-> description is going in, so at least we have parity there.
+Hi,
 
-Ok, in that case, I think just using the 'iommus' property would work,
-with yet another format to cover the SMMU case of passing a range
-of StreamIDs. With #iommu-cells=<3>, we can have a tuple of
-mask/value/length that would be able to cover all cases.
+On 21-12-14 23:39, Maxime Ripard wrote:
+> On Sat, Dec 20, 2014 at 11:24:55AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 19-12-14 19:34, Maxime Ripard wrote:
+>>> On Wed, Dec 17, 2014 at 06:18:23PM +0100, Hans de Goede wrote:
+>>>> Add a dtsi file for A31s based boards.
+>>>>
+>>>> Since the  A31s is the same die as the A31 in a different package, this dtsi
+>>>> simply includes sun6i-a31.dtsi and then overrides the pinctrl compatible to
+>>>> reflect the different package, everything else is identical.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> Changes in v2:
+>>>> -include sun6i-a31.dtsi and override the pinctrl compatible, rather then
+>>>>   copying everything
+>>>> ---
+>>>>   arch/arm/boot/dts/sun6i-a31s.dtsi | 62 +++++++++++++++++++++++++++++++++++++++
+>>>>   1 file changed, 62 insertions(+)
+>>>>   create mode 100644 arch/arm/boot/dts/sun6i-a31s.dtsi
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun6i-a31s.dtsi b/arch/arm/boot/dts/sun6i-a31s.dtsi
+>>>> new file mode 100644
+>>>> index 0000000..d0bd2b9
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/sun6i-a31s.dtsi
+>>>> @@ -0,0 +1,62 @@
+>>>> +/*
+>>>> + * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+>>>> + *
+>>>> + * This file is dual-licensed: you can use it either under the terms
+>>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>>> + * licensing only applies to this file, and not this project as a
+>>>> + * whole.
+>>>> + *
+>>>> + *  a) This library is free software; you can redistribute it and/or
+>>>> + *     modify it under the terms of the GNU General Public License as
+>>>> + *     published by the Free Software Foundation; either version 2 of the
+>>>> + *     License, or (at your option) any later version.
+>>>> + *
+>>>> + *     This library is distributed in the hope that it will be useful,
+>>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + *     GNU General Public License for more details.
+>>>> + *
+>>>> + *     You should have received a copy of the GNU General Public
+>>>> + *     License along with this library; if not, write to the Free
+>>>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>>>> + *     MA 02110-1301 USA
+>>>> + *
+>>>> + * Or, alternatively,
+>>>> + *
+>>>> + *  b) Permission is hereby granted, free of charge, to any person
+>>>> + *     obtaining a copy of this software and associated documentation
+>>>> + *     files (the "Software"), to deal in the Software without
+>>>> + *     restriction, including without limitation the rights to use,
+>>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>>>> + *     sell copies of the Software, and to permit persons to whom the
+>>>> + *     Software is furnished to do so, subject to the following
+>>>> + *     conditions:
+>>>> + *
+>>>> + *     The above copyright notice and this permission notice shall be
+>>>> + *     included in all copies or substantial portions of the Software.
+>>>> + *
+>>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>>>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>>>> + */
+>>>> +
+>>>> +/*
+>>>> + * The A31s is the same die as the A31 in a different package, this is
+>>>> + * reflected by it having different pinctrl compatible everything else is
+>>>> + * identical.
+>>>> + */
+>>>> +
+>>>> +/include/ "sun6i-a31.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +	soc at 01c00000 {
+>>>> +		pio: pinctrl at 01c20800 {
+>>>> +			compatible = "allwinner,sun6i-a31s-pinctrl";
+>>>> +		};
+>>>> +	};
+>>>> +};
+>>>
+>>> Given your previous changes, you should also update the enable-method.
+>>
+>> I've not added a new compatible for the enable-method, given that
+>> this is the exact same die, so the 2 are 100?% compatible, just like you
+>> insisted that "allwinner,sun4i-a10-mod0-clk" should be used for the ir-clk
+>> since it was 100% compatible to that I believe that the enable method
+>> should use the existing compatible and not invent a new one for something
+>> which is 100% compatible.
+>
+> Yeah, you have a point and I agree, but your patch 3 does add a
+> CPU_METHOD_OF_DECLARE for the A31s.
 
-> > As part of the AMD review I found out that their SMMU implementation
-> > only has 15 bits of address space, while bdf is 16 bits, so they
-> > cut off the top bit and get aliasing between bus 0+n and bus 128+n.
-> > 
-> > Another SoC might have more aliasing if they have multiple domains.
-> 
-> This particular aliasing is probably going to be pretty common; the ARM
-> SMMU typically only supports 15-bit StreamIDs (there is an extension to
-> 16-bit, but I haven't seen one built yet and the driver doesn't even support
-> it).
+Ah right, it does, my bad.
 
-In case of AMD, I asked the maintainers to put a bus-range = <0 127> into
-the PCI host node to address that. I've seen something similar while
-discussing another SoC that had multiple PCI hosts connected to the
-same SMMU and my comment back then was a recommendation to not have distinct
-bus-range properties in each one (e.g. <0 31>, <32 63>, <64 95>, <96 127>
-for four hosts), but I suppose that is actually the cleanest way to deal
-with it.
+> Since I was going to push the branch now that 3.19-rc1 is out, do you
+> want me to edit your patch before doing so?
 
-Do you think it's possible that we might have to deal with a single PCI host
-that is connected two different SMMU instances for the purposes of extending
-the StreamID space from 15 to 16 bits? I think we would have trouble
-expressing this with the current syntax.
+Yes, please drop the addition of the extra CPU_METHOD_OF_DECLARE, or let
+me know if you want a new version instead.
 
-	Arnd
+>>> Also, for this patch and the next one, Arnd just warned me that we
+>>> shouldn't duplicate the DT path, and that we should switch to the new
+>>> trend on using label references (like what TI or Amlogic does for
+>>> example).
+>>
+>> Ok, so something like this, right ?  :
+>>
+>> &pio {
+>> 	compatible = "allwinner,sun6i-a31s-pinctrl";
+>> };
+>
+> Yep.
+
+Regards,
+
+Hans
