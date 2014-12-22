@@ -1,175 +1,123 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Dec 2014 10:58:58 +0000
-Subject: [PATCH v4 2/8] arm64/mm: add create_pgd_mapping() to create private
- page tables
+Date: Mon, 22 Dec 2014 10:58:57 +0000
+Subject: [PATCH v4 1/8] arm64/mm: add explicit struct_mm argument to
+ __create_mapping()
 In-Reply-To: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1419245944-2424-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1419245944-2424-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For UEFI, we need to install the memory mappings used for Runtime Services
-in a dedicated set of page tables. Add create_pgd_mapping(), which allows
-us to allocate and install those page table entries early.
+Currently, swapper_pg_dir and idmap_pg_dir share the init_mm mm_struct
+instance. To allow the introduction of other pg_dir instances, for instance,
+for UEFI's mapping of Runtime Services, make the struct_mm instance an
+explicit argument that gets passed down to the pmd and pte instantiation
+functions. Note that the consumers (pmd_populate/pgd_populate) of the
+mm_struct argument don't actually inspect it, but let's fix it for
+correctness' sake.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Steve Capper <steve.capper@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/mmu.h     |  3 +++
- arch/arm64/include/asm/pgtable.h |  5 +++++
- arch/arm64/mm/mmu.c              | 43 ++++++++++++++++++++--------------------
- 3 files changed, 30 insertions(+), 21 deletions(-)
+ arch/arm64/mm/mmu.c | 31 ++++++++++++++++---------------
+ 1 file changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index c2f006c48bdb..5fd40c43be80 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -33,5 +33,8 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
- /* create an identity mapping for memory (or io if map_io is true) */
- extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
-+extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			       unsigned long virt, phys_addr_t size,
-+			       pgprot_t prot);
- 
- #endif
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index df22314f57cf..d5d8dc17e296 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -264,6 +264,11 @@ static inline pmd_t pte_pmd(pte_t pte)
- 	return __pmd(pte_val(pte));
- }
- 
-+static inline pgprot_t mk_sect_prot(pgprot_t prot)
-+{
-+	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
-+}
-+
- /*
-  * THP definitions.
-  */
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7d5dfe2d3de0..3f3d5aa4a8b1 100644
+index 6032f3e3056a..7d5dfe2d3de0 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -158,20 +158,10 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+@@ -156,9 +156,9 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ }
  
- static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
--				  phys_addr_t phys, int map_io)
-+				  phys_addr_t phys, pgprot_t prot)
+-static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+-				  unsigned long end, phys_addr_t phys,
+-				  int map_io)
++static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
++				  unsigned long addr, unsigned long end,
++				  phys_addr_t phys, int map_io)
  {
  	pmd_t *pmd;
  	unsigned long next;
--	pmdval_t prot_sect;
--	pgprot_t prot_pte;
--
--	if (map_io) {
--		prot_sect = PROT_SECT_DEVICE_nGnRE;
--		prot_pte = __pgprot(PROT_DEVICE_nGnRE);
--	} else {
--		prot_sect = PROT_SECT_NORMAL_EXEC;
--		prot_pte = PAGE_KERNEL_EXEC;
--	}
+@@ -178,7 +178,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 	 */
+ 	if (pud_none(*pud) || pud_bad(*pud)) {
+ 		pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
+-		pud_populate(&init_mm, pud, pmd);
++		pud_populate(mm, pud, pmd);
+ 	}
  
- 	/*
- 	 * Check for initial section mappings in the pgd/pud and remove them.
-@@ -187,7 +177,8 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
- 			pmd_t old_pmd =*pmd;
--			set_pmd(pmd, __pmd(phys | prot_sect));
-+			set_pmd(pmd, __pmd(phys |
-+					   pgprot_val(mk_sect_prot(prot))));
- 			/*
- 			 * Check for previous table entries created during
- 			 * boot (__create_page_tables) and flush them.
-@@ -196,7 +187,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				flush_tlb_all();
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot_pte);
-+				       prot);
- 		}
- 		phys += next - addr;
+ 	pmd = pmd_offset(pud, addr);
+@@ -202,16 +202,16 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
  	} while (pmd++, addr = next, addr != end);
-@@ -204,7 +195,7 @@ static void __init alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ }
  
- static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
--				  phys_addr_t phys, int map_io)
-+				  phys_addr_t phys, pgprot_t prot)
+-static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+-				  unsigned long end, phys_addr_t phys,
+-				  int map_io)
++static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
++				  unsigned long addr, unsigned long end,
++				  phys_addr_t phys, int map_io)
  {
  	pud_t *pud;
  	unsigned long next;
-@@ -222,10 +213,11 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 		/*
- 		 * For 4K granule only, attempt to put down a 1GB block
- 		 */
--		if (!map_io && (PAGE_SHIFT == 12) &&
-+		if ((PAGE_SHIFT == 12) &&
- 		    ((addr | next | phys) & ~PUD_MASK) == 0) {
- 			pud_t old_pud = *pud;
--			set_pud(pud, __pud(phys | PROT_SECT_NORMAL_EXEC));
-+			set_pud(pud, __pud(phys |
-+					   pgprot_val(mk_sect_prot(prot))));
  
- 			/*
- 			 * If we have an old value for a pud, it will
-@@ -240,7 +232,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 	if (pgd_none(*pgd)) {
+ 		pud = early_alloc(PTRS_PER_PUD * sizeof(pud_t));
+-		pgd_populate(&init_mm, pgd, pud);
++		pgd_populate(mm, pgd, pud);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+ 
+@@ -240,7 +240,7 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
  				flush_tlb_all();
  			}
  		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
-+			alloc_init_pmd(mm, pud, addr, next, phys, prot);
+-			alloc_init_pmd(pud, addr, next, phys, map_io);
++			alloc_init_pmd(mm, pud, addr, next, phys, map_io);
  		}
  		phys += next - addr;
  	} while (pud++, addr = next, addr != end);
-@@ -252,7 +244,7 @@ static void __init alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+@@ -250,9 +250,9 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+  * Create the page directory entries and any necessary page tables for the
+  * mapping specified by 'md'.
   */
- static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
--				    phys_addr_t size, int map_io)
-+				    phys_addr_t size, pgprot_t prot)
+-static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
+-				    unsigned long virt, phys_addr_t size,
+-				    int map_io)
++static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
++				    phys_addr_t phys, unsigned long virt,
++				    phys_addr_t size, int map_io)
  {
  	unsigned long addr, length, end, next;
  
-@@ -262,7 +254,7 @@ static void __init __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+@@ -262,7 +262,7 @@ static void __init __create_mapping(pgd_t *pgd, phys_addr_t phys,
  	end = addr + length;
  	do {
  		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
-+		alloc_init_pud(mm, pgd, addr, next, phys, prot);
+-		alloc_init_pud(pgd, addr, next, phys, map_io);
++		alloc_init_pud(mm, pgd, addr, next, phys, map_io);
  		phys += next - addr;
  	} while (pgd++, addr = next, addr != end);
  }
-@@ -276,7 +268,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+@@ -275,7 +275,8 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 			&phys, virt);
  		return;
  	}
- 	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
--			 size, 0);
-+			 size, PAGE_KERNEL_EXEC);
+-	__create_mapping(pgd_offset_k(virt & PAGE_MASK), phys, virt, size, 0);
++	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
++			 size, 0);
  }
  
  void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-@@ -286,7 +278,16 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+@@ -284,7 +285,7 @@ void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
+ 		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
  		return;
  	}
- 	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
--			 addr, addr, size, map_io);
-+			 addr, addr, size,
-+			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
-+				: PAGE_KERNEL_EXEC);
-+}
-+
-+void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			       unsigned long virt, phys_addr_t size,
-+			       pgprot_t prot)
-+{
-+	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot);
+-	__create_mapping(&idmap_pg_dir[pgd_index(addr)],
++	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
+ 			 addr, addr, size, map_io);
  }
  
- static void __init map_mem(void)
 -- 
 1.8.3.2
