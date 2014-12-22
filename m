@@ -1,34 +1,52 @@
 From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 22 Dec 2014 17:42:01 +0530
-Subject: [PATCH v3 0/3] mmc: dw_mmc: update host driver with minor fixes
-Message-ID: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
+Date: Mon, 22 Dec 2014 17:42:03 +0530
+Subject: [PATCH v3 2/3] mmc: dw_mmc: exynos: don't use if clock isn't available
+In-Reply-To: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
+References: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <1419250324-11743-3-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is part of [1] which are send by Seungwon jeon few months back.
-when he attempted to add HS400 support for exynos dw_mmc host controller.
-Since then these patches are just sitting idle.
-This is my attempt to land some of the changes which are generic, and performance
-booter on dw_mmc host controller.
+From: Seungwon Jeon <tgih.jun@samsung.com>
 
-These patches are already ACKed by Jaehoon Chung.
+Add checking whether the clock is valid.
 
-[1] http://www.spinics.net/lists/linux-samsung-soc/msg27903.html
+Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+ drivers/mmc/host/dw_mmc-exynos.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-Changes in v3:
-      None, just a rebase on ulf's next branch.
-
-
-Seungwon Jeon (3):
-  mmc: dw_mmc: fix the max_blk_count in IDMAC
-  mmc: dw_mmc: exynos: don't use if clock isn't available
-  mmc: dw_mmc: exynos: move definitions to header file
-
- drivers/mmc/host/dw_mmc-exynos.c |   59 +++++++++-----------------------------
- drivers/mmc/host/dw_mmc-exynos.h |   56 ++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/dw_mmc.c        |    4 +--
- 3 files changed, 71 insertions(+), 48 deletions(-)
- create mode 100644 drivers/mmc/host/dw_mmc-exynos.h
-
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index 509365c..556663f 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -127,9 +127,9 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
+ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+ {
+ 	struct dw_mci_exynos_priv_data *priv = host->priv;
+-	unsigned long rate = clk_get_rate(host->ciu_clk);
+ 
+-	host->bus_hz = rate / (priv->ciu_div + 1);
++	host->bus_hz /= (priv->ciu_div + 1);
++
+ 	return 0;
+ }
+ 
+@@ -232,8 +232,11 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+ 			mci_writel(host, CLKSEL, priv->sdr_timing);
+ 	}
+ 
+-	/* Don't care if wanted clock is zero */
+-	if (!wanted)
++	/*
++	 * Don't care if wanted clock is zero or
++	 * ciu clock is unavailable
++	 */
++	if (!wanted || IS_ERR(host->ciu_clk))
+ 		return;
+ 
+ 	/* Guaranteed minimum frequency for cclkin */
 -- 
 1.7.9.5
