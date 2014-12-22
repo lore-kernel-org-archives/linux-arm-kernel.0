@@ -1,61 +1,23 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 22 Dec 2014 12:57:37 +0100
-Subject: [PATCH] leds: netxbig: fix oops at probe time
-In-Reply-To: <20141211090400.GB18449@kw.sim.vm.gnt>
-References: <1417534330-13154-1-git-send-email-simon.guinot@sequanux.org>
- <20141211090400.GB18449@kw.sim.vm.gnt>
-Message-ID: <20141222115737.GL19261@kw.sim.vm.gnt>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 22 Dec 2014 12:02:24 +0000
+Subject: [PATCH 26/28] ASoC: pxa: drop owner assignment from
+ platform_drivers
+In-Reply-To: <1419196495-9626-27-git-send-email-wsa@the-dreams.de>
+References: <1419196495-9626-1-git-send-email-wsa@the-dreams.de>
+ <1419196495-9626-27-git-send-email-wsa@the-dreams.de>
+Message-ID: <20141222120224.GF17800@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 11, 2014 at 10:04:00AM +0100, Simon Guinot wrote:
-> On Tue, Dec 02, 2014 at 04:32:10PM +0100, Simon Guinot wrote:
-> > This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
-> > this bug, a kernel oops can be observed at probe time on the LaCie 2Big
-> > and 5Big v2 boards:
-> > 
-> > Unable to handle kernel NULL pointer dereference at virtual address 00000008
-> > [...]
-> > [<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
-> > [<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
-> > [<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
-> > [<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
-> > [<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
-> > [<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
-> > [<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
-> > [<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
-> > [<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
-> > [<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
-> > [...]
-> > 
-> > This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
-> > ("leds: netxbig: fix attribute-creation race").
-> > 
-> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > Cc: <stable@vger.kernel.org> # 3.17+
-> > ---
-> >  drivers/leds/leds-netxbig.c | 12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> Hi Bryan,
-> 
-> Please apply up this patch.
+On Sun, Dec 21, 2014 at 10:14:47PM +0100, Wolfram Sang wrote:
+> This platform_driver does not need to set an owner, it will be populated by the
+> driver core.
 
-Hi Bryan,
-
-Is there any news about this patch on your side ?
-
-Jason, Andrew, Sebastian,
-
-Maybe this patch can go through the SoC branch ?
-
-Thanks in advance.
-
-Simon
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
+Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141222/af388081/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141222/e2a3ff7d/attachment.sig>
