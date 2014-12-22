@@ -1,34 +1,22 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 22 Dec 2014 15:46:59 +0800
-Subject: [PATCH v2 0/4] clk: mediatek: Add common clock support for
- Mediatek MT8135.
-In-Reply-To: <1417675942-10502-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1417675942-10502-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1419234419.24116.7.camel@mtksdaap41>
+From: evgeni@studio-punkt.com (Evgeni Dobrev)
+Date: Mon, 22 Dec 2014 09:04:00 +0100
+Subject: [PATCH v2 0/1] add support for Seagate BlackArmor NAS220
+In-Reply-To: <20141215203855.GA28940@anne>
+References: <20141215203855.GA28940@anne>
+Message-ID: <20141222080400.GA15278@anne>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+v2:	indent with tabs only
+	removed NAND layout
 
-On Thu, 2014-12-04 at 14:52 +0800, James Liao wrote:
-> This patchset contains the initial common clock support for Mediatek SoCs.
-> Mediatek SoC's clock architecture comprises of various PLLs, dividers,
-> muxes and clock gates.
-> 
-> This patchset also contains a basic clock support for Mediatek MT8135.
-> 
-> This driver is based on 3.18-rc1 + MT8135 basic support.
-> 
-> James Liao (4):
->   clk: dts: mediatek: add Mediatek MT8135 clock bindings
->   clk: mediatek: Add initial common clock support for Mediatek SoCs.
->   clk: mediatek: Add basic clocks for Mediatek MT8135.
->   dts: mediatek: Enable clock support for Mediatek MT8135.
-> 
+Evgeni Dobrev (1):
+  add support for Seagate BlackArmor NAS220
 
-Hi,
+ arch/arm/boot/dts/Makefile            |    1 +
+ arch/arm/boot/dts/kirkwood-nas220.dts |  158 +++++++++++++++++++++++++++++++++
+ 2 files changed, 159 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-nas220.dts
 
-Any comment for this patchset?
-
-
-Best regards,
-James
+-- 
+1.7.10.4
