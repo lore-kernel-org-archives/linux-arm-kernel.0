@@ -1,131 +1,58 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 22 Dec 2014 12:29:33 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <20141221235000.GC28117@titan.lakedaemon.net>
-References: <54930BBC.4060602@free-electrons.com>
- <20141218191528.GY967@titan.lakedaemon.net>
- <549437DD.7040602@free-electrons.com>
- <20141219160230.GZ967@titan.lakedaemon.net>
- <54944DAC.1000709@free-electrons.com>
- <20141219170328.GA967@titan.lakedaemon.net>
- <54945C5C.2080801@free-electrons.com>
- <20141219174300.GB967@titan.lakedaemon.net>
- <20141219181616.GG19261@kw.sim.vm.gnt>
- <20141221235000.GC28117@titan.lakedaemon.net>
-Message-ID: <20141222112933.GK19261@kw.sim.vm.gnt>
+From: tony.kn@samsung.com (Tony K Nadackal)
+Date: Mon, 22 Dec 2014 17:16:03 +0530
+Subject: [PATCH] clk: samsung: exynos7: Add clocks for MSCL block
+In-Reply-To: <549450A6.9020205@samsung.com>
+References: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
+ <549450A6.9020205@samsung.com>
+Message-ID: <000901d01ddc$eac0d120$c0427360$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 21, 2014 at 06:50:00PM -0500, Jason Cooper wrote:
-> On Fri, Dec 19, 2014 at 07:16:16PM +0100, Simon Guinot wrote:
-> > On Fri, Dec 19, 2014 at 12:43:00PM -0500, Jason Cooper wrote:
-> > > On Fri, Dec 19, 2014 at 06:11:56PM +0100, Gregory CLEMENT wrote:
-> > > > On 19/12/2014 18:03, Jason Cooper wrote:
-> > > > > On Fri, Dec 19, 2014 at 05:09:16PM +0100, Gregory CLEMENT wrote:
-> > > > >> On 19/12/2014 17:02, Jason Cooper wrote:
-> > > > >>> On Fri, Dec 19, 2014 at 03:36:13PM +0100, Gregory CLEMENT wrote:
-> > > > >>>> On 18/12/2014 20:15, Jason Cooper wrote:
-> > > > >>>>> On Thu, Dec 18, 2014 at 06:15:40PM +0100, Gregory CLEMENT wrote:
-> > > > >>>>> ...
-> > > > >>>>>> Jason at the end it seems you didn't ack or nack the patches were you
-> > > > >>>>>> were CC. You expressed some concerns about the GPLv2+ move but I don't know
-> > > > >>>>>> if it is something that prevents you to give your acked-by.
-> > > > >>>>>
-> > > > >>>>> Oops.  :)  I figured my S-o-B when applying would be sufficient.  That
-> > > > >>>>> decision was before we decided on Andrew applying patches this time
-> > > > >>>>> around...
-> > > > >>>>>
-> > > > >>>>> For all my dts{i} contributions:
-> > > > >>>>>
-> > > > >>>>> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > > > >>>>
-> > > > >>>> Thanks :)
-> > > > >>>>
-> > > > >>>>>
-> > > > >>>>> Due to all the merge commits over time and whatnot, it's probably best
-> > > > >>>>> to put my Ack on all the patches in this series...
-> > > > >>>>
-> > > > >>>> OK no problem. By the way, I take care of collecting all the acked-by and
-> > > > >>>> once it will be done I will either sent the updated patch set with all the
-> > > > >>>> acked-by or maybe just I will create a branch to pull if it is easier to handle.
-> > > > >>>
-> > > > >>> Ok, that'll be up to Andrew.
-> > > > >>>
-> > > > >>> Once we have the last few stragglers, and assuming there are no more
-> > > > >>> NAKs, here's what I'd like to do:
-> > > > >>>
-> > > > >>> Regrettably, we'll have to revert Simon's dts contributions.  I say
-> > > > >>
-> > > > >> You missed the email he sent yesterday, finally Simon changed his mind
-> > > > >> and gave his acked-by.
-> > > > > 
-> > > > > Indeed, that was for the oneliner change in the armada-370-xp.dtsi file.
-> > > > > I got a bit ahead of myself, but I'm looking towards kirkwood, orion5x,
-> > > > > dove, which brings up:
-> > > > > 
-> > > > > 18ba7e4fe51d ARM: Kirkwood: add DT support for d2 Network v2
-> > > > > 2d4cd2cafaea ARM: Kirkwood: allow to use netxbig DTSI for d2net_v2 DTS
-> > > > > a96cc303e42a ARM: mvebu: update the SATA compatible string for Armada 370/XP
-> > > > > d3dde4df4483 ARM: Kirkwood: update Network Space Mini v2 description
-> > > > > 98d4f2acb91a ARM: Kirkwood: DT board setup for CloudBox
-> > > > > 4ea931e07d77 ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
-> > > > > 7f9871d9d30f ARM: kirkwood: DT board setup for Network Space Mini v2
-> > > > > ca7d94524ab3 ARM: kirkwood: DT board setup for Network Space Lite v2
-> > > > > ecee1e47ab42 ARM: kirkwood: DT board setup for Network Space v2 and parents
-> > > > > 
-> > > > 
-> > > > OK I understand your concern now. About dove and kirkwood, did you notice that
-> > > > some files didn't have any license?
-> > > 
-> > > Yes.
-> > > 
-> > > > Especially none of the dove files have a license.
-> > > 
-> > > Yes, we'll cross that bridge when we get there.  I suspect it then falls
-> > > under the over-arching license of the project.  Regardless, we'll still
-> > > need Acks from all contributors.
-> > 
-> > Hi Jason,
-> > 
-> > What is the problem with keeping the LaCie DTS files under GPLv2+ only ?
+Hi Sylwester,
+
+On  Friday, December 19, 2014 9:52 PM Sylwester Nawrocki wrote,
+
+> Hi,
 > 
-> Converting armada-* to dual license is just a small part of the
-> overarching effort to convert *all* the devicetree files to dual
-> license.  So, eventually, we'll be doing the same with kirkwood, dove
-> and orion5x dts{i} files.  Perhaps even during this merge window.
+> On 17/12/14 08:33, Tony K Nadackal wrote:
+> > Add clock support for the MSCL block for Exynos7.
+> >
+> > Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> > ---
+> >  .../devicetree/bindings/clock/exynos7-clock.txt    |   1 +
+> >  drivers/clk/samsung/clk-exynos7.c                  | 124
++++++++++++++++++++++
+> >  include/dt-bindings/clock/exynos7-clk.h            |  40 ++++++-
+> >  3 files changed, 164 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/clock/exynos7-clock.txt
+> > b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
+> > index 6d3d5f8..d0e048c 100644
+> > --- a/Documentation/devicetree/bindings/clock/exynos7-clock.txt
+> > +++ b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
+> > @@ -34,6 +34,7 @@ Required Properties for Clock Controller:
+> >  	- "samsung,exynos7-clock-peris"
+> >  	- "samsung,exynos7-clock-fsys0"
+> >  	- "samsung,exynos7-clock-fsys1"
+> > +	- "samsung,exynos7-clock-mscl"
 > 
-> In the long term, we're attempting to provide one neutral place [1] for
-> the bootloaders and kernels to pull devicetrees from and contribute
-> changes back to.
+> I can't see anything controversial in the patch, but I've got some doubts
+regarding
+> the compatible string. Is there a SoC named just "Exynos7"?
 
-OK, let's see if I understand correctly.
+Yes, We have an SoC named Exynos7.
+Please refer http://www.spinics.net/lists/linux-samsung-soc/msg36765.html
 
-If I don't agree with the GPLv2+/x11 relicensing, then support for
-almost all the LaCie boards will be removed from the Linux kernel (maybe
-during the next merge window) ? Is that correct ?
+> If not, what are exact SoC names the "samsung,exynos7-clock-mscl" compatible
+> is supposed to cover ?
+> It would be good to list in this file the exact SoCs names this binding
+applies to,
+> unless there is indeed Exynos7 SoC.
+> 
+> --
+> Thanks,
+> Sylwester
 
-Since all the LaCie boards DTS are at least based on my work (except for
-the Orion ED Mini v2), I think there is 12 files concerned here. See the
-command output: grep -l lacie *.dts | wc -l.
 
-The oldest of this boards have been supported by the Linux kernel since
-the 2.6.32 release. Also some of this boards are still widely used...
-
-You know, it is quite a statement you are sending here: The GPLv2+
-licences are not good enough to get an ARM-based board supported by
-the Linux kernel, while it has always been the case until now. Are all
-the maintainers SoC, ARM SoC, ARM and Linux well aligned with that ?
-
-Is there any way we can keep the LaCie DTS files licenced under GPLv2+
-_and_ still distributed with the others. Anyone would be free to choose
-to use them (or not), in respect of the licence terms.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141222/b9072e9b/attachment-0001.sig>
+Regards,
+Tony
