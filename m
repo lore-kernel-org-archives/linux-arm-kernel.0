@@ -1,82 +1,118 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Dec 2014 22:14:32 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <20141222112933.GK19261@kw.sim.vm.gnt>
-References: <54930BBC.4060602@free-electrons.com>
- <20141221235000.GC28117@titan.lakedaemon.net>
- <20141222112933.GK19261@kw.sim.vm.gnt>
-Message-ID: <6219619.yRPYbqr6Sm@wuerfel>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 22 Dec 2014 16:40:43 -0500
+Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
+ dma configuration
+In-Reply-To: <11285984.OK9CqQGmjZ@wuerfel>
+References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
+ <21520995.3ITgVmVTeV@wuerfel> <549858E4.4050500@ti.com>
+ <11285984.OK9CqQGmjZ@wuerfel>
+Message-ID: <54988FDB.8000108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 December 2014 12:29:33 Simon Guinot wrote:
-> On Sun, Dec 21, 2014 at 06:50:00PM -0500, Jason Cooper wrote:
-> > On Fri, Dec 19, 2014 at 07:16:16PM +0100, Simon Guinot wrote:
-> > > > > Especially none of the dove files have a license.
-> > > > 
-> > > > Yes, we'll cross that bridge when we get there.  I suspect it then falls
-> > > > under the over-arching license of the project.  Regardless, we'll still
-> > > > need Acks from all contributors.
-> > > 
-> > > Hi Jason,
-> > > 
-> > > What is the problem with keeping the LaCie DTS files under GPLv2+ only ?
-> > 
-> > Converting armada-* to dual license is just a small part of the
-> > overarching effort to convert *all* the devicetree files to dual
-> > license.  So, eventually, we'll be doing the same with kirkwood, dove
-> > and orion5x dts{i} files.  Perhaps even during this merge window.
-> > 
-> > In the long term, we're attempting to provide one neutral place [1] for
-> > the bootloaders and kernels to pull devicetrees from and contribute
-> > changes back to.
-> 
-> OK, let's see if I understand correctly.
-> 
-> If I don't agree with the GPLv2+/x11 relicensing, then support for
-> almost all the LaCie boards will be removed from the Linux kernel (maybe
-> during the next merge window) ? Is that correct ?
+On 12/22/2014 02:43 PM, Arnd Bergmann wrote:
+> On Monday 22 December 2014 12:46:12 Murali Karicheri wrote:
+>> On 12/18/2014 05:29 PM, Arnd Bergmann wrote:
+>>> On Thursday 18 December 2014 17:07:04 Murali Karicheri wrote:
+>>>> Add of_pci_dma_configure() to allow updating the dma configuration
+>>>> of the pci device using the configuration from the parent of
+>>>> the root bridge device.
+>>>> +	/*
+>>>> +	 * Set it to coherent_dma_mask by default if the architecture
+>>>> +	 * code has not set it.
+>>>> +	 */
+>>>> +	if (!dev->dma_mask)
+>>>> +		dev->dma_mask =&dev->coherent_dma_mask;
+>>>> +
+>>>> +	ret = of_dma_get_range(parent_np,&dma_addr,&paddr,&size);
+>>>> +	if (ret<   0) {
+>>>> +		dma_addr = offset = 0;
+>>>> +		size = dev->coherent_dma_mask;
+>>>
+>>> Can you check one thing here? I believe the size argument as returned
+>>> from of_dma_get_range is inclusive (e.g. 0x100000000), while the coherent
+>>> mask by definition is exlusive (e.g. 0xffffffff), so the size needs to
+>>> be adapted here. I haven't checked all the code here though, so I may
+>>> be wrong.
+>>
+>> size returned by of_dma_get_range() is inclusive as you indicated. Fromt
+>> the grep of dma-ranges in arch/arm/boot/dts, I see
+>>
+>> arch/arm/boot/dts/keystone.dtsi:		dma-ranges =<0x80000000 0x8
+>> 0x00000000 0x80000000>;
+>> arch/arm/boot/dts/keystone.dtsi:			dma-ranges;
+>> arch/arm/boot/dts/r8a7790.dtsi:		dma-ranges =<0x42000000 0 0x40000000 0
+>> 0x40000000 0 0x80000000
+>> arch/arm/boot/dts/integratorap.dts:	dma-ranges =<0x80000000 0x0
+>> 0x80000000>;
+>> arch/arm/boot/dts/r8a7791.dtsi:		dma-ranges =<0x42000000 0 0x40000000 0
+>> 0x40000000 0 0x80000000
+>>
+>> So I guess I need to change the code to
+>>
+>>   >>  +	ret = of_dma_get_range(parent_np,&dma_addr,&paddr,&size);
+>>   >>  +	if (ret<   0) {
+>>   >>  +		dma_addr = offset = 0;
+>>   >>  +		size = dev->coherent_dma_mask + 1;
+>
+> Right.
+>
+>>>> +	} else {
+>>>> +		offset = PFN_DOWN(paddr - dma_addr);
+>>>> +		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+>>>> +	}
+>>>> +	dev->dma_pfn_offset = offset;
+>>>> +
+>>>> +	coherent = of_dma_is_coherent(parent_np);
+>>>> +	dev_dbg(dev, "device is%sdma coherent\n",
+>>>> +		coherent ? " " : " not ");
+>>>> +
+>>>> +	arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
+>>>
+>>> Basically, I would use limit the size argument we pass into
+>>> arch_setup_dma_ops to the minimum of 'size' and 'dma_mask' here,
+>>> after converting into the same format. We should make sure we do the
+>>> same thing for platform_device as well, so it might be better to do
+>>> it inside of arch_setup_dma_ops instead.
+>>
+>> Do you think following changes will work?
+>>
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64
+>> dma_base, u64 size,
+>>                           struct iommu_ops *iommu, bool coherent)
+>>    {
+>>           struct dma_map_ops *dma_ops;
+>> +       u64 temp_size = min((*(dev->dma_mask) + 1), size);
+>>
+>>           dev->archdata.dma_coherent = coherent;
+>> -       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+>> +       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
+>>
+>> If you agree, I will post v1 of the patch with these updates. Let me
+>> know. I did some basic tests on Keystone with these changes and it works
+>> fine.
+>
+> It's not exactly what I meant. My main point was that we need to limit
+> dev->dma_mask to (size-1) here, but you are not touching that.
 
-Definitely not during the next merge window. Eventually the plan is
-to remove *all* dts files from the kernel, but we're a long way
-away from that.
+if you mean overriding the dev->dma_mask to min((*dev->dma_mask), 
+size-1), then I am getting the error "Coherent DMA mask 0x7fffffff (pfn 
+0x780000-0x800000) covers a smaller range of system memory than the DMA 
+zone pfn 0x0-0x880000) when the devices on Keystone tries to set the dma 
+mask. Something wrong and I need to look into the code.
 
-There is already a mirror of the dts files at
-http://xenbits.xen.org/gitweb/?p=people/ianc/device-tree-rebasing.git;a=summary
-which is hosting files that are meant to be shared with Xen, which is
-also under the GPL, and supports a lot of the same hardware that Linux
-supports, but also depends on passing the correct (modified) dtb blobs
-to the Dom0 kernel.
+> either change the two functions in which we first assign the dma_mask
+> (platform and pci bus), or set it again in arch_setup_dma_ops (on each
+> architecture implementing it), either way would work. Someone else
+> might have a stronger opinion on that matter.
+>
+> For arm_setup_iommu_dma_ops, passing the original size is probably
+> best.
+>
+> 	Arnd
 
-The current setup works ok for Xen, but occasionally there are requests
-for having the files shared more broadly, e.g. with FreeBSD and with boot
-loaders that might be non-GPL but are used to boot Linux and that want
-to ship with a default dtb for a platform they run on.
 
-> Since all the LaCie boards DTS are at least based on my work (except for
-> the Orion ED Mini v2), I think there is 12 files concerned here. See the
-> command output: grep -l lacie *.dts | wc -l.
-> 
-> The oldest of this boards have been supported by the Linux kernel since
-> the 2.6.32 release. Also some of this boards are still widely used...
-> 
-> You know, it is quite a statement you are sending here: The GPLv2+
-> licences are not good enough to get an ARM-based board supported by
-> the Linux kernel, while it has always been the case until now. Are all
-> the maintainers SoC, ARM SoC, ARM and Linux well aligned with that ?
-
-I think you just misunderstood.
-
-> Is there any way we can keep the LaCie DTS files licenced under GPLv2+
-> _and_ still distributed with the others. Anyone would be free to choose
-> to use them (or not), in respect of the licence terms.
-
-What I suspect will happen is that we end up with multiple repositories
-for dts files, e.g. one that contains all files that are GPL-compatible
-and another one that contains the subset that is licensed under more
-permissive licenses such as the X11 or some BSD license. I don't see
-a reason for Linux to stop supporting the former, but it would be nice
-to have a larger shared subset.
-
-	Arnd
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
