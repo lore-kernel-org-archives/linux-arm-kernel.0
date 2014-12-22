@@ -1,106 +1,168 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Mon, 22 Dec 2014 09:00:45 +0530
-Subject: [PATCHv3 0/5] ARM:sunxi:ps2 Added support for A10/A20 ps2
- controller.
-In-Reply-To: <CAGb2v659jEj7cxPCu1UNPb-p6iaH6Sjcp4LCgsBOyBh-odSUhw@mail.gmail.com>
-References: <1418408748-9797-1-git-send-email-vishnupatekar0510@gmail.com>
- <548C1E7D.1000005@redhat.com>
- <CAEzqOZtyeAnG660AKf_0_gCa-+BT_pAzHk0HYYSCdm4y89GFJA@mail.gmail.com>
- <548D5207.8030004@redhat.com>
- <CAEzqOZsWSpd_r3Oc=PBVw3NQH-_1V9JXtC2H4tZ3U6nCN_Z7aA@mail.gmail.com>
- <548EFA9F.4080208@redhat.com>
- <CAGb2v659jEj7cxPCu1UNPb-p6iaH6Sjcp4LCgsBOyBh-odSUhw@mail.gmail.com>
-Message-ID: <CAEzqOZsV_KYio1EYEk885KPT0Q=HTWUOzrrzf-fB1ssJkx=e6Q@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 22 Dec 2014 10:15:46 +0530
+Subject: [PATCH 2/5] PCI: st: Add Device Tree bindings for sti pcie
+In-Reply-To: <1418812486-12394-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1418812486-12394-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <5497A1FA.1090808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for delayed response.
 
-Thanks, Chen-Yu.
-So, I'll keep ps2 enabled for Lime2 board without any comment.
 
-On Mon, Dec 15, 2014 at 9:11 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi,
+On Wednesday 17 December 2014 04:04 PM, Gabriel FERNANDEZ wrote:
+> sti pcie is built around a Synopsis Designware PCIe IP.
 >
-> On Mon, Dec 15, 2014 at 11:13 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->>
->> On 15-12-14 15:13, Vishnu Patekar wrote:
->>>
->>> Hi,
->>>
->>> On Sun, Dec 14, 2014 at 2:31 PM, Hans de Goede <hdegoede@redhat.com>
->>> wrote:
->>>>
->>>> Hi,
->>>>
->>>> On 13-12-14 21:01, Vishnu Patekar wrote:
->>>>>
->>>>>
->>>>> Hello Hans,
->>>>> Please find my comments inlined.
->>>>>
->>>>> On 12/13/14, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>>>
->>>>>>
->>>>>> Hi VishnuPatekar,
->>>>>>
->>>>>> The patch mangling for this set seems to have gone a bit wrong I'm
->>>>>> afraid
->>>>>
->>>>>
->>>>>
->>>>> No, this time I've corrected it. Infact, last version of patch did not
->>>>> used the status bit error macros.
->>>>>
->>>>>> a lot of the patches have my fixup commit messages (which should have
->>>>>> disappeared when squashing in the patches), please replace those by
->>>>>> proper
->>>>>> commit messages describing what the patch actually does.
->>>>>
->>>>>
->>>>> Yes, [PATCHv3 3/5] uses fixup. I'll correct it.
->>>>>>
->>>>>>
->>>>>>
->>>>>> Also the adding of the commented nodes for the lime2 seems to be gone
->>>>>> entirely
->>>>>> from the set, instead now only a comment about the conflict with the
->>>>>> hdmi
->>>>>> pins is added, but it is above the i2c node instead of above a ps2
->>>>>> node.
->>>>>>
->>>>> Maxime's suggested that we should not add commented nodes specially
->>>>> when its trivial to apply. And just note saying ps20 pins conflict
->>>>> with HDMI.
->>>>
->>>>
->>>>
->>>> Ah, I see.
->>>>
->>>>> Should I remove the this comment as well?
->>>>> Or
->>>>> Put this note in start of DTS file?
->>>>
->>>>
->>>>
->>>> The comment should be added to where the pinctrl bits are, not to the
->>>> lime2
->>>> file, ps0 will conflict with hdmi on all boards.
->>>
->>>
->>> Well, In that case,PS2_0 pins conflicts with HDMI, PS2_1 pins
->>> conflicts with LCD. Every pin has multiplexing.
->>
->>
->> Almost every A10 board has a hdmi connector, and only the hdmi ddc pins
->> are multiplexed, so this is sort of special, but yes if we do not have
->> the commented nodes in the dts file, then this comment can be dropped too
->> I guess.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>   Documentation/devicetree/bindings/pci/st-pcie.txt | 53 +++++++++++++++++++++++
+>   1 file changed, 53 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
 >
-> All the HDMI pins have dedicated pins. In addition, the DDC pins are
-> multiplexed. On the Lime, the dedicated pins (ball # R23, R22) are
-> used. I just checked the schematics. There should be no conflict.
+> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> new file mode 100644
+> index 0000000..bd3488f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> @@ -0,0 +1,53 @@
+> +STMicroelectronics STi PCIe controller
+> +
+> +This PCIe host controller is based on the Synopsis Designware PCIe IP
+> +and thus inherits all the common properties defined in designware-pcie.txt.
+> +
+> +Required properties:
+> + - compatible: "st,stih407-pcie"
+> + - reg: base address and length of the pcie controller, mem-window address
+> +   and length available to the controller.
+> + - interrupts: A list of interrupt outputs of the controller.
+> + - interrupt-names: Must include the following entries:
+> +   "msi": STi interrupt that is asserted when an MSI is received
+> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
+> +   offset for IP configuration.
+> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
+> +   Associated names must be "powerdown" and "softreset".
+> + - phys, phy-names: the phandle for the PHY device.
+> +   Associated name must be "pcie_phy"
+> +
+> +Optional properties:
+> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
+> +
+> +Example:
+> +
+> +pcie0: pcie at 9b00000 {
+> +	compatible = "st,stih407-pcie", "snps,dw-pcie";
+> +	device_type = "pci";
+> +	reg = <0x09b00000 0x4000>,	/* dbi cntrl registers */
+> +	      <0x2fff0000 0x00010000>,	/* configuration space */
+> +	      <0x40000000 0x80000000>;	/* lmi mem window */
+> +	reg-names = "dbi", "config", "mem-window";
+> +	st,syscfg = <&syscfg_core 0xd8 0xe0>;
+> +	#address-cells = <3>;
+> +	#size-cells = <2>;
+> +	ranges = <0x00000800 0 0x2fff0000 0x2fff0000 0 0x00010000   /* configuration space */
+
+Pass it through reg property.
+See: arch/arm/boot/dts/spear1310.dtsi or any other dw pcie's dtsi.
+
+
+@Jingoo, Mohit: I would suggest following changes so that no upcoming 
+platform can add it through ranges.
+
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 4fc03b7f1cee..f21570847d08 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -143,8 +143,7 @@
+                         #address-cells = <3>;
+                         #size-cells = <2>;
+                         device_type = "pci";
+-                       ranges = <0x00000800 0 0x01f00000 0x01f00000 0 
+0x00080000 /* configuration space */
+-                                 0x81000000 0 0          0x01f80000 0 
+0x00010000 /* downstream I/O */
++                       ranges = 0x81000000 0 0          0x01f80000 0 
+0x00010000 /* downstream I/O */
+                                   0x82000000 0 0x01000000 0x01000000 0 
+0x00f00000>; /* non-prefetchable memory */
+                         num-lanes = <1>;
+                         interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 7a24fee1e7ae..72593a77455e 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -1197,14 +1197,14 @@
+
+                 pcie: pcie at 0x08000000 {
+                         compatible = "fsl,imx6sx-pcie", "snps,dw-pcie";
+-                       reg = <0x08ffc000 0x4000>; /* DBI */
++                       reg = <0x08ffc000 0x4000>, /* DBI */
++                               <0x08f00000 0x80000>;
++                       reg-names = "dbi", "config";
+                         #address-cells = <3>;
+                         #size-cells = <2>;
+                         device_type = "pci";
+-                                 /* configuration space */
+-                       ranges = <0x00000800 0 0x08f00000 0x08f00000 0 
+0x00080000
+                                   /* downstream I/O */
+-                                 0x81000000 0 0          0x08f80000 0 
+0x00010000
++                       ranges =  0x81000000 0 0          0x08f80000 0 
+0x00010000
+                                   /* non-prefetchable memory */
+                                   0x82000000 0 0x08000000 0x08000000 0 
+0x00f00000>;
+                         num-lanes = <1>;
+diff --git a/drivers/pci/host/pcie-designware.c 
+b/drivers/pci/host/pcie-designware.c
+index df781cdf13c1..0b22b42e1ff9 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -409,19 +409,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+                         pp->mem_mod_base = of_read_number(parser.range -
+                                                           parser.np + 
+na, ns);
+                 }
+-               if (restype == 0) {
+-                       of_pci_range_to_resource(&range, np, &pp->cfg);
+-                       pp->cfg0_size = resource_size(&pp->cfg)/2;
+-                       pp->cfg1_size = resource_size(&pp->cfg)/2;
+-                       pp->cfg0_base = pp->cfg.start;
+-                       pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+-
+-                       /* Find the untranslated configuration space 
+address */
+-                       pp->cfg0_mod_base = of_read_number(parser.range -
+-                                                          parser.np + 
+na, ns);
+-                       pp->cfg1_mod_base = pp->cfg0_mod_base +
+-                                           pp->cfg0_size;
+-               }
+         }
+
+         ret = of_pci_parse_bus_range(np, &pp->busn);
+
+
+Regards
+Pratyush
+
+> +		  0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
+> +	num-lanes = <1>;
+> +	interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "msi";
+> +	#interrupt-cells = <1>;
+> +	interrupt-map-mask = <0 0 0 7>;
+> +	interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
+> +			<0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
+> +			<0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
+> +			<0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
+> +
+> +	resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
+> +		 <&softreset STIH407_PCIE0_SOFTRESET>;
+> +	reset-names = "powerdown",
+> +		      "softreset";
+> +	phys = <&phy_port0 PHY_TYPE_PCIE>;
+> +	phy-names = "pcie_phy";
+> +};
 >
-> ChenYu
