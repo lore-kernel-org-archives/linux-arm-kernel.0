@@ -1,47 +1,86 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 22 Dec 2014 11:55:31 +0100 (CET)
-Subject: [PATCH] ARM: dts: imx28-evk: remove duplicate property
-In-Reply-To: <CAOMZO5Cr2Or5O0c0xjL2Z_Gj6HDGk5vhRckVYw6Q58U+JoZOfQ@mail.gmail.com>
-References: <1412715639-9565-1-git-send-email-mhei@heimpold.de>
- <CAOMZO5Cr2Or5O0c0xjL2Z_Gj6HDGk5vhRckVYw6Q58U+JoZOfQ@mail.gmail.com>
-Message-ID: <102569001.493493.1419245731445.JavaMail.open-xchange@oxbaltgw00.schlund.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Dec 2014 10:58:56 +0000
+Subject: [PATCH v4 0/8] stable UEFI virtual mappings for kexec
+Message-ID: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+This is v4 of the series to update the UEFI memory map handling for the arm64
+architecture so that virtual mappings of UEFI Runtime Services are stable across
+kexec.
 
-[Fix Shawn's mail address]
+To de-risk the adoption of the subset of patches that are essential to get kexec
+working on UEFI systems, in this v4 I dropped all the patches related to the
+iomem resource table, /dev/mem permissions and memory attributes etc. These
+topics will be revisited asap in a separate series.
 
-> Fabio Estevam <festevam@gmail.com> hat am 8. Oktober 2014 um 02:18
-> geschrieben:
->
->
-> On Tue, Oct 7, 2014 at 6:00 PM, Michael Heimpold <mhei@heimpold.de> wrote:
-> > Seems to be a left-over from an automatic merge.
-> >
-> > Signed-off-by: Michael Heimpold <mhei@heimpold.de>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > arch/arm/boot/dts/imx28-evk.dts | 1 -
-> > 1 file changed, 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx28-evk.dts
-> > b/arch/arm/boot/dts/imx28-evk.dts
-> > index 09664fc..2944d39 100644
-> > --- a/arch/arm/boot/dts/imx28-evk.dts
-> > +++ b/arch/arm/boot/dts/imx28-evk.dts
-> > @@ -182,7 +182,6 @@
-> > };
-> >
-> > lradc at 80050000 {
-> > - fsl,lradc-touchscreen-wires = <4>;
->
-> Thanks
->
-> Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
->
+The primary changes with respect to v3 in the patches that were kept are:
+- instead of reording the memory map so that part of it can double as input
+  argument to SetVirtualAddressMap(), increase the allocation size for the
+  memory map so that we can use some of it as scratch space and use that to
+  prepare the input to SVAM() instead.
+- added some acks
+- rebased onto v3.19-rc1
 
-did you get this patch?
+NOTE: these changes trigger an issue on AMD Seattle that we (Mark Rutland and I)
+consider a firmware bug. It appears that, during the call to SVAM() (which is
+called with a 1:1 mapping as per the UEFI spec) the virtual mapping being
+installed is dereferenced prematurely. This went unnoticed in the original
+situation, as the virtual mappings were just kernel mappings that are always
+accessible. However, in the new situation, those mappings are only active
+during Runtime Service invocations, and performing any kind of access through
+them at any other time triggers a fault.
 
-Best regards
-Stefan Wahren
+============== v1 blurb ==================
+
+The main premise of these patches is that, in order to support kexec, we need
+to add code to the kernel that is able to deal with the state of the firmware
+after SetVirtualAddressMap() [SVAM] has been called. However, if we are going to
+deal with that anyway, why not make that the default state, and have only a
+single code path for both cases.
+
+This means SVAM() needs to move to the stub, and hence the code that invents
+the virtual layout needs to move with it. The result is that the kernel proper
+is entered with the virt_addr members of all EFI_MEMORY_RUNTIME regions
+assigned, and the mapping installed into the firmware. The kernel proper needs
+to set up the page tables, and switch to them while performing the runtime
+services calls. Note that there is also an efi_to_phys() to translate the values
+of the fw_vendor and tables fields of the EFI system table. Again, this is
+something we need to do anyway under kexec, or we end up handing over state
+between one kernel and the next, which implies different code paths between
+non-kexec and kexec.
+
+The layout is chosen such that it used the userland half of the virtual address
+space (TTBR0), which means no additional alignment or reservation is required
+to ensure that it will always be available.
+
+One thing that may stand out is the reordering of the memory map. The reason
+for doing this is that we can use the same memory map as input to SVAM(). The
+alternative is allocating memory for it using boot services, but that clutters
+up the existing logic a bit between getting the memory map, populating the fdt,
+and loop again if it didn't fit.
+
+Ard Biesheuvel (8):
+  arm64/mm: add explicit struct_mm argument to __create_mapping()
+  arm64/mm: add create_pgd_mapping() to create private page tables
+  efi: split off remapping code from efi_config_init()
+  efi: efistub: allow allocation alignment larger than EFI_PAGE_SIZE
+  arm64/efi: set EFI_ALLOC_ALIGN to 64 KB
+  arm64/efi: move SetVirtualAddressMap() to UEFI stub
+  arm64/efi: remove free_boot_services() and friends
+  arm64/efi: remove idmap manipulations from UEFI code
+
+ arch/arm64/include/asm/efi.h                   |  24 +-
+ arch/arm64/include/asm/mmu.h                   |   5 +-
+ arch/arm64/include/asm/pgtable.h               |   5 +
+ arch/arm64/kernel/efi.c                        | 360 ++++++++-----------------
+ arch/arm64/kernel/setup.c                      |   2 +-
+ arch/arm64/mm/mmu.c                            |  60 ++---
+ drivers/firmware/efi/efi.c                     |  49 ++--
+ drivers/firmware/efi/libstub/efi-stub-helper.c |  25 +-
+ drivers/firmware/efi/libstub/fdt.c             | 137 +++++++++-
+ include/linux/efi.h                            |   2 +
+ 10 files changed, 348 insertions(+), 321 deletions(-)
+
+-- 
+1.8.3.2
