@@ -1,94 +1,41 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 23 Dec 2014 11:48:35 +0100
-Subject: [PATCH v10 7/8] ARM: EXYNOS: Add support for non-secure L2X0 resume
+Date: Tue, 23 Dec 2014 11:48:32 +0100
+Subject: [PATCH v10 4/8] ARM: l2c: Get outer cache .write_sec callback from
+ mach_desc only if not NULL
 In-Reply-To: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
 References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1419331716-8972-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1419331716-8972-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Figa <t.figa@samsung.com>
 
-On Exynos SoCs it is necessary to resume operation of L2C early in
-assembly code, because otherwise certain systems will crash. This patch
-adds necessary code to non-secure resume handler.
+Certain platforms (i.e. Exynos) might need to set .write_sec callback
+from firmware initialization which is happenning in .init_early callback
+of machine descriptor. However current code will overwrite the pointer
+with whatever is present in machine descriptor, even though it can be
+already set earlier. This patch fixes this by making the assignment
+conditional, depending on whether current .write_sec callback is NULL.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-[rewrote the code accessing l2x0_saved_regs]
-Sigend-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-exynos/sleep.S | 46 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ arch/arm/kernel/irq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
-index e3c373082bbe..31d25834b9c4 100644
---- a/arch/arm/mach-exynos/sleep.S
-+++ b/arch/arm/mach-exynos/sleep.S
-@@ -16,6 +16,8 @@
-  */
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index ad857bada96c..350f188c92d2 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -109,7 +109,8 @@ void __init init_IRQ(void)
  
- #include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include "smc.h"
- 
- #define CPU_MASK	0xff0ffff0
-@@ -74,6 +76,45 @@ ENTRY(exynos_cpu_resume_ns)
- 	mov	r0, #SMC_CMD_C15RESUME
- 	dsb
- 	smc	#0
-+#ifdef CONFIG_CACHE_L2X0
-+	adr	r0, 1f
-+	ldr	r2, [r0]
-+	add	r0, r2, r0
-+
-+	/* Check that the address has been initialised. */
-+	ldr	r1, [r0, #L2X0_R_PHY_BASE]
-+	teq	r1, #0
-+	beq	skip_l2x0
-+
-+	/* Check if controller has been enabled. */
-+	ldr	r2, [r1, #L2X0_CTRL]
-+	tst	r2, #0x1
-+	bne	skip_l2x0
-+
-+	ldr	r1, [r0, #L2X0_R_TAG_LATENCY]
-+	ldr	r2, [r0, #L2X0_R_DATA_LATENCY]
-+	ldr	r3, [r0, #L2X0_R_PREFETCH_CTRL]
-+	mov	r0, #SMC_CMD_L2X0SETUP1
-+	smc	#0
-+
-+	/* Reload saved regs pointer because smc corrupts registers. */
-+	adr	r0, 1f
-+	ldr	r2, [r0]
-+	add	r0, r2, r0
-+
-+	ldr	r1, [r0, #L2X0_R_PWR_CTRL]
-+	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
-+	mov	r0, #SMC_CMD_L2X0SETUP2
-+	smc	#0
-+
-+	mov	r0, #SMC_CMD_L2X0INVALL
-+	smc	#0
-+
-+	mov	r1, #1
-+	mov	r0, #SMC_CMD_L2X0CTRL
-+	smc	#0
-+skip_l2x0:
-+#endif /* CONFIG_CACHE_L2X0 */
- skip_cp15:
- 	b	cpu_resume
- ENDPROC(exynos_cpu_resume_ns)
-@@ -83,3 +124,8 @@ cp15_save_diag:
- 	.globl cp15_save_power
- cp15_save_power:
- 	.long	0	@ cp15 power control
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	.align
-+1:	.long	l2x0_saved_regs - .
-+#endif /* CONFIG_CACHE_L2X0 */
+ 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
+-		outer_cache.write_sec = machine_desc->l2c_write_sec;
++		if (!outer_cache.write_sec)
++			outer_cache.write_sec = machine_desc->l2c_write_sec;
+ 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+ 				   machine_desc->l2c_aux_mask);
+ 		if (ret)
 -- 
 1.9.2
