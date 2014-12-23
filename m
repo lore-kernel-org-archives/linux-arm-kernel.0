@@ -1,23 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Dec 2014 22:03:51 +0100
-Subject: [PATCH 0/8] ARM: Conexant Digicolor CX92755 SoC support
-In-Reply-To: <cover.1419318109.git.baruch@tkos.co.il>
-References: <cover.1419318109.git.baruch@tkos.co.il>
-Message-ID: <5183218.RAoFSdq3OI@wuerfel>
+Date: Tue, 23 Dec 2014 22:07:45 +0100
+Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <72aa7f4069a000c6e39c53e328015aa3@www.loen.fr>
+References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
+ <1419321723.14341.38.camel@mtksdaap41>
+ <72aa7f4069a000c6e39c53e328015aa3@www.loen.fr>
+Message-ID: <1947751.D0rZorCFoT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 December 2014 09:58:37 Baruch Siach wrote:
-> This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
-> one of the Digicolor series of SoCs, all sharing many of the same peripherals.
-> The code was tested on the CX92755 evaluation kit, AKA Equinox.
+On Tuesday 23 December 2014 08:43:55 Marc Zyngier wrote:
 > 
-> Uses attempting to try this code will most likely also want the UART/console
-> driver available from https://patchwork.kernel.org/patch/5515861/.
+> > Neverthless, MT8173 SoC already use 0x10224000 and 0x10225000 as VGIC
+> > base address.
 > 
+> Then its fate is sealed virtualization wise.
 
-Looks very nice overall!
-
-I have replied to two of the patches, the rest looks fine to me.
+It should still work with 4kb pages on the host, right? Would that still
+allow you to have 64kb pages on the guest, or does the guest page size
+have to be smaller or equal to the host?
 
 	Arnd
