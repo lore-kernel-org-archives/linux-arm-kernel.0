@@ -1,66 +1,65 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 23 Dec 2014 17:39:24 +0100
-Subject: [PATCH RESEND] leds: netxbig: fix oops at probe time
-Message-ID: <1419352764-24316-1-git-send-email-simon.guinot@sequanux.org>
+From: orca.chen@gmail.com (Min-Hua Chen)
+Date: Wed, 24 Dec 2014 00:41:20 +0800
+Subject: [PATCH] arm64: setup return path for el1_undef
+In-Reply-To: <20141223155714.GC21816@e104818-lin.cambridge.arm.com>
+References: <CAHkaATRdNgcZnAvgKFRmiMEhLOPxFEPpjTu+XNkDk9DxG+4Fpg@mail.gmail.com>
+ <20141223155714.GC21816@e104818-lin.cambridge.arm.com>
+Message-ID: <CAHkaATSC9OZB=XcOhOR-259RUpoFX9HOkGrU6PR7ae7WBmOc_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
-this bug, a kernel oops can be observed at probe time on the LaCie 2Big
-and 5Big v2 boards:
+On Tue, Dec 23, 2014 at 11:57 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Tue, Dec 23, 2014 at 03:15:10PM +0000, Min-Hua Chen wrote:
+>> Setup return path for el1_undef since el1_undef may
+>> be handled by handlers.
+>
+> Did you find a real issue or it was just code inspection.
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000008
-[...]
-[<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
-[<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
-[<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
-[<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
-[<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
-[<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
-[<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
-[<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
-[<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
-[<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
-[...]
+Thanks for your reply. It was just a code inspection.
 
-This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
-("leds: netxbig: fix attribute-creation race").
+Min-Hua
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Cc: <stable@vger.kernel.org> # 3.17+
-Acked-by: Johan Hovold <johan@kernel.org>
----
- drivers/leds/leds-netxbig.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
-index 64fde485dcaa..4c794f15a57f 100644
---- a/drivers/leds/leds-netxbig.c
-+++ b/drivers/leds/leds-netxbig.c
-@@ -330,18 +330,18 @@ create_netxbig_led(struct platform_device *pdev,
- 	led_dat->sata = 0;
- 	led_dat->cdev.brightness = LED_OFF;
- 	led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
--	/*
--	 * If available, expose the SATA activity blink capability through
--	 * a "sata" sysfs attribute.
--	 */
--	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
--		led_dat->cdev.groups = netxbig_led_groups;
- 	led_dat->mode_addr = template->mode_addr;
- 	led_dat->mode_val = template->mode_val;
- 	led_dat->bright_addr = template->bright_addr;
- 	led_dat->bright_max = (1 << pdata->gpio_ext->num_data) - 1;
- 	led_dat->timer = pdata->timer;
- 	led_dat->num_timer = pdata->num_timer;
-+	/*
-+	 * If available, expose the SATA activity blink capability through
-+	 * a "sata" sysfs attribute.
-+	 */
-+	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
-+		led_dat->cdev.groups = netxbig_led_groups;
- 
- 	return led_classdev_register(&pdev->dev, &led_dat->cdev);
- }
--- 
-2.1.1
+>
+>> asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>> {
+>>     siginfo_t info;
+>>     void __user *pc = (void __user *)instruction_pointer(regs);
+>>
+>>     /* check for AArch32 breakpoint instructions */
+>>     if (!aarch32_break_handler(regs))
+>>         return;
+>>
+>>     if (call_undef_hook(regs) == 0)
+>>         return;
+>>
+>>     ...
+>> }
+>> Signed-off-by: Min-Hua Chen <orca.chen@gmail.com>
+>> ---
+>>  arch/arm64/kernel/entry.S |    3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index fd4fa37..86ebec5 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -313,7 +313,8 @@ el1_undef:
+>>       */
+>>      enable_dbg
+>>      mov    x0, sp
+>> -    b    do_undefinstr
+>> +    bl    do_undefinstr
+>> +    kernel_exit 1
+>>  el1_dbg:
+>>      /*
+>>       * Debug exception handling
+>
+> I don't think this is needed. The code is pretty convoluted but for an
+> EL1 undefined exception we should never return from do_undefinstr(). The
+> call_undef_hook() function returns 1 if !user_mode(regs) and this should
+> cause a kernel panic. Basically we do not allow any kind of undefined
+> instructions in the arm64 kernel.
+>
+> --
+> Catalin
