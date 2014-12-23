@@ -1,61 +1,122 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 23 Dec 2014 09:23:53 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790: add MLB+ clock
-In-Reply-To: <54989071.2060509@cogentembedded.com>
-References: <2277336.BnuIY8UiP8@wasted.cogentembedded.com>
- <20141222000610.GG29188@verge.net.au>
- <54989071.2060509@cogentembedded.com>
-Message-ID: <20141223002353.GD2817@verge.net.au>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Tue, 23 Dec 2014 01:39:47 +0100
+Subject: [PATCH] pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1
+ memories
+Message-ID: <1419295187-2081-1-git-send-email-peda@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: Peter Rosin <peda@axentia.se>
 
-On Tue, Dec 23, 2014 at 12:43:13AM +0300, Sergei Shtylyov wrote:
-> On 12/22/2014 03:06 AM, Simon Horman wrote:
-> 
-> >>From: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
-> 
-> >>Add MLB+ clock to R8A7790 device tree.
-> 
-> >>Signed-off-by: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
-> >>[Sergei: rebased, renamed, added changelog]
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>---
-> >>This patch is against 'renesas-devel-20141218-v3.18' tag of Simon Horman's
-> >>'renesas.git' repo.
-> 
-> >Thanks, I have queued this up.
-> 
->    Oops, just saw a formatting issue in this patch...
-> 
-> [...]
-> >>Index: renesas/include/dt-bindings/clock/r8a7790-clock.h
-> >>===================================================================
-> >>--- renesas.orig/include/dt-bindings/clock/r8a7790-clock.h
-> >>+++ renesas/include/dt-bindings/clock/r8a7790-clock.h
-> >>@@ -97,6 +97,7 @@
-> >>  #define R8A7790_CLK_LVDS0		26
-> >>
-> >>  /* MSTP8 */
-> >>+#define R8A7790_CLK_MLB		2
-> 
->    Need one more tab here.
-> 
-> >>  #define R8A7790_CLK_VIN3		8
-> >>  #define R8A7790_CLK_VIN2		9
-> >>  #define R8A7790_CLK_VIN1		10
-> 
->    Perhaps you still can fix it up, or I can resend? I'm not seeing this
-> patch in the 'devel' branch yet...
+The DDRSDR controller (on the ATSAMA5D31) fails miserably to put LPDDR1
+memories in self-refresh. Force the controller to think it has DDR2
+memories during the self-refresh period, as the DDR2 self-refresh spec
+is equivalent to LPDDR1, and is correctly implemented in the controller.
 
-Thanks for following up on this.
+Assume that the second controller has the same fault, and that other
+CPUs in the family has the same problem, but that is untested.
 
-I had the patch queued up locally but it seems that I forgot to push them.
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
+ include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+ 2 files changed, 39 insertions(+), 6 deletions(-)
 
-I have fixed up this patch by adding an extra tab and pushed the result.
-The result should be in renesas-devel-20141223-v3.19-rc1
-(But kernel.org seems slow today).
-
-Please let me know if I messed things up somehow.
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 20018779bae7..63a9e0b0a17d 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -143,6 +143,16 @@ ddr_sr_enable:
+ 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+ 	bne	sdr_sr_enable
+ 
++	/* LPDDR1 --> force DDR2 mode during self-refresh */
++	ldr	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
++	str	tmp1, .saved_sam9_mdr
++	bic	tmp1, tmp1, #~AT91_DDRSDRC_MD
++	cmp	tmp1, #AT91_DDRSDRC_MD_LOW_POWER_DDR
++	ldreq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
++	biceq	tmp1, tmp1, #AT91_DDRSDRC_MD
++	orreq	tmp1, tmp1, #AT91_DDRSDRC_MD_DDR2
++	streq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
++
+ 	/* prepare for DDRAM self-refresh mode */
+ 	ldr	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+ 	str	tmp1, .saved_sam9_lpr
+@@ -151,14 +161,26 @@ ddr_sr_enable:
+ 
+ 	/* figure out if we use the second ram controller */
+ 	cmp	ramc1, #0
+-	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+-	strne	tmp2, .saved_sam9_lpr1
+-	bicne	tmp2, #AT91_DDRSDRC_LPCB
+-	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
++	beq	ddr_no_2nd_ctrl
++
++	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
++	str	tmp2, .saved_sam9_mdr1
++	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
++	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
++	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
++	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
++	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
++	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
++
++	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
++	str	tmp2, .saved_sam9_lpr1
++	bic	tmp2, #AT91_DDRSDRC_LPCB
++	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+ 
+ 	/* Enable DDRAM self-refresh mode */
++	str	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
++ddr_no_2nd_ctrl:
+ 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+-	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+ 
+ 	b	sdr_sr_done
+ 
+@@ -289,12 +311,17 @@ sdr_sr_done:
+ 	 */
+ 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+ 	bne	sdr_en_restore
++	/* Restore MDR in case of LPDDR1 */
++	ldr	tmp1, .saved_sam9_mdr
++	str	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
+ 	/* Restore LPR on AT91 with DDRAM */
+ 	ldr	tmp1, .saved_sam9_lpr
+ 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+ 
+ 	/* if we use the second ram controller */
+ 	cmp	ramc1, #0
++	ldrne	tmp2, .saved_sam9_mdr1
++	strne	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+ 	ldrne	tmp2, .saved_sam9_lpr1
+ 	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+ 
+@@ -328,5 +355,11 @@ ram_restored:
+ .saved_sam9_lpr1:
+ 	.word 0
+ 
++.saved_sam9_mdr:
++	.word 0
++
++.saved_sam9_mdr1:
++	.word 0
++
+ ENTRY(at91_slow_clock_sz)
+ 	.word .-at91_slow_clock
+diff --git a/include/soc/at91/at91sam9_ddrsdr.h b/include/soc/at91/at91sam9_ddrsdr.h
+index 0210797abf2e..cd2c18787833 100644
+--- a/include/soc/at91/at91sam9_ddrsdr.h
++++ b/include/soc/at91/at91sam9_ddrsdr.h
+@@ -92,7 +92,7 @@
+ #define		AT91_DDRSDRC_UPD_MR	(3 << 20)	 /* Update load mode register and extended mode register */
+ 
+ #define AT91_DDRSDRC_MDR	0x20	/* Memory Device Register */
+-#define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
++#define		AT91_DDRSDRC_MD		(7 << 0)		/* Memory Device Type */
+ #define			AT91_DDRSDRC_MD_SDR		0
+ #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
+ #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
+-- 
+1.7.10.4
