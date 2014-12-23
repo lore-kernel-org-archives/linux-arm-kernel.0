@@ -1,50 +1,37 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 17:03:41 +0800
-Subject: [PATCH RFC v3 11/18] drm/bridge: Add Synopsys DesignWare MIPI
- DSI host controller driver
-In-Reply-To: <1770602566.921194.1419323596151.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-References: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
- <1419306399-9387-12-git-send-email-Ying.Liu@freescale.com>
- <1770602566.921194.1419323596151.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-Message-ID: <54992FED.5080908@freescale.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Tue, 23 Dec 2014 17:08:29 +0800
+Subject: [PATCH 2/2] ASoC: rockchip: i2s: set TDL and RDL to 16 bits
+In-Reply-To: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
+References: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1419325709-15374-3-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Set Transmit Data Level(TDL) and Receive Data Level(RDL) to 16 bits.
+Without this setting, the TDL is default to be 0x00 (means 1 bit),
+and the RDL is default to be 0x1f (means 16 bits).
 
-On 12/23/2014 04:33 PM, Stefan Wahren wrote:
-> Hi Liu,
->
->> Liu Ying <Ying.Liu@freescale.com> hat am 23. Dezember 2014 um 04:46
->> geschrieben:
->>
->>
->> This patch adds Synopsys DesignWare MIPI DSI host controller driver support.
->> Currently, the driver supports the burst with sync pulses mode only.
->>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> ---
->> v2->v3:
->> * Newly introduced in v3 to address Andy Yan's comment. This is based on
->> the i.MX MIPI DSI driver in v2. To make the Synopsys DesignWare MIPI DSI
->> host controller driver less platform-dependant, this patch places it at
->> the drm/bridge directory as a DRM bridge driver.
->>
->> .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt | 72 ++
->
-> please take care of [1] and send the Documentation part as a separate patch.
-> This should also apply to all the other patches from your series.
+This patch is helpful to fix pop sound, tested on rk3288 board.
 
-All right, I'll do that.
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks,
-Liu Ying
-
->
-> Thanks
->
-> Stefan
->
-> [1] -
-> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/submitting-patches.txt
->
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index c74ba37..1cd7efc 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -247,6 +247,10 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	regmap_update_bits(i2s->regmap, I2S_TXCR, I2S_TXCR_VDW_MASK, val);
+ 	regmap_update_bits(i2s->regmap, I2S_RXCR, I2S_RXCR_VDW_MASK, val);
++	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_TDL_MASK,
++			   I2S_DMACR_TDL(16));
++	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_RDL_MASK,
++			   I2S_DMACR_RDL(16));
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
