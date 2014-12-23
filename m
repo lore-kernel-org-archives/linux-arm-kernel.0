@@ -1,30 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 Dec 2014 11:43:05 +0000
-Subject: [PATCH v5 05/19] arm/arm64: KVM: introduce per-VM ops
-In-Reply-To: <1418042274-3246-6-git-send-email-andre.przywara@arm.com> (Andre
- Przywara's message of "Mon, 8 Dec 2014 12:37:40 +0000")
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
- <1418042274-3246-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <86ppba1tiu.fsf@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 23 Dec 2014 20:44:33 +0900
+Subject: [RFC PATCH 0/4] devfreq: Add generic exynos memory-bus frequency
+ driver
+Message-ID: <1419335077-31020-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08 2014 at 12:37:40 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Currently we only have one virtual GIC model supported, so all guests
-> use the same emulation code. With the addition of another model we
-> end up with different guests using potentially different vGIC models,
-> so we have to split up some functions to be per VM.
-> Introduce a vgic_vm_ops struct to hold function pointers for those
-> functions that are different and provide the necessary code to
-> initialize them.
-> Also split up the kvm_vgic_init() function to separate out VGIC model
-> specific functionality into a separate function, which will later be
-> different for a GICv3 model.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+These patch-set adds the generic exynos bus frequency driver for memory bus
+with DEVFREQ framework. The Samsung Exynos SoCs have the common architecture
+for memory bus between DRAM memory and MMC/sub IP in SoC. This driver can
+support the memory bus frequency driver for Exynos SoCs.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Each memory bus block has a clock for memory bus speed and frequency
+table which is changed according to the utilization of memory bus on runtime.
+And then each memory bus group has the one more memory bus blocks and
+OPP table (including frequency and voltage), regulator, devfreq-event
+devices.
 
-	M.
+There are a little difference about the number of memory bus because each Exynos
+SoC have the different sub-IP and different memory bus speed. In spite of this
+difference among Exynos SoCs, we can support almost Exynos SoC by adding
+unique data of memory bus to devicetree file.
+
+Chanwoo Choi (4):
+  devfreq: exynos: Add generic exynos memory bus frequency driver
+  devfreq: exynos: Add documentation for generic exynos memory bus frequency driver
+  ARM: dts: Add memory bus node for Exynos3250
+  ARM: dts: Add memory bus node for Exynos3250-based Rinato board
+
+ .../devicetree/bindings/devfreq/exynos-busfreq.txt | 184 +++++++
+ arch/arm/boot/dts/exynos3250-rinato.dts            |  12 +
+ arch/arm/boot/dts/exynos3250.dtsi                  | 137 +++++
+ drivers/devfreq/Kconfig                            |  15 +
+ drivers/devfreq/Makefile                           |   1 +
+ drivers/devfreq/exynos-busfreq.c                   | 586 +++++++++++++++++++++
+ 6 files changed, 935 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-busfreq.txt
+ create mode 100644 drivers/devfreq/exynos-busfreq.c
+
 -- 
-Jazz is not dead. It just smells funny.
+1.8.5.5
