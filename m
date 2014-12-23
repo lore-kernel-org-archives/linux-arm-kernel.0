@@ -1,57 +1,63 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Dec 2014 15:35:20 +0900
-Subject: [PATCHv5 3/9] devfreq: event: Add exynos-ppmu devfreq-event driver
-In-Reply-To: <5498F0F4.7020700@samsung.com>
-References: <1419304697-14789-1-git-send-email-cw00.choi@samsung.com>
- <1419304697-14789-4-git-send-email-cw00.choi@samsung.com>
- <CAEUmHyYnb8_HNnuz8BLhMOh01+gpXfTv63P-ubYE1DK9uptonA@mail.gmail.com>
- <5498F0F4.7020700@samsung.com>
-Message-ID: <54990D28.2050205@samsung.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 23 Dec 2014 15:30:16 +0800
+Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and
+ evaluation board dts and Makefile
+In-Reply-To: <20141217143305.GC8942@leverpostej>
+References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
+ <1418825853-10934-4-git-send-email-eddie.huang@mediatek.com>
+ <20141217143305.GC8942@leverpostej>
+Message-ID: <1419319816.14341.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Varka,
-
-On 12/23/2014 01:35 PM, Chanwoo Choi wrote:
-> On 12/23/2014 12:40 PM, Varka Bhadram wrote:
->> On Tue, Dec 23, 2014 at 8:48 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>> This patch adds exynos-ppmu devfreq-event driver to get performance data
->>> of each IP for Samsung Exynos SoC. These event from Exynos PPMU provide
->>> useful information about the behavior of the SoC that you can use when
->>> analyzing system performance, and made visible and can be counted using
->>> logic in each IP.
->>>
->>> This patch is based on existing drivers/devfreq/exynos/exynos-ppmu.c
->>>
->>> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
->>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>
-
-snip.
-
+On Wed, 2014-12-17 at 14:33 +0000, Mark Rutland wrote:
+> On Wed, Dec 17, 2014 at 02:17:32PM +0000, Eddie Huang wrote:
+> > Add device tree support for MT8173 SoC and evaluation board based on it.
+> > 
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/Makefile       |   1 +
+> >  arch/arm64/boot/dts/mt8173-evb.dts |  34 +++++++++
+> >  arch/arm64/boot/dts/mt8173.dtsi    | 152 +++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 187 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/mt8173-evb.dts
+> >  create mode 100644 arch/arm64/boot/dts/mt8173.dtsi
+> > 
+> > +	psci {
+> > +		compatible = "arm,psci";
+> > +		method = "smc";
+> > +		cpu_suspend   = <0x84000001>;
+> > +		cpu_off	      = <0x84000002>;
+> > +		cpu_on	      = <0x84000003>;
+> > +		affinity_info = <0x84000004>;
+> > +	};
 > 
->>
->>> +       }
->>> +
->>> +       data->clk_ppmu = devm_clk_get(dev, "ppmu");
->>> +       if (IS_ERR(data->clk_ppmu)) {
->>> +               data->clk_ppmu = NULL;
->>> +               dev_warn(dev, "failed to get PPMU clock\n");
->>> +       }
->> If PPMU clk get fails..?  return PTR_ERR(data->clk_ppmu)
+> There is no AFFINITY_INFO function prior to PSCI 0.2, and
+> 'affinity_info' does not exist in the "arm,psci" binding.
 > 
-> If Exynos SoC don't register the clock to clock tree, the clock remains on state.
-> So, I print just warning message.
+> I take it hotplug has been tested for all but CPU0?
 > 
-> But, It is not proper. I'll fix it.
 
-I faced on unthinkable issue. I'm implementing missing PPMU clock of Exynos3250 (PPMUDMC0, PPMUDMC1, PPMUFSYS).
-But, I can't find the parent clock of PPMUDMC0, PPMUDMC1 and the clock of PPMUFSYS on Exynos3250 datasheet.
-Like this, some PPMU clocks is not specified on Exynos SoC datasheet because some clocks should be remained
-with always-on state.
+Yes, hotplug is ok except CPU0
 
-So, I want to show just warning message if exynos-ppmu driver fail to get ppmu clock.
+> > +
+> > +		gic: interrupt-controller at 10220000 {
+> > +			compatible = "arm,gic-400";
+> > +			#interrupt-cells = <3>;
+> > +			interrupt-parent = <&gic>;
+> > +			interrupt-controller;
+> > +			reg = <0 0x10221000 0 0x1000>,
+> > +			      <0 0x10222000 0 0x1000>,
+> > +			      <0 0x10224000 0 0x2000>,
+> > +			      <0 0x10226000 0 0x2000>;
+> > +			interrupts = <1 9 0xf04>;
+> > +		};
+> 
+> I don't think these reg entries are quite right; GICC should be 8k long.
+> 
+> Marc?
+> 
+> Thanks,
+> Mark.
 
-Thanks,
-Chanwoo Choi
+Yes, GICC should be 8K long.
