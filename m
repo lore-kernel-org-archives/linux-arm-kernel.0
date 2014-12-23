@@ -1,77 +1,75 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 23 Dec 2014 09:30:45 +0200
-Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
-In-Reply-To: <1419271535-4057-1-git-send-email-balbi@ti.com>
-References: <1419271535-4057-1-git-send-email-balbi@ti.com>
-Message-ID: <54991A25.2030804@compulab.co.il>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 23 Dec 2014 09:58:38 +0200
+Subject: [PATCH 1/8] ARM: initial support for Conexant Digicolor CX92755 SoC
+In-Reply-To: <cover.1419318109.git.baruch@tkos.co.il>
+References: <cover.1419318109.git.baruch@tkos.co.il>
+Message-ID: <e705e6c9d491431ab42dbfaedef881602a87619a.1419318109.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/Kconfig                    |  2 ++
+ arch/arm/mach-digicolor/Kconfig     |  3 +++
+ arch/arm/mach-digicolor/Makefile    |  1 +
+ arch/arm/mach-digicolor/digicolor.c | 18 ++++++++++++++++++
+ 4 files changed, 24 insertions(+)
+ create mode 100644 arch/arm/mach-digicolor/Kconfig
+ create mode 100644 arch/arm/mach-digicolor/Makefile
+ create mode 100644 arch/arm/mach-digicolor/digicolor.c
 
-On 12/22/14 20:05, Felipe Balbi wrote:
-
-[...]
-
->  CONFIG_SCSI_SCAN_ASYNC=y
-> -CONFIG_ATA=y
-> -CONFIG_SATA_AHCI_PLATFORM=y
-> -CONFIG_MD=y
-> +CONFIG_ATA=m
-> +CONFIG_SATA_AHCI_PLATFORM=m
-
-Isn't this needed for the rootfs on SATA devices?
-
->  CONFIG_NETDEVICES=y
->  # CONFIG_NET_VENDOR_ARC is not set
->  # CONFIG_NET_CADENCE is not set
-> @@ -154,8 +151,8 @@ CONFIG_TI_CPSW=y
->  # CONFIG_NET_VENDOR_WIZNET is not set
->  CONFIG_AT803X_PHY=y
->  CONFIG_SMSC_PHY=y
-> -CONFIG_USB_USBNET=y
-> -CONFIG_USB_NET_SMSC95XX=y
-> +CONFIG_USB_USBNET=m
-> +CONFIG_USB_NET_SMSC95XX=m
-
-What about the NFS root for boards with only USB eth?
-
-[...]
-
->  CONFIG_DEBUG_GPIO=y
->  CONFIG_GPIO_SYSFS=y
-> -CONFIG_GPIO_TWL4030=y
-> -CONFIG_W1=y
-> +CONFIG_GPIO_TWL4030=m
-
-w/o this devices wired to twl gpios will not come up and likely
-will miss the enumeration...
-
-> -CONFIG_USB=y
-> +CONFIG_HID_GENERIC=m
-> +CONFIG_USB_HIDDEV=y
-> +CONFIG_USB_KBD=m
-> +CONFIG_USB_MOUSE=m
-> +CONFIG_USB=m
-
-So, you don't consider USB a valid rootfs storage option?
-
->  CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-> -CONFIG_USB_MON=y
-> +CONFIG_USB_MON=m
->  CONFIG_USB_XHCI_HCD=m
-> -CONFIG_USB_WDM=y
-> -CONFIG_USB_STORAGE=y
-> +CONFIG_USB_WDM=m
-> +CONFIG_USB_STORAGE=m
-> +CONFIG_USB_MUSB_HDRC=m
-> +CONFIG_USB_MUSB_OMAP2PLUS=m
-> +CONFIG_USB_MUSB_AM35X=m
-> +CONFIG_USB_MUSB_DSPS=m
-
-[...]
-
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 97d07ed60a0b..86e2202565e6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -858,6 +858,8 @@ source "arch/arm/mach-cns3xxx/Kconfig"
+ 
+ source "arch/arm/mach-davinci/Kconfig"
+ 
++source "arch/arm/mach-digicolor/Kconfig"
++
+ source "arch/arm/mach-dove/Kconfig"
+ 
+ source "arch/arm/mach-ep93xx/Kconfig"
+diff --git a/arch/arm/mach-digicolor/Kconfig b/arch/arm/mach-digicolor/Kconfig
+new file mode 100644
+index 000000000000..4830122a9dd0
+--- /dev/null
++++ b/arch/arm/mach-digicolor/Kconfig
+@@ -0,0 +1,3 @@
++config ARCH_DIGICOLOR
++	bool "Conexant Digicolor SoC Support"
++	depends on ARCH_MULTI_V7
+diff --git a/arch/arm/mach-digicolor/Makefile b/arch/arm/mach-digicolor/Makefile
+new file mode 100644
+index 000000000000..3d8a1d228408
+--- /dev/null
++++ b/arch/arm/mach-digicolor/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_DIGICOLOR)	+= digicolor.o
+diff --git a/arch/arm/mach-digicolor/digicolor.c b/arch/arm/mach-digicolor/digicolor.c
+new file mode 100644
+index 000000000000..cfc88d1caa47
+--- /dev/null
++++ b/arch/arm/mach-digicolor/digicolor.c
+@@ -0,0 +1,18 @@
++/*
++ * Support for Conexant Digicolor SoCs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <asm/mach/arch.h>
++
++static const char *digicolor_dt_compat[] __initconst = {
++	"cnxt,cx92755",
++	NULL,
++};
++
++DT_MACHINE_START(DIGICOLOR, "Conexant Digicolor (Flattened Device Tree)")
++	.dt_compat	= digicolor_dt_compat,
++MACHINE_END
 -- 
-Regards,
-Igor.
+2.1.3
