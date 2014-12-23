@@ -1,32 +1,51 @@
-From: martin.vajnar@gmail.com (Martin Vajnar)
-Date: Wed, 24 Dec 2014 00:27:57 +0100
-Subject: [PATCH] hx4700: regulator: declare full constraints
-Message-ID: <1419377277-12727-1-git-send-email-martin.vajnar@gmail.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 24 Dec 2014 08:28:58 +0900
+Subject: [PATCH] arm64: mm: Add pgd_page to support RCU fast_gup
+In-Reply-To: <20141223160113.GD21816@e104818-lin.cambridge.arm.com>
+References: <11B98DF8-2B98-414B-88E5-14C97ADAA60E@gmail.com>
+ <20141221105633.GJ23242@arm.com>
+ <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
+ <374BBC79-DD7B-4FEC-A1B3-DD6D14ED30A8@gmail.com>
+ <20141222153111.GA15240@e104818-lin.cambridge.arm.com>
+ <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
+ <0341C428-A85D-4085-9F75-893576D42A65@gmail.com>
+ <20141223160113.GD21816@e104818-lin.cambridge.arm.com>
+Message-ID: <FE34AECF-FB56-405B-B72D-C1B1BCF10D61@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the removal of CONFIG_REGULATOR_DUMMY option, the touchscreen stopped
-working. This patch enables the "replacement" for REGULATOR_DUMMY and
-allows the touchscreen to work even though there is no regulator for "vcc".
+On Dec 24, 2014, at 1:01 AM, Catalin Marinas wrote:
+> On Tue, Dec 23, 2014 at 03:37:14PM +0000, Jungseok Lee wrote:
+>> It looks like that pmd_page cannot be written using pmd_pfn unless pmd_pfn is
+>> changed since pmd_pfn masks an input value with PMD_MASK, but pmd_page does not.
+>> Additionally, I'm not sure about whether pmd_pfn with PMD_MASK works well for an
+>> user process page table.
+>> 
+>> So, my change on pmd_pfn and pmd_page is as follows. Please correct me if I am wrong.
+>> 
+>> -----8<-----
+>> 
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -294,11 +294,11 @@ void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
+>> 
+>> #define pmd_mkhuge(pmd)                (__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
+>> 
+>> -#define pmd_pfn(pmd)           (((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+>> +#define pmd_pfn(pmd)           ((pmd_val(pmd) & PHYS_MASK) >> PAGE_SHIFT)
+>> #define pfn_pmd(pfn,prot)      (__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+>> #define mk_pmd(page,prot)      pfn_pmd(page_to_pfn(page),prot)
+>> 
+>> -#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+>> +#define pmd_page(pmd)          pfn_to_page(pmd_pfn(pmd))
+>> #define pud_write(pud)         pte_write(pud_pte(pud))
+>> #define pud_pfn(pud)           (((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+> 
+> It looks like pmd_pfn() is only used for huge pages, so the original
+> code was safe. As I said, I won't do further changes here, at least not
+> for 3.19.
 
+Okay, everything is clear.
 
-Signed-off-by: Martin Vajnar <martin.vajnar@gmail.com>
----
- arch/arm/mach-pxa/hx4700.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index c66ad4e..5fb41ad 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -893,6 +893,8 @@ static void __init hx4700_init(void)
- 	mdelay(10);
- 	gpio_set_value(GPIO71_HX4700_ASIC3_nRESET, 1);
- 	mdelay(10);
-+
-+	regulator_has_full_constraints();
- }
- 
- MACHINE_START(H4700, "HP iPAQ HX4700")
--- 
-2.1.3
+Best Regards
+Jungseok Lee
