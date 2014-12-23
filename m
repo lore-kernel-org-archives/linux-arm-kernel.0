@@ -1,55 +1,43 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 23 Dec 2014 10:29:22 +0530
-Subject: clk: samsung: exynos7: Add clocks for MSCL block
-In-Reply-To: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
-References: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
-Message-ID: <5498F6AA.8010405@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 23 Dec 2014 17:32:34 +1100
+Subject: linux-next: missing merge fix patch for the merge of the
+ xen-tip tree with the arm-soc tree
+In-Reply-To: <CA+55aFwQKe0PvSuYqOeQMM8kouB3mkyQQ=gFMX=bkPx3GxanvA@mail.gmail.com>
+References: <20141208184908.27bfd605@canb.auug.org.au>
+ <20141208103328.GE27367@arm.com>
+ <20141223132605.02d81e01@canb.auug.org.au>
+ <CA+55aFwQKe0PvSuYqOeQMM8kouB3mkyQQ=gFMX=bkPx3GxanvA@mail.gmail.com>
+Message-ID: <20141223173234.7c4c45f5@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Linus,
 
-On Wednesday 17 December 2014 01:03 PM, tony nadackal wrote:
-> Add clock support for the MSCL block for Exynos7.
+On Mon, 22 Dec 2014 20:09:50 -0800 Linus Torvalds <torvalds@linux-foundation.org> wrote:
 >
-> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
->
-> ---
-> .../devicetree/bindings/clock/exynos7-clock.txt    |   1 +
->   drivers/clk/samsung/clk-exynos7.c                  | 124 +++++++++++++++++++++
->   include/dt-bindings/clock/exynos7-clk.h            |  40 ++++++-
->   3 files changed, 164 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/clock/exynos7-clock.txt b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-> index 6d3d5f8..d0e048c 100644
-> --- a/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/exynos7-clock.txt
-> @@ -34,6 +34,7 @@ Required Properties for Clock Controller:
->   	- "samsung,exynos7-clock-peris"
->   	- "samsung,exynos7-clock-fsys0"
->   	- "samsung,exynos7-clock-fsys1"
-> +	- "samsung,exynos7-clock-mscl"
->
->    - reg: physical base address of the controller and the length of
->   	memory mapped region.
-> diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
-> index a79bf23..95c1160 100644
-> --- a/drivers/clk/samsung/clk-exynos7.c
-> +++ b/drivers/clk/samsung/clk-exynos7.c
-> @@ -34,6 +34,7 @@
->   #define DIV_TOPC0		0x0600
->   #define DIV_TOPC1		0x0604
->   #define DIV_TOPC3		0x060C
-> +#define	ENABLE_ACLK_TOPC1	0x0804
+> On Mon, Dec 22, 2014 at 6:26 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> > Hi Linus,
+> >
+> > I have been carrying this merge fix patch for some time that is now
+> > needed in your tree:
+> 
+> No, it's not. Look more closely.
+> 
+> My merge put the
+> 
+>         dev->archdata.dma_coherent = coherent;
+> 
+> line at the top of the function, like the way it was in the original commit.
 
-nit: Tab space between #define and ENABLE_ACLK_TOPC1, should be removed.
+Oops, sorry about that.
 
-
-I verified register settings and clock relationships are as per UM I 
-have with me. So other than above nit, everything looks fine.
-
-Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-
-
-Thanks,
-Pankaj Dubey
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141223/5d0da7e0/attachment-0001.sig>
