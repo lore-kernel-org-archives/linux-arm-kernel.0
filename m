@@ -1,42 +1,39 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 11:46:22 +0800
-Subject: [PATCH RFC v3 01/18] clk: divider: Correct parent clk round rate if
- no bestdiv is normally found
+Date: Tue, 23 Dec 2014 11:46:27 +0800
+Subject: [PATCH RFC v3 06/18] ARM: imx6q: clk: Change hdmi_isfr clock's parent
+ to be video_27m clock
 In-Reply-To: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419306399-9387-2-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419306399-9387-7-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If no best divider is normally found, we will try to use the maximum divider.
-We should not set the parent clock rate to be 1Hz by force for being rounded.
-Instead, we should take the maximum divider as a base and calculate a correct
-parent clock rate for being rounded.
+According to the table 33-1 in the i.MX6Q reference manual, the hdmi_isfr
+clock's parent should be the video_27m clock.  The i.MX6DL reference manual
+has the same statement.  This patch changes the hdmi_isfr clock's parent
+from the pll3_pfd1_540m clock to the video_27m clock.
 
+Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v2->v3:
- * None.
+ * Newly introduced in v3.
 
-v1->v2:
- * None.
+ arch/arm/mach-imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/clk/clk-divider.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index c0a842b..f641d4b 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -311,7 +311,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 
- 	if (!bestdiv) {
- 		bestdiv = _get_maxdiv(divider);
--		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-+		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-+						MULT_ROUND_UP(rate, bestdiv));
- 	}
- 
- 	return bestdiv;
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 9470df3..f19472a 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -401,7 +401,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 		clk[IMX6QDL_CLK_GPU2D_CORE] = imx_clk_gate2("gpu2d_core", "gpu2d_core_podf", base + 0x6c, 24);
+ 	clk[IMX6QDL_CLK_GPU3D_CORE]   = imx_clk_gate2("gpu3d_core",    "gpu3d_core_podf",   base + 0x6c, 26);
+ 	clk[IMX6QDL_CLK_HDMI_IAHB]    = imx_clk_gate2("hdmi_iahb",     "ahb",               base + 0x70, 0);
+-	clk[IMX6QDL_CLK_HDMI_ISFR]    = imx_clk_gate2("hdmi_isfr",     "pll3_pfd1_540m",    base + 0x70, 4);
++	clk[IMX6QDL_CLK_HDMI_ISFR]    = imx_clk_gate2("hdmi_isfr",     "video_27m",         base + 0x70, 4);
+ 	clk[IMX6QDL_CLK_I2C1]         = imx_clk_gate2("i2c1",          "ipg_per",           base + 0x70, 6);
+ 	clk[IMX6QDL_CLK_I2C2]         = imx_clk_gate2("i2c2",          "ipg_per",           base + 0x70, 8);
+ 	clk[IMX6QDL_CLK_I2C3]         = imx_clk_gate2("i2c3",          "ipg_per",           base + 0x70, 10);
 -- 
 2.1.0
