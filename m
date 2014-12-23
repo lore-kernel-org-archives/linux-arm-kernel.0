@@ -1,68 +1,50 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 23 Dec 2014 17:55:22 -0500
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
- dma configuration
-In-Reply-To: <4513569.xuD4xkPOuC@wuerfel>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <5090769.jqAkiDgYu7@wuerfel> <5499A96D.4010704@ti.com>
- <4513569.xuD4xkPOuC@wuerfel>
-Message-ID: <5499F2DA.2090407@ti.com>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Tue, 23 Dec 2014 15:06:26 -0800
+Subject: [alsa-devel] [PATCH 2/2] ASoC: rockchip: i2s: set TDL and RDL to
+ 16 bits
+In-Reply-To: <1419325709-15374-3-git-send-email-jay.xu@rock-chips.com>
+References: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
+ <1419325709-15374-3-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <CAEUnVG79MOHUufRnJVe98ZTC4vouUNAEWtPsryEKWLc+Qpdjuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2014 05:42 PM, Arnd Bergmann wrote:
-> On Tuesday 23 December 2014 12:42:05 Murali Karicheri wrote:
->>> here.
->>
->> Arnd,
->>
->> I guess so. Besides we need to keep the default coherent dma mask to
->> 32bit 0xffffffffull as well to work on Keystone and also in sync with
->> current defaults used in pci_device_add() so that we don't break this
->> behavior.
->>
->> Here is the summary of changes need to make on top of my existing patch.
->>
->> 1. of_dma_configure() - change size = dev->coherent_dma_mask to size =
->> dev->coherent_dma_mask + 1. This is a new patch to fix existing code.
->
-> ok
->
->> 2. Do the above change to of_pci_dma_configure() as well.
->
-> ok
->
->> 3. in arch_setup_dma_ops() update the DMA mask to min((*dev->dma_mask),
->> dma_base + size - 1) as
->>
->>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index c17f6a9..88b4769 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -2053,8 +2053,13 @@ void arch_setup_dma_ops(struct device *dev, u64
->> dma_base, u64 size,
->>    {
->>           struct dma_map_ops *dma_ops;
->>
->> +
->> +       *dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
->>
->> I have tested this on keystone and it works fine with rootfs on PCI SATA
->> harddisk. I will be doing more tests with this change. If you are in
->> agreement with the above changes, I will re-spin the patch to accomodate
->> them and send v1 of the same.
->
-> Ok, sounds good. I noticed that you did not put Russell into the Cc list
-> for the emails. Please do so when you send it again, as he may have some
-> additional comments.
-Ok. Will do.
+On Tue, Dec 23, 2014 at 1:08 AM, Jianqun Xu <jay.xu@rock-chips.com> wrote:
+> Set Transmit Data Level(TDL) and Receive Data Level(RDL) to 16 bits.
+> Without this setting, the TDL is default to be 0x00 (means 1 bit),
+> and the RDL is default to be 0x1f (means 16 bits).
 
-Murali
+My impression from the TRM was that TDL and RDL were measured in
+samples.  Are you sure it's 'bits'?
+
 >
-> 	Arnd
-
-
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+> This patch is helpful to fix pop sound, tested on rk3288 board.
+>
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+>  sound/soc/rockchip/rockchip_i2s.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+> index c74ba37..1cd7efc 100644
+> --- a/sound/soc/rockchip/rockchip_i2s.c
+> +++ b/sound/soc/rockchip/rockchip_i2s.c
+> @@ -247,6 +247,10 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+>
+>         regmap_update_bits(i2s->regmap, I2S_TXCR, I2S_TXCR_VDW_MASK, val);
+>         regmap_update_bits(i2s->regmap, I2S_RXCR, I2S_RXCR_VDW_MASK, val);
+> +       regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_TDL_MASK,
+> +                          I2S_DMACR_TDL(16));
+> +       regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_RDL_MASK,
+> +                          I2S_DMACR_RDL(16));
+>
+>         return 0;
+>  }
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
