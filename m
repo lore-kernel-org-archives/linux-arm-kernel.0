@@ -1,42 +1,41 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 18:02:04 +0800
-Subject: [PATCH RFC v4 06/21] ARM: imx6q: clk: Change hdmi_isfr clock's parent
- to be video_27m clock
+Date: Tue, 23 Dec 2014 18:02:02 +0800
+Subject: [PATCH RFC v4 04/21] ARM: imx6q: Add GPR3 MIPI muxing control
+ register field shift bits definition
 In-Reply-To: <1419328939-22758-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419328939-22758-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419328939-22758-7-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419328939-22758-5-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the table 33-1 in the i.MX6Q reference manual, the hdmi_isfr
-clock's parent should be the video_27m clock.  The i.MX6DL reference manual
-has the same statement.  This patch changes the hdmi_isfr clock's parent
-from the pll3_pfd1_540m clock to the video_27m clock.
+This patch adds a macro to define the GPR3 MIPI muxing control register field
+shift bits.
 
-Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v3->v4:
  * None.
 
 v2->v3:
- * Newly introduced in v3.
+ * None.
 
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v1->v2:
+ * None.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 9470df3..f19472a 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -401,7 +401,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		clk[IMX6QDL_CLK_GPU2D_CORE] = imx_clk_gate2("gpu2d_core", "gpu2d_core_podf", base + 0x6c, 24);
- 	clk[IMX6QDL_CLK_GPU3D_CORE]   = imx_clk_gate2("gpu3d_core",    "gpu3d_core_podf",   base + 0x6c, 26);
- 	clk[IMX6QDL_CLK_HDMI_IAHB]    = imx_clk_gate2("hdmi_iahb",     "ahb",               base + 0x70, 0);
--	clk[IMX6QDL_CLK_HDMI_ISFR]    = imx_clk_gate2("hdmi_isfr",     "pll3_pfd1_540m",    base + 0x70, 4);
-+	clk[IMX6QDL_CLK_HDMI_ISFR]    = imx_clk_gate2("hdmi_isfr",     "video_27m",         base + 0x70, 4);
- 	clk[IMX6QDL_CLK_I2C1]         = imx_clk_gate2("i2c1",          "ipg_per",           base + 0x70, 6);
- 	clk[IMX6QDL_CLK_I2C2]         = imx_clk_gate2("i2c2",          "ipg_per",           base + 0x70, 8);
- 	clk[IMX6QDL_CLK_I2C3]         = imx_clk_gate2("i2c3",          "ipg_per",           base + 0x70, 10);
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index ff44374..3b0bed4 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -207,6 +207,7 @@
+ #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU1_DI1	(0x1 << 6)
+ #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI0	(0x2 << 6)
+ #define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI1	(0x3 << 6)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_SHIFT		4
+ #define IMX6Q_GPR3_MIPI_MUX_CTL_MASK		(0x3 << 4)
+ #define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI0	(0x0 << 4)
+ #define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI1	(0x1 << 4)
 -- 
 2.1.0
