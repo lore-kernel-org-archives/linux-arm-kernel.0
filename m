@@ -1,406 +1,111 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 23 Dec 2014 21:00:29 +0530
-Subject: [PATCH v2] thermal: exynos: Add TMU support for Exynos7 SoC
-Message-ID: <1419348629-4584-1-git-send-email-a.kesavan@samsung.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 24 Dec 2014 00:37:14 +0900
+Subject: [PATCH] arm64: mm: Add pgd_page to support RCU fast_gup
+In-Reply-To: <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
+References: <11B98DF8-2B98-414B-88E5-14C97ADAA60E@gmail.com>
+ <20141221105633.GJ23242@arm.com>
+ <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
+ <374BBC79-DD7B-4FEC-A1B3-DD6D14ED30A8@gmail.com>
+ <20141222153111.GA15240@e104818-lin.cambridge.arm.com>
+ <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
+Message-ID: <0341C428-A85D-4085-9F75-893576D42A65@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add registers, bit fields and compatible strings for Exynos7 TMU
-(Thermal Management Unit). Following are a few of the differences
-in the Exynos7 TMU from earlier SoCs:
-	- 8 trigger levels
-	- Different bit offsets and more registers for the rising
-	and falling thresholds.
-	- New power down detection bit in the TMU_CONTROL register
-	which does not update the CURRENT_TEMP0 when tmu power down
-	is detected.
-	- Change in bit offset for the NEXT_DATA field of EMUL_CON
-	register. EMUL_CON register address has also changed.
-	- INTSTAT and INTCLEAR registers present in earlier SoCs
-	have been combined into one INTPEND register. The register
-	address for INTCLEAR and INTPEND is also different.
-	- Since there are 8 rising/falling interrupts as against
-	at most 4 in earlier SoCs the INTEN bit offsets are different.
-	- Multiple probe support which is handled by a TMU_CONTROL1
-	register (No support for this in the current patch).
+On Dec 23, 2014, at 1:28 AM, Catalin Marinas wrote:
+> On Mon, Dec 22, 2014 at 03:31:12PM +0000, Catalin Marinas wrote:
+>> On Mon, Dec 22, 2014 at 03:11:37PM +0000, Jungseok Lee wrote:
+>>> On Dec 22, 2014, at 9:30 PM, Catalin Marinas wrote:
+>>>> On Sun, Dec 21, 2014 at 10:56:33AM +0000, Will Deacon wrote:
+>>>>> On Sat, Dec 20, 2014 at 12:49:40AM +0000, Jungseok Lee wrote:
+>>>>>> This patch adds pgd_page definition in order to keep supporting
+>>>>>> HAVE_GENERIC_RCU_GUP configuration. In addition, it changes pud_page
+>>>>>> expression to align with pmd_page for readability.
+>>>>>> 
+>>>>>> An introduction of pgd_page resolves the following build breakage
+>>>>>> under 4KB + 4Level memory management combo.
+>>>>>> 
+>>>>>> mm/gup.c: In function 'gup_huge_pgd':
+>>>>>> mm/gup.c:889:2: error: implicit declaration of function 'pgd_page' [-Werror=implicit-function-declaration]
+>>>>>> head = pgd_page(orig);
+>>>>>> ^
+>>>>>> mm/gup.c:889:7: warning: assignment makes pointer from integer without a cast
+>>>>>> head = pgd_page(orig);
+>>>>>> 
+>>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>>> Cc: Steve Capper <steve.capper@linaro.org>
+>>>>>> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+>>>>>> ---
+>>>>>> arch/arm64/include/asm/pgtable.h | 4 +++-
+>>>>>> 1 file changed, 3 insertions(+), 1 deletion(-)
+>>>>>> 
+>>>>>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>>>>>> index df22314..a1fe927 100644
+>>>>>> --- a/arch/arm64/include/asm/pgtable.h
+>>>>>> +++ b/arch/arm64/include/asm/pgtable.h
+>>>>>> @@ -401,7 +401,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>>>>>> 	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
+>>>>>> }
+>>>>>> 
+>>>>>> -#define pud_page(pud)           pmd_page(pud_pmd(pud))
+>>>>>> +#define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+>>>>> 
+>>>>> It would be cleaner to use pud_pfn here, otherwise we end up passing a
+>>>>> physical address with the lower attributes present to __phys_to_pfn, which
+>>>>> "knows" to shift them away.
+>>>> 
+>>>> It looks like we did the same with pmd_page() but not with pte_page(),
+>>>> the latter using pte_pfn().
+>>>> 
+>>>> It's not a problem with lower attributes because they are within the
+>>>> first 12 bits, so the shifting gets rid of them. For pmd/pud/pgd, bits
+>>>> above 12 and up to the actual address must be 0.
+>>>> 
+>>>> I agree with changing all of them to use pte/pmd/pud/pgd_pfn but I'm
+>>>> inclined to merge this patch now to fix the kernel build and we'll look
+>>>> at the clean-up after Christmas.
+>>> 
+>>> Either way, I'm fine.
+>> 
+>> Unless you post an updated patch quickly enough ;)
+> 
+> Actually, don't worry, I'll fold Will's suggestions into your patch. I
+> found another problem with pmd_page being defined twice.
 
-This patch adds special clock support required only for Exynos7
-and updates the bindings documentation appropriately. It also updates
-the "code_to_temp" prototype as Exynos7 has 9 bit code-temp mapping.
+Yeah. One of them should be removed.
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
-This patch is based on Lukasz Majewski's Exynos TMU work here:
-http://www.spinics.net/lists/linux-samsung-soc/msg40088.html
+I tried to rework the patch with Will's suggestion, but I've failed to figure
+out a full story of pmd_pfn and pmd_page.
 
-Changes since v1:
-	- Rebased on top of Lukasz' latest exynos tmu series.
-	- Added sclk support to patch adding Exynos7 tmu support.
-	Previously, it was a separate patch.
-	- Used the SOC type to decide if sclk is present.
+It looks like that pmd_page cannot be written using pmd_pfn unless pmd_pfn is
+changed since pmd_pfn masks an input value with PMD_MASK, but pmd_page does not.
+Additionally, I'm not sure about whether pmd_pfn with PMD_MASK works well for an
+user process page table.
 
- .../devicetree/bindings/thermal/exynos-thermal.txt |    4 +
- drivers/thermal/samsung/exynos_tmu.c               |  201 +++++++++++++++++++-
- include/dt-bindings/thermal/thermal_exynos.h       |    1 +
- 3 files changed, 197 insertions(+), 9 deletions(-)
+So, my change on pmd_pfn and pmd_page is as follows. Please correct me if I am wrong.
 
-diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-index ae738f5..7c1c6f1 100644
---- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
-@@ -12,6 +12,7 @@
- 	       "samsung,exynos5420-tmu-ext-triminfo" for TMU channels 2, 3 and 4
- 			Exynos5420 (Must pass triminfo base and triminfo clock)
- 	       "samsung,exynos5440-tmu"
-+	       "samsung,exynos7-tmu"
- - interrupt-parent : The phandle for the interrupt controller
- - reg : Address range of the thermal registers. For soc's which has multiple
- 	instances of TMU and some registers are shared across all TMU's like
-@@ -32,10 +33,13 @@
- - clocks : The main clocks for TMU device
- 	-- 1. operational clock for TMU channel
- 	-- 2. optional clock to access the shared registers of TMU channel
-+	-- 3. optional special clock for functional operation
- - clock-names : Thermal system clock name
- 	-- "tmu_apbif" operational clock for current TMU channel
- 	-- "tmu_triminfo_apbif" clock to access the shared triminfo register
- 		for current TMU channel
-+	-- "tmu_sclk" clock for functional operation of the current TMU
-+		channel
- - vtmu-supply: This entry is optional and provides the regulator node supplying
- 		voltage to TMU. If needed this entry can be placed inside
- 		board/platform specific dts file.
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 0583606..de61975 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -119,6 +119,26 @@
- #define EXYNOS5440_TMU_TH_RISE4_SHIFT		24
- #define EXYNOS5440_EFUSE_SWAP_OFFSET		8
+
+-----8<-----
+
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -294,11 +294,11 @@ void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
  
-+/* Exynos7 specific registers */
-+#define EXYNOS7_THD_TEMP_RISE7_6		0x50
-+#define EXYNOS7_THD_TEMP_FALL7_6		0x60
-+#define EXYNOS7_TMU_REG_INTEN			0x110
-+#define EXYNOS7_TMU_REG_INTPEND			0x118
-+#define EXYNOS7_TMU_REG_EMUL_CON		0x160
-+
-+#define EXYNOS7_TMU_TEMP_MASK			0x1ff
-+#define EXYNOS7_PD_DET_EN_SHIFT			23
-+#define EXYNOS7_TMU_INTEN_RISE0_SHIFT		0
-+#define EXYNOS7_TMU_INTEN_RISE1_SHIFT		1
-+#define EXYNOS7_TMU_INTEN_RISE2_SHIFT		2
-+#define EXYNOS7_TMU_INTEN_RISE3_SHIFT		3
-+#define EXYNOS7_TMU_INTEN_RISE4_SHIFT		4
-+#define EXYNOS7_TMU_INTEN_RISE5_SHIFT		5
-+#define EXYNOS7_TMU_INTEN_RISE6_SHIFT		6
-+#define EXYNOS7_TMU_INTEN_RISE7_SHIFT		7
-+#define EXYNOS7_EMUL_DATA_SHIFT			7
-+#define EXYNOS7_EMUL_DATA_MASK			0x1ff
-+
- #define MCELSIUS	1000
- /**
-  * struct exynos_tmu_data : A structure to hold the private data of the TMU
-@@ -133,6 +153,7 @@
-  * @lock: lock to implement synchronization.
-  * @clk: pointer to the clock structure.
-  * @clk_sec: pointer to the clock structure for accessing the base_second.
-+ * @sclk: pointer to the clock structure for accessing the tmu special clk.
-  * @temp_error1: fused value of the first point trim.
-  * @temp_error2: fused value of the second point trim.
-  * @regulator: pointer to the TMU regulator structure.
-@@ -152,8 +173,8 @@ struct exynos_tmu_data {
- 	int soc;
- 	struct work_struct irq_work;
- 	struct mutex lock;
--	struct clk *clk, *clk_sec;
--	u8 temp_error1, temp_error2;
-+	struct clk *clk, *clk_sec, *sclk;
-+	u16 temp_error1, temp_error2;
- 	struct regulator *regulator;
- 	struct thermal_zone_device *tzd;
+ #define pmd_mkhuge(pmd)                (__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
  
-@@ -223,7 +244,7 @@ static int temp_to_code(struct exynos_tmu_data *data, u8 temp)
-  * Calculate a temperature value from a temperature code.
-  * The unit of the temperature is degree Celsius.
-  */
--static int code_to_temp(struct exynos_tmu_data *data, u8 temp_code)
-+static int code_to_temp(struct exynos_tmu_data *data, u16 temp_code)
- {
- 	struct exynos_tmu_platform_data *pdata = data->pdata;
- 	int temp;
-@@ -513,6 +534,81 @@ static int exynos5440_tmu_initialize(struct platform_device *pdev)
- 	return ret;
- }
+-#define pmd_pfn(pmd)           (((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
++#define pmd_pfn(pmd)           ((pmd_val(pmd) & PHYS_MASK) >> PAGE_SHIFT)
+ #define pfn_pmd(pfn,prot)      (__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+ #define mk_pmd(page,prot)      pfn_pmd(page_to_pfn(page),prot)
  
-+static int exynos7_tmu_initialize(struct platform_device *pdev)
-+{
-+	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-+	struct thermal_zone_device *tz = data->tzd;
-+	struct exynos_tmu_platform_data *pdata = data->pdata;
-+	unsigned int status, trim_info;
-+	unsigned int rising_threshold = 0, falling_threshold = 0;
-+	int ret = 0, threshold_code, i;
-+	unsigned long temp, temp_hist;
-+	unsigned int reg_off, bit_off;
-+
-+	status = readb(data->base + EXYNOS_TMU_REG_STATUS);
-+	if (!status) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	trim_info = readl(data->base + EXYNOS_TMU_REG_TRIMINFO);
-+
-+	data->temp_error1 = trim_info & EXYNOS7_TMU_TEMP_MASK;
-+	if (!data->temp_error1 ||
-+		(pdata->min_efuse_value > data->temp_error1) ||
-+		(data->temp_error1 > pdata->max_efuse_value))
-+		data->temp_error1 = pdata->efuse_value & EXYNOS_TMU_TEMP_MASK;
-+
-+	/* Write temperature code for rising and falling threshold */
-+	for (i = (of_thermal_get_ntrips(tz) - 1); i >= 0; i--) {
-+		/*
-+		 * On exynos7 there are 4 rising and 4 falling threshold
-+		 * registers (0x50-0x5c and 0x60-0x6c respectively). Each
-+		 * register holds the value of two threshold levels (at bit
-+		 * offsets 0 and 16). Based on the fact that there are atmost
-+		 * eight possible trigger levels, calculate the register and
-+		 * bit offsets where the threshold levels are to be written.
-+		 *
-+		 * e.g. EXYNOS7_THD_TEMP_RISE7_6 (0x50)
-+		 * [24:16] - Threshold level 7
-+		 * [8:0] - Threshold level 6
-+		 * e.g. EXYNOS7_THD_TEMP_RISE5_4 (0x54)
-+		 * [24:16] - Threshold level 5
-+		 * [8:0] - Threshold level 4
-+		 *
-+		 * and similarly for falling thresholds.
-+		 */
-+		reg_off = ((7 - i) / 2) * 4;
-+		bit_off = ((8 - i) % 2);
-+
-+		tz->ops->get_trip_temp(tz, i, &temp);
-+		temp /= MCELSIUS;
-+
-+		tz->ops->get_trip_hyst(tz, i, &temp_hist);
-+		temp_hist = temp - (temp_hist / MCELSIUS);
-+
-+		threshold_code = temp_to_code(data, temp);
-+		rising_threshold = readl(data->base +
-+			EXYNOS7_THD_TEMP_RISE7_6 + reg_off);
-+		rising_threshold &= ~(0x1ff << (16 * bit_off));
-+		rising_threshold |= threshold_code << (16 * bit_off);
-+		writel(rising_threshold,
-+			data->base + EXYNOS7_THD_TEMP_RISE7_6 + reg_off);
-+
-+		threshold_code = temp_to_code(data, temp_hist);
-+		falling_threshold = readl(data->base +
-+			EXYNOS7_THD_TEMP_FALL7_6 + reg_off);
-+		falling_threshold &= ~(0x1ff << (16 * bit_off));
-+		falling_threshold |= threshold_code << (16 * bit_off);
-+		writel(falling_threshold,
-+			data->base + EXYNOS7_THD_TEMP_FALL7_6 + reg_off);
-+	}
-+
-+	data->tmu_clear_irqs(data);
-+out:
-+	return ret;
-+}
-+
- static void exynos4210_tmu_control(struct platform_device *pdev, bool on)
- {
- 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-@@ -573,6 +669,46 @@ static void exynos5440_tmu_control(struct platform_device *pdev, bool on)
- 	writel(con, data->base + EXYNOS5440_TMU_S0_7_CTRL);
- }
- 
-+static void exynos7_tmu_control(struct platform_device *pdev, bool on)
-+{
-+	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-+	struct thermal_zone_device *tz = data->tzd;
-+	unsigned int con, interrupt_en;
-+
-+	con = get_con_reg(data, readl(data->base + EXYNOS_TMU_REG_CONTROL));
-+
-+	if (on) {
-+		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
-+		interrupt_en =
-+			(of_thermal_is_trip_valid(tz, 7)
-+			<< EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 6)
-+			<< EXYNOS7_TMU_INTEN_RISE6_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 5)
-+			<< EXYNOS7_TMU_INTEN_RISE5_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 4)
-+			<< EXYNOS7_TMU_INTEN_RISE4_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 3)
-+			<< EXYNOS7_TMU_INTEN_RISE3_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 2)
-+			<< EXYNOS7_TMU_INTEN_RISE2_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 1)
-+			<< EXYNOS7_TMU_INTEN_RISE1_SHIFT) |
-+			(of_thermal_is_trip_valid(tz, 0)
-+			<< EXYNOS7_TMU_INTEN_RISE0_SHIFT);
-+
-+		interrupt_en |=
-+			interrupt_en << EXYNOS_TMU_INTEN_FALL0_SHIFT;
-+	} else {
-+		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
-+		interrupt_en = 0; /* Disable all interrupts */
-+	}
-+	con |= 1 << EXYNOS7_PD_DET_EN_SHIFT;
-+
-+	writel(interrupt_en, data->base + EXYNOS7_TMU_REG_INTEN);
-+	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
-+}
-+
- int exynos_get_temp(void *p, long *temp)
- {
- 	struct exynos_tmu_data *data = p;
-@@ -602,9 +738,19 @@ static u32 get_emul_con_reg(struct exynos_tmu_data *data, unsigned int val,
- 			val &= ~(EXYNOS_EMUL_TIME_MASK << EXYNOS_EMUL_TIME_SHIFT);
- 			val |= (EXYNOS_EMUL_TIME << EXYNOS_EMUL_TIME_SHIFT);
- 		}
--		val &= ~(EXYNOS_EMUL_DATA_MASK << EXYNOS_EMUL_DATA_SHIFT);
--		val |= (temp_to_code(data, temp) << EXYNOS_EMUL_DATA_SHIFT) |
--			EXYNOS_EMUL_ENABLE;
-+		if (data->soc == SOC_ARCH_EXYNOS7) {
-+			val &= ~(EXYNOS7_EMUL_DATA_MASK <<
-+				EXYNOS7_EMUL_DATA_SHIFT);
-+			val |= (temp_to_code(data, temp) <<
-+				EXYNOS7_EMUL_DATA_SHIFT) |
-+				EXYNOS_EMUL_ENABLE;
-+		} else {
-+			val &= ~(EXYNOS_EMUL_DATA_MASK <<
-+				EXYNOS_EMUL_DATA_SHIFT);
-+			val |= (temp_to_code(data, temp) <<
-+				EXYNOS_EMUL_DATA_SHIFT) |
-+				EXYNOS_EMUL_ENABLE;
-+		}
- 	} else {
- 		val &= ~EXYNOS_EMUL_ENABLE;
- 	}
-@@ -620,6 +766,8 @@ static void exynos4412_tmu_set_emulation(struct exynos_tmu_data *data,
- 
- 	if (data->soc == SOC_ARCH_EXYNOS5260)
- 		emul_con = EXYNOS5260_EMUL_CON;
-+	else if (data->soc == SOC_ARCH_EXYNOS7)
-+		emul_con = EXYNOS7_TMU_REG_EMUL_CON;
- 	else
- 		emul_con = EXYNOS_EMUL_CON;
- 
-@@ -683,6 +831,12 @@ static int exynos5440_tmu_read(struct exynos_tmu_data *data)
- 	return readb(data->base + EXYNOS5440_TMU_S0_7_TEMP);
- }
- 
-+static int exynos7_tmu_read(struct exynos_tmu_data *data)
-+{
-+	return readw(data->base + EXYNOS_TMU_REG_CURRENT_TEMP) &
-+		EXYNOS7_TMU_TEMP_MASK;
-+}
-+
- static void exynos_tmu_work(struct work_struct *work)
- {
- 	struct exynos_tmu_data *data = container_of(work,
-@@ -721,6 +875,8 @@ static void exynos4210_tmu_clear_irqs(struct exynos_tmu_data *data)
- 	if (data->soc == SOC_ARCH_EXYNOS5260) {
- 		tmu_intstat = EXYNOS5260_TMU_REG_INTSTAT;
- 		tmu_intclear = EXYNOS5260_TMU_REG_INTCLEAR;
-+	} else if (data->soc == SOC_ARCH_EXYNOS7) {
-+		tmu_intstat = tmu_intclear = EXYNOS7_TMU_REG_INTPEND;
- 	} else {
- 		tmu_intstat = EXYNOS_TMU_REG_INTSTAT;
- 		tmu_intclear = EXYNOS_TMU_REG_INTCLEAR;
-@@ -776,6 +932,9 @@ static const struct of_device_id exynos_tmu_match[] = {
- 	{
- 		.compatible = "samsung,exynos5440-tmu",
- 	},
-+	{
-+		.compatible = "samsung,exynos7-tmu",
-+	},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, exynos_tmu_match);
-@@ -897,6 +1056,13 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 		data->tmu_set_emulation = exynos5440_tmu_set_emulation;
- 		data->tmu_clear_irqs = exynos5440_tmu_clear_irqs;
- 		break;
-+	case SOC_ARCH_EXYNOS7:
-+		data->tmu_initialize = exynos7_tmu_initialize;
-+		data->tmu_control = exynos7_tmu_control;
-+		data->tmu_read = exynos7_tmu_read;
-+		data->tmu_set_emulation = exynos4412_tmu_set_emulation;
-+		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
-+		break;
- 	default:
- 		dev_err(&pdev->dev, "Platform not supported\n");
- 		return -EINVAL;
-@@ -986,27 +1152,43 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 		goto err_clk_sec;
- 	}
- 
-+	if (data->soc == SOC_ARCH_EXYNOS7) {
-+		data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
-+		if (IS_ERR(data->sclk)) {
-+			dev_err(&pdev->dev, "Failed to get sclk\n");
-+			goto err_clk;
-+		} else {
-+			ret = clk_prepare_enable(data->sclk);
-+			if (ret) {
-+				dev_err(&pdev->dev, "Failed to enable sclk\n");
-+				goto err_clk;
-+			}
-+		}
-+	}
-+
- 	ret = exynos_tmu_initialize(pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 
- 	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
- 		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 
- 	ret = exynos_tmu_initialize(pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
--		goto err_clk;
-+		goto err_sclk;
- 	}
- 	exynos_tmu_control(pdev, true);
- 	return 0;
- 
-+err_sclk:
-+	clk_disable_unprepare(data->sclk);
- err_clk:
- 	clk_unprepare(data->clk);
- err_clk_sec:
-@@ -1026,6 +1208,7 @@ static int exynos_tmu_remove(struct platform_device *pdev)
- 	thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
- 	exynos_tmu_control(pdev, false);
- 
-+	clk_disable_unprepare(data->sclk);
- 	clk_unprepare(data->clk);
- 	if (!IS_ERR(data->clk_sec))
- 		clk_unprepare(data->clk_sec);
-diff --git a/include/dt-bindings/thermal/thermal_exynos.h b/include/dt-bindings/thermal/thermal_exynos.h
-index 85789be..7099571 100644
---- a/include/dt-bindings/thermal/thermal_exynos.h
-+++ b/include/dt-bindings/thermal/thermal_exynos.h
-@@ -33,5 +33,6 @@
- #define SOC_ARCH_EXYNOS5420_TRIMINFO 6
- #define SOC_ARCH_EXYNOS5420 7
- #define SOC_ARCH_EXYNOS5440 8
-+#define SOC_ARCH_EXYNOS7 9
- 
- #endif /* _EXYNOS_THERMAL_TMU_DT_H */
--- 
-1.7.9.5
+-#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
++#define pmd_page(pmd)          pfn_to_page(pmd_pfn(pmd))
+ #define pud_write(pud)         pte_write(pud_pte(pud))
+ #define pud_pfn(pud)           (((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+
+
+Thanks for a kind response, Catalin and Will!
+
+Best Regards
+Jungseok Lee
