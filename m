@@ -1,41 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Dec 2014 10:55:06 +0000
-Subject: [PATCH] arm64: Fix SCTLR_EL1 initialisation
-In-Reply-To: <20141217173915.GF30307@arm.com>
-References: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
- <20141217173915.GF30307@arm.com>
-Message-ID: <20141223105505.GA21816@e104818-lin.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 23 Dec 2014 12:00:00 +0100
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <20141222172838.GM11502@n2100.arm.linux.org.uk>
+References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
+ <20141209165746.GA29935@kahuna> <54881589.20105@samsung.com>
+ <20141211092945.GE11502@n2100.arm.linux.org.uk> <54897528.4030804@samsung.com>
+ <20141222170411.GL11502@n2100.arm.linux.org.uk>
+ <CAGo_u6pKUj9x8sCFY0wJCVDkBjT77xetu+XZ+DqWTjEWnvZePA@mail.gmail.com>
+ <20141222172838.GM11502@n2100.arm.linux.org.uk>
+Message-ID: <54994B30.8040606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 05:39:16PM +0000, Will Deacon wrote:
-> On Wed, Dec 17, 2014 at 03:50:21PM +0000, Suzuki K. Poulose wrote:
-> > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> > 
-> > We initialise the SCTLR_EL1 value by read-modify-writeback
-> > of the desired bits, leaving the other bits (including reserved
-> > bits(RESx)) untouched. However, sometimes the boot monitor could
-> > leave garbage values in the RESx bits which could have different
-> > implications. This patch makes sure that all the bits, including
-> > the RESx bits, are set to the proper state, except for the
-> > 'endianness' control bits, EE(25) & E0E(24)- which are set early
-> > in the el2_setup.
-> > 
-> > Updated the state of the Bit[6] in the comment to RES0 in the
-> > comment.
-> > 
-> > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> 
-> Looks good to me:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Is this 3.19 material, or simply a cleanup/being cautious?
+Hello,
 
-I'll leave this for the 3.20 merging window.
+On 2014-12-22 18:28, Russell King - ARM Linux wrote:
+> On Mon, Dec 22, 2014 at 11:12:42AM -0600, Nishanth Menon wrote:
+>> On Mon, Dec 22, 2014 at 11:04 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> That only leaves the non-DT stuff to worry about this, and from what I
+>>> understand, that's going to be removed soon.  If we're going to keep
+>>> the non-DT stuff, we should implement a new machine_desc hook for it
+>>> instead of hijacking one of the existing callbacks.
+>> none of the PL310 support requires non-DT. PL310 is needed for OMAP4
+>> and AM437x both of which are DT only.
+> Right, so the simple answer for the time being is to kill most of
+> omap_l2_cache_init(), leaving just the ioremap() behind.  Everything
+> else can go into the machine_desc structures, and OMAP4 and AM437x
+> can both benefit from initialising the L2 cache at exactly the same
+> point as most other platforms.
 
+I hope I did it right: https://lkml.org/lkml/2014/12/23/158
+Please test, because I have no access to Omap hardware.
+
+Best regards
 -- 
-Catalin
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
