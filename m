@@ -1,31 +1,39 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Dec 2014 12:18:16 +0900
-Subject: [PATCHv5 8/9] ARM: dts: exynos: Add PPMU node to Exynos3250-based
- Rinato board
+Date: Tue, 23 Dec 2014 12:18:17 +0900
+Subject: [PATCHv5 9/9] ARM: dts: exynos: Add PPMU_CPU/DMC0/DMC1 node for
+ Exynos4412-based TRATS2 board
 In-Reply-To: <1419304697-14789-1-git-send-email-cw00.choi@samsung.com>
 References: <1419304697-14789-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1419304697-14789-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1419304697-14789-10-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU dt node to Exynos3250-base Rinato board. The PPMU dt node
-is used to get the utilization of DMC0/DMC1/LEFTBUS/RIGHTBUS Block.
+This patch add dt node for PPMU_CPU/DMC0/DMC1 for exynos4412-trats2 board.
+Each PPMU dt node includes one event of 'PPMU Count 3'
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-rinato.dts | 40 +++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/exynos4412-trats2.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 7789442..11942b0 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -542,6 +542,46 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index dd9ac66..9b98258 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -811,6 +811,36 @@
+ 	};
  };
  
++&ppmu_cpu {
++	status = "okay";
++
++	events {
++		ppmu_cpu_3: ppmu-event3-cpu {
++			event-name = "ppmu-event3-cpu";
++		};
++	};
++};
++
 +&ppmu_dmc0 {
 +	status = "okay";
 +
@@ -46,28 +54,8 @@ index 7789442..11942b0 100644
 +	};
 +};
 +
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &xusbxti {
- 	clock-frequency = <24000000>;
- };
+ &pinctrl_0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sleep0>;
 -- 
 1.8.5.5
