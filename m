@@ -1,5 +1,5 @@
 From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Tue, 23 Dec 2014 20:17:13 +0200
+Date: Tue, 23 Dec 2014 20:43:22 +0200
 Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
  SoC) EVMs
 In-Reply-To: <5499B0BD.5010507@oracle.com>
@@ -9,7 +9,7 @@ References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
  <54983304.3080302@ti.com> <54997AC2.1040507@linaro.org>
  <5499A823.4020704@ti.com> <5499AEFB.8060208@oracle.com>
  <5499B0BD.5010507@oracle.com>
-Message-ID: <5499B1A9.70703@linaro.org>
+Message-ID: <5499B7CA.4080905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -54,9 +54,9 @@ On 12/23/2014 08:13 PM, santosh.shilimkar at oracle.com wrote:
 >>>>>>>>>> and
 >>>>>>>>>> tried booting on keystone k2hk and k2e EVM. The boot hangs with
 >>>>>>>>>> following log. Has anyone seen this? Keystone is an ARM v7 cortex
->>>>>>>>>> A15 SMP platform. I am assuming master branch is broken for
+>>>>>>>>>> A15 SMP platform. I am assuming master branch is broken for 
 >>>>>>>>>> ARM v7
->>>>>>>>>> and someone is working to address this. v3.18 booted up fine
+>>>>>>>>>> and someone is working to address this. v3.18 booted up fine 
 >>>>>>>>>> on my
 >>>>>>>>>> EVM.
 >>>>>>>>>>
@@ -97,7 +97,7 @@ On 12/23/2014 08:13 PM, santosh.shilimkar at oracle.com wrote:
 >>>>>>> lost to
 >>>>>>>       padding on non-LPAE systems.
 >>>>>>>
->>>>>>>       Based on work by Brad Spengler, Larry Bassel, and Laura
+>>>>>>>       Based on work by Brad Spengler, Larry Bassel, and Laura 
 >>>>>>> Abbott.
 >>>>>>>
 >>>>>>>       Signed-off-by: Kees Cook<keescook@chromium.org>
@@ -139,16 +139,19 @@ On 12/23/2014 08:13 PM, santosh.shilimkar at oracle.com wrote:
 >> Uwe,
 > Sorry Uwe !!
 > I mean to ask this question to Nicolas and RMK.
->
+> 
 >> The fix looks straight forward to me. Can you please comment if you
 >> think otherwise.
 >>
->
+> 
 > Grygorii,
 > Can you please add the formatted patch to RMK's patch system ?
->
 
-Ok. I will try - I've never done it before.
+Done:
+Your patch has been accepted as patch 8253/1
+
+Please see
+        http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8253/1
 
 -- 
 regards,
