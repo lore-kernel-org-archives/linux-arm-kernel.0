@@ -1,29 +1,31 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 23 Dec 2014 17:45:49 +0100
-Subject: [PATCH v4 4/8] efi: efistub: allow allocation alignment larger
- than EFI_PAGE_SIZE
-In-Reply-To: <1419245944-2424-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141223164549.GB3810@pd.tnic>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Dec 2014 08:56:35 -0800
+Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
+In-Reply-To: <20141223161936.GA9147@saruman>
+References: <1419271535-4057-1-git-send-email-balbi@ti.com>
+ <54991A25.2030804@compulab.co.il> <20141223161936.GA9147@saruman>
+Message-ID: <20141223165634.GL23854@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 10:59:00AM +0000, Ard Biesheuvel wrote:
-> On systems with 64 KB pages, it is preferable for UEFI memory map
-> entries to be 64 KB aligned multiples of 64 KB, because it relieves
-> us of having to deal with the residues.
-> So, if EFI_ALLOC_ALIGN is #define'd by the platform, use it to round
-> up all memory allocations made.
+* Felipe Balbi <balbi@ti.com> [141223 08:22]:
+> On Tue, Dec 23, 2014 at 09:30:45AM +0200, Igor Grinberg wrote:
+> > On 12/22/14 20:05, Felipe Balbi wrote:
+> > >  CONFIG_DEBUG_GPIO=y
+> > >  CONFIG_GPIO_SYSFS=y
+> > > -CONFIG_GPIO_TWL4030=y
+> > > -CONFIG_W1=y
+> > > +CONFIG_GPIO_TWL4030=m
+> > 
+> > w/o this devices wired to twl gpios will not come up and likely
+> > will miss the enumeration...
 > 
-> Acked-by: Matt Fleming <matt.fleming@intel.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> for example ?
 
-Acked-by: Borislav Petkov <bp@suse.de>
+The TWL4030 part needs to be checked for the legacy booting to
+make sure the board-*.c file *_twl_gpio_setup() callbacks still
+work properly. Or you may want to leave it for later.
 
--- 
-Regards/Gruss,
-    Boris.
+Regards,
 
-Sent from a fat crate under my desk. Formatting is fine.
---
+Tony
