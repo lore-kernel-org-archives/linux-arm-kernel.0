@@ -1,37 +1,66 @@
-From: tony.kn@samsung.com (Tony K Nadackal)
-Date: Tue, 23 Dec 2014 13:43:28 +0530
-Subject: [PATCH] clk: samsung: exynos7: Add clocks for MSCL block
-In-Reply-To: <5498316B.9050906@samsung.com>
-References: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
- <549450A6.9020205@samsung.com> <000901d01ddc$eac0d120$c0427360$@samsung.com>
- <5498316B.9050906@samsung.com>
-Message-ID: <000301d01e88$56c8cc50$045a64f0$@samsung.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Tue, 23 Dec 2014 16:26:37 +0800
+Subject: [PATCH RFC v3 02/18] of: Add vendor prefix for Himax Technologies
+ Inc.
+In-Reply-To: <789433791.920346.1419322152848.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+References: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
+ <1419306399-9387-3-git-send-email-Ying.Liu@freescale.com>
+ <789433791.920346.1419322152848.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+Message-ID: <5499273D.3040900@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Hi Stefan,
 
-On Monday, December 22, 2014 8:28 PM Sylwester Nawrocki,
+On 12/23/2014 04:09 PM, Stefan Wahren wrote:
+> Hi Liu,
+>
+>> Liu Ying <Ying.Liu@freescale.com> hat am 23. Dezember 2014 um 04:46
+>> geschrieben:
+>>
+>>
+>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> ---
+>> v2->v3:
+>> * None.
+>>
+>> v1->v2:
+>> * None.
+>>
+>> Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>> 1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 78efebb..3cee528 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -69,6 +69,7 @@ hannstar HannStar Display Corporation
+>> haoyu Haoyu Microelectronic Co. Ltd.
+>> hisilicon Hisilicon Limited.
+>> hit Hitachi Ltd.
+>> +himax Himax Technologies, Inc.
+>
+> please fix the ordering. himax comes before hisilicon.
 
-[snip]
+Yes. I'll fix that.
 
-> I've queued this patch for 3.20. Would be nice to have a Reviewed-by tag from
-> someone else who has access to the SoC documentation though.
+Thanks,
+Liu Ying
 
-Pankaj Dubey has reviewed this patch [1].
-He has pointed out that there is an extra tab space in the patch. 
-You want me to send a revised version of this patch?
-
-[1] http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg40329.html
-
-> 
-> Is Exynos7420 User Manual applicable to this?
-> Exynos 7 (Octa?) seems like a marketing name to me. In technical documents
-> there are usually more specific names used, like exynos7410 or exynos7420.
-> 
-> --
-> Regards,
-> Sylwester
-
-Regards,
-Tony
+>
+> Thanks
+>
+> Stefan
+>
+>> honeywell Honeywell
+>> hp Hewlett Packard
+>> i2se I2SE GmbH
+>> --
+>> 2.1.0
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
