@@ -1,43 +1,57 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 23 Dec 2014 17:32:34 +1100
-Subject: linux-next: missing merge fix patch for the merge of the
- xen-tip tree with the arm-soc tree
-In-Reply-To: <CA+55aFwQKe0PvSuYqOeQMM8kouB3mkyQQ=gFMX=bkPx3GxanvA@mail.gmail.com>
-References: <20141208184908.27bfd605@canb.auug.org.au>
- <20141208103328.GE27367@arm.com>
- <20141223132605.02d81e01@canb.auug.org.au>
- <CA+55aFwQKe0PvSuYqOeQMM8kouB3mkyQQ=gFMX=bkPx3GxanvA@mail.gmail.com>
-Message-ID: <20141223173234.7c4c45f5@canb.auug.org.au>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 23 Dec 2014 15:35:20 +0900
+Subject: [PATCHv5 3/9] devfreq: event: Add exynos-ppmu devfreq-event driver
+In-Reply-To: <5498F0F4.7020700@samsung.com>
+References: <1419304697-14789-1-git-send-email-cw00.choi@samsung.com>
+ <1419304697-14789-4-git-send-email-cw00.choi@samsung.com>
+ <CAEUmHyYnb8_HNnuz8BLhMOh01+gpXfTv63P-ubYE1DK9uptonA@mail.gmail.com>
+ <5498F0F4.7020700@samsung.com>
+Message-ID: <54990D28.2050205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Varka,
 
-On Mon, 22 Dec 2014 20:09:50 -0800 Linus Torvalds <torvalds@linux-foundation.org> wrote:
->
-> On Mon, Dec 22, 2014 at 6:26 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> > Hi Linus,
-> >
-> > I have been carrying this merge fix patch for some time that is now
-> > needed in your tree:
-> 
-> No, it's not. Look more closely.
-> 
-> My merge put the
-> 
->         dev->archdata.dma_coherent = coherent;
-> 
-> line at the top of the function, like the way it was in the original commit.
+On 12/23/2014 01:35 PM, Chanwoo Choi wrote:
+> On 12/23/2014 12:40 PM, Varka Bhadram wrote:
+>> On Tue, Dec 23, 2014 at 8:48 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>> This patch adds exynos-ppmu devfreq-event driver to get performance data
+>>> of each IP for Samsung Exynos SoC. These event from Exynos PPMU provide
+>>> useful information about the behavior of the SoC that you can use when
+>>> analyzing system performance, and made visible and can be counted using
+>>> logic in each IP.
+>>>
+>>> This patch is based on existing drivers/devfreq/exynos/exynos-ppmu.c
+>>>
+>>> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+>>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
 
-Oops, sorry about that.
+snip.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141223/5d0da7e0/attachment-0001.sig>
+> 
+>>
+>>> +       }
+>>> +
+>>> +       data->clk_ppmu = devm_clk_get(dev, "ppmu");
+>>> +       if (IS_ERR(data->clk_ppmu)) {
+>>> +               data->clk_ppmu = NULL;
+>>> +               dev_warn(dev, "failed to get PPMU clock\n");
+>>> +       }
+>> If PPMU clk get fails..?  return PTR_ERR(data->clk_ppmu)
+> 
+> If Exynos SoC don't register the clock to clock tree, the clock remains on state.
+> So, I print just warning message.
+> 
+> But, It is not proper. I'll fix it.
+
+I faced on unthinkable issue. I'm implementing missing PPMU clock of Exynos3250 (PPMUDMC0, PPMUDMC1, PPMUFSYS).
+But, I can't find the parent clock of PPMUDMC0, PPMUDMC1 and the clock of PPMUFSYS on Exynos3250 datasheet.
+Like this, some PPMU clocks is not specified on Exynos SoC datasheet because some clocks should be remained
+with always-on state.
+
+So, I want to show just warning message if exynos-ppmu driver fail to get ppmu clock.
+
+Thanks,
+Chanwoo Choi
