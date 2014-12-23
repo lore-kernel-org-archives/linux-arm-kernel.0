@@ -1,33 +1,44 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 23 Dec 2014 13:09:34 +0300
-Subject: [PATCH] ARM: sa1100: clear RCSR_SMR on resume
-Message-ID: <1419329374-4372-1-git-send-email-dbaryshkov@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 23 Dec 2014 15:41:12 +0530
+Subject: [PATCH 2/2] ARM: dts: DRA7X: drop id property in pcie_phy
+In-Reply-To: <1418721771-31184-3-git-send-email-vigneshr@ti.com>
+References: <1418721771-31184-1-git-send-email-vigneshr@ti.com>
+ <1418721771-31184-3-git-send-email-vigneshr@ti.com>
+Message-ID: <54993FC0.3090705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-StrongARM core uses RCSR SMR bit to tell to bootloader that it was reset
-by entering the sleep mode. After we have resumed, there is little point
-in having that bit enabled. Moreover, if this bit is set before reboot,
-the bootloader can become confused. Thus clear the SMR bit on resume
-just before clearing the scratchpad (resume address) register.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/pm.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-sa1100/pm.c b/arch/arm/mach-sa1100/pm.c
-index 6645d1e..34853d5 100644
---- a/arch/arm/mach-sa1100/pm.c
-+++ b/arch/arm/mach-sa1100/pm.c
-@@ -81,6 +81,7 @@ static int sa11x0_pm_enter(suspend_state_t state)
- 	/*
- 	 * Ensure not to come back here if it wasn't intended
- 	 */
-+	RCSR = RCSR_SMR;
- 	PSPR = 0;
- 
- 	/*
--- 
-2.1.3
+On Tuesday 16 December 2014 02:52 PM, Vignesh R wrote:
+> Since phyid is no longer used by pcie driver, this field can be dropped
+> from the DT.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 63bf99be1762..889e3023e68f 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1111,7 +1111,6 @@
+>  					      "wkupclk", "refclk",
+>  					      "div-clk", "phy-div";
+>  				#phy-cells = <0>;
+> -				id = <1>;
+>  				ti,hwmods = "pcie1-phy";
+>  			};
+>  
+> @@ -1132,7 +1131,6 @@
+>  					      "div-clk", "phy-div";
+>  				#phy-cells = <0>;
+>  				ti,hwmods = "pcie2-phy";
+> -				id = <2>;
+>  				status = "disabled";
+>  			};
+>  		};
+> 
