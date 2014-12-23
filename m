@@ -1,47 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Dec 2014 16:01:13 +0000
-Subject: [PATCH] arm64: mm: Add pgd_page to support RCU fast_gup
-In-Reply-To: <0341C428-A85D-4085-9F75-893576D42A65@gmail.com>
-References: <11B98DF8-2B98-414B-88E5-14C97ADAA60E@gmail.com>
- <20141221105633.GJ23242@arm.com>
- <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
- <374BBC79-DD7B-4FEC-A1B3-DD6D14ED30A8@gmail.com>
- <20141222153111.GA15240@e104818-lin.cambridge.arm.com>
- <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
- <0341C428-A85D-4085-9F75-893576D42A65@gmail.com>
-Message-ID: <20141223160113.GD21816@e104818-lin.cambridge.arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 23 Dec 2014 10:05:24 -0600
+Subject: regression: OMAP4 (next-20141204) (bisect to: ARM: 8208/1: l2c:
+ Refactor the driver to use commit-like)
+In-Reply-To: <20141223111045.GN11502@n2100.arm.linux.org.uk>
+References: <5481D913.9040109@ti.com> <5481D9BF.2090007@ti.com>
+ <20141209165746.GA29935@kahuna> <54881589.20105@samsung.com>
+ <20141211092945.GE11502@n2100.arm.linux.org.uk>
+ <54897528.4030804@samsung.com>
+ <20141222170411.GL11502@n2100.arm.linux.org.uk>
+ <CAGo_u6pKUj9x8sCFY0wJCVDkBjT77xetu+XZ+DqWTjEWnvZePA@mail.gmail.com>
+ <20141222172838.GM11502@n2100.arm.linux.org.uk>
+ <54994B30.8040606@samsung.com>
+ <20141223111045.GN11502@n2100.arm.linux.org.uk>
+Message-ID: <549992C4.7000603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 23, 2014 at 03:37:14PM +0000, Jungseok Lee wrote:
-> It looks like that pmd_page cannot be written using pmd_pfn unless pmd_pfn is
-> changed since pmd_pfn masks an input value with PMD_MASK, but pmd_page does not.
-> Additionally, I'm not sure about whether pmd_pfn with PMD_MASK works well for an
-> user process page table.
+On 12/23/2014 05:10 AM, Russell King - ARM Linux wrote:
+> On Tue, Dec 23, 2014 at 12:00:00PM +0100, Marek Szyprowski wrote:
+>> I hope I did it right: https://lkml.org/lkml/2014/12/23/158
+>> Please test, because I have no access to Omap hardware.
 > 
-> So, my change on pmd_pfn and pmd_page is as follows. Please correct me if I am wrong.
+> Patch 1/8 looks like I'd expect it to.  Nishanth, please test with your
+> failing scenario, thanks.
 > 
-> -----8<-----
-> 
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -294,11 +294,11 @@ void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
->  
->  #define pmd_mkhuge(pmd)                (__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
->  
-> -#define pmd_pfn(pmd)           (((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-> +#define pmd_pfn(pmd)           ((pmd_val(pmd) & PHYS_MASK) >> PAGE_SHIFT)
->  #define pfn_pmd(pfn,prot)      (__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
->  #define mk_pmd(page,prot)      pfn_pmd(page_to_pfn(page),prot)
->  
-> -#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
-> +#define pmd_page(pmd)          pfn_to_page(pmd_pfn(pmd))
->  #define pud_write(pud)         pte_write(pud_pte(pud))
->  #define pud_pfn(pud)           (((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+3.19-rc1
+ 1:                      am437x-sk: BOOT: PASS:
+http://slexy.org/raw/s2ARFeCcDp
+ 2:                    am43xx-epos: BOOT: PASS:
+http://slexy.org/raw/s2Kzli0GYS
+ 3:                   am43xx-gpevm: BOOT: PASS:
+http://slexy.org/raw/s2DMkJGmdF
+ 4:                  pandaboard-es: BOOT: PASS:
+http://slexy.org/raw/s204jfptrr
+ 5:             pandaboard-vanilla: BOOT: PASS:
+http://slexy.org/raw/s2cbd82pMI
+ 6:                        sdp4430: BOOT: PASS:
+http://slexy.org/raw/s21bzlzUNr
+TOTAL = 6 boards, Booted Boards = 6, No Boot boards = 0
 
-It looks like pmd_pfn() is only used for huge pages, so the original
-code was safe. As I said, I won't do further changes here, at least not
-for 3.19.
+
+against the patch series: (all am437x platforms fail)
+
+testing
+ 1:                      am437x-sk: BOOT: FAIL:
+http://slexy.org/raw/s2yhDXyF7o
+ 2:                    am43xx-epos: BOOT: FAIL:
+http://slexy.org/raw/s2m9cSdt55
+ 3:                   am43xx-gpevm: BOOT: FAIL:
+http://slexy.org/raw/s2MqFFBuIl
+ 4:                  pandaboard-es: BOOT: PASS:
+http://slexy.org/raw/s2XwggyB0a
+ 5:             pandaboard-vanilla: BOOT: PASS:
+http://slexy.org/raw/s25WDvtbob
+ 6:                        sdp4430: BOOT: PASS:
+http://slexy.org/raw/s2gjynR1Co
+TOTAL = 6 boards, Booted Boards = 3, No Boot boards = 3
+
+I am trying to understand what is different in AM437x except that it
+is a single A9 instead of OMAP4 style dual A9s.
 
 -- 
-Catalin
+Regards,
+Nishanth Menon
