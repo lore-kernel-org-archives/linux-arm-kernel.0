@@ -1,114 +1,51 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 23 Dec 2014 12:42:05 -0500
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
- dma configuration
-In-Reply-To: <5090769.jqAkiDgYu7@wuerfel>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <54989DDE.3060409@ti.com> <1723662.JYr5muIJha@wuerfel>
- <5090769.jqAkiDgYu7@wuerfel>
-Message-ID: <5499A96D.4010704@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Dec 2014 17:51:10 +0000
+Subject: [GIT PULL] arm64 fixes for 3.19
+Message-ID: <20141223175102.GA9562@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/2014 06:07 PM, Arnd Bergmann wrote:
-> On Monday 22 December 2014 23:44:52 Arnd Bergmann wrote:
->> On Monday 22 December 2014 17:40:30 Murali Karicheri wrote:
->>> On 12/22/2014 05:24 PM, Arnd Bergmann wrote:
->>>> On Monday 22 December 2014 16:40:43 Murali Karicheri wrote:
->>>>>>> +++ b/arch/arm/mm/dma-mapping.c
->>>>>>> @@ -2052,9 +2052,10 @@ void arch_setup_dma_ops(struct device *dev, u64
->>>>>>> dma_base, u64 size,
->>>>>>>                             struct iommu_ops *iommu, bool coherent)
->>>>>>>      {
->>>>>>>             struct dma_map_ops *dma_ops;
->>>>>>> +       u64 temp_size = min((*(dev->dma_mask) + 1), size);
->>>>>>>
->>>>>>>             dev->archdata.dma_coherent = coherent;
->>>>>>> -       if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
->>>>>>> +       if (arm_setup_iommu_dma_ops(dev, dma_base, temp_size, iommu))
->>>>>>>
->>>>>>> If you agree, I will post v1 of the patch with these updates. Let me
->>>>>>> know. I did some basic tests on Keystone with these changes and it works
->>>>>>> fine.
->>>>>>
->>>>>> It's not exactly what I meant. My main point was that we need to limit
->>>>>> dev->dma_mask to (size-1) here, but you are not touching that.
->>>>>
->>>>> if you mean overriding the dev->dma_mask to min((*dev->dma_mask),
->>>>> size-1), then I am getting the error "Coherent DMA mask 0x7fffffff (pfn
->>>>> 0x780000-0x800000) covers a smaller range of system memory than the DMA
->>>>> zone pfn 0x0-0x880000) when the devices on Keystone tries to set the dma
->>>>> mask. Something wrong and I need to look into the code.
->>>>
->>>> Right, it sounds like the offset was applied incorrectly at some point.
->>>>
->>>> What are the DMA zone size and the phys-offset?
->>> 2G and 0x8_0000_0000. This limit the usable DMA size to 2G on Keystone,
->>> I believe you shouldn't be limiting the dma mask to size-1 in this case,
->>> right? The DT setup the dma-range to have a size of 2G (0x80000000).
->>
->> No, the problem is something else: the pfn range that we calculate for the
->> coherent DMA mask should have been 0x800000-0x880000, not 0x780000-0x800000,
->> so we would exactly match the ZONE_DMA.
->
-> I gave it some more thought, and concluded that the size that gets passed
-> down is not really the right value to be compared to a mask if the dma-capable
-> area starts at a nonzero bus address.
->
-> In your case, bus addresses 0x80000000-0xffffffff are valid for DMA, so
-> the mask must be 0xffffffff to forbid any DMA to addresses larger than
-> 0x100000000, not 0x7fffffff which would not be enough to cover any RAM.
->
-> I guess the dma_mask should be 'min((*dev->dma_mask), dma_base + size - 1)'
-> here.
+Hi Linus,
 
-Arnd,
+Please pull the arm64 fixes below. Thanks.
 
-I guess so. Besides we need to keep the default coherent dma mask to 
-32bit 0xffffffffull as well to work on Keystone and also in sync with 
-current defaults used in pci_device_add() so that we don't break this 
-behavior.
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-Here is the summary of changes need to make on top of my existing patch.
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-1. of_dma_configure() - change size = dev->coherent_dma_mask to size = 
-dev->coherent_dma_mask + 1. This is a new patch to fix existing code.
+are available in the git repository at:
 
-2. Do the above change to of_pci_dma_configure() as well.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-3. in arch_setup_dma_ops() update the DMA mask to min((*dev->dma_mask), 
-dma_base + size - 1) as
+for you to fetch changes up to 5d96e0cba26323c3daeb9f7cdfd4efe70985e2c6:
 
+  arm64: mm: Add pgd_page to support RCU fast_gup (2014-12-23 16:39:17 +0000)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index c17f6a9..88b4769 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2053,8 +2053,13 @@ void arch_setup_dma_ops(struct device *dev, u64 
-dma_base, u64 size,
-  {
-         struct dma_map_ops *dma_ops;
+----------------------------------------------------------------
+arm64 fixes:
+- __cpu_suspend mm switching fix after warm boot
+- arch_setup_dma_ops implementation
+- pgd_page compilation error fix
+- defconfig updates
 
-+
-+       *dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
+----------------------------------------------------------------
+Catalin Marinas (1):
+      arm64: Replace set_arch_dma_coherent_ops with arch_setup_dma_ops
 
-I have tested this on keystone and it works fine with rootfs on PCI SATA 
-harddisk. I will be doing more tests with this change. If you are in 
-agreement with the above changes, I will re-spin the patch to accomodate 
-them and send v1 of the same.
+Jungseok Lee (1):
+      arm64: mm: Add pgd_page to support RCU fast_gup
 
-Regards,
+Lorenzo Pieralisi (1):
+      arm64: kernel: fix __cpu_suspend mm switch on warm-boot
 
-Murali
+Will Deacon (1):
+      arm64: defconfig: defconfig update for 3.19
 
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+ arch/arm64/configs/defconfig         |  9 +++++----
+ arch/arm64/include/asm/dma-mapping.h | 11 ++++++-----
+ arch/arm64/include/asm/pgtable.h     |  5 +++--
+ arch/arm64/kernel/suspend.c          | 14 +++++++++++++-
+ 4 files changed, 27 insertions(+), 12 deletions(-)
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Catalin
