@@ -1,44 +1,27 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 11:46:39 +0800
-Subject: [PATCH RFC v3 18/18] ARM: imx_v6_v7_defconfig: Add support for Himax
- HX8369A panel
-In-Reply-To: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
-References: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419306399-9387-19-git-send-email-Ying.Liu@freescale.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 22 Dec 2014 20:09:50 -0800
+Subject: linux-next: missing merge fix patch for the merge of the xen-tip
+ tree with the arm-soc tree
+In-Reply-To: <20141223132605.02d81e01@canb.auug.org.au>
+References: <20141208184908.27bfd605@canb.auug.org.au>
+ <20141208103328.GE27367@arm.com>
+ <20141223132605.02d81e01@canb.auug.org.au>
+Message-ID: <CA+55aFwQKe0PvSuYqOeQMM8kouB3mkyQQ=gFMX=bkPx3GxanvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Himax HX8369A panel.
+On Mon, Dec 22, 2014 at 6:26 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Linus,
+>
+> I have been carrying this merge fix patch for some time that is now
+> needed in your tree:
 
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm menuconfig and manually choose to build in
-  the Himax HX8369A panel driver
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+No, it's not. Look more closely.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
-v2->v3:
- * None.
+My merge put the
 
-v1->v2:
- * Add the HIMAX prefix in the Kconfig name.
+        dev->archdata.dma_coherent = coherent;
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+line at the top of the function, like the way it was in the original commit.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 3e0e589..27db91b 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -192,6 +192,7 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_PANEL_HIMAX_HX8369A=y
- CONFIG_DRM_IMX=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
--- 
-2.1.0
+                            Linus
