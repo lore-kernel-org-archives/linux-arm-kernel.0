@@ -1,26 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 Dec 2014 11:58:56 +0000
-Subject: [PATCH v5 07/19] arm/arm64: KVM: dont rely on a valid GICH base
- address
-In-Reply-To: <1418042274-3246-8-git-send-email-andre.przywara@arm.com> (Andre
- Przywara's message of "Mon, 8 Dec 2014 12:37:42 +0000")
-References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
- <1418042274-3246-8-git-send-email-andre.przywara@arm.com>
-Message-ID: <86h9wm1ssf.fsf@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 23 Dec 2014 13:00:48 +0100
+Subject: [PATCH]  bluetooth: Add hci_h4p driver
+In-Reply-To: <D5E3AD8F-9122-49FE-B932-F9DDBB89840F@holtmann.org>
+References: <20141213223727.GA13894@amd> <20141220202314.GA8484@amd>
+ <D5E3AD8F-9122-49FE-B932-F9DDBB89840F@holtmann.org>
+Message-ID: <20141223120048.GA848@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 08 2014 at 12:37:42 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> To check whether the vGIC was already initialized, we currently check
-> the GICH base address for not being NULL. Since with GICv3 we may
-> get along without this address, lets use the irqchip_in_kernel()
-> function to detect an already initialized vGIC.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi!
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > +	/* We should always send word aligned data to h4+ devices */
+> > +	if (skb->len % 2) {
+> > +		err = skb_pad(skb, 1);
+> > +		if (!err)
+> > +			*skb_put(skb, 1) = 0x00;
+> > +	}
+> > +	if (err)
+> > +		return err;
+> 
+> This is crazy code.
+> 
+> 	if (skb->len % 2) {
+> 		if (!skb_pad(skb, 1)
+> 			return -ENOMEM;
+> 		*skb_put(skb, 1) = 0x00;
+> 	}
 
-	M.
+This does not work, it needs to be if (skb_pad())... and it does not
+propagate error value. Took me few boots to debug, as I still can't
+scroll back after kernel crash...
+								Pavel
 -- 
-Jazz is not dead. It just smells funny.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
