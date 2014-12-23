@@ -1,105 +1,110 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 18:02:11 +0800
-Subject: [PATCH RFC v4 13/21] Documentation: dt-bindings: Add bindings for
- i.MX specific Synopsys DW MIPI DSI driver
-In-Reply-To: <1419328939-22758-1-git-send-email-Ying.Liu@freescale.com>
-References: <1419328939-22758-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419328939-22758-14-git-send-email-Ying.Liu@freescale.com>
+From: d.safonov@partner.samsung.com (Dmitry Safonov)
+Date: Tue, 23 Dec 2014 13:00:13 +0300
+Subject: [RFC][PATCH RESEND] mm: vmalloc: remove ioremap align constraint
+Message-ID: <1419328813-2211-1-git-send-email-d.safonov@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree bindings for i.MX specific Synopsys DW MIPI DSI driver.
+ioremap uses __get_vm_area_node which sets alignment to fls of requested size.
+I couldn't find any reason for such big align. Does it decrease TLB misses?
+I tested it on custom ARM board with 200+ Mb of ioremap and it works.
+What am I missing?
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+Alignment restriction for ioremap region was introduced with the commit:
+
+> Author: James Bottomley <jejb@mulgrave.(none)>
+> Date:   Wed Jun 30 11:11:14 2004 -0500
+> 
+>     Add vmalloc alignment constraints
+> 
+>     vmalloc is used by ioremap() to get regions for
+>     remapping I/O space.  To feed these regions back
+>     into a __get_free_pages() type memory allocator,
+>     they are expected to have more alignment than
+>     get_vm_area() proves.  So add additional alignment
+>     constraints for VM_IOREMAP.
+> 
+>     Signed-off-by: James Bottomley <James.Bottomley@SteelEye.com>
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: James Bottomley <JBottomley@parallels.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Dyasly Sergey <s.dyasly@samsung.com>
+Signed-off-by: Dmitry Safonov <d.safonov@partner.samsung.com>
 ---
-v3->v4:
- * Newly introduced in v4.  This is separated from the relevant driver patch
-   in v3 to address Stefan Wahren's comment.
+ arch/arm/include/asm/memory.h       | 5 -----
+ arch/unicore32/include/asm/memory.h | 5 -----
+ include/linux/vmalloc.h             | 8 --------
+ mm/vmalloc.c                        | 2 --
+ 4 files changed, 20 deletions(-)
 
- .../devicetree/bindings/drm/imx/mipi_dsi.txt       | 75 ++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
-
-diff --git a/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt b/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
-new file mode 100644
-index 0000000..93cc4ef
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
-@@ -0,0 +1,75 @@
-+i.MX specific Device-Tree bindings for Synopsys DesignWare MIPI DSI host controller
-+
-+MIPI DSI host controller
-+========================
-+
-+The MIPI DSI host controller is a Synopsys DesignWare IP.
-+The common device tree documentation for this controller can be found
-+at [1].
-+
-+Required properties:
-+ - #address-cells: Should be <1>.
-+ - #size-cells: Should be <0>.
-+ - compatible: The compatible string should be "fsl,imx6q-mipi-dsi"
-+   for i.MX6q/sdl SoCs.
-+ - reg: Physical base address of the controller and length of memory
-+   mapped region.
-+ - interrupts: The controller's interrupt number to the CPU(s).
-+ - gpr: Should be <&gpr>.
-+   The phandle points to the iomuxc-gpr region containing the
-+   multiplexer control register for the controller.
-+ - clocks, clock-names: Phandles to the controller pllref, pllref_gate
-+   and core_cfg clocks, as described in [2] and [3].
-+
-+Required sub-nodes:
-+ - ports: This node may contain up to four port nodes with endpoint
-+   definitions as defined in [4], corresponding to the four inputs to
-+   the controller multiplexer.
-+ - A node to represent a DSI peripheral as described in [5].
-+
-+[1] Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt.
-+[2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[3] Documentation/devicetree/bindings/clock/imx6q-clock.txt
-+[4] Documentation/devicetree/bindings/media/video-interfaces.txt
-+[5] Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
-+
-+example:
-+	gpr: iomuxc-gpr at 020e0000 {
-+		/* ... */
-+	};
-+
-+	mipi_dsi: mipi at 021e0000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,imx6q-mipi-dsi";
-+		reg = <0x021e0000 0x4000>;
-+		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
-+		gpr = <&gpr>;
-+		clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
-+			 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
-+		clock-names = "pllref", "core_cfg";
-+
-+		ports {
-+			port at 0 {
-+				reg = <0>;
-+
-+				mipi_mux_0: endpoint {
-+					remote-endpoint = <&ipu1_di0_mipi>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				mipi_mux_1: endpoint {
-+					remote-endpoint = <&ipu1_di1_mipi>;
-+				};
-+			};
-+		};
-+
-+		panel {
-+			compatible = "truly,tft480800-16-e-dsi";
-+			reg = <0>;
-+			/* ... */
-+		};
-+	};
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 184def0..b333245 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -78,11 +78,6 @@
+  */
+ #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
+ 
+-/*
+- * Allow 16MB-aligned ioremap pages
+- */
+-#define IOREMAP_MAX_ORDER	24
+-
+ #else /* CONFIG_MMU */
+ 
+ /*
+diff --git a/arch/unicore32/include/asm/memory.h b/arch/unicore32/include/asm/memory.h
+index debafc4..ffae189 100644
+--- a/arch/unicore32/include/asm/memory.h
++++ b/arch/unicore32/include/asm/memory.h
+@@ -46,11 +46,6 @@
+ #define MODULES_END		(PAGE_OFFSET)
+ 
+ /*
+- * Allow 16MB-aligned ioremap pages
+- */
+-#define IOREMAP_MAX_ORDER	24
+-
+-/*
+  * Physical vs virtual RAM address space conversion.  These are
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+index b87696f..2f428e8 100644
+--- a/include/linux/vmalloc.h
++++ b/include/linux/vmalloc.h
+@@ -18,14 +18,6 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
+ #define VM_UNINITIALIZED	0x00000020	/* vm_struct is not fully initialized */
+ /* bits [20..32] reserved for arch specific ioremap internals */
+ 
+-/*
+- * Maximum alignment for ioremap() regions.
+- * Can be overriden by arch-specific value.
+- */
+-#ifndef IOREMAP_MAX_ORDER
+-#define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
+-#endif
+-
+ struct vm_struct {
+ 	struct vm_struct	*next;
+ 	void			*addr;
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 39c3388..c4f480dd 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1313,8 +1313,6 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
+ 	struct vm_struct *area;
+ 
+ 	BUG_ON(in_interrupt());
+-	if (flags & VM_IOREMAP)
+-		align = 1ul << clamp(fls(size), PAGE_SHIFT, IOREMAP_MAX_ORDER);
+ 
+ 	size = PAGE_ALIGN(size);
+ 	if (unlikely(!size))
 -- 
-2.1.0
+1.9.1
