@@ -1,32 +1,91 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 23 Dec 2014 11:07:48 -0800
-Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
- SoC) EVMs
-In-Reply-To: <5499B7CA.4080905@linaro.org>
-References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
- <CANMBJr5T6SJFiw4HwvK0cfJsyrM8WTPU6_aK0uzznEV4Mqcg3w@mail.gmail.com>
- <5494B932.6060602@ti.com> <20141221102925.GJ10857@pengutronix.de>
- <54983304.3080302@ti.com> <54997AC2.1040507@linaro.org>
- <5499A823.4020704@ti.com> <5499AEFB.8060208@oracle.com>
- <5499B0BD.5010507@oracle.com> <5499B7CA.4080905@linaro.org>
-Message-ID: <5499BD84.2040904@oracle.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 23 Dec 2014 21:49:04 +0100
+Subject: [PATCH] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20141223152325.75e8cb4a@concha.lan.sisa.samsung.com>
+References: <20141203214641.GA1390@amd>
+ <20141223152325.75e8cb4a@concha.lan.sisa.samsung.com>
+Message-ID: <20141223204903.GA1780@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue 2014-12-23 15:23:25, Mauro Carvalho Chehab wrote:
+> Em Wed, 3 Dec 2014 22:46:41 +0100
+> Pavel Machek <pavel@ucw.cz> escreveu:
+> 
+> > 
+> > We are moving to device tree support on OMAP3, but that currently
+> > breaks ADP1653 driver. This adds device tree support, plus required
+> > documentation.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> Please be sure to check your patch with checkpatch. There are several
+> issues on it:
 
+> WARNING: DT compatible string "adi,adp1653" appears un-documented -- check ./Documentation/devicetree/bindings/
+> #78: FILE: arch/arm/boot/dts/omap3-n900.dts:572:
+> +		compatible = "adi,adp1653";
 
-On 12/23/14 10:43 AM, Grygorii.Strashko at linaro.org wrote:
-> On 12/23/2014 08:13 PM, santosh.shilimkar at oracle.com wrote:
+Hmm. Take a look at part quoted below. Someone needs to fix
+checkpatch. Ccing authors.
 
-[..]
+> ERROR: trailing whitespace
+> WARNING: line over 80 characters
 
->> Grygorii,
->> Can you please add the formatted patch to RMK's patch system ?
->
-> Done:
-> Your patch has been accepted as patch 8253/1
->
-Thanks Grygorii !!
+Will fix.
 
-Regards,
-Santosh
+> ERROR: trailing statements should be on next line
+> #177: FILE: drivers/media/i2c/adp1653.c:454:
+> +	if (!child) return -EINVAL;
+
+I actually did these on purporse... the function is trivial, and by
+keeping returns on one line it fits into screen. I see you want it
+fixed below, so I'll do that for next version.
+
+								Pavel
+
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+> > @@ -0,0 +1,38 @@
+> > +* Analog Devices ADP1653 flash LED driver
+> > +
+> > +Required Properties:
+> > +
+> > +  - compatible: Must contain one of the following
+> > +    - "adi,adp1653"
+> > +
+> > +  - reg: I2C slave address
+> > +
+> > +  - gpios: References to the GPIO that controls the power for the chip.
+> > +
+> > +There are two led outputs available - flash and indicator. One led is
+> > +represented by one child node, nodes need to be named "flash" and "indicator".
+> > +
+> > +Required properties of the LED child node:
+> > +- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> > +
+> > +Required properties of the flash LED child node:
+> > +
+> > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> > +- flash-timeout-microsec : see Documentation/devicetree/bindings/leds/common.txt
+> > +
+> > +Example:
+> > +
+> > +        adp1653: led-controller at 30 {
+> > +                compatible = "adi,adp1653";
+> > +		reg = <0x30>;
+> > +                gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> > +
+> > +		flash {
+> > +                        flash-timeout-microsec = <500000>;
+> > +                        flash-max-microamp = <320000>;
+> > +                        max-microamp = <50000>;
+> > +		};
+> > +                indicator {
+> > +                        max-microamp = <17500>;
+> > +		};
+> > +        };
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
