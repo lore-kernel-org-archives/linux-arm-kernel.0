@@ -1,201 +1,168 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 23 Dec 2014 09:58:44 +0200
-Subject: [PATCH 7/8] clocksource: driver for Conexant Digicolor SoC timer
+Date: Tue, 23 Dec 2014 09:58:42 +0200
+Subject: [PATCH 5/8] irqchip: Conexant CX92755 interrupts controller driver
 In-Reply-To: <cover.1419318109.git.baruch@tkos.co.il>
 References: <cover.1419318109.git.baruch@tkos.co.il>
-Message-ID: <0e981c4f437df8754b55f96d1e8a720eb3facbc1.1419318109.git.baruch@tkos.co.il>
+Message-ID: <7997c913e9f6debc09fd62c788b8ac6bd330d4f3.1419318109.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-digicolor/Kconfig       |   1 +
- drivers/clocksource/Makefile          |   1 +
- drivers/clocksource/timer-digicolor.c | 155 ++++++++++++++++++++++++++++++++++
- 3 files changed, 157 insertions(+)
- create mode 100644 drivers/clocksource/timer-digicolor.c
+ drivers/irqchip/Makefile        |   1 +
+ drivers/irqchip/irq-digicolor.c | 135 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 136 insertions(+)
+ create mode 100644 drivers/irqchip/irq-digicolor.c
 
-diff --git a/arch/arm/mach-digicolor/Kconfig b/arch/arm/mach-digicolor/Kconfig
-index 4830122a9dd0..1e53f684a522 100644
---- a/arch/arm/mach-digicolor/Kconfig
-+++ b/arch/arm/mach-digicolor/Kconfig
-@@ -1,3 +1,4 @@
- config ARCH_DIGICOLOR
- 	bool "Conexant Digicolor SoC Support"
- 	depends on ARCH_MULTI_V7
-+	select CLKSRC_MMIO
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b24b56b..a993c108be67 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-+obj-$(CONFIG_ARCH_DIGICOLOR)	+= timer-digicolor.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
-diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 9516a324be6d..42965d2476bb 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -42,3 +42,4 @@ obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
+ obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
+ obj-$(CONFIG_MIPS_GIC)			+= irq-mips-gic.o
+ obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
++obj-$(CONFIG_ARCH_DIGICOLOR)		+= irq-digicolor.o
+diff --git a/drivers/irqchip/irq-digicolor.c b/drivers/irqchip/irq-digicolor.c
 new file mode 100644
-index 000000000000..16dc17894276
+index 000000000000..9970090821a9
 --- /dev/null
-+++ b/drivers/clocksource/timer-digicolor.c
-@@ -0,0 +1,155 @@
++++ b/drivers/irqchip/irq-digicolor.c
+@@ -0,0 +1,135 @@
 +/*
-+ * Conexant Digicolor timer driver
++ * Conexant Digicolor SoCs IRQ chip driver
 + *
 + * Author: Baruch Siach <baruch@tkos.co.il>
 + *
 + * Copyright (C) 2014 Paradox Innovation Ltd.
-+ *
-+ * Based on:
-+ *	Allwinner SoCs hstimer driver
-+ *
-+ * Copyright (C) 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2.  This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+/*
-+ * Conexant Digicolor SoCs have 8 configurable timers, named from "Timer A" to
-+ * "Timer H". Timer A is the only one with watchdog support, so it is dedicated
-+ * to the watchdog driver. This driver uses Timer B for sched_clock(), and
-+ * Timer C for clockevents.
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
++#include <linux/io.h>
 +#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/sched_clock.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/of_irq.h>
 +
-+#define AC_TIMER_B_CONTROL	0x0fc8
-+#define AC_TIMER_B_COUNT_LO	0x0fcc
-+#define AC_TIMER_C_CONTROL	0x0fd0
-+#define AC_TIMER_C_COUNT_LO	0x0fd4
++#include <asm/exception.h>
 +
-+static void __iomem *timer_base;
-+static u32 ticks_per_jiffy;
++#include "irqchip.h"
 +
-+static void digicolor_clkevt_mode(enum clock_event_mode mode,
-+				  struct clock_event_device *clk)
++#define UC_IRQ_CONTROL		0x03a4
++
++#define IC_FLAG_CLEAR_LO	0x40
++#define IC_INT0ENABLE_LO	0x50
++#define IC_INT0ENABLE_XLO	0x54
++#define IC_INT0STATUS_LO	0x58
++#define IC_INT0STATUS_XLO	0x5c
++
++static void __iomem *digicolor_irq_base;
++static struct irq_domain *digicolor_irq_domain;
++
++static void __exception_irq_entry digicolor_handle_irq(struct pt_regs *regs)
 +{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		writeb(0, timer_base + AC_TIMER_C_CONTROL);
-+		writel(ticks_per_jiffy, timer_base + AC_TIMER_C_COUNT_LO);
-+		writeb(0x21, timer_base + AC_TIMER_C_CONTROL);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writeb(0, timer_base + AC_TIMER_C_CONTROL);
-+		writeb(0x11, timer_base + AC_TIMER_C_CONTROL);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		writeb(0, timer_base + AC_TIMER_C_CONTROL);
-+		break;
-+	}
++	u32 status, hwirq;
++
++	do {
++		status = readl(digicolor_irq_base + IC_INT0STATUS_LO);
++		if (status) {
++			hwirq = ffs(status) - 1;
++		} else {
++			status = readl(digicolor_irq_base + IC_INT0STATUS_XLO);
++			if (status)
++				hwirq = ffs(status) - 1 + 32;
++			else
++				return;
++		}
++
++		handle_domain_irq(digicolor_irq_domain, hwirq, regs);
++	} while (1);
 +}
 +
-+static int digicolor_clkevt_next_event(unsigned long evt,
-+				       struct clock_event_device *unused)
++static void digicolor_irq_ack(struct irq_data *irqd)
 +{
-+	writeb(0, timer_base + AC_TIMER_C_CONTROL);
-+	writel(evt, timer_base + AC_TIMER_C_COUNT_LO);
-+	writeb(0x11, timer_base + AC_TIMER_C_CONTROL);
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 8;
++	int reg = irq / 8;
++
++	writeb(BIT(irq_off), digicolor_irq_base + IC_FLAG_CLEAR_LO + reg);
++}
++
++static void digicolor_irq_mask(struct irq_data *irqd)
++{
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 8;
++	int reg = irq / 8;
++	u8 val;
++
++	val = readb(digicolor_irq_base + IC_INT0ENABLE_LO + reg);
++	writeb(val & ~BIT(irq_off),
++	       digicolor_irq_base + IC_INT0ENABLE_LO + reg);
++}
++
++static void digicolor_irq_unmask(struct irq_data *irqd)
++{
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 8;
++	int reg = irq / 8;
++	u8 val;
++
++	val = readb(digicolor_irq_base + IC_INT0ENABLE_LO + reg);
++	writeb(val | BIT(irq_off),
++	       digicolor_irq_base + IC_INT0ENABLE_LO + reg);
++}
++
++static struct irq_chip digicolor_irq_chip = {
++	.name		= "digicolor_irq",
++	.irq_ack	= digicolor_irq_ack,
++	.irq_mask	= digicolor_irq_mask,
++	.irq_unmask	= digicolor_irq_unmask,
++};
++
++static int digicolor_irq_map(struct irq_domain *d, unsigned int virq,
++			 irq_hw_number_t hw)
++{
++	irq_set_chip_and_handler(virq, &digicolor_irq_chip, handle_level_irq);
++	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
 +
 +	return 0;
 +}
 +
-+static struct clock_event_device digicolor_clockevent = {
-+	.name = "digicolor_tick",
-+	.rating = 340,
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode = digicolor_clkevt_mode,
-+	.set_next_event = digicolor_clkevt_next_event,
++static struct irq_domain_ops digicolor_irq_ops = {
++	.map = digicolor_irq_map,
++	.xlate = irq_domain_xlate_onecell,
 +};
 +
-+
-+static irqreturn_t digicolor_timer_interrupt(int irq, void *dev_id)
++static int __init digicolor_of_init(struct device_node *node,
++				struct device_node *parent)
 +{
-+	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction digicolor_timer_irq = {
-+	.name = "digicolor_timerC",
-+	.flags = IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler = digicolor_timer_interrupt,
-+	.dev_id = &digicolor_clockevent,
-+};
-+
-+static u64 digicolor_timer_sched_read(void)
-+{
-+	return ~readl(timer_base + AC_TIMER_B_COUNT_LO);
-+}
-+
-+static void __init digicolor_timer_init(struct device_node *node)
-+{
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	timer_base = of_iomap(node, 0);
-+	if (!timer_base) {
-+		pr_err("Can't map registers");
-+		return;
++	digicolor_irq_base = of_iomap(node, 0);
++	if (!digicolor_irq_base) {
++		pr_err("%s: unable to map IC registers\n", node->full_name);
++		return -ENXIO;
 +	}
 +
-+	irq = irq_of_parse_and_map(node, 2); /* Timer C */
-+	if (irq <= 0) {
-+		pr_err("Can't parse IRQ");
-+		return;
++	/* disable all interrupts */
++	writel(0, digicolor_irq_base + IC_INT0ENABLE_LO);
++	writel(0, digicolor_irq_base + IC_INT0ENABLE_XLO);
++
++	/* channel 1, regular IRQs */
++	writeb(1, digicolor_irq_base + UC_IRQ_CONTROL);
++
++	digicolor_irq_domain = irq_domain_add_linear(node, 64,
++						     &digicolor_irq_ops, NULL);
++	if (!digicolor_irq_domain) {
++		pr_err("%s: unable to create IRQ domain\n", node->full_name);
++		return -ENOMEM;
 +	}
 +
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("Can't get timer clock");
-+		return;
-+	}
-+	clk_prepare_enable(clk);
-+	rate = clk_get_rate(clk);
++	set_handle_irq(digicolor_handle_irq);
 +
-+	writeb(0, timer_base + AC_TIMER_B_CONTROL);
-+	writel(~0, timer_base + AC_TIMER_B_COUNT_LO);
-+	writeb(1, timer_base + AC_TIMER_B_CONTROL);
-+
-+	sched_clock_register(digicolor_timer_sched_read, 32, rate);
-+	clocksource_mmio_init(timer_base + AC_TIMER_B_COUNT_LO, node->name,
-+			      rate, 340, 32, clocksource_mmio_readl_down);
-+
-+	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-+
-+	ret = setup_irq(irq, &digicolor_timer_irq);
-+	if (ret)
-+		pr_warn("failed to setup timer irq %d (%d)\n", irq, ret);
-+
-+	digicolor_clockevent.cpumask = cpu_possible_mask;
-+	digicolor_clockevent.irq = irq;
-+
-+	clockevents_config_and_register(&digicolor_clockevent, rate, 0,
-+					0xffffffff);
++	return 0;
 +}
-+CLOCKSOURCE_OF_DECLARE(conexant_digicolor, "cnxt,cx92755-timer",
-+		       digicolor_timer_init);
++IRQCHIP_DECLARE(conexant_digicolor_ic, "cnxt,cx92755-ic", digicolor_of_init);
 -- 
 2.1.3
