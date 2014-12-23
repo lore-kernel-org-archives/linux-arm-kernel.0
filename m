@@ -1,104 +1,116 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Wed, 24 Dec 2014 10:13:29 +1300
-Subject: [RFC/PATCHv2 2/5] ARM: mvebu: use dt_fixup to provide fallback for
- enable-method
+Date: Wed, 24 Dec 2014 10:13:30 +1300
+Subject: [RFC/PATCHv2 3/5] clk: mvebu: armada-xp: Support for 98DX4251
 In-Reply-To: <1419369212-17047-1-git-send-email-chris.packham@alliedtelesis.co.nz>
 References: <1419369212-17047-1-git-send-email-chris.packham@alliedtelesis.co.nz>
-Message-ID: <1419369212-17047-3-git-send-email-chris.packham@alliedtelesis.co.nz>
+Message-ID: <1419369212-17047-4-git-send-email-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the device tree doesn't define an enable-method insert a property
-into the flattened device tree. arm_dt_init_cpu_maps() will then parse
-this an set smp_ops appropriately. Now that we have this fallback it is
-no longer necessary to set .smp in the DT_MACHINE definition.
-Additionally Armada 370, which is a single core device, no longer has any
-smp operations defined.
+The 98DX4251 is one of a range of packet processors with integrated CPUs
+based on armada-xp. One difference is that the TCLK frequency is fixed
+at 200MHz as opposed to the fixed 250MHz used on armada-xp. Additionally
+the clock-gating options are a subset of what's available on the
+armada-xp.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
-As Arnd and Maxime suggested this replaces the unconditional setting of
-smp_ops[1] with a fixup that inserts an appropriate property in the
-device-tree if needed. It turned out not to be terribly tricky to
-implement that checked each possible CPU node. One assumption I've made
-is that the cpu nodes are numbered contiguously but that seems to be
-reasonable.
+As per Thomas' and Andrews comments I've made this specific to the
+98DX4251 and separated out the gating definitions. It should be good for
+other variants of what Marvell call "MSYS" but I don't have access to
+any to test with.
 
-[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309766.html
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304387.html
 
- arch/arm/mach-mvebu/board-v7.c | 42 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 41 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |  4 +++
+ drivers/clk/mvebu/armada-xp.c                      | 35 ++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index d0d39f1..08eb6a9 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -17,6 +17,8 @@
- #include <linux/clk-provider.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-+#include <linux/of_fdt.h>
-+#include <linux/libfdt.h>
- #include <linux/io.h>
- #include <linux/clocksource.h>
- #include <linux/dma-mapping.h>
-@@ -198,6 +200,44 @@ static void __init mvebu_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+index dc5ea5b..503849e 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+@@ -34,6 +34,9 @@ The following is a list of provided IDs and clock names on Orion5x:
+  1 = cpuclk (CPU0 clock)
+  2 = ddrclk (DDR controller clock derived from CPU0 clock)
+ 
++The following is a list of provided IDs and clock names on MV98DX4251:
++ 0 = tclk   (Internal Bus clock)
++
+ Required properties:
+ - compatible : shall be one of the following:
+ 	"marvell,armada-370-core-clock" - For Armada 370 SoC core clocks
+@@ -46,6 +49,7 @@ Required properties:
+ 	"marvell,mv88f5182-core-clock" - for Orion MV88F5182 SoC
+ 	"marvell,mv88f5281-core-clock" - for Orion MV88F5281 SoC
+ 	"marvell,mv88f6183-core-clock" - for Orion MV88F6183 SoC
++	"marvell,mv98dx4251-core-clock" - for MV98DX4251 SoC
+ - reg : shall be the register address of the Sample-At-Reset (SAR) register
+ - #clock-cells : from common clock binding; shall be set to 1
+ 
+diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
+index b309431..eb17817 100644
+--- a/drivers/clk/mvebu/armada-xp.c
++++ b/drivers/clk/mvebu/armada-xp.c
+@@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
+ 	return 250000000;
  }
  
-+static void __init armada_370_xp_dt_fixup(void)
++/* MV98DX4251 TCLK frequency is fixed to 200MHz */
++static u32 __init mv98dx4251_get_tclk_freq(void __iomem *sar)
 +{
-+	int offset, node;
-+	int i, len;
-+	void *prop;
-+	char buffer[20];
-+	unsigned long root = of_get_flat_dt_root();
-+
-+	if (!IS_ENABLED(CONFIG_SMP) ||
-+	    !of_flat_dt_is_compatible(root, "marvell,armadaxp"))
-+		return;
-+
-+	offset = fdt_path_offset(initial_boot_params, "/cpus");
-+	if (offset < 0)
-+		return;
-+
-+	prop = fdt_getprop(initial_boot_params, offset, "enable-method", &len);
-+	if (prop)
-+		return;
-+
-+	for (i = 0; i < NR_CPUS; i++) {
-+		snprintf(buffer, sizeof(buffer), "cpu@%d", i);
-+		node = fdt_subnode_offset(initial_boot_params, offset, buffer);
-+		if (node < 0)
-+			break;
-+		prop = fdt_getprop(initial_boot_params, node,
-+				   "enable-method", &len);
-+		if (prop)
-+			return;
-+	}
-+
-+	pr_info("No enable-method defined. "
-+		"Falling back to \"marvell,armada-xp-smp\"\n");
-+
-+	fdt_setprop(initial_boot_params, offset, "enable-method",
-+		    "marvell,armada-xp-smp", sizeof("marvell,armada-xp-smp"));
++	return 200000000;
 +}
 +
- static const char * const armada_370_xp_dt_compat[] = {
- 	"marvell,armada-370-xp",
- 	NULL,
-@@ -206,11 +246,11 @@ static const char * const armada_370_xp_dt_compat[] = {
- DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= mvebu_dt_init,
- 	.init_irq       = mvebu_init_irq,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_370_xp_dt_compat,
-+	.dt_fixup	= armada_370_xp_dt_fixup,
- MACHINE_END
+ static const u32 axp_cpu_freqs[] __initconst = {
+ 	1000000000,
+ 	1066000000,
+@@ -158,6 +164,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
+ 	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
+ };
  
- static const char * const armada_375_dt_compat[] = {
++static const struct coreclk_soc_desc mv98dx4251_coreclks = {
++	.get_tclk_freq = mv98dx4251_get_tclk_freq,
++	.get_cpu_freq = axp_get_cpu_freq,
++	.get_clk_ratio = axp_get_clk_ratio,
++	.ratios = axp_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
++};
++
+ /*
+  * Clock Gating Control
+  */
+@@ -195,6 +209,15 @@ static const struct clk_gating_soc_desc axp_gating_desc[] __initconst = {
+ 	{ }
+ };
+ 
++static const struct clk_gating_soc_desc mv98dx4251_gating_desc[] __initconst = {
++	{ "ge1", NULL, 3, 0 },
++	{ "ge0", NULL, 4, 0 },
++	{ "pex00", NULL, 5, 0 },
++	{ "sdio", NULL, 17, 0 },
++	{ "xor0", NULL, 22, 0 },
++	{ }
++};
++
+ static void __init axp_clk_init(struct device_node *np)
+ {
+ 	struct device_node *cgnp =
+@@ -206,3 +229,15 @@ static void __init axp_clk_init(struct device_node *np)
+ 		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
+ }
+ CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
++
++static void __init mv98dx4251_clk_init(struct device_node *np)
++{
++	struct device_node *cgnp =
++		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
++
++	mvebu_coreclk_setup(np, &mv98dx4251_coreclks);
++
++	if (cgnp)
++		mvebu_clk_gating_setup(cgnp, mv98dx4251_gating_desc);
++}
++CLK_OF_DECLARE(mv98dx4251_clk, "marvell,mv98dx4251-core-clock", mv98dx4251_clk_init);
 -- 
 2.2.0.rc0
