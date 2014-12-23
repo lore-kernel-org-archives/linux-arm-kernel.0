@@ -1,95 +1,30 @@
-From: mma@objectxp.com (Michel Marti)
-Date: Tue, 23 Dec 2014 12:41:43 +0100
-Subject: [PATCH] ARM: at91/dt: keep watchdog running in idle mode
-Message-ID: <549954F7.9070009@objectxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 Dec 2014 11:43:05 +0000
+Subject: [PATCH v5 05/19] arm/arm64: KVM: introduce per-VM ops
+In-Reply-To: <1418042274-3246-6-git-send-email-andre.przywara@arm.com> (Andre
+ Przywara's message of "Mon, 8 Dec 2014 12:37:40 +0000")
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+ <1418042274-3246-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <86ppba1tiu.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since turning on idle-halt in commit fe46aa679, SoCs compatible with
-the sam9 watchdog no longer reboot if the wdt times out. Removing the
-'idle-halt' flag fixes this.
+On Mon, Dec 08 2014 at 12:37:40 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Currently we only have one virtual GIC model supported, so all guests
+> use the same emulation code. With the addition of another model we
+> end up with different guests using potentially different vGIC models,
+> so we have to split up some functions to be per VM.
+> Introduce a vgic_vm_ops struct to hold function pointers for those
+> functions that are different and provide the necessary code to
+> initialize them.
+> Also split up the kvm_vgic_init() function to separate out VGIC model
+> specific functionality into a separate function, which will later be
+> different for a GICv3 model.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Signed-off-by: Michel Marti <mma@objectxp.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi | 1 -
- arch/arm/boot/dts/at91sam9263.dtsi | 1 -
- arch/arm/boot/dts/at91sam9g45.dtsi | 1 -
- arch/arm/boot/dts/at91sam9n12.dtsi | 1 -
- arch/arm/boot/dts/at91sam9x5.dtsi  | 1 -
- arch/arm/boot/dts/sama5d3.dtsi     | 1 -
- 6 files changed, 6 deletions(-)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index dd1313c..184e1d1 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -971,7 +971,6 @@
-                 atmel,watchdog-type = "hardware";
-                 atmel,reset-type = "all";
-                 atmel,dbg-halt;
--                atmel,idle-halt;
-                 status = "disabled";
-             };
- 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 1467750..c39556b 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -874,7 +874,6 @@
-                 atmel,watchdog-type = "hardware";
-                 atmel,reset-type = "all";
-                 atmel,dbg-halt;
--                atmel,idle-halt;
-                 status = "disabled";
-             };
- 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 2a8da8a..b8d741d 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1111,7 +1111,6 @@
-                 atmel,watchdog-type = "hardware";
-                 atmel,reset-type = "all";
-                 atmel,dbg-halt;
--                atmel,idle-halt;
-                 status = "disabled";
-             };
- 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 68eb9ad..e0b5c24 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -889,7 +889,6 @@
-                 atmel,watchdog-type = "hardware";
-                 atmel,reset-type = "all";
-                 atmel,dbg-halt;
--                atmel,idle-halt;
-                 status = "disabled";
-             };
- 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index bbb3ba6..ce61f91 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -1125,7 +1125,6 @@
-                 atmel,watchdog-type = "hardware";
-                 atmel,reset-type = "all";
-                 atmel,dbg-halt;
--                atmel,idle-halt;
-                 status = "disabled";
-             };
- 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 5f4144d..63d12ed 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1224,7 +1224,6 @@
-                 atmel,watchdog-type = "hardware";
-                 atmel,reset-type = "all";
-                 atmel,dbg-halt;
--                atmel,idle-halt;
-                 status = "disabled";
-             };
- 
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
