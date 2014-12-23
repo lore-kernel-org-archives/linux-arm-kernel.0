@@ -1,122 +1,86 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Tue, 23 Dec 2014 01:39:47 +0100
-Subject: [PATCH] pm: at91: Workaround DDRSDRC self-refresh bug with LPDDR1
- memories
-Message-ID: <1419295187-2081-1-git-send-email-peda@lysator.liu.se>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 23 Dec 2014 10:22:28 +0800
+Subject: [PATCH v2 3/4] clk: mediatek: Add basic clocks for Mediatek
+ MT8135.
+In-Reply-To: <CABuKBeJNs+BFwS88L_u6sXBJW4bKPuorD-9+q+LZ1N=2dM3t+Q@mail.gmail.com>
+References: <1417675942-10502-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1417675942-10502-4-git-send-email-jamesjj.liao@mediatek.com>
+ <CABuKBeJNs+BFwS88L_u6sXBJW4bKPuorD-9+q+LZ1N=2dM3t+Q@mail.gmail.com>
+Message-ID: <1419301348.22063.28.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Rosin <peda@axentia.se>
+Hi Matthias,
 
-The DDRSDR controller (on the ATSAMA5D31) fails miserably to put LPDDR1
-memories in self-refresh. Force the controller to think it has DDR2
-memories during the self-refresh period, as the DDR2 self-refresh spec
-is equivalent to LPDDR1, and is correctly implemented in the controller.
+On Mon, 2014-12-22 at 19:07 +0100, Matthias Brugger wrote:
+> 2014-12-04 7:52 GMT+01:00 James Liao <jamesjj.liao@mediatek.com>:
+> > +               if (clk_data)
+> > +                       clk_data->clks[gate->id] = clk;
+> > +
+> > +               pr_debug("gate %3d: %s\n", i, gate->name);
+> 
+> Please review the use of pr_debug in this file, there are quite a few
+> (if not all) which are not needed.
+> 
 
-Assume that the second controller has the same fault, and that other
-CPUs in the family has the same problem, but that is untested.
+OK, I'll remove some debug log.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
- include/soc/at91/at91sam9_ddrsdr.h |    2 +-
- 2 files changed, 39 insertions(+), 6 deletions(-)
+> > +       /* PERI1 */
+> > +       GATE(PERI_USBSLV_CK, usbslv_ck, axi_sel, peri1_cg_regs, 8, 0),
+> > +       GATE(PERI_USB1_MCU_CK, usb1_mcu_ck, axi_sel, peri1_cg_regs, 7, 0),
+> > +       GATE(PERI_USB0_MCU_CK, usb0_mcu_ck, axi_sel, peri1_cg_regs, 6, 0),
+> > +       GATE(PERI_GCPU_CK, gcpu_ck, gcpu_sel, peri1_cg_regs, 5, 0),
+> > +       GATE(PERI_FHCTL_CK, fhctl_ck, clk26m, peri1_cg_regs, 4, 0),
+> > +       GATE(PERI_SPI1_CK, spi1_ck, spi_sel, peri1_cg_regs, 3, 0),
+> > +       GATE(PERI_AUXADC_CK, auxadc_ck, clk26m, peri1_cg_regs, 2, 0),
+> > +       GATE(PERI_PERI_PWRAP_CK, peri_pwrap_ck, axi_sel, peri1_cg_regs, 1, 0),
+> > +       GATE(PERI_I2C6_CK, i2c6_ck, axi_sel, peri1_cg_regs, 0, 0),
+> > +};
+> 
+> This clocks look pretty much the same as in mt6589. Can you please
+> check the other SoCs (especially mt6589 and mt6592) and put the parts
+> of the clock tree which are identical together?
+> 
 
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 20018779bae7..63a9e0b0a17d 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -143,6 +143,16 @@ ddr_sr_enable:
- 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
- 	bne	sdr_sr_enable
- 
-+	/* LPDDR1 --> force DDR2 mode during self-refresh */
-+	ldr	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
-+	str	tmp1, .saved_sam9_mdr
-+	bic	tmp1, tmp1, #~AT91_DDRSDRC_MD
-+	cmp	tmp1, #AT91_DDRSDRC_MD_LOW_POWER_DDR
-+	ldreq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
-+	biceq	tmp1, tmp1, #AT91_DDRSDRC_MD
-+	orreq	tmp1, tmp1, #AT91_DDRSDRC_MD_DDR2
-+	streq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
-+
- 	/* prepare for DDRAM self-refresh mode */
- 	ldr	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
- 	str	tmp1, .saved_sam9_lpr
-@@ -151,14 +161,26 @@ ddr_sr_enable:
- 
- 	/* figure out if we use the second ram controller */
- 	cmp	ramc1, #0
--	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
--	strne	tmp2, .saved_sam9_lpr1
--	bicne	tmp2, #AT91_DDRSDRC_LPCB
--	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
-+	beq	ddr_no_2nd_ctrl
-+
-+	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-+	str	tmp2, .saved_sam9_mdr1
-+	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
-+	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
-+	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-+	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
-+	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
-+	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
-+
-+	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-+	str	tmp2, .saved_sam9_lpr1
-+	bic	tmp2, #AT91_DDRSDRC_LPCB
-+	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
- 
- 	/* Enable DDRAM self-refresh mode */
-+	str	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
-+ddr_no_2nd_ctrl:
- 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
--	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
- 
- 	b	sdr_sr_done
- 
-@@ -289,12 +311,17 @@ sdr_sr_done:
- 	 */
- 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
- 	bne	sdr_en_restore
-+	/* Restore MDR in case of LPDDR1 */
-+	ldr	tmp1, .saved_sam9_mdr
-+	str	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
- 	/* Restore LPR on AT91 with DDRAM */
- 	ldr	tmp1, .saved_sam9_lpr
- 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
- 
- 	/* if we use the second ram controller */
- 	cmp	ramc1, #0
-+	ldrne	tmp2, .saved_sam9_mdr1
-+	strne	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
- 	ldrne	tmp2, .saved_sam9_lpr1
- 	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
- 
-@@ -328,5 +355,11 @@ ram_restored:
- .saved_sam9_lpr1:
- 	.word 0
- 
-+.saved_sam9_mdr:
-+	.word 0
-+
-+.saved_sam9_mdr1:
-+	.word 0
-+
- ENTRY(at91_slow_clock_sz)
- 	.word .-at91_slow_clock
-diff --git a/include/soc/at91/at91sam9_ddrsdr.h b/include/soc/at91/at91sam9_ddrsdr.h
-index 0210797abf2e..cd2c18787833 100644
---- a/include/soc/at91/at91sam9_ddrsdr.h
-+++ b/include/soc/at91/at91sam9_ddrsdr.h
-@@ -92,7 +92,7 @@
- #define		AT91_DDRSDRC_UPD_MR	(3 << 20)	 /* Update load mode register and extended mode register */
- 
- #define AT91_DDRSDRC_MDR	0x20	/* Memory Device Register */
--#define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
-+#define		AT91_DDRSDRC_MD		(7 << 0)		/* Memory Device Type */
- #define			AT91_DDRSDRC_MD_SDR		0
- #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
- #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
--- 
-1.7.10.4
+Subsystem clocks (include INFRA and PERI) are similar among Mediatek
+SoCs, but not the same. Some clocks may be added or removed, and some
+clock bits may be shifted, i.e. a register bit may represent different
+clock in different SoCs. So I think it's not a good way to share the
+same clock tree implementation.
+
+> > +/*
+> > + * device tree support
+> > + */
+> 
+> Please delte this comment, it's not necessary
+> 
+
+OK.
+
+> > +       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> > +       if (r)
+> > +               pr_err("could not register clock provide\n");
+> 
+> Please make all these error messages more explanatory. Apart from that
+> it should be "provider" instead of "provide", right?
+> 
+
+You are right. I'll change the error message to show which provider
+registration fail.
+
+> > +       clk_data = alloc_clk_data(INFRA_NR_CLK);
+> > +
+> > +       init_clk_infrasys(base, clk_data);
+> 
+> Why do you put init_clk_gates in a extra function which does nothing else?
+> 
+
+In the beginning clock initialization was not invoked from device tree.
+But now all of them are init from device tree, so it may be a better way
+to remove init_clk_*() and merge the code into this init function. I'll
+refine it in next patch.
+
+
+Best regards,
+
+James
