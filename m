@@ -1,131 +1,187 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 Dec 2014 10:53:09 +0800
-Subject: [PATCH v8 1/6] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <1419303194-3075-1-git-send-email-wens@csie.org>
-References: <1419303194-3075-1-git-send-email-wens@csie.org>
-Message-ID: <1419303194-3075-2-git-send-email-wens@csie.org>
+Date: Tue, 23 Dec 2014 10:53:08 +0800
+Subject: [PATCH v8 0/6] mfd: AXP20x: Add support for AXP202 and AXP209
+Message-ID: <1419303194-3075-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@caione.org>
+Hi everyone,
 
-Bindings documentation for the AXP20x driver. In this file also
-sub-nodes are documented.
+This is v8 of the AXP20x PMIC patches. These are the remaining patches
+of the original series: PEK (power button) input driver, binding docs,
+and defconfig updates.
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-[wens at csie.org: clarify interrupt source for the axp PMIC]
-[wens at csie.org: explain dcdc-workmode in detail and trim lines to 80 chars]
-[wens at csie.org: make regulator supplies optional if using unregulated input]
-[wens at csie.org: use cubieboard2 regulator nodes as example]
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/mfd/axp20x.txt | 97 ++++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
+Mark raised some questions during v7 about the first patch, specifically
+about the "x-powers,dcdc-workmode" property. I've expanded the regulator
+parts of the DT bindings doc. Mark, if you could take a look and give us
+your blessing?
+
+Dmitry, you were OK with the input bits going through the MFD tree, is
+that still the case?
+
+If there are no more problems, maybe Lee could take patches 1~4, and
+Maxime can take the defconfig patches through his tree.
+
+
+Thanks
+ChenYu
+
+
+Changes since v7:
+
+	- DT bindings
+	  * Clarified the AXP's interrupt source
+	  * Added explaination for "x-powers,dcdc-workmode" property
+	  * Made regulator supply properties optional. They can be omitted
+	    when the input is unregulated, as is the case when they are
+	    connected to the IPSOUT output on the PMIC.
+	  * Used real world example (Cubieboard2) for regulator nodes
+	
+	- Fixed paths for PEK sysfs entries.
+
+	- PEK driver
+	  * Made axp20x_pek_remove() in PEK driver static.
+	  * Removed driver owner field.
+	  * Wrapped some lines over 80 characters.
+
+
+Original cover letter from v7:
+
+
+During the merging of v6 several patches were left out. This v7 comprises
+all the patches that are still pending.
+
+//--
+
+AXP209 and AXP202 are the PMUs (Power Management Unit) used by A10, A13
+and A20 SoCs and developed by X-Powers, a sister company of Allwinner.
+AXP20x comprises an adaptive USB-Compatible PWM charger, 2 BUCK DC-DC
+converters, 5 LDOs, multiple 12-bit ADCs of voltage, current and temperature
+as well as 4 configurable GPIOs.
+
+This set of patches introduces the core driver and support for two different
+subsystems:
+        - Regulators
+        - PEK (Power Enable Key)
+
+Changes since v1:
+
+        - Added a new standalone patch for defconfig
+
+        - MFD core:
+          * Removed axp,system-power-controller property
+
+        - Bindings documentation:
+          * Corrected description for dcdc-workmode property
+          * Removed unused axp20x-pek compatible
+
+        - Input misc PEK driver:
+          * Fixed seconds in lower case
+
+        - Regulators subsystem:
+          * Fixed axp20x_set_suspend_voltage()
+          * Switched to using multi-bit control for regulators
+          * When "regulators" node is not found driver doesn't quit
+          * Driver is now using devm_regulator_register()
+          * Added module_platform_driver() instead of subsys_initcall()
+
+        - DT:
+          * Added new DTSI for AXP209
+          * Added support for cubietruck and olinuxino-micro
+
+Changes since v2:
+
+        - Added a new patch for multi_v7_defconfig to enable MFD core
+          and subsystems
+
+        - DT:
+          * Dropped axp,system-power-controller property from DTS
+          * Moved compatible and interrupt-related properties from the
+            DTSI file to the DTS board files
+
+        - Regulators subsystem:
+          * Deleted useless struct axp20x_regulators
+          * Added a warning when out of specs values are used for the
+            dcdc frequency
+
+        - MFD core:
+          * Fixed coding style
+          * Removed IDs from device table for i2c
+
+        - Bindings documentation:
+          * Several corrections and fixes
+
+Changes since v3:
+
+        - Removed x-powers-axp209.dtsi file
+        - Rewritten bindings document
+
+        - MFD core:
+          * Fixed casting
+          * Better comments / documentation
+
+        - Input misc PEK driver:
+          * Timings are now expressed in ms and the sysfs appies the
+            closest possible value
+          * No more useless pretty-printing
+          * Removed devm_request_threaded_irq in favour of
+            devm_request_any_context_irq
+          * Moved from input attributes to platform device attributes
+
+        - Regulators subsystem:
+          * Removed suspend mode (axp20x_set_suspend_voltage)
+          * Added regulators input supply
+
+        - DT:
+          * DTs doesn't include anymore the dtsi
+          * Added input supplies for regulators
+
+Changes since v4:
+
+        - Removed regulator patches already applied / acked by Mark Brown
+
+        - Input misc PEK driver:
+          * Don't print anymore the "us" unit
+          * Added cleanup for attributes when unbindind the device
+          * Fixed error code returned when device_create_file() fails
+
+        - DT:
+          * Enable all the regulators on at boot-time
+          * Removed min and max microvolts for all the regulators but DCDC2
+          * Moved the axp_ipsout regulator outside the MFD node
+
+        - MFD core:
+          * The supply regulators are now specified in the MFD driver using
+            regulator_bulk_register_supply_alias() and the .parent_supplies
+            in the MFD cell
+
+Changes since v5:
+        - Added ACKs
+        - Fixed compilation warning (reported by Hans De Goede)
+        - Vendor-prefixes are now sorted
+        - Removed DT patch
+
+
+Carlo Caione (6):
+  mfd: AXP20x: Add bindings documentation
+  dt-bindings: add vendor-prefix for X-Powers
+  input: misc: Add driver for AXP20x Power Enable Key
+  input: misc: Add ABI docs for AXP20x PEK
+  ARM: sunxi: Add AXP20x support in defconfig
+  ARM: sunxi: Add AXP20x support multi_v7_defconfig
+
+ .../ABI/testing/sysfs-driver-input-axp-pek         |  11 +
+ Documentation/devicetree/bindings/mfd/axp20x.txt   |  97 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/configs/sunxi_defconfig                   |   3 +
+ drivers/input/misc/Kconfig                         |  11 +
+ drivers/input/misc/Makefile                        |   1 +
+ drivers/input/misc/axp20x-pek.c                    | 282 +++++++++++++++++++++
+ 8 files changed, 409 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-input-axp-pek
  create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+ create mode 100644 drivers/input/misc/axp20x-pek.c
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-new file mode 100644
-index 000000000000..b775d8ccbc7c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -0,0 +1,97 @@
-+AXP202/AXP209 device tree bindings
-+
-+The axp20x family current members :
-+axp202 (X-Powers)
-+axp209 (X-Powers)
-+
-+Required properties:
-+- compatible: "x-powers,axp202" or "x-powers,axp209"
-+- reg: The I2C slave address for the AXP chip
-+- interrupt-parent: The parent interrupt controller
-+- interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-+- interrupt-controller: axp20x has its own internal IRQs
-+- #interrupt-cells: Should be set to 1
-+- regulators: A node that houses a sub-node for each regulator. The regulators
-+	      are bound using their name as listed here: dcdc2, dcdc3, ldo1,
-+	      ldo2, ldo3, ldo4, ldo5.  The bindings details of individual
-+	      regulator device can be found in:
-+	      Documentation/devicetree/bindings/regulator/regulator.txt with
-+	      the exception of x-powers,dcdc-freq. Regulators not used should
-+	      still be listed for completeness and that the regulator subsystem
-+	      properly registers them.
-+
-+- x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
-+		      (range: 750-1875). Default: 1.5MHz
-+
-+Optional properties:
-+- regulator supplies - may be omitted if inputs are unregulated, such as using
-+		       the IPSOUT output from the PMIC
-+  - acin-supply: The input supply for LDO1
-+  - vin2-supply: The input supply for DCDC2
-+  - vin3-supply: The input supply for DCDC3
-+  - ldo24in-supply: The input supply for LDO2, LDO4
-+  - ldo3in-supply: The input supply for LDO3
-+  - ldo5in-supply: The input supply for LDO5
-+
-+Optional properties for DCDC regulators:
-+- x-powers,dcdc-workmode: 1 for PWM mode, 0 for AUTO (PWM/PFM) mode
-+			  Default: AUTO mode
-+			  The DCDC regulators work in a mixed PWM/PFM mode,
-+			  using PFM under light loads and switching to PWM
-+			  for heavier loads. Forcing PWM mode trades efficiency
-+			  under light loads for lower output noise. This
-+			  probably makes sense for HiFi audio related
-+			  applications that aren't battery constrained.
-+
-+Example:
-+
-+axp209: pmic at 34 {
-+	compatible = "x-powers,axp209";
-+	reg = <0x34>;
-+	interrupt-parent = <&nmi_intc>;
-+	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	regulators {
-+		x-powers,dcdc-freq = <1500>;
-+
-+		vdd_cpu: dcdc2 {
-+			regulator-always-on;
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1450000>;
-+			regulator-name = "vdd-cpu";
-+		};
-+
-+		vdd_int_dll: dcdc3 {
-+			regulator-always-on;
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1400000>;
-+			regulator-name = "vdd-int-dll";
-+		};
-+
-+		vdd_rtc: ldo1 {
-+			regulator-always-on;
-+			regulator-min-microvolt = <1200000>;
-+			regulator-max-microvolt = <1400000>;
-+			regulator-name = "vdd-rtc";
-+		};
-+
-+		avcc: ldo2 {
-+			regulator-always-on;
-+			regulator-min-microvolt = <2700000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-name = "avcc";
-+		};
-+
-+		ldo3 {
-+			/* unused */
-+		};
-+
-+		csi1_io_2v8: ldo4 {
-+			/* output on extension headers */
-+			regulator-name = "csi1-io-2v8";
-+		};
-+	};
-+};
-+
 -- 
 2.1.4
