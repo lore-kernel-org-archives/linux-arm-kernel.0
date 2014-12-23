@@ -1,310 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Dec 2014 11:07:04 -0600
-Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
-In-Reply-To: <20141223165634.GL23854@atomide.com>
-References: <1419271535-4057-1-git-send-email-balbi@ti.com>
- <54991A25.2030804@compulab.co.il> <20141223161936.GA9147@saruman>
- <20141223165634.GL23854@atomide.com>
-Message-ID: <20141223170704.GD9147@saruman>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Dec 2014 09:06:13 -0800
+Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
+ interface
+In-Reply-To: <1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>
+References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
+ <1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20141223170613.GM23854@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 23, 2014 at 08:56:35AM -0800, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [141223 08:22]:
-> > On Tue, Dec 23, 2014 at 09:30:45AM +0200, Igor Grinberg wrote:
-> > > On 12/22/14 20:05, Felipe Balbi wrote:
-> > > >  CONFIG_DEBUG_GPIO=y
-> > > >  CONFIG_GPIO_SYSFS=y
-> > > > -CONFIG_GPIO_TWL4030=y
-> > > > -CONFIG_W1=y
-> > > > +CONFIG_GPIO_TWL4030=m
-> > > 
-> > > w/o this devices wired to twl gpios will not come up and likely
-> > > will miss the enumeration...
-> > 
-> > for example ?
+* Marek Szyprowski <m.szyprowski@samsung.com> [141223 02:51]:
+> From: Tomasz Figa <t.figa@samsung.com>
 > 
-> The TWL4030 part needs to be checked for the legacy booting to
-> make sure the board-*.c file *_twl_gpio_setup() callbacks still
-> work properly. Or you may want to leave it for later.
+> Certain implementations of secure hypervisors (namely the one found on
+> Samsung Exynos-based boards) do not provide access to individual L2C
+> registers. This makes the .write_sec()-based interface insufficient and
+> provoking ugly hacks.
+> 
+> This patch is first step to make the driver not rely on availability of
+> writes to individual registers. This is achieved by refactoring the
+> driver to use a commit-like operation scheme: all register values are
+> prepared first and stored in an instance of l2x0_regs struct and then a
+> single callback is responsible to flush those values to the hardware.
 
-then I'll leave it for later, it's so small anyway. V2 below:
+The first patch of the series applied things boot with no problem.
+But after applying this one I get the following on am437x:
 
-8<------------------------------------------------------------------
+Unhandled fault: imprecise external abort (0xc06) at 0xb6f33884
 
->From fcda0df51e3138f4901516fe850020968ca228a3 Mon Sep 17 00:00:00 2001
-From: Felipe Balbi <balbi@ti.com>
-Date: Mon, 22 Dec 2014 11:56:27 -0600
-Subject: [PATCH v2] arm: omap: reduce zImage size on omap2plus_defconfig
+Probably the same issue Nishanth mentioned.
 
-By converting a few drivers to modules because they
-won't be needed during boot anyways, we can shave off
-about 700KiB of text.
+Regards,
 
-Note that while at that, and after discussions with Tony
-Lindgren, a few extra drivers were either removed because
-they weren't needed, or added because they're useful for
-debugging/testing.
-
-Below is output of size for pre and post vmlinux binaries:
-
-   text    data     bss     dec     hex filename
-8345476  757948 8411840 17515264        10b4300 vmlinux-post-patch
-9069110  800316 8419072 18288498        1170f72 vmlinux-pre-patch
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
-
-Changes since v1:
-	- leave TWL4030 gpio alone
-
- arch/arm/configs/omap2plus_defconfig | 119 ++++++++++++++++++++++-------------
- 1 file changed, 74 insertions(+), 45 deletions(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index c2c3a85..7e57998 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -13,7 +13,6 @@ CONFIG_CGROUP_FREEZER=y
- CONFIG_CGROUP_DEVICE=y
- CONFIG_CPUSETS=y
- CONFIG_CGROUP_CPUACCT=y
--CONFIG_RESOURCE_COUNTERS=y
- CONFIG_MEMCG=y
- CONFIG_MEMCG_SWAP=y
- CONFIG_MEMCG_KMEM=y
-@@ -68,7 +67,6 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
--CONFIG_GENERIC_CPUFREQ_CPU0=y
- # CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
- CONFIG_CPU_IDLE=y
- CONFIG_BINFMT_MISC=y
-@@ -103,7 +101,7 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
- CONFIG_OMAP_OCP2SCP=y
--CONFIG_CONNECTOR=y
-+CONFIG_CONNECTOR=m
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -122,14 +120,13 @@ CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=16384
- CONFIG_SENSORS_TSL2550=m
- CONFIG_BMP085_I2C=m
--CONFIG_SENSORS_LIS3_I2C=m
- CONFIG_SRAM=y
-+CONFIG_SENSORS_LIS3_I2C=m
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_SCAN_ASYNC=y
--CONFIG_ATA=y
--CONFIG_SATA_AHCI_PLATFORM=y
--CONFIG_MD=y
-+CONFIG_ATA=m
-+CONFIG_SATA_AHCI_PLATFORM=m
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_ARC is not set
- # CONFIG_NET_CADENCE is not set
-@@ -154,8 +151,8 @@ CONFIG_TI_CPSW=y
- # CONFIG_NET_VENDOR_WIZNET is not set
- CONFIG_AT803X_PHY=y
- CONFIG_SMSC_PHY=y
--CONFIG_USB_USBNET=y
--CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_USB_USBNET=m
-+CONFIG_USB_NET_SMSC95XX=m
- CONFIG_USB_ALI_M5632=y
- CONFIG_USB_AN2720=y
- CONFIG_USB_EPSON2888=y
-@@ -172,18 +169,22 @@ CONFIG_WLCORE_SDIO=m
- CONFIG_MWIFIEX=m
- CONFIG_MWIFIEX_SDIO=m
- CONFIG_MWIFIEX_USB=m
--CONFIG_INPUT_JOYDEV=y
--CONFIG_INPUT_EVDEV=y
--CONFIG_KEYBOARD_GPIO=y
-+CONFIG_INPUT_JOYDEV=m
-+CONFIG_INPUT_EVDEV=m
-+CONFIG_KEYBOARD_ATKBD=m
-+CONFIG_KEYBOARD_GPIO=m
- CONFIG_KEYBOARD_MATRIX=m
--CONFIG_KEYBOARD_TWL4030=y
-+CONFIG_KEYBOARD_OMAP4=m
-+CONFIG_KEYBOARD_TWL4030=m
-+# CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=m
- CONFIG_TOUCHSCREEN_EDT_FT5X06=m
- CONFIG_TOUCHSCREEN_TSC2005=m
- CONFIG_TOUCHSCREEN_TSC2007=m
- CONFIG_INPUT_MISC=y
--CONFIG_INPUT_TWL4030_PWRBUTTON=y
-+CONFIG_INPUT_TWL4030_PWRBUTTON=m
-+CONFIG_SERIO=m
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -196,15 +197,16 @@ CONFIG_SERIAL_8250_RSA=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_OMAP=y
- CONFIG_SERIAL_OMAP_CONSOLE=y
--CONFIG_HW_RANDOM=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
-+CONFIG_SPI_TI_QSPI=m
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_TWL4030=y
--CONFIG_W1=y
-+CONFIG_W1=m
-+CONFIG_HDQ_MASTER_OMAP=m
- CONFIG_BATTERY_BQ27x00=m
- CONFIG_CHARGER_ISP1704=m
- CONFIG_CHARGER_TWL4030=m
-@@ -213,20 +215,21 @@ CONFIG_CHARGER_BQ24190=m
- CONFIG_CHARGER_BQ24735=m
- CONFIG_POWER_RESET=y
- CONFIG_POWER_AVS=y
-+CONFIG_HWMON=m
- CONFIG_SENSORS_LM75=m
--CONFIG_THERMAL=y
-+CONFIG_SENSORS_TMP102=m
-+CONFIG_THERMAL=m
- CONFIG_THERMAL_GOV_FAIR_SHARE=y
- CONFIG_THERMAL_GOV_USER_SPACE=y
- CONFIG_CPU_THERMAL=y
--CONFIG_TI_SOC_THERMAL=y
-+CONFIG_TI_SOC_THERMAL=m
- CONFIG_TI_THERMAL=y
- CONFIG_OMAP4_THERMAL=y
- CONFIG_OMAP5_THERMAL=y
- CONFIG_DRA752_THERMAL=y
- CONFIG_WATCHDOG=y
--CONFIG_OMAP_WATCHDOG=y
--CONFIG_TWL4030_WATCHDOG=y
--CONFIG_MFD_SYSCON=y
-+CONFIG_OMAP_WATCHDOG=m
-+CONFIG_TWL4030_WATCHDOG=m
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65217=y
- CONFIG_MFD_TPS65218=y
-@@ -289,51 +292,77 @@ CONFIG_SND_OMAP_SOC=m
- CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
- CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
- CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
--CONFIG_USB=y
-+CONFIG_HID_GENERIC=m
-+CONFIG_USB_HIDDEV=y
-+CONFIG_USB_KBD=m
-+CONFIG_USB_MOUSE=m
-+CONFIG_USB=m
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
--CONFIG_USB_MON=y
-+CONFIG_USB_MON=m
- CONFIG_USB_XHCI_HCD=m
--CONFIG_USB_WDM=y
--CONFIG_USB_STORAGE=y
-+CONFIG_USB_WDM=m
-+CONFIG_USB_STORAGE=m
-+CONFIG_USB_MUSB_HDRC=m
-+CONFIG_USB_MUSB_OMAP2PLUS=m
-+CONFIG_USB_MUSB_AM35X=m
-+CONFIG_USB_MUSB_DSPS=m
- CONFIG_USB_DWC3=m
--CONFIG_USB_TEST=y
-+CONFIG_USB_TEST=m
- CONFIG_AM335X_PHY_USB=y
--CONFIG_USB_GADGET=y
-+CONFIG_USB_GADGET=m
- CONFIG_USB_GADGET_DEBUG=y
- CONFIG_USB_GADGET_DEBUG_FILES=y
- CONFIG_USB_GADGET_DEBUG_FS=y
-+CONFIG_USB_CONFIGFS=m
-+CONFIG_USB_CONFIGFS_SERIAL=y
-+CONFIG_USB_CONFIGFS_ACM=y
-+CONFIG_USB_CONFIGFS_OBEX=y
-+CONFIG_USB_CONFIGFS_NCM=y
-+CONFIG_USB_CONFIGFS_ECM=y
-+CONFIG_USB_CONFIGFS_ECM_SUBSET=y
-+CONFIG_USB_CONFIGFS_RNDIS=y
-+CONFIG_USB_CONFIGFS_EEM=y
-+CONFIG_USB_CONFIGFS_MASS_STORAGE=y
-+CONFIG_USB_CONFIGFS_F_LB_SS=y
-+CONFIG_USB_CONFIGFS_F_FS=y
-+CONFIG_USB_CONFIGFS_F_UAC1=y
-+CONFIG_USB_CONFIGFS_F_UAC2=y
-+CONFIG_USB_CONFIGFS_F_MIDI=y
-+CONFIG_USB_CONFIGFS_F_HID=y
- CONFIG_USB_ZERO=m
- CONFIG_MMC=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_CLASS=m
-+CONFIG_LEDS_GPIO=m
- CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_TIMER=y
--CONFIG_LEDS_TRIGGER_ONESHOT=y
--CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_TIMER=m
-+CONFIG_LEDS_TRIGGER_ONESHOT=m
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=m
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=m
- CONFIG_LEDS_TRIGGER_CPU=y
--CONFIG_LEDS_TRIGGER_GPIO=y
--CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_LEDS_TRIGGER_GPIO=m
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=m
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL92330=y
--CONFIG_RTC_DRV_TWL4030=y
--CONFIG_RTC_DRV_OMAP=y
-+CONFIG_RTC_DRV_TWL4030=m
-+CONFIG_RTC_DRV_OMAP=m
- CONFIG_DMADEVICES=y
- CONFIG_TI_EDMA=y
- CONFIG_DMA_OMAP=y
--CONFIG_EXTCON=y
--CONFIG_EXTCON_PALMAS=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXTCON=m
-+CONFIG_EXTCON_PALMAS=m
-+CONFIG_TI_EMIF=m
- CONFIG_PWM=y
--CONFIG_PWM_TIECAP=y
--CONFIG_PWM_TIEHRPWM=y
--CONFIG_PWM_TWL=y
--CONFIG_PWM_TWL_LED=y
--CONFIG_OMAP_USB2=y
--CONFIG_TI_PIPE3=y
-+CONFIG_PWM_TIECAP=m
-+CONFIG_PWM_TIEHRPWM=m
-+CONFIG_PWM_TWL=m
-+CONFIG_PWM_TWL_LED=m
-+CONFIG_OMAP_USB2=m
-+CONFIG_TI_PIPE3=m
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
--- 
-2.2.0
-
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141223/6f97f3fc/attachment-0001.sig>
+Tony
