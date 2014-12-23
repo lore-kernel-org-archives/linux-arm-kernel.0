@@ -1,36 +1,27 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 23 Dec 2014 12:55:43 +0100
-Subject: clk: samsung: exynos7: Add clocks for MSCL block
-In-Reply-To: <5498F6AA.8010405@samsung.com>
-References: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
- <5498F6AA.8010405@samsung.com>
-Message-ID: <5499583F.9070604@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 Dec 2014 11:57:29 +0000
+Subject: [PATCH v5 06/19] arm/arm64: KVM: move kvm_register_device_ops()
+ into vGIC probing
+In-Reply-To: <1418042274-3246-7-git-send-email-andre.przywara@arm.com> (Andre
+ Przywara's message of "Mon, 8 Dec 2014 12:37:41 +0000")
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+ <1418042274-3246-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <86lhly1suu.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
-
-On 23/12/14 05:59, Pankaj Dubey wrote:
->> diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
->> > index a79bf23..95c1160 100644
->> > --- a/drivers/clk/samsung/clk-exynos7.c
->> > +++ b/drivers/clk/samsung/clk-exynos7.c
->> > @@ -34,6 +34,7 @@
->> >   #define DIV_TOPC0		0x0600
->> >   #define DIV_TOPC1		0x0604
->> >   #define DIV_TOPC3		0x060C
->> > +#define	ENABLE_ACLK_TOPC1	0x0804
+On Mon, Dec 08 2014 at 12:37:41 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Currently we unconditionally register the GICv2 emulation device
+> during the host's KVM initialization. Since with GICv3 support we
+> may end up with only v2 or only v3 or both supported, we move the
+> registration into the GIC probing function, where we will later know
+> which combination is valid.
 >
-> nit: Tab space between #define and ENABLE_ACLK_TOPC1, should be removed.
-> 
-> I verified register settings and clock relationships are as per UM I 
-> have with me. So other than above nit, everything looks fine.
-> 
-> Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Thanks for you review, I have already fixed the whitespace issue when
-applying.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
---
-Regards,
-Sylwester
+	M.
+-- 
+Jazz is not dead. It just smells funny.
