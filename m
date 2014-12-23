@@ -1,74 +1,66 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Dec 2014 10:24:19 -0600
-Subject: [PATCH] USB: gadget: udc: atmel: fix possible oops when
- unloading module
-In-Reply-To: <1419240374-12179-1-git-send-email-songjun.wu@atmel.com>
-References: <1419240374-12179-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <20141223162419.GB9147@saruman>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 23 Dec 2014 17:39:24 +0100
+Subject: [PATCH RESEND] leds: netxbig: fix oops at probe time
+Message-ID: <1419352764-24316-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 05:26:14PM +0800, Songjun Wu wrote:
-> When unloading the module, the urb request will be dequeued
-> and the completion routine will be excuted.
-> If no urb packet, the urb request will not be added to the endpoint queue
-> and the completion routine pointer in urb request is NULL.
-> Accessing to the NULL function pointer will cause the oops issue.
-> Add the code to check the urb request is in the endpoint queue or not.
-> If the urb request is not in the endpoint queue, a negative error code
-> will be returned.
+This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
+this bug, a kernel oops can be observed at probe time on the LaCie 2Big
+and 5Big v2 boards:
 
-have you triggered the NULL pointer oops ? Care to add it to the commit
-log.
+Unable to handle kernel NULL pointer dereference at virtual address 00000008
+[...]
+[<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
+[<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
+[<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
+[<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
+[<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
+[<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
+[<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
+[<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
+[<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
+[<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
+[...]
 
-Also, which commit is this fixing ? Does this need to be backported ?
-When was the bug introduced ?
+This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
+("leds: netxbig: fix attribute-creation race").
 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-> ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c |   12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index ce88237..48629cc 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -828,7 +828,7 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
->  {
->  	struct usba_ep *ep = to_usba_ep(_ep);
->  	struct usba_udc *udc = ep->udc;
-> -	struct usba_request *req = to_usba_req(_req);
-> +	struct usba_request *req;
->  	unsigned long flags;
->  	u32 status;
->  
-> @@ -837,6 +837,16 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
->  
->  	spin_lock_irqsave(&udc->lock, flags);
->  
-> +	list_for_each_entry(req, &ep->queue, queue) {
-> +		if (&req->req == _req)
-> +			break;
-> +	}
-> +
-> +	if (&req->req != _req) {
-> +		spin_unlock_irqrestore(&udc->lock, flags);
-> +		return -EINVAL;
-> +	}
-> +
->  	if (req->using_dma) {
->  		/*
->  		 * If this request is currently being transferred,
-> -- 
-> 1.7.9.5
-> 
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: <stable@vger.kernel.org> # 3.17+
+Acked-by: Johan Hovold <johan@kernel.org>
+---
+ drivers/leds/leds-netxbig.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
+index 64fde485dcaa..4c794f15a57f 100644
+--- a/drivers/leds/leds-netxbig.c
++++ b/drivers/leds/leds-netxbig.c
+@@ -330,18 +330,18 @@ create_netxbig_led(struct platform_device *pdev,
+ 	led_dat->sata = 0;
+ 	led_dat->cdev.brightness = LED_OFF;
+ 	led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+-	/*
+-	 * If available, expose the SATA activity blink capability through
+-	 * a "sata" sysfs attribute.
+-	 */
+-	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
+-		led_dat->cdev.groups = netxbig_led_groups;
+ 	led_dat->mode_addr = template->mode_addr;
+ 	led_dat->mode_val = template->mode_val;
+ 	led_dat->bright_addr = template->bright_addr;
+ 	led_dat->bright_max = (1 << pdata->gpio_ext->num_data) - 1;
+ 	led_dat->timer = pdata->timer;
+ 	led_dat->num_timer = pdata->num_timer;
++	/*
++	 * If available, expose the SATA activity blink capability through
++	 * a "sata" sysfs attribute.
++	 */
++	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
++		led_dat->cdev.groups = netxbig_led_groups;
+ 
+ 	return led_classdev_register(&pdev->dev, &led_dat->cdev);
+ }
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141223/bdbb74a1/attachment.sig>
+2.1.1
