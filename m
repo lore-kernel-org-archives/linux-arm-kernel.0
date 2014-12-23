@@ -1,47 +1,105 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 18:02:19 +0800
-Subject: [PATCH RFC v4 21/21] ARM: imx_v6_v7_defconfig: Add support for Himax
- HX8369A panel
+Date: Tue, 23 Dec 2014 18:02:11 +0800
+Subject: [PATCH RFC v4 13/21] Documentation: dt-bindings: Add bindings for
+ i.MX specific Synopsys DW MIPI DSI driver
 In-Reply-To: <1419328939-22758-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419328939-22758-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419328939-22758-22-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419328939-22758-14-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Himax HX8369A panel.
-
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm menuconfig and manually choose to build in
-  the Himax HX8369A panel driver
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+This patch adds device tree bindings for i.MX specific Synopsys DW MIPI DSI driver.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v3->v4:
- * None.
+ * Newly introduced in v4.  This is separated from the relevant driver patch
+   in v3 to address Stefan Wahren's comment.
 
-v2->v3:
- * None.
+ .../devicetree/bindings/drm/imx/mipi_dsi.txt       | 75 ++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
 
-v1->v2:
- * Add the HIMAX prefix in the Kconfig name.
-
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 3e0e589..27db91b 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -192,6 +192,7 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_PANEL_HIMAX_HX8369A=y
- CONFIG_DRM_IMX=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+diff --git a/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt b/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
+new file mode 100644
+index 0000000..93cc4ef
+--- /dev/null
++++ b/Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
+@@ -0,0 +1,75 @@
++i.MX specific Device-Tree bindings for Synopsys DesignWare MIPI DSI host controller
++
++MIPI DSI host controller
++========================
++
++The MIPI DSI host controller is a Synopsys DesignWare IP.
++The common device tree documentation for this controller can be found
++at [1].
++
++Required properties:
++ - #address-cells: Should be <1>.
++ - #size-cells: Should be <0>.
++ - compatible: The compatible string should be "fsl,imx6q-mipi-dsi"
++   for i.MX6q/sdl SoCs.
++ - reg: Physical base address of the controller and length of memory
++   mapped region.
++ - interrupts: The controller's interrupt number to the CPU(s).
++ - gpr: Should be <&gpr>.
++   The phandle points to the iomuxc-gpr region containing the
++   multiplexer control register for the controller.
++ - clocks, clock-names: Phandles to the controller pllref, pllref_gate
++   and core_cfg clocks, as described in [2] and [3].
++
++Required sub-nodes:
++ - ports: This node may contain up to four port nodes with endpoint
++   definitions as defined in [4], corresponding to the four inputs to
++   the controller multiplexer.
++ - A node to represent a DSI peripheral as described in [5].
++
++[1] Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt.
++[2] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[3] Documentation/devicetree/bindings/clock/imx6q-clock.txt
++[4] Documentation/devicetree/bindings/media/video-interfaces.txt
++[5] Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
++
++example:
++	gpr: iomuxc-gpr at 020e0000 {
++		/* ... */
++	};
++
++	mipi_dsi: mipi at 021e0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "fsl,imx6q-mipi-dsi";
++		reg = <0x021e0000 0x4000>;
++		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
++		gpr = <&gpr>;
++		clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
++			 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
++		clock-names = "pllref", "core_cfg";
++
++		ports {
++			port at 0 {
++				reg = <0>;
++
++				mipi_mux_0: endpoint {
++					remote-endpoint = <&ipu1_di0_mipi>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				mipi_mux_1: endpoint {
++					remote-endpoint = <&ipu1_di1_mipi>;
++				};
++			};
++		};
++
++		panel {
++			compatible = "truly,tft480800-16-e-dsi";
++			reg = <0>;
++			/* ... */
++		};
++	};
 -- 
 2.1.0
