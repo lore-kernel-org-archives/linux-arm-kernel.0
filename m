@@ -1,66 +1,39 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 16:26:37 +0800
-Subject: [PATCH RFC v3 02/18] of: Add vendor prefix for Himax Technologies
- Inc.
-In-Reply-To: <789433791.920346.1419322152848.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 23 Dec 2014 09:33:16 +0100 (CET)
+Subject: [PATCH RFC v3 11/18] drm/bridge: Add Synopsys DesignWare MIPI
+ DSI host controller driver
+In-Reply-To: <1419306399-9387-12-git-send-email-Ying.Liu@freescale.com>
 References: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
- <1419306399-9387-3-git-send-email-Ying.Liu@freescale.com>
- <789433791.920346.1419322152848.JavaMail.open-xchange@oxbaltgw08.schlund.de>
-Message-ID: <5499273D.3040900@freescale.com>
+ <1419306399-9387-12-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1770602566.921194.1419323596151.JavaMail.open-xchange@oxbaltgw08.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Liu,
 
-On 12/23/2014 04:09 PM, Stefan Wahren wrote:
-> Hi Liu,
+> Liu Ying <Ying.Liu@freescale.com> hat am 23. Dezember 2014 um 04:46
+> geschrieben:
 >
->> Liu Ying <Ying.Liu@freescale.com> hat am 23. Dezember 2014 um 04:46
->> geschrieben:
->>
->>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> ---
->> v2->v3:
->> * None.
->>
->> v1->v2:
->> * None.
->>
->> Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->> 1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 78efebb..3cee528 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -69,6 +69,7 @@ hannstar HannStar Display Corporation
->> haoyu Haoyu Microelectronic Co. Ltd.
->> hisilicon Hisilicon Limited.
->> hit Hitachi Ltd.
->> +himax Himax Technologies, Inc.
 >
-> please fix the ordering. himax comes before hisilicon.
+> This patch adds Synopsys DesignWare MIPI DSI host controller driver support.
+> Currently, the driver supports the burst with sync pulses mode only.
+>
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+> v2->v3:
+> * Newly introduced in v3 to address Andy Yan's comment. This is based on
+> the i.MX MIPI DSI driver in v2. To make the Synopsys DesignWare MIPI DSI
+> host controller driver less platform-dependant, this patch places it at
+> the drm/bridge directory as a DRM bridge driver.
+>
+> .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt | 72 ++
 
-Yes. I'll fix that.
+please take care of [1] and send the Documentation part as a separate patch.
+This should also apply to all the other patches from your series.
 
-Thanks,
-Liu Ying
+Thanks
 
->
-> Thanks
->
-> Stefan
->
->> honeywell Honeywell
->> hp Hewlett Packard
->> i2se I2SE GmbH
->> --
->> 2.1.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Stefan
+
+[1] -
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/submitting-patches.txt
