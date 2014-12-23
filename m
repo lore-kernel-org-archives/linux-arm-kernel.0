@@ -1,63 +1,77 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 23 Dec 2014 15:30:16 +0800
-Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and
- evaluation board dts and Makefile
-In-Reply-To: <20141217143305.GC8942@leverpostej>
-References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
- <1418825853-10934-4-git-send-email-eddie.huang@mediatek.com>
- <20141217143305.GC8942@leverpostej>
-Message-ID: <1419319816.14341.6.camel@mtksdaap41>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 23 Dec 2014 09:30:45 +0200
+Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
+In-Reply-To: <1419271535-4057-1-git-send-email-balbi@ti.com>
+References: <1419271535-4057-1-git-send-email-balbi@ti.com>
+Message-ID: <54991A25.2030804@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-17 at 14:33 +0000, Mark Rutland wrote:
-> On Wed, Dec 17, 2014 at 02:17:32PM +0000, Eddie Huang wrote:
-> > Add device tree support for MT8173 SoC and evaluation board based on it.
-> > 
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/Makefile       |   1 +
-> >  arch/arm64/boot/dts/mt8173-evb.dts |  34 +++++++++
-> >  arch/arm64/boot/dts/mt8173.dtsi    | 152 +++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 187 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mt8173-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mt8173.dtsi
-> > 
-> > +	psci {
-> > +		compatible = "arm,psci";
-> > +		method = "smc";
-> > +		cpu_suspend   = <0x84000001>;
-> > +		cpu_off	      = <0x84000002>;
-> > +		cpu_on	      = <0x84000003>;
-> > +		affinity_info = <0x84000004>;
-> > +	};
-> 
-> There is no AFFINITY_INFO function prior to PSCI 0.2, and
-> 'affinity_info' does not exist in the "arm,psci" binding.
-> 
-> I take it hotplug has been tested for all but CPU0?
-> 
+Hi Felipe,
 
-Yes, hotplug is ok except CPU0
+On 12/22/14 20:05, Felipe Balbi wrote:
 
-> > +
-> > +		gic: interrupt-controller at 10220000 {
-> > +			compatible = "arm,gic-400";
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupt-controller;
-> > +			reg = <0 0x10221000 0 0x1000>,
-> > +			      <0 0x10222000 0 0x1000>,
-> > +			      <0 0x10224000 0 0x2000>,
-> > +			      <0 0x10226000 0 0x2000>;
-> > +			interrupts = <1 9 0xf04>;
-> > +		};
-> 
-> I don't think these reg entries are quite right; GICC should be 8k long.
-> 
-> Marc?
-> 
-> Thanks,
-> Mark.
+[...]
 
-Yes, GICC should be 8K long.
+>  CONFIG_SCSI_SCAN_ASYNC=y
+> -CONFIG_ATA=y
+> -CONFIG_SATA_AHCI_PLATFORM=y
+> -CONFIG_MD=y
+> +CONFIG_ATA=m
+> +CONFIG_SATA_AHCI_PLATFORM=m
+
+Isn't this needed for the rootfs on SATA devices?
+
+>  CONFIG_NETDEVICES=y
+>  # CONFIG_NET_VENDOR_ARC is not set
+>  # CONFIG_NET_CADENCE is not set
+> @@ -154,8 +151,8 @@ CONFIG_TI_CPSW=y
+>  # CONFIG_NET_VENDOR_WIZNET is not set
+>  CONFIG_AT803X_PHY=y
+>  CONFIG_SMSC_PHY=y
+> -CONFIG_USB_USBNET=y
+> -CONFIG_USB_NET_SMSC95XX=y
+> +CONFIG_USB_USBNET=m
+> +CONFIG_USB_NET_SMSC95XX=m
+
+What about the NFS root for boards with only USB eth?
+
+[...]
+
+>  CONFIG_DEBUG_GPIO=y
+>  CONFIG_GPIO_SYSFS=y
+> -CONFIG_GPIO_TWL4030=y
+> -CONFIG_W1=y
+> +CONFIG_GPIO_TWL4030=m
+
+w/o this devices wired to twl gpios will not come up and likely
+will miss the enumeration...
+
+> -CONFIG_USB=y
+> +CONFIG_HID_GENERIC=m
+> +CONFIG_USB_HIDDEV=y
+> +CONFIG_USB_KBD=m
+> +CONFIG_USB_MOUSE=m
+> +CONFIG_USB=m
+
+So, you don't consider USB a valid rootfs storage option?
+
+>  CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+> -CONFIG_USB_MON=y
+> +CONFIG_USB_MON=m
+>  CONFIG_USB_XHCI_HCD=m
+> -CONFIG_USB_WDM=y
+> -CONFIG_USB_STORAGE=y
+> +CONFIG_USB_WDM=m
+> +CONFIG_USB_STORAGE=m
+> +CONFIG_USB_MUSB_HDRC=m
+> +CONFIG_USB_MUSB_OMAP2PLUS=m
+> +CONFIG_USB_MUSB_AM35X=m
+> +CONFIG_USB_MUSB_DSPS=m
+
+[...]
+
+
+-- 
+Regards,
+Igor.
