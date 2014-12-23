@@ -1,44 +1,44 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 23 Dec 2014 11:46:38 +0800
-Subject: [PATCH RFC v3 17/18] ARM: imx_v6_v7_defconfig: Add support for MIPI
- DSI host controller
+Date: Tue, 23 Dec 2014 11:46:35 +0800
+Subject: [PATCH RFC v3 14/18] ARM: dtsi: imx6qdl: Add support for MIPI DSI
+ host controller
 In-Reply-To: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419306399-9387-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419306399-9387-18-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419306399-9387-15-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds support for MIPI DSI host controller.
 
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm menuconfig and manually choose to build in
-  the MIPI DSI host controller driver
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
-
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v2->v3:
- * None.
+ * As suggested by Phillip Zabel, change the clocks and the clock-names
+   properties to use the pllref and core_cfg clocks only.
 
 v1->v2:
  * None.
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0dbd0c3..3e0e589 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -199,6 +199,7 @@ CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_IPUV3=y
- CONFIG_DRM_IMX_HDMI=y
-+CONFIG_DRM_IMX_MIPI_DSI=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 96bf2a0..7b1c313 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1006,7 +1006,13 @@
+ 			mipi_dsi: mipi at 021e0000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				compatible = "fsl,imx6q-mipi-dsi";
+ 				reg = <0x021e0000 0x4000>;
++				interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
++				gpr = <&gpr>;
++				clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
++					 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
++				clock-names = "pllref", "core_cfg";
+ 				status = "disabled";
+ 
+ 				ports {
 -- 
 2.1.0
