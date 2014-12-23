@@ -1,111 +1,121 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 24 Dec 2014 00:37:14 +0900
-Subject: [PATCH] arm64: mm: Add pgd_page to support RCU fast_gup
-In-Reply-To: <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
-References: <11B98DF8-2B98-414B-88E5-14C97ADAA60E@gmail.com>
- <20141221105633.GJ23242@arm.com>
- <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
- <374BBC79-DD7B-4FEC-A1B3-DD6D14ED30A8@gmail.com>
- <20141222153111.GA15240@e104818-lin.cambridge.arm.com>
- <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
-Message-ID: <0341C428-A85D-4085-9F75-893576D42A65@gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 23 Dec 2014 10:39:07 -0500
+Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
+ SoC) EVMs
+In-Reply-To: <54997AC2.1040507@linaro.org>
+References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
+ <CANMBJr5T6SJFiw4HwvK0cfJsyrM8WTPU6_aK0uzznEV4Mqcg3w@mail.gmail.com>
+ <5494B932.6060602@ti.com> <20141221102925.GJ10857@pengutronix.de>
+ <54983304.3080302@ti.com> <54997AC2.1040507@linaro.org>
+Message-ID: <54998C9B.2080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 23, 2014, at 1:28 AM, Catalin Marinas wrote:
-> On Mon, Dec 22, 2014 at 03:31:12PM +0000, Catalin Marinas wrote:
->> On Mon, Dec 22, 2014 at 03:11:37PM +0000, Jungseok Lee wrote:
->>> On Dec 22, 2014, at 9:30 PM, Catalin Marinas wrote:
->>>> On Sun, Dec 21, 2014 at 10:56:33AM +0000, Will Deacon wrote:
->>>>> On Sat, Dec 20, 2014 at 12:49:40AM +0000, Jungseok Lee wrote:
->>>>>> This patch adds pgd_page definition in order to keep supporting
->>>>>> HAVE_GENERIC_RCU_GUP configuration. In addition, it changes pud_page
->>>>>> expression to align with pmd_page for readability.
->>>>>> 
->>>>>> An introduction of pgd_page resolves the following build breakage
->>>>>> under 4KB + 4Level memory management combo.
->>>>>> 
->>>>>> mm/gup.c: In function 'gup_huge_pgd':
->>>>>> mm/gup.c:889:2: error: implicit declaration of function 'pgd_page' [-Werror=implicit-function-declaration]
->>>>>> head = pgd_page(orig);
->>>>>> ^
->>>>>> mm/gup.c:889:7: warning: assignment makes pointer from integer without a cast
->>>>>> head = pgd_page(orig);
->>>>>> 
->>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>>>> Cc: Will Deacon <will.deacon@arm.com>
->>>>>> Cc: Steve Capper <steve.capper@linaro.org>
->>>>>> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
->>>>>> ---
->>>>>> arch/arm64/include/asm/pgtable.h | 4 +++-
->>>>>> 1 file changed, 3 insertions(+), 1 deletion(-)
->>>>>> 
->>>>>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->>>>>> index df22314..a1fe927 100644
->>>>>> --- a/arch/arm64/include/asm/pgtable.h
->>>>>> +++ b/arch/arm64/include/asm/pgtable.h
->>>>>> @@ -401,7 +401,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
->>>>>> 	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
->>>>>> }
->>>>>> 
->>>>>> -#define pud_page(pud)           pmd_page(pud_pmd(pud))
->>>>>> +#define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
->>>>> 
->>>>> It would be cleaner to use pud_pfn here, otherwise we end up passing a
->>>>> physical address with the lower attributes present to __phys_to_pfn, which
->>>>> "knows" to shift them away.
->>>> 
->>>> It looks like we did the same with pmd_page() but not with pte_page(),
->>>> the latter using pte_pfn().
->>>> 
->>>> It's not a problem with lower attributes because they are within the
->>>> first 12 bits, so the shifting gets rid of them. For pmd/pud/pgd, bits
->>>> above 12 and up to the actual address must be 0.
->>>> 
->>>> I agree with changing all of them to use pte/pmd/pud/pgd_pfn but I'm
->>>> inclined to merge this patch now to fix the kernel build and we'll look
->>>> at the clean-up after Christmas.
->>> 
->>> Either way, I'm fine.
->> 
->> Unless you post an updated patch quickly enough ;)
-> 
-> Actually, don't worry, I'll fold Will's suggestions into your patch. I
-> found another problem with pmd_page being defined twice.
+On 12/23/2014 09:22 AM, Grygorii.Strashko at linaro.org wrote:
+> On 12/22/2014 05:04 PM, Murali Karicheri wrote:
+>> On 12/21/2014 05:29 AM, Uwe Kleine-K?nig wrote:
+>>> Hello,
+>>>
+>>> I cannot say anything here, but maybe the people being involved in
+>>> 1e6b48116a950 can. I added them to Cc and didn't trim the mail for them.
+>> Uwe,
+>>
+>> Thanks for copying the commit owners. Looking forward for a response
+>> from them.
+>>
+>> Murali
+>>>
+>>> Best regards
+>>> Uwe
+>>>
+>>> On Fri, Dec 19, 2014 at 06:48:02PM -0500, Murali Karicheri wrote:
+>>>> On 12/19/2014 04:25 PM, Tyler Baker wrote:
+>>>>> Hello,
+>>>>>
+>>>>> On 19 December 2014 at 13:18, Uwe Kleine-K?nig
+>>>>> <u.kleine-koenig@pengutronix.de>    wrote:
+>>>>>> Hello,
+>>>>>>
+>>>>>> On Fri, Dec 19, 2014 at 03:55:50PM -0500, Murali Karicheri wrote:
+>>>>>>> I have pulled the latest master from
+>>>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and
+>>>>>>> tried booting on keystone k2hk and k2e EVM. The boot hangs with
+>>>>>>> following log. Has anyone seen this? Keystone is an ARM v7 cortex
+>>>>>>> A15 SMP platform. I am assuming master branch is broken for ARM v7
+>>>>>>> and someone is working to address this. v3.18 booted up fine on my
+>>>>>>> EVM.
+>>>>>>>
+>>>>>>> Any idea?
+>>>>>> You forgot to attach the log?! So no, I don't have any idea. Did you
+>>>>>> bisect?
+>>>>
+>>>> This was my first git bisect work. git bisect showed me below commit
+>>>> as bad commit. But it is pretty old commit. I tried reverting the
+>>>> commit and my board booted up fine. The boot log attached below. I
+>>>> did following until I got the bad commit. v3.18 also worked fine.
+>>>>
+>>>> git bisect start
+>>>> git bisect good<working commit>
+>>>> git bisect bad<non working commit>
+>>>>
+>>>> I build and test. If boots fine, I did git bisect good and if not,
+>>>> git bisect bad until I got the bad commit. Can someone comment if my
+>>>> bisect steps look sane? If so, what is wrong with the below commit?
+>>>> Ours is a LPAE SoC.
+>>>>
+>>>> commit 1e6b48116a95046ec51f3d40f83aff8b006674d7
+>>>> Author: Kees Cook<keescook@chromium.org>
+>>>> Date:   Thu Apr 3 17:28:11 2014 -0700
+>>>>
+>>>>       ARM: mm: allow non-text sections to be non-executable
+>>>>
+>>>>       Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+>>>>       into section-sized areas that can have different permisions.
+>>>> Performs
+>>>>       the NX permission changes during free_initmem, so that init
+>>>> memory can be
+>>>>       reclaimed.
+>>>>
+>>>>       This uses section size instead of PMD size to reduce memory lost to
+>>>>       padding on non-LPAE systems.
+>>>>
+>>>>       Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+>>>>
+>>>>       Signed-off-by: Kees Cook<keescook@chromium.org>
+>>>>       Tested-by: Laura Abbott<lauraa@codeaurora.org>
+>>>>       Acked-by: Nicolas Pitre<nico@linaro.org>
+>>>>
+>
+> Looks like kernel_x_start, kernel_x_end are calculated wrongly in LPAE case.
+> kernel_x_start == 0x0000 0000
+> kernel_x_end   == 0x0080 0000
+>
+> but should be:
+> kernel_x_start == 0x0000 0008 0000 0000
+> kernel_x_end   == 0x0000 0008 0080 0000
+>
+> Below diff restores boot for me:
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index cda7c40..4e6ef89 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1329,8 +1329,8 @@ static void __init kmap_init(void)
+>   static void __init map_lowmem(void)
+>   {
+>          struct memblock_region *reg;
+> -       unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+> -       unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+> +       phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+> +       phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+>
+>          /* Map all the lowmem memory banks. */
+>          for_each_memblock(memory, reg) {
 
-Yeah. One of them should be removed.
+Great! Let me apply this and check it on my end. But how did the 
+offending commit caused this failure? Will you be sending a patch to fix 
+this?
 
-I tried to rework the patch with Will's suggestion, but I've failed to figure
-out a full story of pmd_pfn and pmd_page.
-
-It looks like that pmd_page cannot be written using pmd_pfn unless pmd_pfn is
-changed since pmd_pfn masks an input value with PMD_MASK, but pmd_page does not.
-Additionally, I'm not sure about whether pmd_pfn with PMD_MASK works well for an
-user process page table.
-
-So, my change on pmd_pfn and pmd_page is as follows. Please correct me if I am wrong.
-
-
------8<-----
-
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -294,11 +294,11 @@ void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
- 
- #define pmd_mkhuge(pmd)                (__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
- 
--#define pmd_pfn(pmd)           (((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-+#define pmd_pfn(pmd)           ((pmd_val(pmd) & PHYS_MASK) >> PAGE_SHIFT)
- #define pfn_pmd(pfn,prot)      (__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
- #define mk_pmd(page,prot)      pfn_pmd(page_to_pfn(page),prot)
- 
--#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
-+#define pmd_page(pmd)          pfn_to_page(pmd_pfn(pmd))
- #define pud_write(pud)         pte_write(pud_pte(pud))
- #define pud_pfn(pud)           (((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-
-
-Thanks for a kind response, Catalin and Will!
-
-Best Regards
-Jungseok Lee
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
