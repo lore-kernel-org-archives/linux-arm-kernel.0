@@ -1,49 +1,36 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Dec 2014 20:44:37 +0900
-Subject: [RFC PATCH 4/4] ARM: dts: Add memory bus node for Exynos3250-based
- Rinato board
-In-Reply-To: <1419335077-31020-1-git-send-email-cw00.choi@samsung.com>
-References: <1419335077-31020-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1419335077-31020-5-git-send-email-cw00.choi@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 23 Dec 2014 12:55:43 +0100
+Subject: clk: samsung: exynos7: Add clocks for MSCL block
+In-Reply-To: <5498F6AA.8010405@samsung.com>
+References: <1418801617-7593-1-git-send-email-tony.kn@samsung.com>
+ <5498F6AA.8010405@samsung.com>
+Message-ID: <5499583F.9070604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the exynos memory-bus node which includes the regulator and
-devfreq-event phandle. The devfreq-event phandle is used for the governor
-of devfreq device and provide the current usage state of DMC/Internal
-memory bus group.
+Hi Pankaj,
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250-rinato.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On 23/12/14 05:59, Pankaj Dubey wrote:
+>> diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
+>> > index a79bf23..95c1160 100644
+>> > --- a/drivers/clk/samsung/clk-exynos7.c
+>> > +++ b/drivers/clk/samsung/clk-exynos7.c
+>> > @@ -34,6 +34,7 @@
+>> >   #define DIV_TOPC0		0x0600
+>> >   #define DIV_TOPC1		0x0604
+>> >   #define DIV_TOPC3		0x060C
+>> > +#define	ENABLE_ACLK_TOPC1	0x0804
+>
+> nit: Tab space between #define and ENABLE_ACLK_TOPC1, should be removed.
+> 
+> I verified register settings and clock relationships are as per UM I 
+> have with me. So other than above nit, everything looks fine.
+> 
+> Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 60948ae..6722555 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -564,6 +564,18 @@
- 	};
- };
- 
-+&memory_bus_mif {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-mem-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
-+&memory_bus_int {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-mem-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
- &xusbxti {
- 	clock-frequency = <24000000>;
- };
--- 
-1.8.5.5
+Thanks for you review, I have already fixed the whitespace issue when
+applying.
+
+--
+Regards,
+Sylwester
