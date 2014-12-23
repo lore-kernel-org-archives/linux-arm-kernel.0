@@ -1,42 +1,43 @@
-From: walter@vanguardiasur.com.ar (Walter Lozano)
-Date: Tue, 23 Dec 2014 10:04:22 -0300
-Subject: [PATCH] ARM: socfpga: dts: Add adxl34x
-Message-ID: <1419339862-29852-1-git-send-email-walter@vanguardiasur.com.ar>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 23 Dec 2014 14:09:17 +0100
+Subject: [PATCH v7 2/3] of: Add for_each_endpoint_of_node helper macro
+In-Reply-To: <1419340158-20567-1-git-send-email-p.zabel@pengutronix.de>
+References: <1419340158-20567-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1419340158-20567-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DTS bindings for the adxl34x digital
-accelerometer.
+Note that while of_graph_get_next_endpoint decrements the reference count
+of the child node passed to it, of_node_put(child) still has to be called
+manually when breaking out of the loop.
 
-Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ include/linux/of_graph.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 16ea6f5..f99d7dec 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -68,3 +68,20 @@
- &usb1 {
- 	status = "okay";
+diff --git a/include/linux/of_graph.h b/include/linux/of_graph.h
+index befef42..e43442e 100644
+--- a/include/linux/of_graph.h
++++ b/include/linux/of_graph.h
+@@ -26,6 +26,17 @@ struct of_endpoint {
+ 	const struct device_node *local_node;
  };
+ 
++/**
++ * for_each_endpoint_of_node - iterate over every endpoint in a device node
++ * @parent: parent device node containing ports and endpoints
++ * @child: loop variable pointing to the current endpoint node
++ *
++ * When breaking out of the loop, of_node_put(child) has to be called manually.
++ */
++#define for_each_endpoint_of_node(parent, child) \
++	for (child = of_graph_get_next_endpoint(parent, NULL); child != NULL; \
++	     child = of_graph_get_next_endpoint(parent, child))
 +
-+&gpio2 {
-+	status = "okay";
-+};
-+
-+&i2c1{
-+	status = "okay";
-+
-+	accel1: accel1 at 53{
-+		compatible = "adxl34x";
-+		reg = <0x53>;
-+
-+		interrupt-parent = < &portc >;
-+		interrupts = <3 2>;
-+
-+	};
-+};
+ #ifdef CONFIG_OF
+ int of_graph_parse_endpoint(const struct device_node *node,
+ 				struct of_endpoint *endpoint);
 -- 
-1.7.10.4
+2.1.4
