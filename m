@@ -1,20 +1,35 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 23 Dec 2014 21:44:39 -0800
-Subject: [PATCH] linux/kernel.h: merge ARRAY_AND_SIZE defines
-In-Reply-To: <1419399496-5955-1-git-send-email-yamada.m@jp.panasonic.com>
-References: <1419399496-5955-1-git-send-email-yamada.m@jp.panasonic.com>
-Message-ID: <1419399879.6157.9.camel@perches.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 24 Dec 2014 08:05:26 +0200
+Subject: [PATCH 2/8] ARM: digicolor: add low level debug support
+In-Reply-To: <2866303.axqKJidzX4@wuerfel>
+References: <cover.1419318109.git.baruch@tkos.co.il>
+ <d161e426125c28c9698fa5fecad4e5278abc0895.1419318109.git.baruch@tkos.co.il>
+ <2866303.axqKJidzX4@wuerfel>
+Message-ID: <20141224060525.GH2481@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-24 at 14:38 +0900, Masahiro Yamada wrote:
-> ARRAY_AND_SIZE is a useful macro.  Its definition is already
-> duplicated in some headers.  Move it to include/linux/kernel.h.
+Hi Arnd,
 
-I think it's not a good/useful macro and
-would prefer the uses expanded instead.
+On Tue, Dec 23, 2014 at 10:00:17PM +0100, Arnd Bergmann wrote:
+> On Tuesday 23 December 2014 09:58:39 Baruch Siach wrote:
+> > @@ -14,5 +14,6 @@ static const char *digicolor_dt_compat[] __initconst = {
+> >  };
+> >  
+> >  DT_MACHINE_START(DIGICOLOR, "Conexant Digicolor (Flattened Device Tree)")
+> > +       .map_io         = debug_ll_io_init,
+> >         .dt_compat      = digicolor_dt_compat,
+> >  MACHINE_END
+> 
+> This change is not needed, the debug_ll_io_init function is used by default
+> if no other map_io callback is specified.
 
-The uses of ARRAY_AND_SIZE in structure
-definitions aren't particularly bad, but the
-ARRAY_AND_SIZE uses that hide the number of
-arguments in a function I think are suboptimal.
+OK. I'll remove it for next version.
+
+Thanks,
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
