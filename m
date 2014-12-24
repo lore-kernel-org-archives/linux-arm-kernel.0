@@ -1,68 +1,26 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 24 Dec 2014 10:57:39 -0500
-Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
- dma configuration
-In-Reply-To: <4513569.xuD4xkPOuC@wuerfel>
-References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
- <5090769.jqAkiDgYu7@wuerfel> <5499A96D.4010704@ti.com>
- <4513569.xuD4xkPOuC@wuerfel>
-Message-ID: <549AE273.1040407@ti.com>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Wed, 24 Dec 2014 17:36:26 +0100
+Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
+ disable failure due to domain being gated
+In-Reply-To: <7hlhmfo1b0.fsf@deeprootsystems.com>
+References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+ <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
+ <7hlhmfo1b0.fsf@deeprootsystems.com>
+Message-ID: <20141224163626.GA3902@peachpi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/23/2014 05:42 PM, Arnd Bergmann wrote:
-> On Tuesday 23 December 2014 12:42:05 Murali Karicheri wrote:
->>> here.
->>
->> Arnd,
->>
->> I guess so. Besides we need to keep the default coherent dma mask to
->> 32bit 0xffffffffull as well to work on Keystone and also in sync with
->> current defaults used in pci_device_add() so that we don't break this
->> behavior.
->>
->> Here is the summary of changes need to make on top of my existing patch.
->>
->> 1. of_dma_configure() - change size = dev->coherent_dma_mask to size =
->> dev->coherent_dma_mask + 1. This is a new patch to fix existing code.
->
-> ok
->
->> 2. Do the above change to of_pci_dma_configure() as well.
->
-> ok
->
->> 3. in arch_setup_dma_ops() update the DMA mask to min((*dev->dma_mask),
->> dma_base + size - 1) as
->>
->>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index c17f6a9..88b4769 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -2053,8 +2053,13 @@ void arch_setup_dma_ops(struct device *dev, u64
->> dma_base, u64 size,
->>    {
->>           struct dma_map_ops *dma_ops;
->>
->> +
->> +       *dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
->>
->> I have tested this on keystone and it works fine with rootfs on PCI SATA
->> harddisk. I will be doing more tests with this change. If you are in
->> agreement with the above changes, I will re-spin the patch to accomodate
->> them and send v1 of the same.
->
-> Ok, sounds good. I noticed that you did not put Russell into the Cc list
-> for the emails. Please do so when you send it again, as he may have some
-> additional comments.
->
-> 	Arnd
-Arnd,
+On Wed, Dec 10, 2014 at 09:35:31AM -0800, Kevin Hilman wrote:
+> 
+> I confirm it fixes the boot hang in linux-next (next-20141210) on my
+> exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
+> exynos_defconfig and multi_v7_defconfig.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-Can I add "Reviewed-by: Arnd Bergmann <arnd@arndb.de>" when I send the 
-v2 of the patch? I want to send this today. So please respond.
+does audio work on your peach pi? because kernel boots fine, but i can't get any
+audio out of it
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+bye,
+p.
