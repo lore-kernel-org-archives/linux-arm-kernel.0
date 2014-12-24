@@ -1,41 +1,70 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed, 24 Dec 2014 17:37:02 +0800
-Subject: [PATCH v2 3/3] ASoC: rockchip: i2s: fix maxburst of dma data to 4
-In-Reply-To: <1419413822-11539-1-git-send-email-jay.xu@rock-chips.com>
-References: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
- <1419413822-11539-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1419413822-11539-4-git-send-email-jay.xu@rock-chips.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 24 Dec 2014 10:45:17 +0100
+Subject: [PATCH] ARM: socfpga: dts: Add adxl34x
+In-Reply-To: <1419339862-29852-1-git-send-email-walter@vanguardiasur.com.ar>
+References: <1419339862-29852-1-git-send-email-walter@vanguardiasur.com.ar>
+Message-ID: <20141224094516.GI13070@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since RK3288 DMAC's burst length only support max to 4, here
-set maxburst of playback and capture dma data to 4.
+Hi!
 
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
-changes since v1:
-- new patch since v1
+On Tue, Dec 23, 2014 at 10:04:22AM -0300, Walter Lozano wrote:
+> This patch adds the DTS bindings for the adxl34x digital
+> accelerometer.
+> 
 
- sound/soc/rockchip/rockchip_i2s.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for doing this. Does the ADXL34 work now? Last time I
+tried it, I didn't get any interrupts, but as I didn't really
+care for the accelerometer I didn't dig deeper.
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 1cd7efc..59aeec4 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -458,11 +458,11 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 
- 	i2s->playback_dma_data.addr = res->start + I2S_TXDR;
- 	i2s->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--	i2s->playback_dma_data.maxburst = 16;
-+	i2s->playback_dma_data.maxburst = 4;
- 
- 	i2s->capture_dma_data.addr = res->start + I2S_RXDR;
- 	i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
--	i2s->capture_dma_data.maxburst = 16;
-+	i2s->capture_dma_data.maxburst = 4;
- 
- 	i2s->dev = &pdev->dev;
- 	dev_set_drvdata(&pdev->dev, i2s);
+> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index 16ea6f5..f99d7dec 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> @@ -68,3 +68,20 @@
+>  &usb1 {
+>  	status = "okay";
+>  };
+> +
+> +&gpio2 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c1{
+       ^^^
+
+Add a space here and ...
+
+> +	status = "okay";
+> +
+> +	accel1: accel1 at 53{
+			^^^
+here. Also, this should be accelerometer at 53.
+
+> +		compatible = "adxl34x";
+> +		reg = <0x53>;
+> +
+> +		interrupt-parent = < &portc >;
+				   ^^^    ^^^
+Please remove the spaces here.
+> +		interrupts = <3 2>;
+> +
+> +	};
+> +};
+
+Finally, please sort the nodes alphabetically and not just append them.
+
+Regards,
+Steffen
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
