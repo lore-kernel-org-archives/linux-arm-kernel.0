@@ -1,79 +1,27 @@
-From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Wed, 24 Dec 2014 17:31:19 +0800
-Subject: [PATCH v2] mtd: hisilicon: add device tree node for NAND controller
-Message-ID: <1419413479-32083-1-git-send-email-wangzhou.bry@gmail.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Wed, 24 Dec 2014 17:36:59 +0800
+Subject: [PATCH v2 0/3] ASoC: rockchip: i2s: fix watermark to 16 and maxburst
+ to 4
+In-Reply-To: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
+References: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1419413822-11539-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add dts support for NAND flash controller of Hisilicon Soc Hip04
+To make Bus DMA works more efficiency, DMA may work in burst mode,
+   we set the watermark of transmit and receive reach to 16 bits.
 
-Changes in v2:
-- Base on v3.19-rc1
-- Use nand-ecc-strength, nand-ecc-step-size to replace hisi,nand-ecc-bits
-Changes in v1:
-- Move partition and other board related information into board dts file:
-  hip04-d01.dts
+Jianqun Xu (3):
+  ASoC: rockchip: i2s: fix error defination of transmit data level
+  ASoC: rockchip: i2s: set TDL and RDL to 16 samples
+  ASoC: rockchip: i2s: fix maxburst of dma data to 4
 
-Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
----
- arch/arm/boot/dts/hip04-d01.dts |   27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/hip04.dtsi    |    7 +++++++
- 2 files changed, 34 insertions(+)
+ sound/soc/rockchip/rockchip_i2s.c | 8 ++++++--
+ sound/soc/rockchip/rockchip_i2s.h | 2 +-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
-index 40a9e33..ba04dd5 100644
---- a/arch/arm/boot/dts/hip04-d01.dts
-+++ b/arch/arm/boot/dts/hip04-d01.dts
-@@ -28,5 +28,32 @@
- 		uart0: uart at 4007000 {
- 			status = "ok";
- 		};
-+
-+		nand: nand at 4020000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "hw";
-+			nand-ecc-strength = <16>;
-+			nand-ecc-step-size = <1024>;
-+
-+			partition at 0 {
-+				label = "nand_text";
-+				reg = <0x00000000 0x00400000>;
-+			};
-+
-+			partition at 00400000 {
-+				label = "nand_monitor";
-+				reg = <0x00400000 0x00400000>;
-+			};
-+
-+			partition at 00800000 {
-+				label = "nand_kernel";
-+				reg = <0x00800000 0x00800000>;
-+			};
-+
-+			partition at 01000000 {
-+				label = "nand_fs";
-+				reg = <0x01000000 0x1f000000>;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index 2388145..ac32fce 100644
---- a/arch/arm/boot/dts/hip04.dtsi
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -269,6 +269,13 @@
- 			interrupts = <0 372 4>;
- 		};
- 
-+		nand: nand at 4020000 {
-+			compatible = "hisilicon,504-nfc";
-+			reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
-+			interrupts = <0 379 4>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+		};
- 	};
- 
- 	etb at 0,e3c42000 {
 -- 
-1.7.9.5
+changes since v1:
+- modify commit message suggested by dgreid
+- add patch to fix maxburst
+1.9.1
