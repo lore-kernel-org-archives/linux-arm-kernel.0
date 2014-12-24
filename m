@@ -1,70 +1,69 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 24 Dec 2014 10:45:17 +0100
-Subject: [PATCH] ARM: socfpga: dts: Add adxl34x
-In-Reply-To: <1419339862-29852-1-git-send-email-walter@vanguardiasur.com.ar>
-References: <1419339862-29852-1-git-send-email-walter@vanguardiasur.com.ar>
-Message-ID: <20141224094516.GI13070@pengutronix.de>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Wed, 24 Dec 2014 17:47:17 +0800
+Subject: [PATCH v5 0/2] mtd: hisilicon: add a new driver for NAND controller
+ of hisilicon hip04 Soc
+Message-ID: <1419414439-32444-1-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patchset adds the support for NAND controller of hisilicon hip04 Soc.
+The NAND controller IP was developed by hisilicon and needs a new driver to
+support it. This patchset is based on l2-mtd/master.
 
-On Tue, Dec 23, 2014 at 10:04:22AM -0300, Walter Lozano wrote:
-> This patch adds the DTS bindings for the adxl34x digital
-> accelerometer.
-> 
+I have tested this NAND flash controller driver in Hip04 D01 board using MTD
+test modules. All testes passed except mtd_nandbiterrs. The reason is that this
+NAND controller doesn't support to write raw page in ECC mode. In the test of
+mtd_nandbiterrs, when rewriting raw page(with some bits changed) back, this NAND
+controller will also produce ECC codes and write into NAND flash OOB area. As
+ECC codes in OOB area have been broken, read error comes out as follow.
 
-Thanks for doing this. Does the ADXL34 work now? Last time I
-tried it, I didn't get any interrupts, but as I didn't really
-care for the accelerometer I didn't dig deeper.
+Changes in v5:
+- Make modifications according to the comments from Brian, thanks a lot.
+- Add hisi_nand_read_oob callback function.
 
-> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index 16ea6f5..f99d7dec 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -68,3 +68,20 @@
->  &usb1 {
->  	status = "okay";
->  };
-> +
-> +&gpio2 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c1{
-       ^^^
+Changes in v4:
+- Add mtd->dev.parent = &pdev->dev, thanks Frans Klaver.  
 
-Add a space here and ...
+Changes in v3:
+- Modify code to eliminate some code style warnings.
+- Add ecc-bits input check.
+- Avoid using waterfall style in hisi_nfc_cmdfunc().
 
-> +	status = "okay";
-> +
-> +	accel1: accel1 at 53{
-			^^^
-here. Also, this should be accelerometer at 53.
+Changes in v2:
+- Remove the patch for device tree, now patchset only has the driver and its
 
-> +		compatible = "adxl34x";
-> +		reg = <0x53>;
-> +
-> +		interrupt-parent = < &portc >;
-				   ^^^    ^^^
-Please remove the spaces here.
-> +		interrupts = <3 2>;
-> +
-> +	};
-> +};
+device tree binding documentation.
+- Change the file name: hisi_nand.c to hisi504_nand.c.
 
-Finally, please sort the nodes alphabetically and not just append them.
+Changes in v1:
+- Remove callback functions out of struct hinfc_host, and call them directly
+  in relative functions.
+- Change hinfc_read and hinfc_write from macros to inline functions.
+- Instead of putting pointers, embed struct nand_chip and struct mtd_info
+  in struct hinfc_host directly.
+- rewrite some unclear lines in device tree binding document, correct
+  some code style error.
 
-Regards,
-Steffen
+Link on v4:
+- https://lkml.org/lkml/2014/11/4/377
+Link on v3:
+- https://lkml.org/lkml/2014/10/28/386
+Link on v2:
+- https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg750071.html
+Link on v1:
+- https://lkml.org/lkml/2014/7/15/198
+
+Zhou Wang (2):
+  mtd: hisilicon: add a new NAND controller driver for hisilicon hip04 Soc
+  mtd: hisilicon: add device tree binding documentation
+
+ .../devicetree/bindings/mtd/hisi504-nand.txt       |   48 ++
+ drivers/mtd/nand/Kconfig                           |    5 +
+ drivers/mtd/nand/Makefile                          |    1 +
+ drivers/mtd/nand/hisi504_nand.c                    |  907 ++++++++++++++++++++
+ 4 files changed, 961 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/hisi504-nand.txt
+ create mode 100644 drivers/mtd/nand/hisi504_nand.c
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
