@@ -1,46 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Dec 2014 08:47:36 +0000
-Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <1947751.D0rZorCFoT@wuerfel>
-References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
- <1419321723.14341.38.camel@mtksdaap41>
- <72aa7f4069a000c6e39c53e328015aa3@www.loen.fr> <1947751.D0rZorCFoT@wuerfel>
-Message-ID: <823671a45699c6b7ca6db5243f111d0b@www.loen.fr>
+From: wangzhou.bry@gmail.com (Zhou Wang)
+Date: Wed, 24 Dec 2014 17:23:34 +0800
+Subject: [PATCH v5 0/2] ARM: hip04: add GPIO support
+Message-ID: <1419413016-31932-1-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-12-23 21:07, Arnd Bergmann wrote:
-> On Tuesday 23 December 2014 08:43:55 Marc Zyngier wrote:
->>
->> > Neverthless, MT8173 SoC already use 0x10224000 and 0x10225000 as 
->> VGIC
->> > base address.
->>
->> Then its fate is sealed virtualization wise.
->
-> It should still work with 4kb pages on the host, right? Would that 
-> still
-> allow you to have 64kb pages on the guest, or does the guest page 
-> size
-> have to be smaller or equal to the host?
+This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
+synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
+corresponding dts. The default value of ARCH_NR_GPIOS is used to find gpio
+base here.
 
-Of course, it will still work with 4kB pages, and the guest can still 
-use
-whatever page size it wants, including 64kB. Not very good from a 
-performance
-point of view, but it will work.
+Change in v5:
+- Base on v3.19-rc1
+- Just use default value of ARCH_NR_GPIOS to find gpio base. Remove the new
+  added patch(3/4) in v4.
+Change in v4:
+- Delete "default 128 if ARCH_HIP04" in arch/arm/Kconfig
+- add a new patch to support find GPIO base number in increasing order
+- add gpio-number-forward property in snps gpio binding doc
+Change in v3:
+- Move CONFIG_GPIO_DWAPB to hisi_defconfig
+- Add CONFIG_GPIOLIB, CONFIG_GPIO_SYSFS in hisi_defconfig
+Change in v2:
+- Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
 
-My main worry is that we're already starting to see more and more 
-platforms
-having divergent requirements in their MM setup, and distributions are 
-going
-to struggle to provide a full-featured single kernel image, specially 
-as some
-feel the need to push 64kB pages down to everybody's throat.
+Link for v4:
+- http://www.spinics.net/lists/arm-kernel/msg383883.html
+Link for v3:
+- http://www.spinics.net/lists/devicetree/msg60324.html
 
-Thanks,
+Zhou Wang (2):
+  ARM: hip04: add GPIO configure in hisi_defconfig
+  ARM: dts: hip04: add GPIO pieces
 
-         M.
+ arch/arm/boot/dts/hip04.dtsi    |   77 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/hisi_defconfig |    1 +
+ 2 files changed, 78 insertions(+)
+
 -- 
-Fast, cheap, reliable. Pick two.
+1.7.9.5
