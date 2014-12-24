@@ -1,51 +1,72 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 24 Dec 2014 08:28:58 +0900
-Subject: [PATCH] arm64: mm: Add pgd_page to support RCU fast_gup
-In-Reply-To: <20141223160113.GD21816@e104818-lin.cambridge.arm.com>
-References: <11B98DF8-2B98-414B-88E5-14C97ADAA60E@gmail.com>
- <20141221105633.GJ23242@arm.com>
- <20141222123051.GC20269@e104818-lin.cambridge.arm.com>
- <374BBC79-DD7B-4FEC-A1B3-DD6D14ED30A8@gmail.com>
- <20141222153111.GA15240@e104818-lin.cambridge.arm.com>
- <20141222162823.GB15240@e104818-lin.cambridge.arm.com>
- <0341C428-A85D-4085-9F75-893576D42A65@gmail.com>
- <20141223160113.GD21816@e104818-lin.cambridge.arm.com>
-Message-ID: <FE34AECF-FB56-405B-B72D-C1B1BCF10D61@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 23 Dec 2014 16:11:41 -0800
+Subject: [PATCH] cpufreq: suspend cpufreq governors on shutdown
+Message-ID: <1419379901-17182-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 24, 2014, at 1:01 AM, Catalin Marinas wrote:
-> On Tue, Dec 23, 2014 at 03:37:14PM +0000, Jungseok Lee wrote:
->> It looks like that pmd_page cannot be written using pmd_pfn unless pmd_pfn is
->> changed since pmd_pfn masks an input value with PMD_MASK, but pmd_page does not.
->> Additionally, I'm not sure about whether pmd_pfn with PMD_MASK works well for an
->> user process page table.
->> 
->> So, my change on pmd_pfn and pmd_page is as follows. Please correct me if I am wrong.
->> 
->> -----8<-----
->> 
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -294,11 +294,11 @@ void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
->> 
->> #define pmd_mkhuge(pmd)                (__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
->> 
->> -#define pmd_pfn(pmd)           (((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
->> +#define pmd_pfn(pmd)           ((pmd_val(pmd) & PHYS_MASK) >> PAGE_SHIFT)
->> #define pfn_pmd(pfn,prot)      (__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
->> #define mk_pmd(page,prot)      pfn_pmd(page_to_pfn(page),prot)
->> 
->> -#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
->> +#define pmd_page(pmd)          pfn_to_page(pmd_pfn(pmd))
->> #define pud_write(pud)         pte_write(pud_pte(pud))
->> #define pud_pfn(pud)           (((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-> 
-> It looks like pmd_pfn() is only used for huge pages, so the original
-> code was safe. As I said, I won't do further changes here, at least not
-> for 3.19.
+We should stop cpufreq governors when we shut down the system.  If we
+don't do this, we can end up with this deadlock:
 
-Okay, everything is clear.
+1. cpufreq governor may be running on a CPU other than CPU0.
+2. In machine_restart() we call smp_send_stop() which stops CPUs.
+   If one of these CPUs was actively running a cpufreq governor
+   then it may have the mutex / spinlock needed to access the main
+   PMIC in the system (perhaps over I2C)
+3. If a machine needs access to the main PMIC in order to shutdown
+   then it will never get it since the mutex was lost when the other
+   CPU stopped.
 
-Best Regards
-Jungseok Lee
+Let's avoid the race by stopping the cpufreq governor at shutdown,
+which is a sensible thing to do anyway.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+NOTE: This was developed / tested / on a 3.14 kernel with backports.
+I have confirmed that it compiles on a mainline kernel and doesn't
+crash, but I haven't verified that there isn't some other fix in
+mainline that also fixes this problem.  If you are aware of such a fix
+then please drop this patch.
+
+ drivers/cpufreq/cpufreq.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index a09a29c..bd89721 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -27,6 +27,7 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ #include <linux/suspend.h>
++#include <linux/syscore_ops.h>
+ #include <linux/tick.h>
+ #include <trace/events/power.h>
+ 
+@@ -2550,6 +2551,15 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
+ }
+ EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
+ 
++static void cpufreq_shutdown(void)
++{
++	cpufreq_suspend();
++}
++
++static struct syscore_ops cpufreq_syscore_ops = {
++	.shutdown = cpufreq_shutdown,
++};
++
+ static int __init cpufreq_core_init(void)
+ {
+ 	if (cpufreq_disabled())
+@@ -2558,6 +2568,8 @@ static int __init cpufreq_core_init(void)
+ 	cpufreq_global_kobject = kobject_create();
+ 	BUG_ON(!cpufreq_global_kobject);
+ 
++	register_syscore_ops(&cpufreq_syscore_ops);
++
+ 	return 0;
+ }
+ core_initcall(cpufreq_core_init);
+-- 
+2.2.0.rc0.207.ga3a616c
