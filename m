@@ -1,52 +1,68 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Wed, 24 Dec 2014 16:54:28 +0100
-Subject: [PATCH] ARM: mm: Enable PXN when running non-LPAE kernel on LPAE
- processor
-Message-ID: <1419436468.4705.105.camel@decadent.org.uk>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 24 Dec 2014 10:57:39 -0500
+Subject: [RFC v1 PATCH 1/2] of/pci: add of_pci_dma_configure() update
+ dma configuration
+In-Reply-To: <4513569.xuD4xkPOuC@wuerfel>
+References: <1418940425-2017-1-git-send-email-m-karicheri2@ti.com>
+ <5090769.jqAkiDgYu7@wuerfel> <5499A96D.4010704@ti.com>
+ <4513569.xuD4xkPOuC@wuerfel>
+Message-ID: <549AE273.1040407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VMSA field of MMFR0 (bottom 4 bits) is incremented for each
-added feature.  PXN is supported if the value is >= 4 and LPAE
-is supported if it is >= 5.
+On 12/23/2014 05:42 PM, Arnd Bergmann wrote:
+> On Tuesday 23 December 2014 12:42:05 Murali Karicheri wrote:
+>>> here.
+>>
+>> Arnd,
+>>
+>> I guess so. Besides we need to keep the default coherent dma mask to
+>> 32bit 0xffffffffull as well to work on Keystone and also in sync with
+>> current defaults used in pci_device_add() so that we don't break this
+>> behavior.
+>>
+>> Here is the summary of changes need to make on top of my existing patch.
+>>
+>> 1. of_dma_configure() - change size = dev->coherent_dma_mask to size =
+>> dev->coherent_dma_mask + 1. This is a new patch to fix existing code.
+>
+> ok
+>
+>> 2. Do the above change to of_pci_dma_configure() as well.
+>
+> ok
+>
+>> 3. in arch_setup_dma_ops() update the DMA mask to min((*dev->dma_mask),
+>> dma_base + size - 1) as
+>>
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index c17f6a9..88b4769 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -2053,8 +2053,13 @@ void arch_setup_dma_ops(struct device *dev, u64
+>> dma_base, u64 size,
+>>    {
+>>           struct dma_map_ops *dma_ops;
+>>
+>> +
+>> +       *dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
+>>
+>> I have tested this on keystone and it works fine with rootfs on PCI SATA
+>> harddisk. I will be doing more tests with this change. If you are in
+>> agreement with the above changes, I will re-spin the patch to accomodate
+>> them and send v1 of the same.
+>
+> Ok, sounds good. I noticed that you did not put Russell into the Cc list
+> for the emails. Please do so when you send it again, as he may have some
+> additional comments.
+>
+> 	Arnd
+Arnd,
 
-In case a kernel with CONFIG_ARM_LPAE disabled is used on a
-processor that supports LPAE, we can still use PXN in short
-descriptors.  So check for >= 4 not == 4.
-
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-Cc: Jungseung Lee <js07.lee@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
-This worked for me in QEMU's vexpress-a15 emulation, but I don't have
-real hardware available to test with right now.
-
-Ben.
-
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index cda7c40..0872dc0 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -530,7 +530,7 @@ static void __init build_mem_type_table(void)
- 	 * in the Short-descriptor translation table format descriptors.
- 	 */
- 	if (cpu_arch == CPU_ARCH_ARMv7 &&
--		(read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) == 4) {
-+		(read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) >= 4) {
- 		user_pmd_table |= PMD_PXNTABLE;
- 	}
- #endif
+Can I add "Reviewed-by: Arnd Bergmann <arnd@arndb.de>" when I send the 
+v2 of the patch? I want to send this today. So please respond.
 
 -- 
-Ben Hutchings
-If more than one person is responsible for a bug, no one is at fault.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141224/1cd76870/attachment-0001.sig>
+Murali Karicheri
+Linux Kernel, Texas Instruments
