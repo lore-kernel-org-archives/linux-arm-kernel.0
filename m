@@ -1,59 +1,81 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 24 Dec 2014 15:11 +0100
-Subject: [PATCH] clk: rockchip: fix rk3066 pll lock bit location
-Message-ID: <2140322.FD0TUOM80V@phil>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 24 Dec 2014 09:49:48 -0600
+Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
+In-Reply-To: <549AA94A.8030209@compulab.co.il>
+References: <1419271535-4057-1-git-send-email-balbi@ti.com>
+ <54991A25.2030804@compulab.co.il> <20141223161936.GA9147@saruman>
+ <549AA94A.8030209@compulab.co.il>
+Message-ID: <20141224154948.GA423@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bit locations indicating the locking status of the plls on rk3066 are
-shifted by one to the right when compared to the rk3188, bits [7:4] instead
-of [8:5] on the rk3188, thus indicating the locking state of the wrong pll
-or a completely different information in case of the gpll.
+Hi,
 
-The recently introduced pll init code exposed that problem on some rk3066
-boards when it tried to bring the boot-pll value in line with the value
-from the rate table.
+On Wed, Dec 24, 2014 at 01:53:46PM +0200, Igor Grinberg wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+> 
+> On 12/23/14 18:19, Felipe Balbi wrote:
+> > On Tue, Dec 23, 2014 at 09:30:45AM +0200, Igor Grinberg wrote:
+> >> Hi Felipe,
+> >>
+> >> On 12/22/14 20:05, Felipe Balbi wrote:
+> >>
+> >> [...]
+> >>
+> >>>  CONFIG_SCSI_SCAN_ASYNC=y
+> >>> -CONFIG_ATA=y
+> >>> -CONFIG_SATA_AHCI_PLATFORM=y
+> >>> -CONFIG_MD=y
+> >>> +CONFIG_ATA=m
+> >>> +CONFIG_SATA_AHCI_PLATFORM=m
+> >>
+> >> Isn't this needed for the rootfs on SATA devices?
+> > 
+> > there's no known boards with rootfs on SATA. Until then, we can reduce
+> > the size.
+> 
+> What makes you say so?
+> The decision for rootfs on SATA is taken dynamically.
+> OMAP5 boards (specifically cm-t54) can have rootfs on SATA...
 
-Fix this by defining separate pll definitions for rk3066 with the correct
-locking indices.
+I'll leave the decision to Tony. Even though they _can_, they really
+don't and IIRC, OMAP5's SATA has so many silicon errata that it'd be
+annoying to find that special device which works (e.g it can't negotiate
+lower speeds with SATA III devices and it won't support SATA I).
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3188.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+As of today, we don't know of anybody really shipping anything with
+rootfs on SATA and distros would rather ship initiramfs than a giant
+zImage anyway.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index c540789..4b4e090 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -210,6 +210,17 @@ PNAME(mux_sclk_hsadc_p)		= { "hsadc_src", "hsadc_frac", "ext_hsadc" };
- PNAME(mux_mac_p)		= { "gpll", "dpll" };
- PNAME(mux_sclk_macref_p)	= { "mac_src", "ext_rmii" };
- 
-+static struct rockchip_pll_clock rk3066_pll_clks[] __initdata = {
-+	[apll] = PLL(pll_rk3066, PLL_APLL, "apll", mux_pll_p, 0, RK2928_PLL_CON(0),
-+		     RK2928_MODE_CON, 0, 5, 0, rk3188_pll_rates),
-+	[dpll] = PLL(pll_rk3066, PLL_DPLL, "dpll", mux_pll_p, 0, RK2928_PLL_CON(4),
-+		     RK2928_MODE_CON, 4, 4, 0, NULL),
-+	[cpll] = PLL(pll_rk3066, PLL_CPLL, "cpll", mux_pll_p, 0, RK2928_PLL_CON(8),
-+		     RK2928_MODE_CON, 8, 6, ROCKCHIP_PLL_SYNC_RATE, rk3188_pll_rates),
-+	[gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK2928_PLL_CON(12),
-+		     RK2928_MODE_CON, 12, 7, ROCKCHIP_PLL_SYNC_RATE, rk3188_pll_rates),
-+};
-+
- static struct rockchip_pll_clock rk3188_pll_clks[] __initdata = {
- 	[apll] = PLL(pll_rk3066, PLL_APLL, "apll", mux_pll_p, 0, RK2928_PLL_CON(0),
- 		     RK2928_MODE_CON, 0, 6, 0, rk3188_pll_rates),
-@@ -735,8 +746,8 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- static void __init rk3066a_clk_init(struct device_node *np)
- {
- 	rk3188_common_clk_init(np);
--	rockchip_clk_register_plls(rk3188_pll_clks,
--				   ARRAY_SIZE(rk3188_pll_clks),
-+	rockchip_clk_register_plls(rk3066_pll_clks,
-+				   ARRAY_SIZE(rk3066_pll_clks),
- 				   RK3066_GRF_SOC_STATUS);
- 	rockchip_clk_register_branches(rk3066a_clk_branches,
- 				  ARRAY_SIZE(rk3066a_clk_branches));
+Tony, your call.
+
+> >>> -CONFIG_USB=y
+> >>> +CONFIG_HID_GENERIC=m
+> >>> +CONFIG_USB_HIDDEV=y
+> >>> +CONFIG_USB_KBD=m
+> >>> +CONFIG_USB_MOUSE=m
+> >>> +CONFIG_USB=m
+> >>
+> >> So, you don't consider USB a valid rootfs storage option?
+> > 
+> > read the original defconfig. This is *only* for usbcore.ko, EHCI is
+> > disabled, XHCI is a module, MUSB is disabled. What will you use for
+> > rootfs ?
+> 
+> Yes, thanks for pointing. Now I see indeed this is a sensible thing
+> to do and probably should have been done a while ago.
+> 
+> Might be worth addressing/explaining this in the commit message.
+
+right, I'll look at it after holiday season.
+
 -- 
-2.1.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141224/8a34a38b/attachment.sig>
