@@ -1,7 +1,7 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 24 Dec 2014 16:51:36 -0500
+Date: Wed, 24 Dec 2014 16:55:39 -0500
 Subject: [PATCH] dma-mapping: limit dma_mask in arch_setup_dma_ops()
-Message-ID: <1419457896-3977-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1419458139-4034-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
