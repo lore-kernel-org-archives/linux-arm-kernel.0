@@ -1,33 +1,55 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Wed, 24 Dec 2014 15:35:03 +0900
-Subject: [PATCH] ARM: 8235/1: Support for the PXN CPU feature on ARMv7
-In-Reply-To: <1419374520.4705.84.camel@decadent.org.uk>
-References: <1419374520.4705.84.camel@decadent.org.uk>
-Message-ID: <CAPP0e=MAMHpedaXbTk96=yo+cGSJwnTwK23r3BepoHeAb9epSg@mail.gmail.com>
+From: Andrew.Jackson@arm.com (Andrew Jackson)
+Date: Wed, 24 Dec 2014 06:54:25 +0000
+Subject: [PATCH v4 2/5] ASoC: dwc: Switch to managed clock resource
+In-Reply-To: <9af8128918e2da97801f1122ae06336b1bd1012f.1419342218.git.Andrew.Jackson@arm.com>
+References: <cover.1419342218.git.Andrew.Jackson@arm.com>
+ <9af8128918e2da97801f1122ae06336b1bd1012f.1419342218.git.Andrew.Jackson@arm.com>
+Message-ID: <549A6321.3000703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On 12/23/14 13:56, Andrew Jackson wrote:
+> From: Andrew Jackson <Andrew.Jackson@arm.com>
+> 
+> Simplify error handling during probe by using managed clock
+> resources.
 
-2014-12-24 7:42 GMT+09:00 Ben Hutchings <ben@decadent.org.uk>:
+In my haste to get to the Christmas turkey I missed a clk_put elsewhere.  Will fix and resubmit.
 
->
-> I think that if a non-LPAE kernel runs on a processor that supports
-> LPAE, it should use PXN in short descriptors.  In that case, this test
-> should be changed to match a value of 5 as well.  Maybe it should be
-> simply be read_cpuid_ext(CPUID_EXT_MMFR0) & 4, but as I said I can't
-> check this against the ARM ARM.
+     Andrew
 
-Yes, you are right.
-The case of a non-LPAE kernel running on a processor that supports LPAE
-has been missed.
-It is good to be read_cpuid_ext(CPUID_EXT_MMFR0) & 4.
-Thanks for your reporting.
-
->
-> Ben.
->
-> --
-> Ben Hutchings
-> Editing code like this is akin to sticking plasters on the bleeding stump
-> of a severed limb. - me, 29 June 1999
+> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+> ---
+>  sound/soc/dwc/designware_i2s.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+> index 9573ec7..b3dc535 100644
+> --- a/sound/soc/dwc/designware_i2s.c
+> +++ b/sound/soc/dwc/designware_i2s.c
+> @@ -407,13 +407,13 @@ static int dw_i2s_probe(struct platform_device *pdev)
+>  
+>  	dev->capability = pdata->cap;
+>  	dev->i2s_clk_cfg = pdata->i2s_clk_cfg;
+> -	dev->clk = clk_get(&pdev->dev, NULL);
+> +	dev->clk = devm_clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(dev->clk))
+>  		return  PTR_ERR(dev->clk);
+>  
+>  	ret = clk_prepare_enable(dev->clk);
+>  	if (ret < 0)
+> -		goto err_clk_put;
+> +		return ret;
+>  
+>  	dev_set_drvdata(&pdev->dev, dev);
+>  	ret = snd_soc_register_component(&pdev->dev, &dw_i2s_component,
+> @@ -427,8 +427,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
+>  
+>  err_clk_disable:
+>  	clk_disable(dev->clk);
+> -err_clk_put:
+> -	clk_put(dev->clk);
+>  	return ret;
+>  }
+>  
+> 
