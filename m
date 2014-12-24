@@ -1,23 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Dec 2014 12:43:51 +0000
-Subject: [PATCH v2 0/3] ASoC: rockchip: i2s: fix watermark to 16 and
- maxburst to 4
-In-Reply-To: <1419413822-11539-1-git-send-email-jay.xu@rock-chips.com>
-References: <1419325709-15374-1-git-send-email-jay.xu@rock-chips.com>
- <1419413822-11539-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20141224124351.GA17800@sirena.org.uk>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 24 Dec 2014 08:02:30 -0600
+Subject: [PATCH] linux/kernel.h: merge ARRAY_AND_SIZE defines
+In-Reply-To: <1419399879.6157.9.camel@perches.com>
+References: <1419399496-5955-1-git-send-email-yamada.m@jp.panasonic.com>
+ <1419399879.6157.9.camel@perches.com>
+Message-ID: <549AC776.8090905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 24, 2014 at 05:36:59PM +0800, Jianqun Xu wrote:
-> To make Bus DMA works more efficiency, DMA may work in burst mode,
->    we set the watermark of transmit and receive reach to 16 bits.
+On 12/23/2014 11:44 PM, Joe Perches wrote:
+> On Wed, 2014-12-24 at 14:38 +0900, Masahiro Yamada wrote:
+>> ARRAY_AND_SIZE is a useful macro.  Its definition is already
+>> duplicated in some headers.  Move it to include/linux/kernel.h.
+> 
+> I think it's not a good/useful macro and
+> would prefer the uses expanded instead.
 
-Applied all, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141224/52df34b9/attachment.sig>
+For what it's worth, I agree.	-Alex
+
+> The uses of ARRAY_AND_SIZE in structure
+> definitions aren't particularly bad, but the
+> ARRAY_AND_SIZE uses that hide the number of
+> arguments in a function I think are suboptimal.
+> 
+> 
