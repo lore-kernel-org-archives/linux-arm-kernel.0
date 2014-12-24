@@ -1,41 +1,32 @@
 From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Wed, 24 Dec 2014 17:23:34 +0800
-Subject: [PATCH v5 0/2] ARM: hip04: add GPIO support
-Message-ID: <1419413016-31932-1-git-send-email-wangzhou.bry@gmail.com>
+Date: Wed, 24 Dec 2014 17:23:35 +0800
+Subject: [PATCH v5 1/2] ARM: hip04: add GPIO configure in hisi_defconfig
+In-Reply-To: <1419413016-31932-1-git-send-email-wangzhou.bry@gmail.com>
+References: <1419413016-31932-1-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <1419413016-31932-2-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
-synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
-corresponding dts. The default value of ARCH_NR_GPIOS is used to find gpio
-base here.
+The GPIO controller of Hisilicon hip04 Soc uses the IP from Sysnopsis,
+gpio-dwapb.c can be reused to support this GPIO controller. This patch
+adds related configure item in hisi_defconfig.
 
-Change in v5:
-- Base on v3.19-rc1
-- Just use default value of ARCH_NR_GPIOS to find gpio base. Remove the new
-  added patch(3/4) in v4.
-Change in v4:
-- Delete "default 128 if ARCH_HIP04" in arch/arm/Kconfig
-- add a new patch to support find GPIO base number in increasing order
-- add gpio-number-forward property in snps gpio binding doc
-Change in v3:
-- Move CONFIG_GPIO_DWAPB to hisi_defconfig
-- Add CONFIG_GPIOLIB, CONFIG_GPIO_SYSFS in hisi_defconfig
-Change in v2:
-- Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
-
-Link for v4:
-- http://www.spinics.net/lists/arm-kernel/msg383883.html
-Link for v3:
-- http://www.spinics.net/lists/devicetree/msg60324.html
-
-Zhou Wang (2):
-  ARM: hip04: add GPIO configure in hisi_defconfig
-  ARM: dts: hip04: add GPIO pieces
-
- arch/arm/boot/dts/hip04.dtsi    |   77 +++++++++++++++++++++++++++++++++++++++
+Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
+---
  arch/arm/configs/hisi_defconfig |    1 +
- 2 files changed, 78 insertions(+)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index 1125436..4a50862 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -50,6 +50,7 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_GPIO_DWAPB=y
+ CONFIG_MFD_SYSCON=y
+ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_DRM=y
 -- 
 1.7.9.5
