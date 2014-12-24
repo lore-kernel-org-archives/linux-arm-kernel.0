@@ -1,44 +1,46 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Wed, 24 Dec 2014 03:09:59 +0000
-Subject: [PATCH 4/7] ARM: config: enable ARCH_HIP01
-In-Reply-To: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
-References: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <1419390602-193123-5-git-send-email-long.wanglong@huawei.com>
+Date: Wed, 24 Dec 2014 03:09:55 +0000
+Subject: [PATCH 0/7] ARM: hisi: enable HiP01 SoC
+Message-ID: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make hip01 share the hisi_defconfig.
-And add it into multi_v7_defconfig too.
+Hi, Xu Wei
 
-Signed-off-by: Wang Long <long.wanglong@huawei.com>
----
- arch/arm/configs/hisi_defconfig     | 1 +
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+)
+This series patch enable Hisilicon HiP01 SoC. The HiP01 SoC series
+chip is designed for networking product, it integrates a rich peripheral
+interfaces to support network applications and supports both one 
+core or dual cores and quad cores. The core is Cortex A9. 
 
-diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
-index 1125436..c34da58 100644
---- a/arch/arm/configs/hisi_defconfig
-+++ b/arch/arm/configs/hisi_defconfig
-@@ -8,6 +8,7 @@ CONFIG_ARCH_HI3xxx=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_CMDLINE_PARTITION=y
- CONFIG_ARCH_HIX5HD2=y
-+CONFIG_ARCH_HIP01=y
- CONFIG_ARCH_HIP04=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=16
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2328fe7..23523ed 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -32,6 +32,7 @@ CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HISI=y
- CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_HIX5HD2=y
-+CONFIG_ARCH_HIP01=y
- CONFIG_ARCH_HIP04=y
- CONFIG_ARCH_KEYSTONE=y
- CONFIG_ARCH_MESON=y
+This series patch rebased on Linux 3.19-rc1.
+
+Best Regards
+
+Wang Long (7):
+  ARM: debug: add HiP01 debug uart
+  ARM: hisi: enable HiP01 SoC
+  ARM: dts: Add hip01-ca9x2 dts file
+  ARM: config: enable ARCH_HIP01
+  ARM: hisi: add a common smp_prepares_cpus function
+  ARM: hisi: rename secondary_startup function
+  ARM: hisi: enable smp for HiP01
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  25 +++++
+ arch/arm/Kconfig.debug                             |  10 ++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hip01-ca9x2.dts                  |  51 ++++++++++
+ arch/arm/boot/dts/hip01.dtsi                       | 110 +++++++++++++++++++++
+ arch/arm/configs/hisi_defconfig                    |   1 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/mach-hisi/Kconfig                         |   8 ++
+ arch/arm/mach-hisi/core.h                          |   5 +-
+ arch/arm/mach-hisi/headsmp.S                       |   2 +-
+ arch/arm/mach-hisi/hisilicon.c                     |  10 ++
+ arch/arm/mach-hisi/hotplug.c                       |  31 ++++++
+ arch/arm/mach-hisi/platsmp.c                       |  56 ++++++++++-
+ 13 files changed, 306 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
+ create mode 100644 arch/arm/boot/dts/hip01.dtsi
+
 -- 
 1.8.3.4
