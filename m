@@ -1,63 +1,45 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Wed, 24 Dec 2014 03:10:01 +0000
-Subject: [PATCH 6/7] ARM: hisi: rename secondary_startup function
+Date: Wed, 24 Dec 2014 03:10:00 +0000
+Subject: [PATCH 5/7] ARM: hisi: add a common smp_prepares_cpus function
 In-Reply-To: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
 References: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <1419390602-193123-7-git-send-email-long.wanglong@huawei.com>
+Message-ID: <1419390602-193123-6-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As hix5hd2 and hip01 has the same secondary_startup
-so rename hix5hd2_secondary_startup to
-to hisi_secondary_startup.
+As hix5hd2 and hip01 has the same .smp_prepare_cpus
+in struct smp_operations, so rename hix5hd2_smp_prepare_cpus
+to hisi_common_smp_prepare_cpus.
 
-the hip01 will use hisi_secondary_startup for the
-secondary core boot.
+the hip01 will use hisi_common_smp_prepare_cpus in its
+struct smp_operations.
 
 Signed-off-by: Wang Long <long.wanglong@huawei.com>
 ---
- arch/arm/mach-hisi/core.h    | 2 +-
- arch/arm/mach-hisi/headsmp.S | 2 +-
- arch/arm/mach-hisi/platsmp.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-hisi/platsmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
-index 88b1f48..75520b0 100644
---- a/arch/arm/mach-hisi/core.h
-+++ b/arch/arm/mach-hisi/core.h
-@@ -12,7 +12,7 @@ extern void hi3xxx_cpu_die(unsigned int cpu);
- extern int hi3xxx_cpu_kill(unsigned int cpu);
- extern void hi3xxx_set_cpu(int cpu, bool enable);
- 
--extern void hix5hd2_secondary_startup(void);
-+extern void hisi_secondary_startup(void);
- extern struct smp_operations hix5hd2_smp_ops;
- extern void hix5hd2_set_cpu(int cpu, bool enable);
- extern void hix5hd2_cpu_die(unsigned int cpu);
-diff --git a/arch/arm/mach-hisi/headsmp.S b/arch/arm/mach-hisi/headsmp.S
-index 278889c..81e35b1 100644
---- a/arch/arm/mach-hisi/headsmp.S
-+++ b/arch/arm/mach-hisi/headsmp.S
-@@ -11,6 +11,6 @@
- 
- 	__CPUINIT
- 
--ENTRY(hix5hd2_secondary_startup)
-+ENTRY(hisi_secondary_startup)
- 	bl	v7_invalidate_l1
- 	b	secondary_startup
 diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-index b3c3a58..4a70f56 100644
+index 575dd82..b3c3a58 100644
 --- a/arch/arm/mach-hisi/platsmp.c
 +++ b/arch/arm/mach-hisi/platsmp.c
-@@ -116,7 +116,7 @@ static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	phys_addr_t jumpaddr;
+@@ -96,7 +96,7 @@ struct smp_operations hi3xxx_smp_ops __initdata = {
+ #endif
+ };
  
--	jumpaddr = virt_to_phys(hix5hd2_secondary_startup);
-+	jumpaddr = virt_to_phys(hisi_secondary_startup);
- 	hix5hd2_set_scu_boot_addr(HIX5HD2_BOOT_ADDRESS, jumpaddr);
- 	hix5hd2_set_cpu(cpu, true);
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+-static void __init hix5hd2_smp_prepare_cpus(unsigned int max_cpus)
++static void __init hisi_common_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	hisi_enable_scu_a9();
+ }
+@@ -125,7 +125,7 @@ static int hix5hd2_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 
+ struct smp_operations hix5hd2_smp_ops __initdata = {
+-	.smp_prepare_cpus	= hix5hd2_smp_prepare_cpus,
++	.smp_prepare_cpus	= hisi_common_smp_prepare_cpus,
+ 	.smp_boot_secondary	= hix5hd2_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= hix5hd2_cpu_die,
 -- 
 1.8.3.4
