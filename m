@@ -1,54 +1,250 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Wed, 24 Dec 2014 03:09:56 +0000
-Subject: [PATCH 1/7] ARM: debug: add HiP01 debug uart
+Date: Wed, 24 Dec 2014 03:09:58 +0000
+Subject: [PATCH 3/7] ARM: dts: Add hip01-ca9x2 dts file
 In-Reply-To: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
 References: <1419390602-193123-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <1419390602-193123-2-git-send-email-long.wanglong@huawei.com>
+Message-ID: <1419390602-193123-4-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support of Hisilicon HiP01 debug uart.
-The uart of hip01 is 8250 compatible.
+Add dts file for Hisilicon hip01 ca9x2 board
 
 Signed-off-by: Wang Long <long.wanglong@huawei.com>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../bindings/arm/hisilicon/hisilicon.txt           |  25 +++++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/hip01-ca9x2.dts                  |  50 ++++++++++
+ arch/arm/boot/dts/hip01.dtsi                       | 110 +++++++++++++++++++++
+ 4 files changed, 186 insertions(+)
+ create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
+ create mode 100644 arch/arm/boot/dts/hip01.dtsi
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5ddd490..e0cf6ce 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -272,6 +272,14 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the UART on Highbank based devices.
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index f717c7b..35b1bd4 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -9,6 +9,10 @@ HiP04 D01 Board
+ Required root node properties:
+ 	- compatible = "hisilicon,hip04-d01";
  
-+	config DEBUG_HIP01_UART
-+		bool "Hisilicon Hip01 Debug UART"
-+		depends on ARCH_HIP01
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HIP01 UART.
++HiP01 ca9x2 Board
++Required root node properties:
++	- compatible = "hisilicon,hip01-ca9x2";
 +
- 	config DEBUG_HIP04_UART
- 		bool "Hisilicon HiP04 Debug UART"
- 		depends on ARCH_HIP04
-@@ -1252,6 +1260,7 @@ config DEBUG_UART_PHYS
- 	default 0x16000000 if ARCH_INTEGRATOR
- 	default 0x18000300 if DEBUG_BCM_5301X
- 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
-+	default 0x20001000 if DEBUG_HIP01_UART
- 	default 0x20060000 if DEBUG_RK29_UART0
- 	default 0x20064000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
- 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
-@@ -1394,6 +1403,7 @@ config DEBUG_UART_VIRT
- 	default 0xfef36000 if DEBUG_HIGHBANK_UART
- 	default 0xfefff700 if ARCH_IOP33X
- 	default 0xff003000 if DEBUG_U300_UART
-+	default 0xffd01000 if DEBUG_HIP01_UART
- 	default DEBUG_UART_PHYS if !MMU
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 
+ Hisilicon system controller
+ 
+@@ -37,6 +41,27 @@ Example:
+ 	};
+ 
+ -----------------------------------------------------------------------
++Hisilicon HiP01 system controller
++
++Required properties:
++- compatible : "hisilicon,hip01-sysctrl"
++- reg : Register address and size
++
++The HiP01 system controller is mostly compatible with hisilicon
++system controller,but it has some specific control registers for
++HIP01 SoC family, such as slave core boot, and also some same
++registers located at different offset.
++
++Example:
++
++	/* for hip01-ca9x2 */
++	sysctrl: system-controller at 10000000 {
++		compatible = "hisilicon,hip01-sysctrl", "hisilicon,sysctrl";
++		reg = <0x10000000 0x1000>;
++		reboot-offset = <0x4>;
++	};
++
++-----------------------------------------------------------------------
+ Hisilicon CPU controller
+ 
+ Required properties:
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 91bd5bd..70c2fd0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -105,6 +105,7 @@ dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+ dtb-$(CONFIG_ARCH_HIX5HD2) += hisi-x5hd2-dkb.dtb
+ dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+ 	ecx-2000.dtb
++dtb-$(CONFIG_ARCH_HIP01) += hip01-ca9x2.dtb
+ dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+ dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+ 	integratorcp.dtb
+diff --git a/arch/arm/boot/dts/hip01-ca9x2.dts b/arch/arm/boot/dts/hip01-ca9x2.dts
+new file mode 100644
+index 0000000..3f157ae
+--- /dev/null
++++ b/arch/arm/boot/dts/hip01-ca9x2.dts
+@@ -0,0 +1,50 @@
++/*
++ * Hisilicon Ltd. HiP01 SoC
++ *
++ * Copyright (C) 2014 Hisilicon Ltd.
++ * Copyright (C) 2014 Huawei Ltd.
++ *
++ * Author: Wang Long <long.wanglong@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/dts-v1/;
++
++/* First 8KB reserved for secondary core boot */
++/memreserve/ 0x80000000 0x00002000;
++
++#include "hip01.dtsi"
++
++/ {
++	model = "Hisilicon HIP01 Development Board";
++	compatible = "hisilicon,hip01-ca9x2", "hisilicon,hip01";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++		};
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x80000000>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/hip01.dtsi b/arch/arm/boot/dts/hip01.dtsi
+new file mode 100644
+index 0000000..33130f8
+--- /dev/null
++++ b/arch/arm/boot/dts/hip01.dtsi
+@@ -0,0 +1,110 @@
++/*
++ * Hisilicon Ltd. HiP01 SoC
++ *
++ * Copyright (c) 2014 Hisilicon Ltd.
++ * Copyright (c) 2014 Huawei Ltd.
++ *
++ * Author: Wang Long <long.wanglong@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include "skeleton.dtsi"
++
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	gic: interrupt-controller at 1e001000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x1a001000 0x1000>, <0x1a000100 0x1000>;
++	};
++
++	hisi_refclk144mhz: refclk144mkhz {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <144000000>;
++		clock-output-names = "hisi:refclk144khz";
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		ranges = <0 0x10000000 0x20000000>;
++
++		amba {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "arm,amba-bus";
++			ranges;
++
++			uart0: uart at 10001000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x10001000 0x1000>;
++				clocks = <&hisi_refclk144mhz>;
++				clock-names = "apb_pclk";
++				reg-shift = <2>;
++				interrupts = <0 32 4>;
++				status = "disabled";
++			};
++
++			uart1: uart at 10002000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x10002000 0x1000>;
++				clocks = <&hisi_refclk144mhz>;
++				clock-names = "apb_pclk";
++				reg-shift = <2>;
++				interrupts = <0 33 4>;
++				status = "disabled";
++			};
++
++			uart2: uart at 10003000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x10003000 0x1000>;
++				clocks = <&hisi_refclk144mhz>;
++				clock-names = "apb_pclk";
++				reg-shift = <2>;
++				interrupts = <0 34 4>;
++				status = "disabled";
++			};
++
++			uart3: uart at 10006000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x10006000 0x1000>;
++				clocks = <&hisi_refclk144mhz>;
++				clock-names = "apb_pclk";
++				reg-shift = <2>;
++				interrupts = <0 4 4>;
++				status = "disabled";
++			};
++		};
++
++		system-controller at 10000000 {
++			compatible = "hisilicon,hip01-sysctrl", "hisilicon,sysctrl";
++			reg = <0x10000000 0x1000>;
++			reboot-offset = <0x4>;
++		};
++
++		global_timer at 0a000200 {
++			compatible = "arm,cortex-a9-global-timer";
++			reg = <0x0a000200 0x100>;
++			interrupts = <1 11 0xf04>;
++			clocks = <&hisi_refclk144mhz>;
++		};
++
++		local_timer at 0a000600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0x0a000600 0x100>;
++			interrupts = <1 13 0xf04>;
++			clocks = <&hisi_refclk144mhz>;
++		};
++	};
++};
 -- 
 1.8.3.4
