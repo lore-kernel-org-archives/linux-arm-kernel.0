@@ -1,104 +1,76 @@
 From: wangzhou.bry@gmail.com (Zhou Wang)
-Date: Wed, 24 Dec 2014 17:23:36 +0800
-Subject: [PATCH v5 2/2] ARM: dts: hip04: add GPIO pieces
-In-Reply-To: <1419413016-31932-1-git-send-email-wangzhou.bry@gmail.com>
-References: <1419413016-31932-1-git-send-email-wangzhou.bry@gmail.com>
-Message-ID: <1419413016-31932-3-git-send-email-wangzhou.bry@gmail.com>
+Date: Wed, 24 Dec 2014 17:31:19 +0800
+Subject: [PATCH v2] mtd: hisilicon: add device tree node for NAND controller
+Message-ID: <1419413479-32083-1-git-send-email-wangzhou.bry@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hisilicon Soc hip04 has four GPIO controllers, each one has 32
-GPIOs and can be configured to be an interrupt controller.The GPIO
-controllers are compatible with the snps,dw-apb-gpio driver.
-This patch add the corresponding device tree nodes.
+This patch add dts support for NAND flash controller of Hisilicon Soc Hip04
+
+Changes in v2:
+- Base on v3.19-rc1
+- Use nand-ecc-strength, nand-ecc-step-size to replace hisi,nand-ecc-bits
+Changes in v1:
+- Move partition and other board related information into board dts file:
+  hip04-d01.dts
 
 Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
 ---
- arch/arm/boot/dts/hip04.dtsi |   75 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+ arch/arm/boot/dts/hip04-d01.dts |   27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/hip04.dtsi    |    7 +++++++
+ 2 files changed, 34 insertions(+)
 
+diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+index 40a9e33..ba04dd5 100644
+--- a/arch/arm/boot/dts/hip04-d01.dts
++++ b/arch/arm/boot/dts/hip04-d01.dts
+@@ -28,5 +28,32 @@
+ 		uart0: uart at 4007000 {
+ 			status = "ok";
+ 		};
++
++		nand: nand at 4020000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "hw";
++			nand-ecc-strength = <16>;
++			nand-ecc-step-size = <1024>;
++
++			partition at 0 {
++				label = "nand_text";
++				reg = <0x00000000 0x00400000>;
++			};
++
++			partition at 00400000 {
++				label = "nand_monitor";
++				reg = <0x00400000 0x00400000>;
++			};
++
++			partition at 00800000 {
++				label = "nand_kernel";
++				reg = <0x00800000 0x00800000>;
++			};
++
++			partition at 01000000 {
++				label = "nand_fs";
++				reg = <0x01000000 0x1f000000>;
++			};
++		};
+ 	};
+ };
 diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index 2388145..267942a 100644
+index 2388145..ac32fce 100644
 --- a/arch/arm/boot/dts/hip04.dtsi
 +++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -269,6 +269,81 @@
+@@ -269,6 +269,13 @@
  			interrupts = <0 372 4>;
  		};
  
-+		gpio at 4003000 {
++		nand: nand at 4020000 {
++			compatible = "hisilicon,504-nfc";
++			reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
++			interrupts = <0 379 4>;
 +			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4003000 0x1000>;
-+
-+			gpio3: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 392 4>;
-+			};
-+		};
-+
-+		gpio at 4002000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4002000 0x1000>;
-+
-+			gpio2: gpio-controller at 0 {
-+			compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 391 4>;
-+			};
-+		};
-+
-+		gpio at 4001000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4001000 0x1000>;
-+
-+			gpio1: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 390 4>;
-+			};
-+		};
-+
-+		gpio at 4000000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dw-apb-gpio";
-+			reg = <0x4000000 0x1000>;
-+
-+			gpio0: gpio-controller at 0 {
-+				compatible = "snps,dw-apb-gpio-port";
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				snps,nr-gpios = <32>;
-+				reg = <0>;
-+				interrupt-parent = <&gic>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <0 389 4>;
-+			};
++			#size-cells = <1>;
 +		};
  	};
  
