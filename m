@@ -1,50 +1,46 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 24 Dec 2014 16:39:43 +0800
-Subject: [PATCH RFC v5 21/21] ARM: imx_v6_v7_defconfig: Add support for Himax
- HX8369A panel
-In-Reply-To: <1419410383-6359-1-git-send-email-Ying.Liu@freescale.com>
-References: <1419410383-6359-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419410383-6359-22-git-send-email-Ying.Liu@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Dec 2014 08:47:36 +0000
+Subject: [PATCH v2 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
+ board dts and Makefile
+In-Reply-To: <1947751.D0rZorCFoT@wuerfel>
+References: <1418825853-10934-1-git-send-email-eddie.huang@mediatek.com>
+ <1419321723.14341.38.camel@mtksdaap41>
+ <72aa7f4069a000c6e39c53e328015aa3@www.loen.fr> <1947751.D0rZorCFoT@wuerfel>
+Message-ID: <823671a45699c6b7ca6db5243f111d0b@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Himax HX8369A panel.
+On 2014-12-23 21:07, Arnd Bergmann wrote:
+> On Tuesday 23 December 2014 08:43:55 Marc Zyngier wrote:
+>>
+>> > Neverthless, MT8173 SoC already use 0x10224000 and 0x10225000 as 
+>> VGIC
+>> > base address.
+>>
+>> Then its fate is sealed virtualization wise.
+>
+> It should still work with 4kb pages on the host, right? Would that 
+> still
+> allow you to have 64kb pages on the guest, or does the guest page 
+> size
+> have to be smaller or equal to the host?
 
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm menuconfig and manually choose to build in
-  the Himax HX8369A panel driver
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+Of course, it will still work with 4kB pages, and the guest can still 
+use
+whatever page size it wants, including 64kB. Not very good from a 
+performance
+point of view, but it will work.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
-v4->v5:
- * None.
+My main worry is that we're already starting to see more and more 
+platforms
+having divergent requirements in their MM setup, and distributions are 
+going
+to struggle to provide a full-featured single kernel image, specially 
+as some
+feel the need to push 64kB pages down to everybody's throat.
 
-v3->v4:
- * None.
+Thanks,
 
-v2->v3:
- * None.
-
-v1->v2:
- * Add the HIMAX prefix in the Kconfig name.
-
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 3e0e589..27db91b 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -192,6 +192,7 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_PANEL_HIMAX_HX8369A=y
- CONFIG_DRM_IMX=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+         M.
 -- 
-2.1.0
+Fast, cheap, reliable. Pick two.
