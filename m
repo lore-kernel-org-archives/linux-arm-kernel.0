@@ -1,48 +1,33 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 24 Dec 2014 08:16:57 +0200
-Subject: [PATCH 5/8] irqchip: Conexant CX92755 interrupts controller driver
-In-Reply-To: <16151065.LjzHK8TaOo@wuerfel>
-References: <cover.1419318109.git.baruch@tkos.co.il>
- <7997c913e9f6debc09fd62c788b8ac6bd330d4f3.1419318109.git.baruch@tkos.co.il>
- <16151065.LjzHK8TaOo@wuerfel>
-Message-ID: <20141224061657.GI2481@sapphire.tkos.co.il>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Wed, 24 Dec 2014 15:35:03 +0900
+Subject: [PATCH] ARM: 8235/1: Support for the PXN CPU feature on ARMv7
+In-Reply-To: <1419374520.4705.84.camel@decadent.org.uk>
+References: <1419374520.4705.84.camel@decadent.org.uk>
+Message-ID: <CAPP0e=MAMHpedaXbTk96=yo+cGSJwnTwK23r3BepoHeAb9epSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Ben,
 
-On Tue, Dec 23, 2014 at 10:02:18PM +0100, Arnd Bergmann wrote:
-> On Tuesday 23 December 2014 09:58:42 Baruch Siach wrote:
-> > +static void __exception_irq_entry digicolor_handle_irq(struct pt_regs *regs)
-> > +{
-> > +       u32 status, hwirq;
-> > +
-> > +       do {
-> > +               status = readl(digicolor_irq_base + IC_INT0STATUS_LO);
-> > +               if (status) {
-> > +                       hwirq = ffs(status) - 1;
-> > +               } else {
-> > +                       status = readl(digicolor_irq_base + IC_INT0STATUS_XLO);
-> > +                       if (status)
-> > +                               hwirq = ffs(status) - 1 + 32;
-> > +                       else
-> > +                               return;
-> > +               }
-> > +
-> > +               handle_domain_irq(digicolor_irq_domain, hwirq, regs);
-> > +       } while (1);
-> > +}
-> > 
-> 
-> Have you tried using the generic_irqchip code for this? The hardware
-> seems simple enough.
+2014-12-24 7:42 GMT+09:00 Ben Hutchings <ben@decadent.org.uk>:
 
-Thanks for the tip. I'll look into converting to GENERIC_IRQ_CHIP for next 
-version.
+>
+> I think that if a non-LPAE kernel runs on a processor that supports
+> LPAE, it should use PXN in short descriptors.  In that case, this test
+> should be changed to match a value of 5 as well.  Maybe it should be
+> simply be read_cpuid_ext(CPUID_EXT_MMFR0) & 4, but as I said I can't
+> check this against the ARM ARM.
 
-baruch
+Yes, you are right.
+The case of a non-LPAE kernel running on a processor that supports LPAE
+has been missed.
+It is good to be read_cpuid_ext(CPUID_EXT_MMFR0) & 4.
+Thanks for your reporting.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>
+> Ben.
+>
+> --
+> Ben Hutchings
+> Editing code like this is akin to sticking plasters on the bleeding stump
+> of a severed limb. - me, 29 June 1999
