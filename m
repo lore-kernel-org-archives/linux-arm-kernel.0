@@ -1,151 +1,110 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 24 Dec 2014 12:33:39 +0530
-Subject: [PATCH v5 6/6] input: touchscreen: ti_am335x_tsc: Replace delta
- filtering with median filtering
-In-Reply-To: <1419404619-10744-1-git-send-email-vigneshr@ti.com>
-References: <1419404619-10744-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1419404619-10744-7-git-send-email-vigneshr@ti.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Wed, 24 Dec 2014 16:39:22 +0800
+Subject: [PATCH RFC v5 00/21] Add support for i.MX MIPI DSI DRM driver
+Message-ID: <1419410383-6359-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, delta filtering was applied TSC co-ordinate readouts before
-reporting a single value to user space. This patch replaces delta filtering
-with median filtering. Median filtering sorts co-ordinate readouts, drops min
-and max values, and reports the average of remaining values. This method is
-more sensible than delta filering. Median filtering is applied only if number
-of readouts is greater than 3 else just average of co-ordinate readouts is
-reported.
+Hi,
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/input/touchscreen/ti_am335x_tsc.c | 91 +++++++++++++++++--------------
- 1 file changed, 51 insertions(+), 40 deletions(-)
+This series addresses comments from Andrzej Hajda on v4.
+Most comments are about the Himax HX8369A DRM panel driver.
+And, a single comment is about the Synopsys DesignWare MIPI DSI host
+controller DRM bridge driver.
 
-diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 9cb8b4a01dca..504b85db6425 100644
---- a/drivers/input/touchscreen/ti_am335x_tsc.c
-+++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -26,6 +26,7 @@
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/sort.h>
- 
- #include <linux/mfd/ti_am335x_tscadc.h>
- 
-@@ -204,56 +205,61 @@ static void titsc_step_config(struct titsc *ts_dev)
- 	am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
- }
- 
-+static int titsc_cmp_coord(const void *a, const void *b)
-+{
-+	return *(int *)a - *(int *)b;
-+}
-+
- static void titsc_read_coordinates(struct titsc *ts_dev,
- 		u32 *x, u32 *y, u32 *z1, u32 *z2)
- {
--	unsigned int fifocount = titsc_readl(ts_dev, REG_FIFO0CNT);
--	unsigned int prev_val_x = ~0, prev_val_y = ~0;
--	unsigned int prev_diff_x = ~0, prev_diff_y = ~0;
--	unsigned int read, diff;
--	unsigned int i, channel;
-+	unsigned int yvals[7], xvals[7];
-+	unsigned int i, xsum = 0, ysum = 0;
- 	unsigned int creads = ts_dev->coordinate_readouts;
--	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
- 
--	*z1 = *z2 = 0;
--	if (fifocount % (creads * 2 + 2))
--		fifocount -= fifocount % (creads * 2 + 2);
--	/*
--	 * Delta filter is used to remove large variations in sampled
--	 * values from ADC. The filter tries to predict where the next
--	 * coordinate could be. This is done by taking a previous
--	 * coordinate and subtracting it form current one. Further the
--	 * algorithm compares the difference with that of a present value,
--	 * if true the value is reported to the sub system.
--	 */
--	for (i = 0; i < fifocount; i++) {
--		read = titsc_readl(ts_dev, REG_FIFO0);
--
--		channel = (read & 0xf0000) >> 16;
--		read &= 0xfff;
--		if (channel > first_step + creads + 2) {
--			diff = abs(read - prev_val_x);
--			if (diff < prev_diff_x) {
--				prev_diff_x = diff;
--				*x = read;
--			}
--			prev_val_x = read;
-+	for (i = 0; i < creads; i++) {
-+		yvals[i] = titsc_readl(ts_dev, REG_FIFO0);
-+		yvals[i] &= 0xfff;
-+	}
- 
--		} else if (channel == first_step + creads + 1) {
--			*z1 = read;
-+	*z1 = titsc_readl(ts_dev, REG_FIFO0);
-+	*z1 &= 0xfff;
-+	*z2 = titsc_readl(ts_dev, REG_FIFO0);
-+	*z2 &= 0xfff;
- 
--		} else if (channel == first_step + creads + 2) {
--			*z2 = read;
-+	for (i = 0; i < creads; i++) {
-+		xvals[i] = titsc_readl(ts_dev, REG_FIFO0);
-+		xvals[i] &= 0xfff;
-+	}
- 
--		} else if (channel > first_step) {
--			diff = abs(read - prev_val_y);
--			if (diff < prev_diff_y) {
--				prev_diff_y = diff;
--				*y = read;
--			}
--			prev_val_y = read;
-+	/*
-+	 * If co-ordinates readouts is less than 4 then
-+	 * report the average. In case of 4 or more
-+	 * readouts, sort the co-ordinate samples, drop
-+	 * min and max values and report the average of
-+	 * remaining values.
-+	 */
-+	if (creads <=  3) {
-+		for (i = 0; i < creads; i++) {
-+			ysum += yvals[i];
-+			xsum += xvals[i];
- 		}
-+		ysum /= creads;
-+		xsum /= creads;
-+	} else {
-+		sort(yvals, creads, sizeof(unsigned int),
-+		     titsc_cmp_coord, NULL);
-+		sort(xvals, creads, sizeof(unsigned int),
-+		     titsc_cmp_coord, NULL);
-+		for (i = 1; i < creads - 1; i++) {
-+			ysum += yvals[i];
-+			xsum += xvals[i];
-+		}
-+		ysum /= creads - 2;
-+		xsum /= creads - 2;
- 	}
-+	*y = ysum;
-+	*x = xsum;
- }
- 
- static irqreturn_t titsc_irq(int irq, void *dev)
-@@ -369,6 +375,11 @@ static int titsc_parse_dt(struct platform_device *pdev,
- 	if (err < 0)
- 		return err;
- 
-+	if (ts_dev->coordinate_readouts <= 0) {
-+		dev_warn(&pdev->dev, "invalid co-ordinate readouts, resetting it to 5\n");
-+		ts_dev->coordinate_readouts = 5;
-+	}
-+
- 	err = of_property_read_u32(node, "ti,charge-delay",
- 				   &ts_dev->charge_delay);
- 	/*
+The i.MX MIPI DSI is a Synopsys DesignWare MIPI DSI host controller IP.
+This series adds support for a Synopsys DesignWare MIPI DSI host controller
+DRM bridge driver and a i.MX MIPI DSI specific DRM driver.
+Currently, the MIPI DSI drivers only support the burst with sync pulse mode.
+
+This series also includes a DRM panel driver for the Truly TFT480800-16-E panel
+which is driven by the Himax HX8369A driver IC.  The driver IC data sheet could
+be found at [1].  As mentioned by the data sheet, the driver IC supports several
+interface modes.  Currently, the DRM panel driver only supports the MIPI DSI video
+mode.  New interface modes could be added later(perhaps, just like the way the DRM
+simple panel driver supports both MIPI DSI interface panels and simple(parallel)
+interface panels).
+
+The MIPI DSI feature is tested on i.MX6Q SabreSD board and i.MX6DL SabreSD board.
+The MIPI DSI display could be enabled directly on i.MX6Q SabreSD board after
+applying this series, because the 26.4MHz pixel clock the panel requires could be
+derived from the IPU HSP clock(264MHz) with an integer divider.
+On i.MX6DL SabreSD board, we need to manually disable the LVDS and HDMI displays in
+the device tree blob, since the i.MX6DL IPU HSP clock is 198MHz at present, which
+makes the pixel clock share the PLL5 video clock source with the LVDS and HDMI,
+thus, the panel cannot get the pixel clock rate it wants.
+
+Patch 01/21 is needed to get a precise pixel clock rate(26.4MHz) from the PLL5 video
+clock.  If we don't have this patch, the pixel clock rate is about 20MHz, which
+causes a horitonal shift on the display image.
+
+This series can be applied on the drm-next branch.
+
+[1] http://www.allshore.com/pdf/Himax_HX8369-A.pdf
+
+Liu Ying (21):
+  clk: divider: Correct parent clk round rate if no bestdiv is normally
+    found
+  of: Add vendor prefix for Himax Technologies Inc.
+  of: Add vendor prefix for Truly Semiconductors Limited
+  ARM: imx6q: Add GPR3 MIPI muxing control register field shift bits
+    definition
+  ARM: imx6q: clk: Add the video_27m clock
+  ARM: imx6q: clk: Change hdmi_isfr clock's parent to be video_27m clock
+  ARM: imx6q: clk: Change hsi_tx clock to be a shared clock gate
+  ARM: imx6q: clk: Add support for mipi_core_cfg clock as a shared clock
+    gate
+  ARM: dts: imx6qdl: Move existing MIPI DSI ports into a new 'ports'
+    node
+  drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+  Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
+    bridge driver
+  drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
+  Documentation: dt-bindings: Add bindings for i.MX specific Synopsys DW
+    MIPI DSI driver
+  drm: imx: Support Synopsys DesignWare MIPI DSI host controller
+  Documentation: dt-bindings: Add bindings for Himax HX8369A DRM panel
+    driver
+  drm: panel: Add support for Himax HX8369A MIPI DSI panel
+  ARM: dtsi: imx6qdl: Add support for MIPI DSI host controller
+  ARM: dts: imx6qdl-sabresd: Add support for TRULY TFT480800-16-E MIPI
+    DSI panel
+  ARM: imx_v6_v7_defconfig: Cleanup for imx drm being moved out of
+    staging
+  ARM: imx_v6_v7_defconfig: Add support for MIPI DSI host controller
+  ARM: imx_v6_v7_defconfig: Add support for Himax HX8369A panel
+
+ .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt |  72 ++
+ .../devicetree/bindings/drm/imx/mipi_dsi.txt       |  75 ++
+ .../devicetree/bindings/panel/himax,hx8369a.txt    |  39 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/imx6q.dtsi                       |  20 +-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  20 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  29 +-
+ arch/arm/configs/imx_v6_v7_defconfig               |  17 +-
+ arch/arm/mach-imx/clk-imx6q.c                      |   7 +-
+ drivers/clk/clk-divider.c                          |   3 +-
+ drivers/gpu/drm/bridge/Kconfig                     |   5 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/dw_mipi_dsi.c               | 997 +++++++++++++++++++++
+ drivers/gpu/drm/imx/Kconfig                        |   7 +
+ drivers/gpu/drm/imx/Makefile                       |   1 +
+ drivers/gpu/drm/imx/dw_mipi_dsi-imx.c              | 226 +++++
+ drivers/gpu/drm/panel/Kconfig                      |   5 +
+ drivers/gpu/drm/panel/Makefile                     |   1 +
+ drivers/gpu/drm/panel/panel-himax-hx8369a.c        | 608 +++++++++++++
+ include/drm/bridge/dw_mipi_dsi.h                   |  27 +
+ include/drm/drm_mipi_dsi.h                         |  14 +
+ include/dt-bindings/clock/imx6qdl-clock.h          |   4 +-
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |   1 +
+ 23 files changed, 2151 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/drm/imx/mipi_dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/panel/himax,hx8369a.txt
+ create mode 100644 drivers/gpu/drm/bridge/dw_mipi_dsi.c
+ create mode 100644 drivers/gpu/drm/imx/dw_mipi_dsi-imx.c
+ create mode 100644 drivers/gpu/drm/panel/panel-himax-hx8369a.c
+ create mode 100644 include/drm/bridge/dw_mipi_dsi.h
+
 -- 
-1.9.1
+2.1.0
