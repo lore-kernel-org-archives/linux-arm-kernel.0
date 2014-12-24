@@ -1,63 +1,151 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 24 Dec 2014 12:33:38 +0530
-Subject: [PATCH v5 5/6] input: touchscreen: ti_am335x_tsc: Use charge delay DT
- parameter
+Date: Wed, 24 Dec 2014 12:33:39 +0530
+Subject: [PATCH v5 6/6] input: touchscreen: ti_am335x_tsc: Replace delta
+ filtering with median filtering
 In-Reply-To: <1419404619-10744-1-git-send-email-vigneshr@ti.com>
 References: <1419404619-10744-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1419404619-10744-6-git-send-email-vigneshr@ti.com>
+Message-ID: <1419404619-10744-7-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch reads charge delay from tsc DT node and writes to
-REG_CHARGEDELAY register. If the charge delay is not specified in DT
-then default value of 0x400(CHARGEDLY_OPENDLY) is used.
+Previously, delta filtering was applied TSC co-ordinate readouts before
+reporting a single value to user space. This patch replaces delta filtering
+with median filtering. Median filtering sorts co-ordinate readouts, drops min
+and max values, and reports the average of remaining values. This method is
+more sensible than delta filering. Median filtering is applied only if number
+of readouts is greater than 3 else just average of co-ordinate readouts is
+reported.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
-v5:
- - print out a warning when ti,charge-delay is not specified
-
- drivers/input/touchscreen/ti_am335x_tsc.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/input/touchscreen/ti_am335x_tsc.c | 91 +++++++++++++++++--------------
+ 1 file changed, 51 insertions(+), 40 deletions(-)
 
 diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
-index 8650b1dd24dc..9cb8b4a01dca 100644
+index 9cb8b4a01dca..504b85db6425 100644
 --- a/drivers/input/touchscreen/ti_am335x_tsc.c
 +++ b/drivers/input/touchscreen/ti_am335x_tsc.c
-@@ -52,6 +52,7 @@ struct titsc {
- 	u32			bit_xp, bit_xn, bit_yp, bit_yn;
- 	u32			inp_xp, inp_xn, inp_yp, inp_yn;
- 	u32			step_mask;
-+	u32			charge_delay;
- };
+@@ -26,6 +26,7 @@
+ #include <linux/delay.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/sort.h>
  
- static unsigned int titsc_readl(struct titsc *ts, unsigned int reg)
-@@ -177,7 +178,7 @@ static void titsc_step_config(struct titsc *ts_dev)
+ #include <linux/mfd/ti_am335x_tscadc.h>
  
- 	config = titsc_readl(ts_dev, REG_IDLECONFIG);
- 	titsc_writel(ts_dev, REG_CHARGECONFIG, config);
--	titsc_writel(ts_dev, REG_CHARGEDELAY, CHARGEDLY_OPENDLY);
-+	titsc_writel(ts_dev, REG_CHARGEDELAY, ts_dev->charge_delay);
+@@ -204,56 +205,61 @@ static void titsc_step_config(struct titsc *ts_dev)
+ 	am335x_tsc_se_set_cache(ts_dev->mfd_tscadc, ts_dev->step_mask);
+ }
  
- 	/* coordinate_readouts + 1 ... coordinate_readouts + 2 is for Z */
- 	config = STEPCONFIG_MODE_HWSYNC |
-@@ -368,6 +369,17 @@ static int titsc_parse_dt(struct platform_device *pdev,
++static int titsc_cmp_coord(const void *a, const void *b)
++{
++	return *(int *)a - *(int *)b;
++}
++
+ static void titsc_read_coordinates(struct titsc *ts_dev,
+ 		u32 *x, u32 *y, u32 *z1, u32 *z2)
+ {
+-	unsigned int fifocount = titsc_readl(ts_dev, REG_FIFO0CNT);
+-	unsigned int prev_val_x = ~0, prev_val_y = ~0;
+-	unsigned int prev_diff_x = ~0, prev_diff_y = ~0;
+-	unsigned int read, diff;
+-	unsigned int i, channel;
++	unsigned int yvals[7], xvals[7];
++	unsigned int i, xsum = 0, ysum = 0;
+ 	unsigned int creads = ts_dev->coordinate_readouts;
+-	unsigned int first_step = TOTAL_STEPS - (creads * 2 + 2);
+ 
+-	*z1 = *z2 = 0;
+-	if (fifocount % (creads * 2 + 2))
+-		fifocount -= fifocount % (creads * 2 + 2);
+-	/*
+-	 * Delta filter is used to remove large variations in sampled
+-	 * values from ADC. The filter tries to predict where the next
+-	 * coordinate could be. This is done by taking a previous
+-	 * coordinate and subtracting it form current one. Further the
+-	 * algorithm compares the difference with that of a present value,
+-	 * if true the value is reported to the sub system.
+-	 */
+-	for (i = 0; i < fifocount; i++) {
+-		read = titsc_readl(ts_dev, REG_FIFO0);
+-
+-		channel = (read & 0xf0000) >> 16;
+-		read &= 0xfff;
+-		if (channel > first_step + creads + 2) {
+-			diff = abs(read - prev_val_x);
+-			if (diff < prev_diff_x) {
+-				prev_diff_x = diff;
+-				*x = read;
+-			}
+-			prev_val_x = read;
++	for (i = 0; i < creads; i++) {
++		yvals[i] = titsc_readl(ts_dev, REG_FIFO0);
++		yvals[i] &= 0xfff;
++	}
+ 
+-		} else if (channel == first_step + creads + 1) {
+-			*z1 = read;
++	*z1 = titsc_readl(ts_dev, REG_FIFO0);
++	*z1 &= 0xfff;
++	*z2 = titsc_readl(ts_dev, REG_FIFO0);
++	*z2 &= 0xfff;
+ 
+-		} else if (channel == first_step + creads + 2) {
+-			*z2 = read;
++	for (i = 0; i < creads; i++) {
++		xvals[i] = titsc_readl(ts_dev, REG_FIFO0);
++		xvals[i] &= 0xfff;
++	}
+ 
+-		} else if (channel > first_step) {
+-			diff = abs(read - prev_val_y);
+-			if (diff < prev_diff_y) {
+-				prev_diff_y = diff;
+-				*y = read;
+-			}
+-			prev_val_y = read;
++	/*
++	 * If co-ordinates readouts is less than 4 then
++	 * report the average. In case of 4 or more
++	 * readouts, sort the co-ordinate samples, drop
++	 * min and max values and report the average of
++	 * remaining values.
++	 */
++	if (creads <=  3) {
++		for (i = 0; i < creads; i++) {
++			ysum += yvals[i];
++			xsum += xvals[i];
+ 		}
++		ysum /= creads;
++		xsum /= creads;
++	} else {
++		sort(yvals, creads, sizeof(unsigned int),
++		     titsc_cmp_coord, NULL);
++		sort(xvals, creads, sizeof(unsigned int),
++		     titsc_cmp_coord, NULL);
++		for (i = 1; i < creads - 1; i++) {
++			ysum += yvals[i];
++			xsum += xvals[i];
++		}
++		ysum /= creads - 2;
++		xsum /= creads - 2;
+ 	}
++	*y = ysum;
++	*x = xsum;
+ }
+ 
+ static irqreturn_t titsc_irq(int irq, void *dev)
+@@ -369,6 +375,11 @@ static int titsc_parse_dt(struct platform_device *pdev,
  	if (err < 0)
  		return err;
  
-+	err = of_property_read_u32(node, "ti,charge-delay",
-+				   &ts_dev->charge_delay);
-+	/*
-+	 * If ti,charge-delay value is not specified, then use CHARGEDLY_OPENDLY
-+	 * as the default value.
-+	 */
-+	if (err < 0) {
-+		ts_dev->charge_delay = CHARGEDLY_OPENDLY;
-+		dev_warn(&pdev->dev, "ti,charge-delay not specified\n");
++	if (ts_dev->coordinate_readouts <= 0) {
++		dev_warn(&pdev->dev, "invalid co-ordinate readouts, resetting it to 5\n");
++		ts_dev->coordinate_readouts = 5;
 +	}
 +
- 	return of_property_read_u32_array(node, "ti,wire-config",
- 			ts_dev->config_inp, ARRAY_SIZE(ts_dev->config_inp));
- }
+ 	err = of_property_read_u32(node, "ti,charge-delay",
+ 				   &ts_dev->charge_delay);
+ 	/*
 -- 
 1.9.1
