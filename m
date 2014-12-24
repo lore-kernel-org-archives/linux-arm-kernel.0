@@ -1,70 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 23 Dec 2014 22:09:48 -0800
-Subject: [PATCH v2] cpufreq: suspend cpufreq governors on shutdown
-Message-ID: <1419401388-20171-1-git-send-email-dianders@chromium.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 24 Dec 2014 08:16:57 +0200
+Subject: [PATCH 5/8] irqchip: Conexant CX92755 interrupts controller driver
+In-Reply-To: <16151065.LjzHK8TaOo@wuerfel>
+References: <cover.1419318109.git.baruch@tkos.co.il>
+ <7997c913e9f6debc09fd62c788b8ac6bd330d4f3.1419318109.git.baruch@tkos.co.il>
+ <16151065.LjzHK8TaOo@wuerfel>
+Message-ID: <20141224061657.GI2481@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should stop cpufreq governors when we shut down the system.  If we
-don't do this, we can end up with this deadlock:
+Hi Arnd,
 
-1. cpufreq governor may be running on a CPU other than CPU0.
-2. In machine_restart() we call smp_send_stop() which stops CPUs.
-   If one of these CPUs was actively running a cpufreq governor
-   then it may have the mutex / spinlock needed to access the main
-   PMIC in the system (perhaps over I2C)
-3. If a machine needs access to the main PMIC in order to shutdown
-   then it will never get it since the mutex was lost when the other
-   CPU stopped.
-4. We'll hang (possibly eventually hitting the hard lockup detector).
+On Tue, Dec 23, 2014 at 10:02:18PM +0100, Arnd Bergmann wrote:
+> On Tuesday 23 December 2014 09:58:42 Baruch Siach wrote:
+> > +static void __exception_irq_entry digicolor_handle_irq(struct pt_regs *regs)
+> > +{
+> > +       u32 status, hwirq;
+> > +
+> > +       do {
+> > +               status = readl(digicolor_irq_base + IC_INT0STATUS_LO);
+> > +               if (status) {
+> > +                       hwirq = ffs(status) - 1;
+> > +               } else {
+> > +                       status = readl(digicolor_irq_base + IC_INT0STATUS_XLO);
+> > +                       if (status)
+> > +                               hwirq = ffs(status) - 1 + 32;
+> > +                       else
+> > +                               return;
+> > +               }
+> > +
+> > +               handle_domain_irq(digicolor_irq_domain, hwirq, regs);
+> > +       } while (1);
+> > +}
+> > 
+> 
+> Have you tried using the generic_irqchip code for this? The hardware
+> seems simple enough.
 
-Let's avoid the problem by stopping the cpufreq governor at shutdown,
-which is a sensible thing to do anyway.
+Thanks for the tip. I'll look into converting to GENERIC_IRQ_CHIP for next 
+version.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v2:
-- Add a comment about why we register
-- Don't create cpufreq_shutdown() wrapper function
+baruch
 
- drivers/cpufreq/cpufreq.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index a09a29c..33f3d65 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -27,6 +27,7 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- #include <linux/suspend.h>
-+#include <linux/syscore_ops.h>
- #include <linux/tick.h>
- #include <trace/events/power.h>
- 
-@@ -2550,6 +2551,14 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
- }
- EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
- 
-+/*
-+ * Stop cpufreq at shutdown to make sure it isn't holding any locks
-+ * or mutexes when secondary CPUs are halted.
-+ */
-+static struct syscore_ops cpufreq_syscore_ops = {
-+	.shutdown = cpufreq_suspend,
-+};
-+
- static int __init cpufreq_core_init(void)
- {
- 	if (cpufreq_disabled())
-@@ -2558,6 +2567,8 @@ static int __init cpufreq_core_init(void)
- 	cpufreq_global_kobject = kobject_create();
- 	BUG_ON(!cpufreq_global_kobject);
- 
-+	register_syscore_ops(&cpufreq_syscore_ops);
-+
- 	return 0;
- }
- core_initcall(cpufreq_core_init);
 -- 
-2.2.0.rc0.207.ga3a616c
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
