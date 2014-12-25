@@ -1,85 +1,43 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 25 Dec 2014 16:19:41 +0100
-Subject: [PATCH v3 1/1] add support for Seagate BlackArmor NAS220
-In-Reply-To: <20141225141240.GJ19265@lunn.ch>
-References: <20141215203855.GA28940@anne> <20141222125750.GA29163@anne>
- <549C0C3C.8060601@gmail.com> <20141225133109.GI19265@lunn.ch>
- <549C1465.6030909@gmail.com> <20141225141240.GJ19265@lunn.ch>
-Message-ID: <549C2B0D.1000607@gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 26 Dec 2014 00:21:23 +0200
+Subject: v3.19-rc1 regression(?) on N900
+In-Reply-To: <20141225091121.GA20355@amd>
+References: <549B44E2.6080202@ti.com> <201412250932.40403@pali>
+ <20141225091121.GA20355@amd>
+Message-ID: <20141225222122.GB582@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.12.2014 15:12, Andrew Lunn wrote:
->>> Hi Sebastian
->>>
->>> I'm not sure what you mean here. The binding Documentation says:
->>
->> I was hoping that using phys/phy-names would allow us to get rid of
->> nr-ports property. I haven't checked the corresponding code and likely
->> will not before next year, but we should try to get rid of the nr-ports
->> property completely.
->>
->>> Required Properties:
->>> - compatibility : "marvell,orion-sata" or "marvell,armada-370-sata"
->>> - reg           : Address range of controller
->>> - interrupts    : Interrupt controller is using
->>> - nr-ports      : Number of SATA ports in use.
->>>
->>> Optional Properties:
->>> - phys          : List of phandles to sata phys
->>> - phy-names     : Should be "0", "1", etc, one number per phandle
->>>
->>> The optional phys/phy-names have just been added to
->>> kirkwood-6192.dtsi.
->>
->> Yeah, saw that patch after the review.. and my understanding of the
->> phys/phy-names properties is that
->> (a) they allow to count the number of _available_ ports
->> (b) they allow to determine the number of _used_ ports
->> (c) they allow to e.g. disable port 0 but enable port 1
->>
->> while nr-ports only allows (a). You can derive (b) only if you use
->> the first out of two but you cannot do (c) with nr-ports.
->>
->> Which is why we introduced the phys/phy-names properties.
->
-> We introduced them for turning the phys on and off.
+Hi,
 
-Actually, the main reason was to turn the unused phys off. IIRC,
-just reducing nr-ports from 2 to 1 allowed the SATA driver to skip
-the second port, but left the PHY up and running. It also doesn't
-allow to disable the first port and keep the second up.
+On Thu, Dec 25, 2014 at 10:11:21AM +0100, Pavel Machek wrote:
+> On Thu 2014-12-25 09:32:40, Pali Roh?r wrote:
+> > On Wednesday 24 December 2014 23:57:38 Nishanth Menon wrote:
+> > > based on automated testing with u-boot as a chained
+> > > bootloader..
+> > > 
+> > > v3.19-rc1: hung
+> > > https://github.com/nmenon/kernel-test-logs/blob/v3.19-rc1/omap
+> > > 2plus_defconfig/n900.txt
+> 
+> Early hang, independend on config. That's "dtb too big". Delete
+> something, and it should work again.
 
-Using phys/phy-names now allows a more detailed description by having
-three devices (SATA + 2 PHY nodes), e.g. SATA controller with 2
-potential ports, port 0 unconnected, port 1 connected. PHY0 will be
-auto-disabled after device probe, PHY1 will be enabled by SATA driver.
+For me, DT boot works fine with 3.19-rc1 as is...
 
-IIRC, this is the setup used by Guruplug, where port1 is connected to
-eSATA while port0 is unconnected.
+> Plus you'll note video regression.
 
-> We don't do any derivation from this information. It is the same for
-> all devices, since it is in the kirkwood-*.dtsi file, not per board.
->
-> Also, orion5x does not allow such control of the phys, they are always
-> on. So i don't know if we can derive anything from this information,
-> since it is not always present.
+...however, I can confirm that framebuffer is broken:
 
-Ok, you made me look it up in the code ;)
+[    8.230743] omapfb omapfb: no displays
+[    8.255584] omapfb omapfb: failed to setup omapfb
+[    8.260620] platform omapfb: Driver omapfb requests probe deferral
+[    8.284118] of_get_named_gpiod_flags: parsed 'reset-gpios' property of node
+'/ocp/spi at 48098000/acx565akm at 2[0]' - status (0)
+[    8.284271] acx565akm spi1.2: failed to find video source
+[    8.290069] spi spi1.2: Driver acx565akm requests probe deferral
 
-AFAIKS, nr-ports is only used for preallocating SATA host, clks, and
-phys structs. The code logic implies that #phys/clk has to match
-nr-ports property anyway. Unfortunately, n_ports variable and
-hpriv->n_ports is mangled irritatingly often in current sata_mv.c.
+I bisected it to ef691ff48bc8 (OMAPDSS: DT: Get source endpoint
+by matching reg-id). When I revert that, also FB works with 3.19-rc1.
 
-What I was proposing (hoping we already do) is: remove the redundant
-information passed by nr-ports were we can, e.g. count the number of
-clocks/phys passed instead of reading nr-ports property.
-
-I do understand that Orion5x neither has clocks nor phys on SATA so
-we may either stick with nr-ports there or add fake (&tclk) clocks
-instead.
-
-Anyway, for this patch, I agree it could stay the way it is.
-
-Sebastian
+A.
