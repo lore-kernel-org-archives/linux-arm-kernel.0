@@ -1,76 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 25 Dec 2014 14:18:02 +0100
-Subject: [PATCH 2/2] ARM: dts: berlin: add PPI cpu mask to twd timer
- interrupts
-In-Reply-To: <1419487942-2277-3-git-send-email-jszhang@marvell.com>
-References: <1419487942-2277-1-git-send-email-jszhang@marvell.com>
- <1419487942-2277-3-git-send-email-jszhang@marvell.com>
-Message-ID: <549C0E8A.6010709@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 25 Dec 2014 14:31:09 +0100
+Subject: [PATCH v3 1/1] add support for Seagate BlackArmor NAS220
+In-Reply-To: <549C0C3C.8060601@gmail.com>
+References: <20141215203855.GA28940@anne> <20141222125750.GA29163@anne>
+ <549C0C3C.8060601@gmail.com>
+Message-ID: <20141225133109.GI19265@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.12.2014 07:12, Jisheng Zhang wrote:
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Thu, Dec 25, 2014 at 02:08:12PM +0100, Sebastian Hesselbarth wrote:
+> >+			status = "okay";
+> >+		};
+> >+
+> >+		sata at 80000 {
+> >+			status = "okay";
+> >+			nr-ports = <2>;
+> 
+> I need some update from the other mvebu guys here: Do we have SATA
+> PHY nodes in v3.19 for Kirkwood already? If so, please update to the
+> new binding.
 
-Jisheng,
+Hi Sebastian
 
-thanks for the patches!
+I'm not sure what you mean here. The binding Documentation says:
 
-Please always add some text to the commit log, no matter how simple the
-change is.
+Required Properties:
+- compatibility : "marvell,orion-sata" or "marvell,armada-370-sata"
+- reg           : Address range of controller
+- interrupts    : Interrupt controller is using
+- nr-ports      : Number of SATA ports in use.
 
-> ---
->   arch/arm/boot/dts/berlin2.dtsi   | 3 ++-
->   arch/arm/boot/dts/berlin2cd.dtsi | 3 ++-
->   arch/arm/boot/dts/berlin2q.dtsi  | 3 ++-
->   3 files changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-> index 015a06c..f6d9002 100644
-> --- a/arch/arm/boot/dts/berlin2.dtsi
-> +++ b/arch/arm/boot/dts/berlin2.dtsi
-> @@ -104,7 +104,8 @@
->   		local-timer at ad0600 {
->   			compatible = "arm,cortex-a9-twd-timer";
->   			reg = <0xad0600 0x20>;
-> -			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-> +					IRQ_TYPE_LEVEL_HIGH)>;
+Optional Properties:
+- phys          : List of phandles to sata phys
+- phy-names     : Should be "0", "1", etc, one number per phandle
 
-IMHO, feel free to ignore 80-column restriction on each of the lines
-changed.
+The optional phys/phy-names have just been added to
+kirkwood-6192.dtsi.
 
-Sebastian
-
->   			clocks = <&chip CLKID_TWD>;
->   		};
->
-> diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-> index a318bc3..517a364 100644
-> --- a/arch/arm/boot/dts/berlin2cd.dtsi
-> +++ b/arch/arm/boot/dts/berlin2cd.dtsi
-> @@ -76,7 +76,8 @@
->   		local-timer at ad0600 {
->   			compatible = "arm,cortex-a9-twd-timer";
->   			reg = <0xad0600 0x20>;
-> -			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) |
-> +					IRQ_TYPE_LEVEL_HIGH)>;
->   			clocks = <&chip CLKID_TWD>;
->   		};
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 933dcbb..33fbf8f 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -112,7 +112,8 @@
->   			compatible = "arm,cortex-a9-twd-timer";
->   			reg = <0xad0600 0x20>;
->   			clocks = <&chip CLKID_TWD>;
-> -			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-> +					IRQ_TYPE_LEVEL_HIGH)>;
->   		};
->
->   		gic: interrupt-controller at ad1000 {
->
+	Andrew
