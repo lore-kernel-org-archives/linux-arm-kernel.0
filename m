@@ -1,136 +1,19 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 25 Dec 2014 16:34:20 +0800
-Subject: [PATCH 4/4] ARM: sirf: bring up SMP in atlas7 SoC
-In-Reply-To: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
-References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1419496460-4929-5-git-send-email-21cnbao@gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 25 Dec 2014 16:48:31 +0800
+Subject: kernel panic when booting on exynos 5440
+Message-ID: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhiwu Song <Zhiwu.Song@csr.com>
+Hi Pankaj,
 
-correct cpu1 jump/flag address, remove scu related logic, scu doesn't
-expose in cortex-a7.
+In your commit fce9e5bb2(ARM: EXYNOS: Add support for
+mapping PMU base address via DT), 'pmu_base_addr' is
+only parsed for very limited machines from the table of
+'exynos_dt_pmu_match'.  For other boards, 'pmu_base_addr'
+will keep its default value of null, then panic() is triggered.
 
-this patch breaks marco chip, but marco project has been dropped.
+What do you think about the problem?
 
-Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/common.c  |  1 -
- arch/arm/mach-prima2/platsmp.c | 52 +++++++++++-------------------------------
- 2 files changed, 13 insertions(+), 40 deletions(-)
-
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 2f45d48..444e34d 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -23,7 +23,6 @@ static void __init sirfsoc_init_late(void)
- static __init void sirfsoc_map_io(void)
- {
- 	sirfsoc_map_lluart();
--	sirfsoc_map_scu();
- }
- 
- #ifdef CONFIG_ARCH_ATLAS6
-diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
-index 335c12e..fc2b03c 100644
---- a/arch/arm/mach-prima2/platsmp.c
-+++ b/arch/arm/mach-prima2/platsmp.c
-@@ -20,30 +20,10 @@
- 
- #include "common.h"
- 
--static void __iomem *scu_base;
--static void __iomem *rsc_base;
-+static void __iomem *clk_base;
- 
- static DEFINE_SPINLOCK(boot_lock);
- 
--static struct map_desc scu_io_desc __initdata = {
--	.length		= SZ_4K,
--	.type		= MT_DEVICE,
--};
--
--void __init sirfsoc_map_scu(void)
--{
--	unsigned long base;
--
--	/* Get SCU base */
--	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
--
--	scu_io_desc.virtual = SIRFSOC_VA(base);
--	scu_io_desc.pfn = __phys_to_pfn(base);
--	iotable_init(&scu_io_desc, 1);
--
--	scu_base = (void __iomem *)SIRFSOC_VA(base);
--}
--
- static void sirfsoc_secondary_init(unsigned int cpu)
- {
- 	/*
-@@ -60,8 +40,8 @@ static void sirfsoc_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
- }
- 
--static struct of_device_id rsc_ids[]  = {
--	{ .compatible = "sirf,marco-rsc" },
-+static struct of_device_id clk_ids[]  = {
-+	{ .compatible = "sirf,atlas7-clkc" },
- 	{},
- };
- 
-@@ -70,27 +50,27 @@ static int sirfsoc_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	unsigned long timeout;
- 	struct device_node *np;
- 
--	np = of_find_matching_node(NULL, rsc_ids);
-+	np = of_find_matching_node(NULL, clk_ids);
- 	if (!np)
- 		return -ENODEV;
- 
--	rsc_base = of_iomap(np, 0);
--	if (!rsc_base)
-+	clk_base = of_iomap(np, 0);
-+	if (!clk_base)
- 		return -ENOMEM;
- 
- 	/*
--	 * write the address of secondary startup into the sram register
--	 * at offset 0x2C, then write the magic number 0x3CAF5D62 to the
--	 * RSC register at offset 0x28, which is what boot rom code is
-+	 * write the address of secondary startup into the clkc register
-+	 * at offset 0x2bC, then write the magic number 0x3CAF5D62 to the
-+	 * clkc register at offset 0x2b8, which is what boot rom code is
- 	 * waiting for. This would wake up the secondary core from WFE
- 	 */
--#define SIRFSOC_CPU1_JUMPADDR_OFFSET 0x2C
-+#define SIRFSOC_CPU1_JUMPADDR_OFFSET 0x2bc
- 	__raw_writel(virt_to_phys(sirfsoc_secondary_startup),
--		rsc_base + SIRFSOC_CPU1_JUMPADDR_OFFSET);
-+		clk_base + SIRFSOC_CPU1_JUMPADDR_OFFSET);
- 
--#define SIRFSOC_CPU1_WAKEMAGIC_OFFSET 0x28
-+#define SIRFSOC_CPU1_WAKEMAGIC_OFFSET 0x2b8
- 	__raw_writel(0x3CAF5D62,
--		rsc_base + SIRFSOC_CPU1_WAKEMAGIC_OFFSET);
-+		clk_base + SIRFSOC_CPU1_WAKEMAGIC_OFFSET);
- 
- 	/* make sure write buffer is drained */
- 	mb();
-@@ -132,13 +112,7 @@ static int sirfsoc_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return pen_release != -1 ? -ENOSYS : 0;
- }
- 
--static void __init sirfsoc_smp_prepare_cpus(unsigned int max_cpus)
--{
--	scu_enable(scu_base);
--}
--
- struct smp_operations sirfsoc_smp_ops __initdata = {
--	.smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,
- 	.smp_secondary_init     = sirfsoc_secondary_init,
- 	.smp_boot_secondary     = sirfsoc_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--- 
-2.2.0
+Thanks,
+Ming Lei
