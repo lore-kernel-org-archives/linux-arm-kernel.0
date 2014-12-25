@@ -1,44 +1,35 @@
-From: walter@vanguardiasur.com.ar (Walter Lozano)
-Date: Wed, 24 Dec 2014 20:11:52 -0300
-Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
-Message-ID: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 25 Dec 2014 10:11:09 +0800
+Subject: [PATCH v8 3/4] ARM: mediatek: Add sysirq in
+ mt6589/mt8135/mt8127 dtsi
+In-Reply-To: <1416902662-19281-4-git-send-email-yingjoe.chen@mediatek.com>
+References: <1416902662-19281-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1416902662-19281-4-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1419473469.7238.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DTS bindings for the adxl34x digital
-accelerometer.
 
-Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
----
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Hi Matthias,
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 16ea6f5..d343e03 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -60,6 +60,22 @@
- 	rxc-skew-ps = <2000>;
- };
- 
-+&gpio2 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	accel1: accelerometer at 53 {
-+		compatible = "adxl34x";
-+		reg = <0x53>;
-+
-+		interrupt-parent = <&portc>;
-+		interrupts = <3 2>;
-+	};
-+};
-+
- &mmc0 {
- 	vmmc-supply = <&regulator_3_3v>;
- 	vqmmc-supply = <&regulator_3_3v>;
--- 
-1.7.10.4
+On Tue, 2014-11-25 at 16:04 +0800, Yingjoe Chen wrote:
+> Add sysirq settings for mt6589/mt8135/mt8127
+> This also correct timer interrupt flag. The old setting works
+> because boot loader already set polarity for timer interrupt.
+> Without intpol support, the setting was not changed so gic
+> can get the irq correctly.
+> 
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt6589.dtsi | 14 ++++++++++++--
+>  arch/arm/boot/dts/mt8127.dtsi | 14 ++++++++++++--
+>  arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++--
+>  3 files changed, 36 insertions(+), 6 deletions(-)
+
+It seems this patch is not merged in 3.19-rc1. This do have dependency
+on other patches, and all the other patches in this series are merged.
+
+Is this planed to merge later or do we need to send additional pull
+request for it?
+
+Joe.C
