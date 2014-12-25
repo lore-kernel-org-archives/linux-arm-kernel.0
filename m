@@ -1,70 +1,38 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Thu, 25 Dec 2014 09:32:40 +0100
-Subject: v3.19-rc1 regression(?) on N900
-In-Reply-To: <549B44E2.6080202@ti.com>
-References: <549B44E2.6080202@ti.com>
-Message-ID: <201412250932.40403@pali>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 25 Dec 2014 16:34:16 +0800
+Subject: [PATCH 0/4] ARM: add basic CSR atlas7 Auto SoC support
+Message-ID: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 December 2014 23:57:38 Nishanth Menon wrote:
-> based on automated testing with u-boot as a chained
-> bootloader..
-> 
-> v3.18: boots fine:
-> https://github.com/nmenon/kernel-test-logs/blob/v3.18/omap2plu
-> s_defconfig/n900.txt
-> 
-> v3.19-rc1: hung
-> https://github.com/nmenon/kernel-test-logs/blob/v3.19-rc1/omap
-> 2plus_defconfig/n900.txt
-> 
-> in the interim, my farm had a bit of breakdown around the time
-> of n900 breakdown..
-> 
-> as per my last functional linux-next logs:
-> https://github.com/nmenon/kernel-test-logs/blob/next-20141204/
-> omap2plus_defconfig/n900.txt -> hung.
-> https://github.com/nmenon/kernel-test-logs/blob/next-20141112/
-> omap2plus_defconfig/n900.txt -> working.
-> 
-> DEBUG_LL, CONFIG_DEBUG_OMAP3UART3=y and early_printk did not
-> yield information either
-> 
-> Note: I am using the combined uImage+dtb image.[2]
-> 
-> I think this might just be my setup..(i use chained loader ->
-> NOLO->u-boot->serial download->kernel) but anyways.. Since
-> Pali thought others might be interested in sharing
-> experience...
-> 
-> [1]   http://slexy.org/raw/s2osxhhwbR
-> [2]
-> https://github.com/nmenon/linux-2.6-playground/commit/177f5f71
-> b3f21ea484ee4b09a2e0c015de522417
+From: Barry Song <Baohua.Song@csr.com>
 
-CCing other people.
+add basic support for CSR atlas7 new Auto SoC. this patchset only
+adds debug port, dts, smp and machine for the chip.
 
-I see same problem in qemu with 3.19-rc1 kernel when doing DT 
-boot. In qemu I'm using direct booting from OneNAND (X-Loader --> 
-NOLO --> kernel) without U-Boot. After NOLO load & boot kernel I 
-do not see any other output from serial console. Also on qemu 
-screen there is no new output (just NOKIA logo from bootloader).
+we need some follow-up patches for clock, pinctrl, dma and so on.
 
-I do not have this problem when doing legacy/board code boot with 
-3.19-rc1 kernel, so this problem is related to DT.
+Guo Zeng (1):
+  ARM: sirf: add two debug ports for CSRatlas7 SoC
 
-Kernel 3.18-rc1 worked fine for both DT and legacy boot.
+Zhiwu Song (3):
+  ARM: sirf: add atlas7 machine support
+  ARM: dts: add init dts file for CSR atlas7 SoC
+  ARM: sirf: bring up SMP in atlas7 SoC
 
-Can somebody look what broke DT booting?
+ Documentation/devicetree/bindings/arm/sirf.txt |   2 +
+ arch/arm/Kconfig.debug                         |  21 +-
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/atlas7-evb.dts               | 110 ++++
+ arch/arm/boot/dts/atlas7.dtsi                  | 813 +++++++++++++++++++++++++
+ arch/arm/include/debug/sirf.S                  |  37 +-
+ arch/arm/mach-prima2/Kconfig                   |  13 +-
+ arch/arm/mach-prima2/common.c                  |  16 +-
+ arch/arm/mach-prima2/lluart.c                  |  21 +-
+ arch/arm/mach-prima2/platsmp.c                 |  52 +-
+ 10 files changed, 1022 insertions(+), 64 deletions(-)
+ create mode 100644 arch/arm/boot/dts/atlas7-evb.dts
+ create mode 100644 arch/arm/boot/dts/atlas7.dtsi
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141225/8838583b/attachment.sig>
+2.2.0
