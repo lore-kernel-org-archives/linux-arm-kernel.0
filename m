@@ -1,56 +1,76 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 25 Dec 2014 11:19:04 +0100
-Subject: [PATCH v2] ALSA: atmel: fix building the ac97 driver for
- at91-multiplatform
-In-Reply-To: <1419160689-20447-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1419160689-20447-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <s5hppb8hw13.wl-tiwai@suse.de>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 25 Dec 2014 16:02:44 +0530
+Subject: kernel panic when booting on exynos 5440
+In-Reply-To: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
+References: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
+Message-ID: <549BE7CC.1000005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Sun, 21 Dec 2014 12:18:09 +0100,
-Alexandre Belloni wrote:
-> 
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> at91 will no longer export the mach/cpu.h and mach/hardware.h header files
-> in the future, which would break building the atmel ac97c driver.
-> 
-> Since the cpu_is_* check is only used to find out whether we are running
-> on avr32 or arm/at91, we can hardcode that check in the ARM case.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
++CC: Thomas Abraham
 
-Is this targeted for 3.19 or 3.20?
+Hi Ming,
 
+On Thursday 25 December 2014 02:18 PM, Ming Lei wrote:
+> Hi Pankaj,
+>
+> In your commit fce9e5bb2(ARM: EXYNOS: Add support for
+> mapping PMU base address via DT), 'pmu_base_addr' is
+> only parsed for very limited machines from the table of
+> 'exynos_dt_pmu_match'.  For other boards, 'pmu_base_addr'
+> will keep its default value of null, then panic() is triggered.
+>
 
-thanks,
+Yes, it will.
+As exynos5440 DT does not have PMU device node, neither above mentioned 
+patch added corresponding matching device_id.
+If I remember correctly, I might have missed this because exynos5440 DT 
+was not having PMU node.
 
-Takashi
+> What do you think about the problem?
 
-> ---
->  sound/atmel/ac97c.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
-> index b59427d5a697..83975f8d5947 100644
-> --- a/sound/atmel/ac97c.c
-> +++ b/sound/atmel/ac97c.c
-> @@ -34,10 +34,10 @@
->  #include <linux/platform_data/dma-dw.h>
->  #include <linux/dma/dw.h>
->  
-> +#ifdef CONFIG_AVR32
->  #include <mach/cpu.h>
-> -
-> -#ifdef CONFIG_ARCH_AT91
-> -#include <mach/hardware.h>
-> +#else
-> +#define cpu_is_at32ap7000() 0
->  #endif
->  
->  #include "ac97c.h"
-> -- 
-> 2.1.0
-> 
+I missed this part, and I should have taken care of this in original 
+patch itself. Well as of now I can think of only one solution that if we 
+really want to keep support for exynos5440 in mainline kernel, to avoid 
+above issue we should skip pmu mapping for exynos5440. In this case 
+following patch will do this work.
+
+Also I will like to know from Kukjin that what best can be done now.
+If he is OK with below solution I can post the same.
+
+---------------------------------------------------------------
+
+Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
+
+Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
+of mapping of exynos5440 PMU register which will result in kernel panic.
+As of now let's avoid mapping of exynos5440 PMU.
+
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+  arch/arm/mach-exynos/exynos.c | 3 ++-
+  1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index c13d083..1891b8c 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -208,7 +208,8 @@ static void __init exynos_init_irq(void)
+          * DT is not unflatten so we can't use DT APIs before
+          * init_irq
+          */
+-       exynos_map_pmu();
++       if (!of_machine_is_compatible("samsung,exynos5440"))
++               exynos_map_pmu();
+  }
+
+  static void __init exynos_dt_machine_init(void)
+
+------------------------------------------------------
+>
+> Thanks,
+> Ming Lei
+>
+
+Thanks,
+Pankaj Dubey
