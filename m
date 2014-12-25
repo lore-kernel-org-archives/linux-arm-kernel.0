@@ -1,89 +1,42 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 25 Dec 2014 16:23:46 +0530
-Subject: kernel panic when booting on exynos 5440
-In-Reply-To: <CACVXFVMOmq4rzXtaLNFn2NE-X=__dTJFANWtuJZS9m9szV0JuQ@mail.gmail.com>
-References: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
- <549BE7CC.1000005@samsung.com>
- <CACVXFVMOmq4rzXtaLNFn2NE-X=__dTJFANWtuJZS9m9szV0JuQ@mail.gmail.com>
-Message-ID: <549BECBA.4060707@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 25 Dec 2014 13:25:19 +0100
+Subject: [PATCH] ARM: dts: sun6i: ippo-q8h-v5: Fix serial0 alias
+In-Reply-To: <1419510319-32400-1-git-send-email-hdegoede@redhat.com>
+References: <1419510319-32400-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1419510319-32400-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Ippo q8h has its serial console connected to the r-uart. Adjust the
+serial0 alias to match.
 
-On Thursday 25 December 2014 04:13 PM, Ming Lei wrote:
-> On Thu, Dec 25, 2014 at 6:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> +CC: Thomas Abraham
->>
->> Hi Ming,
->>
->> On Thursday 25 December 2014 02:18 PM, Ming Lei wrote:
->>>
->>> Hi Pankaj,
->>>
->>> In your commit fce9e5bb2(ARM: EXYNOS: Add support for
->>> mapping PMU base address via DT), 'pmu_base_addr' is
->>> only parsed for very limited machines from the table of
->>> 'exynos_dt_pmu_match'.  For other boards, 'pmu_base_addr'
->>> will keep its default value of null, then panic() is triggered.
->>>
->>
->> Yes, it will.
->> As exynos5440 DT does not have PMU device node, neither above mentioned
->> patch added corresponding matching device_id.
->> If I remember correctly, I might have missed this because exynos5440 DT was
->> not having PMU node.
->>
->>> What do you think about the problem?
->>
->>
->> I missed this part, and I should have taken care of this in original patch
->> itself. Well as of now I can think of only one solution that if we really
->> want to keep support for exynos5440 in mainline kernel, to avoid above issue
->> we should skip pmu mapping for exynos5440. In this case following patch will
->> do this work.
->>
->> Also I will like to know from Kukjin that what best can be done now.
->> If he is OK with below solution I can post the same.
->>
->> ---------------------------------------------------------------
->>
->> Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
->>
->> Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
->> of mapping of exynos5440 PMU register which will result in kernel panic.
->> As of now let's avoid mapping of exynos5440 PMU.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/mach-exynos/exynos.c | 3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index c13d083..1891b8c 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -208,7 +208,8 @@ static void __init exynos_init_irq(void)
->>           * DT is not unflatten so we can't use DT APIs before
->>           * init_irq
->>           */
->> -       exynos_map_pmu();
->> +       if (!of_machine_is_compatible("samsung,exynos5440"))
->> +               exynos_map_pmu();
->>   }
->
-> If I remember correctly, there are other SoCs which have not been
-> included in the pmu mapping list, and looks these SoCs need
-> to be handled too.
->
+This fixes the kernel serial console no longer working since 3.19-rc1, because
+8250_dw.c now honors dt aliases, causing the serial console to be ttyS5 rather
+then being ttyS0, as it was in 3.18 and before.
 
-As far as I can see in today's linux-next and kgene/for-next tree, only 
-exynos5440 PMU mapping is missing. If I am missing anything please 
-specify exact SoC name, which you think need to be handled.
+Note that adjusting bootargs instead is not an acceptable fix, because
+console=ttyS0,115200 is used by a lot of bootscripts, etc. and this should
+continue to work.
 
-Thanks,
-Pankaj Dubey
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->
-> Thanks,
-> Ming Lei
->
+diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+index 7f2117c..32ad808 100644
+--- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
++++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+@@ -55,6 +55,10 @@
+ 	model = "Ippo Q8H Dual Core Tablet (v5)";
+ 	compatible = "ippo,q8h-v5", "allwinner,sun8i-a23";
+ 
++	aliases {
++		serial0 = &r_uart;
++	};
++
+ 	chosen {
+ 		bootargs = "earlyprintk console=ttyS0,115200";
+ 	};
+-- 
+2.1.0
