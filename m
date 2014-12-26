@@ -1,53 +1,43 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 26 Dec 2014 16:26:53 +0800
-Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8173 SoC 
-Message-ID: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
+Date: Fri, 26 Dec 2014 16:26:54 +0800
+Subject: [PATCH v3 1/4] Document: DT: Add bindings for mediatek MT8173 Soc
+ Platform
+In-Reply-To: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
+References: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1419582417-4448-2-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8173 is a SoC based on 64bit ARMv8 architecture. It contains 2 CA53 + 2 CA57 cores.
-MT8173 share many HW IP with MT8135 and other MT65xx series. This patchset was tested
-on MT8173 engineer sample, and boot to shell ok.
+Add the devicetree binding document for mediatek MT8173 SoC.
+This is a 64-bit four core Soc.
+And mt8173-evb is a evaluation board based on mt8173.
 
-This series contains document bindings, device tree, defconfig, and one sysirq
-modification for MT8173.
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ Documentation/devicetree/bindings/arm/mediatek.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Changes in v3:
-
-1. Modify mt8173.dtsi according Mark Rutland review comment, CPU ID, PSCI and GIC address.
-2. Include interrupt dt-binding header files, replace interrupt number by enum value.
-3. Rebase to 3.19-rc1, create arch/arm64/boot/dts/mediatek folder to put mt8173.dtsi.
-
-This patch base on 3.19-rc1, Joe's sysirq patch [1] and test boot to shell with
-Catalin Marinas's arch_timer virtual counter patch [2]
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310335.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309856.html
-
-Eddie Huang (3):
-  Document: DT: Add bindings for mediatek MT8173 Soc Platform
-  arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and
-    Makefile
-  arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
-
-Yingjoe Chen (1):
-  irqchip: mtk-sysirq: Get irq number from register resource size
-
- Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
- arch/arm64/Kconfig                                 |   6 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/mediatek/Makefile              |   5 +
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  34 +++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 159 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   2 +
- drivers/irqchip/irq-mtk-sysirq.c                   |  18 ++-
- 8 files changed, 222 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
-
---
-1.8.1.1.dirty
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index 3be4013..dd7550a 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -9,6 +9,7 @@ compatible: Must contain one of
+    "mediatek,mt6592"
+    "mediatek,mt8127"
+    "mediatek,mt8135"
++   "mediatek,mt8173"
+ 
+ 
+ Supported boards:
+@@ -25,3 +26,6 @@ Supported boards:
+ - MTK mt8135 tablet EVB:
+     Required root node properties:
+       - compatible = "mediatek,mt8135-evbp1", "mediatek,mt8135";
++- MTK mt8173 tablet EVB:
++    Required root node properties:
++      - compatible = "mediatek,mt8173-evb", "mediatek,mt8173";
+-- 
+1.8.1.1
 
 ************* Email Confidentiality Notice ********************
 The information contained in this e-mail message (including any 
