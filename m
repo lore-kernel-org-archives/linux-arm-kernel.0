@@ -1,148 +1,339 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Dec 2014 22:42:46 -0600
-Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
-In-Reply-To: <549BE333.9060709@compulab.co.il>
-References: <1419271535-4057-1-git-send-email-balbi@ti.com>
- <54991A25.2030804@compulab.co.il> <20141223161936.GA9147@saruman>
- <549AA94A.8030209@compulab.co.il> <20141224154948.GA423@saruman>
- <20141224190401.GN23854@atomide.com>
- <549BE333.9060709@compulab.co.il>
-Message-ID: <20141226044246.GB7661@saruman>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 26 Dec 2014 14:37:14 +0800
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <Pine.LNX.4.64.1412241626510.28885@axis700.grange>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <1418869646-17071-3-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1412182237370.11953@axis700.grange>
+ <5493C1A8.4050204@atmel.com>
+ <Pine.LNX.4.64.1412192307320.21176@axis700.grange>
+ <5497F1F5.7000505@atmel.com>
+ <Pine.LNX.4.64.1412241626510.28885@axis700.grange>
+Message-ID: <549D021A.7030307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Guennadi
 
-On Thu, Dec 25, 2014 at 12:13:07PM +0200, Igor Grinberg wrote:
-> Hi Tony,
-> 
-> On 12/24/14 21:04, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [141224 07:52]:
-> >> Hi,
-> >>
-> >> On Wed, Dec 24, 2014 at 01:53:46PM +0200, Igor Grinberg wrote:
-> >>> -----BEGIN PGP SIGNED MESSAGE-----
-> >>> Hash: SHA1
-> >>>
-> >>> On 12/23/14 18:19, Felipe Balbi wrote:
-> >>>> On Tue, Dec 23, 2014 at 09:30:45AM +0200, Igor Grinberg wrote:
-> >>>>> Hi Felipe,
-> >>>>>
-> >>>>> On 12/22/14 20:05, Felipe Balbi wrote:
-> >>>>>
-> >>>>> [...]
-> >>>>>
-> >>>>>>  CONFIG_SCSI_SCAN_ASYNC=y
-> >>>>>> -CONFIG_ATA=y
-> >>>>>> -CONFIG_SATA_AHCI_PLATFORM=y
-> >>>>>> -CONFIG_MD=y
-> >>>>>> +CONFIG_ATA=m
-> >>>>>> +CONFIG_SATA_AHCI_PLATFORM=m
-> >>>>>
-> >>>>> Isn't this needed for the rootfs on SATA devices?
-> >>>>
-> >>>> there's no known boards with rootfs on SATA. Until then, we can reduce
-> >>>> the size.
-> >>>
-> >>> What makes you say so?
-> >>> The decision for rootfs on SATA is taken dynamically.
-> >>> OMAP5 boards (specifically cm-t54) can have rootfs on SATA...
-> >>
-> >> I'll leave the decision to Tony. Even though they _can_, they really
-> >> don't and IIRC, OMAP5's SATA has so many silicon errata that it'd be
-> >> annoying to find that special device which works (e.g it can't negotiate
-> >> lower speeds with SATA III devices and it won't support SATA I).
-> 
-> Yet, it is not that buggy and at least until now, I di not get any
-> reports about badly working SATA from customers...
-> 
-> >>
-> >> As of today, we don't know of anybody really shipping anything with
-> >> rootfs on SATA and distros would rather ship initiramfs than a giant
-> >> zImage anyway.
-> 
-> So, you just continue to ignore what I'm saying... even after I point
-> to a device...
+Thanks for the reply.
+And Merry Christmas and happy new year.
 
-you pointed a device which *can* have rootfs on SATA, not one which
-*has* rootfs on SATA, there's a very big difference there.
+On 12/25/2014 6:39 AM, Guennadi Liakhovetski wrote:
+> Hi Josh,
+>
+> On Mon, 22 Dec 2014, Josh Wu wrote:
+>
+>> Hi, Guennadi
+>>
+>> On 12/20/2014 6:16 AM, Guennadi Liakhovetski wrote:
+>>> On Fri, 19 Dec 2014, Josh Wu wrote:
+>>>
+>>>> Hi, Guennadi
+>>>>
+>>>> Thanks for the review.
+>>>>
+>>>> On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
+>>>>> Hi Josh,
+>>>>>
+>>>>> Thanks for your patches!
+>>>>>
+>>>>> On Thu, 18 Dec 2014, Josh Wu wrote:
+>>>>>
+>>>>>> To support async probe for ov2640, we need remove the code to get
+>>>>>> 'mclk'
+>>>>>> in ov2640_probe() function. oterwise, if soc_camera host is not probed
+>>>>>> in the moment, then we will fail to get 'mclk' and quit the
+>>>>>> ov2640_probe()
+>>>>>> function.
+>>>>>>
+>>>>>> So in this patch, we move such 'mclk' getting code to ov2640_s_power()
+>>>>>> function. That make ov2640 survive, as we can pass a NULL (priv-clk)
+>>>>>> to
+>>>>>> soc_camera_set_power() function.
+>>>>>>
+>>>>>> And if soc_camera host is probed, the when ov2640_s_power() is called,
+>>>>>> then we can get the 'mclk' and that make us enable/disable soc_camera
+>>>>>> host's clock as well.
+>>>>>>
+>>>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>>>>> ---
+>>>>>> v3 -> v4:
+>>>>>> v2 -> v3:
+>>>>>> v1 -> v2:
+>>>>>>      no changes.
+>>>>>>
+>>>>>>     drivers/media/i2c/soc_camera/ov2640.c | 31
+>>>>>> +++++++++++++++++++++----------
+>>>>>>     1 file changed, 21 insertions(+), 10 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+>>>>>> b/drivers/media/i2c/soc_camera/ov2640.c
+>>>>>> index 1fdce2f..9ee910d 100644
+>>>>>> --- a/drivers/media/i2c/soc_camera/ov2640.c
+>>>>>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+>>>>>> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev *sd,
+>>>>>> int
+>>>>>> on)
+>>>>>>     	struct i2c_client *client = v4l2_get_subdevdata(sd);
+>>>>>>     	struct soc_camera_subdev_desc *ssdd =
+>>>>>> soc_camera_i2c_to_desc(client);
+>>>>>>     	struct ov2640_priv *priv = to_ov2640(client);
+>>>>>> +	struct v4l2_clk *clk;
+>>>>>> +
+>>>>>> +	if (!priv->clk) {
+>>>>>> +		clk = v4l2_clk_get(&client->dev, "mclk");
+>>>>>> +		if (IS_ERR(clk))
+>>>>>> +			dev_warn(&client->dev, "Cannot get the mclk.
+>>>>>> maybe
+>>>>>> soc-camera host is not probed yet.\n");
+>>>>>> +		else
+>>>>>> +			priv->clk = clk;
+>>>>>> +	}
+>>>>>>       	return soc_camera_set_power(&client->dev, ssdd, priv->clk,
+>>>>>> on);
+>>>>>>     }
+>> Just let me explained a little more details at first:
+>>
+>> As my understanding, current the priv->clk is a v4l2_clk: mclk, which is a
+>> wrapper clock in soc_camera.c.
+>> it can make soc_camera to call camera host's clock_start() clock_stop().
+>> As in ov2640, the real mck (pck1) is in ov2640 dt node (xvclk). So the camera
+>> host's clock_start()/stop() only need to enable/disable his peripheral clock.
+> I'm looking at the ov2640 datasheet. In the block diagram I only see one
+> input clock - the xvclk. Yes, it can be supplied by the camera host
+> controller, in which case it is natural for the camera host driver to own
+> and control it, or it can be a separate clock device - either static or
+> configurable. This is just a note to myself to clarify, that it's one and
+> the same clock pin we're talking about.
+>
+> Now, from the hardware / DT PoV, I think, the DT should look like:
+>
+> a) in the ov2640 I2C DT node we should have a clock consumer entry,
+> linking to a board-specific source.
 
-> Is it SATA that makes it so giant?
-> Because I find it worth having in SATA than spare some more k's...
+That's what this patch series do right now.
+In my patch 5/5 DT document said, ov2640 need a clock consumer which 
+refer to the xvclk input clock.
+And it is a required property.
 
-that's your point of view. As Tony mentioned, we have a very standard
-way of dealing with this which is initramfs and x86 has been using that
-for the past 15+ years.
+>
+> b) if the ov2640 clock is supplied by a camera host, its DT entry should
+> have a clock source subnode, to which ov2640 clock consumer entry should
+> link. The respective camera host driver should then parse that clock
+> subnode and register the respective clock with the V4L2 framework, by
+> calling v4l2_clk_register().
+Ok, So in this case, I need to wait for the "mclk" in probe of ov2640 
+driver. So that I can be compatible for the camera host which provide 
+the clock source.
 
-> >> Tony, your call.
-> > 
-> > I think we should move omap2plus_defconfig to be mostly modular and
-> > usable for distros as a base. Most distros prefer to build almost
-> > everything as loadable modules. And my preference is that we should
-> > only keep the minimum rootfs for devices and serial support as
-> > built-in and rely on initramfs for most drivers. And slowly move
-> > also the remaining built-in drivers to be loadable modules.
-> > 
-> > The reasons for having drivers as loadable modules are many. It
-> > allows distros to use the same kernel for all the devices without
-> > bloating the kernel. It makes developing drivers easier as just the
-> > module needs to be reloaded. And loadable modules protect us from
-> > cross-framework spaghetti calls in the kernel as the interfaces are 
-> > clearly defined.
-> > 
-> > Are there people really using SATA as rootfs right now on omaps?
-> 
-> Yes. That is exactly my point.
+>
+> c) if the ov2640 clock is supplied by a different clock source, the
+> respective driver should parse it and also eventually call
+> v4l2_clk_register().
+>
+> Implementing case (b) above is so far up to each individual (soc-camera)
+> camera host driver. In soc-camera host drivers don't register V4L2 clocks
+> themselves, as you correctly noticed, they just provide a .clock_start()
+> and a .clock_stop() callbacks. The registration is done by the soc-camera
+> core.
+>
+> If I understand correctly you have case (c). Unfortunately, this case
+> isn't supported atm. I think, a suitable way to do this would be:
+>
+> (1) modify soc-camera to not register a V4L2 clock if the host doesn't
+> provide the required callbacks.
+>
+> (2) hosts should recognise configurations, in which they don't supply the
+> master clock to clients and not provide the callbacks then.
+>
+> (3) a separate driver should register a suitable V4L2 clock.
+>
+> Whereas I don't think we need to modify camera drivers. Their requesting
+> of a V4L2 clock is correct as is.
+>
+> Some more fine-print: if the clock is supplied by a generic device, it
+> would be wrong for it to register a V4L2 clock. It should register a
+> normal CCF clock, and a separate V4L2 driver should create a V4L2 clock
+> from it. This isn't implemented either and we've been talking about it for
+> a while now...
 
-read your email, you said it *CAN* have rootfs on SATA.
+I think I understand your point now.
 
-> > If it's only something that will be more widely used in the future,
-> > then I suggest we make it into a loadable module, and presume
-> > initramfs and loadable module also for any new devices. The same
-> > way x86 has been doing with distros for years.
-> 
-> The difference from x86 is that we're in embedded here and
+>
+>> That is the motivation I want ov2640 be probed even without "mclk".
+> ov2640 can be used with other boards and camera hosts, not only your
+> specific board. In other configurations your change will break the driver.
+>
+>>> Ok, think about this: you check whether priv->clk is set on each
+>>> .s_power() call, which is already a bit awkward.
+>> yes, it is.
+>>
+>>> Such approach can be used
+>>> when there's no other way to perform a one-time action, but here we have
+>>> one. But never mind, that's not the main problem. If priv->clk isn't set,
+>>> you try to acquire it. But during probing, when this function is called
+>>> for the first time clock isn't available yet, but you still want to
+>>> succeed probing. So, you just issue a warning and continue. But then later
+>>> an application opens the camera, .s_power() is called again, but for some
+>>> reason the clock might still be not available, and this time you should
+>>> fail.
+>>> But you don't, you succeed and then you'll fail somewhere later,
+>>> presumably, with a timeout waiting for frames. Am I right?
+>> if the clock (v4l2 clock: mclk) is not available, then, there is no camera
+>> host available.
+> This isn't true - from the hardware perspective. The clock can be supplied
+> by a different source.
+>
+>> So the system should have no v4l2 device found.
+>> I think in this case the application cannot call the camera sensor .s_power()
+>> via v4l2 ioctl.
+>> So the timeout case should not happened.
+> No, sorry, I meant a physical clock, not aclock object. You can register
+> the complete framework and try to use it, but if the physical clock isn't
+> enabled, the camera sensor won't function correctly.
+>
+>>>>>> @@ -1078,21 +1087,21 @@ static int ov2640_probe(struct i2c_client
+>>>>>> *client,
+>>>>>>     	if (priv->hdl.error)
+>>>>>>     		return priv->hdl.error;
+>>>>>>     -	priv->clk = v4l2_clk_get(&client->dev, "mclk");
+>>>>>> -	if (IS_ERR(priv->clk)) {
+>>>>>> -		ret = PTR_ERR(priv->clk);
+>>>>>> -		goto eclkget;
+>>>>>> -	}
+>>>>>> -
+>>>>>>     	ret = ov2640_video_probe(client);
+>>>>> The first thing the above ov2640_video_probe() function will do is call
+>>>>> ov2640_s_power(), which will request the clock. So, by moving requesting
+>>>>> the clock from ov2640_probe() to ov2640_s_power() doesn't change how
+>>>>> probing will be performed, am I right?
+>>>> yes, you are right. In this patch, the "mclk" will requested by
+>>>> ov2640_s_power().
+>>>>
+>>>> The reason why I put the getting "mclk" code from ov2640_probe() to
+>>>> ov2640_s_power() is : as the "mclk" here is camera host's peripheral
+>>>> clock.
+>>>> That means ov2640 still can be probed properly (read ov2640 id) even no
+>>>> "mclk". So when I move this code to ov2640_s_power(), otherwise the
+>>>> ov2640_probe() will be failed or DEFER_PROBE.
+>>>>
+>>>> Is this true for all camera host? If it's not true, then I think use
+>>>> -EPROBE_DEFER would be a proper way.
+>>> Sorry, not sure what your question is.
+>> Sorry, I don't make me clear here.
+>> My question should be: Are all the camera host's clock_start()/stop() only
+>> operate their peripheral clock?
+> Yes, that's all camera hosts have. They cannot operate other unrelated
+> clock sources.
+>
+>>> And I'm not sure ov2640's registers
+>>> can be accessed with no running clock.
+>> No, it seems there is a misunderstanding here.
+>>
+>> I didn't mean ov2640 can be probed without xvclk.
+>> What I try to say is the ov2640 can be probed without camera host's peripheral
+>> clock.
+> Ok, then your patch will break the driver even earlier - when trying to
+> access ov2640 registers without enabling the clock.
+>
+>>>    I think some camera sensors can do
+>>> this, but I have no idea about this one. How did you verify? Is it
+>>> mentioned in a datasheet? Or did you really disconnected (grounded) the
+>>> sensor clock input and tried to access its reqisters?
+>>> If you just
+>>> verified, that it's working without requesting the clock, are you sure
+>>> your clock output isn't running permanently all the time anyway?
+>> I didn't verify the those method as I only probed the ov2640 without ISI
+>> enabled. ISI peripheral clock is disabled and etc.
+> Right, this means a separate (probably always-on) clock source is used on
+> your specific board, but this doesn't have to be the case on all other
+> boards, where ov2640 is used.
+>
+>>>>> Or are there any other patched,
+>>>>> that change that, that I'm overseeing?
+>>>>>
+>>>>> If I'm right, then I would propose an approach, already used in other
+>>>>> drivers instead of this one: return -EPROBE_DEFER if the clock isn't
+>>>>> available during probing. See ef6672ea35b5bb64ab42e18c1a1ffc717c31588a
+>>>>> for
+>>>>> an example. Or did I misunderstand anything?
+>> I can implement with your method. like in probe() function, request the
+>> v4l2_clk "mclk", if failed then return -EPROBE_DEFER.
+> Yes, please, I think this would be a correct solution.
+According to my understanding, if I implement this way I can be 
+compatible with the camera host which provide the xvclk for ov2640.
 
-bullshit, you would never ship a product with omap2plus_defconfig. You'd
-build your own at which point you would switch SATA to built-in.
+So I will prepare the next version with this way.
+BTW: do you have any comment for the 1/5 patches?
 
-> although initramfs is a kind of option, but it means, you need to
-> load even more data during the boot process... it is annoying and
-> I would not want to use it on embedded.
+Best Regards,
+Josh Wu
 
-make your own defconfig.
-
-> (BTW, x86_64_defconfig has it compiled in...)
-> 
-> We can also, split the defconfig as it was some time ago... but I
-> would not want to go that direction...
-> 
-> If we go the initramfs way, then why not also load MMC from it?
-> That will also reduce kernel size... (but add initramfs size)
-
-I'm fine with that. The difference is that people have been relying on
-MMC built-in for the past 10+ years, since the old OMAP1 MMC driver,
-changing that now is likely to cause some "my board won't boot anymore"
-bug reports.
-
-> I'm sure you will find making the MMC a loadable module inconvenient.
-> That how I find making the SATA a loadable module...
-> 
-> Right now, we tell our customers that they can use mainline with
-> omap2plus_defconfig.
-
-that's the worst thing you can do. You should at a minimum provide your
-customers with a more minimal rootfs. Why would you have your customers
-build MUSB on an OMAP5 board ? Why would they build 5 different
-network device drivers ? Why would they build almost every single PMIC
-we ever used ? The list goes on and on.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141225/57f00227/attachment.sig>
+>
+>> But I remember you mentioned that you will remove the v4l2 clock in future.
+>> See ff5430de commit message.
+>> So I just want to not so depends on the v4l2_clk "mclk".
+> This might or might not happen. We so far depend on it. And we might also
+> keep it, just adding a CCF V4L2 clock driver to handle generic clock
+> sources like in case (c) above.
+>
+> Thanks
+> Guennadi
+>
+>> Best Regards,
+>> Josh Wu
+>>
+>>>> Actually months ago I already done a version of ov2640 patch which use
+>>>> -EPROBE_DEFER way.
+>>>>
+>>>> But now I think the ov2640 can be probed correctly without "mclk", so it
+>>>> is no
+>>>> need to return -EPROBE_DEFER.
+>>>> And the v4l2 asyn API can handle the synchronization of host. So I prefer
+>>>> to
+>>>> use this way.
+>>>> What do you think about this?
+>>>>
+>>>> Best Regards,
+>>>> Josh Wu
+>>>>
+>>>>> Thanks
+>>>>> Guennadi
+>>>>>
+>>>>>>     	if (ret) {
+>>>>>> -		v4l2_clk_put(priv->clk);
+>>>>>> -eclkget:
+>>>>>> -		v4l2_ctrl_handler_free(&priv->hdl);
+>>>>>> +		goto evideoprobe;
+>>>>>>     	} else {
+>>>>>>     		dev_info(&adapter->dev, "OV2640 Probed\n");
+>>>>>>     	}
+>>>>>>     +	ret = v4l2_async_register_subdev(&priv->subdev);
+>>>>>> +	if (ret < 0)
+>>>>>> +		goto evideoprobe;
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +
+>>>>>> +evideoprobe:
+>>>>>> +	v4l2_ctrl_handler_free(&priv->hdl);
+>>>>>>     	return ret;
+>>>>>>     }
+>>>>>>     @@ -1100,7 +1109,9 @@ static int ov2640_remove(struct i2c_client
+>>>>>> *client)
+>>>>>>     {
+>>>>>>     	struct ov2640_priv       *priv = to_ov2640(client);
+>>>>>>     -	v4l2_clk_put(priv->clk);
+>>>>>> +	v4l2_async_unregister_subdev(&priv->subdev);
+>>>>>> +	if (priv->clk)
+>>>>>> +		v4l2_clk_put(priv->clk);
+>>>>>>     	v4l2_device_unregister_subdev(&priv->subdev);
+>>>>>>     	v4l2_ctrl_handler_free(&priv->hdl);
+>>>>>>     	return 0;
+>>>>>> -- 
+>>>>>> 1.9.1
+>>>>>>
+>>>>> --
+>>>>> To unsubscribe from this list: send the line "unsubscribe linux-media"
+>>>>> in
+>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
