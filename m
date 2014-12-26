@@ -1,5 +1,5 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 26 Dec 2014 14:42:07 +0100
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 26 Dec 2014 09:09:00 -0600
 Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
 In-Reply-To: <549D4CEA.6090009@compulab.co.il>
 References: <1419271535-4057-1-git-send-email-balbi@ti.com>
@@ -8,83 +8,134 @@ References: <1419271535-4057-1-git-send-email-balbi@ti.com>
  <20141224190401.GN23854@atomide.com>
  <549BE333.9060709@compulab.co.il> <20141226044246.GB7661@saruman>
  <549D4CEA.6090009@compulab.co.il>
-Message-ID: <CABxcv=n+FSuZemxQb2=wFM8m6xmWUKACnrCWFG-LevToU_UVHg@mail.gmail.com>
+Message-ID: <20141226150900.GC17430@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi,
 
-On Fri, Dec 26, 2014 at 12:56 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
->>>>> Tony, your call.
->>>>
->>>> I think we should move omap2plus_defconfig to be mostly modular and
->>>> usable for distros as a base. Most distros prefer to build almost
->>>> everything as loadable modules. And my preference is that we should
->>>> only keep the minimum rootfs for devices and serial support as
->>>> built-in and rely on initramfs for most drivers. And slowly move
->>>> also the remaining built-in drivers to be loadable modules.
->>>>
->>>> The reasons for having drivers as loadable modules are many. It
->>>> allows distros to use the same kernel for all the devices without
->>>> bloating the kernel. It makes developing drivers easier as just the
->>>> module needs to be reloaded. And loadable modules protect us from
->>>> cross-framework spaghetti calls in the kernel as the interfaces are
->>>> clearly defined.
->>>>
+On Fri, Dec 26, 2014 at 01:56:26PM +0200, Igor Grinberg wrote:
+> >>>> Tony, your call.
+> >>>
+> >>> I think we should move omap2plus_defconfig to be mostly modular and
+> >>> usable for distros as a base. Most distros prefer to build almost
+> >>> everything as loadable modules. And my preference is that we should
+> >>> only keep the minimum rootfs for devices and serial support as
+> >>> built-in and rely on initramfs for most drivers. And slowly move
+> >>> also the remaining built-in drivers to be loadable modules.
+> >>>
+> >>> The reasons for having drivers as loadable modules are many. It
+> >>> allows distros to use the same kernel for all the devices without
+> >>> bloating the kernel. It makes developing drivers easier as just the
+> >>> module needs to be reloaded. And loadable modules protect us from
+> >>> cross-framework spaghetti calls in the kernel as the interfaces are 
+> >>> clearly defined.
+> >>>
+> >>> Are there people really using SATA as rootfs right now on omaps?
+> >>
+> >> Yes. That is exactly my point.
+> > 
+> > read your email, you said it *CAN* have rootfs on SATA.
+> 
+> yep, it also *CAN* have rootfs on MMC and NFS and ...
 
-I do agree with Tony and Felipe that we should try to build as much
-stuff as possible as a module instead of built-in to match what
-distros do and what has been done for x86 for years.
+those we *know* people are using as rootfs. We know of several users who
+are actually using it :-)
 
-However, if that's the case I wonder what's the point of having both
-an omap2plus_defconfig and a multi_v7_defconfig? Would it make sense
-to get rid of the SoC specific configs then and just use the single
-ARMv7 defconfig for all SoCs with most of the options enabled as a
-module?
+> >>> If it's only something that will be more widely used in the future,
+> >>> then I suggest we make it into a loadable module, and presume
+> >>> initramfs and loadable module also for any new devices. The same
+> >>> way x86 has been doing with distros for years.
+> >>
+> >> The difference from x86 is that we're in embedded here and
+> > 
+> > bullshit, you would never ship a product with omap2plus_defconfig. You'd
+> > build your own at which point you would switch SATA to built-in.
+> 
+> Yep, that is one of the options indeed, but I'm not asking you to
+> deal with my problems, right?
+> I'm feeling like you are trying to insult me.
+> Are you angry with me? Why?
+> Is it because I have a different opinion?
 
-FYI, some time ago I posted a patch to enable SBS-compliant batteries
-support as a module for Exynos defconfig and was told to re-spin the
-patch and enabling it as built-in instead since the most popular use
-case for exynos_defconfig was development and people usually just copy
-the kernel binary and not the modules [0].
+heh, cute :-)
 
-So it seems that each ARM SoC community has a different opinion about
-how things should be configured and do it differently.
+> >> although initramfs is a kind of option, but it means, you need to
+> >> load even more data during the boot process... it is annoying and
+> >> I would not want to use it on embedded.
+> > 
+> > make your own defconfig.
+> 
+> This sounds like: mind your own business...
+> Is that what you want to say?
 
->>
->> bullshit, you would never ship a product with omap2plus_defconfig. You'd
->> build your own at which point you would switch SATA to built-in.
->
+nope, not really. Just saying that if you're really concerned about
+being embedded and that initramfs takes that much more time to load,
+you'd just make your own defconfig and maintain it out-of-tree.
 
-There are different opinions but let please try to keep the discussion
-constructive and use a polite tone.
+RMK does that for quite a few boards, I do it for my boards and also for
+my x86 desktops/laptops.
 
->>>
->>> Right now, we tell our customers that they can use mainline with
->>> omap2plus_defconfig.
->>
->> that's the worst thing you can do.
->
+It's not really rocket science.
 
-I'm confused, Felipe said that customers should not base their config
-from omap2plus_defconfig but AFAUI Tony's argument is exactly the
-opposite, that everything should be configured as a module so distros
-can use omap2plus_defconfig as a base. So, is or is not expected that
-people will use omap2plus_defconfig as a base for their own config?
+> >> (BTW, x86_64_defconfig has it compiled in...)
+> >>
+> >> We can also, split the defconfig as it was some time ago... but I
+> >> would not want to go that direction...
+> >>
+> >> If we go the initramfs way, then why not also load MMC from it?
+> >> That will also reduce kernel size... (but add initramfs size)
+> > 
+> > I'm fine with that. The difference is that people have been relying on
+> > MMC built-in for the past 10+ years, since the old OMAP1 MMC driver,
+> > changing that now is likely to cause some "my board won't boot anymore"
+> > bug reports.
+> 
+> Yep. So there are exceptions, right?
 
-I think the problem is that there isn't an agreement about what is the
-purpose of the per SoC (e.g: oma2plus_defconfig) and the multi_v7
-defconfigs (or at least is not well documented since I could not find
-it). So, IMHO this concern should be raised to the ARM SoC maintainers
-and there should be an agreement in the ARM community as a whole about
-how things should be configured on each defconfig, and all SoCs should
-follow the agreed rule.
+never claimed the contrary.
 
-Otherwise it seems that the motivation for each kconfig symbol enabled
-is just to make the workflow of the developer posting the patches
-easier and wins whoever shouts louder.
+> >> I'm sure you will find making the MMC a loadable module inconvenient.
+> >> That how I find making the SATA a loadable module...
+> >>
+> >> Right now, we tell our customers that they can use mainline with
+> >> omap2plus_defconfig.
+> > 
+> > that's the worst thing you can do.
+> 
+> Hmmm... Interesting, so people should not use mainline.
 
-Thanks a lot and best regards,
-Javier
+now you're reading what you want to read ;-) Using my statements out of
+context.
 
-[0]: http://www.spinics.net/lists/arm-kernel/msg353808.html
+It's clear (actually s/rootfs/defconfig below) that I meant defconfig.
+
+> > You should at a minimum provide your
+> > customers with a more minimal rootfs. Why would you have your customers
+
+oh wait, not rootfs, defconfig.
+
+> > build MUSB on an OMAP5 board ? Why would they build 5 different
+> > network device drivers ? Why would they build almost every single PMIC
+> > we ever used ? The list goes on and on.
+> 
+> That is their decision to make. I'm just saying that they can use it.
+
+right, and they can switch SATA to built-in if they want to ship an
+initramfs-less product, don't you think ?
+
+Or they can append initramfs to the kernel image and not even have a
+root filesystem anywhere (been there, done that), but that's not
+relevant to this discussion.
+
+Anyway, I'll leave it to Tony.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141226/0cf931b2/attachment.sig>
