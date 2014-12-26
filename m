@@ -1,52 +1,12 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 27 Dec 2014 02:21:56 +0300
-Subject: [PATCH v4 3/3] ARM: shmobile: henninger: add CAN0 DT support
-In-Reply-To: <6830301.90YaDPuTpx@wasted.cogentembedded.com>
-References: <6830301.90YaDPuTpx@wasted.cogentembedded.com>
-Message-ID: <8071243.02TkQ9xbCu@wasted.cogentembedded.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Sat, 27 Dec 2014 00:21:16 +0100
+Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic LEDs
+ layer
+Message-ID: <20141226232116.GA5069@type>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Henninger board dependent part of the CAN0 device node.
+Here is v5 coming, with separate patches for the kbd and the input
+parts.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-Changes in version 4:
-- refreshed the patch.
-
-Changes in version 3:
-- changed "can0_data_a" to "can0_data", removed "can_clk_d" in the
-  "renesas,groups" property;
-- moved CAN0 node to go after all others;
-- refreshed the patch.
-
- arch/arm/boot/dts/r8a7791-henninger.dts |   11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -147,6 +147,11 @@
- 		renesas,groups = "vin0_data8", "vin0_clk";
- 		renesas,function = "vin0";
- 	};
-+
-+	can0_pins: can0 {
-+		renesas,groups = "can0_data";
-+		renesas,function = "can0";
-+	};
- };
- 
- &scif0 {
-@@ -321,3 +326,9 @@
- 		};
- 	};
- };
-+
-+&can0 {
-+	pinctrl-0 = <&can0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
+Samuel
