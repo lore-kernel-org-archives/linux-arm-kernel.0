@@ -1,57 +1,80 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 26 Dec 2014 16:26:57 +0800
-Subject: [PATCH v3 4/4] arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
+Date: Fri, 26 Dec 2014 16:26:55 +0800
+Subject: [PATCH v3 2/4] irqchip: mtk-sysirq: Get irq number from register
+ resource size
 In-Reply-To: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
 References: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1419582417-4448-5-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1419582417-4448-3-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT8173 arm64 Kconfig and defconfig files
+From: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
+Originally mtk-sysirq hardcoded supported irq number to 224. This
+was fine since all SoCs before support the same number of irqs for
+intpol.
+
+However MT8173 intpol support 32 more irq pins, changes to get
+irq number from register resource size to suppor MT8173 properly.
+
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
 ---
- arch/arm64/Kconfig           | 6 ++++++
- arch/arm64/configs/defconfig | 2 ++
- 2 files changed, 8 insertions(+)
+ drivers/irqchip/irq-mtk-sysirq.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b1f9a20..e627ead 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -148,6 +148,12 @@ source "kernel/Kconfig.freezer"
+diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+index 0b0d2c0..fadd865 100644
+--- a/drivers/irqchip/irq-mtk-sysirq.c
++++ b/drivers/irqchip/irq-mtk-sysirq.c
+@@ -23,8 +23,6 @@
  
- menu "Platform selection"
+ #include "irqchip.h"
  
-+config ARCH_MEDIATEK
-+	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
-+	select ARM_GIC
-+	help
-+	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+-#define MT6577_SYS_INTPOL_NUM	(224)
+-
+ struct mtk_sysirq_chip_data {
+ 	spinlock_t lock;
+ 	void __iomem *intpol_base;
+@@ -124,7 +122,8 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+ {
+ 	struct irq_domain *domain, *domain_parent;
+ 	struct mtk_sysirq_chip_data *chip_data;
+-	int ret = 0;
++	struct resource res;
++	int ret, size, intpol_num;
+ 
+ 	domain_parent = irq_find_host(parent);
+ 	if (!domain_parent) {
+@@ -132,19 +131,24 @@ static int __init mtk_sysirq_of_init(struct device_node *node,
+ 		return -EINVAL;
+ 	}
+ 
++	ret = of_address_to_resource(node, 0, &res);
++	if (ret)
++		return ret;
 +
- config ARCH_SEATTLE
- 	bool "AMD Seattle SoC Family"
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index dd301be..ed84d21 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -32,6 +32,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_THUNDER=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
-@@ -87,6 +88,7 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
+ 	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
+ 	if (!chip_data)
+ 		return -ENOMEM;
+ 
+-	chip_data->intpol_base = of_io_request_and_map(node, 0, "intpol");
+-	if (IS_ERR(chip_data->intpol_base)) {
++	size = resource_size(&res);
++	intpol_num = size * 8;
++	chip_data->intpol_base = ioremap(res.start, size);
++	if (!chip_data->intpol_base) {
+ 		pr_err("mtk_sysirq: unable to map sysirq register\n");
+ 		ret = PTR_ERR(chip_data->intpol_base);
+ 		goto out_free;
+ 	}
+ 
+-	domain = irq_domain_add_hierarchy(domain_parent, 0,
+-					  MT6577_SYS_INTPOL_NUM, node,
++	domain = irq_domain_add_hierarchy(domain_parent, 0, intpol_num, node,
+ 					  &sysirq_domain_ops, chip_data);
+ 	if (!domain) {
+ 		ret = -ENOMEM;
 -- 
 1.8.1.1
 
