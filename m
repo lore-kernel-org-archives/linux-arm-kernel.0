@@ -1,55 +1,110 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 26 Dec 2014 18:26:27 +0100
-Subject: [PATCH 2/3] hwmon: Driver for OMAP3 temperature sensor
-In-Reply-To: <1419597294-21487-3-git-send-email-sre@kernel.org>
-References: <20141226102933.GA28778@amd>
- <1419597294-21487-1-git-send-email-sre@kernel.org>
- <1419597294-21487-3-git-send-email-sre@kernel.org>
-Message-ID: <20141226172627.GB24756@amd>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Dec 2014 13:02:02 -0600
+Subject: [PATCHv2] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20141224223434.GA20669@amd>
+References: <20141203214641.GA1390@amd> <20141224223434.GA20669@amd>
+Message-ID: <CAL_JsqJsDqYm-xfEM1CqNzJxfZY6vnYxaBYpT+3t4+gV2F3M1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2014-12-26 13:34:53, Sebastian Reichel wrote:
-> OMAP34xx and OMAP36xx processors contain a register in the syscon area,
-> which can be used to determine the SoCs temperature. This patch provides
-> a DT based driver for the temperature sensor based on an older driver
-> written by Peter De Schrijver for the Nokia N900 and N9.
-> 
-> Signed-off-by: Sebastian Reichel <sre@kernel.org>
+On Wed, Dec 24, 2014 at 4:34 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>
+> We are moving to device tree support on OMAP3, but that currently
+> breaks ADP1653 driver. This adds device tree support, plus required
+> documentation.
+>
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>
+> ---
+>
+> Changed -microsec to -us, as requested by devicetree people.
+>
+> Fixed checkpatch issues.
+>
+> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+> index 2d88816..2c6c7c5 100644
+> --- a/Documentation/devicetree/bindings/leds/common.txt
+> +++ b/Documentation/devicetree/bindings/leds/common.txt
+> @@ -14,6 +14,15 @@ Optional properties for child nodes:
+>       "ide-disk" - LED indicates disk activity
+>       "timer" - LED flashes at a fixed, configurable rate
+>
+> +- max-microamp : maximum intensity in microamperes of the LED
+> +                (torch LED for flash devices)
+> +- flash-max-microamp : maximum intensity in microamperes of the
+> +                       flash LED; it is mandatory if the LED should
+> +                      support the flash mode
+> +- flash-timeout-microsec : timeout in microseconds after which the flash
+> +                           LED is turned off
 
-> +	if (!data->valid || time_after(jiffies, data->last_updated + HZ)) {
-> +		clk_enable(data->clk_32k);
+Doesn't all this go in your flash led binding patch?
 
-This needs to be clk_prepare_enable()
+> +
+> +
+>  Examples:
+>
+>  system-status {
+> @@ -21,3 +30,10 @@ system-status {
+>         linux,default-trigger = "heartbeat";
+>         ...
+>  };
+> +
+> +camera-flash {
+> +       label = "Flash";
+> +       max-microamp = <50000>;
+> +       flash-max-microamp = <320000>;
+> +       flash-timeout-microsec = <500000>;
+> +}
+> diff --git a/Documentation/devicetree/bindings/media/i2c/adp1653.txt b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+> new file mode 100644
+> index 0000000..3c7065f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+> @@ -0,0 +1,38 @@
+> +* Analog Devices ADP1653 flash LED driver
+> +
+> +Required Properties:
+> +
+> +  - compatible: Must contain one of the following
+> +    - "adi,adp1653"
+> +
+> +  - reg: I2C slave address
+> +
+> +  - gpios: References to the GPIO that controls the power for the chip.
+> +
+> +There are two led outputs available - flash and indicator. One led is
+> +represented by one child node, nodes need to be named "flash" and "indicator".
+> +
+> +Required properties of the LED child node:
+> +- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> +
+> +Required properties of the flash LED child node:
+> +
+> +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
+> +
+> +Example:
+> +
+> +        adp1653: led-controller at 30 {
+> +                compatible = "adi,adp1653";
+> +               reg = <0x30>;
+> +                gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> +
+> +               flash {
+> +                        flash-timeout-us = <500000>;
+> +                        flash-max-microamp = <320000>;
+> +                        max-microamp = <50000>;
+> +               };
+> +                indicator {
 
-> +		regmap_update_bits(data->syscon, SYSCON_TEMP_REG,
-> +				   soc_mask, soc_mask);
-> +
-> +		if (!wait_for_eocz(EOCZ_MIN_RISING_DELAY,
-> +		    EOCZ_MAX_RISING_DELAY, 1, data)) {
-> +			e = -EIO;
-> +			goto err;
-> +		}
-> +
-> +		regmap_update_bits(data->syscon, SYSCON_TEMP_REG, soc_mask, 0);
-> +
-> +		if (!wait_for_eocz(EOCZ_MIN_FALLING_DELAY,
-> +		    EOCZ_MAX_FALLING_DELAY, 0, data)) {
-> +			e = -EIO;
-> +			goto err;
-> +		}
-> +
-> +		regmap_read(data->syscon, SYSCON_TEMP_REG, &temp_sensor_reg);
-> +		data->temperature = temp_sensor_reg & ((1<<7) - 1);
-> +		data->last_updated = jiffies;
-> +		data->valid = true;
-> +
-> +err:
-> +		clk_disable(data->clk_32k);
+These are different LEDs or different modes?
 
-And this clk_disable_unprepare().
+> +                        max-microamp = <17500>;
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+This is a bit inconsistent. The binding says this is for flash LEDs
+torch mode, but I see no reason why it can't be common. Can you update
+the binding doc to be clear here.
+
+Also, aren't you missing label properties?
+
+Rob
