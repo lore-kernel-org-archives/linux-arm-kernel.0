@@ -1,29 +1,33 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 26 Dec 2014 17:54:59 +0800
-Subject: [PATCH 0/2] ARM: mediatek: Add MT8135 and MT8127 UART support 
-Message-ID: <1419587701-13451-1-git-send-email-eddie.huang@mediatek.com>
+Date: Fri, 26 Dec 2014 17:55:01 +0800
+Subject: [PATCH 2/2] ARM: Add mediatek SoC UART support in defconfig
+In-Reply-To: <1419587701-13451-1-git-send-email-eddie.huang@mediatek.com>
+References: <1419587701-13451-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1419587701-13451-3-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.19-rc1 contains Joe's MT8135 & MT8127 basic support and sysirq driver patch.
-But still can not boot to shell due to lack UART device node in device tree.
-This patch enables MTK UART driver in multi_v7_defconfig and UART device node.
+Add mediatek SoC UART support in multi_v7_defconfig
 
-This patch base on 3.19-rc1, and Joe's sysirq dts patch [1]
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305812.html
-
-Eddie Huang (2):
-  ARM: mediatek: add UART dts for mt8127 and mt8135
-  ARM: Add mediatek SoC UART support in defconfig
-
- arch/arm/boot/dts/mt8127.dtsi       | 34 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt8135.dtsi       | 34 ++++++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig |  1 +
- 3 files changed, 69 insertions(+)
-
---
-1.8.1.1.dirty
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2328fe7..fd0ff95 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -195,6 +195,7 @@ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_MESON=y
+-- 
+1.8.1.1
 
 ************* Email Confidentiality Notice ********************
 The information contained in this e-mail message (including any 
