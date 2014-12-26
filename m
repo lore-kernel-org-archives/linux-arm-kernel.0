@@ -1,111 +1,64 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 26 Dec 2014 17:30:05 +0800
-Subject: [PATCH 2/4] mtd: nand: atmel: Update DT documentation after
- splitting NFC and NAND
-In-Reply-To: <1417732214-3292-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417732214-3292-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <549D2A9D.50407@atmel.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Fri, 26 Dec 2014 17:35:28 +0800
+Subject: [PATCH 0/8] arm64: improved memory map handling for /dev/mem,
+ ACPI etc
+In-Reply-To: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20141226093528.GA26133@darkstar.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Boris
+On 12/22/14 at 07:08pm, Ard Biesheuvel wrote:
+> This series was split off from the UEFI virtmap for kexec series that I posted
+> earlier today. The main purpose is to deal with the need to classify memory
+> ranges as RAM or non-RAM in a consistent and comprehensive manner. This series
+> applies on top of the other series.
+> 
+> Patch #1 avoids an early panic if the UEFI memory map is available but UEFI
+> support itself fails to initialize. In this case, there is no need to panic
+> early, and we have a better chance of being able to inform the user if we deal
+> with this error condition at a later time.
+> 
+> Patch #2 adds iomem resource registration of UEFI memory regions. This is
+> necessary because otherwise, drivers could potentially claim regions that
+> are in active use by the firmware. This applies to both MMIO (NOR flash, RTC)
+> and RAM ranges (runtime services code and data).
+> 
+> Patch #3-6 adds support to UEFI and non-UEFI code paths to record all memory
+> known to the system in the 'physmem' memblock table (if enabled). This fulfils
+> a need in the /dev/mem and (upcoming) ACPI layers to be able to classify ranges
+> as being backed by normal RAM even if they are not covered by the 'memory'
+> memblock table, and are hence not covered by the linear direct mapping.
+> The physmem code is pre-existing code that only needs minor tweaking to be made
+> suitable for this purpose.
+> 
+> Patch #7 enables the 'physmem' memblock table for arm64, and wires it into the
+> handling of /dev/mem mappings, both to decide whether it should be mapped as
+> MT_NORMAL, and whether read-write access can be allowed. (Non-RAM regions can
+> be mapped read-write as long as they are not claimed by a driver in the iomem
+> resource table. RAM regions can only be mapped read-only, and only if they are
+> not covered by the 'memory' memblock table, and hence not covered by the linear
+> mapping)
+> 
+> Finally, patch #8 changes the way the virtual memory map is handled by the
+> early UEFI code. Specifically, it memblock_remove()s rather than _reserves()
+> UEFI reserved RAM regions, so that they are removed entirely from the linear
+> mapping.
+> 
+> Ard Biesheuvel (8):
+>   arm64/efi: use UEFI memory map unconditionally if available
+>   arm64/efi: register UEFI reserved regions as iomem resources
+>   memblock: add physmem to memblock_dump_all() output
+>   memblock: introduce memblock_add_phys() and memblock_is_physmem()
+>   of: fdt: register physmem in early_init_dt_scan_memory()
+>   arm64/efi: register physmem in reserve_regions()
+>   arm64: use 'physmem' memblock to improve CONFIG_STRICT_DEVMEM handling
+>   arm64/efi: memblock_remove rather than _reserve UEFI reserved RAM
 
-Thanks for the patch.
+Ard, It is much cleaner for this splitting.
 
-You need to rebase on the top of current mtd-l2 git tree. As I had some 
-change on the binding document.
+I wonder if some of them can become general code such as register reserved
+regions as iomem resources?
 
-Best Regards,
-Josh Wu
-
-On 12/5/2014 6:30 AM, Boris Brezillon wrote:
-> The NAND and NFC (NAND Flash Controller) were linked together with a
-> parent <-> child relationship.
->
-> This model has several drawbacks:
-> - it does not allow for multiple NAND chip handling while the controller
->    support multi-chip (even though the driver is not ready yet)
-> - it mixes NAND partitions and NFC nodes at the same level (which is a bit
->    disturbing)
-> - the introduction of the EBI bus implies defining NAND chips under the
->    EBI node, and the ranges available under the EBI node should be
->    restricted to EBI address space, while the NFC references several
->    registers outside of these EBI ranges.
->
-> Move the NFC node outside of the NAND node, to get a more future-proof
-> model.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->   .../devicetree/bindings/mtd/atmel-nand.txt         | 46 ++++++++++++----------
->   1 file changed, 26 insertions(+), 20 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> index 6edc3b6..8896850 100644
-> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> @@ -30,15 +30,19 @@ Optional properties:
->     sector size 1024.
->   - nand-bus-width : 8 or 16 bus width if not present 8
->   - nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
-> -- Nand Flash Controller(NFC) is a slave driver under Atmel nand flash
-> -  - Required properties:
-> -    - compatible : "atmel,sama5d3-nfc".
-> -    - reg : should specify the address and size used for NFC command registers,
-> -            NFC registers and NFC Sram. NFC Sram address and size can be absent
-> -            if don't want to use it.
-> -    - clocks: phandle to the peripheral clock
-> -  - Optional properties:
-> -    - atmel,write-by-sram: boolean to enable NFC write by sram.
-> +- atmel,nfc: phandle referencing the NAND Flash Controller, if available.
-> +
-> +The NAND Flash Controller (NFC) is an advanced NAND controller and should be
-> +used in conjunction with the NAND flash device.
-> +Required properties:
-> + - compatible : "atmel,sama5d3-nfc".
-> + - reg : should specify the address and size used for NFC command registers,
-> +         NFC registers and NFC Sram. NFC Sram address and size can be absent
-> +         if you don't want to use it.
-> + - clocks: phandle to the peripheral clock
-> +
-> +Optional properties:
-> + - atmel,write-by-sram: boolean to enable NFC write by sram.
->   
->   Examples:
->   nand0: nand at 40000000,0 {
-> @@ -89,21 +93,23 @@ nand0: nand at 40000000 {
->   };
->   
->   /* for NFC supported chips */
-> +nfc: nfc at 70000000 {
-> +	compatible = "atmel,sama5d3-nfc";
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	clocks = <&hsmc_clk>
-> +	reg = <
-> +		0x70000000 0x10000000	/* NFC Command Registers */
-> +		0xffffc000 0x00000070	/* NFC HSMC regs */
-> +		0x00200000 0x00100000	/* NFC SRAM banks */
-> +	>;
-> +};
-> +
->   nand0: nand at 40000000 {
->   	compatible = "atmel,at91rm9200-nand";
->   	#address-cells = <1>;
->   	#size-cells = <1>;
->   	ranges;
-> +	atmel,nfc = <&nfc>;
->           ...
-> -        nfc at 70000000 {
-> -		compatible = "atmel,sama5d3-nfc";
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		clocks = <&hsmc_clk>
-> -		reg = <
-> -			0x70000000 0x10000000	/* NFC Command Registers */
-> -			0xffffc000 0x00000070	/* NFC HSMC regs */
-> -			0x00200000 0x00100000	/* NFC SRAM banks */
-> -		>;
-> -	};
->   };
+Thanks
+Dave
