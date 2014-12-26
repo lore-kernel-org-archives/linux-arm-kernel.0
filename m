@@ -1,50 +1,104 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Dec 2014 14:35:16 -0600
-Subject: [PATCH] arm: boot: dts: am437x-idk: add gpio-based power key
-Message-ID: <1419626116-12833-1-git-send-email-balbi@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Dec 2014 14:52:40 -0600
+Subject: [PATCHv2] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20141226203340.GA1791@amd>
+References: <20141203214641.GA1390@amd> <20141224223434.GA20669@amd>
+ <CAL_JsqJsDqYm-xfEM1CqNzJxfZY6vnYxaBYpT+3t4+gV2F3M1A@mail.gmail.com>
+ <20141226203340.GA1791@amd>
+Message-ID: <CAL_JsqJ4tsRfvb1XrGmwBJaFUGwMVGTjNp1mBykFBJDJF1uHbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM437x IDK board has a User Switch which we can
-program to whatever we want. Because this board
-doesn't have a PMIC which can give us power button
-presses, let's use this user switch as a gpio-keys
-power button.
+On Fri, Dec 26, 2014 at 2:33 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+>> > We are moving to device tree support on OMAP3, but that currently
+>> > breaks ADP1653 driver. This adds device tree support, plus required
+>> > documentation.
+>> >
+>> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>> >
+>> > ---
+>> >
+>> > Changed -microsec to -us, as requested by devicetree people.
+>> >
+>> > Fixed checkpatch issues.
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+>> > index 2d88816..2c6c7c5 100644
+>> > --- a/Documentation/devicetree/bindings/leds/common.txt
+>> > +++ b/Documentation/devicetree/bindings/leds/common.txt
+>> > @@ -14,6 +14,15 @@ Optional properties for child nodes:
+>> >       "ide-disk" - LED indicates disk activity
+>> >       "timer" - LED flashes at a fixed, configurable rate
+>> >
+>> > +- max-microamp : maximum intensity in microamperes of the LED
+>> > +                (torch LED for flash devices)
+>> > +- flash-max-microamp : maximum intensity in microamperes of the
+>> > +                       flash LED; it is mandatory if the LED should
+>> > +                      support the flash mode
+>> > +- flash-timeout-microsec : timeout in microseconds after which the flash
+>> > +                           LED is turned off
+>>
+>> Doesn't all this go in your flash led binding patch?
+>
+> No, I should not have included this part.
+>
+>> > +Example:
+>> > +
+>> > +        adp1653: led-controller at 30 {
+>> > +                compatible = "adi,adp1653";
+>> > +               reg = <0x30>;
+>> > +                gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+>> > +
+>> > +               flash {
+>> > +                        flash-timeout-us = <500000>;
+>> > +                        flash-max-microamp = <320000>;
+>> > +                        max-microamp = <50000>;
+>> > +               };
+>> > +                indicator {
+>>
+>> These are different LEDs or different modes?
+>
+> flash & indicator are different LEDs. One is white, one is red. Flash
+> can be used as a flash and as a torch.
+>
+>> > +                        max-microamp = <17500>;
+>>
+>> This is a bit inconsistent. The binding says this is for flash LEDs
+>> torch mode, but I see no reason why it can't be common. Can you update
+>> the binding doc to be clear here.
+>
+> By inconsisnent, you mean you want patch below?
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+Yes.
 
-depends on [1]. Boot logs at [2]. Note that this can rather easily
-be folded into the original patch if so desired.
+>> Also, aren't you missing label properties?
+>
+> label is optional, and as my driver does not yet use it, I forgot
+> about it.
 
-[1] http://marc.info/?l=linux-omap&m=141928747902983&w=2
-[2] http://hastebin.com/xasuyinizu
+Based on your node names, there are obviously user defined functions
+for them already. So they should have labels whether or not the driver
+uses them.
 
- arch/arm/boot/dts/am437x-idk-evm.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Rob
 
-diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
-index b52dd0a..86f6219 100644
---- a/arch/arm/boot/dts/am437x-idk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-idk-evm.dts
-@@ -96,6 +96,18 @@
- 		regulator-boot-on;
- 		vin-supply = <&v1_5dreg>;
- 	};
-+
-+	gpio_keys: gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		switch at 0 {
-+			label = "power-button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
- 
- &am43xx_pinmux {
--- 
-2.2.0
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>
+> index 2c6c7c5..92d4dac 100644
+> --- a/Documentation/devicetree/bindings/leds/common.txt
+> +++ b/Documentation/devicetree/bindings/leds/common.txt
+> @@ -15,7 +15,6 @@ Optional properties for child nodes:
+>       "timer" - LED flashes at a fixed, configurable rate
+>
+>  - max-microamp : maximum intensity in microamperes of the LED
+> -                (torch LED for flash devices)
+>  - flash-max-microamp : maximum intensity in microamperes of the
+>                         flash LED; it is mandatory if the LED should
+>                        support the flash mode
+>
+>
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
