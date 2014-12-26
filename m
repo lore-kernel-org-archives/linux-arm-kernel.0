@@ -1,55 +1,63 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 26 Dec 2014 16:57:59 +0800
-Subject: [PATCH v2 1/3] ARM: dts: berlin: add pmu node for BG2Q and BG2CD
+Date: Fri, 26 Dec 2014 16:58:00 +0800
+Subject: [PATCH v2 2/3] ARM: dts: berlin: add PPI cpu mask to twd timer
+ interrupts
 In-Reply-To: <1419584281-4811-1-git-send-email-jszhang@marvell.com>
 References: <1419584281-4811-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1419584281-4811-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1419584281-4811-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the pmu node, enabling the PMU unit on Marvell BG2Q and
-BG2CD SoCs.
+According to the gic binding document, "bits[15:8] PPI interrupt cpu
+mask.  Each bit corresponds to each of the 8 possible cpus attached to
+the GIC.  A bit set to '1' indicated the interrupt is wired to that
+CPU." This patch wants to add the PPI cpu mask for completeness.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 5 +++++
- arch/arm/boot/dts/berlin2q.dtsi  | 8 ++++++++
- 2 files changed, 13 insertions(+)
+ arch/arm/boot/dts/berlin2.dtsi   | 2 +-
+ arch/arm/boot/dts/berlin2cd.dtsi | 2 +-
+ arch/arm/boot/dts/berlin2q.dtsi  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 015a06c..63d00a6 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -104,7 +104,7 @@
+ 		local-timer at ad0600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xad0600 0x20>;
+-			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			clocks = <&chip CLKID_TWD>;
+ 		};
+ 
 diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 230df3b..a318bc3 100644
+index a318bc3..81b670a 100644
 --- a/arch/arm/boot/dts/berlin2cd.dtsi
 +++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -45,6 +45,11 @@
+@@ -76,7 +76,7 @@
+ 		local-timer at ad0600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xad0600 0x20>;
+-			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			clocks = <&chip CLKID_TWD>;
+ 		};
  
- 		ranges = <0 0xf7000000 0x1000000>;
- 
-+		pmu {
-+			compatible = "arm,cortex-a9-pmu";
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		sdhci0: sdhci at ab0000 {
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab0000 0x200>;
 diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 35253c9..933dcbb 100644
+index 933dcbb..41a683f 100644
 --- a/arch/arm/boot/dts/berlin2q.dtsi
 +++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -63,6 +63,14 @@
- 		ranges = <0 0xf7000000 0x1000000>;
- 		interrupt-parent = <&gic>;
+@@ -112,7 +112,7 @@
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xad0600 0x20>;
+ 			clocks = <&chip CLKID_TWD>;
+-			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
  
-+		pmu {
-+			compatible = "arm,cortex-a9-pmu";
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		sdhci0: sdhci at ab0000 {
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab0000 0x200>;
+ 		gic: interrupt-controller at ad1000 {
 -- 
 2.1.4
