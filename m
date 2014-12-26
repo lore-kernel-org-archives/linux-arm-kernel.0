@@ -1,43 +1,63 @@
-From: flora.fu@mediatek.com (Flora Fu)
-Date: Fri, 26 Dec 2014 15:09:27 +0800
-Subject: [PATCH v4 5/6] arm: dts: mt8135: Add support for MT8135 PMIC wrapper
-In-Reply-To: <1419577768-12037-1-git-send-email-flora.fu@mediatek.com>
-References: <1419577768-12037-1-git-send-email-flora.fu@mediatek.com>
-Message-ID: <1419577768-12037-6-git-send-email-flora.fu@mediatek.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Fri, 26 Dec 2014 16:26:53 +0800
+Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8173 SoC 
+Message-ID: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree for MT8135 PMIC wrapper in mt8135.dtsi.
+MT8173 is a SoC based on 64bit ARMv8 architecture. It contains 2 CA53 + 2 CA57 cores.
+MT8173 share many HW IP with MT8135 and other MT65xx series. This patchset was tested
+on MT8173 engineer sample, and boot to shell ok.
 
-Signed-off-by: Flora Fu <flora.fu@mediatek.com>
----
- arch/arm/boot/dts/mt8135.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+This series contains document bindings, device tree, defconfig, and one sysirq
+modification for MT8173.
 
-diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
-index ec83e69..ab08063 100644
---- a/arch/arm/boot/dts/mt8135.dtsi
-+++ b/arch/arm/boot/dts/mt8135.dtsi
-@@ -117,6 +117,20 @@
- 			reg = <0 0x10200030 0 0x1c>;
- 		};
- 
-+		pwrap: pwrap at 1000f000 {
-+			compatible = "mediatek,mt8135-pwrap";
-+			reg = <0 0x1000f000 0 0x1000>,
-+				<0 0x11017000 0 0x1000>;
-+			reg-names = "pwrap-base", "pwrap-bridge-base";
-+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&infrarst MT8135_INFRA_PMIC_WRAP_RST>,
-+					<&perirst MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
-+			reset-names = "infra-pwrap-rst",
-+					"peri-pwrap-bridge-rst";
-+			clocks = <&topckgen TOP_PMICSPI_SEL>, <&clk26m> ;
-+			clock-names = "pmicspi-sel", "pmicspi-parent";
-+		};
-+
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
--- 
+Changes in v3:
+
+1. Modify mt8173.dtsi according Mark Rutland review comment, CPU ID, PSCI and GIC address.
+2. Include interrupt dt-binding header files, replace interrupt number by enum value.
+3. Rebase to 3.19-rc1, create arch/arm64/boot/dts/mediatek folder to put mt8173.dtsi.
+
+This patch base on 3.19-rc1, Joe's sysirq patch [1] and test boot to shell with
+Catalin Marinas's arch_timer virtual counter patch [2]
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310335.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309856.html
+
+Eddie Huang (3):
+  Document: DT: Add bindings for mediatek MT8173 Soc Platform
+  arm64: dts: Add mediatek MT8173 SoC and evaluation board dts and
+    Makefile
+  arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
+
+Yingjoe Chen (1):
+  irqchip: mtk-sysirq: Get irq number from register resource size
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ arch/arm64/Kconfig                                 |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   5 +
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  34 +++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 159 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   2 +
+ drivers/irqchip/irq-mtk-sysirq.c                   |  18 ++-
+ 8 files changed, 222 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
+
+--
 1.8.1.1.dirty
+
+************* Email Confidentiality Notice ********************
+The information contained in this e-mail message (including any 
+attachments) may be confidential, proprietary, privileged, or otherwise
+exempt from disclosure under applicable laws. It is intended to be 
+conveyed only to the designated recipient(s). Any use, dissemination, 
+distribution, printing, retaining or copying of this e-mail (including its 
+attachments) by unintended recipient(s) is strictly prohibited and may 
+be unlawful. If you are not an intended recipient of this e-mail, or believe 
+that you have received this e-mail in error, please notify the sender 
+immediately (by replying to this e-mail), delete any and all copies of 
+this e-mail (including any attachments) from your system, and do not
+disclose the content of this e-mail to any other person. Thank you!
