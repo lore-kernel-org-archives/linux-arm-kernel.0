@@ -1,322 +1,226 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Sat, 27 Dec 2014 00:23:10 +0100
-Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to input LEDs
-In-Reply-To: <20141226232116.GA5069@type>
-References: <20141226232116.GA5069@type>
-Message-ID: <20141226232310.GD5069@type>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 26 Dec 2014 15:41:17 -0800
+Subject: [PATCH 3/5] input: misc: add tps65218 power button driver
+In-Reply-To: <1419622104-25812-4-git-send-email-balbi@ti.com>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+ <1419622104-25812-4-git-send-email-balbi@ti.com>
+Message-ID: <20141226234117.GA1071@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This permits to reassign input LEDs to something else than keyboard "leds"
-state, by adding a trigger and a led for each input leds, the former being
-triggered by EV_LED events, and the latter being by default triggered by the
-former. The user can then make the LED use another trigger, including other LED
-triggers of the same keyboard.
+Hi Felipe,
 
-The hardware LEDs are now not actioned from the ED_LED event any more, but from
-the per-device LED layer.
+On Fri, Dec 26, 2014 at 01:28:22PM -0600, Felipe Balbi wrote:
+> With this driver, we can report KEY_POWER on
+> AM437x SK. This patch has been tested with said
+> board.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/input/misc/Kconfig              |  10 +++
+>  drivers/input/misc/Makefile             |   1 +
+>  drivers/input/misc/tps65218-pwrbutton.c | 135 ++++++++++++++++++++++++++++++++
+>  3 files changed, 146 insertions(+)
+>  create mode 100644 drivers/input/misc/tps65218-pwrbutton.c
+> 
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index 23297ab..364cfb8 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -404,6 +404,16 @@ config INPUT_RETU_PWRBUTTON
+>  	  To compile this driver as a module, choose M here. The module will
+>  	  be called retu-pwrbutton.
+>  
+> +config INPUT_TPS65218_PWRBUTTON
+> +	tristate "TPS65218 Power button driver"
+> +	depends on MFD_TPS65218
+> +	help
+> +	  Say Y here if you want to enable power buttong reporting for
+> +	  the TPS65218 Power Management IC device.
+> +
+> +	  To compile this driver as a module, choose M here. The module will
+> +	  be called tps65218-pwrbutton.
+> +
+>  config INPUT_TWL4030_PWRBUTTON
+>  	tristate "TWL4030 Power button Driver"
+>  	depends on TWL4030_CORE
+> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+> index 19c7603..a923753 100644
+> --- a/drivers/input/misc/Makefile
+> +++ b/drivers/input/misc/Makefile
+> @@ -59,6 +59,7 @@ obj-$(CONFIG_INPUT_SGI_BTNS)		+= sgi_btns.o
+>  obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc-onkey.o
+>  obj-$(CONFIG_INPUT_SOC_BUTTON_ARRAY)	+= soc_button_array.o
+>  obj-$(CONFIG_INPUT_SPARCSPKR)		+= sparcspkr.o
+> +obj-$(CONFIG_INPUT_TPS65218_PWRBUTTON)	+= tps65218-pwrbutton.o
+>  obj-$(CONFIG_INPUT_TWL4030_PWRBUTTON)	+= twl4030-pwrbutton.o
+>  obj-$(CONFIG_INPUT_TWL4030_VIBRA)	+= twl4030-vibra.o
+>  obj-$(CONFIG_INPUT_TWL6040_VIBRA)	+= twl6040-vibra.o
+> diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
+> new file mode 100644
+> index 0000000..a1f8a19
+> --- /dev/null
+> +++ b/drivers/input/misc/tps65218-pwrbutton.c
+> @@ -0,0 +1,135 @@
+> +/*
+> + * Texas Instruments' TPS65218 Power Button Input Driver
+> + *
+> + * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
+> + * Author: Felipe Balbi <balbi@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/input.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/tps65218.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +struct tps65218_pwrbutton {
+> +	struct device *dev;
+> +	struct tps65218 *tps;
+> +	struct input_dev *idev;
+> +	int irq;
 
-[ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
-[blogic at openwrt.org: CONFIG_INPUT_LEDS stubs should be static inline]
-[akpm at linux-foundation.org: remove unneeded `extern', fix comment layout]
-Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
-Signed-off-by: Evan Broder <evan@ebroder.net>
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-Signed-off-by: John Crispin <blogic@openwrt.org>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
----
-Changed in this version:
-- separate kbd LED changes from input LED changes
-- add a per-device trigger, triggered by EV_LED events
-- make the per-device LED triggered by default by the per-device trigger, so
-  that evdev users get the modified behavior too
-- make the hardware driven by the LED instead of EV_LED events
+You do not need to store IRQ since you are not using it outside of
+probe().
 
---- a/drivers/input/input.c
-+++ b/drivers/input/input.c
-@@ -27,6 +27,7 @@
- #include <linux/device.h>
- #include <linux/mutex.h>
- #include <linux/rcupdate.h>
-+#include <linux/leds.h>
- #include "input-compat.h"
- 
- MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-@@ -324,11 +325,20 @@ static int input_get_disposition(struct
- 		break;
- 
- 	case EV_LED:
--		if (is_event_supported(code, dev->ledbit, LED_MAX) &&
--		    !!test_bit(code, dev->led) != !!value) {
--
--			__change_bit(code, dev->led);
--			disposition = INPUT_PASS_TO_ALL;
-+		if (is_event_supported(code, dev->ledbit, LED_MAX)) {
-+#ifdef CONFIG_INPUT_LED
-+			/* Redirect through trigger/LED pair */
-+			if (dev->triggers && dev->triggers[code].name)
-+				led_trigger_event(&dev->triggers[code],
-+						  value ? LED_FULL : LED_OFF);
-+			disposition = INPUT_PASS_TO_HANDLERS;
-+#else /* !CONFIG_INPUT_LED */
-+			/* Directly pass to device */
-+			if (!!test_bit(code, dev->led) != !!value) {
-+				__change_bit(code, dev->led);
-+				disposition = INPUT_PASS_TO_ALL;
-+			}
-+#endif /* !CONFIG_INPUT_LED */
- 		}
- 		break;
- 
-@@ -711,6 +721,9 @@ static void input_disconnect_device(stru
- 		handle->open = 0;
- 
- 	spin_unlock_irq(&dev->event_lock);
-+
-+	if (is_event_supported(EV_LED, dev->evbit, EV_MAX))
-+		input_led_disconnect(dev);
- }
- 
- /**
-@@ -2137,6 +2150,9 @@ int input_register_device(struct input_d
- 
- 	list_add_tail(&dev->node, &input_dev_list);
- 
-+	if (is_event_supported(EV_LED, dev->evbit, EV_MAX))
-+		input_led_connect(dev);
-+
- 	list_for_each_entry(handler, &input_handler_list, node)
- 		input_attach_handler(dev, handler);
- 
---- a/drivers/input/Kconfig
-+++ b/drivers/input/Kconfig
-@@ -178,6 +178,15 @@ comment "Input Device Drivers"
- 
- source "drivers/input/keyboard/Kconfig"
- 
-+config INPUT_LEDS
-+	bool "LED Support"
-+	depends on LEDS_CLASS = INPUT || LEDS_CLASS = y
-+	select LEDS_TRIGGERS
-+	default y
-+	help
-+	  This option enables support for LEDs on keyboards managed
-+	  by the input layer.
-+
- source "drivers/input/mouse/Kconfig"
- 
- source "drivers/input/joystick/Kconfig"
---- a/drivers/input/Makefile
-+++ b/drivers/input/Makefile
-@@ -6,6 +6,9 @@
- 
- obj-$(CONFIG_INPUT)		+= input-core.o
- input-core-y := input.o input-compat.o input-mt.o ff-core.o
-+ifeq ($(CONFIG_INPUT_LEDS),y)
-+input-core-y += leds.o
-+endif
- 
- obj-$(CONFIG_INPUT_FF_MEMLESS)	+= ff-memless.o
- obj-$(CONFIG_INPUT_POLLDEV)	+= input-polldev.o
---- a/include/linux/input.h
-+++ b/include/linux/input.h
-@@ -79,6 +79,8 @@ struct input_value {
-  * @led: reflects current state of device's LEDs
-  * @snd: reflects current state of sound effects
-  * @sw: reflects current state of device's switches
-+ * @leds: led objects for the device's LEDs
-+ * @triggers: trigger objects for the device's LEDs
-  * @open: this method is called when the very first user calls
-  *	input_open_device(). The driver must prepare the device
-  *	to start generating events (start polling thread,
-@@ -164,6 +166,9 @@ struct input_dev {
- 	unsigned long snd[BITS_TO_LONGS(SND_CNT)];
- 	unsigned long sw[BITS_TO_LONGS(SW_CNT)];
- 
-+	struct led_classdev *leds;
-+	struct led_trigger *triggers;
-+
- 	int (*open)(struct input_dev *dev);
- 	void (*close)(struct input_dev *dev);
- 	int (*flush)(struct input_dev *dev, struct file *file);
-@@ -531,4 +536,22 @@ int input_ff_erase(struct input_dev *dev
- int input_ff_create_memless(struct input_dev *dev, void *data,
- 		int (*play_effect)(struct input_dev *, void *, struct ff_effect *));
- 
-+#ifdef CONFIG_INPUT_LEDS
-+
-+int input_led_connect(struct input_dev *dev);
-+void input_led_disconnect(struct input_dev *dev);
-+
-+#else
-+
-+static inline int input_led_connect(struct input_dev *dev)
-+{
-+	return 0;
-+}
-+
-+static inline void input_led_disconnect(struct input_dev *dev)
-+{
-+}
-+
-+#endif
-+
- #endif
---- /dev/null
-+++ b/drivers/input/leds.c
-@@ -0,0 +1,155 @@
-+/*
-+ * LED support for the input layer
-+ *
-+ * Copyright 2010-2014 Samuel Thibault <samuel.thibault@ens-lyon.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * This creates a trigger/LED pair per device:
-+ * - the trigger is actioned from the core's input_get_disposition,
-+ * - the LED is by default triggered by that trigger
-+ * - the LED actuates the hardware.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/leds.h>
-+#include <linux/input.h>
-+
-+static const char *const input_led_names[LED_CNT] = {
-+	[LED_NUML] = "numl",
-+	[LED_CAPSL] = "capsl",
-+	[LED_SCROLLL] = "scrolll",
-+	[LED_COMPOSE] = "compose",
-+	[LED_KANA] = "kana",
-+	[LED_SLEEP] = "sleep",
-+	[LED_SUSPEND] = "suspend",
-+	[LED_MUTE] = "mute",
-+	[LED_MISC] = "misc",
-+	[LED_MAIL] = "mail",
-+	[LED_CHARGING] = "charging",
-+};
-+
-+/* Free LED data from input device, used at abortion and disconnection.  */
-+static void input_led_delete(struct input_dev *dev)
-+{
-+	if (dev) {
-+		struct led_classdev *leds = dev->leds;
-+		struct led_trigger *triggers = dev->triggers;
-+		int i;
-+
-+		if (leds) {
-+			for (i = 0; i < LED_CNT; i++)
-+				kfree(leds[i].name);
-+			kfree(leds);
-+			dev->leds = NULL;
-+		}
-+
-+		if (triggers) {
-+			for (i = 0; i < LED_CNT; i++)
-+				kfree(triggers[i].name);
-+			kfree(triggers);
-+			dev->triggers = NULL;
-+		}
-+	}
-+}
-+
-+/* LED state change for some keyboard, notify that keyboard.  */
-+static void perdevice_input_led_set(struct led_classdev *cdev,
-+			  enum led_brightness brightness)
-+{
-+	struct input_dev *dev;
-+	struct led_classdev *leds;
-+	int led;
-+
-+	dev = cdev->dev->platform_data;
-+	if (!dev)
-+		/* Still initializing */
-+		return;
-+
-+	leds = dev->leds;
-+	led = cdev - leds;
-+
-+	if (test_bit(EV_LED, dev->evbit) &&
-+		led <= LED_MAX && test_bit(led, dev->ledbit) &&
-+		!!test_bit(led, dev->led) != !!brightness) {
-+		__change_bit(led, dev->led);
-+		dev->event(dev, EV_LED, led, !!brightness);
-+	}
-+}
-+
-+/* A new input device with potential LEDs to connect.  */
-+int input_led_connect(struct input_dev *dev)
-+{
-+	int i, error = -ENOMEM;
-+	struct led_classdev *leds;
-+	struct led_trigger *triggers;
-+
-+	leds = kcalloc(LED_CNT, sizeof(*leds), GFP_KERNEL);
-+	if (!leds)
-+		goto err;
-+	dev->leds = leds;
-+
-+	triggers = kcalloc(LED_CNT, sizeof(*triggers), GFP_KERNEL);
-+	if (!triggers)
-+		goto err;
-+	dev->triggers = triggers;
-+
-+	/* Register this device's LEDs and triggers */
-+	for (i = 0; i < LED_CNT; i++)
-+		if (input_led_names[i] && test_bit(i, dev->ledbit)) {
-+			leds[i].name = kasprintf(GFP_KERNEL, "%s::%s",
-+						dev_name(&dev->dev),
-+						input_led_names[i]);
-+			if (!leds[i].name)
-+				goto err;
-+			leds[i].max_brightness = 1;
-+			leds[i].brightness_set = perdevice_input_led_set;
-+
-+			triggers[i].name = kasprintf(GFP_KERNEL, "%s-%s",
-+						dev_name(&dev->dev),
-+						input_led_names[i]);
-+			if (!triggers[i].name)
-+				goto err;
-+
-+			/* make the LED triggered by the corresponding trigger
-+			 * by default */
-+			leds[i].default_trigger = triggers[i].name;
-+		}
-+
-+	/* No issue so far, we can register for real.  */
-+	for (i = 0; i < LED_CNT; i++)
-+		if (leds[i].name) {
-+			led_classdev_register(&dev->dev, &leds[i]);
-+			leds[i].dev->platform_data = dev;
-+			led_trigger_register(&triggers[i]);
-+		}
-+
-+	return 0;
-+
-+err:
-+	input_led_delete(dev);
-+	return error;
-+}
-+
-+void input_led_disconnect(struct input_dev *dev)
-+{
-+	int i;
-+	struct led_classdev *leds = dev->leds;
-+	struct led_trigger *triggers = dev->triggers;
-+
-+	for (i = 0; i < LED_CNT; i++) {
-+		if (leds[i].name)
-+			led_classdev_unregister(&leds[i]);
-+		if (triggers[i].name)
-+			led_trigger_unregister(&triggers[i]);
-+	}
-+
-+	input_led_delete(dev);
-+}
+> +
+> +	unsigned int pressed:1;
+
+You probably can remove 'pressed' as well and send events directly to
+input core and rely on it to filter out duplicates so there won't be
+release event without press event. If you prefer to keep it please use
+bool instead of bit field.
+
+> +};
+> +
+> +static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
+> +{
+> +	struct tps65218_pwrbutton *pwr = _pwr;
+> +	unsigned int reg;
+> +	int ret;
+> +
+> +	ret = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
+> +	if (ret) {
+> +		dev_err(pwr->dev, "can't read register --> %d\n", ret);
+> +		goto out;
+> +	}
+> +
+> +	if (reg & TPS65218_STATUS_PB_STATE) {
+> +		input_report_key(pwr->idev, KEY_POWER, 1);
+> +		pm_wakeup_event(pwr->dev, 0);
+> +		pwr->pressed = true;
+> +	} else {
+> +		/*
+> +		 * we don't want to report KEY_POWER releases on any of the
+> +		 * other IRQ sources. Only when button was previously pressed
+> +		 */
+> +		if (pwr->pressed) {
+> +			input_report_key(pwr->idev, KEY_POWER, 0);
+> +			pwr->pressed = false;
+> +		}
+> +	}
+> +
+> +	input_sync(pwr->idev);
+> +
+> +out:
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int tps65218_pwron_probe(struct platform_device *pdev)
+> +{
+> +	struct tps65218 *tps = dev_get_drvdata(pdev->dev.parent);
+> +	struct device *dev = &pdev->dev;
+> +	struct tps65218_pwrbutton *pwr;
+> +	struct input_dev *idev;
+> +	int ret;
+> +
+> +	pwr = devm_kzalloc(dev, sizeof(*pwr), GFP_KERNEL);
+> +	if (!pwr)
+> +		return -ENOMEM;
+> +
+> +	idev = devm_input_allocate_device(dev);
+> +	if (!idev)
+> +		return -ENOMEM;
+> +
+> +	idev->name = "tps65218_pwrbutton";
+> +	idev->phys = "tps65218_pwrbutton/input0";
+> +	idev->dev.parent = dev;
+> +	idev->id.bustype = BUS_I2C;
+> +
+> +	input_set_capability(idev, EV_KEY, KEY_POWER);
+> +
+> +	pwr->tps = tps;
+> +	pwr->dev = dev;
+> +	pwr->idev = idev;
+> +	pwr->irq = platform_get_irq(pdev, 0);
+> +	platform_set_drvdata(pdev, pwr);
+> +	device_init_wakeup(dev, true);
+> +
+> +	ret = devm_request_threaded_irq(dev, pwr->irq, NULL, tps65218_pwr_irq,
+> +			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+> +			dev_name(dev), pwr);
+
+I am very fond of calling variables that hold error codes "error", Then
+you have:
+
+	error = f();
+	if (error) {
+		/* handle error */
+	}
+
+> +	if (ret) {
+> +		dev_err(dev, "failed to request IRQ #%d --> %d\n",
+> +				pwr->irq, ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = input_register_device(idev);
+> +	if (ret) {
+> +		dev_err(dev, "Can't register power button --> %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id of_tps65218_pwr_match[] = {
+> +	{ .compatible = "ti,tps65218-pwrbutton" },
+> +	{ },
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
+> +
+> +static struct platform_driver tps65218_pwron_driver = {
+> +	.probe	= tps65218_pwron_probe,
+> +	.driver	= {
+> +		.name	= "tps65218_pwrbutton",
+> +		.of_match_table = of_tps65218_pwr_match,
+> +	},
+> +};
+> +module_platform_driver(tps65218_pwron_driver);
+> +
+> +MODULE_DESCRIPTION("TPS65218 Power Button");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
+> -- 
+> 2.2.0
+> 
+
+Thanks!
+
+-- 
+Dmitry
