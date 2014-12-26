@@ -1,47 +1,32 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Dec 2014 09:27:07 -0600
-Subject: [PATCH] USB: gadget: udc: atmel: fix possible oops when
- unloading module
-In-Reply-To: <549A138D.50204@atmel.com>
-References: <1419240374-12179-1-git-send-email-songjun.wu@atmel.com>
- <20141223162419.GB9147@saruman> <549A138D.50204@atmel.com>
-Message-ID: <20141226152707.GG17430@saruman>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Sat, 27 Dec 2014 00:54:44 +0900
+Subject: [PATCH] clk: rockchip: fix rk3066 pll lock bit location
+In-Reply-To: <2140322.FD0TUOM80V@phil>
+References: <2140322.FD0TUOM80V@phil>
+Message-ID: <CAFnsNoTnsG3JPxA9cYyxozofThn78VCZJjV2VhLKwsx2DDYhEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+hi,
 
-On Wed, Dec 24, 2014 at 09:14:53AM +0800, Wu, Songjun wrote:
-> 
-> ? 12/24/2014 00:24, Felipe Balbi ??:
-> >On Mon, Dec 22, 2014 at 05:26:14PM +0800, Songjun Wu wrote:
-> >>When unloading the module, the urb request will be dequeued
-> >>and the completion routine will be excuted.
-> >>If no urb packet, the urb request will not be added to the endpoint queue
-> >>and the completion routine pointer in urb request is NULL.
-> >>Accessing to the NULL function pointer will cause the oops issue.
-> >>Add the code to check the urb request is in the endpoint queue or not.
-> >>If the urb request is not in the endpoint queue, a negative error code
-> >>will be returned.
-> >
-> >have you triggered the NULL pointer oops ? Care to add it to the commit
-> >log.
-> 
-> Executing the 'insmod g_hid.ko', then executing the 'rmmod g_hid.ko', the
-> NULL pointer oops will be triggered.
+On Wed, Dec 24, 2014 at 11:11 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> The bit locations indicating the locking status of the plls on rk3066 are
+> shifted by one to the right when compared to the rk3188, bits [7:4] instead
+> of [8:5] on the rk3188, thus indicating the locking state of the wrong pll
+> or a completely different information in case of the gpll.
+>
+> The recently introduced pll init code exposed that problem on some rk3066
+> boards when it tried to bring the boot-pll value in line with the value
+> from the rate table.
+>
+> Fix this by defining separate pll definitions for rk3066 with the correct
+> locking indices.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/rockchip/clk-rk3188.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
 
-what about all my other queries below and what about adding the oops
-dump to commit log ?
+it worked fine on ChipSPARK Rayeager PX2(=RK3066) board, thanks!
 
-> >Also, which commit is this fixing ? Does this need to be backported ?
-> >When was the bug introduced ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141226/b3c6d350/attachment.sig>
+Tested-by: FUKAUMI Naoki <naobsd@gmail.com>
