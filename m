@@ -1,257 +1,210 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 26 Dec 2014 11:44:04 +0200
-Subject: [PATCH v7 1/3] of: Decrement refcount of previous endpoint in
- of_graph_get_next_endpoint
-In-Reply-To: <1419340158-20567-2-git-send-email-p.zabel@pengutronix.de>
-References: <1419340158-20567-1-git-send-email-p.zabel@pengutronix.de>
- <1419340158-20567-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1673229.XX60cPdPif@avalon>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 26 Dec 2014 17:45:51 +0800
+Subject: [PATCH 4/4] ARM: at91/dt: sama5: move NAND nodes into board
+ dts/dtsi
+In-Reply-To: <1417732214-3292-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417732214-3292-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <549D2E4F.4090705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi, Boris
 
-Thank you for the patch.
-
-On Tuesday 23 December 2014 14:09:16 Philipp Zabel wrote:
-> Decrementing the reference count of the previous endpoint node allows to
-> use the of_graph_get_next_endpoint function in a for_each_... style macro.
-> All current users of this function that pass a non-NULL prev parameter
-> (coresight, rcar-du, imx-drm, soc_camera, and omap2-dss) are changed to
-> not decrement the passed prev argument's refcount themselves.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+On 12/5/2014 6:30 AM, Boris Brezillon wrote:
+> sama5d3 and sama5d4 SoCs provides several CS to interface with external
+> memories, and in particular NAND chips.
+> The NAND flash controller embedded in the these SoCs can connect to any of
+> the available CS (each CS is assigned a memory range, hence the nand at xxx
+> you're seeing in the DT), thus the NAND chip definition should be part of
+> the board description because we cannot guess at the SoC level which CS
+> will be chosen by the board designer.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> Changes since v6:
->  - Added omap2-dss.
->  - Added Mathieu's ack.
-> ---
->  drivers/coresight/of_coresight.c                  | 13 ++-----------
->  drivers/gpu/drm/imx/imx-drm-core.c                | 13 ++-----------
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c             | 15 ++++-----------
+>   arch/arm/boot/dts/at91-sama5d3_xplained.dts | 18 +++++++++++++++++-
+>   arch/arm/boot/dts/at91-sama5d4ek.dts        | 16 +++++++++++++++-
+>   arch/arm/boot/dts/sama5d3.dtsi              | 21 ---------------------
+>   arch/arm/boot/dts/sama5d3xcm.dtsi           | 18 +++++++++++++++++-
+>   arch/arm/boot/dts/sama5d4.dtsi              | 19 -------------------
+>   5 files changed, 49 insertions(+), 43 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> index fec1fca..860258b 100644
+> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> @@ -213,13 +213,29 @@
+>   		};
+>   
+>   		nand0: nand at 60000000 {
+> +			compatible = "atmel,at91rm9200-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+it would be better to leave this part to the sama5d3.dtsi.
 
-For rcar-du,
+> +			reg = <	0x60000000 0x01000000	/* EBI CS3 */
+> +				0xffffc070 0x00000490	/* SMC PMECC regs */
+> +				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
+> +				0x00110000 0x00018000	/* ROM code */
+> +				>;
+> +			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+ditto.
+> +			atmel,nand-addr-offset = <21>;
+> +			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
+> +			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+ditto.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> +			atmel,nfc = <&nfc>;
+>   			nand-bus-width = <8>;
+>   			nand-ecc-mode = "hw";
+>   			atmel,has-pmecc;
+>   			atmel,pmecc-cap = <4>;
+>   			atmel,pmecc-sector-size = <512>;
+>   			nand-on-flash-bbt;
+> -			status = "okay";
+>   
+>   			at91bootstrap at 0 {
+>   				label = "at91bootstrap";
+> diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+> index b5b8400..5de0d2d 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4ek.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+> @@ -204,11 +204,25 @@
+>   		};
+>   
+>   		nand0: nand at 80000000 {
+> +			compatible = "atmel,at91rm9200-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+it would be better to leave this part to the sama5d4.dtsi.
 
->  drivers/media/platform/soc_camera/soc_camera.c    |  3 ++-
->  drivers/of/base.c                                 |  9 +--------
->  drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |  7 +------
->  6 files changed, 12 insertions(+), 48 deletions(-)
-> 
-> diff --git a/drivers/coresight/of_coresight.c
-> b/drivers/coresight/of_coresight.c index 5030c07..349c88b 100644
-> --- a/drivers/coresight/of_coresight.c
-> +++ b/drivers/coresight/of_coresight.c
-> @@ -52,15 +52,6 @@ of_coresight_get_endpoint_device(struct device_node
-> *endpoint) endpoint, of_dev_node_match);
->  }
-> 
-> -static struct device_node *of_get_coresight_endpoint(
-> -		const struct device_node *parent, struct device_node *prev)
-> -{
-> -	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
-> -
-> -	of_node_put(prev);
-> -	return node;
-> -}
-> -
->  static void of_coresight_get_ports(struct device_node *node,
->  				   int *nr_inport, int *nr_outport)
->  {
-> @@ -68,7 +59,7 @@ static void of_coresight_get_ports(struct device_node
-> *node, int in = 0, out = 0;
-> 
->  	do {
-> -		ep = of_get_coresight_endpoint(node, ep);
-> +		ep = of_graph_get_next_endpoint(node, ep);
->  		if (!ep)
->  			break;
-> 
-> @@ -140,7 +131,7 @@ struct coresight_platform_data
-> *of_get_coresight_platform_data( /* Iterate through each port to discover
-> topology */
->  		do {
->  			/* Get a handle on a port */
-> -			ep = of_get_coresight_endpoint(node, ep);
-> +			ep = of_graph_get_next_endpoint(node, ep);
->  			if (!ep)
->  				break;
-> 
-> diff --git a/drivers/gpu/drm/imx/imx-drm-core.c
-> b/drivers/gpu/drm/imx/imx-drm-core.c index b250130..fed627d 100644
-> --- a/drivers/gpu/drm/imx/imx-drm-core.c
-> +++ b/drivers/gpu/drm/imx/imx-drm-core.c
-> @@ -436,15 +436,6 @@ static uint32_t imx_drm_find_crtc_mask(struct
-> imx_drm_device *imxdrm, return 0;
->  }
-> 
-> -static struct device_node *imx_drm_of_get_next_endpoint(
-> -		const struct device_node *parent, struct device_node *prev)
-> -{
-> -	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
-> -
-> -	of_node_put(prev);
-> -	return node;
-> -}
-> -
->  int imx_drm_encoder_parse_of(struct drm_device *drm,
->  	struct drm_encoder *encoder, struct device_node *np)
->  {
-> @@ -456,7 +447,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
->  	for (i = 0; ; i++) {
->  		u32 mask;
-> 
-> -		ep = imx_drm_of_get_next_endpoint(np, ep);
-> +		ep = of_graph_get_next_endpoint(np, ep);
->  		if (!ep)
->  			break;
-> 
-> @@ -504,7 +495,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
-> return -EINVAL;
-> 
->  	do {
-> -		ep = imx_drm_of_get_next_endpoint(node, ep);
-> +		ep = of_graph_get_next_endpoint(node, ep);
->  		if (!ep)
->  			break;
-> 
-> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
-> b/drivers/gpu/drm/rcar-du/rcar_du_kms.c index 0c5ee61..480c4d9 100644
-> --- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
-> +++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
-> @@ -206,7 +206,7 @@ static int rcar_du_encoders_init_one(struct
-> rcar_du_device *rcdu, enum rcar_du_encoder_type enc_type =
-> RCAR_DU_ENCODER_NONE;
->  	struct device_node *connector = NULL;
->  	struct device_node *encoder = NULL;
-> -	struct device_node *prev = NULL;
-> +	struct device_node *ep_node = NULL;
->  	struct device_node *entity_ep_node;
->  	struct device_node *entity;
->  	int ret;
-> @@ -225,11 +225,7 @@ static int rcar_du_encoders_init_one(struct
-> rcar_du_device *rcdu, entity_ep_node = of_parse_phandle(ep->local_node,
-> "remote-endpoint", 0);
-> 
->  	while (1) {
-> -		struct device_node *ep_node;
-> -
-> -		ep_node = of_graph_get_next_endpoint(entity, prev);
-> -		of_node_put(prev);
-> -		prev = ep_node;
-> +		ep_node = of_graph_get_next_endpoint(entity, ep_node);
-> 
->  		if (!ep_node)
->  			break;
-> @@ -300,7 +296,7 @@ static int rcar_du_encoders_init_one(struct
-> rcar_du_device *rcdu, static int rcar_du_encoders_init(struct
-> rcar_du_device *rcdu)
->  {
->  	struct device_node *np = rcdu->dev->of_node;
-> -	struct device_node *prev = NULL;
-> +	struct device_node *ep_node = NULL;
->  	unsigned int num_encoders = 0;
-> 
->  	/*
-> @@ -308,15 +304,12 @@ static int rcar_du_encoders_init(struct rcar_du_device
-> *rcdu) * pipeline.
->  	 */
->  	while (1) {
-> -		struct device_node *ep_node;
->  		enum rcar_du_output output;
->  		struct of_endpoint ep;
->  		unsigned int i;
->  		int ret;
-> 
-> -		ep_node = of_graph_get_next_endpoint(np, prev);
-> -		of_node_put(prev);
-> -		prev = ep_node;
-> +		ep_node = of_graph_get_next_endpoint(np, ep_node);
-> 
->  		if (ep_node == NULL)
->  			break;
-> diff --git a/drivers/media/platform/soc_camera/soc_camera.c
-> b/drivers/media/platform/soc_camera/soc_camera.c index b3db51c..289b637
-> 100644
-> --- a/drivers/media/platform/soc_camera/soc_camera.c
-> +++ b/drivers/media/platform/soc_camera/soc_camera.c
-> @@ -1710,7 +1710,6 @@ static void scan_of_host(struct soc_camera_host *ici)
->  		if (!i)
->  			soc_of_bind(ici, epn, ren->parent);
-> 
-> -		of_node_put(epn);
->  		of_node_put(ren);
-> 
->  		if (i) {
-> @@ -1718,6 +1717,8 @@ static void scan_of_host(struct soc_camera_host *ici)
->  			break;
->  		}
->  	}
-> +
-> +	of_node_put(epn);
->  }
-> 
->  #else
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 36536b6..aac66df 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -2085,8 +2085,7 @@ EXPORT_SYMBOL(of_graph_parse_endpoint);
->   * @prev: previous endpoint node, or NULL to get first
->   *
->   * Return: An 'endpoint' node pointer with refcount incremented. Refcount
-> - * of the passed @prev node is not decremented, the caller have to use
-> - * of_node_put() on it when done.
-> + * of the passed @prev node is decremented.
->   */
->  struct device_node *of_graph_get_next_endpoint(const struct device_node
-> *parent, struct device_node *prev)
-> @@ -2122,12 +2121,6 @@ struct device_node *of_graph_get_next_endpoint(const
-> struct device_node *parent, if (WARN_ONCE(!port, "%s(): endpoint %s has no
-> parent node\n",
->  			      __func__, prev->full_name))
->  			return NULL;
-> -
-> -		/*
-> -		 * Avoid dropping prev node refcount to 0 when getting the next
-> -		 * child below.
-> -		 */
-> -		of_node_get(prev);
->  	}
-> 
->  	while (1) {
-> diff --git a/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c
-> b/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c index 2f0822e..76fb18b
-> 100644
-> --- a/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c
-> +++ b/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c
-> @@ -164,20 +164,15 @@ static void __init omapdss_walk_device(struct
-> device_node *node, bool root)
-> 
->  		pn = of_graph_get_remote_port_parent(n);
-> 
-> -		if (!pn) {
-> -			of_node_put(n);
-> +		if (!pn)
->  			continue;
-> -		}
-> 
->  		if (!of_device_is_available(pn) || omapdss_list_contains(pn)) {
->  			of_node_put(pn);
-> -			of_node_put(n);
->  			continue;
->  		}
-> 
->  		omapdss_walk_device(pn, false);
-> -
-> -		of_node_put(n);
->  	}
->  }
+> +			reg = <	0x80000000 0x08000000	/* EBI CS3 */
+> +				0xfc05c070 0x00000490	/* SMC PMECC regs */
+> +				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
+> +				>;
+> +			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
+ditto.
 
--- 
-Regards,
+> +			atmel,nand-addr-offset = <21>;
+> +			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_nand>;
+> +			atmel,nfc = <&nfc>;
+>   			nand-bus-width = <8>;
+>   			nand-ecc-mode = "hw";
+>   			nand-on-flash-bbt;
+>   			atmel,has-pmecc;
+> -			status = "okay";
+>   
+>   			at91bootstrap at 0 {
+>   				label = "at91bootstrap";
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 1749853..0a944e0 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -1397,27 +1397,6 @@
+>   			status = "disabled";
+>   		};
+>   
+> -		nand0: nand at 60000000 {
+> -			compatible = "atmel,at91rm9200-nand";
+> -			#address-cells = <1>;
+> -			#size-cells = <1>;
+> -			ranges;
+> -			reg = <	0x60000000 0x01000000	/* EBI CS3 */
+> -				0xffffc070 0x00000490	/* SMC PMECC regs */
+> -				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
+> -				0x00110000 0x00018000	/* ROM code */
+> -				>;
+> -			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+> -			atmel,nand-addr-offset = <21>;
+> -			atmel,nand-cmd-offset = <22>;
+> -			atmel,nand-has-dma;
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
+> -			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+> -			atmel,nfc = <&nfc>;
+> -			status = "disabled";
+> -		};
+> -
+>   		nfc: nfc at 70000000 {
+>   			compatible = "atmel,sama5d3-nfc";
+>   			reg = <0x70000000 0x10000000	/* NFC Command Registers */
+> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> index cfcd200..e6c2aec 100644
+> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> @@ -76,13 +76,29 @@
+>   		};
+>   
+>   		nand0: nand at 60000000 {
+> +			compatible = "atmel,at91rm9200-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+it would be better to leave this part to the sama5d3.dtsi.
 
-Laurent Pinchart
+> +			reg = <	0x60000000 0x01000000	/* EBI CS3 */
+> +				0xffffc070 0x00000490	/* SMC PMECC regs */
+> +				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
+> +				0x00110000 0x00018000	/* ROM code */
+> +				>;
+> +			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+ditto.
+> +			atmel,nand-addr-offset = <21>;
+> +			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
+> +			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+ditto.
+
+> +			atmel,nfc = <&nfc>;
+>   			nand-bus-width = <8>;
+>   			nand-ecc-mode = "hw";
+>   			atmel,has-pmecc;
+>   			atmel,pmecc-cap = <4>;
+>   			atmel,pmecc-sector-size = <512>;
+>   			nand-on-flash-bbt;
+> -			status = "okay";
+>   
+>   			at91bootstrap at 0 {
+>   				label = "at91bootstrap";
+> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+> index 3b5e9f1..8647eb3 100644
+> --- a/arch/arm/boot/dts/sama5d4.dtsi
+> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+> @@ -265,25 +265,6 @@
+>   			cache-level = <2>;
+>   		};
+>   
+> -		nand0: nand at 80000000 {
+> -			compatible = "atmel,at91rm9200-nand";
+> -			#address-cells = <1>;
+> -			#size-cells = <1>;
+> -			ranges;
+> -			reg = <	0x80000000 0x08000000	/* EBI CS3 */
+> -				0xfc05c070 0x00000490	/* SMC PMECC regs */
+> -				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
+> -				>;
+> -			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
+> -			atmel,nand-addr-offset = <21>;
+> -			atmel,nand-cmd-offset = <22>;
+> -			atmel,nand-has-dma;
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&pinctrl_nand>;
+> -			atmel,nfc = <&nfc>;
+> -			status = "disabled";
+> -		};
+> -
+>   		nfc: nfc at 90000000 {
+>   			compatible = "atmel,sama5d3-nfc";
+>   			reg = <0x90000000 0x10000000	/* NFC Command Registers */
+Best Regards,
+Josh Wu
