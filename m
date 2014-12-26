@@ -1,210 +1,39 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 26 Dec 2014 17:45:51 +0800
-Subject: [PATCH 4/4] ARM: at91/dt: sama5: move NAND nodes into board
- dts/dtsi
-In-Reply-To: <1417732214-3292-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417732214-3292-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417732214-3292-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <549D2E4F.4090705@atmel.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Fri, 26 Dec 2014 17:54:59 +0800
+Subject: [PATCH 0/2] ARM: mediatek: Add MT8135 and MT8127 UART support 
+Message-ID: <1419587701-13451-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Boris
+3.19-rc1 contains Joe's MT8135 & MT8127 basic support and sysirq driver patch.
+But still can not boot to shell due to lack UART device node in device tree.
+This patch enables MTK UART driver in multi_v7_defconfig and UART device node.
 
-On 12/5/2014 6:30 AM, Boris Brezillon wrote:
-> sama5d3 and sama5d4 SoCs provides several CS to interface with external
-> memories, and in particular NAND chips.
-> The NAND flash controller embedded in the these SoCs can connect to any of
-> the available CS (each CS is assigned a memory range, hence the nand at xxx
-> you're seeing in the DT), thus the NAND chip definition should be part of
-> the board description because we cannot guess at the SoC level which CS
-> will be chosen by the board designer.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->   arch/arm/boot/dts/at91-sama5d3_xplained.dts | 18 +++++++++++++++++-
->   arch/arm/boot/dts/at91-sama5d4ek.dts        | 16 +++++++++++++++-
->   arch/arm/boot/dts/sama5d3.dtsi              | 21 ---------------------
->   arch/arm/boot/dts/sama5d3xcm.dtsi           | 18 +++++++++++++++++-
->   arch/arm/boot/dts/sama5d4.dtsi              | 19 -------------------
->   5 files changed, 49 insertions(+), 43 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index fec1fca..860258b 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -213,13 +213,29 @@
->   		};
->   
->   		nand0: nand at 60000000 {
-> +			compatible = "atmel,at91rm9200-nand";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-it would be better to leave this part to the sama5d3.dtsi.
+This patch base on 3.19-rc1, and Joe's sysirq dts patch [1]
 
-> +			reg = <	0x60000000 0x01000000	/* EBI CS3 */
-> +				0xffffc070 0x00000490	/* SMC PMECC regs */
-> +				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
-> +				0x00110000 0x00018000	/* ROM code */
-> +				>;
-> +			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
-ditto.
-> +			atmel,nand-addr-offset = <21>;
-> +			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
-> +			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
-ditto.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305812.html
 
-> +			atmel,nfc = <&nfc>;
->   			nand-bus-width = <8>;
->   			nand-ecc-mode = "hw";
->   			atmel,has-pmecc;
->   			atmel,pmecc-cap = <4>;
->   			atmel,pmecc-sector-size = <512>;
->   			nand-on-flash-bbt;
-> -			status = "okay";
->   
->   			at91bootstrap at 0 {
->   				label = "at91bootstrap";
-> diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-> index b5b8400..5de0d2d 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-> @@ -204,11 +204,25 @@
->   		};
->   
->   		nand0: nand at 80000000 {
-> +			compatible = "atmel,at91rm9200-nand";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-it would be better to leave this part to the sama5d4.dtsi.
+Eddie Huang (2):
+  ARM: mediatek: add UART dts for mt8127 and mt8135
+  ARM: Add mediatek SoC UART support in defconfig
 
-> +			reg = <	0x80000000 0x08000000	/* EBI CS3 */
-> +				0xfc05c070 0x00000490	/* SMC PMECC regs */
-> +				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
-> +				>;
-> +			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
-ditto.
+ arch/arm/boot/dts/mt8127.dtsi       | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt8135.dtsi       | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig |  1 +
+ 3 files changed, 69 insertions(+)
 
-> +			atmel,nand-addr-offset = <21>;
-> +			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_nand>;
-> +			atmel,nfc = <&nfc>;
->   			nand-bus-width = <8>;
->   			nand-ecc-mode = "hw";
->   			nand-on-flash-bbt;
->   			atmel,has-pmecc;
-> -			status = "okay";
->   
->   			at91bootstrap at 0 {
->   				label = "at91bootstrap";
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 1749853..0a944e0 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -1397,27 +1397,6 @@
->   			status = "disabled";
->   		};
->   
-> -		nand0: nand at 60000000 {
-> -			compatible = "atmel,at91rm9200-nand";
-> -			#address-cells = <1>;
-> -			#size-cells = <1>;
-> -			ranges;
-> -			reg = <	0x60000000 0x01000000	/* EBI CS3 */
-> -				0xffffc070 0x00000490	/* SMC PMECC regs */
-> -				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
-> -				0x00110000 0x00018000	/* ROM code */
-> -				>;
-> -			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
-> -			atmel,nand-addr-offset = <21>;
-> -			atmel,nand-cmd-offset = <22>;
-> -			atmel,nand-has-dma;
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
-> -			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
-> -			atmel,nfc = <&nfc>;
-> -			status = "disabled";
-> -		};
-> -
->   		nfc: nfc at 70000000 {
->   			compatible = "atmel,sama5d3-nfc";
->   			reg = <0x70000000 0x10000000	/* NFC Command Registers */
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index cfcd200..e6c2aec 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -76,13 +76,29 @@
->   		};
->   
->   		nand0: nand at 60000000 {
-> +			compatible = "atmel,at91rm9200-nand";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-it would be better to leave this part to the sama5d3.dtsi.
+--
+1.8.1.1.dirty
 
-> +			reg = <	0x60000000 0x01000000	/* EBI CS3 */
-> +				0xffffc070 0x00000490	/* SMC PMECC regs */
-> +				0xffffc500 0x00000100	/* SMC PMECC Error Location regs */
-> +				0x00110000 0x00018000	/* ROM code */
-> +				>;
-> +			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
-ditto.
-> +			atmel,nand-addr-offset = <21>;
-> +			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
-> +			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
-ditto.
-
-> +			atmel,nfc = <&nfc>;
->   			nand-bus-width = <8>;
->   			nand-ecc-mode = "hw";
->   			atmel,has-pmecc;
->   			atmel,pmecc-cap = <4>;
->   			atmel,pmecc-sector-size = <512>;
->   			nand-on-flash-bbt;
-> -			status = "okay";
->   
->   			at91bootstrap at 0 {
->   				label = "at91bootstrap";
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index 3b5e9f1..8647eb3 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -265,25 +265,6 @@
->   			cache-level = <2>;
->   		};
->   
-> -		nand0: nand at 80000000 {
-> -			compatible = "atmel,at91rm9200-nand";
-> -			#address-cells = <1>;
-> -			#size-cells = <1>;
-> -			ranges;
-> -			reg = <	0x80000000 0x08000000	/* EBI CS3 */
-> -				0xfc05c070 0x00000490	/* SMC PMECC regs */
-> -				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
-> -				>;
-> -			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
-> -			atmel,nand-addr-offset = <21>;
-> -			atmel,nand-cmd-offset = <22>;
-> -			atmel,nand-has-dma;
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&pinctrl_nand>;
-> -			atmel,nfc = <&nfc>;
-> -			status = "disabled";
-> -		};
-> -
->   		nfc: nfc at 90000000 {
->   			compatible = "atmel,sama5d3-nfc";
->   			reg = <0x90000000 0x10000000	/* NFC Command Registers */
-Best Regards,
-Josh Wu
+************* Email Confidentiality Notice ********************
+The information contained in this e-mail message (including any 
+attachments) may be confidential, proprietary, privileged, or otherwise
+exempt from disclosure under applicable laws. It is intended to be 
+conveyed only to the designated recipient(s). Any use, dissemination, 
+distribution, printing, retaining or copying of this e-mail (including its 
+attachments) by unintended recipient(s) is strictly prohibited and may 
+be unlawful. If you are not an intended recipient of this e-mail, or believe 
+that you have received this e-mail in error, please notify the sender 
+immediately (by replying to this e-mail), delete any and all copies of 
+this e-mail (including any attachments) from your system, and do not
+disclose the content of this e-mail to any other person. Thank you!
