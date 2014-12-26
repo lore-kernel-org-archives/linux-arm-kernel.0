@@ -1,80 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Dec 2014 17:09:12 +0000
-Subject: [RFC 0/2] Qualcomm RPM sleep states
-In-Reply-To: <CAJAp7OjKEg1jC9aA-Y-BuP4ux7sY+YqHbC7ug4E8MAVdAJzCmg@mail.gmail.com>
-References: <5480CEEF.7000906@codeaurora.org>
- <20141208180635.GB3268@sonymobile.com>
- <20141208193935.GD11764@sirena.org.uk>
- <20141208205502.GC3268@sonymobile.com>
- <20141209181652.GG11764@sirena.org.uk>
- <20141209192517.GD3268@sonymobile.com>
- <20141209202820.GK11764@sirena.org.uk>
- <20141211223653.GE3268@sonymobile.com>
- <20141215180431.GL11764@sirena.org.uk>
- <CAJAp7OjKEg1jC9aA-Y-BuP4ux7sY+YqHbC7ug4E8MAVdAJzCmg@mail.gmail.com>
-Message-ID: <20141226170912.GI17800@sirena.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 26 Dec 2014 18:19:44 +0100
+Subject: [PATCH 1/3] DT Binding for omap3 temperature sensor
+In-Reply-To: <1419597294-21487-2-git-send-email-sre@kernel.org>
+References: <20141226102933.GA28778@amd>
+ <1419597294-21487-1-git-send-email-sre@kernel.org>
+ <1419597294-21487-2-git-send-email-sre@kernel.org>
+Message-ID: <20141226171944.GA24756@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 10:05:54PM -0800, Bjorn Andersson wrote:
-> On Mon, Dec 15, 2014 at 10:04 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Thu, Dec 11, 2014 at 02:36:54PM -0800, Bjorn Andersson wrote:
+On Fri 2014-12-26 13:34:52, Sebastian Reichel wrote:
+> OMAP34xx and OMAP36xx processors contain a register in the syscon area,
+> which can be used to determine the SoCs temperature. This provides a
+> DT binding specification for the temperature monitor.
+> 
+> Signed-off-by: Sebastian Reichel <sre@kernel.org>
+> ---
+>  .../bindings/hwmon/omap3-temperature.txt           | 25 ++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwmon/omap3-temperature.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/hwmon/omap3-temperature.txt b/Documentation/devicetree/bindings/hwmon/omap3-temperature.txt
+> new file mode 100644
+> index 0000000..99631ad
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/hwmon/omap3-temperature.txt
+> @@ -0,0 +1,25 @@
+> +* OMAP3 temperature sensor
+> +
+> +The OMAP34xx and OMAP36xx processors contain a register in the syscon area,
+> +which can be used to determine the SoCs temperature.
+> +
+> +Requires node properties:
+> +- compatible :	should contain one of
+> +	- "ti,omap34xx-temperature-sensor" for OMAP34xx
+> +	- "ti,omap36xx-temperature-sensor" for OMAP36xx
+> +- syscon :	Should be a phandle to system configuration node which
+> +		encompases the temperature register
+> +- clocks :	Should contain 32KHz fclk clock specifier
+> +- clock-names :	Should contain clock names
+> +	- "fck" for the 32KHz fclk clock specifier
 
-> >> > We already have a runtime API for specifying suspend state.  It doesn't
-> >> > currently aggregate but that's a simple matter of programming.
+I don't quite get it. The temperature sensor is internal on the CPU,
+right? Why do we need device tree to describe it? As soon as we have
+CPU that is compatible to ti,omap3430, we know everything we need to
+know, no?
 
-> >> Do you mean alter properties of a state or select between the predefined
-> >> states? I've found some apis related to the latter, but not the first.
+> +Example for omap34xx:
+> +
+> +/ {
+> +	temperature-sensor {
+> +		compatible = "ti,omap34xx-temperature-sensor";
+> +		syscon = <&omap3_scm_general>;
+> +		clocks = <&ts_fck>;
+> +		clock-names = "fck";
+> +	};
+> +};
 
-> > Hrm, indeed.  Well, duplicating the existing APIs seems like a good way
-> > forwards - the logic is all the same, it's just that we don't want to
-> > apply the changes to the state used at runtime.
+Or is there something that depends on the board there? Or do we want
+to do it like this to be consistent with existing bindings?
 
-> Are you suggesting that we introduce a shadow of the current API for
-> the purpose of affecting a certain state? Can you elaborate on how
-> that would look like and work?
-
-Like the current APIs but specifying a state?
-
-> >> Because for the overall system the active state is the outlier here. But it
-> >> probably doesn't matter for our conclusions.
-
-> > I'd argue that for the purpose of running Linux it's the common state...
-
-> Does "running Linux" indicate that there's instructions flowing
-> through the CPU pipeline or that the hardware overall is up and
-> running?
-
-I think that for most practical purposes with Android (which is the
-interesting thing here) those are very much the same?
-
-> > It's not just the DT binding, it's also the regulator driver that needs
-> > to do the aggregation that's being discussed and is going to assume a
-> > particular arrangement of clients.
-
-> The downstream implementation sports 3 rdevs per regulator and their
-> requests are aggregated into the two states. So the regulator
-> implementation are not aware of the individual clients, it just
-> aggregates the 3 rdev states and programs the hardware accordingly.
-
-To me doing that aggregation requires some knowledge.
-
-> >> What I don't like with that solution is that we above have two different rdev
-> >> and that we need to aggregate state between the various rdevs in the ldo12
-> >> grouping. (so that active only and both actually affect the active state).
-
-> > Yes, that's a big part of the problem - there's things going on that the
-> > core should know about but doesn't.
-
-> The way that the aggregation of these properties works there's no
-> problems doing it in stages. But it comes with code duplication and
-> the need of the various rdevs to share common state.
-
-To me both the sharing of state and the code duplication are problems.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141226/4b243377/attachment.sig>
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
