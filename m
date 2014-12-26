@@ -1,191 +1,305 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 26 Dec 2014 11:38:11 +0100 (CET)
-Subject: [PATCH v4 2/5] media: ov2640: add async probe function
-In-Reply-To: <1492726.KPKGvtrvz4@avalon>
-References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
- <7803041.cyoUKFJAdh@avalon> <Pine.LNX.4.64.1412261006290.9254@axis700.grange>
- <1492726.KPKGvtrvz4@avalon>
-Message-ID: <Pine.LNX.4.64.1412261136360.9254@axis700.grange>
+From: evgeni@studio-punkt.com (Evgeni Dobrev)
+Date: Fri, 26 Dec 2014 12:06:49 +0100
+Subject: [PATCH v3 1/1] add support for Seagate BlackArmor NAS220
+In-Reply-To: <549C0C3C.8060601@gmail.com>
+References: <20141215203855.GA28940@anne> <20141222125750.GA29163@anne>
+ <549C0C3C.8060601@gmail.com>
+Message-ID: <20141226110649.GC4700@anne>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Dec 2014, Laurent Pinchart wrote:
+Hello Sebastian,
 
-> Hi Guennadi,
-> 
-> On Friday 26 December 2014 10:14:26 Guennadi Liakhovetski wrote:
-> > On Fri, 26 Dec 2014, Laurent Pinchart wrote:
-> > > On Friday 26 December 2014 14:37:14 Josh Wu wrote:
-> > >> On 12/25/2014 6:39 AM, Guennadi Liakhovetski wrote:
-> > >>> On Mon, 22 Dec 2014, Josh Wu wrote:
-> > >>>> On 12/20/2014 6:16 AM, Guennadi Liakhovetski wrote:
-> > >>>>> On Fri, 19 Dec 2014, Josh Wu wrote:
-> > >>>>>> On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
-> > >>>>>>> On Thu, 18 Dec 2014, Josh Wu wrote:
-> > >>>>>>>> To support async probe for ov2640, we need remove the code to get
-> > >>>>>>>> 'mclk' in ov2640_probe() function. oterwise, if soc_camera host
-> > >>>>>>>> is not probed in the moment, then we will fail to get 'mclk' and
-> > >>>>>>>> quit the ov2640_probe() function.
-> > >>>>>>>> 
-> > >>>>>>>> So in this patch, we move such 'mclk' getting code to
-> > >>>>>>>> ov2640_s_power() function. That make ov2640 survive, as we can
-> > >>>>>>>> pass a NULL (priv-clk) to soc_camera_set_power() function.
-> > >>>>>>>> 
-> > >>>>>>>> And if soc_camera host is probed, the when ov2640_s_power() is
-> > >>>>>>>> called, then we can get the 'mclk' and that make us
-> > >>>>>>>> enable/disable soc_camera host's clock as well.
-> > >>>>>>>> 
-> > >>>>>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > >>>>>>>> ---
-> > >>>>>>>> v3 -> v4:
-> > >>>>>>>> v2 -> v3:
-> > >>>>>>>> v1 -> v2:
-> > >>>>>>>>      no changes.
-> > >>>>>>>>  
-> > >>>>>>>>  drivers/media/i2c/soc_camera/ov2640.c | 31 ++++++++++++++-------
-> > >>>>>>>>  1 file changed, 21 insertions(+), 10 deletions(-)
-> > >>>>>>>> 
-> > >>>>>>>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
-> > >>>>>>>> b/drivers/media/i2c/soc_camera/ov2640.c
-> > >>>>>>>> index 1fdce2f..9ee910d 100644
-> > >>>>>>>> --- a/drivers/media/i2c/soc_camera/ov2640.c
-> > >>>>>>>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
-> > >>>>>>>> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev
-> > >>>>>>>> *sd, int on)
-> > >>>>>>>>     	struct i2c_client *client = v4l2_get_subdevdata(sd);
-> > >>>>>>>>     	struct soc_camera_subdev_desc *ssdd =
-> > >>>>>>>> soc_camera_i2c_to_desc(client);
-> > >>>>>>>>     	struct ov2640_priv *priv = to_ov2640(client);
-> > >>>>>>>> +	struct v4l2_clk *clk;
-> > >>>>>>>> +
-> > >>>>>>>> +	if (!priv->clk) {
-> > >>>>>>>> +		clk = v4l2_clk_get(&client->dev, "mclk");
-> > >>>>>>>> +		if (IS_ERR(clk))
-> > >>>>>>>> +			dev_warn(&client->dev, "Cannot get the mclk.
-> > >>>>>>>> maybe soc-camera host is not probed yet.\n");
-> > >>>>>>>> +		else
-> > >>>>>>>> +			priv->clk = clk;
-> > >>>>>>>> +	}
-> > >>>>>>>>       	return soc_camera_set_power(&client->dev, ssdd, priv
-> > >>>>>>>> ->clk, on);
-> > >>>>>>>>     }
-> > >>>> 
-> > >>>> Just let me explained a little more details at first:
-> > >>>> 
-> > >>>> As my understanding, current the priv->clk is a v4l2_clk: mclk, which
-> > >>>> is a wrapper clock in soc_camera.c. it can make soc_camera to call
-> > >>>> camera host's clock_start() clock_stop(). As in ov2640, the real mck
-> > >>>> (pck1) is in ov2640 dt node (xvclk). So the camera host's
-> > >>>> clock_start()/stop() only need to enable/disable his peripheral
-> > >>>> clock.
-> > >>> 
-> > >>> I'm looking at the ov2640 datasheet. In the block diagram I only see
-> > >>> one input clock - the xvclk. Yes, it can be supplied by the camera
-> > >>> host controller, in which case it is natural for the camera host
-> > >>> driver to own and control it, or it can be a separate clock device -
-> > >>> either static or configurable. This is just a note to myself to
-> > >>> clarify, that it's one and the same clock pin we're talking about.
-> > >>> 
-> > >>> Now, from the hardware / DT PoV, I think, the DT should look like:
-> > >>> 
-> > >>> a) in the ov2640 I2C DT node we should have a clock consumer entry,
-> > >>> linking to a board-specific source.
-> > >> 
-> > >> That's what this patch series do right now.
-> > >> In my patch 5/5 DT document said, ov2640 need a clock consumer which
-> > >> refer to the xvclk input clock.
-> > >> And it is a required property.
-> > >> 
-> > >>> b) if the ov2640 clock is supplied by a camera host, its DT entry
-> > >>> should have a clock source subnode, to which ov2640 clock consumer
-> > >>> entry should link. The respective camera host driver should then parse
-> > >>> that clock subnode and register the respective clock with the V4L2
-> > >>> framework, by calling v4l2_clk_register().
-> > >> 
-> > >> Ok, So in this case, I need to wait for the "mclk" in probe of ov2640
-> > >> driver. So that I can be compatible for the camera host which provide
-> > >> the clock source.
-> > > 
-> > > Talking about mclk and xvclk is quite confusing. There's no mclk from an
-> > > ov2640 point of view. The ov2640 driver should call v4l2_clk_get("xvclk").
-> > 
-> > Yes, I also was thinking about this, and yes, requesting a "xvclk" clock
-> > would be more logical. But then, as you write below, if we let the
-> > v4l2_clk wrapper first check for a CCF "xvclk" clock, say, none is found.
-> > How do we then find the exported "mclk" V4L2 clock? Maybe v4l2_clk_get()
-> > should use two names?..
-> 
-> Given that v4l2_clk_get() is only used by soc-camera drivers and that they all 
-> call it with the clock name set to "mclk", I wonder whether we couldn't just 
-> get rid of struct v4l2_clk.id and ignore the id argument to v4l2_clk_get() 
-> when CCF isn't available. Maybe we've overdesigned v4l2_clk :-)
-
-Sure, that'd be fine with me, if everyone else agrees.
-
-> > >>> c) if the ov2640 clock is supplied by a different clock source, the
-> > >>> respective driver should parse it and also eventually call
-> > >>> v4l2_clk_register().
-> > >>> 
-> > >>> Implementing case (b) above is so far up to each individual
-> > >>> (soc-camera) camera host driver. In soc-camera host drivers don't
-> > >>> register V4L2 clocks themselves, as you correctly noticed, they just
-> > >>> provide a .clock_start() and a .clock_stop() callbacks. The
-> > >>> registration is done by the soc-camera core.
-> > >>> 
-> > >>> If I understand correctly you have case (c). Unfortunately, this case
-> > >>> isn't supported atm. I think, a suitable way to do this would be:
-> > >>> 
-> > >>> (1) modify soc-camera to not register a V4L2 clock if the host doesn't
-> > >>> provide the required callbacks.
-> > >>> 
-> > >>> (2) hosts should recognise configurations, in which they don't supply
-> > >>> the master clock to clients and not provide the callbacks then.
-> > >>> 
-> > >>> (3) a separate driver should register a suitable V4L2 clock.
-> > >>> 
-> > >>> Whereas I don't think we need to modify camera drivers. Their
-> > >>> requesting of a V4L2 clock is correct as is.
-> > >>> 
-> > >>> Some more fine-print: if the clock is supplied by a generic device, it
-> > >>> would be wrong for it to register a V4L2 clock. It should register a
-> > >>> normal CCF clock, and a separate V4L2 driver should create a V4L2
-> > >>> clock from it. This isn't implemented either and we've been talking
-> > >>> about it for a while now...
-> > > 
-> > > v4l2_clk_get() should try to get the clock from CCF with a call to
-> > > clk_get() first, and then look at the list of v4l2-specific clocks.
-> > 
-> > Yes, how will it find the "mclk" when "xvclk" (or any other name) is
-> > requested? We did discuss this in the beginning and agreed to use a fixed
-> > clock name for the time being...
-> 
-> Please see above.
-> 
-> > > That's at least how I had envisioned it when v4l2_clk_get() was
-> > > introduced. Let's remember that v4l2_clk was designed as a temporary
-> > > workaround for platforms not implementing CCF yet. Is that still needed,
-> > > or could be instead just get rid of it now ?
+On Thu, Dec 25, 2014 at 02:08:12PM +0100, Sebastian Hesselbarth wrote:
+> On 22.12.2014 13:57, Evgeni Dobrev wrote:
+> >This patch adds support for Seagate BlackArmor NAS220.
 > >
-> > I didn't check, but I don't think all platforms, handled by soc-camera,
-> > support CCF yet.
+> >The Seagate BlackArmor NAS 220 is a NAS system based on Marvell 88f6192. It has
+> >32MB NAND and 128MB DRAM. It has two SATA slots, one Gigabit Ethernet port, two
+> >USB 2.0 ports, two buttons and three LEDs. There is a serial port available on
+> >the CN5 connector on the board (1 - TX, 4 - RX, 6 - GND).
+> >
+> >The only functionality still not implemented is the bi-color led on the front
+> >panel (status). Pins mpp22 and mpp23 control this led. Setting mpp22 to high and
+> >mpp23 to low results in orange color. Setting mpp22 to low and mpp23 to high
+> >results in blue color.
+> >
+> >The third led is wired to show the SATA activity on the two drives.
+> >
+> >Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
 > 
-> After a quick check it looks like only OMAP1 and SH Mobile are missing. Atmel, 
-> MX2, MX3 and R-Car all support CCF. PXA27x has CCF support but doesn't enable 
-> it yet for an unknown (to me) reason.
+> Evgeni,
 > 
-> The CEU driver is used on both arch/sh and arch/arm/mach-shmobile. The former 
-> will most likely never receive CCF support, and the latter is getting fixed. 
-> As arch/sh isn't maintained anymore I would be fine with dropping CEU support 
-> for it.
+> sorry for the late review, but I do have some nits that should
+> remove some inconsistencies. If we don't do it now, we'd never
+> change that later.
 > 
-> OMAP1 is thus the only long-term show-stopper. What should we do with it ?
 
-Indeed, what should we? :)
+thank you for your review. I will make the changes you suggest and resubmit.
 
-Thanks
-Guennadi
-
-> -- 
-> Regards,
+> >---
+> >  arch/arm/boot/dts/Makefile            |    1 +
+> >  arch/arm/boot/dts/kirkwood-nas220.dts |  166 +++++++++++++++++++++++++++++++++
+> >  2 files changed, 167 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/kirkwood-nas220.dts
+> >
+> >diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >index 38c89ca..8b9ad1d 100644
+> >--- a/arch/arm/boot/dts/Makefile
+> >+++ b/arch/arm/boot/dts/Makefile
+> >@@ -132,6 +132,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
+> >  	kirkwood-lsxhl.dtb \
+> >  	kirkwood-mplcec4.dtb \
+> >  	kirkwood-mv88f6281gtw-ge.dtb \
+> >+	kirkwood-nas220.dtb \
 > 
-> Laurent Pinchart
+> I am not too happy with choosing "nas220" as the base name for the
+> board. Can we make it a little bit more specific like
+> "seagate-nas220" or "blackarmor-nas220" ?
+> 
+> >  	kirkwood-net2big.dtb \
+> >  	kirkwood-net5big.dtb \
+> >  	kirkwood-netgear_readynas_duo_v2.dtb \
+> >diff --git a/arch/arm/boot/dts/kirkwood-nas220.dts b/arch/arm/boot/dts/kirkwood-nas220.dts
+> >new file mode 100644
+> >index 0000000..8175f3d
+> >--- /dev/null
+> >+++ b/arch/arm/boot/dts/kirkwood-nas220.dts
+> >@@ -0,0 +1,166 @@
+> >+/*
+> >+ * Device Tree file for Seagate BlackArmor NAS220
+> >+ *
+> >+ * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
+> >+ *
+> >+ * Licensed under GPLv2 or later.
+> >+ */
+> >+
+> >+/dts-v1/;
+> >+
+> >+#include <dt-bindings/gpio/gpio.h>
+> >+#include <dt-bindings/input/input.h>
+> >+#include "kirkwood.dtsi"
+> >+#include "kirkwood-6192.dtsi"
+> >+
+> >+/ {
+> >+	model = "Seagate NAS 220";
+> 
+> model = "Seagate BlackArmor NAS220";
+> 
+> i.e. choose the same spelling in comment above and model name here.
+> 
+> >+	compatible = "seagate,nas220","marvell,kirkwood-88f6192","marvell,kirkwood";
+> 
+> compatible should reflect the chosen base name above.
+> 
+> >+
+> >+	memory { /* 128 MB */
+> >+		device_type = "memory";
+> >+		reg = <0x00000000 0x8000000>;
+> >+	};
+> >+
+> >+	chosen {
+> >+		bootargs = "console=ttyS0,115200n8";
+> >+		stdout-path = &uart0;
+> >+	};
+> >+
+> >+	ocp at f1000000 {
+> >+		pinctrl: pin-controller at 10000 {
+> 
+> v3.19 should already have a label for the common pinctrl node.
+> Please do not replay the bus structure but use a node reference
+> like &nand and friends below.
+> 
+> >+			pinctrl-0 = <&pmx_uart0
+> >+				     &pmx_button_reset
+> >+				     &pmx_button_power>;
+> >+			pinctrl-names = "default";
+> >+
+> >+			pmx_act_sata0: pmx-act-sata0 {
+> >+				marvell,pins = "mpp15";
+> >+				marvell,function = "sata0";
+> >+			};
+> 
+> Insert a blank line between each of the pmx_foo nodes?
+> 
+> >+			pmx_act_sata1: pmx-act-sata1 {
+> >+				marvell,pins = "mpp16";
+> >+				marvell,function = "sata1";
+> >+			};
+> >+			pmx_power_sata0: pmx-power-sata0 {
+> >+				marvell,pins = "mpp24";
+> >+				marvell,function = "gpio";
+> >+			};
+> >+			pmx_power_sata1: pmx-power-sata1 {
+> >+				marvell,pins = "mpp28";
+> >+				marvell,function = "gpio";
+> >+			};
+> >+			pmx_button_reset: pmx-button-reset {
+> >+				marvell,pins = "mpp29";
+> >+				marvell,function = "gpio";
+> >+			};
+> >+			pmx_button_power: pmx-button-power {
+> >+				marvell,pins = "mpp26";
+> >+				marvell,function = "gpio";
+> >+			};
+> >+		};
+> >+
+> >+
+> 
+> Remove extra blank line.
+> 
+> >+		/*
+> >+		 * Serial port routed to connector CN5
+> >+		 *
+> >+		 * pin 1 - TX
+> >+		 * pin 4 - RX
+> >+		 * pin 6 - GND
+> >+		 */
+> 
+> Nice! Can you also clarify if TX/RX are as seen from the SoC or
+> remote end?
+> 
+> >+		serial at 12000 {
+> 
+> Please use node references where possible, IIRC v3.19 should have
+> labels for serial, sata, and i2c. Avoid to replay the bus structure.
+> 
+> >+			status = "okay";
+> >+		};
+> >+
+> >+		sata at 80000 {
+> >+			status = "okay";
+> >+			nr-ports = <2>;
+> 
+> I need some update from the other mvebu guys here: Do we have SATA
+> PHY nodes in v3.19 for Kirkwood already? If so, please update to the
+> new binding.
+> 
+> >+		};
+> >+
+> >+		i2c at 11000 {
+> >+			status = "okay";
+> >+			adt7476: adt7476a at 2e {
+> 
+> I know we have a lot of bad examples, but: node names should reflect
+> device function, not device name, i.e.
+> 
+> adt7476: thermal at 2e {
+> 	...
+> };
+> 
+> >+				compatible = "adi,adt7476";
+> >+				reg = <0x2e>;
+> >+			};
+> >+		};
+> >+	};
+> >+
+> >+	gpio_poweroff {
+> >+		compatible = "gpio-poweroff";
+> >+		gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+> >+	};
+> >+
+> >+	gpio_keys {
+> >+		compatible = "gpio-keys";
+> 
+> Add a blank line between nodes.
+> 
+> >+		button at 1{
+> >+			label = "Reset push button";
+> 
+> Reduce label to "Reset" and "Power" below.
+> 
+> >+			linux,code = <KEY_POWER>;
+> >+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+> >+		};
+> >+		button at 2{
+> >+			label = "Power push button";
+> >+			linux,code = <KEY_SLEEP>;
+> >+			gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
+> >+		};
+> >+	};
+> >+
+> >+	gpio-leds {
+> >+		compatible = "gpio-leds";
+> 
+> Add a blank line between nodes.
+> 
+> >+		blue-power {
+> >+			label = "nas220:blue:power";
+> >+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+> >+			linux,default-trigger = "default-on";
+> >+		};
+> >+	};
+> >+
+> >+	regulators {
+> >+		compatible = "simple-bus";
+> >+		#address-cells = <1>;
+> >+		#size-cells = <0>;
+> >+		pinctrl-0 = <&pmx_power_sata0 &pmx_power_sata1>;
+> >+		pinctrl-names = "default";
+> >+
+> >+		sata0_power: regulator at 1 {
+> >+			compatible = "regulator-fixed";
+> >+			reg = <1>;
+> >+			regulator-name = "SATA0 Power";
+> >+			regulator-min-microvolt = <5000000>;
+> >+			regulator-max-microvolt = <5000000>;
+> >+			enable-active-high;
+> >+			regulator-always-on;
+> >+			regulator-boot-on;
+> >+			gpio = <&gpio0 24 0>;
+> 
+> Hmm, do you need "regulator-always-on" when it is GPIO controlled?
+> Also, gpio property could use GPIO_ACTIVE_HIGH/LOW here too.
+> 
+> >+		};
+> >+
+> >+		sata1_power: regulator at 2 {
+> >+			compatible = "regulator-fixed";
+> >+			reg = <2>;
+> >+			regulator-name = "SATA1 Power";
+> >+			regulator-min-microvolt = <5000000>;
+> >+			regulator-max-microvolt = <5000000>;
+> >+			enable-active-high;
+> >+			regulator-always-on;
+> >+			regulator-boot-on;
+> >+			gpio = <&gpio0 28 0>;
+> 
+> ditto.
+> 
+> >+		};
+> >+	};
+> >+};
+> >+
+> >+&nand {
+> >+	status = "okay";
+> >+};
+> >+
+> >+&mdio {
+> >+	status = "okay";
+> >+	ethphy0: ethernet-phy at 8 {
+> >+		 reg = <8>;
+> >+	 };
+> 
+> Remove extra space before brace.
+> 
+> >+};
+> >+
+> >+&eth0 {
+> >+	status = "okay";
+> >+	ethernet0-port at 0 {
+> >+		phy-handle = <&ethphy0>;
+> >+	};
+> >+};
+> >
+> 
+> Overall, this look fine to me, with the nits taken care of
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+> Thanks!
+> 
+
+Thanks,
+
+evgeni
