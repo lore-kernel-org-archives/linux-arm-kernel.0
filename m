@@ -1,48 +1,57 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 26 Dec 2014 13:34:51 +0100
-Subject: [PATCH 0/3] OMAP3 temperature sensor
-In-Reply-To: <20141226102933.GA28778@amd>
+Date: Fri, 26 Dec 2014 13:34:54 +0100
+Subject: [PATCH 3/3] ARM: dts: OMAP34xx/36xx: Add temperature sensor
+In-Reply-To: <1419597294-21487-1-git-send-email-sre@kernel.org>
 References: <20141226102933.GA28778@amd>
-Message-ID: <1419597294-21487-1-git-send-email-sre@kernel.org>
+ <1419597294-21487-1-git-send-email-sre@kernel.org>
+Message-ID: <1419597294-21487-4-git-send-email-sre@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+OMAP34xx and OMAP36xx processors contain a register in the
+syscon area, which can be used to determine the SoCs temperature.
 
-I've prepared an updated variant of the omap34xx temperature monitor driver.
-It's based on the N9 driver instead of the N900 driver (and thus has omap36xx
-support).
+Signed-off-by: Sebastian Reichel <sre@kernel.org>
+---
+ arch/arm/boot/dts/omap34xx.dtsi | 7 +++++++
+ arch/arm/boot/dts/omap36xx.dtsi | 7 +++++++
+ 2 files changed, 14 insertions(+)
 
-The differences compared to the original driver are:
-
- * DT based
- * No includes from arch, instead uses syscon DT node + regmap
- * Removed support for raw temperature reading
-  - I assume this was used for debugging and regmap can be used
-    instead with newer kernels.
- * Introduction of managed resources where possible
- * Usage of module_platform_driver() macro
- * Added some comments referencing the TRM
-
-So far the patchset is _compile-tested only_. I will test it on my N900 in
-the next days.
-
--- Sebastian
-
-Sebastian Reichel (3):
-  DT Binding for omap3 temperature sensor
-  hwmon: Driver for OMAP3 temperature sensor
-  ARM: dts: OMAP34xx/36xx: Add temperature sensor
-
- .../bindings/hwmon/omap3-temperature.txt           |  25 ++
- arch/arm/boot/dts/omap34xx.dtsi                    |   7 +
- arch/arm/boot/dts/omap36xx.dtsi                    |   7 +
- drivers/hwmon/Kconfig                              |   8 +
- drivers/hwmon/Makefile                             |   1 +
- drivers/hwmon/omap3-temp.c                         | 307 +++++++++++++++++++++
- 6 files changed, 355 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/omap3-temperature.txt
- create mode 100644 drivers/hwmon/omap3-temp.c
-
+diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+index 3819c1e..64679ee 100644
+--- a/arch/arm/boot/dts/omap34xx.dtsi
++++ b/arch/arm/boot/dts/omap34xx.dtsi
+@@ -38,6 +38,13 @@
+ 			pinctrl-single,function-mask = <0xff1f>;
+ 		};
+ 	};
++
++	omap3_temperature_sensor: temperature-sensor {
++		compatible = "ti,omap34xx-temperature-sensor";
++		syscon = <&omap3_scm_general>;
++		clocks = <&ts_fck>;
++		clock-names = "fck";
++	};
+ };
+ 
+ &ssi {
+diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+index 541704a..be9ee1d 100644
+--- a/arch/arm/boot/dts/omap36xx.dtsi
++++ b/arch/arm/boot/dts/omap36xx.dtsi
+@@ -70,6 +70,13 @@
+ 			pinctrl-single,function-mask = <0xff1f>;
+ 		};
+ 	};
++
++	omap3_temperature_sensor: temperature-sensor {
++		compatible = "ti,omap36xx-temperature-sensor";
++		syscon = <&omap3_scm_general>;
++		clocks = <&ts_fck>;
++		clock-names = "fck";
++	};
+ };
+ 
+ /* OMAP3630 needs dss_96m_fck for VENC */
 -- 
 2.1.3
