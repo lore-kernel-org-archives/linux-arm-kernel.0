@@ -1,43 +1,26 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 26 Dec 2014 00:21:23 +0200
-Subject: v3.19-rc1 regression(?) on N900
-In-Reply-To: <20141225091121.GA20355@amd>
-References: <549B44E2.6080202@ti.com> <201412250932.40403@pali>
- <20141225091121.GA20355@amd>
-Message-ID: <20141225222122.GB582@fuloong-minipc.musicnaut.iki.fi>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 26 Dec 2014 09:39:11 +0800
+Subject: kernel panic when booting on exynos 5440
+In-Reply-To: <549BECBA.4060707@samsung.com>
+References: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
+ <549BE7CC.1000005@samsung.com>
+ <CACVXFVMOmq4rzXtaLNFn2NE-X=__dTJFANWtuJZS9m9szV0JuQ@mail.gmail.com>
+ <549BECBA.4060707@samsung.com>
+Message-ID: <CACVXFVOTieySjaihsUSf++p6sM1LouoEhfQmZ2uguyeirZ0uJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 25, 2014 at 6:53 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>> If I remember correctly, there are other SoCs which have not been
+>> included in the pmu mapping list, and looks these SoCs need
+>> to be handled too.
+>>
+>
+> As far as I can see in today's linux-next and kgene/for-next tree, only
+> exynos5440 PMU mapping is missing. If I am missing anything please specify
+> exact SoC name, which you think need to be handled.
 
-On Thu, Dec 25, 2014 at 10:11:21AM +0100, Pavel Machek wrote:
-> On Thu 2014-12-25 09:32:40, Pali Roh?r wrote:
-> > On Wednesday 24 December 2014 23:57:38 Nishanth Menon wrote:
-> > > based on automated testing with u-boot as a chained
-> > > bootloader..
-> > > 
-> > > v3.19-rc1: hung
-> > > https://github.com/nmenon/kernel-test-logs/blob/v3.19-rc1/omap
-> > > 2plus_defconfig/n900.txt
-> 
-> Early hang, independend on config. That's "dtb too big". Delete
-> something, and it should work again.
+You are right, it is my fault.
 
-For me, DT boot works fine with 3.19-rc1 as is...
-
-> Plus you'll note video regression.
-
-...however, I can confirm that framebuffer is broken:
-
-[    8.230743] omapfb omapfb: no displays
-[    8.255584] omapfb omapfb: failed to setup omapfb
-[    8.260620] platform omapfb: Driver omapfb requests probe deferral
-[    8.284118] of_get_named_gpiod_flags: parsed 'reset-gpios' property of node
-'/ocp/spi at 48098000/acx565akm at 2[0]' - status (0)
-[    8.284271] acx565akm spi1.2: failed to find video source
-[    8.290069] spi spi1.2: Driver acx565akm requests probe deferral
-
-I bisected it to ef691ff48bc8 (OMAPDSS: DT: Get source endpoint
-by matching reg-id). When I revert that, also FB works with 3.19-rc1.
-
-A.
+Thanks
+Ming Lei
