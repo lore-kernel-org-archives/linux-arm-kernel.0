@@ -1,34 +1,55 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Dec 2014 13:28:19 -0600
-Subject: [PATCH 0/5] AM437x SK: Add power-button support
-Message-ID: <1419622104-25812-1-git-send-email-balbi@ti.com>
+Date: Fri, 26 Dec 2014 13:28:20 -0600
+Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers volatile
+In-Reply-To: <1419622104-25812-1-git-send-email-balbi@ti.com>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+Message-ID: <1419622104-25812-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+STATUS register can be modified by the HW, so we
+should bypass cache because of that.
 
-the following patches add tps65218 power button support and
-make it usable with AM437x SK.
+In the case of INT[12] registers, they are the ones
+that actually clear the IRQ source at the time they
+are read. If we rely on the cache for them, we will
+never be able to clear the interrupt, which will cause
+our IRQ line to be disabled due to IRQ throttling.
 
-Developed and tested on top of v3.19-rc1. Logs at [1]
+Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
+Cc: <stable@vger.kernel.org> # v3.15+
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/mfd/tps65218.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-[1] http://hastebin.com/ecopenuqot
-
-Felipe Balbi (5):
-  mfd: tps65218: make INT[12] and STATUS registers volatile
-  mfd: tps65218: make INT1 our status_base register
-  input: misc: add tps65218 power button driver
-  arm: boot: dts: am437x-sk: add power button binding
-  arm: omap2plus_defconfig: enable TPS65218 power button
-
- arch/arm/boot/dts/am437x-sk-evm.dts     |   5 ++
- arch/arm/configs/omap2plus_defconfig    |   1 +
- drivers/input/misc/Kconfig              |  10 +++
- drivers/input/misc/Makefile             |   1 +
- drivers/input/misc/tps65218-pwrbutton.c | 135 ++++++++++++++++++++++++++++++++
- drivers/mfd/tps65218.c                  |  12 +++
- 6 files changed, 164 insertions(+)
- create mode 100644 drivers/input/misc/tps65218-pwrbutton.c
-
+diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+index 0d256cb..2243f75 100644
+--- a/drivers/mfd/tps65218.c
++++ b/drivers/mfd/tps65218.c
+@@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
+ }
+ EXPORT_SYMBOL_GPL(tps65218_clear_bits);
+ 
++static const struct regmap_range tps65218_yes_ranges[] = {
++	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
++	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
++};
++
++static const struct regmap_access_table tps65218_volatile_table = {
++	.yes_ranges = tps65218_yes_ranges,
++	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
++};
++
+ static struct regmap_config tps65218_regmap_config = {
+ 	.reg_bits = 8,
+ 	.val_bits = 8,
+ 	.cache_type = REGCACHE_RBTREE,
++	.volatile_table = &tps65218_volatile_table,
+ };
+ 
+ static const struct regmap_irq tps65218_irqs[] = {
 -- 
 2.2.0
