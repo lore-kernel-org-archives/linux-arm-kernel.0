@@ -1,35 +1,26 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 26 Dec 2014 17:58:51 +0100
-Subject: [PATCH v2 6/6] arm: pxa: Transition pxa27x to clk framework
-In-Reply-To: <2303917.o2xPYRxhCJ@avalon> (Laurent Pinchart's message of "Fri,
- 26 Dec 2014 11:56:33 +0200")
-References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
- <1405353263-13424-7-git-send-email-robert.jarzmik@free.fr>
- <2303917.o2xPYRxhCJ@avalon>
-Message-ID: <8761cy73g4.fsf@free.fr>
+Date: Fri, 26 Dec 2014 18:09:07 +0100
+Subject: [PATCH] hx4700: regulator: declare full constraints
+In-Reply-To: <1419377277-12727-1-git-send-email-martin.vajnar@gmail.com>
+ (Martin Vajnar's message of "Wed, 24 Dec 2014 00:27:57 +0100")
+References: <1419377277-12727-1-git-send-email-martin.vajnar@gmail.com>
+Message-ID: <871tnm72z0.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> writes:
+Martin Vajnar <martin.vajnar@gmail.com> writes:
 
-> Hi Robert,
+> Since the removal of CONFIG_REGULATOR_DUMMY option, the touchscreen stopped
+> working. This patch enables the "replacement" for REGULATOR_DUMMY and
+> allows the touchscreen to work even though there is no regulator for "vcc".
 >
-> What happened to this patch ? It looks like the rest of the series got merged, 
-> but this one seems to be missing.
+>
+> Signed-off-by: Martin Vajnar <martin.vajnar@gmail.com>
 
-It got reverted, because there were 3 boards with a defconfig which required
-that both pxa27x and pxa25x were ported to common clock framework. As at that
-time I had not ported pxa25x, I had to revert this one.
+Queued up into pxa/for-next tree, thanks.
 
-But now the situation is brighter. pxa25x was ported, tested, and merged by
-Mike..Linus, so I can enable again common clock framework for both pxa27x and
-pxa25x.
-
-Actually it's good you make me think of it, as I've had the "pxa25x + pxa27x
-common clocks enabler" patch in my local development tree for some time but I
-didn't post it.
-
-I'll post if for review this weekend I think.
+I took the liberty to add "Cc: stable at vger.kernel.org" to your commit as it
+looks a regression to me. Feel free to add it next time.
 
 Cheers.
 
