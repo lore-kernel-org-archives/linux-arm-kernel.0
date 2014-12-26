@@ -1,64 +1,257 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 26 Dec 2014 17:35:28 +0800
-Subject: [PATCH 0/8] arm64: improved memory map handling for /dev/mem,
- ACPI etc
-In-Reply-To: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20141226093528.GA26133@darkstar.redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 26 Dec 2014 11:44:04 +0200
+Subject: [PATCH v7 1/3] of: Decrement refcount of previous endpoint in
+ of_graph_get_next_endpoint
+In-Reply-To: <1419340158-20567-2-git-send-email-p.zabel@pengutronix.de>
+References: <1419340158-20567-1-git-send-email-p.zabel@pengutronix.de>
+ <1419340158-20567-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1673229.XX60cPdPif@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/22/14 at 07:08pm, Ard Biesheuvel wrote:
-> This series was split off from the UEFI virtmap for kexec series that I posted
-> earlier today. The main purpose is to deal with the need to classify memory
-> ranges as RAM or non-RAM in a consistent and comprehensive manner. This series
-> applies on top of the other series.
-> 
-> Patch #1 avoids an early panic if the UEFI memory map is available but UEFI
-> support itself fails to initialize. In this case, there is no need to panic
-> early, and we have a better chance of being able to inform the user if we deal
-> with this error condition at a later time.
-> 
-> Patch #2 adds iomem resource registration of UEFI memory regions. This is
-> necessary because otherwise, drivers could potentially claim regions that
-> are in active use by the firmware. This applies to both MMIO (NOR flash, RTC)
-> and RAM ranges (runtime services code and data).
-> 
-> Patch #3-6 adds support to UEFI and non-UEFI code paths to record all memory
-> known to the system in the 'physmem' memblock table (if enabled). This fulfils
-> a need in the /dev/mem and (upcoming) ACPI layers to be able to classify ranges
-> as being backed by normal RAM even if they are not covered by the 'memory'
-> memblock table, and are hence not covered by the linear direct mapping.
-> The physmem code is pre-existing code that only needs minor tweaking to be made
-> suitable for this purpose.
-> 
-> Patch #7 enables the 'physmem' memblock table for arm64, and wires it into the
-> handling of /dev/mem mappings, both to decide whether it should be mapped as
-> MT_NORMAL, and whether read-write access can be allowed. (Non-RAM regions can
-> be mapped read-write as long as they are not claimed by a driver in the iomem
-> resource table. RAM regions can only be mapped read-only, and only if they are
-> not covered by the 'memory' memblock table, and hence not covered by the linear
-> mapping)
-> 
-> Finally, patch #8 changes the way the virtual memory map is handled by the
-> early UEFI code. Specifically, it memblock_remove()s rather than _reserves()
-> UEFI reserved RAM regions, so that they are removed entirely from the linear
-> mapping.
-> 
-> Ard Biesheuvel (8):
->   arm64/efi: use UEFI memory map unconditionally if available
->   arm64/efi: register UEFI reserved regions as iomem resources
->   memblock: add physmem to memblock_dump_all() output
->   memblock: introduce memblock_add_phys() and memblock_is_physmem()
->   of: fdt: register physmem in early_init_dt_scan_memory()
->   arm64/efi: register physmem in reserve_regions()
->   arm64: use 'physmem' memblock to improve CONFIG_STRICT_DEVMEM handling
->   arm64/efi: memblock_remove rather than _reserve UEFI reserved RAM
+Hi Philipp,
 
-Ard, It is much cleaner for this splitting.
+Thank you for the patch.
 
-I wonder if some of them can become general code such as register reserved
-regions as iomem resources?
+On Tuesday 23 December 2014 14:09:16 Philipp Zabel wrote:
+> Decrementing the reference count of the previous endpoint node allows to
+> use the of_graph_get_next_endpoint function in a for_each_... style macro.
+> All current users of this function that pass a non-NULL prev parameter
+> (coresight, rcar-du, imx-drm, soc_camera, and omap2-dss) are changed to
+> not decrement the passed prev argument's refcount themselves.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+> Changes since v6:
+>  - Added omap2-dss.
+>  - Added Mathieu's ack.
+> ---
+>  drivers/coresight/of_coresight.c                  | 13 ++-----------
+>  drivers/gpu/drm/imx/imx-drm-core.c                | 13 ++-----------
+>  drivers/gpu/drm/rcar-du/rcar_du_kms.c             | 15 ++++-----------
 
-Thanks
-Dave
+For rcar-du,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+>  drivers/media/platform/soc_camera/soc_camera.c    |  3 ++-
+>  drivers/of/base.c                                 |  9 +--------
+>  drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |  7 +------
+>  6 files changed, 12 insertions(+), 48 deletions(-)
+> 
+> diff --git a/drivers/coresight/of_coresight.c
+> b/drivers/coresight/of_coresight.c index 5030c07..349c88b 100644
+> --- a/drivers/coresight/of_coresight.c
+> +++ b/drivers/coresight/of_coresight.c
+> @@ -52,15 +52,6 @@ of_coresight_get_endpoint_device(struct device_node
+> *endpoint) endpoint, of_dev_node_match);
+>  }
+> 
+> -static struct device_node *of_get_coresight_endpoint(
+> -		const struct device_node *parent, struct device_node *prev)
+> -{
+> -	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
+> -
+> -	of_node_put(prev);
+> -	return node;
+> -}
+> -
+>  static void of_coresight_get_ports(struct device_node *node,
+>  				   int *nr_inport, int *nr_outport)
+>  {
+> @@ -68,7 +59,7 @@ static void of_coresight_get_ports(struct device_node
+> *node, int in = 0, out = 0;
+> 
+>  	do {
+> -		ep = of_get_coresight_endpoint(node, ep);
+> +		ep = of_graph_get_next_endpoint(node, ep);
+>  		if (!ep)
+>  			break;
+> 
+> @@ -140,7 +131,7 @@ struct coresight_platform_data
+> *of_get_coresight_platform_data( /* Iterate through each port to discover
+> topology */
+>  		do {
+>  			/* Get a handle on a port */
+> -			ep = of_get_coresight_endpoint(node, ep);
+> +			ep = of_graph_get_next_endpoint(node, ep);
+>  			if (!ep)
+>  				break;
+> 
+> diff --git a/drivers/gpu/drm/imx/imx-drm-core.c
+> b/drivers/gpu/drm/imx/imx-drm-core.c index b250130..fed627d 100644
+> --- a/drivers/gpu/drm/imx/imx-drm-core.c
+> +++ b/drivers/gpu/drm/imx/imx-drm-core.c
+> @@ -436,15 +436,6 @@ static uint32_t imx_drm_find_crtc_mask(struct
+> imx_drm_device *imxdrm, return 0;
+>  }
+> 
+> -static struct device_node *imx_drm_of_get_next_endpoint(
+> -		const struct device_node *parent, struct device_node *prev)
+> -{
+> -	struct device_node *node = of_graph_get_next_endpoint(parent, prev);
+> -
+> -	of_node_put(prev);
+> -	return node;
+> -}
+> -
+>  int imx_drm_encoder_parse_of(struct drm_device *drm,
+>  	struct drm_encoder *encoder, struct device_node *np)
+>  {
+> @@ -456,7 +447,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+>  	for (i = 0; ; i++) {
+>  		u32 mask;
+> 
+> -		ep = imx_drm_of_get_next_endpoint(np, ep);
+> +		ep = of_graph_get_next_endpoint(np, ep);
+>  		if (!ep)
+>  			break;
+> 
+> @@ -504,7 +495,7 @@ int imx_drm_encoder_get_mux_id(struct device_node *node,
+> return -EINVAL;
+> 
+>  	do {
+> -		ep = imx_drm_of_get_next_endpoint(node, ep);
+> +		ep = of_graph_get_next_endpoint(node, ep);
+>  		if (!ep)
+>  			break;
+> 
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_kms.c index 0c5ee61..480c4d9 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+> @@ -206,7 +206,7 @@ static int rcar_du_encoders_init_one(struct
+> rcar_du_device *rcdu, enum rcar_du_encoder_type enc_type =
+> RCAR_DU_ENCODER_NONE;
+>  	struct device_node *connector = NULL;
+>  	struct device_node *encoder = NULL;
+> -	struct device_node *prev = NULL;
+> +	struct device_node *ep_node = NULL;
+>  	struct device_node *entity_ep_node;
+>  	struct device_node *entity;
+>  	int ret;
+> @@ -225,11 +225,7 @@ static int rcar_du_encoders_init_one(struct
+> rcar_du_device *rcdu, entity_ep_node = of_parse_phandle(ep->local_node,
+> "remote-endpoint", 0);
+> 
+>  	while (1) {
+> -		struct device_node *ep_node;
+> -
+> -		ep_node = of_graph_get_next_endpoint(entity, prev);
+> -		of_node_put(prev);
+> -		prev = ep_node;
+> +		ep_node = of_graph_get_next_endpoint(entity, ep_node);
+> 
+>  		if (!ep_node)
+>  			break;
+> @@ -300,7 +296,7 @@ static int rcar_du_encoders_init_one(struct
+> rcar_du_device *rcdu, static int rcar_du_encoders_init(struct
+> rcar_du_device *rcdu)
+>  {
+>  	struct device_node *np = rcdu->dev->of_node;
+> -	struct device_node *prev = NULL;
+> +	struct device_node *ep_node = NULL;
+>  	unsigned int num_encoders = 0;
+> 
+>  	/*
+> @@ -308,15 +304,12 @@ static int rcar_du_encoders_init(struct rcar_du_device
+> *rcdu) * pipeline.
+>  	 */
+>  	while (1) {
+> -		struct device_node *ep_node;
+>  		enum rcar_du_output output;
+>  		struct of_endpoint ep;
+>  		unsigned int i;
+>  		int ret;
+> 
+> -		ep_node = of_graph_get_next_endpoint(np, prev);
+> -		of_node_put(prev);
+> -		prev = ep_node;
+> +		ep_node = of_graph_get_next_endpoint(np, ep_node);
+> 
+>  		if (ep_node == NULL)
+>  			break;
+> diff --git a/drivers/media/platform/soc_camera/soc_camera.c
+> b/drivers/media/platform/soc_camera/soc_camera.c index b3db51c..289b637
+> 100644
+> --- a/drivers/media/platform/soc_camera/soc_camera.c
+> +++ b/drivers/media/platform/soc_camera/soc_camera.c
+> @@ -1710,7 +1710,6 @@ static void scan_of_host(struct soc_camera_host *ici)
+>  		if (!i)
+>  			soc_of_bind(ici, epn, ren->parent);
+> 
+> -		of_node_put(epn);
+>  		of_node_put(ren);
+> 
+>  		if (i) {
+> @@ -1718,6 +1717,8 @@ static void scan_of_host(struct soc_camera_host *ici)
+>  			break;
+>  		}
+>  	}
+> +
+> +	of_node_put(epn);
+>  }
+> 
+>  #else
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 36536b6..aac66df 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -2085,8 +2085,7 @@ EXPORT_SYMBOL(of_graph_parse_endpoint);
+>   * @prev: previous endpoint node, or NULL to get first
+>   *
+>   * Return: An 'endpoint' node pointer with refcount incremented. Refcount
+> - * of the passed @prev node is not decremented, the caller have to use
+> - * of_node_put() on it when done.
+> + * of the passed @prev node is decremented.
+>   */
+>  struct device_node *of_graph_get_next_endpoint(const struct device_node
+> *parent, struct device_node *prev)
+> @@ -2122,12 +2121,6 @@ struct device_node *of_graph_get_next_endpoint(const
+> struct device_node *parent, if (WARN_ONCE(!port, "%s(): endpoint %s has no
+> parent node\n",
+>  			      __func__, prev->full_name))
+>  			return NULL;
+> -
+> -		/*
+> -		 * Avoid dropping prev node refcount to 0 when getting the next
+> -		 * child below.
+> -		 */
+> -		of_node_get(prev);
+>  	}
+> 
+>  	while (1) {
+> diff --git a/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c
+> b/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c index 2f0822e..76fb18b
+> 100644
+> --- a/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c
+> +++ b/drivers/video/fbdev/omap2/dss/omapdss-boot-init.c
+> @@ -164,20 +164,15 @@ static void __init omapdss_walk_device(struct
+> device_node *node, bool root)
+> 
+>  		pn = of_graph_get_remote_port_parent(n);
+> 
+> -		if (!pn) {
+> -			of_node_put(n);
+> +		if (!pn)
+>  			continue;
+> -		}
+> 
+>  		if (!of_device_is_available(pn) || omapdss_list_contains(pn)) {
+>  			of_node_put(pn);
+> -			of_node_put(n);
+>  			continue;
+>  		}
+> 
+>  		omapdss_walk_device(pn, false);
+> -
+> -		of_node_put(n);
+>  	}
+>  }
+
+-- 
+Regards,
+
+Laurent Pinchart
