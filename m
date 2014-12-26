@@ -1,31 +1,87 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 26 Dec 2014 22:23:26 +0100
-Subject: [PATCH] clk: rockchip: fix rk3066 pll lock bit location
-In-Reply-To: <2140322.FD0TUOM80V@phil>
-References: <2140322.FD0TUOM80V@phil>
-Message-ID: <2847519.2sf188msm1@phil>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Dec 2014 15:24:47 -0600
+Subject: [PATCH 1/2] tty: serial: 8250_mtk: Add earlycon
+In-Reply-To: <1418891601-53769-2-git-send-email-eddie.huang@mediatek.com>
+References: <1418891601-53769-1-git-send-email-eddie.huang@mediatek.com>
+ <1418891601-53769-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <CAL_JsqKp+1ZWPK4rB4_vxrx-dtNCy7Hc3S67uQ9VHdAby8erjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 24. Dezember 2014, 15:11:00 schrieb Heiko St?bner:
-> The bit locations indicating the locking status of the plls on rk3066 are
-> shifted by one to the right when compared to the rk3188, bits [7:4] instead
-> of [8:5] on the rk3188, thus indicating the locking state of the wrong pll
-> or a completely different information in case of the gpll.
-> 
-> The recently introduced pll init code exposed that problem on some rk3066
-> boards when it tried to bring the boot-pll value in line with the value
-> from the rate table.
-> 
-> Fix this by defining separate pll definitions for rk3066 with the correct
-> locking indices.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Thu, Dec 18, 2014 at 2:33 AM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> Mediatek UART has highspeed register, but 8250_early.c doesn't
+> support this, so add earlycon in 8250_mtk.c
 
-applied to my clk-fixes branch with naobsd's tested-by.
+I don't see any highspeed register setup here. More generically,
+aren't you just skipping any UART setup? That may be useful on other
+platforms with 8250s, too. With the kernel command line version, you
+could perhaps add a "noinit" flag. The DT case is harder, and I'm not
+sure how we should handle that. We could perhaps add a
+"stdout-path-initialized" flag to chosen.
 
-I've also received another positive response of the patch fixing the issue on 
-IRC.
+>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  drivers/tty/serial/8250/8250_mtk.c | 33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>
+> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+> index de7aae5..65dd569 100644
+> --- a/drivers/tty/serial/8250/8250_mtk.c
+> +++ b/drivers/tty/serial/8250/8250_mtk.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/serial_8250.h>
+>  #include <linux/serial_reg.h>
+> +#include <linux/console.h>
+>
+>  #include "8250.h"
+>
+> @@ -289,6 +290,38 @@ static struct platform_driver mtk8250_platform_driver = {
+>  };
+>  module_platform_driver(mtk8250_platform_driver);
+>
+> +#define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
+> +
+> +static void __init mtk8250_serial_putc(struct uart_port *port, int c)
+> +{
+> +       while ((readl(port->membase + (UART_LSR << 2)) & BOTH_EMPTY) !=
+> +               BOTH_EMPTY)
+> +               ;
+> +       writel(c, port->membase + (UART_TX << 2));
+> +}
+> +
+> +static void __init early_mtk8250_write(struct console *console,
+> +                                       const char *s, unsigned int count)
 
+Is there a reason early_serial8250_write can't work for you other than
+it is currently static?
 
-Heiko
+Rob
+
+> +{
+> +       struct earlycon_device *dev = console->data;
+> +
+> +       uart_console_write(&dev->port, s, count, mtk8250_serial_putc);
+> +}
+> +
+> +static int __init early_mtk8250_setup(struct earlycon_device *device,
+> +                                       const char *options)
+> +{
+> +       if (!device->port.membase)
+> +               return -ENODEV;
+> +
+> +       device->con->write = early_mtk8250_write;
+> +
+> +       return 0;
+> +}
+> +
+> +EARLYCON_DECLARE(mtk8250, early_mtk8250_setup);
+> +OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
+> +
+>  MODULE_AUTHOR("Matthias Brugger");
+>  MODULE_LICENSE("GPL");
+>  MODULE_DESCRIPTION("Mediatek 8250 serial port driver");
+> --
+> 1.8.1.1.dirty
+>
