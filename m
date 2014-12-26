@@ -1,310 +1,191 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 26 Dec 2014 11:29:34 +0100
-Subject: [PATCH] add omap34xx temperature monitoring support
-Message-ID: <20141226102933.GA28778@amd>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 26 Dec 2014 11:38:11 +0100 (CET)
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <1492726.KPKGvtrvz4@avalon>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <7803041.cyoUKFJAdh@avalon> <Pine.LNX.4.64.1412261006290.9254@axis700.grange>
+ <1492726.KPKGvtrvz4@avalon>
+Message-ID: <Pine.LNX.4.64.1412261136360.9254@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 26 Dec 2014, Laurent Pinchart wrote:
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> Hi Guennadi,
+> 
+> On Friday 26 December 2014 10:14:26 Guennadi Liakhovetski wrote:
+> > On Fri, 26 Dec 2014, Laurent Pinchart wrote:
+> > > On Friday 26 December 2014 14:37:14 Josh Wu wrote:
+> > >> On 12/25/2014 6:39 AM, Guennadi Liakhovetski wrote:
+> > >>> On Mon, 22 Dec 2014, Josh Wu wrote:
+> > >>>> On 12/20/2014 6:16 AM, Guennadi Liakhovetski wrote:
+> > >>>>> On Fri, 19 Dec 2014, Josh Wu wrote:
+> > >>>>>> On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
+> > >>>>>>> On Thu, 18 Dec 2014, Josh Wu wrote:
+> > >>>>>>>> To support async probe for ov2640, we need remove the code to get
+> > >>>>>>>> 'mclk' in ov2640_probe() function. oterwise, if soc_camera host
+> > >>>>>>>> is not probed in the moment, then we will fail to get 'mclk' and
+> > >>>>>>>> quit the ov2640_probe() function.
+> > >>>>>>>> 
+> > >>>>>>>> So in this patch, we move such 'mclk' getting code to
+> > >>>>>>>> ov2640_s_power() function. That make ov2640 survive, as we can
+> > >>>>>>>> pass a NULL (priv-clk) to soc_camera_set_power() function.
+> > >>>>>>>> 
+> > >>>>>>>> And if soc_camera host is probed, the when ov2640_s_power() is
+> > >>>>>>>> called, then we can get the 'mclk' and that make us
+> > >>>>>>>> enable/disable soc_camera host's clock as well.
+> > >>>>>>>> 
+> > >>>>>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > >>>>>>>> ---
+> > >>>>>>>> v3 -> v4:
+> > >>>>>>>> v2 -> v3:
+> > >>>>>>>> v1 -> v2:
+> > >>>>>>>>      no changes.
+> > >>>>>>>>  
+> > >>>>>>>>  drivers/media/i2c/soc_camera/ov2640.c | 31 ++++++++++++++-------
+> > >>>>>>>>  1 file changed, 21 insertions(+), 10 deletions(-)
+> > >>>>>>>> 
+> > >>>>>>>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+> > >>>>>>>> b/drivers/media/i2c/soc_camera/ov2640.c
+> > >>>>>>>> index 1fdce2f..9ee910d 100644
+> > >>>>>>>> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> > >>>>>>>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> > >>>>>>>> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev
+> > >>>>>>>> *sd, int on)
+> > >>>>>>>>     	struct i2c_client *client = v4l2_get_subdevdata(sd);
+> > >>>>>>>>     	struct soc_camera_subdev_desc *ssdd =
+> > >>>>>>>> soc_camera_i2c_to_desc(client);
+> > >>>>>>>>     	struct ov2640_priv *priv = to_ov2640(client);
+> > >>>>>>>> +	struct v4l2_clk *clk;
+> > >>>>>>>> +
+> > >>>>>>>> +	if (!priv->clk) {
+> > >>>>>>>> +		clk = v4l2_clk_get(&client->dev, "mclk");
+> > >>>>>>>> +		if (IS_ERR(clk))
+> > >>>>>>>> +			dev_warn(&client->dev, "Cannot get the mclk.
+> > >>>>>>>> maybe soc-camera host is not probed yet.\n");
+> > >>>>>>>> +		else
+> > >>>>>>>> +			priv->clk = clk;
+> > >>>>>>>> +	}
+> > >>>>>>>>       	return soc_camera_set_power(&client->dev, ssdd, priv
+> > >>>>>>>> ->clk, on);
+> > >>>>>>>>     }
+> > >>>> 
+> > >>>> Just let me explained a little more details at first:
+> > >>>> 
+> > >>>> As my understanding, current the priv->clk is a v4l2_clk: mclk, which
+> > >>>> is a wrapper clock in soc_camera.c. it can make soc_camera to call
+> > >>>> camera host's clock_start() clock_stop(). As in ov2640, the real mck
+> > >>>> (pck1) is in ov2640 dt node (xvclk). So the camera host's
+> > >>>> clock_start()/stop() only need to enable/disable his peripheral
+> > >>>> clock.
+> > >>> 
+> > >>> I'm looking at the ov2640 datasheet. In the block diagram I only see
+> > >>> one input clock - the xvclk. Yes, it can be supplied by the camera
+> > >>> host controller, in which case it is natural for the camera host
+> > >>> driver to own and control it, or it can be a separate clock device -
+> > >>> either static or configurable. This is just a note to myself to
+> > >>> clarify, that it's one and the same clock pin we're talking about.
+> > >>> 
+> > >>> Now, from the hardware / DT PoV, I think, the DT should look like:
+> > >>> 
+> > >>> a) in the ov2640 I2C DT node we should have a clock consumer entry,
+> > >>> linking to a board-specific source.
+> > >> 
+> > >> That's what this patch series do right now.
+> > >> In my patch 5/5 DT document said, ov2640 need a clock consumer which
+> > >> refer to the xvclk input clock.
+> > >> And it is a required property.
+> > >> 
+> > >>> b) if the ov2640 clock is supplied by a camera host, its DT entry
+> > >>> should have a clock source subnode, to which ov2640 clock consumer
+> > >>> entry should link. The respective camera host driver should then parse
+> > >>> that clock subnode and register the respective clock with the V4L2
+> > >>> framework, by calling v4l2_clk_register().
+> > >> 
+> > >> Ok, So in this case, I need to wait for the "mclk" in probe of ov2640
+> > >> driver. So that I can be compatible for the camera host which provide
+> > >> the clock source.
+> > > 
+> > > Talking about mclk and xvclk is quite confusing. There's no mclk from an
+> > > ov2640 point of view. The ov2640 driver should call v4l2_clk_get("xvclk").
+> > 
+> > Yes, I also was thinking about this, and yes, requesting a "xvclk" clock
+> > would be more logical. But then, as you write below, if we let the
+> > v4l2_clk wrapper first check for a CCF "xvclk" clock, say, none is found.
+> > How do we then find the exported "mclk" V4L2 clock? Maybe v4l2_clk_get()
+> > should use two names?..
+> 
+> Given that v4l2_clk_get() is only used by soc-camera drivers and that they all 
+> call it with the clock name set to "mclk", I wonder whether we couldn't just 
+> get rid of struct v4l2_clk.id and ignore the id argument to v4l2_clk_get() 
+> when CCF isn't available. Maybe we've overdesigned v4l2_clk :-)
 
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index 6529c09..9007ca9 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -28,6 +28,10 @@ config HWMON_VID
- 	tristate
- 	default n
- 
-+config SENSORS_OMAP34XX
-+	bool "TI OMAP34xx internal temperature sensor"
-+	depends on ARCH_OMAP3 && HIGH_RES_TIMERS
-+
- config HWMON_DEBUG_CHIP
- 	bool "Hardware Monitoring Chip debugging messages"
- 	default n
-diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-index 6728064..5c3b5d1 100644
---- a/drivers/hwmon/Makefile
-+++ b/drivers/hwmon/Makefile
-@@ -120,6 +120,7 @@ obj-$(CONFIG_SENSORS_NCT6683)	+= nct6683.o
- obj-$(CONFIG_SENSORS_NCT6775)	+= nct6775.o
- obj-$(CONFIG_SENSORS_NCT7802)	+= nct7802.o
- obj-$(CONFIG_SENSORS_NTC_THERMISTOR)	+= ntc_thermistor.o
-+obj-$(CONFIG_SENSORS_OMAP34XX)  += omap34xx_temp.o
- obj-$(CONFIG_SENSORS_PC87360)	+= pc87360.o
- obj-$(CONFIG_SENSORS_PC87427)	+= pc87427.o
- obj-$(CONFIG_SENSORS_PCF8591)	+= pcf8591.o
-diff --git a/drivers/hwmon/omap34xx_temp.c b/drivers/hwmon/omap34xx_temp.c
-new file mode 100644
-index 0000000..bc7a72f
---- /dev/null
-+++ b/drivers/hwmon/omap34xx_temp.c
-@@ -0,0 +1,263 @@
-+/*
-+ * omap34xx_temp.c - Linux kernel module for OMAP34xx hardware monitoring
-+ *
-+ * Copyright (C) 2008 Nokia Corporation
-+ *
-+ * Written by Peter De Schrijver <peter.de-schrijver@nokia.com>
-+ *
-+ * Inspired by k8temp.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General
-+ * Public License. See the file "COPYING" in the main directory of this
-+ * archive for more details.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/hrtimer.h>
-+#include <linux/module.h>
-+#include <linux/hwmon.h>
-+#include <linux/hwmon-sysfs.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+
-+#include "../../arch/arm/mach-omap2/control.h"
-+
-+#define TEMP_SENSOR_SOC BIT(8)
-+#define TEMP_SENSOR_EOCZ BIT(7)
-+
-+/* minimum delay for EOCZ rise after SOC rise is
-+ * 11 cycles of the 32.768Khz clock */
-+#define EOCZ_MIN_RISING_DELAY (11 * 30518)
-+
-+/* maximum delay for EOCZ rise after SOC rise is
-+ * 14 cycles of the 32.768Khz clock */
-+#define EOCZ_MAX_RISING_DELAY (14 * 30518)
-+
-+/* minimum delay for EOCZ falling is
-+ * 36 cycles of the 32.768Khz clock */
-+#define EOCZ_MIN_FALLING_DELAY (36 * 30518)
-+
-+/* maximum delay for EOCZ falling is
-+ * 40 cycles of the 32.768Khz clock */
-+#define EOCZ_MAX_FALLING_DELAY (40 * 30518)
-+
-+struct omap34xx_data {
-+	struct device *hwmon_dev;
-+	struct clk *clk_32k;
-+	struct mutex update_lock;
-+	const char *name;
-+	char valid;
-+	unsigned long last_updated;
-+	u32 temp;
-+};
-+
-+static struct platform_device omap34xx_temp_device = {
-+	.name	= "omap34xx_temp",
-+	.id	= -1,
-+};
-+
-+static int adc_to_temp[] = {
-+	-40, -40, -40, -40, -40, -39, -38, -36, -34, -32, -31, -29, -28, -26,
-+	-25, -24, -22, -21, -19, -18, -17, -15, -14, -12, -11, -9, -8, -7, -5,
-+	-4, -2, -1, 0, 1, 3, 4, 5, 7, 8, 10, 11, 13, 14, 15, 17, 18, 20, 21,
-+	22, 24, 25, 27, 28, 30, 31, 32, 34, 35, 37, 38, 39, 41, 42, 44, 45,
-+	47, 48, 49, 51, 52, 53, 55, 56, 58, 59, 60, 62, 63, 65, 66, 67, 69,
-+	70, 72, 73, 74, 76, 77, 79, 80, 81, 83, 84, 85, 87, 88, 89, 91, 92,
-+	94, 95, 96, 98, 99, 100, 102, 103, 105, 106, 107, 109, 110, 111, 113,
-+	114, 116, 117, 118, 120, 121, 122, 124, 124, 125, 125, 125, 125, 125};
-+
-+static inline u32 wait_for_eocz(int min_delay, int max_delay, u32 level)
-+{
-+	struct timespec timeout;
-+	ktime_t expire;
-+	u32 temp_sensor_reg;
-+
-+	level &= 1;
-+	level *= TEMP_SENSOR_EOCZ;
-+
-+	expire = ktime_add_ns(ktime_get(), max_delay);
-+	timeout = ns_to_timespec(min_delay);
-+	hrtimer_nanosleep(&timeout, NULL, HRTIMER_MODE_REL, CLOCK_MONOTONIC);
-+	do {
-+		temp_sensor_reg = omap_ctrl_readl(OMAP343X_CONTROL_TEMP_SENSOR);
-+		if ((temp_sensor_reg & TEMP_SENSOR_EOCZ) == level)
-+			break;
-+	} while (ktime_us_delta(expire, ktime_get()) > 0);
-+
-+	return (temp_sensor_reg & TEMP_SENSOR_EOCZ) == level;
-+}
-+
-+static void omap34xx_update(struct omap34xx_data *data)
-+{
-+	u32 temp_sensor_reg;
-+
-+	mutex_lock(&data->update_lock);
-+
-+	if (!data->valid
-+	    || time_after(jiffies, data->last_updated + HZ)) {
-+		clk_prepare_enable(data->clk_32k);
-+
-+		temp_sensor_reg = omap_ctrl_readl(OMAP343X_CONTROL_TEMP_SENSOR);
-+		temp_sensor_reg |= TEMP_SENSOR_SOC;
-+		omap_ctrl_writel(temp_sensor_reg, OMAP343X_CONTROL_TEMP_SENSOR);
-+
-+		if (!wait_for_eocz(EOCZ_MIN_RISING_DELAY,
-+					EOCZ_MAX_RISING_DELAY, 1))
-+			goto err;
-+
-+		temp_sensor_reg = omap_ctrl_readl(OMAP343X_CONTROL_TEMP_SENSOR);
-+		temp_sensor_reg &= ~TEMP_SENSOR_SOC;
-+		omap_ctrl_writel(temp_sensor_reg, OMAP343X_CONTROL_TEMP_SENSOR);
-+
-+		if (!wait_for_eocz(EOCZ_MIN_FALLING_DELAY,
-+					EOCZ_MAX_FALLING_DELAY, 0))
-+			goto err;
-+
-+		data->temp = omap_ctrl_readl(OMAP343X_CONTROL_TEMP_SENSOR) &
-+						((1<<7) - 1);
-+		data->last_updated = jiffies;
-+		data->valid = 1;
-+
-+err:
-+		clk_disable_unprepare(data->clk_32k);
-+	}
-+
-+	mutex_unlock(&data->update_lock);
-+}
-+
-+static ssize_t show_name(struct device *dev,
-+			struct device_attribute *devattr, char *buf)
-+{
-+	struct omap34xx_data *data = dev_get_drvdata(dev);
-+
-+	return sprintf(buf, "%s\n", data->name);
-+}
-+
-+static ssize_t show_temp_raw(struct device *dev,
-+			 struct device_attribute *devattr, char *buf)
-+{
-+	struct omap34xx_data *data = dev_get_drvdata(dev);
-+
-+	omap34xx_update(data);
-+
-+	return sprintf(buf, "%d\n", data->temp);
-+}
-+
-+static ssize_t show_temp(struct device *dev,
-+			 struct device_attribute *devattr, char *buf)
-+{
-+	struct omap34xx_data *data = dev_get_drvdata(dev);
-+
-+	omap34xx_update(data);
-+
-+	return sprintf(buf, "%d\n", adc_to_temp[data->temp]);
-+}
-+
-+static SENSOR_DEVICE_ATTR_2(temp1_input, S_IRUGO, show_temp, NULL, 0, 0);
-+static SENSOR_DEVICE_ATTR_2(temp1_input_raw, S_IRUGO, show_temp_raw,
-+				NULL, 0, 0);
-+static DEVICE_ATTR(name, S_IRUGO, show_name, NULL);
-+
-+static int omap34xx_temp_probe(void)
-+{
-+	int err;
-+	struct omap34xx_data *data;
-+
-+	err = platform_device_register(&omap34xx_temp_device);
-+	if (err) {
-+		pr_err("Unable to register omap34xx temperature device\n");
-+		goto exit;
-+	}
-+
-+	data = kzalloc(sizeof(struct omap34xx_data), GFP_KERNEL);
-+	if (!data) {
-+		err = -ENOMEM;
-+		goto exit_platform;
-+	}
-+
-+	dev_set_drvdata(&omap34xx_temp_device.dev, data);
-+	mutex_init(&data->update_lock);
-+	data->name = "omap34xx_temp";
-+
-+	data->clk_32k = clk_get(&omap34xx_temp_device.dev, "ts_fck");
-+	if (IS_ERR(data->clk_32k)) {
-+		err = PTR_ERR(data->clk_32k);
-+		goto exit_free;
-+	}
-+
-+	err = device_create_file(&omap34xx_temp_device.dev,
-+				 &sensor_dev_attr_temp1_input.dev_attr);
-+	if (err)
-+		goto clock_free;
-+
-+	err = device_create_file(&omap34xx_temp_device.dev,
-+				 &sensor_dev_attr_temp1_input_raw.dev_attr);
-+	if (err)
-+		goto exit_remove;
-+
-+	err = device_create_file(&omap34xx_temp_device.dev, &dev_attr_name);
-+	if (err)
-+		goto exit_remove_raw;
-+
-+	data->hwmon_dev = hwmon_device_register(&omap34xx_temp_device.dev);
-+
-+	if (IS_ERR(data->hwmon_dev)) {
-+		err = PTR_ERR(data->hwmon_dev);
-+		goto exit_remove_all;
-+	}
-+
-+	return 0;
-+
-+exit_remove_all:
-+	device_remove_file(&omap34xx_temp_device.dev,
-+			   &dev_attr_name);
-+exit_remove_raw:
-+	device_remove_file(&omap34xx_temp_device.dev,
-+			   &sensor_dev_attr_temp1_input_raw.dev_attr);
-+exit_remove:
-+	device_remove_file(&omap34xx_temp_device.dev,
-+			   &sensor_dev_attr_temp1_input.dev_attr);
-+clock_free:
-+	clk_put(data->clk_32k);
-+
-+exit_free:
-+	kfree(data);
-+exit_platform:
-+	platform_device_unregister(&omap34xx_temp_device);
-+exit:
-+	return err;
-+}
-+
-+static int __init omap34xx_temp_init(void)
-+{
-+	return omap34xx_temp_probe();
-+}
-+
-+static void __exit omap34xx_temp_exit(void)
-+{
-+	struct omap34xx_data *data =
-+			dev_get_drvdata(&omap34xx_temp_device.dev);
-+
-+	clk_put(data->clk_32k);
-+	hwmon_device_unregister(data->hwmon_dev);
-+	device_remove_file(&omap34xx_temp_device.dev,
-+			   &sensor_dev_attr_temp1_input.dev_attr);
-+	device_remove_file(&omap34xx_temp_device.dev, &dev_attr_name);
-+	kfree(data);
-+	platform_device_unregister(&omap34xx_temp_device);
-+}
-+
-+MODULE_AUTHOR("Peter De Schrijver");
-+MODULE_DESCRIPTION("Omap34xx temperature sensor");
-+MODULE_LICENSE("GPL");
-+
-+module_init(omap34xx_temp_init)
-+module_exit(omap34xx_temp_exit)
-+
+Sure, that'd be fine with me, if everyone else agrees.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> > >>> c) if the ov2640 clock is supplied by a different clock source, the
+> > >>> respective driver should parse it and also eventually call
+> > >>> v4l2_clk_register().
+> > >>> 
+> > >>> Implementing case (b) above is so far up to each individual
+> > >>> (soc-camera) camera host driver. In soc-camera host drivers don't
+> > >>> register V4L2 clocks themselves, as you correctly noticed, they just
+> > >>> provide a .clock_start() and a .clock_stop() callbacks. The
+> > >>> registration is done by the soc-camera core.
+> > >>> 
+> > >>> If I understand correctly you have case (c). Unfortunately, this case
+> > >>> isn't supported atm. I think, a suitable way to do this would be:
+> > >>> 
+> > >>> (1) modify soc-camera to not register a V4L2 clock if the host doesn't
+> > >>> provide the required callbacks.
+> > >>> 
+> > >>> (2) hosts should recognise configurations, in which they don't supply
+> > >>> the master clock to clients and not provide the callbacks then.
+> > >>> 
+> > >>> (3) a separate driver should register a suitable V4L2 clock.
+> > >>> 
+> > >>> Whereas I don't think we need to modify camera drivers. Their
+> > >>> requesting of a V4L2 clock is correct as is.
+> > >>> 
+> > >>> Some more fine-print: if the clock is supplied by a generic device, it
+> > >>> would be wrong for it to register a V4L2 clock. It should register a
+> > >>> normal CCF clock, and a separate V4L2 driver should create a V4L2
+> > >>> clock from it. This isn't implemented either and we've been talking
+> > >>> about it for a while now...
+> > > 
+> > > v4l2_clk_get() should try to get the clock from CCF with a call to
+> > > clk_get() first, and then look at the list of v4l2-specific clocks.
+> > 
+> > Yes, how will it find the "mclk" when "xvclk" (or any other name) is
+> > requested? We did discuss this in the beginning and agreed to use a fixed
+> > clock name for the time being...
+> 
+> Please see above.
+> 
+> > > That's at least how I had envisioned it when v4l2_clk_get() was
+> > > introduced. Let's remember that v4l2_clk was designed as a temporary
+> > > workaround for platforms not implementing CCF yet. Is that still needed,
+> > > or could be instead just get rid of it now ?
+> >
+> > I didn't check, but I don't think all platforms, handled by soc-camera,
+> > support CCF yet.
+> 
+> After a quick check it looks like only OMAP1 and SH Mobile are missing. Atmel, 
+> MX2, MX3 and R-Car all support CCF. PXA27x has CCF support but doesn't enable 
+> it yet for an unknown (to me) reason.
+> 
+> The CEU driver is used on both arch/sh and arch/arm/mach-shmobile. The former 
+> will most likely never receive CCF support, and the latter is getting fixed. 
+> As arch/sh isn't maintained anymore I would be fine with dropping CEU support 
+> for it.
+> 
+> OMAP1 is thus the only long-term show-stopper. What should we do with it ?
+
+Indeed, what should we? :)
+
+Thanks
+Guennadi
+
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
