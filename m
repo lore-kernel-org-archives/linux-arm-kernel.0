@@ -1,18 +1,20 @@
 From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Sat, 27 Dec 2014 00:21:53 +0100
-Subject: [PATCHv5 1/2] INPUT: Introduce generic trigger/LED pairs between
- keyboard modifiers and input LEDs
+Date: Sat, 27 Dec 2014 00:23:10 +0100
+Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to input LEDs
 In-Reply-To: <20141226232116.GA5069@type>
 References: <20141226232116.GA5069@type>
-Message-ID: <20141226232153.GB5069@type>
+Message-ID: <20141226232310.GD5069@type>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This permits to change which modifier triggers which keyboard LEDs, by adding
-modifier triggers, and a series of evled LEDs.
+This permits to reassign input LEDs to something else than keyboard "leds"
+state, by adding a trigger and a led for each input leds, the former being
+triggered by EV_LED events, and the latter being by default triggered by the
+former. The user can then make the LED use another trigger, including other LED
+triggers of the same keyboard.
 
-This permits to fix #7063 from userland by using a modifier to implement proper
-CapsLock behavior and have the keyboard caps lock led show that modifier state.
+The hardware LEDs are now not actioned from the ED_LED event any more, but from
+the per-device LED layer.
 
 [ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
 [blogic at openwrt.org: CONFIG_INPUT_LEDS stubs should be static inline]
@@ -25,317 +27,296 @@ Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
 Changed in this version:
 - separate kbd LED changes from input LED changes
-- remove the VT triggers, revert back to emitting EV_LED events
+- add a per-device trigger, triggered by EV_LED events
+- make the per-device LED triggered by default by the per-device trigger, so
+  that evdev users get the modified behavior too
+- make the hardware driven by the LED instead of EV_LED events
 
---- a/drivers/tty/Kconfig
-+++ b/drivers/tty/Kconfig
-@@ -13,6 +13,9 @@ config VT
- 	bool "Virtual terminal" if EXPERT
- 	depends on !S390 && !UML
- 	select INPUT
-+	select NEW_LEDS
-+	select LEDS_CLASS
-+	select LEDS_TRIGGERS
- 	default y
- 	---help---
- 	  If you say Y here, you will get support for terminal devices with
---- a/drivers/tty/vt/keyboard.c
-+++ b/drivers/tty/vt/keyboard.c
-@@ -33,6 +33,7 @@
- #include <linux/string.h>
- #include <linux/init.h>
- #include <linux/slab.h>
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -27,6 +27,7 @@
+ #include <linux/device.h>
+ #include <linux/mutex.h>
+ #include <linux/rcupdate.h>
 +#include <linux/leds.h>
+ #include "input-compat.h"
  
- #include <linux/kbd_kern.h>
- #include <linux/kbd_diacr.h>
-@@ -130,6 +131,7 @@ static char rep;					/* flag telling cha
- static int shift_state = 0;
+ MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+@@ -324,11 +325,20 @@ static int input_get_disposition(struct
+ 		break;
  
- static unsigned char ledstate = 0xff;			/* undefined */
-+static unsigned char lockstate = 0xff;			/* undefined */
- static unsigned char ledioctl;
+ 	case EV_LED:
+-		if (is_event_supported(code, dev->ledbit, LED_MAX) &&
+-		    !!test_bit(code, dev->led) != !!value) {
+-
+-			__change_bit(code, dev->led);
+-			disposition = INPUT_PASS_TO_ALL;
++		if (is_event_supported(code, dev->ledbit, LED_MAX)) {
++#ifdef CONFIG_INPUT_LED
++			/* Redirect through trigger/LED pair */
++			if (dev->triggers && dev->triggers[code].name)
++				led_trigger_event(&dev->triggers[code],
++						  value ? LED_FULL : LED_OFF);
++			disposition = INPUT_PASS_TO_HANDLERS;
++#else /* !CONFIG_INPUT_LED */
++			/* Directly pass to device */
++			if (!!test_bit(code, dev->led) != !!value) {
++				__change_bit(code, dev->led);
++				disposition = INPUT_PASS_TO_ALL;
++			}
++#endif /* !CONFIG_INPUT_LED */
+ 		}
+ 		break;
  
- /*
-@@ -962,6 +964,146 @@ static void k_brl(struct vc_data *vc, un
+@@ -711,6 +721,9 @@ static void input_disconnect_device(stru
+ 		handle->open = 0;
+ 
+ 	spin_unlock_irq(&dev->event_lock);
++
++	if (is_event_supported(EV_LED, dev->evbit, EV_MAX))
++		input_led_disconnect(dev);
  }
  
- /*
-+ * Keyboard LEDs are propagated by default like the following example:
-+ *
-+ * VT keyboard LED state or modifier state, calls kbd_bh()
-+ * -> kbd-xxx VT trigger
-+ * -> vt::xxx VT LED
-+ * -> input EV_DEV events (in vt_led_cb)
-+ *
-+ * KDSETLED directly triggers vt::xxx LEDs.
-+ *
-+ * Userland can however choose the trigger for the vt::numl LED, or
-+ * independently choose the trigger for any inputx::numl LED.
-+ */
+ /**
+@@ -2137,6 +2150,9 @@ int input_register_device(struct input_d
+ 
+ 	list_add_tail(&dev->node, &input_dev_list);
+ 
++	if (is_event_supported(EV_LED, dev->evbit, EV_MAX))
++		input_led_connect(dev);
 +
-+/* We route VT keyboard "leds" through triggers */
-+static void kbd_ledstate_trigger_activate(struct led_classdev *cdev);
+ 	list_for_each_entry(handler, &input_handler_list, node)
+ 		input_attach_handler(dev, handler);
+ 
+--- a/drivers/input/Kconfig
++++ b/drivers/input/Kconfig
+@@ -178,6 +178,15 @@ comment "Input Device Drivers"
+ 
+ source "drivers/input/keyboard/Kconfig"
+ 
++config INPUT_LEDS
++	bool "LED Support"
++	depends on LEDS_CLASS = INPUT || LEDS_CLASS = y
++	select LEDS_TRIGGERS
++	default y
++	help
++	  This option enables support for LEDs on keyboards managed
++	  by the input layer.
 +
-+static struct led_trigger ledtrig_ledstate[] = {
-+#define DEFINE_LEDSTATE_TRIGGER(kbd_led, nam) \
-+	[kbd_led] = { \
-+		.name = nam, \
-+		.activate = kbd_ledstate_trigger_activate, \
-+	}
-+	DEFINE_LEDSTATE_TRIGGER(VC_SCROLLOCK, "kbd-scrollock"),
-+	DEFINE_LEDSTATE_TRIGGER(VC_NUMLOCK,   "kbd-numlock"),
-+	DEFINE_LEDSTATE_TRIGGER(VC_CAPSLOCK,  "kbd-capslock"),
-+	DEFINE_LEDSTATE_TRIGGER(VC_KANALOCK,  "kbd-kanalock"),
-+#undef DEFINE_LEDSTATE_TRIGGER
-+};
+ source "drivers/input/mouse/Kconfig"
+ 
+ source "drivers/input/joystick/Kconfig"
+--- a/drivers/input/Makefile
++++ b/drivers/input/Makefile
+@@ -6,6 +6,9 @@
+ 
+ obj-$(CONFIG_INPUT)		+= input-core.o
+ input-core-y := input.o input-compat.o input-mt.o ff-core.o
++ifeq ($(CONFIG_INPUT_LEDS),y)
++input-core-y += leds.o
++endif
+ 
+ obj-$(CONFIG_INPUT_FF_MEMLESS)	+= ff-memless.o
+ obj-$(CONFIG_INPUT_POLLDEV)	+= input-polldev.o
+--- a/include/linux/input.h
++++ b/include/linux/input.h
+@@ -79,6 +79,8 @@ struct input_value {
+  * @led: reflects current state of device's LEDs
+  * @snd: reflects current state of sound effects
+  * @sw: reflects current state of device's switches
++ * @leds: led objects for the device's LEDs
++ * @triggers: trigger objects for the device's LEDs
+  * @open: this method is called when the very first user calls
+  *	input_open_device(). The driver must prepare the device
+  *	to start generating events (start polling thread,
+@@ -164,6 +166,9 @@ struct input_dev {
+ 	unsigned long snd[BITS_TO_LONGS(SND_CNT)];
+ 	unsigned long sw[BITS_TO_LONGS(SW_CNT)];
+ 
++	struct led_classdev *leds;
++	struct led_trigger *triggers;
 +
-+static int input_leds[] = {
-+	[VC_SCROLLOCK] = LED_SCROLLL,
-+	[VC_NUMLOCK] = LED_NUML,
-+	[VC_CAPSLOCK] = LED_CAPSL,
-+	[VC_KANALOCK] = LED_KANA,
-+};
+ 	int (*open)(struct input_dev *dev);
+ 	void (*close)(struct input_dev *dev);
+ 	int (*flush)(struct input_dev *dev, struct file *file);
+@@ -531,4 +536,22 @@ int input_ff_erase(struct input_dev *dev
+ int input_ff_create_memless(struct input_dev *dev, void *data,
+ 		int (*play_effect)(struct input_dev *, void *, struct ff_effect *));
+ 
++#ifdef CONFIG_INPUT_LEDS
 +
-+/* Called on trigger connection, to set initial state */
-+static void kbd_ledstate_trigger_activate(struct led_classdev *cdev)
++int input_led_connect(struct input_dev *dev);
++void input_led_disconnect(struct input_dev *dev);
++
++#else
++
++static inline int input_led_connect(struct input_dev *dev)
 +{
-+	struct led_trigger *trigger = cdev->trigger;
-+	int led = trigger - ledtrig_ledstate;
-+
-+	tasklet_disable(&keyboard_tasklet);
-+	led_trigger_event(trigger, ledstate & (1 << led) ? LED_FULL : LED_OFF);
-+	tasklet_enable(&keyboard_tasklet);
-+}
-+
-+/* We route VT keyboard lockstates through triggers */
-+static void kbd_lockstate_trigger_activate(struct led_classdev *cdev);
-+
-+static struct led_trigger ledtrig_lockstate[] = {
-+#define DEFINE_LOCKSTATE_TRIGGER(kbd_led, nam) \
-+	[kbd_led] = { \
-+		.name = nam, \
-+		.activate = kbd_lockstate_trigger_activate, \
-+	}
-+	DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTLOCK,  "kbd-shiftlock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_ALTGRLOCK,  "kbd-altgrlock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_CTRLLOCK,   "kbd-ctrllock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_ALTLOCK,    "kbd-altlock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTLLOCK, "kbd-shiftllock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTRLOCK, "kbd-shiftrlock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_CTRLLLOCK,  "kbd-ctrlllock"),
-+	DEFINE_LOCKSTATE_TRIGGER(VC_CTRLRLOCK,  "kbd-ctrlrlock"),
-+#undef DEFINE_LOCKSTATE_TRIGGER
-+};
-+
-+/* Called on trigger connection, to set initial state */
-+static void kbd_lockstate_trigger_activate(struct led_classdev *cdev)
-+{
-+	struct led_trigger *trigger = cdev->trigger;
-+	int led = trigger - ledtrig_lockstate;
-+
-+	tasklet_disable(&keyboard_tasklet);
-+	led_trigger_event(trigger, lockstate & (1 << led) ? LED_FULL : LED_OFF);
-+	tasklet_enable(&keyboard_tasklet);
-+}
-+
-+/* Handler for VT LEDs, scheduling injecting input events in a worker */
-+static void vt_led_set(struct led_classdev *cdev,
-+			  enum led_brightness brightness);
-+static struct led_classdev vt_leds[LED_CNT] = {
-+#define DEFINE_INPUT_LED(vt_led, nam, deftrig) \
-+	[vt_led] = { \
-+		.name = "vt::"nam, \
-+		.max_brightness = 1, \
-+		.brightness_set = vt_led_set, \
-+		.default_trigger = deftrig, \
-+	}
-+/* Default triggers for the VT LEDs just correspond to the legacy
-+ * usage. */
-+	DEFINE_INPUT_LED(LED_NUML, "numl", "kbd-numlock"),
-+	DEFINE_INPUT_LED(LED_CAPSL, "capsl", "kbd-capslock"),
-+	DEFINE_INPUT_LED(LED_SCROLLL, "scrolll", "kbd-scrollock"),
-+	DEFINE_INPUT_LED(LED_COMPOSE, "compose", NULL),
-+	DEFINE_INPUT_LED(LED_KANA, "kana", "kbd-kanalock"),
-+	DEFINE_INPUT_LED(LED_SLEEP, "sleep", NULL),
-+	DEFINE_INPUT_LED(LED_SUSPEND, "suspend", NULL),
-+	DEFINE_INPUT_LED(LED_MUTE, "mute", NULL),
-+	DEFINE_INPUT_LED(LED_MISC, "misc", NULL),
-+	DEFINE_INPUT_LED(LED_MAIL, "mail", NULL),
-+	DEFINE_INPUT_LED(LED_CHARGING, "charging", NULL),
-+};
-+
-+static struct work_struct vt_led_work[LED_CNT];
-+static char vt_led_state[LED_CNT];
-+
-+/* Emit input events to actually update one LED */
-+static int kbd_update_leds_helper(struct input_handle *handle, void *data)
-+{
-+	int led = *(int *)data;
-+
-+	if (test_bit(EV_LED, handle->dev->evbit)) {
-+		input_inject_event(handle, EV_LED, led, vt_led_state[led]);
-+		input_inject_event(handle, EV_SYN, SYN_REPORT, 0);
-+	}
-+
 +	return 0;
 +}
 +
-+/* Emit input events to actually update one LED on all keyboards */
-+static void vt_led_cb(struct work_struct *work)
++static inline void input_led_disconnect(struct input_dev *dev)
 +{
-+	int led = work - vt_led_work;
-+
-+	input_handler_for_each_handle(&kbd_handler, &led,
-+				      kbd_update_leds_helper);
 +}
 +
-+/* VT LED state change, scheduling triggering input events for it */
-+static void vt_led_set(struct led_classdev *cdev,
-+			  enum led_brightness brightness)
-+{
-+	int led = cdev - vt_leds;
++#endif
 +
-+	vt_led_state[led] = !!brightness;
-+	schedule_work(&vt_led_work[led]);
-+}
+ #endif
+--- /dev/null
++++ b/drivers/input/leds.c
+@@ -0,0 +1,155 @@
++/*
++ * LED support for the input layer
++ *
++ * Copyright 2010-2014 Samuel Thibault <samuel.thibault@ens-lyon.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
 +/*
-  * The leds display either (i) the status of NumLock, CapsLock, ScrollLock,
-  * or (ii) whatever pattern of lights people want to show using KDSETLED,
-  * or (iii) specified bits of specified words in kernel memory.
-@@ -995,20 +1137,6 @@ static inline unsigned char getleds(void
- 	return kb->ledflagstate;
- }
- 
--static int kbd_update_leds_helper(struct input_handle *handle, void *data)
--{
--	unsigned char leds = *(unsigned char *)data;
--
--	if (test_bit(EV_LED, handle->dev->evbit)) {
--		input_inject_event(handle, EV_LED, LED_SCROLLL, !!(leds & 0x01));
--		input_inject_event(handle, EV_LED, LED_NUML,    !!(leds & 0x02));
--		input_inject_event(handle, EV_LED, LED_CAPSL,   !!(leds & 0x04));
--		input_inject_event(handle, EV_SYN, SYN_REPORT, 0);
--	}
--
--	return 0;
--}
--
- /**
-  *	vt_get_leds	-	helper for braille console
-  *	@console: console to read
-@@ -1085,26 +1213,39 @@ void vt_kbd_con_stop(int console)
- }
- 
- /*
-- * This is the tasklet that updates LED state on all keyboards
-- * attached to the box. The reason we use tasklet is that we
-- * need to handle the scenario when keyboard handler is not
-- * registered yet but we already getting updates from the VT to
-- * update led state.
-+ * This is the tasklet that updates LED state of all LED triggers, which will
-+ * thus update the VT LED status, and eventually submit input events.
-+ * The reason we use tasklet is that we need to handle the scenario when
-+ * keyboard handler is not registered yet but we already getting updates
-+ * from the VT to update led state.
-  */
- static void kbd_bh(unsigned long dummy)
- {
- 	unsigned char leds;
- 	unsigned long flags;
--	
-+	int i;
++ * This creates a trigger/LED pair per device:
++ * - the trigger is actioned from the core's input_get_disposition,
++ * - the LED is by default triggered by that trigger
++ * - the LED actuates the hardware.
++ */
 +
- 	spin_lock_irqsave(&led_lock, flags);
- 	leds = getleds();
- 	spin_unlock_irqrestore(&led_lock, flags);
- 
- 	if (leds != ledstate) {
--		input_handler_for_each_handle(&kbd_handler, &leds,
--					      kbd_update_leds_helper);
-+		for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++)
-+			if ((leds ^ ledstate) & (1 << i))
-+				led_trigger_event(&ledtrig_ledstate[i],
-+						leds & (1 << i)
-+						? LED_FULL : LED_OFF);
- 		ledstate = leds;
- 	}
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/leds.h>
++#include <linux/input.h>
 +
-+	if (kbd->lockstate != lockstate) {
-+		for (i = 0; i < ARRAY_SIZE(ledtrig_lockstate); i++)
-+			if ((kbd->lockstate ^ lockstate) & (1 << i))
-+				led_trigger_event(&ledtrig_lockstate[i],
-+						kbd->lockstate & (1 << i)
-+						? LED_FULL : LED_OFF);
-+		lockstate = kbd->lockstate;
-+	}
- }
- 
- DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
-@@ -1448,10 +1589,13 @@ static void kbd_disconnect(struct input_
-  */
- static void kbd_start(struct input_handle *handle)
- {
-+	int i;
++static const char *const input_led_names[LED_CNT] = {
++	[LED_NUML] = "numl",
++	[LED_CAPSL] = "capsl",
++	[LED_SCROLLL] = "scrolll",
++	[LED_COMPOSE] = "compose",
++	[LED_KANA] = "kana",
++	[LED_SLEEP] = "sleep",
++	[LED_SUSPEND] = "suspend",
++	[LED_MUTE] = "mute",
++	[LED_MISC] = "misc",
++	[LED_MAIL] = "mail",
++	[LED_CHARGING] = "charging",
++};
 +
- 	tasklet_disable(&keyboard_tasklet);
- 
- 	if (ledstate != 0xff)
--		kbd_update_leds_helper(handle, &ledstate);
-+		for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++)
-+			kbd_update_leds_helper(handle, &input_leds[i]);
- 
- 	tasklet_enable(&keyboard_tasklet);
- }
-@@ -1501,6 +1645,26 @@ int __init kbd_init(void)
- 	if (error)
- 		return error;
- 
-+	for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++) {
-+		error = led_trigger_register(&ledtrig_ledstate[i]);
-+		if (error)
-+			pr_err("error %d while registering trigger %s\n",
-+					error, ledtrig_ledstate[i].name);
-+	}
++/* Free LED data from input device, used at abortion and disconnection.  */
++static void input_led_delete(struct input_dev *dev)
++{
++	if (dev) {
++		struct led_classdev *leds = dev->leds;
++		struct led_trigger *triggers = dev->triggers;
++		int i;
 +
-+	for (i = 0; i < ARRAY_SIZE(ledtrig_lockstate); i++) {
-+		error = led_trigger_register(&ledtrig_lockstate[i]);
-+		if (error)
-+			pr_err("error %d while registering trigger %s\n",
-+					error, ledtrig_lockstate[i].name);
-+	}
-+
-+	for (i = 0; i < LED_CNT; i++)
-+		if (vt_leds[i].name) {
-+			led_classdev_register(NULL, &vt_leds[i]);
-+			INIT_WORK(&vt_led_work[i], vt_led_cb);
++		if (leds) {
++			for (i = 0; i < LED_CNT; i++)
++				kfree(leds[i].name);
++			kfree(leds);
++			dev->leds = NULL;
 +		}
 +
- 	tasklet_enable(&keyboard_tasklet);
- 	tasklet_schedule(&keyboard_tasklet);
- 
---- a/Documentation/leds/leds-class.txt
-+++ b/Documentation/leds/leds-class.txt
-@@ -2,9 +2,6 @@
- LED handling under Linux
- ========================
- 
--If you're reading this and thinking about keyboard leds, these are
--handled by the input subsystem and the led class is *not* needed.
--
- In its simplest form, the LED class just allows control of LEDs from
- userspace. LEDs appear in /sys/class/leds/. The maximum brightness of the
- LED is defined in max_brightness file. The brightness file will set the brightness
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -11,9 +11,6 @@ menuconfig NEW_LEDS
- 	  Say Y to enable Linux LED support.  This allows control of supported
- 	  LEDs from both userspace and optionally, by kernel events (triggers).
- 
--	  This is not related to standard keyboard LEDs which are controlled
--	  via the input system.
--
- if NEW_LEDS
- 
- config LEDS_CLASS
++		if (triggers) {
++			for (i = 0; i < LED_CNT; i++)
++				kfree(triggers[i].name);
++			kfree(triggers);
++			dev->triggers = NULL;
++		}
++	}
++}
++
++/* LED state change for some keyboard, notify that keyboard.  */
++static void perdevice_input_led_set(struct led_classdev *cdev,
++			  enum led_brightness brightness)
++{
++	struct input_dev *dev;
++	struct led_classdev *leds;
++	int led;
++
++	dev = cdev->dev->platform_data;
++	if (!dev)
++		/* Still initializing */
++		return;
++
++	leds = dev->leds;
++	led = cdev - leds;
++
++	if (test_bit(EV_LED, dev->evbit) &&
++		led <= LED_MAX && test_bit(led, dev->ledbit) &&
++		!!test_bit(led, dev->led) != !!brightness) {
++		__change_bit(led, dev->led);
++		dev->event(dev, EV_LED, led, !!brightness);
++	}
++}
++
++/* A new input device with potential LEDs to connect.  */
++int input_led_connect(struct input_dev *dev)
++{
++	int i, error = -ENOMEM;
++	struct led_classdev *leds;
++	struct led_trigger *triggers;
++
++	leds = kcalloc(LED_CNT, sizeof(*leds), GFP_KERNEL);
++	if (!leds)
++		goto err;
++	dev->leds = leds;
++
++	triggers = kcalloc(LED_CNT, sizeof(*triggers), GFP_KERNEL);
++	if (!triggers)
++		goto err;
++	dev->triggers = triggers;
++
++	/* Register this device's LEDs and triggers */
++	for (i = 0; i < LED_CNT; i++)
++		if (input_led_names[i] && test_bit(i, dev->ledbit)) {
++			leds[i].name = kasprintf(GFP_KERNEL, "%s::%s",
++						dev_name(&dev->dev),
++						input_led_names[i]);
++			if (!leds[i].name)
++				goto err;
++			leds[i].max_brightness = 1;
++			leds[i].brightness_set = perdevice_input_led_set;
++
++			triggers[i].name = kasprintf(GFP_KERNEL, "%s-%s",
++						dev_name(&dev->dev),
++						input_led_names[i]);
++			if (!triggers[i].name)
++				goto err;
++
++			/* make the LED triggered by the corresponding trigger
++			 * by default */
++			leds[i].default_trigger = triggers[i].name;
++		}
++
++	/* No issue so far, we can register for real.  */
++	for (i = 0; i < LED_CNT; i++)
++		if (leds[i].name) {
++			led_classdev_register(&dev->dev, &leds[i]);
++			leds[i].dev->platform_data = dev;
++			led_trigger_register(&triggers[i]);
++		}
++
++	return 0;
++
++err:
++	input_led_delete(dev);
++	return error;
++}
++
++void input_led_disconnect(struct input_dev *dev)
++{
++	int i;
++	struct led_classdev *leds = dev->leds;
++	struct led_trigger *triggers = dev->triggers;
++
++	for (i = 0; i < LED_CNT; i++) {
++		if (leds[i].name)
++			led_classdev_unregister(&leds[i]);
++		if (triggers[i].name)
++			led_trigger_unregister(&triggers[i]);
++	}
++
++	input_led_delete(dev);
++}
