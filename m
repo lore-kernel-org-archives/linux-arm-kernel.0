@@ -1,291 +1,179 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 26 Dec 2014 11:56:33 +0200
-Subject: [PATCH v2 6/6] arm: pxa: Transition pxa27x to clk framework
-In-Reply-To: <1405353263-13424-7-git-send-email-robert.jarzmik@free.fr>
-References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
- <1405353263-13424-7-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <2303917.o2xPYRxhCJ@avalon>
+Date: Fri, 26 Dec 2014 12:06:13 +0200
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <Pine.LNX.4.64.1412261006290.9254@axis700.grange>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <7803041.cyoUKFJAdh@avalon> <Pine.LNX.4.64.1412261006290.9254@axis700.grange>
+Message-ID: <1492726.KPKGvtrvz4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi Guennadi,
 
-What happened to this patch ? It looks like the rest of the series got merged, 
-but this one seems to be missing.
+On Friday 26 December 2014 10:14:26 Guennadi Liakhovetski wrote:
+> On Fri, 26 Dec 2014, Laurent Pinchart wrote:
+> > On Friday 26 December 2014 14:37:14 Josh Wu wrote:
+> >> On 12/25/2014 6:39 AM, Guennadi Liakhovetski wrote:
+> >>> On Mon, 22 Dec 2014, Josh Wu wrote:
+> >>>> On 12/20/2014 6:16 AM, Guennadi Liakhovetski wrote:
+> >>>>> On Fri, 19 Dec 2014, Josh Wu wrote:
+> >>>>>> On 12/19/2014 5:59 AM, Guennadi Liakhovetski wrote:
+> >>>>>>> On Thu, 18 Dec 2014, Josh Wu wrote:
+> >>>>>>>> To support async probe for ov2640, we need remove the code to get
+> >>>>>>>> 'mclk' in ov2640_probe() function. oterwise, if soc_camera host
+> >>>>>>>> is not probed in the moment, then we will fail to get 'mclk' and
+> >>>>>>>> quit the ov2640_probe() function.
+> >>>>>>>> 
+> >>>>>>>> So in this patch, we move such 'mclk' getting code to
+> >>>>>>>> ov2640_s_power() function. That make ov2640 survive, as we can
+> >>>>>>>> pass a NULL (priv-clk) to soc_camera_set_power() function.
+> >>>>>>>> 
+> >>>>>>>> And if soc_camera host is probed, the when ov2640_s_power() is
+> >>>>>>>> called, then we can get the 'mclk' and that make us
+> >>>>>>>> enable/disable soc_camera host's clock as well.
+> >>>>>>>> 
+> >>>>>>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> >>>>>>>> ---
+> >>>>>>>> v3 -> v4:
+> >>>>>>>> v2 -> v3:
+> >>>>>>>> v1 -> v2:
+> >>>>>>>>      no changes.
+> >>>>>>>>  
+> >>>>>>>>  drivers/media/i2c/soc_camera/ov2640.c | 31 ++++++++++++++-------
+> >>>>>>>>  1 file changed, 21 insertions(+), 10 deletions(-)
+> >>>>>>>> 
+> >>>>>>>> diff --git a/drivers/media/i2c/soc_camera/ov2640.c
+> >>>>>>>> b/drivers/media/i2c/soc_camera/ov2640.c
+> >>>>>>>> index 1fdce2f..9ee910d 100644
+> >>>>>>>> --- a/drivers/media/i2c/soc_camera/ov2640.c
+> >>>>>>>> +++ b/drivers/media/i2c/soc_camera/ov2640.c
+> >>>>>>>> @@ -739,6 +739,15 @@ static int ov2640_s_power(struct v4l2_subdev
+> >>>>>>>> *sd, int on)
+> >>>>>>>>     	struct i2c_client *client = v4l2_get_subdevdata(sd);
+> >>>>>>>>     	struct soc_camera_subdev_desc *ssdd =
+> >>>>>>>> soc_camera_i2c_to_desc(client);
+> >>>>>>>>     	struct ov2640_priv *priv = to_ov2640(client);
+> >>>>>>>> +	struct v4l2_clk *clk;
+> >>>>>>>> +
+> >>>>>>>> +	if (!priv->clk) {
+> >>>>>>>> +		clk = v4l2_clk_get(&client->dev, "mclk");
+> >>>>>>>> +		if (IS_ERR(clk))
+> >>>>>>>> +			dev_warn(&client->dev, "Cannot get the mclk.
+> >>>>>>>> maybe soc-camera host is not probed yet.\n");
+> >>>>>>>> +		else
+> >>>>>>>> +			priv->clk = clk;
+> >>>>>>>> +	}
+> >>>>>>>>       	return soc_camera_set_power(&client->dev, ssdd, priv
+> >>>>>>>> ->clk, on);
+> >>>>>>>>     }
+> >>>> 
+> >>>> Just let me explained a little more details at first:
+> >>>> 
+> >>>> As my understanding, current the priv->clk is a v4l2_clk: mclk, which
+> >>>> is a wrapper clock in soc_camera.c. it can make soc_camera to call
+> >>>> camera host's clock_start() clock_stop(). As in ov2640, the real mck
+> >>>> (pck1) is in ov2640 dt node (xvclk). So the camera host's
+> >>>> clock_start()/stop() only need to enable/disable his peripheral
+> >>>> clock.
+> >>> 
+> >>> I'm looking at the ov2640 datasheet. In the block diagram I only see
+> >>> one input clock - the xvclk. Yes, it can be supplied by the camera
+> >>> host controller, in which case it is natural for the camera host
+> >>> driver to own and control it, or it can be a separate clock device -
+> >>> either static or configurable. This is just a note to myself to
+> >>> clarify, that it's one and the same clock pin we're talking about.
+> >>> 
+> >>> Now, from the hardware / DT PoV, I think, the DT should look like:
+> >>> 
+> >>> a) in the ov2640 I2C DT node we should have a clock consumer entry,
+> >>> linking to a board-specific source.
+> >> 
+> >> That's what this patch series do right now.
+> >> In my patch 5/5 DT document said, ov2640 need a clock consumer which
+> >> refer to the xvclk input clock.
+> >> And it is a required property.
+> >> 
+> >>> b) if the ov2640 clock is supplied by a camera host, its DT entry
+> >>> should have a clock source subnode, to which ov2640 clock consumer
+> >>> entry should link. The respective camera host driver should then parse
+> >>> that clock subnode and register the respective clock with the V4L2
+> >>> framework, by calling v4l2_clk_register().
+> >> 
+> >> Ok, So in this case, I need to wait for the "mclk" in probe of ov2640
+> >> driver. So that I can be compatible for the camera host which provide
+> >> the clock source.
+> > 
+> > Talking about mclk and xvclk is quite confusing. There's no mclk from an
+> > ov2640 point of view. The ov2640 driver should call v4l2_clk_get("xvclk").
+> 
+> Yes, I also was thinking about this, and yes, requesting a "xvclk" clock
+> would be more logical. But then, as you write below, if we let the
+> v4l2_clk wrapper first check for a CCF "xvclk" clock, say, none is found.
+> How do we then find the exported "mclk" V4L2 clock? Maybe v4l2_clk_get()
+> should use two names?..
 
-On Monday 14 July 2014 17:54:23 Robert Jarzmik wrote:
-> Transition the PXA27x CPUs to the clock framework.
-> This transition still enables legacy platforms to run without device
-> tree as before, ie relying on platform data encoded in board specific
-> files.
+Given that v4l2_clk_get() is only used by soc-camera drivers and that they all 
+call it with the clock name set to "mclk", I wonder whether we couldn't just 
+get rid of struct v4l2_clk.id and ignore the id argument to v4l2_clk_get() 
+when CCF isn't available. Maybe we've overdesigned v4l2_clk :-)
+
+> >>> c) if the ov2640 clock is supplied by a different clock source, the
+> >>> respective driver should parse it and also eventually call
+> >>> v4l2_clk_register().
+> >>> 
+> >>> Implementing case (b) above is so far up to each individual
+> >>> (soc-camera) camera host driver. In soc-camera host drivers don't
+> >>> register V4L2 clocks themselves, as you correctly noticed, they just
+> >>> provide a .clock_start() and a .clock_stop() callbacks. The
+> >>> registration is done by the soc-camera core.
+> >>> 
+> >>> If I understand correctly you have case (c). Unfortunately, this case
+> >>> isn't supported atm. I think, a suitable way to do this would be:
+> >>> 
+> >>> (1) modify soc-camera to not register a V4L2 clock if the host doesn't
+> >>> provide the required callbacks.
+> >>> 
+> >>> (2) hosts should recognise configurations, in which they don't supply
+> >>> the master clock to clients and not provide the callbacks then.
+> >>> 
+> >>> (3) a separate driver should register a suitable V4L2 clock.
+> >>> 
+> >>> Whereas I don't think we need to modify camera drivers. Their
+> >>> requesting of a V4L2 clock is correct as is.
+> >>> 
+> >>> Some more fine-print: if the clock is supplied by a generic device, it
+> >>> would be wrong for it to register a V4L2 clock. It should register a
+> >>> normal CCF clock, and a separate V4L2 driver should create a V4L2
+> >>> clock from it. This isn't implemented either and we've been talking
+> >>> about it for a while now...
+> > 
+> > v4l2_clk_get() should try to get the clock from CCF with a call to
+> > clk_get() first, and then look at the list of v4l2-specific clocks.
 > 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  arch/arm/Kconfig           |   1 +
->  arch/arm/mach-pxa/Makefile |   8 +-
->  arch/arm/mach-pxa/pxa27x.c | 186 +++---------------------------------------
->  3 files changed, 17 insertions(+), 178 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 87b63fd..96bdc7b 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -642,6 +642,7 @@ config ARCH_PXA
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_CPU_SUSPEND if PM
->  	select AUTO_ZRELADDR
-> +	select COMMON_CLK if PXA27x
->  	select CLKDEV_LOOKUP
->  	select CLKSRC_MMIO
->  	select GENERIC_CLOCKEVENTS
-> diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-> index 648867a..ce15823 100644
-> --- a/arch/arm/mach-pxa/Makefile
-> +++ b/arch/arm/mach-pxa/Makefile
-> @@ -3,16 +3,16 @@
->  #
-> 
->  # Common support (must be linked before board specific support)
-> -obj-y				+= clock.o devices.o generic.o irq.o \
-> +obj-y				+= devices.o generic.o irq.o \
->  				   time.o reset.o
->  obj-$(CONFIG_PM)		+= pm.o sleep.o standby.o
-> 
->  # Generic drivers that other drivers may depend upon
-> 
->  # SoC-specific code
-> -obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o clock-pxa2xx.o pxa2xx.o 
-pxa25x.o
-> -obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o clock-pxa2xx.o pxa2xx.o 
-pxa27x.o
-> -obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock-pxa3xx.o pxa3xx.o smemc.o
-> pxa3xx-ulpi.o +obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o clock.o clock-
-pxa2xx.o
-> pxa2xx.o pxa25x.o +obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o pxa2xx.o pxa27x.o
-> +obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock.o clock-pxa3xx.o pxa3xx.o
-> smemc.o pxa3xx-ulpi.o obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
->  obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
->  obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
-> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-> index 301471a..6beb32cd 100644
-> --- a/arch/arm/mach-pxa/pxa27x.c
-> +++ b/arch/arm/mach-pxa/pxa27x.c
-> @@ -37,7 +37,8 @@
-> 
->  #include "generic.h"
->  #include "devices.h"
-> -#include "clock.h"
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
-> 
->  void pxa27x_clear_otgph(void)
->  {
-> @@ -73,174 +74,6 @@ void pxa27x_configure_ac97reset(int reset_gpio, bool
-> to_gpio) }
->  EXPORT_SYMBOL_GPL(pxa27x_configure_ac97reset);
-> 
-> -/* Crystal clock: 13MHz */
-> -#define BASE_CLK	13000000
-> -
-> -/*
-> - * Get the clock frequency as reflected by CCSR and the turbo flag.
-> - * We assume these values have been applied via a fcs.
-> - * If info is not 0 we also display the current settings.
-> - */
-> -unsigned int pxa27x_get_clk_frequency_khz(int info)
-> -{
-> -	unsigned long ccsr, clkcfg;
-> -	unsigned int l, L, m, M, n2, N, S;
-> -       	int cccr_a, t, ht, b;
-> -
-> -	ccsr = CCSR;
-> -	cccr_a = CCCR & (1 << 25);
-> -
-> -	/* Read clkcfg register: it has turbo, b, half-turbo (and f) */
-> -	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
-> -	t  = clkcfg & (1 << 0);
-> -	ht = clkcfg & (1 << 2);
-> -	b  = clkcfg & (1 << 3);
-> -
-> -	l  = ccsr & 0x1f;
-> -	n2 = (ccsr>>7) & 0xf;
-> -	m  = (l <= 10) ? 1 : (l <= 20) ? 2 : 4;
-> -
-> -	L  = l * BASE_CLK;
-> -	N  = (L * n2) / 2;
-> -	M  = (!cccr_a) ? (L/m) : ((b) ? L : (L/2));
-> -	S  = (b) ? L : (L/2);
-> -
-> -	if (info) {
-> -		printk( KERN_INFO "Run Mode clock: %d.%02dMHz (*%d)\n",
-> -			L / 1000000, (L % 1000000) / 10000, l );
-> -		printk( KERN_INFO "Turbo Mode clock: %d.%02dMHz (*%d.%d, 
-%sactive)\n",
-> -			N / 1000000, (N % 1000000)/10000, n2 / 2, (n2 % 2)*5,
-> -			(t) ? "" : "in" );
-> -		printk( KERN_INFO "Memory clock: %d.%02dMHz (/%d)\n",
-> -			M / 1000000, (M % 1000000) / 10000, m );
-> -		printk( KERN_INFO "System bus clock: %d.%02dMHz \n",
-> -			S / 1000000, (S % 1000000) / 10000 );
-> -	}
-> -
-> -	return (t) ? (N/1000) : (L/1000);
-> -}
-> -
-> -/*
-> - * Return the current mem clock frequency as reflected by CCCR[A], B, and L
-> - */
-> -static unsigned long clk_pxa27x_mem_getrate(struct clk *clk)
-> -{
-> -	unsigned long ccsr, clkcfg;
-> -	unsigned int l, L, m, M;
-> -       	int cccr_a, b;
-> -
-> -	ccsr = CCSR;
-> -	cccr_a = CCCR & (1 << 25);
-> -
-> -	/* Read clkcfg register: it has turbo, b, half-turbo (and f) */
-> -	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (clkcfg) );
-> -	b = clkcfg & (1 << 3);
-> -
-> -	l = ccsr & 0x1f;
-> -	m = (l <= 10) ? 1 : (l <= 20) ? 2 : 4;
-> -
-> -	L = l * BASE_CLK;
-> -	M = (!cccr_a) ? (L/m) : ((b) ? L : (L/2));
-> -
-> -	return M;
-> -}
-> -
-> -static const struct clkops clk_pxa27x_mem_ops = {
-> -	.enable		= clk_dummy_enable,
-> -	.disable	= clk_dummy_disable,
-> -	.getrate	= clk_pxa27x_mem_getrate,
-> -};
-> -
-> -/*
-> - * Return the current LCD clock frequency in units of 10kHz as
-> - */
-> -static unsigned int pxa27x_get_lcdclk_frequency_10khz(void)
-> -{
-> -	unsigned long ccsr;
-> -	unsigned int l, L, k, K;
-> -
-> -	ccsr = CCSR;
-> -
-> -	l = ccsr & 0x1f;
-> -	k = (l <= 7) ? 1 : (l <= 16) ? 2 : 4;
-> -
-> -	L = l * BASE_CLK;
-> -	K = L / k;
-> -
-> -	return (K / 10000);
-> -}
-> -
-> -static unsigned long clk_pxa27x_lcd_getrate(struct clk *clk)
-> -{
-> -	return pxa27x_get_lcdclk_frequency_10khz() * 10000;
-> -}
-> -
-> -static const struct clkops clk_pxa27x_lcd_ops = {
-> -	.enable		= clk_pxa2xx_cken_enable,
-> -	.disable	= clk_pxa2xx_cken_disable,
-> -	.getrate	= clk_pxa27x_lcd_getrate,
-> -};
-> -
-> -static DEFINE_PXA2_CKEN(pxa27x_ffuart, FFUART, 14857000, 1);
-> -static DEFINE_PXA2_CKEN(pxa27x_btuart, BTUART, 14857000, 1);
-> -static DEFINE_PXA2_CKEN(pxa27x_stuart, STUART, 14857000, 1);
-> -static DEFINE_PXA2_CKEN(pxa27x_i2s, I2S, 14682000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_i2c, I2C, 32842000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_usb, USB, 48000000, 5);
-> -static DEFINE_PXA2_CKEN(pxa27x_mmc, MMC, 19500000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_ficp, FICP, 48000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_usbhost, USBHOST, 48000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_pwri2c, PWRI2C, 13000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_keypad, KEYPAD, 32768, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_ssp1, SSP1, 13000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_ssp2, SSP2, 13000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_ssp3, SSP3, 13000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_pwm0, PWM0, 13000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_pwm1, PWM1, 13000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_ac97, AC97, 24576000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_ac97conf, AC97CONF, 24576000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_msl, MSL, 48000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_usim, USIM, 48000000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_memstk, MEMSTK, 19500000, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_im, IM, 0, 0);
-> -static DEFINE_PXA2_CKEN(pxa27x_memc, MEMC, 0, 0);
-> -
-> -static DEFINE_CK(pxa27x_lcd, LCD, &clk_pxa27x_lcd_ops);
-> -static DEFINE_CK(pxa27x_camera, CAMERA, &clk_pxa27x_lcd_ops);
-> -static DEFINE_CLK(pxa27x_mem, &clk_pxa27x_mem_ops, 0, 0);
-> -
-> -static struct clk_lookup pxa27x_clkregs[] = {
-> -	INIT_CLKREG(&clk_pxa27x_lcd, "pxa2xx-fb", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_camera, "pxa27x-camera.0", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_ffuart, "pxa2xx-uart.0", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_btuart, "pxa2xx-uart.1", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_stuart, "pxa2xx-uart.2", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_i2s, "pxa2xx-i2s", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_i2c, "pxa2xx-i2c.0", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_usb, "pxa27x-udc", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_mmc, "pxa2xx-mci.0", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_stuart, "pxa2xx-ir", "UARTCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_ficp, "pxa2xx-ir", "FICPCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_usbhost, "pxa27x-ohci", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_pwri2c, "pxa2xx-i2c.1", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_keypad, "pxa27x-keypad", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_ssp1, "pxa27x-ssp.0", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_ssp2, "pxa27x-ssp.1", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_ssp3, "pxa27x-ssp.2", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_pwm0, "pxa27x-pwm.0", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_pwm1, "pxa27x-pwm.1", NULL),
-> -	INIT_CLKREG(&clk_pxa27x_ac97, NULL, "AC97CLK"),
-> -	INIT_CLKREG(&clk_pxa27x_ac97conf, NULL, "AC97CONFCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_msl, NULL, "MSLCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_usim, NULL, "USIMCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_memstk, NULL, "MSTKCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
-> -	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
-> -	INIT_CLKREG(&clk_dummy, "pxa27x-gpio", NULL),
-> -	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
-> -};
-> -
->  #ifdef CONFIG_PM
-> 
->  #define SAVE(x)		sleep_save[SLEEP_SAVE_##x] = x
-> @@ -460,8 +293,6 @@ static int __init pxa27x_init(void)
-> 
->  		reset_status = RCSR;
-> 
-> -		clkdev_add_table(pxa27x_clkregs, ARRAY_SIZE(pxa27x_clkregs));
-> -
->  		if ((ret = pxa_init_dma(IRQ_DMA, 32)))
->  			return ret;
-> 
-> @@ -469,10 +300,17 @@ static int __init pxa27x_init(void)
-> 
->  		register_syscore_ops(&pxa_irq_syscore_ops);
->  		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
-> -		register_syscore_ops(&pxa2xx_clock_syscore_ops);
-> 
-> -		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
-> -		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
-> +		if (!of_have_populated_dt()) {
-> +			ret = clk_register_clkdev(NULL, NULL,
-> +						  "pxa27x-gpio");
-> +			if (!ret)
-> +				pxa_register_device(&pxa27x_device_gpio,
-> +						    &pxa27x_gpio_info);
-> +			if (!ret)
-> +				ret = platform_add_devices(devices,
-> +							   ARRAY_SIZE(devices));
-> +		}
->  	}
-> 
->  	return ret;
+> Yes, how will it find the "mclk" when "xvclk" (or any other name) is
+> requested? We did discuss this in the beginning and agreed to use a fixed
+> clock name for the time being...
+
+Please see above.
+
+> > That's at least how I had envisioned it when v4l2_clk_get() was
+> > introduced. Let's remember that v4l2_clk was designed as a temporary
+> > workaround for platforms not implementing CCF yet. Is that still needed,
+> > or could be instead just get rid of it now ?
+>
+> I didn't check, but I don't think all platforms, handled by soc-camera,
+> support CCF yet.
+
+After a quick check it looks like only OMAP1 and SH Mobile are missing. Atmel, 
+MX2, MX3 and R-Car all support CCF. PXA27x has CCF support but doesn't enable 
+it yet for an unknown (to me) reason.
+
+The CEU driver is used on both arch/sh and arch/arm/mach-shmobile. The former 
+will most likely never receive CCF support, and the latter is getting fixed. 
+As arch/sh isn't maintained anymore I would be fine with dropping CEU support 
+for it.
+
+OMAP1 is thus the only long-term show-stopper. What should we do with it ?
 
 -- 
 Regards,
