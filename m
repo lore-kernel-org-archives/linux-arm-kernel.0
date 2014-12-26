@@ -1,81 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Dec 2014 14:53:13 -0600
-Subject: [PATCH v2] arm: boot: dts: am437x-idk: add gpio-based power key
-In-Reply-To: <1419626116-12833-1-git-send-email-balbi@ti.com>
-References: <1419626116-12833-1-git-send-email-balbi@ti.com>
-Message-ID: <1419627193-20838-1-git-send-email-balbi@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 26 Dec 2014 22:23:26 +0100
+Subject: [PATCH] clk: rockchip: fix rk3066 pll lock bit location
+In-Reply-To: <2140322.FD0TUOM80V@phil>
+References: <2140322.FD0TUOM80V@phil>
+Message-ID: <2847519.2sf188msm1@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM437x IDK board has a User Switch which we can
-program to whatever we want. Because this board
-doesn't have a PMIC which can give us power button
-presses, let's use this user switch as a gpio-keys
-power button.
+Am Mittwoch, 24. Dezember 2014, 15:11:00 schrieb Heiko St?bner:
+> The bit locations indicating the locking status of the plls on rk3066 are
+> shifted by one to the right when compared to the rk3188, bits [7:4] instead
+> of [8:5] on the rk3188, thus indicating the locking state of the wrong pll
+> or a completely different information in case of the gpll.
+> 
+> The recently introduced pll init code exposed that problem on some rk3066
+> boards when it tried to bring the boot-pll value in line with the value
+> from the rate table.
+> 
+> Fix this by defining separate pll definitions for rk3066 with the correct
+> locking indices.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+applied to my clk-fixes branch with naobsd's tested-by.
 
-Changes since v1:
-	- Add explicit pinctrl data.
-	  (note that ball reset state is already MUX_MODE7, and even
-	   though it was already working before, as can be seen from
-	   v1's boot logs, it's best that we cope with possibly broken
-	   bootloaders)
+I've also received another positive response of the patch fixing the issue on 
+IRC.
 
-depends on [1]. Boot logs at [2]. Note that this can rather easily
-be folded into the original patch if so desired.
 
-[1] http://marc.info/?l=linux-omap&m=141928747902983&w=2
-[2] http://hastebin.com/qezicehunu
-
- arch/arm/boot/dts/am437x-idk-evm.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
-index b52dd0a..f9a17e2 100644
---- a/arch/arm/boot/dts/am437x-idk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-idk-evm.dts
-@@ -96,9 +96,29 @@
- 		regulator-boot-on;
- 		vin-supply = <&v1_5dreg>;
- 	};
-+
-+	gpio_keys: gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_keys_pins_default>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		switch at 0 {
-+			label = "power-button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
- 
- &am43xx_pinmux {
-+	gpio_keys_pins_default: gpio_keys_pins_default {
-+		pinctrl-single,pins = <
-+			0x1b8 (PIN_INPUT | MUX_MODE7)	/* cam0_field.gpio4_2 */
-+		>;
-+	};
-+
- 	i2c0_pins_default: i2c0_pins_default {
- 		pinctrl-single,pins = <
- 			0x188 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0) /* i2c0_sda.i2c0_sda */
-@@ -282,6 +302,10 @@
- 	status = "okay";
- };
- 
-+&gpio4 {
-+	status = "okay";
-+};
-+
- &gpio5 {
- 	status = "okay";
- };
--- 
-2.2.0
+Heiko
