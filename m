@@ -1,32 +1,50 @@
-From: naobsd@gmail.com (Naoki FUKAUMI)
-Date: Sat, 27 Dec 2014 00:54:44 +0900
-Subject: [PATCH] clk: rockchip: fix rk3066 pll lock bit location
-In-Reply-To: <2140322.FD0TUOM80V@phil>
-References: <2140322.FD0TUOM80V@phil>
-Message-ID: <CAFnsNoTnsG3JPxA9cYyxozofThn78VCZJjV2VhLKwsx2DDYhEA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Dec 2014 07:54:57 -0800
+Subject: [PATCH] add omap34xx temperature monitoring support
+In-Reply-To: <20141226102933.GA28778@amd>
+References: <20141226102933.GA28778@amd>
+Message-ID: <20141226155456.GB12409@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+* Pavel Machek <pavel@ucw.cz> [141226 02:32]:
+> --- /dev/null
+> +++ b/drivers/hwmon/omap34xx_temp.c
+> @@ -0,0 +1,263 @@
+> +/*
+> + * omap34xx_temp.c - Linux kernel module for OMAP34xx hardware monitoring
+> + *
+> + * Copyright (C) 2008 Nokia Corporation
+> + *
+> + * Written by Peter De Schrijver <peter.de-schrijver@nokia.com>
+> + *
+> + * Inspired by k8temp.c
+> + *
+> + * This file is subject to the terms and conditions of the GNU General
+> + * Public License. See the file "COPYING" in the main directory of this
+> + * archive for more details.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/hrtimer.h>
+> +#include <linux/module.h>
+> +#include <linux/hwmon.h>
+> +#include <linux/hwmon-sysfs.h>
+> +#include <linux/err.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +
+> +#include "../../arch/arm/mach-omap2/control.h"
 
-On Wed, Dec 24, 2014 at 11:11 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> The bit locations indicating the locking status of the plls on rk3066 are
-> shifted by one to the right when compared to the rk3188, bits [7:4] instead
-> of [8:5] on the rk3188, thus indicating the locking state of the wrong pll
-> or a completely different information in case of the gpll.
->
-> The recently introduced pll init code exposed that problem on some rk3066
-> boards when it tried to bring the boot-pll value in line with the value
-> from the rate table.
->
-> Fix this by defining separate pll definitions for rk3066 with the correct
-> locking indices.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/rockchip/clk-rk3188.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
+No need to do this, you can use syscon here like pbias-regulator.c
+is doing.
 
-it worked fine on ChipSPARK Rayeager PX2(=RK3066) board, thanks!
+Regards,
 
-Tested-by: FUKAUMI Naoki <naobsd@gmail.com>
+Tony
