@@ -1,40 +1,37 @@
-From: orca.chen@gmail.com (Min-Hua Chen)
-Date: Sat, 27 Dec 2014 00:52:10 +0800
-Subject: [PATCH] arm64: add ioremap physical address information
-Message-ID: <CAHkaATSM=V+BNZvAXC+VG6NDjOK9m0ZP3Q=SUaoxtgDw4SKZog@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 26 Dec 2014 17:58:51 +0100
+Subject: [PATCH v2 6/6] arm: pxa: Transition pxa27x to clk framework
+In-Reply-To: <2303917.o2xPYRxhCJ@avalon> (Laurent Pinchart's message of "Fri,
+ 26 Dec 2014 11:56:33 +0200")
+References: <1405353263-13424-1-git-send-email-robert.jarzmik@free.fr>
+ <1405353263-13424-7-git-send-email-robert.jarzmik@free.fr>
+ <2303917.o2xPYRxhCJ@avalon>
+Message-ID: <8761cy73g4.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In /proc/vmallocinfo, it's good to show the physical address
-of each ioremap in vmallocinfo. Add physical address information
-in arm64 ioremap.
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> writes:
 
-0xffffc900047f2000-0xffffc900047f4000    8192 _nv013519rm+0x57/0xa0
-[nvidia] phys=f8100000 ioremap
-0xffffc900047f4000-0xffffc900047f6000    8192 _nv013519rm+0x57/0xa0
-[nvidia] phys=f8008000 ioremap
-0xffffc90004800000-0xffffc90004821000  135168 e1000_probe+0x22c/0xb95
-[e1000e] phys=f4300000 ioremap
-0xffffc900049c0000-0xffffc900049e1000  135168 _nv013521rm+0x4d/0xd0
-[nvidia] phys=e0140000 ioremap
+> Hi Robert,
+>
+> What happened to this patch ? It looks like the rest of the series got merged, 
+> but this one seems to be missing.
 
-Signed-off-by: Min-Hua Chen <orca.chen@gmail.com>
----
- arch/arm64/mm/ioremap.c |    1 +
- 1 file changed, 1 insertion(+)
+It got reverted, because there were 3 boards with a defconfig which required
+that both pxa27x and pxa25x were ported to common clock framework. As at that
+time I had not ported pxa25x, I had to revert this one.
 
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index cbb99c8..01e88c8 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -62,6 +62,7 @@ static void __iomem *__ioremap_caller(phys_addr_t
-phys_addr, size_t size,
-     if (!area)
-         return NULL;
-     addr = (unsigned long)area->addr;
-+    area->phys_addr = phys_addr;
+But now the situation is brighter. pxa25x was ported, tested, and merged by
+Mike..Linus, so I can enable again common clock framework for both pxa27x and
+pxa25x.
 
-     err = ioremap_page_range(addr, addr + size, phys_addr, prot);
-     if (err) {
+Actually it's good you make me think of it, as I've had the "pxa25x + pxa27x
+common clocks enabler" patch in my local development tree for some time but I
+didn't post it.
+
+I'll post if for review this weekend I think.
+
+Cheers.
+
 --
-1.7.10.4
+Robert
