@@ -1,19 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 27 Dec 2014 17:46:48 +0300
-Subject: [PATCH 2/3] ARM: mvebu: a38x: Add the pinctrl alias
-In-Reply-To: <1419678035-10658-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1419678035-10658-1-git-send-email-gregory.clement@free-electrons.com>
- <1419678035-10658-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <549EC658.3060204@cogentembedded.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Sat, 27 Dec 2014 15:52:08 +0100
+Subject: [PATCH v3] ALSA: atmel: fix building the ac97 driver for
+ at91-multiplatform
+In-Reply-To: <1419600478-16885-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1419600478-16885-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <s5hd275i1rb.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+At Fri, 26 Dec 2014 14:27:58 +0100,
+Alexandre Belloni wrote:
+> 
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> at91 will no longer export the mach/cpu.h and mach/hardware.h header files
+> in the future, which would break building the atmel ac97c driver.
+> 
+> Since the cpu_is_* check is only used to find out whether we are running
+> on avr32 or arm/at91, we can hardcode that check in the ARM case.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-On 12/27/2014 2:00 PM, Gregory CLEMENT wrote:
+Thanks, applied.
 
-    You're not adding an alias. It's a label.
 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Takashi
 
-WBR, Sergei
+> ---
+> Changes in v3:
+>  - added my SoB
+> 
+>  sound/atmel/ac97c.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+> index b59427d5a697..e458957c5f52 100644
+> --- a/sound/atmel/ac97c.c
+> +++ b/sound/atmel/ac97c.c
+> @@ -34,10 +34,10 @@
+>  #include <linux/platform_data/dma-dw.h>
+>  #include <linux/dma/dw.h>
+>  
+> +#ifdef CONFIG_AVR32
+>  #include <mach/cpu.h>
+> -
+> -#ifdef CONFIG_ARCH_AT91
+> -#include <mach/hardware.h>
+> +#else
+> +#define cpu_is_at32ap7000() 0
+>  #endif
+>  
+>  #include "ac97c.h"
+> -- 
+> 2.1.0
+> 
