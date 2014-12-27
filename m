@@ -1,65 +1,36 @@
 From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 27 Dec 2014 19:52:54 +0200
-Subject: [PATCH 2/7] mfd: menelaus: drop support for SW controller VCORE
-In-Reply-To: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1419702779-16001-3-git-send-email-aaro.koskinen@iki.fi>
+Date: Sat, 27 Dec 2014 19:52:52 +0200
+Subject: [PATCH 0/7] Menelaus cleanup for DT, phase 1
+Message-ID: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop support for SW controlled VCORE, nobody uses it.
+Hi,
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- drivers/mfd/menelaus.c       | 23 -----------------------
- include/linux/mfd/menelaus.h |  1 -
- 2 files changed, 24 deletions(-)
+These patches start removal of board-specific callbacks from Menelaus:
+delete platform data and a callback from the driver to the board files.
 
-diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-index 9f01aef..917fa86 100644
---- a/drivers/mfd/menelaus.c
-+++ b/drivers/mfd/menelaus.c
-@@ -532,29 +532,6 @@ static const struct menelaus_vtg_value vcore_values[] = {
- 	{ 1450, 18 },
- };
- 
--int menelaus_set_vcore_sw(unsigned int mV)
--{
--	int val, ret;
--	struct i2c_client *c = the_menelaus->client;
--
--	val = menelaus_get_vtg_value(mV, vcore_values,
--				     ARRAY_SIZE(vcore_values));
--	if (val < 0)
--		return -EINVAL;
--
--	dev_dbg(&c->dev, "Setting VCORE to %d mV (val 0x%02x)\n", mV, val);
--
--	/* Set SW mode and the voltage in one go. */
--	mutex_lock(&the_menelaus->lock);
--	ret = menelaus_write_reg(MENELAUS_VCORE_CTRL1, val);
--	if (ret == 0)
--		the_menelaus->vcore_hw_mode = 0;
--	mutex_unlock(&the_menelaus->lock);
--	msleep(1);
--
--	return ret;
--}
--
- int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV)
- {
- 	int fval, rval, val, ret;
-diff --git a/include/linux/mfd/menelaus.h b/include/linux/mfd/menelaus.h
-index a1e12bf3..9e85ac0 100644
---- a/include/linux/mfd/menelaus.h
-+++ b/include/linux/mfd/menelaus.h
-@@ -24,7 +24,6 @@ extern int menelaus_set_vaux(unsigned int mV);
- extern int menelaus_set_vdcdc(int dcdc, unsigned int mV);
- extern int menelaus_set_slot_sel(int enable);
- extern int menelaus_get_slot_pin_states(void);
--extern int menelaus_set_vcore_sw(unsigned int mV);
- extern int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV);
- 
- #define EN_VPLL_SLEEP	(1 << 7)
+Tested on top of 3.19-rc1 on N800/N810 which are the only in-tree users
+for the driver.
+
+Aaro Koskinen (7):
+  mfd: menelaus: delete omap_has_menelaus
+  mfd: menelaus: drop support for SW controller VCORE
+  mfd: menelaus: add initial DT support
+  ARM: OMAP: N8x0: configure menelaus using DT
+  mfd: menelaus: delete platform data support
+  mfd: menelaus: make vcore and regulator controls internal
+  mfd: menelaus: use macro for magic number
+
+ Documentation/devicetree/bindings/mfd/menelaus.txt | 30 ++++++++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  3 +
+ arch/arm/mach-omap2/board-n8x0.c                   | 57 --------------
+ arch/arm/mach-omap2/common-board-devices.h         |  2 -
+ arch/arm/mach-omap2/pdata-quirks.c                 |  1 -
+ drivers/mfd/menelaus.c                             | 86 ++++++++++++++--------
+ include/linux/mfd/menelaus.h                       | 25 -------
+ 7 files changed, 87 insertions(+), 117 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/menelaus.txt
+
 -- 
 2.2.0
