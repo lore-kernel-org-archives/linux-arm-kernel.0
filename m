@@ -1,220 +1,146 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Dec 2014 21:36:48 -0600
-Subject: [PATCH v2 3/5] input: misc: add tps65218 power button driver
-In-Reply-To: <20141226234117.GA1071@dtor-ws>
-References: <20141226234117.GA1071@dtor-ws>
-Message-ID: <1419651408-529-1-git-send-email-balbi@ti.com>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Sat, 27 Dec 2014 09:37:21 +0200
+Subject: [PATCH 2/2] ARM: dts: sun7i: Add dts file for MSI Primo73 tablet
+In-Reply-To: <1419665841-22629-1-git-send-email-siarhei.siamashka@gmail.com>
+References: <1419665841-22629-1-git-send-email-siarhei.siamashka@gmail.com>
+Message-ID: <1419665841-22629-2-git-send-email-siarhei.siamashka@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this driver, we can report KEY_POWER on
-AM437x SK. This patch has been tested with said
-board.
+The MSI Primo73 is an A20 based tablet, with 1G RAM, 16G NAND,
+1024x600 TN LCD display, mono speaker, 0.3 MP front camera, 2.0 MP
+rear camera, 3000 mAh battery, gt911 touchscreen, mma8452 accelerometer
+and rtl8188etv usb wifi. Has "power", "volume+" and "volume-" buttons
+(both volume buttons are also connected to the UBOOT_SEL pin). The
+external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
+OTG and 3.5mm headphone jack. More details are available at
+    http://linux-sunxi.org/MSI_Primo73
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
+This initial dts file only provides support for mmc, wifi and uart
+(there is no external connector for uart though). Graphics can be used
+via simplefb. However, without usb otg, there are no reasonable means
+to handle user input yet.
+
+Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
 ---
+ arch/arm/boot/dts/Makefile              |  3 +-
+ arch/arm/boot/dts/sun7i-a20-primo73.dts | 94 +++++++++++++++++++++++++++++++++
+ 2 files changed, 96 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-primo73.dts
 
-Changes since v1:
-	- Add device tree documentation
-	- s/ret/error
-	- removed 'pressed' as input core will filter events
-	- use a saner name when requesting IRQ. dev_name(dev) will return
-		$i2c_bus_address.i2c-omap:0-0024:tps65218-pwrbutton
-	- remove blank line before MODULE_DEVICE_TABLE()
-
- .../bindings/input/tps65218-pwrbutton.txt          |  17 +++
- drivers/input/misc/Kconfig                         |  10 ++
- drivers/input/misc/Makefile                        |   1 +
- drivers/input/misc/tps65218-pwrbutton.c            | 124 +++++++++++++++++++++
- 4 files changed, 152 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
- create mode 100644 drivers/input/misc/tps65218-pwrbutton.c
-
-diff --git a/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt b/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f363938..7822e8b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -477,7 +477,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-olinuxino-lime.dtb \
+ 	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+-	sun7i-a20-pcduino3.dtb
++	sun7i-a20-pcduino3.dtb \
++	sun7i-a20-primo73.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-ippo-q8h-v5.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+diff --git a/arch/arm/boot/dts/sun7i-a20-primo73.dts b/arch/arm/boot/dts/sun7i-a20-primo73.dts
 new file mode 100644
-index 0000000..e30e0b9
+index 0000000..8a09b24
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
-@@ -0,0 +1,17 @@
-+Texas Instruments TPS65218 power button
-+
-+This driver provides a simple power button event via an Interrupt.
-+
-+Required properties:
-+- compatible: should be "ti,tps65218-pwrbutton"
-+- interrupts: should be one of the following
-+   - <3 IRQ_TYPE_EDGE_BOTH>: For controllers compatible with tps65218
-+
-+Example:
-+
-+&tps {
-+	power-button {
-+		compatible = "ti,tps65218-pwrbutton";
-+		interrupts = <3 IRQ_TYPE_EDGE_BOTH>;
-+	};
-+};
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index 23297ab..364cfb8 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -404,6 +404,16 @@ config INPUT_RETU_PWRBUTTON
- 	  To compile this driver as a module, choose M here. The module will
- 	  be called retu-pwrbutton.
- 
-+config INPUT_TPS65218_PWRBUTTON
-+	tristate "TPS65218 Power button driver"
-+	depends on MFD_TPS65218
-+	help
-+	  Say Y here if you want to enable power buttong reporting for
-+	  the TPS65218 Power Management IC device.
-+
-+	  To compile this driver as a module, choose M here. The module will
-+	  be called tps65218-pwrbutton.
-+
- config INPUT_TWL4030_PWRBUTTON
- 	tristate "TWL4030 Power button Driver"
- 	depends on TWL4030_CORE
-diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-index 19c7603..a923753 100644
---- a/drivers/input/misc/Makefile
-+++ b/drivers/input/misc/Makefile
-@@ -59,6 +59,7 @@ obj-$(CONFIG_INPUT_SGI_BTNS)		+= sgi_btns.o
- obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc-onkey.o
- obj-$(CONFIG_INPUT_SOC_BUTTON_ARRAY)	+= soc_button_array.o
- obj-$(CONFIG_INPUT_SPARCSPKR)		+= sparcspkr.o
-+obj-$(CONFIG_INPUT_TPS65218_PWRBUTTON)	+= tps65218-pwrbutton.o
- obj-$(CONFIG_INPUT_TWL4030_PWRBUTTON)	+= twl4030-pwrbutton.o
- obj-$(CONFIG_INPUT_TWL4030_VIBRA)	+= twl4030-vibra.o
- obj-$(CONFIG_INPUT_TWL6040_VIBRA)	+= twl6040-vibra.o
-diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
-new file mode 100644
-index 0000000..2f85e2e
---- /dev/null
-+++ b/drivers/input/misc/tps65218-pwrbutton.c
-@@ -0,0 +1,124 @@
++++ b/arch/arm/boot/dts/sun7i-a20-primo73.dts
+@@ -0,0 +1,94 @@
 +/*
-+ * Texas Instruments' TPS65218 Power Button Input Driver
++ * Copyright 2014 Siarhei Siamashka <siarhei.siamashka@gmail.com>
 + *
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
-+ * Author: Felipe Balbi <balbi@ti.com>
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
 + *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <linux/init.h>
-+#include <linux/input.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/tps65218.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
 +
-+struct tps65218_pwrbutton {
-+	struct device *dev;
-+	struct tps65218 *tps;
-+	struct input_dev *idev;
++/ {
++	model = "MSI Primo73 tablet";
++	compatible = "msi,primo73", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 1 0>; /* PH1 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			/* rtl8188etv wifi is connected here */
++			status = "okay";
++		};
++
++		pinctrl at 01c20800 {
++			usb2_vbus_pin_a: usb2_vbus_pin at 0 {
++				allwinner,pins = "PH12";
++			};
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		gpio = <&pio 7 12 0>; /* PH12 */
++		status = "okay";
++	};
 +};
-+
-+static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
-+{
-+	struct tps65218_pwrbutton *pwr = _pwr;
-+	unsigned int reg;
-+	int error;
-+
-+	error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
-+	if (error) {
-+		dev_err(pwr->dev, "can't read register --> %d\n", error);
-+		goto out;
-+	}
-+
-+	if (reg & TPS65218_STATUS_PB_STATE) {
-+		input_report_key(pwr->idev, KEY_POWER, 1);
-+		pm_wakeup_event(pwr->dev, 0);
-+	} else {
-+		input_report_key(pwr->idev, KEY_POWER, 0);
-+	}
-+
-+	input_sync(pwr->idev);
-+
-+out:
-+	return IRQ_HANDLED;
-+}
-+
-+static int tps65218_pwron_probe(struct platform_device *pdev)
-+{
-+	struct tps65218 *tps = dev_get_drvdata(pdev->dev.parent);
-+	struct device *dev = &pdev->dev;
-+	struct tps65218_pwrbutton *pwr;
-+	struct input_dev *idev;
-+	int error;
-+	int irq;
-+
-+	pwr = devm_kzalloc(dev, sizeof(*pwr), GFP_KERNEL);
-+	if (!pwr)
-+		return -ENOMEM;
-+
-+	idev = devm_input_allocate_device(dev);
-+	if (!idev)
-+		return -ENOMEM;
-+
-+	idev->name = "tps65218_pwrbutton";
-+	idev->phys = "tps65218_pwrbutton/input0";
-+	idev->dev.parent = dev;
-+	idev->id.bustype = BUS_I2C;
-+
-+	input_set_capability(idev, EV_KEY, KEY_POWER);
-+
-+	pwr->tps = tps;
-+	pwr->dev = dev;
-+	pwr->idev = idev;
-+	platform_set_drvdata(pdev, pwr);
-+	device_init_wakeup(dev, true);
-+
-+	irq = platform_get_irq(pdev, 0);
-+	error = devm_request_threaded_irq(dev, irq, NULL, tps65218_pwr_irq,
-+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-+			"tps65218-pwrbutton", pwr);
-+	if (error) {
-+		dev_err(dev, "failed to request IRQ #%d --> %d\n",
-+				irq, error);
-+		return error;
-+	}
-+
-+	error= input_register_device(idev);
-+	if (error) {
-+		dev_err(dev, "Can't register power button --> %d\n", error);
-+		return error;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct of_device_id of_tps65218_pwr_match[] = {
-+	{ .compatible = "ti,tps65218-pwrbutton" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
-+
-+static struct platform_driver tps65218_pwron_driver = {
-+	.probe	= tps65218_pwron_probe,
-+	.driver	= {
-+		.name	= "tps65218_pwrbutton",
-+		.of_match_table = of_tps65218_pwr_match,
-+	},
-+};
-+module_platform_driver(tps65218_pwron_driver);
-+
-+MODULE_DESCRIPTION("TPS65218 Power Button");
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
 -- 
-2.2.0
+2.0.4
