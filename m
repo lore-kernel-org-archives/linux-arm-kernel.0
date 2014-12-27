@@ -1,145 +1,106 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Sat, 27 Dec 2014 09:37:20 +0200
-Subject: [PATCH 1/2] ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
-Message-ID: <1419665841-22629-1-git-send-email-siarhei.siamashka@gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Sat, 27 Dec 2014 15:33:57 +0800
+Subject: [PATCH v17 00/11] ARM: kprobes: OPTPROBES and other improvements.
+Message-ID: <1419665637-12744-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSI Primo81 is an A31s based tablet, with 1G RAM, 16G NAND,
-1024x768 IPS LCD display, mono speaker, 0.3 MP front camera, 2.0 MP
-rear camera, 3500 mAh battery, gt911 touchscreen, mma8452 accelerometer
-and rtl8188etv usb wifi. Has "power", "volume+" and "volume-" buttons
-(both volume buttons are also connected to the UBOOT_SEL pin). The
-external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
-OTG and 3.5mm headphone jack. More details are available at
-    http://linux-sunxi.org/MSI_Primo81
+This is v17 patch series of kprobeopt. The main change in this version
+are:
 
-This initial dts file only provides support for mmc, wifi and uart
-(there is no external connector for uart though). Graphics can be used
-via simplefb. However, without usb otg, there are no reasonable means
-to handle user input yet.
+ 1. Patch 02/11 remove 3 useless ARM decode actions.
+ 2. Patch 10/11 collects register usage of probed instructions.
+ 3. Patch 11/11 use register usage information to decide whether
+    the probed instruction needs simulation or emulation. In most
+    of the case, the probed instruction is copied into code template
+    and get executed during restoring.
 
-Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
----
- arch/arm/boot/dts/Makefile               |  3 +-
- arch/arm/boot/dts/sun6i-a31s-primo81.dts | 95 ++++++++++++++++++++++++++++++++
- 2 files changed, 97 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
+Jon Medhurst (Tixy) (2):
+  ARM: kprobes: Add test cases for stack consuming instructions
+  ARM: kprobes: Fix unreliable MRS instruction tests
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c486545..f363938 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -464,7 +464,8 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-colombus.dtb \
- 	sun6i-a31-hummingbird.dtb \
- 	sun6i-a31-m9.dtb \
--	sun6i-a31s-cs908.dtb
-+	sun6i-a31s-cs908.dtb \
-+	sun6i-a31s-primo81.dtb
- dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-bananapi.dtb \
- 	sun7i-a20-bootsetup.dtb \
-diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-new file mode 100644
-index 0000000..a5e8562
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-@@ -0,0 +1,95 @@
-+/*
-+ * Copyright 2014 Siarhei Siamashka <siarhei.siamashka@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun6i-a31s.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "MSI Primo81 tablet";
-+	compatible = "msi,primo81", "allwinner,sun6i-a31s";
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_primo81>;
-+			vmmc-supply = <&reg_vcc3v0>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 0 8 0>; /* PA8 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c19400 {
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c1a000 {
-+			/* rtl8188etv wifi is connected here */
-+			status = "okay";
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			mmc0_cd_pin_primo81: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PA8";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+};
+Masami Hiramatsu (1):
+  kprobes: Pass the original kprobe for preparing optimized kprobe
+
+Wang Nan (8):
+  ARM: probes: move all probe code to dedicate directory
+  ARM: kprobes: remove unused ARM decoder actions.
+  ARM: kprobes: introduces checker
+  ARM: kprobes: collects stack consumption for store instructions
+  ARM: kprobes: disallow probing stack consuming instructions
+  ARM: kprobes: enable OPTPROBES for ARM 32
+  ARM: kprobes: check register usage for probed instruction.
+  ARM: optprobes: execute instruction during restoring if possible.
+
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/{kernel => include/asm}/insn.h            |   0
+ arch/arm/include/asm/kprobes.h                     |  33 +-
+ arch/arm/{kernel => include/asm}/patch.h           |   0
+ arch/arm/include/asm/probes.h                      |  23 ++
+ arch/arm/kernel/Makefile                           |  16 +-
+ arch/arm/kernel/entry-armv.S                       |   3 +-
+ arch/arm/kernel/ftrace.c                           |   3 +-
+ arch/arm/kernel/jump_label.c                       |   5 +-
+ arch/arm/kernel/patch.c                            |   3 +-
+ arch/arm/probes/Makefile                           |   7 +
+ .../{kernel/probes-arm.c => probes/decode-arm.c}   |  12 +-
+ .../{kernel/probes-arm.h => probes/decode-arm.h}   |  10 +-
+ .../probes-thumb.c => probes/decode-thumb.c}       |  16 +-
+ .../probes-thumb.h => probes/decode-thumb.h}       |  10 +-
+ arch/arm/{kernel/probes.c => probes/decode.c}      |  81 ++++-
+ arch/arm/{kernel/probes.h => probes/decode.h}      |  13 +-
+ arch/arm/probes/kprobes/Makefile                   |  12 +
+ .../kprobes-arm.c => probes/kprobes/actions-arm.c} |  12 +-
+ .../kprobes/actions-common.c}                      |   4 +-
+ .../kprobes/actions-thumb.c}                       |  10 +-
+ arch/arm/probes/kprobes/checkers-arm.c             | 223 +++++++++++++
+ arch/arm/probes/kprobes/checkers-common.c          | 101 ++++++
+ arch/arm/probes/kprobes/checkers-thumb.c           | 110 +++++++
+ arch/arm/probes/kprobes/checkers.h                 |  55 ++++
+ .../{kernel/kprobes.c => probes/kprobes/core.c}    |  49 ++-
+ .../{kernel/kprobes.h => probes/kprobes/core.h}    |  12 +-
+ arch/arm/probes/kprobes/opt-arm.c                  | 360 +++++++++++++++++++++
+ .../kprobes/test-arm.c}                            |  37 ++-
+ .../kprobes-test.c => probes/kprobes/test-core.c}  |  36 ++-
+ .../kprobes-test.h => probes/kprobes/test-core.h}  |  35 +-
+ .../kprobes/test-thumb.c}                          |  20 +-
+ arch/arm/probes/uprobes/Makefile                   |   1 +
+ .../uprobes-arm.c => probes/uprobes/actions-arm.c} |   9 +-
+ .../{kernel/uprobes.c => probes/uprobes/core.c}    |   8 +-
+ .../{kernel/uprobes.h => probes/uprobes/core.h}    |   0
+ arch/x86/kernel/kprobes/opt.c                      |   3 +-
+ include/linux/kprobes.h                            |   3 +-
+ kernel/kprobes.c                                   |   4 +-
+ 40 files changed, 1215 insertions(+), 126 deletions(-)
+ rename arch/arm/{kernel => include/asm}/insn.h (100%)
+ rename arch/arm/{kernel => include/asm}/patch.h (100%)
+ create mode 100644 arch/arm/probes/Makefile
+ rename arch/arm/{kernel/probes-arm.c => probes/decode-arm.c} (99%)
+ rename arch/arm/{kernel/probes-arm.h => probes/decode-arm.h} (92%)
+ rename arch/arm/{kernel/probes-thumb.c => probes/decode-thumb.c} (98%)
+ rename arch/arm/{kernel/probes-thumb.h => probes/decode-thumb.h} (90%)
+ rename arch/arm/{kernel/probes.c => probes/decode.c} (84%)
+ rename arch/arm/{kernel/probes.h => probes/decode.h} (97%)
+ create mode 100644 arch/arm/probes/kprobes/Makefile
+ rename arch/arm/{kernel/kprobes-arm.c => probes/kprobes/actions-arm.c} (97%)
+ rename arch/arm/{kernel/kprobes-common.c => probes/kprobes/actions-common.c} (98%)
+ rename arch/arm/{kernel/kprobes-thumb.c => probes/kprobes/actions-thumb.c} (98%)
+ create mode 100644 arch/arm/probes/kprobes/checkers-arm.c
+ create mode 100644 arch/arm/probes/kprobes/checkers-common.c
+ create mode 100644 arch/arm/probes/kprobes/checkers-thumb.c
+ create mode 100644 arch/arm/probes/kprobes/checkers.h
+ rename arch/arm/{kernel/kprobes.c => probes/kprobes/core.c} (94%)
+ rename arch/arm/{kernel/kprobes.h => probes/kprobes/core.h} (79%)
+ create mode 100644 arch/arm/probes/kprobes/opt-arm.c
+ rename arch/arm/{kernel/kprobes-test-arm.c => probes/kprobes/test-arm.c} (97%)
+ rename arch/arm/{kernel/kprobes-test.c => probes/kprobes/test-core.c} (98%)
+ rename arch/arm/{kernel/kprobes-test.h => probes/kprobes/test-core.h} (92%)
+ rename arch/arm/{kernel/kprobes-test-thumb.c => probes/kprobes/test-thumb.c} (97%)
+ create mode 100644 arch/arm/probes/uprobes/Makefile
+ rename arch/arm/{kernel/uprobes-arm.c => probes/uprobes/actions-arm.c} (96%)
+ rename arch/arm/{kernel/uprobes.c => probes/uprobes/core.c} (97%)
+ rename arch/arm/{kernel/uprobes.h => probes/uprobes/core.h} (100%)
+
 -- 
-2.0.4
+1.8.4
