@@ -1,31 +1,25 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 27 Dec 2014 19:29:23 +0100
-Subject: [PATCH] pinctrl: rockchip: Avoid losing interrupts when
- supporting both edges
-In-Reply-To: <1419274049-5069-1-git-send-email-dianders@chromium.org>
-References: <1419274049-5069-1-git-send-email-dianders@chromium.org>
-Message-ID: <6699676.mHhQhT5KAT@phil>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 27 Dec 2014 20:09:30 +0100
+Subject: [PATCH 3/3] ARM: dts: OMAP34xx/36xx: Add temperature sensor
+In-Reply-To: <1419597294-21487-4-git-send-email-sre@kernel.org>
+References: <20141226102933.GA28778@amd>
+ <1419597294-21487-1-git-send-email-sre@kernel.org>
+ <1419597294-21487-4-git-send-email-sre@kernel.org>
+Message-ID: <20141227190930.GA10007@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 22. Dezember 2014, 10:47:29 schrieb Doug Anderson:
-> I was seeing cases where I was losing interrupts when inserting and
-> removing SD cards.  Sometimes the card would get "stuck" in the
-> inserted state.
+On Fri 2014-12-26 13:34:54, Sebastian Reichel wrote:
+> OMAP34xx and OMAP36xx processors contain a register in the
+> syscon area, which can be used to determine the SoCs temperature.
 > 
-> I believe that the problem was related to the code to handle the case
-> where we needed both rising and falling edges.  This code would
-> disable the interrupt as the polarity was switched.  If an interrupt
-> came at the wrong time it could be lost.
-> 
-> We'll match what the gpio-dwapb.c driver does upstream and change the
-> interrupt polarity without disabling things.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sebastian Reichel <sre@kernel.org>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-on a rk3188 board with the edge triggered power-button
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Tested-by: Pavel Machek <pavel@ucw.cz>
 
-
-Heiko
+Driver binds and does something, so binding works ok.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
