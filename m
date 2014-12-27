@@ -1,31 +1,31 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 27 Dec 2014 19:52:59 +0200
-Subject: [PATCH 7/7] mfd: menelaus: use macro for magic number
-In-Reply-To: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1419702779-16001-8-git-send-email-aaro.koskinen@iki.fi>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 27 Dec 2014 19:29:23 +0100
+Subject: [PATCH] pinctrl: rockchip: Avoid losing interrupts when
+ supporting both edges
+In-Reply-To: <1419274049-5069-1-git-send-email-dianders@chromium.org>
+References: <1419274049-5069-1-git-send-email-dianders@chromium.org>
+Message-ID: <6699676.mHhQhT5KAT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use macro to check a register bit.
+Am Montag, 22. Dezember 2014, 10:47:29 schrieb Doug Anderson:
+> I was seeing cases where I was losing interrupts when inserting and
+> removing SD cards.  Sometimes the card would get "stuck" in the
+> inserted state.
+> 
+> I believe that the problem was related to the code to handle the case
+> where we needed both rising and falling edges.  This code would
+> disable the interrupt as the polarity was switched.  If an interrupt
+> came at the wrong time it could be lost.
+> 
+> We'll match what the gpio-dwapb.c driver does upstream and change the
+> interrupt polarity without disabling things.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- drivers/mfd/menelaus.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+on a rk3188 board with the edge triggered power-button
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-index 8660adf..05bae40 100644
---- a/drivers/mfd/menelaus.c
-+++ b/drivers/mfd/menelaus.c
-@@ -1242,7 +1242,7 @@ static int menelaus_probe(struct i2c_client *client,
- 	err = menelaus_read_reg(MENELAUS_VCORE_CTRL1);
- 	if (err < 0)
- 		goto fail;
--	if (err & BIT(7))
-+	if (err & VCORE_CTRL1_HW_NSW)
- 		menelaus->vcore_hw_mode = 1;
- 	else
- 		menelaus->vcore_hw_mode = 0;
--- 
-2.2.0
+
+Heiko
