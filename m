@@ -1,11 +1,11 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 27 Dec 2014 20:48:51 +0100
+Date: Sat, 27 Dec 2014 20:58:25 +0100
 Subject: [PATCH 2/3] hwmon: Driver for OMAP3 temperature sensor
 In-Reply-To: <1419597294-21487-3-git-send-email-sre@kernel.org>
 References: <20141226102933.GA28778@amd>
  <1419597294-21487-1-git-send-email-sre@kernel.org>
  <1419597294-21487-3-git-send-email-sre@kernel.org>
-Message-ID: <20141227194851.GE10007@amd>
+Message-ID: <20141227195825.GF10007@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,19 +16,24 @@ On Fri 2014-12-26 13:34:53, Sebastian Reichel wrote:
 > written by Peter De Schrijver for the Nokia N900 and N9.
 > 
 > Signed-off-by: Sebastian Reichel <sre@kernel.org>
+> ---
+>  drivers/hwmon/Kconfig      |   8 ++
+>  drivers/hwmon/Makefile     |   1 +
+>  drivers/hwmon/omap3-temp.c | 307 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 316 insertions(+)
+>  create mode 100644 drivers/hwmon/omap3-temp.c
 
-When it hangs, it seems to hang here:
+When it hangs, it loops here:
 
-     	if (!wait_for_eocz(data, EOCZ_MIN_RISING_DELAY,
-	                    EOCZ_MAX_RISING_DELAY, 1)) {
-			                            e = -EIO;
-								goto
-	                    err;
-			                    }
+do {
+regmap_read(data->syscon, SYSCON_TEMP_REG,&temp_sensor_reg);
+if ((temp_sensor_reg & eocz_mask) == level)
+   return true;
+printk("=");
+}
+while (ktime_us_delta(expire, ktime_get()) > 0);
 
-...so wait does not seem to reliably wait.
 									Pavel
-									
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
