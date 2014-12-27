@@ -1,58 +1,45 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Sat, 27 Dec 2014 15:52:08 +0100
-Subject: [PATCH v3] ALSA: atmel: fix building the ac97 driver for
- at91-multiplatform
-In-Reply-To: <1419600478-16885-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1419600478-16885-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <s5hd275i1rb.wl-tiwai@suse.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 27 Dec 2014 14:55:24 +0100
+Subject: [PATCH 0/4] Transition of pxa25x and pxa27x to clock framework
+Message-ID: <1419688528-760-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 26 Dec 2014 14:27:58 +0100,
-Alexandre Belloni wrote:
-> 
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> at91 will no longer export the mach/cpu.h and mach/hardware.h header files
-> in the future, which would break building the atmel ac97c driver.
-> 
-> Since the cpu_is_* check is only used to find out whether we are running
-> on avr32 or arm/at91, we can hardcode that check in the ARM case.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Link: http://www.spinics.net/lists/arm-kernel/msg382068.html
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+This series makes the transition from old clock code to the clock framework for
+the pxa25x and pxa27x. That will only leave pxa3xx to be converted. As there is
+no defconfig using both pxa3xx and any other pxa2xx variant, the previous mess
+should be avoided.
 
-Thanks, applied.
+This change can be very disruptive for pxa25x and pxa27x platforms. So far only
+Dmitry and me had tested it, and covered tosa (pxa25x), lubbock (pxa25x),
+mioa701(pxa27x) boards.
 
+Once reviewed, I'd like this serie to go through the pxa tree. Therefore an ack
+from Mike is necesary for the last patch (add missing pxa27x clocks).
 
-Takashi
+This is targeted at 3.20 window.
 
-> ---
-> Changes in v3:
->  - added my SoB
-> 
->  sound/atmel/ac97c.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
-> index b59427d5a697..e458957c5f52 100644
-> --- a/sound/atmel/ac97c.c
-> +++ b/sound/atmel/ac97c.c
-> @@ -34,10 +34,10 @@
->  #include <linux/platform_data/dma-dw.h>
->  #include <linux/dma/dw.h>
->  
-> +#ifdef CONFIG_AVR32
->  #include <mach/cpu.h>
-> -
-> -#ifdef CONFIG_ARCH_AT91
-> -#include <mach/hardware.h>
-> +#else
-> +#define cpu_is_at32ap7000() 0
->  #endif
->  
->  #include "ac97c.h"
-> -- 
-> 2.1.0
-> 
+Cheers.
+
+--
+Robert
+
+Robert Jarzmik (4):
+  arm: pxa: change clocks init sequence
+  arm: pxa: Transition pxa25x and pxa27x to clk framework
+  arm: pxa: move gpio11 clock to board files
+  clk: pxa: add missing pxa27x clocks for Irda and sa1100-rtc
+
+ arch/arm/Kconfig             |   1 +
+ arch/arm/mach-pxa/Makefile   |   9 +--
+ arch/arm/mach-pxa/eseries.c  |   5 +-
+ arch/arm/mach-pxa/generic.c  |   4 +
+ arch/arm/mach-pxa/generic.h  |   2 +
+ arch/arm/mach-pxa/lubbock.c  |   3 +
+ arch/arm/mach-pxa/pxa25x.c   | 182 -------------------------------------------
+ arch/arm/mach-pxa/pxa27x.c   | 174 +----------------------------------------
+ drivers/clk/pxa/clk-pxa27x.c |  32 +++++++-
+ 9 files changed, 50 insertions(+), 362 deletions(-)
+
+-- 
+2.1.0
