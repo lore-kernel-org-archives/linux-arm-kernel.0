@@ -1,79 +1,114 @@
 From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 27 Dec 2014 19:52:58 +0200
-Subject: [PATCH 6/7] mfd: menelaus: make vcore and regulator controls internal
+Date: Sat, 27 Dec 2014 19:52:56 +0200
+Subject: [PATCH 4/7] ARM: OMAP: N8x0: configure menelaus using DT
 In-Reply-To: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
 References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1419702779-16001-7-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <1419702779-16001-5-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make vcore and regulator control functions internal to the driver.
+Configure Menelaus using DT.
 
 Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 ---
- drivers/mfd/menelaus.c       | 13 +++++++++++--
- include/linux/mfd/menelaus.h | 12 ------------
- 2 files changed, 11 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi |  3 ++
+ arch/arm/mach-omap2/board-n8x0.c            | 57 -----------------------------
+ arch/arm/mach-omap2/pdata-quirks.c          |  1 -
+ 3 files changed, 3 insertions(+), 58 deletions(-)
 
-diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-index 4a900cc..8660adf 100644
---- a/drivers/mfd/menelaus.c
-+++ b/drivers/mfd/menelaus.c
-@@ -163,6 +163,15 @@
- #define MCT_PIN_ST_S1_CD_ST		(1 << 0)
- #define MCT_PIN_ST_S2_CD_ST		(1 << 1)
- 
-+#define EN_VPLL_SLEEP			(1 << 7)
-+#define EN_VMMC_SLEEP			(1 << 6)
-+#define EN_VAUX_SLEEP			(1 << 5)
-+#define EN_VIO_SLEEP			(1 << 4)
-+#define EN_VMEM_SLEEP			(1 << 3)
-+#define EN_DC3_SLEEP			(1 << 2)
-+#define EN_DC2_SLEEP			(1 << 1)
-+#define EN_VC_SLEEP			(1 << 0)
-+
- static void menelaus_work(struct work_struct *_menelaus);
- 
- struct menelaus_chip {
-@@ -534,7 +543,7 @@ static const struct menelaus_vtg_value vcore_values[] = {
- 	{ 1450, 18 },
+diff --git a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+index c9f1e93..c19718c 100644
+--- a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
++++ b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+@@ -32,6 +32,9 @@
+ 		compatible = "menelaus";
+ 		reg = <0x72>;
+ 		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
++		ti,autosleep;
++		ti,vcore-min-microvolt = <1050000>;
++		ti,vcore-max-microvolt = <1400000>;
+ 	};
  };
  
--int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV)
-+static int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV)
- {
- 	int fval, rval, val, ret;
- 	struct i2c_client *c = the_menelaus->client;
-@@ -743,7 +752,7 @@ int menelaus_get_slot_pin_states(void)
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index b6443a4..0b511c0 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -516,63 +516,6 @@ void __init n8x0_mmc_init(void)
  }
- EXPORT_SYMBOL(menelaus_get_slot_pin_states);
+ #endif	/* CONFIG_MMC_OMAP */
  
--int menelaus_set_regulator_sleep(int enable, u32 val)
-+static int menelaus_set_regulator_sleep(int enable, u32 val)
- {
- 	int t, ret;
- 	struct i2c_client *c = the_menelaus->client;
-diff --git a/include/linux/mfd/menelaus.h b/include/linux/mfd/menelaus.h
-index 21eeff5..bcabc03 100644
---- a/include/linux/mfd/menelaus.h
-+++ b/include/linux/mfd/menelaus.h
-@@ -18,17 +18,5 @@ extern int menelaus_set_vaux(unsigned int mV);
- extern int menelaus_set_vdcdc(int dcdc, unsigned int mV);
- extern int menelaus_set_slot_sel(int enable);
- extern int menelaus_get_slot_pin_states(void);
--extern int menelaus_set_vcore_hw(unsigned int roof_mV, unsigned int floor_mV);
+-#ifdef CONFIG_MENELAUS
 -
--#define EN_VPLL_SLEEP	(1 << 7)
--#define EN_VMMC_SLEEP	(1 << 6)
--#define EN_VAUX_SLEEP	(1 << 5)
--#define EN_VIO_SLEEP	(1 << 4)
--#define EN_VMEM_SLEEP	(1 << 3)
--#define EN_DC3_SLEEP	(1 << 2)
--#define EN_DC2_SLEEP	(1 << 1)
--#define EN_VC_SLEEP	(1 << 0)
+-static int n8x0_auto_sleep_regulators(void)
+-{
+-	u32 val;
+-	int ret;
 -
--extern int menelaus_set_regulator_sleep(int enable, u32 val);
- 
+-	val = EN_VPLL_SLEEP | EN_VMMC_SLEEP    \
+-		| EN_VAUX_SLEEP | EN_VIO_SLEEP \
+-		| EN_VMEM_SLEEP | EN_DC3_SLEEP \
+-		| EN_VC_SLEEP | EN_DC2_SLEEP;
+-
+-	ret = menelaus_set_regulator_sleep(1, val);
+-	if (ret < 0) {
+-		pr_err("Could not set regulators to sleep on menelaus: %u\n",
+-		       ret);
+-		return ret;
+-	}
+-	return 0;
+-}
+-
+-static int n8x0_auto_voltage_scale(void)
+-{
+-	int ret;
+-
+-	ret = menelaus_set_vcore_hw(1400, 1050);
+-	if (ret < 0) {
+-		pr_err("Could not set VCORE voltage on menelaus: %u\n", ret);
+-		return ret;
+-	}
+-	return 0;
+-}
+-
+-static int n8x0_menelaus_late_init(struct device *dev)
+-{
+-	int ret;
+-
+-	ret = n8x0_auto_voltage_scale();
+-	if (ret < 0)
+-		return ret;
+-	ret = n8x0_auto_sleep_regulators();
+-	if (ret < 0)
+-		return ret;
+-	return 0;
+-}
+-
+-#else
+-static int n8x0_menelaus_late_init(struct device *dev)
+-{
+-	return 0;
+-}
+-#endif
+-
+-struct menelaus_platform_data n8x0_menelaus_platform_data __initdata = {
+-	.late_init = n8x0_menelaus_late_init,
+-};
+-
+ struct aic3x_pdata n810_aic33_data __initdata = {
+ 	.gpio_reset = 118,
+ };
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 3d7eee1..fca4650 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -369,7 +369,6 @@ static struct pdata_init auxdata_quirks[] __initdata = {
+ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_MACH_NOKIA_N8X0
+ 	OF_DEV_AUXDATA("ti,omap2420-mmc", 0x4809c000, "mmci-omap.0", NULL),
+-	OF_DEV_AUXDATA("menelaus", 0x72, "1-0072", &n8x0_menelaus_platform_data),
+ 	OF_DEV_AUXDATA("tlv320aic3x", 0x18, "2-0018", &n810_aic33_data),
  #endif
+ #ifdef CONFIG_ARCH_OMAP3
 -- 
 2.2.0
