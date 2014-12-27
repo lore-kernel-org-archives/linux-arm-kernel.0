@@ -1,36 +1,140 @@
 From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 27 Dec 2014 19:52:52 +0200
-Subject: [PATCH 0/7] Menelaus cleanup for DT, phase 1
-Message-ID: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+Date: Sat, 27 Dec 2014 19:52:55 +0200
+Subject: [PATCH 3/7] mfd: menelaus: add initial DT support
+In-Reply-To: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <1419702779-16001-4-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add initial DT support.
 
-These patches start removal of board-specific callbacks from Menelaus:
-delete platform data and a callback from the driver to the board files.
-
-Tested on top of 3.19-rc1 on N800/N810 which are the only in-tree users
-for the driver.
-
-Aaro Koskinen (7):
-  mfd: menelaus: delete omap_has_menelaus
-  mfd: menelaus: drop support for SW controller VCORE
-  mfd: menelaus: add initial DT support
-  ARM: OMAP: N8x0: configure menelaus using DT
-  mfd: menelaus: delete platform data support
-  mfd: menelaus: make vcore and regulator controls internal
-  mfd: menelaus: use macro for magic number
-
- Documentation/devicetree/bindings/mfd/menelaus.txt | 30 ++++++++
- arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  3 +
- arch/arm/mach-omap2/board-n8x0.c                   | 57 --------------
- arch/arm/mach-omap2/common-board-devices.h         |  2 -
- arch/arm/mach-omap2/pdata-quirks.c                 |  1 -
- drivers/mfd/menelaus.c                             | 86 ++++++++++++++--------
- include/linux/mfd/menelaus.h                       | 25 -------
- 7 files changed, 87 insertions(+), 117 deletions(-)
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ Documentation/devicetree/bindings/mfd/menelaus.txt | 30 +++++++++++++
+ drivers/mfd/menelaus.c                             | 52 ++++++++++++++++++++--
+ 2 files changed, 78 insertions(+), 4 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/mfd/menelaus.txt
 
+diff --git a/Documentation/devicetree/bindings/mfd/menelaus.txt b/Documentation/devicetree/bindings/mfd/menelaus.txt
+new file mode 100644
+index 0000000..5f69f23
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/menelaus.txt
+@@ -0,0 +1,30 @@
++Menelaus (Texas Instruments TWL92330) Power Management chip
++
++Menelaus provides facilities to control the power resources.
++
++Required properties:
++- compatible: must be "menelaus"
++- reg: I2C address of the chip
++
++Optional properties:
++- interrupts: the interrupt
++- ti,autosleep: All regulators are put to sleep by default.
++- ti,vcore-min-microvolt: Range floor for the HW controlled VCORE
++- ti,vcore-max-microvolt: Range roof for the HW controlled VCORE
++
++The use of ti,autosleep is recommended at least on Nokia N800/N810.
++
++Example:
++
++&i2c1 {
++	clock-frequency = <400000>;
++
++	pmic at 72 {
++		compatible = "menelaus";
++		reg = <0x72>;
++		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
++		ti,autosleep;
++		ti,vcore-min-microvolt = <1050000>;
++		ti,vcore-max-microvolt = <1400000>;
++	};
++};
+diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
+index 917fa86..3e04c64 100644
+--- a/drivers/mfd/menelaus.c
++++ b/drivers/mfd/menelaus.c
+@@ -16,6 +16,8 @@
+  * Amit Kucheria <amit.kucheria@nokia.com>
+  * Copyright (C) 2005, 2006 Nokia Corporation
+  *
++ * Cleanups and DT modifications by Aaro Koskinen <aaro.koskinen@iki.fi>.
++ *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+@@ -767,6 +769,22 @@ out:
+ 	return ret;
+ }
+ 
++static int menelaus_auto_sleep_regulators(void)
++{
++	u32 val;
++	int ret;
++
++	val = EN_VPLL_SLEEP | EN_VMMC_SLEEP | EN_VAUX_SLEEP | EN_VIO_SLEEP | \
++	      EN_VMEM_SLEEP | EN_DC3_SLEEP  | EN_VC_SLEEP   | EN_DC2_SLEEP;
++	ret = menelaus_set_regulator_sleep(1, val);
++	if (ret < 0) {
++		dev_err(&the_menelaus->client->dev,
++			"could not set regulators to sleep: %d\n", ret);
++		return ret;
++	}
++	return 0;
++}
++
+ /*-----------------------------------------------------------------------*/
+ 
+ /* Handles Menelaus interrupts. Does not run in interrupt context */
+@@ -1162,6 +1180,7 @@ static int menelaus_probe(struct i2c_client *client,
+ 	struct menelaus_chip	*menelaus;
+ 	int			rev = 0;
+ 	int			err = 0;
++	struct device_node	*np = client->dev.of_node;
+ 	struct menelaus_platform_data *menelaus_pdata =
+ 					dev_get_platdata(&client->dev);
+ 
+@@ -1221,10 +1240,35 @@ static int menelaus_probe(struct i2c_client *client,
+ 	else
+ 		menelaus->vcore_hw_mode = 0;
+ 
+-	if (menelaus_pdata != NULL && menelaus_pdata->late_init != NULL) {
+-		err = menelaus_pdata->late_init(&client->dev);
+-		if (err < 0)
+-			goto fail;
++	if (menelaus_pdata != NULL) {
++		if (menelaus_pdata->late_init != NULL) {
++			err = menelaus_pdata->late_init(&client->dev);
++			if (err < 0)
++				goto fail;
++		}
++	} else if (np) {
++		u32 vcore_min;
++		u32 vcore_max;
++
++		if (!of_property_read_u32(np, "ti,vcore-min-microvolt",
++					  &vcore_min) &&
++		    !of_property_read_u32(np, "ti,vcore-max-microvolt",
++					  &vcore_max)) {
++			err = menelaus_set_vcore_hw(vcore_max / 1000,
++						    vcore_min / 1000);
++			if (err < 0) {
++				dev_err(&client->dev,
++					"could not set VCORE voltage: %d\n",
++					err);
++				goto fail;
++			}
++		}
++
++		if (of_property_read_bool(np, "ti,autosleep")) {
++			err = menelaus_auto_sleep_regulators();
++			if (err < 0)
++				goto fail;
++		}
+ 	}
+ 
+ 	menelaus_rtc_init(menelaus);
 -- 
 2.2.0
