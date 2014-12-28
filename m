@@ -1,59 +1,86 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 27 Dec 2014 18:22:49 -0700
-Subject: [RFC PATCH v2] drivers: pci: move PCI domain assignment to
- generic PCI code
-In-Reply-To: <20141227103655.GA27544@e102568-lin.cambridge.arm.com>
-References: <1415637706-2195-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20141120225449.GD7987@google.com>
- <20141227103655.GA27544@e102568-lin.cambridge.arm.com>
-Message-ID: <CAErSpo6KA2jbs_aqXYRHjcxAnuXhxzGH2P=xv4udJWeRvve78A@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 27 Dec 2014 20:08:32 -0600
+Subject: [RFC/PATCHv2 1/5] dtc: Use quotes to include header files
+In-Reply-To: <1419369212-17047-2-git-send-email-chris.packham@alliedtelesis.co.nz>
+References: <1419369212-17047-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <1419369212-17047-2-git-send-email-chris.packham@alliedtelesis.co.nz>
+Message-ID: <CAL_JsqLegL1jT4rtNtum1RabXvd3NbS_G1EkkVjCcN-aPg975A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 27, 2014 at 3:36 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Hi Bjorn,
+On Tue, Dec 23, 2014 at 3:13 PM, Chris Packham
+<chris.packham@alliedtelesis.co.nz> wrote:
+> Currently in arch and driver code that needs early access to the
+> flattened device tree it is necessary to add specific CFLAGS so that
+> when scripts/dtc/libfdt/libfdt.h is included the C preprocessor is able
+> to locate the libfdt versions of libfdt_env.h and fdt.h without
+> generating an error.
 >
-> On Thu, Nov 20, 2014 at 10:54:49PM +0000, Bjorn Helgaas wrote:
->> On Mon, Nov 10, 2014 at 04:41:46PM +0000, Lorenzo Pieralisi wrote:
->> > The current logic used for PCI domain assignment in arm64
->> > pci_bus_assign_domain_nr() is flawed in that, depending on the host
->> > controllers configuration for a platform and the respective initialization
->> > sequence, core code may end up allocating PCI domain numbers from both DT and
->> > the core code generic domain counter, which would result in PCI domain
->> > allocation aliases/errors.
->> >
->> > This patch fixes the logic behind the PCI domain number assignment and
->> > moves the resulting code to generic PCI core code so that the same domain
->> > allocation logic is used on all platforms selecting
->> >
->> > CONFIG_PCI_DOMAINS_GENERIC
->> >
->> > instead of resorting to an arch specific implementation that might end up
->> > duplicating the PCI domain assignment logic wrongly.
->> >
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->> > Cc: Liviu Dudau <liviu.dudau@arm.com>
->> > Cc: Bjorn Helgaas <bhelgaas@google.com>
->> > Cc: Rob Herring <robh+dt@kernel.org>
->> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>
->> Applied with Liviu and Arnd's acks to pci/domain for v3.19, thanks.
->>
->> It doesn't matter whether I'm in the to: or cc: list.  The important thing
->> is that it appears on the linux-pci list, because I use patchwork as my
->> to-do list, and patchwork only vacuums up stuff from linux-pci.
+> We already provide an alternative linux-specific
+> version of libfdt_env.h and directly include scripts/dtc/libfdt/fdt.h
+> so the inclusion by scripts/dtc/libfdt/libfdt.h is a no-op thanks to the
+> inclusion guards.
 >
-> This patch has not been merged last cycle and it is a prerequisite for
-> the ARM pcibios domain code removal patchset you merged in your pci/domain
-> branch. Please consider pulling it there so that the ARM pcibios domain
-> removal patchset can be based correctly on top of this patch, at the
-> moment it can't compile (see kbuild test report).
+> By using quotes in scripts/dtc/libfdt/libfdt.h it picks up fdt.h and
+> libfdt_env.h from the source directory without needing to add CFLAGS for
+> the sources that happen to include linux/libfdt.h.
+>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+> For the files that include linux/libfdt.h we currently also have to
+> specify additional CFLAGS to satisfy the CPP.
+>
+>   $ git grep '<linux/libfdt.h>'
+>   arch/mips/cavium-octeon/octeon-platform.c:#include <linux/libfdt.h>
+>   arch/mips/cavium-octeon/setup.c:#include <linux/libfdt.h>
+>   arch/mips/mti-sead3/sead3-setup.c:#include <linux/libfdt.h>
+>   arch/powerpc/kernel/prom.c:#include <linux/libfdt.h>
+>   drivers/firmware/efi/libstub/fdt.c:#include <linux/libfdt.h>
+>   drivers/of/fdt.c:#include <linux/libfdt.h>
+>   drivers/of/fdt_address.c:#include <linux/libfdt.h>
+>
+>   $ git grep -e '-I.*dtc/libfdt'
+>   arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o = -I$(src)/../../../scripts/dtc/libfdt
+>   arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o = -I$(src)/../../../scripts/dtc/libfdt
+>   arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o = -I$(src)/../../../scripts/dtc/libfdt
+>   arch/powerpc/kernel/Makefile:CFLAGS_prom.o              = -I$(src)/../../../scripts/dtc/libfdt
+>   drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o += -I$(srctree)/scripts/dtc/libfdt/
+>   drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
+>   drivers/of/Makefile:CFLAGS_fdt_address.o = -I$(src)/../../scripts/dtc/libfdt
+>   lib/Makefile:   $(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
+>
+> Simply by switching to using quotes we can avoid having this extra step.
 
-Huh, I can't remember why I didn't merge that for v3.19.  Maybe I just
-missed it by mistake.
+Nice, but I would like to see all of these CFLAGS removed as well.
 
-Anyway, I picked that patch into pci/domain for another try.
+>  scripts/dtc/libfdt/libfdt.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Bjorn
+This is an import of dtc/libfdt and patches to it should be sent
+upstream and to devicetree-compiler list.
+
+Rob
+
+> diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
+> index 73f4975..ea1ddcd 100644
+> --- a/scripts/dtc/libfdt/libfdt.h
+> +++ b/scripts/dtc/libfdt/libfdt.h
+> @@ -51,8 +51,8 @@
+>   *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+>   */
+>
+> -#include <libfdt_env.h>
+> -#include <fdt.h>
+> +#include "libfdt_env.h"
+> +#include "fdt.h"
+>
+>  #define FDT_FIRST_SUPPORTED_VERSION    0x10
+>  #define FDT_LAST_SUPPORTED_VERSION     0x11
+> --
+> 2.2.0.rc0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
