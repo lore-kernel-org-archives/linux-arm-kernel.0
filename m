@@ -1,62 +1,55 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Sun, 28 Dec 2014 19:24:43 +0100
-Subject: Memory copy between Linux-managed RAM and other RAM
-Message-ID: <54A04AEB.1070502@free.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 28 Dec 2014 21:46:20 +0000
+Subject: [PATCH] clocksource: =?UTF-8?Q?arch=5Ftimer=3A=20Fix=20arm=36?=
+ =?UTF-8?Q?=34=20platforms=20not=20booting?=
+In-Reply-To: <1419776431-26217-1-git-send-email-christoffer.dall@linaro.org>
+References: <1419776431-26217-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <71346397bb3c0e654aa5b634328ae29c@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On 2014-12-28 14:20, Christoffer Dall wrote:
+> Commit 0b46b8a718c6e ("clocksource: arch_timer: Fix code to...") 
+> fixes
+> timer issues with certain ARMv7 platforms, but unfortunately breaks
+> arm64 platforms with hyp mode (EL2) enabled.
+>
+> The commit only sets arch_timer_use_virtual to false under 
+> CONFIG_ARM,
+> but forgets that the config variable is also set in other code paths
+> (actually, right underneath the check in the patch) with detrimental
+> consequences as we've now introduced a direct early call to BUG() on
+> practically all arm64 platforms.
+>
+> One could argue that this code could be refactored to use different
+> variables for checking which *timer* to use and which *counter* to 
+> use,
+> which seems to be the desired difference between ARM and arm64 in 
+> this
+> case, but this approach fixes an urgent issue for now.
+>
+> Cc: Sonny Rao <sonnyrao@chromium.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> This was apparently already discovered by Yingjoe Chen in this thread
+> https://lkml.org/lkml/2014/11/24/41 and Catalin recommended a similar
+> fix.
 
-I'm working on a Cortex-A9 SoC equipped with 2 GB of RAM.
+I'm increasingly worried about the time it takes to get such critical
+fixes into the tree (arm64 is *dead* without it).
 
-However, Linux is only given a fraction (typically 256 MB) of the RAM
-to manage (via the mem= bootparam) while the rest is managed using
-"OS-agnostic software". This "other memory" is meant to be shared
-between different hardware blocks of the SoC.
+What is holding this patch which, as far as I remember, has been posted
+by Catalin almost three weeks ago?
 
-We have a custom "memory_copy" kernel module, to copy between
-"Linux-managed RAM" and "SoC-wide RAM". However, the performance
-of this routine is... disappointingly underwhelming (8.5 MB/s).
+Daniel?
 
-Taking a closer look at the implementation, I spotted some
-inefficiencies.
-
-1) data is first copied (in chunks) to a temporary kernel buffer
-
-2) for each word, a hardware remap is setup, then the word
-is copied, then the hardware remap is reset. (This hardware
-remap technique dates back to when we used MIPS.)
-
-I thought I could both make the implementation simpler, and boost
-the performance.
-
-A) I used ioremap to have Linux map the "SoC-wide RAM" physical
-addresses to virtual addresses that can be used in the module.
-
-B) I then use copy_{to,from}_user directly between the user-space
-buffer and the "SoC-wide RAM".
-
-This approach is ~20x faster than the original.
-
-My main question is:
-
-Is this safe/guaranteed to work all the time? (as long as the
-"SoC-wide RAM" is indeed RAM, not MM registers)
-
-
-Secondary thoughts/questions:
-
-We have routines for accesses in units of {8,16,32} bits.
-Since we're dealing with memory, I don't think the width
-of the accesses is important, right? (for correctness)
-
-AFAIU, ioremap maps as MT_DEVICE, i.e. uncached, no WC,
-all memory optimizations disabled, etc. There might be
-some performance improvements by using cached accesses,
-and manually flushing when the copy is done.
-
-Also, I don't know if copy_{to,from}_user is optimized
-using SIMD/NEON? Maybe there is some perf left on the
-table there?
-
-Regards.
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
