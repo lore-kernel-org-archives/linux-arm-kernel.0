@@ -1,135 +1,307 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 27 Dec 2014 20:53:29 -0600
-Subject: [RFC/PATCHv2 2/5] ARM: mvebu: use dt_fixup to provide fallback
- for enable-method
-In-Reply-To: <1419369212-17047-3-git-send-email-chris.packham@alliedtelesis.co.nz>
-References: <1419369212-17047-1-git-send-email-chris.packham@alliedtelesis.co.nz>
- <1419369212-17047-3-git-send-email-chris.packham@alliedtelesis.co.nz>
-Message-ID: <CAL_JsqJggc9+xaY5gkEa9_LeJUfcD-HOcD+=ZVjQbSTG6x2RhA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 27 Dec 2014 21:24:30 -0600
+Subject: [PATCH RFC] ARM: early fixmap support for earlycon
+In-Reply-To: <1419714491-28564-1-git-send-email-stefan@agner.ch>
+References: <1419714491-28564-1-git-send-email-stefan@agner.ch>
+Message-ID: <CAL_Jsq+Sy-ovfrOeY55tWjiXejtkRLMdC2Y56Mn9hsaTeNm1qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 23, 2014 at 3:13 PM, Chris Packham
-<chris.packham@alliedtelesis.co.nz> wrote:
-> When the device tree doesn't define an enable-method insert a property
-> into the flattened device tree. arm_dt_init_cpu_maps() will then parse
-> this an set smp_ops appropriately. Now that we have this fallback it is
-> no longer necessary to set .smp in the DT_MACHINE definition.
-> Additionally Armada 370, which is a single core device, no longer has any
-> smp operations defined.
+On Sat, Dec 27, 2014 at 3:08 PM, Stefan Agner <stefan@agner.ch> wrote:
+
+Thanks for picking this up.
+
+> Add early fixmap support, initially to support permanent, fixed
+> mapping support for early console. A temporary, early pte is
+> created which is migrated to a permanent mapping in paging_init.
+> This is also needed since the attributs may change as the memory
+
+s/attributs/attributes/
+
+I would like to fix this problem. I think it can be if we setup
+memtype table earlier. The complication is some of it is dependent on
+cache_policy. The device memory types don't depend on cache_policy, so
+they could be setup early and used. I think that can all be done after
+this patch.
+
+> types are initialized. The 3MiB range of fixmap spans two pte
+> tables, but currently only one pte is created for early fixmap
+> support.
 >
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> Readd FIX_KMAP_BEGIN to the index calculation in highmem.c since
+
+s/Readd/Re-add/
+
+> the index for kmap does not start at zero anymore. This reverts
+> 4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
+> FIX_KMAP_END") to some extends.
+
+s/extends/extent/
+
+>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
-> As Arnd and Maxime suggested this replaces the unconditional setting of
-> smp_ops[1] with a fixup that inserts an appropriate property in the
-> device-tree if needed. It turned out not to be terribly tricky to
-> implement that checked each possible CPU node. One assumption I've made
-> is that the cpu nodes are numbered contiguously but that seems to be
-> reasonable.
+> While trying to implement earlycon support on Vybrid SoC, it
+> turned out that set_fixmap does not support calls at that early
+> stage. This patch picks up code/ideas from Rob's and Mark's
+> patches supporting early_ioremap and fixmap support from Rob's
+> git tree. This patch only adds the necessary bits to extend
+> fixmap API for earlycon.
+> https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=arm-fixmap
 
-In general, that's not a good assumption, but may be okay for Armada.
+Given, I wrote some of this, feel free to add my SOB. It all looks
+good to me. One minor spelling error below though.
 
-> [1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309766.html
+It would be nice if you could re-factor the early_ioremap support on
+top of this, too.
 
-I'm not really convinced this is better than a 1-line function...
-
+> Also aligned the implementation somewhat how it is done for arm64
+> in Laura's patch af86e5974d30 ("arm64: Factor out fixmap
+> initialization from ioremap").
 >
->  arch/arm/mach-mvebu/board-v7.c | 42 +++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 41 insertions(+), 1 deletion(-)
+> Tested with CONFIG_DEBUG_SET_MODULE_RONX which makes use of fixmap
+> support too.
 >
-> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-> index d0d39f1..08eb6a9 100644
-> --- a/arch/arm/mach-mvebu/board-v7.c
-> +++ b/arch/arm/mach-mvebu/board-v7.c
-> @@ -17,6 +17,8 @@
->  #include <linux/clk-provider.h>
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/libfdt.h>
->  #include <linux/io.h>
->  #include <linux/clocksource.h>
->  #include <linux/dma-mapping.h>
-> @@ -198,6 +200,44 @@ static void __init mvebu_dt_init(void)
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  arch/arm/Kconfig              |  3 ++
+>  arch/arm/include/asm/fixmap.h | 13 +++++++-
+>  arch/arm/kernel/setup.c       |  3 ++
+>  arch/arm/mm/highmem.c         |  6 ++--
+>  arch/arm/mm/mmu.c             | 76 +++++++++++++++++++++++++++++++++++++++++--
+>  5 files changed, 94 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 97d07ed..3a73cca 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -183,6 +183,9 @@ config ARCH_HAS_ILOG2_U64
+>  config ARCH_HAS_BANDGAP
+>         bool
+>
+> +config FIX_EARLYCON_MEM
+> +       def_bool y
+> +
+>  config GENERIC_HWEIGHT
+>         bool
+>         default y
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 0415eae..2d8b12b 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -6,9 +6,13 @@
+>  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
+>
+>  #include <asm/kmap_types.h>
+> +#include <asm/pgtable.h>
+>
+>  enum fixed_addresses {
+> -       FIX_KMAP_BEGIN,
+> +       FIX_EARLYCON_MEM_BASE,
+> +       __end_of_permanent_fixed_addresses,
+> +
+> +       FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
+>         FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
+>
+>         /* Support writing RO kernel text via kprobes, jump labels, etc. */
+> @@ -18,7 +22,14 @@ enum fixed_addresses {
+>         __end_of_fixed_addresses
+>  };
+>
+> +#define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+> +
+> +#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+> +#define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
+> +#define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
+> +
+>  void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+> +void __init early_fixmap_init(void);
+>
+>  #include <asm-generic/fixmap.h>
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index f9c8639..015eade 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -37,6 +37,7 @@
+>  #include <asm/cpu.h>
+>  #include <asm/cputype.h>
+>  #include <asm/elf.h>
+> +#include <asm/fixmap.h>
+>  #include <asm/procinfo.h>
+>  #include <asm/psci.h>
+>  #include <asm/sections.h>
+> @@ -916,6 +917,8 @@ void __init setup_arch(char **cmdline_p)
+>         strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
+>         *cmdline_p = cmd_line;
+>
+> +       early_fixmap_init();
+> +
+>         parse_early_param();
+>
+>         early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
+> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+> index b98895d..c7097f9 100644
+> --- a/arch/arm/mm/highmem.c
+> +++ b/arch/arm/mm/highmem.c
+> @@ -78,7 +78,7 @@ void *kmap_atomic(struct page *page)
+>
+>         type = kmap_atomic_idx_push();
+>
+> -       idx = type + KM_TYPE_NR * smp_processor_id();
+> +       idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+>         vaddr = __fix_to_virt(idx);
+>  #ifdef CONFIG_DEBUG_HIGHMEM
+>         /*
+> @@ -105,7 +105,7 @@ void __kunmap_atomic(void *kvaddr)
+>
+>         if (kvaddr >= (void *)FIXADDR_START) {
+>                 type = kmap_atomic_idx();
+> -               idx = type + KM_TYPE_NR * smp_processor_id();
+> +               idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+>
+>                 if (cache_is_vivt())
+>                         __cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+> @@ -135,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+>                 return page_address(page);
+>
+>         type = kmap_atomic_idx_push();
+> -       idx = type + KM_TYPE_NR * smp_processor_id();
+> +       idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+>         vaddr = __fix_to_virt(idx);
+>  #ifdef CONFIG_DEBUG_HIGHMEM
+>         BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index cda7c40..d1f70dd 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -357,6 +357,47 @@ const struct mem_type *get_mem_type(unsigned int type)
 >  }
+>  EXPORT_SYMBOL(get_mem_type);
 >
-> +static void __init armada_370_xp_dt_fixup(void)
+> +static pte_t *(*pte_offset_fixmap)(pmd_t *dir, unsigned long addr);
+> +
+> +static pte_t bm_pte[PTRS_PER_PTE + PTE_HWTABLE_PTRS]
+> +       __aligned(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE) __initdata;
+> +
+> +static pte_t * __init pte_offset_early_fixmap(pmd_t *dir, unsigned long addr)
 > +{
-> +       int offset, node;
-> +       int i, len;
-> +       void *prop;
-> +       char buffer[20];
-> +       unsigned long root = of_get_flat_dt_root();
-> +
-> +       if (!IS_ENABLED(CONFIG_SMP) ||
-
-This doesn't need to be conditional on SMP. You should fixup the DT
-independent of kernel options.
-
-> +           !of_flat_dt_is_compatible(root, "marvell,armadaxp"))
-> +               return;
-> +
-> +       offset = fdt_path_offset(initial_boot_params, "/cpus");
-> +       if (offset < 0)
-> +               return;
-> +
-> +       prop = fdt_getprop(initial_boot_params, offset, "enable-method", &len);
-> +       if (prop)
-> +               return;
-> +
-> +       for (i = 0; i < NR_CPUS; i++) {
-> +               snprintf(buffer, sizeof(buffer), "cpu@%d", i);
-> +               node = fdt_subnode_offset(initial_boot_params, offset, buffer);
-
-You can use fdt_node_offset_by_compatible with the cpu compatible
-string here instead.
-
-> +               if (node < 0)
-> +                       break;
-> +               prop = fdt_getprop(initial_boot_params, node,
-> +                                  "enable-method", &len);
-
-Do you really need to search thru all of the nodes? enable-method
-should either be present on all or none.
-
-> +               if (prop)
-> +                       return;
-> +       }
-> +
-> +       pr_info("No enable-method defined. "
-> +               "Falling back to \"marvell,armada-xp-smp\"\n");
-> +
-> +       fdt_setprop(initial_boot_params, offset, "enable-method",
-> +                   "marvell,armada-xp-smp", sizeof("marvell,armada-xp-smp"));
-
-Use fdt_setprop_string here.
-
-enable-method is supposed to be a per cpu property. The Marvell berlin
-binding is wrong here and should not be copied.
-
-Rob
-
+> +       return &bm_pte[pte_index(addr)];
 > +}
 > +
->  static const char * const armada_370_xp_dt_compat[] = {
->         "marvell,armada-370-xp",
->         NULL,
-> @@ -206,11 +246,11 @@ static const char * const armada_370_xp_dt_compat[] = {
->  DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
->         .l2c_aux_val    = 0,
->         .l2c_aux_mask   = ~0,
-> -       .smp            = smp_ops(armada_xp_smp_ops),
->         .init_machine   = mvebu_dt_init,
->         .init_irq       = mvebu_init_irq,
->         .restart        = mvebu_restart,
->         .dt_compat      = armada_370_xp_dt_compat,
-> +       .dt_fixup       = armada_370_xp_dt_fixup,
->  MACHINE_END
+> +static pte_t *pte_offset_late_fixmap(pmd_t *dir, unsigned long addr)
+> +{
+> +       return pte_offset_kernel(dir, addr);
+> +}
+> +
+> +static inline pmd_t * __init fixmap_pmd(unsigned long addr)
+> +{
+> +       pgd_t *pgd = pgd_offset_k(addr);
+> +       pud_t *pud = pud_offset(pgd, addr);
+> +       pmd_t *pmd = pmd_offset(pud, addr);
+> +
+> +       return pmd;
+> +}
+> +
+> +void __init early_fixmap_init(void)
+> +{
+> +       pmd_t *pmd;
+> +
+> +       /*
+> +        * The early fixmap range spans multiple pmds, for which
+> +        * we are not preparted:
+
+s/preparted/prepared/
+
+> +        */
+> +       BUILD_BUG_ON((__fix_to_virt(__end_of_permanent_fixed_addresses) >> PMD_SHIFT)
+> +                    != FIXADDR_TOP >> PMD_SHIFT);
+> +
+> +       pmd = fixmap_pmd(FIXADDR_TOP);
+> +       pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> +
+> +       pte_offset_fixmap = &pte_offset_early_fixmap;
+> +}
+> +
+>  /*
+>   * To avoid TLB flush broadcasts, this uses local_flush_tlb_kernel_range().
+>   * As a result, this can only be called with preemption disabled, as under
+> @@ -365,7 +406,7 @@ EXPORT_SYMBOL(get_mem_type);
+>  void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
+>  {
+>         unsigned long vaddr = __fix_to_virt(idx);
+> -       pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
+> +       pte_t *pte = pte_offset_fixmap(pmd_off_k(vaddr), vaddr);
 >
->  static const char * const armada_375_dt_compat[] = {
+>         /* Make sure fixmap region does not exceed available allocation. */
+>         BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
+> @@ -855,7 +896,7 @@ static void __init create_mapping(struct map_desc *md)
+>         }
+>
+>         if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+> -           md->virtual >= PAGE_OFFSET &&
+> +           md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
+>             (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+>                 pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
+>                         (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+> @@ -1231,7 +1272,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+>
+>         early_trap_init(vectors);
+>
+> -       for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
+> +       for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
+>                 pmd_clear(pmd_off_k(addr));
+>
+>         /*
+> @@ -1508,6 +1549,34 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+>
+>  #endif
+>
+> +static void __init early_fixmap_shutdown(void)
+> +{
+> +       int i;
+> +
+> +       pte_offset_fixmap = &pte_offset_late_fixmap;
+> +       pmd_clear(fixmap_pmd(fix_to_virt(__end_of_permanent_fixed_addresses - 1)));
+> +
+> +       for (i = 0; i < __end_of_permanent_fixed_addresses; i++) {
+> +               pte_t *pte;
+> +               struct map_desc map;
+> +
+> +               map.virtual = fix_to_virt(i);
+> +               pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
+> +
+> +               /* Only i/o device mappings are supported ATM */
+> +               if (pte_none(*pte) ||
+> +                   (pte_val(*pte) & L_PTE_MT_MASK) != L_PTE_MT_DEV_SHARED)
+> +                       continue;
+> +
+> +               map.pfn = pte_pfn(*pte);
+> +               map.type = MT_DEVICE;
+> +               map.length = PAGE_SIZE;
+> +
+> +               create_mapping(&map);
+> +       }
+> +}
+> +
+> +
+>  /*
+>   * paging_init() sets up the page tables, initialises the zone memory
+>   * maps, and sets up the zero page, bad page and bad page tables.
+> @@ -1520,6 +1589,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+>         prepare_page_table();
+>         map_lowmem();
+>         dma_contiguous_remap();
+> +       early_fixmap_shutdown();
+>         devicemaps_init(mdesc);
+>         kmap_init();
+>         tcm_init();
 > --
-> 2.2.0.rc0
+> 2.2.1
 >
 >
 > _______________________________________________
