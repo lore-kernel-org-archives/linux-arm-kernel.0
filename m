@@ -1,310 +1,229 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 27 Dec 2014 21:24:30 -0600
-Subject: [PATCH RFC] ARM: early fixmap support for earlycon
-In-Reply-To: <1419714491-28564-1-git-send-email-stefan@agner.ch>
-References: <1419714491-28564-1-git-send-email-stefan@agner.ch>
-Message-ID: <CAL_Jsq+Sy-ovfrOeY55tWjiXejtkRLMdC2Y56Mn9hsaTeNm1qA@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sat, 27 Dec 2014 20:50:16 -0800
+Subject: [PATCH v2 3/5] input: misc: add tps65218 power button driver
+In-Reply-To: <1419651408-529-1-git-send-email-balbi@ti.com>
+References: <20141226234117.GA1071@dtor-ws>
+ <1419651408-529-1-git-send-email-balbi@ti.com>
+Message-ID: <20141228045016.GA5501@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 27, 2014 at 3:08 PM, Stefan Agner <stefan@agner.ch> wrote:
+On Fri, Dec 26, 2014 at 09:36:48PM -0600, Felipe Balbi wrote:
+> With this driver, we can report KEY_POWER on
+> AM437x SK. This patch has been tested with said
+> board.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Thanks for picking this up.
+Applied, thank you.
 
-> Add early fixmap support, initially to support permanent, fixed
-> mapping support for early console. A temporary, early pte is
-> created which is migrated to a permanent mapping in paging_init.
-> This is also needed since the attributs may change as the memory
-
-s/attributs/attributes/
-
-I would like to fix this problem. I think it can be if we setup
-memtype table earlier. The complication is some of it is dependent on
-cache_policy. The device memory types don't depend on cache_policy, so
-they could be setup early and used. I think that can all be done after
-this patch.
-
-> types are initialized. The 3MiB range of fixmap spans two pte
-> tables, but currently only one pte is created for early fixmap
-> support.
->
-> Readd FIX_KMAP_BEGIN to the index calculation in highmem.c since
-
-s/Readd/Re-add/
-
-> the index for kmap does not start at zero anymore. This reverts
-> 4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
-> FIX_KMAP_END") to some extends.
-
-s/extends/extent/
-
->
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
-> While trying to implement earlycon support on Vybrid SoC, it
-> turned out that set_fixmap does not support calls at that early
-> stage. This patch picks up code/ideas from Rob's and Mark's
-> patches supporting early_ioremap and fixmap support from Rob's
-> git tree. This patch only adds the necessary bits to extend
-> fixmap API for earlycon.
-> https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=arm-fixmap
-
-Given, I wrote some of this, feel free to add my SOB. It all looks
-good to me. One minor spelling error below though.
-
-It would be nice if you could re-factor the early_ioremap support on
-top of this, too.
-
-> Also aligned the implementation somewhat how it is done for arm64
-> in Laura's patch af86e5974d30 ("arm64: Factor out fixmap
-> initialization from ioremap").
->
-> Tested with CONFIG_DEBUG_SET_MODULE_RONX which makes use of fixmap
-> support too.
->
->  arch/arm/Kconfig              |  3 ++
->  arch/arm/include/asm/fixmap.h | 13 +++++++-
->  arch/arm/kernel/setup.c       |  3 ++
->  arch/arm/mm/highmem.c         |  6 ++--
->  arch/arm/mm/mmu.c             | 76 +++++++++++++++++++++++++++++++++++++++++--
->  5 files changed, 94 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 97d07ed..3a73cca 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -183,6 +183,9 @@ config ARCH_HAS_ILOG2_U64
->  config ARCH_HAS_BANDGAP
->         bool
->
-> +config FIX_EARLYCON_MEM
-> +       def_bool y
+> 
+> Changes since v1:
+> 	- Add device tree documentation
+> 	- s/ret/error
+> 	- removed 'pressed' as input core will filter events
+> 	- use a saner name when requesting IRQ. dev_name(dev) will return
+> 		$i2c_bus_address.i2c-omap:0-0024:tps65218-pwrbutton
+> 	- remove blank line before MODULE_DEVICE_TABLE()
+> 
+>  .../bindings/input/tps65218-pwrbutton.txt          |  17 +++
+>  drivers/input/misc/Kconfig                         |  10 ++
+>  drivers/input/misc/Makefile                        |   1 +
+>  drivers/input/misc/tps65218-pwrbutton.c            | 124 +++++++++++++++++++++
+>  4 files changed, 152 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+>  create mode 100644 drivers/input/misc/tps65218-pwrbutton.c
+> 
+> diff --git a/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt b/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+> new file mode 100644
+> index 0000000..e30e0b9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+> @@ -0,0 +1,17 @@
+> +Texas Instruments TPS65218 power button
 > +
->  config GENERIC_HWEIGHT
->         bool
->         default y
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 0415eae..2d8b12b 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -6,9 +6,13 @@
->  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
->
->  #include <asm/kmap_types.h>
-> +#include <asm/pgtable.h>
->
->  enum fixed_addresses {
-> -       FIX_KMAP_BEGIN,
-> +       FIX_EARLYCON_MEM_BASE,
-> +       __end_of_permanent_fixed_addresses,
+> +This driver provides a simple power button event via an Interrupt.
 > +
-> +       FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
->         FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
->
->         /* Support writing RO kernel text via kprobes, jump labels, etc. */
-> @@ -18,7 +22,14 @@ enum fixed_addresses {
->         __end_of_fixed_addresses
->  };
->
-> +#define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+> +Required properties:
+> +- compatible: should be "ti,tps65218-pwrbutton"
+> +- interrupts: should be one of the following
+> +   - <3 IRQ_TYPE_EDGE_BOTH>: For controllers compatible with tps65218
 > +
-> +#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-> +#define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
-> +#define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
+> +Example:
 > +
->  void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
-> +void __init early_fixmap_init(void);
->
->  #include <asm-generic/fixmap.h>
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index f9c8639..015eade 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -37,6 +37,7 @@
->  #include <asm/cpu.h>
->  #include <asm/cputype.h>
->  #include <asm/elf.h>
-> +#include <asm/fixmap.h>
->  #include <asm/procinfo.h>
->  #include <asm/psci.h>
->  #include <asm/sections.h>
-> @@ -916,6 +917,8 @@ void __init setup_arch(char **cmdline_p)
->         strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
->         *cmdline_p = cmd_line;
->
-> +       early_fixmap_init();
+> +&tps {
+> +	power-button {
+> +		compatible = "ti,tps65218-pwrbutton";
+> +		interrupts = <3 IRQ_TYPE_EDGE_BOTH>;
+> +	};
+> +};
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index 23297ab..364cfb8 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -404,6 +404,16 @@ config INPUT_RETU_PWRBUTTON
+>  	  To compile this driver as a module, choose M here. The module will
+>  	  be called retu-pwrbutton.
+>  
+> +config INPUT_TPS65218_PWRBUTTON
+> +	tristate "TPS65218 Power button driver"
+> +	depends on MFD_TPS65218
+> +	help
+> +	  Say Y here if you want to enable power buttong reporting for
+> +	  the TPS65218 Power Management IC device.
 > +
->         parse_early_param();
->
->         early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index b98895d..c7097f9 100644
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -78,7 +78,7 @@ void *kmap_atomic(struct page *page)
->
->         type = kmap_atomic_idx_push();
->
-> -       idx = type + KM_TYPE_NR * smp_processor_id();
-> +       idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
->         vaddr = __fix_to_virt(idx);
->  #ifdef CONFIG_DEBUG_HIGHMEM
->         /*
-> @@ -105,7 +105,7 @@ void __kunmap_atomic(void *kvaddr)
->
->         if (kvaddr >= (void *)FIXADDR_START) {
->                 type = kmap_atomic_idx();
-> -               idx = type + KM_TYPE_NR * smp_processor_id();
-> +               idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
->
->                 if (cache_is_vivt())
->                         __cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
-> @@ -135,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
->                 return page_address(page);
->
->         type = kmap_atomic_idx_push();
-> -       idx = type + KM_TYPE_NR * smp_processor_id();
-> +       idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
->         vaddr = __fix_to_virt(idx);
->  #ifdef CONFIG_DEBUG_HIGHMEM
->         BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index cda7c40..d1f70dd 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -357,6 +357,47 @@ const struct mem_type *get_mem_type(unsigned int type)
->  }
->  EXPORT_SYMBOL(get_mem_type);
->
-> +static pte_t *(*pte_offset_fixmap)(pmd_t *dir, unsigned long addr);
+> +	  To compile this driver as a module, choose M here. The module will
+> +	  be called tps65218-pwrbutton.
 > +
-> +static pte_t bm_pte[PTRS_PER_PTE + PTE_HWTABLE_PTRS]
-> +       __aligned(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE) __initdata;
+>  config INPUT_TWL4030_PWRBUTTON
+>  	tristate "TWL4030 Power button Driver"
+>  	depends on TWL4030_CORE
+> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+> index 19c7603..a923753 100644
+> --- a/drivers/input/misc/Makefile
+> +++ b/drivers/input/misc/Makefile
+> @@ -59,6 +59,7 @@ obj-$(CONFIG_INPUT_SGI_BTNS)		+= sgi_btns.o
+>  obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc-onkey.o
+>  obj-$(CONFIG_INPUT_SOC_BUTTON_ARRAY)	+= soc_button_array.o
+>  obj-$(CONFIG_INPUT_SPARCSPKR)		+= sparcspkr.o
+> +obj-$(CONFIG_INPUT_TPS65218_PWRBUTTON)	+= tps65218-pwrbutton.o
+>  obj-$(CONFIG_INPUT_TWL4030_PWRBUTTON)	+= twl4030-pwrbutton.o
+>  obj-$(CONFIG_INPUT_TWL4030_VIBRA)	+= twl4030-vibra.o
+>  obj-$(CONFIG_INPUT_TWL6040_VIBRA)	+= twl6040-vibra.o
+> diff --git a/drivers/input/misc/tps65218-pwrbutton.c b/drivers/input/misc/tps65218-pwrbutton.c
+> new file mode 100644
+> index 0000000..2f85e2e
+> --- /dev/null
+> +++ b/drivers/input/misc/tps65218-pwrbutton.c
+> @@ -0,0 +1,124 @@
+> +/*
+> + * Texas Instruments' TPS65218 Power Button Input Driver
+> + *
+> + * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
+> + * Author: Felipe Balbi <balbi@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 > +
-> +static pte_t * __init pte_offset_early_fixmap(pmd_t *dir, unsigned long addr)
+> +#include <linux/init.h>
+> +#include <linux/input.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/tps65218.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +struct tps65218_pwrbutton {
+> +	struct device *dev;
+> +	struct tps65218 *tps;
+> +	struct input_dev *idev;
+> +};
+> +
+> +static irqreturn_t tps65218_pwr_irq(int irq, void *_pwr)
 > +{
-> +       return &bm_pte[pte_index(addr)];
+> +	struct tps65218_pwrbutton *pwr = _pwr;
+> +	unsigned int reg;
+> +	int error;
+> +
+> +	error = tps65218_reg_read(pwr->tps, TPS65218_REG_STATUS, &reg);
+> +	if (error) {
+> +		dev_err(pwr->dev, "can't read register --> %d\n", error);
+> +		goto out;
+> +	}
+> +
+> +	if (reg & TPS65218_STATUS_PB_STATE) {
+> +		input_report_key(pwr->idev, KEY_POWER, 1);
+> +		pm_wakeup_event(pwr->dev, 0);
+> +	} else {
+> +		input_report_key(pwr->idev, KEY_POWER, 0);
+> +	}
+> +
+> +	input_sync(pwr->idev);
+> +
+> +out:
+> +	return IRQ_HANDLED;
 > +}
 > +
-> +static pte_t *pte_offset_late_fixmap(pmd_t *dir, unsigned long addr)
+> +static int tps65218_pwron_probe(struct platform_device *pdev)
 > +{
-> +       return pte_offset_kernel(dir, addr);
+> +	struct tps65218 *tps = dev_get_drvdata(pdev->dev.parent);
+> +	struct device *dev = &pdev->dev;
+> +	struct tps65218_pwrbutton *pwr;
+> +	struct input_dev *idev;
+> +	int error;
+> +	int irq;
+> +
+> +	pwr = devm_kzalloc(dev, sizeof(*pwr), GFP_KERNEL);
+> +	if (!pwr)
+> +		return -ENOMEM;
+> +
+> +	idev = devm_input_allocate_device(dev);
+> +	if (!idev)
+> +		return -ENOMEM;
+> +
+> +	idev->name = "tps65218_pwrbutton";
+> +	idev->phys = "tps65218_pwrbutton/input0";
+> +	idev->dev.parent = dev;
+> +	idev->id.bustype = BUS_I2C;
+> +
+> +	input_set_capability(idev, EV_KEY, KEY_POWER);
+> +
+> +	pwr->tps = tps;
+> +	pwr->dev = dev;
+> +	pwr->idev = idev;
+> +	platform_set_drvdata(pdev, pwr);
+> +	device_init_wakeup(dev, true);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	error = devm_request_threaded_irq(dev, irq, NULL, tps65218_pwr_irq,
+> +			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+> +			"tps65218-pwrbutton", pwr);
+> +	if (error) {
+> +		dev_err(dev, "failed to request IRQ #%d --> %d\n",
+> +				irq, error);
+> +		return error;
+> +	}
+> +
+> +	error= input_register_device(idev);
+> +	if (error) {
+> +		dev_err(dev, "Can't register power button --> %d\n", error);
+> +		return error;
+> +	}
+> +
+> +	return 0;
 > +}
 > +
-> +static inline pmd_t * __init fixmap_pmd(unsigned long addr)
-> +{
-> +       pgd_t *pgd = pgd_offset_k(addr);
-> +       pud_t *pud = pud_offset(pgd, addr);
-> +       pmd_t *pmd = pmd_offset(pud, addr);
+> +static struct of_device_id of_tps65218_pwr_match[] = {
+> +	{ .compatible = "ti,tps65218-pwrbutton" },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, of_tps65218_pwr_match);
 > +
-> +       return pmd;
-> +}
+> +static struct platform_driver tps65218_pwron_driver = {
+> +	.probe	= tps65218_pwron_probe,
+> +	.driver	= {
+> +		.name	= "tps65218_pwrbutton",
+> +		.of_match_table = of_tps65218_pwr_match,
+> +	},
+> +};
+> +module_platform_driver(tps65218_pwron_driver);
 > +
-> +void __init early_fixmap_init(void)
-> +{
-> +       pmd_t *pmd;
-> +
-> +       /*
-> +        * The early fixmap range spans multiple pmds, for which
-> +        * we are not preparted:
+> +MODULE_DESCRIPTION("TPS65218 Power Button");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
+> -- 
+> 2.2.0
+> 
 
-s/preparted/prepared/
-
-> +        */
-> +       BUILD_BUG_ON((__fix_to_virt(__end_of_permanent_fixed_addresses) >> PMD_SHIFT)
-> +                    != FIXADDR_TOP >> PMD_SHIFT);
-> +
-> +       pmd = fixmap_pmd(FIXADDR_TOP);
-> +       pmd_populate_kernel(&init_mm, pmd, bm_pte);
-> +
-> +       pte_offset_fixmap = &pte_offset_early_fixmap;
-> +}
-> +
->  /*
->   * To avoid TLB flush broadcasts, this uses local_flush_tlb_kernel_range().
->   * As a result, this can only be called with preemption disabled, as under
-> @@ -365,7 +406,7 @@ EXPORT_SYMBOL(get_mem_type);
->  void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
->  {
->         unsigned long vaddr = __fix_to_virt(idx);
-> -       pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
-> +       pte_t *pte = pte_offset_fixmap(pmd_off_k(vaddr), vaddr);
->
->         /* Make sure fixmap region does not exceed available allocation. */
->         BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
-> @@ -855,7 +896,7 @@ static void __init create_mapping(struct map_desc *md)
->         }
->
->         if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
-> -           md->virtual >= PAGE_OFFSET &&
-> +           md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
->             (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
->                 pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
->                         (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
-> @@ -1231,7 +1272,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
->
->         early_trap_init(vectors);
->
-> -       for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
-> +       for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
->                 pmd_clear(pmd_off_k(addr));
->
->         /*
-> @@ -1508,6 +1549,34 @@ void __init early_paging_init(const struct machine_desc *mdesc,
->
->  #endif
->
-> +static void __init early_fixmap_shutdown(void)
-> +{
-> +       int i;
-> +
-> +       pte_offset_fixmap = &pte_offset_late_fixmap;
-> +       pmd_clear(fixmap_pmd(fix_to_virt(__end_of_permanent_fixed_addresses - 1)));
-> +
-> +       for (i = 0; i < __end_of_permanent_fixed_addresses; i++) {
-> +               pte_t *pte;
-> +               struct map_desc map;
-> +
-> +               map.virtual = fix_to_virt(i);
-> +               pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
-> +
-> +               /* Only i/o device mappings are supported ATM */
-> +               if (pte_none(*pte) ||
-> +                   (pte_val(*pte) & L_PTE_MT_MASK) != L_PTE_MT_DEV_SHARED)
-> +                       continue;
-> +
-> +               map.pfn = pte_pfn(*pte);
-> +               map.type = MT_DEVICE;
-> +               map.length = PAGE_SIZE;
-> +
-> +               create_mapping(&map);
-> +       }
-> +}
-> +
-> +
->  /*
->   * paging_init() sets up the page tables, initialises the zone memory
->   * maps, and sets up the zero page, bad page and bad page tables.
-> @@ -1520,6 +1589,7 @@ void __init paging_init(const struct machine_desc *mdesc)
->         prepare_page_table();
->         map_lowmem();
->         dma_contiguous_remap();
-> +       early_fixmap_shutdown();
->         devicemaps_init(mdesc);
->         kmap_init();
->         tcm_init();
-> --
-> 2.2.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Dmitry
