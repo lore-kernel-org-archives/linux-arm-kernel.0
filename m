@@ -1,62 +1,30 @@
-From: wangweidong1@huawei.com (Wang Weidong)
-Date: Mon, 29 Dec 2014 10:58:35 +0800
-Subject: [Ask for HELP] Should it support ustat syscall for arm64
-Message-ID: <54A0C35B.4010001@huawei.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 28 Dec 2014 19:30:17 +0100
+Subject: [PATCH V2] clk: mxs: Fix invalid 32-bit access to frac registers
+In-Reply-To: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+References: <1419762402-4548-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <201412281930.17676.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sunday, December 28, 2014 at 11:26:42 AM, Stefan Wahren wrote:
+> According to i.MX23 and i.MX28 reference manual the fractional
+> clock control registers must be addressed by byte instructions.
+> 
+> This patch fixes the erroneous 32-bit access to these registers
+> and extends the comment in the init functions.
+> 
+> Btw the imx23 init now uses a R-M-W sequence just like imx28 init
+> to avoid any clock glitches.
+> 
+> The changes has been tested only with a i.MX28 board, because i don't
+> have access to an i.MX23 board.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-As I ran LTP testcase ustat01 and ustat02 on Arm64, and got the result:
+I don't see a problem,
 
-ustat01     1  TFAIL  :  ustat(2) failed and setthe errno to 38 : Function not implemented
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-ustat02     1  TFAIL  :  ustat(2) failed to produce expected error; 22, errno: EINVAL:
-                         TEST_ERRNO=ENOSYS(38): Function not implemented
-ustat02     2  TFAIL  :  ustat(2) failed to produce expected error; 14, errno: EFAULT:
-                         TEST_ERRNO=ENOSYS(38): Function not implemented
-
------------------------
-
-I found the glibc and kernel's implementation:
-The glibc version is 2.19, kernel is 3.16.
-
-The glibc will use the sysdeps/unix/sysv/linux/generic/ustat.c
-But it only return ENOSYS.
-
-The kernel doesn't support the NR_ustat syscall.
-
-So I did that:
-1. In glibc:
-I changed the sysdeps/unix/sysv/linux/generic/ustat.c:
-
--#include <errno.h>
--#include <sys/ustat.h>
-+#define __ARCH_WANT_SYSCALL_DEPRECATED
-+#include <sysdeps/unix/sysv/linux/ustat.c>
- 
--#include <sysdep.h>
--#include <sys/syscall.h>
--
--/* This deprecated syscall is no longer used (replaced with fstat).  */
--int
--ustat (dev_t dev, struct ustat *ubuf)
--{
--  __set_errno (ENOSYS);
--  return -1;
--}
--stub_warning (ustat)
-
-2. In Kernel:
-I changed the arch/arm64/include/uapi/asm/unistd.h:
-
-+#define __ARCH_WANT_SYSCALL_DEPRECATED
-+#define __ARCH_WANT_SYS_FORK
-+#define __ARCH_WANT_SYS_VFORK
-
-After the changing, These cases will Pass.
-
-So, Does it need to support ustat syscall for arm64?
-
-Regards,
-Wang
+Best regards,
+Marek Vasut
