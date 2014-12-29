@@ -1,100 +1,96 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 30 Dec 2014 00:32:06 +0100
-Subject: [PATCH v2 03/12] irqchip: vf610-mscm: support NVIC parent
+Date: Tue, 30 Dec 2014 00:32:07 +0100
+Subject: [PATCH v2 04/12] irqchip: nvic: increase number of external
+ interrupts to 112
 In-Reply-To: <1419895935-22966-1-git-send-email-stefan@agner.ch>
 References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
-Message-ID: <1419895935-22966-4-git-send-email-stefan@agner.ch>
+Message-ID: <1419895935-22966-5-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the NVIC interrupt controller as node parent of the MSCM
-interrupt router. On the dual-core variants of Vybird (VF6xx), the
-NVIC interrupt controller is used by the Cortex-M4. To support
-running Linux on this core too, MSCM needs NVIC parent support too.
+So far, only vectors for up to 48 external interrupts have been
+allocated in the vector table. The first 16 vectors of the vector
+table are reserved for internal exceptions (Reset, SVC...). The
+external interrupts start at offset 16. Hence, by increasing the
+vector table to 128 vectors, we increase the amount of vectors
+reserved for external interrupts to 112. Also, only register the
+amount of IRQ's we have vectors available for.
+
+Note: the vector table must align to the number of entries in the
+vector table, hence increase the alignment to 0x200.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/irqchip/irq-vf610-mscm.c | 31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+When I started developing, I added UART0 with IRQ 61 to the device
+tree. The framework happily accepted that, even though only 48
+vectors for external interrupts were available. This was the
+initial reason I added the WARN (in v1). However, when thinking
+about it, just registering the amount of IRQ's actually supported
+according to the vector table makes much more sense, since this
+would warn the user on the offending IRQ's request call...
 
-diff --git a/drivers/irqchip/irq-vf610-mscm.c b/drivers/irqchip/irq-vf610-mscm.c
-index 7a284d5..f4f7d78 100644
---- a/drivers/irqchip/irq-vf610-mscm.c
-+++ b/drivers/irqchip/irq-vf610-mscm.c
-@@ -30,6 +30,7 @@ struct vf610_mscm_chip_data {
- 	void __iomem *mscm_base;
- 	u16 cpu_mask;
- 	u16 saved_irsprc[MSCM_IRSPRC_NUM];
-+	bool is_nvic;
- };
+ arch/arm/kernel/entry-v7m.S | 8 ++++----
+ drivers/irqchip/irq-nvic.c  | 9 +++++++++
+ 2 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index 2260f18..c38a5e5 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -115,9 +115,9 @@ ENTRY(__switch_to)
+ ENDPROC(__switch_to)
  
- static struct vf610_mscm_chip_data *mscm_data;
-@@ -74,6 +75,7 @@ static void vf610_mscm_enable(struct irq_data *data)
+ 	.data
+-	.align	8
++	.align	9
+ /*
+- * Vector table (64 words => 256 bytes natural alignment)
++ * Vector table (128 words => 512 bytes natural alignment)
+  */
+ ENTRY(vector_table)
+ 	.long	0			@ 0 - Reset stack pointer
+@@ -136,6 +136,6 @@ ENTRY(vector_table)
+ 	.long	__invalid_entry		@ 13 - Reserved
+ 	.long	__pendsv_entry		@ 14 - PendSV
+ 	.long	__invalid_entry		@ 15 - SysTick
+-	.rept	64 - 16
+-	.long	__irq_entry		@ 16..64 - External Interrupts
++	.rept	128 - 16
++	.long	__irq_entry		@ 16..128 - External Interrupts
+ 	.endr
+diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
+index 5fac910..740cc55 100644
+--- a/drivers/irqchip/irq-nvic.c
++++ b/drivers/irqchip/irq-nvic.c
+@@ -38,6 +38,11 @@
+  * 16 irqs.
+  */
+ #define NVIC_MAX_IRQ		((NVIC_MAX_BANKS - 1) * 32 + 16)
++/*
++ * Number of IRQ's supported is limited by the size of the vector table
++ * defined in entry-v7m.S
++ */
++#define NVIC_MAX_IRQ_VECTORS	(128 - 16)
+ 
+ static struct irq_domain *nvic_irq_domain;
+ 
+@@ -46,6 +51,8 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
  {
- 	irq_hw_number_t hwirq = data->hwirq;
- 	struct vf610_mscm_chip_data *chip_data = data->chip_data;
-+	struct irq_data *parent = data->parent_data;
- 	u16 irsprc;
+ 	unsigned int irq = irq_linear_revmap(nvic_irq_domain, hwirq);
  
- 	irsprc = readw_relaxed(chip_data->mscm_base + MSCM_IRSPRC(hwirq));
-@@ -84,17 +86,24 @@ static void vf610_mscm_enable(struct irq_data *data)
- 	writew_relaxed(chip_data->cpu_mask,
- 		       chip_data->mscm_base + MSCM_IRSPRC(hwirq));
- 
--	irq_chip_unmask_parent(data);
-+	if (parent->chip->irq_enable)
-+		parent->chip->irq_enable(parent);
-+	else
-+		parent->chip->irq_unmask(parent);
++	BUG_ON(hwirq >= NVIC_MAX_IRQ_VECTORS);
++
+ 	handle_IRQ(irq, regs);
  }
  
- static void vf610_mscm_disable(struct irq_data *data)
- {
- 	irq_hw_number_t hwirq = data->hwirq;
- 	struct vf610_mscm_chip_data *chip_data = data->chip_data;
-+	struct irq_data *parent = data->parent_data;
+@@ -93,6 +100,8 @@ static int __init nvic_of_init(struct device_node *node,
+ 	irqs = numbanks * 32;
+ 	if (irqs > NVIC_MAX_IRQ)
+ 		irqs = NVIC_MAX_IRQ;
++	if (irqs > NVIC_MAX_IRQ_VECTORS)
++		irqs = NVIC_MAX_IRQ_VECTORS;
  
- 	writew_relaxed(0x0, chip_data->mscm_base + MSCM_IRSPRC(hwirq));
- 
--	irq_chip_mask_parent(data);
-+	if (parent->chip->irq_enable)
-+		parent->chip->irq_disable(parent);
-+	else
-+		parent->chip->irq_mask(parent);
- }
- 
- static struct irq_chip vf610_mscm_irq_chip = {
-@@ -126,10 +135,17 @@ static int vf610_mscm_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 					      domain->host_data);
- 
- 	gic_data.np = domain->parent->of_node;
--	gic_data.args_count = 3;
--	gic_data.args[0] = GIC_SPI;
--	gic_data.args[1] = irq_data->args[0];
--	gic_data.args[2] = irq_data->args[1];
-+
-+	if (mscm_data->is_nvic) {
-+		gic_data.args_count = 1;
-+		gic_data.args[0] = irq_data->args[0];
-+	} else {
-+		gic_data.args_count = 3;
-+		gic_data.args[0] = GIC_SPI;
-+		gic_data.args[1] = irq_data->args[0];
-+		gic_data.args[2] = irq_data->args[1];
-+	}
-+
- 	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
- }
- 
-@@ -171,6 +187,9 @@ static int __init vf610_mscm_of_init(struct device_node *node,
- 		goto out_unmap;
- 	}
- 
-+	if (of_device_is_compatible(domain->parent->of_node, "arm,armv7m-nvic"))
-+		mscm_data->is_nvic = true;
-+
- 	mscm_data->cpu_mask = 0x1 << readl_relaxed(mscm_data->mscm_base + MSCM_CPxNUM);
- 
- 	cpu_pm_register_notifier(&mscm_notifier_block);
+ 	nvic_irq_domain =
+ 		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
 -- 
 2.2.1
