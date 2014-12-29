@@ -1,168 +1,43 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 29 Dec 2014 15:16:53 -0800
-Subject: [PATCH v8 3/6] input: misc: Add driver for AXP20x Power Enable Key
-In-Reply-To: <1419303194-3075-4-git-send-email-wens@csie.org>
-References: <1419303194-3075-1-git-send-email-wens@csie.org>
- <1419303194-3075-4-git-send-email-wens@csie.org>
-Message-ID: <20141229231653.GH9565@dtor-ws>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 30 Dec 2014 00:32:04 +0100
+Subject: [PATCH v2 01/12] genirq: generic chip: support hierarchy domain
+In-Reply-To: <1419895935-22966-1-git-send-email-stefan@agner.ch>
+References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
+Message-ID: <1419895935-22966-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 23, 2014 at 10:53:11AM +0800, Chen-Yu Tsai wrote:
-> From: Carlo Caione <carlo@caione.org>
-> 
-> This patch add support for the Power Enable Key found on MFD AXP202 and
-> AXP209. Besides the basic support for the button, the driver adds two
-> entries in sysfs to configure the time delay for power on/off.
-> 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> [wens at csie.org: make axp20x_pek_remove() static; remove driver owner field]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Use the new helper function irq_domain_set_info to make sure the
+function irq_domain_set_hwirq_and_chip is being called, which is
+crucial to save irqdomain specific data to irq_data.
 
-Hmm, it looks like MFD parts are in mainline, so I can actually pick
-this up myself. OK.
-
-By the way, does driver works for you with the patch below?
-
-Thanks.
-
--- 
-Dmitry
-
-Input: axp20x-pek - switch over to using attribute group
-
-From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
-Instead of registering device attributes individually let's use attribute
-groups and also devm_* infrastructure to ease cleanup.
-
-Refresh of synaptics-forcepad-pnp.patch
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/input/misc/axp20x-pek.c |   64 ++++++++++++++++++++++-----------------
- 1 file changed, 36 insertions(+), 28 deletions(-)
+ kernel/irq/generic-chip.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
-index 8dbd097..f1c8447 100644
---- a/drivers/input/misc/axp20x-pek.c
-+++ b/drivers/input/misc/axp20x-pek.c
-@@ -138,17 +138,28 @@ static ssize_t axp20x_store_ext_attr(struct device *dev,
- 				 axp20x_ea->mask, idx);
- 	if (ret != 0)
- 		return -EINVAL;
-+
- 	return count;
- }
- 
- static struct dev_ext_attribute axp20x_dev_attr_startup = {
- 	.attr	= __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
--	.var	= &axp20x_pek_startup_ext_attr
-+	.var	= &axp20x_pek_startup_ext_attr,
- };
- 
- static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
- 	.attr	= __ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
--	.var	= &axp20x_pek_shutdown_ext_attr
-+	.var	= &axp20x_pek_shutdown_ext_attr,
-+};
-+
-+static struct attribute *axp20x_attributes[] = {
-+	&axp20x_dev_attr_startup.attr.attr,
-+	&axp20x_dev_attr_shutdown.attr.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group axp20x_attribute_group = {
-+	.attrs = axp20x_attributes,
- };
- 
- static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
-@@ -166,6 +177,13 @@ static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
- 	return IRQ_HANDLED;
- }
- 
-+static void axp20x_remove_sysfs_group(void *_data)
-+{
-+	struct device *dev = _data;
-+
-+	sysfs_remove_group(&dev->kobj, &axp20x_attribute_group);
-+}
-+
- static int axp20x_pek_probe(struct platform_device *pdev)
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index 61024e8..15b370d 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -360,7 +360,7 @@ static struct lock_class_key irq_nested_lock_class;
+ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 			 irq_hw_number_t hw_irq)
  {
- 	struct axp20x_pek *axp20x_pek;
-@@ -214,12 +232,11 @@ static int axp20x_pek_probe(struct platform_device *pdev)
- 	input_set_drvdata(idev, axp20x_pek);
+-	struct irq_data *data = irq_get_irq_data(virq);
++	struct irq_data *data = irq_domain_get_irq_data(d, virq);
+ 	struct irq_domain_chip_generic *dgc = d->gc;
+ 	struct irq_chip_generic *gc;
+ 	struct irq_chip_type *ct;
+@@ -405,8 +405,7 @@ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 	else
+ 		data->mask = 1 << idx;
  
- 	error = devm_request_any_context_irq(&pdev->dev, axp20x_pek->irq_dbr,
--					  axp20x_pek_irq, 0,
--					  "axp20x-pek-dbr", idev);
-+					     axp20x_pek_irq, 0,
-+					     "axp20x-pek-dbr", idev);
- 	if (error < 0) {
- 		dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
- 			axp20x_pek->irq_dbr, error);
--
- 		return error;
- 	}
- 
-@@ -232,45 +249,36 @@ static int axp20x_pek_probe(struct platform_device *pdev)
- 		return error;
- 	}
- 
--	error = device_create_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
--	if (error)
-+	error = sysfs_create_group(&pdev->dev.kobj, &axp20x_attribute_group);
-+	if (error) {
-+		dev_err(axp20x->dev, "Failed to create sysfs attributes: %d\n",
-+			error);
- 		return error;
-+	}
- 
--	error = device_create_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
--	if (error)
--		goto clear_startup_attr;
-+	error = devm_add_action(&pdev->dev,
-+				axp20x_remove_sysfs_group, &pdev->dev);
-+	if (error) {
-+		axp20x_remove_sysfs_group(&pdev->dev);
-+		dev_err(&pdev->dev, "Failed to add sysfs cleanup action: %d\n",
-+			error);
-+		return error;
-+	}
- 
- 	error = input_register_device(idev);
- 	if (error) {
- 		dev_err(axp20x->dev, "Can't register input device: %d\n",
- 			error);
--		goto clear_attr;
-+		return error;
- 	}
- 
- 	platform_set_drvdata(pdev, axp20x_pek);
- 
+-	irq_set_chip_and_handler(virq, chip, ct->handler);
+-	irq_set_chip_data(virq, gc);
++	irq_domain_set_info(d, virq, hw_irq, chip, gc, ct->handler, NULL, NULL);
+ 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
  	return 0;
--
--clear_attr:
--	device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
--
--clear_startup_attr:
--	device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
--
--	return error;
--}
--
--static int axp20x_pek_remove(struct platform_device *pdev)
--{
--	device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
--	device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
--
--	return 0;
  }
- 
- static struct platform_driver axp20x_pek_driver = {
- 	.probe		= axp20x_pek_probe,
--	.remove		= axp20x_pek_remove,
- 	.driver		= {
- 		.name		= "axp20x-pek",
- 	},
+-- 
+2.2.1
