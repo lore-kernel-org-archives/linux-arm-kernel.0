@@ -1,56 +1,33 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 29 Dec 2014 18:04:40 +0100
-Subject: [PATCH 5/8] net: sun4i-emac: fix error return code
-In-Reply-To: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1419872683-32709-6-git-send-email-Julia.Lawall@lip6.fr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Dec 2014 11:20:34 -0600
+Subject: [PATCH] ARM: onfig: multi_v7: Update it for Keystone defconfig
+In-Reply-To: <1419873207-3630-1-git-send-email-santosh.shilimkar@oracle.com>
+References: <1419873207-3630-1-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <20141229172034.GK29379@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return a negative error code on failure.
+Hi,
 
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
+subject typo: s/onfig/config/
 
-// <smpl>
-@@
-identifier ret; expression e1,e2;
-@@
-(
-if (\(ret < 0\|ret != 0\))
- { ... return ret; }
-|
-ret = 0
-)
-... when != ret = e1
-    when != &ret
-*if(...)
-{
-  ... when != ret = e2
-      when forall
- return ret;
-}
-// </smpl>
+On Mon, Dec 29, 2014 at 09:13:27AM -0800, Santosh Shilimkar wrote:
+> @@ -346,9 +354,13 @@ CONFIG_USB_OHCI_HCD=y
+>  CONFIG_USB_OHCI_HCD_STI=y
+>  CONFIG_USB_OHCI_HCD_PLATFORM=y
+>  CONFIG_USB_STORAGE=y
+> +CONFIG_USB_DWC3=y
+> +CONFIG_USB_DWC3_DEBUG=y
+> +CONFIG_USB_DWC3_VERBOSE=y
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+you don't really need DEBUG or VERBOSE to be enabled always.
 
----
- drivers/net/ethernet/allwinner/sun4i-emac.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-index 1fcd556..cfdf7de 100644
---- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-@@ -850,8 +850,10 @@ static int emac_probe(struct platform_device *pdev)
- 	}
- 
- 	db->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(db->clk))
-+	if (IS_ERR(db->clk)) {
-+		ret = PTR_ERR(db->clk);
- 		goto out;
-+	}
- 
- 	clk_prepare_enable(db->clk);
- 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141229/3cd96336/attachment.sig>
