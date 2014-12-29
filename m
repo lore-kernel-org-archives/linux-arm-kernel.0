@@ -1,33 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Dec 2014 11:20:34 -0600
-Subject: [PATCH] ARM: onfig: multi_v7: Update it for Keystone defconfig
-In-Reply-To: <1419873207-3630-1-git-send-email-santosh.shilimkar@oracle.com>
-References: <1419873207-3630-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <20141229172034.GK29379@saruman>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 29 Dec 2014 18:04:42 +0100
+Subject: [PATCH 7/8] net: axienet: fix error return code
+In-Reply-To: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1419872683-32709-8-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Return a negative error code on failure.
 
-subject typo: s/onfig/config/
+A simplified version of the semantic match that finds this problem is as
+follows: (http://coccinelle.lip6.fr/)
 
-On Mon, Dec 29, 2014 at 09:13:27AM -0800, Santosh Shilimkar wrote:
-> @@ -346,9 +354,13 @@ CONFIG_USB_OHCI_HCD=y
->  CONFIG_USB_OHCI_HCD_STI=y
->  CONFIG_USB_OHCI_HCD_PLATFORM=y
->  CONFIG_USB_STORAGE=y
-> +CONFIG_USB_DWC3=y
-> +CONFIG_USB_DWC3_DEBUG=y
-> +CONFIG_USB_DWC3_VERBOSE=y
+// <smpl>
+@@
+identifier ret; expression e1,e2;
+@@
+(
+if (\(ret < 0\|ret != 0\))
+ { ... return ret; }
+|
+ret = 0
+)
+... when != ret = e1
+    when != &ret
+*if(...)
+{
+  ... when != ret = e2
+      when forall
+ return ret;
+}
+// </smpl>
 
-you don't really need DEBUG or VERBOSE to be enabled always.
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141229/3cd96336/attachment.sig>
+---
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 4ea2d4e..6ca4a52 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -1501,6 +1501,7 @@ static int axienet_of_probe(struct platform_device *op)
+ 	lp->regs = of_iomap(op->dev.of_node, 0);
+ 	if (!lp->regs) {
+ 		dev_err(&op->dev, "could not map Axi Ethernet regs.\n");
++		ret = -ENOMEM;
+ 		goto nodev;
+ 	}
+ 	/* Setup checksum offload, but default to off if not specified */
+@@ -1567,6 +1568,7 @@ static int axienet_of_probe(struct platform_device *op)
+ 	np = of_parse_phandle(op->dev.of_node, "axistream-connected", 0);
+ 	if (!np) {
+ 		dev_err(&op->dev, "could not find DMA node\n");
++		ret = -ENODEV;
+ 		goto err_iounmap;
+ 	}
+ 	lp->dma_regs = of_iomap(np, 0);
