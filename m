@@ -1,71 +1,43 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 29 Dec 2014 09:04:13 +0900
-Subject: [PATCHv6 9/9] ARM: dts: exynos: Add PPMU node for Exynos4412-based
- TRATS2 board
-In-Reply-To: <1419811453-16160-1-git-send-email-cw00.choi@samsung.com>
-References: <1419811453-16160-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1419811453-16160-10-git-send-email-cw00.choi@samsung.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 29 Dec 2014 10:43:21 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v3.20
+Message-ID: <cover.1419808942.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add dt node for PPMU_{DMC0|DMC1|LEFTBUS|RIGHTBUS} for
-exynos4412-trats2 board. Each PPMU dt node includes one event of 'PPMU Count3'.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 40 +++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+Please consider these Renesas ARM based SoC defconfig updates for v3.20.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index c9b70b6..bee0eed 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -877,6 +877,46 @@
- 	};
- };
- 
-+&ppmu_dmc0 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc0_3: ppmu-event3-dmc0 {
-+			event-name = "ppmu-event3-dmc0";
-+		};
-+	};
-+};
-+
-+&ppmu_dmc1 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc1_3: ppmu-event3-dmc1 {
-+			event-name = "ppmu-event3-dmc1";
-+		};
-+	};
-+};
-+
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &pinctrl_0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sleep0>;
--- 
-1.8.5.5
+
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.20
+
+for you to fetch changes up to db54d850b686c2ca81c10dd3582e98ee089a0e3a:
+
+  ARM: shmobile: Enable DA9063 watchdog in multiplatform defconfig (2014-12-21 16:53:36 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v3.20
+
+* Enable DA9063, MICREL_PHY and MTD_BLOCK watchdog in multiplatform defconfig
+* Update AK8975 config option in kzm9g defconfig
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: kzm9g_defconfig: Update AK8975 config option
+      ARM: shmobile: Enable MICREL_PHY in shmobile_defconfig
+      ARM: shmobile: Enable DA9063 watchdog in multiplatform defconfig
+
+Kuninori Morimoto (2):
+      ARM: shmobile: defconfig: cleanup by savedefconfig
+      ARM: shmobile: defconfig: add MTD_BLOCK
+
+ arch/arm/configs/kzm9g_defconfig    |  2 +-
+ arch/arm/configs/shmobile_defconfig | 30 ++++++++++++++----------------
+ 2 files changed, 15 insertions(+), 17 deletions(-)
