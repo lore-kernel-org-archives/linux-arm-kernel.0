@@ -1,9 +1,9 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 29 Dec 2014 18:04:38 +0100
-Subject: [PATCH 3/8] soc: ti: knav_qmss_queue: fix error return code
+Date: Mon, 29 Dec 2014 18:04:40 +0100
+Subject: [PATCH 5/8] net: sun4i-emac: fix error return code
 In-Reply-To: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1419872683-32709-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1419872683-32709-6-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,18 +35,22 @@ ret = 0
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/soc/ti/knav_qmss_queue.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/allwinner/sun4i-emac.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 8e6a95d..d41c3bc 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1759,6 +1759,7 @@ static int knav_queue_probe(struct platform_device *pdev)
- 	regions =  of_get_child_by_name(node, "descriptor-regions");
- 	if (!regions) {
- 		dev_err(dev, "descriptor-regions not specified\n");
-+		ret = -ENODEV;
- 		goto err;
+diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
+index 1fcd556..cfdf7de 100644
+--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
++++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
+@@ -850,8 +850,10 @@ static int emac_probe(struct platform_device *pdev)
  	}
- 	ret = knav_queue_setup_regions(kdev, regions);
+ 
+ 	db->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(db->clk))
++	if (IS_ERR(db->clk)) {
++		ret = PTR_ERR(db->clk);
+ 		goto out;
++	}
+ 
+ 	clk_prepare_enable(db->clk);
+ 
