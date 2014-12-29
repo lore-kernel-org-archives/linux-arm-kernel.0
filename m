@@ -1,40 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:46:47 +0900
-Subject: [PATCH 5/6] ARM: shmobile: koelsch: Rename SCIF[01] serial ports to
- ttySC[01]
-In-Reply-To: <cover.1419809774.git.horms+renesas@verge.net.au>
-References: <cover.1419809774.git.horms+renesas@verge.net.au>
-Message-ID: <1f75cdac773bc9c93ad6126c01ae27bd343302b1.1419809774.git.horms+renesas@verge.net.au>
+Date: Mon, 29 Dec 2014 10:46:58 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 CCF Updates for v3.20
+Message-ID: <cover.1419809955.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-There's no reason to name the only two available serial ports on the
-board ttySC6 and ttySC7 (apart from confusing userspace, which we should
-try to avoid).
+Please consider these Renesas ARM based SoC sh73a0 CCF updates for v3.20.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 990af16..bf58c79 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -48,8 +48,8 @@
- 	compatible = "renesas,koelsch", "renesas,r8a7791";
- 
- 	aliases {
--		serial6 = &scif0;
--		serial7 = &scif1;
-+		serial0 = &scif0;
-+		serial1 = &scif1;
- 	};
- 
- 	chosen {
--- 
-2.1.3
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-ccf-for-v3.20
+
+for you to fetch changes up to 09bd745b555c262d1e2c851777317f3adf3cf3d4:
+
+  ARM: shmobile: sh73a0: disable legacy clock initialization (2014-12-21 17:09:25 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC sh73a0 CCF Updates for v3.20
+
+* Add sh73a0 CCF support
+
+----------------------------------------------------------------
+Ulrich Hecht (6):
+      clk: shmobile: sh73a0 common clock framework implementation
+      ARM: shmobile: sh73a0: Add CPG register bits header
+      ARM: shmobile: sh73a0: Common clock framework DT description
+      ARM: shmobile: kzm9g-reference: Common clock framework DT description
+      ARM: shmobile: sh73a0: add MSTP clock assignments to DT
+      ARM: shmobile: sh73a0: disable legacy clock initialization
+
+ .../bindings/clock/renesas,sh73a0-cpg-clocks.txt   |  35 ++
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |   4 +
+ arch/arm/boot/dts/sh73a0.dtsi                      | 358 +++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-sh73a0.c              |   5 +-
+ drivers/clk/shmobile/Makefile                      |   1 +
+ drivers/clk/shmobile/clk-sh73a0.c                  | 218 +++++++++++++
+ include/dt-bindings/clock/sh73a0-clock.h           |  79 +++++
+ 7 files changed, 699 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,sh73a0-cpg-clocks.txt
+ create mode 100644 drivers/clk/shmobile/clk-sh73a0.c
+ create mode 100644 include/dt-bindings/clock/sh73a0-clock.h
