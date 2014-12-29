@@ -1,60 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:47:04 +0900
-Subject: [PATCH 1/4] ARM: shmobile: sh73a0 legacy/reference: Add missing
- INTCA0 clock for irqpin module
+Date: Mon, 29 Dec 2014 10:47:05 +0900
+Subject: [PATCH 2/4] ARM: shmobile: Fix is_e2 warning
 In-Reply-To: <cover.1419810196.git.horms+renesas@verge.net.au>
 References: <cover.1419810196.git.horms+renesas@verge.net.au>
-Message-ID: <2f472ae6b1998af6d9a4ccc3f0d58781db21cafc.1419810196.git.horms+renesas@verge.net.au>
+Message-ID: <95abc9de7896bf65e67bf781d709ec453f1f5f84.1419810196.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-This clock drives the irqpin controller modules.
-Before, it was assumed enabled by the bootloader or reset state.
-By making it available to the driver, we make sure it gets enabled when
-needed, and allow it to be managed by system or runtime PM.
+Fix "is_e2" warning introduced by:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+9ce3fa6 ARM: shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794
+
+Only triggers on kernel configurations that have ARCH_ARM_TIMER=n.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh73a0.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 6b4c1f3..3855fb0 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -553,6 +553,7 @@ enum { MSTP001,
- 	MSTP314, MSTP313, MSTP312, MSTP311,
- 	MSTP304, MSTP303, MSTP302, MSTP301, MSTP300,
- 	MSTP411, MSTP410, MSTP403,
-+	MSTP508,
- 	MSTP_NR };
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 3dd6edd..c35b91d 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -52,15 +52,13 @@ void __init rcar_gen2_timer_init(void)
+ {
+ #if defined(CONFIG_ARM_ARCH_TIMER) || defined(CONFIG_COMMON_CLK)
+ 	u32 mode = rcar_gen2_read_mode_pins();
+-	bool is_e2 = (bool)of_find_compatible_node(NULL, NULL,
+-		"renesas,r8a7794");
+ #endif
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 	void __iomem *base;
+ 	int extal_mhz = 0;
+ 	u32 freq;
  
- #define MSTP(_parent, _reg, _bit, _flags) \
-@@ -597,6 +598,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP411] = MSTP(&div4_clks[DIV4_HP], SMSTPCR4, 11, 0), /* IIC3 */
- 	[MSTP410] = MSTP(&div4_clks[DIV4_HP], SMSTPCR4, 10, 0), /* IIC4 */
- 	[MSTP403] = MSTP(&r_clk, SMSTPCR4, 3, 0), /* KEYSC */
-+	[MSTP508] = MSTP(&div4_clks[DIV4_HP], SMSTPCR5, 8, 0), /* INTCA0 */
- };
- 
- /* The lookups structure below includes duplicate entries for some clocks
-@@ -677,6 +679,14 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* I2C4 */
- 	CLKDEV_DEV_ID("e6828000.i2c", &mstp_clks[MSTP410]), /* I2C4 */
- 	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[MSTP403]), /* KEYSC */
-+	CLKDEV_DEV_ID("renesas_intc_irqpin.0",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("e6900000.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("renesas_intc_irqpin.1",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("e6900004.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("renesas_intc_irqpin.2",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("e6900008.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("renesas_intc_irqpin.3",	&mstp_clks[MSTP508]), /* INTCA0 */
-+	CLKDEV_DEV_ID("e690000c.irqpin",	&mstp_clks[MSTP508]), /* INTCA0 */
- 
- 	/* ICK */
- 	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSIT]),
+-	if (is_e2) {
++	if (of_machine_is_compatible("renesas,r8a7794")) {
+ 		freq = 260000000 / 8;	/* ZS / 8 */
+ 		/* CNTVOFF has to be initialized either from non-secure
+ 		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
 -- 
 2.1.3
