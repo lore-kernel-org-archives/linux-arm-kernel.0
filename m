@@ -1,50 +1,168 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 30 Dec 2014 01:13:17 +0300
-Subject: [PATCH] ARM: shmobile: r8a7791: add ADSP clocks
-In-Reply-To: <CAMuHMdWwx3So77Zuz7JrpJbBZe2oKN3YnkZL3m0gUCHZGu6SEg@mail.gmail.com>
-References: <1937156.Ii2YrGkOFy@wasted.cogentembedded.com>	<CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>	<54A1BABF.5070208@cogentembedded.com>
- <CAMuHMdWwx3So77Zuz7JrpJbBZe2oKN3YnkZL3m0gUCHZGu6SEg@mail.gmail.com>
-Message-ID: <54A1D1FD.7010006@cogentembedded.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 29 Dec 2014 15:16:53 -0800
+Subject: [PATCH v8 3/6] input: misc: Add driver for AXP20x Power Enable Key
+In-Reply-To: <1419303194-3075-4-git-send-email-wens@csie.org>
+References: <1419303194-3075-1-git-send-email-wens@csie.org>
+ <1419303194-3075-4-git-send-email-wens@csie.org>
+Message-ID: <20141229231653.GH9565@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/30/2014 12:23 AM, Geert Uytterhoeven wrote:
+On Tue, Dec 23, 2014 at 10:53:11AM +0800, Chen-Yu Tsai wrote:
+> From: Carlo Caione <carlo@caione.org>
+> 
+> This patch add support for the Power Enable Key found on MFD AXP202 and
+> AXP209. Besides the basic support for the button, the driver adds two
+> entries in sysfs to configure the time delay for power on/off.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> [wens at csie.org: make axp20x_pek_remove() static; remove driver owner field]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
->>>> --- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
->>>> +++ renesas/include/dt-bindings/clock/r8a7791-clock.h
+Hmm, it looks like MFD parts are in mainline, so I can actually pick
+this up myself. OK.
 
->>>> -#define R8A7791_CLK_RCAN               9
->>>> +#define R8A7791_CLK_ADSP               9
->>>> +#define R8A7791_CLK_RCAN               10
+By the way, does driver works for you with the patch below?
 
->>> R8A7791_CLK_RCAN is changed?
+Thanks.
 
->>     Yes. It shouldn't be?
+-- 
+Dmitry
 
-> All definitions in include/dt-bindings/ are part of the DT ABI, and cannot be
-> changed without breaking the DT binding.
+Input: axp20x-pek - switch over to using attribute group
 
-> Hence when adding new entries, they must be added at the end of the list,
-> using a new available value.
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-    Oh, OK...
+Instead of registering device attributes individually let's use attribute
+groups and also devm_* infrastructure to ease cleanup.
 
-> Apart from that, what happens if you boot a new DTS on a kernel with an old
-> clk-rcar-gen2 driver that doesn't know about the new CPG clock?
-> Does it just fail to initialize and find that single clock,
+Refresh of synaptics-forcepad-pnp.patch
+---
+ drivers/input/misc/axp20x-pek.c |   64 ++++++++++++++++++++++-----------------
+ 1 file changed, 36 insertions(+), 28 deletions(-)
 
-    Yes, exactly. The driver will cuss loudly but will continue to work.
-
-> or does the whole CPG driver fail?
-
-    No.
-
-> I wanted to check that after seeing the RCAN CPG patch, but haven't gotten to it
-> yet due to Xmas and NY holidays.
-
-    No holidays yet here. There will be long holidays starting from January 1st...
-
-> Gr{oetje,eeting}s,
->                          Geert
-
-WBR, Sergei
+diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
+index 8dbd097..f1c8447 100644
+--- a/drivers/input/misc/axp20x-pek.c
++++ b/drivers/input/misc/axp20x-pek.c
+@@ -138,17 +138,28 @@ static ssize_t axp20x_store_ext_attr(struct device *dev,
+ 				 axp20x_ea->mask, idx);
+ 	if (ret != 0)
+ 		return -EINVAL;
++
+ 	return count;
+ }
+ 
+ static struct dev_ext_attribute axp20x_dev_attr_startup = {
+ 	.attr	= __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+-	.var	= &axp20x_pek_startup_ext_attr
++	.var	= &axp20x_pek_startup_ext_attr,
+ };
+ 
+ static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
+ 	.attr	= __ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+-	.var	= &axp20x_pek_shutdown_ext_attr
++	.var	= &axp20x_pek_shutdown_ext_attr,
++};
++
++static struct attribute *axp20x_attributes[] = {
++	&axp20x_dev_attr_startup.attr.attr,
++	&axp20x_dev_attr_shutdown.attr.attr,
++	NULL,
++};
++
++static const struct attribute_group axp20x_attribute_group = {
++	.attrs = axp20x_attributes,
+ };
+ 
+ static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
+@@ -166,6 +177,13 @@ static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void axp20x_remove_sysfs_group(void *_data)
++{
++	struct device *dev = _data;
++
++	sysfs_remove_group(&dev->kobj, &axp20x_attribute_group);
++}
++
+ static int axp20x_pek_probe(struct platform_device *pdev)
+ {
+ 	struct axp20x_pek *axp20x_pek;
+@@ -214,12 +232,11 @@ static int axp20x_pek_probe(struct platform_device *pdev)
+ 	input_set_drvdata(idev, axp20x_pek);
+ 
+ 	error = devm_request_any_context_irq(&pdev->dev, axp20x_pek->irq_dbr,
+-					  axp20x_pek_irq, 0,
+-					  "axp20x-pek-dbr", idev);
++					     axp20x_pek_irq, 0,
++					     "axp20x-pek-dbr", idev);
+ 	if (error < 0) {
+ 		dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
+ 			axp20x_pek->irq_dbr, error);
+-
+ 		return error;
+ 	}
+ 
+@@ -232,45 +249,36 @@ static int axp20x_pek_probe(struct platform_device *pdev)
+ 		return error;
+ 	}
+ 
+-	error = device_create_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
+-	if (error)
++	error = sysfs_create_group(&pdev->dev.kobj, &axp20x_attribute_group);
++	if (error) {
++		dev_err(axp20x->dev, "Failed to create sysfs attributes: %d\n",
++			error);
+ 		return error;
++	}
+ 
+-	error = device_create_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
+-	if (error)
+-		goto clear_startup_attr;
++	error = devm_add_action(&pdev->dev,
++				axp20x_remove_sysfs_group, &pdev->dev);
++	if (error) {
++		axp20x_remove_sysfs_group(&pdev->dev);
++		dev_err(&pdev->dev, "Failed to add sysfs cleanup action: %d\n",
++			error);
++		return error;
++	}
+ 
+ 	error = input_register_device(idev);
+ 	if (error) {
+ 		dev_err(axp20x->dev, "Can't register input device: %d\n",
+ 			error);
+-		goto clear_attr;
++		return error;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, axp20x_pek);
+ 
+ 	return 0;
+-
+-clear_attr:
+-	device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
+-
+-clear_startup_attr:
+-	device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
+-
+-	return error;
+-}
+-
+-static int axp20x_pek_remove(struct platform_device *pdev)
+-{
+-	device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
+-	device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
+-
+-	return 0;
+ }
+ 
+ static struct platform_driver axp20x_pek_driver = {
+ 	.probe		= axp20x_pek_probe,
+-	.remove		= axp20x_pek_remove,
+ 	.driver		= {
+ 		.name		= "axp20x-pek",
+ 	},
