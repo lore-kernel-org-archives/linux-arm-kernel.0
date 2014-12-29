@@ -1,49 +1,62 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 29 Dec 2014 09:51:50 +0800
-Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8173 SoC
-In-Reply-To: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
-References: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1419817910.2371.8.camel@mtksdaap41>
+From: wangweidong1@huawei.com (Wang Weidong)
+Date: Mon, 29 Dec 2014 10:58:35 +0800
+Subject: [Ask for HELP] Should it support ustat syscall for arm64
+Message-ID: <54A0C35B.4010001@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Sorry for my IT setting issue that accidentally add mediatek
-confidential notice in the tail of this mail series.
-Please skip it, and if anyone have concern, I can resend it.
+As I ran LTP testcase ustat01 and ustat02 on Arm64, and got the result:
 
-> 
->  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->  arch/arm64/Kconfig                                 |   6 +
->  arch/arm64/boot/dts/Makefile                       |   1 +
->  arch/arm64/boot/dts/mediatek/Makefile              |   5 +
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  34 +++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 159 +++++++++++++++++++++
->  arch/arm64/configs/defconfig                       |   2 +
->  drivers/irqchip/irq-mtk-sysirq.c                   |  18 ++-
->  8 files changed, 222 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> 
-> --
-> 1.8.1.1.dirty
-> 
-> ************* Email Confidentiality Notice ********************
-> The information contained in this e-mail message (including any 
-> attachments) may be confidential, proprietary, privileged, or otherwise
-> exempt from disclosure under applicable laws. It is intended to be 
-> conveyed only to the designated recipient(s). Any use, dissemination, 
-> distribution, printing, retaining or copying of this e-mail (including its 
-> attachments) by unintended recipient(s) is strictly prohibited and may 
-> be unlawful. If you are not an intended recipient of this e-mail, or believe 
-> that you have received this e-mail in error, please notify the sender 
-> immediately (by replying to this e-mail), delete any and all copies of 
-> this e-mail (including any attachments) from your system, and do not
-> disclose the content of this e-mail to any other person. Thank you!
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ustat01     1  TFAIL  :  ustat(2) failed and setthe errno to 38 : Function not implemented
+
+ustat02     1  TFAIL  :  ustat(2) failed to produce expected error; 22, errno: EINVAL:
+                         TEST_ERRNO=ENOSYS(38): Function not implemented
+ustat02     2  TFAIL  :  ustat(2) failed to produce expected error; 14, errno: EFAULT:
+                         TEST_ERRNO=ENOSYS(38): Function not implemented
+
+-----------------------
+
+I found the glibc and kernel's implementation:
+The glibc version is 2.19, kernel is 3.16.
+
+The glibc will use the sysdeps/unix/sysv/linux/generic/ustat.c
+But it only return ENOSYS.
+
+The kernel doesn't support the NR_ustat syscall.
+
+So I did that:
+1. In glibc:
+I changed the sysdeps/unix/sysv/linux/generic/ustat.c:
+
+-#include <errno.h>
+-#include <sys/ustat.h>
++#define __ARCH_WANT_SYSCALL_DEPRECATED
++#include <sysdeps/unix/sysv/linux/ustat.c>
+ 
+-#include <sysdep.h>
+-#include <sys/syscall.h>
+-
+-/* This deprecated syscall is no longer used (replaced with fstat).  */
+-int
+-ustat (dev_t dev, struct ustat *ubuf)
+-{
+-  __set_errno (ENOSYS);
+-  return -1;
+-}
+-stub_warning (ustat)
+
+2. In Kernel:
+I changed the arch/arm64/include/uapi/asm/unistd.h:
+
++#define __ARCH_WANT_SYSCALL_DEPRECATED
++#define __ARCH_WANT_SYS_FORK
++#define __ARCH_WANT_SYS_VFORK
+
+After the changing, These cases will Pass.
+
+So, Does it need to support ustat syscall for arm64?
+
+Regards,
+Wang
