@@ -1,53 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Dec 2014 22:23:44 +0100
-Subject: [PATCH] ARM: shmobile: r8a7791: add ADSP clocks
-In-Reply-To: <54A1BABF.5070208@cogentembedded.com>
-References: <1937156.Ii2YrGkOFy@wasted.cogentembedded.com>
- <CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>
- <54A1BABF.5070208@cogentembedded.com>
-Message-ID: <CAMuHMdWwx3So77Zuz7JrpJbBZe2oKN3YnkZL3m0gUCHZGu6SEg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 29 Dec 2014 22:37:01 +0100
+Subject: [GIT PULL] mvebu: Fixes for -rc3
+In-Reply-To: <20141229211047.GA18826@lunn.ch>
+References: <20141229211047.GA18826@lunn.ch>
+Message-ID: <14a97faf4f0.2778.107cef0f820c2f5d7b7f41463071c310@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On December 29, 2014 10:12:29 PM Andrew Lunn <andrew@lunn.ch> wrote:
 
-On Mon, Dec 29, 2014 at 9:34 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 12/29/2014 11:24 PM, Geert Uytterhoeven wrote:
+> Hi Folks
 >
->>> --- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
->>> +++ renesas/include/dt-bindings/clock/r8a7791-clock.h
+> Jason is taking a back seat this cycle and i'm doing all the patch
+> wrangling for mvebu.
 >
+> Here is a pull request for fixes for 3.19. Just one patch.
 >
->>> -#define R8A7791_CLK_RCAN               9
->>> +#define R8A7791_CLK_ADSP               9
->>> +#define R8A7791_CLK_RCAN               10
+> Please let me know if i've done anything wrong.
 >
->> R8A7791_CLK_RCAN is changed?
+>        Andrew
 >
->    Yes. It shouldn't be?
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>
+> are available in the git repository at:
+>
+>   ssh://git.infradead.org/srv/git/linux-mvebu.git tags/mvebu-fixes-3.19
 
-All definitions in include/dt-bindings/ are part of the DT ABI, and cannot be
-changed without breaking the DT binding.
+Andrew,
 
-Hence when adding new entries, they must be added at the end of the list,
-using a new available value.
+This should be the public git URL, they can't do anything with the ssh URL. 
+It's a common mistake, but I suggest to simply RESEND the pull request with 
+the proper URL and a note why you resend.
 
-Apart from that, what happens if you boot a new DTS on a kernel with an old
-clk-rcar-gen2 driver that doesn't know about the new CPG clock?
-Does it just fail to initialize and find that single clock, or does
-the whole CPG
-driver fail?
-I wanted to check that after seeing the RCAN CPG patch, but haven't gotten to it
-yet due to Xmas and NY holidays.
+Sebastian
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> for you to fetch changes up to d4b0833a65e8b9fc58d992ba0cc89cad1580db31:
+>
+>   ARM: mvebu: Fix pinctrl configuration for Armada 370 DB (2014-12-21 
+>   06:01:05 -0600)
+>
+> ----------------------------------------------------------------
+> Fixes for 3.19
+>
+> ----------------------------------------------------------------
+> Gregory CLEMENT (1):
+>       ARM: mvebu: Fix pinctrl configuration for Armada 370 DB
+>
+>  arch/arm/boot/dts/armada-370-db.dts | 24 ------------------------
+>  1 file changed, 24 deletions(-)
