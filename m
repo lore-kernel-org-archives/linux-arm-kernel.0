@@ -1,35 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:58 +0900
-Subject: [PATCH 27/30] ARM: shmobile: r8a73a4: Add r8a73a4-ape6evm.dtb to
- ARCH_SHMOBILE_MULTI
+Date: Mon, 29 Dec 2014 10:43:59 +0900
+Subject: [PATCH 28/30] ARM: shmobile: ape6evm: Fix LAN9220 VDDVARIO voltage
 In-Reply-To: <cover.1419812185.git.horms+renesas@verge.net.au>
 References: <cover.1419812185.git.horms+renesas@verge.net.au>
-Message-ID: <088b1691f560afa4e5e7990fd8081546236b39cf.1419812186.git.horms+renesas@verge.net.au>
+Message-ID: <09ee81da85b10e0ca876977d333c8761441ecc78.1419812186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Makes sure the dtb is built for multiplatform builds.
+The LAN9220 VDDVARIO supply is powered by a 1.8V source, not 3.3V. Fix
+it in the device tree.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd..fabc569 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -416,6 +416,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += \
- 	sh73a0-kzm9g-reference.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- 	r7s72100-genmai.dtb \
-+	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7779-marzen.dtb \
- 	r8a7790-lager.dtb \
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index 6b7bc1f..0d50bef 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -55,8 +55,16 @@
+ 		enable-active-high;
+ 	};
+ 
+-	/* Common 3.3V rail, used by several devices on APE6EVM */
+-	ape6evm_fixed_3v3: regulator at 2 {
++	/* Common 1.8V and 3.3V rails, used by several devices on APE6EVM */
++	ape6evm_fixed_1v8: regulator at 2 {
++		compatible = "regulator-fixed";
++		regulator-name = "1V8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	ape6evm_fixed_3v3: regulator at 3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "3V3";
+ 		regulator-min-microvolt = <3300000>;
+@@ -80,7 +88,7 @@
+ 			smsc,irq-active-high;
+ 			smsc,irq-push-pull;
+ 			vdd33a-supply = <&ape6evm_fixed_3v3>;
+-			vddvario-supply = <&ape6evm_fixed_3v3>;
++			vddvario-supply = <&ape6evm_fixed_1v8>;
+ 		};
+ 	};
+ 
 -- 
 2.1.3
