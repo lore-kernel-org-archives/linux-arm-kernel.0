@@ -1,30 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Dec 2014 21:24:15 +0100
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 29 Dec 2014 23:34:07 +0300
 Subject: [PATCH] ARM: shmobile: r8a7791: add ADSP clocks
-In-Reply-To: <1937156.Ii2YrGkOFy@wasted.cogentembedded.com>
+In-Reply-To: <CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>
 References: <1937156.Ii2YrGkOFy@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>
+ <CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>
+Message-ID: <54A1BABF.5070208@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 29, 2014 at 9:19 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> --- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
-> +++ renesas/include/dt-bindings/clock/r8a7791-clock.h
+Hello.
 
-> -#define R8A7791_CLK_RCAN               9
-> +#define R8A7791_CLK_ADSP               9
-> +#define R8A7791_CLK_RCAN               10
+On 12/29/2014 11:24 PM, Geert Uytterhoeven wrote:
 
-R8A7791_CLK_RCAN is changed?
+>> --- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
+>> +++ renesas/include/dt-bindings/clock/r8a7791-clock.h
 
-Gr{oetje,eeting}s,
+>> -#define R8A7791_CLK_RCAN               9
+>> +#define R8A7791_CLK_ADSP               9
+>> +#define R8A7791_CLK_RCAN               10
 
-                        Geert
+> R8A7791_CLK_RCAN is changed?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+    Yes. It shouldn't be?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Gr{oetje,eeting}s,
+>                          Geert
+
+WBR, Sergei
