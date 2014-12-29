@@ -1,70 +1,54 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 29 Dec 2014 14:39:26 +0800
-Subject: [PATCH RFC v6 19/21] ARM: imx_v6_v7_defconfig: Cleanup for imx drm
- being moved out of staging
-In-Reply-To: <1419835168-9034-1-git-send-email-Ying.Liu@freescale.com>
-References: <1419835168-9034-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419835168-9034-20-git-send-email-Ying.Liu@freescale.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 29 Dec 2014 09:53:12 +0200
+Subject: [PATCH] arch: arm: common: edma.c:  Remove some unused functions
+In-Reply-To: <1417906406-5527-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1417906406-5527-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <54A10868.70001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+On 12/07/2014 12:53 AM, Rickard Strandqvist wrote:
+> Removes some functions that are not used anywhere:
+> edma_shadow0_read() edma_or_array()
+> 
+> This was partially found by using a static code analysis program called cppcheck.
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
-v5->v6:
- * None.
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-v4->v5:
- * None.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+> ---
+>  arch/arm/common/edma.c |    8 --------
+>  1 file changed, 8 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index d86771a..163273d 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -160,10 +160,6 @@ static inline void edma_modify_array(unsigned ctlr, int offset, int i,
+>  {
+>  	edma_modify(ctlr, offset + (i << 2), and, or);
+>  }
+> -static inline void edma_or_array(unsigned ctlr, int offset, int i, unsigned or)
+> -{
+> -	edma_or(ctlr, offset + (i << 2), or);
+> -}
+>  static inline void edma_or_array2(unsigned ctlr, int offset, int i, int j,
+>  		unsigned or)
+>  {
+> @@ -174,10 +170,6 @@ static inline void edma_write_array2(unsigned ctlr, int offset, int i, int j,
+>  {
+>  	edma_write(ctlr, offset + ((i*2 + j) << 2), val);
+>  }
+> -static inline unsigned int edma_shadow0_read(unsigned ctlr, int offset)
+> -{
+> -	return edma_read(ctlr, EDMA_SHADOW0 + offset);
+> -}
+>  static inline unsigned int edma_shadow0_read_array(unsigned ctlr, int offset,
+>  		int i)
+>  {
+> 
 
-v3->v4:
- * None.
 
-v2->v3:
- * None.
-
-v1->v2:
- * None.
-
- arch/arm/configs/imx_v6_v7_defconfig | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6790f1b..0dbd0c3 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -192,7 +192,13 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_DRM_IMX=y
-+CONFIG_DRM_IMX_FB_HELPER=y
-+CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
-+CONFIG_DRM_IMX_TVE=y
-+CONFIG_DRM_IMX_LDB=y
-+CONFIG_DRM_IMX_IPUV3=y
-+CONFIG_DRM_IMX_HDMI=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
-@@ -249,13 +255,6 @@ CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_FSL_EDMA=y
- CONFIG_STAGING=y
--CONFIG_DRM_IMX=y
--CONFIG_DRM_IMX_FB_HELPER=y
--CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
--CONFIG_DRM_IMX_TVE=y
--CONFIG_DRM_IMX_LDB=y
--CONFIG_DRM_IMX_IPUV3=y
--CONFIG_DRM_IMX_HDMI=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PWM=y
- CONFIG_PWM_IMX=y
 -- 
-2.1.0
+P?ter
