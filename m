@@ -1,29 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 29 Dec 2014 08:29:58 -0600
-Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
- interface
-In-Reply-To: <549FEABA.10206@gmail.com>
-References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
- <1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>
- <20141223170613.GM23854@atomide.com> <5499A2B4.2080909@ti.com>
- <549FEABA.10206@gmail.com>
-Message-ID: <20141229142958.GA10746@kahuna>
+From: fabf@skynet.be (Fabian Frederick)
+Date: Mon, 29 Dec 2014 15:29:41 +0100
+Subject: [PATCH 07/11 linux-next] [media] s5p-mfc: remove unnecessary
+ version.h inclusion
+In-Reply-To: <1419863387-24233-1-git-send-email-fabf@skynet.be>
+References: <1419863387-24233-1-git-send-email-fabf@skynet.be>
+Message-ID: <1419863387-24233-8-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:34-20141228, Tomasz Figa wrote:
-> May I ask you (or anyone else working on OMAP) to try to figure out
-> what the issue is? It is stopping L2 cache support for Exynos4 being
+Based on versioncheck.
 
-http://slexy.org/view/s2BnzxVglj
-Took a register dump and compared -> Got the same dump
-http://slexy.org/view/s21YRHpzeW .
+Signed-off-by: Fabian Frederick <fabf@skynet.be>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-Basically, this implies: possible sequence change broke AM437x or
-some secure function call (which i have'nt dumped).
-
-Is it possible to break up this patch into easier patches?
-
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index c6c3452..a9ef843 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -18,7 +18,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+-#include <linux/version.h>
+ #include <linux/videodev2.h>
+ #include <linux/workqueue.h>
+ #include <media/v4l2-ctrls.h>
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index bd64f1d..68df3cd 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -19,7 +19,6 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+-#include <linux/version.h>
+ #include <linux/videodev2.h>
+ #include <media/v4l2-event.h>
+ #include <linux/workqueue.h>
 -- 
-Regards,
-Nishanth Menon
+2.1.0
