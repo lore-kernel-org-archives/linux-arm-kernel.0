@@ -1,59 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:44 +0900
-Subject: [PATCH 13/30] ARM: shmobile: r8a7791: Add IPMMU-SGX clock to device
+Date: Mon, 29 Dec 2014 10:43:45 +0900
+Subject: [PATCH 14/30] ARM: shmobile: r8a7794: Add SYS-DMAC clocks to device
  tree
 In-Reply-To: <cover.1419812185.git.horms+renesas@verge.net.au>
 References: <cover.1419812185.git.horms+renesas@verge.net.au>
-Message-ID: <ce85ad47882fe375dcb3f7cce6c10ae800ac2d9c.1419812186.git.horms+renesas@verge.net.au>
+Message-ID: <be16cd385c08dce7efa406704b5aa420ef6d1992.1419812186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+From: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
 
-Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+Signed-off-by: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
 [horms: resolved conflicts]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 8 +++++---
- include/dt-bindings/clock/r8a7791-clock.h | 1 +
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi            | 7 +++++--
+ include/dt-bindings/clock/r8a7794-clock.h | 2 ++
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 958a69b..78d6371 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1154,15 +1154,17 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>, <&zs_clk>,
--				 <&zs_clk>;
-+			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>,
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 13e4a8d..6d95638 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -479,16 +479,19 @@
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
+ 			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>,
+-				 <&mp_clk>, <&mp_clk>, <&mp_clk>;
++				 <&mp_clk>, <&mp_clk>, <&mp_clk>,
 +				 <&zs_clk>, <&zs_clk>;
  			#clock-cells = <1>;
  			clock-indices = <
-+				R8A7791_CLK_IPMMU_SGX
- 				R8A7791_CLK_VIN2 R8A7791_CLK_VIN1 R8A7791_CLK_VIN0
- 				R8A7791_CLK_ETHER R8A7791_CLK_SATA1 R8A7791_CLK_SATA0
+ 				R8A7794_CLK_SCIFA2 R8A7794_CLK_SCIFA1 R8A7794_CLK_SCIFA0
+ 				R8A7794_CLK_MSIOF2 R8A7794_CLK_SCIFB0 R8A7794_CLK_SCIFB1
+ 				R8A7794_CLK_MSIOF1 R8A7794_CLK_SCIFB2
++				R8A7794_CLK_SYS_DMAC1 R8A7794_CLK_SYS_DMAC0
  			>;
  			clock-output-names =
--				"vin2", "vin1", "vin0", "ether", "sata1", "sata0";
-+				"ipmmu_sgx", "vin2", "vin1", "vin0", "ether", "sata1",
-+				"sata0";
+ 				"scifa2", "scifa1", "scifa0", "msiof2", "scifb0",
+-				"scifb1", "msiof1", "scifb2";
++				"scifb1", "msiof1", "scifb2",
++				"sys-dmac1", "sys-dmac0";
  		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index 3ea2bbc..ee9bb944 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -91,6 +91,7 @@
- #define R8A7791_CLK_LVDS0		26
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index 52492d8..c0bd14a5 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -48,6 +48,8 @@
+ #define R8A7794_CLK_SCIFB1		7
+ #define R8A7794_CLK_MSIOF1		8
+ #define R8A7794_CLK_SCIFB2		16
++#define R8A7794_CLK_SYS_DMAC1		18
++#define R8A7794_CLK_SYS_DMAC0		19
  
- /* MSTP8 */
-+#define R8A7791_CLK_IPMMU_SGX		0
- #define R8A7791_CLK_VIN2		9
- #define R8A7791_CLK_VIN1		10
- #define R8A7791_CLK_VIN0		11
+ /* MSTP3 */
+ #define R8A7794_CLK_CMT1		29
 -- 
 2.1.3
