@@ -1,46 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:47:05 +0900
-Subject: [PATCH 2/4] ARM: shmobile: Fix is_e2 warning
+Date: Mon, 29 Dec 2014 10:47:06 +0900
+Subject: [PATCH 3/4] ARM: shmobile: r8a7779: No TWD setup in C for
+ Multiplatform
 In-Reply-To: <cover.1419810196.git.horms+renesas@verge.net.au>
 References: <cover.1419810196.git.horms+renesas@verge.net.au>
-Message-ID: <95abc9de7896bf65e67bf781d709ec453f1f5f84.1419810196.git.horms+renesas@verge.net.au>
+Message-ID: <1dc13eee3a5c60131657482aa88c997e5fa8b50c.1419810196.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Fix "is_e2" warning introduced by:
-
-9ce3fa6 ARM: shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794
-
-Only triggers on kernel configurations that have ARCH_ARM_TIMER=n.
+Skip the TWD setup in C for r8a7779 Multiplatform.
+We should use DTS for the TWD device anyway.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-shmobile/smp-r8a7779.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 3dd6edd..c35b91d 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -52,15 +52,13 @@ void __init rcar_gen2_timer_init(void)
- {
- #if defined(CONFIG_ARM_ARCH_TIMER) || defined(CONFIG_COMMON_CLK)
- 	u32 mode = rcar_gen2_read_mode_pins();
--	bool is_e2 = (bool)of_find_compatible_node(NULL, NULL,
--		"renesas,r8a7794");
- #endif
- #ifdef CONFIG_ARM_ARCH_TIMER
- 	void __iomem *base;
- 	int extal_mhz = 0;
- 	u32 freq;
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 3f761f8..9fc280e 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -56,7 +56,7 @@ static struct rcar_sysc_ch *r8a7779_ch_cpu[4] = {
+ 	[3] = &r8a7779_ch_cpu3,
+ };
  
--	if (is_e2) {
-+	if (of_machine_is_compatible("renesas,r8a7794")) {
- 		freq = 260000000 / 8;	/* ZS / 8 */
- 		/* CNTVOFF has to be initialized either from non-secure
- 		 * Hypervisor mode or secure Monitor mode with SCR.NS==1.
+-#ifdef CONFIG_HAVE_ARM_TWD
++#if defined(CONFIG_HAVE_ARM_TWD) && !defined(CONFIG_ARCH_MULTIPLATFORM)
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, R8A7779_SCU_BASE + 0x600, 29);
+ void __init r8a7779_register_twd(void)
+ {
 -- 
 2.1.3
