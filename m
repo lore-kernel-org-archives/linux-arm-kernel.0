@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:36 +0900
-Subject: [PATCH 2/7] ARM: shmobile: armadillo800eva dts: Replace status value
+Date: Mon, 29 Dec 2014 10:43:41 +0900
+Subject: [PATCH 7/7] ARM: shmobile: kzm9g-reference dts: Replace status value
  "ok" by "okay"
 In-Reply-To: <cover.1419809027.git.horms+renesas@verge.net.au>
 References: <cover.1419809027.git.horms+renesas@verge.net.au>
-Message-ID: <16d3b8845ef3934a0586df5662254d54785d7741.1419809027.git.horms+renesas@verge.net.au>
+Message-ID: <338d1f0b5e877eae51c885da81d86b0efd6373e7.1419809027.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,23 +17,14 @@ values.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index d4af4d8..9bd0cb4 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -172,7 +172,7 @@
- 	pinctrl-names = "default";
- 
- 	phy-handle = <&phy0>;
--	status = "ok";
-+	status = "okay";
- 
- 	phy0: ethernet-phy at 0 {
- 		reg = <0>;
-@@ -193,7 +193,7 @@
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 939be12..863dc4c 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -179,7 +179,7 @@
  };
  
  &cmt1 {
