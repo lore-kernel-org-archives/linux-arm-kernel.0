@@ -1,78 +1,172 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Dec 2014 17:49:00 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT PM Updates for v3.20
-In-Reply-To: <cover.1419809198.git.horms+renesas@verge.net.au>
-References: <cover.1419809198.git.horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXA+NaxCaBmH743Q-EotQa1en9tpRQPOhRvDi1POnUxdg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 29 Dec 2014 11:05:55 -0600
+Subject: [RFC] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpokUXvhqt+z4EPC9k=O8ZnQOqNSGGi8w6w4shYtbvv8mTw@mail.gmail.com>
+References: <52c403454c3b8fc201abe7ac74cf657638479311.1417691389.git.viresh.kumar@linaro.org>
+ <CAKohpokUXvhqt+z4EPC9k=O8ZnQOqNSGGi8w6w4shYtbvv8mTw@mail.gmail.com>
+Message-ID: <CAL_JsqJabcXe7-juTnJDcVdzpnFokYmt-N=bjZt5a+32Fzr_vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Mon, Dec 29, 2014 at 2:43 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Please consider these Renesas ARM based SoC DT PM updates for v3.20.
+On Tue, Dec 9, 2014 at 9:51 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 4 December 2014 at 16:44, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> The shortcomings we are trying to solve here:
+>>
+>> - Some kind of compatibility string to probe the right cpufreq driver for
+>>   platforms, when multiple drivers are available. For example: how to choose
+>>   between cpufreq-dt and arm_big_little drivers.
+>>
+>> - Getting clock sharing information between CPUs. Single shared clock vs.
+>>   independent clock per core vs. shared clock per cluster.
+>>
+>> - Support for turbo modes
+>>
+>> - Other per OPP settings: transition latencies, disabled status, etc.?
 >
+> Some updates on the structure of bindings which I got up to with help of Arnd
+> and Rob over IRC, have got better examples to show how things would look
+> like:
 >
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt
+> b/Documentation/devicetree/bindings/power/opp.txt
+> index 74499e5033fc..8ae574b84650 100644
+> --- a/Documentation/devicetree/bindings/power/opp.txt
+> +++ b/Documentation/devicetree/bindings/power/opp.txt
+> @@ -1,9 +1,292 @@
+> -* Generic OPP Interface
+> +Generic OPP (Operating Performance Points) Interface
+> +----------------------------------------------------
 >
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>  SoCs have a standard set of tuples consisting of frequency and
+>  voltage pairs that the device will support per voltage domain. These
+>  are called Operating Performance Points or OPPs.
 >
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-pm-for-v3.20
->
-> for you to fetch changes up to 73e844408c4e344aaece455a4bfa9d845e4d8425:
->
->   ARM: shmobile: r8a7740 dtsi: Add PM domain support (2014-12-21 16:59:10 +0900)
->
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT PM Updates for v3.20
->
-> * DT support from PM domains
-> * Enable DT support for PM domains on r8a7740
->
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (6):
->       PM / Domains: Add DT bindings for the R-Mobile System Controller
->       ARM: shmobile: R-Mobile: Use generic_pm_domain.attach_dev() for pm_clk setup
->       ARM: shmobile: R-Mobile: Enable module clocks if !CONFIG_PM_RUNTIME
+> +This documents defines OPP bindings with its required/optional properties.
+> +OPPs can be defined for any device, this file uses CPU device as an example to
+> +illustrate how to define OPPs.
+> +
+> +opp nodes and opp-lists
+> +
+> +- opp-listN:
+> +  List of nodes defining performance points. Following belong to the nodes
+> +  within the opp-lists.
+> +
+> +  Required properties:
+> +  - frequency-kHz: Frequency in kHz
 
-Is it still possible to drop the above commit?
-This branch was rebased on v3.19-rc1[*], where this is no longer needed, and
-even has bad (as in suboptimal; fortunately it does not crash) side effects:
+s/kHz/khz/
 
-    As of commit b2b49ccbdd547135 ("PM: Kconfig: Set PM_RUNTIME if PM_SLEEP
-    is selected"), CONFIG_PM_RUNTIME is always enabled if CONFIG_PM is
-    enabled, so this section is no longer needed.
+> +  - voltage-uV: voltage in micro Volts
 
-    As of commit 464ed18ebdb6236f ("PM: Eliminate CONFIG_PM_RUNTIME"),
-    CONFIG_PM_RUNTIME no longer exists, and this section will always be
-    executed, which may enable clocks that are not needed.
+-microvolt is more consistent with regulator binding.
 
-Anyway, I've sent a revert, too
-(http://marc.info/?l=linux-sh&m=141987158302176&w=2).
+The names are a bit redundant. perhaps opp-khz and opp-microvolt instead.
 
-Thanks!
+> +
+> +  Optional properties:
+> +  - turbo-mode: Marks the volt-freq pair as turbo pair.
+> +  - status: Marks the node enabled/disabled.
+> +
+> +- oppN:
+> +  Operating performance point node per device. Devices using it should have its
+> +  phandle in their "operating-points-v2" property.
+> +
+> +  Required properties:
+> +  - compatible: allow OPPs to express their compatibility
+> +  - opp-list: phandle to opp-list defined above.
+> +
+> +  Optional properties:
+> +  - clocks: Tuple of clock providers
+> +  - clock-names: Clock names
+> +  - opp-supply: phandle to the parent supply/regulator node
+> +  - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
+> +  - clock-latency: Specify the possible maximum transition latency for clock,
+> +    in unit of nanoseconds.
+> +
+> +Example 1: Simple case of dual-core cortex A9-single cluster, sharing
+> clock line.
+> +
+> +/ {
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       compatible = "arm,cortex-a9";
+> +                       reg = <0>;
+> +                       next-level-cache = <&L2>;
+> +                       operating-points-v2 = <&opp0>;
+> +
+> +                       opp0: opp0 {
 
-BTW, this happened because this series was originally intended for 3.19, but
-postponed to 3.20 because a dependency entered mainline only in a late
-3.18-rc*, when arm-soc for 3.19 was about to close.
+I don't really like having this under cpu0 when it applies to all
+cpus. I would move it out of /cpus.
 
-[*] If it wouldn't have been rebased, the issue would have shown up after the
-    merge into post-v3.19-rc1 anyway, and would have needed a revert.
+> +                               compatible = "linux,cpu-dvfs";
 
->       ARM: shmobile: R-Mobile: Store SYSC base address in rmobile_pm_domain
->       ARM: shmobile: R-Mobile: Add DT support for PM domains
->       ARM: shmobile: r8a7740 dtsi: Add PM domain support
+This should not be linux specific. Probably not cpu specific either.
 
-Gr{oetje,eeting}s,
+> +                               clocks = <&clk-controller 0>;
+> +                               clock-names = "cpu";
 
-                        Geert
+clocks are an input to the cpu, not really an opp. You could have a an
+OPP which uses a different parent clock, but that is most likely a
+switch within the clock controller rather than 2 clock inputs to the
+cpu.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+I think the clock binding for cpus should stand on its own independent of OPPs.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +                               opp-supply = <&cpu-supply0>;
+
+Same comment as clocks applies here.
+
+> +                               voltage-tolerance = <2>; /* percentage */
+> +                               clock-latency = <300000>;
+
+These could be per entry. I'm not sure it is worth the savings to not
+just always specify them per entry.
+
+We should append units (-us) to clock-latency unless there is a good
+reason to maintain compatibility.
+
+> +                               opp-list = <&opplist0>;
+
+With the above changes, having this list is unnecessary.
+
+So, what I envision is like this:
+
+/cpus {
+  cpu at 0 {
+    clocks = <...>;
+    cpu-supply = <...>;
+    operating-point-v2 = <&cpu0-opp>;
+   };
+  cpu at 1 {
+    clocks = <...>;
+    cpu-supply = <...>;
+    operating-point-v2 = <&cpu1-opp>;
+   };
+};
+
+cpu0-opp : opp0 {
+  compatible = "operating-point-table";
+  entry0 {
+    opp-khz = <500000>;
+    opp-microvolt = <900000>;
+  };
+  entry1 {
+    opp-khz = <1000000>;
+    opp-microvolt = <1000000>;
+    turbo-mode;
+  };
+};
+
+cpu1-opp : opp1 {
+  compatible = "operating-point-table";
+...
+};
+
+We need to also consider if this all works for other non-cpu OPPs like
+GPUs or DRAM/bus.
+
+Rob
