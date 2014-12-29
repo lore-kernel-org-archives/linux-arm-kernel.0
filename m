@@ -1,41 +1,29 @@
-From: fabf@skynet.be (Fabian Frederick)
-Date: Mon, 29 Dec 2014 15:29:34 +0100
-Subject: [PATCH 00/11 linux-next] drivers: remove unnecessary version.h
- inclusion
-Message-ID: <1419863387-24233-1-git-send-email-fabf@skynet.be>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 29 Dec 2014 08:29:58 -0600
+Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
+ interface
+In-Reply-To: <549FEABA.10206@gmail.com>
+References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
+ <1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>
+ <20141223170613.GM23854@atomide.com> <5499A2B4.2080909@ti.com>
+ <549FEABA.10206@gmail.com>
+Message-ID: <20141229142958.GA10746@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small patchset removes unnecessary version.h includes detected by
-versioncheck in drivers branch.
+On 20:34-20141228, Tomasz Figa wrote:
+> May I ask you (or anyone else working on OMAP) to try to figure out
+> what the issue is? It is stopping L2 cache support for Exynos4 being
 
-Fabian Frederick (11):
-  rsxx: remove unnecessary version.h inclusion
-  skd: remove unnecessary version.h inclusion
-  ipmi: remove unnecessary version.h inclusion
-  input: remove unnecessary version.h inclusion
-  [media] tw68: remove unnecessary version.h inclusion
-  [media] s5p-g2d: remove unnecessary version.h inclusion
-  [media] s5p-mfc: remove unnecessary version.h inclusion
-  [media] vivid: remove unnecessary version.h inclusion
-  [media] uvcvideo: remove unnecessary version.h inclusion
-  GenWQE: remove unnecessary version.h inclusion
-  s390/hmcdrv: remove unnecessary version.h inclusion
+http://slexy.org/view/s2BnzxVglj
+Took a register dump and compared -> Got the same dump
+http://slexy.org/view/s21YRHpzeW .
 
- drivers/block/rsxx/rsxx_priv.h               | 1 -
- drivers/block/skd_main.c                     | 1 -
- drivers/char/ipmi/ipmi_ssif.c                | 1 -
- drivers/input/touchscreen/elants_i2c.c       | 2 --
- drivers/media/pci/tw68/tw68.h                | 1 -
- drivers/media/platform/s5p-g2d/g2d.c         | 1 -
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 1 -
- drivers/media/platform/vivid/vivid-tpg.h     | 1 -
- drivers/media/usb/uvc/uvc_v4l2.c             | 1 -
- drivers/misc/genwqe/card_base.h              | 1 -
- drivers/misc/genwqe/card_sysfs.c             | 1 -
- drivers/s390/char/hmcdrv_mod.c               | 1 -
- 13 files changed, 14 deletions(-)
+Basically, this implies: possible sequence change broke AM437x or
+some secure function call (which i have'nt dumped).
+
+Is it possible to break up this patch into easier patches?
 
 -- 
-2.1.0
+Regards,
+Nishanth Menon
