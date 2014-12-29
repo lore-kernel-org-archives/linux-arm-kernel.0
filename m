@@ -1,58 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:42 +0900
-Subject: [PATCH 11/30] ARM: shmobile: r8a7794: Add USBDMAC[01] clocks to
- device tree
+Date: Mon, 29 Dec 2014 10:43:40 +0900
+Subject: [PATCH 09/30] ARM: shmobile: r8a7791: Correct mask for GIC PPI
+ interrupts
 In-Reply-To: <cover.1419812185.git.horms+renesas@verge.net.au>
 References: <cover.1419812185.git.horms+renesas@verge.net.au>
-Message-ID: <22a9b44fc17e83417fa890123a33164ea37fc10c.1419812186.git.horms+renesas@verge.net.au>
+Message-ID: <aa5404fc74c31491c8087a9ed546a94dee60aac1.1419812185.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-[horms: merged per-clock patches]
+R-Car M2-W (r8a7791) contains two Cortex-A15 cores, hence the second
+interrupt specifier cell for Private Peripheral Interrupts should use
+"GIC_CPU_MASK_SIMPLE(2)".
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 7 ++++---
- include/dt-bindings/clock/r8a7794-clock.h | 2 ++
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index e537654..13e4a8d 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -493,13 +493,14 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&rclk_clk>;
-+			clocks = <&rclk_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
--				R8A7794_CLK_CMT1
-+				R8A7794_CLK_CMT1 R8A7794_CLK_USBDMAC0
-+				R8A7794_CLK_USBDMAC1
- 			>;
- 			clock-output-names =
--				"cmt1";
-+				"cmt1", "usbdmac0", "usbdmac1";
- 		};
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 94e2bbf..52492d8 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -51,6 +51,8 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 7fabea2..958a69b 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -78,7 +78,7 @@
+ 			<0 0xf1002000 0 0x1000>,
+ 			<0 0xf1004000 0 0x2000>,
+ 			<0 0xf1006000 0 0x2000>;
+-		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
  
- /* MSTP3 */
- #define R8A7794_CLK_CMT1		29
-+#define R8A7794_CLK_USBDMAC0		30
-+#define R8A7794_CLK_USBDMAC1		31
+ 	gpio0: gpio at e6050000 {
+@@ -186,10 +186,10 @@
  
- /* MSTP5 */
- #define R8A7794_CLK_THERMAL		22
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+-		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <1 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <1 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			     <1 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			     <1 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			     <1 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
+ 	cmt0: timer at ffca0000 {
 -- 
 2.1.3
