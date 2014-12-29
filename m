@@ -1,48 +1,34 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 30 Dec 2014 00:32:09 +0100
-Subject: [PATCH v2 06/12] ARM: unify MMU/!MMU addruart calls
+Date: Tue, 30 Dec 2014 00:32:10 +0100
+Subject: [PATCH v2 07/12] ARM: imx: depend MXC debug board on 3DS machines
 In-Reply-To: <1419895935-22966-1-git-send-email-stefan@agner.ch>
 References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
-Message-ID: <1419895935-22966-7-git-send-email-stefan@agner.ch>
+Message-ID: <1419895935-22966-8-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the needless differences between MMU/!MMU addruart calls.
-This allows to use the same addruart macro on SoC level. Useful
-for SoC consisting of multiple CPUs with and without MMU such as
-Freescale Vybrid.
+Depend the MXC debug board on machines which actually support it.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/include/debug/efm32.S | 2 +-
- arch/arm/kernel/debug.S        | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+This configuration appeared lonely when I enabled ARCH_MULTI_V7M.
+Afaik, the selection of it only makes sense with one of the supported
+boards...
 
-diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
-index 2265a19..660fa1e 100644
---- a/arch/arm/include/debug/efm32.S
-+++ b/arch/arm/include/debug/efm32.S
-@@ -16,7 +16,7 @@
+ arch/arm/mach-imx/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 3c5859e..96c8eb8 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -21,6 +21,7 @@ config MXC_AVIC
  
- #define	UARTn_TXDATA		0x0034
- 
--		.macro	addruart, rx, tmp
-+		.macro	addruart, rx, tmp, tmp2
- 		ldr	\rx, =(CONFIG_DEBUG_UART_PHYS)
- 
- 		/*
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index 78c91b5..ea9646c 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -35,7 +35,7 @@
- 
- #else /* !CONFIG_MMU */
- 		.macro	addruart_current, rx, tmp1, tmp2
--		addruart	\rx, \tmp1
-+		addruart	\rx, \tmp1, \tmp2
- 		.endm
- 
- #endif /* CONFIG_MMU */
+ config MXC_DEBUG_BOARD
+ 	bool "Enable MXC debug board(for 3-stack)"
++	depends on CONFIG_MACH_MX27_3DS || CONFIG_MACH_MX31_3DS || CONFIG_MACH_MX35_3DS
+ 	help
+ 	  The debug board is an integral part of the MXC 3-stack(PDK)
+ 	  platforms, it can be attached or removed from the peripheral
 -- 
 2.2.1
