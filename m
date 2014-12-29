@@ -1,47 +1,85 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 29 Dec 2014 10:04:46 +0200
-Subject: v3.19-rc1 regression(?) on N900
-In-Reply-To: <20141225222122.GB582@fuloong-minipc.musicnaut.iki.fi>
-References: <549B44E2.6080202@ti.com> <201412250932.40403@pali>
- <20141225091121.GA20355@amd>
- <20141225222122.GB582@fuloong-minipc.musicnaut.iki.fi>
-Message-ID: <54A10B1E.7030800@ti.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 29 Dec 2014 16:15:09 +0800
+Subject: [Ask for HELP] Should it support ustat syscall for arm64
+In-Reply-To: <54A0C35B.4010001@huawei.com>
+References: <54A0C35B.4010001@huawei.com>
+Message-ID: <54A10D8D.8060002@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 26/12/14 00:21, Aaro Koskinen wrote:
 
-> ...however, I can confirm that framebuffer is broken:
+On 2014/12/29 10:58, Wang Weidong wrote:
+> Hi,
 > 
-> [    8.230743] omapfb omapfb: no displays
-> [    8.255584] omapfb omapfb: failed to setup omapfb
-> [    8.260620] platform omapfb: Driver omapfb requests probe deferral
-> [    8.284118] of_get_named_gpiod_flags: parsed 'reset-gpios' property of node
-> '/ocp/spi at 48098000/acx565akm at 2[0]' - status (0)
-> [    8.284271] acx565akm spi1.2: failed to find video source
-> [    8.290069] spi spi1.2: Driver acx565akm requests probe deferral
+> As I ran LTP testcase ustat01 and ustat02 on Arm64, and got the result:
 > 
-> I bisected it to ef691ff48bc8 (OMAPDSS: DT: Get source endpoint
-> by matching reg-id). When I revert that, also FB works with 3.19-rc1.
+> ustat01     1  TFAIL  :  ustat(2) failed and setthe errno to 38 : Function not implemented
+> 
+> ustat02     1  TFAIL  :  ustat(2) failed to produce expected error; 22, errno: EINVAL:
+>                          TEST_ERRNO=ENOSYS(38): Function not implemented
+> ustat02     2  TFAIL  :  ustat(2) failed to produce expected error; 14, errno: EFAULT:
+>                          TEST_ERRNO=ENOSYS(38): Function not implemented
+> 
+> -----------------------
+> 
+> I found the glibc and kernel's implementation:
+> The glibc version is 2.19, kernel is 3.16.
+> 
+> The glibc will use the sysdeps/unix/sysv/linux/generic/ustat.c
+> But it only return ENOSYS.
+> 
+> The kernel doesn't support the NR_ustat syscall.
+> 
+> So I did that:
+> 1. In glibc:
+> I changed the sysdeps/unix/sysv/linux/generic/ustat.c:
+> 
+> -#include <errno.h>
+> -#include <sys/ustat.h>
+> +#define __ARCH_WANT_SYSCALL_DEPRECATED
+> +#include <sysdeps/unix/sysv/linux/ustat.c>
+>  
+> -#include <sysdep.h>
+> -#include <sys/syscall.h>
+> -
+> -/* This deprecated syscall is no longer used (replaced with fstat).  */
+> -int
+> -ustat (dev_t dev, struct ustat *ubuf)
+> -{
+> -  __set_errno (ENOSYS);
+> -  return -1;
+> -}
+> -stub_warning (ustat)
+> 
+> 2. In Kernel:
+> I changed the arch/arm64/include/uapi/asm/unistd.h:
+> 
+> +#define __ARCH_WANT_SYSCALL_DEPRECATED
+> +#define __ARCH_WANT_SYS_FORK
+> +#define __ARCH_WANT_SYS_VFORK
+> 
+> After the changing, These cases will Pass.
 
-I've attached a patch for this. Only hack-tested on OMAP3 beagle, so
-please report if it works.
+Hi Weidong,
 
- Tomi
+> So, Does it need to support ustat syscall for arm64?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-OMAPDSS-SDI-fix-output-port_num.patch
-Type: text/x-patch
-Size: 1355 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141229/5bc95826/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141229/5bc95826/attachment.sig>
+No, on arm64 the ustat syscall is obsolete.
+You could find syscalls from "include/uapi/asm-generic/unistd.h".
+And on arm64, there is no define for "__ARCH_WANT_SYSCALL_DEPRECATED".
+So there is no support for the syscalls covered by the macro above.
+
+Best Regards,
+Wei
+
+> Regards,
+> Wang
+> 
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> 
+> .
+> 
