@@ -1,29 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 29 Dec 2014 23:34:07 +0300
-Subject: [PATCH] ARM: shmobile: r8a7791: add ADSP clocks
-In-Reply-To: <CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>
-References: <1937156.Ii2YrGkOFy@wasted.cogentembedded.com>
- <CAMuHMdUqC5v-d95Sk2NewSE-EBKS49vn7jPKpixF2djg6NOmVw@mail.gmail.com>
-Message-ID: <54A1BABF.5070208@cogentembedded.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 29 Dec 2014 14:35:55 -0600
+Subject: [PATCH 2/3] hwmon: Driver for OMAP3 temperature sensor
+In-Reply-To: <20141229181556.GA26926@amd>
+References: <20141226102933.GA28778@amd>
+ <1419597294-21487-1-git-send-email-sre@kernel.org>
+ <1419597294-21487-3-git-send-email-sre@kernel.org>
+ <CANOLnON6rAQ2+jJEFDKseH2Htu6bqRkURDioGt7zp1Ze73f8Pw@mail.gmail.com>
+ <CAGo_u6qO0ok+GBnm7SQtw6dJuwGN2OuP7CpKDEWawS3V2go4KA@mail.gmail.com>
+ <20141229181556.GA26926@amd>
+Message-ID: <54A1BB2B.9060204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 12/29/2014 12:15 PM, Pavel Machek wrote:
+> On Mon 2014-12-29 12:01:03, Nishanth Menon wrote:
+>> On Mon, Dec 29, 2014 at 11:52 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
+>>> On Fri, Dec 26, 2014 at 2:34 PM, Sebastian Reichel <sre@kernel.org> wrote:
+>>>> OMAP34xx and OMAP36xx processors contain a register in the syscon area,
+>>>> which can be used to determine the SoCs temperature. This patch provides
+>>>> a DT based driver for the temperature sensor based on an older driver
+>>>> written by Peter De Schrijver for the Nokia N900 and N9.
+>>>
+>>> The sensor looks like an earlier iteration of sensors used in newer
+>>> OMAPs, which are already supported by maybe
+>>> drivers/thermal/ti-soc-thermal/ , maybe it would make sense to update
+>>> that driver instead?
+>>
+>> Just to be clear - OMAP4 is the first time that the sensors were
+>> reliable enough to be used.
+> 
+> When testing initial version of the patch, they seem to work very well
+> in the omap3 case.
 
-On 12/29/2014 11:24 PM, Geert Uytterhoeven wrote:
+Just be careful when you try to make thermal policy like decisions
+based on this sensor. Placement of the sensor w.r.t the actual logic
+generating heat has to be a factor as well. If you are just looking
+for an approximation temperature (thermometerish kind), you might be
+ok with this. I am not sure we'd find any TI data around this.. just a
+heads up.
 
->> --- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
->> +++ renesas/include/dt-bindings/clock/r8a7791-clock.h
+Also notice http://www.ti.com/lit/er/sprz278f/sprz278f.pdf "Advisory
+3.1.1.186 MMC OCP Clock Not Gated When Thermal Sensor Is Used" I think
+there were accuracy issues at certain values etc.. So remember to do a
+off mode type PM tests as well before you consider requesting these to
+be merged.
 
->> -#define R8A7791_CLK_RCAN               9
->> +#define R8A7791_CLK_ADSP               9
->> +#define R8A7791_CLK_RCAN               10
-
-> R8A7791_CLK_RCAN is changed?
-
-    Yes. It shouldn't be?
-
-> Gr{oetje,eeting}s,
->                          Geert
-
-WBR, Sergei
+-- 
+Regards,
+Nishanth Menon
