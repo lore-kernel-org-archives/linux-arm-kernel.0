@@ -1,53 +1,50 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 29 Dec 2014 14:39:28 +0800
-Subject: [PATCH RFC v6 21/21] ARM: imx_v6_v7_defconfig: Add support for Himax
- HX8369A panel
+Date: Mon, 29 Dec 2014 14:39:24 +0800
+Subject: [PATCH RFC v6 17/21] ARM: dtsi: imx6qdl: Add support for MIPI DSI
+ host controller
 In-Reply-To: <1419835168-9034-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419835168-9034-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419835168-9034-22-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419835168-9034-18-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Himax HX8369A panel.
-
-The new imx_v6_v7_defconfig is generated in this way:
-* make ARCH=arm imx_v6_v7_defconfig
-* make ARCH=arm menuconfig and manually choose to build in
-  the Himax HX8369A panel driver
-* make ARCH=arm savedefconfig
-* cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+This patch adds support for MIPI DSI host controller.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v5->v6:
  * None.
 
-v4->v5:
- * None.
-
 v3->v4:
  * None.
 
 v2->v3:
- * None.
+ * As suggested by Phillip Zabel, change the clocks and the clock-names
+   properties to use the pllref and core_cfg clocks only.
 
 v1->v2:
- * Add the HIMAX prefix in the Kconfig name.
+ * None.
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 3e0e589..27db91b 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -192,6 +192,7 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_PANEL_HIMAX_HX8369A=y
- CONFIG_DRM_IMX=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 96bf2a0..7b1c313 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1006,7 +1006,13 @@
+ 			mipi_dsi: mipi at 021e0000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				compatible = "fsl,imx6q-mipi-dsi";
+ 				reg = <0x021e0000 0x4000>;
++				interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
++				gpr = <&gpr>;
++				clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
++					 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
++				clock-names = "pllref", "core_cfg";
+ 				status = "disabled";
+ 
+ 				ports {
 -- 
 2.1.0
