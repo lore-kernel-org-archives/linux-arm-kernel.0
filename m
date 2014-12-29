@@ -1,73 +1,162 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 29 Dec 2014 18:04:36 +0100
-Subject: [PATCH 1/8] net: Xilinx: fix error return code
-In-Reply-To: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1419872683-32709-2-git-send-email-Julia.Lawall@lip6.fr>
+Date: Mon, 29 Dec 2014 18:04:35 +0100
+Subject: [PATCH 0/8] fix error return code
+Message-ID: <1419872683-32709-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return a negative error code on failure.
-
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
+The complate semantic patch that finds this problem is as follows:
+(http://coccinelle.lip6.fr/)
 
 // <smpl>
+@ok exists@
+identifier f,ret,i;
+expression e;
+constant c;
 @@
-identifier ret; expression e1,e2;
-@@
+
+// identify a function that returns a negative return value at least once.
+f(...) {
+... when any
 (
-if (\(ret < 0\|ret != 0\))
+return -c at i;
+|
+ret = -c at i;
+... when != ret = e
+return ret;
+|
+if (ret < 0) { ... return ret; }
+)
+... when any
+}
+
+@r exists@
+identifier ret,ok.f,fn;
+expression e1,e2,e3,e4,e5,e6,x;
+statement S,S1;
+position p1,p2,p3;
+@@
+
+// identify a case where the return variable is set to a non-negative value
+// and then returned in error-handling code
+f(...) {
+... when any
+(
+if at p1 (\(ret < 0\|ret != 0\))
  { ... return ret; }
 |
-ret = 0
+ret@p1 = 0
 )
-... when != ret = e1
+... when != \(ret = e1\|ret++\|ret--\|ret+=e1\|ret-=e1\)
     when != &ret
-*if(...)
-{
+    when any
+(
+ if (<+... ret = e5 ...+>) S1
+|
+ if (<+... &ret ...+>) S1
+|
+if at p2(<+...x = fn(...)...+>)
+ {
+  ... when != ret = e6
+      when forall
+ return at p3 ret;
+}
+|
+break;
+|
+x = fn(...)
+... when != \(ret = e4\|ret++\|ret--\|ret+=e4\|ret-=e4\)
+    when != &ret
+(
+ if (<+... ret = e3 ...+>) S
+|
+ if (<+... &ret ...+>) S
+|
+if at p2(<+...\(x != 0\|x < 0\|x == NULL\|IS_ERR(x)\)...+>)
+ {
   ... when != ret = e2
       when forall
- return ret;
+ return at p3 ret;
 }
+)
+)
+... when any
+}
+
+@printer depends on r@
+position p;
+identifier ok.f,pr;
+constant char [] c;
+@@
+
+f(...) { <...pr@p(...,c,...)...> }
+
+@bad0 exists@
+identifier r.ret,ok.f,g != {ERR_PTR,IS_ERR};
+position p != printer.p;
+@@
+
+f(...) { ... when any
+g at p(...,ret,...)
+... when any
+ }
+
+@bad depends on !bad0 exists@
+position r.p1,r.p2;
+statement S1,S2;
+identifier r.ret;
+expression e1;
+@@
+
+// ignore the above if there is some path where the variable is set to
+// something else
+(
+if at p1 (\(ret < 0\|ret != 0\)) S1
+|
+ret at p1 = 0
+)
+... when any
+ \(ret = e1\|ret++\|ret--\|ret+=e1\|ret-=e1\|&ret\)
+... when any
+if at p2(...) S2
+
+@bad1 depends on !bad0 && !bad exists@
+position r.p2;
+statement S2;
+identifier r.ret;
+expression e1;
+constant c;
+@@
+
+ret = -c
+... when != \(ret = e1\|ret++\|ret--\|ret+=e1\|ret-=e1\)
+    when != &ret
+    when any
+if at p2(...) S2
+
+@bad2 depends on !bad0 && !bad && !bad1 exists@
+position r.p1,r.p2;
+identifier r.ret;
+expression e1;
+statement S2;
+constant c;
+@@
+
+// likewise ignore it if there has been an intervening return
+ret at p1 = 0
+... when != if (...) { ... ret = e1 ... return ret; }
+    when != if (...) { ... return -c; }
+    when any
+if@p2(...) S2
+
+
+@script:python depends on !bad0 && !bad && !bad1 && !bad2@
+p1 << r.p1;
+p2 << r.p2;
+p3 << r.p3;
+@@
+
+cocci.print_main("",p1)
+cocci.print_secs("",p2)
+cocci.print_secs("",p3)
 // </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/net/ethernet/xilinx/ll_temac_main.c   |    2 ++
- drivers/net/ethernet/xilinx/xilinx_emaclite.c |    1 +
- 2 files changed, 3 insertions(+)
-
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index 9c2d91e..dbcbf0c 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -1043,6 +1043,7 @@ static int temac_of_probe(struct platform_device *op)
- 	lp->regs = of_iomap(op->dev.of_node, 0);
- 	if (!lp->regs) {
- 		dev_err(&op->dev, "could not map temac regs.\n");
-+		rc = -ENOMEM;
- 		goto nodev;
- 	}
- 
-@@ -1062,6 +1063,7 @@ static int temac_of_probe(struct platform_device *op)
- 	np = of_parse_phandle(op->dev.of_node, "llink-connected", 0);
- 	if (!np) {
- 		dev_err(&op->dev, "could not find DMA node\n");
-+		rc = -ENODEV;
- 		goto err_iounmap;
- 	}
- 
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 2485879..9d4ce38 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1109,6 +1109,7 @@ static int xemaclite_of_probe(struct platform_device *ofdev)
- 	res = platform_get_resource(ofdev, IORESOURCE_IRQ, 0);
- 	if (!res) {
- 		dev_err(dev, "no IRQ found\n");
-+		rc = -ENXIO;
- 		goto error;
- 	}
- 
