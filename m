@@ -1,34 +1,106 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 30 Dec 2014 00:32:10 +0100
-Subject: [PATCH v2 07/12] ARM: imx: depend MXC debug board on 3DS machines
+Date: Tue, 30 Dec 2014 00:32:12 +0100
+Subject: [PATCH v2 09/12] ARM: efm32: move into multiplatform
 In-Reply-To: <1419895935-22966-1-git-send-email-stefan@agner.ch>
 References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
-Message-ID: <1419895935-22966-8-git-send-email-stefan@agner.ch>
+Message-ID: <1419895935-22966-10-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depend the MXC debug board on machines which actually support it.
+From: Arnd Bergmann <arnd@arndb.de>
 
+Since the multiplatform configuration can support no-MMU kernels now,
+there is nothing stopping us from moving the efm32 platform in there
+as well. This introduces a new ARCH_MULTI_V7M CPU architecture selection
+option, since v7-M is incompatible with v7-A, and we can have either
+of the two enabled for multiplatform, but not both at the same time.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-This configuration appeared lonely when I enabled ARCH_MULTI_V7M.
-Afaik, the selection of it only makes sense with one of the supported
-boards...
+ arch/arm/Kconfig                 | 35 ++++++++++++++++-------------------
+ arch/arm/configs/efm32_defconfig |  2 ++
+ 2 files changed, 18 insertions(+), 19 deletions(-)
 
- arch/arm/mach-imx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 3c5859e..96c8eb8 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -21,6 +21,7 @@ config MXC_AVIC
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 95007b9..8fe035b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -314,7 +314,7 @@ config ARCH_MULTIPLATFORM
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
+-	select MULTI_IRQ_HANDLER
++	select MULTI_IRQ_HANDLER if !ARCH_MULTI_V7M
+ 	select SPARSE_IRQ
+ 	select USE_OF
  
- config MXC_DEBUG_BOARD
- 	bool "Enable MXC debug board(for 3-stack)"
-+	depends on CONFIG_MACH_MX27_3DS || CONFIG_MACH_MX31_3DS || CONFIG_MACH_MX35_3DS
- 	help
- 	  The debug board is an integral part of the MXC 3-stack(PDK)
- 	  platforms, it can be attached or removed from the peripheral
+@@ -400,24 +400,6 @@ config ARCH_EBSA110
+ 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
+ 	  parallel port.
+ 
+-config ARCH_EFM32
+-	bool "Energy Micro efm32"
+-	depends on !MMU
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_NVIC
+-	select AUTO_ZRELADDR
+-	select CLKSRC_OF
+-	select COMMON_CLK
+-	select CPU_V7M
+-	select GENERIC_CLOCKEVENTS
+-	select NO_DMA
+-	select NO_IOPORT_MAP
+-	select SPARSE_IRQ
+-	select USE_OF
+-	help
+-	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
+-	  processors.
+-
+ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+@@ -778,6 +760,14 @@ menu "Multiple platform selection"
+ 
+ comment "CPU Core family selection"
+ 
++config ARCH_MULTI_V7M
++	bool "ARMv7-M based platforms (Cortex-M)"
++	depends on !MMU && !(ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7)
++	select CPU_V7M
++	select ARM_NVIC
++	select NO_DMA # for now
++	select NO_IOPORT_MAP # for now
++
+ config ARCH_MULTI_V4
+ 	bool "ARMv4 based platforms (FA526)"
+ 	depends on !ARCH_MULTI_V6_V7 && MMU
+@@ -834,6 +824,13 @@ config ARCH_VIRT
+ 	select ARM_PSCI
+ 	select HAVE_ARM_ARCH_TIMER
+ 
++config ARCH_EFM32
++	bool "Energy Micro efm32" if ARCH_MULTI_V7M
++	depends on !MMU
++	help
++	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
++	  processors.
++
+ #
+ # This is sorted alphabetically by mach-* pathname.  However, plat-*
+ # Kconfigs may be included either alphabetically (according to the
+diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
+index f59fffb..7bd2486 100644
+--- a/arch/arm/configs/efm32_defconfig
++++ b/arch/arm/configs/efm32_defconfig
+@@ -16,6 +16,8 @@ CONFIG_EMBEDDED=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_MMU is not set
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_MULTI_V7M=y
+ CONFIG_ARCH_EFM32=y
+ # CONFIG_KUSER_HELPERS is not set
+ CONFIG_SET_MEM_PARAM=y
 -- 
 2.2.1
