@@ -1,40 +1,49 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:47:07 +0900
-Subject: [PATCH 4/4] ARM: shmobile: r8a73a4: Multiplatform support
-In-Reply-To: <cover.1419810196.git.horms+renesas@verge.net.au>
-References: <cover.1419810196.git.horms+renesas@verge.net.au>
-Message-ID: <39695882d3d642a73bca551e682426e4e3bcd158.1419810196.git.horms+renesas@verge.net.au>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 29 Dec 2014 09:51:50 +0800
+Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8173 SoC
+In-Reply-To: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
+References: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1419817910.2371.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Hi,
 
-Enable r8a73a4 Multiplatform support for the generic r8a73a4
-machine vector.
+Sorry for my IT setting issue that accidentally add mediatek
+confidential notice in the tail of this mail series.
+Please skip it, and if anyone have concern, I can resend it.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 1b4fafe..d107b93 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -51,6 +51,11 @@ config ARCH_R7S72100
- 	bool "RZ/A1H (R7S72100)"
- 	select SYS_SUPPORTS_SH_MTU2
- 
-+config ARCH_R8A73A4
-+	bool "R-Mobile APE6 (R8A73A40)"
-+	select ARCH_RMOBILE
-+	select RENESAS_IRQC
-+
- config ARCH_R8A7740
- 	bool "R-Mobile A1 (R8A77400)"
- 	select ARCH_RMOBILE
--- 
-2.1.3
+> 
+>  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+>  arch/arm64/Kconfig                                 |   6 +
+>  arch/arm64/boot/dts/Makefile                       |   1 +
+>  arch/arm64/boot/dts/mediatek/Makefile              |   5 +
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  34 +++++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 159 +++++++++++++++++++++
+>  arch/arm64/configs/defconfig                       |   2 +
+>  drivers/irqchip/irq-mtk-sysirq.c                   |  18 ++-
+>  8 files changed, 222 insertions(+), 7 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> 
+> --
+> 1.8.1.1.dirty
+> 
+> ************* Email Confidentiality Notice ********************
+> The information contained in this e-mail message (including any 
+> attachments) may be confidential, proprietary, privileged, or otherwise
+> exempt from disclosure under applicable laws. It is intended to be 
+> conveyed only to the designated recipient(s). Any use, dissemination, 
+> distribution, printing, retaining or copying of this e-mail (including its 
+> attachments) by unintended recipient(s) is strictly prohibited and may 
+> be unlawful. If you are not an intended recipient of this e-mail, or believe 
+> that you have received this e-mail in error, please notify the sender 
+> immediately (by replying to this e-mail), delete any and all copies of 
+> this e-mail (including any attachments) from your system, and do not
+> disclose the content of this e-mail to any other person. Thank you!
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
