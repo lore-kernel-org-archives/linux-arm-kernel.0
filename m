@@ -1,37 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:32 +0900
-Subject: [PATCH 01/30] ARM: shmobile: ape6evm-reference: Correct BSC bus range
+Date: Mon, 29 Dec 2014 10:43:33 +0900
+Subject: [PATCH 02/30] ARM: shmobile: r8a7740 dtsi: Change to using
+ clock-indices
 In-Reply-To: <cover.1419812185.git.horms+renesas@verge.net.au>
 References: <cover.1419812185.git.horms+renesas@verge.net.au>
-Message-ID: <b5c107f03b65e14a70d86654cf2427bdc7e4afe6.1419812185.git.horms+renesas@verge.net.au>
+Message-ID: <9f04e56749bf6da4cb36a6bc703e584b496c26f4.1419812185.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The address space for the r8a73a4 Bus State Controller covers the first
-512 MiB, not the first 2 GiB.
-Correct the size in the "ranges" property to reflect this, and to no
-longer overlap with PCI Express Memory.
+With the addition of clock-indices in commit 8e33f91a0b84ae19 ("clk:
+shmobile: clk-mstp: change to using clock-indices"), we can change the
+DTSes to use the generic property instead of the deprecated
+vendor-specific property.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7740.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-index 84e05f7..b3d8f84 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts
-@@ -67,7 +67,7 @@
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		ranges = <0 0 0 0x80000000>;
-+		ranges = <0 0 0 0x20000000>;
- 	};
- };
- 
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index a8a674b..60ca622 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -453,7 +453,7 @@
+ 			reg = <0xe6150080 4>;
+ 			clocks = <&sub_clk>, <&sub_clk>;
+ 			#clock-cells = <1>;
+-			renesas,clock-indices = <
++			clock-indices = <
+ 				R8A7740_CLK_SUBCK R8A7740_CLK_SUBCK2
+ 			>;
+ 			clock-output-names =
+@@ -468,7 +468,7 @@
+ 				 <&cpg_clocks R8A7740_CLK_HPP>, <&sub_clk>,
+ 				 <&cpg_clocks R8A7740_CLK_B>;
+ 			#clock-cells = <1>;
+-			renesas,clock-indices = <
++			clock-indices = <
+ 				R8A7740_CLK_CEU21 R8A7740_CLK_CEU20 R8A7740_CLK_TMU0
+ 				R8A7740_CLK_LCDC1 R8A7740_CLK_IIC0 R8A7740_CLK_TMU1
+ 				R8A7740_CLK_LCDC0
+@@ -489,7 +489,7 @@
+ 				 <&sub_clk>, <&sub_clk>, <&sub_clk>,
+ 				 <&sub_clk>;
+ 			#clock-cells = <1>;
+-			renesas,clock-indices = <
++			clock-indices = <
+ 				R8A7740_CLK_SCIFA6 R8A7740_CLK_INTCA
+ 				R8A7740_CLK_SCIFA7
+ 				R8A7740_CLK_DMAC1 R8A7740_CLK_DMAC2
+@@ -518,7 +518,7 @@
+ 				 <&cpg_clocks R8A7740_CLK_HP>,
+ 				 <&cpg_clocks R8A7740_CLK_HP>;
+ 			#clock-cells = <1>;
+-			renesas,clock-indices = <
++			clock-indices = <
+ 				R8A7740_CLK_CMT1 R8A7740_CLK_FSI R8A7740_CLK_IIC1
+ 				R8A7740_CLK_USBF R8A7740_CLK_SDHI0 R8A7740_CLK_SDHI1
+ 				R8A7740_CLK_MMC R8A7740_CLK_GETHER R8A7740_CLK_TPU0
+@@ -535,7 +535,7 @@
+ 				 <&cpg_clocks R8A7740_CLK_HP>,
+ 				 <&cpg_clocks R8A7740_CLK_HP>;
+ 			#clock-cells = <1>;
+-			renesas,clock-indices = <
++			clock-indices = <
+ 				R8A7740_CLK_USBH R8A7740_CLK_SDHI2
+ 				R8A7740_CLK_USBFUNC R8A7740_CLK_USBPHY
+ 			>;
 -- 
 2.1.3
