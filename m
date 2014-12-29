@@ -1,52 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:40 +0900
-Subject: [PATCH 09/30] ARM: shmobile: r8a7791: Correct mask for GIC PPI
- interrupts
+Date: Mon, 29 Dec 2014 10:43:43 +0900
+Subject: [PATCH 12/30] ARM: shmobile: koelsch: Fix QSPI mode of SPI-Flash into
+ mode3
 In-Reply-To: <cover.1419812185.git.horms+renesas@verge.net.au>
 References: <cover.1419812185.git.horms+renesas@verge.net.au>
-Message-ID: <aa5404fc74c31491c8087a9ed546a94dee60aac1.1419812185.git.horms+renesas@verge.net.au>
+Message-ID: <9c5becce21af35e59c7313d3603af1d620fffd05.1419812186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
 
-R-Car M2-W (r8a7791) contains two Cortex-A15 cores, hence the second
-interrupt specifier cell for Private Peripheral Interrupts should use
-"GIC_CPU_MASK_SIMPLE(2)".
+In order to change into mode3, CPOL and CPHA bit of SPCMD register
+of QSPI is changed. Mode3 can avoid intermediate voltage.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+[horms: Updated changelog and re-ordered properties]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 7fabea2..958a69b 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -78,7 +78,7 @@
- 			<0 0xf1002000 0 0x1000>,
- 			<0 0xf1004000 0 0x2000>,
- 			<0 0xf1006000 0 0x2000>;
--		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 1e5f8d2..691e4c6 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -444,6 +444,8 @@
+ 		spi-max-frequency = <30000000>;
+ 		spi-tx-bus-width = <4>;
+ 		spi-rx-bus-width = <4>;
++		spi-cpha;
++		spi-cpol;
+ 		m25p,fast-read;
  
- 	gpio0: gpio at e6050000 {
-@@ -186,10 +186,10 @@
- 
- 	timer {
- 		compatible = "arm,armv7-timer";
--		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <1 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <1 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts = <1 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <1 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <1 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <1 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
- 	cmt0: timer at ffca0000 {
+ 		partition at 0 {
 -- 
 2.1.3
