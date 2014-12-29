@@ -1,37 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:22 +0900
-Subject: [PATCH 5/5] ARM: shmobile: Enable DA9063 watchdog in multiplatform
- defconfig
-In-Reply-To: <cover.1419808942.git.horms+renesas@verge.net.au>
-References: <cover.1419808942.git.horms+renesas@verge.net.au>
-Message-ID: <db54d850b686c2ca81c10dd3582e98ee089a0e3a.1419808942.git.horms+renesas@verge.net.au>
+Date: Mon, 29 Dec 2014 10:43:39 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Cleanups for v3.20
+Message-ID: <cover.1419809027.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This allows to restart koelsch on watchdog timeout or manual system
-restart request.
+Please consider these Renesas ARM based SoC DT cleanups for v3.20.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index a9a1b0af..99e1226 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -108,6 +108,9 @@ CONFIG_GPIO_RCAR=y
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
-+CONFIG_WATCHDOG=y
-+CONFIG_DA9063_WATCHDOG=y
-+CONFIG_MFD_DA9063=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
--- 
-2.1.3
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups-for-v3.20
+
+for you to fetch changes up to 338d1f0b5e877eae51c885da81d86b0efd6373e7:
+
+  ARM: shmobile: kzm9g-reference dts: Replace status value "ok" by "okay" (2014-12-21 16:55:32 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Cleanups for v3.20
+
+* Replace status value "ok" with "okay"
+
+----------------------------------------------------------------
+Geert Uytterhoeven (7):
+      ARM: shmobile: genmai dts: Replace status value "ok" by "okay"
+      ARM: shmobile: armadillo800eva dts: Replace status value "ok" by "okay"
+      ARM: shmobile: lager dts: Replace status value "ok" by "okay"
+      ARM: shmobile: henninger dts: Replace status value "ok" by "okay"
+      ARM: shmobile: koelsch dts: Replace status value "ok" by "okay"
+      ARM: shmobile: alt dts: Replace status value "ok" by "okay"
+      ARM: shmobile: kzm9g-reference dts: Replace status value "ok" by "okay"
+
+ arch/arm/boot/dts/r7s72100-genmai.dts         |  2 +-
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts |  4 ++--
+ arch/arm/boot/dts/r8a7790-lager.dts           | 12 ++++++------
+ arch/arm/boot/dts/r8a7791-henninger.dts       |  4 ++--
+ arch/arm/boot/dts/r8a7791-koelsch.dts         |  6 +++---
+ arch/arm/boot/dts/r8a7794-alt.dts             |  4 ++--
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts  |  2 +-
+ 7 files changed, 17 insertions(+), 17 deletions(-)
