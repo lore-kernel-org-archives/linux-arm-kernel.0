@@ -1,54 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:47 +0900
-Subject: [PATCH 16/30] ARM: shmobile: r8a7794: Add QSPI clock to device tree
+Date: Mon, 29 Dec 2014 10:43:48 +0900
+Subject: [PATCH 17/30] ARM: shmobile: r8a7779: Use R8A7779_CLK_P as SCIF
+ parent clock
 In-Reply-To: <cover.1419812185.git.horms+renesas@verge.net.au>
 References: <cover.1419812185.git.horms+renesas@verge.net.au>
-Message-ID: <3281480b70ceb9889b71f7b8a7bf54db3c05d40e.1419812186.git.horms+renesas@verge.net.au>
+Message-ID: <c6ce3cdfce6c0214f178fbad73d138dd1f1b04f6.1419812186.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Signed-off-by: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-[horms: omitted device node and alias; only add clock]
-[horms: use clock-indicies instead of renesas,clock-indicies]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Use R8A7779_CLK_P as parent clock for SCIF devices on r8a7779.
+With this change in place the SCIF CCF handling matches the
+legacy clock code. Also, this matches the data sheet.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 8 ++++++++
- include/dt-bindings/clock/r8a7794-clock.h | 1 +
- 2 files changed, 9 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 6d95638..068ca09 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -535,6 +535,14 @@
- 			clock-output-names =
- 				"vin1", "vin0", "ether";
- 		};
-+		mstp9_clks: mstp9_clks at e6150994 {
-+			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
-+			clocks = <&cpg_clocks R8A7794_CLK_QSPI>;
-+			#clock-cells = <1>;
-+			clock-indices = <R8A7794_CLK_QSPI_MOD>;
-+			clock-output-names = "qspi_mod";
-+		};
- 		mstp11_clks: mstp11_clks at e615099c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index c0bd14a5..fba89a4 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -86,6 +86,7 @@
- #define R8A7794_CLK_GPIO2		10
- #define R8A7794_CLK_GPIO1		11
- #define R8A7794_CLK_GPIO0		12
-+#define R8A7794_CLK_QSPI_MOD		17
- 
- /* MSTP11 */
- #define R8A7794_CLK_SCIFA3		6
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index e3846af..ee3bb3e 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -464,12 +464,12 @@
+ 				 <&cpg_clocks R8A7779_CLK_P>,
+ 				 <&cpg_clocks R8A7779_CLK_S>,
+ 				 <&cpg_clocks R8A7779_CLK_S>,
+-				 <&cpg_clocks R8A7779_CLK_S1>,
+-				 <&cpg_clocks R8A7779_CLK_S1>,
+-				 <&cpg_clocks R8A7779_CLK_S1>,
+-				 <&cpg_clocks R8A7779_CLK_S1>,
+-				 <&cpg_clocks R8A7779_CLK_S1>,
+-				 <&cpg_clocks R8A7779_CLK_S1>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
++				 <&cpg_clocks R8A7779_CLK_P>,
+ 				 <&cpg_clocks R8A7779_CLK_P>,
+ 				 <&cpg_clocks R8A7779_CLK_P>,
+ 				 <&cpg_clocks R8A7779_CLK_P>,
 -- 
 2.1.3
