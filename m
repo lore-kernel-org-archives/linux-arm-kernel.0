@@ -1,36 +1,80 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 29 Dec 2014 20:02:52 +0200
-Subject: v3.19-rc1 regression(?) on N900
-In-Reply-To: <54A10B1E.7030800@ti.com>
-References: <549B44E2.6080202@ti.com> <201412250932.40403@pali>
- <20141225091121.GA20355@amd>
- <20141225222122.GB582@fuloong-minipc.musicnaut.iki.fi>
- <54A10B1E.7030800@ti.com>
-Message-ID: <20141229180252.GE582@fuloong-minipc.musicnaut.iki.fi>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Dec 2014 12:12:56 -0600
+Subject: [PATCH 3/7] mfd: menelaus: add initial DT support
+In-Reply-To: <20141228233445.GD582@fuloong-minipc.musicnaut.iki.fi>
+References: <1419702779-16001-1-git-send-email-aaro.koskinen@iki.fi>
+ <1419702779-16001-4-git-send-email-aaro.koskinen@iki.fi>
+ <20141227212553.GA21729@saruman>
+ <20141228233445.GD582@fuloong-minipc.musicnaut.iki.fi>
+Message-ID: <20141229181256.GN29379@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Dec 29, 2014 at 10:04:46AM +0200, Tomi Valkeinen wrote:
-> On 26/12/14 00:21, Aaro Koskinen wrote:
-> 
-> > ...however, I can confirm that framebuffer is broken:
+On Mon, Dec 29, 2014 at 01:34:45AM +0200, Aaro Koskinen wrote:
+> > > Add initial DT support.
+> > > 
+> > > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/menelaus.txt | 30 +++++++++++++
+> > >  drivers/mfd/menelaus.c                             | 52 ++++++++++++++++++++--
+> > >  2 files changed, 78 insertions(+), 4 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/mfd/menelaus.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mfd/menelaus.txt b/Documentation/devicetree/bindings/mfd/menelaus.txt
+> > > new file mode 100644
+> > > index 0000000..5f69f23
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/mfd/menelaus.txt
+> > > @@ -0,0 +1,30 @@
+> > > +Menelaus (Texas Instruments TWL92330) Power Management chip
+> > > +
+> > > +Menelaus provides facilities to control the power resources.
+> > > +
+> > > +Required properties:
+> > > +- compatible: must be "menelaus"
+> > > +- reg: I2C address of the chip
+> > > +
+> > > +Optional properties:
+> > > +- interrupts: the interrupt
+> > > +- ti,autosleep: All regulators are put to sleep by default.
+> > > +- ti,vcore-min-microvolt: Range floor for the HW controlled VCORE
+> > > +- ti,vcore-max-microvolt: Range roof for the HW controlled VCORE
+> > > +
+> > > +The use of ti,autosleep is recommended at least on Nokia N800/N810.
+> > > +
+> > > +Example:
+> > > +
+> > > +&i2c1 {
+> > > +	clock-frequency = <400000>;
+> > > +
+> > > +	pmic at 72 {
+> > > +		compatible = "menelaus";
+> > > +		reg = <0x72>;
+> > > +		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
+> > > +		ti,autosleep;
+> > > +		ti,vcore-min-microvolt = <1050000>;
+> > > +		ti,vcore-max-microvolt = <1400000>;
 > > 
-> > [    8.230743] omapfb omapfb: no displays
-> > [    8.255584] omapfb omapfb: failed to setup omapfb
-> > [    8.260620] platform omapfb: Driver omapfb requests probe deferral
-> > [    8.284118] of_get_named_gpiod_flags: parsed 'reset-gpios' property of node
-> > '/ocp/spi at 48098000/acx565akm at 2[0]' - status (0)
-> > [    8.284271] acx565akm spi1.2: failed to find video source
-> > [    8.290069] spi spi1.2: Driver acx565akm requests probe deferral
-> > 
-> > I bisected it to ef691ff48bc8 (OMAPDSS: DT: Get source endpoint
-> > by matching reg-id). When I revert that, also FB works with 3.19-rc1.
+> > looks like these should be first converted to actual regulators
+> > otherwise we will have to maintain this binding forever which means that
+> > any effort of adding regulator fwk support for menelaus will become a
+> > lot more difficult because it'll have to cope with the legacy/bogus
+> > binding.
 > 
-> I've attached a patch for this. Only hack-tested on OMAP3 beagle, so
-> please report if it works.
+> I was thinking such conversion could be done with incremental patches...
+> There's basically only one board (n8x0) that uses this and not likely
+> to be any others. Is there a way to declare bindings unstable?
 
-That works, thanks.
+AFAICT, once they hit a major release, they're stable for life :-)
 
-A.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141229/34e7df09/attachment.sig>
