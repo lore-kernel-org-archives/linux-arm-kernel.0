@@ -1,43 +1,66 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 30 Dec 2014 00:32:04 +0100
-Subject: [PATCH v2 01/12] genirq: generic chip: support hierarchy domain
+Date: Tue, 30 Dec 2014 00:32:05 +0100
+Subject: [PATCH v2 02/12] irqchip: nvic: support hierarchy irq domain
 In-Reply-To: <1419895935-22966-1-git-send-email-stefan@agner.ch>
 References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
-Message-ID: <1419895935-22966-2-git-send-email-stefan@agner.ch>
+Message-ID: <1419895935-22966-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new helper function irq_domain_set_info to make sure the
-function irq_domain_set_hwirq_and_chip is being called, which is
-crucial to save irqdomain specific data to irq_data.
+Add support for hierarchy irq domain. Use to support the interrupt
+router found in Vybrid SoC, which is between the NVIC and the
+peripherals.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- kernel/irq/generic-chip.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-nvic.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index 61024e8..15b370d 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -360,7 +360,7 @@ static struct lock_class_key irq_nested_lock_class;
- int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 			 irq_hw_number_t hw_irq)
- {
--	struct irq_data *data = irq_get_irq_data(virq);
-+	struct irq_data *data = irq_domain_get_irq_data(d, virq);
- 	struct irq_domain_chip_generic *dgc = d->gc;
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
-@@ -405,8 +405,7 @@ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 	else
- 		data->mask = 1 << idx;
- 
--	irq_set_chip_and_handler(virq, chip, ct->handler);
--	irq_set_chip_data(virq, gc);
-+	irq_domain_set_info(d, virq, hw_irq, chip, gc, ct->handler, NULL, NULL);
- 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
- 	return 0;
+diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
+index 4ff0805..5fac910 100644
+--- a/drivers/irqchip/irq-nvic.c
++++ b/drivers/irqchip/irq-nvic.c
+@@ -49,6 +49,31 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
+ 	handle_IRQ(irq, regs);
  }
+ 
++static int nvic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs, void *arg)
++{
++	int i, ret;
++	irq_hw_number_t hwirq;
++	unsigned int type = IRQ_TYPE_NONE;
++	struct of_phandle_args *irq_data = arg;
++
++	ret = irq_domain_xlate_onecell(domain, irq_data->np, irq_data->args,
++				   irq_data->args_count, &hwirq, &type);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < nr_irqs; i++)
++		irq_map_generic_chip(domain, virq + i, hwirq + i);
++
++	return 0;
++}
++
++static const struct irq_domain_ops nvic_irq_domain_ops = {
++	.xlate = irq_domain_xlate_onecell,
++	.alloc = nvic_irq_domain_alloc,
++	.free = irq_domain_free_irqs_top,
++};
++
+ static int __init nvic_of_init(struct device_node *node,
+ 			       struct device_node *parent)
+ {
+@@ -70,7 +95,8 @@ static int __init nvic_of_init(struct device_node *node,
+ 		irqs = NVIC_MAX_IRQ;
+ 
+ 	nvic_irq_domain =
+-		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
++		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
++
+ 	if (!nvic_irq_domain) {
+ 		pr_warn("Failed to allocate irq domain\n");
+ 		return -ENOMEM;
 -- 
 2.2.1
