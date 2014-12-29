@@ -1,51 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 Dec 2014 14:33:42 -0200
-Subject: Generic slave capabilities reporting
-In-Reply-To: <CAOMZO5CPcRFJEsnYuATESSArcCbiVCGuAhdq67iR7hF3UPbs6Q@mail.gmail.com>
-References: <CAOMZO5CPcRFJEsnYuATESSArcCbiVCGuAhdq67iR7hF3UPbs6Q@mail.gmail.com>
-Message-ID: <CAOMZO5BuAU552XVWe-dDRBS-0vFJmxonJPS1ztgyCm3Aiz0Edw@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 29 Dec 2014 17:46:00 +0100
+Subject: [PATCH] ARM: shmobile: R-Mobile: Remove !CONFIG_PM_RUNTIME section
+Message-ID: <1419871560-8623-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 29, 2014 at 2:25 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Maxime,
->
-> Since commit ecc19d17868be9c ("dmaengine: Add a warning for drivers
-> not using the generic slave caps retrieval") I am getting the
-> following warning on mx6:
->
-> [    0.113023] ------------[ cut here ]------------
-> [    0.113053] WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:830
-> dma_async_device_register+0x2a0/0x4c8()
-> [    0.113063] this driver doesn't support generic slave capabilities reporting
-> [    0.113073] Modules linked in:
-> [    0.113094] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-> 3.19.0-rc1-next-20141226 #2297
-> [    0.113104] Hardware name: Freescale i.MX6 SoloX (Device Tree)
->
-> What dma driver could I take as an example to implement this generic
-> slave capabilities reporting?
+As of commit b2b49ccbdd547135 ("PM: Kconfig: Set PM_RUNTIME if PM_SLEEP
+is selected"), CONFIG_PM_RUNTIME is always enabled if CONFIG_PM is
+enabled, so this section is no longer needed.
 
-It seems I need to do the same as you did in the sunxi dma driver:
+As of commit 464ed18ebdb6236f ("PM: Eliminate CONFIG_PM_RUNTIME"),
+CONFIG_PM_RUNTIME no longer exists, and this section will always be
+executed, which may enable clocks that are not needed.
 
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1595,6 +1595,14 @@ static int sdma_probe(struct platform_device *pdev)
-     sdma->dma_device.device_prep_dma_cyclic = sdma_prep_dma_cyclic;
-     sdma->dma_device.device_config = sdma_config;
-     sdma->dma_device.device_terminate_all = sdma_disable_channel;
-+    sdma->dma_device.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+                          BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+                          BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+    sdma->dma_device.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
-+                          BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
-+                          BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+    sdma->dma_device.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+    sdma->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
-     sdma->dma_device.device_issue_pending = sdma_issue_pending;
-     sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
-     dma_set_max_seg_size(sdma->dma_device.dev, 65535);
+This reverts commit 64b0089e0c486736 ("ARM: shmobile: R-Mobile: Enable
+module clocks if !CONFIG_PM_RUNTIME").
 
-Regards,
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Commit 64b0089e0c486736 is in renesas-dt-pm-for-v3.20
+("[GIT PULL] Renesas ARM Based SoC DT PM Updates for v3.20")
 
-Fabio Estevam
+On r8a7740/armadillo, without this patch the MSTP clocks for CEU20, FSI,
+IIC[01], LCDC1, SCIFA[02-7], SCIFB, SY_DMAC[1-3], TPU0, and USB_DMAC are kept
+running.
+---
+ arch/arm/mach-shmobile/pm-rmobile.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index 3b9c8dd2a9cf3151..07fb4ea4d8e94258 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -135,14 +135,6 @@ static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
+ 		goto fail;
+ 	}
+ 
+-	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+-		error = pm_clk_resume(dev);
+-		if (error) {
+-			dev_err(dev, "pm_clk_resume failed %d\n", error);
+-			goto fail;
+-		}
+-	}
+-
+ 	return 0;
+ 
+ fail:
+-- 
+1.9.1
