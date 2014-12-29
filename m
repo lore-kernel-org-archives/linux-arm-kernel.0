@@ -1,43 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:21 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v3.20
-Message-ID: <cover.1419808942.git.horms+renesas@verge.net.au>
+Date: Mon, 29 Dec 2014 10:43:18 +0900
+Subject: [PATCH 1/5] ARM: shmobile: kzm9g_defconfig: Update AK8975 config
+ option
+In-Reply-To: <cover.1419808942.git.horms+renesas@verge.net.au>
+References: <cover.1419808942.git.horms+renesas@verge.net.au>
+Message-ID: <ca8bfc97ca7795f86e5b25553dd19d96b252bb29.1419808942.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC defconfig updates for v3.20.
+CONFIG_SENSORS_AK8975 was renamed to CONFIG_AK8975 in commit
+2fc72cd8354e3e9c ("iio:magnetometer:ak8975 move driver out of staging")
+in v3.10.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/kzm9g_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v3.20
-
-for you to fetch changes up to db54d850b686c2ca81c10dd3582e98ee089a0e3a:
-
-  ARM: shmobile: Enable DA9063 watchdog in multiplatform defconfig (2014-12-21 16:53:36 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v3.20
-
-* Enable DA9063, MICREL_PHY and MTD_BLOCK watchdog in multiplatform defconfig
-* Update AK8975 config option in kzm9g defconfig
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: kzm9g_defconfig: Update AK8975 config option
-      ARM: shmobile: Enable MICREL_PHY in shmobile_defconfig
-      ARM: shmobile: Enable DA9063 watchdog in multiplatform defconfig
-
-Kuninori Morimoto (2):
-      ARM: shmobile: defconfig: cleanup by savedefconfig
-      ARM: shmobile: defconfig: add MTD_BLOCK
-
- arch/arm/configs/kzm9g_defconfig    |  2 +-
- arch/arm/configs/shmobile_defconfig | 30 ++++++++++++++----------------
- 2 files changed, 15 insertions(+), 17 deletions(-)
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index 5d63fc5..23e8d14 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -126,8 +126,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_ASYNC_TX_DMA=y
+ CONFIG_STAGING=y
+-CONFIG_SENSORS_AK8975=y
+ CONFIG_IIO=y
++CONFIG_AK8975=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+-- 
+2.1.3
