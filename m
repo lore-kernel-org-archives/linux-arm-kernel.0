@@ -1,48 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:47:06 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v3.20
-Message-ID: <cover.1419810196.git.horms+renesas@verge.net.au>
+Date: Mon, 29 Dec 2014 10:46:59 +0900
+Subject: [PATCH 6/6] ARM: shmobile: sh73a0: disable legacy clock initialization
+In-Reply-To: <cover.1419809955.git.horms+renesas@verge.net.au>
+References: <cover.1419809955.git.horms+renesas@verge.net.au>
+Message-ID: <09bd745b555c262d1e2c851777317f3adf3cf3d4.1419809955.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Please consider these Renesas ARM based SoC updates for v3.20.
+Disables sh73a0_clock_init() if CCF is enabled.
 
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.20
-
-for you to fetch changes up to 39695882d3d642a73bca551e682426e4e3bcd158:
-
-  ARM: shmobile: r8a73a4: Multiplatform support (2014-12-21 17:11:22 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v3.20
-
-* Multiplatform support for r8a73a4
-* No TWD setup in C for Multiplatform on r8a7779
-* Fix is_e2 warning in generic R-Car Gen2 SoC setup code
-* Add missing Add missing legacy INTCA0 clock for irqpin module on sh73a0
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: sh73a0 legacy/reference: Add missing INTCA0 clock for irqpin module
-
-Magnus Damm (2):
-      ARM: shmobile: Fix is_e2 warning
-      ARM: shmobile: r8a7779: No TWD setup in C for Multiplatform
-
-Ulrich Hecht (1):
-      ARM: shmobile: r8a73a4: Multiplatform support
-
- arch/arm/mach-shmobile/Kconfig           |  5 +++++
- arch/arm/mach-shmobile/clock-sh73a0.c    | 10 ++++++++++
- arch/arm/mach-shmobile/setup-rcar-gen2.c |  4 +---
- arch/arm/mach-shmobile/smp-r8a7779.c     |  2 +-
- 4 files changed, 17 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 93ebe34..354cab1 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -763,7 +763,9 @@ void __init __weak sh73a0_register_twd(void) { }
+ void __init sh73a0_earlytimer_init(void)
+ {
+ 	shmobile_init_delay();
++#ifndef CONFIG_COMMON_CLK
+ 	sh73a0_clock_init();
++#endif
+ 	shmobile_earlytimer_init();
+ 	sh73a0_register_twd();
+ }
+@@ -782,8 +784,9 @@ void __init sh73a0_add_early_devices(void)
+ void __init sh73a0_add_standard_devices_dt(void)
+ {
+ 	/* clocks are setup late during boot in the case of DT */
++#ifndef CONFIG_COMMON_CLK
+ 	sh73a0_clock_init();
+-
++#endif
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-- 
+2.1.3
