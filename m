@@ -1,36 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:47:06 +0900
-Subject: [PATCH 3/4] ARM: shmobile: r8a7779: No TWD setup in C for
- Multiplatform
+Date: Mon, 29 Dec 2014 10:47:07 +0900
+Subject: [PATCH 4/4] ARM: shmobile: r8a73a4: Multiplatform support
 In-Reply-To: <cover.1419810196.git.horms+renesas@verge.net.au>
 References: <cover.1419810196.git.horms+renesas@verge.net.au>
-Message-ID: <1dc13eee3a5c60131657482aa88c997e5fa8b50c.1419810196.git.horms+renesas@verge.net.au>
+Message-ID: <39695882d3d642a73bca551e682426e4e3bcd158.1419810196.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Skip the TWD setup in C for r8a7779 Multiplatform.
-We should use DTS for the TWD device anyway.
+Enable r8a73a4 Multiplatform support for the generic r8a73a4
+machine vector.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 3f761f8..9fc280e 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -56,7 +56,7 @@ static struct rcar_sysc_ch *r8a7779_ch_cpu[4] = {
- 	[3] = &r8a7779_ch_cpu3,
- };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 1b4fafe..d107b93 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -51,6 +51,11 @@ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
+ 	select SYS_SUPPORTS_SH_MTU2
  
--#ifdef CONFIG_HAVE_ARM_TWD
-+#if defined(CONFIG_HAVE_ARM_TWD) && !defined(CONFIG_ARCH_MULTIPLATFORM)
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, R8A7779_SCU_BASE + 0x600, 29);
- void __init r8a7779_register_twd(void)
- {
++config ARCH_R8A73A4
++	bool "R-Mobile APE6 (R8A73A40)"
++	select ARCH_RMOBILE
++	select RENESAS_IRQC
++
+ config ARCH_R8A7740
+ 	bool "R-Mobile A1 (R8A77400)"
+ 	select ARCH_RMOBILE
 -- 
 2.1.3
