@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 29 Dec 2014 10:43:37 +0900
-Subject: [PATCH 3/7] ARM: shmobile: lager dts: Replace status value "ok" by
+Date: Mon, 29 Dec 2014 10:43:39 +0900
+Subject: [PATCH 5/7] ARM: shmobile: koelsch dts: Replace status value "ok" by
  "okay"
 In-Reply-To: <cover.1419809027.git.horms+renesas@verge.net.au>
 References: <cover.1419809027.git.horms+renesas@verge.net.au>
-Message-ID: <fd7a8cbf0eec4a4f4191a22c879e2f8258257ca6.1419809027.git.horms+renesas@verge.net.au>
+Message-ID: <815446d624f692b197ec5dde00cf341196513e03.1419809027.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ values.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 636d53b..56e66bb 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -355,7 +355,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 990af16..e2faa62 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -366,7 +366,7 @@
  
  	phy-handle = <&phy1>;
  	renesas,ether-link-active-low;
@@ -33,7 +33,7 @@ index 636d53b..56e66bb 100644
  
  	phy1: ethernet-phy at 1 {
  		reg = <1>;
-@@ -366,7 +366,7 @@
+@@ -377,7 +377,7 @@
  };
  
  &cmt0 {
@@ -41,36 +41,15 @@ index 636d53b..56e66bb 100644
 +	status = "okay";
  };
  
- &mmcif1 {
-@@ -470,17 +470,17 @@
- };
+ &sata0 {
+@@ -563,7 +563,7 @@
  
- &iic0	{
+ /* composite video input */
+ &vin1 {
 -	status = "ok";
 +	status = "okay";
- };
- 
- &iic1	{
--	status = "ok";
-+	status = "okay";
- 	pinctrl-0 = <&iic1_pins>;
- 	pinctrl-names = "default";
- };
- 
- &iic2	{
--	status = "ok";
-+	status = "okay";
- 	pinctrl-0 = <&iic2_pins>;
- 	pinctrl-names = "default";
- 
-@@ -562,7 +562,7 @@
  	pinctrl-0 = <&vin1_pins>;
  	pinctrl-names = "default";
  
--	status = "ok";
-+	status = "okay";
- 
- 	port {
- 		#address-cells = <1>;
 -- 
 2.1.3
