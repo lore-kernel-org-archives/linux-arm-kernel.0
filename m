@@ -1,29 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Dec 2014 23:35:17 +0100
-Subject: [PATCH 1/4] ARM: sirf: add two debug ports for CSRatlas7 SoC
-In-Reply-To: <1419496460-4929-2-git-send-email-21cnbao@gmail.com>
+Date: Tue, 30 Dec 2014 23:38:06 +0100
+Subject: [PATCH 4/4] ARM: sirf: bring up SMP in atlas7 SoC
+In-Reply-To: <1419496460-4929-5-git-send-email-21cnbao@gmail.com>
 References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
- <1419496460-4929-2-git-send-email-21cnbao@gmail.com>
-Message-ID: <88770560.BUUQRjmk3f@wuerfel>
+ <1419496460-4929-5-git-send-email-21cnbao@gmail.com>
+Message-ID: <1704317.ZimINfER0N@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 December 2014 16:34:17 Barry Song wrote:
->  #if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
-> -#define SIRFSOC_UART1_PA_BASE          0xb0060000
-> +#define SIRF_LLUART_PA_BASE          0xb0060000
->  #elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
-> -#define SIRFSOC_UART1_PA_BASE          0xcc060000
-> +#define SIRF_LLUART_PA_BASE          0xcc060000
-> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART1)
-> +#define SIRF_LLUART_PA_BASE          0x18020000
-> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART0)
-> +#define SIRF_LLUART_PA_BASE          0x18010000
->  #else
-> -#define SIRFSOC_UART1_PA_BASE          0
-> +#define SIRF_LLUART_PA_BASE          0
->  #endif
+On Thursday 25 December 2014 16:34:20 Barry Song wrote:
+> From: Zhiwu Song <Zhiwu.Song@csr.com>
+> 
+> correct cpu1 jump/flag address, remove scu related logic, scu doesn't
+> expose in cortex-a7.
+> 
+> this patch breaks marco chip, but marco project has been dropped.
+> 
+> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-I think it would be nicer to use DEBUG_UART_PHYS/DEBUG_UART_VIRT here.
+It doesn't seem nice to intentionally break hardware that we still have
+support for in the kernel. If Marco is not used anywhere, how about
+sending another patch before this one to remove all references to it?
 
 	Arnd
