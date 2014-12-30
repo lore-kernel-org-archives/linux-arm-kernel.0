@@ -1,36 +1,82 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 30 Dec 2014 17:27:16 +0100
-Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
-In-Reply-To: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20141230162716.GC24811@lunn.ch>
+Date: Tue, 30 Dec 2014 17:35:15 +0100
+Subject: [PATCH RESEND] leds: netxbig: fix oops at probe time
+In-Reply-To: <1419352764-24316-1-git-send-email-simon.guinot@sequanux.org>
+References: <1419352764-24316-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20141230163515.GD24811@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas
+On Tue, Dec 23, 2014 at 05:39:24PM +0100, Simon Guinot wrote:
+> This patch fixes a NULL pointer dereference on led_dat->mode_val. Due to
+> this bug, a kernel oops can be observed at probe time on the LaCie 2Big
+> and 5Big v2 boards:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 00000008
+> [...]
+> [<c03f244c>] (netxbig_led_probe) from [<c02c8c6c>] (platform_drv_probe+0x4c/0x9c)
+> [<c02c8c6c>] (platform_drv_probe) from [<c02c72d0>] (driver_probe_device+0x98/0x25c)
+> [<c02c72d0>] (driver_probe_device) from [<c02c7520>] (__driver_attach+0x8c/0x90)
+> [<c02c7520>] (__driver_attach) from [<c02c5c24>] (bus_for_each_dev+0x68/0x94)
+> [<c02c5c24>] (bus_for_each_dev) from [<c02c6408>] (bus_add_driver+0x124/0x1dc)
+> [<c02c6408>] (bus_add_driver) from [<c02c7ac0>] (driver_register+0x78/0xf8)
+> [<c02c7ac0>] (driver_register) from [<c000888c>] (do_one_initcall+0x80/0x1cc)
+> [<c000888c>] (do_one_initcall) from [<c0733618>] (kernel_init_freeable+0xe4/0x1b4)
+> [<c0733618>] (kernel_init_freeable) from [<c058db9c>] (kernel_init+0xc/0xec)
+> [<c058db9c>] (kernel_init) from [<c0009850>] (ret_from_fork+0x14/0x24)
+> [...]
+> 
+> This bug was introduced by commit 588a6a99286ae30afb1339d8bc2163517b1b7dd1
+> ("leds: netxbig: fix attribute-creation race").
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: <stable@vger.kernel.org> # 3.17+
+> Acked-by: Johan Hovold <johan@kernel.org>
 
-I'm probably getting ahead of myself here, since there has not been
-any review comments, but i'm trying to figure out what should be
-submitted for -rc3 and which can wait for the next merge window.
+Hi Bryan, Richard
 
-[PATCH 1/6] dt: bindings: update mvebu-mbus DT binding with new
-branch dt for next merge window, since it is not strictly a fix.
+Simon has asked that this be taken via mvebu, since there has not been
+any response from the LED maintainers. I will queue it up as part of
+my next set of fixes for -rc3, and Cc: you on the pull request.
 
-[PATCH 2/6] bus: mvebu-mbus: fix support of MBus window 13
-branch fixes for next -rc
-
-[PATCH 3/6] ARM: mvebu: fix compatible strings of MBus on Armada 375 and Armada 38x
-branch fixes for next -rc
-
-[PATCH 4/6] bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window
-branch drivers for next merge window. I assume it is only a run time dependency for the
-mv_cesa patches?
-
-[PATCH 5/6] bus: mvebu-mbus: use automatic I/O synchronization barriers
-branch fixes for next -rc
-
-[PATCH 6/6] ARM: mvebu: use arm_coherent_dma_ops
-Here i'm unsure. Is this a fix, or a cleanup?
+If this is not O.K. with you, please let me know.
 
 Thanks
 	Andrew
+
+> ---
+>  drivers/leds/leds-netxbig.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
+> index 64fde485dcaa..4c794f15a57f 100644
+> --- a/drivers/leds/leds-netxbig.c
+> +++ b/drivers/leds/leds-netxbig.c
+> @@ -330,18 +330,18 @@ create_netxbig_led(struct platform_device *pdev,
+>  	led_dat->sata = 0;
+>  	led_dat->cdev.brightness = LED_OFF;
+>  	led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+> -	/*
+> -	 * If available, expose the SATA activity blink capability through
+> -	 * a "sata" sysfs attribute.
+> -	 */
+> -	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
+> -		led_dat->cdev.groups = netxbig_led_groups;
+>  	led_dat->mode_addr = template->mode_addr;
+>  	led_dat->mode_val = template->mode_val;
+>  	led_dat->bright_addr = template->bright_addr;
+>  	led_dat->bright_max = (1 << pdata->gpio_ext->num_data) - 1;
+>  	led_dat->timer = pdata->timer;
+>  	led_dat->num_timer = pdata->num_timer;
+> +	/*
+> +	 * If available, expose the SATA activity blink capability through
+> +	 * a "sata" sysfs attribute.
+> +	 */
+> +	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
+> +		led_dat->cdev.groups = netxbig_led_groups;
+>  
+>  	return led_classdev_register(&pdev->dev, &led_dat->cdev);
+>  }
+> -- 
+> 2.1.1
+> 
