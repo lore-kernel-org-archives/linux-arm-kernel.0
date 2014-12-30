@@ -1,55 +1,109 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Dec 2014 13:28:36 -0600
-Subject: [PATCH 7/9] ARM: versatile: move mach includes into mach directory
+Date: Tue, 30 Dec 2014 13:28:37 -0600
+Subject: [PATCH 8/9] ARM: versatile: convert to multi-platform
 In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
 References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1419967718-26909-8-git-send-email-robherring2@gmail.com>
+Message-ID: <1419967718-26909-9-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-In preparation for multi-platform support, move platform.h and
-hardware.h into mach-versatile directory. Combine them into a single
-file in the process.
+Now that all the prerequisites are in place, we can enable Versatile
+boards for multi-platform kernels.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-versatile/core.c                     |  3 +-
- arch/arm/mach-versatile/include/mach/hardware.h    | 32 ----------------------
- .../mach-versatile/{include/mach => }/platform.h   |  5 ++++
- 3 files changed, 6 insertions(+), 34 deletions(-)
- delete mode 100644 arch/arm/mach-versatile/include/mach/hardware.h
- rename arch/arm/mach-versatile/{include/mach => }/platform.h (98%)
+ arch/arm/Kconfig                                  | 21 +----------
+ arch/arm/mach-versatile/Kconfig                   | 14 +++++++
+ arch/arm/mach-versatile/Makefile.boot             |  4 --
+ arch/arm/mach-versatile/include/mach/uncompress.h | 45 -----------------------
+ 4 files changed, 16 insertions(+), 68 deletions(-)
+ create mode 100644 arch/arm/mach-versatile/Kconfig
+ delete mode 100644 arch/arm/mach-versatile/Makefile.boot
+ delete mode 100644 arch/arm/mach-versatile/include/mach/uncompress.h
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 566a946..f6b122b 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -34,8 +34,7 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7816b54..4d9858f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -337,25 +337,6 @@ config ARCH_REALVIEW
+ 	help
+ 	  This enables support for ARM Ltd RealView boards.
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <mach/hardware.h>
--#include <mach/platform.h>
-+#include "platform.h"
+-config ARCH_VERSATILE
+-	bool "ARM Ltd. Versatile family"
+-	select ARCH_WANT_OPTIONAL_GPIOLIB
+-	select ARM_AMBA
+-	select ARM_TIMER_SP804
+-	select ARM_VIC
+-	select CLKSRC_VERSATILE
+-	select COMMON_CLK
+-	select COMMON_CLK_VERSATILE
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
+-	select ICST
+-	select MIGHT_HAVE_PCI
+-	select SPARSE_IRQ
+-	select USE_OF
+-	select VERSATILE_FPGA_IRQ
+-	help
+-	  This enables support for ARM Ltd Versatile board.
+-
+ config ARCH_AT91
+ 	bool "Atmel AT91"
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -956,6 +937,8 @@ source "arch/arm/mach-u300/Kconfig"
  
- #include "core.h"
+ source "arch/arm/mach-ux500/Kconfig"
  
-diff --git a/arch/arm/mach-versatile/include/mach/hardware.h b/arch/arm/mach-versatile/include/mach/hardware.h
++source "arch/arm/mach-versatile/Kconfig"
++
+ source "arch/arm/mach-vexpress/Kconfig"
+ source "arch/arm/plat-versatile/Kconfig"
+ 
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+new file mode 100644
+index 0000000..1d6a8b2
+--- /dev/null
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -0,0 +1,14 @@
++config ARCH_VERSATILE
++	bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
++	select ARM_AMBA
++	select ARM_TIMER_SP804
++	select ARM_VIC
++	select CLKSRC_VERSATILE
++	select COMMON_CLK_VERSATILE
++	select CPU_ARM926T
++	select ICST
++	select MIGHT_HAVE_PCI
++	select VERSATILE_FPGA_IRQ
++	help
++	  This enables support for ARM Ltd Versatile board.
++
+diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
 deleted file mode 100644
-index 22a1158..0000000
---- a/arch/arm/mach-versatile/include/mach/hardware.h
+index ff0a4b5..0000000
+--- a/arch/arm/mach-versatile/Makefile.boot
 +++ /dev/null
-@@ -1,32 +0,0 @@
+@@ -1,4 +0,0 @@
+-   zreladdr-y	+= 0x00008000
+-params_phys-y	:= 0x00000100
+-initrd_phys-y	:= 0x00800000
+-
+diff --git a/arch/arm/mach-versatile/include/mach/uncompress.h b/arch/arm/mach-versatile/include/mach/uncompress.h
+deleted file mode 100644
+index 986e3d3..0000000
+--- a/arch/arm/mach-versatile/include/mach/uncompress.h
++++ /dev/null
+@@ -1,45 +0,0 @@
 -/*
-- *  arch/arm/mach-versatile/include/mach/hardware.h
+- *  arch/arm/mach-versatile/include/mach/uncompress.h
 - *
-- *  This file contains the hardware definitions of the Versatile boards.
-- *
-- *  Copyright (C) 2003 ARM Limited.
+- *  Copyright (C) 2003 ARM Limited
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -65,35 +119,31 @@ index 22a1158..0000000
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
--#ifndef __ASM_ARCH_HARDWARE_H
--#define __ASM_ARCH_HARDWARE_H
+-#define AMBA_UART_DR	(*(volatile unsigned char *)0x101F1000)
+-#define AMBA_UART_LCRH	(*(volatile unsigned char *)0x101F102C)
+-#define AMBA_UART_CR	(*(volatile unsigned char *)0x101F1030)
+-#define AMBA_UART_FR	(*(volatile unsigned char *)0x101F1018)
 -
--#include <asm/sizes.h>
+-/*
+- * This does not append a newline
+- */
+-static inline void putc(int c)
+-{
+-	while (AMBA_UART_FR & (1 << 5))
+-		barrier();
 -
--/* macro to get at MMIO space when running virtually */
--#define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
+-	AMBA_UART_DR = c;
+-}
 -
--#define __io_address(n)		((void __iomem __force *)IO_ADDRESS(n))
+-static inline void flush(void)
+-{
+-	while (AMBA_UART_FR & (1 << 3))
+-		barrier();
+-}
 -
--#endif
-diff --git a/arch/arm/mach-versatile/include/mach/platform.h b/arch/arm/mach-versatile/platform.h
-similarity index 98%
-rename from arch/arm/mach-versatile/include/mach/platform.h
-rename to arch/arm/mach-versatile/platform.h
-index 7fe008b..05deec2 100644
---- a/arch/arm/mach-versatile/include/mach/platform.h
-+++ b/arch/arm/mach-versatile/platform.h
-@@ -21,6 +21,11 @@
- #ifndef __address_h
- #define __address_h                     1
- 
-+/* macro to get at MMIO space when running virtually */
-+#define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
-+
-+#define __io_address(n)		((void __iomem __force *)IO_ADDRESS(n))
-+
- /*
-  * Memory definitions
-  */
+-/*
+- * nothing to do
+- */
+-#define arch_decomp_setup()
 -- 
 2.1.0
