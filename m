@@ -1,133 +1,132 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 30 Dec 2014 08:51:08 -0600
-Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
- interface
-In-Reply-To: <CA+Ln22G3kVA_-tsjAxbe2rqSHeLtdU2X_EhNL0uW3cUCgaWLgg@mail.gmail.com>
-References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>	<1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>	<54A19C17.1020909@ti.com>
- <CA+Ln22G3kVA_-tsjAxbe2rqSHeLtdU2X_EhNL0uW3cUCgaWLgg@mail.gmail.com>
-Message-ID: <54A2BBDC.1020900@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 30 Dec 2014 10:12:59 -0500
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <20141222112933.GK19261@kw.sim.vm.gnt>
+References: <20141218191528.GY967@titan.lakedaemon.net>
+ <549437DD.7040602@free-electrons.com>
+ <20141219160230.GZ967@titan.lakedaemon.net>
+ <54944DAC.1000709@free-electrons.com>
+ <20141219170328.GA967@titan.lakedaemon.net>
+ <54945C5C.2080801@free-electrons.com>
+ <20141219174300.GB967@titan.lakedaemon.net>
+ <20141219181616.GG19261@kw.sim.vm.gnt>
+ <20141221235000.GC28117@titan.lakedaemon.net>
+ <20141222112933.GK19261@kw.sim.vm.gnt>
+Message-ID: <20141230151259.GI28117@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/30/2014 03:05 AM, Tomasz Figa wrote:
-> Thanks a lot for investigating this, even before I could look into
-> splitting this.
+On Mon, Dec 22, 2014 at 12:29:33PM +0100, Simon Guinot wrote:
+> On Sun, Dec 21, 2014 at 06:50:00PM -0500, Jason Cooper wrote:
+> > On Fri, Dec 19, 2014 at 07:16:16PM +0100, Simon Guinot wrote:
+> > > On Fri, Dec 19, 2014 at 12:43:00PM -0500, Jason Cooper wrote:
+> > > > On Fri, Dec 19, 2014 at 06:11:56PM +0100, Gregory CLEMENT wrote:
+> > > > > On 19/12/2014 18:03, Jason Cooper wrote:
+> > > > > > On Fri, Dec 19, 2014 at 05:09:16PM +0100, Gregory CLEMENT wrote:
+> > > > > >> On 19/12/2014 17:02, Jason Cooper wrote:
+> > > > > >>> On Fri, Dec 19, 2014 at 03:36:13PM +0100, Gregory CLEMENT wrote:
+> > > > > >>>> On 18/12/2014 20:15, Jason Cooper wrote:
+> > > > > >>>>> On Thu, Dec 18, 2014 at 06:15:40PM +0100, Gregory CLEMENT wrote:
+> > > > > >>>>> ...
+> > > > > >>>>>> Jason at the end it seems you didn't ack or nack the patches were you
+> > > > > >>>>>> were CC. You expressed some concerns about the GPLv2+ move but I don't know
+> > > > > >>>>>> if it is something that prevents you to give your acked-by.
+> > > > > >>>>>
+> > > > > >>>>> Oops.  :)  I figured my S-o-B when applying would be sufficient.  That
+> > > > > >>>>> decision was before we decided on Andrew applying patches this time
+> > > > > >>>>> around...
+> > > > > >>>>>
+> > > > > >>>>> For all my dts{i} contributions:
+> > > > > >>>>>
+> > > > > >>>>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > > > > >>>>
+> > > > > >>>> Thanks :)
+> > > > > >>>>
+> > > > > >>>>>
+> > > > > >>>>> Due to all the merge commits over time and whatnot, it's probably best
+> > > > > >>>>> to put my Ack on all the patches in this series...
+> > > > > >>>>
+> > > > > >>>> OK no problem. By the way, I take care of collecting all the acked-by and
+> > > > > >>>> once it will be done I will either sent the updated patch set with all the
+> > > > > >>>> acked-by or maybe just I will create a branch to pull if it is easier to handle.
+> > > > > >>>
+> > > > > >>> Ok, that'll be up to Andrew.
+> > > > > >>>
+> > > > > >>> Once we have the last few stragglers, and assuming there are no more
+> > > > > >>> NAKs, here's what I'd like to do:
+> > > > > >>>
+> > > > > >>> Regrettably, we'll have to revert Simon's dts contributions.  I say
+> > > > > >>
+> > > > > >> You missed the email he sent yesterday, finally Simon changed his mind
+> > > > > >> and gave his acked-by.
+> > > > > > 
+> > > > > > Indeed, that was for the oneliner change in the armada-370-xp.dtsi file.
+> > > > > > I got a bit ahead of myself, but I'm looking towards kirkwood, orion5x,
+> > > > > > dove, which brings up:
+> > > > > > 
+> > > > > > 18ba7e4fe51d ARM: Kirkwood: add DT support for d2 Network v2
+> > > > > > 2d4cd2cafaea ARM: Kirkwood: allow to use netxbig DTSI for d2net_v2 DTS
+> > > > > > a96cc303e42a ARM: mvebu: update the SATA compatible string for Armada 370/XP
+> > > > > > d3dde4df4483 ARM: Kirkwood: update Network Space Mini v2 description
+> > > > > > 98d4f2acb91a ARM: Kirkwood: DT board setup for CloudBox
+> > > > > > 4ea931e07d77 ARM: Kirkwood: fix ns2 gpios by converting to pinctrl
+> > > > > > 7f9871d9d30f ARM: kirkwood: DT board setup for Network Space Mini v2
+> > > > > > ca7d94524ab3 ARM: kirkwood: DT board setup for Network Space Lite v2
+> > > > > > ecee1e47ab42 ARM: kirkwood: DT board setup for Network Space v2 and parents
+> > > > > > 
+> > > > > 
+> > > > > OK I understand your concern now. About dove and kirkwood, did you notice that
+> > > > > some files didn't have any license?
+> > > > 
+> > > > Yes.
+> > > > 
+> > > > > Especially none of the dove files have a license.
+> > > > 
+> > > > Yes, we'll cross that bridge when we get there.  I suspect it then falls
+> > > > under the over-arching license of the project.  Regardless, we'll still
+> > > > need Acks from all contributors.
+> > > 
+> > > Hi Jason,
+> > > 
+> > > What is the problem with keeping the LaCie DTS files under GPLv2+ only ?
+> > 
+> > Converting armada-* to dual license is just a small part of the
+> > overarching effort to convert *all* the devicetree files to dual
+> > license.  So, eventually, we'll be doing the same with kirkwood, dove
+> > and orion5x dts{i} files.  Perhaps even during this merge window.
+> > 
+> > In the long term, we're attempting to provide one neutral place [1] for
+> > the bootloaders and kernels to pull devicetrees from and contribute
+> > changes back to.
 > 
-> 2014-12-30 3:23 GMT+09:00 Nishanth Menon <nm@ti.com>:
->> On 12/23/2014 04:48 AM, Marek Szyprowski wrote:
->>
->>> -static void l2c310_resume(void)
->>> +static void l2c310_configure(void __iomem *base)
->>>  {
->>> -     void __iomem *base = l2x0_base;
->>> +     unsigned revision;
->>>
->>> -     if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
->>> -             unsigned revision;
->>> -
->>> -             /* restore pl310 setup */
->>> -             writel_relaxed(l2x0_saved_regs.tag_latency,
->>> -                            base + L310_TAG_LATENCY_CTRL);
->>> -             writel_relaxed(l2x0_saved_regs.data_latency,
->>> -                            base + L310_DATA_LATENCY_CTRL);
->>> -             writel_relaxed(l2x0_saved_regs.filter_end,
->>> -                            base + L310_ADDR_FILTER_END);
->>> -             writel_relaxed(l2x0_saved_regs.filter_start,
->>> -                            base + L310_ADDR_FILTER_START);
->>> -
->>> -             revision = readl_relaxed(base + L2X0_CACHE_ID) &
->>> -                             L2X0_CACHE_ID_RTL_MASK;
->>> -
->>> -             if (revision >= L310_CACHE_ID_RTL_R2P0)
->>> -                     l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
->>> -                                   L310_PREFETCH_CTRL);
->>> -             if (revision >= L310_CACHE_ID_RTL_R3P0)
->>> -                     l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
->>> -                                   L310_POWER_CTRL);
->>> -
->>> -             l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
->>> -
->>> -             /* Re-enable full-line-of-zeros for Cortex-A9 */
->>> -             if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
->>> -                     set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
->>> -     }
->>> +     /* restore pl310 setup */
->>> +     writel_relaxed(l2x0_saved_regs.tag_latency,
->>> +                    base + L310_TAG_LATENCY_CTRL);
->>> +     writel_relaxed(l2x0_saved_regs.data_latency,
->>> +                    base + L310_DATA_LATENCY_CTRL);
->>> +     writel_relaxed(l2x0_saved_regs.filter_end,
->>> +                    base + L310_ADDR_FILTER_END);
->>> +     writel_relaxed(l2x0_saved_regs.filter_start,
->>> +                    base + L310_ADDR_FILTER_START);
->>> +
->>
->> ^^ The above change broke AM437xx. Looks like the change causes the
->> following behavior difference on AM437x. For some reason, touching any
->> of the above 4 registers(even with the values read from the same
->> registers) causes AM437x to go beserk. Comment the 4 writes and we
->> reach shell. looks like l2c310_resume is not invoked prior to this
->> series. :(.. now that we reuse that logic to actually do programming,
->> we start to see the problem.
+> OK, let's see if I understand correctly.
 > 
-> Hmm, but the thing is that .configure() should not be called if the
-> controller is already configured, i.e. L2X0_CTRL_EN in L2X0_CTRL is
-> set. Maybe I missed some check somewhere. Let me reread my code I
-> wrote quite a long time ago and make sure.
+> If I don't agree with the GPLv2+/x11 relicensing, then support for
+> almost all the LaCie boards will be removed from the Linux kernel (maybe
+> during the next merge window) ? Is that correct ?
 
-you have'nt missed a check here. it does indeed get called
-l2c310_enable->l2c_enable -> (if cache
-disabled)->l2c_configure->l2c310_configure
+No.  Nothing will change wrt to the Linux kernel.  In my mind, I've
+always viewed arch/arm/boot/dts as a separate repo that happens to be
+incubating in the Linux kernel tree.  Right or wrong, I was referring to
+the dts/dtsi/bindings eventually standing on their own.  Looking back on
+the conversation, I definitely worded it badly.  I apologize for that.
 
-It looks like a quirk of AM437x which remained hidden till this patch
-exposed it. The original pl310 resume would have been invoked if
-outer_resume was invoked (if my reading of code is correct), which in
-the case of AM437x was never invoked during boot. By reusing the
-restore code for resume (which in my opinion is a good change), we
-seemed to have exposed quirky behavior on am437x. I started a thread
-yesterday with hardware folks trying to understand the integration
-aspects and explanation for this quirky behavior - unfortunately, with
-holidays, I doubt I might get a quick answer fast. but the workaround
-seems obvious - do not write to the the mentioned 4 registers on
-am437x. This might make sense it arm,tag-latency , arm,data-latency,
-arm,filter-ranges properties are not defined in OF.
+> Is there any way we can keep the LaCie DTS files licenced under GPLv2+
+> _and_ still distributed with the others. Anyone would be free to choose
+> to use them (or not), in respect of the licence terms.
 
->> one option might be to write only those registers that differ from
->> saved_registers (example: unmodified values dont need reprogramming).
->>
->> Looks like the following also need addressing:
->> data->save is called twice (once more after l2cof_init)
->> l2c310_init_fns also needs l2c310_configure
->> will be nice to use l2x0_data only after we kmemdup data in __l2c_init
-> 
-> I'll check this.
-Thanks.
+Yes, the difficulty lies in making that distribution *easy* for other
+projects.  They already have their own dts files, why would they adopt
+our work if they have to pick through it?
 
-> 
->>
->> if you'd like to split this up in pieces, [1] might be nice - will go
->> good to change the pl310, aurora etc in each chunks to enable better
->> review.
-> 
-> Thanks a lot, the split up version will be definitely useful. Just to
-> make sure, the parts look quite bisectable, but have you verified that
-> applying the changes one by one leave the L2 cache working on OMAP?
+I suspect the eventual solution (after the dts/bindings are their own
+repo) will involve adopting the SPDX-* header tag, and then some
+scripting to create separate git branches by license.  That would allow
+us to keep everything in the repo, make it easy to incorporate /
+redistribute based on license, and hopefully reduce the maintenance
+burden.
 
-The split is not complete or properly done as I ignored aurora and was
-trying to do it focussed on pl310 impacted code in a hurry, but yes,
-the split is indeed bisectable for OMAP platforms. The intent was to
-indicate the direction we should probably take and introduce the
-refactor in stages. At the very least, it tends to be easier to debug
-down to.
+thx,
 
->> [1]
->> https://github.com/nmenon/linux-2.6-playground/commits/temp/l2c-patch2-splitup
-> 
-> Best regards,
-> Tomasz
-> 
-
-
--- 
-Regards,
-Nishanth Menon
+Jason.
