@@ -1,32 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Dec 2014 23:05:57 +0100
-Subject: [PATCH 7/9] ARM: versatile: move mach includes into mach directory
-In-Reply-To: <1419967718-26909-8-git-send-email-robherring2@gmail.com>
+Date: Tue, 30 Dec 2014 23:08:03 +0100
+Subject: [PATCH 0/9] ARM Versatile multi-platform support
+In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
 References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <1419967718-26909-8-git-send-email-robherring2@gmail.com>
-Message-ID: <4692855.QAqGntT4PC@wuerfel>
+Message-ID: <5504415.vqcrleXQ36@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 December 2014 13:28:36 Rob Herring wrote:
+On Tuesday 30 December 2014 13:28:29 Rob Herring wrote:
 > From: Rob Herring <robh@kernel.org>
 > 
-> In preparation for multi-platform support, move platform.h and
-> hardware.h into mach-versatile directory. Combine them into a single
-> file in the process.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-versatile/core.c                     |  3 +-
->  arch/arm/mach-versatile/include/mach/hardware.h    | 32 ----------------------
->  .../mach-versatile/{include/mach => }/platform.h   |  5 ++++
->  3 files changed, 6 insertions(+), 34 deletions(-)
-> 
+> This series converts ARM Versatile platform to multi-platform. I started 
+> this some time ago and some pieces were already merged. The primary 
+> piece remaining is converting the PCI host to DT which I was waiting for 
+> the common PCI DT parsing to get settled. Now that that is in place as 
+> well as a few other pieces are in place like multi-platform fixes for 
+> CLCD, we can fully convert Versatile to DT and multi-platform.
 
-If I read this right, there is only one file left that includes this
-header after patch 9, so how about moving the contents into versatile_dt.c
-directly?
+Hi Rob, thanks for picking this up again, looks great overall!
+
+I've replied to a few individual patches with minor questions, but
+none of them are show-stoppers.
 
 	Arnd
