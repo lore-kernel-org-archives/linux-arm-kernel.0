@@ -1,162 +1,81 @@
-From: ashwinc@codeaurora.org (ashwinc at codeaurora.org)
-Date: Tue, 30 Dec 2014 20:13:58 -0000
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
- <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
-Message-ID: <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 30 Dec 2014 23:20:34 +0300
+Subject: [PATCH v2] ARM: shmobile: r8a7791: add ADSP clocks
+Message-ID: <4692589.Khlcz7yVTN@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7791 device tree.
 
-Overall the document looks good to us. Some minor clarifications below.
+Based on the original patch by Konstantin Kozhevnikov
+<konstantin.kozhevnikov@cogentembedded.com>.
 
-> ---------- Forwarded message ----------
-> From: Graeme Gregory <graeme.gregory@linaro.org>
->
-> Add documentation for the guidelines of how to use ACPI
-> on ARM64.
->
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  Documentation/arm64/arm-acpi.txt |  323
-> ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 323 insertions(+)
->  create mode 100644 Documentation/arm64/arm-acpi.txt
->
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-[..]
+---
+The patch is against 'renesas-devel-20141229-v3.19-rc2' tag of Simon Horman's
+'renesas.git' repo plus the R8A7791 CAN patches posted last week. It depends on
+the patch adding the ADSP clock support to  the 'clk-rcar-gen2' driver in order
+to work.
 
-> +Relationship with Device Tree
-> +-----------------------------
+Changes in version 2:
+- avoided changing #define R8A7791_CLK_RCAN, so had to swap "adsp" and "rcan" in
+  the "clock-output-names" property of the CPG node.
 
-[..]
+ arch/arm/boot/dts/r8a7791.dtsi            |   11 +++++++----
+ include/dt-bindings/clock/r8a7791-clock.h |    2 ++
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-> +When booting using ACPI tables, the /chosen node in DT will still be
-> parsed
-> +to extract the kernel command line and initrd path.  No other section of
-> the
-> +DT will be used.
-
-Is this still true?
-
-
-> +Programmable Power Control Resources
-> +------------------------------------
-> +Programmable power control resources include such resources as
-> voltage/current
-> +providers (regulators) and clock sources.
-> +
-> +The kernel assumes that power control of these resources is represented
-> with
-> +Power Resource Objects (ACPI section 7.1).  The ACPI core will then
-> handle
-> +correctly enabling and disabling resources as they are needed.  In order
-> to
-> +get that to work, ACPI assumes each device has defined D-states and that
-> these
-> +can be controlled through the optional ACPI methods _PS0, _PS1, _PS2, and
-> _PS3;
-> +in ACPI, _PS0 is the method to invoke to turn a device full on, and _PS3
-> is for
-> +turning a device full off.
-> +
-> +The kernel ACPI code will also assume that the _PS? methods follow the
-> normal
-> +ACPI rules for such methods:
-> +
-> +   -- If either _PS0 or _PS3 is implemented, then the other method must
-> also
-> +      be implemented.
-> +
-> +   -- If a device requires usage or setup of a power resource when on,
-> the ASL
-> +      should organize that it is allocated/enabled using the _PS0 method.
-> +
-> +   -- Resources allocated or enabled in the _PS0 method should be
-> disabled
-> +      or de-allocated in the _PS3 method.
-> +
-> +   -- Firmware will leave the resources in a reasonable state before
-> handing
-> +      over control to the kernel.
-> +
-
-We found this section could be improved a bit by explicitly calling out
-the options for handling device PM. Platform vendor has two choices.
-Resources can be managed in _PSx routine which gets called on entry to Dx.
- Or they can be declared separately as power resources with their own _ON
-and _OFF methods.  They are then tied back to D-states for a particular
-device via _PRx which specifies which power resources a device needs to be
-on while in Dx.  Kernel then tracks number of devices using a power
-resource and calls _ON/_OFF as needed.
-
-> +Such code in _PS? methods will of course be very platform specific.  But,
-> +this allows the driver to abstract out the interface for operating the
-> device
-> +and avoid having to read special non-standard values from ACPI tables.
-> Further,
-> +abstracting the use of these resources allows the hardware to change over
-> time
-> +without requiring updates to the driver.
-> +
-
-I think its been mentioned in the past and you planned to add it here: we
-should explicitly state that with ACPI, the kernel clock/vreg framework
-are not expected to be used at all.
-
-> +
-> +Clocks
-> +------
-> +ACPI makes the assumption that clocks are initialized by the firmware --
-> +UEFI, in this case -- to some working value before control is handed over
-> +to the kernel.  This has implications for devices such as UARTs, or SoC
-> +driven LCD displays, for example.
-> +
-> +When the kernel boots, the clock is assumed to be set to reasonable
-> +working value.  If for some reason the frequency needs to change -- e.g.,
-> +throttling for power management -- the device driver should expect that
-> +process to be abstracted out into some ACPI method that can be invoked
-
-Exception to this is CPU clocks where CPPC provides a much richer
-interface than just blindly invoking some method.
-
-> +(please see the ACPI specification for further recommendations on
-> standard
-> +methods to be expected).  If is not, there is no direct way for ACPI to
-> +control the clocks.
-> +
-> +
-
-[..]
-
-> +ASWG
-> +----
-> +The following areas are not yet fully defined for ARM in the 5.1 version
-> +of the ACPI specification and are expected to be worked through in the
-> +UEFI ACPI Specification Working Group (ASWG):
-> +
-> +   -- ACPI based CPU topology
-> +   -- ACPI based Power management
-
-Should clarify this to idle management rather than generic power management.
-
-> +   -- CPU idle control based on PSCI
-> +   -- CPU performance control (CPPC)
-
-There is no ongoing work on CPPC. Additional enhancements may be explored
-in the future, but spec is viable as is.
-
-Regards,
-Ashwin
-
---
-Qualcomm Innovation Center, Inc
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
-
---
+Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
++++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+@@ -909,7 +909,7 @@
+ 			#clock-cells = <1>;
+ 			clock-output-names = "main", "pll0", "pll1", "pll3",
+ 					     "lb", "qspi", "sdh", "sd0", "z",
+-					     "rcan";
++					     "rcan", "adsp";
+ 		};
+ 
+ 		/* Variable factor clocks */
+@@ -1164,13 +1164,16 @@
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+-			clocks = <&hp_clk>, <&hp_clk>, <&extal_clk>, <&p_clk>;
++			clocks = <&hp_clk>, <&hp_clk>, <&cpg_clocks R8A7791_CLK_ADSP>,
++				 <&extal_clk>, <&p_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				R8A7791_CLK_AUDIO_DMAC0 R8A7791_CLK_AUDIO_DMAC1
+-				R8A7791_CLK_THERMAL R8A7791_CLK_PWM
++				R8A7791_CLK_ADSP_MOD R8A7791_CLK_THERMAL
++				R8A7791_CLK_PWM
+ 			>;
+-			clock-output-names = "audmac0", "audmac1", "thermal", "pwm";
++			clock-output-names = "audmac0", "audmac1", "adsp_mod",
++					     "thermal", "pwm";
+ 		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+Index: renesas/include/dt-bindings/clock/r8a7791-clock.h
+===================================================================
+--- renesas.orig/include/dt-bindings/clock/r8a7791-clock.h
++++ renesas/include/dt-bindings/clock/r8a7791-clock.h
+@@ -21,6 +21,7 @@
+ #define R8A7791_CLK_SD0			7
+ #define R8A7791_CLK_Z			8
+ #define R8A7791_CLK_RCAN		9
++#define R8A7791_CLK_ADSP		10
+ 
+ /* MSTP0 */
+ #define R8A7791_CLK_MSIOF0		0
+@@ -72,6 +73,7 @@
+ /* MSTP5 */
+ #define R8A7791_CLK_AUDIO_DMAC1		1
+ #define R8A7791_CLK_AUDIO_DMAC0		2
++#define R8A7791_CLK_ADSP_MOD		6
+ #define R8A7791_CLK_THERMAL		22
+ #define R8A7791_CLK_PWM			23
+ 
