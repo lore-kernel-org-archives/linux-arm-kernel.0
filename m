@@ -1,68 +1,79 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Dec 2014 18:20:50 +0100
-Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
-In-Reply-To: <20141230162716.GC24811@lunn.ch>
-References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20141230162716.GC24811@lunn.ch>
-Message-ID: <20141230182050.0550ccdc@free-electrons.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Dec 2014 18:39:43 +0100
+Subject: v3.19-rc1 regression(?) on N900
+In-Reply-To: <54A10B1E.7030800@ti.com>
+References: <549B44E2.6080202@ti.com> <201412250932.40403@pali>
+ <20141225091121.GA20355@amd>
+ <20141225222122.GB582@fuloong-minipc.musicnaut.iki.fi>
+ <54A10B1E.7030800@ti.com>
+Message-ID: <20141230173800.GA23142@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
 
-On Tue, 30 Dec 2014 17:27:16 +0100, Andrew Lunn wrote:
+On Mon 2014-12-29 10:04:46, Tomi Valkeinen wrote:
+> Hi,
+> 
+> On 26/12/14 00:21, Aaro Koskinen wrote:
+> 
+> > ...however, I can confirm that framebuffer is broken:
+> > 
+> > [    8.230743] omapfb omapfb: no displays
+> > [    8.255584] omapfb omapfb: failed to setup omapfb
+> > [    8.260620] platform omapfb: Driver omapfb requests probe deferral
+> > [    8.284118] of_get_named_gpiod_flags: parsed 'reset-gpios' property of node
+> > '/ocp/spi at 48098000/acx565akm at 2[0]' - status (0)
+> > [    8.284271] acx565akm spi1.2: failed to find video source
+> > [    8.290069] spi spi1.2: Driver acx565akm requests probe deferral
+> > 
+> > I bisected it to ef691ff48bc8 (OMAPDSS: DT: Get source endpoint
+> > by matching reg-id). When I revert that, also FB works with 3.19-rc1.
+> 
+> I've attached a patch for this. Only hack-tested on OMAP3 beagle, so
+> please report if it works.
 
-> [PATCH 1/6] dt: bindings: update mvebu-mbus DT binding with new
-> branch dt for next merge window, since it is not strictly a fix.
+This fixes the issue for me.
 
-Right.
+Tested-by: Pavel Machek <pavel@ucw.cz>
 
-> [PATCH 2/6] bus: mvebu-mbus: fix support of MBus window 13
-> branch fixes for next -rc
 
-Correct.
+> From fe3e8dde8eae80541a3f3b39c421428ebd02955f Mon Sep 17 00:00:00 2001
+> From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Date: Mon, 29 Dec 2014 09:57:11 +0200
+> Subject: [PATCH] OMAPDSS: SDI: fix output port_num
+> 
+> After the commit ef691ff48bc8 (OMAPDSS: DT: Get source endpoint by
+> matching reg-id) we look for the SDI output using the port number.
+> However, the SDI driver doesn't set the port number, which causes the
+> SDI display to not initialize.
+> 
+> Fix this by setting the SDI port number to 1. We use a hardcoded value,
+> as SDI was used only on OMAP3 and it's always port number 1 there.
+> 
+> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>  drivers/video/fbdev/omap2/dss/sdi.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/video/fbdev/omap2/dss/sdi.c b/drivers/video/fbdev/omap2/dss/sdi.c
+> index d51a983075bc..5c2ccab5a958 100644
+> --- a/drivers/video/fbdev/omap2/dss/sdi.c
+> +++ b/drivers/video/fbdev/omap2/dss/sdi.c
+> @@ -342,6 +342,8 @@ static void sdi_init_output(struct platform_device *pdev)
+>  	out->output_type = OMAP_DISPLAY_TYPE_SDI;
+>  	out->name = "sdi.0";
+>  	out->dispc_channel = OMAP_DSS_CHANNEL_LCD;
+> +	/* We have SDI only on OMAP3, where it's on port 1 */
+> +	out->port_num = 1;
+>  	out->ops.sdi = &sdi_ops;
+>  	out->owner = THIS_MODULE;
+>  
 
-> [PATCH 3/6] ARM: mvebu: fix compatible strings of MBus on Armada 375 and Armada 38x
-> branch fixes for next -rc
 
-Correct, since this is needed for PATCH 2/6 to work properly.
 
-> [PATCH 4/6] bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window
-> branch drivers for next merge window. I assume it is only a run time dependency for the
-> mv_cesa patches?
 
-Indeed, next merge window is good enough for this one: the mv_cesa
-patches have not even been posted yet. I'm not sure whether the mv_cesa
-stuff will be ready for 3.20, or 3.21 anyway. But having for sure this
-mvebu-mbus improvement already scheduled for 3.20 means one less
-dependency to handle when we'll submit the mv_cesa patches.
-
-> [PATCH 5/6] bus: mvebu-mbus: use automatic I/O synchronization barriers
-> branch fixes for next -rc
-
-Right.
-
-> [PATCH 6/6] ARM: mvebu: use arm_coherent_dma_ops
-> Here i'm unsure. Is this a fix, or a cleanup?
-
-It's a fix, because it is what brings this part of the cover letter:
-
-    * It allows to switch to use the existing arm_coherent_dma_ops
-      instead of mvebu specific DMA operations. arm_coherent_dma_ops
-      make sure that DMA coherent mappings are mapped cacheable (which
-      is possible in a cache-coherent platform), which is a necessary
-      to make sure that both CPU-side and device-side accesses are
-      done in a cacheable way. Without this, CPU-side accesses to DMA
-      coherent mappings were made uncached, while device-side accesses
-      were made in a cacheable way, leading to potentially
-      unpredictable behavior.
-
-Which is really a fix. So it should go in 3.19-rc.
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
