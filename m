@@ -1,311 +1,52 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 30 Dec 2014 19:23:14 +0800
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20141224171815.GD13399@e104818-lin.cambridge.arm.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
- <20141224171815.GD13399@e104818-lin.cambridge.arm.com>
-Message-ID: <54A28B22.7090305@linaro.org>
+From: pbrobinson@gmail.com (Peter Robinson)
+Date: Tue, 30 Dec 2014 11:36:20 +0000
+Subject: [PATCH] drivers/rtc/rtc-em3027.c: add device tree support
+Message-ID: <1419939380-4439-1-git-send-email-pbrobinson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Set the of_match_table for this driver so that devices can be described
+in the device tree. This device is used in the Trimslice and is already
+defined in the Trimslice device tree.
 
-On 2014?12?25? 01:18, Catalin Marinas wrote:
-> Hi,
->
-> Some thoughts before the end of the year. I won't be able to follow up
-> until around 5th of January though.
->
-> On Fri, Oct 17, 2014 at 02:37:14PM +0100, Hanjun Guo wrote:
->> --- /dev/null
->> +++ b/Documentation/arm64/arm-acpi.txt
->> @@ -0,0 +1,323 @@
->> +ACPI on ARMv8 Servers
->> +---------------------
->> +ACPI can be used for ARMv8 general purpose servers designed to follow
->> +the ARM SBSA (Server Base System Architecture) specification, currently
->> +available to those with an ARM login at http://silver.arm.com.
->
-> You should mention SBBR (Server Base Boot Requirements) here as well.
-> The arm-acpi.txt is complementary to arm-acpi.txt and longer term we
-> should aim to move parts of the Linux document into the more OS-agonstic
-> SBBR.
+Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
+---
+ drivers/rtc/rtc-em3027.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-ok, I will update the doc. and I agree that moving parts of this doc
-into SBBR, actually part of the content is coming from SBBR, especially
-section "Booting using ACPI tables" (not include the command line part).
-please refer to section 4.2 ACPI Tables in SBBR.
-
->
->> +The ARMv8 kernel implements the reduced hardware model of ACPI version
->> +5.1 and its corresponding errata.
->
-> I would say 5.1 or later to avoid updating this document every time we
-> get a new ACPI release.
-
-sure, will update it.
-
->
->> +If an ARMv8 system does not meet the requirements of the SBSA, or cannot
->> +be described using the mechanisms defined in the required ACPI specifications,
->> +then it is likely that Device Tree (DT) is more suitable than ACPI for the
->> +hardware.
->
-> Based on some private discussions, I think we could drop some of the
-> references to DT in this document. It should specify the requirements
-> for ACPI support and, if not met, the alternative SoC support is
-> automatically DT for Linux. That's just to make it easier to move parts
-> of this doc into SBBR.
->
->> +Relationship with Device Tree
->> +-----------------------------
->
-> This section is fine, Linux specific and it will stay in this document.
->
->> +ACPI support in drivers and subsystems for ARMv8 should never be mutually
->> +exclusive with DT support at compile time.
->> +
->> +At boot time the kernel will only use one description method depending on
->> +parameters passed from the bootloader (including kernel bootargs).
->> +
->> +Regardless of whether DT or ACPI is used, the kernel must always be capable
->> +of booting with either scheme (in kernels with both schemes enabled at compile
->> +time).
->> +
->> +When booting using ACPI tables, the /chosen node in DT will still be parsed
->> +to extract the kernel command line and initrd path.  No other section of the
->> +DT will be used.
->
-> I don't think this paragraph is needed. That's a kernel detail when how
-> the EFI_STUB passes the information to the rest of the kernel. We
-> mandate UEFI booting for ACPI support, so I wouldn't expect an
-> ACPI-aware U-Boot.
-
-Agree, we can boot kernel ok without passing the dtb to kernel
-in the command line if ACPI presents.
-
->
->> +Booting using ACPI tables
->> +-------------------------
->> +The only defined method for passing ACPI tables to the kernel on ARMv8
->> +is via the UEFI system configuration table.
->> +
->> +Processing of ACPI tables may be disabled by passing acpi=off on the kernel
->> +command line; this is the default behavior.  If acpi=force is used, the kernel
->> +will ONLY use device configuration information contained in the ACPI tables.
->
-> See my comments to Al around the defaults. I think if only ACPI tables
-> are present, we shouldn't panic the kernel if acpi=force is missing but
-> continue with ACPI.
-
-I think we need another patch to implement it, for this patch set,kernel
-will panic if no dtb and acpi=off. since passing no DT tables to OS but
-acpi=force is missing is a corner case, we can do a follow up patch to
-fix that, does it make sense?
-
-> If both DT and ACPI tables are present, DT will be
-> the default. You could say "this is the default behaviour if both ACPI
-> and DT tables are present".
->
->> +Device Enumeration
->> +------------------
->> +Device descriptions in ACPI should use standard recognized ACPI interfaces.
->> +These can contain less information than is typically provided via a Device
->
-> s/can/may/ ? Not sure, it just sounds better to me (not a native English
-> speaker).
->
->> +Tree description for the same device.  This is also one of the reasons that
->> +ACPI can be useful -- the driver takes into account that it may have less
->> +detailed information about the device and uses sensible defaults instead.
->> +If done properly in the driver, the hardware can change and improve over
->> +time without the driver having to change at all.
->> +
->> +Clocks provide an excellent example.  In DT, clocks need to be specified
->> +and the drivers need to take them into account.  In ACPI, the assumption
->> +is that UEFI will leave the device in a reasonable default state, including
->> +any clock settings.  If for some reason the driver needs to change a clock
->> +value, this can be done in an ACPI method; all the driver needs to do is
->> +invoke the method and not concern itself with what the method needs to do
->> +to change the clock.  Changing the hardware can then take place over time
->> +by changing what the ACPI method does, and not the driver.
->> +
->> +ACPI drivers should only look at one specific ASL object -- the _DSD object
->> +-- for device driver parameters (known in DT as "bindings", or "Device
->> +Properties" in ACPI).  Not all DT bindings will be recognized.
->
-> This last sentence kind of implies that many of the DT bindings will be
-> recognised. While it is useful to have some commonalities, I think this
-> gives the wrong message that _DSD is a copy of DT. We should avoid this.
->
->> The UEFI
->> +Forum provides a mechanism for registering such bindings [URL TBD by ASWG]
->
-> s/bindings/properties/ if we talk in the ACPI context.
->
->> +so that they may be used on any operating system supporting ACPI.  Device
->> +properties that have not been registered with the UEFI Forum should not be
->> +used.
->
-> More about this further down.
->
->> +Drivers should look for device properties in the _DSD object ONLY; the _DSD
->> +object is described in the ACPI specification section 6.2.5, but more
->> +specifically, use the _DSD Device Properties UUID:
->> +
->> +   -- UUID: daffd814-6eba-4d8c-8a91-bc9bbf4aa301
->> +
->> +   -- http://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf)
->> +
->> +The kernel has an interface for looking up device properties in a manner
->> +independent of whether DT or ACPI is being used and that interface should
->> +be used;
->
-> I haven't followed the _DSD kernel support but does it provide a common
-> API to be shared with DT? I'm not entirely convinced it's a good idea.
->
->> it can eliminate some duplication of code paths in driver probing
->> +functions and discourage divergence between DT bindings and ACPI device
->> +properties.
->
-> Given the current different mechanism of reviewing/approving bindings
-> between DT and ACPI (kernel community vs UEFI forum), I don't see how we
-> encourage convergence (unless we state that _DSD are Linux-only, Windows
-> should use a different mechanism like .inf files).
->
->> +ACPI tables are described with a formal language called ASL, the ACPI
->> +Source Language (section 19 of the specification).  This means that there
->> +are always multiple ways to describe the same thing -- including device
->> +properties.  For example, device properties could use an ASL construct
->> +that looks like this: Name(KEY0, "value0").  An ACPI device driver would
->> +then retrieve the value of the property by evaluating the KEY0 object.
->> +However, using Name() this way has multiple problems: (1) ACPI limits
->> +names ("KEY0") to four characters unlike DT; (2) there is no industry
->> +wide registry that maintains a list of names, minimzing re-use; (3)
->> +there is also no registry for the definition of property values ("value0"),
->> +again making re-use difficult; and (4) how does one maintain backward
->> +compatibility as new hardware comes out?  The _DSD method was created
->> +to solve precisely these sorts of problems; Linux drivers should ALWAYS
->> +use the _DSD method for device properties and nothing else.
->> +
->> +The _DSM object (ACPI Section 9.14.1) could also be used for conveying
->> +device properties to a driver.  Linux drivers should only expect it to
->> +be used if _DSD cannot represent the data required, and there is no way
->> +to create a new UUID for the _DSD object.  Note that there is even less
->> +regulation of the use of _DSM than there is of _DSD.  Drivers that depend
->> +on the contents of _DSM objects will be more difficult to maintain over
->> +time because of this.
->> +
->> +The _DSD object is a very flexible mechanism in ACPI, as are the registered
->> +Device Properties.  This flexibility allows _DSD to cover more than just the
->> +generic server case and care should be taken in device drivers not to expect
->> +it to replicate highly specific embedded behaviour from DT.
->
-> While this is all good, we need to be more specific on what "embedded
-> behaviour" means. Maybe not for this document but the UEFI approval
-> process for new properties doesn't give any hint on what is and is not
-> sane (and I already disagree with some of the examples on uefi.org).
->
->> +Both DT bindings and ACPI device properties for device drivers have review
->> +processes.  Use them.  And, before creating new device properties, check to
->> +be sure that they have not been defined before and either registered in the
->> +Linux kernel documentation or the UEFI Forum.  If the device drivers supports
->> +ACPI and DT, please make sure the device properties are consistent in both
->> +places.
->
-> In the interest of progress, I think we need to *temporarily* ban the
-> use of _DSD on ARM platforms aimed at ACPI and state it clearly in this
-> document. Once we are happy with the UEFI forum review process, we'll
-> adjust the document accordingly.
->
-> My problems with _DSD:
->
-> a) no clear guidance on what a good property means, whether it covers
->     just device specific information or it may include Linux behaviour
->     (like "linux,default-trigger", I don't think it should)
-> b) the Linux kernel community does not seem to be involved in the UEFI
->     forum _DSD review process. This means that we'll be faced with
->     patches against drivers to support UEFI-published _DSD properties.
->     I want to avoid such arguments, rejecting kernel code is too late
->     after _DSD properties have been published
->
-> The alternative to _DSD would be to program the hardware to some sane
-> state. For example, I'm sure a MAC address can be written by firmware to
-> some register and the driver can read and store it locally (I'm not even
-> sure why we need MAC address in ACPI tables, this is not really a
-> property of the hardware but a configuration that could be done in
-> firmware).
->
->> +Clocks
->> +------
->> +ACPI makes the assumption that clocks are initialized by the firmware --
->> +UEFI, in this case -- to some working value before control is handed over
->> +to the kernel.  This has implications for devices such as UARTs, or SoC
->> +driven LCD displays, for example.
->> +
->> +When the kernel boots, the clock is assumed to be set to reasonable
->> +working value.  If for some reason the frequency needs to change -- e.g.,
->> +throttling for power management -- the device driver should expect that
->> +process to be abstracted out into some ACPI method that can be invoked
->> +(please see the ACPI specification for further recommendations on standard
->> +methods to be expected).  If is not, there is no direct way for ACPI to
->> +control the clocks.
->
-> I would emphasize that there is no way for _Linux_ to directly control the
-> clocks on an ACPI-enabled platform.
->
->> +ASWG
->> +----
->> +The following areas are not yet fully defined for ARM in the 5.1 version
->> +of the ACPI specification and are expected to be worked through in the
->> +UEFI ACPI Specification Working Group (ASWG):
->> +
->> +   -- ACPI based CPU topology
->> +   -- ACPI based Power management
->> +   -- CPU idle control based on PSCI
->> +   -- CPU performance control (CPPC)
->> +   -- ACPI based SMMU
->> +   -- ITS support for GIC in MADT
->
-> In addition to the above and _DSD requirements/banning, I would also add
-> some clear statements around:
->
-> _OSC: only global/published capabilities are allowed. For
-> device-specific _OSC we need a process or maybe we can ban them entirely
-> and rely on _DSD once we clarify the process.
->
-> _OSI: firmware must not check for certain _OSI strings. Here I'm not
-> sure what we would have to do for ARM Linux. Reporting "Windows" does
-> not make any sense but not reporting anything can, as Matthew Garrett
-> pointed out, can be interpreted by firmware as "Linux". In addition to
-> any statements in this document, I suggest you patch
-> drivers/acpi/acpica/utosi.c accordingly, maybe report "Linux" for ARM
-> and print a kernel warning so that we notice earlier.
->
-> ACPI_OS_NAME: this is globally defined as "Microsoft Windows NT". It
-> doesn't make much sense in the ARM context. Could we change it to
-> "Linux" when CONFIG_ARM64?
->
-> Compatibility with older kernels: ACPI firmware must work, even though
-> not fully optimal, with the earliest kernel version implementing the
-> targeted ACPI spec. There may be a need for new drivers but otherwise
-> adding things like CPU power management should not break older kernel
-> versions. In addition, the ACPI firmware must also work with the latest
-> kernel version.
->
->
-> I strongly consider that we need to be very strict with the Linux ACPI
-> firmware and hardware requirements to avoid the need for supporting
-> non-standard implementations as much as possible. This is, however, a
-> live document, so we can relax it as we see fit (e.g. _DSD process
-> clarified).
->
-> In the meantime, Merry Christmas ;). I'll follow up in January.
-
-I will send another version of patches based on 3.19-rc2, and I will
-address some comments in that patch set, we can continue our discussion
-here about doc for ACPI on ARM64.
-
-Thanks
-Hanjun
+diff --git a/drivers/rtc/rtc-em3027.c b/drivers/rtc/rtc-em3027.c
+index fccf366..7fbb051 100644
+--- a/drivers/rtc/rtc-em3027.c
++++ b/drivers/rtc/rtc-em3027.c
+@@ -15,6 +15,7 @@
+ #include <linux/rtc.h>
+ #include <linux/bcd.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ 
+ /* Registers */
+ #define EM3027_REG_ON_OFF_CTRL	0x00
+@@ -135,10 +136,21 @@ static struct i2c_device_id em3027_id[] = {
+ 	{ "em3027", 0 },
+ 	{ }
+ };
++MODULE_DEVICE_TABLE(i2c, em3027_id);
++
++#ifdef CONFIG_OF
++static const struct of_device_id em3027_of_match[] = {
++	{ .compatible = "emmicro,em3027", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, em3027_of_match);
++#endif
+ 
+ static struct i2c_driver em3027_driver = {
+ 	.driver = {
+ 		   .name = "rtc-em3027",
++		   .owner  = THIS_MODULE,
++		   .of_match_table = of_match_ptr(em3027_of_match),
+ 	},
+ 	.probe = &em3027_probe,
+ 	.id_table = em3027_id,
+-- 
+2.1.0
