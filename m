@@ -1,75 +1,69 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 30 Dec 2014 16:41:47 +0800
-Subject: [PATCH 2/2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
-References: <1419928907-18053-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1419928907-18053-3-git-send-email-jingchang.lu@freescale.com>
+From: songjun.wu@atmel.com (Songjun Wu)
+Date: Tue, 30 Dec 2014 17:49:27 +0800
+Subject: [PATCH] USB: gadget: udc: atmel: fix possible oops when unloading
+ module
+Message-ID: <1419932967-2694-1-git-send-email-songjun.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds power management suspend/resume support for
-the fsl-edma driver.
+Executing the 'insmod g_hid.ko', then executing the
+'rmmod g_hid.ko', the NULL pointer oops will be triggered.
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+When unloading the module 'g_hid.ko', the urb request will be
+dequeued and the completion routine will be excuted. If no urb
+packet, the urb request will not be added to the endpoint queue
+and the completion routine pointer in urb request is NULL.
+Accessing to the NULL function pointer will cause the oops issue.
+Add the code to check the urb request is in the endpoint queue
+or not.If the urb request is not in the endpoint queue, a negative
+error code will be returned.
+
+This bug was introduced since the file 'atmel_usba_udc.c' was
+initialized. Fixes: 914a3f3b3754 (USB: add atmel_usba_udc driver)
+Cc: stable at vger.kernel.org # always been there...
+
+oops dump log is shown in the following.
+Unable to handle kernel NULL pointer dereference at virtual
+address 00000000
+pgd = dedf0000
+[00000000] *pgd=3ede5831, *pte=00000000, *ppte=00000000
+Internal error: Oops: 80000007 [#1] ARM
+Modules linked in: g_hid(-) usb_f_hid libcomposite
+
+Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
 ---
- drivers/dma/fsl-edma.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ drivers/usb/gadget/udc/atmel_usba_udc.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index e0bd517..6a81699 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -1017,6 +1017,43 @@ static int fsl_edma_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index ce88237..48629cc 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -828,7 +828,7 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
+ {
+ 	struct usba_ep *ep = to_usba_ep(_ep);
+ 	struct usba_udc *udc = ep->udc;
+-	struct usba_request *req = to_usba_req(_req);
++	struct usba_request *req;
+ 	unsigned long flags;
+ 	u32 status;
  
-+#ifdef CONFIG_PM_SLEEP
-+static int fsl_edma_pm_suspend(struct device *dev)
-+{
-+	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-+	struct fsl_edma_chan *fsl_chan;
-+	int i;
-+
-+	for (i = 0; i < fsl_edma->n_chans; i++) {
-+		fsl_chan = &fsl_edma->chans[i];
-+		fsl_edma_chan_mux(fsl_chan, 0, false);
+@@ -837,6 +837,16 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
+ 
+ 	spin_lock_irqsave(&udc->lock, flags);
+ 
++	list_for_each_entry(req, &ep->queue, queue) {
++		if (&req->req == _req)
++			break;
 +	}
 +
-+	return 0;
-+}
-+
-+static int fsl_edma_pm_resume(struct device *dev)
-+{
-+	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-+	struct fsl_edma_chan *fsl_chan;
-+	int i;
-+
-+	for (i = 0; i < fsl_edma->n_chans; i++) {
-+		fsl_chan = &fsl_edma->chans[i];
-+		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
-+		/* restore the channel slave id configuration */
-+		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
++	if (&req->req != _req) {
++		spin_unlock_irqrestore(&udc->lock, flags);
++		return -EINVAL;
 +	}
 +
-+	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-+		    fsl_edma->membase + EDMA_CR);
-+
-+	return 0;
-+}
-+#endif
-+static
-+SIMPLE_DEV_PM_OPS(fsl_edma_pm_ops, fsl_edma_pm_suspend, fsl_edma_pm_resume);
-+
- static const struct of_device_id fsl_edma_dt_ids[] = {
- 	{ .compatible = "fsl,vf610-edma", },
- 	{ /* sentinel */ }
-@@ -1027,6 +1064,7 @@ static struct platform_driver fsl_edma_driver = {
- 	.driver		= {
- 		.name	= "fsl-edma",
- 		.of_match_table = fsl_edma_dt_ids,
-+		.pm	= &fsl_edma_pm_ops,
- 	},
- 	.probe          = fsl_edma_probe,
- 	.remove		= fsl_edma_remove,
+ 	if (req->using_dma) {
+ 		/*
+ 		 * If this request is currently being transferred,
 -- 
-1.8.0
+1.7.9.5
