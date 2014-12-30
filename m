@@ -1,477 +1,355 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 30 Dec 2014 14:53:11 +0100
-Subject: [PATCH v2 4/4] mmc: sdhci: host: add new f_sdh30
-In-Reply-To: <1418628635-3436-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1418628635-3436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1418628635-3436-5-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <CAPDyKFocSBmjEhJS8x2nbDrH_YA3=UaKjWpQtSc7MPwYeUUe-w@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 30 Dec 2014 15:57:01 +0200
+Subject: [PATCHv2] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20141224223434.GA20669@amd>
+References: <20141203214641.GA1390@amd>
+ <20141224223434.GA20669@amd>
+Message-ID: <20141230135701.GN17565@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 December 2014 at 08:30, Vincent Yang
-<vincent.yang.fujitsu@gmail.com> wrote:
-> This patch adds new host controller driver for
-> Fujitsu SDHCI controller f_sdh30.
->
-> Signed-off-by: Andy Green <andy.green@linaro.org>
-> Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
-> Signed-off-by: Tetsuya Takinishi <t.takinishi@jp.fujitsu.com>
+Hi Pavel,
+
+Thanks for the patch! A few comments below.
+
+On Wed, Dec 24, 2014 at 11:34:34PM +0100, Pavel Machek wrote:
+> 
+> We are moving to device tree support on OMAP3, but that currently
+> breaks ADP1653 driver. This adds device tree support, plus required
+> documentation.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
 > ---
->  .../devicetree/bindings/mmc/sdhci-fujitsu.txt      |  35 +++
->  drivers/mmc/host/Kconfig                           |   8 +
->  drivers/mmc/host/Makefile                          |   1 +
->  drivers/mmc/host/sdhci_f_sdh30.c                   | 319 +++++++++++++++++++++
->  4 files changed, 363 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
->  create mode 100644 drivers/mmc/host/sdhci_f_sdh30.c
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
+> 
+> Changed -microsec to -us, as requested by devicetree people.
+> 
+> Fixed checkpatch issues.
+> 
+> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+> index 2d88816..2c6c7c5 100644
+> --- a/Documentation/devicetree/bindings/leds/common.txt
+> +++ b/Documentation/devicetree/bindings/leds/common.txt
+> @@ -14,6 +14,15 @@ Optional properties for child nodes:
+>       "ide-disk" - LED indicates disk activity
+>       "timer" - LED flashes at a fixed, configurable rate
+>  
+> +- max-microamp : maximum intensity in microamperes of the LED
+> +	         (torch LED for flash devices)
+
+s/torch LED/torch mode/
+
+> +- flash-max-microamp : maximum intensity in microamperes of the
+> +                       flash LED; it is mandatory if the LED should
+> +		       support the flash mode
+> +- flash-timeout-microsec : timeout in microseconds after which the flash
+> +                           LED is turned off
+
+These should go to a different patch.
+
+> +
+> +
+>  Examples:
+>  
+>  system-status {
+> @@ -21,3 +30,10 @@ system-status {
+>  	linux,default-trigger = "heartbeat";
+>  	...
+>  };
+> +
+> +camera-flash {
+> +	label = "Flash";
+> +	max-microamp = <50000>;
+> +	flash-max-microamp = <320000>;
+> +	flash-timeout-microsec = <500000>;
+> +}
+> diff --git a/Documentation/devicetree/bindings/media/i2c/adp1653.txt b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
 > new file mode 100644
-> index 0000000..d1a50f1
+> index 0000000..3c7065f
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-fujitsu.txt
-> @@ -0,0 +1,35 @@
-> +* Fujitsu SDHCI controller
+> +++ b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+> @@ -0,0 +1,38 @@
+> +* Analog Devices ADP1653 flash LED driver
 > +
-> +This file documents differences between the core properties in mmc.txt
-> +and the properties used by the sdhci_f_sdh30 driver.
+> +Required Properties:
 > +
-> +Required properties:
-> +- compatible: "fujitsu,mb86s70-sdhci-3.0"
-> +- voltage-ranges : This is a list of pairs. In each pair, two cells
-> +  are required. First cell specifies minimum slot voltage (mV), second
-> +  cell specifies maximum slot voltage (mV). In case of supported voltage
-> +  range is discontinuous, several ranges could be specified as a list.
+> +  - compatible: Must contain one of the following
+> +    - "adi,adp1653"
 
-Can't these be modelled from a regulator instead? Thus using a "vmmc-supply"?
+I doubt whether there are going to be more chips supported with the driver.
+There hasn't been since the driver was written not I'm aware of one now.
+
+> +  - reg: I2C slave address
+> +
+> +  - gpios: References to the GPIO that controls the power for the chip.
+> +
+> +There are two led outputs available - flash and indicator. One led is
+> +represented by one child node, nodes need to be named "flash" and "indicator".
+
+80 characters per line.
 
 > +
-> +Optional properties:
-> +- vqmmc-supply: phandle to the regulator device tree node, mentioned
-> +  as the VCCQ/VDD_IO supply in the eMMC/SD specs.
-> +- clocks: Must contain an entry for each entry in clock-names. It is a
-> +  list of phandles and clock-specifier pairs.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Should contain the following two entries:
-> +       "iface" - clock used for sdhci interface
-> +       "core"  - core clock for sdhci controller
+> +Required properties of the LED child node:
+> +- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> +
+> +Required properties of the flash LED child node:
+> +
+> +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
 > +
 > +Example:
 > +
-> +       sdhci1: mmc at 36600000 {
-> +               compatible = "fujitsu,mb86s70-sdhci-3.0";
-> +               reg = <0 0x36600000 0x1000>;
-> +               interrupts = <0 172 0x4>,
-> +                            <0 173 0x4>;
-> +               voltage-ranges = <1800 1800>, <3300 3300>;
-> +               bus-width = <4>;
-> +               vqmmc-supply = <&vccq_sdhci1>;
-> +               clocks = <&clock 2 2 0>, <&clock 2 3 0>;
-> +               clock-names = "iface", "core";
-> +       };
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 2d6fbdd..288dcc3 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -290,6 +290,14 @@ config MMC_SDHCI_BCM2835
->           This selects the BCM2835 SD/MMC controller. If you have a BCM2835
->           platform with SD or MMC devices, say Y or M here.
->
-> +config MMC_SDHCI_F_SDH30
-> +       tristate "SDHCI support for Fujitsu Semiconductor F_SDH30"
-> +       depends on MMC_SDHCI_PLTFM
-> +       depends on OF
-> +       help
-> +         This selects the Secure Digital Host Controller Interface (SDHCI)
-> +         Needed by some Fujitsu SoC for MMC / SD / SDIO support.
-> +         If you have a controller with this interface, say Y or M here.
->           If unsure, say N.
->
->  config MMC_MOXART
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index f7b0a77..6a7cfe0 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_MMC_SDHCI_PXAV3) += sdhci-pxav3.o
->  obj-$(CONFIG_MMC_SDHCI_PXAV2)  += sdhci-pxav2.o
->  obj-$(CONFIG_MMC_SDHCI_S3C)    += sdhci-s3c.o
->  obj-$(CONFIG_MMC_SDHCI_SIRF)           += sdhci-sirf.o
-> +obj-$(CONFIG_MMC_SDHCI_F_SDH30)        += sdhci_f_sdh30.o
->  obj-$(CONFIG_MMC_SDHCI_SPEAR)  += sdhci-spear.o
->  obj-$(CONFIG_MMC_WBSD)         += wbsd.o
->  obj-$(CONFIG_MMC_AU1X)         += au1xmmc.o
-> diff --git a/drivers/mmc/host/sdhci_f_sdh30.c b/drivers/mmc/host/sdhci_f_sdh30.c
-> new file mode 100644
-> index 0000000..76df115
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci_f_sdh30.c
-> @@ -0,0 +1,319 @@
-> +/*
-> + * linux/drivers/mmc/host/sdhci_f_sdh30.c
-> + *
-> + * Copyright (C) 2013 - 2014 Fujitsu Semiconductor, Ltd
-> + *              Vincent Yang <vincent.yang@tw.fujitsu.com>
-> + * Copyright (C) 2014 Linaro Ltd  Andy Green <andy.green@linaro.org>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation, version 2 of the License.
-> + */
+> +        adp1653: led-controller at 30 {
+> +                compatible = "adi,adp1653";
+> +		reg = <0x30>;
+> +                gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+
+Please use tabs for indentation above (and below).
+
 > +
-> +#include <linux/err.h>
-> +#include <linux/delay.h>
-> +#include <linux/module.h>
-> +#include <linux/mmc/sd.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/mmc/card.h>
-> +#include <linux/gpio.h>
+> +		flash {
+> +                        flash-timeout-us = <500000>;
+> +                        flash-max-microamp = <320000>;
+> +                        max-microamp = <50000>;
+> +		};
+> +                indicator {
+> +                        max-microamp = <17500>;
+> +		};
+> +        };
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index bc82a12..d04e7cc 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -553,6 +558,22 @@
+>  
+>  		ti,usb-charger-detection = <&isp1704>;
+>  	};
+> +
+> +	adp1653: led-controller at 30 {
+> +		compatible = "adi,adp1653";
+> +		reg = <0x30>;
+> +		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> +
+> +		flash {
+> +			flash-timeout-us = <500000>;
+> +			flash-max-microamp = <320000>;
+> +			max-microamp = <50000>;
+> +		};
+> +
+> +		indicator {
+> +			max-microamp = <17500>;
+> +		};
+> +	};
+
+This should go to a separate patch as well.
+
+>  };
+>  
+>  &i2c3 {
+> diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
+> index 873fe19..78341d0 100644
+> --- a/drivers/media/i2c/adp1653.c
+> +++ b/drivers/media/i2c/adp1653.c
+> @@ -8,6 +8,7 @@
+>   * Contributors:
+>   *	Sakari Ailus <sakari.ailus@iki.fi>
+>   *	Tuukka Toivonen <tuukkat76@gmail.com>
+> + *      Pavel Machek <pavel@ucw.cz>
+>   *
+>   * This program is free software; you can redistribute it and/or
+>   * modify it under the terms of the GNU General Public License
+> @@ -34,9 +35,12 @@
+>  #include <linux/module.h>
+>  #include <linux/i2c.h>
+>  #include <linux/slab.h>
 > +#include <linux/of_gpio.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/suspend.h>
+>  #include <media/adp1653.h>
+>  #include <media/v4l2-device.h>
+>  
+> +#include <linux/gpio.h>
+
+Please arrange along with the rest of headers.
+
 > +
-> +#include "sdhci.h"
-> +#include "sdhci-pltfm.h"
+>  #define TIMEOUT_MAX		820000
+>  #define TIMEOUT_STEP		54600
+>  #define TIMEOUT_MIN		(TIMEOUT_MAX - ADP1653_REG_CONFIG_TMR_SET_MAX \
+> @@ -306,9 +318,18 @@ adp1653_init_device(struct adp1653_flash *flash)
+>  static int
+>  __adp1653_set_power(struct adp1653_flash *flash, int on)
+>  {
+> -	int ret;
+> +	int ret = 0;
 > +
-> +/* F_SDH30 extended Controller registers */
-> +#define F_SDH30_AHB_CONFIG             0x100
-> +#define  F_SDH30_AHB_BIGED             0x00000040
-> +#define  F_SDH30_BUSLOCK_DMA           0x00000020
-> +#define  F_SDH30_BUSLOCK_EN            0x00000010
-> +#define  F_SDH30_SIN                   0x00000008
-> +#define  F_SDH30_AHB_INCR_16           0x00000004
-> +#define  F_SDH30_AHB_INCR_8            0x00000002
-> +#define  F_SDH30_AHB_INCR_4            0x00000001
+> +	if (flash->platform_data->power)
+> +		ret = flash->platform_data->power(&flash->subdev, on);
+
+if () {
+} else {
+}
+
+> +	else {
+> +		gpio_set_value(flash->platform_data->power_gpio, on);
+
+Shouldn't you add this to the platform data struct?
+
+power_gpio is actually a poor name for this, as is the "power" callback.
+This is really "EN" gpio in the spec, I'd call it perhaps just "gpio", or
+"enable_gpio".
+
+> +		if (on) {
+> +			/* Some delay is apparently required. */
+> +			udelay(20);
+
+The driver should always handle the delay, platform data or not. This
+reminds me --- is there a need to retain the support for platform data? I
+don't think it's being used anywhere. I'm fine with both keeping and
+removing it.
+
+> +		}
+> +	}
+>  
+> -	ret = flash->platform_data->power(&flash->subdev, on);
+>  	if (ret < 0)
+>  		return ret;
+>  
+> @@ -316,8 +337,13 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
+>  		return 0;
+>  
+>  	ret = adp1653_init_device(flash);
+> -	if (ret < 0)
+> +	if (ret >= 0)
+> +		return ret;
 > +
-> +#define F_SDH30_TUNING_SETTING         0x108
-> +#define  F_SDH30_CMD_CHK_DIS           0x00010000
-> +
-> +#define F_SDH30_IO_CONTROL2            0x114
-> +#define  F_SDH30_CRES_O_DN             0x00080000
-> +#define  F_SDH30_MSEL_O_1_8            0x00040000
-> +
-> +#define F_SDH30_ESD_CONTROL            0x124
-> +#define  F_SDH30_EMMC_RST              0x00000002
-> +#define  F_SDH30_EMMC_HS200            0x01000000
-> +
-> +#define F_SDH30_CMD_DAT_DELAY          0x200
-> +
-> +#define F_SDH30_MIN_CLOCK              400000
-> +
-> +struct f_sdhost_priv {
-> +       struct clk *clk_iface;
-> +       struct clk *clk;
-> +       u32 vendor_hs200;
-> +       struct device *dev;
-> +};
-> +
-> +void sdhci_f_sdh30_soft_voltage_switch(struct sdhci_host *host)
+> +	if (flash->platform_data->power)
+>  		flash->platform_data->power(&flash->subdev, 0);
+> +	else
+> +		gpio_set_value(flash->platform_data->power_gpio, 0);
+>  
+>  	return ret;
+>  }
+> @@ -407,21 +433,78 @@ static int adp1653_resume(struct device *dev)
+>  
+>  #endif /* CONFIG_PM */
+>  
+> +static int adp1653_of_init(struct i2c_client *client,
+> +			   struct adp1653_flash *flash,
+> +			   struct device_node *node)
 > +{
-> +       struct f_sdhost_priv *priv = sdhci_priv(host);
-> +       u32 ctrl = 0;
+> +	u32 val;
+> +	struct adp1653_platform_data *pd;
+> +	enum of_gpio_flags flags;
+> +	int gpio;
+> +	struct device_node *child;
 > +
-> +       usleep_range(2500, 3000);
-> +       ctrl = sdhci_readl(host, F_SDH30_IO_CONTROL2);
-> +       ctrl |= F_SDH30_CRES_O_DN;
-> +       sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
-> +       ctrl |= F_SDH30_MSEL_O_1_8;
-> +       sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
+> +	if (!node)
+> +		return -EINVAL;
 > +
-> +       ctrl &= ~F_SDH30_CRES_O_DN;
-> +       sdhci_writel(host, ctrl, F_SDH30_IO_CONTROL2);
-> +       usleep_range(2500, 3000);
+> +	pd = devm_kzalloc(&client->dev, sizeof(*pd), GFP_KERNEL);
+> +	if (!pd)
+> +		return -ENOMEM;
+> +	flash->platform_data = pd;
 > +
-> +       if (priv->vendor_hs200) {
-> +               dev_info(priv->dev, "%s: setting hs200\n", __func__);
-> +               ctrl = sdhci_readl(host, F_SDH30_ESD_CONTROL);
-> +               ctrl |= priv->vendor_hs200;
-> +               sdhci_writel(host, ctrl, F_SDH30_ESD_CONTROL);
-> +       }
+> +	child = of_get_child_by_name(node, "flash");
+> +	if (!child)
+> +		return -EINVAL;
+> +	if (of_property_read_u32(child, "flash-timeout-microsec", &val))
+> +		return -EINVAL;
 > +
-> +       ctrl = sdhci_readl(host, F_SDH30_TUNING_SETTING);
-> +       ctrl |= F_SDH30_CMD_CHK_DIS;
-> +       sdhci_writel(host, ctrl, F_SDH30_TUNING_SETTING);
+> +	pd->max_flash_timeout = val;
+> +	if (of_property_read_u32(child, "flash-max-microamp", &val))
+> +		return -EINVAL;
+> +	pd->max_flash_intensity = val/1000;
+> +
+> +	if (of_property_read_u32(child, "max-microamp", &val))
+> +		return -EINVAL;
+> +	pd->max_torch_intensity = val/1000;
+> +
+> +	child = of_get_child_by_name(node, "indicator");
+> +	if (!child)
+> +		return -EINVAL;
+
+Do you require an indicator to be connected? I think it shouldn't be
+mandatory, at least the driver should work without it, even if it exposes
+the control (making that conditional would be a subject for another patch,
+but that doesn't need to be done now).
+
+> +	if (of_property_read_u32(child, "max-microamp", &val))
+> +		return -EINVAL;
+> +	pd->max_indicator_intensity = val;
+> +
+> +	if (!of_find_property(node, "gpios", NULL)) {
+> +		dev_err(&client->dev, "No gpio node\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	gpio = of_get_gpio_flags(node, 0, &flags);
+
+You could assign to pd->... here.
+
+> +	if (gpio < 0) {
+> +		dev_err(&client->dev, "Error getting GPIO\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pd->power_gpio = gpio;
+> +	return 0;
 > +}
 > +
-> +unsigned int sdhci_f_sdh30_get_min_clock(struct sdhci_host *host)
-> +{
-> +       return F_SDH30_MIN_CLOCK;
-> +}
 > +
-> +void sdhci_f_sdh30_reset(struct sdhci_host *host, u8 mask)
-> +{
-> +       if (sdhci_readw(host, SDHCI_CLOCK_CONTROL) == 0)
-> +               sdhci_writew(host, 0xBC01, SDHCI_CLOCK_CONTROL);
-> +
-> +       sdhci_reset(host, mask);
-> +}
-> +
-> +static const struct sdhci_ops sdhci_f_sdh30_ops = {
-> +       .voltage_switch = sdhci_f_sdh30_soft_voltage_switch,
-> +       .get_min_clock = sdhci_f_sdh30_get_min_clock,
-> +       .reset = sdhci_f_sdh30_reset,
-> +       .set_clock = sdhci_set_clock,
-> +       .set_bus_width = sdhci_set_bus_width,
-> +       .set_uhs_signaling = sdhci_set_uhs_signaling,
-> +};
-> +
-> +static int sdhci_f_sdh30_probe(struct platform_device *pdev)
-> +{
-> +       struct sdhci_host *host;
-> +       struct device *dev = &pdev->dev;
-> +       int irq, ctrl = 0, ret = 0;
-> +       struct f_sdhost_priv *priv;
-> +       u32 reg = 0;
-> +
-> +       irq = platform_get_irq(pdev, 0);
-> +       if (irq < 0) {
-> +               dev_err(dev, "%s: no irq specified\n", __func__);
-> +               ret = irq;
-> +               goto err;
-> +       }
-> +
-> +       host = sdhci_alloc_host(dev, sizeof(struct sdhci_host) +
-> +                                               sizeof(struct f_sdhost_priv));
-> +       if (IS_ERR(host)) {
-> +               dev_err(dev, "%s: host allocate error\n", __func__);
-
-No need to print this, already done via kzalloc().
-
-> +               ret = -ENOMEM;
-> +               goto err;
-> +       }
-> +       priv = sdhci_priv(host);
-> +       priv->dev = dev;
-> +
-> +       host->quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
-> +                      SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
-> +       host->quirks2 = SDHCI_QUIRK2_SUPPORT_SINGLE |
-> +                       SDHCI_QUIRK2_TUNING_WORK_AROUND;
-> +
-> +       ret = mmc_of_parse(host->mmc);
-> +       if (ret)
-> +               goto err_of_parse;
-> +
-> +       ret = mmc_of_parse_voltage(pdev->dev.of_node, &host->ocr_mask);
-> +       if (ret)
-> +               goto err_of_parse;
-> +
-> +       platform_set_drvdata(pdev, host);
-> +
-> +       sdhci_get_of_property(pdev);
-> +       host->hw_name = "f_sdh30";
-> +       host->ops = &sdhci_f_sdh30_ops;
-> +       host->irq = irq;
-> +
-> +       host->ioaddr = of_iomap(pdev->dev.of_node, 0);
-
-How about using devm_ioremap_resource()?
-
-> +       if (!host->ioaddr) {
-> +               dev_err(dev, "%s: failed to remap registers\n", __func__);
-> +               ret = -ENXIO;
-> +               goto err_remap;
-> +       }
-> +
-> +       priv->clk_iface = clk_get(&pdev->dev, "iface");
-
-devm_clk_get()
-
-> +       if (!IS_ERR(priv->clk_iface)) {
-> +               ret = clk_prepare_enable(priv->clk_iface);
-> +               if (ret < 0) {
-> +                       dev_err(dev, "Failed to enable iface clock: %d\n", ret);
-> +                       goto err_clk1;
-> +               }
-> +       }
-> +       priv->clk = clk_get(&pdev->dev, "core");
-
-devm_clk_get()
-
-> +       if (!IS_ERR(priv->clk)) {
-> +               ret = clk_prepare_enable(priv->clk);
-> +               if (ret < 0) {
-> +                       dev_err(dev, "Failed to enable core clock: %d\n", ret);
-> +                       goto err_clk2;
-> +               }
-> +       }
-> +
-> +#ifdef CONFIG_PM_RUNTIME
-
-Remove this #ifdef.
-
-> +       pm_runtime_set_active(&pdev->dev);
-> +       pm_runtime_enable(&pdev->dev);
-> +       ret = pm_runtime_get_sync(&pdev->dev);
-
-Why do a pm_runtime_get_sync() without a balanced call to
-pm_runtime_put()? That will keep the device forever runtime PM
-resumed.
-
-> +       if (ret < 0)
-> +               dev_err(dev, "Failed to pm_runtime_get_sync: %d\n", ret);
-> +#endif
-> +
-> +       ret = sdhci_add_host(host);
-> +       if (ret) {
-> +               dev_err(dev, "%s: host add error\n", __func__);
-> +               goto err_add_host;
-> +       }
-> +
-> +       /* init vendor specific regs */
-
-All this vendor specfic stuff must be done prior you invoke
-sdhci_add_host(), otherwise you will start the card initialization
-before this driver is fully probed.
-
-> +       ctrl = sdhci_readw(host, F_SDH30_AHB_CONFIG);
-> +       ctrl |= F_SDH30_SIN | F_SDH30_AHB_INCR_16 | F_SDH30_AHB_INCR_8 |
-> +               F_SDH30_AHB_INCR_4;
-> +       ctrl &= ~(F_SDH30_AHB_BIGED | F_SDH30_BUSLOCK_EN);
-> +       sdhci_writew(host, ctrl, F_SDH30_AHB_CONFIG);
-> +
-> +       reg = sdhci_readl(host, F_SDH30_ESD_CONTROL);
-> +       sdhci_writel(host, reg & ~F_SDH30_EMMC_RST, F_SDH30_ESD_CONTROL);
-> +       msleep(20);
-> +       sdhci_writel(host, reg | F_SDH30_EMMC_RST, F_SDH30_ESD_CONTROL);
-> +
-> +       reg = sdhci_readl(host, SDHCI_CAPABILITIES);
-> +       if (reg & SDHCI_CAN_DO_8BIT)
-> +               priv->vendor_hs200 = F_SDH30_EMMC_HS200;
-> +       else
-> +               priv->vendor_hs200 = 0;
-> +
-> +       return 0;
-> +
-> +err_add_host:
-> +       clk_put(priv->clk);
-> +err_clk2:
-> +       clk_put(priv->clk_iface);
-> +err_clk1:
-> +       iounmap(host->ioaddr);
-> +err_remap:
-> +err_of_parse:
-> +       sdhci_free_host(host);
-> +err:
-> +       return ret;
-
-If you use the devm_* managed functions as I pointed out above, this
-error handling will be greatly simplified.
-
-> +}
-> +
-> +static int sdhci_f_sdh30_remove(struct platform_device *pdev)
-> +{
-> +       struct sdhci_host *host = platform_get_drvdata(pdev);
-> +       struct f_sdhost_priv *priv = sdhci_priv(host);
-> +       struct resource *iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  static int adp1653_probe(struct i2c_client *client,
+>  			 const struct i2c_device_id *devid)
+>  {
+>  	struct adp1653_flash *flash;
+>  	int ret;
+>  
+> -	/* we couldn't work without platform data */
+> -	if (client->dev.platform_data == NULL)
+> -		return -ENODEV;
+> -
+>  	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+>  	if (flash == NULL)
+>  		return -ENOMEM;
+>  
+>  	flash->platform_data = client->dev.platform_data;
+> +	if (!flash->platform_data) {
+> +		ret = adp1653_of_init(client, flash, client->dev.of_node);
+> +		if (ret)
+> +			return ret;
+> +	}
+>  
+>  	mutex_init(&flash->power_lock);
+>  
+> @@ -438,10 +521,11 @@ static int adp1653_probe(struct i2c_client *client,
+>  		goto free_and_quit;
+>  
+>  	flash->subdev.entity.type = MEDIA_ENT_T_V4L2_SUBDEV_FLASH;
+> -
 > +
 
-Don't forget to handle runtime PM here. You probably would like this:
-pm_runtime_get_sync()
-pm_runtime_disable()
-pm_runtime_put_noidle()
+Huh? :-)
 
-> +       sdhci_remove_host(host, readl(host->ioaddr + SDHCI_INT_STATUS) ==
-> +                         0xffffffff);
-> +       iounmap(host->ioaddr);
-> +       release_mem_region(iomem->start, resource_size(iomem));
-> +
-> +       clk_disable_unprepare(priv->clk_iface);
-> +       clk_disable_unprepare(priv->clk);
-> +
-> +       clk_put(priv->clk);
-> +       clk_put(priv->clk_iface);
-> +
-> +       sdhci_free_host(host);
-> +       platform_set_drvdata(pdev, NULL);
-> +
-> +       return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int sdhci_f_sdh30_suspend(struct device *dev)
-> +{
-> +       struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +       return sdhci_suspend_host(host);
-> +}
-> +
-> +static int sdhci_f_sdh30_resume(struct device *dev)
-> +{
-> +       struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +       return sdhci_resume_host(host);
-> +}
-> +#endif
-> +
-> +#ifdef CONFIG_PM_RUNTIME
+>  	return 0;
+>  
+>  free_and_quit:
+> +	dev_err(&client->dev, "adp1653: failed to register device\n");
+>  	v4l2_ctrl_handler_free(&flash->ctrls);
+>  	return ret;
+>  }
+> @@ -464,7 +551,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
+>  
+> -static struct dev_pm_ops adp1653_pm_ops = {
+> +static const struct dev_pm_ops adp1653_pm_ops = {
+>  	.suspend	= adp1653_suspend,
+>  	.resume		= adp1653_resume,
+>  };
+> 
+> 
 
-->CONFIG_PM
+-- 
+Kind regards,
 
-> +static int sdhci_f_sdh30_runtime_suspend(struct device *dev)
-> +{
-> +       struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +       return sdhci_runtime_suspend_host(host);
-> +}
-> +
-> +static int sdhci_f_sdh30_runtime_resume(struct device *dev)
-> +{
-> +       struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +       return sdhci_runtime_resume_host(host);
-> +}
-> +#endif
-> +
-> +#ifdef CONFIG_PM
-
-Remove #ifdef
-
-> +static const struct dev_pm_ops sdhci_f_sdh30_pmops = {
-> +       SET_SYSTEM_SLEEP_PM_OPS(sdhci_f_sdh30_suspend, sdhci_f_sdh30_resume)
-> +       SET_RUNTIME_PM_OPS(sdhci_f_sdh30_runtime_suspend,
-> +                          sdhci_f_sdh30_runtime_resume, NULL)
-> +};
-> +
-> +#define SDHCI_F_SDH30_PMOPS (&sdhci_f_sdh30_pmops)
-
-Remove this and use &sdhci_f_sdh30_pmops directly below instead.
-
-> +
-> +#else
-> +#define SDHCI_F_SDH30_PMOPS NULL
-> +#endif
-> +
-> +static const struct of_device_id f_sdh30_dt_ids[] = {
-> +       { .compatible = "fujitsu,mb86s70-sdhci-3.0" },
-> +       { /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, f_sdh30_dt_ids);
-> +
-> +static struct platform_driver sdhci_f_sdh30_driver = {
-> +       .driver = {
-> +               .name = "f_sdh30",
-> +               .of_match_table = f_sdh30_dt_ids,
-> +#ifdef CONFIG_PM_SLEEP
-> +               .pm     = SDHCI_F_SDH30_PMOPS,
-> +#endif
-> +       },
-> +       .probe  = sdhci_f_sdh30_probe,
-> +       .remove = sdhci_f_sdh30_remove,
-> +};
-> +
-> +module_platform_driver(sdhci_f_sdh30_driver);
-> +
-> +MODULE_DESCRIPTION("F_SDH30 SD Card Controller driver");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("FUJITSU SEMICONDUCTOR LTD.");
-> +MODULE_ALIAS("platform:f_sdh30");
-> --
-> 1.9.0
->
-
-Kind regards
-Uffe
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
