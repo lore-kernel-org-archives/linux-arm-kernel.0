@@ -1,52 +1,54 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Dec 2014 13:43:42 +0100
-Subject: [PATCH 1/6] dt: bindings: update mvebu-mbus DT binding with new
- compatible properties
+Date: Tue, 30 Dec 2014 13:43:44 +0100
+Subject: [PATCH 3/6] ARM: mvebu: fix compatible strings of MBus on Armada 375
+ and Armada 38x
 In-Reply-To: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1419943428-18491-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1419943428-18491-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to what was originally thought, the Armada 375 and Armada 38x
-MBus windows hardware block is *not* compatible with the Armada 370,
-due to a difference in how window 13 is handled. It was rather
-compatible with the Armada XP MBus hardware block.
+Due to the special handling of window 13 on Armada 375 and Armada 38x
+(similar to Armada XP), the MBus hardware block is *not* compatible
+with the one used on Armada 370. Using the Armada 370 compatible
+string on Armada 375 and 38x will lead to a non-working device if
+window 13 ends up being used.
 
-However, the DTs for Armada 375 and Armada 38x encode the following
-compatible string for MBus:
-
-  compatible = "marvell,armada375-mbus", "marvell,armada370-mbus", "simple-bus";
-  compatible = "marvell,armada380-mbus", "marvell,armada370-mbus", "simple-bus";
-
-So, by extending the mvebu-mbus DT binding to also cover the
-marvell,armada375-mbus and marvell,armada380-mbus compatible strings,
-we can define a new behavior for those SoCs without changing the DT.
-
-Therefore, this commit adds those two new compatible strings to the DT
-binding documentation of mvebu-mbus. Note that it re-uses two existing
-duplicated lines for the armada370-mbus and armadaxp-mbus compatible
-strings.
-
+Fixes: 4de59085091 ("ARM: mvebu: add Device Tree description of the Armada 375 SoC")
+Fixes: 0d3d96ab005 ("ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs")
+Cc: <stable@vger.kernel.org> # v3.15+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/bus/mvebu-mbus.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/armada-375.dtsi | 2 +-
+ arch/arm/boot/dts/armada-38x.dtsi | 3 +--
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
-index 5e16c3c..fa6cde4 100644
---- a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
-+++ b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
-@@ -6,8 +6,8 @@ Required properties:
- - compatible:	 Should be set to one of the following:
- 		 marvell,armada370-mbus
- 		 marvell,armadaxp-mbus
--		 marvell,armada370-mbus
--		 marvell,armadaxp-mbus
-+		 marvell,armada375-mbus
-+		 marvell,armada380-mbus
- 		 marvell,kirkwood-mbus
- 		 marvell,dove-mbus
- 		 marvell,orion5x-88f5281-mbus
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 50096d3..126bf7e 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -63,7 +63,7 @@
+ 	};
+ 
+ 	soc {
+-		compatible = "marvell,armada375-mbus", "marvell,armada370-mbus", "simple-bus";
++		compatible = "marvell,armada375-mbus", "simple-bus";
+ 		#address-cells = <2>;
+ 		#size-cells = <1>;
+ 		controller = <&mbusc>;
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 74391da..7d8295c 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -31,8 +31,7 @@
+ 	};
+ 
+ 	soc {
+-		compatible = "marvell,armada380-mbus", "marvell,armada370-mbus",
+-			     "simple-bus";
++		compatible = "marvell,armada380-mbus", "simple-bus";
+ 		#address-cells = <2>;
+ 		#size-cells = <1>;
+ 		controller = <&mbusc>;
 -- 
 2.1.0
