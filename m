@@ -1,19 +1,19 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 30 Dec 2014 11:34:10 +0800
-Subject: [PATCH RFC v7 20/21] ARM: imx_v6_v7_defconfig: Add support for MIPI
- DSI host controller
+Date: Tue, 30 Dec 2014 11:34:11 +0800
+Subject: [PATCH RFC v7 21/21] ARM: imx_v6_v7_defconfig: Add support for Himax
+ HX8369A panel
 In-Reply-To: <1419910451-15268-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419910451-15268-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419910451-15268-21-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419910451-15268-22-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for MIPI DSI host controller.
+This patch adds support for Himax HX8369A panel.
 
 The new imx_v6_v7_defconfig is generated in this way:
 * make ARCH=arm imx_v6_v7_defconfig
 * make ARCH=arm menuconfig and manually choose to build in
-  the MIPI DSI host controller driver
+  the Himax HX8369A panel driver
 * make ARCH=arm savedefconfig
 * cp defconfig arch/arm/configs/imx_v6_v7_defconfig
 
@@ -35,22 +35,22 @@ v2->v3:
  * None.
 
 v1->v2:
- * None.
+ * Add the HIMAX prefix in the Kconfig name.
 
  arch/arm/configs/imx_v6_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0dbd0c3..3e0e589 100644
+index 3e0e589..27db91b 100644
 --- a/arch/arm/configs/imx_v6_v7_defconfig
 +++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -199,6 +199,7 @@ CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_IPUV3=y
- CONFIG_DRM_IMX_HDMI=y
-+CONFIG_DRM_IMX_MIPI_DSI=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
+@@ -192,6 +192,7 @@ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
+ CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_DRM_PANEL_HIMAX_HX8369A=y
+ CONFIG_DRM_IMX=y
+ CONFIG_DRM_IMX_FB_HELPER=y
+ CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
 -- 
 2.1.0
