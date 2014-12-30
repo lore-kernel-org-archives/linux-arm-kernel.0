@@ -1,107 +1,103 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Dec 2014 10:58:02 +0200
-Subject: [PATCH v4 2/5] media: ov2640: add async probe function
-In-Reply-To: <alpine.DEB.2.00.1412300927380.8237@axis700.grange>
-References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
- <2421077.hZ7S0HT2At@avalon>
- <alpine.DEB.2.00.1412300927380.8237@axis700.grange>
-Message-ID: <4898423.Jl8IWzpt6k@avalon>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 30 Dec 2014 18:05:51 +0900
+Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
+ interface
+In-Reply-To: <54A19C17.1020909@ti.com>
+References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
+ <1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>
+ <54A19C17.1020909@ti.com>
+Message-ID: <CA+Ln22G3kVA_-tsjAxbe2rqSHeLtdU2X_EhNL0uW3cUCgaWLgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Thanks a lot for investigating this, even before I could look into
+splitting this.
 
-On Tuesday 30 December 2014 09:36:31 Guennadi Liakhovetski wrote:
-> Hi Laurent,
-> 
-> First of all, sorry, I am currently on a holiday, so, replies are delayed,
-> real work (reviewing or anything else) is impossible.
+2014-12-30 3:23 GMT+09:00 Nishanth Menon <nm@ti.com>:
+> On 12/23/2014 04:48 AM, Marek Szyprowski wrote:
+>
+>> -static void l2c310_resume(void)
+>> +static void l2c310_configure(void __iomem *base)
+>>  {
+>> -     void __iomem *base = l2x0_base;
+>> +     unsigned revision;
+>>
+>> -     if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+>> -             unsigned revision;
+>> -
+>> -             /* restore pl310 setup */
+>> -             writel_relaxed(l2x0_saved_regs.tag_latency,
+>> -                            base + L310_TAG_LATENCY_CTRL);
+>> -             writel_relaxed(l2x0_saved_regs.data_latency,
+>> -                            base + L310_DATA_LATENCY_CTRL);
+>> -             writel_relaxed(l2x0_saved_regs.filter_end,
+>> -                            base + L310_ADDR_FILTER_END);
+>> -             writel_relaxed(l2x0_saved_regs.filter_start,
+>> -                            base + L310_ADDR_FILTER_START);
+>> -
+>> -             revision = readl_relaxed(base + L2X0_CACHE_ID) &
+>> -                             L2X0_CACHE_ID_RTL_MASK;
+>> -
+>> -             if (revision >= L310_CACHE_ID_RTL_R2P0)
+>> -                     l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
+>> -                                   L310_PREFETCH_CTRL);
+>> -             if (revision >= L310_CACHE_ID_RTL_R3P0)
+>> -                     l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
+>> -                                   L310_POWER_CTRL);
+>> -
+>> -             l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
+>> -
+>> -             /* Re-enable full-line-of-zeros for Cortex-A9 */
+>> -             if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
+>> -                     set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+>> -     }
+>> +     /* restore pl310 setup */
+>> +     writel_relaxed(l2x0_saved_regs.tag_latency,
+>> +                    base + L310_TAG_LATENCY_CTRL);
+>> +     writel_relaxed(l2x0_saved_regs.data_latency,
+>> +                    base + L310_DATA_LATENCY_CTRL);
+>> +     writel_relaxed(l2x0_saved_regs.filter_end,
+>> +                    base + L310_ADDR_FILTER_END);
+>> +     writel_relaxed(l2x0_saved_regs.filter_start,
+>> +                    base + L310_ADDR_FILTER_START);
+>> +
+>
+> ^^ The above change broke AM437xx. Looks like the change causes the
+> following behavior difference on AM437x. For some reason, touching any
+> of the above 4 registers(even with the values read from the same
+> registers) causes AM437x to go beserk. Comment the 4 writes and we
+> reach shell. looks like l2c310_resume is not invoked prior to this
+> series. :(.. now that we reuse that logic to actually do programming,
+> we start to see the problem.
 
-Sure, no worries. Enjoy your holidays without thinking too much about soc-
-camera :-)
+Hmm, but the thing is that .configure() should not be called if the
+controller is already configured, i.e. L2X0_CTRL_EN in L2X0_CTRL is
+set. Maybe I missed some check somewhere. Let me reread my code I
+wrote quite a long time ago and make sure.
 
-> On Tue, 30 Dec 2014, Laurent Pinchart wrote:
-> > On Friday 26 December 2014 11:38:11 Guennadi Liakhovetski wrote:
-> >> On Fri, 26 Dec 2014, Laurent Pinchart wrote:
-> >>> On Friday 26 December 2014 10:14:26 Guennadi Liakhovetski wrote:
-> >>>> On Fri, 26 Dec 2014, Laurent Pinchart wrote:
-> >>>>> On Friday 26 December 2014 14:37:14 Josh Wu wrote:
-> >
-> > [snip]
-> > 
-> >>>>> Talking about mclk and xvclk is quite confusing. There's no mclk
-> >>>>> from an ov2640 point of view. The ov2640 driver should call
-> >>>>> v4l2_clk_get("xvclk").
-> >>>> 
-> >>>> Yes, I also was thinking about this, and yes, requesting a "xvclk"
-> >>>> clock would be more logical. But then, as you write below, if we let
-> >>>> the v4l2_clk wrapper first check for a CCF "xvclk" clock, say, none is
-> >>>> found. How do we then find the exported "mclk" V4L2 clock? Maybe
-> >>>> v4l2_clk_get() should use two names?..
-> >>> 
-> >>> Given that v4l2_clk_get() is only used by soc-camera drivers and that
-> >>> they all call it with the clock name set to "mclk", I wonder whether we
-> >>> couldn't just get rid of struct v4l2_clk.id and ignore the id argument
-> >>> to v4l2_clk_get() when CCF isn't available. Maybe we've overdesigned
-> >>> v4l2_clk :-)
-> >> 
-> >> Sure, that'd be fine with me, if everyone else agrees.
-> > 
-> > Can you submit a patch ? That's the best way to find out if anyone
-> > objects.
-> 
-> Can do, sure, once I am back home and find time for this.
-> 
-> > [snip]
-> > 
-> >>>>> v4l2_clk_get() should try to get the clock from CCF with a call to
-> >>>>> clk_get() first, and then look at the list of v4l2-specific clocks.
-> >>>> 
-> >>>> Yes, how will it find the "mclk" when "xvclk" (or any other name) is
-> >>>> requested? We did discuss this in the beginning and agreed to use a
-> >>>> fixed clock name for the time being...
-> >>> 
-> >>> Please see above.
-> >>> 
-> >>>>> That's at least how I had envisioned it when v4l2_clk_get() was
-> >>>>> introduced. Let's remember that v4l2_clk was designed as a temporary
-> >>>>> workaround for platforms not implementing CCF yet. Is that still
-> >>>>> needed, or could be instead just get rid of it now ?
-> >>>> 
-> >>>> I didn't check, but I don't think all platforms, handled by
-> >>>> soc-camera, support CCF yet.
-> >>> 
-> >>> After a quick check it looks like only OMAP1 and SH Mobile are
-> >>> missing. Atmel, MX2, MX3 and R-Car all support CCF. PXA27x has CCF
-> >>> support but doesn't enable it yet for an unknown (to me) reason.
+>
+> one option might be to write only those registers that differ from
+> saved_registers (example: unmodified values dont need reprogramming).
+>
+> Looks like the following also need addressing:
+> data->save is called twice (once more after l2cof_init)
+> l2c310_init_fns also needs l2c310_configure
+> will be nice to use l2x0_data only after we kmemdup data in __l2c_init
 
-On a side note, patches to enable CCF for PXA27x have been posted, they should 
-be merged in v3.20.
+I'll check this.
 
-> >>> The CEU driver is used on both arch/sh and arch/arm/mach-shmobile. The
-> >>> former will most likely never receive CCF support, and the latter is
-> >>> getting fixed. As arch/sh isn't maintained anymore I would be fine
-> >>> with dropping CEU support for it.
-> >>> 
-> >>> OMAP1 is thus the only long-term show-stopper. What should we do with
-> >>> it ?
-> >> 
-> >> Indeed, what should we? :)
-> > 
-> > You're listed as the soc-camera maintainer, so you should provide an
-> > answer to that question :-)
-> 
-> Thanks for ar reminder;)
-> 
-> > I'll propose one, let's drop the omap1-camera driver (I've
-> > CC'ed the original author of the driver to this e-mail).
-> 
-> Let's see what they reply, but I don't tgink Josh will want to wait that
-> long. And until omap1 is in the mainline we cannot drop v4l2_clk.
+>
+> if you'd like to split this up in pieces, [1] might be nice - will go
+> good to change the pl310, aurora etc in each chunks to enable better
+> review.
 
-Agreed, this was more of a question for the next step.
+Thanks a lot, the split up version will be definitely useful. Just to
+make sure, the parts look quite bisectable, but have you verified that
+applying the changes one by one leave the L2 cache working on OMAP?
 
--- 
-Regards,
+>
+> [1]
+> https://github.com/nmenon/linux-2.6-playground/commits/temp/l2c-patch2-splitup
 
-Laurent Pinchart
+Best regards,
+Tomasz
