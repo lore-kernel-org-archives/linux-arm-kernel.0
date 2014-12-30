@@ -1,99 +1,131 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Dec 2014 13:43:47 +0100
-Subject: [PATCH 6/6] ARM: mvebu: use arm_coherent_dma_ops
+Date: Tue, 30 Dec 2014 13:43:46 +0100
+Subject: [PATCH 5/6] bus: mvebu-mbus: use automatic I/O synchronization
+ barriers
 In-Reply-To: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1419943428-18491-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1419943428-18491-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have enabled automatic I/O synchronization barriers, we no
-longer need any explicit barriers. We can therefore simplify
-arch/arm/mach-mvebu/coherency.c by using the existing
-arm_coherent_dma_ops instead of our custom mvebu_hwcc_dma_ops.
+Instead of using explicit I/O synchronization barriers shoehorned
+inside the streaming DMA mappings API (in
+arch/arm/mach-mvebu/coherency.c), we are switching to use automatic
+I/O synchronization barrier.
 
-Fixes: e60304f8cb7b ("arm: mvebu: Add hardware I/O Coherency support")
-Cc: <stable@vger.kernel.org> # v3.8+
+The primary motivation for this change is that explicit I/O
+synchronization barriers are not only needed for streaming DMA
+mappings (which can easily be done by overriding the dma_map_ops), but
+also for coherent DMA mappings (which is a lot less easy to do, since
+the kernel assumes such mappings are coherent and don't require any
+sort of cache maintenance operation to ensure the consistency of the
+buffers).
+
+Switching to automatic I/O synchronization barriers will also allow us
+to use the existing arm_coherent_dma_ops instead of our custom
+arm_dma_ops.
+
+In order to use automatic I/O synchronization barriers, this commit
+changes mvebu-mbus in two ways:
+
+ - It enables automatic I/O synchronization barriers in the 0x84
+   register of the MBus bridge, by enabling such barriers for all MBus
+   units. This enables automatic barriers for the on-SoC peripherals
+   that are doing DMA.
+
+ - It enables the SyncEnable bit in the MBus windows, so that PCIe
+   devices also use automatic I/O synchronization barrier.
+
+This automatic synchronization barrier relies on the assumption that
+at least one register of a given hardware unit is read before the
+driver accesses the DMA mappings modified by this unit. This
+assumption is guaranteed for PCI devices by vertue of the PCI
+standard, and we can reasonably verify that this assumption is also
+true for the limited number of platform drivers doing DMA used on
+Marvell EBU platforms.
+
+Fixes: fddddb52a6c4 ("bus: introduce an Marvell EBU MBus driver")
+Cc: <stable@vger.kernel.org> # v3.10+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 51 ++---------------------------------------
- 1 file changed, 2 insertions(+), 49 deletions(-)
+Due to the coherent mapping problem, the I/O coherency has in fact
+been broken since its introduction, which is why we request the
+backport of this patch all the way up to 3.10.
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 3585cb3..440799b 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -33,6 +33,7 @@
- #include <asm/smp_plat.h>
- #include <asm/cacheflush.h>
- #include <asm/mach/map.h>
-+#include <asm/dma-mapping.h>
- #include "coherency.h"
- #include "mvebu-soc-id.h"
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/bus/mvebu-mbus.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index bb0dd21..649d187 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -70,6 +70,7 @@
+  */
+ #define WIN_CTRL_OFF		0x0000
+ #define   WIN_CTRL_ENABLE       BIT(0)
++#define   WIN_CTRL_SYNCBARRIER  BIT(1)
+ #define   WIN_CTRL_TGT_MASK     0xf0
+ #define   WIN_CTRL_TGT_SHIFT    4
+ #define   WIN_CTRL_ATTR_MASK    0xff00
+@@ -83,6 +84,9 @@
+ #define   WIN_REMAP_LOW         0xffff0000
+ #define WIN_REMAP_HI_OFF	0x000c
  
-@@ -76,54 +77,6 @@ int set_cpu_coherent(void)
- 	return ll_enable_coherency();
- }
++#define UNIT_SYNC_BARRIER_OFF   0x84
++#define   UNIT_SYNC_BARRIER_ALL 0xFFFF
++
+ #define ATTR_HW_COHERENCY	(0x1 << 4)
  
--static inline void mvebu_hwcc_sync_io_barrier(void)
--{
--	writel(0x1, coherency_cpu_base + IO_SYNC_BARRIER_CTL_OFFSET);
--	while (readl(coherency_cpu_base + IO_SYNC_BARRIER_CTL_OFFSET) & 0x1);
--}
--
--static dma_addr_t mvebu_hwcc_dma_map_page(struct device *dev, struct page *page,
--				  unsigned long offset, size_t size,
--				  enum dma_data_direction dir,
--				  struct dma_attrs *attrs)
--{
--	if (dir != DMA_TO_DEVICE)
--		mvebu_hwcc_sync_io_barrier();
--	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
--}
--
--
--static void mvebu_hwcc_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
--			      size_t size, enum dma_data_direction dir,
--			      struct dma_attrs *attrs)
--{
--	if (dir != DMA_TO_DEVICE)
--		mvebu_hwcc_sync_io_barrier();
--}
--
--static void mvebu_hwcc_dma_sync(struct device *dev, dma_addr_t dma_handle,
--			size_t size, enum dma_data_direction dir)
--{
--	if (dir != DMA_TO_DEVICE)
--		mvebu_hwcc_sync_io_barrier();
--}
--
--static struct dma_map_ops mvebu_hwcc_dma_ops = {
--	.alloc			= arm_dma_alloc,
--	.free			= arm_dma_free,
--	.mmap			= arm_dma_mmap,
--	.map_page		= mvebu_hwcc_dma_map_page,
--	.unmap_page		= mvebu_hwcc_dma_unmap_page,
--	.get_sgtable		= arm_dma_get_sgtable,
--	.map_sg			= arm_dma_map_sg,
--	.unmap_sg		= arm_dma_unmap_sg,
--	.sync_single_for_cpu	= mvebu_hwcc_dma_sync,
--	.sync_single_for_device	= mvebu_hwcc_dma_sync,
--	.sync_sg_for_cpu	= arm_dma_sync_sg_for_cpu,
--	.sync_sg_for_device	= arm_dma_sync_sg_for_device,
--	.set_dma_mask		= arm_dma_set_mask,
--};
--
- static int mvebu_hwcc_notifier(struct notifier_block *nb,
- 			       unsigned long event, void *__dev)
+ #define DDR_BASE_CS_OFF(n)	(0x0000 + ((n) << 3))
+@@ -317,6 +321,7 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
+ 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
+ 		(attr << WIN_CTRL_ATTR_SHIFT)    |
+ 		(target << WIN_CTRL_TGT_SHIFT)   |
++		WIN_CTRL_SYNCBARRIER             |
+ 		WIN_CTRL_ENABLE;
+ 
+ 	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
+@@ -996,7 +1001,8 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+ 					 phys_addr_t sdramwins_phys_base,
+ 					 size_t sdramwins_size,
+ 					 phys_addr_t mbusbridge_phys_base,
+-					 size_t mbusbridge_size)
++					 size_t mbusbridge_size,
++					 bool is_coherent)
  {
-@@ -131,7 +84,7 @@ static int mvebu_hwcc_notifier(struct notifier_block *nb,
+ 	int win;
  
- 	if (event != BUS_NOTIFY_ADD_DEVICE)
- 		return NOTIFY_DONE;
--	set_dma_ops(dev, &mvebu_hwcc_dma_ops);
-+	set_dma_ops(dev, &arm_coherent_dma_ops);
+@@ -1028,6 +1034,10 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
  
- 	return NOTIFY_OK;
+ 	mbus->soc->setup_cpu_target(mbus);
+ 
++	if (is_coherent)
++		writel(UNIT_SYNC_BARRIER_ALL,
++		       mbus->mbuswins_base + UNIT_SYNC_BARRIER_OFF);
++
+ 	register_syscore_ops(&mvebu_mbus_syscore_ops);
+ 
+ 	return 0;
+@@ -1055,7 +1065,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 			mbuswins_phys_base,
+ 			mbuswins_size,
+ 			sdramwins_phys_base,
+-			sdramwins_size, 0, 0);
++			sdramwins_size, 0, 0, false);
  }
+ 
+ #ifdef CONFIG_OF
+@@ -1257,7 +1267,8 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
+ 				     sdramwins_res.start,
+ 				     resource_size(&sdramwins_res),
+ 				     mbusbridge_res.start,
+-				     resource_size(&mbusbridge_res));
++				     resource_size(&mbusbridge_res),
++				     is_coherent);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.1.0
