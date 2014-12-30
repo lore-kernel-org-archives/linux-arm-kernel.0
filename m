@@ -1,40 +1,54 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 30 Dec 2014 13:42:29 +0300
-Subject: [PATCH v2 07/12] ARM: imx: depend MXC debug board on 3DS machines
-In-Reply-To: <1419895935-22966-8-git-send-email-stefan@agner.ch>
-References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
- <1419895935-22966-8-git-send-email-stefan@agner.ch>
-Message-ID: <54A28195.4070102@cogentembedded.com>
+From: andrew.jackson@arm.com (Andrew Jackson)
+Date: Tue, 30 Dec 2014 10:55:44 +0000
+Subject: [PATCH v5 2/6] ASoC: dwc: Prepare clock before use
+In-Reply-To: <cover.1419936132.git.Andrew.Jackson@arm.com>
+References: <cover.1419936132.git.Andrew.Jackson@arm.com>
+Message-ID: <faa0193d388fe808c2fae461954bb1730ba29244.1419936132.git.Andrew.Jackson@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Andrew Jackson <Andrew.Jackson@arm.com>
 
-On 12/30/2014 2:32 AM, Stefan Agner wrote:
+Some I2S clocks may require some time to get the clock ready
+for operation and so need to be prepared before they are enabled.
+So, prepare the clock as well as enabling it, but combine the
+two through clk_prepare_enable.
 
-> Depend the MXC debug board on machines which actually support it.
+Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+---
+ sound/soc/dwc/designware_i2s.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> This configuration appeared lonely when I enabled ARCH_MULTI_V7M.
-> Afaik, the selection of it only makes sense with one of the supported
-> boards...
-
->   arch/arm/mach-imx/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
-
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 3c5859e..96c8eb8 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -21,6 +21,7 @@ config MXC_AVIC
->
->   config MXC_DEBUG_BOARD
->   	bool "Enable MXC debug board(for 3-stack)"
-> +	depends on CONFIG_MACH_MX27_3DS || CONFIG_MACH_MX31_3DS || CONFIG_MACH_MX35_3DS
-
-    CONFIG_ prefixes are not needed in Kconfig.
-
-[...]
-
-WBR, Sergei
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index 5e9d163..08608c1 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -411,7 +411,7 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 	if (IS_ERR(dev->clk))
+ 		return  PTR_ERR(dev->clk);
+ 
+-	ret = clk_enable(dev->clk);
++	ret = clk_prepare_enable(dev->clk);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -426,13 +426,16 @@ static int dw_i2s_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_clk_disable:
+-	clk_disable(dev->clk);
++	clk_disable_unprepare(dev->clk);
+ 	return ret;
+ }
+ 
+ static int dw_i2s_remove(struct platform_device *pdev)
+ {
++	struct dw_i2s_dev *dev = dev_get_drvdata(&pdev->dev);
++
+ 	snd_soc_unregister_component(&pdev->dev);
++	clk_disable_unprepare(dev->clk);
+ 
+ 	return 0;
+ }
+-- 
+1.7.1
