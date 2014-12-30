@@ -1,42 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 30 Dec 2014 15:39:48 +0300
-Subject: [PATCH v5 2/6] ASoC: dwc: Prepare clock before use
-In-Reply-To: <faa0193d388fe808c2fae461954bb1730ba29244.1419936132.git.Andrew.Jackson@arm.com>
-References: <cover.1419936132.git.Andrew.Jackson@arm.com>
- <faa0193d388fe808c2fae461954bb1730ba29244.1419936132.git.Andrew.Jackson@arm.com>
-Message-ID: <54A29D14.6000705@cogentembedded.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Dec 2014 13:43:42 +0100
+Subject: [PATCH 1/6] dt: bindings: update mvebu-mbus DT binding with new
+ compatible properties
+In-Reply-To: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1419943428-18491-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Contrary to what was originally thought, the Armada 375 and Armada 38x
+MBus windows hardware block is *not* compatible with the Armada 370,
+due to a difference in how window 13 is handled. It was rather
+compatible with the Armada XP MBus hardware block.
 
-On 12/30/2014 1:55 PM, Andrew Jackson wrote:
+However, the DTs for Armada 375 and Armada 38x encode the following
+compatible string for MBus:
 
-> From: Andrew Jackson <Andrew.Jackson@arm.com>
+  compatible = "marvell,armada375-mbus", "marvell,armada370-mbus", "simple-bus";
+  compatible = "marvell,armada380-mbus", "marvell,armada370-mbus", "simple-bus";
 
-> Some I2S clocks may require some time to get the clock ready
-> for operation and so need to be prepared before they are enabled.
-> So, prepare the clock as well as enabling it, but combine the
-> two through clk_prepare_enable.
+So, by extending the mvebu-mbus DT binding to also cover the
+marvell,armada375-mbus and marvell,armada380-mbus compatible strings,
+we can define a new behavior for those SoCs without changing the DT.
 
-> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
-> ---
->   sound/soc/dwc/designware_i2s.c |    7 +++++--
->   1 files changed, 5 insertions(+), 2 deletions(-)
+Therefore, this commit adds those two new compatible strings to the DT
+binding documentation of mvebu-mbus. Note that it re-uses two existing
+duplicated lines for the armada370-mbus and armadaxp-mbus compatible
+strings.
 
-> diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
-> index 5e9d163..08608c1 100644
-> --- a/sound/soc/dwc/designware_i2s.c
-> +++ b/sound/soc/dwc/designware_i2s.c
-[...]
-> @@ -426,13 +426,16 @@ static int dw_i2s_probe(struct platform_device *pdev)
-[...]
->   static int dw_i2s_remove(struct platform_device *pdev)
->   {
-> +	struct dw_i2s_dev *dev = dev_get_drvdata(&pdev->dev);
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ Documentation/devicetree/bindings/bus/mvebu-mbus.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-    Why not just platform_get_drvdata(pdev)?
-
-[...]
-
-WBR, Sergei
+diff --git a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+index 5e16c3c..fa6cde4 100644
+--- a/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
++++ b/Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+@@ -6,8 +6,8 @@ Required properties:
+ - compatible:	 Should be set to one of the following:
+ 		 marvell,armada370-mbus
+ 		 marvell,armadaxp-mbus
+-		 marvell,armada370-mbus
+-		 marvell,armadaxp-mbus
++		 marvell,armada375-mbus
++		 marvell,armada380-mbus
+ 		 marvell,kirkwood-mbus
+ 		 marvell,dove-mbus
+ 		 marvell,orion5x-88f5281-mbus
+-- 
+2.1.0
