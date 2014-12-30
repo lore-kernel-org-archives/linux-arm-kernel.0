@@ -1,181 +1,229 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 30 Dec 2014 15:25:23 +0800
-Subject: [PATCH v8 3/6] input: misc: Add driver for AXP20x Power Enable Key
-In-Reply-To: <20141229231653.GH9565@dtor-ws>
-References: <1419303194-3075-1-git-send-email-wens@csie.org>
- <1419303194-3075-4-git-send-email-wens@csie.org>
- <20141229231653.GH9565@dtor-ws>
-Message-ID: <CAGb2v65z=e_83Mi0wfaWVueKLGeHM4avFe4JBq_a+uHRKb7J0g@mail.gmail.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Tue, 30 Dec 2014 09:39:02 +0200
+Subject: [PATCH v2] ARM: dts: cm-t3x: add NAND support
+In-Reply-To: <54A151F2.9010904@ti.com>
+References: <54A00BD6.8010507@compulab.co.il>
+ <1419777049-25271-1-git-send-email-lifshitz@compulab.co.il>
+ <54A151F2.9010904@ti.com>
+Message-ID: <54A25696.80608@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 7:16 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Tue, Dec 23, 2014 at 10:53:11AM +0800, Chen-Yu Tsai wrote:
->> From: Carlo Caione <carlo@caione.org>
+Hi Roger,
+
+On 12/29/2014 03:06 PM, Roger Quadros wrote:
+> Hi Dmitry,
+>
+> On 28/12/14 16:30, Dmitry Lifshitz wrote:
+>> CM-T3517, CM-T3530 and CM-T3730 features NAND storage chip connected to
+>> GPMC bus.
 >>
->> This patch add support for the Power Enable Key found on MFD AXP202 and
->> AXP209. Besides the basic support for the button, the driver adds two
->> entries in sysfs to configure the time delay for power on/off.
+>> Add GPMC DT entry into the root DT file omap3-cm-t3x.dtsi, common for
+>> all three modules.
 >>
->> Signed-off-by: Carlo Caione <carlo@caione.org>
->> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> [wens at csie.org: make axp20x_pek_remove() static; remove driver owner field]
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> NAND timings are calculated to be safe for CM-T3x devices as it works
+>> now in non DT boot (in this case the timings are updated by U-Boot).
 >
-> Hmm, it looks like MFD parts are in mainline, so I can actually pick
-> this up myself. OK.
+> I didn't get this part. You provide the GPMC timings in the DT now so they will override
+> u-boot configured timings.
+>
 
-Cool.
+In the board files for CM-T3x modules we did not override NAND timings 
+configured in U-Boot. Now, with DT boot, we do not want to rely on boot 
+loader settings wherever is possible. So, we specify the timings 
+explicitly.
 
->
-> By the way, does driver works for you with the patch below?
+In order to avoid regression, the timings setup is the same as we do in 
+U-Boot.
 
-It does. You could apply it or squash it when you pick up the
-PEK patch. I'm ok either way.
+>>
+>> Update GPMC ranges in boards DT files to include all connected devices.
+>>
+>> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+>> ---
+>>
+>> v2 * Update GPMC ranges with NAND values in omap3-cm-t3x30.dtsi.
+>>     * Add commit message details
+>>
+>>   arch/arm/boot/dts/omap3-cm-t3x.dtsi   |   58 +++++++++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/omap3-cm-t3x30.dtsi |    3 +-
+>>   arch/arm/boot/dts/omap3-sbc-t3517.dts |    4 ++
+>>   arch/arm/boot/dts/omap3-sbc-t3530.dts |   10 ++----
+>>   arch/arm/boot/dts/omap3-sbc-t3730.dts |    5 ++-
+>>   5 files changed, 70 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+>> index 6ea6d46..4d091ca 100644
+>> --- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
+>> @@ -259,3 +259,61 @@
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&mcbsp2_pins>;
+>>   };
+>> +
+>> +&gpmc {
+>> +	ranges = <0 0 0x00000000 0x01000000>;
+>
+> Isn't this ranges property redundant as it will be overridden by the board specific dts?
+>
+>> +
+>> +	nand at 0,0 {
+>> +		reg = <0 0 4>;	/* CS0, offset 0, IO size 4 */
+>> +		nand-bus-width = <8>;
+>> +		gpmc,device-width = <1>;
+>> +		ti,nand-ecc-opt = "sw";
+>
+> any particular reason for sticking with "sw"? Isn't it better to use at least "ham1"
+> or migrate to stronger schemes like "bch4" or "bch8"?
+>
+> "ham1" scheme is compatible with ROM loader so the boot partition could be flashed from Linux.
+> For bch4/8 you will have to keep boot partition/s locked from Linux access as we don't yet
+> support mixed ECC schemes among partitions.
+>
+
+The regression issue should be considered here. Our customers have 
+thousands of boards running rootfs with "sw" ecc. Updating the kernel is 
+not a reason for reformatting the NAND.
+
+>> +
+>> +		gpmc,cs-on-ns = <0>;
+>> +		gpmc,cs-rd-off-ns = <120>;
+>> +		gpmc,cs-wr-off-ns = <120>;
+>> +
+>> +		gpmc,adv-on-ns = <0>;
+>> +		gpmc,adv-rd-off-ns = <120>;
+>> +		gpmc,adv-wr-off-ns = <120>;
+>> +
+>> +		gpmc,we-on-ns = <6>;
+>> +		gpmc,we-off-ns = <90>;
+>> +
+>> +		gpmc,oe-on-ns = <6>;
+>> +		gpmc,oe-off-ns = <90>;
+>> +
+>> +		gpmc,page-burst-access-ns = <6>;
+>> +		gpmc,access-ns = <72>;
+>> +		gpmc,cycle2cycle-delay-ns = <60>;
+>> +
+>> +		gpmc,rd-cycle-ns = <120>;
+>> +		gpmc,wr-cycle-ns = <120>;
+>> +		gpmc,wr-access-ns = <186>;
+>> +		gpmc,wr-data-mux-bus-ns = <90>;
+>> +
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +
+>> +		partition at 0 {
+>> +			label = "xloader";
+>> +			reg = <0 0x80000>;
+>> +		};
+>> +		partition at 0x80000 {
+>> +			label = "uboot";
+>> +			reg = <0x80000 0x1e0000>;
+>> +		};
+>> +		partition at 0x260000 {
+>> +			label = "uboot environment";
+>> +			reg = <0x260000 0x40000>;
+>> +		};
+>> +		partition at 0x2a0000 {
+>> +			label = "linux";
+>> +			reg = <0x2a0000 0x400000>;
+>> +		};
+>> +		partition at 0x6a0000 {
+>> +			label = "rootfs";
+>> +			reg = <0x6a0000 0x1f880000>;
+>> +		};
+>> +	};
+>> +};
+>> diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+>> index 9a4a3ab..d9e92b6 100644
+>> --- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
+>> @@ -50,7 +50,8 @@
+>>   #include "omap-gpmc-smsc911x.dtsi"
+>>
+>>   &gpmc {
+>> -	ranges = <5 0 0x2c000000 0x01000000>;
+>> +	ranges = <5 0 0x2c000000 0x01000000>, /* CM-T3x30 SMSC9x Eth */
+>> +		 <0 0 0x00000000 0x01000000>; /* CM-T3x NAND */
+>
+> Isn't this ranges property redundant as it will anyways be overridden by the board specific dts?
+>
+
+The ranges are specified here (and other files below) by design.
+
+We built a tree like structure to organize DT files -
+d234e4239 "ARM: dts: sbc-t3x: refactor DT support"
+
+It allows to inherit/override properties common for different boards.
+
+Our customers do not have to deal with a correct GPMC ranges settings, 
+once they base on omap3-cm-t3x.dts core module DT file (in case they do 
+not connect additional device to the bus).
+
+This is the point of Igor's comment to the previous patch version.
+
+>>
+>>   	smsc1: ethernet at gpmc {
+>>   		compatible = "smsc,lan9221", "smsc,lan9115";
+>> diff --git a/arch/arm/boot/dts/omap3-sbc-t3517.dts b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+>> index 1798653..c2d5c28 100644
+>> --- a/arch/arm/boot/dts/omap3-sbc-t3517.dts
+>> +++ b/arch/arm/boot/dts/omap3-sbc-t3517.dts
+>> @@ -69,3 +69,7 @@
+>>   	};
+>>   };
+>>
+>> +&gpmc {
+>> +	ranges = <4 0 0x2d000000 0x01000000>,	/* SB-T35 SMSC9x Eth */
+>> +		 <0 0 0x00000000 0x01000000>;	/* CM-T3x NAND */
+>> +};
+>> diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+>> index c994f0f..834bc78 100644
+>> --- a/arch/arm/boot/dts/omap3-sbc-t3530.dts
+>> +++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
+>> @@ -26,14 +26,10 @@
+>>   	};
+>>   };
+>>
+>> -/*
+>> - * The following ranges correspond to SMSC9x eth chips on CM-T3530 CoM and
+>> - * SB-T35 baseboard respectively.
+>> - * This setting includes both chips in SBC-T3530 board device tree.
+>> - */
+>>   &gpmc {
+>> -	ranges = <5 0 0x2c000000 0x01000000>,
+>> -		 <4 0 0x2d000000 0x01000000>;
+>> +	ranges = <5 0 0x2c000000 0x01000000>,	/* CM-T3x30 SMSC9x Eth */
+>> +		 <4 0 0x2d000000 0x01000000>,	/* SB-T35 SMSC9x Eth */
+>> +		 <0 0 0x00000000 0x01000000>;	/* CM-T3x NAND */
+>>   };
+>>
+>>   &mmc1 {
+>> diff --git a/arch/arm/boot/dts/omap3-sbc-t3730.dts b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+>> index 5bdddf2..73c7bf4 100644
+>> --- a/arch/arm/boot/dts/omap3-sbc-t3730.dts
+>> +++ b/arch/arm/boot/dts/omap3-sbc-t3730.dts
+>> @@ -27,8 +27,9 @@
+>>   };
+>>
+>>   &gpmc {
+>> -	ranges = <5 0 0x2c000000 0x01000000>,
+>> -		 <4 0 0x2d000000 0x01000000>;
+>> +	ranges = <5 0 0x2c000000 0x01000000>,	/* CM-T3x30 SMSC9x Eth */
+>> +		 <4 0 0x2d000000 0x01000000>,	/* SB-T35 SMSC9x Eth */
+>> +		 <0 0 0x00000000 0x01000000>;	/* CM-T3x NAND */
+>>   };
+>>
+>>   &dss {
+>>
+>
+> cheers,
+> -roger
+>
+>
+>
 
 
-Thanks!
-ChenYu
+Thanks,
 
-> Thanks.
->
-> --
-> Dmitry
->
-> Input: axp20x-pek - switch over to using attribute group
->
-> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->
-> Instead of registering device attributes individually let's use attribute
-> groups and also devm_* infrastructure to ease cleanup.
->
-> Refresh of synaptics-forcepad-pnp.patch
-> ---
->  drivers/input/misc/axp20x-pek.c |   64 ++++++++++++++++++++++-----------------
->  1 file changed, 36 insertions(+), 28 deletions(-)
->
-> diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
-> index 8dbd097..f1c8447 100644
-> --- a/drivers/input/misc/axp20x-pek.c
-> +++ b/drivers/input/misc/axp20x-pek.c
-> @@ -138,17 +138,28 @@ static ssize_t axp20x_store_ext_attr(struct device *dev,
->                                  axp20x_ea->mask, idx);
->         if (ret != 0)
->                 return -EINVAL;
-> +
->         return count;
->  }
->
->  static struct dev_ext_attribute axp20x_dev_attr_startup = {
->         .attr   = __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
-> -       .var    = &axp20x_pek_startup_ext_attr
-> +       .var    = &axp20x_pek_startup_ext_attr,
->  };
->
->  static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
->         .attr   = __ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
-> -       .var    = &axp20x_pek_shutdown_ext_attr
-> +       .var    = &axp20x_pek_shutdown_ext_attr,
-> +};
-> +
-> +static struct attribute *axp20x_attributes[] = {
-> +       &axp20x_dev_attr_startup.attr.attr,
-> +       &axp20x_dev_attr_shutdown.attr.attr,
-> +       NULL,
-> +};
-> +
-> +static const struct attribute_group axp20x_attribute_group = {
-> +       .attrs = axp20x_attributes,
->  };
->
->  static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
-> @@ -166,6 +177,13 @@ static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
->         return IRQ_HANDLED;
->  }
->
-> +static void axp20x_remove_sysfs_group(void *_data)
-> +{
-> +       struct device *dev = _data;
-> +
-> +       sysfs_remove_group(&dev->kobj, &axp20x_attribute_group);
-> +}
-> +
->  static int axp20x_pek_probe(struct platform_device *pdev)
->  {
->         struct axp20x_pek *axp20x_pek;
-> @@ -214,12 +232,11 @@ static int axp20x_pek_probe(struct platform_device *pdev)
->         input_set_drvdata(idev, axp20x_pek);
->
->         error = devm_request_any_context_irq(&pdev->dev, axp20x_pek->irq_dbr,
-> -                                         axp20x_pek_irq, 0,
-> -                                         "axp20x-pek-dbr", idev);
-> +                                            axp20x_pek_irq, 0,
-> +                                            "axp20x-pek-dbr", idev);
->         if (error < 0) {
->                 dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
->                         axp20x_pek->irq_dbr, error);
-> -
->                 return error;
->         }
->
-> @@ -232,45 +249,36 @@ static int axp20x_pek_probe(struct platform_device *pdev)
->                 return error;
->         }
->
-> -       error = device_create_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
-> -       if (error)
-> +       error = sysfs_create_group(&pdev->dev.kobj, &axp20x_attribute_group);
-> +       if (error) {
-> +               dev_err(axp20x->dev, "Failed to create sysfs attributes: %d\n",
-> +                       error);
->                 return error;
-> +       }
->
-> -       error = device_create_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
-> -       if (error)
-> -               goto clear_startup_attr;
-> +       error = devm_add_action(&pdev->dev,
-> +                               axp20x_remove_sysfs_group, &pdev->dev);
-> +       if (error) {
-> +               axp20x_remove_sysfs_group(&pdev->dev);
-> +               dev_err(&pdev->dev, "Failed to add sysfs cleanup action: %d\n",
-> +                       error);
-> +               return error;
-> +       }
->
->         error = input_register_device(idev);
->         if (error) {
->                 dev_err(axp20x->dev, "Can't register input device: %d\n",
->                         error);
-> -               goto clear_attr;
-> +               return error;
->         }
->
->         platform_set_drvdata(pdev, axp20x_pek);
->
->         return 0;
-> -
-> -clear_attr:
-> -       device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
-> -
-> -clear_startup_attr:
-> -       device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
-> -
-> -       return error;
-> -}
-> -
-> -static int axp20x_pek_remove(struct platform_device *pdev)
-> -{
-> -       device_remove_file(&pdev->dev, &axp20x_dev_attr_shutdown.attr);
-> -       device_remove_file(&pdev->dev, &axp20x_dev_attr_startup.attr);
-> -
-> -       return 0;
->  }
->
->  static struct platform_driver axp20x_pek_driver = {
->         .probe          = axp20x_pek_probe,
-> -       .remove         = axp20x_pek_remove,
->         .driver         = {
->                 .name           = "axp20x-pek",
->         },
+Dmitry
