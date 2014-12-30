@@ -1,29 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Dec 2014 23:34:32 +0100
-Subject: [PATCH 2/4] ARM: sirf: add atlas7 machine support
-In-Reply-To: <1419496460-4929-3-git-send-email-21cnbao@gmail.com>
+Date: Tue, 30 Dec 2014 23:35:17 +0100
+Subject: [PATCH 1/4] ARM: sirf: add two debug ports for CSRatlas7 SoC
+In-Reply-To: <1419496460-4929-2-git-send-email-21cnbao@gmail.com>
 References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
- <1419496460-4929-3-git-send-email-21cnbao@gmail.com>
-Message-ID: <4739415.xM06V8YCmL@wuerfel>
+ <1419496460-4929-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <88770560.BUUQRjmk3f@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 December 2014 16:34:18 Barry Song wrote:
-> +DT_MACHINE_START(ATLAS7_DT, "Generic ATLAS7 (Flattened Device Tree)")
-> +       /* Maintainer: Barry Song <baohua.song@csr.com> */
-> +       .smp            = smp_ops(sirfsoc_smp_ops),
-> +       .map_io         = sirfsoc_map_io,
-> +       .init_late      = sirfsoc_init_late,
-> +       .dt_compat      = atlas7_dt_match,
-> +MACHINE_END
+On Thursday 25 December 2014 16:34:17 Barry Song wrote:
+>  #if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
+> -#define SIRFSOC_UART1_PA_BASE          0xb0060000
+> +#define SIRF_LLUART_PA_BASE          0xb0060000
+>  #elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
+> -#define SIRFSOC_UART1_PA_BASE          0xcc060000
+> +#define SIRF_LLUART_PA_BASE          0xcc060000
+> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART1)
+> +#define SIRF_LLUART_PA_BASE          0x18020000
+> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART0)
+> +#define SIRF_LLUART_PA_BASE          0x18010000
+>  #else
+> -#define SIRFSOC_UART1_PA_BASE          0
+> +#define SIRF_LLUART_PA_BASE          0
+>  #endif
 
-Can you check if the sirfsoc_map_io function is still required?
-My guess is that you can just replace sirfsoc_map_scu() with a
-call of ioremap in sirfsoc_smp_prepare_cpus, and drop sirfsoc_map_lluart()
-entirely in favor of the default debug_ll_io_init() function that
-is called when map_io is NULL.
-
-Also, how about merging the entries for atlas6 and atlas7, and just
-having multiple compatible strings in atlas_dt_match?
+I think it would be nicer to use DEBUG_UART_PHYS/DEBUG_UART_VIRT here.
 
 	Arnd
