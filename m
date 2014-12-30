@@ -1,52 +1,50 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Tue, 30 Dec 2014 11:36:20 +0000
-Subject: [PATCH] drivers/rtc/rtc-em3027.c: add device tree support
-Message-ID: <1419939380-4439-1-git-send-email-pbrobinson@gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 30 Dec 2014 13:12:27 +0100 (CET)
+Subject: [PATCH v4 2/5] media: ov2640: add async probe function
+In-Reply-To: <54A279A6.1060003@atmel.com>
+References: <1418869646-17071-1-git-send-email-josh.wu@atmel.com>
+ <1492726.KPKGvtrvz4@avalon> <Pine.LNX.4.64.1412261136360.9254@axis700.grange>
+ <2421077.hZ7S0HT2At@avalon>
+ <alpine.DEB.2.00.1412300927380.8237@axis700.grange>
+ <54A279A6.1060003@atmel.com>
+Message-ID: <alpine.DEB.2.00.1412301308070.9569@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the of_match_table for this driver so that devices can be described
-in the device tree. This device is used in the Trimslice and is already
-defined in the Trimslice device tree.
+On Tue, 30 Dec 2014, Josh Wu wrote:
 
-Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
----
- drivers/rtc/rtc-em3027.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+[snip]
 
-diff --git a/drivers/rtc/rtc-em3027.c b/drivers/rtc/rtc-em3027.c
-index fccf366..7fbb051 100644
---- a/drivers/rtc/rtc-em3027.c
-+++ b/drivers/rtc/rtc-em3027.c
-@@ -15,6 +15,7 @@
- #include <linux/rtc.h>
- #include <linux/bcd.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- 
- /* Registers */
- #define EM3027_REG_ON_OFF_CTRL	0x00
-@@ -135,10 +136,21 @@ static struct i2c_device_id em3027_id[] = {
- 	{ "em3027", 0 },
- 	{ }
- };
-+MODULE_DEVICE_TABLE(i2c, em3027_id);
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id em3027_of_match[] = {
-+	{ .compatible = "emmicro,em3027", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, em3027_of_match);
-+#endif
- 
- static struct i2c_driver em3027_driver = {
- 	.driver = {
- 		   .name = "rtc-em3027",
-+		   .owner  = THIS_MODULE,
-+		   .of_match_table = of_match_ptr(em3027_of_match),
- 	},
- 	.probe = &em3027_probe,
- 	.id_table = em3027_id,
--- 
-2.1.0
+> > And until omap1 is in the mainline we cannot drop v4l2_clk.
+
+s/until/as lonh as/
+
+> So I think the better way right now for ov2640 driver is still request both
+> the v4l2_clock: mclk, and the clock: xvclk in probe().
+> In that way,  we can take our time to introduce other patches to merged these
+> two clocks.
+> Does it make sense?
+
+How about this sequence, that we cat still try to get in on time for the 
+next merge window:
+
+1. stop using the clock name in v4l2_clk
+2. add support for CCF to v4l2_clk, falling back to current behaviour if 
+no clock is found
+3. switch ov2640 to using "xvclk"
+
+Otherwise I would propose to add asynchronous probing support to ov2640 
+_without_ changing the clock name. Whether or not we changee clock's name 
+isn't related directly to async support, since the driver already is using 
+v4l2_clk with the standarf "wrong" name. So, I would consider these two 
+changes separately - one is a new feature, another is a fix. The only 
+question is in which order to apply them. In general fix-first is 
+preferred, but since in this case the fix requires framework changes, we 
+could go with feature-first. This also makes sense since features need to 
+catch a merge window, whereas a fix can go in later too. So, if we don't 
+manage the above 3-step plan, I would priposw the most primitive patch ro 
+ov2640 just adding async support in line wuth other drivers and without 
+changing the clock name at first.
+
+Thanks
+Guennadi
