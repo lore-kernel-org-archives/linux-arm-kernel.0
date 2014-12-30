@@ -1,92 +1,92 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Dec 2014 13:28:29 -0600
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-Message-ID: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+Date: Tue, 30 Dec 2014 13:28:30 -0600
+Subject: [PATCH 1/9] dt/bindings: add versatile PCI binding
+In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1419967718-26909-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-This series converts ARM Versatile platform to multi-platform. I started 
-this some time ago and some pieces were already merged. The primary 
-piece remaining is converting the PCI host to DT which I was waiting for 
-the common PCI DT parsing to get settled. Now that that is in place as 
-well as a few other pieces are in place like multi-platform fixes for 
-CLCD, we can fully convert Versatile to DT and multi-platform.
+Add binding documentation for the PCI controller found on Versatile PB
+boards.
 
-There's still a few things that need DT support which can be done 
-later:
-- MMC card detect and write protect. Should be able to use VExpress 
-  support
-- Reboot support. Should be able to re-use Realview reboot code.
-- flash phys-map support. Binding exists, but specifically Vpp control 
-  is needed.
-- CLCD support. Not sure where this is at.
-
-This has been tested on QEMU. A previous version was tested on 
-Versatile/AB by Linus Walleij. Linus reported a problem with the 
-display panel detection. Investigation on h/w is needed still as I have 
-not been able to identify the issue by inspection and the display 
-detection seems to work correctly on QEMU.
-
-Linus had also mentioned to me that QEMU users may have some issue with 
-removing non-DT code as the work flow has to change somewhat. Copying 
-Peter Maydell here for comment (and there's rumors he may have actual PB 
-h/w with PCI as well).
-
-This series is available here:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git versatile-multiplatform
-
-Rob
-
-Rob Herring (9):
-  dt/bindings: add versatile PCI binding
-  dts: versatile: add PCI controller binding
-  ARM: versatile: add DT based PCI detection
-  pci: add DT based ARM Versatile PCI host driver
-  dts: versatile: add sysregs nodes
-  ARM: versatile: switch to DT only booting and remove legacy code
-  ARM: versatile: move mach includes into mach directory
-  ARM: versatile: convert to multi-platform
-  ARM: versatile: consolidate code to single file
-
- .../devicetree/bindings/pci/versatile.txt          |  59 ++
- arch/arm/Kconfig                                   |  17 -
- arch/arm/boot/dts/versatile-ab.dts                 |  23 +
- arch/arm/boot/dts/versatile-pb.dts                 |  37 +
- arch/arm/mach-versatile/Kconfig                    |  39 +-
- arch/arm/mach-versatile/Makefile                   |   6 +-
- arch/arm/mach-versatile/Makefile.boot              |   4 -
- arch/arm/mach-versatile/core.c                     | 845 ---------------------
- arch/arm/mach-versatile/core.h                     |  46 --
- arch/arm/mach-versatile/include/mach/clkdev.h      |  16 -
- arch/arm/mach-versatile/include/mach/hardware.h    |  38 -
- arch/arm/mach-versatile/include/mach/irqs.h        | 134 ----
- arch/arm/mach-versatile/include/mach/uncompress.h  |  45 --
- arch/arm/mach-versatile/pci.c                      | 368 ---------
- .../mach-versatile/{include/mach => }/platform.h   | 179 +----
- arch/arm/mach-versatile/versatile_ab.c             |  44 --
- arch/arm/mach-versatile/versatile_dt.c             | 338 ++++++++-
- arch/arm/mach-versatile/versatile_pb.c             |  91 ---
- drivers/clk/versatile/Kconfig                      |   3 +-
- drivers/pci/host/Kconfig                           |   4 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-versatile.c                   | 305 ++++++++
- 22 files changed, 784 insertions(+), 1858 deletions(-)
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+---
+ .../devicetree/bindings/pci/versatile.txt          | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pci/versatile.txt
- delete mode 100644 arch/arm/mach-versatile/Makefile.boot
- delete mode 100644 arch/arm/mach-versatile/core.c
- delete mode 100644 arch/arm/mach-versatile/core.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-versatile/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-versatile/pci.c
- rename arch/arm/mach-versatile/{include/mach => }/platform.h (54%)
- delete mode 100644 arch/arm/mach-versatile/versatile_ab.c
- delete mode 100644 arch/arm/mach-versatile/versatile_pb.c
- create mode 100644 drivers/pci/host/pci-versatile.c
 
+diff --git a/Documentation/devicetree/bindings/pci/versatile.txt b/Documentation/devicetree/bindings/pci/versatile.txt
+new file mode 100644
+index 0000000..2cc6071
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/versatile.txt
+@@ -0,0 +1,59 @@
++* ARM Versatile Platform Baseboard PCI interface
++
++PCI host controller found on the ARM Versatile PB board's FPGA.
++
++Required properties:
++- compatible: should contain "arm,versatile-pci" to identify the Versatile PCI
++  controller.
++- reg: base addresses and lengths of the pci controller. There must be 3
++  entries:
++	- Versatile specific registers
++	- Self Config space
++	- Config space
++- #address-cells: set to <3>
++- #size-cells: set to <2>
++- device_type: set to "pci"
++- bus-range: set to <0 0xff>
++- ranges: ranges for the PCI memory and I/O regions
++- #interrupt-cells: set to <1>
++- interrupt-map-mask and interrupt-map: standard PCI properties	to define
++	the mapping of the PCI interface to interrupt numbers.
++
++Example:
++
++pci-controller at 10001000 {
++	compatible = "arm,versatile-pci";
++	device_type = "pci";
++	reg = <0x10001000 0x1000
++	       0x41000000 0x10000
++	       0x42000000 0x100000>;
++	bus-range = <0 0xff>;
++	#address-cells = <3>;
++	#size-cells = <2>;
++	#interrupt-cells = <1>;
++
++	ranges = <0x01000000 0 0x00000000 0x43000000 0 0x00010000   /* downstream I/O */
++		  0x02000000 0 0x50000000 0x50000000 0 0x10000000   /* non-prefetchable memory */
++		  0x42000000 0 0x60000000 0x60000000 0 0x10000000>; /* prefetchable memory */
++
++	interrupt-map-mask = <0x1800 0 0 7>;
++	interrupt-map = <0x1800 0 0 1 &sic 28
++			 0x1800 0 0 2 &sic 29
++			 0x1800 0 0 3 &sic 30
++			 0x1800 0 0 4 &sic 27
++
++			 0x1000 0 0 1 &sic 27
++			 0x1000 0 0 2 &sic 28
++			 0x1000 0 0 3 &sic 29
++			 0x1000 0 0 4 &sic 30
++
++			 0x0800 0 0 1 &sic 30
++			 0x0800 0 0 2 &sic 27
++			 0x0800 0 0 3 &sic 28
++			 0x0800 0 0 4 &sic 29
++
++			 0x0000 0 0 1 &sic 29
++			 0x0000 0 0 2 &sic 30
++			 0x0000 0 0 3 &sic 27
++			 0x0000 0 0 4 &sic 28>;
++};
 -- 
 2.1.0
