@@ -1,109 +1,50 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Dec 2014 13:28:37 -0600
-Subject: [PATCH 8/9] ARM: versatile: convert to multi-platform
+Date: Tue, 30 Dec 2014 13:28:38 -0600
+Subject: [PATCH 9/9] ARM: versatile: consolidate code to single file
 In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
 References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1419967718-26909-9-git-send-email-robherring2@gmail.com>
+Message-ID: <1419967718-26909-10-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Now that all the prerequisites are in place, we can enable Versatile
-boards for multi-platform kernels.
+The split of core.c and versatile_dt.c now makes little sense, so move
+all of core.c into versatile_dt.c.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                                  | 21 +----------
- arch/arm/mach-versatile/Kconfig                   | 14 +++++++
- arch/arm/mach-versatile/Makefile.boot             |  4 --
- arch/arm/mach-versatile/include/mach/uncompress.h | 45 -----------------------
- 4 files changed, 16 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/mach-versatile/Kconfig
- delete mode 100644 arch/arm/mach-versatile/Makefile.boot
- delete mode 100644 arch/arm/mach-versatile/include/mach/uncompress.h
+ arch/arm/mach-versatile/Makefile       |   2 +-
+ arch/arm/mach-versatile/core.c         | 324 ---------------------------------
+ arch/arm/mach-versatile/core.h         |  41 -----
+ arch/arm/mach-versatile/versatile_dt.c | 291 ++++++++++++++++++++++++++++-
+ 4 files changed, 291 insertions(+), 367 deletions(-)
+ delete mode 100644 arch/arm/mach-versatile/core.c
+ delete mode 100644 arch/arm/mach-versatile/core.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7816b54..4d9858f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -337,25 +337,6 @@ config ARCH_REALVIEW
- 	help
- 	  This enables support for ARM Ltd RealView boards.
+diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
+index ccef512..41b124b 100644
+--- a/arch/arm/mach-versatile/Makefile
++++ b/arch/arm/mach-versatile/Makefile
+@@ -2,4 +2,4 @@
+ # Makefile for the linux kernel.
+ #
  
--config ARCH_VERSATILE
--	bool "ARM Ltd. Versatile family"
--	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select ARM_AMBA
--	select ARM_TIMER_SP804
--	select ARM_VIC
--	select CLKSRC_VERSATILE
--	select COMMON_CLK
--	select COMMON_CLK_VERSATILE
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
--	select ICST
--	select MIGHT_HAVE_PCI
--	select SPARSE_IRQ
--	select USE_OF
--	select VERSATILE_FPGA_IRQ
--	help
--	  This enables support for ARM Ltd Versatile board.
--
- config ARCH_AT91
- 	bool "Atmel AT91"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -956,6 +937,8 @@ source "arch/arm/mach-u300/Kconfig"
- 
- source "arch/arm/mach-ux500/Kconfig"
- 
-+source "arch/arm/mach-versatile/Kconfig"
-+
- source "arch/arm/mach-vexpress/Kconfig"
- source "arch/arm/plat-versatile/Kconfig"
- 
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-new file mode 100644
-index 0000000..1d6a8b2
---- /dev/null
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -0,0 +1,14 @@
-+config ARCH_VERSATILE
-+	bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
-+	select ARM_AMBA
-+	select ARM_TIMER_SP804
-+	select ARM_VIC
-+	select CLKSRC_VERSATILE
-+	select COMMON_CLK_VERSATILE
-+	select CPU_ARM926T
-+	select ICST
-+	select MIGHT_HAVE_PCI
-+	select VERSATILE_FPGA_IRQ
-+	help
-+	  This enables support for ARM Ltd Versatile board.
-+
-diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
+-obj-y					:= core.o versatile_dt.o
++obj-y					:= versatile_dt.o
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
 deleted file mode 100644
-index ff0a4b5..0000000
---- a/arch/arm/mach-versatile/Makefile.boot
+index f6b122b..0000000
+--- a/arch/arm/mach-versatile/core.c
 +++ /dev/null
-@@ -1,4 +0,0 @@
--   zreladdr-y	+= 0x00008000
--params_phys-y	:= 0x00000100
--initrd_phys-y	:= 0x00800000
--
-diff --git a/arch/arm/mach-versatile/include/mach/uncompress.h b/arch/arm/mach-versatile/include/mach/uncompress.h
-deleted file mode 100644
-index 986e3d3..0000000
---- a/arch/arm/mach-versatile/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,45 +0,0 @@
+@@ -1,324 +0,0 @@
 -/*
-- *  arch/arm/mach-versatile/include/mach/uncompress.h
+- *  linux/arch/arm/mach-versatile/core.c
 - *
-- *  Copyright (C) 2003 ARM Limited
+- *  Copyright (C) 1999 - 2003 ARM Limited
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -119,31 +60,664 @@ index 986e3d3..0000000
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
--#define AMBA_UART_DR	(*(volatile unsigned char *)0x101F1000)
--#define AMBA_UART_LCRH	(*(volatile unsigned char *)0x101F102C)
--#define AMBA_UART_CR	(*(volatile unsigned char *)0x101F1030)
--#define AMBA_UART_FR	(*(volatile unsigned char *)0x101F1018)
+-#include <linux/init.h>
+-#include <linux/device.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/platform_device.h>
+-#include <linux/interrupt.h>
+-#include <linux/of_platform.h>
+-#include <linux/amba/bus.h>
+-#include <linux/amba/clcd.h>
+-#include <linux/platform_data/video-clcd-versatile.h>
+-#include <linux/amba/mmci.h>
+-#include <linux/io.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/reboot.h>
 -
--/*
-- * This does not append a newline
-- */
--static inline void putc(int c)
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include "platform.h"
+-
+-#include "core.h"
+-
+-static struct map_desc versatile_io_desc[] __initdata __maybe_unused = {
+-	{
+-		.virtual	=  IO_ADDRESS(VERSATILE_SYS_BASE),
+-		.pfn		= __phys_to_pfn(VERSATILE_SYS_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE
+-	}, {
+-		.virtual	=  IO_ADDRESS(VERSATILE_SCTL_BASE),
+-		.pfn		= __phys_to_pfn(VERSATILE_SCTL_BASE),
+-		.length		= SZ_4K * 9,
+-		.type		= MT_DEVICE
+-	},
+-};
+-
+-void __init versatile_map_io(void)
 -{
--	while (AMBA_UART_FR & (1 << 5))
--		barrier();
--
--	AMBA_UART_DR = c;
+-	debug_ll_io_init();
+-	iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
 -}
 -
--static inline void flush(void)
+-
+-#define VERSATILE_FLASHCTRL    (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_FLASH_OFFSET)
+-
+-static void versatile_flash_set_vpp(struct platform_device *pdev, int on)
 -{
--	while (AMBA_UART_FR & (1 << 3))
--		barrier();
+-	u32 val;
+-
+-	val = __raw_readl(VERSATILE_FLASHCTRL);
+-	if (on)
+-		val |= VERSATILE_FLASHPROG_FLVPPEN;
+-	else
+-		val &= ~VERSATILE_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, VERSATILE_FLASHCTRL);
+-}
+-
+-static struct physmap_flash_data versatile_flash_data = {
+-	.width			= 4,
+-	.set_vpp		= versatile_flash_set_vpp,
+-};
+-
+-static struct resource versatile_flash_resource = {
+-	.start			= VERSATILE_FLASH_BASE,
+-	.end			= VERSATILE_FLASH_BASE + VERSATILE_FLASH_SIZE - 1,
+-	.flags			= IORESOURCE_MEM,
+-};
+-
+-struct platform_device versatile_flash_device = {
+-	.name			= "physmap-flash",
+-	.id			= 0,
+-	.dev			= {
+-		.platform_data	= &versatile_flash_data,
+-	},
+-	.num_resources		= 1,
+-	.resource		= &versatile_flash_resource,
+-};
+-
+-#define VERSATILE_SYSMCI	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_MCI_OFFSET)
+-
+-unsigned int mmc_status(struct device *dev)
+-{
+-	struct amba_device *adev = container_of(dev, struct amba_device, dev);
+-	u32 mask;
+-
+-	if (adev->res.start == VERSATILE_MMCI0_BASE)
+-		mask = 1;
+-	else
+-		mask = 2;
+-
+-	return readl(VERSATILE_SYSMCI) & mask;
+-}
+-
+-static struct mmci_platform_data mmc0_plat_data = {
+-	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.status		= mmc_status,
+-	.gpio_wp	= -1,
+-	.gpio_cd	= -1,
+-};
+-
+-static struct mmci_platform_data mmc1_plat_data = {
+-	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.status		= mmc_status,
+-	.gpio_wp	= -1,
+-	.gpio_cd	= -1,
+-};
+-
+-/*
+- * CLCD support.
+- */
+-#define SYS_CLCD_MODE_MASK	(3 << 0)
+-#define SYS_CLCD_MODE_888	(0 << 0)
+-#define SYS_CLCD_MODE_5551	(1 << 0)
+-#define SYS_CLCD_MODE_565_RLSB	(2 << 0)
+-#define SYS_CLCD_MODE_565_BLSB	(3 << 0)
+-#define SYS_CLCD_NLCDIOON	(1 << 2)
+-#define SYS_CLCD_VDDPOSSWITCH	(1 << 3)
+-#define SYS_CLCD_PWR3V5SWITCH	(1 << 4)
+-#define SYS_CLCD_ID_MASK	(0x1f << 8)
+-#define SYS_CLCD_ID_SANYO_3_8	(0x00 << 8)
+-#define SYS_CLCD_ID_UNKNOWN_8_4	(0x01 << 8)
+-#define SYS_CLCD_ID_EPSON_2_2	(0x02 << 8)
+-#define SYS_CLCD_ID_SANYO_2_5	(0x07 << 8)
+-#define SYS_CLCD_ID_VGA		(0x1f << 8)
+-
+-static bool is_sanyo_2_5_lcd;
+-
+-/*
+- * Disable all display connectors on the interface module.
+- */
+-static void versatile_clcd_disable(struct clcd_fb *fb)
+-{
+-	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+-	u32 val;
+-
+-	val = readl(sys_clcd);
+-	val &= ~SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
+-	writel(val, sys_clcd);
+-
+-	/*
+-	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light off
+-	 */
+-	if (of_machine_is_compatible("arm,versatile-ab") && is_sanyo_2_5_lcd) {
+-		void __iomem *versatile_ib2_ctrl = __io_address(VERSATILE_IB2_CTRL);
+-		unsigned long ctrl;
+-
+-		ctrl = readl(versatile_ib2_ctrl);
+-		ctrl &= ~0x01;
+-		writel(ctrl, versatile_ib2_ctrl);
+-	}
 -}
 -
 -/*
-- * nothing to do
+- * Enable the relevant connector on the interface module.
 - */
--#define arch_decomp_setup()
+-static void versatile_clcd_enable(struct clcd_fb *fb)
+-{
+-	struct fb_var_screeninfo *var = &fb->fb.var;
+-	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+-	u32 val;
+-
+-	val = readl(sys_clcd);
+-	val &= ~SYS_CLCD_MODE_MASK;
+-
+-	switch (var->green.length) {
+-	case 5:
+-		val |= SYS_CLCD_MODE_5551;
+-		break;
+-	case 6:
+-		if (var->red.offset == 0)
+-			val |= SYS_CLCD_MODE_565_RLSB;
+-		else
+-			val |= SYS_CLCD_MODE_565_BLSB;
+-		break;
+-	case 8:
+-		val |= SYS_CLCD_MODE_888;
+-		break;
+-	}
+-
+-	/*
+-	 * Set the MUX
+-	 */
+-	writel(val, sys_clcd);
+-
+-	/*
+-	 * And now enable the PSUs
+-	 */
+-	val |= SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
+-	writel(val, sys_clcd);
+-
+-	/*
+-	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light on
+-	 */
+-	if (of_machine_is_compatible("arm,versatile-ab") && is_sanyo_2_5_lcd) {
+-		void __iomem *versatile_ib2_ctrl = __io_address(VERSATILE_IB2_CTRL);
+-		unsigned long ctrl;
+-
+-		ctrl = readl(versatile_ib2_ctrl);
+-		ctrl |= 0x01;
+-		writel(ctrl, versatile_ib2_ctrl);
+-	}
+-}
+-
+-/*
+- * Detect which LCD panel is connected, and return the appropriate
+- * clcd_panel structure.  Note: we do not have any information on
+- * the required timings for the 8.4in panel, so we presently assume
+- * VGA timings.
+- */
+-static int versatile_clcd_setup(struct clcd_fb *fb)
+-{
+-	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+-	const char *panel_name;
+-	u32 val;
+-
+-	is_sanyo_2_5_lcd = false;
+-
+-	val = readl(sys_clcd) & SYS_CLCD_ID_MASK;
+-	if (val == SYS_CLCD_ID_SANYO_3_8)
+-		panel_name = "Sanyo TM38QV67A02A";
+-	else if (val == SYS_CLCD_ID_SANYO_2_5) {
+-		panel_name = "Sanyo QVGA Portrait";
+-		is_sanyo_2_5_lcd = true;
+-	} else if (val == SYS_CLCD_ID_EPSON_2_2)
+-		panel_name = "Epson L2F50113T00";
+-	else if (val == SYS_CLCD_ID_VGA)
+-		panel_name = "VGA";
+-	else {
+-		printk(KERN_ERR "CLCD: unknown LCD panel ID 0x%08x, using VGA\n",
+-			val);
+-		panel_name = "VGA";
+-	}
+-
+-	fb->panel = versatile_clcd_get_panel(panel_name);
+-	if (!fb->panel)
+-		return -EINVAL;
+-
+-	return versatile_clcd_setup_dma(fb, SZ_1M);
+-}
+-
+-static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
+-{
+-	clcdfb_decode(fb, regs);
+-
+-	/* Always clear BGR for RGB565: we do the routing externally */
+-	if (fb->fb.var.green.length == 6)
+-		regs->cntl &= ~CNTL_BGR;
+-}
+-
+-static struct clcd_board clcd_plat_data = {
+-	.name		= "Versatile",
+-	.caps		= CLCD_CAP_5551 | CLCD_CAP_565 | CLCD_CAP_888,
+-	.check		= clcdfb_check,
+-	.decode		= versatile_clcd_decode,
+-	.disable	= versatile_clcd_disable,
+-	.enable		= versatile_clcd_enable,
+-	.setup		= versatile_clcd_setup,
+-	.mmap		= versatile_clcd_mmap_dma,
+-	.remove		= versatile_clcd_remove_dma,
+-};
+-
+-/*
+- * Lookup table for attaching a specific name and platform_data pointer to
+- * devices as they get created by of_platform_populate().  Ideally this table
+- * would not exist, but the current clock implementation depends on some devices
+- * having a specific name.
+- */
+-struct of_dev_auxdata versatile_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", &mmc0_plat_data),
+-	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI1_BASE, "fpga:0b", &mmc1_plat_data),
+-
+-	OF_DEV_AUXDATA("arm,primecell", VERSATILE_CLCD_BASE, "dev:20", &clcd_plat_data),
+-
+-	{}
+-};
+-
+-void versatile_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	void __iomem *sys = __io_address(VERSATILE_SYS_BASE);
+-	u32 val;
+-
+-	val = __raw_readl(sys + VERSATILE_SYS_RESETCTL_OFFSET);
+-	val |= 0x105;
+-
+-	__raw_writel(0xa05f, sys + VERSATILE_SYS_LOCK_OFFSET);
+-	__raw_writel(val, sys + VERSATILE_SYS_RESETCTL_OFFSET);
+-	__raw_writel(0, sys + VERSATILE_SYS_LOCK_OFFSET);
+-}
+-
+-/* Early initializations */
+-void __init versatile_init_early(void)
+-{
+-	u32 val;
+-
+-	/*
+-	 * set clock frequency:
+-	 *	VERSATILE_REFCLK is 32KHz
+-	 *	VERSATILE_TIMCLK is 1MHz
+-	 */
+-	val = readl(__io_address(VERSATILE_SCTL_BASE));
+-	writel((VERSATILE_TIMCLK << VERSATILE_TIMER1_EnSel) |
+-	       (VERSATILE_TIMCLK << VERSATILE_TIMER2_EnSel) |
+-	       (VERSATILE_TIMCLK << VERSATILE_TIMER3_EnSel) |
+-	       (VERSATILE_TIMCLK << VERSATILE_TIMER4_EnSel) | val,
+-	       __io_address(VERSATILE_SCTL_BASE));
+-}
+diff --git a/arch/arm/mach-versatile/core.h b/arch/arm/mach-versatile/core.h
+deleted file mode 100644
+index c3d7157..0000000
+--- a/arch/arm/mach-versatile/core.h
++++ /dev/null
+@@ -1,41 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-versatile/core.h
+- *
+- *  Copyright (C) 2004 ARM Limited
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARCH_VERSATILE_H
+-#define __ASM_ARCH_VERSATILE_H
+-
+-#include <linux/amba/bus.h>
+-#include <linux/of_platform.h>
+-#include <linux/reboot.h>
+-
+-extern struct platform_device versatile_flash_device;
+-
+-extern void __init versatile_init_early(void);
+-extern void __init versatile_init_irq(void);
+-extern void __init versatile_map_io(void);
+-extern void versatile_timer_init(void);
+-extern void versatile_restart(enum reboot_mode, const char *);
+-extern unsigned int mmc_status(struct device *dev);
+-#ifdef CONFIG_OF
+-extern struct of_dev_auxdata versatile_auxdata_lookup[];
+-#endif
+-
+-#endif
+diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
+index 1bb21d1..9b0d392 100644
+--- a/arch/arm/mach-versatile/versatile_dt.c
++++ b/arch/arm/mach-versatile/versatile_dt.c
+@@ -28,13 +28,302 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/slab.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/clcd.h>
++#include <linux/platform_data/video-clcd-versatile.h>
++#include <linux/amba/mmci.h>
++#include <linux/mtd/physmap.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ 
+-#include "core.h"
++#include "platform.h"
+ 
+ #define VERSATILE_SYS_PCICTL_OFFSET           0x44
+ 
++#define VERSATILE_FLASHCTRL    (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_FLASH_OFFSET)
++
++static void versatile_flash_set_vpp(struct platform_device *pdev, int on)
++{
++	u32 val;
++
++	val = __raw_readl(VERSATILE_FLASHCTRL);
++	if (on)
++		val |= VERSATILE_FLASHPROG_FLVPPEN;
++	else
++		val &= ~VERSATILE_FLASHPROG_FLVPPEN;
++	__raw_writel(val, VERSATILE_FLASHCTRL);
++}
++
++static struct physmap_flash_data versatile_flash_data = {
++	.width			= 4,
++	.set_vpp		= versatile_flash_set_vpp,
++};
++
++static struct resource versatile_flash_resource = {
++	.start			= VERSATILE_FLASH_BASE,
++	.end			= VERSATILE_FLASH_BASE + VERSATILE_FLASH_SIZE - 1,
++	.flags			= IORESOURCE_MEM,
++};
++
++struct platform_device versatile_flash_device = {
++	.name			= "physmap-flash",
++	.id			= 0,
++	.dev			= {
++		.platform_data	= &versatile_flash_data,
++	},
++	.num_resources		= 1,
++	.resource		= &versatile_flash_resource,
++};
++
++#define VERSATILE_SYSMCI	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_MCI_OFFSET)
++
++unsigned int mmc_status(struct device *dev)
++{
++	struct amba_device *adev = container_of(dev, struct amba_device, dev);
++	u32 mask;
++
++	if (adev->res.start == VERSATILE_MMCI0_BASE)
++		mask = 1;
++	else
++		mask = 2;
++
++	return readl(VERSATILE_SYSMCI) & mask;
++}
++
++static struct mmci_platform_data mmc0_plat_data = {
++	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
++	.status		= mmc_status,
++	.gpio_wp	= -1,
++	.gpio_cd	= -1,
++};
++
++static struct mmci_platform_data mmc1_plat_data = {
++	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
++	.status		= mmc_status,
++	.gpio_wp	= -1,
++	.gpio_cd	= -1,
++};
++
++/*
++ * CLCD support.
++ */
++#define SYS_CLCD_MODE_MASK	(3 << 0)
++#define SYS_CLCD_MODE_888	(0 << 0)
++#define SYS_CLCD_MODE_5551	(1 << 0)
++#define SYS_CLCD_MODE_565_RLSB	(2 << 0)
++#define SYS_CLCD_MODE_565_BLSB	(3 << 0)
++#define SYS_CLCD_NLCDIOON	(1 << 2)
++#define SYS_CLCD_VDDPOSSWITCH	(1 << 3)
++#define SYS_CLCD_PWR3V5SWITCH	(1 << 4)
++#define SYS_CLCD_ID_MASK	(0x1f << 8)
++#define SYS_CLCD_ID_SANYO_3_8	(0x00 << 8)
++#define SYS_CLCD_ID_UNKNOWN_8_4	(0x01 << 8)
++#define SYS_CLCD_ID_EPSON_2_2	(0x02 << 8)
++#define SYS_CLCD_ID_SANYO_2_5	(0x07 << 8)
++#define SYS_CLCD_ID_VGA		(0x1f << 8)
++
++static bool is_sanyo_2_5_lcd;
++
++/*
++ * Disable all display connectors on the interface module.
++ */
++static void versatile_clcd_disable(struct clcd_fb *fb)
++{
++	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
++	u32 val;
++
++	val = readl(sys_clcd);
++	val &= ~SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
++	writel(val, sys_clcd);
++
++	/*
++	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light off
++	 */
++	if (of_machine_is_compatible("arm,versatile-ab") && is_sanyo_2_5_lcd) {
++		void __iomem *versatile_ib2_ctrl = __io_address(VERSATILE_IB2_CTRL);
++		unsigned long ctrl;
++
++		ctrl = readl(versatile_ib2_ctrl);
++		ctrl &= ~0x01;
++		writel(ctrl, versatile_ib2_ctrl);
++	}
++}
++
++/*
++ * Enable the relevant connector on the interface module.
++ */
++static void versatile_clcd_enable(struct clcd_fb *fb)
++{
++	struct fb_var_screeninfo *var = &fb->fb.var;
++	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
++	u32 val;
++
++	val = readl(sys_clcd);
++	val &= ~SYS_CLCD_MODE_MASK;
++
++	switch (var->green.length) {
++	case 5:
++		val |= SYS_CLCD_MODE_5551;
++		break;
++	case 6:
++		if (var->red.offset == 0)
++			val |= SYS_CLCD_MODE_565_RLSB;
++		else
++			val |= SYS_CLCD_MODE_565_BLSB;
++		break;
++	case 8:
++		val |= SYS_CLCD_MODE_888;
++		break;
++	}
++
++	/*
++	 * Set the MUX
++	 */
++	writel(val, sys_clcd);
++
++	/*
++	 * And now enable the PSUs
++	 */
++	val |= SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
++	writel(val, sys_clcd);
++
++	/*
++	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light on
++	 */
++	if (of_machine_is_compatible("arm,versatile-ab") && is_sanyo_2_5_lcd) {
++		void __iomem *versatile_ib2_ctrl = __io_address(VERSATILE_IB2_CTRL);
++		unsigned long ctrl;
++
++		ctrl = readl(versatile_ib2_ctrl);
++		ctrl |= 0x01;
++		writel(ctrl, versatile_ib2_ctrl);
++	}
++}
++
++/*
++ * Detect which LCD panel is connected, and return the appropriate
++ * clcd_panel structure.  Note: we do not have any information on
++ * the required timings for the 8.4in panel, so we presently assume
++ * VGA timings.
++ */
++static int versatile_clcd_setup(struct clcd_fb *fb)
++{
++	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
++	const char *panel_name;
++	u32 val;
++
++	is_sanyo_2_5_lcd = false;
++
++	val = readl(sys_clcd) & SYS_CLCD_ID_MASK;
++	if (val == SYS_CLCD_ID_SANYO_3_8)
++		panel_name = "Sanyo TM38QV67A02A";
++	else if (val == SYS_CLCD_ID_SANYO_2_5) {
++		panel_name = "Sanyo QVGA Portrait";
++		is_sanyo_2_5_lcd = true;
++	} else if (val == SYS_CLCD_ID_EPSON_2_2)
++		panel_name = "Epson L2F50113T00";
++	else if (val == SYS_CLCD_ID_VGA)
++		panel_name = "VGA";
++	else {
++		printk(KERN_ERR "CLCD: unknown LCD panel ID 0x%08x, using VGA\n",
++			val);
++		panel_name = "VGA";
++	}
++
++	fb->panel = versatile_clcd_get_panel(panel_name);
++	if (!fb->panel)
++		return -EINVAL;
++
++	return versatile_clcd_setup_dma(fb, SZ_1M);
++}
++
++static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
++{
++	clcdfb_decode(fb, regs);
++
++	/* Always clear BGR for RGB565: we do the routing externally */
++	if (fb->fb.var.green.length == 6)
++		regs->cntl &= ~CNTL_BGR;
++}
++
++static struct clcd_board clcd_plat_data = {
++	.name		= "Versatile",
++	.caps		= CLCD_CAP_5551 | CLCD_CAP_565 | CLCD_CAP_888,
++	.check		= clcdfb_check,
++	.decode		= versatile_clcd_decode,
++	.disable	= versatile_clcd_disable,
++	.enable		= versatile_clcd_enable,
++	.setup		= versatile_clcd_setup,
++	.mmap		= versatile_clcd_mmap_dma,
++	.remove		= versatile_clcd_remove_dma,
++};
++
++/*
++ * Lookup table for attaching a specific name and platform_data pointer to
++ * devices as they get created by of_platform_populate().  Ideally this table
++ * would not exist, but the current clock implementation depends on some devices
++ * having a specific name.
++ */
++struct of_dev_auxdata versatile_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", &mmc0_plat_data),
++	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI1_BASE, "fpga:0b", &mmc1_plat_data),
++
++	OF_DEV_AUXDATA("arm,primecell", VERSATILE_CLCD_BASE, "dev:20", &clcd_plat_data),
++
++	{}
++};
++
++static struct map_desc versatile_io_desc[] __initdata __maybe_unused = {
++	{
++		.virtual	=  IO_ADDRESS(VERSATILE_SYS_BASE),
++		.pfn		= __phys_to_pfn(VERSATILE_SYS_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
++	}, {
++		.virtual	=  IO_ADDRESS(VERSATILE_SCTL_BASE),
++		.pfn		= __phys_to_pfn(VERSATILE_SCTL_BASE),
++		.length		= SZ_4K * 9,
++		.type		= MT_DEVICE
++	},
++};
++
++static void __init versatile_map_io(void)
++{
++	debug_ll_io_init();
++	iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
++}
++
++static void __init versatile_init_early(void)
++{
++	u32 val;
++
++	/*
++	 * set clock frequency:
++	 *	VERSATILE_REFCLK is 32KHz
++	 *	VERSATILE_TIMCLK is 1MHz
++	 */
++	val = readl(__io_address(VERSATILE_SCTL_BASE));
++	writel((VERSATILE_TIMCLK << VERSATILE_TIMER1_EnSel) |
++	       (VERSATILE_TIMCLK << VERSATILE_TIMER2_EnSel) |
++	       (VERSATILE_TIMCLK << VERSATILE_TIMER3_EnSel) |
++	       (VERSATILE_TIMCLK << VERSATILE_TIMER4_EnSel) | val,
++	       __io_address(VERSATILE_SCTL_BASE));
++}
++
++static void versatile_restart(enum reboot_mode mode, const char *cmd)
++{
++	void __iomem *sys = __io_address(VERSATILE_SYS_BASE);
++	u32 val;
++
++	val = __raw_readl(sys + VERSATILE_SYS_RESETCTL_OFFSET);
++	val |= 0x105;
++
++	__raw_writel(0xa05f, sys + VERSATILE_SYS_LOCK_OFFSET);
++	__raw_writel(val, sys + VERSATILE_SYS_RESETCTL_OFFSET);
++	__raw_writel(0, sys + VERSATILE_SYS_LOCK_OFFSET);
++}
++
+ static void __init versatile_dt_pci_init(void)
+ {
+ 	u32 val;
 -- 
 2.1.0
