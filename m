@@ -1,129 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 30 Dec 2014 11:29:10 +0100
-Subject: [PATCH v5 0/4] Fixes for SDIO interrupts for dw_mmc
-In-Reply-To: <CAD=FV=UCyOXfMqu_MYbd5pKOpgXPB87LQ7hCegeeY9vzsy6QAg@mail.gmail.com>
-References: <1417563767-32181-1-git-send-email-dianders@chromium.org>
- <CAPDyKFpxvE4x_-PV=KN0HKY5cNug-ss9m5KCjNdebR1LDOJi5w@mail.gmail.com>
- <CAD=FV=UCyOXfMqu_MYbd5pKOpgXPB87LQ7hCegeeY9vzsy6QAg@mail.gmail.com>
-Message-ID: <CAPDyKFqGW2NaN+5mUrpBWrhM5ZfUSx70-Yyk9qmNaC1ft_ibpw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 30 Dec 2014 13:42:29 +0300
+Subject: [PATCH v2 07/12] ARM: imx: depend MXC debug board on 3DS machines
+In-Reply-To: <1419895935-22966-8-git-send-email-stefan@agner.ch>
+References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
+ <1419895935-22966-8-git-send-email-stefan@agner.ch>
+Message-ID: <54A28195.4070102@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 December 2014 at 20:02, Doug Anderson <dianders@chromium.org> wrote:
-> Ulf,
->
-> On Fri, Dec 19, 2014 at 2:17 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 3 December 2014 at 00:42, Doug Anderson <dianders@chromium.org> wrote:
->>> Bing Zhao at Marvell found a problem with dw_mmc where interrupts
->>> weren't firing sometimes.  He tracked it down to a read-modify-write
->>> problem with the INTMASK.  These patches fix the problem.
->>>
->>> Note: I've picked up a > 1-year old series here to make another
->>> attempt at landing it upstream.  These patches have been in shipping
->>> Chromebooks for the last year.  Note that v3 to v4 has no changes
->>> other than a rebase and a small commit message update.
->>>
->>> The first two patches extend the "init_card()" mechanism of MMC core
->>> to actually be called for all card types, not just SDIO.  That could
->>> be applied any time and should fix at least one longstanding bug
->>> (untested).
->>>
->>> The third patch is a cleanup patch to use init_card() to move things
->>> around a bit so we don't need to handle SDIO cards in such a strange
->>> place.  On earlier versions of this patch Seungwon brought up a few
->>> points which I have _not_ addressed.  See
->>> <https://patchwork.kernel.org/patch/3049071/>.  Other than talk of
->>> cards with out of band interrupts maybe being able to gate their
->>> clocks, he wanted to use MMC_QUIRK_BROKEN_CLK_GATING.  I didn't do
->>> that because of the ordering of init_card() and when the quirks are
->>> set.  Some users of init_card() like pandora_wl1251_init_card() rely
->>> on it being called very early in the process.
->>> pandora_wl1251_init_card() hardcodes a vendor and device and thus need
->>> to be called super early.  On the other hand the code that adds quirks
->>> _reads_ the vendor and device.  It can't possibly move before
->>> init_card().  If folks are willing to take an additional host op of
->>> init_card_late() I can certainly go that way, though.
->>>
->>> The fourth patch is (I think) reviewed and ready to go assuming the
->>> other two land.
->>
->> I have queued this up for 3.20.
->
-> Thanks!
->
->
->> It was a bit hard to follow the
->> updated the revisions, please don't send patches "in-reply-to" for
->> future sets.
->
-> Very strange.  I didn't send out anything in-reply-to other than what
-> git-send-email usually does.  I believe I had:
->
-> [0] - no in reply to.
->  [1] - in reply to [0]
->  [2] - in reply to [0]
->  [3] - in reply to [0]
->  [4] - in reply to [0]
+Hello.
 
-That's good. As long as there are no in-reply to previous versions of
-patches/patchsets.
+On 12/30/2014 2:32 AM, Stefan Agner wrote:
 
-I am using gmails web-based client so it could very well be that it
-does some magic, which I am not yet aware of.
+> Depend the MXC debug board on machines which actually support it.
 
->
-> Is there some other way you'd prefer?
->
-> Looking full headers in <https://patchwork.kernel.org/patch/5425241/>,
-> I confirm it is "in-reply-to"
-> "1417563767-32181-1-git-send-email-dianders at chromium.org".  Patchwork
-> doesn't keep cover letters, but you can see at
-> <http://www.spinics.net/lists/linux-mmc/msg29699.html>) that there is
-> no in-reply-to.
->
-> I'm more than happy to adjust my workflow if you can give me some
-> specifics.  Thanks!  :)
->
->
->> In v5, I don't find a patch 1/4. Anyway, I have taken patch 2->4.
->
-> Ah, maybe because it wasn't sent to linux-mmc?  I messed that up and
-> will try to do better in the future.  Sorry.  :(  You were in the To
-> line, though.  You can see at
-> <https://patchwork.kernel.org/patch/5425241/>.
->
-> Do you want me to repost it and CC linux-mmc with Tony's Ack?
-
-I suggest you have a look at my next branch and to verify that I
-haven't screwed things up. If so, either I should drop the patches and
-you make a resend or if it's possible to just send an incremental path
-on top?
-
-Kind regards
-Uffe
-
->
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
+> This configuration appeared lonely when I enabled ARCH_MULTI_V7M.
+> Afaik, the selection of it only makes sense with one of the supported
+> boards...
+
+>   arch/arm/mach-imx/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 3c5859e..96c8eb8 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -21,6 +21,7 @@ config MXC_AVIC
 >
-> Note: patchwork seems to find all my patches:
->
-> pwclient list -w dianders at chromium.org -p ""
->
-> 5425241 New          [v5,1/4] ARM: OMAP2+: Make sure
-> pandora_wl1251_init_card() applies to SDIO only
-> 5425291 New          [v5,1/4] ARM: OMAP2+: Make sure
-> pandora_wl1251_init_card() applies to SDIO only
-> 5425311 New          [v5,1/4] ARM: OMAP2+: Make sure
-> pandora_wl1251_init_card() applies to SDIO only
-> 5425231 New          [v5,2/4] mmc: core: Support the optional
-> init_card() callback for MMC and SD
-> 5425301 New          [v5,2/4] mmc: core: Support the optional
-> init_card() callback for MMC and SD
-> 5425271 New          [v5,3/4] mmc: dw_mmc: Cleanup disable of low
-> power mode w/ SDIO interrupts
-> 5425281 New          [v5,3/4] mmc: dw_mmc: Cleanup disable of low
-> power mode w/ SDIO interrupts
-> 5425251 New          [v5,4/4] mmc: dw_mmc: Protect read-modify-write
-> of INTMASK with a lock
-> 5425261 New          [v5,4/4] mmc: dw_mmc: Protect read-modify-write
-> of INTMASK with a lock
+>   config MXC_DEBUG_BOARD
+>   	bool "Enable MXC debug board(for 3-stack)"
+> +	depends on CONFIG_MACH_MX27_3DS || CONFIG_MACH_MX31_3DS || CONFIG_MACH_MX35_3DS
+
+    CONFIG_ prefixes are not needed in Kconfig.
+
+[...]
+
+WBR, Sergei
