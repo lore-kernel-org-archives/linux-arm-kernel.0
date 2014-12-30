@@ -1,29 +1,21 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 30 Dec 2014 11:33:59 +0800
-Subject: [PATCH RFC v7 09/21] ARM: dts: imx6qdl: Move existing MIPI DSI ports
- into a new 'ports' node
+Date: Tue, 30 Dec 2014 11:34:00 +0800
+Subject: [PATCH RFC v7 10/21] drm/dsi: Add a helper to get bits per pixel of
+ MIPI DSI pixel format
 In-Reply-To: <1419910451-15268-1-git-send-email-Ying.Liu@freescale.com>
 References: <1419910451-15268-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1419910451-15268-10-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1419910451-15268-11-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI DSI node contains some ports which represent possible DRM CRTCs
-it can connect with.  Each port has a 'reg' property embedded.  This
-property will be wrongly interpretted by the MIPI DSI bus driver, because
-the driver will take each subnode which contains a 'reg' property as a
-DSI peripheral device.  This patch moves the existing MIPI DSI ports into
-a new 'ports' node so that the MIPI DSI bus driver may distinguish its
-DSI peripheral device(s) from the existing ports.
-
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v6->v7:
  * None.
 
 v5->v6:
- * None.
+ * Address the over 80 characters in one line warning reported by the
+   checkpatch.pl script.
 
 v4->v5:
  * None.
@@ -32,87 +24,40 @@ v3->v4:
  * None.
 
 v2->v3:
- * Add Philipp's Ack.
+ * None.
 
 v1->v2:
- * Newly added, as suggested by Thierry Reding.
+ * Thierry Reding suggested that the mipi_dsi_pixel_format_to_bpp() function
+   could be placed at the common DRM MIPI DSI driver.
+   This patch is newly added.
 
- arch/arm/boot/dts/imx6q.dtsi   | 20 +++++++++++---------
- arch/arm/boot/dts/imx6qdl.dtsi | 23 ++++++++++++++---------
- 2 files changed, 25 insertions(+), 18 deletions(-)
+ include/drm/drm_mipi_dsi.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index e9f3646..9c0990b 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -292,19 +292,21 @@
- };
+diff --git a/include/drm/drm_mipi_dsi.h b/include/drm/drm_mipi_dsi.h
+index f1d8d0d..3662021 100644
+--- a/include/drm/drm_mipi_dsi.h
++++ b/include/drm/drm_mipi_dsi.h
+@@ -163,6 +163,20 @@ static inline struct mipi_dsi_device *to_mipi_dsi_device(struct device *dev)
+ 	return container_of(dev, struct mipi_dsi_device, dev);
+ }
  
- &mipi_dsi {
--	port at 2 {
--		reg = <2>;
-+	ports {
-+		port at 2 {
-+			reg = <2>;
- 
--		mipi_mux_2: endpoint {
--			remote-endpoint = <&ipu2_di0_mipi>;
-+			mipi_mux_2: endpoint {
-+				remote-endpoint = <&ipu2_di0_mipi>;
-+			};
- 		};
--	};
- 
--	port at 3 {
--		reg = <3>;
-+		port at 3 {
-+			reg = <3>;
- 
--		mipi_mux_3: endpoint {
--			remote-endpoint = <&ipu2_di1_mipi>;
-+			mipi_mux_3: endpoint {
-+				remote-endpoint = <&ipu2_di1_mipi>;
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 9596ed5..96bf2a0 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1009,19 +1009,24 @@
- 				reg = <0x021e0000 0x4000>;
- 				status = "disabled";
- 
--				port at 0 {
--					reg = <0>;
-+				ports {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++static inline int mipi_dsi_pixel_format_to_bpp(enum mipi_dsi_pixel_format fmt)
++{
++	switch (fmt) {
++	case MIPI_DSI_FMT_RGB888:
++	case MIPI_DSI_FMT_RGB666:
++		return 24;
++	case MIPI_DSI_FMT_RGB666_PACKED:
++		return 18;
++	case MIPI_DSI_FMT_RGB565:
++		return 16;
++	}
++	return -EINVAL;
++}
 +
-+					port at 0 {
-+						reg = <0>;
- 
--					mipi_mux_0: endpoint {
--						remote-endpoint = <&ipu1_di0_mipi>;
-+						mipi_mux_0: endpoint {
-+							remote-endpoint = <&ipu1_di0_mipi>;
-+						};
- 					};
--				};
- 
--				port at 1 {
--					reg = <1>;
-+					port at 1 {
-+						reg = <1>;
- 
--					mipi_mux_1: endpoint {
--						remote-endpoint = <&ipu1_di1_mipi>;
-+						mipi_mux_1: endpoint {
-+							remote-endpoint = <&ipu1_di1_mipi>;
-+						};
- 					};
- 				};
- 			};
+ struct mipi_dsi_device *of_find_mipi_dsi_device_by_node(struct device_node *np);
+ int mipi_dsi_attach(struct mipi_dsi_device *dsi);
+ int mipi_dsi_detach(struct mipi_dsi_device *dsi);
 -- 
 2.1.0
