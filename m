@@ -1,39 +1,42 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 30 Dec 2014 12:15:14 +0000
-Subject: [PATCH] arm64: Fix SCTLR_EL1 initialisation
-In-Reply-To: <20141217173915.GF30307@arm.com>
-References: <1418831421-19370-1-git-send-email-suzuki.poulose@arm.com>
- <20141217173915.GF30307@arm.com>
-Message-ID: <54A29752.2060204@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 30 Dec 2014 15:39:48 +0300
+Subject: [PATCH v5 2/6] ASoC: dwc: Prepare clock before use
+In-Reply-To: <faa0193d388fe808c2fae461954bb1730ba29244.1419936132.git.Andrew.Jackson@arm.com>
+References: <cover.1419936132.git.Andrew.Jackson@arm.com>
+ <faa0193d388fe808c2fae461954bb1730ba29244.1419936132.git.Andrew.Jackson@arm.com>
+Message-ID: <54A29D14.6000705@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/14 17:39, Will Deacon wrote:
-> On Wed, Dec 17, 2014 at 03:50:21PM +0000, Suzuki K. Poulose wrote:
->> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>
->> We initialise the SCTLR_EL1 value by read-modify-writeback
->> of the desired bits, leaving the other bits (including reserved
->> bits(RESx)) untouched. However, sometimes the boot monitor could
->> leave garbage values in the RESx bits which could have different
->> implications. This patch makes sure that all the bits, including
->> the RESx bits, are set to the proper state, except for the
->> 'endianness' control bits, EE(25) & E0E(24)- which are set early
->> in the el2_setup.
->>
->> Updated the state of the Bit[6] in the comment to RES0 in the
->> comment.
->>
->> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->
-> Looks good to me:
->
->    Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Is this 3.19 material, or simply a cleanup/being cautious?
-Sorry, for the late response. Yes this is kind of being cautious.
+Hello.
 
-Suzuki
+On 12/30/2014 1:55 PM, Andrew Jackson wrote:
+
+> From: Andrew Jackson <Andrew.Jackson@arm.com>
+
+> Some I2S clocks may require some time to get the clock ready
+> for operation and so need to be prepared before they are enabled.
+> So, prepare the clock as well as enabling it, but combine the
+> two through clk_prepare_enable.
+
+> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+> ---
+>   sound/soc/dwc/designware_i2s.c |    7 +++++--
+>   1 files changed, 5 insertions(+), 2 deletions(-)
+
+> diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+> index 5e9d163..08608c1 100644
+> --- a/sound/soc/dwc/designware_i2s.c
+> +++ b/sound/soc/dwc/designware_i2s.c
+[...]
+> @@ -426,13 +426,16 @@ static int dw_i2s_probe(struct platform_device *pdev)
+[...]
+>   static int dw_i2s_remove(struct platform_device *pdev)
+>   {
+> +	struct dw_i2s_dev *dev = dev_get_drvdata(&pdev->dev);
+
+    Why not just platform_get_drvdata(pdev)?
+
+[...]
+
+WBR, Sergei
