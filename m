@@ -1,32 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 31 Dec 2014 18:52:37 +0000
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <54A4016E.3000300@ti.com>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk>
- <5491F0B6.4090904@ti.com>
- <20141218101618.GJ11502@n2100.arm.linux.org.uk>
- <20141218114949.GY11764@sirena.org.uk> <54A4016E.3000300@ti.com>
-Message-ID: <20141231185237.GO11764@sirena.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 31 Dec 2014 13:22:01 -0600
+Subject: [PATCH 3/9] ARM: versatile: add DT based PCI detection
+In-Reply-To: <CAFEAcA9=eoP4-F0Z8J171=DHE5JHVn7ahMnQrHQFz9SHePQHNQ@mail.gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <13417872.31IhE1RbAx@wuerfel>
+ <CAL_Jsq+iVWPsN9LXEMT6DmjS7MGsnmgJLgyb33N3me=OcCet6g@mail.gmail.com>
+ <14512076.oz77HnzXre@wuerfel>
+ <CAFEAcA9=eoP4-F0Z8J171=DHE5JHVn7ahMnQrHQFz9SHePQHNQ@mail.gmail.com>
+Message-ID: <CAL_JsqLBCeCc2VKvHAdG5bBJt=2qmX5BnosdGd_2n+Pb9BhuZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 31, 2014 at 04:00:14PM +0200, Peter Ujfalusi wrote:
-> On 12/18/2014 01:49 PM, Mark Brown wrote:
+On Wed, Dec 31, 2014 at 10:13 AM, Peter Maydell
+<peter.maydell@linaro.org> wrote:
+> On 31 December 2014 at 15:23, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 30 December 2014 17:05:16 Rob Herring wrote:
+>>> Because the register to check is not part of the PCI controller, but
+>>> part of the system registers. There was no infrastructure for the
+>>> system registers when I originally wrote this, but there's some syscon
+>>> support now for VExpress that may be able to be used. I think it is
+>>> cleaner if we can avoid syscon dependencies in drivers in general, but
+>>> it is pretty much zero chance the Versatile PCI driver will ever be
+>>> used on another platform.
+>>
+>> Ok, I see. I guess ideally we would get a correct DTB file from the boot
+>> loader, but that is of course completely unrealistic on versatile, both
+>> on hardware and qemu.
+>
+> Why would you want to get the bootloader to do this for you when
+> the hardware provides a perfectly good mechanism for probing
+> for the existence of the hardware? "Ask the hardware" is always
+> going to be a more reliable and foolproof way to get the answer
+> if you can do it -- device tree should just be for the cases where
+> there is no way to probe. In any case the only way for the boot
+> loader to determine the correct value to put into the device tree
+> would be to read the register itself.
 
-> > Right, spot on - I'll send a revert for that upstream.  Thanks for
-> > tracking this down.
+Only that it is nice to hide all the ugly bits in the
+bootloader/firmware and DT already provides a standard way to enable
+or disable h/w. This h/w is not probeable in any sort of standard way.
 
-> Mark, can you send the e3b1e6a19e09877b91517dfe304a2b3f6b2138fc (found it in
-> linux-next) for 3.19 if it not yet done? With that applied mainline boots up
-> on my Blaze.
+>> I suspect that either the existing behavior is completely bogus because
+>> the driver always reads what it write before, and then you can skip
+>> the logic completely, or your new driver is broken because reading
+>> the register without writing it first will result in undefined behavior
+>> on real hardware.
+>
+> The documentation describes this register as:
+>
+> # The SYS_PCICTL register at 0x10000044 enables the bridge to the PCI bus:
+> #
+> # * Setting bit 0 HIGH enables PCI bus accesses.
+> # * Read returns a HIGH in bit 0 if a PCI board is present
+> #   in the expansion backplane.
+>
+> ie the read and write behaviour is independent. So I suspect
+> that this new driver's failure to write 1 means that it
+> will break PCI on real hardware. (QEMU doesn't attempt to
+> model this behaviour: SYS_PCICTL will always read-as-one,
+> writes-ignored.)
 
-Already done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141231/e6e2d202/attachment-0001.sig>
+>From Table 4.4, I came to the conclusion that the write wasn't really necessary:
+
+SYS_PCICTL  0x10000044  Read only  -Read returns a HIGH in bit [0] if
+a PCI board is present in the expansion backplane.
+
+I'll add it back.
+
+Rob
