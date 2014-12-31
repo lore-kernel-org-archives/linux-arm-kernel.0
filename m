@@ -1,10 +1,9 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 31 Dec 2014 16:23:21 +0800
-Subject: [PATCH RFC v8 03/21] of: Add vendor prefix for Truly Semiconductors
- Limited
+Date: Wed, 31 Dec 2014 16:23:20 +0800
+Subject: [PATCH RFC v8 02/21] of: Add vendor prefix for Himax Technologies Inc.
 In-Reply-To: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
 References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1420014219-915-4-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1420014219-915-3-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,7 +22,7 @@ v4->v5:
  * None.
 
 v3->v4:
- * None.
+ * Fix an ordering issue to address Stefan Wahren's comment.
 
 v2->v3:
  * None.
@@ -35,16 +34,16 @@ v1->v2:
  1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index f46adb2..0e67bad 100644
+index 78efebb..f46adb2 100644
 --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
 +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -158,6 +158,7 @@ tlm	Trusted Logic Mobility
- toradex	Toradex AG
- toshiba	Toshiba Corporation
- toumaz	Toumaz
-+truly	Truly Semiconductors Limited
- usi	Universal Scientific Industrial Co., Ltd.
- v3	V3 Semiconductor
- variscite	Variscite Ltd.
+@@ -67,6 +67,7 @@ gumstix	Gumstix, Inc.
+ gw	Gateworks Corporation
+ hannstar	HannStar Display Corporation
+ haoyu	Haoyu Microelectronic Co. Ltd.
++himax	Himax Technologies, Inc.
+ hisilicon	Hisilicon Limited.
+ hit	Hitachi Ltd.
+ honeywell	Honeywell
 -- 
 2.1.0
