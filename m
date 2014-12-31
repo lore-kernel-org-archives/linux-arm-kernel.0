@@ -1,35 +1,34 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 31 Dec 2014 16:57:51 +0800
-Subject: [PATCH 2/3] ARM: berlin: add broken-cd and set bus width for eMMC in
- Marvell DMP DT
+Date: Wed, 31 Dec 2014 16:57:52 +0800
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
 In-Reply-To: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
 References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1420016272-6789-3-git-send-email-jszhang@marvell.com>
+Message-ID: <1420016272-6789-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no card detection for the eMMC, so this patch adds the missing
-broken-cd property. This patch also sets bus width as 8 to add
-MMC_CAP_8_BIT_DATA in the Host capabilities.
+The "smemc" clock is removed on BG2Q SoCs. In fact, bit19 of clkenable
+register is for nfc. Current code use bit19 for non-exist "smemc"
+incorrectly, this prevents eMMC from working due to the sdhci's
+"core" clk is still gated.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Cc: stable at vger.kernel.org # 3.16+
 ---
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/berlin/bg2q.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index 28e7e20..a98ac1b 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -65,6 +65,8 @@
+diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+index 21784e4..440ef81 100644
+--- a/drivers/clk/berlin/bg2q.c
++++ b/drivers/clk/berlin/bg2q.c
+@@ -285,7 +285,6 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
+ 	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
+ 	{ "sdio",	"perif",	16, CLK_IGNORE_UNUSED },
+ 	{ "nfc",	"perif",	18 },
+-	{ "smemc",	"perif",	19 },
+ 	{ "pcie",	"perif",	22 },
  };
  
- &sdhci2 {
-+	broken-cd;
-+	bus-width = <8>;
- 	non-removable;
- 	status = "okay";
- };
 -- 
 2.1.4
