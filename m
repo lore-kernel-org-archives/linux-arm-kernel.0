@@ -1,30 +1,23 @@
-From: xiakaixu@huawei.com (Kaixu Xia)
-Date: Wed, 31 Dec 2014 15:40:29 +0800
-Subject: [PATCH] coresight: fix typo in comment in of_coresight.c
-Message-ID: <1420011629-77676-1-git-send-email-xiakaixu@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 31 Dec 2014 09:18:02 +0100
+Subject: [PATCH v4 4/4] Documentation: dt: gpio: Add gpio-number-forward
+ property in snps gpio binding doc
+In-Reply-To: <1417750722-14027-5-git-send-email-wangzhou.bry@gmail.com>
+References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+ <1417750722-14027-5-git-send-email-wangzhou.bry@gmail.com>
+Message-ID: <CACRpkdaBVN46BMO3Q5mN8OncghG3VH2=zv66EyWJEK1rwx3P6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Debugfs isn't used for coresight configuration, so the corresponding 
-comments should be changed.
+On Fri, Dec 5, 2014 at 4:38 AM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
 
-Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
----
- drivers/coresight/of_coresight.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> This property is used to indicate gpiochip_find_base() to find GPIO
+> base number in increasing order.
+>
+> Signed-off-by: Zhou Wang <wangzhou.bry@gmail.com>
 
-diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-index 5030c07..8bd524e 100644
---- a/drivers/coresight/of_coresight.c
-+++ b/drivers/coresight/of_coresight.c
-@@ -126,7 +126,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 	if (!pdata)
- 		return ERR_PTR(-ENOMEM);
- 
--	/* Use device name as debugfs handle */
-+	/* Use device name as sysfs handle */
- 	pdata->name = dev_name(dev);
- 
- 	/* Get the number of input and output port for this component */
--- 
-1.8.5.5
+NAK. GPIO numbers is a Linux-internal thing, not a OS independent
+property.
+
+Yours,
+Linus Walleij
