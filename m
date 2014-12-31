@@ -1,17 +1,12 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 31 Dec 2014 16:23:19 +0800
-Subject: [PATCH RFC v8 01/21] clk: divider: Correct parent clk round rate if
- no bestdiv is normally found
+Date: Wed, 31 Dec 2014 16:23:21 +0800
+Subject: [PATCH RFC v8 03/21] of: Add vendor prefix for Truly Semiconductors
+ Limited
 In-Reply-To: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
 References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1420014219-915-2-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1420014219-915-4-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-If no best divider is normally found, we will try to use the maximum divider.
-We should not set the parent clock rate to be 1Hz by force for being rounded.
-Instead, we should take the maximum divider as a base and calculate a correct
-parent clock rate for being rounded.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
@@ -36,22 +31,20 @@ v2->v3:
 v1->v2:
  * None.
 
- drivers/clk/clk-divider.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index c0a842b..f641d4b 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -311,7 +311,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 
- 	if (!bestdiv) {
- 		bestdiv = _get_maxdiv(divider);
--		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-+		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-+						MULT_ROUND_UP(rate, bestdiv));
- 	}
- 
- 	return bestdiv;
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index f46adb2..0e67bad 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -158,6 +158,7 @@ tlm	Trusted Logic Mobility
+ toradex	Toradex AG
+ toshiba	Toshiba Corporation
+ toumaz	Toumaz
++truly	Truly Semiconductors Limited
+ usi	Universal Scientific Industrial Co., Ltd.
+ v3	V3 Semiconductor
+ variscite	Variscite Ltd.
 -- 
 2.1.0
