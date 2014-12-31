@@ -1,35 +1,33 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 31 Dec 2014 16:57:50 +0800
-Subject: [PATCH 1/3] ARM: dts: berlin: fix io clk and add missing core clk for
- BG2Q sdhci2 host
-In-Reply-To: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
-References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1420016272-6789-2-git-send-email-jszhang@marvell.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 31 Dec 2014 09:25:41 +0000
+Subject: [PATCH 0/9] ARM Versatile multi-platform support
+In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On BG2Q, the sdhci2 host uses nfcecc for "io" clk and nfc for "core" clk.
-The shdci2 can't work Without this patch due to the "core" clk is gated.
+On 30 December 2014 at 19:28, Rob Herring <robherring2@gmail.com> wrote:
+> This has been tested on QEMU. A previous version was tested on
+> Versatile/AB by Linus Walleij. Linus reported a problem with the
+> display panel detection. Investigation on h/w is needed still as I have
+> not been able to identify the issue by inspection and the display
+> detection seems to work correctly on QEMU.
+>
+> Linus had also mentioned to me that QEMU users may have some issue with
+> removing non-DT code as the work flow has to change somewhat.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Cc: stable at vger.kernel.org # 3.16+
----
- arch/arm/boot/dts/berlin2q.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+As long as you call out the requirement for a DT now in whatever
+your equivalent of release notes is that should be fine. (Does
+the kernel provide a useful message to serial in the absence of a
+DT or does it now not have enough platform knowledge to do that?)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 35253c9..903f3bb 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -83,7 +83,8 @@
- 			compatible = "mrvl,pxav3-mmc";
- 			reg = <0xab1000 0x200>;
- 			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&chip CLKID_SDIO1XIN>;
-+			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
-+			clock-names = "io", "core";
- 			status = "disabled";
- 		};
- 
--- 
-2.1.4
+> Copying
+> Peter Maydell here for comment (and there's rumors he may have actual PB
+> h/w with PCI as well).
+
+Will Deacon and Marc Zyngier are currently in possession of that h/w.
+I'm sure they'd be delighted to pull it out of the cupboard and
+give it a spin :-)
+
+-- PMM
