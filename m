@@ -1,33 +1,33 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 31 Dec 2014 09:25:41 +0000
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 31 Dec 2014 10:57:20 +0100
+Subject: [PATCH 0/3] Add Armada 385 General Purpose Development Board
+ support
+In-Reply-To: <1419678035-10658-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1419678035-10658-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20141231105720.24e6983f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 December 2014 at 19:28, Rob Herring <robherring2@gmail.com> wrote:
-> This has been tested on QEMU. A previous version was tested on
-> Versatile/AB by Linus Walleij. Linus reported a problem with the
-> display panel detection. Investigation on h/w is needed still as I have
-> not been able to identify the issue by inspection and the display
-> detection seems to work correctly on QEMU.
->
-> Linus had also mentioned to me that QEMU users may have some issue with
-> removing non-DT code as the work flow has to change somewhat.
+Dear Gregory CLEMENT,
 
-As long as you call out the requirement for a DT now in whatever
-your equivalent of release notes is that should be fine. (Does
-the kernel provide a useful message to serial in the absence of a
-DT or does it now not have enough platform knowledge to do that?)
+On Sat, 27 Dec 2014 12:00:32 +0100, Gregory CLEMENT wrote:
 
-> Copying
-> Peter Maydell here for comment (and there's rumors he may have actual PB
-> h/w with PCI as well).
+> this patch set adds the support for the Armada 385 GP board, this board
+> is pretty close to the Armada 385 RD one. It comes with a new revision
+> of the Armada 385 SoC (B0).
 
-Will Deacon and Marc Zyngier are currently in possession of that h/w.
-I'm sure they'd be delighted to pull it out of the cupboard and
-give it a spin :-)
+Unless I'm wrong, it actually comes with an A0 revision, not a B0. But
+it's indeed different from the Z1 revision we have been using until now.
 
--- PMM
+At least, my Armada XP GP says:
+
+Board: DB-88F6820-GP
+SoC:   MV88F6828 Rev A0
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
