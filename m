@@ -1,65 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 31 Dec 2014 16:23:30 +0100
-Subject: [PATCH 3/9] ARM: versatile: add DT based PCI detection
-In-Reply-To: <CAL_Jsq+iVWPsN9LXEMT6DmjS7MGsnmgJLgyb33N3me=OcCet6g@mail.gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <13417872.31IhE1RbAx@wuerfel>
- <CAL_Jsq+iVWPsN9LXEMT6DmjS7MGsnmgJLgyb33N3me=OcCet6g@mail.gmail.com>
-Message-ID: <14512076.oz77HnzXre@wuerfel>
+Date: Wed, 31 Dec 2014 16:31:05 +0100
+Subject: [PATCH 1/4] ARM: sirf: add two debug ports for CSRatlas7 SoC
+In-Reply-To: <CAGsJ_4wUO6rOW4ZyciXkdKtZjkbdHyo=je7_20B5kumKnu8m9A@mail.gmail.com>
+References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
+ <88770560.BUUQRjmk3f@wuerfel>
+ <CAGsJ_4wUO6rOW4ZyciXkdKtZjkbdHyo=je7_20B5kumKnu8m9A@mail.gmail.com>
+Message-ID: <43053389.8mSSmmg5HD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 December 2014 17:05:16 Rob Herring wrote:
-> On Tue, Dec 30, 2014 at 3:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 30 December 2014 13:28:32 Rob Herring wrote:
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> Disable the Versatile PCI DT node when no PCI backplane is detected. This
-> >> will prevent the Versatile PCI driver from probing when PCI is not
-> >> populated.
+On Wednesday 31 December 2014 23:05:44 Barry Song wrote:
+> 2014-12-31 6:35 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Thursday 25 December 2014 16:34:17 Barry Song wrote:
+> >>  #if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
+> >> -#define SIRFSOC_UART1_PA_BASE          0xb0060000
+> >> +#define SIRF_LLUART_PA_BASE          0xb0060000
+> >>  #elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
+> >> -#define SIRFSOC_UART1_PA_BASE          0xcc060000
+> >> +#define SIRF_LLUART_PA_BASE          0xcc060000
+> >> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART1)
+> >> +#define SIRF_LLUART_PA_BASE          0x18020000
+> >> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART0)
+> >> +#define SIRF_LLUART_PA_BASE          0x18010000
+> >>  #else
+> >> -#define SIRFSOC_UART1_PA_BASE          0
+> >> +#define SIRF_LLUART_PA_BASE          0
+> >>  #endif
 > >
-> > Can you explain why the check is done in platform code instead of the PCI
-> > driver probe function itself?
+> > I think it would be nicer to use DEBUG_UART_PHYS/DEBUG_UART_VIRT here.
 > 
-> Because the register to check is not part of the PCI controller, but
-> part of the system registers. There was no infrastructure for the
-> system registers when I originally wrote this, but there's some syscon
-> support now for VExpress that may be able to be used. I think it is
-> cleaner if we can avoid syscon dependencies in drivers in general, but
-> it is pretty much zero chance the Versatile PCI driver will ever be
-> used on another platform.
+> yes if it is more general name for all. my second feeling is that does
+> this conflict CSR namespace stuff into high-level and common namespace
+> things?
 
-Ok, I see. I guess ideally we would get a correct DTB file from the boot
-loader, but that is of course completely unrealistic on versatile, both
-on hardware and qemu.
-
-Maybe we can just take your current approach for now, and add a comment
-about the possibility of using syscon in the future to the function.
-
-I'm also not completely sure if your code gets it right: the existing
-driver writes '1' into this register in .preinit() and then reads the
-same register back in .setup(). Your driver just reads the value but
-never writes it.
-
-I suspect that either the existing behavior is completely bogus because
-the driver always reads what it write before, and then you can skip
-the logic completely, or your new driver is broken because reading
-the register without writing it first will result in undefined behavior
-on real hardware.
-
-> >> +     /* Check if PCI backplane is detected */
-> >> +     val = __raw_readl(base + VERSATILE_SYS_PCICTL_OFFSET);
-> >> +     if (val & 1)
-> >> +             goto err;
-> >
-> > Using __raw_readl prevents this from working with big-endian kernels, so just
-> > use readl here.
-> 
-> So does the fact that this is an ARM926, but yes there's not really
-> any reason not to use readl.
-
-Ok. I don't think there is anything preventing you from setting big-endian
-mode on arm926 though, it's just that nobody ever has the need in practice,
-and a lot of drivers are broken.
+I think my comment was misleading. What I meant was to use
+CONFIG_DEBUG_UART_PHYS from arch/arm/Kconfig.debug the same way
+we do for the 8250 and pl011 compatible uarts.
 
 	Arnd
