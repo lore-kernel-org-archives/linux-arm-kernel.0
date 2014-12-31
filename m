@@ -1,48 +1,63 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 31 Dec 2014 14:19:52 +0900
-Subject: [RFC PATCHv2 8/8] ARM: dts: Add memory bus node for Exynos4412-based
- TRATS2 board
-In-Reply-To: <1420003192-5576-1-git-send-email-cw00.choi@samsung.com>
-References: <1420003192-5576-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1420003192-5576-9-git-send-email-cw00.choi@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 31 Dec 2014 15:14:36 +0900
+Subject: [PATCH 21/30] ARM: shmobile: r8a7794: Add SDHI clocks to device
+ tree
+In-Reply-To: <54A13791.2060201@cogentembedded.com>
+References: <cover.1419812185.git.horms+renesas@verge.net.au>
+ <8e181633e6ca960491ac502ccd4a4aac482c3ff9.1419812186.git.horms+renesas@verge.net.au>
+ <54A13791.2060201@cogentembedded.com>
+Message-ID: <20141231061436.GE22191@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Exynos4412 memory-bus node which includes the regulator
-and devfreq-event phandle. The devfreq-event phandle is used for the
-governor of devfreq device and provide the current usage state of
-MIF (Memory Interface) / INT (Internal) memory bus group.
+On Mon, Dec 29, 2014 at 02:14:25PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 12/29/2014 4:43 AM, Simon Horman wrote:
+> 
+> >From: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> 
+> >Signed-off-by: Shinobu Uehara <shinobu.uehara.xc@renesas.com>
+> >[horms: omitted device nodes; only add clock]
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/boot/dts/r8a7794.dtsi            | 20 +++++++++++++++++++-
+> >  include/dt-bindings/clock/r8a7794-clock.h |  3 +++
+> >  2 files changed, 22 insertions(+), 1 deletion(-)
+> 
+> >diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> >index 728d719..c376676 100644
+> >--- a/arch/arm/boot/dts/r8a7794.dtsi
+> >+++ b/arch/arm/boot/dts/r8a7794.dtsi
+> >@@ -293,6 +293,21 @@
+> >  			clock-output-names = "main", "pll0", "pll1", "pll3",
+> >  					     "lb", "qspi", "sdh", "sd0", "z";
+> >  		};
+> >+		/* Variable factor clocks */
+> >+		sd1_clk: sd2_clk at e6150078 {
+> 
+>    So is it SD1 or SD2 clock?
+> 
+> >+			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+> >+			reg = <0 0xe6150078 0 4>;
+> >+			clocks = <&pll1_div2_clk>;
+> >+			#clock-cells = <0>;
+> >+			clock-output-names = "sd1";
+> >+		};
+> >+		sd2_clk: sd3_clk at e615007c {
+> 
+>    Same question...
+> 
+> >+			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+> >+			reg = <0 0xe615007c 0 4>;
+> >+			clocks = <&pll1_div2_clk>;
+> >+			#clock-cells = <0>;
+> >+			clock-output-names = "sd2";
+> >+		};
+> [...]
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Thanks, and sorry for letting that slip through.
+e6150078 should be sd1_clk and e615007c should be sd2_clk.
+And for reference sd3_clk is e615026c.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index bee0eed..21ba25e 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -917,6 +917,18 @@
- 	};
- };
- 
-+&memory_bus_mif {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-mem-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
-+&memory_bus_int {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-mem-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
- &pinctrl_0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sleep0>;
--- 
-1.8.5.5
+I'll send an incremental patch to fix this problem.
