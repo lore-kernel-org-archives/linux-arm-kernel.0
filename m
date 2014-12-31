@@ -1,43 +1,57 @@
-From: ashwinc@codeaurora.org (ashwinc at codeaurora.org)
-Date: Wed, 31 Dec 2014 15:08:23 -0000
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54A3B526.9040903@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
- <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
- <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
- <54A3B526.9040903@linaro.org>
-Message-ID: <d3ea3f18e4d9ca9c623e3632129caee6.squirrel@www.codeaurora.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 31 Dec 2014 20:51:16 +0530
+Subject: [RFC 0/8] ARM64: Uprobe support added
+Message-ID: <cover.1420038188.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 December 2014 at 03:34, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> On 2014???12???31??? 04:13, ashwinc at codeaurora.org wrote:
->> Hi Hanjun,
->>> +ASWG
->>> +----
->>> +The following areas are not yet fully defined for ARM in the 5.1
->>> version
->>> +of the ACPI specification and are expected to be worked through in the
->>> +UEFI ACPI Specification Working Group (ASWG):
->>> +
->>> +   -- ACPI based CPU topology
->>> +   -- ACPI based Power management
->>
->> Should clarify this to idle management rather than generic power
->> management.
->
-> and I think it is CPU idle specific here, right?
->
+These patches have been prepared on top of ARM64 kprobe v3 patches [1]
+under review.
 
-Right.
+Unit test for following has been done so far and they have been found
+working
+    1. Normal instruction, which can be probed like sub, ldr, add etc.
+    2. Instructions which can be simulated like ret.
+    3. uretprobe
 
-Thanks,
-Ashwin
 
---
-Qualcomm Innovation Center, Inc
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
 
---
+[1]https://lkml.org/lkml/2014/11/18/33
+
+Pratyush Anand (8):
+  ARM64: Move BRK opcodes defines from kprobes.h to insn.h
+  ARM64: Refactor kprobes-arm64
+  Kernel/uprobe: Define arch_uprobe_exception_notify as __weak
+  ARM64: Add instruction_pointer_set function
+  ARM64: Re-factor flush_ptrace_access
+  ARM64: Handle TRAP_HWBRKPT for user mode as well
+  ARM64: Handle TRAP_BRKPT for user mode as well
+  ARM64: Add uprobe support
+
+ arch/arm/kernel/uprobes.c                          |   6 -
+ arch/arm64/Kconfig                                 |   3 +
+ arch/arm64/include/asm/insn.h                      |   8 +
+ arch/arm64/include/asm/probes.h                    |  26 ++-
+ arch/arm64/include/asm/ptrace.h                    |   7 +
+ arch/arm64/include/asm/thread_info.h               |   5 +-
+ arch/arm64/include/asm/uprobes.h                   |  43 ++++
+ arch/arm64/kernel/Makefile                         |   5 +-
+ arch/arm64/kernel/debug-monitors.c                 |  14 +-
+ arch/arm64/kernel/kprobes.c                        |  11 +-
+ arch/arm64/kernel/kprobes.h                        |   7 +-
+ .../kernel/{kprobes-arm64.c => probes-arm64.c}     |  84 +++----
+ .../kernel/{kprobes-arm64.h => probes-arm64.h}     |  17 +-
+ arch/arm64/kernel/probes-condn-check.c             |   2 +-
+ arch/arm64/kernel/probes-decode.h                  |   4 +-
+ arch/arm64/kernel/signal.c                         |   4 +-
+ arch/arm64/kernel/uprobes.c                        | 255 +++++++++++++++++++++
+ arch/arm64/mm/flush.c                              |  30 ++-
+ kernel/events/uprobes.c                            |  18 ++
+ 19 files changed, 445 insertions(+), 104 deletions(-)
+ create mode 100644 arch/arm64/include/asm/uprobes.h
+ rename arch/arm64/kernel/{kprobes-arm64.c => probes-arm64.c} (79%)
+ rename arch/arm64/kernel/{kprobes-arm64.h => probes-arm64.h} (60%)
+ create mode 100644 arch/arm64/kernel/uprobes.c
+
+-- 
+2.1.0
