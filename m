@@ -1,14 +1,16 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 31 Dec 2014 16:23:35 +0800
-Subject: [PATCH RFC v8 17/21] ARM: dtsi: imx6qdl: Add support for MIPI DSI
- host controller
+Date: Wed, 31 Dec 2014 16:23:36 +0800
+Subject: [PATCH RFC v8 18/21] ARM: dts: imx6qdl-sabresd: Add support for TRULY
+ TFT480800-16-E MIPI DSI panel
 In-Reply-To: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
 References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1420014219-915-18-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1420014219-915-19-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for MIPI DSI host controller.
+The TRULY TFT480800-16-E panel is driven by the Himax HX8369A driver IC.
+The driver IC supports several display/control interface modes, including
+the MIPI DSI video mode and command mode.
 
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
@@ -21,36 +23,64 @@ v6->v7:
 v5->v6:
  * None.
 
+v4->v5:
+ * Replace the bs[3:0]-gpios properties with the bs-gpios property.
+   This addresses Andrzej Hajda's comment.
+
 v3->v4:
  * None.
 
 v2->v3:
- * As suggested by Phillip Zabel, change the clocks and the clock-names
-   properties to use the pllref and core_cfg clocks only.
-
-v1->v2:
  * None.
 
- arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+v1->v2:
+ * To address Thierry Reding's comments, remove several unnecessary
+   properties as they can be implied by the compatible string.
+ * Fix the compatible string.
+ * Remove the display-timings node from the panel node as it can be
+   implied by the compatible string as well.
+ * Remove the status property as it is unneeded.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 96bf2a0..7b1c313 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1006,7 +1006,13 @@
- 			mipi_dsi: mipi at 021e0000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				compatible = "fsl,imx6q-mipi-dsi";
- 				reg = <0x021e0000 0x4000>;
-+				interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
-+				gpr = <&gpr>;
-+				clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
-+					 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
-+				clock-names = "pllref", "core_cfg";
- 				status = "disabled";
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index baf2f00..4e3a666 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -482,6 +482,13 @@
+ 				MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
+ 			>;
+ 		};
++
++		pinctrl_mipi_panel: mipipanelgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x1b0b0
++				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x1b0b0
++			>;
++		};
+ 	};
  
- 				ports {
+ 	gpio_leds {
+@@ -518,6 +525,19 @@
+ 	};
+ };
+ 
++&mipi_dsi {
++	status = "okay";
++
++	panel {
++		compatible = "truly,tft480800-16-e-dsi";
++		reg = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mipi_panel>;
++		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
++		bs-gpios = <0>, <0>, <&gpio6 14 GPIO_ACTIVE_HIGH>, <0>;
++	};
++};
++
+ &pcie {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
 -- 
 2.1.0
