@@ -1,16 +1,20 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 31 Dec 2014 16:23:29 +0800
-Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings for
- Synopsys DW MIPI DSI DRM bridge driver
+Date: Wed, 31 Dec 2014 16:23:25 +0800
+Subject: [PATCH RFC v8 07/21] ARM: imx6q: clk: Change hsi_tx clock to be a
+ shared clock gate
 In-Reply-To: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
 References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1420014219-915-8-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree bindings for Synopsys DesignWare MIPI DSI
-host controller DRM bridge driver.
+The CG8 field of the CCM CCGR3 register is named as 'mipi_core_cfg'
+clock, according to the i.MX6q/sdl reference manuals.  This clock is
+actually the gate for several clocks, including the hsi_tx_sel clock's
+output and the video_27m clock's output.  So, this patch changes the
+hsi_tx clock to be a shared clock gate.
 
+Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v7->v8:
@@ -20,100 +24,40 @@ v6->v7:
  * None.
 
 v5->v6:
- * Add the #address-cells and #size-cells properties in the example 'ports'
-   node.
- * Remove the useless input-port properties from the example port at 0 and port at 1
-   nodes.
+ * None.
 
 v4->v5:
  * None.
 
 v3->v4:
- * Newly introduced in v4.  This is separated from the relevant driver patch
-   in v3 to address Stefan Wahren's comment.
+ * None.
 
- .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt | 73 ++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+v2->v3:
+ * Newly introduced in v3.
 
-diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-new file mode 100644
-index 0000000..f88a8d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-@@ -0,0 +1,73 @@
-+Device-Tree bindings for Synopsys DesignWare MIPI DSI host controller
-+
-+The controller is a digital core that implements all protocol functions
-+defined in the MIPI DSI specification, providing an interface between
-+the system and the MIPI DPHY, and allowing communication with a MIPI DSI
-+compliant display.
-+
-+Required properties:
-+ - #address-cells: Should be <1>.
-+ - #size-cells: Should be <0>.
-+ - compatible: The compatible string should be "fsl,imx6q-mipi-dsi" for
-+   i.MX6q/sdl SoCs.  For other SoCs, please refer to their specific
-+   device tree binding documentations.
-+ - reg: Represent the physical address range of the controller.
-+ - interrupts: Represent the controller's interrupt to the CPU(s).
-+ - clocks, clock-names: Phandles to the controller pll reference and
-+   core configuration clocks, as described in [1].
-+
-+For more required properties, please refer to relevant device tree binding
-+documentations which describe the controller embedded in specific SoCs.
-+
-+Required sub-nodes:
-+ - A node to represent a DSI peripheral as described in [2].
-+
-+For more required sub-nodes, please refer to relevant device tree binding
-+documentations which describe the controller embedded in specific SoCs.
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+[2] Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
-+
-+example:
-+	gpr: iomuxc-gpr at 020e0000 {
-+		/* ... */
-+	};
-+
-+	mipi_dsi: mipi at 021e0000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,imx6q-mipi-dsi";
-+		reg = <0x021e0000 0x4000>;
-+		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
-+		gpr = <&gpr>;
-+		clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
-+			 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
-+		clock-names = "pllref", "core_cfg";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				mipi_mux_0: endpoint {
-+					remote-endpoint = <&ipu1_di0_mipi>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				mipi_mux_1: endpoint {
-+					remote-endpoint = <&ipu1_di1_mipi>;
-+				};
-+			};
-+		};
-+
-+		panel {
-+			compatible = "truly,tft480800-16-e-dsi";
-+			reg = <0>;
-+			/* ... */
-+		};
-+	};
+ arch/arm/mach-imx/clk-imx6q.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index f19472a..080d5b7 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -119,6 +119,7 @@ static unsigned int share_count_asrc;
+ static unsigned int share_count_ssi1;
+ static unsigned int share_count_ssi2;
+ static unsigned int share_count_ssi3;
++static unsigned int share_count_mipi_core_cfg;
+ 
+ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ {
+@@ -416,7 +417,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_LDB_DI0]      = imx_clk_gate2("ldb_di0",       "ldb_di0_podf",      base + 0x74, 12);
+ 	clk[IMX6QDL_CLK_LDB_DI1]      = imx_clk_gate2("ldb_di1",       "ldb_di1_podf",      base + 0x74, 14);
+ 	clk[IMX6QDL_CLK_IPU2_DI1]     = imx_clk_gate2("ipu2_di1",      "ipu2_di1_sel",      base + 0x74, 10);
+-	clk[IMX6QDL_CLK_HSI_TX]       = imx_clk_gate2("hsi_tx",        "hsi_tx_podf",       base + 0x74, 16);
++	clk[IMX6QDL_CLK_HSI_TX]       = imx_clk_gate2_shared("hsi_tx", "hsi_tx_podf",       base + 0x74, 16, &share_count_mipi_core_cfg);
+ 	if (cpu_is_imx6dl())
+ 		/*
+ 		 * The multiplexer and divider of the imx6q clock gpu2d get
 -- 
 2.1.0
