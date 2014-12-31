@@ -1,118 +1,119 @@
 From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 31 Dec 2014 16:23:27 +0800
-Subject: [PATCH RFC v8 09/21] ARM: dts: imx6qdl: Move existing MIPI DSI ports
- into a new 'ports' node
+Date: Wed, 31 Dec 2014 16:23:29 +0800
+Subject: [PATCH RFC v8 11/21] Documentation: dt-bindings: Add bindings for
+ Synopsys DW MIPI DSI DRM bridge driver
 In-Reply-To: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
 References: <1420014219-915-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <1420014219-915-10-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <1420014219-915-12-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI DSI node contains some ports which represent possible DRM CRTCs
-it can connect with.  Each port has a 'reg' property embedded.  This
-property will be wrongly interpretted by the MIPI DSI bus driver, because
-the driver will take each subnode which contains a 'reg' property as a
-DSI peripheral device.  This patch moves the existing MIPI DSI ports into
-a new 'ports' node so that the MIPI DSI bus driver may distinguish its
-DSI peripheral device(s) from the existing ports.
+This patch adds device tree bindings for Synopsys DesignWare MIPI DSI
+host controller DRM bridge driver.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 ---
 v7->v8:
  * None.
 
-v5->v6:
+v6->v7:
  * None.
+
+v5->v6:
+ * Add the #address-cells and #size-cells properties in the example 'ports'
+   node.
+ * Remove the useless input-port properties from the example port at 0 and port at 1
+   nodes.
 
 v4->v5:
  * None.
 
 v3->v4:
- * None.
+ * Newly introduced in v4.  This is separated from the relevant driver patch
+   in v3 to address Stefan Wahren's comment.
 
-v2->v3:
- * Add Philipp's Ack.
+ .../devicetree/bindings/drm/bridge/dw_mipi_dsi.txt | 73 ++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
 
-v1->v2:
- * Newly added, as suggested by Thierry Reding.
-
- arch/arm/boot/dts/imx6q.dtsi   | 20 +++++++++++---------
- arch/arm/boot/dts/imx6qdl.dtsi | 23 ++++++++++++++---------
- 2 files changed, 25 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index e9f3646..9c0990b 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -292,19 +292,21 @@
- };
- 
- &mipi_dsi {
--	port at 2 {
--		reg = <2>;
-+	ports {
-+		port at 2 {
-+			reg = <2>;
- 
--		mipi_mux_2: endpoint {
--			remote-endpoint = <&ipu2_di0_mipi>;
-+			mipi_mux_2: endpoint {
-+				remote-endpoint = <&ipu2_di0_mipi>;
-+			};
- 		};
--	};
- 
--	port at 3 {
--		reg = <3>;
-+		port at 3 {
-+			reg = <3>;
- 
--		mipi_mux_3: endpoint {
--			remote-endpoint = <&ipu2_di1_mipi>;
-+			mipi_mux_3: endpoint {
-+				remote-endpoint = <&ipu2_di1_mipi>;
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 9596ed5..96bf2a0 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1009,19 +1009,24 @@
- 				reg = <0x021e0000 0x4000>;
- 				status = "disabled";
- 
--				port at 0 {
--					reg = <0>;
-+				ports {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+new file mode 100644
+index 0000000..f88a8d6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+@@ -0,0 +1,73 @@
++Device-Tree bindings for Synopsys DesignWare MIPI DSI host controller
 +
-+					port at 0 {
-+						reg = <0>;
- 
--					mipi_mux_0: endpoint {
--						remote-endpoint = <&ipu1_di0_mipi>;
-+						mipi_mux_0: endpoint {
-+							remote-endpoint = <&ipu1_di0_mipi>;
-+						};
- 					};
--				};
- 
--				port at 1 {
--					reg = <1>;
-+					port at 1 {
-+						reg = <1>;
- 
--					mipi_mux_1: endpoint {
--						remote-endpoint = <&ipu1_di1_mipi>;
-+						mipi_mux_1: endpoint {
-+							remote-endpoint = <&ipu1_di1_mipi>;
-+						};
- 					};
- 				};
- 			};
++The controller is a digital core that implements all protocol functions
++defined in the MIPI DSI specification, providing an interface between
++the system and the MIPI DPHY, and allowing communication with a MIPI DSI
++compliant display.
++
++Required properties:
++ - #address-cells: Should be <1>.
++ - #size-cells: Should be <0>.
++ - compatible: The compatible string should be "fsl,imx6q-mipi-dsi" for
++   i.MX6q/sdl SoCs.  For other SoCs, please refer to their specific
++   device tree binding documentations.
++ - reg: Represent the physical address range of the controller.
++ - interrupts: Represent the controller's interrupt to the CPU(s).
++ - clocks, clock-names: Phandles to the controller pll reference and
++   core configuration clocks, as described in [1].
++
++For more required properties, please refer to relevant device tree binding
++documentations which describe the controller embedded in specific SoCs.
++
++Required sub-nodes:
++ - A node to represent a DSI peripheral as described in [2].
++
++For more required sub-nodes, please refer to relevant device tree binding
++documentations which describe the controller embedded in specific SoCs.
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/mipi/dsi/mipi-dsi-bus.txt
++
++example:
++	gpr: iomuxc-gpr at 020e0000 {
++		/* ... */
++	};
++
++	mipi_dsi: mipi at 021e0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "fsl,imx6q-mipi-dsi";
++		reg = <0x021e0000 0x4000>;
++		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
++		gpr = <&gpr>;
++		clocks = <&clks IMX6QDL_CLK_MIPI_CORE_CFG>,
++			 <&clks IMX6QDL_CLK_MIPI_CORE_CFG>;
++		clock-names = "pllref", "core_cfg";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++
++				mipi_mux_0: endpoint {
++					remote-endpoint = <&ipu1_di0_mipi>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				mipi_mux_1: endpoint {
++					remote-endpoint = <&ipu1_di1_mipi>;
++				};
++			};
++		};
++
++		panel {
++			compatible = "truly,tft480800-16-e-dsi";
++			reg = <0>;
++			/* ... */
++		};
++	};
 -- 
 2.1.0
