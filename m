@@ -1,35 +1,52 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 31 Dec 2014 16:00:14 +0200
-Subject: OMAP 4430 SDP: rather sick with recent kernels
-In-Reply-To: <20141218114949.GY11764@sirena.org.uk>
-References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
- <20141217172333.GE23854@atomide.com>
- <20141217185155.GI11502@n2100.arm.linux.org.uk> <5491F0B6.4090904@ti.com>
- <20141218101618.GJ11502@n2100.arm.linux.org.uk>
- <20141218114949.GY11764@sirena.org.uk>
-Message-ID: <54A4016E.3000300@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 31 Dec 2014 22:50:16 +0800
+Subject: [PATCH 2/4] ARM: sirf: add atlas7 machine support
+In-Reply-To: <4739415.xM06V8YCmL@wuerfel>
+References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
+ <1419496460-4929-3-git-send-email-21cnbao@gmail.com>
+ <4739415.xM06V8YCmL@wuerfel>
+Message-ID: <CAGsJ_4xzn0mHXa85yMSOERt23as7W=PfkfyzC6xrXo5wBDcR1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/18/2014 01:49 PM, Mark Brown wrote:
-> On Thu, Dec 18, 2014 at 10:16:18AM +0000, Russell King - ARM Linux wrote:
-> 
->> So that doesn't work - but importantly, it does point towards a
->> possible culpret - snd_soc_of_parse_audio_routing().
-> 
->> This is obvious when you stop and think about what it's doing, this is
->> truely where this bug lies, and it /is/ in generic ASoC code.
-> 
->> The problem is that this function doesn't consider the implications of
->> deferred probing.  Let's see what happens if we defer, and re-do the
->> ABE initialisation, including calling this function:
-> 
-> Right, spot on - I'll send a revert for that upstream.  Thanks for
-> tracking this down.
+2014-12-31 6:34 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 25 December 2014 16:34:18 Barry Song wrote:
+>> +DT_MACHINE_START(ATLAS7_DT, "Generic ATLAS7 (Flattened Device Tree)")
+>> +       /* Maintainer: Barry Song <baohua.song@csr.com> */
+>> +       .smp            = smp_ops(sirfsoc_smp_ops),
+>> +       .map_io         = sirfsoc_map_io,
+>> +       .init_late      = sirfsoc_init_late,
+>> +       .dt_compat      = atlas7_dt_match,
+>> +MACHINE_END
+>
+> Can you check if the sirfsoc_map_io function is still required?
+> My guess is that you can just replace sirfsoc_map_scu() with a
+> call of ioremap in sirfsoc_smp_prepare_cpus, and drop sirfsoc_map_lluart()
+> entirely in favor of the default debug_ll_io_init() function that
+> is called when map_io is NULL.
+>
+> Also, how about merging the entries for atlas6 and atlas7, and just
+> having multiple compatible strings in atlas_dt_match?
 
-Mark, can you send the e3b1e6a19e09877b91517dfe304a2b3f6b2138fc (found it in
-linux-next) for 3.19 if it not yet done? With that applied mainline boots up
-on my Blaze.
+the situation is that atlas7 is not a family of atlas6. atlas6 is much
+similar with prima2, but atlas7 is actually a replacement of earlier
+marco family.
 
--- 
-P?ter
+atlas7 is a dual core cortex-a7, but atlas6 is a single core
+cortex-a9. and atlas7 is using a Network on Chip(NoC) bus architecture
+which is completely not same with atlas6 which is using a tree-type
+bus, so atlas7 will have some machine-specific codes like NoC fireware
+which should be in machine specific codes to handle external data
+aborts things for security protection. and more important, atlas7 has
+much different IP modules with atlas6 for things like GPS,
+connectiviy, software digital radios. and atlas7 has a more cortex-M3
+for CAN stack, so this will involve some IPC drivers. and one more DSP
+for audio processing.
+
+this means atlas7 is not a simple atlas6+1, it is a new chip.  i have
+a feeling atlas7 should be highlighted as a seperate machine.
+
+>
+>         Arnd
+
+-barry
