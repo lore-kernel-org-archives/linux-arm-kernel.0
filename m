@@ -1,34 +1,30 @@
-From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Wed, 31 Dec 2014 13:06:16 +0530
-Subject: [RFC PATCH v3 1/4] arm64: defconfig: increase NR_CPUS range to 2-4096.
-In-Reply-To: <1420011379-7116-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1420011379-7116-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <1420011379-7116-2-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+From: xiakaixu@huawei.com (Kaixu Xia)
+Date: Wed, 31 Dec 2014 15:40:29 +0800
+Subject: [PATCH] coresight: fix typo in comment in of_coresight.c
+Message-ID: <1420011629-77676-1-git-send-email-xiakaixu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Raising the maximum limit to 4096.
-This is to accomadate up-coming higher multi-core platforms.
+Debugfs isn't used for coresight configuration, so the corresponding 
+comments should be changed.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 ---
- arch/arm64/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/coresight/of_coresight.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 61fbd1f..242419d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -302,8 +302,8 @@ config SCHED_SMT
- 	  places. If unsure say N here.
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index 5030c07..8bd524e 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -126,7 +126,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	if (!pdata)
+ 		return ERR_PTR(-ENOMEM);
  
- config NR_CPUS
--	int "Maximum number of CPUs (2-64)"
--	range 2 64
-+	int "Maximum number of CPUs (2-4096)"
-+	range 2 4096
- 	depends on SMP
- 	# These have to remain sorted largest to smallest
- 	default "64"
+-	/* Use device name as debugfs handle */
++	/* Use device name as sysfs handle */
+ 	pdata->name = dev_name(dev);
+ 
+ 	/* Get the number of input and output port for this component */
 -- 
-1.8.1.4
+1.8.5.5
