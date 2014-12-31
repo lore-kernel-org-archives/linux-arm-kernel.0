@@ -1,96 +1,51 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 31 Dec 2014 12:13:05 +0530
-Subject: [PATCH v3 4/4] ARM: dts: add HS400 support for Exynos5420 and
- exynos5800
-In-Reply-To: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
-References: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1420008185-24758-5-git-send-email-alim.akhtar@samsung.com>
+From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Wed, 31 Dec 2014 13:06:15 +0530
+Subject: [RFC PATCH v3 0/4] arm64:numa: Add numa support for arm64 platforms.
+Message-ID: <1420011379-7116-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Seungwon Jeon <tgih.jun@samsung.com>
+This is v3 patch set to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) platform.
 
-HS400 timing value set is added for SMDK5420, peach-pit and
-exynos5800 peach-pi.
-And GPIO line for RCLK should be pull-down state.
+In this patchset, defined and implemented dt bindings for numa mapping for core and memory.
+using device node property arm,associativity.
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts |    5 ++++-
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
- arch/arm/boot/dts/exynos5420-smdk5420.dts  |    5 ++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  |    5 ++++-
- 4 files changed, 19 insertions(+), 3 deletions(-)
+v2:
+Defined and implemented numa map for memory, cores to node and
+proximity distance matrix of nodes to each other.
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index e9f5a6c..151ae7d 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -568,8 +568,11 @@
- 	clock-frequency = <400000000>;
- 	samsung,dw-mshc-sdr-timing = <0 4 3>;
- 	samsung,dw-mshc-ddr-timing = <0 2 3>;
-+	samsung,dw-mshc-hs200-timing = <0 2 3>;
-+	samsung,dw-mshc-hs400-timing = <0 2 1>;
-+	read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 	bus-width = <8>;
- };
- 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index ba686e4..dd85fe2 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -194,6 +194,13 @@
- 			samsung,pin-drv = <3>;
- 		};
- 
-+		sd0_rclk: sd0-rclk {
-+			samsung,pins = "gpc0-7";
-+			samsung,pin-function = <2>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <3>;
-+		};
-+
- 		sd1_clk: sd1-clk {
- 			samsung,pins = "gpc1-0";
- 			samsung,pin-function = <2>;
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 140ea54..685e2a4 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -79,8 +79,11 @@
- 		card-detect-delay = <200>;
- 		samsung,dw-mshc-sdr-timing = <0 4 3>;
- 		samsung,dw-mshc-ddr-timing = <0 2 3>;
-+		samsung,dw-mshc-hs200-timing = <0 2 3>;
-+		samsung,dw-mshc-hs400-timing = <0 2 1>;
-+		read-strobe-delay = <90>;
- 		pinctrl-names = "default";
--		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-+		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 		bus-width = <8>;
- 		cap-mmc-highspeed;
- 	};
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 9a4875b..28d4109 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -556,8 +556,11 @@
- 	clock-frequency = <400000000>;
- 	samsung,dw-mshc-sdr-timing = <0 4 3>;
- 	samsung,dw-mshc-ddr-timing = <0 2 3>;
-+	samsung,dw-mshc-hs200-timing = <0 2 3>;
-+	samsung,dw-mshc-hs400-timing = <0 2 1>;
-+	read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 	bus-width = <8>;
- };
- 
+v1:
+Initial patchset to support numa on arm64 platforms.
+
+Ganapatrao Kulkarni (4):
+  arm64: defconfig: increase NR_CPUS range to 2-4096.
+  Documentation: arm64/arm: dt bindings for numa.
+  arm64:thunder: Add initial dts for Cavium's Thunder SoC in 2 Node
+    topology.
+  arm64:numa: adding numa support for arm64 platforms.
+
+ Documentation/devicetree/bindings/arm/numa.txt | 198 +++++++
+ arch/arm64/Kconfig                             |  36 +-
+ arch/arm64/boot/dts/thunder-88xx-2n.dts        |  78 +++
+ arch/arm64/boot/dts/thunder-88xx-2n.dtsi       | 789 +++++++++++++++++++++++++
+ arch/arm64/include/asm/mmzone.h                |  32 +
+ arch/arm64/include/asm/numa.h                  |  45 ++
+ arch/arm64/kernel/Makefile                     |   1 +
+ arch/arm64/kernel/dt_numa.c                    | 296 ++++++++++
+ arch/arm64/kernel/setup.c                      |   8 +
+ arch/arm64/kernel/smp.c                        |   2 +
+ arch/arm64/mm/Makefile                         |   1 +
+ arch/arm64/mm/init.c                           |  34 +-
+ arch/arm64/mm/numa.c                           | 520 ++++++++++++++++
+ 13 files changed, 2032 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dts
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dtsi
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/kernel/dt_numa.c
+ create mode 100644 arch/arm64/mm/numa.c
+
 -- 
-1.7.9.5
+1.8.1.4
