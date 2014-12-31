@@ -1,42 +1,32 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 31 Dec 2014 17:34:43 +0100
-Subject: [PATCH] ASoC: adi: Add missing return statement.
-In-Reply-To: <1420042837-3337-1-git-send-email-andrew.jackson@arm.com>
-References: <1420042837-3337-1-git-send-email-andrew.jackson@arm.com>
-Message-ID: <54A425A3.2070108@metafoo.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 31 Dec 2014 18:52:37 +0000
+Subject: OMAP 4430 SDP: rather sick with recent kernels
+In-Reply-To: <54A4016E.3000300@ti.com>
+References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
+ <20141217172333.GE23854@atomide.com>
+ <20141217185155.GI11502@n2100.arm.linux.org.uk>
+ <5491F0B6.4090904@ti.com>
+ <20141218101618.GJ11502@n2100.arm.linux.org.uk>
+ <20141218114949.GY11764@sirena.org.uk> <54A4016E.3000300@ti.com>
+Message-ID: <20141231185237.GO11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31/2014 05:20 PM, Andrew Jackson wrote:
-> From: Andrew Jackson <Andrew.Jackson@arm.com>
->
-> The probe routine was disabling the clock even
-> if the system was configured successfully.  Add
-> a return statement to leave clocks enabled.
->
-> Signed-off-by: Andrew Jackson <Andrew.Jackson@arm.com>
+On Wed, Dec 31, 2014 at 04:00:14PM +0200, Peter Ujfalusi wrote:
+> On 12/18/2014 01:49 PM, Mark Brown wrote:
 
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+> > Right, spot on - I'll send a revert for that upstream.  Thanks for
+> > tracking this down.
 
-Thanks, never noticed since the clock is shared with other peripherals.
+> Mark, can you send the e3b1e6a19e09877b91517dfe304a2b3f6b2138fc (found it in
+> linux-next) for 3.19 if it not yet done? With that applied mainline boots up
+> on my Blaze.
 
-> ---
-> Spotted while reviewing clock preparation
->
->   sound/soc/adi/axi-i2s.c |    2 ++
->   1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/sound/soc/adi/axi-i2s.c b/sound/soc/adi/axi-i2s.c
-> index 7752860..4c23381 100644
-> --- a/sound/soc/adi/axi-i2s.c
-> +++ b/sound/soc/adi/axi-i2s.c
-> @@ -240,6 +240,8 @@ static int axi_i2s_probe(struct platform_device *pdev)
->   	if (ret)
->   		goto err_clk_disable;
->
-> +	return 0;
-> +
->   err_clk_disable:
->   	clk_disable_unprepare(i2s->clk);
->   	return ret;
->
+Already done.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141231/e6e2d202/attachment-0001.sig>
