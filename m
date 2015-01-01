@@ -1,73 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 30 Jan 2015 13:27:14 +0100
-Subject: [PATCH 2/9] regulator: core: Introduce set_optimum_mode op
-In-Reply-To: <20150130000741.GP11960@sonymobile.com>
-References: <1422413199-17273-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1422413199-17273-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20150128195204.GN21293@sirena.org.uk>
- <20150130000741.GP11960@sonymobile.com>
-Message-ID: <20150130122714.GA26617@finisterre.sirena.org.uk>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 01 Jan 2015 07:29:17 +0530
+Subject: [RFC 0/8] ARM64: Uprobe support added
+In-Reply-To: <cover.1420038188.git.panand@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+Message-ID: <54A4A9F5.6070800@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 29, 2015 at 04:07:42PM -0800, Bjorn Andersson wrote:
-> On Wed 28 Jan 11:52 PST 2015, Mark Brown wrote:
++Dave
 
-> > This is basically fine but can you please rename this to be something
-> > that more directly reflects the fact that we're just informing the
-> > driver about the operating parameters - there are other things a driver
-> > could usefully do with this, for example set current limits so that if
-> > something starts to consume excessive current the device will flag this
-> > as an error.
+Sorry, I took all cc list from your kprobe patches and forgot to add you. :(
 
-> The purpose of the series was to be able to implement patch 9, which
-> will utilize the load_uA to set the "mode" of the Qualcomm regulators.
+Please review.
 
-> So I would like it to be a "setter of current consumption".
-
-> I'm not sure what to name the function to have it cover these additional
-> cases.
-
-notify_load() or something?  That's what it's doing, what the driver
-does with it is a separate thing.
-
-> > It'd also be better to split the voltage specs out into a separate
-> > function, especially for the output voltage where obviously we have a
-> > separate range based interface for setting that.
-
-> The current implementors of get_optimum_mode all ignore the voltages, so
-> we could effectively simplify the interface to:
-
->  get_optimum_mode(rdev, load);
-
-> Question is if there are any implementations where we don't know the
-> output voltage in the regulator driver (as locking prevents us from
-> using the standard interface of querying this). Input voltage is just a
-> query away.
-
-We can always fix the locking to let people query the voltage if they
-need to.
-
-> Having drms_uA_update() request an appropriate mode for the given load
-> and then calling set_mode directly (the current implementation) gives us
-> a single point of entry to the regulator drivers related to setting
-> modes (regulator_set_mode and drms_uA_update calls set_mode). But seen
-> from a consumer there's no consistency; the last call to
-> regulator_set_mode() and regulator_set_optimum_mode() will win.
-
-That's fine, consumers shouldn't be using both simultaneously anyway.
-If a consumer is actually setting modes actively at runtime by name it
-needs to be fairly closely tied to a specific system and regulator so
-it's not clear if there's much use case anyway.
-
-> I think this covers your concern about patch 3-7 as well, please let me
-> know what you think.
-
-Possibly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150130/52b1927a/attachment-0001.sig>
+On Wednesday 31 December 2014 08:51 PM, Pratyush Anand wrote:
+> These patches have been prepared on top of ARM64 kprobe v3 patches [1]
+> under review.
+>
+> Unit test for following has been done so far and they have been found
+> working
+>      1. Normal instruction, which can be probed like sub, ldr, add etc.
+>      2. Instructions which can be simulated like ret.
+>      3. uretprobe
+>
+>
+>
+> [1]https://lkml.org/lkml/2014/11/18/33
+>
+> Pratyush Anand (8):
+>    ARM64: Move BRK opcodes defines from kprobes.h to insn.h
+>    ARM64: Refactor kprobes-arm64
+>    Kernel/uprobe: Define arch_uprobe_exception_notify as __weak
+>    ARM64: Add instruction_pointer_set function
+>    ARM64: Re-factor flush_ptrace_access
+>    ARM64: Handle TRAP_HWBRKPT for user mode as well
+>    ARM64: Handle TRAP_BRKPT for user mode as well
+>    ARM64: Add uprobe support
+>
+>   arch/arm/kernel/uprobes.c                          |   6 -
+>   arch/arm64/Kconfig                                 |   3 +
+>   arch/arm64/include/asm/insn.h                      |   8 +
+>   arch/arm64/include/asm/probes.h                    |  26 ++-
+>   arch/arm64/include/asm/ptrace.h                    |   7 +
+>   arch/arm64/include/asm/thread_info.h               |   5 +-
+>   arch/arm64/include/asm/uprobes.h                   |  43 ++++
+>   arch/arm64/kernel/Makefile                         |   5 +-
+>   arch/arm64/kernel/debug-monitors.c                 |  14 +-
+>   arch/arm64/kernel/kprobes.c                        |  11 +-
+>   arch/arm64/kernel/kprobes.h                        |   7 +-
+>   .../kernel/{kprobes-arm64.c => probes-arm64.c}     |  84 +++----
+>   .../kernel/{kprobes-arm64.h => probes-arm64.h}     |  17 +-
+>   arch/arm64/kernel/probes-condn-check.c             |   2 +-
+>   arch/arm64/kernel/probes-decode.h                  |   4 +-
+>   arch/arm64/kernel/signal.c                         |   4 +-
+>   arch/arm64/kernel/uprobes.c                        | 255 +++++++++++++++++++++
+>   arch/arm64/mm/flush.c                              |  30 ++-
+>   kernel/events/uprobes.c                            |  18 ++
+>   19 files changed, 445 insertions(+), 104 deletions(-)
+>   create mode 100644 arch/arm64/include/asm/uprobes.h
+>   rename arch/arm64/kernel/{kprobes-arm64.c => probes-arm64.c} (79%)
+>   rename arch/arm64/kernel/{kprobes-arm64.h => probes-arm64.h} (60%)
+>   create mode 100644 arch/arm64/kernel/uprobes.c
+>
