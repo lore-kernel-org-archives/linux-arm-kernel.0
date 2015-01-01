@@ -1,59 +1,47 @@
 From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Thu,  1 Jan 2015 18:55:12 +0100
-Subject: [PATCH] arch: arm: mach-rpc: ecard:  Remove some unused functions
-Message-ID: <1420134912-1742-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Date: Thu,  1 Jan 2015 18:56:09 +0100
+Subject: [PATCH] arch: arm: mm: cache-feroceon-l2: Remove some unused functions
+Message-ID: <1420134969-1892-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Removes some functions that are not used anywhere:
-ecard_disablefiq() ecard_enablefiq()
+l2_inv_pa() l2_clean_pa()
 
 This was partially found by using a static code analysis program called cppcheck.
 
 Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 ---
- arch/arm/mach-rpc/ecard.c |   29 -----------------------------
- 1 file changed, 29 deletions(-)
+ arch/arm/mm/cache-feroceon-l2.c |   10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/arch/arm/mach-rpc/ecard.c b/arch/arm/mach-rpc/ecard.c
-index fcb1d59..e5c8caf 100644
---- a/arch/arm/mach-rpc/ecard.c
-+++ b/arch/arm/mach-rpc/ecard.c
-@@ -462,35 +462,6 @@ static struct irq_chip ecard_chip = {
- 	.irq_unmask	= ecard_irq_unmask,
- };
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index e028a7f..c2eac97 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -65,11 +65,6 @@ static inline void l2_put_va(unsigned long vaddr)
+ #endif
+ }
  
--void ecard_enablefiq(unsigned int fiqnr)
+-static inline void l2_clean_pa(unsigned long addr)
 -{
--	ecard_t *ec = slot_to_ecard(fiqnr);
--
--	if (ec) {
--		if (!ec->ops)
--			ec->ops = &ecard_default_ops;
--
--		if (ec->claimed && ec->ops->fiqenable)
--			ec->ops->fiqenable(ec, fiqnr);
--		else
--			printk(KERN_ERR "ecard: rejecting request to "
--				"enable FIQs for %d\n", fiqnr);
--	}
+-	__asm__("mcr p15, 1, %0, c15, c9, 3" : : "r" (addr));
 -}
 -
--void ecard_disablefiq(unsigned int fiqnr)
--{
--	ecard_t *ec = slot_to_ecard(fiqnr);
--
--	if (ec) {
--		if (!ec->ops)
--			ec->ops = &ecard_default_ops;
--
--		if (ec->ops->fiqdisable)
--			ec->ops->fiqdisable(ec, fiqnr);
--	}
--}
--
- static void ecard_dump_irq_state(void)
+ static inline void l2_clean_pa_range(unsigned long start, unsigned long end)
  {
- 	ecard_t *ec;
+ 	unsigned long va_start, va_end, flags;
+@@ -96,11 +91,6 @@ static inline void l2_clean_inv_pa(unsigned long addr)
+ 	__asm__("mcr p15, 1, %0, c15, c10, 3" : : "r" (addr));
+ }
+ 
+-static inline void l2_inv_pa(unsigned long addr)
+-{
+-	__asm__("mcr p15, 1, %0, c15, c11, 3" : : "r" (addr));
+-}
+-
+ static inline void l2_inv_pa_range(unsigned long start, unsigned long end)
+ {
+ 	unsigned long va_start, va_end, flags;
 -- 
 1.7.10.4
