@@ -1,30 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 1 Jan 2015 20:26:24 +0100
-Subject: [PATCH] arch: arm: mm: ioremap:  Remove unused function
-In-Reply-To: <1420139451-2671-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1420139451-2671-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <20150101202624.25df9f6d@free-electrons.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Thu, 1 Jan 2015 20:04:24 +0000
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54A3B526.9040903@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+ <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
+ <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
+ <54A3B526.9040903@linaro.org>
+Message-ID: <20150101200424.GB12770@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rickard Strandqvist,
-
-On Thu,  1 Jan 2015 20:10:51 +0100, Rickard Strandqvist wrote:
-> Remove the function pci_ioremap_set_mem_type() that is not used anywhere.
+On Wed, Dec 31, 2014 at 04:34:46PM +0800, Hanjun Guo wrote:
+> On 2014?12?31? 04:13, ashwinc at codeaurora.org wrote:
+> >Hi Hanjun,
+> >
+> >Overall the document looks good to us. Some minor clarifications below.
+> >
+> >>---------- Forwarded message ----------
+> >>From: Graeme Gregory <graeme.gregory@linaro.org>
+> >>
+> >>Add documentation for the guidelines of how to use ACPI
+> >>on ARM64.
+> >>
+> >>Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> >>Signed-off-by: Al Stone <al.stone@linaro.org>
+> >>Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>---
+> >>  Documentation/arm64/arm-acpi.txt |  323
+> >>++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 323 insertions(+)
+> >>  create mode 100644 Documentation/arm64/arm-acpi.txt
+> >>
+> >
+> >[..]
+> >
+> >>+Relationship with Device Tree
+> >>+-----------------------------
+> >
+> >[..]
+> >
+> >>+When booting using ACPI tables, the /chosen node in DT will still be
+> >>parsed
+> >>+to extract the kernel command line and initrd path.  No other section of
+> >>the
+> >>+DT will be used.
+> >
+> >Is this still true?
 > 
-> This was partially found by using a static code analysis program called cppcheck.
+> No, we can booting the ACPI system in EFI stub without dtb. Catalin
+> also pointed out this issue, I will remove this paragraph.
 > 
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 
-Hum, I was supposed to use this in arch/arm/mach-mvebu/ to make sure
-that PCI I/O regions are mapped strongly-ordered. We're indeed doing it
-for PCI mem regions, but we never did it for PCI I/O regions. I
-remember there has been some discussions about this, but I don't
-remember the outcome, and whether it has affected the fact that mapping
-PCI I/O regions strongly-ordered for mach-mvebu was never merged.
+The paragraph is still correct, the /chosen node is always present even
+if nothing else is.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Graeme
