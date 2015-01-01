@@ -1,133 +1,425 @@
 From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Thu,  1 Jan 2015 18:06:34 +0100
-Subject: [PATCH] arch: arm: mach-omap2: voltage.c: Remove some unused functions
-Message-ID: <1420131994-31636-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Date: Thu,  1 Jan 2015 18:21:10 +0100
+Subject: [PATCH] arch: arm: nwfpe: softfloat.c:  Remove some unused functions
+Message-ID: <1420132870-32472-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Removes some functions that are not used anywhere:
-voltdm_for_each_pwrdm() omap_change_voltscale_method()
+floatx80_lt_quiet() floatx80_le_quiet() floatx80_eq_signaling()
+floatx80_le() floatx80_to_int32_round_to_zero() float64_lt_quiet()
+float64_le_quiet() float64_eq_signaling() float32_lt_quiet()
+float32_le_quiet() float32_eq_signaling()
 
 This was partially found by using a static code analysis program called cppcheck.
 
 Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 ---
- arch/arm/mach-omap2/voltage.c |   65 ++---------------------------------------
- arch/arm/mach-omap2/voltage.h |    5 ----
- 2 files changed, 3 insertions(+), 67 deletions(-)
+ arch/arm/nwfpe/softfloat.c |  320 --------------------------------------------
+ arch/arm/nwfpe/softfloat.h |   11 --
+ 2 files changed, 331 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 3783b86..43e42fd 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -224,37 +224,6 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- }
+diff --git a/arch/arm/nwfpe/softfloat.c b/arch/arm/nwfpe/softfloat.c
+index ffa6b43..dda30ab 100644
+--- a/arch/arm/nwfpe/softfloat.c
++++ b/arch/arm/nwfpe/softfloat.c
+@@ -1568,78 +1568,6 @@ flag float32_lt( float32 a, float32 b )
  
- /**
-- * omap_change_voltscale_method() - API to change the voltage scaling method.
-- * @voltdm:	pointer to the VDD whose voltage scaling method
-- *		has to be changed.
-- * @voltscale_method:	the method to be used for voltage scaling.
-- *
-- * This API can be used by the board files to change the method of voltage
-- * scaling between vpforceupdate and vcbypass. The parameter values are
-- * defined in voltage.h
-- */
--void omap_change_voltscale_method(struct voltagedomain *voltdm,
--				  int voltscale_method)
+ /*
+ -------------------------------------------------------------------------------
+-Returns 1 if the single-precision floating-point value `a' is equal to the
+-corresponding value `b', and 0 otherwise.  The invalid exception is raised
+-if either operand is a NaN.  Otherwise, the comparison is performed
+-according to the IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag float32_eq_signaling( float32 a, float32 b )
 -{
--	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warn("%s: VDD specified does not exist!\n", __func__);
--		return;
--	}
 -
--	switch (voltscale_method) {
--	case VOLTSCALE_VPFORCEUPDATE:
--		voltdm->scale = omap_vp_forceupdate_scale;
--		return;
--	case VOLTSCALE_VCBYPASS:
--		voltdm->scale = omap_vc_bypass_scale;
--		return;
--	default:
--		pr_warn("%s: Trying to change the method of voltage scaling to an unsupported one!\n",
--			__func__);
--	}
+-    if (    ( ( extractFloat32Exp( a ) == 0xFF ) && extractFloat32Frac( a ) )
+-         || ( ( extractFloat32Exp( b ) == 0xFF ) && extractFloat32Frac( b ) )
+-       ) {
+-        float_raise( float_flag_invalid );
+-        return 0;
+-    }
+-    return ( a == b ) || ( (bits32) ( ( a | b )<<1 ) == 0 );
+-
 -}
 -
--/**
-  * omap_voltage_late_init() - Init the various voltage parameters
-  *
-  * This API is to be called in the later stages of the
-@@ -321,10 +290,9 @@ static struct voltagedomain *_voltdm_lookup(const char *name)
-  * @voltdm: struct voltagedomain * to add the powerdomain to
-  * @pwrdm: struct powerdomain * to associate with a voltagedomain
-  *
-- * Associate the powerdomain @pwrdm with a voltagedomain @voltdm.  This
-- * enables the use of voltdm_for_each_pwrdm().  Returns -EINVAL if
-- * presented with invalid pointers; -ENOMEM if memory could not be allocated;
-- * or 0 upon success.
-+ * Associate the powerdomain @pwrdm with a voltagedomain @voltdm.
-+ * Returns -EINVAL if presented with invalid pointers;
-+ * -ENOMEM if memory could not be allocated; or 0 upon success.
-  */
- int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
- {
-@@ -340,33 +308,6 @@ int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
- }
- 
- /**
-- * voltdm_for_each_pwrdm - call function for each pwrdm in a voltdm
-- * @voltdm: struct voltagedomain * to iterate over
-- * @fn: callback function *
-- *
-- * Call the supplied function @fn for each powerdomain in the
-- * voltagedomain @voltdm.  Returns -EINVAL if presented with invalid
-- * pointers; or passes along the last return value of the callback
-- * function, which should be 0 for success or anything else to
-- * indicate failure.
-- */
--int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
--			  int (*fn)(struct voltagedomain *voltdm,
--				    struct powerdomain *pwrdm))
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the single-precision floating-point value `a' is less than or
+-equal to the corresponding value `b', and 0 otherwise.  Quiet NaNs do not
+-cause an exception.  Otherwise, the comparison is performed according to the
+-IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag float32_le_quiet( float32 a, float32 b )
 -{
--	struct powerdomain *pwrdm;
--	int ret = 0;
+-    flag aSign, bSign;
+-    //int16 aExp, bExp;
 -
--	if (!fn)
--		return -EINVAL;
+-    if (    ( ( extractFloat32Exp( a ) == 0xFF ) && extractFloat32Frac( a ) )
+-         || ( ( extractFloat32Exp( b ) == 0xFF ) && extractFloat32Frac( b ) )
+-       ) {
+-        /* Do nothing, even if NaN as we're quiet */
+-        return 0;
+-    }
+-    aSign = extractFloat32Sign( a );
+-    bSign = extractFloat32Sign( b );
+-    if ( aSign != bSign ) return aSign || ( (bits32) ( ( a | b )<<1 ) == 0 );
+-    return ( a == b ) || ( aSign ^ ( a < b ) );
 -
--	list_for_each_entry(pwrdm, &voltdm->pwrdm_list, voltdm_node)
--		ret = (*fn)(voltdm, pwrdm);
--
--	return ret;
 -}
 -
--/**
-  * voltdm_for_each - call function on each registered voltagedomain
-  * @fn: callback function *
-  *
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index f7f2879..d8208f3 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -163,8 +163,6 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
- 		unsigned long volt);
- int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- 			       struct omap_voltdm_pmic *pmic);
--void omap_change_voltscale_method(struct voltagedomain *voltdm,
--		int voltscale_method);
- int omap_voltage_late_init(void);
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the single-precision floating-point value `a' is less than
+-the corresponding value `b', and 0 otherwise.  Quiet NaNs do not cause an
+-exception.  Otherwise, the comparison is performed according to the IEC/IEEE
+-Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag float32_lt_quiet( float32 a, float32 b )
+-{
+-    flag aSign, bSign;
+-
+-    if (    ( ( extractFloat32Exp( a ) == 0xFF ) && extractFloat32Frac( a ) )
+-         || ( ( extractFloat32Exp( b ) == 0xFF ) && extractFloat32Frac( b ) )
+-       ) {
+-        /* Do nothing, even if NaN as we're quiet */
+-        return 0;
+-    }
+-    aSign = extractFloat32Sign( a );
+-    bSign = extractFloat32Sign( b );
+-    if ( aSign != bSign ) return aSign && ( (bits32) ( ( a | b )<<1 ) != 0 );
+-    return ( a != b ) && ( aSign ^ ( a < b ) );
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+ Returns the result of converting the double-precision floating-point value
+ `a' to the 32-bit two's complement integer format.  The conversion is
+ performed according to the IEC/IEEE Standard for Binary Floating-point
+@@ -2453,78 +2381,6 @@ flag float64_lt( float64 a, float64 b )
  
- extern void omap2xxx_voltagedomains_init(void);
-@@ -177,9 +175,6 @@ void voltdm_init(struct voltagedomain **voltdm_list);
- int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm);
- int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
- 		    void *user);
--int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
--			  int (*fn)(struct voltagedomain *voltdm,
--				    struct powerdomain *pwrdm));
- int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
- void voltdm_reset(struct voltagedomain *voltdm);
- unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
+ }
+ 
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the double-precision floating-point value `a' is equal to the
+-corresponding value `b', and 0 otherwise.  The invalid exception is raised
+-if either operand is a NaN.  Otherwise, the comparison is performed
+-according to the IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag float64_eq_signaling( float64 a, float64 b )
+-{
+-
+-    if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
+-         || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) )
+-       ) {
+-        float_raise( float_flag_invalid );
+-        return 0;
+-    }
+-    return ( a == b ) || ( (bits64) ( ( a | b )<<1 ) == 0 );
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the double-precision floating-point value `a' is less than or
+-equal to the corresponding value `b', and 0 otherwise.  Quiet NaNs do not
+-cause an exception.  Otherwise, the comparison is performed according to the
+-IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag float64_le_quiet( float64 a, float64 b )
+-{
+-    flag aSign, bSign;
+-    //int16 aExp, bExp;
+-
+-    if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
+-         || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) )
+-       ) {
+-        /* Do nothing, even if NaN as we're quiet */
+-        return 0;
+-    }
+-    aSign = extractFloat64Sign( a );
+-    bSign = extractFloat64Sign( b );
+-    if ( aSign != bSign ) return aSign || ( (bits64) ( ( a | b )<<1 ) == 0 );
+-    return ( a == b ) || ( aSign ^ ( a < b ) );
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the double-precision floating-point value `a' is less than
+-the corresponding value `b', and 0 otherwise.  Quiet NaNs do not cause an
+-exception.  Otherwise, the comparison is performed according to the IEC/IEEE
+-Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag float64_lt_quiet( float64 a, float64 b )
+-{
+-    flag aSign, bSign;
+-
+-    if (    ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) )
+-         || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) )
+-       ) {
+-        /* Do nothing, even if NaN as we're quiet */
+-        return 0;
+-    }
+-    aSign = extractFloat64Sign( a );
+-    bSign = extractFloat64Sign( b );
+-    if ( aSign != bSign ) return aSign && ( (bits64) ( ( a | b )<<1 ) != 0 );
+-    return ( a != b ) && ( aSign ^ ( a < b ) );
+-
+-}
+-
+ #ifdef FLOATX80
+ 
+ /*
+@@ -2558,52 +2414,6 @@ int32 floatx80_to_int32( struct roundingData *roundData, floatx80 a )
+ /*
+ -------------------------------------------------------------------------------
+ Returns the result of converting the extended double-precision floating-
+-point value `a' to the 32-bit two's complement integer format.  The
+-conversion is performed according to the IEC/IEEE Standard for Binary
+-Floating-point Arithmetic, except that the conversion is always rounded
+-toward zero.  If `a' is a NaN, the largest positive integer is returned.
+-Otherwise, if the conversion overflows, the largest integer with the same
+-sign as `a' is returned.
+--------------------------------------------------------------------------------
+-*/
+-int32 floatx80_to_int32_round_to_zero( floatx80 a )
+-{
+-    flag aSign;
+-    int32 aExp, shiftCount;
+-    bits64 aSig, savedASig;
+-    int32 z;
+-
+-    aSig = extractFloatx80Frac( a );
+-    aExp = extractFloatx80Exp( a );
+-    aSign = extractFloatx80Sign( a );
+-    shiftCount = 0x403E - aExp;
+-    if ( shiftCount < 32 ) {
+-        if ( ( aExp == 0x7FFF ) && (bits64) ( aSig<<1 ) ) aSign = 0;
+-        goto invalid;
+-    }
+-    else if ( 63 < shiftCount ) {
+-        if ( aExp || aSig ) float_raise( float_flag_inexact );
+-        return 0;
+-    }
+-    savedASig = aSig;
+-    aSig >>= shiftCount;
+-    z = aSig;
+-    if ( aSign ) z = - z;
+-    if ( ( z < 0 ) ^ aSign ) {
+- invalid:
+-        float_raise( float_flag_invalid );
+-        return aSign ? 0x80000000 : 0x7FFFFFFF;
+-    }
+-    if ( ( aSig<<shiftCount ) != savedASig ) {
+-        float_raise( float_flag_inexact );
+-    }
+-    return z;
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+-Returns the result of converting the extended double-precision floating-
+ point value `a' to the single-precision floating-point format.  The
+ conversion is performed according to the IEC/IEEE Standard for Binary
+ Floating-point Arithmetic.
+@@ -3270,40 +3080,6 @@ flag floatx80_eq( floatx80 a, floatx80 b )
+ /*
+ -------------------------------------------------------------------------------
+ Returns 1 if the extended double-precision floating-point value `a' is
+-less than or equal to the corresponding value `b', and 0 otherwise.  The
+-comparison is performed according to the IEC/IEEE Standard for Binary
+-Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag floatx80_le( floatx80 a, floatx80 b )
+-{
+-    flag aSign, bSign;
+-
+-    if (    (    ( extractFloatx80Exp( a ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( a )<<1 ) )
+-         || (    ( extractFloatx80Exp( b ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( b )<<1 ) )
+-       ) {
+-        float_raise( float_flag_invalid );
+-        return 0;
+-    }
+-    aSign = extractFloatx80Sign( a );
+-    bSign = extractFloatx80Sign( b );
+-    if ( aSign != bSign ) {
+-        return
+-               aSign
+-            || (    ( ( (bits16) ( ( a.high | b.high )<<1 ) ) | a.low | b.low )
+-                 == 0 );
+-    }
+-    return
+-          aSign ? le128( b.high, b.low, a.high, a.low )
+-        : le128( a.high, a.low, b.high, b.low );
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the extended double-precision floating-point value `a' is
+ less than the corresponding value `b', and 0 otherwise.  The comparison
+ is performed according to the IEC/IEEE Standard for Binary Floating-point
+ Arithmetic.
+@@ -3335,101 +3111,5 @@ flag floatx80_lt( floatx80 a, floatx80 b )
+ 
+ }
+ 
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the extended double-precision floating-point value `a' is equal
+-to the corresponding value `b', and 0 otherwise.  The invalid exception is
+-raised if either operand is a NaN.  Otherwise, the comparison is performed
+-according to the IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag floatx80_eq_signaling( floatx80 a, floatx80 b )
+-{
+-
+-    if (    (    ( extractFloatx80Exp( a ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( a )<<1 ) )
+-         || (    ( extractFloatx80Exp( b ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( b )<<1 ) )
+-       ) {
+-        float_raise( float_flag_invalid );
+-        return 0;
+-    }
+-    return
+-           ( a.low == b.low )
+-        && (    ( a.high == b.high )
+-             || (    ( a.low == 0 )
+-                  && ( (bits16) ( ( a.high | b.high )<<1 ) == 0 ) )
+-           );
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the extended double-precision floating-point value `a' is less
+-than or equal to the corresponding value `b', and 0 otherwise.  Quiet NaNs
+-do not cause an exception.  Otherwise, the comparison is performed according
+-to the IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag floatx80_le_quiet( floatx80 a, floatx80 b )
+-{
+-    flag aSign, bSign;
+-
+-    if (    (    ( extractFloatx80Exp( a ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( a )<<1 ) )
+-         || (    ( extractFloatx80Exp( b ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( b )<<1 ) )
+-       ) {
+-        /* Do nothing, even if NaN as we're quiet */
+-        return 0;
+-    }
+-    aSign = extractFloatx80Sign( a );
+-    bSign = extractFloatx80Sign( b );
+-    if ( aSign != bSign ) {
+-        return
+-               aSign
+-            || (    ( ( (bits16) ( ( a.high | b.high )<<1 ) ) | a.low | b.low )
+-                 == 0 );
+-    }
+-    return
+-          aSign ? le128( b.high, b.low, a.high, a.low )
+-        : le128( a.high, a.low, b.high, b.low );
+-
+-}
+-
+-/*
+--------------------------------------------------------------------------------
+-Returns 1 if the extended double-precision floating-point value `a' is less
+-than the corresponding value `b', and 0 otherwise.  Quiet NaNs do not cause
+-an exception.  Otherwise, the comparison is performed according to the
+-IEC/IEEE Standard for Binary Floating-point Arithmetic.
+--------------------------------------------------------------------------------
+-*/
+-flag floatx80_lt_quiet( floatx80 a, floatx80 b )
+-{
+-    flag aSign, bSign;
+-
+-    if (    (    ( extractFloatx80Exp( a ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( a )<<1 ) )
+-         || (    ( extractFloatx80Exp( b ) == 0x7FFF )
+-              && (bits64) ( extractFloatx80Frac( b )<<1 ) )
+-       ) {
+-        /* Do nothing, even if NaN as we're quiet */
+-        return 0;
+-    }
+-    aSign = extractFloatx80Sign( a );
+-    bSign = extractFloatx80Sign( b );
+-    if ( aSign != bSign ) {
+-        return
+-               aSign
+-            && (    ( ( (bits16) ( ( a.high | b.high )<<1 ) ) | a.low | b.low )
+-                 != 0 );
+-    }
+-    return
+-          aSign ? lt128( b.high, b.low, a.high, a.low )
+-        : lt128( a.high, a.low, b.high, b.low );
+-
+-}
+-
+ #endif
+ 
+diff --git a/arch/arm/nwfpe/softfloat.h b/arch/arm/nwfpe/softfloat.h
+index df4d243..8a5b2b2 100644
+--- a/arch/arm/nwfpe/softfloat.h
++++ b/arch/arm/nwfpe/softfloat.h
+@@ -157,9 +157,6 @@ float32 float32_sqrt( struct roundingData*, float32 );
+ char float32_eq( float32, float32 );
+ char float32_le( float32, float32 );
+ char float32_lt( float32, float32 );
+-char float32_eq_signaling( float32, float32 );
+-char float32_le_quiet( float32, float32 );
+-char float32_lt_quiet( float32, float32 );
+ char float32_is_signaling_nan( float32 );
+ 
+ /*
+@@ -189,9 +186,6 @@ float64 float64_sqrt( struct roundingData *, float64 );
+ char float64_eq( float64, float64 );
+ char float64_le( float64, float64 );
+ char float64_lt( float64, float64 );
+-char float64_eq_signaling( float64, float64 );
+-char float64_le_quiet( float64, float64 );
+-char float64_lt_quiet( float64, float64 );
+ char float64_is_signaling_nan( float64 );
+ 
+ #ifdef FLOATX80
+@@ -202,7 +196,6 @@ Software IEC/IEEE extended double-precision conversion routines.
+ -------------------------------------------------------------------------------
+ */
+ signed int floatx80_to_int32( struct roundingData *, floatx80 );
+-signed int floatx80_to_int32_round_to_zero( floatx80 );
+ float32 floatx80_to_float32( struct roundingData *, floatx80 );
+ float64 floatx80_to_float64( struct roundingData *, floatx80 );
+ 
+@@ -219,11 +212,7 @@ floatx80 floatx80_div( struct roundingData *, floatx80, floatx80 );
+ floatx80 floatx80_rem( struct roundingData *, floatx80, floatx80 );
+ floatx80 floatx80_sqrt( struct roundingData *, floatx80 );
+ char floatx80_eq( floatx80, floatx80 );
+-char floatx80_le( floatx80, floatx80 );
+ char floatx80_lt( floatx80, floatx80 );
+-char floatx80_eq_signaling( floatx80, floatx80 );
+-char floatx80_le_quiet( floatx80, floatx80 );
+-char floatx80_lt_quiet( floatx80, floatx80 );
+ char floatx80_is_signaling_nan( floatx80 );
+ 
+ extern flag floatx80_is_nan(floatx80);
 -- 
 1.7.10.4
