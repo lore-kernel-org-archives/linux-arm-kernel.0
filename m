@@ -1,121 +1,30 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Thu,  1 Jan 2015 20:14:24 +0100
-Subject: [PATCH] video: fbdev: exynos: exynos_mipi_dsi_common: Remove some
- unused functions
-Message-ID: <1420139664-3008-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 1 Jan 2015 20:26:24 +0100
+Subject: [PATCH] arch: arm: mm: ioremap:  Remove unused function
+In-Reply-To: <1420139451-2671-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1420139451-2671-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20150101202624.25df9f6d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removes some functions that are not used anywhere:
-exynos_mipi_dsi_fifo_clear() exynos_mipi_dsi_set_data_transfer_mode()
-exynos_mipi_dsi_enable_frame_done_int()
+Dear Rickard Strandqvist,
 
-This was partially found by using a static code analysis program called cppcheck.
+On Thu,  1 Jan 2015 20:10:51 +0100, Rickard Strandqvist wrote:
+> Remove the function pci_ioremap_set_mem_type() that is not used anywhere.
+> 
+> This was partially found by using a static code analysis program called cppcheck.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- .../video/fbdev/exynos/exynos_mipi_dsi_common.c    |   53 --------------------
- .../video/fbdev/exynos/exynos_mipi_dsi_common.h    |    7 ---
- 2 files changed, 60 deletions(-)
+Hum, I was supposed to use this in arch/arm/mach-mvebu/ to make sure
+that PCI I/O regions are mapped strongly-ordered. We're indeed doing it
+for PCI mem regions, but we never did it for PCI I/O regions. I
+remember there has been some discussions about this, but I don't
+remember the outcome, and whether it has affected the fact that mapping
+PCI I/O regions strongly-ordered for mach-mvebu was never merged.
 
-diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-index 85edabf..d7b4abc 100644
---- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-+++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.c
-@@ -690,15 +690,6 @@ void exynos_mipi_dsi_init_interrupt(struct mipi_dsim_device *dsim)
- 	exynos_mipi_dsi_set_interrupt_mask(dsim, src, 1);
- }
- 
--int exynos_mipi_dsi_enable_frame_done_int(struct mipi_dsim_device *dsim,
--	unsigned int enable)
--{
--	/* enable only frame done interrupt */
--	exynos_mipi_dsi_set_interrupt_mask(dsim, INTMSK_FRAME_DONE, enable);
--
--	return 0;
--}
--
- void exynos_mipi_dsi_stand_by(struct mipi_dsim_device *dsim,
- 		unsigned int enable)
- {
-@@ -819,30 +810,6 @@ int exynos_mipi_dsi_set_hs_enable(struct mipi_dsim_device *dsim)
- 	return 0;
- }
- 
--int exynos_mipi_dsi_set_data_transfer_mode(struct mipi_dsim_device *dsim,
--		unsigned int mode)
--{
--	if (mode) {
--		if (dsim->state != DSIM_STATE_HSCLKEN) {
--			dev_err(dsim->dev, "HS Clock lane is not enabled.\n");
--			return -EINVAL;
--		}
--
--		exynos_mipi_dsi_set_lcdc_transfer_mode(dsim, 0);
--	} else {
--		if (dsim->state == DSIM_STATE_INIT || dsim->state ==
--			DSIM_STATE_ULPS) {
--			dev_err(dsim->dev,
--				"DSI Master is not STOP or HSDT state.\n");
--			return -EINVAL;
--		}
--
--		exynos_mipi_dsi_set_cpu_transfer_mode(dsim, 0);
--	}
--
--	return 0;
--}
--
- int exynos_mipi_dsi_get_frame_done_status(struct mipi_dsim_device *dsim)
- {
- 	return _exynos_mipi_dsi_get_frame_done_status(dsim);
-@@ -855,26 +822,6 @@ int exynos_mipi_dsi_clear_frame_done(struct mipi_dsim_device *dsim)
- 	return 0;
- }
- 
--int exynos_mipi_dsi_fifo_clear(struct mipi_dsim_device *dsim,
--				unsigned int val)
--{
--	int try = TRY_FIFO_CLEAR;
--
--	exynos_mipi_dsi_sw_reset_release(dsim);
--	exynos_mipi_dsi_func_reset(dsim);
--
--	do {
--		if (exynos_mipi_dsi_get_sw_reset_release(dsim)) {
--			exynos_mipi_dsi_init_interrupt(dsim);
--			dev_dbg(dsim->dev, "reset release done.\n");
--			return 0;
--		}
--	} while (--try);
--
--	dev_err(dsim->dev, "failed to clear dsim fifo.\n");
--	return -EAGAIN;
--}
--
- MODULE_AUTHOR("InKi Dae <inki.dae@samsung.com>");
- MODULE_DESCRIPTION("Samusung SoC MIPI-DSI common driver");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.h b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.h
-index 4125522..5c1c30b 100644
---- a/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.h
-+++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi_common.h
-@@ -31,16 +31,9 @@ int exynos_mipi_dsi_set_display_mode(struct mipi_dsim_device *dsim,
- 			struct mipi_dsim_config *dsim_info);
- int exynos_mipi_dsi_init_link(struct mipi_dsim_device *dsim);
- int exynos_mipi_dsi_set_hs_enable(struct mipi_dsim_device *dsim);
--int exynos_mipi_dsi_set_data_transfer_mode(struct mipi_dsim_device *dsim,
--		unsigned int mode);
--int exynos_mipi_dsi_enable_frame_done_int(struct mipi_dsim_device *dsim,
--	unsigned int enable);
- int exynos_mipi_dsi_get_frame_done_status(struct mipi_dsim_device *dsim);
- int exynos_mipi_dsi_clear_frame_done(struct mipi_dsim_device *dsim);
- 
- extern struct fb_info *registered_fb[FB_MAX] __read_mostly;
- 
--int exynos_mipi_dsi_fifo_clear(struct mipi_dsim_device *dsim,
--				unsigned int val);
--
- #endif /* _EXYNOS_MIPI_DSI_COMMON_H */
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
