@@ -1,64 +1,102 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 2 Jan 2015 16:20:42 -0500
-Subject: [GIT PULL] Fixes for 3.19, #2
-In-Reply-To: <20150102160818.GB6708@lunn.ch>
-References: <20150102160818.GB6708@lunn.ch>
-Message-ID: <20150102212042.GC15589@titan.lakedaemon.net>
+From: chrisp@alliedtelesis.co.nz (Chris Packham)
+Date: Sat, 3 Jan 2015 10:21:24 +1300 (NZDT)
+Subject: [RFC/PATCHv2 1/5] dtc: Use quotes to include header files
+In-Reply-To: <CAL_JsqLegL1jT4rtNtum1RabXvd3NbS_G1EkkVjCcN-aPg975A@mail.gmail.com>
+References: <1419369212-17047-1-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <1419369212-17047-2-git-send-email-chris.packham@alliedtelesis.co.nz>
+ <CAL_JsqLegL1jT4rtNtum1RabXvd3NbS_G1EkkVjCcN-aPg975A@mail.gmail.com>
+Message-ID: <alpine.DEB.2.10.1501031016150.12776@chrisp-dl.ws.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
 
-Much better!  One small note, below:
+Hi Rob,
 
-On Fri, Jan 02, 2015 at 05:08:18PM +0100, Andrew Lunn wrote:
-> Hi Arnd
-> 
-> Here is a second set of fixes for the next -rc. It contains a single
-> patch to fix an Opps with the kirkwood netbig LED driver. This patch
-> has been sent to the LED maintainers a couple of times, with
-> reminders, but there has been no response. So we would like to take it
-> via mvebu->arm-soc. We informed the LED maintainers about this plan,
-> and they are Cc: to this pull request, just so everybody knows what is
-> going on.
-> 
+On Sat, 27 Dec 2014, Rob Herring wrote:
 
-I usually add a short blurb in here saying that this is an incremental
-pull request from tags/mvebu-fixes-3.19 up to tags/mvebu-fixes-3.19-2 on
-the mvebu/fixes branch.
+> On Tue, Dec 23, 2014 at 3:13 PM, Chris Packham
+> <chris.packham@alliedtelesis.co.nz> wrote:
+>> Currently in arch and driver code that needs early access to the
+>> flattened device tree it is necessary to add specific CFLAGS so that
+>> when scripts/dtc/libfdt/libfdt.h is included the C preprocessor is able
+>> to locate the libfdt versions of libfdt_env.h and fdt.h without
+>> generating an error.
+>>
+>> We already provide an alternative linux-specific
+>> version of libfdt_env.h and directly include scripts/dtc/libfdt/fdt.h
+>> so the inclusion by scripts/dtc/libfdt/libfdt.h is a no-op thanks to the
+>> inclusion guards.
+>>
+>> By using quotes in scripts/dtc/libfdt/libfdt.h it picks up fdt.h and
+>> libfdt_env.h from the source directory without needing to add CFLAGS for
+>> the sources that happen to include linux/libfdt.h.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> ---
+>> For the files that include linux/libfdt.h we currently also have to
+>> specify additional CFLAGS to satisfy the CPP.
+>>
+>>   $ git grep '<linux/libfdt.h>'
+>>   arch/mips/cavium-octeon/octeon-platform.c:#include <linux/libfdt.h>
+>>   arch/mips/cavium-octeon/setup.c:#include <linux/libfdt.h>
+>>   arch/mips/mti-sead3/sead3-setup.c:#include <linux/libfdt.h>
+>>   arch/powerpc/kernel/prom.c:#include <linux/libfdt.h>
+>>   drivers/firmware/efi/libstub/fdt.c:#include <linux/libfdt.h>
+>>   drivers/of/fdt.c:#include <linux/libfdt.h>
+>>   drivers/of/fdt_address.c:#include <linux/libfdt.h>
+>>
+>>   $ git grep -e '-I.*dtc/libfdt'
+>>   arch/mips/cavium-octeon/Makefile:CFLAGS_octeon-platform.o = -I$(src)/../../../scripts/dtc/libfdt
+>>   arch/mips/cavium-octeon/Makefile:CFLAGS_setup.o = -I$(src)/../../../scripts/dtc/libfdt
+>>   arch/mips/mti-sead3/Makefile:CFLAGS_sead3-setup.o = -I$(src)/../../../scripts/dtc/libfdt
+>>   arch/powerpc/kernel/Makefile:CFLAGS_prom.o              = -I$(src)/../../../scripts/dtc/libfdt
+>>   drivers/firmware/efi/libstub/Makefile:CFLAGS_fdt.o += -I$(srctree)/scripts/dtc/libfdt/
+>>   drivers/of/Makefile:CFLAGS_fdt.o = -I$(src)/../../scripts/dtc/libfdt
+>>   drivers/of/Makefile:CFLAGS_fdt_address.o = -I$(src)/../../scripts/dtc/libfdt
+>>   lib/Makefile:   $(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
+>>
+>> Simply by switching to using quotes we can avoid having this extra step.
+>
+> Nice, but I would like to see all of these CFLAGS removed as well.
+>
 
-I add that so the arm-soc maintainers easily have a clear idea what they
-are pulling in and what it is based on.  For some reason request-pull
-doesn't add 'tags/mvebu-fixes-3.19' into the below info even when you
-specify it as the start on the cli...
+If/when this is accepted I'll send a follow up patch removing these. Given 
+the comment below about getting the patch in the upstream dtc repository 
+it make take some time for it to be accepted there and then sync'd with 
+the kernel source.
 
-thx,
+>>  scripts/dtc/libfdt/libfdt.h | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> This is an import of dtc/libfdt and patches to it should be sent
+> upstream and to devicetree-compiler list.
 
-Jason.
+Have done so now.
 
-> Thanks
-> 	Andrew
-> 
-> The following changes since commit d4b0833a65e8b9fc58d992ba0cc89cad1580db31:
-> 
->   ARM: mvebu: Fix pinctrl configuration for Armada 370 DB (2014-12-21 06:01:05 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-2
-> 
-> for you to fetch changes up to bb682e44c77731711818c2cf9f6d4bc277207eee:
-> 
->   leds: netxbig: fix oops at probe time (2014-12-30 10:39:23 -0600)
-> 
-> ----------------------------------------------------------------
-> 2nd set of fixes for 3.19:
-> 
-> leds: netxbig: fix oops at probe time
-> 
-> ----------------------------------------------------------------
-> Simon Guinot (1):
->       leds: netxbig: fix oops at probe time
-> 
->  drivers/leds/leds-netxbig.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> Rob
+>
+>> diff --git a/scripts/dtc/libfdt/libfdt.h b/scripts/dtc/libfdt/libfdt.h
+>> index 73f4975..ea1ddcd 100644
+>> --- a/scripts/dtc/libfdt/libfdt.h
+>> +++ b/scripts/dtc/libfdt/libfdt.h
+>> @@ -51,8 +51,8 @@
+>>   *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+>>   */
+>>
+>> -#include <libfdt_env.h>
+>> -#include <fdt.h>
+>> +#include "libfdt_env.h"
+>> +#include "fdt.h"
+>>
+>>  #define FDT_FIRST_SUPPORTED_VERSION    0x10
+>>  #define FDT_LAST_SUPPORTED_VERSION     0x11
+>> --
+>> 2.2.0.rc0
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
