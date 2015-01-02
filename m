@@ -1,87 +1,70 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 02 Jan 2015 17:55:06 +0900
-Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
- interface
-In-Reply-To: <54A19C17.1020909@ti.com>
-References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>
- <1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>
- <54A19C17.1020909@ti.com>
-Message-ID: <54A65CEA.9060202@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Jan 2015 09:59:14 +0100
+Subject: [PATCH 1/4] ARM: sirf: add two debug ports for CSRatlas7 SoC
+In-Reply-To: <CAGsJ_4wgbDkVu4hEgyP6T7Q-RMHE3bhUppSMN28qeDEVPWDDwg@mail.gmail.com>
+References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
+ <43053389.8mSSmmg5HD@wuerfel>
+ <CAGsJ_4wgbDkVu4hEgyP6T7Q-RMHE3bhUppSMN28qeDEVPWDDwg@mail.gmail.com>
+Message-ID: <14663003.FPHtjKFxH1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.12.2014 03:23, Nishanth Menon wrote:
-> On 12/23/2014 04:48 AM, Marek Szyprowski wrote:
->
->> -static void l2c310_resume(void)
->> +static void l2c310_configure(void __iomem *base)
->>   {
->> -	void __iomem *base = l2x0_base;
->> +	unsigned revision;
->>
->> -	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
->> -		unsigned revision;
->> -
->> -		/* restore pl310 setup */
->> -		writel_relaxed(l2x0_saved_regs.tag_latency,
->> -			       base + L310_TAG_LATENCY_CTRL);
->> -		writel_relaxed(l2x0_saved_regs.data_latency,
->> -			       base + L310_DATA_LATENCY_CTRL);
->> -		writel_relaxed(l2x0_saved_regs.filter_end,
->> -			       base + L310_ADDR_FILTER_END);
->> -		writel_relaxed(l2x0_saved_regs.filter_start,
->> -			       base + L310_ADDR_FILTER_START);
->> -
->> -		revision = readl_relaxed(base + L2X0_CACHE_ID) &
->> -				L2X0_CACHE_ID_RTL_MASK;
->> -
->> -		if (revision >= L310_CACHE_ID_RTL_R2P0)
->> -			l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
->> -				      L310_PREFETCH_CTRL);
->> -		if (revision >= L310_CACHE_ID_RTL_R3P0)
->> -			l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
->> -				      L310_POWER_CTRL);
->> -
->> -		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
->> -
->> -		/* Re-enable full-line-of-zeros for Cortex-A9 */
->> -		if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
->> -			set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
->> -	}
->> +	/* restore pl310 setup */
->> +	writel_relaxed(l2x0_saved_regs.tag_latency,
->> +		       base + L310_TAG_LATENCY_CTRL);
->> +	writel_relaxed(l2x0_saved_regs.data_latency,
->> +		       base + L310_DATA_LATENCY_CTRL);
->> +	writel_relaxed(l2x0_saved_regs.filter_end,
->> +		       base + L310_ADDR_FILTER_END);
->> +	writel_relaxed(l2x0_saved_regs.filter_start,
->> +		       base + L310_ADDR_FILTER_START);
->> +
->
-> ^^ The above change broke AM437xx. Looks like the change causes the
-> following behavior difference on AM437x. For some reason, touching any
-> of the above 4 registers(even with the values read from the same
-> registers) causes AM437x to go beserk. Comment the 4 writes and we
-> reach shell. looks like l2c310_resume is not invoked prior to this
-> series. :(.. now that we reuse that logic to actually do programming,
-> we start to see the problem.
+On Friday 02 January 2015 15:51:41 Barry Song wrote:
+> 2014-12-31 23:31 GMT+08:00, Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday 31 December 2014 23:05:44 Barry Song wrote:
+> >> 2014-12-31 6:35 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> >> > On Thursday 25 December 2014 16:34:17 Barry Song wrote:
+> >> >>  #if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
+> >> >> -#define SIRFSOC_UART1_PA_BASE          0xb0060000
+> >> >> +#define SIRF_LLUART_PA_BASE          0xb0060000
+> >> >>  #elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
+> >> >> -#define SIRFSOC_UART1_PA_BASE          0xcc060000
+> >> >> +#define SIRF_LLUART_PA_BASE          0xcc060000
+> >> >> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART1)
+> >> >> +#define SIRF_LLUART_PA_BASE          0x18020000
+> >> >> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART0)
+> >> >> +#define SIRF_LLUART_PA_BASE          0x18010000
+> >> >>  #else
+> >> >> -#define SIRFSOC_UART1_PA_BASE          0
+> >> >> +#define SIRF_LLUART_PA_BASE          0
+> >> >>  #endif
+> >> >
+> >> > I think it would be nicer to use DEBUG_UART_PHYS/DEBUG_UART_VIRT here.
+> >>
+> >> yes if it is more general name for all. my second feeling is that does
+> >> this conflict CSR namespace stuff into high-level and common namespace
+> >> things?
+> >
+> > I think my comment was misleading. What I meant was to use
+> > CONFIG_DEBUG_UART_PHYS from arch/arm/Kconfig.debug the same way
+> > we do for the 8250 and pl011 compatible uarts.
+> 
+> it is even better if all CSR ports are same in register layout. then
+> we can simply have a Kconfig options for all ports and use the
+> CONFIG_DEBUG_UART_VIRT/PHYS to differentiate ports.
 
-OK, I probably have answer for this. Apparently all four register above 
-cannot be written in non-secure mode and they should go through 
-l2c_write_sec(). More on this can be found in CoreLink Level 2 Cache 
-Controller L2C-310 Technical Reference Manual, 3.2. Register summary, 
-table 3.1. I have checked the TRM for r3p3, but I guess this should be 
-uniform for all revisions.
+Right. In most other cases, we still have one option per implementation
+but then only use it to pick a different default for the UART address.
 
-Why this worked before? The registers were not written unless respective 
-properties in DT were present and OMAP do not have them in DT. Current 
-code always writes them, which should not really matter if the code is 
-correct. (But it isn't - writel_relaxed() can't be used directly for 
-those registers.)
+As a side note here, we don't yet have working CONFIG_EARLYCON support
+on ARM, but there are new patches to implement that. With EARLYCON
+working, it would be much less important to have DEBUG_LL configured
+easily, and you could just leave entering the right address to
+advanced users that need to debug the kernel earlier than the
+earlycon init.
 
-Could you check if replacing those four writel_relaxed() with 
-l2c_write_sec() does the thing?
+> but here we still
+> need the options for different ports as TXFIFO_EMPTY bits are
+> different on different ports.
+> 
+> +#ifdef CONFIG_DEBUG_SIRFATLAS7_UART0
+> +#define SIRF_LLUART_TXFIFO_EMPTY                       (1 << 8)
+> +#else
+> +#define SIRF_LLUART_TXFIFO_EMPTY                       (1 << 6)
+> +#endif
 
-Best regards,
-Tomasz
+Yes, so we need two options at least, so we can tell the difference
+between atlas7 and the others.
+
+
+	Arnd
