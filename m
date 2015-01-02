@@ -1,62 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Jan 2015 22:17:53 +0100
-Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <1420011208-7051-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1420011208-7051-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <1741288.B6kbjm5Uq5@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 02 Jan 2015 22:20:12 +0100
+Subject: [PATCH] clk: rockchip: rk3288: Make s2r reliable by switching
+ PLLs to slow mode
+In-Reply-To: <1419276708-28294-1-git-send-email-dianders@chromium.org>
+References: <1419276708-28294-1-git-send-email-dianders@chromium.org>
+Message-ID: <2520772.QQVueoUhik@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
-> +
-> +	memory at 00000000 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x00000000 0x0 0x80000000>;
-> +		/* board 0, socket 0, no specific core */
-> +		arm,associativity = <0 0 0xffff>;
-> +	};
-> +
-> +	memory at 10000000000 {
-> +		device_type = "memory";
-> +		reg = <0x100 0x00000000 0x0 0x80000000>;
-> +		/* board 1, socket 0, no specific core */
-> +		arm,associativity = <1 0 0xffff>;
-> +	};
-> +};
+Am Montag, 22. Dezember 2014, 11:31:48 schrieb Doug Anderson:
+> We've been seeing some crashes at resume time on rk3288-based systems.
+> On some machines they simply never wake up from suspend.  Symptoms
+> include:
+> 
+> - System clearly got to sleep OK.  Power consumption is low, the PWM
+>   for the PWM regulator has stopped, and the "global_pwroff" output
+>   shows that the system is down.
+> 
+> - When system tries to wake up power consumption goes up.
+> 
+> - No kernel resume code (which was left in PMU SRAM) ran.  We added
+>   some basic logging to this code (write to a location in SRAM right
+>   at resume time) and didn't see the logging run.
+> 
+> It appears that we can fix the problem by slowing down APLL before we
+> suspend.  On the system I tested things seemed reliable if I disabled
+> 1.8GHz and 1.7GHz.  The Mask ROM itself tries to slow things down
+> (which is why PLLs are in slow mode by the time we get to the kernel),
+> but apparently it is crashing before it even gets there.
+> 
+> We'll be super paranoid and not just go down to 1.6GHz but we'll match
+> what the Mask ROM seems to be doing and go into slow mode.  We'll also
+> be safe and put all PLLs (not just APLL) into slow mode (well, except
+> DPLL which is needed for SDRAM).  We'll even put NPLL into slow mode
+> which the Mask ROM didn't do (not that it's used for much important
+> stuff at early resume time).
+> 
+> Note that the old Rockchip reference code did something just like
+> this, though they jammed it into pm.c instead of putting it in the
+> syscore ops of the clock driver.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-So no memory in any other socket?
+applied to my clk branch for 3.20
 
-> +		cpu at 00f {
-> +			device_type = "cpu";
-> +			compatible = "cavium,thunder", "arm,armv8";
-> +			reg = <0x0 0x00f>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 0x00f>;
-> +		};
-> +		cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "cavium,thunder", "arm,armv8";
-> +			reg = <0x0 0x100>;
-> +			enable-method = "psci";
-> +			arm,associativity = <0 0 0x100>;
-> +		};
+As I already talked about with Doug on IRC (last year), I see this as a sort-
+of stop-gap solution till we know the suspend requirements of the older/other 
+Rockchip SoCs that do suspend slightly different and can generalize the whole 
+clk suspend handling at this point.
 
-What is the 0x100 offset in the last-level topology field? Does this have
-no significance to topology at all? I would expect that to be something
-like cluster number that is relevant to caching and should be represented
-as a separate level.
 
-In contrast, the level-two topology information seems to always be
-zero for all CPUs, so you could probably leave that one out.
-
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-
-The soc node is missing a topology information, please add one.
-
-	Arnd
+Heiko
