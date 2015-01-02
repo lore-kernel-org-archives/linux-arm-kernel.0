@@ -1,70 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Jan 2015 09:59:14 +0100
-Subject: [PATCH 1/4] ARM: sirf: add two debug ports for CSRatlas7 SoC
-In-Reply-To: <CAGsJ_4wgbDkVu4hEgyP6T7Q-RMHE3bhUppSMN28qeDEVPWDDwg@mail.gmail.com>
+Date: Fri, 02 Jan 2015 10:00:27 +0100
+Subject: [PATCH 2/4] ARM: sirf: add atlas7 machine support
+In-Reply-To: <CAGsJ_4xzn0mHXa85yMSOERt23as7W=PfkfyzC6xrXo5wBDcR1g@mail.gmail.com>
 References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
- <43053389.8mSSmmg5HD@wuerfel>
- <CAGsJ_4wgbDkVu4hEgyP6T7Q-RMHE3bhUppSMN28qeDEVPWDDwg@mail.gmail.com>
-Message-ID: <14663003.FPHtjKFxH1@wuerfel>
+ <4739415.xM06V8YCmL@wuerfel>
+ <CAGsJ_4xzn0mHXa85yMSOERt23as7W=PfkfyzC6xrXo5wBDcR1g@mail.gmail.com>
+Message-ID: <6143383.aIfcyE6KvX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 January 2015 15:51:41 Barry Song wrote:
-> 2014-12-31 23:31 GMT+08:00, Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 31 December 2014 23:05:44 Barry Song wrote:
-> >> 2014-12-31 6:35 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> >> > On Thursday 25 December 2014 16:34:17 Barry Song wrote:
-> >> >>  #if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
-> >> >> -#define SIRFSOC_UART1_PA_BASE          0xb0060000
-> >> >> +#define SIRF_LLUART_PA_BASE          0xb0060000
-> >> >>  #elif defined(CONFIG_DEBUG_SIRFMARCO_UART1)
-> >> >> -#define SIRFSOC_UART1_PA_BASE          0xcc060000
-> >> >> +#define SIRF_LLUART_PA_BASE          0xcc060000
-> >> >> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART1)
-> >> >> +#define SIRF_LLUART_PA_BASE          0x18020000
-> >> >> +#elif defined(CONFIG_DEBUG_SIRFATLAS7_UART0)
-> >> >> +#define SIRF_LLUART_PA_BASE          0x18010000
-> >> >>  #else
-> >> >> -#define SIRFSOC_UART1_PA_BASE          0
-> >> >> +#define SIRF_LLUART_PA_BASE          0
-> >> >>  #endif
-> >> >
-> >> > I think it would be nicer to use DEBUG_UART_PHYS/DEBUG_UART_VIRT here.
-> >>
-> >> yes if it is more general name for all. my second feeling is that does
-> >> this conflict CSR namespace stuff into high-level and common namespace
-> >> things?
+On Wednesday 31 December 2014 22:50:16 Barry Song wrote:
+> 2014-12-31 6:34 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Thursday 25 December 2014 16:34:18 Barry Song wrote:
+> >> +DT_MACHINE_START(ATLAS7_DT, "Generic ATLAS7 (Flattened Device Tree)")
+> >> +       /* Maintainer: Barry Song <baohua.song@csr.com> */
+> >> +       .smp            = smp_ops(sirfsoc_smp_ops),
+> >> +       .map_io         = sirfsoc_map_io,
+> >> +       .init_late      = sirfsoc_init_late,
+> >> +       .dt_compat      = atlas7_dt_match,
+> >> +MACHINE_END
 > >
-> > I think my comment was misleading. What I meant was to use
-> > CONFIG_DEBUG_UART_PHYS from arch/arm/Kconfig.debug the same way
-> > we do for the 8250 and pl011 compatible uarts.
+> > Can you check if the sirfsoc_map_io function is still required?
+> > My guess is that you can just replace sirfsoc_map_scu() with a
+> > call of ioremap in sirfsoc_smp_prepare_cpus, and drop sirfsoc_map_lluart()
+> > entirely in favor of the default debug_ll_io_init() function that
+> > is called when map_io is NULL.
+> >
+> > Also, how about merging the entries for atlas6 and atlas7, and just
+> > having multiple compatible strings in atlas_dt_match?
 > 
-> it is even better if all CSR ports are same in register layout. then
-> we can simply have a Kconfig options for all ports and use the
-> CONFIG_DEBUG_UART_VIRT/PHYS to differentiate ports.
-
-Right. In most other cases, we still have one option per implementation
-but then only use it to pick a different default for the UART address.
-
-As a side note here, we don't yet have working CONFIG_EARLYCON support
-on ARM, but there are new patches to implement that. With EARLYCON
-working, it would be much less important to have DEBUG_LL configured
-easily, and you could just leave entering the right address to
-advanced users that need to debug the kernel earlier than the
-earlycon init.
-
-> but here we still
-> need the options for different ports as TXFIFO_EMPTY bits are
-> different on different ports.
+> the situation is that atlas7 is not a family of atlas6. atlas6 is much
+> similar with prima2, but atlas7 is actually a replacement of earlier
+> marco family.
 > 
-> +#ifdef CONFIG_DEBUG_SIRFATLAS7_UART0
-> +#define SIRF_LLUART_TXFIFO_EMPTY                       (1 << 8)
-> +#else
-> +#define SIRF_LLUART_TXFIFO_EMPTY                       (1 << 6)
-> +#endif
+> atlas7 is a dual core cortex-a7, but atlas6 is a single core
+> cortex-a9. and atlas7 is using a Network on Chip(NoC) bus architecture
+> which is completely not same with atlas6 which is using a tree-type
+> bus, so atlas7 will have some machine-specific codes like NoC fireware
+> which should be in machine specific codes to handle external data
+> aborts things for security protection. and more important, atlas7 has
+> much different IP modules with atlas6 for things like GPS,
+> connectiviy, software digital radios. and atlas7 has a more cortex-M3
+> for CAN stack, so this will involve some IPC drivers. and one more DSP
+> for audio processing.
+> 
+> this means atlas7 is not a simple atlas6+1, it is a new chip.  i have
+> a feeling atlas7 should be highlighted as a seperate machine.
 
-Yes, so we need two options at least, so we can tell the difference
-between atlas7 and the others.
-
+Ideally, I'd like to see a single DT_MACHINE_START for all of the
+sirf machines once you have eliminated all the callbacks, but
+until then, using one per SoC type for consistency is fine with me
+as well, so just leave it that way for now.
 
 	Arnd
