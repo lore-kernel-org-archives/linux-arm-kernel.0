@@ -1,119 +1,170 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 2 Jan 2015 14:45:50 -0600
-Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <54A6D375.6050604@ti.com>
-References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
- <1419459099-6667-2-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
- <54A6D375.6050604@ti.com>
-Message-ID: <CAL_Jsq+krOUA3BPvMCdaOBhALoi+pzWbw3YndXqR8x52OJogZg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Jan 2015 21:52:42 +0100
+Subject: [PATCH 4/9] pci: add DT based ARM Versatile PCI host driver
+In-Reply-To: <CAL_JsqJbUHkr0zXYKTvS0WPGs7mNqkppsn4i0LuWz5Wv12Unmw@mail.gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <2308474.mrIrUSfiTv@wuerfel>
+ <CAL_JsqJbUHkr0zXYKTvS0WPGs7mNqkppsn4i0LuWz5Wv12Unmw@mail.gmail.com>
+Message-ID: <5205206.j8Q9x4GQsU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 2, 2015 at 11:20 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> Rob,
->
-> See my response below. Arnd and Will, please review this as well.
->
-> On 12/26/2014 02:33 PM, Rob Herring wrote:
->>
->> On Wed, Dec 24, 2014 at 4:11 PM, Murali Karicheri<m-karicheri2@ti.com>
->> wrote:
->>>
->>> Add of_pci_dma_configure() to allow updating the dma configuration
->>> of the pci device using the configuration from DT of the parent of
->>> the root bridge device.
->>>
->>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->>> ---
->>>   drivers/of/of_pci.c    |   73
->>> ++++++++++++++++++++++++++++++++++++++++++++++++
->>>   include/linux/of_pci.h |   12 ++++++++
->>>   2 files changed, 85 insertions(+)
->>>
+On Friday 02 January 2015 12:14:43 Rob Herring wrote:
+> On Tue, Dec 30, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 30 December 2014 13:28:33 Rob Herring wrote:
+> >> From: Rob Herring <robh@kernel.org>
+> >>
+> >> This converts the Versatile PCI host code to a platform driver using
+> >> the commom DT parsing and setup. The driver uses only an empty ARM
+> >> pci_sys_data struct and does not use pci_common_init_dev init function.
+> >> The old host code will be removed in a subsequent commit when Versatile
+> >> is completely converted to DT.
+> >>
+> >> I've tested this on QEMU with the sym53c8xx driver in both i/o and
+> >> memory mapped modes.
+> >
+> > Ah, this is quite clever, I think you tried to explain to me what you
+> > did with the pci_sys_data before, but I didn't get it then.
+> >
+> >> +
+> >> +static void __iomem *__pci_addr(struct pci_bus *bus,
+> >> +                             unsigned int devfn, int offset)
+> >> +{
+> >> +     unsigned int busnr = bus->number;
+> >> +
+> >> +     /*
+> >> +      * Trap out illegal values
+> >> +      */
+> >> +     BUG_ON(offset > 255);
+> >> +     BUG_ON(busnr > 255);
+> >> +     BUG_ON(devfn > 255);
+> >
+> > Isn't an offset>255 something that can be triggered by a non-broken
+> > driver or even user space?
+> 
+> I don't know. I just copied what the old driver did. Are these checks
+> even host controller specific?
 
-[...]
+A busnr or devfn larger than 255 would be a serious bug on any host
+controller, those just don't exist. A BUG_ON check here is not a problem,
+but if we want to have it, I'd prefer to put it into the core code.
 
->>> +               coherent = of_dma_is_coherent(parent_np);
->>> +               dev_dbg(dev, "device is%sdma coherent\n",
->>> +                       coherent ? " " : " not ");
->>> +
->>> +               arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
->>
->>
->> This is the same code as of_dma_configure. The only difference I see
->> is which node ptr is passed to of_dma_get_range. You need to make that
->> a function param of of_dma_configure.
->>
->> of_dma_configure also has iommu handling now. You will probably need
->> something similar for PCI in that you setup an iommu based on the root
->> bus DT properties.
->>
-> Initially I had the same idea to re-use the existing function
-> of_dma_configure() for this. I wanted to defer this until we have an
-> agreement on the changes required for the subject functionality. My quick
-> review of the code suggestio this would require additional API changes as
-> below. I did a quick test of the changes and it works for Keystone, but need
-> to be reviewed by everyone as I touch the IOMMU functionality here and I
-> don't have a platform with IOMMU. Need test by someone to make sure I don't
-> break anything.
+offset values between 256 and 4095 can be valid on some devices, but
+apparently this host controller does not support them.
 
-The IOMMU changes look trivial. We may want to address the comment in
-of_iommu_configure about parent nodes. We should be sure these changes
-work with how we would do searching parent nodes.
+> > Maybe just return PCIBIOS_BAD_REGISTER_NUMBER in this case?
+> 
+> Perhaps. We could probably simplify the config space read/write
+> functions and just provide the PCI core a bus/devfn/offset to config
+> address translation function. That would not work in all cases, but
+> propably most that have memory mapped config space.
 
-> Here are the changes required to implement this suggestion.
->
-> 1. Move the of_dma_configure() to drivers/of/device.c (include the API in
-> of_device.h) and make it global (using proper EXPORT macro). Otherwise, we
-> will have to include of_platform.h in drivers/of/of_pci.c assuming the
-> prototype is defined in of_platform.h which doesn't look appropriate to me.
-> Would require following additional include files in drivers/of/device.c as
-> well.
->
-> +#include <linux/of_address.h>
-> +#include <linux/of_iommu.h>
-> +#include <linux/dma-mapping.h>
+Actually, thinking about this some more, the implementation seems to
+be "CAM" compliant, and we could share the confic space accessors with
+the ones from drivers/pci/host/pci-host-generic.c.
 
-Okay.
+> >> +static int versatile_pci_parse_request_of_pci_ranges(struct device *dev,
+> >> +                                                  struct list_head *res)
+> >> +{
+> >> +     int err, mem = 1, res_valid = 0;
+> >> +     struct device_node *np = dev->of_node;
+> >> +     resource_size_t iobase;
+> >> +     struct pci_host_bridge_window *win;
+> >> +
+> >> +     err = of_pci_get_host_bridge_resources(np, 0, 0xff, res, &iobase);
+> >> +     if (err)
+> >> +             return err;
+> >> +
+> >> +     list_for_each_entry(win, res, list) {
+> >> +             struct resource *parent, *res = win->res;
+> >> +
+> >> +             switch (resource_type(res)) {
+> >> +             case IORESOURCE_IO:
+> >> +                     parent = &ioport_resource;
+> >> +                     err = pci_remap_iospace(res, iobase);
+> >> +                     if (err) {
+> >> +                             dev_warn(dev, "error %d: failed to map resource %pR\n",
+> >> +                                      err, res);
+> >> +                             continue;
+> >> +                     }
+> >> +                     break;
+> >> +             case IORESOURCE_MEM:
+> >> +                     parent = &iomem_resource;
+> >> +                     res_valid |= !(res->flags & IORESOURCE_PREFETCH);
+> >> +
+> >> +                     writel(res->start >> 28, PCI_IMAP(mem));
+> >> +                     writel(PHYS_OFFSET >> 28, PCI_SMAP(mem));
+> >> +                     mem++;
+> >> +
+> >> +                     break;
+> >> +             case IORESOURCE_BUS:
+> >> +             default:
+> >> +                     continue;
+> >> +             }
+> >> +
+> >> +             err = devm_request_resource(dev, parent, res);
+> >> +             if (err)
+> >> +                     goto out_release_res;
+> >> +     }
+> >
+> > I wonder if we should also request the physical resource for the I/O space
+> > window to have it show up in /proc/iomem. We are rather inconsistent in this
+> > regard between drivers.
+> 
+> It's a little complicated now because we don't have that as a struct
+> resource any more. We could reconstruct it from iobase and the i/o
+> resource size.
 
-> 2. drivers/iommu/of_iommu.c. This is needed so that of_iommu_configure() can
-> take confuguration from the root bus DT as you have suggested.
->
-> -struct iommu_ops *of_iommu_configure(struct device *dev)
-> +struct iommu_ops *of_iommu_configure(struct device *dev, struct device_node
-> *node)
->  {
->         struct of_phandle_args iommu_spec;
->         struct device_node *np;
-> @@ -145,7 +145,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev)
->          * See the `Notes:' section of
->          * Documentation/devicetree/bindings/iommu/iommu.txt
->          */
-> -       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-> +       while (!of_parse_phandle_with_args(node, "iommus",
->                                            "#iommu-cells", idx,
->                                            &iommu_spec)) {
->
 
-Seems safe enough.
 
-> 3. drivers/of/of_pci.c. The existing function (added in this patch) will
-> make call to of_dma_configure() as
->
-> parent_np = of_get_pci_root_bridge_parent(pci_dev);
-> of_dma_configure(dev, parent_np);
+> >> +     pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
+> >> +     pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
+> >> +
+> >> +     bus = pci_scan_root_bus(&pdev->dev, 0, &pci_versatile_ops, &sys, &pci_res);
+> >> +     if (!bus)
+> >> +             return -ENOMEM;
+> >> +
+> >> +     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> >> +     pci_assign_unassigned_bus_resources(bus);
+> >> +
+> >> +     return 0;
+> >
+> > One general question, mainly for Bjorn: pci_scan_root_bus adds all the devices
+> > at the Linux driver level by calling pci_bus_add_devices(), but then we call
+> > pci_fixup_irqs and pci_assign_unassigned_bus_resources after that, which will
+> > change the devices again. Is this how it's meant to work? How do we ensure
+> > that we have the correct irq number and resources by the time we enter the
+> > probe() function of the PCI device driver that gets bound to a device here?
+> 
+> I'm a bit puzzled myself. I think that the devices are not probed
+> until after pci_assign_unassigned_bus_resources. It certainly doesn't
+> work without that call. Really, I think of_irq_parse_and_map_pci
+> should be the default if no one else has set the device's irq (and the
+> host has a device node of course).
+> 
+> It also seems to be a bit of random set of pci functions that are
+> called here. It would be nice to simplify this chunk of code.
 
-Okay.
+Yes, and we recently had some attempts at creating a better interface posted
+on the mailing list, not sure what the latest status on it is. I think we
+want to end up with a two-stage interface along the lines of:
 
-> 4. drivers/of/platform.c. Add a wrapper function of_platform_dma_configure()
-> that calls of_dma_configure() as
-> of_dma_configure(dev, dev->of_node). All existing calls converted to this
-> wrapper.
+	/* allocate a pci_host_bridge, scan DT, set default operations, map
+	   I/O space if necessary, request all resources ... */
+	phb = pci_host_bridge_create(parent, ..., sizeof(struct my_pci_private));
+	if (IS_ERR(phb))
+		return PTR_ERR(phb);
 
-There's only a few callers of of_dma_configure, so I don't think this
-is necessary. The only thing platform bus specific is who is calling
-the function.
+	/* any host specific customization */
+	phb->bus->ops = my_pci_ops; /* for nonstandard config space access */
+	phb->foo = my_pci_foo; /* some other optional function pointers, replacing pcibios_* */
+	my_pci = &phb->priv; /* extra allocated data */
+	my_pci->clk = devm_clk_get(parent, "pci");
+	my_pci->regs = devm_ioremap_resource(parent, platform_get_resource(pdev,
+							IORESOURCE_MEM, 0);
+	
+	/* scan everything */
+	return pci_scan_child_bus_and_add_devices(phb->bus);
 
-Rob
+
+	Arnd
