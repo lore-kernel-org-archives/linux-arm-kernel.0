@@ -1,53 +1,53 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 2 Jan 2015 11:27:55 +0100
-Subject: [PATCH 2/2] ARM: Add mediatek SoC UART support in defconfig
-In-Reply-To: <1419587701-13451-3-git-send-email-eddie.huang@mediatek.com>
-References: <1419587701-13451-1-git-send-email-eddie.huang@mediatek.com>
- <1419587701-13451-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBeLJBjvjYs18b45f6LY33EyofRVJX8Fj2dTEtLpT3F7ZKQ@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 2 Jan 2015 11:28:48 +0100
+Subject: [PATCH v5 0/4] Fixes for SDIO interrupts for dw_mmc
+In-Reply-To: <CAPDyKFqGW2NaN+5mUrpBWrhM5ZfUSx70-Yyk9qmNaC1ft_ibpw@mail.gmail.com>
+References: <1417563767-32181-1-git-send-email-dianders@chromium.org>
+ <CAPDyKFpxvE4x_-PV=KN0HKY5cNug-ss9m5KCjNdebR1LDOJi5w@mail.gmail.com>
+ <CAD=FV=UCyOXfMqu_MYbd5pKOpgXPB87LQ7hCegeeY9vzsy6QAg@mail.gmail.com>
+ <CAPDyKFqGW2NaN+5mUrpBWrhM5ZfUSx70-Yyk9qmNaC1ft_ibpw@mail.gmail.com>
+Message-ID: <CABxcv==1w1GAHNCaNnh+e-xaYo8xtuD8dywTseioosxT4GZOvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-26 10:55 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
-> Add mediatek SoC UART support in multi_v7_defconfig
+Hello Ulf,
+
+On Tue, Dec 30, 2014 at 11:29 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 19 December 2014 at 20:02, Doug Anderson <dianders@chromium.org> wrote:
+>>
+>>> It was a bit hard to follow the
+>>> updated the revisions, please don't send patches "in-reply-to" for
+>>> future sets.
+>>
+>> Very strange.  I didn't send out anything in-reply-to other than what
+>> git-send-email usually does.  I believe I had:
+>>
+>> [0] - no in reply to.
+>>  [1] - in reply to [0]
+>>  [2] - in reply to [0]
+>>  [3] - in reply to [0]
+>>  [4] - in reply to [0]
 >
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> That's good. As long as there are no in-reply to previous versions of
+> patches/patchsets.
 >
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 2328fe7..fd0ff95 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -195,6 +195,7 @@ CONFIG_SERIO_AMBAKMI=y
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_SERIAL_8250_DW=y
-> +CONFIG_SERIAL_8250_MT6577=y
->  CONFIG_SERIAL_AMBA_PL011=y
->  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
->  CONFIG_SERIAL_MESON=y
-> --
-> 1.8.1.1
-
-Applied, thanks.
-
+> I am using gmails web-based client so it could very well be that it
+> does some magic, which I am not yet aware of.
 >
-> ************* Email Confidentiality Notice ********************
-> The information contained in this e-mail message (including any
-> attachments) may be confidential, proprietary, privileged, or otherwise
-> exempt from disclosure under applicable laws. It is intended to be
-> conveyed only to the designated recipient(s). Any use, dissemination,
-> distribution, printing, retaining or copying of this e-mail (including its
-> attachments) by unintended recipient(s) is strictly prohibited and may
-> be unlawful. If you are not an intended recipient of this e-mail, or believe
-> that you have received this e-mail in error, please notify the sender
-> immediately (by replying to this e-mail), delete any and all copies of
-> this e-mail (including any attachments) from your system, and do not
-> disclose the content of this e-mail to any other person. Thank you!
 
+I think that you were confused because Gmail's "conversation view"
+groups emails in a thread not by the email subject but by the email
+body.
 
+So if a new revision of a series is sent and a patch did not change
+from the previous version, Gmail will add it to the old patch thread
+since the body is basically the same even when a version is present in
+the subject (e.g: PATCH v2 foo).
 
--- 
-motzblog.wordpress.com
+I found that annoying as well so I disabled conversation view going to
+Gmail's settings -> General -> Conversation view off
+
+Hope it helps.
+
+Best regards,
+Javier
