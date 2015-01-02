@@ -1,27 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 2 Jan 2015 09:38:45 -0600
-Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
- interface
-In-Reply-To: <54A66143.2080506@gmail.com>
-References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>	<1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>	<54A19C17.1020909@ti.com>
- <CA+Ln22G3kVA_-tsjAxbe2rqSHeLtdU2X_EhNL0uW3cUCgaWLgg@mail.gmail.com>
- <54A2BBDC.1020900@ti.com> <54A66143.2080506@gmail.com>
-Message-ID: <54A6BB85.70805@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 2 Jan 2015 16:52:06 +0100
+Subject: [PATCH resend v3 0/2] mmc: Add SDIO function devicetree subnode
+ parsing
+In-Reply-To: <1404119245-5839-1-git-send-email-hdegoede@redhat.com>
+References: <1404119245-5839-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAPDyKFrTcJw0aZ-V399jJzCmi-6nqduUFV02s-bN-oDAOwVA5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2015 03:13 AM, Tomasz Figa wrote:
+On 30 June 2014 at 11:07, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi All,
+>
+> Here is a resend of 3 of my submission of Sascha Hauer's
+> "mmc: Add SDIO function devicetree subnode parsing" patch.
+>
+> Can we please get some movement on these patches, either a review specifying
+> why this cannot go upstream, or else queuing it up for next / 3.17 ?
+>
+> Changes since v1:
+> - Submit as a stand-alone patch-set, rather then as part of a larger oob irq
+>   support patchset crossing multiple subsystems
+> - Add a patch to document the already existing practice of using slot subnodes
+> - Split of the dt bindings documentation for sdio-func child nodes into its
+>   own patch
+> - Add a preparation patch, setting slot_no where relevant
+> - And finally the "Add SDIO function devicetree subnode parsing" patch itself
+>   has been modified to look for the sdio function childnodes under a slot node
+>   instead of directly under the host node
+>
+> Changes since v2:
+> - Drop the slot subnodes again, and drop the 2 slot subnodes patches
+>
+> Regards,
+>
+> Hans
 
-> However I'm not sure about your concern about using l2x0_data before 
-> kmemdup(). I don't see any code potentially doing this.
+So after quite a delay (sorry about that!!), I decided to apply this
+patchset for my next branch.
 
-It is not terribly important, but anyways [1] is what I had in mind..
+Only a minor trivial conflict showed up on patch2. Also I took the
+liberty to change the prefix of patch 1 into only "mmc".
 
-
-
-[1]
-https://github.com/nmenon/linux-2.6-playground/commit/40f65e4707856f7b35872cf2225bf8beaf43552c#diff-56925866b8b499d75763bf5a1d7f1666L883
-
--- 
-Regards,
-Nishanth Menon
+Kind regards
+Uffe
