@@ -1,53 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Jan 2015 18:14:24 +0000
-Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
-In-Reply-To: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
-References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20150102181423.GS11285@n2100.arm.linux.org.uk>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Fri, 2 Jan 2015 12:18:06 -0600
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20150102115533.GA25573@red-moon>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <2148776.X8NPqiYA6S@wuerfel>
+ <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
+ <2355100.WsW1DXh57P@wuerfel> <54A1AC5C.7000903@amd.com>
+ <20150102115533.GA25573@red-moon>
+Message-ID: <54A6E0DE.6090309@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 02, 2015 at 05:14:04PM +0100, Ulf Hansson wrote:
-> To be able to handle these SOC specific power sequences, we add a MMC power
-> sequence interface, which helps the mmc core to deal with such.
+On 1/2/2015 5:55 AM, Lorenzo Pieralisi wrote:
+> Hi Suravee,
+>
+> On Mon, Dec 29, 2014 at 07:32:44PM +0000, Suravee Suthikulpanit wrote:
+>> >Hi,
+>> >
+>> >I am not sure if this thread is still alive. I'm trying to see what I
+>> >can do to help clean up/convert to make the PCI GHC also works for arm64
+>> >w/ zero or minimal ifdefs.
+>> >
+>> >Please let me know if someone is already working on this. I noticed that
+>> >Lorenzo's patches has already been in 3.19-rc1, and in Bjorn's
+>> >pci/domain branch. Otherwise, I'll try to continue the work based on the
+>> >sample patch from Arnd here.
+> If I am not mistaken, the only bit missing to remove pci_sys_data (and so
+> having a generic host controller driver that works on ARM32/64) is generic
+> MSI management.
 
-I think this should be done differently - part of that is with hind sight
-given that we now have a range of interface types.
+Lorenzo,
 
-One of my early design mistakes with MMC was to incorporate the power up
-and initialisation protocol (the 74 clocks business) into the core code.
-This was wrong, because it is a detail which only applies to dumb host
-interfaces.  More inteligent interfaces do not need that complexity as
-they handle that in hardware.
+Do you mean to remove pci_sys_data from pci-host-generic.c or removing 
+it completely? I assume the former case.
 
-Rather than MMC ending up with more layers and more infrastructure like
-this - turning it more into the turd which is sdhci - I would like to see
-some proper thought put into design, specifically addressing the above
-design issue.
+So, looking at the current code in the pci-host-generic.c, my 
+understanding is that the:
+     *gen_pci = pci_bus->sysdata->private_data
+will be changed to:
+     *gen_pci = pci_bus->sysdata
 
-What should be done is to move away from the opaque "set_ios" method into
-something more appropriate - a set of callbacks which describe what we
-want to achieve.
+Then, we can simply just call pci_scan_root_bus() directly since we no 
+longer need to declare hw_pci for calling pci_common_init_dev().
 
-In the case of power up, there should be a single call into the host
-controller code which is responsible for initiating the power up
-sequence, and waits for the power up sequence to complete.  In other
-words, most of mmc_power_up() should be moved to a library function,
-which dumb host adapters hook into the "power up" method.  More
-inteligent adapters (eg, PXA, sdhci) can add their own hook which poke
-the hardware and return when the hardware has completed its power up
-sequence.
+> I know for certain Marc is working on it, and the solution is WIP,
+> I think we should prevent adding more churn to pci_sys_data, since
+> I managed to remove most of the dependencies (domain, mem_offset).
 
-That avoids the "mmc_delay(10)" for inteligent adapters where these
-delays are not required - which presumably also are not required if some
-special power up sequence for eMMC is required.
+Thanks for cleaning up the domain and mem_offset.
 
-The same thing goes for this "powerseq" stuff - all you're doing is
-propagating the same design mistake (with the POWER_UP/POWER_ON etc
-details) into it.  That shouldn't be the case - think about the dumb
-powerup method I described above vs the inteligent method - these are
-two separate powerup methods, and should be implemented as such.
+I saw Marc's irq/msi_domain patch series 
+(http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/msi_domain). 
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+
+My understanding is that deals with associating the newly introduced 
+msi_domain to each device, which replaces the need for pci_bus->msi and 
+hw_pci->msi_ctrl when configure with CONFIG_PCI_MSI_IRQ_DOMAIN (not sure 
+if this would be the plan for all arm32).  For ARM32, if not define 
+CONFIG_PCI_MSI_IRQ_DOMAIN, it would still fall back to using the 
+[pci_sys_data|hw_pci]->msi_ctrl.
+
+However, I noticed that the hw_pci->msi_controller is not even used for 
+the pci-host-generic. So, this should not be blocking the work to free 
+pci-host-generic from pci_sys_data and hw_pci, as the MSI stuff can go 
+in separately. Am I missing something?
+
+> So to sum it up, to have a generic host controller driver for ARM32/64
+> we just need to work out how to handle the MSI data, patches will be
+> on the lists shortly to handle that, please review.
+>
+> Thanks,
+> Lorenzo
+>
+
+Thanks for the update and the summary. I'll help review/test the MSI 
+patch once posted.
+
+Thanks,
+
+Suravee
