@@ -1,58 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Jan 2015 10:46:35 +0100
-Subject: [PATCH] arch: arm: mach-omap2: voltage.c: Remove some unused
- functions
-In-Reply-To: <1420131994-31636-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1420131994-31636-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <3966855.LUXW4xbVYM@wuerfel>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 02 Jan 2015 10:49:06 +0100
+Subject: [PATCH] clk: samsung: Fix Exynos 5420 pinctrl setup and clock
+ disable failure due to domain being gated
+In-Reply-To: <20141224163626.GA3902@peachpi>
+References: <1417788934-23447-1-git-send-email-k.kozlowski@samsung.com>
+ <1418129982.19339.6.camel@AMDC1943> <5486F69B.6020005@samsung.com>
+ <7hlhmfo1b0.fsf@deeprootsystems.com> <20141224163626.GA3902@peachpi>
+Message-ID: <54A66992.1080802@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 January 2015 18:06:34 Rickard Strandqvist wrote:
+Hello Paolo,
 
-> -void omap_change_voltscale_method(struct voltagedomain *voltdm,
-> -				  int voltscale_method)
-> -{
-> -	if (!voltdm || IS_ERR(voltdm)) {
-> -		pr_warn("%s: VDD specified does not exist!\n", __func__);
-> -		return;
-> -	}
-> -
-> -	switch (voltscale_method) {
-> -	case VOLTSCALE_VPFORCEUPDATE:
-> -		voltdm->scale = omap_vp_forceupdate_scale;
-> -		return;
-> -	case VOLTSCALE_VCBYPASS:
-> -		voltdm->scale = omap_vc_bypass_scale;
-> -		return;
-> -	default:
-> -		pr_warn("%s: Trying to change the method of voltage scaling to an unsupported one!\n",
-> -			__func__);
-> -	}
-> -}
+On 12/24/2014 05:36 PM, Paolo Pisati wrote:
+> On Wed, Dec 10, 2014 at 09:35:31AM -0800, Kevin Hilman wrote:
+>> 
+>> I confirm it fixes the boot hang in linux-next (next-20141210) on my
+>> exynos5800-peach-pi and exynos5420-arndale-octa.  Tested both
+>> exynos_defconfig and multi_v7_defconfig.
+>> 
+>> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+> does audio work on your peach pi? because kernel boots fine, but i can't get any
+> audio out of it
+> 
 
-The VOLTSCALE_VPFORCEUPDATE/VOLTSCALE_VCBYPASS macros are now unused and should
-be removed as well.
+Audio is not working for me as well. I said before that audio was working
+because I tested with the headphone audio jack but I forgot that I had
+re-introduced the clk_ignore_unused parameter to my kernel command line
+to test the mmc/sdio wifi. Without clk_ignore_unused, I have no audio.
 
-> @@ -321,10 +290,9 @@ static struct voltagedomain *_voltdm_lookup(const char *name)
->   * @voltdm: struct voltagedomain * to add the powerdomain to
->   * @pwrdm: struct powerdomain * to associate with a voltagedomain
->   *
-> - * Associate the powerdomain @pwrdm with a voltagedomain @voltdm.  This
-> - * enables the use of voltdm_for_each_pwrdm().  Returns -EINVAL if
-> - * presented with invalid pointers; -ENOMEM if memory could not be allocated;
-> - * or 0 upon success.
-> + * Associate the powerdomain @pwrdm with a voltagedomain @voltdm.
-> + * Returns -EINVAL if presented with invalid pointers;
-> + * -ENOMEM if memory could not be allocated; or 0 upon success.
->   */
->  int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
->  {
+I see that the downstream daisy_max98095 ASoC driver in the ChromeOS tree
+grabs some clocks that the mainline sound/soc/samsung/snow.c driver so it
+it seems that at least that is missing and may explain why it is working
+with clk_ignore_unused.
 
-You have correctly spotted the only place that references voltdm_for_each_pwrdm
-and changed the comment, but you failed to notice that it no longer makes
-sense to call voltdm_add_pwrdm or keep the voltdm->pwrdm_list pointer
-at all, so this function, and the associated list heads can all be removed
-as well.
-
-	Arnd
+Best regards,
+Javier
