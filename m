@@ -1,34 +1,59 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 2 Jan 2015 20:53:51 +0100
-Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <20141226232116.GA5069@type>
-References: <20141226232116.GA5069@type>
-Message-ID: <20150102195350.GB27538@amd>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 2 Jan 2015 14:00:14 -0600
+Subject: [PATCH 0/3] drivers: soc: ti: Introduce wkup_m3_ipc driver
+Message-ID: <1420228817-41310-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This series introduces a wkup_m3_ipc driver to handle communication
+between the MPU and Cortex M3 present on TI AM335x SoCs. This is
+required for much of the PM functionality for AM335x including suspend
+support. This was split off from v4 of the am335x suspend series,
+discussion that led to the implementation of this driver can be found
+with the series here [1].  A previous RFC version of this series can be
+found here [2]. The changes from that version are as follows:
+ - Remove wake source reporting as it is unnecessary.
+ - Use newly introduced rproc_get_by_phandle API to get rproc for
+   booting [3].
 
-> Here is v5 coming, with separate patches for the kbd and the input
-> parts.
+This series depends on the patch "remoteproc: Introduce
+rproc_get_by_phandle API" [3] and the wkup_m3_rproc series found
+here [4]. A branch based on 3.19-rc1 containing this series and
+all dependencies for the AM33xx suspend series can be found
+here [5] for a high level view of what I am using this for.
 
-After booting with this, capslock led does not seem to work on text
-console.
+A small API is exposed to allow the SoC PM code to execute the
+specific tasks it needs to in order to enter and exit low power
+modes. Communication works the same as it did in the past using the
+IPC registers found within the control module, a mailbox module, and
+an interrupt coming back from the CM3. All of that, including the
+configurations needed for different low power tasks is encapsulated
+within this driver.
 
-input4::capsl/trigger was none by default, that can't be right, right?
+Regards,
+Dave
 
-I tried putting kbd-capslock and input4-capsl there, but that did not
-seem to help.
+[1] http://www.spinics.net/lists/linux-omap/msg109331.html
+[2] http://www.spinics.net/lists/linux-omap/msg113372.html
+[3] http://marc.info/?l=linux-kernel&m=142022798923784&w=2
+[4] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg795457.html
+[5] https://github.com/dgerlach/linux-pm/tree/pm-am335x-v3.19-rc1
 
-It works with heartbeat trigger, but not with input4-numl
-trigger. (But numlock led works ok with that trigger, weird).
+Dave Gerlach (3):
+  Documentation: dt: add ti,am3353-wkup-m3-ipc bindings
+  soc: ti: Add wkup_m3_ipc driver
+  ARM: dts: am33xx: Add wkup_m3_ipc node
 
-vt::capsl/brightness controls capslock led, even when
-input4-capsl/trigger is set to input4-numl.
+ .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  41 ++
+ arch/arm/boot/dts/am33xx.dtsi                      |   9 +
+ drivers/soc/ti/Kconfig                             |  11 +
+ drivers/soc/ti/Makefile                            |   1 +
+ drivers/soc/ti/wkup_m3_ipc.c                       | 451 +++++++++++++++++++++
+ include/linux/wkup_m3_ipc.h                        |  33 ++
+ 6 files changed, 546 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+ create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
+ create mode 100644 include/linux/wkup_m3_ipc.h
 
-Confused,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.1.0
