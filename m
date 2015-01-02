@@ -1,100 +1,98 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 2 Jan 2015 10:50:23 +0100
-Subject: [PATCH v2 09/12] ARM: efm32: move into multiplatform
-In-Reply-To: <1419895935-22966-10-git-send-email-stefan@agner.ch>
-References: <1419895935-22966-1-git-send-email-stefan@agner.ch>
- <1419895935-22966-10-git-send-email-stefan@agner.ch>
-Message-ID: <20150102095023.GE28003@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Jan 2015 11:10:23 +0100
+Subject: [PATCH] arch: arm: mach-ux500: board-mop500-regulators.c: Remove
+ unused function
+In-Reply-To: <1420126805-28098-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1420126805-28098-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <5939350.DKrZ01egfS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday 01 January 2015 16:40:05 Rickard Strandqvist wrote:
+> Remove the function mop500_regulator_init() that is not used anywhere.
+> 
+> This was partially found by using a static code analysis program called cppcheck.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 
-On Tue, Dec 30, 2014 at 12:32:12AM +0100, Stefan Agner wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> Since the multiplatform configuration can support no-MMU kernels now,
-> there is nothing stopping us from moving the efm32 platform in there
-> as well. This introduces a new ARCH_MULTI_V7M CPU architecture selection
-> option, since v7-M is incompatible with v7-A, and we can have either
-> of the two enabled for multiplatform, but not both at the same time.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+This looks wrong: For one thing, you failed to notice that now another function
+in the same file becomes unused, or that half of the file is not used
+anyway.
+
+It also seems that the fact that this function is not called was an accident
+and it should in fact be called. Maybe Lee has some more insight in this,
+as he added the function in the first place.
+
+Finally (unrelated to your patch, but triggered by looking at it), I suspect
+we should just move the ab8500_regulator_plat_data and everything it references
+to drivers/regulator/ab8500-ext.c, because we only have one instance of it
+and won't ever have more.
+
+	Arnd
+
 > ---
->  arch/arm/Kconfig                 | 35 ++++++++++++++++-------------------
->  arch/arm/configs/efm32_defconfig |  2 ++
->  2 files changed, 18 insertions(+), 19 deletions(-)
+>  arch/arm/mach-ux500/board-mop500-regulators.c |   41 -------------------------
+>  arch/arm/mach-ux500/board-mop500-regulators.h |    2 --
+>  2 files changed, 43 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 95007b9..8fe035b 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -314,7 +314,7 @@ config ARCH_MULTIPLATFORM
->  	select COMMON_CLK
->  	select GENERIC_CLOCKEVENTS
->  	select MIGHT_HAVE_PCI
-> -	select MULTI_IRQ_HANDLER
-> +	select MULTI_IRQ_HANDLER if !ARCH_MULTI_V7M
->  	select SPARSE_IRQ
->  	select USE_OF
+> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+> index 32d744e..156e83b 100644
+> --- a/arch/arm/mach-ux500/board-mop500-regulators.c
+> +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+> @@ -1022,44 +1022,3 @@ static void ab8500_modify_reg_init(int id, u8 mask, u8 value)
 >  
-> @@ -400,24 +400,6 @@ config ARCH_EBSA110
->  	  Ethernet interface, two PCMCIA sockets, two serial ports and a
->  	  parallel port.
->  
-> -config ARCH_EFM32
-> -	bool "Energy Micro efm32"
-> -	depends on !MMU
-> -	select ARCH_REQUIRE_GPIOLIB
-> -	select ARM_NVIC
-> -	select AUTO_ZRELADDR
-> -	select CLKSRC_OF
-> -	select COMMON_CLK
-> -	select CPU_V7M
-> -	select GENERIC_CLOCKEVENTS
-> -	select NO_DMA
-> -	select NO_IOPORT_MAP
-> -	select SPARSE_IRQ
-> -	select USE_OF
-> -	help
-> -	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
-> -	  processors.
+>  	BUG_ON(1);
+>  }
 > -
->  config ARCH_EP93XX
->  	bool "EP93xx-based"
->  	select ARCH_HAS_HOLES_MEMORYMODEL
-> @@ -778,6 +760,14 @@ menu "Multiple platform selection"
+> -void mop500_regulator_init(void)
+> -{
+> -	struct regulator_init_data *regulator;
+> -
+> -	/*
+> -	 * Temporarily turn on Vaux2 on 8520 machine
+> -	 */
+> -	if (cpu_is_u8520()) {
+> -		/* Vaux2 initialized to be on */
+> -		ab8500_modify_reg_init(AB8505_VAUX12REGU, 0x0f, 0x05);
+> -	}
+> -
+> -	/*
+> -	 * Handle AB8500_EXT_SUPPLY2 on HREFP_V20_V50 boards (do it for
+> -	 * all HREFP_V20 boards)
+> -	 */
+> -	if (cpu_is_u8500v20()) {
+> -		/* VextSupply2RequestCtrl =  HP/OFF depending on VxRequest */
+> -		ab8500_modify_reg_init(AB8500_REGUREQUESTCTRL3, 0x01, 0x01);
+> -
+> -		/* VextSupply2SysClkReq1HPValid = SysClkReq1 controlled */
+> -		ab8500_modify_reg_init(AB8500_REGUSYSCLKREQ1HPVALID2,
+> -			0x20, 0x20);
+> -
+> -		/* VextSupply2 = force HP at initialization */
+> -		ab8500_modify_reg_init(AB8500_EXTSUPPLYREGU, 0x0c, 0x04);
+> -
+> -		/* enable VextSupply2 during platform active */
+> -		regulator = &ab8500_ext_regulators[AB8500_EXT_SUPPLY2];
+> -		regulator->constraints.always_on = 1;
+> -
+> -		/* disable VextSupply2 in suspend */
+> -		regulator = &ab8500_ext_regulators[AB8500_EXT_SUPPLY2];
+> -		regulator->constraints.state_mem.disabled = 1;
+> -		regulator->constraints.state_standby.disabled = 1;
+> -
+> -		/* enable VextSupply2 HW control (used in suspend) */
+> -		regulator->driver_data = (void *)&ab8500_ext_supply2;
+> -	}
+> -}
+> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+> index 9bece38..dc3ee77 100644
+> --- a/arch/arm/mach-ux500/board-mop500-regulators.h
+> +++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+> @@ -19,6 +19,4 @@ extern struct ab8500_regulator_platform_data ab8505_regulator_plat_data;
+>  extern struct regulator_init_data tps61052_regulator;
+>  extern struct regulator_init_data gpio_en_3v3_regulator;
 >  
->  comment "CPU Core family selection"
->  
-> +config ARCH_MULTI_V7M
-> +	bool "ARMv7-M based platforms (Cortex-M)"
-> +	depends on !MMU && !(ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7)
-As ARCH_MULTI_V7M depends on !MMU already ...
-> +	select CPU_V7M
-> +	select ARM_NVIC
-> +	select NO_DMA # for now
-> +	select NO_IOPORT_MAP # for now
-> +
->  config ARCH_MULTI_V4
->  	bool "ARMv4 based platforms (FA526)"
->  	depends on !ARCH_MULTI_V6_V7 && MMU
-> @@ -834,6 +824,13 @@ config ARCH_VIRT
->  	select ARM_PSCI
->  	select HAVE_ARM_ARCH_TIMER
->  
-> +config ARCH_EFM32
-> +	bool "Energy Micro efm32" if ARCH_MULTI_V7M
-> +	depends on !MMU
-... you don't need to repeat it here.
-
-Other than that you can have my Ack. I didn't test it though and must
-have missed the changes mentioned in the commit log.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> -void mop500_regulator_init(void);
+> -
+>  #endif
+> 
