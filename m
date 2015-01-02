@@ -1,70 +1,60 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 02 Jan 2015 17:28:11 +0800
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150101200424.GB12770@xora-haswell.xora.org.uk>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
- <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
- <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
- <54A3B526.9040903@linaro.org>
- <20150101200424.GB12770@xora-haswell.xora.org.uk>
-Message-ID: <54A664AB.3030101@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Jan 2015 10:29:43 +0100
+Subject: [PATCH] arch: arm: mach-rpc: ecard: Remove some unused functions
+In-Reply-To: <1420134912-1742-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1420134912-1742-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <1988901.x1xNE8yBZx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Graeme,
+On Thursday 01 January 2015 18:55:12 Rickard Strandqvist wrote:
+> Removes some functions that are not used anywhere:
+> ecard_disablefiq() ecard_enablefiq()
+> 
+> This was partially found by using a static code analysis program called cppcheck.
+> 
+> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 
-On 2015?01?02? 04:04, Graeme Gregory wrote:
-> On Wed, Dec 31, 2014 at 04:34:46PM +0800, Hanjun Guo wrote:
->> On 2014?12?31? 04:13, ashwinc at codeaurora.org wrote:
->>> Hi Hanjun,
->>>
->>> Overall the document looks good to us. Some minor clarifications below.
->>>
->>>> ---------- Forwarded message ----------
->>>> From: Graeme Gregory <graeme.gregory@linaro.org>
->>>>
->>>> Add documentation for the guidelines of how to use ACPI
->>>> on ARM64.
->>>>
->>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->>>> Signed-off-by: Al Stone <al.stone@linaro.org>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>   Documentation/arm64/arm-acpi.txt |  323
->>>> ++++++++++++++++++++++++++++++++++++++
->>>>   1 file changed, 323 insertions(+)
->>>>   create mode 100644 Documentation/arm64/arm-acpi.txt
->>>>
->>>
->>> [..]
->>>
->>>> +Relationship with Device Tree
->>>> +-----------------------------
->>>
->>> [..]
->>>
->>>> +When booting using ACPI tables, the /chosen node in DT will still be
->>>> parsed
->>>> +to extract the kernel command line and initrd path.  No other section of
->>>> the
->>>> +DT will be used.
->>>
->>> Is this still true?
->>
->> No, we can booting the ACPI system in EFI stub without dtb. Catalin
->> also pointed out this issue, I will remove this paragraph.
->>
->
-> The paragraph is still correct, the /chosen node is always present even
-> if nothing else is.
+Looks like a correct change to me, very nice!
 
-Sorry for the confusing, I mean no dtb needed for the command line if
-ACPI tables are available.
+However looking a bit further you will notice that after this is removed,
+there is more that becomes unused:
 
-efi will create a empty dtb if no dtb found, and add the cmd line into
-the new created dtb, I'm just wondering, can we remove the limitation
-for passing the cmd line in /chosen node in the future?
+> -void ecard_enablefiq(unsigned int fiqnr)
+> -{
+> -	ecard_t *ec = slot_to_ecard(fiqnr);
+> -
+> -	if (ec) {
+> -		if (!ec->ops)
+> -			ec->ops = &ecard_default_ops;
+> -
+> -		if (ec->claimed && ec->ops->fiqenable)
+> -			ec->ops->fiqenable(ec, fiqnr);
+> -		else
+> -			printk(KERN_ERR "ecard: rejecting request to "
+> -				"enable FIQs for %d\n", fiqnr);
+> -	}
+> -}
+> -
+> -void ecard_disablefiq(unsigned int fiqnr)
+> -{
+> -	ecard_t *ec = slot_to_ecard(fiqnr);
+> -
+> -	if (ec) {
+> -		if (!ec->ops)
+> -			ec->ops = &ecard_default_ops;
+> -
+> -		if (ec->ops->fiqdisable)
+> -			ec->ops->fiqdisable(ec, fiqnr);
+> -	}
+> -}
 
-Thanks
-Hanjun
+These are in fact the only references to the fiqenable/fiqdisable/fiqpending
+callback pointers, so it would be helpful to remove them as well, along with
+the stub implementation from 
+
+Is cppcheck something you are working on yourself, or did you pick it up
+from someone else? Is it possible to get cppcheck to also find those unused
+callback pointers? I assume we have more of them in other code.
+
+	Arnd
