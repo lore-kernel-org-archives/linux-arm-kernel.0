@@ -1,121 +1,248 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 2 Jan 2015 12:20:53 -0500
-Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
-References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
- <1419459099-6667-2-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
-Message-ID: <54A6D375.6050604@ti.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 2 Jan 2015 18:23:33 +0100
+Subject: [RFC 8/8] ARM64: Add uprobe support
+In-Reply-To: <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
+Message-ID: <20150102172333.GA6264@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+Hi Pratyush,
 
-See my response below. Arnd and Will, please review this as well.
+I'll try to actually read this patch (and the whole series) later, just
+a couple of quick questions for now.
 
-On 12/26/2014 02:33 PM, Rob Herring wrote:
-> On Wed, Dec 24, 2014 at 4:11 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> Add of_pci_dma_configure() to allow updating the dma configuration
->> of the pci device using the configuration from DT of the parent of
->> the root bridge device.
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> ---
->>   drivers/of/of_pci.c    |   73 ++++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/of_pci.h |   12 ++++++++
->>   2 files changed, 85 insertions(+)
->>
-----------------------CUT--------------------------------------------
->> +       unsigned long offset;
->> +       bool coherent;
->> +       int ret;
->> +
->> +       parent_np = of_get_pci_root_bridge_parent(pci_dev);
->> +
->> +       if (parent_np) {
+On 12/31, Pratyush Anand wrote:
 >
-> Save a level of indentation and do:
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -205,6 +205,7 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
 >
-> if (!parent_np)
->    return;
+>  #define instruction_pointer(regs)	((regs)->pc)
+>  #define stack_pointer(regs)		((regs)->sp)
+> +#define procedure_link_pointer(regs)	((regs)->regs[30])
 
-Agree. This will not be needed if I go with changes proposed by your 
-next comment below.
->
->> +               /*
--------CUT------------------------------------------------------
->> +
->> +               coherent = of_dma_is_coherent(parent_np);
->> +               dev_dbg(dev, "device is%sdma coherent\n",
->> +                       coherent ? " " : " not ");
->> +
->> +               arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
->
-> This is the same code as of_dma_configure. The only difference I see
-> is which node ptr is passed to of_dma_get_range. You need to make that
-> a function param of of_dma_configure.
->
-> of_dma_configure also has iommu handling now. You will probably need
-> something similar for PCI in that you setup an iommu based on the root
-> bus DT properties.
->
-Initially I had the same idea to re-use the existing function 
-of_dma_configure() for this. I wanted to defer this until we have an 
-agreement on the changes required for the subject functionality. My 
-quick review of the code suggestio this would require additional API 
-changes as below. I did a quick test of the changes and it works for 
-Keystone, but need to be reviewed by everyone as I touch the IOMMU 
-functionality here and I don't have a platform with IOMMU. Need test by 
-someone to make sure I don't break anything.
+perhaps it makes sense to change (at least) arch_prepare_kretprobe() to use
+the new helper? OK, we can do this later.
 
-Here are the changes required to implement this suggestion.
+> +/* Single step context for uprobe */
+> +struct uprobe_step_ctx {
+> +	struct list_head node;
+> +	unsigned long match_addr;
+> +};
 
-1. Move the of_dma_configure() to drivers/of/device.c (include the API 
-in of_device.h) and make it global (using proper EXPORT macro). 
-Otherwise, we will have to include of_platform.h in drivers/of/of_pci.c 
-assuming the prototype is defined in of_platform.h which doesn't look 
-appropriate to me. Would require following additional include files in 
-drivers/of/device.c as well.
+I don't understand this... please see below.
 
-+#include <linux/of_address.h>
-+#include <linux/of_iommu.h>
-+#include <linux/dma-mapping.h>
+> +struct arch_uprobe_task {
+> +	unsigned long saved_fault_code;
+> +	u64 saved_user_pc;
+> +	struct uprobe_step_ctx ss_ctx;
+> +};
 
-2. drivers/iommu/of_iommu.c. This is needed so that of_iommu_configure() 
-can take confuguration from the root bus DT as you have suggested.
+saved_user_pc looks unneeded, you can rely on uprobe_task->vaddr ?
 
--struct iommu_ops *of_iommu_configure(struct device *dev)
-+struct iommu_ops *of_iommu_configure(struct device *dev, struct 
-device_node *node)
-  {
-         struct of_phandle_args iommu_spec;
-         struct device_node *np;
-@@ -145,7 +145,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev)
-          * See the `Notes:' section of
-          * Documentation/devicetree/bindings/iommu/iommu.txt
-          */
--       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-+       while (!of_parse_phandle_with_args(node, "iommus",
-                                            "#iommu-cells", idx,
-                                            &iommu_spec)) {
+> +++ b/arch/arm64/kernel/uprobes.c
+> @@ -0,0 +1,255 @@
+> +/*
+> + * Copyright (C) 2014 Pratyush Anand <panand@redhat.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/highmem.h>
+> +#include <linux/ptrace.h>
+> +#include <linux/uprobes.h>
+> +#include <asm/debug-monitors.h>
+> +#include <asm/probes.h>
+> +
+> +#include "probes-arm64.h"
+> +
+> +#define UPROBE_INV_FAULT_CODE	UINT_MAX
+> +
+> +static LIST_HEAD(step_ctx);
+> +static DEFINE_RWLOCK(step_ctx_lock);
+> +
+> +static void add_ss_context(struct uprobe_task *utask)
+> +{
+> +	struct uprobe_step_ctx *ss_ctx = &utask->autask.ss_ctx;
+> +
+> +	ss_ctx->match_addr = utask->xol_vaddr;
+> +	write_lock(&step_ctx_lock);
+> +	list_add(&ss_ctx->node, &step_ctx);
+> +	write_unlock(&step_ctx_lock);
+> +}
+> +
+> +static struct uprobe_step_ctx *find_ss_context(unsigned long vaddr)
+> +{
+> +	struct uprobe_step_ctx *ss_ctx;
+> +
+> +	read_lock(&step_ctx_lock);
+> +	list_for_each_entry(ss_ctx, &step_ctx, node)	{
+> +		if (ss_ctx->match_addr == vaddr) {
+> +			read_unlock(&step_ctx_lock);
+> +			return ss_ctx;
+> +		}
+> +	}
+> +	read_unlock(&step_ctx_lock);
+> +
+> +	return NULL;
+> +}
 
-3. drivers/of/of_pci.c. The existing function (added in this patch) will 
-make call to of_dma_configure() as
+This looks very wrong to me, but perhaps because I do not understand
+why do we need these *_ss_context() helpers.
 
-parent_np = of_get_pci_root_bridge_parent(pci_dev);
-of_dma_configure(dev, parent_np);
+> +static void del_ss_context(struct uprobe_task *utask)
+> +{
+> +	struct uprobe_step_ctx *ss_ctx = find_ss_context(utask->xol_vaddr);
+> +
+> +	if (ss_ctx) {
+> +		write_lock(&step_ctx_lock);
+> +		list_del(&ss_ctx->node);
+> +		write_unlock(&step_ctx_lock);
+> +	} else {
+> +		WARN_ON(1);
+> +	}
+> +}
 
-4. drivers/of/platform.c. Add a wrapper function 
-of_platform_dma_configure() that calls of_dma_configure() as
-of_dma_configure(dev, dev->of_node). All existing calls converted to 
-this wrapper.
+Don't we need del_ss_context() in arch_uprobe_abort_xol() ? But this is
+minor.
 
-If the above looks good, I can post v3 of the patch with these changes.
+Why we can trust find_ss_context() ? What if another thread also called
+add_ss_context() with the same (virtual) ->xol_vaddr ?
 
-> Rob
+But the main question is: why do we need add/find_ss_context ?? Please
+explain.
 
+> +int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
+> +{
+> +	struct uprobe_task *utask = current->utask;
+> +
+> +	/* saved fault code is restored in post_xol */
+> +	utask->autask.saved_fault_code = current->thread.fault_code;
+> +
+> +	/* An invalid fault code between pre/post xol event */
+> +	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
+> +
+> +	/* Save user pc */
+> +	utask->autask.saved_user_pc = task_pt_regs(current)->user_regs.pc;
+> +
+> +	/* Instruction point to execute ol */
+> +	instruction_pointer_set(regs, utask->xol_vaddr);
+> +
+> +	add_ss_context(utask);
+> +
+> +	user_enable_single_step(current);
+> +
+> +	return 0;
+> +}
+> +
+> +int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
+> +{
+> +	struct uprobe_task *utask = current->utask;
+> +
+> +	WARN_ON_ONCE(current->thread.fault_code != UPROBE_INV_FAULT_CODE);
+> +
+> +	/* restore fault code */
+> +	current->thread.fault_code = utask->autask.saved_fault_code;
+> +
+> +	/* restore user pc */
+> +	task_pt_regs(current)->user_regs.pc = utask->autask.saved_user_pc;
+> +
+> +	/* Instruction point to execute next to breakpoint address */
+> +	instruction_pointer_set(regs, utask->vaddr + 4);
+> +
+> +	del_ss_context(utask);
+> +
+> +	user_disable_single_step(current);
+> +
+> +	return 0;
+> +}
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+task_pt_regs() above looks strange. We we can't use "struct pt_regs *regs"
+passed as an argument?
+
+See also the note about .saved_user_pc above. I think you can use
+utask->vaddr instead.
+
+And why do you need to play with ->user_regs.pc?? instruction_pointer_set()
+after that modifies the same word?
+
+Or it is possible that regs != task_pt_regs(current) ? (to remind, I do not
+know arm ;)
+
+Could you also explain
+
+	instruction_pointer_set(regs, utask->vaddr + 4);
+
+?
+
+I mean, I do not understand why this is always correct. What if the probed
+insn is "jmp" (I do not know arm64's name for jump) ?
+
+Probably this is correct because in this case arm_probe_decode_insn() should
+return INSN_GOOD_NO_SLOT and this insn will be emulated? If yes, this needs a
+comment, imo.
+
+> +static int uprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr)
+> +{
+> +	unsigned long flags;
+> +
+> +	local_irq_save(flags);
+> +	uprobe_pre_sstep_notifier(regs);
+> +	local_irq_restore(flags);
+> +
+> +	return 0;
+> +}
+
+Again, you do not need to disable irqs around uprobe_pre_sstep_notifier().
+
+And I am not sure I understand the logic... "return 0" actually means
+"return DBG_HOOK_HANDLED", right?
+
+I do not understand this register_break_hook() interface and the usage
+of .esr_mask/esr_val. But given that this patch adds BRK64_ESR_UPROBES
+and uses BRK64_OPCODE_UPROBES, I will assume that uprobe_breakpoint_handler()
+will be called if this exception was triggered by UPROBE_SWBP_INSN.
+
+In this case, why the unconditional DBG_HOOK_HANDLED is correct? For example,
+what if the application itself or debugger use UPROBE_SWBP_INSN for (self)
+debugging and this task has no uprobes? In this case uprobe_pre_sstep_notifier()
+will do nothing, it won't set TIF_UPROBES and handle_swbp() won't be called.
+
+IOW, shouldn't it do
+
+	if (user_mode(regs) && uprobe_pre_sstep_notifier(regs))
+		return DBG_HOOK_HANDLED;
+	return DBG_HOOK_ERROR;
+
+?
+
+> +static int uprobe_single_step_handler(struct pt_regs *regs, unsigned int esr)
+> +{
+> +	unsigned long flags;
+> +
+> +	if (!find_ss_context(regs->pc - 4))
+> +		return DBG_HOOK_ERROR;
+> +
+> +	local_irq_save(flags);
+> +	uprobe_post_sstep_notifier(regs);
+> +	local_irq_restore(flags);
+> +
+> +	return 0;
+> +}
+
+The same. No need to clear irqs, and please explain why we can't rely
+on user_mode() && uprobe_post_sstep_notifier(), and why do we
+need find_ss_context().
+
+> +void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
+> +		void *kaddr, unsigned long len)
+> +{
+> +	__flush_ptrace_access(page, uaddr, kaddr, len);
+> +}
+
+I have some concerns... I'll reply to 5/8 which adds __flush_ptrace_access.
+
+Oleg.
