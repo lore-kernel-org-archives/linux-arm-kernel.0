@@ -1,66 +1,48 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  2 Jan 2015 16:24:14 +0100
-Subject: [PATCH RESEND 1/4] ARM: dts: Add power and lid GPIO keys pinctrl for
- exynos5250-snow
+Date: Fri,  2 Jan 2015 16:24:16 +0100
+Subject: [PATCH RESEND 3/4] ARM: dts: Set Peach boards USB WebCam regulators
+ to always on
 In-Reply-To: <1420212257-22443-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1420212257-22443-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1420212257-22443-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1420212257-22443-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos5250 Snow Chromebook has GPIO keys for power and lid
-so the SoC I/O pins have to be configured in external interrupt
-mode. Currently, this is working without setting the pinctrl
-lines but is better to set it explicitly instead of relying on
-the previous state of the I/O pins.
-
-The DTS snippets were taken from the downstream ChromeOS tree.
+The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
+Silicon Motion USB UVC WebCam whose power supply is the tps65090 fet5
+regulator. Since the camera uses the generic USB Video Class driver and
+this does not grab a regulator, mark the regulator as always on so the
+USB device is enumerated and usable.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5250-snow.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 1 +
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index effaf2a..b9aeec4 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -33,6 +33,8 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&power_key_irq &lid_irq>;
- 
- 		power {
- 			label = "Power";
-@@ -540,6 +542,13 @@
- };
- 
- &pinctrl_0 {
-+	power_key_irq: power-key-irq {
-+		samsung,pins = "gpx1-3";
-+		samsung,pin-function = <0xf>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	ec_irq: ec-irq {
- 		samsung,pins = "gpx1-6";
- 		samsung,pin-function = <0>;
-@@ -575,6 +584,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	lid_irq: lid-irq {
-+		samsung,pins = "gpx3-5";
-+		samsung,pin-function = <0xf>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	hdmi_hpd_irq: hdmi-hpd-irq {
- 		samsung,pins = "gpx3-7";
- 		samsung,pin-function = <0>;
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index fa74a73..a4c5152 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -831,6 +831,7 @@
+ 					};
+ 					tps65090_fet5: fet5 {
+ 						regulator-name = "camout";
++						regulator-always-on;
+ 					};
+ 					tps65090_fet6: fet6 {
+ 						regulator-name = "lcd_vdd";
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index d603e73..1367276 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -820,6 +820,7 @@
+ 					};
+ 					tps65090_fet5: fet5 {
+ 						regulator-name = "camout";
++						regulator-always-on;
+ 					};
+ 					tps65090_fet6: fet6 {
+ 						regulator-name = "lcd_vdd";
 -- 
 2.1.3
