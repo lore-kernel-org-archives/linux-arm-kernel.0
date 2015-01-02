@@ -1,45 +1,43 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 2 Jan 2015 16:52:06 +0100
-Subject: [PATCH resend v3 0/2] mmc: Add SDIO function devicetree subnode
- parsing
-In-Reply-To: <1404119245-5839-1-git-send-email-hdegoede@redhat.com>
-References: <1404119245-5839-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAPDyKFrTcJw0aZ-V399jJzCmi-6nqduUFV02s-bN-oDAOwVA5Q@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 2 Jan 2015 17:08:18 +0100
+Subject: [GIT PULL] Fixes for 3.19, #2
+Message-ID: <20150102160818.GB6708@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2014 at 11:07, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi All,
->
-> Here is a resend of 3 of my submission of Sascha Hauer's
-> "mmc: Add SDIO function devicetree subnode parsing" patch.
->
-> Can we please get some movement on these patches, either a review specifying
-> why this cannot go upstream, or else queuing it up for next / 3.17 ?
->
-> Changes since v1:
-> - Submit as a stand-alone patch-set, rather then as part of a larger oob irq
->   support patchset crossing multiple subsystems
-> - Add a patch to document the already existing practice of using slot subnodes
-> - Split of the dt bindings documentation for sdio-func child nodes into its
->   own patch
-> - Add a preparation patch, setting slot_no where relevant
-> - And finally the "Add SDIO function devicetree subnode parsing" patch itself
->   has been modified to look for the sdio function childnodes under a slot node
->   instead of directly under the host node
->
-> Changes since v2:
-> - Drop the slot subnodes again, and drop the 2 slot subnodes patches
->
-> Regards,
->
-> Hans
+Hi Arnd
 
-So after quite a delay (sorry about that!!), I decided to apply this
-patchset for my next branch.
+Here is a second set of fixes for the next -rc. It contains a single
+patch to fix an Opps with the kirkwood netbig LED driver. This patch
+has been sent to the LED maintainers a couple of times, with
+reminders, but there has been no response. So we would like to take it
+via mvebu->arm-soc. We informed the LED maintainers about this plan,
+and they are Cc: to this pull request, just so everybody knows what is
+going on.
 
-Only a minor trivial conflict showed up on patch2. Also I took the
-liberty to change the prefix of patch 1 into only "mmc".
+Thanks
+	Andrew
 
-Kind regards
-Uffe
+The following changes since commit d4b0833a65e8b9fc58d992ba0cc89cad1580db31:
+
+  ARM: mvebu: Fix pinctrl configuration for Armada 370 DB (2014-12-21 06:01:05 -0600)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-2
+
+for you to fetch changes up to bb682e44c77731711818c2cf9f6d4bc277207eee:
+
+  leds: netxbig: fix oops at probe time (2014-12-30 10:39:23 -0600)
+
+----------------------------------------------------------------
+2nd set of fixes for 3.19:
+
+leds: netxbig: fix oops at probe time
+
+----------------------------------------------------------------
+Simon Guinot (1):
+      leds: netxbig: fix oops at probe time
+
+ drivers/leds/leds-netxbig.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
