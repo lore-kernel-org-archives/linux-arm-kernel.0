@@ -1,82 +1,54 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  2 Jan 2015 17:11:29 +0100
-Subject: [PATCH RESEND] ARM: exynos_defconfig: Enable options for display
- panel support
-Message-ID: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri,  2 Jan 2015 17:14:04 +0100
+Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
+Message-ID: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Exynos devices have a display panel. Most of them just have
-a simple panel while others have more complex configurations that
-requires an embedded DisplayPort (eDP) to LVDS bridges.
+This is yet another try to solve the issues of dealing with power sequences for
+the MMC subsystem. The latest attempt, see link below, took a generic approach
+by adding a new top level driver layer. That's was rejected by several reasons.
+http://lwn.net/Articles/602855/
 
-This patch enables the following features to be built in the kernel
-image to support both setups:
+This time the approach is focused to fix the issues for MMC only.
 
-- Direct Rendering Manager (DRM)
-- DRM bridge registration and lookup framework
-- Parade ps8622/ps8625 eDP/LVDS bridge
-- NXP ptn3460 eDP/LVDS bridge
-- Exynos Fully Interactive Mobile Display controller (FIMD)
-- Panel registration and lookup framework
-- Simple panels
-- Backlight & LCD device support
+To give a short background, SOCs may specify a specific MMC power sequence. To
+successfully detect an (e)MMC/SD/SDIO card, that power sequence must be followed
+while initializing the card.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
+To be able to handle these SOC specific power sequences, we add a MMC power
+sequence interface, which helps the mmc core to deal with such.
 
-Hello Kukjin,
+A MMC power sequence provider then implements a set of callbacks from the above
+mentioned interface. The provider has a corresponding DT compatibility string
+and relies on CONFIG_OF to be set to find it's various resourses, like for
+example a GPIO reset.
 
-You dropped this patch since exynos drm was causing boot hangs on some
-platforms but the fix for that issue is already in linux-next (commit:
-f1e9203 clk: samsung: Fix Exynos 5420 pinctrl setup and clock disable
-failure due to domain being gated) so I think it makes sense to enable
-the display options again.
+The mmc core will from mmc_of_parse() try find a "mmc-pwrseq" DT node and then
+call the corresponding MMC power sequence provider's initialization function.
 
-NOTE: Display panel is still not working since patch "arm: dts: Exynos5:
-Use pmu_system_controller phandle for dp phy" is needed [0] but I think
-we should enable display options to catch the regressions easier.
 
-Best regards,
-Javier
+Ulf Hansson (4):
+  mmc: core: Initial support for MMC power sequences
+  mmc: pwrseq: Document DT bindings for the simple MMC power sequence
+  mmc: pwrseq: Initial support for the simple MMC power sequence
+    provider
+  mmc: pwrseq_simple: Add support for a reset GPIO pin
 
-[0]: https://lkml.org/lkml/2014/11/24/10
+ .../devicetree/bindings/mmc/mmc,pwrseq-simple.txt  |  23 +++++
+ Documentation/devicetree/bindings/mmc/mmc.txt      |   5 +
+ drivers/mmc/core/Makefile                          |   2 +-
+ drivers/mmc/core/core.c                            |   7 ++
+ drivers/mmc/core/host.c                            |   4 +-
+ drivers/mmc/core/pwrseq.c                          | 109 +++++++++++++++++++++
+ drivers/mmc/core/pwrseq.h                          |  42 ++++++++
+ drivers/mmc/core/pwrseq_simple.c                   |  86 ++++++++++++++++
+ include/linux/mmc/host.h                           |   2 +
+ 9 files changed, 278 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
+ create mode 100644 drivers/mmc/core/pwrseq.c
+ create mode 100644 drivers/mmc/core/pwrseq.h
+ create mode 100644 drivers/mmc/core/pwrseq_simple.c
 
- arch/arm/configs/exynos_defconfig | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 22beed3..27cdd52 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -111,11 +111,26 @@ CONFIG_REGULATOR_S2MPA01=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS65090=y
-+CONFIG_DRM=y
-+CONFIG_DRM_BRIDGE=y
-+CONFIG_DRM_PTN3460=y
-+CONFIG_DRM_PS8622=y
-+CONFIG_DRM_EXYNOS=y
-+CONFIG_DRM_EXYNOS_FIMD=y
-+CONFIG_DRM_EXYNOS_DP=y
-+CONFIG_DRM_PANEL=y
-+CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB=y
- CONFIG_FB_MODE_HELPERS=y
- CONFIG_FB_SIMPLE=y
- CONFIG_EXYNOS_VIDEO=y
- CONFIG_EXYNOS_MIPI_DSI=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_GENERIC=y
-+CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FONTS=y
- CONFIG_FONT_7x14=y
 -- 
-2.1.3
+1.9.1
