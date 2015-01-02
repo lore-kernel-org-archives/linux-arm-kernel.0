@@ -1,53 +1,64 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 02 Jan 2015 22:20:12 +0100
-Subject: [PATCH] clk: rockchip: rk3288: Make s2r reliable by switching
- PLLs to slow mode
-In-Reply-To: <1419276708-28294-1-git-send-email-dianders@chromium.org>
-References: <1419276708-28294-1-git-send-email-dianders@chromium.org>
-Message-ID: <2520772.QQVueoUhik@phil>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 2 Jan 2015 16:20:42 -0500
+Subject: [GIT PULL] Fixes for 3.19, #2
+In-Reply-To: <20150102160818.GB6708@lunn.ch>
+References: <20150102160818.GB6708@lunn.ch>
+Message-ID: <20150102212042.GC15589@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 22. Dezember 2014, 11:31:48 schrieb Doug Anderson:
-> We've been seeing some crashes at resume time on rk3288-based systems.
-> On some machines they simply never wake up from suspend.  Symptoms
-> include:
-> 
-> - System clearly got to sleep OK.  Power consumption is low, the PWM
->   for the PWM regulator has stopped, and the "global_pwroff" output
->   shows that the system is down.
-> 
-> - When system tries to wake up power consumption goes up.
-> 
-> - No kernel resume code (which was left in PMU SRAM) ran.  We added
->   some basic logging to this code (write to a location in SRAM right
->   at resume time) and didn't see the logging run.
-> 
-> It appears that we can fix the problem by slowing down APLL before we
-> suspend.  On the system I tested things seemed reliable if I disabled
-> 1.8GHz and 1.7GHz.  The Mask ROM itself tries to slow things down
-> (which is why PLLs are in slow mode by the time we get to the kernel),
-> but apparently it is crashing before it even gets there.
-> 
-> We'll be super paranoid and not just go down to 1.6GHz but we'll match
-> what the Mask ROM seems to be doing and go into slow mode.  We'll also
-> be safe and put all PLLs (not just APLL) into slow mode (well, except
-> DPLL which is needed for SDRAM).  We'll even put NPLL into slow mode
-> which the Mask ROM didn't do (not that it's used for much important
-> stuff at early resume time).
-> 
-> Note that the old Rockchip reference code did something just like
-> this, though they jammed it into pm.c instead of putting it in the
-> syscore ops of the clock driver.
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+Andrew,
 
-applied to my clk branch for 3.20
+Much better!  One small note, below:
 
-As I already talked about with Doug on IRC (last year), I see this as a sort-
-of stop-gap solution till we know the suspend requirements of the older/other 
-Rockchip SoCs that do suspend slightly different and can generalize the whole 
-clk suspend handling at this point.
+On Fri, Jan 02, 2015 at 05:08:18PM +0100, Andrew Lunn wrote:
+> Hi Arnd
+> 
+> Here is a second set of fixes for the next -rc. It contains a single
+> patch to fix an Opps with the kirkwood netbig LED driver. This patch
+> has been sent to the LED maintainers a couple of times, with
+> reminders, but there has been no response. So we would like to take it
+> via mvebu->arm-soc. We informed the LED maintainers about this plan,
+> and they are Cc: to this pull request, just so everybody knows what is
+> going on.
+> 
 
+I usually add a short blurb in here saying that this is an incremental
+pull request from tags/mvebu-fixes-3.19 up to tags/mvebu-fixes-3.19-2 on
+the mvebu/fixes branch.
 
-Heiko
+I add that so the arm-soc maintainers easily have a clear idea what they
+are pulling in and what it is based on.  For some reason request-pull
+doesn't add 'tags/mvebu-fixes-3.19' into the below info even when you
+specify it as the start on the cli...
+
+thx,
+
+Jason.
+
+> Thanks
+> 	Andrew
+> 
+> The following changes since commit d4b0833a65e8b9fc58d992ba0cc89cad1580db31:
+> 
+>   ARM: mvebu: Fix pinctrl configuration for Armada 370 DB (2014-12-21 06:01:05 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-2
+> 
+> for you to fetch changes up to bb682e44c77731711818c2cf9f6d4bc277207eee:
+> 
+>   leds: netxbig: fix oops at probe time (2014-12-30 10:39:23 -0600)
+> 
+> ----------------------------------------------------------------
+> 2nd set of fixes for 3.19:
+> 
+> leds: netxbig: fix oops at probe time
+> 
+> ----------------------------------------------------------------
+> Simon Guinot (1):
+>       leds: netxbig: fix oops at probe time
+> 
+>  drivers/leds/leds-netxbig.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
