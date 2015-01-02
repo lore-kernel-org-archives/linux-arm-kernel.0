@@ -1,69 +1,145 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 2 Jan 2015 19:19:08 +0100
-Subject: [RFC 5/8] ARM64: Re-factor flush_ptrace_access
-In-Reply-To: <20150102175115.GB6761@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <f41f96aaed90007076ce496b9a0746c6f1a01ddb.1420038188.git.panand@redhat.com>
- <20150102175115.GB6761@redhat.com>
-Message-ID: <20150102181908.GA8466@redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 2 Jan 2015 19:21:21 +0100
+Subject: [PATCH 2/3] ARM: mediatek: add UART dts for mt8127 and mt8135
+In-Reply-To: <CABuKBeJ-bBiJSbh9jKH1+T2MhKCjxnkryStrhG_kFX7HuBnevQ@mail.gmail.com>
+References: <1413983529-21887-1-git-send-email-eddie.huang@mediatek.com>
+ <1413983529-21887-3-git-send-email-eddie.huang@mediatek.com>
+ <CABuKBeJ-bBiJSbh9jKH1+T2MhKCjxnkryStrhG_kFX7HuBnevQ@mail.gmail.com>
+Message-ID: <CABuKBe+WeL7AOP0U9dtujUVr=cO2EDmz8rBSnscC9_LpxB7+yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02, Oleg Nesterov wrote:
->
-> On 12/31, Pratyush Anand wrote:
-> >
-> > Re-factor flush_ptrace_access to reuse vma independent part.
->
-> But for what? The changelog should explain this.
->
-> > Signed-off-by: Pratyush Anand <panand@redhat.com>
-> > ---
-> >  arch/arm64/mm/flush.c | 24 +++++++++++++++---------
-> >  1 file changed, 15 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> > index b6f14e8d2121..9a4dd6f39cfb 100644
-> > --- a/arch/arm64/mm/flush.c
-> > +++ b/arch/arm64/mm/flush.c
-> > @@ -34,19 +34,25 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
-> >  		__flush_icache_all();
-> >  }
-> >
-> > +static void __flush_ptrace_access(struct page *page, unsigned long uaddr,
-> > +		void *kaddr, unsigned long len)
-> > +{
-> > +	unsigned long addr = (unsigned long)kaddr;
-> > +
-> > +	if (icache_is_aliasing()) {
-> > +		__flush_dcache_area(kaddr, len);
-> > +		__flush_icache_all();
-> > +	} else {
-> > +		flush_icache_range(addr, addr + len);
-> > +	}
-> > +}
-> > +
-> >  static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-> >  				unsigned long uaddr, void *kaddr,
-> >  				unsigned long len)
-> >  {
-> > -	if (vma->vm_flags & VM_EXEC) {
-> > -		unsigned long addr = (unsigned long)kaddr;
-> > -		if (icache_is_aliasing()) {
-> > -			__flush_dcache_area(kaddr, len);
-> > -			__flush_icache_all();
-> > -		} else {
-> > -			flush_icache_range(addr, addr + len);
-> > -		}
-> > -	}
-> > +	if (vma->vm_flags & VM_EXEC)
-> > +		__flush_ptrace_access(page, uaddr, kaddr, len);
-> >  }
->
-> So why uprobes can't use flush_ptrace_access() ? flush_uprobe_xol_access() is
-> called by arch_uprobe_copy_ixol(), and xol vma has VM_EXEC bit set.
+2015-01-02 11:23 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> 2014-10-22 15:12 GMT+02:00 Eddie Huang <eddie.huang@mediatek.com>:
+>> This add dts support for mt8127 and mt8135 SOC UART
+>>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> ---
+>>  arch/arm/boot/dts/mt8127.dtsi | 34 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/mt8135.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 70 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
+>> index 25c9f69..249c218 100644
+>> --- a/arch/arm/boot/dts/mt8127.dtsi
+>> +++ b/arch/arm/boot/dts/mt8127.dtsi
+>> @@ -64,6 +64,12 @@
+>>                         clock-frequency = <32000>;
+>>                         #clock-cells = <0>;
+>>                 };
+>> +
+>> +               uart_clk: dummy26m {
+>> +                       compatible = "fixed-clock";
+>> +                       clock-frequency = <26000000>;
+>> +                       #clock-cells = <0>;
+>> +                };
+>>         };
+>>
+>>         soc {
+>> @@ -89,5 +95,33 @@
+>>                               <0 0x10214000 0 0x2000>,
+>>                               <0 0x10216000 0 0x2000>;
+>>                 };
+>> +
+>> +               uart0: serial at 11006000 {
+>> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11002000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
 
-Ah, sorry, I forgot that arch_uprobe_copy_ixol() doesn't have "vma" so it
-can't use flush_ptrace_access()... perhaps you can update the changelog.
+I just realized that you forgot to disable the uart ports by default
+in the dtsi.
+I fixed that for you, but please send a patch enabling the necessary
+ports in the board dts file.
+It depends on the board which uarts will be enabled rather then on the SoC.
 
-Oleg.
+>> +
+>> +               uart1: serial at 11007000 {
+>> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11003000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>> +
+>> +               uart2: serial at 11008000 {
+>> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11004000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>> +
+>> +               uart3: serial at 11009000 {
+>> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11005000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>>         };
+>>  };
+>> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+>> index 90a56ad..683b761 100644
+>> --- a/arch/arm/boot/dts/mt8135.dtsi
+>> +++ b/arch/arm/boot/dts/mt8135.dtsi
+>> @@ -86,6 +86,13 @@
+>>                         clock-frequency = <32000>;
+>>                         #clock-cells = <0>;
+>>                 };
+>> +
+>> +               uart_clk: dummy26m {
+>> +                       compatible = "fixed-clock";
+>> +                       clock-frequency = <26000000>;
+>> +                       #clock-cells = <0>;
+>> +               };
+>> +
+>>         };
+>>
+>>         soc {
+>> @@ -111,5 +118,34 @@
+>>                               <0 0x10214000 0 0x2000>,
+>>                               <0 0x10216000 0 0x2000>;
+>>                 };
+>> +
+>> +               uart0: serial at 11006000 {
+>> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11006000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>> +
+>> +               uart1: serial at 11007000 {
+>> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11007000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>> +
+>> +               uart2: serial at 11008000 {
+>> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11008000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>> +
+>> +               uart3: serial at 11009000 {
+>> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+>> +                       reg = <0 0x11009000 0 0x400>;
+>> +                       interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
+>> +                       clocks = <&uart_clk>;
+>> +               };
+>> +
+>>         };
+>>  };
+>> --
+>> 1.8.1.1.dirty
+>>
+>
+> Applied to v3.20-next/dts, thanks.
+>
+> --
+> motzblog.wordpress.com
+
+
+
+-- 
+motzblog.wordpress.com
