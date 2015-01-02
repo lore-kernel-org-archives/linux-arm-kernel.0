@@ -1,159 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Jan 2015 22:10:37 +0100
-Subject: [RFC PATCH v3 4/4] arm64:numa: adding numa support for arm64
- platforms.
-In-Reply-To: <1420011208-7051-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1420011208-7051-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <1849719.f6Z6RhZjTc@wuerfel>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 2 Jan 2015 16:12:05 -0500
+Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <1450683.bjnXzaM6nd@wuerfel>
+References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
+ <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
+ <54A6D375.6050604@ti.com> <1450683.bjnXzaM6nd@wuerfel>
+Message-ID: <54A709A5.1000801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[re-sent with correct mailing list address]
+On 01/02/2015 03:57 PM, Arnd Bergmann wrote:
+> On Friday 02 January 2015 12:20:53 Murali Karicheri wrote:
+>> Initially I had the same idea to re-use the existing function
+>> of_dma_configure() for this. I wanted to defer this until we have an
+>> agreement on the changes required for the subject functionality. My
+>> quick review of the code suggestio this would require additional API
+>> changes as below. I did a quick test of the changes and it works for
+>> Keystone, but need to be reviewed by everyone as I touch the IOMMU
+>> functionality here and I don't have a platform with IOMMU. Need test by
+>> someone to make sure I don't break anything.
+>>
+>> Here are the changes required to implement this suggestion.
+>>
+>> 1. Move the of_dma_configure() to drivers/of/device.c (include the API
+>> in of_device.h) and make it global (using proper EXPORT macro).
+>> Otherwise, we will have to include of_platform.h in drivers/of/of_pci.c
+>> assuming the prototype is defined in of_platform.h which doesn't look
+>> appropriate to me. Would require following additional include files in
+>> drivers/of/device.c as well.
+>>
+>> +#include<linux/of_address.h>
+>> +#include<linux/of_iommu.h>
+>> +#include<linux/dma-mapping.h>
+>
+> Yes, sounds good.
+>
+>> 2. drivers/iommu/of_iommu.c. This is needed so that of_iommu_configure()
+>> can take confuguration from the root bus DT as you have suggested.
+>>
+>> -struct iommu_ops *of_iommu_configure(struct device *dev)
+>> +struct iommu_ops *of_iommu_configure(struct device *dev, struct
+>> device_node *node)
+>>    {
+>>           struct of_phandle_args iommu_spec;
+>>           struct device_node *np;
+>> @@ -145,7 +145,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev)
+>>            * See the `Notes:' section of
+>>            * Documentation/devicetree/bindings/iommu/iommu.txt
+>>            */
+>> -       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+>> +       while (!of_parse_phandle_with_args(node, "iommus",
+>>                                              "#iommu-cells", idx,
+>>                                              &iommu_spec)) {
+>
+> Right.
+>
+>> 3. drivers/of/of_pci.c. The existing function (added in this patch) will
+>> make call to of_dma_configure() as
+>>
+>> parent_np = of_get_pci_root_bridge_parent(pci_dev);
+>> of_dma_configure(dev, parent_np);
+>
+> With dev =&pci_dev->dev, I assume?
 
-On Wednesday 31 December 2014 13:03:28 Ganapatrao Kulkarni wrote:
-> Adding numa support for arm64 based platforms.
-> Adding dt node pasring for numa topology using property arm,associativity.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+Yes
 
-Maybe the parts that are common with powerpc can be moved to drivers/of/numa.c?
-We can always look for both arm,associativity and ibm,associativity, I don't
-think we should be worried about any conflicts that way.
+>
+>> 4. drivers/of/platform.c. Add a wrapper function
+>> of_platform_dma_configure() that calls of_dma_configure() as
+>> of_dma_configure(dev, dev->of_node). All existing calls converted to
+>> this wrapper.
+>
+> There are only two callers, I don't think we need a wrapper for it,
+> just change the calling conventions along with step 2.
 
-> +#define MAX_DISTANCE_REF_POINTS 4
+Ok. That is what Rob's comment as well.
 
-I think we should use 8 here like powerpc, four levels might get exceeded
-on complex SoCs.
+>
+>> If the above looks good, I can post v3 of the patch with these changes.
+>
+> With that one minor change, sounds perfect to me. The same can also
+> be used by other bus types if we ever need it.
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> +int dt_get_cpu_node_id(int cpu)
-> +{
-> +	struct device_node *dn = NULL;
-> +
-> +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> +		const u32 *cell;
-> +		u64 hwid;
-> +
-> +		/*
-> +		 * A cpu node with missing "reg" property is
-> +		 * considered invalid to build a cpu_logical_map
-> +		 * entry.
-> +		 */
-> +		cell = of_get_property(dn, "reg", NULL);
-> +		if (!cell) {
-> +			pr_err("%s: missing reg property\n", dn->full_name);
-> +			return default_nid;
-> +		}
-> +		hwid = of_read_number(cell, of_n_addr_cells(dn));
-> +
-> +		if (cpu_logical_map(cpu) == hwid)
-> +		return of_node_to_nid_single(dn);
-> +	}
-> +	return NUMA_NO_NODE;
-> +}
-> +EXPORT_SYMBOL(dt_get_cpu_node_id);
 
-Maybe just expose a function to the device node for a CPU ID here, and
-expect callers to use of_node_to_nid?
-
-> +
-> +/**
-> + * early_init_dt_scan_numa_map - parse memory node and map nid to memory range.
-> + */
-> +int __init early_init_dt_scan_numa_map(unsigned long node, const char *uname,
-> +				     int depth, void *data)
-> +{
-> +	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-> +
-> +	/* We are scanning "numa-map" nodes only */
-
-a stale comment?
-
-> +/* DT node mapping is done already early_init_dt_scan_memory */
-> +int __init arm64_dt_numa_init(void)
-> +{
-> +	int i;
-> +	u32 nodea, nodeb, distance, node_count = 0;
-> +
-> +	of_scan_flat_dt(early_init_dt_scan_numa_map, NULL);
-> +
-> +	for_each_node_mask(i, numa_nodes_parsed)
-> +		node_count = i;
-> +	node_count++;
-> +
-> +	for (nodea =  0; nodea < node_count; nodea++) {
-> +		for (nodeb = 0; nodeb < node_count; nodeb++) {
-> +			distance = dt_get_node_distance(nodea, nodeb);
-> +			numa_set_distance(nodea, nodeb, distance);
-> +		}
-> +	}
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(arm64_dt_numa_init);
-
-No need to export functions that are called only be architecture code.
-Since this works on the flattened device tree format, you can never
-have loadable modules calling it.
-
-> @@ -461,7 +464,12 @@ static int c_show(struct seq_file *m, void *v)
->  		 * "processor".  Give glibc what it expects.
->  		 */
->  #ifdef CONFIG_SMP
-> +	if (IS_ENABLED(CONFIG_NUMA)) {
-> +		seq_printf(m, "processor\t: %d", i);
-> +		seq_printf(m, " [nid: %d]\n", cpu_to_node(i));
-> +	} else {
->  		seq_printf(m, "processor\t: %d\n", i);
-> +	}
->  #endif
->  	}
-
-Do we need to make this conditional? I think we can just always
-print the node number, even if it's going to be zero for systems
-without the associativity properties.
-
-> +
-> +int cpu_to_node_map[NR_CPUS];
-> +EXPORT_SYMBOL(cpu_to_node_map);
-
-This seems to be x86 specific, do we need it?
-
-> +/*
-> + *  Set the cpu to node and mem mapping
-> + */
-> +void numa_store_cpu_info(int cpu)
-> +{
-> +#ifdef CONFIG_ARM64_DT_NUMA
-> +	node_cpu_hwid[cpu].node_id  =  dt_get_cpu_node_id(cpu);
-> +#endif
-
-I would try to avoid the #ifdef here, by providing a stub function of
-dt_get_cpu_node_id or whichever function we end up calling here when
-NUMA is disabled.
-
-> +
-> +/**
-> + * arm64_numa_init - Initialize NUMA
-> + *
-> + * Try each configured NUMA initialization method until one succeeds.  The
-> + * last fallback is dummy single node config encomapssing whole memory and
-> + * never fails.
-> + */
-> +void __init arm64_numa_init(void)
-> +{
-> +	if (!numa_off) {
-> +#ifdef CONFIG_ARM64_DT_NUMA
-> +		if (!numa_init(arm64_dt_numa_init))
-> +			return;
-> +#endif
-> +	}
-> +
-> +	numa_init(dummy_numa_init);
-> +}
-
-I don't think we need the CONFIG_ARM64_DT_NUMA=n case here, it should just
-not be conditional, and the arm64_dt_numa_init should fall back to doing
-something reasonable when numa is turned off or there are no associativity
-properties.
-
-	Arnd
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
