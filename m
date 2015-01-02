@@ -1,55 +1,135 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 2 Jan 2015 19:05:23 +0100
-Subject: [RFC 6/8] ARM64: Handle TRAP_HWBRKPT for user mode as well
-In-Reply-To: <1e0a9e778669bb2a2e40bf101eff8ae85110ce54.1420038188.git.panand@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <1e0a9e778669bb2a2e40bf101eff8ae85110ce54.1420038188.git.panand@redhat.com>
-Message-ID: <20150102180523.GC6761@redhat.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 2 Jan 2015 12:14:43 -0600
+Subject: [PATCH 4/9] pci: add DT based ARM Versatile PCI host driver
+In-Reply-To: <2308474.mrIrUSfiTv@wuerfel>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <1419967718-26909-5-git-send-email-robherring2@gmail.com>
+ <2308474.mrIrUSfiTv@wuerfel>
+Message-ID: <CAL_JsqJbUHkr0zXYKTvS0WPGs7mNqkppsn4i0LuWz5Wv12Unmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let me repeat once again that I know absolutely nothing about arm* ;)
-
-On 12/31, Pratyush Anand wrote:
+On Tue, Dec 30, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 30 December 2014 13:28:33 Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> This converts the Versatile PCI host code to a platform driver using
+>> the commom DT parsing and setup. The driver uses only an empty ARM
+>> pci_sys_data struct and does not use pci_common_init_dev init function.
+>> The old host code will be removed in a subsequent commit when Versatile
+>> is completely converted to DT.
+>>
+>> I've tested this on QEMU with the sym53c8xx driver in both i/o and
+>> memory mapped modes.
 >
-> uprobe registers a handler at step_hook. So, single_step_handler now
-> checks for user mode as well if there is a valid hook.
+> Ah, this is quite clever, I think you tried to explain to me what you
+> did with the pci_sys_data before, but I didn't get it then.
 >
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  arch/arm64/kernel/debug-monitors.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>> +
+>> +static void __iomem *__pci_addr(struct pci_bus *bus,
+>> +                             unsigned int devfn, int offset)
+>> +{
+>> +     unsigned int busnr = bus->number;
+>> +
+>> +     /*
+>> +      * Trap out illegal values
+>> +      */
+>> +     BUG_ON(offset > 255);
+>> +     BUG_ON(busnr > 255);
+>> +     BUG_ON(devfn > 255);
 >
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index b056369fd47d..2676b8655241 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -236,6 +236,9 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->  	if (!reinstall_suspended_bps(regs))
->  		return 0;
+> Isn't an offset>255 something that can be triggered by a non-broken
+> driver or even user space?
+
+I don't know. I just copied what the old driver did. Are these checks
+even host controller specific?
+
+> Maybe just return PCIBIOS_BAD_REGISTER_NUMBER in this case?
+
+Perhaps. We could probably simplify the config space read/write
+functions and just provide the PCI core a bus/devfn/offset to config
+address translation function. That would not work in all cases, but
+propably most that have memory mapped config space.
+
+>> +static int versatile_pci_parse_request_of_pci_ranges(struct device *dev,
+>> +                                                  struct list_head *res)
+>> +{
+>> +     int err, mem = 1, res_valid = 0;
+>> +     struct device_node *np = dev->of_node;
+>> +     resource_size_t iobase;
+>> +     struct pci_host_bridge_window *win;
+>> +
+>> +     err = of_pci_get_host_bridge_resources(np, 0, 0xff, res, &iobase);
+>> +     if (err)
+>> +             return err;
+>> +
+>> +     list_for_each_entry(win, res, list) {
+>> +             struct resource *parent, *res = win->res;
+>> +
+>> +             switch (resource_type(res)) {
+>> +             case IORESOURCE_IO:
+>> +                     parent = &ioport_resource;
+>> +                     err = pci_remap_iospace(res, iobase);
+>> +                     if (err) {
+>> +                             dev_warn(dev, "error %d: failed to map resource %pR\n",
+>> +                                      err, res);
+>> +                             continue;
+>> +                     }
+>> +                     break;
+>> +             case IORESOURCE_MEM:
+>> +                     parent = &iomem_resource;
+>> +                     res_valid |= !(res->flags & IORESOURCE_PREFETCH);
+>> +
+>> +                     writel(res->start >> 28, PCI_IMAP(mem));
+>> +                     writel(PHYS_OFFSET >> 28, PCI_SMAP(mem));
+>> +                     mem++;
+>> +
+>> +                     break;
+>> +             case IORESOURCE_BUS:
+>> +             default:
+>> +                     continue;
+>> +             }
+>> +
+>> +             err = devm_request_resource(dev, parent, res);
+>> +             if (err)
+>> +                     goto out_release_res;
+>> +     }
 >
-> +	if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
-> +		return 0;
-> +
->  	if (user_mode(regs)) {
->  		info.si_signo = SIGTRAP;
->  		info.si_errno = 0;
-> @@ -251,9 +254,6 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->  		 */
->  		user_rewind_single_step(current);
->  	} else {
-> -		if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
-> -			return 0;
-> -
+> I wonder if we should also request the physical resource for the I/O space
+> window to have it show up in /proc/iomem. We are rather inconsistent in this
+> regard between drivers.
 
-Agreed, we need something like this change...
+It's a little complicated now because we don't have that as a struct
+resource any more. We could reconstruct it from iobase and the i/o
+resource size.
 
-But did you verify that it can't break other users of register_step_hook() ?
-The current handlers do not check user_mode() == F, they assume that they
-can't be called otherwise.
+>
+>> +     pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
+>> +     pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
+>> +
+>> +     bus = pci_scan_root_bus(&pdev->dev, 0, &pci_versatile_ops, &sys, &pci_res);
+>> +     if (!bus)
+>> +             return -ENOMEM;
+>> +
+>> +     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+>> +     pci_assign_unassigned_bus_resources(bus);
+>> +
+>> +     return 0;
+>
+> One general question, mainly for Bjorn: pci_scan_root_bus adds all the devices
+> at the Linux driver level by calling pci_bus_add_devices(), but then we call
+> pci_fixup_irqs and pci_assign_unassigned_bus_resources after that, which will
+> change the devices again. Is this how it's meant to work? How do we ensure
+> that we have the correct irq number and resources by the time we enter the
+> probe() function of the PCI device driver that gets bound to a device here?
 
-If this all is correct, please explain why in the changelog.
+I'm a bit puzzled myself. I think that the devices are not probed
+until after pci_assign_unassigned_bus_resources. It certainly doesn't
+work without that call. Really, I think of_irq_parse_and_map_pci
+should be the default if no one else has set the device's irq (and the
+host has a device node of course).
 
-The same for the next patch.
+It also seems to be a bit of random set of pci functions that are
+called here. It would be nice to simplify this chunk of code.
 
-Oleg.
+Rob
