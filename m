@@ -1,75 +1,113 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 2 Jan 2015 16:47:51 +0000
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54A664AB.3030101@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
- <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
- <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
- <54A3B526.9040903@linaro.org>
- <20150101200424.GB12770@xora-haswell.xora.org.uk>
- <54A664AB.3030101@linaro.org>
-Message-ID: <EE1B062D-90AC-491F-90E7-D7EACF1F5B06@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 2 Jan 2015 08:58:08 -0800
+Subject: [PATCH v3 1/4] mmc: dw_mmc: exynos: incorporate ciu_div into
+ timing property
+In-Reply-To: <1420008185-24758-2-git-send-email-alim.akhtar@samsung.com>
+References: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
+ <1420008185-24758-2-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CAD=FV=WXzPt=VKxB=KHK+hC=RN6WbmdnQcLUT4zFQ0Ud7BFanQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 Jan 2015, at 09:28, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>> On 2015?01?02? 04:04, Graeme Gregory wrote:
->>>> On Wed, Dec 31, 2014 at 04:34:46PM +0800, Hanjun Guo wrote:
->>>> On 2014?12?31? 04:13, ashwinc at codeaurora.org wrote:
->>>> Hi Hanjun,
->>>> 
->>>> Overall the document looks good to us. Some minor clarifications below.
->>>> 
->>>>> ---------- Forwarded message ----------
->>>>> From: Graeme Gregory <graeme.gregory@linaro.org>
->>>>> 
->>>>> Add documentation for the guidelines of how to use ACPI
->>>>> on ARM64.
->>>>> 
->>>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->>>>> Signed-off-by: Al Stone <al.stone@linaro.org>
->>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>> ---
->>>>> Documentation/arm64/arm-acpi.txt |  323
->>>>> ++++++++++++++++++++++++++++++++++++++
->>>>> 1 file changed, 323 insertions(+)
->>>>> create mode 100644 Documentation/arm64/arm-acpi.txt
->>>> 
->>>> [..]
->>>> 
->>>>> +Relationship with Device Tree
->>>>> +-----------------------------
->>>> 
->>>> [..]
->>>> 
->>>>> +When booting using ACPI tables, the /chosen node in DT will still be
->>>>> parsed
->>>>> +to extract the kernel command line and initrd path.  No other section of
->>>>> the
->>>>> +DT will be used.
->>>> 
->>>> Is this still true?
->>> 
->>> No, we can booting the ACPI system in EFI stub without dtb. Catalin
->>> also pointed out this issue, I will remove this paragraph.
->> 
->> The paragraph is still correct, the /chosen node is always present even
->> if nothing else is.
-> 
-> Sorry for the confusing, I mean no dtb needed for the command line if
-> ACPI tables are available.
-> 
-> efi will create a empty dtb if no dtb found, and add the cmd line into
-> the new created dtb, I'm just wondering, can we remove the limitation
-> for passing the cmd line in /chosen node in the future?
+Alim,
 
-My point is that on an ACPI based system, we don't really care how EFI_STUB passes
-the command line to the rest of the kernel. Since UEFI doesn't need to know about
-such detail and since ACPI is only supported with EFI_STUB, we don't need to mention
-the chosen node in this document. 
+On Tue, Dec 30, 2014 at 10:43 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+> From: Seungwon Jeon <tgih.jun@samsung.com>
+>
+> ciu_div may not be common value for all speed mode.
+> So, it needs to be attached to CLKSEL timing.
 
-At some point we may even change the way EFI_STUB passes the command line to the 
-kernel but this is still irrelevant to ACPI. 
+The more time I've spent looking at all of this stuff the less I like
+the exynos bindings.  Personally I'd prefer to see the exynos bindings
+fixed rather than go further down the path of these bindings.
 
-Catalin
+Specifically:
+
+1. The "drive" really should be specified quite differently.
+According to the DesignWare docs, the "drive" phase is there to meet
+hold time requirements.  Hold time requirements are different for
+different SD/MMC modes and are specified in nanoseconds (SDR104 is
+.8ns, ID mode is 5.0ns).  There is a per-SoC parameter needed that
+indicates some built-in delay (in nanoseconds) and that shouldn't
+change based on clock speed or card mode.
+
+2. The ciu_div really ought to be automatic.  Start out at a divide by
+4.  If you end up with both drive and sample at phases of 0, 90, 180,
+270 then you can change to divide by 2.
+
+I still haven't looked at every last detail of these delays though, so
+please correct me if I'm wrong.  I've added Alex who may have looked
+at this more than I have.
+
+
+With all of the above, there's also the fact that (I think) we should
+be moving towards working with the clock phase API since all of your
+values are effectively specifying clock phases, just in a very arcane
+way.
+
+
+> This also introduce a new compatibale 'dw-mshc-hs200-timing'
+> for selecting hs200 timing value
+
+As per above, I don't think this is needed.
+
+
+> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   15 ++--
+>  drivers/mmc/host/dw_mmc-exynos.c                   |   81 ++++++++++++++------
+>  drivers/mmc/host/dw_mmc-exynos.h                   |    1 +
+>  3 files changed, 67 insertions(+), 30 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> index ee4fc05..06455de 100644
+> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> @@ -23,10 +23,6 @@ Required Properties:
+>         - "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
+>           specific extensions having an SMU.
+>
+> -* samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
+> -  unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+> -  ignored for Exynos4 SoC's. The valid range of divider value is 0 to 7.
+> -
+>  * samsung,dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
+>    in transmit mode and CIU clock phase shift value in receive mode for single
+>    data rate mode operation. Refer notes below for the order of the cells and the
+> @@ -37,11 +33,16 @@ Required Properties:
+>    data rate mode operation. Refer notes below for the order of the cells and the
+>    valid values.
+>
+> +* samsung,dw-mshc-hs200-timing: Similar with dw-mshc-sdr-timing.
+> +
+>    Notes for the sdr-timing and ddr-timing values:
+>
+>      The order of the cells should be
+>        - First Cell: CIU clock phase shift value for tx mode.
+>        - Second Cell: CIU clock phase shift value for rx mode.
+> +      - Thrid Cell: Specifies the divider value for the card interface
+> +        unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+> +        ignored for Exynos4 SoC's. The valid range of divider value is 0 to 7.
+>
+>      Valid values for SDR and DDR CIU clock timing for Exynos5250:
+>        - valid value for tx phase shift and rx phase shift is 0 to 7.
+> @@ -79,8 +80,8 @@ Example:
+>                 broken-cd;
+>                 fifo-depth = <0x80>;
+>                 card-detect-delay = <200>;
+> -               samsung,dw-mshc-ciu-div = <3>;
+> -               samsung,dw-mshc-sdr-timing = <2 3>;
+> -               samsung,dw-mshc-ddr-timing = <1 2>;
+> +               samsung,dw-mshc-sdr-timing = <2 3 3>;
+> +               samsung,dw-mshc-ddr-timing = <1 2 3>;
+> +               samsung,dw-mshc-hs200-timing = <0 2 3>;
+
+You are breaking backward compatibility here.  If your change is
+merged then all old boards will instantly break.  Since the "dts" and
+code changes will likely be merged through different trees you'll end
+up with a bunch of broken trees until everything is merged together.
+Even if you don't subscribe to the stable bindings theory this is not
+acceptable.
+
+-Doug
