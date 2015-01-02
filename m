@@ -1,95 +1,116 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 2 Jan 2015 16:12:05 -0500
-Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <1450683.bjnXzaM6nd@wuerfel>
-References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
- <54A6D375.6050604@ti.com> <1450683.bjnXzaM6nd@wuerfel>
-Message-ID: <54A709A5.1000801@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Jan 2015 22:17:02 +0100
+Subject: [RFC PATCH v3 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <1420011208-7051-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1420011208-7051-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <5205211.ZMrS3F6Zab@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/2015 03:57 PM, Arnd Bergmann wrote:
-> On Friday 02 January 2015 12:20:53 Murali Karicheri wrote:
->> Initially I had the same idea to re-use the existing function
->> of_dma_configure() for this. I wanted to defer this until we have an
->> agreement on the changes required for the subject functionality. My
->> quick review of the code suggestio this would require additional API
->> changes as below. I did a quick test of the changes and it works for
->> Keystone, but need to be reviewed by everyone as I touch the IOMMU
->> functionality here and I don't have a platform with IOMMU. Need test by
->> someone to make sure I don't break anything.
->>
->> Here are the changes required to implement this suggestion.
->>
->> 1. Move the of_dma_configure() to drivers/of/device.c (include the API
->> in of_device.h) and make it global (using proper EXPORT macro).
->> Otherwise, we will have to include of_platform.h in drivers/of/of_pci.c
->> assuming the prototype is defined in of_platform.h which doesn't look
->> appropriate to me. Would require following additional include files in
->> drivers/of/device.c as well.
->>
->> +#include<linux/of_address.h>
->> +#include<linux/of_iommu.h>
->> +#include<linux/dma-mapping.h>
->
-> Yes, sounds good.
->
->> 2. drivers/iommu/of_iommu.c. This is needed so that of_iommu_configure()
->> can take confuguration from the root bus DT as you have suggested.
->>
->> -struct iommu_ops *of_iommu_configure(struct device *dev)
->> +struct iommu_ops *of_iommu_configure(struct device *dev, struct
->> device_node *node)
->>    {
->>           struct of_phandle_args iommu_spec;
->>           struct device_node *np;
->> @@ -145,7 +145,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev)
->>            * See the `Notes:' section of
->>            * Documentation/devicetree/bindings/iommu/iommu.txt
->>            */
->> -       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
->> +       while (!of_parse_phandle_with_args(node, "iommus",
->>                                              "#iommu-cells", idx,
->>                                              &iommu_spec)) {
->
-> Right.
->
->> 3. drivers/of/of_pci.c. The existing function (added in this patch) will
->> make call to of_dma_configure() as
->>
->> parent_np = of_get_pci_root_bridge_parent(pci_dev);
->> of_dma_configure(dev, parent_np);
->
-> With dev =&pci_dev->dev, I assume?
+On Wednesday 31 December 2014 13:03:26 Ganapatrao Kulkarni wrote:
+> DT bindings for numa map for memory, cores and IOs using arm,associativity
+> device node property.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+> ---
+>  Documentation/devicetree/bindings/arm/numa.txt | 198 +++++++++++++++++++++++++
+>  1 file changed, 198 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
+> new file mode 100644
+> index 0000000..4f51e25
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/numa.txt
+> @@ -0,0 +1,198 @@
+> +==============================================================================
+> +NUMA binding description.
+> +==============================================================================
+> +
+> +==============================================================================
+> +1 - Introduction
+> +==============================================================================
+> +
+> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
+> +collections of hardware resources including processors, memory, and I/O buses,
+> +that comprise what is commonly known as a ???NUMA node???.
+> +Processor accesses to memory within the local NUMA node is generally faster
+> +than processor accesses to memory outside of the local NUMA node.
+> +DT defines interfaces that allow the platform to convey NUMA node
+> +topology information to OS.
+> +
+> +==============================================================================
+> +2 - arm,associativity
+> +==============================================================================
+> +
+> +The mapping is done using arm,associativity device property.
+> +this property needs to be present in every device node which needs to to be
+> +mapped to numa nodes.
+> +
+> +arm,associativity property is set of 32-bit integers. representing the
+> +board id, socket id and core id.
+> +
+> +ex:
+> +	/* board 0, socket 0, core 0 */
+> +	arm,associativity = <0 0 0x000>;
+> +
+> +	/* board 1, socket 0, core 8 */
+> +	arm,associativity = <1 0 0x08>;
 
-Yes
+This is way too specific to Cavium machines. Most other vendors will not (at first)
+have multiple boards or multiple sockets, but need to represent multiple clusters
+and/or SMT threads instead. Also the wording suggests that this is only relevant
+for NUMA, which I don't think is helpful because we will also want to describe
+the topology within one NUMA node for locality.
 
->
->> 4. drivers/of/platform.c. Add a wrapper function
->> of_platform_dma_configure() that calls of_dma_configure() as
->> of_dma_configure(dev, dev->of_node). All existing calls converted to
->> this wrapper.
->
-> There are only two callers, I don't think we need a wrapper for it,
-> just change the calling conventions along with step 2.
+I think we should stick to the powerpc definition here and not define what the
+levels mean at the binding level. Something like:
 
-Ok. That is what Rob's comment as well.
+"Each level of topology defines a boundary in the system at which a significant
+difference in performance can be measured between cross-device accesses within
+a single location and those spanning multiple locations. The first cell always
+contains the broadest subdivision within the system, while the last cell enumerates
+the individual devices, such as an SMT thread of a CPU, or a bus bridge within
+an SoC".
 
->
->> If the above looks good, I can post v3 of the patch with these changes.
->
-> With that one minor change, sounds perfect to me. The same can also
-> be used by other bus types if we ever need it.
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +==============================================================================
+> +3 - arm,associativity-reference-points
+> +==============================================================================
+> +This property is a set of 32-bit integers, each representing an index into
+> +the arm,associativity nodes. The first integer is the most significant
+> +NUMA boundary and the following are progressively less significant boundaries.
+> +There can be more than one level of NUMA.
+> +
+> +Ex:
+> +	arm,associativity-reference-points = <0 1>;
+> +	The board Id(index 0) used first to calculate the associativity (node
+> +	distance), then follows the  socket id(index 1).
+> +
+> +	arm,associativity-reference-points = <1 0>;
+> +	The socket Id(index 1) used first to calculate the associativity,
+> +	then follows the board id(index 0).
+> +
+> +	arm,associativity-reference-points = <0>;
+> +	Only the board Id(index 0) used to calculate the associativity.
+> +
+> +	arm,associativity-reference-points = <1>;
+> +	Only socket Id(index 1) used to calculate the associativity.
+> +
+> +==============================================================================
+> +4 - Example dts
+> +==============================================================================
+> +
+> +Example: 2 Node system consists of 2 boards and each board having one socket
+> +and 8 core in each socket.
 
+I think the example should also include a PCI controller.
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+> +
+> +	arm,associativity-reference-points = <0 1>;
+
+This doesn't really match the associativity properties, because the
+second level in the cpus nodes is completely meaningless and should
+not be listed as a secondary reference point.
+
+	Arnd
