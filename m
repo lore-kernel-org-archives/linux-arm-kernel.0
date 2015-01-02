@@ -1,145 +1,30 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 2 Jan 2015 19:21:21 +0100
-Subject: [PATCH 2/3] ARM: mediatek: add UART dts for mt8127 and mt8135
-In-Reply-To: <CABuKBeJ-bBiJSbh9jKH1+T2MhKCjxnkryStrhG_kFX7HuBnevQ@mail.gmail.com>
-References: <1413983529-21887-1-git-send-email-eddie.huang@mediatek.com>
- <1413983529-21887-3-git-send-email-eddie.huang@mediatek.com>
- <CABuKBeJ-bBiJSbh9jKH1+T2MhKCjxnkryStrhG_kFX7HuBnevQ@mail.gmail.com>
-Message-ID: <CABuKBe+WeL7AOP0U9dtujUVr=cO2EDmz8rBSnscC9_LpxB7+yg@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 02 Jan 2015 10:46:54 -0800
+Subject: [PATCH V2 0/2] ARM: l2c: OMAP4/AM437x: Additional register
+ programming support.
+In-Reply-To: <1420220628-23742-1-git-send-email-nm@ti.com>
+References: <1420220628-23742-1-git-send-email-nm@ti.com>
+Message-ID: <54A6E79E.7010203@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-02 11:23 GMT+01:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> 2014-10-22 15:12 GMT+02:00 Eddie Huang <eddie.huang@mediatek.com>:
->> This add dts support for mt8127 and mt8135 SOC UART
->>
->> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->> ---
->>  arch/arm/boot/dts/mt8127.dtsi | 34 ++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/mt8135.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->>  2 files changed, 70 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
->> index 25c9f69..249c218 100644
->> --- a/arch/arm/boot/dts/mt8127.dtsi
->> +++ b/arch/arm/boot/dts/mt8127.dtsi
->> @@ -64,6 +64,12 @@
->>                         clock-frequency = <32000>;
->>                         #clock-cells = <0>;
->>                 };
->> +
->> +               uart_clk: dummy26m {
->> +                       compatible = "fixed-clock";
->> +                       clock-frequency = <26000000>;
->> +                       #clock-cells = <0>;
->> +                };
->>         };
->>
->>         soc {
->> @@ -89,5 +95,33 @@
->>                               <0 0x10214000 0 0x2000>,
->>                               <0 0x10216000 0 0x2000>;
->>                 };
->> +
->> +               uart0: serial at 11006000 {
->> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11002000 0 0x400>;
->> +                       interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
-
-I just realized that you forgot to disable the uart ports by default
-in the dtsi.
-I fixed that for you, but please send a patch enabling the necessary
-ports in the board dts file.
-It depends on the board which uarts will be enabled rather then on the SoC.
-
->> +
->> +               uart1: serial at 11007000 {
->> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11003000 0 0x400>;
->> +                       interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->> +
->> +               uart2: serial at 11008000 {
->> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11004000 0 0x400>;
->> +                       interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->> +
->> +               uart3: serial at 11009000 {
->> +                       compatible = "mediatek,mt8127-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11005000 0 0x400>;
->> +                       interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->>         };
->>  };
->> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
->> index 90a56ad..683b761 100644
->> --- a/arch/arm/boot/dts/mt8135.dtsi
->> +++ b/arch/arm/boot/dts/mt8135.dtsi
->> @@ -86,6 +86,13 @@
->>                         clock-frequency = <32000>;
->>                         #clock-cells = <0>;
->>                 };
->> +
->> +               uart_clk: dummy26m {
->> +                       compatible = "fixed-clock";
->> +                       clock-frequency = <26000000>;
->> +                       #clock-cells = <0>;
->> +               };
->> +
->>         };
->>
->>         soc {
->> @@ -111,5 +118,34 @@
->>                               <0 0x10214000 0 0x2000>,
->>                               <0 0x10216000 0 0x2000>;
->>                 };
->> +
->> +               uart0: serial at 11006000 {
->> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11006000 0 0x400>;
->> +                       interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->> +
->> +               uart1: serial at 11007000 {
->> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11007000 0 0x400>;
->> +                       interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->> +
->> +               uart2: serial at 11008000 {
->> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11008000 0 0x400>;
->> +                       interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->> +
->> +               uart3: serial at 11009000 {
->> +                       compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
->> +                       reg = <0 0x11009000 0 0x400>;
->> +                       interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&uart_clk>;
->> +               };
->> +
->>         };
->>  };
->> --
->> 1.8.1.1.dirty
->>
+On 1/2/15 9:43 AM, Nishanth Menon wrote:
+> Hi,
+> OMAP4 and AM437x ROM code provides services to program PL310's latency
+> registers and AM437x provides service for programming Address filter
+> registers.
 >
-> Applied to v3.20-next/dts, thanks.
+> Provide support in the kernel for the same.
 >
-> --
-> motzblog.wordpress.com
+> V2 of the series contains documentation update and a bug fix due to a
+> typo introduced during patch split :(
+>
+> Nishanth Menon (2):
+>    ARM: l2c: OMAP4/AM437x: Introduce support for cache latency
+>      programming
+>    ARM: l2c: AM437x: Introduce support for cache filter programming
+>
+Looks fine to me ...
+Feel free to add my ack if you need one ...
 
-
-
--- 
-motzblog.wordpress.com
+Minor: The subject looks like I2C though it is L2C ;-)
