@@ -1,103 +1,59 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri,  2 Jan 2015 16:24:15 +0100
-Subject: [PATCH RESEND 2/4] ARM: dts: Add lid GPIO key device node for Peach
- boards
+Date: Fri,  2 Jan 2015 16:24:14 +0100
+Subject: [PATCH RESEND 1/4] ARM: dts: Add power and lid GPIO keys pinctrl for
+ exynos5250-snow
 In-Reply-To: <1420212257-22443-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1420212257-22443-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1420212257-22443-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1420212257-22443-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have both
-a power and lid GPIO keys but only the former was defined in the
-DTS. Add DTS snippets for the lid GPIO key too. These were taken
-from the downstream ChromeOS 3.8 kernel tree.
+The Exynos5250 Snow Chromebook has GPIO keys for power and lid
+so the SoC I/O pins have to be configured in external interrupt
+mode. Currently, this is working without setting the pinctrl
+lines but is better to set it explicitly instead of relying on
+the previous state of the I/O pins.
+
+The DTS snippets were taken from the downstream ChromeOS tree.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 18 +++++++++++++++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 19 ++++++++++++++++++-
- 2 files changed, 35 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos5250-snow.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 9a050e1..fa74a73 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -53,7 +53,7 @@
- 		compatible = "gpio-keys";
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index effaf2a..b9aeec4 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -33,6 +33,8 @@
  
- 		pinctrl-names = "default";
--		pinctrl-0 = <&power_key_irq>;
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
++		pinctrl-names = "default";
 +		pinctrl-0 = <&power_key_irq &lid_irq>;
  
  		power {
  			label = "Power";
-@@ -61,6 +61,15 @@
- 			linux,code = <KEY_POWER>;
- 			gpio-key,wakeup;
- 		};
-+
-+		lid-switch {
-+			label = "Lid";
-+			gpios = <&gpx3 4 GPIO_ACTIVE_LOW>;
-+			linux,input-type = <5>; /* EV_SW */
-+			linux,code = <0>; /* SW_LID */
-+			debounce-interval = <1>;
-+			gpio-key,wakeup;
-+		};
- 	};
+@@ -540,6 +542,13 @@
+ };
  
- 	memory {
-@@ -658,6 +667,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	lid_irq: lid-irq {
-+		samsung,pins = "gpx3-4";
+ &pinctrl_0 {
++	power_key_irq: power-key-irq {
++		samsung,pins = "gpx1-3";
 +		samsung,pin-function = <0xf>;
 +		samsung,pin-pud = <0>;
 +		samsung,pin-drv = <0>;
 +	};
 +
- 	hdmi_hpd_irq: hdmi-hpd-irq {
- 		samsung,pins = "gpx3-7";
+ 	ec_irq: ec-irq {
+ 		samsung,pins = "gpx1-6";
  		samsung,pin-function = <0>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index e8fdda8..d603e73 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -52,7 +52,7 @@
- 		compatible = "gpio-keys";
- 
- 		pinctrl-names = "default";
--		pinctrl-0 = <&power_key_irq>;
-+		pinctrl-0 = <&power_key_irq &lid_irq>;
- 
- 		power {
- 			label = "Power";
-@@ -60,6 +60,16 @@
- 			linux,code = <KEY_POWER>;
- 			gpio-key,wakeup;
- 		};
-+
-+		lid-switch {
-+			label = "Lid";
-+			gpios = <&gpx3 4 GPIO_ACTIVE_LOW>;
-+			linux,input-type = <5>; /* EV_SW */
-+			linux,code = <0>; /* SW_LID */
-+			debounce-interval = <1>;
-+			gpio-key,wakeup;
-+		};
-+
- 	};
- 
- 	memory {
-@@ -646,6 +656,13 @@
+@@ -575,6 +584,13 @@
  		samsung,pin-drv = <0>;
  	};
  
 +	lid_irq: lid-irq {
-+		samsung,pins = "gpx3-4";
++		samsung,pins = "gpx3-5";
 +		samsung,pin-function = <0xf>;
 +		samsung,pin-pud = <0>;
 +		samsung,pin-drv = <0>;
