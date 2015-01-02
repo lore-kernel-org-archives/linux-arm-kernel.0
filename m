@@ -1,135 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 2 Jan 2015 12:14:43 -0600
-Subject: [PATCH 4/9] pci: add DT based ARM Versatile PCI host driver
-In-Reply-To: <2308474.mrIrUSfiTv@wuerfel>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <1419967718-26909-5-git-send-email-robherring2@gmail.com>
- <2308474.mrIrUSfiTv@wuerfel>
-Message-ID: <CAL_JsqJbUHkr0zXYKTvS0WPGs7mNqkppsn4i0LuWz5Wv12Unmw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 2 Jan 2015 18:14:24 +0000
+Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
+In-Reply-To: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
+References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20150102181423.GS11285@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 30 December 2014 13:28:33 Rob Herring wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> This converts the Versatile PCI host code to a platform driver using
->> the commom DT parsing and setup. The driver uses only an empty ARM
->> pci_sys_data struct and does not use pci_common_init_dev init function.
->> The old host code will be removed in a subsequent commit when Versatile
->> is completely converted to DT.
->>
->> I've tested this on QEMU with the sym53c8xx driver in both i/o and
->> memory mapped modes.
->
-> Ah, this is quite clever, I think you tried to explain to me what you
-> did with the pci_sys_data before, but I didn't get it then.
->
->> +
->> +static void __iomem *__pci_addr(struct pci_bus *bus,
->> +                             unsigned int devfn, int offset)
->> +{
->> +     unsigned int busnr = bus->number;
->> +
->> +     /*
->> +      * Trap out illegal values
->> +      */
->> +     BUG_ON(offset > 255);
->> +     BUG_ON(busnr > 255);
->> +     BUG_ON(devfn > 255);
->
-> Isn't an offset>255 something that can be triggered by a non-broken
-> driver or even user space?
+On Fri, Jan 02, 2015 at 05:14:04PM +0100, Ulf Hansson wrote:
+> To be able to handle these SOC specific power sequences, we add a MMC power
+> sequence interface, which helps the mmc core to deal with such.
 
-I don't know. I just copied what the old driver did. Are these checks
-even host controller specific?
+I think this should be done differently - part of that is with hind sight
+given that we now have a range of interface types.
 
-> Maybe just return PCIBIOS_BAD_REGISTER_NUMBER in this case?
+One of my early design mistakes with MMC was to incorporate the power up
+and initialisation protocol (the 74 clocks business) into the core code.
+This was wrong, because it is a detail which only applies to dumb host
+interfaces.  More inteligent interfaces do not need that complexity as
+they handle that in hardware.
 
-Perhaps. We could probably simplify the config space read/write
-functions and just provide the PCI core a bus/devfn/offset to config
-address translation function. That would not work in all cases, but
-propably most that have memory mapped config space.
+Rather than MMC ending up with more layers and more infrastructure like
+this - turning it more into the turd which is sdhci - I would like to see
+some proper thought put into design, specifically addressing the above
+design issue.
 
->> +static int versatile_pci_parse_request_of_pci_ranges(struct device *dev,
->> +                                                  struct list_head *res)
->> +{
->> +     int err, mem = 1, res_valid = 0;
->> +     struct device_node *np = dev->of_node;
->> +     resource_size_t iobase;
->> +     struct pci_host_bridge_window *win;
->> +
->> +     err = of_pci_get_host_bridge_resources(np, 0, 0xff, res, &iobase);
->> +     if (err)
->> +             return err;
->> +
->> +     list_for_each_entry(win, res, list) {
->> +             struct resource *parent, *res = win->res;
->> +
->> +             switch (resource_type(res)) {
->> +             case IORESOURCE_IO:
->> +                     parent = &ioport_resource;
->> +                     err = pci_remap_iospace(res, iobase);
->> +                     if (err) {
->> +                             dev_warn(dev, "error %d: failed to map resource %pR\n",
->> +                                      err, res);
->> +                             continue;
->> +                     }
->> +                     break;
->> +             case IORESOURCE_MEM:
->> +                     parent = &iomem_resource;
->> +                     res_valid |= !(res->flags & IORESOURCE_PREFETCH);
->> +
->> +                     writel(res->start >> 28, PCI_IMAP(mem));
->> +                     writel(PHYS_OFFSET >> 28, PCI_SMAP(mem));
->> +                     mem++;
->> +
->> +                     break;
->> +             case IORESOURCE_BUS:
->> +             default:
->> +                     continue;
->> +             }
->> +
->> +             err = devm_request_resource(dev, parent, res);
->> +             if (err)
->> +                     goto out_release_res;
->> +     }
->
-> I wonder if we should also request the physical resource for the I/O space
-> window to have it show up in /proc/iomem. We are rather inconsistent in this
-> regard between drivers.
+What should be done is to move away from the opaque "set_ios" method into
+something more appropriate - a set of callbacks which describe what we
+want to achieve.
 
-It's a little complicated now because we don't have that as a struct
-resource any more. We could reconstruct it from iobase and the i/o
-resource size.
+In the case of power up, there should be a single call into the host
+controller code which is responsible for initiating the power up
+sequence, and waits for the power up sequence to complete.  In other
+words, most of mmc_power_up() should be moved to a library function,
+which dumb host adapters hook into the "power up" method.  More
+inteligent adapters (eg, PXA, sdhci) can add their own hook which poke
+the hardware and return when the hardware has completed its power up
+sequence.
 
->
->> +     pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
->> +     pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
->> +
->> +     bus = pci_scan_root_bus(&pdev->dev, 0, &pci_versatile_ops, &sys, &pci_res);
->> +     if (!bus)
->> +             return -ENOMEM;
->> +
->> +     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
->> +     pci_assign_unassigned_bus_resources(bus);
->> +
->> +     return 0;
->
-> One general question, mainly for Bjorn: pci_scan_root_bus adds all the devices
-> at the Linux driver level by calling pci_bus_add_devices(), but then we call
-> pci_fixup_irqs and pci_assign_unassigned_bus_resources after that, which will
-> change the devices again. Is this how it's meant to work? How do we ensure
-> that we have the correct irq number and resources by the time we enter the
-> probe() function of the PCI device driver that gets bound to a device here?
+That avoids the "mmc_delay(10)" for inteligent adapters where these
+delays are not required - which presumably also are not required if some
+special power up sequence for eMMC is required.
 
-I'm a bit puzzled myself. I think that the devices are not probed
-until after pci_assign_unassigned_bus_resources. It certainly doesn't
-work without that call. Really, I think of_irq_parse_and_map_pci
-should be the default if no one else has set the device's irq (and the
-host has a device node of course).
+The same thing goes for this "powerseq" stuff - all you're doing is
+propagating the same design mistake (with the POWER_UP/POWER_ON etc
+details) into it.  That shouldn't be the case - think about the dumb
+powerup method I described above vs the inteligent method - these are
+two separate powerup methods, and should be implemented as such.
 
-It also seems to be a bit of random set of pci functions that are
-called here. It would be nice to simplify this chunk of code.
-
-Rob
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
