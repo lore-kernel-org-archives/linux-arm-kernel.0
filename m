@@ -1,74 +1,159 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 2 Jan 2015 21:10:17 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <5492F84E.7020706@ti.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
-Message-ID: <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Jan 2015 22:10:37 +0100
+Subject: [RFC PATCH v3 4/4] arm64:numa: adding numa support for arm64
+ platforms.
+In-Reply-To: <1420011208-7051-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1420011208-7051-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <1849719.f6Z6RhZjTc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Suman, lakml
+[re-sent with correct mailing list address]
 
-Hi Roger
-
-On Thu, 18 Dec 2014, Roger Quadros wrote:
-
-> Fixing up Paul's email id.
+On Wednesday 31 December 2014 13:03:28 Ganapatrao Kulkarni wrote:
+> Adding numa support for arm64 based platforms.
+> Adding dt node pasring for numa topology using property arm,associativity.
 > 
-> cheers,
-> -roger
-> 
-> On 18/12/14 17:49, Roger Quadros wrote:
-> > There are quite a few hwmods that don't have sysconfig register and so
-> > _find_mpu_rt_port(oh) will return NULL thus preventing ready state check
-> > on those modules after the module is enabled.
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
 
-Hmm.  Any IP block that exposes registers that are accessible by the MPU 
-should have an MPU register target port, even if there's no SYSCONFIG 
-register.  And if an IP block doesn't have registers that are accessible 
-from the MPU, then there shouldn't be much point to waiting for the module 
-to become ready.
+Maybe the parts that are common with powerpc can be moved to drivers/of/numa.c?
+We can always look for both arm,associativity and ibm,associativity, I don't
+think we should be worried about any conflicts that way.
 
-Looks like the real problem is the test for oh->class->sysc before the 
-call to _init_mpu_rt_base().  That was introduced by commit 6423d6df1440 
-("ARM: OMAP2+: hwmod: check for module address space during init"). It's 
-not clear to me why that test was added, since _init_mpu_rt_base() doesn't 
-do anything with oh->class->sysc or SYSCONFIG registers.
+> +#define MAX_DISTANCE_REF_POINTS 4
 
-Could you please test the following patch?
-I don't have an AM437x-gp-evm.  
+I think we should use 8 here like powerpc, four levels might get exceeded
+on complex SoCs.
 
+> +int dt_get_cpu_node_id(int cpu)
+> +{
+> +	struct device_node *dn = NULL;
+> +
+> +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
+> +		const u32 *cell;
+> +		u64 hwid;
+> +
+> +		/*
+> +		 * A cpu node with missing "reg" property is
+> +		 * considered invalid to build a cpu_logical_map
+> +		 * entry.
+> +		 */
+> +		cell = of_get_property(dn, "reg", NULL);
+> +		if (!cell) {
+> +			pr_err("%s: missing reg property\n", dn->full_name);
+> +			return default_nid;
+> +		}
+> +		hwid = of_read_number(cell, of_n_addr_cells(dn));
+> +
+> +		if (cpu_logical_map(cpu) == hwid)
+> +		return of_node_to_nid_single(dn);
+> +	}
+> +	return NUMA_NO_NODE;
+> +}
+> +EXPORT_SYMBOL(dt_get_cpu_node_id);
 
-- Paul
+Maybe just expose a function to the device node for a CPU ID here, and
+expect callers to use of_node_to_nid?
 
----
- arch/arm/mach-omap2/omap_hwmod.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+> +
+> +/**
+> + * early_init_dt_scan_numa_map - parse memory node and map nid to memory range.
+> + */
+> +int __init early_init_dt_scan_numa_map(unsigned long node, const char *uname,
+> +				     int depth, void *data)
+> +{
+> +	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+> +
+> +	/* We are scanning "numa-map" nodes only */
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index cbb908dc5cf0..ce6d11f3eda7 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2451,14 +2451,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
- 				oh->name, np->name);
- 	}
- 
--	if (oh->class->sysc) {
--		r = _init_mpu_rt_base(oh, NULL, index, np);
--		if (r < 0) {
--			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
--			     oh->name);
--			return 0;
--		}
--	}
-+	r = _init_mpu_rt_base(oh, NULL, index, np);
-+	if (r < 0)
-+		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
-+			 oh->name);
- 
- 	r = _init_clocks(oh, NULL);
- 	if (r < 0) {
--- 
-2.1.4
+a stale comment?
+
+> +/* DT node mapping is done already early_init_dt_scan_memory */
+> +int __init arm64_dt_numa_init(void)
+> +{
+> +	int i;
+> +	u32 nodea, nodeb, distance, node_count = 0;
+> +
+> +	of_scan_flat_dt(early_init_dt_scan_numa_map, NULL);
+> +
+> +	for_each_node_mask(i, numa_nodes_parsed)
+> +		node_count = i;
+> +	node_count++;
+> +
+> +	for (nodea =  0; nodea < node_count; nodea++) {
+> +		for (nodeb = 0; nodeb < node_count; nodeb++) {
+> +			distance = dt_get_node_distance(nodea, nodeb);
+> +			numa_set_distance(nodea, nodeb, distance);
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(arm64_dt_numa_init);
+
+No need to export functions that are called only be architecture code.
+Since this works on the flattened device tree format, you can never
+have loadable modules calling it.
+
+> @@ -461,7 +464,12 @@ static int c_show(struct seq_file *m, void *v)
+>  		 * "processor".  Give glibc what it expects.
+>  		 */
+>  #ifdef CONFIG_SMP
+> +	if (IS_ENABLED(CONFIG_NUMA)) {
+> +		seq_printf(m, "processor\t: %d", i);
+> +		seq_printf(m, " [nid: %d]\n", cpu_to_node(i));
+> +	} else {
+>  		seq_printf(m, "processor\t: %d\n", i);
+> +	}
+>  #endif
+>  	}
+
+Do we need to make this conditional? I think we can just always
+print the node number, even if it's going to be zero for systems
+without the associativity properties.
+
+> +
+> +int cpu_to_node_map[NR_CPUS];
+> +EXPORT_SYMBOL(cpu_to_node_map);
+
+This seems to be x86 specific, do we need it?
+
+> +/*
+> + *  Set the cpu to node and mem mapping
+> + */
+> +void numa_store_cpu_info(int cpu)
+> +{
+> +#ifdef CONFIG_ARM64_DT_NUMA
+> +	node_cpu_hwid[cpu].node_id  =  dt_get_cpu_node_id(cpu);
+> +#endif
+
+I would try to avoid the #ifdef here, by providing a stub function of
+dt_get_cpu_node_id or whichever function we end up calling here when
+NUMA is disabled.
+
+> +
+> +/**
+> + * arm64_numa_init - Initialize NUMA
+> + *
+> + * Try each configured NUMA initialization method until one succeeds.  The
+> + * last fallback is dummy single node config encomapssing whole memory and
+> + * never fails.
+> + */
+> +void __init arm64_numa_init(void)
+> +{
+> +	if (!numa_off) {
+> +#ifdef CONFIG_ARM64_DT_NUMA
+> +		if (!numa_init(arm64_dt_numa_init))
+> +			return;
+> +#endif
+> +	}
+> +
+> +	numa_init(dummy_numa_init);
+> +}
+
+I don't think we need the CONFIG_ARM64_DT_NUMA=n case here, it should just
+not be conditional, and the arm64_dt_numa_init should fall back to doing
+something reasonable when numa is turned off or there are no associativity
+properties.
+
+	Arnd
