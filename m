@@ -1,81 +1,69 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Fri, 2 Jan 2015 12:18:06 -0600
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20150102115533.GA25573@red-moon>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2148776.X8NPqiYA6S@wuerfel>
- <20141023091309.GF25302@e106497-lin.cambridge.arm.com>
- <2355100.WsW1DXh57P@wuerfel> <54A1AC5C.7000903@amd.com>
- <20150102115533.GA25573@red-moon>
-Message-ID: <54A6E0DE.6090309@amd.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 2 Jan 2015 19:19:08 +0100
+Subject: [RFC 5/8] ARM64: Re-factor flush_ptrace_access
+In-Reply-To: <20150102175115.GB6761@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <f41f96aaed90007076ce496b9a0746c6f1a01ddb.1420038188.git.panand@redhat.com>
+ <20150102175115.GB6761@redhat.com>
+Message-ID: <20150102181908.GA8466@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/2/2015 5:55 AM, Lorenzo Pieralisi wrote:
-> Hi Suravee,
+On 01/02, Oleg Nesterov wrote:
 >
-> On Mon, Dec 29, 2014 at 07:32:44PM +0000, Suravee Suthikulpanit wrote:
->> >Hi,
->> >
->> >I am not sure if this thread is still alive. I'm trying to see what I
->> >can do to help clean up/convert to make the PCI GHC also works for arm64
->> >w/ zero or minimal ifdefs.
->> >
->> >Please let me know if someone is already working on this. I noticed that
->> >Lorenzo's patches has already been in 3.19-rc1, and in Bjorn's
->> >pci/domain branch. Otherwise, I'll try to continue the work based on the
->> >sample patch from Arnd here.
-> If I am not mistaken, the only bit missing to remove pci_sys_data (and so
-> having a generic host controller driver that works on ARM32/64) is generic
-> MSI management.
-
-Lorenzo,
-
-Do you mean to remove pci_sys_data from pci-host-generic.c or removing 
-it completely? I assume the former case.
-
-So, looking at the current code in the pci-host-generic.c, my 
-understanding is that the:
-     *gen_pci = pci_bus->sysdata->private_data
-will be changed to:
-     *gen_pci = pci_bus->sysdata
-
-Then, we can simply just call pci_scan_root_bus() directly since we no 
-longer need to declare hw_pci for calling pci_common_init_dev().
-
-> I know for certain Marc is working on it, and the solution is WIP,
-> I think we should prevent adding more churn to pci_sys_data, since
-> I managed to remove most of the dependencies (domain, mem_offset).
-
-Thanks for cleaning up the domain and mem_offset.
-
-I saw Marc's irq/msi_domain patch series 
-(http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/msi_domain). 
-
-
-My understanding is that deals with associating the newly introduced 
-msi_domain to each device, which replaces the need for pci_bus->msi and 
-hw_pci->msi_ctrl when configure with CONFIG_PCI_MSI_IRQ_DOMAIN (not sure 
-if this would be the plan for all arm32).  For ARM32, if not define 
-CONFIG_PCI_MSI_IRQ_DOMAIN, it would still fall back to using the 
-[pci_sys_data|hw_pci]->msi_ctrl.
-
-However, I noticed that the hw_pci->msi_controller is not even used for 
-the pci-host-generic. So, this should not be blocking the work to free 
-pci-host-generic from pci_sys_data and hw_pci, as the MSI stuff can go 
-in separately. Am I missing something?
-
-> So to sum it up, to have a generic host controller driver for ARM32/64
-> we just need to work out how to handle the MSI data, patches will be
-> on the lists shortly to handle that, please review.
+> On 12/31, Pratyush Anand wrote:
+> >
+> > Re-factor flush_ptrace_access to reuse vma independent part.
 >
-> Thanks,
-> Lorenzo
+> But for what? The changelog should explain this.
 >
+> > Signed-off-by: Pratyush Anand <panand@redhat.com>
+> > ---
+> >  arch/arm64/mm/flush.c | 24 +++++++++++++++---------
+> >  1 file changed, 15 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> > index b6f14e8d2121..9a4dd6f39cfb 100644
+> > --- a/arch/arm64/mm/flush.c
+> > +++ b/arch/arm64/mm/flush.c
+> > @@ -34,19 +34,25 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+> >  		__flush_icache_all();
+> >  }
+> >
+> > +static void __flush_ptrace_access(struct page *page, unsigned long uaddr,
+> > +		void *kaddr, unsigned long len)
+> > +{
+> > +	unsigned long addr = (unsigned long)kaddr;
+> > +
+> > +	if (icache_is_aliasing()) {
+> > +		__flush_dcache_area(kaddr, len);
+> > +		__flush_icache_all();
+> > +	} else {
+> > +		flush_icache_range(addr, addr + len);
+> > +	}
+> > +}
+> > +
+> >  static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+> >  				unsigned long uaddr, void *kaddr,
+> >  				unsigned long len)
+> >  {
+> > -	if (vma->vm_flags & VM_EXEC) {
+> > -		unsigned long addr = (unsigned long)kaddr;
+> > -		if (icache_is_aliasing()) {
+> > -			__flush_dcache_area(kaddr, len);
+> > -			__flush_icache_all();
+> > -		} else {
+> > -			flush_icache_range(addr, addr + len);
+> > -		}
+> > -	}
+> > +	if (vma->vm_flags & VM_EXEC)
+> > +		__flush_ptrace_access(page, uaddr, kaddr, len);
+> >  }
+>
+> So why uprobes can't use flush_ptrace_access() ? flush_uprobe_xol_access() is
+> called by arch_uprobe_copy_ixol(), and xol vma has VM_EXEC bit set.
 
-Thanks for the update and the summary. I'll help review/test the MSI 
-patch once posted.
+Ah, sorry, I forgot that arch_uprobe_copy_ixol() doesn't have "vma" so it
+can't use flush_ptrace_access()... perhaps you can update the changelog.
 
-Thanks,
-
-Suravee
+Oleg.
