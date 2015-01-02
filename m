@@ -1,43 +1,82 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 2 Jan 2015 17:08:18 +0100
-Subject: [GIT PULL] Fixes for 3.19, #2
-Message-ID: <20150102160818.GB6708@lunn.ch>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri,  2 Jan 2015 17:11:29 +0100
+Subject: [PATCH RESEND] ARM: exynos_defconfig: Enable options for display
+ panel support
+Message-ID: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Many Exynos devices have a display panel. Most of them just have
+a simple panel while others have more complex configurations that
+requires an embedded DisplayPort (eDP) to LVDS bridges.
 
-Here is a second set of fixes for the next -rc. It contains a single
-patch to fix an Opps with the kirkwood netbig LED driver. This patch
-has been sent to the LED maintainers a couple of times, with
-reminders, but there has been no response. So we would like to take it
-via mvebu->arm-soc. We informed the LED maintainers about this plan,
-and they are Cc: to this pull request, just so everybody knows what is
-going on.
+This patch enables the following features to be built in the kernel
+image to support both setups:
 
-Thanks
-	Andrew
+- Direct Rendering Manager (DRM)
+- DRM bridge registration and lookup framework
+- Parade ps8622/ps8625 eDP/LVDS bridge
+- NXP ptn3460 eDP/LVDS bridge
+- Exynos Fully Interactive Mobile Display controller (FIMD)
+- Panel registration and lookup framework
+- Simple panels
+- Backlight & LCD device support
 
-The following changes since commit d4b0833a65e8b9fc58d992ba0cc89cad1580db31:
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
 
-  ARM: mvebu: Fix pinctrl configuration for Armada 370 DB (2014-12-21 06:01:05 -0600)
+Hello Kukjin,
 
-are available in the git repository at:
+You dropped this patch since exynos drm was causing boot hangs on some
+platforms but the fix for that issue is already in linux-next (commit:
+f1e9203 clk: samsung: Fix Exynos 5420 pinctrl setup and clock disable
+failure due to domain being gated) so I think it makes sense to enable
+the display options again.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.19-2
+NOTE: Display panel is still not working since patch "arm: dts: Exynos5:
+Use pmu_system_controller phandle for dp phy" is needed [0] but I think
+we should enable display options to catch the regressions easier.
 
-for you to fetch changes up to bb682e44c77731711818c2cf9f6d4bc277207eee:
+Best regards,
+Javier
 
-  leds: netxbig: fix oops at probe time (2014-12-30 10:39:23 -0600)
+[0]: https://lkml.org/lkml/2014/11/24/10
 
-----------------------------------------------------------------
-2nd set of fixes for 3.19:
+ arch/arm/configs/exynos_defconfig | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-leds: netxbig: fix oops at probe time
-
-----------------------------------------------------------------
-Simon Guinot (1):
-      leds: netxbig: fix oops at probe time
-
- drivers/leds/leds-netxbig.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 22beed3..27cdd52 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -111,11 +111,26 @@ CONFIG_REGULATOR_S2MPA01=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TPS65090=y
++CONFIG_DRM=y
++CONFIG_DRM_BRIDGE=y
++CONFIG_DRM_PTN3460=y
++CONFIG_DRM_PS8622=y
++CONFIG_DRM_EXYNOS=y
++CONFIG_DRM_EXYNOS_FIMD=y
++CONFIG_DRM_EXYNOS_DP=y
++CONFIG_DRM_PANEL=y
++CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_FB=y
+ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_EXYNOS_VIDEO=y
+ CONFIG_EXYNOS_MIPI_DSI=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_CLASS_DEVICE=y
++CONFIG_LCD_PLATFORM=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_GENERIC=y
++CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FONTS=y
+ CONFIG_FONT_7x14=y
+-- 
+2.1.3
