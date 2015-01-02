@@ -1,43 +1,35 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Fri, 2 Jan 2015 21:11:17 +0100
-Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <20150102195350.GB27538@amd>
-References: <20141226232116.GA5069@type>
- <20150102195350.GB27538@amd>
-Message-ID: <20150102201117.GD25336@type.youpi.perso.aquilenet.fr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 2 Jan 2015 14:33:20 -0600
+Subject: [PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
+In-Reply-To: <20150102201643.GE4920@saruman>
+References: <1420228817-41310-1-git-send-email-d-gerlach@ti.com>
+ <1420228817-41310-3-git-send-email-d-gerlach@ti.com>
+ <20150102201643.GE4920@saruman>
+Message-ID: <20150102203320.GF4920@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel Machek, le Fri 02 Jan 2015 20:53:51 +0100, a ?crit :
-> input4::capsl/trigger was none by default, that can't be right, right?
+On Fri, Jan 02, 2015 at 02:16:43PM -0600, Felipe Balbi wrote:
+> On Fri, Jan 02, 2015 at 02:00:16PM -0600, Dave Gerlach wrote:
+> > Introduce a wkup_m3_ipc driver to handle communication between the MPU
+> > and Cortex M3 wkup_m3 present on am335x.
+> > 
+> > This driver is responsible for actually booting the wkup_m3_rproc and
+> > also handling all IPC which is done using the IPC registers in the control
+> > module, a mailbox, and a separate interrupt back from the wkup_m3. A small
+> > API is exposed for executing specific power commands, which include
+> > configuring for low power mode, request a transition to a low power mode,
+> > and status info on a previous transition.
 
-Indeed. And I don't see how it can be that way, since the input4::capsl
-LED and the input4-capsl trigger get initialized at the same time in
-input_led_connect... (and the order does not matter since both will
-try to connect to the other on registration).
+another comment is that no user of such API is provided, so it's very
+difficult to verify that there's no other way of implementing this.
 
-> I tried putting kbd-capslock and input4-capsl there, but that did not
-> seem to help.
-
-That should have.
-
-> It works with heartbeat trigger, but not with input4-numl
-> trigger.
-
-It should have worked with input4-numl too.
-
-> vt::capsl/brightness controls capslock led, even when
-> input4-capsl/trigger is set to input4-numl.
-
-It shouldn't.
-
-> Confused,
-
-I guess I'm even more.  I had tested everything that you have described,
-without any issue, on both an internal laptop keyboard and an external
-USB keyboard, and have tested again just now, with the same success.
-
-Which hardware setup do you have, more precisely?
-
-Samuel
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150102/66fab74c/attachment.sig>
