@@ -1,190 +1,75 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri,  2 Jan 2015 17:14:07 +0100
-Subject: [PATCH 3/4] mmc: pwrseq: Initial support for the simple MMC power
- sequence provider
-In-Reply-To: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
-References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1420215248-20650-4-git-send-email-ulf.hansson@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 2 Jan 2015 16:47:51 +0000
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54A664AB.3030101@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+ <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
+ <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
+ <54A3B526.9040903@linaro.org>
+ <20150101200424.GB12770@xora-haswell.xora.org.uk>
+ <54A664AB.3030101@linaro.org>
+Message-ID: <EE1B062D-90AC-491F-90E7-D7EACF1F5B06@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To add the core part for the MMC power sequence, let's start by adding
-initial support for the simple MMC power sequence provider.
+On 2 Jan 2015, at 09:28, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>> On 2015?01?02? 04:04, Graeme Gregory wrote:
+>>>> On Wed, Dec 31, 2014 at 04:34:46PM +0800, Hanjun Guo wrote:
+>>>> On 2014?12?31? 04:13, ashwinc at codeaurora.org wrote:
+>>>> Hi Hanjun,
+>>>> 
+>>>> Overall the document looks good to us. Some minor clarifications below.
+>>>> 
+>>>>> ---------- Forwarded message ----------
+>>>>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>>>> 
+>>>>> Add documentation for the guidelines of how to use ACPI
+>>>>> on ARM64.
+>>>>> 
+>>>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>>>>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> ---
+>>>>> Documentation/arm64/arm-acpi.txt |  323
+>>>>> ++++++++++++++++++++++++++++++++++++++
+>>>>> 1 file changed, 323 insertions(+)
+>>>>> create mode 100644 Documentation/arm64/arm-acpi.txt
+>>>> 
+>>>> [..]
+>>>> 
+>>>>> +Relationship with Device Tree
+>>>>> +-----------------------------
+>>>> 
+>>>> [..]
+>>>> 
+>>>>> +When booting using ACPI tables, the /chosen node in DT will still be
+>>>>> parsed
+>>>>> +to extract the kernel command line and initrd path.  No other section of
+>>>>> the
+>>>>> +DT will be used.
+>>>> 
+>>>> Is this still true?
+>>> 
+>>> No, we can booting the ACPI system in EFI stub without dtb. Catalin
+>>> also pointed out this issue, I will remove this paragraph.
+>> 
+>> The paragraph is still correct, the /chosen node is always present even
+>> if nothing else is.
+> 
+> Sorry for the confusing, I mean no dtb needed for the command line if
+> ACPI tables are available.
+> 
+> efi will create a empty dtb if no dtb found, and add the cmd line into
+> the new created dtb, I'm just wondering, can we remove the limitation
+> for passing the cmd line in /chosen node in the future?
 
-In this initial step, the MMC power sequence node are fetched and the
-compatible string for the simple MMC power sequence provider are
-verified.
+My point is that on an ACPI based system, we don't really care how EFI_STUB passes
+the command line to the rest of the kernel. Since UEFI doesn't need to know about
+such detail and since ACPI is only supported with EFI_STUB, we don't need to mention
+the chosen node in this document. 
 
-At this point we don't parse the node for any properties, but instead
-that will be handled from following patches. Since there are no
-properties supported yet, let's just implement the ->alloc() and the
-->free() callbacks.
+At some point we may even change the way EFI_STUB passes the command line to the 
+kernel but this is still irrelevant to ACPI. 
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/core/Makefile        |  2 +-
- drivers/mmc/core/pwrseq.c        | 61 +++++++++++++++++++++++++++++++++++++++-
- drivers/mmc/core/pwrseq.h        |  2 ++
- drivers/mmc/core/pwrseq_simple.c | 48 +++++++++++++++++++++++++++++++
- 4 files changed, 111 insertions(+), 2 deletions(-)
- create mode 100644 drivers/mmc/core/pwrseq_simple.c
-
-diff --git a/drivers/mmc/core/Makefile b/drivers/mmc/core/Makefile
-index ccdd35f..b39cbd2 100644
---- a/drivers/mmc/core/Makefile
-+++ b/drivers/mmc/core/Makefile
-@@ -8,5 +8,5 @@ mmc_core-y			:= core.o bus.o host.o \
- 				   sdio.o sdio_ops.o sdio_bus.o \
- 				   sdio_cis.o sdio_io.o sdio_irq.o \
- 				   quirks.o slot-gpio.o
--mmc_core-$(CONFIG_OF)		+= pwrseq.o
-+mmc_core-$(CONFIG_OF)		+= pwrseq.o pwrseq_simple.o
- mmc_core-$(CONFIG_DEBUG_FS)	+= debugfs.o
-diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
-index 24f2370..47ffa1b 100644
---- a/drivers/mmc/core/pwrseq.c
-+++ b/drivers/mmc/core/pwrseq.c
-@@ -7,14 +7,73 @@
-  *
-  *  MMC power sequence management
-  */
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+
- #include <linux/mmc/host.h>
- 
- #include "pwrseq.h"
- 
-+struct mmc_pwrseq_match {
-+	const char *compatible;
-+	int (*alloc)(struct mmc_host *host, struct device *dev);
-+};
-+
-+static struct mmc_pwrseq_match pwrseq_match[] = {
-+	{
-+		.compatible = "mmc,pwrseq-simple",
-+		.alloc = mmc_pwrseq_simple_alloc,
-+	},
-+};
-+
-+static struct mmc_pwrseq_match *mmc_pwrseq_find(struct device_node *np)
-+{
-+	struct mmc_pwrseq_match *match = ERR_PTR(-ENODEV);
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pwrseq_match); i++) {
-+		if (of_device_is_compatible(np,	pwrseq_match[i].compatible)) {
-+			match = &pwrseq_match[i];
-+			break;
-+		}
-+	}
-+
-+	return match;
-+}
- 
- int mmc_pwrseq_alloc(struct mmc_host *host)
- {
--	return 0;
-+	struct platform_device *pdev;
-+	struct device_node *np;
-+	struct mmc_pwrseq_match *match;
-+	int ret = 0;
-+
-+	np = of_parse_phandle(host->parent->of_node, "mmc-pwrseq", 0);
-+	if (!np)
-+		return 0;
-+
-+	pdev = of_find_device_by_node(np);
-+	if (!pdev) {
-+		ret = -ENODEV;
-+		goto err;
-+	}
-+
-+	match = mmc_pwrseq_find(np);
-+	if (IS_ERR(match)) {
-+		ret = PTR_ERR(match);
-+		goto err;
-+	}
-+
-+	ret = match->alloc(host, &pdev->dev);
-+	if (!ret)
-+		dev_info(host->parent, "allocated mmc-pwrseq\n");
-+
-+err:
-+	of_node_put(np);
-+	return ret;
- }
- 
- void mmc_pwrseq_power_up(struct mmc_host *host)
-diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
-index 430874d..7e20dda 100644
---- a/drivers/mmc/core/pwrseq.h
-+++ b/drivers/mmc/core/pwrseq.h
-@@ -27,6 +27,8 @@ void mmc_pwrseq_power_on(struct mmc_host *host);
- void mmc_pwrseq_power_off(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
- 
-+int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev);
-+
- #else
- 
- static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-new file mode 100644
-index 0000000..7f87bc1
---- /dev/null
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -0,0 +1,48 @@
-+/*
-+ *  Copyright (C) 2014 Linaro Ltd
-+ *
-+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ *
-+ *  Simple MMC power sequence management
-+ */
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+
-+#include <linux/mmc/host.h>
-+
-+#include "pwrseq.h"
-+
-+struct mmc_pwrseq_simple {
-+	struct mmc_pwrseq pwrseq;
-+};
-+
-+static void mmc_pwrseq_simple_free(struct mmc_host *host)
-+{
-+	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-+					struct mmc_pwrseq_simple, pwrseq);
-+
-+	kfree(&pwrseq);
-+	host->pwrseq = NULL;
-+}
-+
-+static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
-+	.free = mmc_pwrseq_simple_free,
-+};
-+
-+int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
-+{
-+	struct mmc_pwrseq_simple *pwrseq;
-+
-+	pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
-+	if (!pwrseq)
-+		return -ENOMEM;
-+
-+	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
-+	host->pwrseq = &pwrseq->pwrseq;
-+
-+	return 0;
-+}
--- 
-1.9.1
+Catalin
