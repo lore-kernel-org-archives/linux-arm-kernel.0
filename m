@@ -1,37 +1,70 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 02 Jan 2015 18:28:11 +0900
-Subject: [PATCH v10 2/8] ARM: l2c: Refactor the driver to use commit-like
- interface
-In-Reply-To: <54A66143.2080506@gmail.com>
-References: <1419331716-8972-1-git-send-email-m.szyprowski@samsung.com>	<1419331716-8972-3-git-send-email-m.szyprowski@samsung.com>	<54A19C17.1020909@ti.com>
- <CA+Ln22G3kVA_-tsjAxbe2rqSHeLtdU2X_EhNL0uW3cUCgaWLgg@mail.gmail.com>
- <54A2BBDC.1020900@ti.com> <54A66143.2080506@gmail.com>
-Message-ID: <54A664AB.1060100@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 02 Jan 2015 17:28:11 +0800
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20150101200424.GB12770@xora-haswell.xora.org.uk>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+ <CAJ5Y-eZ5cu9_OhG24yAv+CZq7zKg0vU+eVGekyN+9dDzaz1OhQ@mail.gmail.com>
+ <8fc9550c96a468b3e50d51a37db68a33.squirrel@www.codeaurora.org>
+ <54A3B526.9040903@linaro.org>
+ <20150101200424.GB12770@xora-haswell.xora.org.uk>
+Message-ID: <54A664AB.3030101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Graeme,
 
-
-On 02.01.2015 18:13, Tomasz Figa wrote:
-> On 30.12.2014 23:51, Nishanth Menon wrote:
->>>> Looks like the following also need addressing:
->>>> data->save is called twice (once more after l2cof_init)
->>>> l2c310_init_fns also needs l2c310_configure
->>>> will be nice to use l2x0_data only after we kmemdup data in __l2c_init
+On 2015?01?02? 04:04, Graeme Gregory wrote:
+> On Wed, Dec 31, 2014 at 04:34:46PM +0800, Hanjun Guo wrote:
+>> On 2014?12?31? 04:13, ashwinc at codeaurora.org wrote:
+>>> Hi Hanjun,
 >>>
->>> I'll check this.
->> Thanks.
+>>> Overall the document looks good to us. Some minor clarifications below.
+>>>
+>>>> ---------- Forwarded message ----------
+>>>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>>>
+>>>> Add documentation for the guidelines of how to use ACPI
+>>>> on ARM64.
+>>>>
+>>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>>>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>   Documentation/arm64/arm-acpi.txt |  323
+>>>> ++++++++++++++++++++++++++++++++++++++
+>>>>   1 file changed, 323 insertions(+)
+>>>>   create mode 100644 Documentation/arm64/arm-acpi.txt
+>>>>
+>>>
+>>> [..]
+>>>
+>>>> +Relationship with Device Tree
+>>>> +-----------------------------
+>>>
+>>> [..]
+>>>
+>>>> +When booting using ACPI tables, the /chosen node in DT will still be
+>>>> parsed
+>>>> +to extract the kernel command line and initrd path.  No other section of
+>>>> the
+>>>> +DT will be used.
+>>>
+>>> Is this still true?
+>>
+>> No, we can booting the ACPI system in EFI stub without dtb. Catalin
+>> also pointed out this issue, I will remove this paragraph.
 >>
 >
-> Apparently the second save in __l2c_init() is not needed and it should
-> have been removed. However it might be a good idea to actually do second
-> save in l2c_enable() after l2c_configure() so that the values actually
-> permitted by hardware and/or secure firmware are stored.
->
-> l2c310_init_fns needs to be updated indeed.
+> The paragraph is still correct, the /chosen node is always present even
+> if nothing else is.
 
-Hmm, apparently current patch already adds this (and I missed it reading 
-it at first), so I'm not sure what's your concern about it.
+Sorry for the confusing, I mean no dtb needed for the command line if
+ACPI tables are available.
 
-Best regards,
-Tomasz
+efi will create a empty dtb if no dtb found, and add the cmd line into
+the new created dtb, I'm just wondering, can we remove the limitation
+for passing the cmd line in /chosen node in the future?
+
+Thanks
+Hanjun
