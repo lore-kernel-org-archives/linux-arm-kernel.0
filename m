@@ -1,48 +1,63 @@
 From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 2 Jan 2015 18:43:14 +0100
-Subject: [RFC 3/8] Kernel/uprobe: Define arch_uprobe_exception_notify
- as __weak
-In-Reply-To: <c40bb09f1edad6899c3855eb56bf4a4f541c49f7.1420038188.git.panand@redhat.com>
+Date: Fri, 2 Jan 2015 18:51:15 +0100
+Subject: [RFC 5/8] ARM64: Re-factor flush_ptrace_access
+In-Reply-To: <f41f96aaed90007076ce496b9a0746c6f1a01ddb.1420038188.git.panand@redhat.com>
 References: <cover.1420038188.git.panand@redhat.com>
- <c40bb09f1edad6899c3855eb56bf4a4f541c49f7.1420038188.git.panand@redhat.com>
-Message-ID: <20150102174314.GA6761@redhat.com>
+ <f41f96aaed90007076ce496b9a0746c6f1a01ddb.1420038188.git.panand@redhat.com>
+Message-ID: <20150102175115.GB6761@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/31, Pratyush Anand wrote:
 >
-> Both ARM and ARM64 handle uprobe exceptions through their own hooks.So
-> nothing to be done in arch_uprobe_exception_notify except to return
-> NOTIFY_DONE. Implement this as weak default function and remove
-> definition from arm arch code.
->
+> Re-factor flush_ptrace_access to reuse vma independent part.
+
+But for what? The changelog should explain this.
+
 > Signed-off-by: Pratyush Anand <panand@redhat.com>
 > ---
->  arch/arm/kernel/uprobes.c |  6 ------
->  kernel/events/uprobes.c   | 18 ++++++++++++++++++
->  2 files changed, 18 insertions(+), 6 deletions(-)
+>  arch/arm64/mm/flush.c | 24 +++++++++++++++---------
+>  1 file changed, 15 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-> index 56adf9c1fde0..0f3663ca82fc 100644
-> --- a/arch/arm/kernel/uprobes.c
-> +++ b/arch/arm/kernel/uprobes.c
-> @@ -178,12 +178,6 @@ void arch_uprobe_abort_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
->  	instruction_pointer_set(regs, utask->vaddr);
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index b6f14e8d2121..9a4dd6f39cfb 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -34,19 +34,25 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+>  		__flush_icache_all();
 >  }
 >
-> -int arch_uprobe_exception_notify(struct notifier_block *self,
-> -				 unsigned long val, void *data)
-> -{
-> -	return NOTIFY_DONE;
-> -}
+> +static void __flush_ptrace_access(struct page *page, unsigned long uaddr,
+> +		void *kaddr, unsigned long len)
+> +{
+> +	unsigned long addr = (unsigned long)kaddr;
+> +
+> +	if (icache_is_aliasing()) {
+> +		__flush_dcache_area(kaddr, len);
+> +		__flush_icache_all();
+> +	} else {
+> +		flush_icache_range(addr, addr + len);
+> +	}
+> +}
+> +
+>  static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+>  				unsigned long uaddr, void *kaddr,
+>  				unsigned long len)
+>  {
+> -	if (vma->vm_flags & VM_EXEC) {
+> -		unsigned long addr = (unsigned long)kaddr;
+> -		if (icache_is_aliasing()) {
+> -			__flush_dcache_area(kaddr, len);
+> -			__flush_icache_all();
+> -		} else {
+> -			flush_icache_range(addr, addr + len);
+> -		}
+> -	}
+> +	if (vma->vm_flags & VM_EXEC)
+> +		__flush_ptrace_access(page, uaddr, kaddr, len);
+>  }
 
-I agree, this is ugly. But I disagree with this change.
-
-I think we should simply kill uprobe_exception_nb and unexport
-arch_uprobe_exception_notify on x86/powerpc, and in fact I was going to do
-this a long ago.
-
-I'll send the patch later. Until then please add the dummy arch_uprobe_exception_notify()
-like arch/arm does, to make the generic code happy.
+So why uprobes can't use flush_ptrace_access() ? flush_uprobe_xol_access() is
+called by arch_uprobe_copy_ixol(), and xol vma has VM_EXEC bit set.
 
 Oleg.
