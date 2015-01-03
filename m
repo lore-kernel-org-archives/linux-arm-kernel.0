@@ -1,67 +1,30 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Sat, 3 Jan 2015 12:30:26 -0600
-Subject: [PATCH V3] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan node
-Message-ID: <1420309826-7904-1-git-send-email-nm@ti.com>
+Date: Sat, 3 Jan 2015 13:13:30 -0600
+Subject: [PATCH] MAINTAINERS: Add linux-omap to list of reviewers for TI
+ Thermal
+Message-ID: <1420312410-4469-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
-a fan (such as AFB02505HHB) over J1 connector for various purposes.
-Provide device tree node to enable the same.
+Add linux-omap mailing list to the TI THERMAL list for wider review.
 
+Reported-by: Pavel Machek <pavel@ucw.cz>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-V3: Rebased to v3.19-rc1, added label for GPIO fan (for future cooling device
-    reference)
-V2: https://patchwork.kernel.org/patch/5445111/
-V1: https://patchwork.kernel.org/patch/5444911/
+ MAINTAINERS |    1 +
+ 1 file changed, 1 insertion(+)
 
-Enable and disable can be controlled by (post the RPM, it finds
-closest match - even a 1 will do)
-
-echo '13000' > /sys/class/hwmon/hwmon0/fan1_target
-and
-echo '0' > /sys/class/hwmon/hwmon0/fan1_target
-
-Test log: http://slexy.org/view/s2T0ajh46z
-
-requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
-Applies on v3.19-rc1
-
- arch/arm/boot/dts/am57xx-beagle-x15.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 6c2e8e4..c171720 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -80,6 +80,14 @@
- 			default-state = "off";
- 		};
- 	};
-+
-+	gpio_fan: gpio_fan {
-+		/* Based on 5v 500mA AFB02505HHB */
-+		compatible = "gpio-fan";
-+		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
-+		gpio-fan,speed-map = <0    0
-+				      13000 1>;
-+	};
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddb9ac8..dc9efd5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9533,6 +9533,7 @@ F:	drivers/platform/x86/thinkpad_acpi.c
+ TI BANDGAP AND THERMAL DRIVER
+ M:	Eduardo Valentin <edubezval@gmail.com>
+ L:	linux-pm at vger.kernel.org
++L:	linux-omap at vger.kernel.org
+ S:	Supported
+ F:	drivers/thermal/ti-soc-thermal/
  
- &dra7_pmx_core {
-@@ -394,6 +402,12 @@
- 			wakeup-source;
- 			ti,palmas-long-press-seconds = <12>;
- 		};
-+
-+		tps659038_gpio: tps659038_gpio {
-+			compatible = "ti,palmas-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
- 	};
- 
- 	tmp102: tmp102 at 48 {
 -- 
 1.7.9.5
