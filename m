@@ -1,39 +1,70 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 3 Jan 2015 15:40:01 +0900
-Subject: [PATCH V2 2/2] ARM: l2c: AM437x: Introduce support for cache
- filter programming
-In-Reply-To: <1420220628-23742-3-git-send-email-nm@ti.com>
+Date: Sat, 3 Jan 2015 15:42:43 +0900
+Subject: [PATCH V2 0/2] ARM: l2c: OMAP4/AM437x: Additional register
+ programming support.
+In-Reply-To: <20150103002317.GH3298@atomide.com>
 References: <1420220628-23742-1-git-send-email-nm@ti.com>
- <1420220628-23742-3-git-send-email-nm@ti.com>
-Message-ID: <CA+Ln22Epd8VpA9DQPFYBdjewUY3ejODhaRHgBSNZAQCYjx5saw@mail.gmail.com>
+ <54A6E79E.7010203@oracle.com> <54A6F5C8.2050008@ti.com>
+ <20150103002317.GH3298@atomide.com>
+Message-ID: <CA+Ln22E0_R1cXXgF_L8kdz+cTmAkhykTtN04=q6JXNsUsFv9Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Hi Tony,
 
-2015-01-03 2:43 GMT+09:00 Nishanth Menon <nm@ti.com>:
-> AM437x generation of processors support programming the PL310 L2Cache
-> controller's address filter start and end registers using a secure
-> montior service.
+2015-01-03 9:23 GMT+09:00 Tony Lindgren <tony@atomide.com>:
+> * Nishanth Menon <nm@ti.com> [150102 11:50]:
+>> On 01/02/2015 12:46 PM, santosh.shilimkar at oracle.com wrote:
+>> > On 1/2/15 9:43 AM, Nishanth Menon wrote:
+>> >> Hi,
+>> >> OMAP4 and AM437x ROM code provides services to program PL310's latency
+>> >> registers and AM437x provides service for programming Address filter
+>> >> registers.
+>> >>
+>> >> Provide support in the kernel for the same.
+>> >>
+>> >> V2 of the series contains documentation update and a bug fix due to a
+>> >> typo introduced during patch split :(
+>> >>
+>> >> Nishanth Menon (2):
+>> >>    ARM: l2c: OMAP4/AM437x: Introduce support for cache latency
+>> >>      programming
+>> >>    ARM: l2c: AM437x: Introduce support for cache filter programming
+>> >>
+>> > Looks fine to me ...
+>> > Feel free to add my ack if you need one ...
+>> >
+>> > Minor: The subject looks like I2C though it is L2C ;-)
+>> >
+>> Yeah, the thought did occur to me, but decided instead to go with the
+>> existing $subject conventions of arch/arm/mach-omap2/omap4-common.c
+>> ARM: l2c: omap2+: get rid of init call
+>> ARM: l2c: omap2+: get rid of redundant cache replacement policy setting
+>> ARM: l2c: omap2: remove explicit non-secure access bits
+>> ARM: l2c: omap2: remove cache size override
+>> ARM: l2c: omap2: remove explicit SMI calls to enable L2 cache
+>> ARM: l2c: omap2: implement new write_sec method
+>> ARM: l2c: remove platforms/SoCs setting early BRESP
+>> ARM: l2c: fix register naming
+>> ARM: l2c: omap2: remove ES1.0 support
+>>
+>> ..
+>>
+>> If folks feel strongly about this, I can capitalize the same and post
+>> a v3 to help confusing fonts on certain mail clients and terminals.
+>> let me know if folks want me to.
+>
+> I guess no need to :)
+>
+> Looks like these still won't fix the issue we found in the
+> series posted by Tomasz though. At least I'm still getting errors
+> on am437x with these and the patches from Tomasz applied.
 
-typo: s/montior/monitor/
-
-[snip]
-
-> +               base = omap4_get_l2cache_base();
-> +               filter_start = (reg == L310_ADDR_FILTER_START) ? val :
-> +                              readl_relaxed(base + L310_ADDR_FILTER_START);
-> +               filter_end = (reg == L310_ADDR_FILTER_END) ? val :
-> +                              readl_relaxed(base + L310_ADDR_FILTER_END);
-> +               omap_smc1_2(AM43X_MON_L2X0_SETFILTER_INDEX, filter_start,
-> +                           filter_end);
-> +               return;
-
-I don't have any significant comments about this patch in particular,
-but just noticed that you need to do read-backs here (and the typo
-thanks to the spell checker of my mailing app). Maybe you should
-consider switching to the .configure() API I introduced in my series?
-This would let you get rid of the hardcoded static mapping.
+Indeed, as I figured out in the original thread about this issue,
+additional patch fixing code unaffected by my series (besides changing
+the condition which triggers calling it) is necessary. Namely, the
+affected 4 registers need to be written using the write_sec wrapper,
+instead of using writel*() directly.
 
 Best regards,
 Tomasz
