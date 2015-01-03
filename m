@@ -1,52 +1,55 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 3 Jan 2015 20:47:25 +0100
-Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <20150102201117.GD25336@type.youpi.perso.aquilenet.fr>
-References: <20141226232116.GA5069@type> <20150102195350.GB27538@amd>
- <20150102201117.GD25336@type.youpi.perso.aquilenet.fr>
-Message-ID: <20150103194725.GA13390@amd>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Sat, 03 Jan 2015 20:50:24 +0100
+Subject: Tegra 2 T20 NAND Flash Support
+In-Reply-To: <1401903129.9454.2.camel@tellur>
+References: <538E6FB5.5020806@ziswiler.com> <1401866283.2173.3.camel@tellur>
+ <538EC96A.4050702@ziswiler.com> <20140604144134.GH28484@ulmo>
+ <1401903129.9454.2.camel@tellur>
+Message-ID: <1420314624.2169.6.camel@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-01-02 21:11:17, Samuel Thibault wrote:
-> Pavel Machek, le Fri 02 Jan 2015 20:53:51 +0100, a ?crit :
-> > input4::capsl/trigger was none by default, that can't be right, right?
+Am Mittwoch, den 04.06.2014, 19:32 +0200 schrieb Lucas Stach:
+> Am Mittwoch, den 04.06.2014, 16:41 +0200 schrieb Thierry Reding:
+> > On Wed, Jun 04, 2014 at 09:23:22AM +0200, Marcel Ziswiler wrote:
+> > > On 06/04/2014 09:18 AM, Lucas Stach wrote:
+> > > >I took the Linux Tegra NAND driver from Thierry and cleaned it up quite
+> > > >a bit. It now works with both ONFI and non-ONFI NAND, at least for
+> > > >reading. Writing doesn't quite work yet and I've got side-tracked with
+> > > >other stuff.
+> > > >
+> > > >If you are interested in moving this forward I can put up my WIP patches
+> > > >to some public location.
+> > > 
+> > > Sounds great, yes. That would be perfect, thanks.
+> > > 
+> > > We even once got an universal NAND test infrastructure from Micron based on
+> > > a re-worked Colibri T20 which we could use to validate it with various NAND
+> > > flash parts.
+> > 
+> > Excellent, I would've had a hard time digging up those patches. It's
+> > really been quite a while.
+> > 
+> I've put up a rebased version of the patches at
 > 
-> Indeed. And I don't see how it can be that way, since the input4::capsl
-> LED and the input4-capsl trigger get initialized at the same time in
-> input_led_connect... (and the order does not matter since both will
-> try to connect to the other on registration).
+> git://git.pengutronix.de/git/lst/linux.git tegra-nand
 > 
-> > I tried putting kbd-capslock and input4-capsl there, but that did not
-> > seem to help.
-> 
-> That should have.
-> 
-> > It works with heartbeat trigger, but not with input4-numl
-> > trigger.
-> 
-> It should have worked with input4-numl too.
-> 
-> > vt::capsl/brightness controls capslock led, even when
-> > input4-capsl/trigger is set to input4-numl.
-> 
-> It shouldn't.
-> 
-> > Confused,
-> 
-> I guess I'm even more.  I had tested everything that you have described,
-> without any issue, on both an internal laptop keyboard and an external
-> USB keyboard, and have tested again just now, with the same success.
-> 
-> Which hardware setup do you have, more precisely?
+For those still interested:
+I've continued to work on this for the last few days and pushed a new
+version of my WIP to the above location.
 
-I tested on Thinkpad X60, with internal keyboard. (PS/2, I'd say). I
-let Debian boot into graphical login prompt, switched to text console,
-and did the testing there.
+It is now in a state where the in-kernel mtd tests seem to be happy with
+it. Also creating/using a filesystem on top of the mtdblock device seems
+to work properly.
 
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I still need to validate that anything using the OOB areas is working
+properly. The last missing feature is BCH ECC support, but that should
+be easy to add.
+
+I don't know if it still needs some performance tuning. 5MB/s write and
+12,5MB/s read on a Colibri T20 seem pretty slow me, but I have nothing
+to compare with ATM.
+Marcel could you maybe dig out some benchmarks with L4T?
+
+Regards,
+Lucas
