@@ -1,70 +1,80 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 3 Jan 2015 15:42:43 +0900
-Subject: [PATCH V2 0/2] ARM: l2c: OMAP4/AM437x: Additional register
- programming support.
-In-Reply-To: <20150103002317.GH3298@atomide.com>
-References: <1420220628-23742-1-git-send-email-nm@ti.com>
- <54A6E79E.7010203@oracle.com> <54A6F5C8.2050008@ti.com>
- <20150103002317.GH3298@atomide.com>
-Message-ID: <CA+Ln22E0_R1cXXgF_L8kdz+cTmAkhykTtN04=q6JXNsUsFv9Eg@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Sat, 03 Jan 2015 15:47:59 +0900
+Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
+ support
+In-Reply-To: <CAEC9eQPKC05C0uJr0eKEuG1eqWohYqV=2seWQtanRFryDgF0ng@mail.gmail.com>
+References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
+ <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
+ <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
+ <54914D7D.9060108@collabora.co.uk>
+ <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
+ <CAEC9eQPKC05C0uJr0eKEuG1eqWohYqV=2seWQtanRFryDgF0ng@mail.gmail.com>
+Message-ID: <54A7909F.1070308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 2015? 01? 02? 22:14, Ajay kumar wrote:
+> Hi Daniel,
+> 
+> This series is sitting out there since long without any ACKs.
+> If people can ACK this series, I am ready to rebase and send ASAP.
 
-2015-01-03 9:23 GMT+09:00 Tony Lindgren <tony@atomide.com>:
-> * Nishanth Menon <nm@ti.com> [150102 11:50]:
->> On 01/02/2015 12:46 PM, santosh.shilimkar at oracle.com wrote:
->> > On 1/2/15 9:43 AM, Nishanth Menon wrote:
->> >> Hi,
->> >> OMAP4 and AM437x ROM code provides services to program PL310's latency
->> >> registers and AM437x provides service for programming Address filter
->> >> registers.
->> >>
->> >> Provide support in the kernel for the same.
->> >>
->> >> V2 of the series contains documentation update and a bug fix due to a
->> >> typo introduced during patch split :(
->> >>
->> >> Nishanth Menon (2):
->> >>    ARM: l2c: OMAP4/AM437x: Introduce support for cache latency
->> >>      programming
->> >>    ARM: l2c: AM437x: Introduce support for cache filter programming
->> >>
->> > Looks fine to me ...
->> > Feel free to add my ack if you need one ...
->> >
->> > Minor: The subject looks like I2C though it is L2C ;-)
->> >
->> Yeah, the thought did occur to me, but decided instead to go with the
->> existing $subject conventions of arch/arm/mach-omap2/omap4-common.c
->> ARM: l2c: omap2+: get rid of init call
->> ARM: l2c: omap2+: get rid of redundant cache replacement policy setting
->> ARM: l2c: omap2: remove explicit non-secure access bits
->> ARM: l2c: omap2: remove cache size override
->> ARM: l2c: omap2: remove explicit SMI calls to enable L2 cache
->> ARM: l2c: omap2: implement new write_sec method
->> ARM: l2c: remove platforms/SoCs setting early BRESP
->> ARM: l2c: fix register naming
->> ARM: l2c: omap2: remove ES1.0 support
+Acked-by: Inki Dae <inki.dae@samsung.com>
+
+And, for [PATCH V8 5/14] drm/exynos: dp: support drm_bridge,
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+
+Thanks,
+Inki Dae
+
+> 
+> Regards,
+> Ajay Kumar
+> 
+> On Fri, Jan 2, 2015 at 6:40 PM, Daniel Stone <daniel@fooishbar.org> wrote:
+>> Hi Ajay,
 >>
->> ..
+>> On 17 December 2014 at 09:31, Javier Martinez Canillas
+>> <javier.martinez@collabora.co.uk> wrote:
+>>>
+>>> On 12/16/2014 12:37 AM, Laurent Pinchart wrote:
+>>>>> You asked Ajay to change his series to use the video port and enpoints
+>>>>> DT
+>>>>> bindings instead of phandles, could you please review his latest
+>>>>> version?
+>>>>>
+>>>>> I guess is now too late for 3.19 since we are in the middle of the
+>>>>> merge
+>>>>> window but it would be great if this series can at least made it to
+>>>>> 3.20.
+>>>>
+>>>> I don't have time to review the series in details right now, but I'm
+>>>> happy
+>>>> with the DT bindings, and have no big issue with the rest of the
+>>>> patches. I
+>>>> don't really like the of_drm_find_bridge() concept introduced in 03/14
+>>>> but I
+>>>> won't nack it given lack of time to implement an alternative proposal.
+>>>> It's an
+>>>> internal API, it can always be reworked later anyway.
+>>>
+>>> Thanks a lot for taking the time to look at the DT bindings, then I guess
+>>> that the series are finally ready to be merged?
+>>>
+>>> Ajay's series don't apply cleanly anymore because it has been a while
+>>> since
+>>> he posted it but he can rebase on top of 3.19-rc1 once it is released and
+>>> re-resend.
 >>
->> If folks feel strongly about this, I can capitalize the same and post
->> a v3 to help confusing fonts on certain mail clients and terminals.
->> let me know if folks want me to.
->
-> I guess no need to :)
->
-> Looks like these still won't fix the issue we found in the
-> series posted by Tomasz though. At least I'm still getting errors
-> on am437x with these and the patches from Tomasz applied.
-
-Indeed, as I figured out in the original thread about this issue,
-additional patch fixing code unaffected by my series (besides changing
-the condition which triggers calling it) is necessary. Namely, the
-affected 4 registers need to be written using the write_sec wrapper,
-instead of using writel*() directly.
-
-Best regards,
-Tomasz
+>>
+>> Do you have any plans to rebase this so it's ready for merging?
+>>
+>> Thierry, Daniel, Dave - whose tree would this be best to merge through?
+>>
+>> Cheers,
+>> Daniel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
