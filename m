@@ -1,26 +1,65 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Mon, 05 Jan 2015 10:08:22 +1030
-Subject: [PATCH] linux/kernel.h: merge ARRAY_AND_SIZE defines
-In-Reply-To: <549AC776.8090905@linaro.org>
-References: <1419399496-5955-1-git-send-email-yamada.m@jp.panasonic.com>
- <1419399879.6157.9.camel@perches.com> <549AC776.8090905@linaro.org>
-Message-ID: <87sifqp15d.fsf@rustcorp.com.au>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat,  3 Jan 2015 16:27:34 +0800
+Subject: [PATCH V3 00/10] ARM: sirf: drop CSR marco and add atlas7 platform
+Message-ID: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alex Elder <elder@linaro.org> writes:
-> On 12/23/2014 11:44 PM, Joe Perches wrote:
->> On Wed, 2014-12-24 at 14:38 +0900, Masahiro Yamada wrote:
->>> ARRAY_AND_SIZE is a useful macro.  Its definition is already
->>> duplicated in some headers.  Move it to include/linux/kernel.h.
->> 
->> I think it's not a good/useful macro and
->> would prefer the uses expanded instead.
->
-> For what it's worth, I agree.	-Alex
+From: Barry Song <Baohua.Song@csr.com>
 
-Me too.  It's fine in current usage, but I wouldn't want to see
-more of it.
+this patchset drops MARCO as it is not supported any more. its 
+replacement is atlas7.
+some IPs from marco are moved to atlas7, for example timer. for this 
+kind of IPs, we rename to atlas7. some IPs need some change for 
+atlas7, such as platsmp, we break marco and move to atlas7 directly.
 
-Cheers,
-Rusty.
+the patchset add debug ports, machine and devicetree for the new atlas7.
+
+-v3:
+ split DEBUG_LL patch to two patches(one for adding ports, the other
+  for moving to debug_ll_io_init);
+ add ack of Arnd Bergmann <arnd@arndb.de> for all;
+ add ack of Daniel Lezcano <daniel.lezcano@linaro.org> for clocksource;
+
+Barry Song (6):
+  ARM: sirf: drop MARCO low-level debug port
+  ARM: dts: drop MARCO platform DT stuff
+  ARM: sirf: drop MARCO support in reset controller module
+  ARM: sirf: drop MARCO machine
+  ARM: sirf: move to debug_ll_io_init and drop map_io
+  clocksource: marco: rename marco to atlas7
+
+Guo Zeng (1):
+  ARM: sirf: add two debug ports for CSRatlas7 SoC
+
+Zhiwu Song (3):
+  ARM: sirf: move platsmp to support atlas7 SoC
+  ARM: sirf: add atlas7 machine support
+  ARM: dts: add init dts file for CSR atlas7 SoC
+
+ Documentation/devicetree/bindings/arm/sirf.txt     |   6 +-
+ arch/arm/Kconfig.debug                             |  37 +-
+ arch/arm/boot/dts/Makefile                         |   2 +-
+ arch/arm/boot/dts/atlas7-evb.dts                   | 110 +++
+ arch/arm/boot/dts/atlas7.dtsi                      | 813 +++++++++++++++++++++
+ arch/arm/boot/dts/marco-evb.dts                    |  54 --
+ arch/arm/boot/dts/marco.dtsi                       | 757 -------------------
+ arch/arm/include/debug/sirf.S                      |  30 +-
+ arch/arm/mach-prima2/Kconfig                       |  22 +-
+ arch/arm/mach-prima2/common.c                      |  22 +-
+ arch/arm/mach-prima2/lluart.c                      |  35 -
+ arch/arm/mach-prima2/platsmp.c                     |  52 +-
+ arch/arm/mach-prima2/rstc.c                        |  41 +-
+ arch/arm/mach-prima2/rtciobrg.c                    |   1 -
+ drivers/clocksource/Makefile                       |   2 +-
+ .../clocksource/{timer-marco.c => timer-atlas7.c}  |  15 +-
+ 16 files changed, 1021 insertions(+), 978 deletions(-)
+ create mode 100644 arch/arm/boot/dts/atlas7-evb.dts
+ create mode 100644 arch/arm/boot/dts/atlas7.dtsi
+ delete mode 100644 arch/arm/boot/dts/marco-evb.dts
+ delete mode 100644 arch/arm/boot/dts/marco.dtsi
+ delete mode 100644 arch/arm/mach-prima2/lluart.c
+ rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
+
+-- 
+2.2.1
