@@ -1,222 +1,174 @@
-From: rickard_strandqvist@spectrumdigital.se (Rickard Strandqvist)
-Date: Sat,  3 Jan 2015 01:37:43 +0100
-Subject: [PATCH v2] arch: arm: mach-omap2: voltage: Remove some unused
- functions
-Message-ID: <1420245463-5511-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Sat, 3 Jan 2015 08:01:29 +0530
+Subject: [PATCH v7] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <20150102105008.GA31364@pd.tnic>
+References: <d71411fd1be84d99af5936138cbcc9c7@BL2FFO11FD014.protection.gbl>
+ <20150102105008.GA31364@pd.tnic>
+Message-ID: <CAGnW=BbrpMoMGSVmFXUAYsnyOPGpkz=HbL6mRzB7PqRhbq5HTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removes some functions that are not used anywhere:
-omap_change_voltscale_method() voltdm_add_pwrdm()
-voltdm_for_each() voltdm_for_each_pwrdm()
+On Fri, Jan 2, 2015 at 4:20 PM, Borislav Petkov <bp@alien8.de> wrote:
+> On Fri, Jan 02, 2015 at 09:52:20AM +0530, Punnaiah Choudary Kalluri wrote:
+>> +/**
+>> + * synps_edac_handle_error - Handle controller error types CE and UE
+>> + * @mci:     Pointer to the edac memory controller instance
+>> + * @p:               Pointer to the synopsys ecc status structure
+>> + *
+>> + * Handles the controller ECC correctable and un correctable error.
+>> + */
+>> +static void synps_edac_handle_error(struct mem_ctl_info *mci,
+>> +                                 struct synps_ecc_status *p)
+>> +{
+>> +     char message[SYNPS_EDAC_MSG_SIZE];
+>
+> This is still on the stack. My previous comment:
+>
+> "You could preallocate this on driver init so you don't do relatively
+> big stack allocations on the error reporting path and remain lean."
 
-And remove define VOLTSCALE_VPFORCEUPDATE and VOLTSCALE_VCBYPASS
+Oh. sorry its my mistake. I will update
 
-This was partially found by using a static code analysis program called cppcheck.
+>
+>> +     struct ecc_error_info *pinf;
+>> +
+>> +     if (p->ce_cnt) {
+>> +             pinf = &p->ceinfo;
+>> +             snprintf(message, SYNPS_EDAC_MSG_SIZE,
+>> +                      "DDR ECC error type :%s Row %d Bank %d Col %d ",
+>> +                      "CE", pinf->row, pinf->bank, pinf->col);
+>> +             edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+>> +                                  p->ce_cnt, 0, 0, 0, 0, 0, -1,
+>> +                                  message, "");
+>> +     }
+>> +
+>> +     if (p->ue_cnt) {
+>> +             pinf = &p->ueinfo;
+>> +             snprintf(message, SYNPS_EDAC_MSG_SIZE,
+>> +                      "DDR ECC error type :%s Row %d Bank %d Col %d ",
+>> +                      "UE", pinf->row, pinf->bank, pinf->col);
+>> +             edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
+>> +                                  p->ue_cnt, 0, 0, 0, 0, 0, -1,
+>> +                                  message, "");
+>> +     }
+>
+> From the previous review:
+>
+> "If you memset(p, 0,...) here, after consumption, you don't need to do
+> it anywhere else and be sure that *p would be always clean and ready for
+> the next error."
 
-Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
----
- arch/arm/mach-omap2/powerdomain.c |    1 -
- arch/arm/mach-omap2/voltage.c     |  110 -------------------------------------
- arch/arm/mach-omap2/voltage.h     |   13 -----
- 3 files changed, 124 deletions(-)
+p is pointing to the stack memory. so, if we do memset after consumption, then
+it will not guarantee that next time we will get the clean memory.
+Here i am clearing
+this memory only when the controller reports error and before
+consumption by the edac
+core to ensure that there is no garbage data.
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 7fb033e..20fae59 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -115,7 +115,6 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	}
- 	pwrdm->voltdm.ptr = voltdm;
- 	INIT_LIST_HEAD(&pwrdm->voltdm_node);
--	voltdm_add_pwrdm(voltdm, pwrdm);
- skip_voltdm:
- 	spin_lock_init(&pwrdm->_lock);
- 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 3783b86..cba8cad 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -224,37 +224,6 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- }
- 
- /**
-- * omap_change_voltscale_method() - API to change the voltage scaling method.
-- * @voltdm:	pointer to the VDD whose voltage scaling method
-- *		has to be changed.
-- * @voltscale_method:	the method to be used for voltage scaling.
-- *
-- * This API can be used by the board files to change the method of voltage
-- * scaling between vpforceupdate and vcbypass. The parameter values are
-- * defined in voltage.h
-- */
--void omap_change_voltscale_method(struct voltagedomain *voltdm,
--				  int voltscale_method)
--{
--	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warn("%s: VDD specified does not exist!\n", __func__);
--		return;
--	}
--
--	switch (voltscale_method) {
--	case VOLTSCALE_VPFORCEUPDATE:
--		voltdm->scale = omap_vp_forceupdate_scale;
--		return;
--	case VOLTSCALE_VCBYPASS:
--		voltdm->scale = omap_vc_bypass_scale;
--		return;
--	default:
--		pr_warn("%s: Trying to change the method of voltage scaling to an unsupported one!\n",
--			__func__);
--	}
--}
--
--/**
-  * omap_voltage_late_init() - Init the various voltage parameters
-  *
-  * This API is to be called in the later stages of the
-@@ -316,90 +285,11 @@ static struct voltagedomain *_voltdm_lookup(const char *name)
- 	return voltdm;
- }
- 
--/**
-- * voltdm_add_pwrdm - add a powerdomain to a voltagedomain
-- * @voltdm: struct voltagedomain * to add the powerdomain to
-- * @pwrdm: struct powerdomain * to associate with a voltagedomain
-- *
-- * Associate the powerdomain @pwrdm with a voltagedomain @voltdm.  This
-- * enables the use of voltdm_for_each_pwrdm().  Returns -EINVAL if
-- * presented with invalid pointers; -ENOMEM if memory could not be allocated;
-- * or 0 upon success.
-- */
--int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
--{
--	if (!voltdm || !pwrdm)
--		return -EINVAL;
--
--	pr_debug("voltagedomain: %s: associating powerdomain %s\n",
--		 voltdm->name, pwrdm->name);
--
--	list_add(&pwrdm->voltdm_node, &voltdm->pwrdm_list);
--
--	return 0;
--}
--
--/**
-- * voltdm_for_each_pwrdm - call function for each pwrdm in a voltdm
-- * @voltdm: struct voltagedomain * to iterate over
-- * @fn: callback function *
-- *
-- * Call the supplied function @fn for each powerdomain in the
-- * voltagedomain @voltdm.  Returns -EINVAL if presented with invalid
-- * pointers; or passes along the last return value of the callback
-- * function, which should be 0 for success or anything else to
-- * indicate failure.
-- */
--int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
--			  int (*fn)(struct voltagedomain *voltdm,
--				    struct powerdomain *pwrdm))
--{
--	struct powerdomain *pwrdm;
--	int ret = 0;
--
--	if (!fn)
--		return -EINVAL;
--
--	list_for_each_entry(pwrdm, &voltdm->pwrdm_list, voltdm_node)
--		ret = (*fn)(voltdm, pwrdm);
--
--	return ret;
--}
--
--/**
-- * voltdm_for_each - call function on each registered voltagedomain
-- * @fn: callback function *
-- *
-- * Call the supplied function @fn for each registered voltagedomain.
-- * The callback function @fn can return anything but 0 to bail out
-- * early from the iterator.  Returns the last return value of the
-- * callback function, which should be 0 for success or anything else
-- * to indicate failure; or -EINVAL if the function pointer is null.
-- */
--int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
--		    void *user)
--{
--	struct voltagedomain *temp_voltdm;
--	int ret = 0;
--
--	if (!fn)
--		return -EINVAL;
--
--	list_for_each_entry(temp_voltdm, &voltdm_list, node) {
--		ret = (*fn)(temp_voltdm, user);
--		if (ret)
--			break;
--	}
--
--	return ret;
--}
--
- static int _voltdm_register(struct voltagedomain *voltdm)
- {
- 	if (!voltdm || !voltdm->name)
- 		return -EINVAL;
- 
--	INIT_LIST_HEAD(&voltdm->pwrdm_list);
- 	list_add(&voltdm->node, &voltdm_list);
- 
- 	pr_debug("voltagedomain: registered %s\n", voltdm->name);
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index f7f2879..e645503 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -23,10 +23,6 @@
- 
- struct powerdomain;
- 
--/* XXX document */
--#define VOLTSCALE_VPFORCEUPDATE		1
--#define VOLTSCALE_VCBYPASS		2
--
- /*
-  * OMAP3 GENERIC setup times. Revisit to see if these needs to be
-  * passed from board or PMIC file
-@@ -55,7 +51,6 @@ struct omap_vfsm_instance {
-  * @name: Name of the voltage domain which can be used as a unique identifier.
-  * @scalable: Whether or not this voltage domain is scalable
-  * @node: list_head linking all voltage domains
-- * @pwrdm_list: list_head linking all powerdomains in this voltagedomain
-  * @vc: pointer to VC channel associated with this voltagedomain
-  * @vp: pointer to VP associated with this voltagedomain
-  * @read: read a VC/VP register
-@@ -71,7 +66,6 @@ struct voltagedomain {
- 	char *name;
- 	bool scalable;
- 	struct list_head node;
--	struct list_head pwrdm_list;
- 	struct omap_vc_channel *vc;
- 	const struct omap_vfsm_instance *vfsm;
- 	struct omap_vp_instance *vp;
-@@ -163,8 +157,6 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
- 		unsigned long volt);
- int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- 			       struct omap_voltdm_pmic *pmic);
--void omap_change_voltscale_method(struct voltagedomain *voltdm,
--		int voltscale_method);
- int omap_voltage_late_init(void);
- 
- extern void omap2xxx_voltagedomains_init(void);
-@@ -175,11 +167,6 @@ extern void omap54xx_voltagedomains_init(void);
- struct voltagedomain *voltdm_lookup(const char *name);
- void voltdm_init(struct voltagedomain **voltdm_list);
- int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm);
--int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
--		    void *user);
--int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
--			  int (*fn)(struct voltagedomain *voltdm,
--				    struct powerdomain *pwrdm));
- int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
- void voltdm_reset(struct voltagedomain *voltdm);
- unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
--- 
-1.7.10.4
+here is the call stack
+
+int synps_edac_geterror_info(void __iomem *base,
+                                            struct synps_ecc_status *p)
+
+{
+            ...
+            regval = readl(base + STAT_OFST);
+             if (!regval)
+                 return 1;
+
+             memset(p, 0, sizeof(*p));
+           ...
+}
+
+
+static void synps_edac_check(struct mem_ctl_info *mci) {
+            struct synps_ecc_status stat;
+       ...
+       status = synps_edac_geterror_info(priv->baseaddr, &stat);
+       ...
+       synps_edac_handle_error(mci, &stat);
+      ...
+}
+
+
+>
+> Looks like you've missed those two points.
+>
+>> +static int synps_edac_mc_probe(struct platform_device *pdev)
+>> +{
+>> +     struct mem_ctl_info *mci;
+>> +     struct edac_mc_layer layers[2];
+>> +     struct synps_edac_priv *priv;
+>> +     int rc;
+>> +     struct resource *res;
+>> +     void __iomem *baseaddr;
+>> +
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     baseaddr = devm_ioremap_resource(&pdev->dev, res);
+>> +     if (IS_ERR(baseaddr))
+>> +             return PTR_ERR(baseaddr);
+>> +
+>> +     if (!synps_edac_get_eccstate(baseaddr)) {
+>> +             edac_printk(KERN_INFO, EDAC_MC, "ECC not enabled\n");
+>> +             return -ENXIO;
+>> +     }
+>> +
+>> +     layers[0].type = EDAC_MC_LAYER_CHIP_SELECT;
+>> +     layers[0].size = SYNPS_EDAC_NR_CSROWS;
+>> +     layers[0].is_virt_csrow = true;
+>> +     layers[1].type = EDAC_MC_LAYER_CHANNEL;
+>> +     layers[1].size = SYNPS_EDAC_NR_CHANS;
+>> +     layers[1].is_virt_csrow = false;
+>> +
+>> +     mci = edac_mc_alloc(0, ARRAY_SIZE(layers), layers,
+>> +                         sizeof(struct synps_edac_priv));
+>> +     if (!mci) {
+>> +             edac_printk(KERN_ERR, EDAC_MC,
+>> +                         "Failed memory allocation for mc instance\n");
+>> +             return -ENOMEM;
+>> +     }
+>> +
+>> +     priv = mci->pvt_info;
+>> +     priv->baseaddr = baseaddr;
+>> +     rc = synps_edac_mc_init(mci, pdev);
+>> +     if (rc) {
+>> +             edac_printk(KERN_ERR, EDAC_MC,
+>> +                         "Failed to initialize instance\n");
+>> +             goto free_edac_mc;
+>> +     }
+>> +
+>> +     rc = edac_mc_add_mc(mci);
+>> +     if (rc) {
+>> +             edac_printk(KERN_ERR, EDAC_MC,
+>> +                         "Failed to register with EDAC core\n");
+>> +             goto free_edac_mc;
+>> +     }
+>
+> With all the more or less redundant commenting in this driver, the *one*
+> line which definitely needs a comment is without one:
+>
+>         /*
+>          * Start capturing the correctable and uncorrectable errors. A write of
+>          * 0 starts the counters.
+>          */
+
+Ok.
+
+Thanks,
+Punnaiah
+>> +     writel(0x0, baseaddr + ECC_CTRL_OFST);
+>> +     return rc;
+>> +
+>> +free_edac_mc:
+>> +     edac_mc_free(mci);
+>> +
+>> +     return rc;
+>> +}
+>
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> Sent from a fat crate under my desk. Formatting is fine.
+> --
