@@ -1,95 +1,96 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sat,  3 Jan 2015 16:27:41 +0800
-Subject: [PATCH V3 07/10] ARM: sirf: move to debug_ll_io_init and drop map_io
+Date: Sat,  3 Jan 2015 16:27:42 +0800
+Subject: [PATCH V3 08/10] ARM: sirf: add atlas7 machine support
 In-Reply-To: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
 References: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1420273664-10438-8-git-send-email-21cnbao@gmail.com>
+Message-ID: <1420273664-10438-9-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+From: Zhiwu Song <Zhiwu.Song@csr.com>
 
-this patch moves to debug_ll_io_init(), then finally drops CSR map_io()
-machine callbacks.
+atlas7 is next-gen auto soc from CSR.
+It could bring to customers most integrated SoC solution:
+- World leading Bluetooth 4.0 and GNSS baseband
+- Audio processing, analog CODEC and ADC by DSP
+- Analog video input
+- SDR accelerators
+- CAN bus support by Cortex-M3
 
+Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-prima2/common.c |  7 -------
- arch/arm/mach-prima2/lluart.c | 33 ---------------------------------
- 2 files changed, 40 deletions(-)
- delete mode 100644 arch/arm/mach-prima2/lluart.c
+ Documentation/devicetree/bindings/arm/sirf.txt |  4 ++++
+ arch/arm/mach-prima2/Kconfig                   | 13 ++++++++++++-
+ arch/arm/mach-prima2/common.c                  | 13 +++++++++++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/arm/sirf.txt b/Documentation/devicetree/bindings/arm/sirf.txt
+index 9daa1c1..7b28ee6 100644
+--- a/Documentation/devicetree/bindings/arm/sirf.txt
++++ b/Documentation/devicetree/bindings/arm/sirf.txt
+@@ -3,5 +3,9 @@ CSR SiRFprimaII and SiRFmarco device tree bindings.
+ 
+ Required root node properties:
+     - compatible:
++    - "sirf,atlas6-cb" : atlas6 "cb" evaluation board
++    - "sirf,atlas6" : atlas6 device based board
++    - "sirf,atlas7-cb" : atlas7 "cb" evaluation board
++    - "sirf,atlas7" : atlas7 device based board
+     - "sirf,prima2-cb" : prima2 "cb" evaluation board
+     - "sirf,prima2" : prima2 device based board
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index cc1c323..a219dc3 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -11,7 +11,7 @@ menuconfig ARCH_SIRF
+ 
+ if ARCH_SIRF
+ 
+-comment "CSR SiRF atlas6/primaII/Marco/Polo Specific Features"
++comment "CSR SiRF atlas6/primaII/Atlas7 Specific Features"
+ 
+ config ARCH_ATLAS6
+ 	bool "CSR SiRFSoC ATLAS6 ARM Cortex A9 Platform"
+@@ -20,6 +20,17 @@ config ARCH_ATLAS6
+ 	help
+           Support for CSR SiRFSoC ARM Cortex A9 Platform
+ 
++config ARCH_ATLAS7
++	bool "CSR SiRFSoC ATLAS7 ARM Cortex A7 Platform"
++	default y
++	select ARM_GIC
++	select CPU_V7
++	select HAVE_ARM_SCU if SMP
++	select HAVE_SMP
++	select SMP_ON_UP if SMP
++	help
++          Support for CSR SiRFSoC ARM Cortex A7 Platform
++
+ config ARCH_PRIMA2
+ 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+ 	default y
 diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index a20b8d4..c62ff68 100644
+index c62ff68..0c819bb 100644
 --- a/arch/arm/mach-prima2/common.c
 +++ b/arch/arm/mach-prima2/common.c
-@@ -20,11 +20,6 @@ static void __init sirfsoc_init_late(void)
- 	sirfsoc_pm_init();
- }
- 
--static __init void sirfsoc_map_io(void)
--{
--	sirfsoc_map_lluart();
--}
--
- #ifdef CONFIG_ARCH_ATLAS6
- static const char *atlas6_dt_match[] __initconst = {
- 	"sirf,atlas6",
-@@ -35,7 +30,6 @@ DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.map_io         = sirfsoc_map_io,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = atlas6_dt_match,
- MACHINE_END
-@@ -51,7 +45,6 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--	.map_io         = sirfsoc_map_io,
- 	.dma_zone_size	= SZ_256M,
- 	.init_late	= sirfsoc_init_late,
+@@ -50,3 +50,16 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
  	.dt_compat      = prima2_dt_match,
-diff --git a/arch/arm/mach-prima2/lluart.c b/arch/arm/mach-prima2/lluart.c
-deleted file mode 100644
-index 20453c1..0000000
---- a/arch/arm/mach-prima2/lluart.c
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Static memory mapping for DEBUG_LL
-- *
-- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-- *
-- * Licensed under GPLv2 or later.
-- */
--
--#include <linux/kernel.h>
--#include <asm/page.h>
--#include <asm/mach/map.h>
--#include "common.h"
--
--#if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
--#define SIRFSOC_UART1_PA_BASE          0xb0060000
--#else
--#define SIRFSOC_UART1_PA_BASE          0
--#endif
--
--#define SIRFSOC_UART1_VA_BASE          SIRFSOC_VA(0x060000)
--#define SIRFSOC_UART1_SIZE		SZ_4K
--
--void __init sirfsoc_map_lluart(void)
--{
--	struct map_desc sirfsoc_lluart_map = {
--		.virtual        = SIRFSOC_UART1_VA_BASE,
--		.pfn            = __phys_to_pfn(SIRFSOC_UART1_PA_BASE),
--		.length         = SIRFSOC_UART1_SIZE,
--		.type           = MT_DEVICE,
--	};
--
--	iotable_init(&sirfsoc_lluart_map, 1);
--}
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_ARCH_ATLAS7
++static const char *atlas7_dt_match[] __initdata = {
++	"sirf,atlas7",
++	NULL
++};
++
++DT_MACHINE_START(ATLAS7_DT, "Generic ATLAS7 (Flattened Device Tree)")
++	/* Maintainer: Barry Song <baohua.song@csr.com> */
++	.smp            = smp_ops(sirfsoc_smp_ops),
++	.dt_compat      = atlas7_dt_match,
++MACHINE_END
++#endif
 -- 
 2.2.1
