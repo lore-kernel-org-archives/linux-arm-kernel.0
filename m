@@ -1,46 +1,76 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 3 Jan 2015 20:28:28 +0000 (UTC)
-Subject: OMAP baseline test results for v3.19-rc1
-In-Reply-To: <8629693.mvYldWiixb@wuerfel>
-References: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
- <8629693.mvYldWiixb@wuerfel>
-Message-ID: <alpine.DEB.2.02.1501031955170.27058@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 03 Jan 2015 22:37:09 +0100
+Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <54A71CD1.4070107@ti.com>
+References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
+ <CAL_Jsq+krOUA3BPvMCdaOBhALoi+pzWbw3YndXqR8x52OJogZg@mail.gmail.com>
+ <54A71CD1.4070107@ti.com>
+Message-ID: <2019516.ehiuEv0rdL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 3 Jan 2015, Arnd Bergmann wrote:
-
-> On Saturday 03 January 2015 07:21:49 Paul Walmsley wrote:
-> > Another ~300KB kernel object size increase for omap2plus_defconfig 
-> > kernels.
+On Friday 02 January 2015 17:33:53 Murali Karicheri wrote:
 > 
-> 300kb seems like a lot for a single release. 
+> I have no experience with IOMMU and may not offer much help here as I 
+> originally wrote above. Will Deacon has added this API and probably able 
+> to offer some help in this discussion.
+> 
+> Will Deacon,
+> 
+> Any comment?
 
-+300KB is high, but not exceptionally so.
+It's complicated :(
 
-The data, since I started keeping track of it, is below.  The last numeric 
-column represents the total kernel object size delta in bytes.
+> Looking at the iommu documentation and of_iommu.c, I get a feeling that 
+> this API is not really used at present as there are no callers of 
+> of_iommu_set_ops() and I assume this is a WIP.
 
-> Have you looked into where this is coming from?
+Right, but we have patches for some iommu drivers based on this API,
+and we should migrate all of them eventually.
 
-I have not.
+> I believe the way it is 
+> expected to work is to have the iommu driver of the master IOMMU devices 
+> call of_iommu_set_ops(). The device node of this master IOMMU device is 
+> specified as a phandle in the OF node of the device (various bus devices 
+> such as platform, PCI etc). This allow to retrieve the iommu ops though 
+> the of_iommu_configure() API and use it in arch_setup_dma_ops(). So my 
+> gut feeling is that for PCI devices, as there are no DT node, the root 
+> bus node may specify iommus phandle to IOMMU master OF nodes.
 
+Yes, but we also need to pass a PCI device specific identifier along
+with the root bus node, because some iommu drivers take the PCI
+bus/device/function number into account for creating per-function
+i/o page tables.
 
-- Paul
+> W.r.t your comment "We may want to address the comment in
+> of_iommu_configure about parent nodes. We should be sure these changes 
+> work with how we would do searching parent nodes",
+> 
+> I believe, the parent node search itself should work the same way in the 
+> case of PCI as with platform bus case. PCI's case, we are providing the 
+> OF node of the root bus host bridge. Why should this be any different in 
+> terms of search?
+> 
+> I see a potential issue with dma-ranges as described in the notes below.
+> As noted below the usage of dma-range for iommu is to be determined. For 
+> keystone, the of_iommu_configure() always return false as we don't use 
+> the iommu. But don't know if this has any consequences for other 
+> platforms. Or I got your questions wrong. Any help here from others on 
+> the list?
+> 
+> ========================================================================
+> One possible extension to the above is to use an "iommus" property along 
+> with a "dma-ranges" property in a bus device node (such as PCI host 
+> bridges). This can be useful to describe how children on the bus relate 
+> to the IOMMU if they are not explicitly listed in the device tree (e.g. 
+> PCI devices). However, the requirements of that use-case haven't been 
+> fully determined yet. Implementing this is therefore not recommended 
+> without further discussion and extension of this binding.
+> =========================================================================
 
+This probably won't ever apply to PCI devices, so let's ignore it for now.
+For the moment (and for PCI), we should assume that we either configure
+an iommu directly or we use dma-ranges if no iommu is in use.
 
-http://www.pwsan.com/omap/testlogs/
-
-test_v3.7-rc1/20121017205513/build/size.txt:+128332   -67728    +2144   +62748  omap2plus_defconfig
-test_v3.8-rc1/20121228031713/build/size.txt:+168843   +25288     +900  +195031  omap2plus_defconfig
-test_v3.9-rc1/20130312100243/build/size.txt:+195310   +37968    +1364  +234642  omap2plus_defconfig
-test_v3.10-rc1/20130518212204/build/size.txt: -59854   -98552   +37136  -121270  omap2plus_defconfig
-test_v3.11-rc1/20130721020309/build/size.txt:+159173    -2456    +1680  +158397  omap2plus_defconfig
-test_v3.12-rc1/20130922202452/build_z/size.txt:+237402   +47344     +760  +285506  omap2plus_defconfig
-test_v3.13-rc1/20131208173326/build_z/size.txt:-276029    -5584    +5008  -276605  omap2plus_defconfig
-test_v3.14-rc1/20140210035354/build_z/size.txt: +94801   -17448    -9016   +68337  omap2plus_defconfig
-test_v3.15-rc1/20140421113253/build_z/size.txt: +30722   +11392    +4312   +46426  omap2plus_defconfig
-test_v3.16-rc1/20140629224344/build_z/size.txt:+133191   +20776  +2750728  +2904695  omap2plus_defconfig
-test_v3.17-rc1/20140821122707/build_z/size.txt: +54469   -34424    +1728   +21773  omap2plus_defconfig
-test_v3.18-rc1/20141020095901/build_z/size.txt:+677950   +32008   +54408  +764366  omap2plus_defconfig
-test_v3.19-rc1/20150102151849/build_z/size.txt:+297698    +9648    -4528  +302818  omap2plus_defconfig
+	Arnd
