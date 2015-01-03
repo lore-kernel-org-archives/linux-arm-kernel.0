@@ -1,136 +1,170 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sat,  3 Jan 2015 16:27:39 +0800
-Subject: [PATCH V3 05/10] ARM: sirf: move platsmp to support atlas7 SoC
+Date: Sat,  3 Jan 2015 16:27:40 +0800
+Subject: [PATCH V3 06/10] ARM: sirf: add two debug ports for CSRatlas7 SoC
 In-Reply-To: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
 References: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1420273664-10438-6-git-send-email-21cnbao@gmail.com>
+Message-ID: <1420273664-10438-7-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhiwu Song <Zhiwu.Song@csr.com>
+From: Guo Zeng <Guo.Zeng@csr.com>
 
-this patch breaks marco SMP support, but marco project has been dropped.
-so its correct cpu1 jump/flag address for atlas7 and remove scu related
-logic as scu doesn't expose in cortex-a7.
+this patch adds UART0 and UART1 as LLUART port, as the new atlas7
+registers layout are different, it also refines some names of old
+hard-coded MARCOs and uses CONFIG_DEBUG_UART_PHYS/DEBUG_UART_VIRT
+to define different base addresses for multiple ports.
 
+Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
 Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-prima2/common.c  |  1 -
- arch/arm/mach-prima2/platsmp.c | 52 +++++++++++-------------------------------
- 2 files changed, 13 insertions(+), 40 deletions(-)
+ arch/arm/Kconfig.debug        | 36 +++++++++++++++++++++++++++++++++---
+ arch/arm/include/debug/sirf.S | 28 +++++++++++++---------------
+ 2 files changed, 46 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index bc53cc4..a20b8d4 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -23,7 +23,6 @@ static void __init sirfsoc_init_late(void)
- static __init void sirfsoc_map_io(void)
- {
- 	sirfsoc_map_lluart();
--	sirfsoc_map_scu();
- }
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index e0a3cc9..1edfb86 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -916,10 +916,29 @@ choice
+ 	config DEBUG_SIRFPRIMA2_UART1
+ 		bool "Kernel low-level debugging messages via SiRFprimaII UART1"
+ 		depends on ARCH_PRIMA2
++		select DEBUG_SIRFSOC_UART
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the uart1 port on SiRFprimaII devices.
  
- #ifdef CONFIG_ARCH_ATLAS6
-diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
-index 335c12e..fc2b03c 100644
---- a/arch/arm/mach-prima2/platsmp.c
-+++ b/arch/arm/mach-prima2/platsmp.c
-@@ -20,30 +20,10 @@
++	config DEBUG_SIRFATLAS7_UART0
++		bool "Kernel low-level debugging messages via SiRFatlas7 UART0"
++		depends on ARCH_ATLAS7
++		select DEBUG_SIRFSOC_UART
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the uart0 port on SiRFATLAS7 devices.The uart0
++		  is used on SiRFATLAS7 as a extra debug port.sometimes an extra
++		  debug port can be very useful.
++
++	config DEBUG_SIRFATLAS7_UART1
++		bool "Kernel low-level debugging messages via SiRFatlas7 UART1"
++		depends on ARCH_ATLAS7
++		select DEBUG_SIRFSOC_UART
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the uart1 port on SiRFATLAS7 devices.
++
+ 	config STIH41X_DEBUG_ASC2
+ 		bool "Use StiH415/416 ASC2 UART for low-level debug"
+ 		depends on ARCH_STI
+@@ -1154,6 +1173,10 @@ config DEBUG_STI_UART
+ 	bool
+ 	depends on ARCH_STI
  
- #include "common.h"
++config DEBUG_SIRFSOC_UART
++	bool
++	depends on ARCH_SIRF
++
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/sa1100.S" if DEBUG_SA1100
+@@ -1188,7 +1211,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+ 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+-	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1
++	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
+ 	default "debug/sti.S" if DEBUG_STI_UART
+ 	default "debug/tegra.S" if DEBUG_TEGRA_UART
+ 	default "debug/ux500.S" if DEBUG_UX500_UART
+@@ -1305,6 +1328,9 @@ config DEBUG_UART_PHYS
+ 	default 0xfff36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfffe8600 if DEBUG_UART_BCM63XX
+ 	default 0xfffff700 if ARCH_IOP33X
++	default 0xb0060000 if DEBUG_SIRFPRIMA2_UART1
++	default 0x18010000 if DEBUG_SIRFATLAS7_UART0
++	default 0x18020000 if DEBUG_SIRFATLAS7_UART1
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+@@ -1313,7 +1339,8 @@ config DEBUG_UART_PHYS
+ 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
+ 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
+ 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
+-		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART
++		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
++		DEBUG_SIRFSOC_UART
  
--static void __iomem *scu_base;
--static void __iomem *rsc_base;
-+static void __iomem *clk_base;
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1387,11 +1414,14 @@ config DEBUG_UART_VIRT
+ 	default 0xfef36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfefff700 if ARCH_IOP33X
+ 	default 0xff003000 if DEBUG_U300_UART
++	default 0xfec60000 if DEBUG_SIRFPRIMA2_UART1
++	default 0xfec10000 if DEBUG_SIRFATLAS7_UART0
++	default 0xfec20000 if DEBUG_SIRFATLAS7_UART1
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
+-		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART
++		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || DEBUG_SIRFSOC_UART
  
- static DEFINE_SPINLOCK(boot_lock);
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+diff --git a/arch/arm/include/debug/sirf.S b/arch/arm/include/debug/sirf.S
+index 006ec9f..630f231 100644
+--- a/arch/arm/include/debug/sirf.S
++++ b/arch/arm/include/debug/sirf.S
+@@ -6,35 +6,33 @@
+  * Licensed under GPLv2 or later.
+  */
  
--static struct map_desc scu_io_desc __initdata = {
--	.length		= SZ_4K,
--	.type		= MT_DEVICE,
--};
--
--void __init sirfsoc_map_scu(void)
--{
--	unsigned long base;
--
--	/* Get SCU base */
--	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
--
--	scu_io_desc.virtual = SIRFSOC_VA(base);
--	scu_io_desc.pfn = __phys_to_pfn(base);
--	iotable_init(&scu_io_desc, 1);
--
--	scu_base = (void __iomem *)SIRFSOC_VA(base);
--}
--
- static void sirfsoc_secondary_init(unsigned int cpu)
- {
- 	/*
-@@ -60,8 +40,8 @@ static void sirfsoc_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
- }
+-#if defined(CONFIG_DEBUG_SIRFPRIMA2_UART1)
+-#define SIRFSOC_UART1_PA_BASE          0xb0060000
+-#else
+-#define SIRFSOC_UART1_PA_BASE          0
+-#endif
++#define SIRF_LLUART_TXFIFO_STATUS	0x0114
++#define SIRF_LLUART_TXFIFO_DATA	0x0118
  
--static struct of_device_id rsc_ids[]  = {
--	{ .compatible = "sirf,marco-rsc" },
-+static struct of_device_id clk_ids[]  = {
-+	{ .compatible = "sirf,atlas7-clkc" },
- 	{},
- };
+-#define SIRFSOC_UART1_VA_BASE		0xFEC60000
++#define SIRF_LLUART_TXFIFO_FULL                       (1 << 5)
  
-@@ -70,27 +50,27 @@ static int sirfsoc_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	unsigned long timeout;
- 	struct device_node *np;
+-#define SIRFSOC_UART_TXFIFO_STATUS	0x0114
+-#define SIRFSOC_UART_TXFIFO_DATA	0x0118
++#ifdef CONFIG_DEBUG_SIRFATLAS7_UART0
++#define SIRF_LLUART_TXFIFO_EMPTY			(1 << 8)
++#else
++#define SIRF_LLUART_TXFIFO_EMPTY			(1 << 6)
++#endif
  
--	np = of_find_matching_node(NULL, rsc_ids);
-+	np = of_find_matching_node(NULL, clk_ids);
- 	if (!np)
- 		return -ENODEV;
+-#define SIRFSOC_UART1_TXFIFO_FULL                       (1 << 5)
+-#define SIRFSOC_UART1_TXFIFO_EMPTY			(1 << 6)
  
--	rsc_base = of_iomap(np, 0);
--	if (!rsc_base)
-+	clk_base = of_iomap(np, 0);
-+	if (!clk_base)
- 		return -ENOMEM;
+ 	.macro	addruart, rp, rv, tmp
+-	ldr	\rp, =SIRFSOC_UART1_PA_BASE		@ physical
+-	ldr	\rv, =SIRFSOC_UART1_VA_BASE		@ virtual
++	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ physical
++	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ virtual
+ 	.endm
  
- 	/*
--	 * write the address of secondary startup into the sram register
--	 * at offset 0x2C, then write the magic number 0x3CAF5D62 to the
--	 * RSC register at offset 0x28, which is what boot rom code is
-+	 * write the address of secondary startup into the clkc register
-+	 * at offset 0x2bC, then write the magic number 0x3CAF5D62 to the
-+	 * clkc register at offset 0x2b8, which is what boot rom code is
- 	 * waiting for. This would wake up the secondary core from WFE
- 	 */
--#define SIRFSOC_CPU1_JUMPADDR_OFFSET 0x2C
-+#define SIRFSOC_CPU1_JUMPADDR_OFFSET 0x2bc
- 	__raw_writel(virt_to_phys(sirfsoc_secondary_startup),
--		rsc_base + SIRFSOC_CPU1_JUMPADDR_OFFSET);
-+		clk_base + SIRFSOC_CPU1_JUMPADDR_OFFSET);
+ 	.macro	senduart,rd,rx
+-	str	\rd, [\rx, #SIRFSOC_UART_TXFIFO_DATA]
++	str	\rd, [\rx, #SIRF_LLUART_TXFIFO_DATA]
+ 	.endm
  
--#define SIRFSOC_CPU1_WAKEMAGIC_OFFSET 0x28
-+#define SIRFSOC_CPU1_WAKEMAGIC_OFFSET 0x2b8
- 	__raw_writel(0x3CAF5D62,
--		rsc_base + SIRFSOC_CPU1_WAKEMAGIC_OFFSET);
-+		clk_base + SIRFSOC_CPU1_WAKEMAGIC_OFFSET);
+ 	.macro	busyuart,rd,rx
+ 	.endm
  
- 	/* make sure write buffer is drained */
- 	mb();
-@@ -132,13 +112,7 @@ static int sirfsoc_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return pen_release != -1 ? -ENOSYS : 0;
- }
+ 	.macro	waituart,rd,rx
+-1001:	ldr	\rd, [\rx, #SIRFSOC_UART_TXFIFO_STATUS]
+-	tst	\rd, #SIRFSOC_UART1_TXFIFO_EMPTY
++1001:	ldr	\rd, [\rx, #SIRF_LLUART_TXFIFO_STATUS]
++	tst	\rd, #SIRF_LLUART_TXFIFO_EMPTY
+ 	beq	1001b
+ 	.endm
  
--static void __init sirfsoc_smp_prepare_cpus(unsigned int max_cpus)
--{
--	scu_enable(scu_base);
--}
--
- struct smp_operations sirfsoc_smp_ops __initdata = {
--	.smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,
- 	.smp_secondary_init     = sirfsoc_secondary_init,
- 	.smp_boot_secondary     = sirfsoc_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
 -- 
 2.2.1
