@@ -1,55 +1,46 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Sat, 03 Jan 2015 20:50:24 +0100
-Subject: Tegra 2 T20 NAND Flash Support
-In-Reply-To: <1401903129.9454.2.camel@tellur>
-References: <538E6FB5.5020806@ziswiler.com> <1401866283.2173.3.camel@tellur>
- <538EC96A.4050702@ziswiler.com> <20140604144134.GH28484@ulmo>
- <1401903129.9454.2.camel@tellur>
-Message-ID: <1420314624.2169.6.camel@lynxeye.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 3 Jan 2015 20:28:28 +0000 (UTC)
+Subject: OMAP baseline test results for v3.19-rc1
+In-Reply-To: <8629693.mvYldWiixb@wuerfel>
+References: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
+ <8629693.mvYldWiixb@wuerfel>
+Message-ID: <alpine.DEB.2.02.1501031955170.27058@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 04.06.2014, 19:32 +0200 schrieb Lucas Stach:
-> Am Mittwoch, den 04.06.2014, 16:41 +0200 schrieb Thierry Reding:
-> > On Wed, Jun 04, 2014 at 09:23:22AM +0200, Marcel Ziswiler wrote:
-> > > On 06/04/2014 09:18 AM, Lucas Stach wrote:
-> > > >I took the Linux Tegra NAND driver from Thierry and cleaned it up quite
-> > > >a bit. It now works with both ONFI and non-ONFI NAND, at least for
-> > > >reading. Writing doesn't quite work yet and I've got side-tracked with
-> > > >other stuff.
-> > > >
-> > > >If you are interested in moving this forward I can put up my WIP patches
-> > > >to some public location.
-> > > 
-> > > Sounds great, yes. That would be perfect, thanks.
-> > > 
-> > > We even once got an universal NAND test infrastructure from Micron based on
-> > > a re-worked Colibri T20 which we could use to validate it with various NAND
-> > > flash parts.
-> > 
-> > Excellent, I would've had a hard time digging up those patches. It's
-> > really been quite a while.
-> > 
-> I've put up a rebased version of the patches at
+On Sat, 3 Jan 2015, Arnd Bergmann wrote:
+
+> On Saturday 03 January 2015 07:21:49 Paul Walmsley wrote:
+> > Another ~300KB kernel object size increase for omap2plus_defconfig 
+> > kernels.
 > 
-> git://git.pengutronix.de/git/lst/linux.git tegra-nand
-> 
-For those still interested:
-I've continued to work on this for the last few days and pushed a new
-version of my WIP to the above location.
+> 300kb seems like a lot for a single release. 
 
-It is now in a state where the in-kernel mtd tests seem to be happy with
-it. Also creating/using a filesystem on top of the mtdblock device seems
-to work properly.
++300KB is high, but not exceptionally so.
 
-I still need to validate that anything using the OOB areas is working
-properly. The last missing feature is BCH ECC support, but that should
-be easy to add.
+The data, since I started keeping track of it, is below.  The last numeric 
+column represents the total kernel object size delta in bytes.
 
-I don't know if it still needs some performance tuning. 5MB/s write and
-12,5MB/s read on a Colibri T20 seem pretty slow me, but I have nothing
-to compare with ATM.
-Marcel could you maybe dig out some benchmarks with L4T?
+> Have you looked into where this is coming from?
 
-Regards,
-Lucas
+I have not.
+
+
+- Paul
+
+
+http://www.pwsan.com/omap/testlogs/
+
+test_v3.7-rc1/20121017205513/build/size.txt:+128332   -67728    +2144   +62748  omap2plus_defconfig
+test_v3.8-rc1/20121228031713/build/size.txt:+168843   +25288     +900  +195031  omap2plus_defconfig
+test_v3.9-rc1/20130312100243/build/size.txt:+195310   +37968    +1364  +234642  omap2plus_defconfig
+test_v3.10-rc1/20130518212204/build/size.txt: -59854   -98552   +37136  -121270  omap2plus_defconfig
+test_v3.11-rc1/20130721020309/build/size.txt:+159173    -2456    +1680  +158397  omap2plus_defconfig
+test_v3.12-rc1/20130922202452/build_z/size.txt:+237402   +47344     +760  +285506  omap2plus_defconfig
+test_v3.13-rc1/20131208173326/build_z/size.txt:-276029    -5584    +5008  -276605  omap2plus_defconfig
+test_v3.14-rc1/20140210035354/build_z/size.txt: +94801   -17448    -9016   +68337  omap2plus_defconfig
+test_v3.15-rc1/20140421113253/build_z/size.txt: +30722   +11392    +4312   +46426  omap2plus_defconfig
+test_v3.16-rc1/20140629224344/build_z/size.txt:+133191   +20776  +2750728  +2904695  omap2plus_defconfig
+test_v3.17-rc1/20140821122707/build_z/size.txt: +54469   -34424    +1728   +21773  omap2plus_defconfig
+test_v3.18-rc1/20141020095901/build_z/size.txt:+677950   +32008   +54408  +764366  omap2plus_defconfig
+test_v3.19-rc1/20150102151849/build_z/size.txt:+297698    +9648    -4528  +302818  omap2plus_defconfig
