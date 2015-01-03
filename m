@@ -1,30 +1,52 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sat, 3 Jan 2015 13:13:30 -0600
-Subject: [PATCH] MAINTAINERS: Add linux-omap to list of reviewers for TI
- Thermal
-Message-ID: <1420312410-4469-1-git-send-email-nm@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 3 Jan 2015 20:47:25 +0100
+Subject: [PATCHv5 0/2] INPUT: Route keyboard LEDs through the generic
+ LEDs layer
+In-Reply-To: <20150102201117.GD25336@type.youpi.perso.aquilenet.fr>
+References: <20141226232116.GA5069@type> <20150102195350.GB27538@amd>
+ <20150102201117.GD25336@type.youpi.perso.aquilenet.fr>
+Message-ID: <20150103194725.GA13390@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add linux-omap mailing list to the TI THERMAL list for wider review.
+On Fri 2015-01-02 21:11:17, Samuel Thibault wrote:
+> Pavel Machek, le Fri 02 Jan 2015 20:53:51 +0100, a ?crit :
+> > input4::capsl/trigger was none by default, that can't be right, right?
+> 
+> Indeed. And I don't see how it can be that way, since the input4::capsl
+> LED and the input4-capsl trigger get initialized at the same time in
+> input_led_connect... (and the order does not matter since both will
+> try to connect to the other on registration).
+> 
+> > I tried putting kbd-capslock and input4-capsl there, but that did not
+> > seem to help.
+> 
+> That should have.
+> 
+> > It works with heartbeat trigger, but not with input4-numl
+> > trigger.
+> 
+> It should have worked with input4-numl too.
+> 
+> > vt::capsl/brightness controls capslock led, even when
+> > input4-capsl/trigger is set to input4-numl.
+> 
+> It shouldn't.
+> 
+> > Confused,
+> 
+> I guess I'm even more.  I had tested everything that you have described,
+> without any issue, on both an internal laptop keyboard and an external
+> USB keyboard, and have tested again just now, with the same success.
+> 
+> Which hardware setup do you have, more precisely?
 
-Reported-by: Pavel Machek <pavel@ucw.cz>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- MAINTAINERS |    1 +
- 1 file changed, 1 insertion(+)
+I tested on Thinkpad X60, with internal keyboard. (PS/2, I'd say). I
+let Debian boot into graphical login prompt, switched to text console,
+and did the testing there.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddb9ac8..dc9efd5 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9533,6 +9533,7 @@ F:	drivers/platform/x86/thinkpad_acpi.c
- TI BANDGAP AND THERMAL DRIVER
- M:	Eduardo Valentin <edubezval@gmail.com>
- L:	linux-pm at vger.kernel.org
-+L:	linux-omap at vger.kernel.org
- S:	Supported
- F:	drivers/thermal/ti-soc-thermal/
- 
+Thanks,
+									Pavel
 -- 
-1.7.9.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
