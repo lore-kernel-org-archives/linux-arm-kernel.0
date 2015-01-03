@@ -1,121 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 3 Jan 2015 23:02:19 +0100
-Subject: [PATCH] thermal: add omap3 support
-In-Reply-To: <20150103123426.GA26069@developer>
-References: <20150103111146.GB7065@amd>
- <20150103123426.GA26069@developer>
-Message-ID: <20150103220219.GA26747@amd>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 4 Jan 2015 00:39:50 +0100
+Subject: [PATCH V3] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan
+ node
+In-Reply-To: <1420309826-7904-1-git-send-email-nm@ti.com>
+References: <1420309826-7904-1-git-send-email-nm@ti.com>
+Message-ID: <20150103233949.GA4108@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Nishanth,
 
-> Thanks for sending your code.
+On Sat, Jan 03, 2015 at 12:30:26PM -0600, Nishanth Menon wrote:
+> [...]
+> +		gpio-fan,speed-map = <0    0
+> +				      13000 1>;
+> [...]
 
-You are welcome.
+iirc DT maintainers prefer this format:
 
-> > Add support for omap3430 sensor. Tested on Nokia N900.
-> 
-> To my understanding, and as already mentioned by Nishanth Menon
-> (currently TIer), TI has intentionally avoided adding this support.
+gpio-fan,speed-map = <0     0>,
+                     <13000 1>;
 
-Well, Nokia had similar code in their kernel.
+This should result in the same .dtb, but is a bit easier to read.
 
-> There is a hardware accuracy limitation in this sensor, and therefore it
-> is not advisable to use it, specially in Dynamic Thermal Management,
-> such as the thermal framework.
-
-We are talking cellphone here. Yes, sensor may be inacurate (but it
-seems to work pretty well; perhaps TI can point us to some docs that
-explains the details?), but it provides useful information (mostly
-room temperature). I don't think we'll ever run anywhere close to
-thermal limits where inacuracy would matter. (Battery can't really
-take > 60C. AFAICT CPU limit is 120C. Battery is close to the CPU.)
-
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > diff --git a/drivers/thermal/ti-soc-thermal/Kconfig b/drivers/thermal/ti-soc-thermal/Kconfig
-> > index bd4c7be..a49495f 100644
-> > --- a/drivers/thermal/ti-soc-thermal/Kconfig
-> > +++ b/drivers/thermal/ti-soc-thermal/Kconfig
-> > @@ -21,6 +21,15 @@ config TI_THERMAL
-> >  	  This includes trip points definitions, extrapolation rules and
-> >  	  CPU cooling device bindings.
-> >  
-> > +config OMAP3_THERMAL
-> > +	bool "Texas Instruments OMAP3 thermal support"
-> > +	depends on TI_SOC_THERMAL
-> > +	depends on ARCH_OMAP3
-> > +	help
-> > +	  If you say yes here you get thermal support for the Texas Instruments
-> > +	  OMAP3 SoC family. The current chip supported are:
-> > +	   - OMAP3430
-> 
-> But if you insist :-), I believe the user deserves at least a fair
-> message saying this is on his / her own risk.
-
-Something like this?
-
-          If you say yes here you get thermal support for the Texas Instruments
-	  OMAP3 SoC family. The current chip supported are:
-	              - OMAP3430
-
-          OMAP3 chips normally don't need thermal management, and sensors in
-	  this generation are not very accurate, nor they are very close to
-          the important hotspots.
-
-          Say 'N' here.
-	  
-
-> > +static struct temp_sensor_registers
-> > +omap34xx_mpu_temp_sensor_registers = {
-> > +	.temp_sensor_ctrl = 0,
-> > +	.bgap_tempsoff_mask = 0, /* Unused, we don't have POWER_SWITCH */
-> > +	.bgap_soc_mask = BIT(8),
-> > +	.bgap_eocz_mask = BIT(7),
-> > +	.bgap_dtemp_mask = 0x7f,
-> > +
-> > +	.bgap_mode_ctrl = 0,
-> > +	.mode_ctrl_mask = BIT(9),
-> > +
-> > +	.bgap_efuse = 0,
-> 
-> The 0'ed filed may be removed here.
-
-Ok; I'll keep temp_sensors_ctrl / bgap_mode_ctrl, because it is actually used.
-
-
-> > diff --git a/drivers/thermal/ti-soc-thermal/ti-bandgap.c b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> > index 634b6ce..3b4e72f 100644
-> > --- a/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> > +++ b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> > @@ -1509,6 +1531,12 @@ static SIMPLE_DEV_PM_OPS(ti_bandgap_dev_pm_ops, ti_bandgap_suspend,
-> >  #endif
-> >  
-> >  static const struct of_device_id of_ti_bandgap_match[] = {
-> > +#ifdef CONFIG_OMAP3_THERMAL
-> > +	{
-> > +		.compatible = "ti,omap34xx-bandgap",
-> 
-> This needs to be updated in the binding documentation.
-> Documentation/devicetree/bindings/thermal/ti_soc_thermal.txt
-
-Ok.
-
-> > +		.data = (void *)&omap34xx_data,
-> 
-> 
-> Having a run time message intentionally advising users of the risk of
-> using this sensor is also required.
-
-Ok, what about?
-
-    if (TI_BANDGAP_HAS(bgp, UNRELIABLE))
-              dev_warn(&pdev->dev,
-                         "OMAP3 thermal sensor is unreliable and normally unneccessary\n");
-
-Will not fit in 80 columns, but keeping message on one line is more important.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150104/f9e39628/attachment.sig>
