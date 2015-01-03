@@ -1,80 +1,158 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Sat, 03 Jan 2015 15:47:59 +0900
-Subject: [PATCH V8 00/14] drm/exynos: few patches to enhance bridge chip
- support
-In-Reply-To: <CAEC9eQPKC05C0uJr0eKEuG1eqWohYqV=2seWQtanRFryDgF0ng@mail.gmail.com>
-References: <1416045309-13359-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQOrKw2Z1q-ztFfadXmsL3CTcAkkv9kcS2QnDOAVSh2AuQ@mail.gmail.com>
- <548ABAB6.6010200@collabora.co.uk> <3197445.qizQc0zeRb@avalon>
- <54914D7D.9060108@collabora.co.uk>
- <CAPj87rN4HZzDt5JBLyTRmKZs7XcOG=0ha7ZQf9hmjPAFgTyhYQ@mail.gmail.com>
- <CAEC9eQPKC05C0uJr0eKEuG1eqWohYqV=2seWQtanRFryDgF0ng@mail.gmail.com>
-Message-ID: <54A7909F.1070308@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 3 Jan 2015 07:21:49 +0000 (UTC)
+Subject: OMAP baseline test results for v3.19-rc1
+Message-ID: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015? 01? 02? 22:14, Ajay kumar wrote:
-> Hi Daniel,
-> 
-> This series is sitting out there since long without any ACKs.
-> If people can ACK this series, I am ready to rebase and send ASAP.
 
-Acked-by: Inki Dae <inki.dae@samsung.com>
+Here are some basic OMAP test results for Linux v3.19-rc1.
+Logs and other details at:
 
-And, for [PATCH V8 5/14] drm/exynos: dp: support drm_bridge,
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
+    http://www.pwsan.com/omap/testlogs/test_v3.19-rc1/20150102151849/
 
-Thanks,
-Inki Dae
 
-> 
-> Regards,
-> Ajay Kumar
-> 
-> On Fri, Jan 2, 2015 at 6:40 PM, Daniel Stone <daniel@fooishbar.org> wrote:
->> Hi Ajay,
->>
->> On 17 December 2014 at 09:31, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>>
->>> On 12/16/2014 12:37 AM, Laurent Pinchart wrote:
->>>>> You asked Ajay to change his series to use the video port and enpoints
->>>>> DT
->>>>> bindings instead of phandles, could you please review his latest
->>>>> version?
->>>>>
->>>>> I guess is now too late for 3.19 since we are in the middle of the
->>>>> merge
->>>>> window but it would be great if this series can at least made it to
->>>>> 3.20.
->>>>
->>>> I don't have time to review the series in details right now, but I'm
->>>> happy
->>>> with the DT bindings, and have no big issue with the rest of the
->>>> patches. I
->>>> don't really like the of_drm_find_bridge() concept introduced in 03/14
->>>> but I
->>>> won't nack it given lack of time to implement an alternative proposal.
->>>> It's an
->>>> internal API, it can always be reworked later anyway.
->>>
->>> Thanks a lot for taking the time to look at the DT bindings, then I guess
->>> that the series are finally ready to be merged?
->>>
->>> Ajay's series don't apply cleanly anymore because it has been a while
->>> since
->>> he posted it but he can rebase on top of 3.19-rc1 once it is released and
->>> re-resend.
->>
->>
->> Do you have any plans to rebase this so it's ready for merging?
->>
->> Thierry, Daniel, Dave - whose tree would this be best to merge through?
->>
->> Cheers,
->> Daniel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 2/17): 2430sdp, 2420n800
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54
+
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+Kernel warnings during boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (12/17): am335xbonelt, am335xbone, 4460pandaes, 37xxevm,
+		  2430sdp, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm, 5430es2uevm, 5430es2sbct54,
+		  2420n800
+
+Kernel warnings during PM test:
+    FAIL ( 7/17): 4430es2panda, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm
+    skip ( 6/17): 5912osk, 3517evm, am335xbonelt/am335x-boneblack,
+		  am335xbone, cmt3517, 2420n800
+    Pass ( 4/17): 4460pandaes, 2430sdp, 5430es2uevm, 5430es2sbct54
+
+
+vmlinux object size
+(delta in bytes from test_v3.18 (b2776bf7149bddd1f4161f14f79520f17fc1d71d)):
+   text     data      bss    total  kernel
++100107    +3648    -6248   +97507  omap1_defconfig
++101103    +2800    -6248   +97655  omap1_defconfig_1510innovator_only
++101099    +2816    -6184   +97731  omap1_defconfig_5912osk_only
++883783   +15784    -2432  +897135  multi_v7_defconfig
++297698    +9648    -4528  +302818  omap2plus_defconfig
++280493   +10720    -1824  +289389  omap2plus_defconfig_2430sdp_only
++297806   +10696    -4592  +303910  omap2plus_defconfig_am33xx_only
++327814   +11784    -4400  +335198  omap2plus_defconfig_am43xx_only
++293602    +9664    -4528  +298738  omap2plus_defconfig_cpupm
++324078   +12384    -4400  +332062  omap2plus_defconfig_dra7xx_only
++216837    +8480    -4600  +220717  omap2plus_defconfig_n800_multi_omap2xxx
++213429    +8432    -4632  +217229  omap2plus_defconfig_n800_only_a
++291026    +9864    -4656  +296234  omap2plus_defconfig_no_pm
++330978   +11696    -4464  +338210  omap2plus_defconfig_omap2_4_only
++315374    +7280    -4528  +318126  omap2plus_defconfig_omap3_4_only
++327978   +11464    -4400  +335042  omap2plus_defconfig_omap5_only
+ +31708    -1336    -6644   +23728  rmk_omap3430_ldp_allnoconfig
+ +59907    -2672    -6520   +50715  rmk_omap3430_ldp_oldconfig
+ +35652    +1548    -7308   +29892  rmk_omap4430_sdp_allnoconfig
+ +83106    +1824    -6272   +78658  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.18 (b2776bf7149bddd1f4161f14f79520f17fc1d71d))
+  avail  rsrvd   high  freed  board          kconfig
+ -117380k -13692k      .  -164k  2420n800       omap2plus_defconfig_n800_only_a
+  -160k   160k      .      .  2430sdp        omap2plus_defconfig
+   -32k    32k      .    12k  3530es31beagle omap2plus_defconfig
+   -32k    32k      .    12k  3530es3beagle  omap2plus_defconfig
+   224k  -224k      .    12k  3730beaglexm   omap2plus_defconfig
+   224k  -224k      .    12k  3730es12beaglexmomap2plus_defconfig
+   -32k    32k      .    12k  37xxevm        omap2plus_defconfig
+   224k  -224k      .    12k  4430es2panda   omap2plus_defconfig
+   740k  -740k      .    12k  4460pandaes    omap2plus_defconfig
+   740k  -740k      .    12k  4460varsomom   omap2plus_defconfig
+  1760k -1760k      .    12k  5430es2sbct54  omap2plus_defconfig
+  1748k -1748k      .    12k  5430es2uevm    omap2plus_defconfig
+  -172k   172k      .    20k  am335xbone     omap2plus_defconfig_am33xx_only
+   144k  -144k      .    12k  am335xbonelt   omap2plus_defconfig
+
+
+The N800 didn't boot because the kernel has once again gotten too big for 
+NOLO's size limits.  Looking into it.
+
+Another ~300KB kernel object size increase for omap2plus_defconfig 
+kernels.
+
+The test report system is now searching through the boot & PM transcripts 
+for formal kernel warnings ("WARNING: CPU: \d+ PID: \d+") in the "Kernel 
+warnings" sections, and indicating failure when warnings are found.
+
+The memory reporting line logged during kernel boot has changed again, to 
+split out CMA reserved memory from other reserved memory.  It's all lumped 
+back together in these test reports.
