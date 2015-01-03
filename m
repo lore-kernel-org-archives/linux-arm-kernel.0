@@ -1,82 +1,80 @@
-From: dserrg@gmail.com (Sergey Dyasly)
-Date: Sat, 3 Jan 2015 18:59:46 +0300
-Subject: [RFC][PATCH RESEND] mm: vmalloc: remove ioremap align constraint
-In-Reply-To: <11656044.WGcPr1b8t8@wuerfel>
-References: <1419328813-2211-1-git-send-email-d.safonov@partner.samsung.com>
- <11656044.WGcPr1b8t8@wuerfel>
-Message-ID: <20150103185946.1d4fad32bb3de9ac9bdcfb88@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 4 Jan 2015 01:16:02 +0900
+Subject: [PATCH V2 2/2] ARM: l2c: AM437x: Introduce support for cache
+ filter programming
+In-Reply-To: <20150103153446.GA23591@kahuna>
+References: <1420220628-23742-1-git-send-email-nm@ti.com>
+ <1420220628-23742-3-git-send-email-nm@ti.com>
+ <CA+Ln22Epd8VpA9DQPFYBdjewUY3ejODhaRHgBSNZAQCYjx5saw@mail.gmail.com>
+ <20150103153446.GA23591@kahuna>
+Message-ID: <CA+Ln22Ejvwd9J=jnWAUeb=nn-cvWiptqOydax+z4BeMrww_xqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+2015-01-04 0:34 GMT+09:00 Nishanth Menon <nm@ti.com>:
+> On 15:40-20150103, Tomasz Figa wrote:
+>> Hi Nishanth,
+>>
+>> 2015-01-03 2:43 GMT+09:00 Nishanth Menon <nm@ti.com>:
+>> > AM437x generation of processors support programming the PL310 L2Cache
+>> > controller's address filter start and end registers using a secure
+>> > montior service.
+>>
+>> typo: s/montior/monitor/
+>>
+>> [snip]
+>
+> Uggh.. yes indeed. I will post a v3 updating the comments. If the
+> following is ok.
+>>
+>> > +               base = omap4_get_l2cache_base();
+>> > +               filter_start = (reg == L310_ADDR_FILTER_START) ? val :
+>> > +                              readl_relaxed(base + L310_ADDR_FILTER_START);
+>> > +               filter_end = (reg == L310_ADDR_FILTER_END) ? val :
+>> > +                              readl_relaxed(base + L310_ADDR_FILTER_END);
+>> > +               omap_smc1_2(AM43X_MON_L2X0_SETFILTER_INDEX, filter_start,
+>> > +                           filter_end);
+>> > +               return;
+>>
+>> I don't have any significant comments about this patch in particular,
+>> but just noticed that you need to do read-backs here (and the typo
+>> thanks to the spell checker of my mailing app). Maybe you should
+>> consider switching to the .configure() API I introduced in my series?
+>> This would let you get rid of the hardcoded static mapping.
+>
+> Yeah, I have two choices there.. Either I provide the fundamental
+> write function for the generic l2c code to use OR I provide a
+> duplicate of resultant l2c_configure(aux write) + l2c310_configure.
+>
+> To allow for reuse of improvements or anything like errata
+> implementations in the future, OMAP L2C implementation has chosen to provide the
+> low level code and allow the higherlevel configure/write/whatever of the
+> future to stay in arch/arm/mm/cache-l2x0.c. The write_sec operation is
+> not too complicated enough to warrant a replication of l2c310_configure.
+>
+> So, I prefer the current implementation than providing a .configure
+> handler for outer_cache.configure from SoC level.
+>
+> Let me know if anyone has a strong objection to this.
 
-First, some background information. We originally encountered high fragmentation
-issue in vmalloc area:
+Well, what l2c310_configure() does after my series is just writing the
+registers. If they cannot be written normally (without some tricks
+such as reading back other registers) then IMHO a separate function
+should be provided.
 
-	1. Total size of vmalloc area was 400 MB.
-	2. 200 MB of vmalloc area was consumed by ioremaps of various sizes.
-	3. Largest contiguous chunk of vmalloc area was 12 MB.
-	4. ioremap of 10 MB failed due to 8 MB alignment requirement.
+This is becomes possible after patch 3/8 (ARM: l2c: Add interface to
+ask hypervisor to configure L2C) and what is used on Exynos which also
+updates multiple registers in single SMC calls. You can find an
+example of use in patch 6/8 (ARM: EXYNOS: Add .write_sec outer cache
+callback for L2C-310). What's even more interesting is that approaches
+similar to the one currently used on OMAP had been NAKed, when
+proposed for Exynos and this is why we have the solution proposed by
+my patches.
 
-It was decided to further increase the size of vmalloc area to resolve the above
-issue. And I don't like that solution because it decreases the amount of lowmem.
+Note that .write_sec() callback is still used for L2X0_CTRL and
+L2X0_DEBUG_CTRL registers, because there might be a need to write them
+separately (e.g. to disable the controller and to perform debug
+operations/workarounds when the controller is already enabled).
 
-Now let's see how ioremap uses supersections. Judging from current implementation
-of __arm_ioremap_pfn_caller:
-
-	#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
-		if (pfn >= 0x100000 && !((paddr | size | addr) & ~SUPERSECTION_MASK)) {
-			remap_area_supersections();
-		} else if (!((paddr | size | addr) & ~PMD_MASK)) {
-			remap_area_sections();
-		} else
-	#endif
-			err = ioremap_page_range();
-
-supersections and sections mappings are used only in !SMP && !LPAE case.
-Otherwise, mapping is created using the usual 4K pages (and we are using SMP).
-The suggested patch removes alignment requirements for ioremap but it means that
-sections will not be used in !SMP case. So another solution is required.
-
-__get_vm_area_node has align parameter, maybe it can be used to specify the
-required alignment of ioremap operation? Because I find current generic fls
-algorithm to be very restrictive in cases when it's not necessary to use such
-a big alignment.
-
-
-On Tue, 23 Dec 2014 21:58:49 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Tuesday 23 December 2014 13:00:13 Dmitry Safonov wrote:
-> > ioremap uses __get_vm_area_node which sets alignment to fls of requested size.
-> > I couldn't find any reason for such big align. Does it decrease TLB misses?
-> > I tested it on custom ARM board with 200+ Mb of ioremap and it works.
-> > What am I missing?
-> 
-> The alignment was originally introduced in this commit:
-> 
-> commit ff0daca525dde796382b9ccd563f169df2571211
-> Author: Russell King <rmk@dyn-67.arm.linux.org.uk>
-> Date:   Thu Jun 29 20:17:15 2006 +0100
-> 
->     [ARM] Add section support to ioremap
->     
->     Allow section mappings to be setup using ioremap() and torn down
->     with iounmap().  This requires additional support in the MM
->     context switch to ensure that mappings are properly synchronised
->     when mapped in.
->     
->     Based an original implementation by Deepak Saxena, reworked and
->     ARMv6 support added by rmk.
->     
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> and then later extended to 16MB supersection mappings, which indeed
-> is used to reduce TLB pressure.
-> 
-> I don't see any downsides to it, why change it?
-> 
-> 	Arnd
-
--- 
-Sergey Dyasly <dserrg@gmail.com>
+Best regards,
+Tomasz
