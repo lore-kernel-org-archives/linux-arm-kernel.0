@@ -1,76 +1,121 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 03 Jan 2015 22:37:09 +0100
-Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <54A71CD1.4070107@ti.com>
-References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
- <CAL_Jsq+krOUA3BPvMCdaOBhALoi+pzWbw3YndXqR8x52OJogZg@mail.gmail.com>
- <54A71CD1.4070107@ti.com>
-Message-ID: <2019516.ehiuEv0rdL@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 3 Jan 2015 23:02:19 +0100
+Subject: [PATCH] thermal: add omap3 support
+In-Reply-To: <20150103123426.GA26069@developer>
+References: <20150103111146.GB7065@amd>
+ <20150103123426.GA26069@developer>
+Message-ID: <20150103220219.GA26747@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 January 2015 17:33:53 Murali Karicheri wrote:
+Hi!
+
+> Thanks for sending your code.
+
+You are welcome.
+
+> > Add support for omap3430 sensor. Tested on Nokia N900.
 > 
-> I have no experience with IOMMU and may not offer much help here as I 
-> originally wrote above. Will Deacon has added this API and probably able 
-> to offer some help in this discussion.
+> To my understanding, and as already mentioned by Nishanth Menon
+> (currently TIer), TI has intentionally avoided adding this support.
+
+Well, Nokia had similar code in their kernel.
+
+> There is a hardware accuracy limitation in this sensor, and therefore it
+> is not advisable to use it, specially in Dynamic Thermal Management,
+> such as the thermal framework.
+
+We are talking cellphone here. Yes, sensor may be inacurate (but it
+seems to work pretty well; perhaps TI can point us to some docs that
+explains the details?), but it provides useful information (mostly
+room temperature). I don't think we'll ever run anywhere close to
+thermal limits where inacuracy would matter. (Battery can't really
+take > 60C. AFAICT CPU limit is 120C. Battery is close to the CPU.)
+
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > diff --git a/drivers/thermal/ti-soc-thermal/Kconfig b/drivers/thermal/ti-soc-thermal/Kconfig
+> > index bd4c7be..a49495f 100644
+> > --- a/drivers/thermal/ti-soc-thermal/Kconfig
+> > +++ b/drivers/thermal/ti-soc-thermal/Kconfig
+> > @@ -21,6 +21,15 @@ config TI_THERMAL
+> >  	  This includes trip points definitions, extrapolation rules and
+> >  	  CPU cooling device bindings.
+> >  
+> > +config OMAP3_THERMAL
+> > +	bool "Texas Instruments OMAP3 thermal support"
+> > +	depends on TI_SOC_THERMAL
+> > +	depends on ARCH_OMAP3
+> > +	help
+> > +	  If you say yes here you get thermal support for the Texas Instruments
+> > +	  OMAP3 SoC family. The current chip supported are:
+> > +	   - OMAP3430
 > 
-> Will Deacon,
+> But if you insist :-), I believe the user deserves at least a fair
+> message saying this is on his / her own risk.
+
+Something like this?
+
+          If you say yes here you get thermal support for the Texas Instruments
+	  OMAP3 SoC family. The current chip supported are:
+	              - OMAP3430
+
+          OMAP3 chips normally don't need thermal management, and sensors in
+	  this generation are not very accurate, nor they are very close to
+          the important hotspots.
+
+          Say 'N' here.
+	  
+
+> > +static struct temp_sensor_registers
+> > +omap34xx_mpu_temp_sensor_registers = {
+> > +	.temp_sensor_ctrl = 0,
+> > +	.bgap_tempsoff_mask = 0, /* Unused, we don't have POWER_SWITCH */
+> > +	.bgap_soc_mask = BIT(8),
+> > +	.bgap_eocz_mask = BIT(7),
+> > +	.bgap_dtemp_mask = 0x7f,
+> > +
+> > +	.bgap_mode_ctrl = 0,
+> > +	.mode_ctrl_mask = BIT(9),
+> > +
+> > +	.bgap_efuse = 0,
 > 
-> Any comment?
+> The 0'ed filed may be removed here.
 
-It's complicated :(
+Ok; I'll keep temp_sensors_ctrl / bgap_mode_ctrl, because it is actually used.
 
-> Looking at the iommu documentation and of_iommu.c, I get a feeling that 
-> this API is not really used at present as there are no callers of 
-> of_iommu_set_ops() and I assume this is a WIP.
 
-Right, but we have patches for some iommu drivers based on this API,
-and we should migrate all of them eventually.
-
-> I believe the way it is 
-> expected to work is to have the iommu driver of the master IOMMU devices 
-> call of_iommu_set_ops(). The device node of this master IOMMU device is 
-> specified as a phandle in the OF node of the device (various bus devices 
-> such as platform, PCI etc). This allow to retrieve the iommu ops though 
-> the of_iommu_configure() API and use it in arch_setup_dma_ops(). So my 
-> gut feeling is that for PCI devices, as there are no DT node, the root 
-> bus node may specify iommus phandle to IOMMU master OF nodes.
-
-Yes, but we also need to pass a PCI device specific identifier along
-with the root bus node, because some iommu drivers take the PCI
-bus/device/function number into account for creating per-function
-i/o page tables.
-
-> W.r.t your comment "We may want to address the comment in
-> of_iommu_configure about parent nodes. We should be sure these changes 
-> work with how we would do searching parent nodes",
+> > diff --git a/drivers/thermal/ti-soc-thermal/ti-bandgap.c b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
+> > index 634b6ce..3b4e72f 100644
+> > --- a/drivers/thermal/ti-soc-thermal/ti-bandgap.c
+> > +++ b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
+> > @@ -1509,6 +1531,12 @@ static SIMPLE_DEV_PM_OPS(ti_bandgap_dev_pm_ops, ti_bandgap_suspend,
+> >  #endif
+> >  
+> >  static const struct of_device_id of_ti_bandgap_match[] = {
+> > +#ifdef CONFIG_OMAP3_THERMAL
+> > +	{
+> > +		.compatible = "ti,omap34xx-bandgap",
 > 
-> I believe, the parent node search itself should work the same way in the 
-> case of PCI as with platform bus case. PCI's case, we are providing the 
-> OF node of the root bus host bridge. Why should this be any different in 
-> terms of search?
-> 
-> I see a potential issue with dma-ranges as described in the notes below.
-> As noted below the usage of dma-range for iommu is to be determined. For 
-> keystone, the of_iommu_configure() always return false as we don't use 
-> the iommu. But don't know if this has any consequences for other 
-> platforms. Or I got your questions wrong. Any help here from others on 
-> the list?
-> 
-> ========================================================================
-> One possible extension to the above is to use an "iommus" property along 
-> with a "dma-ranges" property in a bus device node (such as PCI host 
-> bridges). This can be useful to describe how children on the bus relate 
-> to the IOMMU if they are not explicitly listed in the device tree (e.g. 
-> PCI devices). However, the requirements of that use-case haven't been 
-> fully determined yet. Implementing this is therefore not recommended 
-> without further discussion and extension of this binding.
-> =========================================================================
+> This needs to be updated in the binding documentation.
+> Documentation/devicetree/bindings/thermal/ti_soc_thermal.txt
 
-This probably won't ever apply to PCI devices, so let's ignore it for now.
-For the moment (and for PCI), we should assume that we either configure
-an iommu directly or we use dma-ranges if no iommu is in use.
+Ok.
 
-	Arnd
+> > +		.data = (void *)&omap34xx_data,
+> 
+> 
+> Having a run time message intentionally advising users of the risk of
+> using this sensor is also required.
+
+Ok, what about?
+
+    if (TI_BANDGAP_HAS(bgp, UNRELIABLE))
+              dev_warn(&pdev->dev,
+                         "OMAP3 thermal sensor is unreliable and normally unneccessary\n");
+
+Will not fit in 80 columns, but keeping message on one line is more important.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
