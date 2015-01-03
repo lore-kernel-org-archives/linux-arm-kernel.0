@@ -1,10 +1,9 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sat,  3 Jan 2015 16:27:37 +0800
-Subject: [PATCH V3 03/10] ARM: sirf: drop MARCO support in reset controller
- module
+Date: Sat,  3 Jan 2015 16:27:38 +0800
+Subject: [PATCH V3 04/10] ARM: sirf: drop MARCO machine
 In-Reply-To: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
 References: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1420273664-10438-4-git-send-email-21cnbao@gmail.com>
+Message-ID: <1420273664-10438-5-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,68 +15,66 @@ atlas7.
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-prima2/rstc.c | 41 ++++++++++++-----------------------------
- 1 file changed, 12 insertions(+), 29 deletions(-)
+ arch/arm/mach-prima2/Kconfig    |  9 ---------
+ arch/arm/mach-prima2/common.c   | 17 -----------------
+ arch/arm/mach-prima2/rtciobrg.c |  1 -
+ 3 files changed, 27 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index e1f1f86..7c251eb 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -34,36 +34,20 @@ static int sirfsoc_reset_module(struct reset_controller_dev *rcdev,
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+index 042f693..cc1c323 100644
+--- a/arch/arm/mach-prima2/Kconfig
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -28,15 +28,6 @@ config ARCH_PRIMA2
+ 	help
+           Support for CSR SiRFSoC ARM Cortex A9 Platform
  
- 	mutex_lock(&rstc_lock);
+-config ARCH_MARCO
+-	bool "CSR SiRFSoC MARCO ARM Cortex A9 Platform"
+-	default y
+-	select ARM_GIC
+-	select HAVE_ARM_SCU if SMP
+-	select SMP_ON_UP if SMP
+-	help
+-          Support for CSR SiRFSoC ARM Cortex A9 Platform
+-
+ config SIRF_IRQ
+ 	bool
  
--	if (of_device_is_compatible(rcdev->of_node, "sirf,prima2-rstc")) {
--		/*
--		 * Writing 1 to this bit resets corresponding block.
--		 * Writing 0 to this bit de-asserts reset signal of the
--		 * corresponding block. datasheet doesn't require explicit
--		 * delay between the set and clear of reset bit. it could
--		 * be shorter if tests pass.
--		 */
--		writel(readl(sirfsoc_rstc_base +
-+	/*
-+	 * Writing 1 to this bit resets corresponding block.
-+	 * Writing 0 to this bit de-asserts reset signal of the
-+	 * corresponding block. datasheet doesn't require explicit
-+	 * delay between the set and clear of reset bit. it could
-+	 * be shorter if tests pass.
-+	 */
-+	writel(readl(sirfsoc_rstc_base +
- 			(reset_bit / 32) * 4) | (1 << reset_bit),
--			sirfsoc_rstc_base + (reset_bit / 32) * 4);
--		msleep(20);
--		writel(readl(sirfsoc_rstc_base +
-+		sirfsoc_rstc_base + (reset_bit / 32) * 4);
-+	msleep(20);
-+	writel(readl(sirfsoc_rstc_base +
- 			(reset_bit / 32) * 4) & ~(1 << reset_bit),
--			sirfsoc_rstc_base + (reset_bit / 32) * 4);
--	} else {
--		/*
--		 * For MARCO and POLO
--		 * Writing 1 to SET register resets corresponding block.
--		 * Writing 1 to CLEAR register de-asserts reset signal of the
--		 * corresponding block.
--		 * datasheet doesn't require explicit delay between the set and
--		 * clear of reset bit. it could be shorter if tests pass.
--		 */
--		writel(1 << reset_bit,
--			sirfsoc_rstc_base + (reset_bit / 32) * 8);
--		msleep(20);
--		writel(1 << reset_bit,
--			sirfsoc_rstc_base + (reset_bit / 32) * 8 + 4);
--	}
-+		sirfsoc_rstc_base + (reset_bit / 32) * 4);
+diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
+index a860ea2..bc53cc4 100644
+--- a/arch/arm/mach-prima2/common.c
++++ b/arch/arm/mach-prima2/common.c
+@@ -58,20 +58,3 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+ 	.dt_compat      = prima2_dt_match,
+ MACHINE_END
+ #endif
+-
+-#ifdef CONFIG_ARCH_MARCO
+-static const char *marco_dt_match[] __initconst = {
+-	"sirf,marco",
+-	NULL
+-};
+-
+-DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
+-	/* Maintainer: Barry Song <baohua.song@csr.com> */
+-	.l2c_aux_val	= 0,
+-	.l2c_aux_mask	= ~0,
+-	.smp            = smp_ops(sirfsoc_smp_ops),
+-	.map_io         = sirfsoc_map_io,
+-	.init_late	= sirfsoc_init_late,
+-	.dt_compat      = marco_dt_match,
+-MACHINE_END
+-#endif
+diff --git a/arch/arm/mach-prima2/rtciobrg.c b/arch/arm/mach-prima2/rtciobrg.c
+index 70a0b47..8f66d8f 100644
+--- a/arch/arm/mach-prima2/rtciobrg.c
++++ b/arch/arm/mach-prima2/rtciobrg.c
+@@ -104,7 +104,6 @@ EXPORT_SYMBOL_GPL(sirfsoc_rtc_iobrg_writel);
  
- 	mutex_unlock(&rstc_lock);
- 
-@@ -106,7 +90,6 @@ static int sirfsoc_rstc_probe(struct platform_device *pdev)
- 
- static const struct of_device_id rstc_ids[]  = {
- 	{ .compatible = "sirf,prima2-rstc" },
--	{ .compatible = "sirf,marco-rstc" },
- 	{},
+ static const struct of_device_id rtciobrg_ids[] = {
+ 	{ .compatible = "sirf,prima2-rtciobg" },
+-	{ .compatible = "sirf,marco-rtciobg" },
+ 	{}
  };
  
 -- 
