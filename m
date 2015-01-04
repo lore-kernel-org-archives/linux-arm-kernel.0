@@ -1,62 +1,65 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sun, 4 Jan 2015 23:15:47 +0800
-Subject: [PATCH next 1/2] mmc: sdhci-pxav3: fix unbalanced clock issues during
- probe
-In-Reply-To: <1420384548-7816-1-git-send-email-jszhang@marvell.com>
-References: <1420384548-7816-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1420384548-7816-2-git-send-email-jszhang@marvell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 04 Jan 2015 17:38:06 +0100
+Subject: [RFC][PATCH RESEND] mm: vmalloc: remove ioremap align constraint
+In-Reply-To: <20150103185946.1d4fad32bb3de9ac9bdcfb88@gmail.com>
+References: <1419328813-2211-1-git-send-email-d.safonov@partner.samsung.com>
+ <11656044.WGcPr1b8t8@wuerfel>
+ <20150103185946.1d4fad32bb3de9ac9bdcfb88@gmail.com>
+Message-ID: <5891256.RkdjYUxedq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0dcaa2499b7d ("sdhci-pxav3: Fix runtime PM initialization") tries
-to fix one hang issue caused by calling sdhci_add_host() on a suspended
-device. The fix enables the clock twice, once by clk_prepare_enable() and
-another by pm_runtime_get_sync(), meaning that the clock will never be
-gated at runtime PM suspend. I observed the power consumption regression on
-Marvell BG2Q SoCs.
+On Saturday 03 January 2015 18:59:46 Sergey Dyasly wrote:
+> Hi Arnd,
+> 
+> First, some background information. We originally encountered high fragmentation
+> issue in vmalloc area:
+> 
+> 	1. Total size of vmalloc area was 400 MB.
+> 	2. 200 MB of vmalloc area was consumed by ioremaps of various sizes.
+> 	3. Largest contiguous chunk of vmalloc area was 12 MB.
+> 	4. ioremap of 10 MB failed due to 8 MB alignment requirement.
 
-In fact, the fix is not correct. There still be a very small window
-during which a runtime suspend might somehow occur after pm_runtime_enable()
-but before pm_runtime_get_sync().
+Interesting, can you describe how you end up with that many ioremap mappings?
+200MB seems like a lot. Do you perhaps get a lot of duplicate entries for the
+same hardware registers, or maybe a leak?
 
-This patch fixes all of the two problems by just incrementing the usage
-counter before pm_runtime_enable(). It also adjust the order of disabling
-runtime pm and storing the usage count in the error path to handle clock
-gating properly.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Cc: <stable@vger.kernel.org> # v3.11+
----
- drivers/mmc/host/sdhci-pxav3.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index ca3424e..1255dd2 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -365,10 +365,11 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 		}
- 	}
+Can you send the output of /proc/vmallocinfo?
  
--	pm_runtime_enable(&pdev->dev);
--	pm_runtime_get_sync(&pdev->dev);
-+	pm_runtime_get_noresume(&pdev->dev);
-+	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, PXAV3_RPM_DELAY_MS);
- 	pm_runtime_use_autosuspend(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
- 	pm_suspend_ignore_children(&pdev->dev, 1);
- 
- 	ret = sdhci_add_host(host);
-@@ -391,8 +392,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_add_host:
--	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
- err_of_parse:
- err_cd_req:
- err_mbus_win:
--- 
-2.1.4
+> It was decided to further increase the size of vmalloc area to resolve the above
+> issue. And I don't like that solution because it decreases the amount of lowmem.
+
+If all the mappings are in fact required, have you considered using
+CONFIG_VMSPLIT_2G split to avoid the use of highmem?
+
+> Now let's see how ioremap uses supersections. Judging from current implementation
+> of __arm_ioremap_pfn_caller:
+> 
+> 	#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+> 		if (pfn >= 0x100000 && !((paddr | size | addr) & ~SUPERSECTION_MASK)) {
+> 			remap_area_supersections();
+> 		} else if (!((paddr | size | addr) & ~PMD_MASK)) {
+> 			remap_area_sections();
+> 		} else
+> 	#endif
+> 			err = ioremap_page_range();
+> 
+> supersections and sections mappings are used only in !SMP && !LPAE case.
+> Otherwise, mapping is created using the usual 4K pages (and we are using SMP).
+> The suggested patch removes alignment requirements for ioremap but it means that
+> sections will not be used in !SMP case. So another solution is required.
+> 
+> __get_vm_area_node has align parameter, maybe it can be used to specify the
+> required alignment of ioremap operation? Because I find current generic fls
+> algorithm to be very restrictive in cases when it's not necessary to use such
+> a big alignment.
+
+I think using next-power-of-two alignment generally helps limit the effects of
+fragmentation the same way that the buddy allocator works.
+
+Since the section and supersection maps are only used with non-SMP non-LPAE
+(why is that the case btw?), it would however make sense to use the default
+(7 + PAGE_SHIFT) instead of the ARM-specific 24 here if one of them is set,
+I don't see any downsides to that.
+
+	Arnd
