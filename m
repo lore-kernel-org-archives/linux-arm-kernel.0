@@ -1,62 +1,80 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 4 Jan 2015 23:35:38 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP: hwmod fixes for v3.19-rc
-Message-ID: <alpine.DEB.2.02.1501042334250.28771@utopia.booyaka.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Mon, 5 Jan 2015 00:45:01 +0100
+Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to
+ input LEDs
+In-Reply-To: <20150104232838.GA14912@dtor-glaptop>
+References: <20141226232116.GA5069@type> <20141226232310.GD5069@type>
+ <20150104232838.GA14912@dtor-glaptop>
+Message-ID: <20150104234501.GJ25336@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Dmitry Torokhov, le Sun 04 Jan 2015 15:28:38 -0800, a ?crit :
+> I'd rather we did not have a separate config option for this. Do we really need to
+> support case where LEDs are disabled?
 
-Hi Tony
+I don't really mind.
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> I'd rather stub it out instead of providing 2 separate code paths.
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+Ok.
 
-are available in the git repository at:
+> > +/* LED state change for some keyboard, notify that keyboard.  */
+> > +static void perdevice_input_led_set(struct led_classdev *cdev,
+> > +			  enum led_brightness brightness)
+> > +{
+> > +	struct input_dev *dev;
+> > +	struct led_classdev *leds;
+> > +	int led;
+> > +
+> > +	dev = cdev->dev->platform_data;
+> 
+> Umm, platform data is not the best place for storing this. Why not drvdata?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.19-rc/omap-fixes-a
+Just because it didn't exist when I wrote the code :)
+Ok.
 
-for you to fetch changes up to 99d076b747455449b2eec9e37f3fb0bfdf51af32:
+> > +/* A new input device with potential LEDs to connect.  */
+> > +int input_led_connect(struct input_dev *dev)
+> > +{
+> > +	int i, error = -ENOMEM;
+> > +	struct led_classdev *leds;
+> > +	struct led_trigger *triggers;
+> > +
+> > +	leds = kcalloc(LED_CNT, sizeof(*leds), GFP_KERNEL);
+> > +	if (!leds)
+> > +		goto err;
+> 
+> Why do we allocate all possible led's for every device?
 
-  MAINTAINERS: add maintainer for OMAP hwmod data (2015-01-02 16:24:27 -0700)
+Ah, right, that was making things simpler, but it could be
+squeezed.  I'm just afraid of one thing: may dev->ledbit change after
+input_register_device?  It seems that at least uinput somehow permits
+this.  It then means having to store the number of actually created LEDs
+and triggers alongside.
 
-- ----------------------------------------------------------------
-For v3.19-rc, fix some hwmod structure details for the OMAP DSS modules
-for DRA7xx and AM43xx.  Also update the MAINTAINERS file to encourage
-folks to cc me on hwmod data patches.
+> > +	dev->leds = leds;
+> > +
+> > +	triggers = kcalloc(LED_CNT, sizeof(*triggers), GFP_KERNEL);
+> > +	if (!triggers)
+> > +		goto err;
+> > +	dev->triggers = triggers;
+> 
+> Hmm, maybe having per-device triggers is a bit of overkill and we could have
+> just "input-numl", "input-capsl", etc.
 
-Basic build, boot, and PM testlogs are available here:
+No, that won't work, notably for evdev access: we have to respect the
+per-device semantic.
 
-http://www.pwsan.com/omap/testlogs/omap-fixes-a-for-v3.19-rc/20150103144242/
+> > +	/* No issue so far, we can register for real.  */
+> > +	for (i = 0; i < LED_CNT; i++)
+> > +		if (leds[i].name) {
+> > +			led_classdev_register(&dev->dev, &leds[i]);
+> > +			leds[i].dev->platform_data = dev;
+> > +			led_trigger_register(&triggers[i]);
+> 
+> We need error handling here.
 
-- ----------------------------------------------------------------
-Paul Walmsley (1):
-      MAINTAINERS: add maintainer for OMAP hwmod data
+Right.
 
-Tomi Valkeinen (2):
-      ARM: AM43xx: hwmod: set DSS submodule parent hwmods
-      ARM: DRA7xx: hwmod: set DSS submodule parent hwmods
-
- MAINTAINERS                                | 6 ++++++
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 2 ++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 2 ++
- 3 files changed, 10 insertions(+)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJUqc29AAoJEMePsQ0LvSpLwHMP/iwMppVchp7aBom6wAJXf5Cf
-3d6M8j+5UNex01TDnBAj9fSWC0ea/HkEKpOSVp+TOsLX1cnMPQfC6wBmJ4nZ4HLG
-l+7e1x6S0eKCvoMh6yvTzf5hJfmHCs0ULcJJ2E87fNhuSJ+t7ESCaVFSFqCvT2Fi
-Rq+9Ba/9Mwe2UHotmwRpt1wNFSzIWuHfi2La5SOwUdPZ/6snpy5blmGpipG4vUJL
-Oe3zvY0NVo0Ee/i8Q89UqmE56jStsq6/Lo4rH1yfVTLAnFdR43X8lC8u5uKvaQB9
-EELRUvY+chISVVahHFAt2DmuenPBnYIQqZ6I4rgf+RirT7Ee2qEL4Chty5bwrz61
-OfGiWEvZ/JmnVvn6SYicZ9wbKL58AL1eVMG6ylHBtjiAkJc2eg5QeS+uNnEBFjIG
-6UeVLBQQ1ldvYt/n8L3vyxqeKnf4f9/THg/4hvgYLvhs2Vpj8dL2syknwhfRb1pG
-7yLH7pD3wxibAK5gMVLNR8NdDZmfUeI/EyF++CqY5qj5YzN4qTUk2mvpdQI96bg0
-mgPs/t1mNg54M2W6TnWLAF7CnowK3UTAu3QxmxQuaxXf5uu0mWmxyAijzl7LTeoj
-6Gm/qyLALvE7cTAH/10PjkrvvP0MpZ6Fs9PWLEc3t1/6RoDXZA6BdzQARSjvhgMM
-Y2mY3tU2B7IUbycZQIkS
-=4el2
------END PGP SIGNATURE-----
+Samuel
