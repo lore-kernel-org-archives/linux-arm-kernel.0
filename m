@@ -1,41 +1,64 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 4 Jan 2015 18:44:13 +0000 (UTC)
-Subject: OMAP baseline test results for v3.19-rc1
-In-Reply-To: <8185039.GnfXITBRGF@wuerfel>
-References: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
- <8629693.mvYldWiixb@wuerfel>
- <alpine.DEB.2.02.1501031955170.27058@utopia.booyaka.com>
- <8185039.GnfXITBRGF@wuerfel>
-Message-ID: <alpine.DEB.2.02.1501041842210.28771@utopia.booyaka.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 04 Jan 2015 20:20:15 +0100
+Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
+In-Reply-To: <20150102181423.GS11285@n2100.arm.linux.org.uk>
+References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
+ <20150102181423.GS11285@n2100.arm.linux.org.uk>
+Message-ID: <54A9926F.9090607@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 4 Jan 2015, Arnd Bergmann wrote:
+Hi Russell,
 
-> So 3.16 was by far the largest increase, almost 10x bigger than the 3.19 increase, but
-> others are quite big as well.
-> 
-> Do you know what happened in 3.16?
+On 02-01-15 19:14, Russell King - ARM Linux wrote:
+> On Fri, Jan 02, 2015 at 05:14:04PM +0100, Ulf Hansson wrote:
+>> To be able to handle these SOC specific power sequences, we add a MMC power
+>> sequence interface, which helps the mmc core to deal with such.
+>
+> I think this should be done differently - part of that is with hind sight
+> given that we now have a range of interface types.
+>
+> One of my early design mistakes with MMC was to incorporate the power up
+> and initialisation protocol (the 74 clocks business) into the core code.
+> This was wrong, because it is a detail which only applies to dumb host
+> interfaces.  More inteligent interfaces do not need that complexity as
+> they handle that in hardware.
+>
+> Rather than MMC ending up with more layers and more infrastructure like
+> this - turning it more into the turd which is sdhci - I would like to see
+> some proper thought put into design, specifically addressing the above
+> design issue.
+>
+> What should be done is to move away from the opaque "set_ios" method into
+> something more appropriate - a set of callbacks which describe what we
+> want to achieve.
 
-It was commit 1413c03893332366e5b4d1e26f942ada25f3e82a ("lockdep: Increase 
-static allocations").
+I think you misunderstand what this patch-set tries to do, this patch-set
+is intended for use with on board sdio devices, which typically may need
+a number of resources initialized before the can be probed over the sd
+bus at all. E.g. a regulator enabled, a reset de-asserted, a clk configured
+and provided, etc. So this is about sequencing of events before even
+trying to talk to the device at the basic spi compatible layer.
 
+Your ideas seem like a good idea to improve the mmc subsys, but this
+is somewhat unrelated, in a way this could apply equally to say an usb
+attached device, or basically any discoverable bus, where some onboard
+devices may need some form of enabling (or power up) before they can be
+discovered.
 
-- Paul
+Which is why the original patchset Ulf references in the cover letter was
+trying to be more generic, since the got nowhere Ulf now is trying with
+something mmc specific, since the direct need for this functionality is
+with sdio devices.
 
-commit 1413c03893332366e5b4d1e26f942ada25f3e82a
-Author: Sasha Levin <sasha.levin@oracle.com>
-Date:   Wed Jan 8 14:21:46 2014 -0500
+Note that this is a real world problem which has been hacked around a lot
+in vendor kernels, so although getting the design right as always is
+important, it is also important to at some point come up with something
+workable, and if you look at previous threads on this topic, you will see
+that has already been discussed a lot, and always seems to get stuck on
+people trying to find the "perfect. 100% generic" solution, a typical
+example of perfect being the enemy of good.
 
-    lockdep: Increase static allocations
-    
-    Fuzzing a recent kernel with a large configuration hits the static
-    allocation limits and disables lockdep.
-    
-    This patch doubles the limits.
-    
-    Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
-    Signed-off-by: Peter Zijlstra <peterz@infradead.org>
-    Link: http://lkml.kernel.org/r/1389208906-24338-1-git-send-email-sasha.levin at oracle.com
-    Cc: linux-kernel at vger.kernel.org
-    Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Regards,
+
+Hans
