@@ -1,66 +1,32 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun, 4 Jan 2015 21:55:51 +0200
-Subject: OMAP baseline test results for v3.19-rc1
-In-Reply-To: <3902724.ayWKVuEiEg@wuerfel>
-References: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
- <8629693.mvYldWiixb@wuerfel>
- <20150103134437.GO582@fuloong-minipc.musicnaut.iki.fi>
- <3902724.ayWKVuEiEg@wuerfel>
-Message-ID: <20150104195550.GP582@fuloong-minipc.musicnaut.iki.fi>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Sun,  4 Jan 2015 21:39:18 +0100
+Subject: [PATCH 2/4] clk: tegra20: init NDFLASH clock to sensible rate
+In-Reply-To: <1420403960-26626-1-git-send-email-dev@lynxeye.de>
+References: <1420403960-26626-1-git-send-email-dev@lynxeye.de>
+Message-ID: <1420403960-26626-2-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Set up the NAND Flash controller clock to run at 150MHz
+instead of the rate set by the bootloader. This is a
+conservative rate which also yields good performance.
 
-On Sun, Jan 04, 2015 at 05:46:31PM +0100, Arnd Bergmann wrote:
-> On Saturday 03 January 2015 15:44:38 Aaro Koskinen wrote:
-> > On Sat, Jan 03, 2015 at 01:51:53PM +0100, Arnd Bergmann wrote:
-> > > On Saturday 03 January 2015 07:21:49 Paul Walmsley wrote:
-> > > > Another ~300KB kernel object size increase for omap2plus_defconfig 
-> > > > kernels.
-> > > 
-> > > 300kb seems like a lot for a single release. Have you looked into
-> > > where this is coming from?
-> > 
-> > In 3.19-rc1, all initrd decompressors are by default enabled...
-> 
-> Interesting, this seems to be the opposite of the intention of the
-> change that caused it, which tried to let you disable the algorithms
-> without selecting CONFIG_EXPERT. For some reason that is impossible
-> to know now, they already defaulted to 'n' when EXPERT was set, but
-> now they default to 'y'.
-> 
-> Does this indeed cause the entire change in size?
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+---
+ drivers/clk/tegra/clk-tegra20.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Actually, no. It seems a bigger contributor is enabling SATA
-in omap2plus_defconfig. But there still something else... Below is some
-data based on quick checks.
-
-v3.18 / omap2plus_defconfig:
-
-	text     data   bss     dec             hex     filename
-	8811980  790500 8423536 18026016        1130e20 vmlinux
-
-v3.19-rc1 / omap2plus_defconfig:
-
-	text     data   bss     dec             hex     filename
-	9093858  800316 8419072 18313246        117701e vmlinux
-
-v3.19-rc1 / omap2plus_defconfig + revert ec72c666fb34 ("usr/Kconfig: make
-initrd compression algorithm selection not expert"):
-
-	text     data   bss     dec             hex     filename
-	9070939  800260 8419072 18290271        117165f vmlinux
-
-v3.19-rc1 / omap2plus_defconfig + revert 661ea91b676b ("ARM:
-omap2plus_defconfig: Enable AHCI_PLATFORM driver"):
-
-	text     data   bss     dec             hex     filename
-	8928148  792700 8414784 18135632        114ba50 vmlinux
-
-v3.19-rc1 / omap2plus_defconfig + revert ec72c666fb34 & 661ea91b676b:
-
-	text     data   bss     dec             hex     filename
-	8901129  792644 8414784 18108557        114508d vmlinux
-
-A.
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 41272dc..f20424d 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -1063,6 +1063,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{TEGRA20_CLK_DISP2, TEGRA20_CLK_PLL_P, 600000000, 0},
+ 	{TEGRA20_CLK_GR2D, TEGRA20_CLK_PLL_C, 300000000, 0},
+ 	{TEGRA20_CLK_GR3D, TEGRA20_CLK_PLL_C, 300000000, 0},
++	{TEGRA20_CLK_NDFLASH, TEGRA20_CLK_PLL_P, 150000000, 0},
+ 	{TEGRA20_CLK_CLK_MAX, TEGRA20_CLK_CLK_MAX, 0, 0}, /* This MUST be the last entry */
+ };
+ 
+-- 
+2.1.0
