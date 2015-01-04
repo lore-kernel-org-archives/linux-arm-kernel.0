@@ -1,65 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 04 Jan 2015 17:38:06 +0100
-Subject: [RFC][PATCH RESEND] mm: vmalloc: remove ioremap align constraint
-In-Reply-To: <20150103185946.1d4fad32bb3de9ac9bdcfb88@gmail.com>
-References: <1419328813-2211-1-git-send-email-d.safonov@partner.samsung.com>
- <11656044.WGcPr1b8t8@wuerfel>
- <20150103185946.1d4fad32bb3de9ac9bdcfb88@gmail.com>
-Message-ID: <5891256.RkdjYUxedq@wuerfel>
+Date: Sun, 04 Jan 2015 17:46:31 +0100
+Subject: OMAP baseline test results for v3.19-rc1
+In-Reply-To: <20150103134437.GO582@fuloong-minipc.musicnaut.iki.fi>
+References: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
+ <8629693.mvYldWiixb@wuerfel>
+ <20150103134437.GO582@fuloong-minipc.musicnaut.iki.fi>
+Message-ID: <3902724.ayWKVuEiEg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 03 January 2015 18:59:46 Sergey Dyasly wrote:
-> Hi Arnd,
+On Saturday 03 January 2015 15:44:38 Aaro Koskinen wrote:
 > 
-> First, some background information. We originally encountered high fragmentation
-> issue in vmalloc area:
+> On Sat, Jan 03, 2015 at 01:51:53PM +0100, Arnd Bergmann wrote:
+> > On Saturday 03 January 2015 07:21:49 Paul Walmsley wrote:
+> > > Another ~300KB kernel object size increase for omap2plus_defconfig 
+> > > kernels.
+> > 
+> > 300kb seems like a lot for a single release. Have you looked into
+> > where this is coming from?
 > 
-> 	1. Total size of vmalloc area was 400 MB.
-> 	2. 200 MB of vmalloc area was consumed by ioremaps of various sizes.
-> 	3. Largest contiguous chunk of vmalloc area was 12 MB.
-> 	4. ioremap of 10 MB failed due to 8 MB alignment requirement.
-
-Interesting, can you describe how you end up with that many ioremap mappings?
-200MB seems like a lot. Do you perhaps get a lot of duplicate entries for the
-same hardware registers, or maybe a leak?
-
-Can you send the output of /proc/vmallocinfo?
- 
-> It was decided to further increase the size of vmalloc area to resolve the above
-> issue. And I don't like that solution because it decreases the amount of lowmem.
-
-If all the mappings are in fact required, have you considered using
-CONFIG_VMSPLIT_2G split to avoid the use of highmem?
-
-> Now let's see how ioremap uses supersections. Judging from current implementation
-> of __arm_ioremap_pfn_caller:
+> In 3.19-rc1, all initrd decompressors are by default enabled...
 > 
-> 	#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
-> 		if (pfn >= 0x100000 && !((paddr | size | addr) & ~SUPERSECTION_MASK)) {
-> 			remap_area_supersections();
-> 		} else if (!((paddr | size | addr) & ~PMD_MASK)) {
-> 			remap_area_sections();
-> 		} else
-> 	#endif
-> 			err = ioremap_page_range();
+>  CONFIG_RD_GZIP=y
+> -# CONFIG_RD_BZIP2 is not set
+> -# CONFIG_RD_LZMA is not set
+> -# CONFIG_RD_XZ is not set
+> -# CONFIG_RD_LZO is not set
+> -# CONFIG_RD_LZ4 is not set
+> +CONFIG_RD_BZIP2=y
+> +CONFIG_RD_LZMA=y
+> +CONFIG_RD_XZ=y
+> +CONFIG_RD_LZO=y
+> +CONFIG_RD_LZ4=y
 > 
-> supersections and sections mappings are used only in !SMP && !LPAE case.
-> Otherwise, mapping is created using the usual 4K pages (and we are using SMP).
-> The suggested patch removes alignment requirements for ioremap but it means that
-> sections will not be used in !SMP case. So another solution is required.
-> 
-> __get_vm_area_node has align parameter, maybe it can be used to specify the
-> required alignment of ioremap operation? Because I find current generic fls
-> algorithm to be very restrictive in cases when it's not necessary to use such
-> a big alignment.
 
-I think using next-power-of-two alignment generally helps limit the effects of
-fragmentation the same way that the buddy allocator works.
+Interesting, this seems to be the opposite of the intention of the
+change that caused it, which tried to let you disable the algorithms
+without selecting CONFIG_EXPERT. For some reason that is impossible
+to know now, they already defaulted to 'n' when EXPERT was set, but
+now they default to 'y'.
 
-Since the section and supersection maps are only used with non-SMP non-LPAE
-(why is that the case btw?), it would however make sense to use the default
-(7 + PAGE_SHIFT) instead of the ARM-specific 24 here if one of them is set,
-I don't see any downsides to that.
+Does this indeed cause the entire change in size?
 
 	Arnd
