@@ -1,62 +1,240 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sun, 4 Jan 2015 10:57:27 +0800
-Subject: kernel panic when booting on exynos 5440
-In-Reply-To: <549BE7CC.1000005@samsung.com>
-References: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
- <549BE7CC.1000005@samsung.com>
-Message-ID: <CACVXFVOVS=sVqxe3q3_SShxoTkHy+yi4+2Go9k4gqhUgBjiZFQ@mail.gmail.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Sun, 04 Jan 2015 14:05:37 +0900
+Subject: [PATCH v18 10/11] ARM: kprobes: check register usage for probed
+ instruction.
+In-Reply-To: <1419826043-27935-1-git-send-email-wangnan0@huawei.com>
+References: <54A07FBE.3010206@hitachi.com>
+ <1419826043-27935-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <54A8CA21.1060009@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+Hi Wang,
 
-On Thu, Dec 25, 2014 at 6:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> +CC: Thomas Abraham
->
-> Hi Ming,
->
-> On Thursday 25 December 2014 02:18 PM, Ming Lei wrote:
->>
->> Hi Pankaj,
->>
->> In your commit fce9e5bb2(ARM: EXYNOS: Add support for
->> mapping PMU base address via DT), 'pmu_base_addr' is
->> only parsed for very limited machines from the table of
->> 'exynos_dt_pmu_match'.  For other boards, 'pmu_base_addr'
->> will keep its default value of null, then panic() is triggered.
->>
->
-> Yes, it will.
-> As exynos5440 DT does not have PMU device node, neither above mentioned
-> patch added corresponding matching device_id.
-> If I remember correctly, I might have missed this because exynos5440 DT was
-> not having PMU node.
->
->> What do you think about the problem?
->
->
-> I missed this part, and I should have taken care of this in original patch
-> itself. Well as of now I can think of only one solution that if we really
-> want to keep support for exynos5440 in mainline kernel, to avoid above issue
-> we should skip pmu mapping for exynos5440. In this case following patch will
-> do this work.
->
-> Also I will like to know from Kukjin that what best can be done now.
-> If he is OK with below solution I can post the same.
->
-> ---------------------------------------------------------------
->
-> Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
->
-> Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
-> of mapping of exynos5440 PMU register which will result in kernel panic.
-> As of now let's avoid mapping of exynos5440 PMU.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+(2014/12/29 13:07), Wang Nan wrote:
+> This patch utilizes previous introduced checker to check register usage
+> for probed ARM instruction and saves it in a mask. Futher patch will
+> use such information to avoid simuation or emulation.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  arch/arm/include/asm/probes.h          |  12 ++++
+>  arch/arm/probes/decode.c               |   7 ++
+>  arch/arm/probes/kprobes/actions-arm.c  |   2 +-
+>  arch/arm/probes/kprobes/checkers-arm.c | 124 +++++++++++++++++++++++++++++++++
+>  arch/arm/probes/kprobes/checkers.h     |   1 +
+>  5 files changed, 145 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+> index f0a1ee8..ee04067 100644
+> --- a/arch/arm/include/asm/probes.h
+> +++ b/arch/arm/include/asm/probes.h
+> @@ -41,6 +41,18 @@ struct arch_probes_insn {
+>  	probes_insn_singlestep_t	*insn_singlestep;
+>  	probes_insn_fn_t		*insn_fn;
+>  	int stack_space;
+> +
+> +	/* Use 2 bits for a register. One more bit for extension */
 
-Is there any opportunity to merge the fix? Or exynos5440 will not be
-supported in future?
+Would you have any concrete idea for the extend bits? If not, we don't need
+it at this point. I think we don't need to care about future binary compatibility :)
+(moreover, if you need another bitflag, you can add another flag)
+
+> +#define REG_NO_USE	(0)
+> +#define REG_USE		(1)
+> +#define REG_MASK	(3)
+> +#define __register_usage_flag(n, f)	((f) << ((n) * 2))
+> +#define __register_usage_mask(n)	(REG_MASK << ((n) * 2))
+> +#define __clean_register_flag(m, n)	((m) & (~(__register_usage_mask(n))))
+> +#define __set_register_flag(m, n, f)	(__clean_register_flag(m, n) | __register_usage_flag(n, f))
+> +#define set_register_nouse(m, n)	do {(m) = __set_register_flag(m, n, REG_NO_USE);} while(0)
+> +#define set_register_use(m, n)		do {(m) = __set_register_flag(m, n, REG_USE);} while(0)
+> +	int register_usage_mask;
+
+Is this a mask or flag? It seems a bit flag, if so, it should be "register_usage_flag".
+
+Thank you,
+
+>  };
+>  
+>  #endif /* __ASSEMBLY__ */
+> diff --git a/arch/arm/probes/decode.c b/arch/arm/probes/decode.c
+> index f9d7c42..d60a1b2 100644
+> --- a/arch/arm/probes/decode.c
+> +++ b/arch/arm/probes/decode.c
+> @@ -435,6 +435,13 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+>  	 */
+>  	asi->stack_space = 0;
+>  
+> +	/*
+> +	 * Similay to stack_space, register_usage_mask is filled by
+> +	 * checkers. Its default value is set to ~0, which is 'all
+> +	 * registers are used', to prevent any potential optimization.
+> +	 */
+> +	asi->register_usage_mask = ~(0UL);
+> +
+>  	if (emulate)
+>  		insn = prepare_emulated_insn(insn, asi, thumb);
+>  
+> diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
+> index 4fedd4c..26e435b 100644
+> --- a/arch/arm/probes/kprobes/actions-arm.c
+> +++ b/arch/arm/probes/kprobes/actions-arm.c
+> @@ -340,4 +340,4 @@ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+>  	[PROBES_LDMSTM] = {.decoder = kprobe_decode_ldmstm}
+>  };
+>  
+> -const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, NULL};
+> +const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, arm_regs_checker, NULL};
+> diff --git a/arch/arm/probes/kprobes/checkers-arm.c b/arch/arm/probes/kprobes/checkers-arm.c
+> index f817663..df1d77b 100644
+> --- a/arch/arm/probes/kprobes/checkers-arm.c
+> +++ b/arch/arm/probes/kprobes/checkers-arm.c
+> @@ -97,3 +97,127 @@ const struct decode_checker arm_stack_checker[NUM_PROBES_ARM_ACTIONS] = {
+>  	[PROBES_STORE] = {.checker = arm_check_stack},
+>  	[PROBES_LDMSTM] = {.checker = arm_check_stack},
+>  };
+> +
+> +static enum probes_insn __kprobes arm_check_regs_nouse(probes_opcode_t insn,
+> +		struct arch_probes_insn *asi,
+> +		const struct decode_header *h)
+> +{
+> +	asi->register_usage_mask = 0;
+> +	return INSN_GOOD;
+> +}
+> +
+> +static void __arm_check_regs(probes_opcode_t insn,
+> +		const struct decode_header *h,
+> +		int *quintuple)
+> +{
+> +	int i;
+> +	u32 regs = h->type_regs.bits >> DECODE_TYPE_BITS;
+> +	probes_opcode_t mask, shifted;
+> +
+> +	memset(quintuple, 0xff, sizeof(int) * 5);
+> +	for (i = 0, shifted = insn, mask = 0xf; regs != 0;
+> +			regs >>= 4, mask <<= 4, shifted >>= 4, i++)
+> +		if (regs & 0xf)
+> +			quintuple[i] = shifted & 0xf;
+> +}
+> +
+> +static enum probes_insn arm_check_regs_normal(probes_opcode_t insn,
+> +		struct arch_probes_insn *asi,
+> +		const struct decode_header *h)
+> +{
+> +	int quintuple[5], i;
+> +	asi->register_usage_mask = 0;
+> +	__arm_check_regs(insn, h, quintuple);
+> +	for (i = 0; i < 5; i++) {
+> +		int r = quintuple[i];
+> +		if (r < 0)
+> +			continue;
+> +		set_register_use(asi->register_usage_mask, r);
+> +	}
+> +
+> +	return INSN_GOOD;
+> +}
+> +
+> +static enum probes_insn arm_check_regs_ldmstm(probes_opcode_t insn,
+> +		struct arch_probes_insn *asi,
+> +		const struct decode_header *h)
+> +{
+> +	unsigned int reglist = insn & 0xffff;
+> +	unsigned int rn = (insn >> 16) & 0xf;
+> +	int i;
+> +
+> +	set_register_use(asi->register_usage_mask, rn);
+> +	for (i = 0; reglist > 0; i++, reglist >>= 1)
+> +		if (reglist & 1)
+> +			set_register_use(asi->register_usage_mask, i);
+> +	return INSN_GOOD;
+> +}
+> +
+> +static enum probes_insn arm_check_regs_mov_ip_sp(probes_opcode_t insn,
+> +		struct arch_probes_insn *asi,
+> +		const struct decode_header *h)
+> +{
+> +	/* should be 'mov ip, sp' */
+> +	set_register_use(asi->register_usage_mask, 12);
+> +	set_register_use(asi->register_usage_mask, 13);
+> +	return INSN_GOOD;
+> +}
+> +
+> +/*
+> + *                                    | Rn |Rt/d|         | Rm |
+> + * LDRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1101 xxxx
+> + * STRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1111 xxxx
+> + *                                    | Rn |Rt/d|         |imm4L|
+> + * LDRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1101 xxxx
+> + * STRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1111 xxxx
+> + *
+> + * Such instructions access Rt/d and its next register, so different
+> + * from others, a specific checker is required for Rt/d and Rt2/d2.
+> + */
+> +static enum probes_insn arm_check_regs_ldrdstrd(probes_opcode_t insn,
+> +		struct arch_probes_insn *asi,
+> +		const struct decode_header *h)
+> +{
+> +	int quintuple[5], rn, rdt, rm;
+> +	asi->register_usage_mask = 0;
+> +	__arm_check_regs(insn, h, quintuple);
+> +
+> +	rn = quintuple[4];
+> +	rdt = quintuple[3];
+> +	rm = quintuple[0];
+> +        set_register_use(asi->register_usage_mask, rn);
+> +        set_register_use(asi->register_usage_mask, rdt);
+> +        set_register_use(asi->register_usage_mask, rdt + 1);
+> +	if (rm >= 0)
+> +		set_register_use(asi->register_usage_mask, rm);
+> +
+> +	return INSN_GOOD;
+> +}
+> +
+> +
+> +const struct decode_checker arm_regs_checker[NUM_PROBES_ARM_ACTIONS] = {
+> +	[PROBES_EMULATE_NONE] = {.checker = arm_check_regs_nouse},
+> +	[PROBES_SIMULATE_NOP] = {.checker = arm_check_regs_nouse},
+> +	[PROBES_MRS] = {.checker = arm_check_regs_normal},
+> +	[PROBES_SATURATING_ARITHMETIC] = {.checker = arm_check_regs_normal},
+> +	[PROBES_MUL1] = {.checker = arm_check_regs_normal},
+> +	[PROBES_MUL2] = {.checker = arm_check_regs_normal},
+> +	[PROBES_MUL_ADD_LONG] = {.checker = arm_check_regs_normal},
+> +	[PROBES_MUL_ADD] = {.checker = arm_check_regs_normal},
+> +	[PROBES_LOAD] = {.checker = arm_check_regs_normal},
+> +	[PROBES_LOAD_EXTRA] = {.checker = arm_check_regs_normal},
+> +	[PROBES_STORE] = {.checker = arm_check_regs_normal},
+> +	[PROBES_STORE_EXTRA] = {.checker = arm_check_regs_normal},
+> +	[PROBES_DATA_PROCESSING_REG] = {.checker = arm_check_regs_normal},
+> +	[PROBES_DATA_PROCESSING_IMM] = {.checker = arm_check_regs_normal},
+> +	[PROBES_SATURATE] = {.checker = arm_check_regs_normal},
+> +	[PROBES_REV] = {.checker = arm_check_regs_normal},
+> +	[PROBES_MMI] = {.checker = arm_check_regs_normal},
+> +	[PROBES_PACK] = {.checker = arm_check_regs_normal},
+> +	[PROBES_EXTEND] = {.checker = arm_check_regs_normal},
+> +	[PROBES_EXTEND_ADD] = {.checker = arm_check_regs_normal},
+> +	[PROBES_BITFIELD] = {.checker = arm_check_regs_normal},
+> +	[PROBES_LDMSTM] = {.checker = arm_check_regs_ldmstm},
+> +	[PROBES_MOV_IP_SP] = {.checker = arm_check_regs_mov_ip_sp},
+> +	[PROBES_LDRSTRD] = {.checker = arm_check_regs_ldrdstrd},
+> +};
+> diff --git a/arch/arm/probes/kprobes/checkers.h b/arch/arm/probes/kprobes/checkers.h
+> index bddfa0e..cf6c9e7 100644
+> --- a/arch/arm/probes/kprobes/checkers.h
+> +++ b/arch/arm/probes/kprobes/checkers.h
+> @@ -47,6 +47,7 @@ extern const union decode_action stack_check_actions[];
+>  
+>  #ifndef CONFIG_THUMB2_KERNEL
+>  extern const struct decode_checker arm_stack_checker[];
+> +extern const struct decode_checker arm_regs_checker[];
+>  #else
+>  #endif
+>  extern const struct decode_checker t32_stack_checker[];
+> 
 
 
-Thanks,
-Ming Lei
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
