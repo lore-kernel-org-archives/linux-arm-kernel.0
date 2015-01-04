@@ -1,64 +1,66 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 04 Jan 2015 20:20:15 +0100
-Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
-In-Reply-To: <20150102181423.GS11285@n2100.arm.linux.org.uk>
-References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
- <20150102181423.GS11285@n2100.arm.linux.org.uk>
-Message-ID: <54A9926F.9090607@redhat.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 4 Jan 2015 21:55:51 +0200
+Subject: OMAP baseline test results for v3.19-rc1
+In-Reply-To: <3902724.ayWKVuEiEg@wuerfel>
+References: <alpine.DEB.2.02.1501030712210.27058@utopia.booyaka.com>
+ <8629693.mvYldWiixb@wuerfel>
+ <20150103134437.GO582@fuloong-minipc.musicnaut.iki.fi>
+ <3902724.ayWKVuEiEg@wuerfel>
+Message-ID: <20150104195550.GP582@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On 02-01-15 19:14, Russell King - ARM Linux wrote:
-> On Fri, Jan 02, 2015 at 05:14:04PM +0100, Ulf Hansson wrote:
->> To be able to handle these SOC specific power sequences, we add a MMC power
->> sequence interface, which helps the mmc core to deal with such.
->
-> I think this should be done differently - part of that is with hind sight
-> given that we now have a range of interface types.
->
-> One of my early design mistakes with MMC was to incorporate the power up
-> and initialisation protocol (the 74 clocks business) into the core code.
-> This was wrong, because it is a detail which only applies to dumb host
-> interfaces.  More inteligent interfaces do not need that complexity as
-> they handle that in hardware.
->
-> Rather than MMC ending up with more layers and more infrastructure like
-> this - turning it more into the turd which is sdhci - I would like to see
-> some proper thought put into design, specifically addressing the above
-> design issue.
->
-> What should be done is to move away from the opaque "set_ios" method into
-> something more appropriate - a set of callbacks which describe what we
-> want to achieve.
+On Sun, Jan 04, 2015 at 05:46:31PM +0100, Arnd Bergmann wrote:
+> On Saturday 03 January 2015 15:44:38 Aaro Koskinen wrote:
+> > On Sat, Jan 03, 2015 at 01:51:53PM +0100, Arnd Bergmann wrote:
+> > > On Saturday 03 January 2015 07:21:49 Paul Walmsley wrote:
+> > > > Another ~300KB kernel object size increase for omap2plus_defconfig 
+> > > > kernels.
+> > > 
+> > > 300kb seems like a lot for a single release. Have you looked into
+> > > where this is coming from?
+> > 
+> > In 3.19-rc1, all initrd decompressors are by default enabled...
+> 
+> Interesting, this seems to be the opposite of the intention of the
+> change that caused it, which tried to let you disable the algorithms
+> without selecting CONFIG_EXPERT. For some reason that is impossible
+> to know now, they already defaulted to 'n' when EXPERT was set, but
+> now they default to 'y'.
+> 
+> Does this indeed cause the entire change in size?
 
-I think you misunderstand what this patch-set tries to do, this patch-set
-is intended for use with on board sdio devices, which typically may need
-a number of resources initialized before the can be probed over the sd
-bus at all. E.g. a regulator enabled, a reset de-asserted, a clk configured
-and provided, etc. So this is about sequencing of events before even
-trying to talk to the device at the basic spi compatible layer.
+Actually, no. It seems a bigger contributor is enabling SATA
+in omap2plus_defconfig. But there still something else... Below is some
+data based on quick checks.
 
-Your ideas seem like a good idea to improve the mmc subsys, but this
-is somewhat unrelated, in a way this could apply equally to say an usb
-attached device, or basically any discoverable bus, where some onboard
-devices may need some form of enabling (or power up) before they can be
-discovered.
+v3.18 / omap2plus_defconfig:
 
-Which is why the original patchset Ulf references in the cover letter was
-trying to be more generic, since the got nowhere Ulf now is trying with
-something mmc specific, since the direct need for this functionality is
-with sdio devices.
+	text     data   bss     dec             hex     filename
+	8811980  790500 8423536 18026016        1130e20 vmlinux
 
-Note that this is a real world problem which has been hacked around a lot
-in vendor kernels, so although getting the design right as always is
-important, it is also important to at some point come up with something
-workable, and if you look at previous threads on this topic, you will see
-that has already been discussed a lot, and always seems to get stuck on
-people trying to find the "perfect. 100% generic" solution, a typical
-example of perfect being the enemy of good.
+v3.19-rc1 / omap2plus_defconfig:
 
-Regards,
+	text     data   bss     dec             hex     filename
+	9093858  800316 8419072 18313246        117701e vmlinux
 
-Hans
+v3.19-rc1 / omap2plus_defconfig + revert ec72c666fb34 ("usr/Kconfig: make
+initrd compression algorithm selection not expert"):
+
+	text     data   bss     dec             hex     filename
+	9070939  800260 8419072 18290271        117165f vmlinux
+
+v3.19-rc1 / omap2plus_defconfig + revert 661ea91b676b ("ARM:
+omap2plus_defconfig: Enable AHCI_PLATFORM driver"):
+
+	text     data   bss     dec             hex     filename
+	8928148  792700 8414784 18135632        114ba50 vmlinux
+
+v3.19-rc1 / omap2plus_defconfig + revert ec72c666fb34 & 661ea91b676b:
+
+	text     data   bss     dec             hex     filename
+	8901129  792644 8414784 18108557        114508d vmlinux
+
+A.
