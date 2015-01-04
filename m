@@ -1,112 +1,54 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 04 Jan 2015 19:00:40 +0100
-Subject: [PATCH V2 9/9] clocksource: marco: rename marco to atlas7
-In-Reply-To: <1420249007-8262-10-git-send-email-21cnbao@gmail.com>
-References: <1420249007-8262-1-git-send-email-21cnbao@gmail.com>
- <1420249007-8262-10-git-send-email-21cnbao@gmail.com>
-Message-ID: <54A97FC8.7000505@linaro.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sun, 4 Jan 2015 19:40:12 +0100
+Subject: [RFC 8/8] ARM64: Add uprobe support
+In-Reply-To: <54A944ED.5010408@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
+ <20150102172333.GA6264@redhat.com> <54A944ED.5010408@redhat.com>
+Message-ID: <20150104184012.GA12614@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2015 02:36 AM, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+On 01/04, Pratyush Anand wrote:
 >
-> marco project is replaced by atlas7 and we should obliterate
-> its all traces.
+> On Friday 02 January 2015 10:53 PM, Oleg Nesterov wrote:
+>> But the main question is: why do we need add/find_ss_context ?? Please
+>> explain.
+>>
 >
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> See arch/arm64/kernel/debug-monitors.c: call_step_hook
+>
+> Unlike breakpoint exception, there is no ESR info check for step
+> exception. So, it is the responsibility of step handler
+> (uprobe_single_step_handler) to make sure that exception was generated
+> for it.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Yes, yes, this is clear. My point was, we can (I think) rely on
+uprobe_post_sstep_notifier() which checks ->active_uprobe != NULL.
 
-> ---
->   drivers/clocksource/Makefile                          |  2 +-
->   drivers/clocksource/{timer-marco.c => timer-atlas7.c} | 15 +++++++--------
->   2 files changed, 8 insertions(+), 9 deletions(-)
->   rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
->
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 94d90b2..306bc47 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -18,7 +18,7 @@ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
->   obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
->   obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
->   obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
-> -obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
-> +obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
->   obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
->   obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
->   obj-$(CONFIG_ARCH_PXA)		+= pxa_timer.o
-> diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-atlas7.c
-> similarity index 95%
-> rename from drivers/clocksource/timer-marco.c
-> rename to drivers/clocksource/timer-atlas7.c
-> index 361a789..60f9de3 100644
-> --- a/drivers/clocksource/timer-marco.c
-> +++ b/drivers/clocksource/timer-atlas7.c
-> @@ -38,7 +38,7 @@
->
->   #define SIRFSOC_TIMER_REG_CNT 6
->
-> -static unsigned long marco_timer_rate;
-> +static unsigned long atlas7_timer_rate;
->
->   static const u32 sirfsoc_timer_reg_list[SIRFSOC_TIMER_REG_CNT] = {
->   	SIRFSOC_TIMER_WATCHDOG_EN,
-> @@ -195,7 +195,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
->   	ce->rating = 200;
->   	ce->set_mode = sirfsoc_timer_set_mode;
->   	ce->set_next_event = sirfsoc_timer_set_next_event;
-> -	clockevents_calc_mult_shift(ce, marco_timer_rate, 60);
-> +	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
->   	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
->   	ce->min_delta_ns = clockevent_delta2ns(2, ce);
->   	ce->cpumask = cpumask_of(cpu);
-> @@ -255,9 +255,8 @@ static void __init sirfsoc_clockevent_init(void)
->   }
->
->   /* initialize the kernel jiffy timer source */
-> -static void __init sirfsoc_marco_timer_init(struct device_node *np)
-> +static void __init sirfsoc_atlas7_timer_init(struct device_node *np)
->   {
-> -	u32 timer_div;
->   	struct clk *clk;
->
->   	clk = of_clk_get(np, 0);
-> @@ -265,7 +264,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
->
->   	BUG_ON(clk_prepare_enable(clk));
->
-> -	marco_timer_rate = clk_get_rate(clk);
-> +	atlas7_timer_rate = clk_get_rate(clk);
->
->   	/* timer dividers: 0, not divided */
->   	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
-> @@ -283,7 +282,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
->   	/* Clear all interrupts */
->   	writel_relaxed(0xFFFF, sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
->
-> -	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, marco_timer_rate));
-> +	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, atlas7_timer_rate));
->
->   	sirfsoc_clockevent_init();
->   }
-> @@ -302,6 +301,6 @@ static void __init sirfsoc_of_timer_init(struct device_node *np)
->   	if (!sirfsoc_timer1_irq.irq)
->   		panic("No irq passed for timer1 via DT\n");
->
-> -	sirfsoc_marco_timer_init(np);
-> +	sirfsoc_atlas7_timer_init(np);
->   }
-> -CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick", sirfsoc_of_timer_init );
-> +CLOCKSOURCE_OF_DECLARE(sirfsoc_atlas7_timer, "sirf,atlas7-tick", sirfsoc_of_timer_init);
->
+And I guess you understood what I meant, but since I wasn't clear let
+me repeat to ensure we really understand each other.
 
+Can't
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+	uprobe_single_step_handler(regs, esr)
+	{
+		if (user_mode(regs) && uprobe_post_sstep_notifier(regs))
+			return HANDLED;
+		return ERROR;
+	}
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+work without this step_ctx logic?
+
+If everything is correct, the probed task can execute a single (xol) insn
+in user-mode before the trap. If ->active_uprobe is set we know that we
+expect the ss trap in user-mode, and nothing else except this xol insn can
+generate it?
+
+Perhaps arm64 needs additional checks, I dunno... If you think that the
+->active_uprobe check is not enough you can probably also verify that
+"utask->state = UTASK_SSTEP" and/or "regs->pc - 4 == utask->xol_vaddr",
+but so far it seems to me that these additional checks can only make sense
+under WARN_ON().
+
+Oleg.
