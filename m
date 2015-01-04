@@ -1,125 +1,174 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Sun, 4 Jan 2015 16:19:05 +0800
-Subject: [PATCH 0/8] arm64: improved memory map handling for /dev/mem,
- ACPI etc
-In-Reply-To: <CAKv+Gu_Ou6Fv7-AUcpbUJAijwEJ8=PCB1mQU3mCfctLFAMhu_w@mail.gmail.com>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141226093528.GA26133@darkstar.redhat.com>
- <CAKv+Gu_1VCJK7y5U9H-mhjjN6AFW8+SGvbKUZfuzx6qGEpVg0A@mail.gmail.com>
- <20141230092514.GF2457@darkstar.redhat.com>
- <CAKv+Gu_Ou6Fv7-AUcpbUJAijwEJ8=PCB1mQU3mCfctLFAMhu_w@mail.gmail.com>
-Message-ID: <20150104081905.GA6231@darkstar.redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 4 Jan 2015 10:00:36 +0100
+Subject: [PATCHv2] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20141230135701.GN17565@valkosipuli.retiisi.org.uk>
+References: <20141203214641.GA1390@amd> <20141224223434.GA20669@amd>
+ <20141230135701.GN17565@valkosipuli.retiisi.org.uk>
+Message-ID: <20150104090036.GA30683@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/30/14 at 01:21pm, Ard Biesheuvel wrote:
-> On 30 December 2014 at 09:25, Dave Young <dyoung@redhat.com> wrote:
-> > On 12/29/14 at 09:22am, Ard Biesheuvel wrote:
-> >> On 26 December 2014 at 09:35, Dave Young <dyoung@redhat.com> wrote:
-> >> > On 12/22/14 at 07:08pm, Ard Biesheuvel wrote:
-> >> >> This series was split off from the UEFI virtmap for kexec series that I posted
-> >> >> earlier today. The main purpose is to deal with the need to classify memory
-> >> >> ranges as RAM or non-RAM in a consistent and comprehensive manner. This series
-> >> >> applies on top of the other series.
-> >> >>
-> >> >> Patch #1 avoids an early panic if the UEFI memory map is available but UEFI
-> >> >> support itself fails to initialize. In this case, there is no need to panic
-> >> >> early, and we have a better chance of being able to inform the user if we deal
-> >> >> with this error condition at a later time.
-> >> >>
-> >> >> Patch #2 adds iomem resource registration of UEFI memory regions. This is
-> >> >> necessary because otherwise, drivers could potentially claim regions that
-> >> >> are in active use by the firmware. This applies to both MMIO (NOR flash, RTC)
-> >> >> and RAM ranges (runtime services code and data).
-> >> >>
-> >> >> Patch #3-6 adds support to UEFI and non-UEFI code paths to record all memory
-> >> >> known to the system in the 'physmem' memblock table (if enabled). This fulfils
-> >> >> a need in the /dev/mem and (upcoming) ACPI layers to be able to classify ranges
-> >> >> as being backed by normal RAM even if they are not covered by the 'memory'
-> >> >> memblock table, and are hence not covered by the linear direct mapping.
-> >> >> The physmem code is pre-existing code that only needs minor tweaking to be made
-> >> >> suitable for this purpose.
-> >> >>
-> >> >> Patch #7 enables the 'physmem' memblock table for arm64, and wires it into the
-> >> >> handling of /dev/mem mappings, both to decide whether it should be mapped as
-> >> >> MT_NORMAL, and whether read-write access can be allowed. (Non-RAM regions can
-> >> >> be mapped read-write as long as they are not claimed by a driver in the iomem
-> >> >> resource table. RAM regions can only be mapped read-only, and only if they are
-> >> >> not covered by the 'memory' memblock table, and hence not covered by the linear
-> >> >> mapping)
-> >> >>
-> >> >> Finally, patch #8 changes the way the virtual memory map is handled by the
-> >> >> early UEFI code. Specifically, it memblock_remove()s rather than _reserves()
-> >> >> UEFI reserved RAM regions, so that they are removed entirely from the linear
-> >> >> mapping.
-> >> >>
-> >> >> Ard Biesheuvel (8):
-> >> >>   arm64/efi: use UEFI memory map unconditionally if available
-> >> >>   arm64/efi: register UEFI reserved regions as iomem resources
-> >> >>   memblock: add physmem to memblock_dump_all() output
-> >> >>   memblock: introduce memblock_add_phys() and memblock_is_physmem()
-> >> >>   of: fdt: register physmem in early_init_dt_scan_memory()
-> >> >>   arm64/efi: register physmem in reserve_regions()
-> >> >>   arm64: use 'physmem' memblock to improve CONFIG_STRICT_DEVMEM handling
-> >> >>   arm64/efi: memblock_remove rather than _reserve UEFI reserved RAM
-> >> >
-> >> > Ard, It is much cleaner for this splitting.
-> >> >
-> >>
-> >> Thanks for having a look.
-> >>
-> >> > I wonder if some of them can become general code such as register reserved
-> >> > regions as iomem resources?
-> >> >
-> >>
-> >> AFAICT, the x86 code adds reservations for such regions to the E820
-> >> memory map, which in turn is used to memblock_reserve() the actual
-> >> memory. Also, sharing of the RTC is handled with a dedicated mutex in
-> >> the runtime services wrapper code (and x86 does not even use the time
-> >> related runtime services as they are broken on many firmware
-> >> implementations) so blindly applying the same logic to x86 or ia64
-> >> would likely break stuff.
-> >
-> > Ok, I think bootloader will pass the E820 ranges though it can not tell
-> > which region is for what.
-> >
-> >>
-> >> Do you (or Mark) have any feedback on the utility of this series in
-> >> the ACPI context? I failed to mention in the cover letter that
-> >> memblock_is_physmem() now serves the purpose of page_is_ram(), i.e.,
-> >> whether a physical region is backed by a slice of RAM that was left
-> >> out of the kernel's linear mapping.
-> >
-> > I will do some test later along with the stable mapping stuff.
+Hi!
 
-The whole patchset works well without the last patch.
-
-I found that patch 8/8 caused system boot hangs very early.
-Just after stub print something about virtmap..
-
-Any idea about it? I tested your patches upon 3.18.
-
-
-> >
+> Thanks for the patch! A few comments below.
 > 
-> Cheers.
+> On Wed, Dec 24, 2014 at 11:34:34PM +0100, Pavel Machek wrote:
+> > 
+> > We are moving to device tree support on OMAP3, but that currently
+> > breaks ADP1653 driver. This adds device tree support, plus required
+> > documentation.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > ---
+> > 
+> > Changed -microsec to -us, as requested by devicetree people.
+> > 
+> > Fixed checkpatch issues.
+> > 
+> > diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+> > index 2d88816..2c6c7c5 100644
+> > --- a/Documentation/devicetree/bindings/leds/common.txt
+> > +++ b/Documentation/devicetree/bindings/leds/common.txt
+> > @@ -14,6 +14,15 @@ Optional properties for child nodes:
+> >       "ide-disk" - LED indicates disk activity
+> >       "timer" - LED flashes at a fixed, configurable rate
+> >  
+> > +- max-microamp : maximum intensity in microamperes of the LED
+> > +	         (torch LED for flash devices)
 > 
-> > BTW, with previous stable mapping patches on modified 3.18 tree kexec kernel
-> > panics because of damaged efi mempry map arrays. It contains some
-> > random value instead of right addresses so that virt_to_phys return
-> > same value for vendor field. Will do more debugging maybe I missed something.
-> > Any clue for debugging above issue will be appreciated.
-> >
+> s/torch LED/torch mode/
 > 
-> No clues, unfortunately. The memory map is not used after early boot,
-> so it may be getting clobbered at any point between the first boot and
-> the second boot.
+> > +- flash-max-microamp : maximum intensity in microamperes of the
+> > +                       flash LED; it is mandatory if the LED should
+> > +		       support the flash mode
+> > +- flash-timeout-microsec : timeout in microseconds after which the flash
+> > +                           LED is turned off
+> 
+> These should go to a different patch.
 
-It was caused by uefi sys table/mmap start addresses changes.
-I generate dtb from acpi=off boot /proc/device-tree, and use the dtb for kexec
-boot, but seems mmap addresses changes sometimes.
+Actually these both should not be in this patch in the first place.
 
-Do you know have plan or status in Linaro for exporting dtb for acpi booting?
+> > +  - reg: I2C slave address
+> > +
+> > +  - gpios: References to the GPIO that controls the power for the chip.
+> > +
+> > +There are two led outputs available - flash and indicator. One led is
+> > +represented by one child node, nodes need to be named "flash" and "indicator".
+> 
+> 80 characters per line.
 
-Thanks
-Dave
+Count them. It is.
+
+> > +
+> > +Required properties of the LED child node:
+> > +- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> > +
+> > +Required properties of the flash LED child node:
+> > +
+> > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> > +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
+> > +
+> > +Example:
+> > +
+> > +        adp1653: led-controller at 30 {
+> > +                compatible = "adi,adp1653";
+> > +		reg = <0x30>;
+> > +                gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> 
+> Please use tabs for indentation above (and below).
+
+Ok.
+
+> > --- a/arch/arm/boot/dts/omap3-n900.dts
+> > +++ b/arch/arm/boot/dts/omap3-n900.dts
+> > @@ -553,6 +558,22 @@
+> >  
+> >  		ti,usb-charger-detection = <&isp1704>;
+> >  	};
+> > +
+> > +	adp1653: led-controller at 30 {
+> > +		compatible = "adi,adp1653";
+> > +		reg = <0x30>;
+> > +		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> > +
+> > +		flash {
+> > +			flash-timeout-us = <500000>;
+> > +			flash-max-microamp = <320000>;
+> > +			max-microamp = <50000>;
+> > +		};
+> > +
+> > +		indicator {
+> > +			max-microamp = <17500>;
+> > +		};
+> > +	};
+> 
+> This should go to a separate patch as well.
+
+How many patches do I need to do for one trivial change? :-(.
+
+
+> > +	if (flash->platform_data->power)
+> > +		ret = flash->platform_data->power(&flash->subdev, on);
+> 
+> if () {
+> } else {
+> }
+
+Ok.
+
+> > +	else {
+> > +		gpio_set_value(flash->platform_data->power_gpio, on);
+> 
+> Shouldn't you add this to the platform data struct?
+
+I don't see what you mean.
+
+> power_gpio is actually a poor name for this, as is the "power" callback.
+> This is really "EN" gpio in the spec, I'd call it perhaps just "gpio", or
+> "enable_gpio".
+
+Feel free to clean that that up in followup patch.
+
+> > +		if (on) {
+> > +			/* Some delay is apparently required. */
+> > +			udelay(20);
+> 
+> The driver should always handle the delay, platform data or not. This
+> reminds me --- is there a need to retain the support for platform data? I
+> don't think it's being used anywhere. I'm fine with both keeping and
+> removing it.
+
+Lets do that in followup patch, if needed.
+
+> > +	child = of_get_child_by_name(node, "indicator");
+> > +	if (!child)
+> > +		return -EINVAL;
+> 
+> Do you require an indicator to be connected? I think it shouldn't be
+> mandatory, at least the driver should work without it, even if it
+> exposes
+> the control (making that conditional would be a subject for another patch,
+> but that doesn't need to be done now).
+
+Another patch, if someone needs it, yes.	
+
+> > +	if (of_property_read_u32(child, "max-microamp", &val))
+> > +		return -EINVAL;
+> > +	pd->max_indicator_intensity = val;
+> > +
+> > +	if (!of_find_property(node, "gpios", NULL)) {
+> > +		dev_err(&client->dev, "No gpio node\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	gpio = of_get_gpio_flags(node, 0, &flags);
+> 
+> You could assign to pd->... here.
+
+Ok.
+								Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
