@@ -1,126 +1,57 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Sun, 04 Jan 2015 14:25:48 +0900
-Subject: [PATCH v18 11/11] ARM: optprobes: execute instruction during
- restoring if possible.
-In-Reply-To: <1419826053-27988-1-git-send-email-wangnan0@huawei.com>
-References: <54A07FBE.3010206@hitachi.com>
- <1419826053-27988-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <54A8CEDC.8060808@hitachi.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 03 Jan 2015 23:33:25 -0700
+Subject: Tegra 2 T20 NAND Flash Support
+In-Reply-To: <1420314624.2169.6.camel@lynxeye.de>
+References: <538E6FB5.5020806@ziswiler.com> <1401866283.2173.3.camel@tellur>	
+ <538EC96A.4050702@ziswiler.com> <20140604144134.GH28484@ulmo>	
+ <1401903129.9454.2.camel@tellur> <1420314624.2169.6.camel@lynxeye.de>
+Message-ID: <54A8DEB5.4030208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/12/29 13:07), Wang Nan wrote:
-> This patch removes software emulation or simulation for most of probed
-> instructions. If the instruction doesn't use PC relative addressing,
-> it will be translated into following instructions in the restore code
-> in code template:
+On 01/03/2015 12:50 PM, Lucas Stach wrote:
+> Am Mittwoch, den 04.06.2014, 19:32 +0200 schrieb Lucas Stach:
+>> Am Mittwoch, den 04.06.2014, 16:41 +0200 schrieb Thierry Reding:
+>>> On Wed, Jun 04, 2014 at 09:23:22AM +0200, Marcel Ziswiler wrote:
+>>>> On 06/04/2014 09:18 AM, Lucas Stach wrote:
+>>>>> I took the Linux Tegra NAND driver from Thierry and cleaned it up quite
+>>>>> a bit. It now works with both ONFI and non-ONFI NAND, at least for
+>>>>> reading. Writing doesn't quite work yet and I've got side-tracked with
+>>>>> other stuff.
+>>>>>
+>>>>> If you are interested in moving this forward I can put up my WIP patches
+>>>>> to some public location.
+>>>>
+>>>> Sounds great, yes. That would be perfect, thanks.
+>>>>
+>>>> We even once got an universal NAND test infrastructure from Micron based on
+>>>> a re-worked Colibri T20 which we could use to validate it with various NAND
+>>>> flash parts.
+>>>
+>>> Excellent, I would've had a hard time digging up those patches. It's
+>>> really been quite a while.
+>>>
+>> I've put up a rebased version of the patches at
+>>
+>> git://git.pengutronix.de/git/lst/linux.git tegra-nand
+>>
+> For those still interested:
+> I've continued to work on this for the last few days and pushed a new
+> version of my WIP to the above location.
 > 
->  ldmia {r0 - r14}  // restore all instruction except PC
->  <instruction>     // direct execute the probed instruction
->  b next_insn       // branch to next instruction.
+> It is now in a state where the in-kernel mtd tests seem to be happy with
+> it. Also creating/using a filesystem on top of the mtdblock device seems
+> to work properly.
 > 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-
-Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-[...]
->  /*
-> + * See register_usage_mask. If the probed instruction doesn't use PC,
-> + * we can copy it into template and have it executed directly without
-> + * simulation or emulation.
-> + */
-> +#define can_kprobe_direct_exec(m)	(!((m) & __register_usage_mask(15)))
-
-BTW, is there any macro which indicates 15 is the number of PC register?
-If we can do something like below, it will be easier to understand.
-
-#define can_kprobe_direct_exec(m)	(!test_bit(ARM_REG_PC/* == 15*/, &m))
-
-Thank you,
-
-> +
-> +/*
->   * NOTE: the first sub and add instruction will be modified according
->   * to the stack cost of the instruction.
->   */
-> @@ -66,7 +73,15 @@ asm (
->  			"	orrne	r2, #1\n"
->  			"	strne	r2, [sp, #60] @ set bit0 of PC for thumb\n"
->  			"	msr	cpsr_cxsf, r1\n"
-> +			".global optprobe_template_restore_begin\n"
-> +			"optprobe_template_restore_begin:\n"
->  			"	ldmia	sp, {r0 - r15}\n"
-> +			".global optprobe_template_restore_orig_insn\n"
-> +			"optprobe_template_restore_orig_insn:\n"
-> +			"	nop\n"
-> +			".global optprobe_template_restore_end\n"
-> +			"optprobe_template_restore_end:\n"
-> +			"	nop\n"
->  			".global optprobe_template_val\n"
->  			"optprobe_template_val:\n"
->  			"1:	.long 0\n"
-> @@ -86,6 +101,12 @@ asm (
->  	((unsigned long *)&optprobe_template_add_sp - (unsigned long *)&optprobe_template_entry)
->  #define TMPL_SUB_SP \
->  	((unsigned long *)&optprobe_template_sub_sp - (unsigned long *)&optprobe_template_entry)
-> +#define TMPL_RESTORE_BEGIN \
-> +	((unsigned long *)&optprobe_template_restore_begin - (unsigned long *)&optprobe_template_entry)
-> +#define TMPL_RESTORE_ORIGN_INSN \
-> +	((unsigned long *)&optprobe_template_restore_orig_insn - (unsigned long *)&optprobe_template_entry)
-> +#define TMPL_RESTORE_END \
-> +	((unsigned long *)&optprobe_template_restore_end - (unsigned long *)&optprobe_template_entry)
->  
->  /*
->   * ARM can always optimize an instruction when using ARM ISA, except
-> @@ -155,8 +176,12 @@ optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
->  		__this_cpu_write(current_kprobe, NULL);
->  	}
->  
-> -	/* In each case, we must singlestep the replaced instruction. */
-> -	op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
-> +	/*
-> +	 * We singlestep the replaced instruction only when it can't be
-> +	 * executed directly during restore.
-> +	 */
-> +	if (!p->ainsn.kprobe_direct_exec)
-> +		op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
->  
->  	local_irq_restore(flags);
->  }
-> @@ -238,6 +263,28 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
->  	val = (unsigned long)optimized_callback;
->  	code[TMPL_CALL_IDX] = val;
->  
-> +	/* If possible, copy insn and have it executed during restore */
-> +	orig->ainsn.kprobe_direct_exec = false;
-> +	if (can_kprobe_direct_exec(orig->ainsn.register_usage_mask)) {
-> +		kprobe_opcode_t final_branch = arm_gen_branch(
-> +				(unsigned long)(&code[TMPL_RESTORE_END]),
-> +				(unsigned long)(op->kp.addr) + 4);
-> +		if (final_branch != 0) {
-> +			/*
-> +			 * Replace original 'ldmia sp, {r0 - r15}' with
-> +			 * 'ldmia {r0 - r14}', restore all registers except pc.
-> +			 */
-> +			code[TMPL_RESTORE_BEGIN] = __opcode_to_mem_arm(0xe89d7fff);
-> +
-> +			/* The original probed instruction */
-> +			code[TMPL_RESTORE_ORIGN_INSN] = __opcode_to_mem_arm(orig->opcode);
-> +
-> +			/* Jump back to next instruction */
-> +			code[TMPL_RESTORE_END] = __opcode_to_mem_arm(final_branch);
-> +			orig->ainsn.kprobe_direct_exec = true;
-> +		}
-> +	}
-> +
->  	flush_icache_range((unsigned long)code,
->  			   (unsigned long)(&code[TMPL_END_IDX]));
->  
+> I still need to validate that anything using the OOB areas is working
+> properly. The last missing feature is BCH ECC support, but that should
+> be easy to add.
 > 
+> I don't know if it still needs some performance tuning. 5MB/s write and
+> 12,5MB/s read on a Colibri T20 seem pretty slow me, but I have nothing
+> to compare with ATM.
+> Marcel could you maybe dig out some benchmarks with L4T?
 
-
--- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+That sounds pretty similar to the eMMC on devices of that age (at least
+with the upstream drivers that don't support fast transfer modes) so
+it's probably not bad...
