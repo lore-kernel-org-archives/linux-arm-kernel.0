@@ -1,97 +1,62 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Sun, 4 Jan 2015 06:21:41 +0530
-Subject: [PATCH v3 1/3] mmc: dw_mmc: fix the max_blk_count in IDMAC
-In-Reply-To: <CAD=FV=WQkkEM1aMPNX6oeKC4Bf2-D8z8uwf6z4btcdxiCpSvJw@mail.gmail.com>
-References: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
- <1419250324-11743-2-git-send-email-alim.akhtar@samsung.com>
- <CAD=FV=WQkkEM1aMPNX6oeKC4Bf2-D8z8uwf6z4btcdxiCpSvJw@mail.gmail.com>
-Message-ID: <CAGOxZ539VQ1fJbGpnJ-Awp0fQrU=-32zQYg4Tg8Vc67=8TnN+w@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sun, 4 Jan 2015 10:57:27 +0800
+Subject: kernel panic when booting on exynos 5440
+In-Reply-To: <549BE7CC.1000005@samsung.com>
+References: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
+ <549BE7CC.1000005@samsung.com>
+Message-ID: <CACVXFVOVS=sVqxe3q3_SShxoTkHy+yi4+2Go9k4gqhUgBjiZFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug / Sonny
-New year greetings!!
+Hi Guys,
 
-On Sat, Jan 3, 2015 at 4:37 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Alim,
+On Thu, Dec 25, 2014 at 6:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> +CC: Thomas Abraham
 >
-> On Mon, Dec 22, 2014 at 4:12 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
->> From: Seungwon Jeon <tgih.jun@samsung.com>
+> Hi Ming,
+>
+> On Thursday 25 December 2014 02:18 PM, Ming Lei wrote:
 >>
->> Even though 1MB is reserved for descriptor table in IDMAC,
->> the dw_mmc host driver is allowed to receive only maximum
->> 128KB block length in one request. This is caused by setting
->> improper max_blk_count. It needs to be e adjusted so that
->> descriptor table is used fully. It is found that the performance
->> is improved with the increased the max_blk_count.
+>> Hi Pankaj,
 >>
->> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>  drivers/mmc/host/dw_mmc.c |    4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+>> In your commit fce9e5bb2(ARM: EXYNOS: Add support for
+>> mapping PMU base address via DT), 'pmu_base_addr' is
+>> only parsed for very limited machines from the table of
+>> 'exynos_dt_pmu_match'.  For other boards, 'pmu_base_addr'
+>> will keep its default value of null, then panic() is triggered.
 >>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 64ea042..a1b80e5 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -2332,9 +2332,9 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->>  #ifdef CONFIG_MMC_DW_IDMAC
->>                 mmc->max_segs = host->ring_size;
->>                 mmc->max_blk_size = 65536;
->> -               mmc->max_blk_count = host->ring_size;
->>                 mmc->max_seg_size = 0x1000;
->> -               mmc->max_req_size = mmc->max_seg_size * mmc->max_blk_count;
->> +               mmc->max_req_size = mmc->max_seg_size * host->ring_size;
->> +               mmc->max_blk_count = mmc->max_req_size / 512;
 >
-> The numbers are a little different than the ones you and Sonny arrived
-> at about a year ago at
-> <https://chromium-review.googlesource.com/#/c/176488/>
+> Yes, it will.
+> As exynos5440 DT does not have PMU device node, neither above mentioned
+> patch added corresponding matching device_id.
+> If I remember correctly, I might have missed this because exynos5440 DT was
+> not having PMU node.
 >
-> You end up with the same max_req_size I think, but it looks as if
-> max_blk_count is 0x800 in your series and ix 0xffff in the one from a
-> year ago.  Do you have any explanation for why it is max_req_size /
-> 512?
+>> What do you think about the problem?
 >
-Before taking this patch, I went over all the discussions that had
-happened in past
-http://marc.info/?l=linux-mmc&m=133039478518090&w=2 (way back in 2012)
-http://www.spinics.net/lists/linux-mmc/msg25549.html
-and
-http://www.spinics.net/lists/linux-mmc/msg25797.html
+>
+> I missed this part, and I should have taken care of this in original patch
+> itself. Well as of now I can think of only one solution that if we really
+> want to keep support for exynos5440 in mainline kernel, to avoid above issue
+> we should skip pmu mapping for exynos5440. In this case following patch will
+> do this work.
+>
+> Also I will like to know from Kukjin that what best can be done now.
+> If he is OK with below solution I can post the same.
+>
+> ---------------------------------------------------------------
+>
+> Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
+>
+> Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
+> of mapping of exynos5440 PMU register which will result in kernel panic.
+> As of now let's avoid mapping of exynos5440 PMU.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-and the last one was having an ACK from maintainer.
-
-Having said that, I did check the performance number with current
-patch which has landed and with one which sets max_blk_count as
-0xFFFF.
-And both given exactly the same numbers on peach-pi (Write: ~52MB/s
-and Read: ~146MB/s (HS200) using iozone),
-
-I checked it a bit more and found that in both the case
-max_hw_sectors_kb is set to 1024 (max request size to block layer) and
-max_hw_sectors_kb is the one which actually affect the Performance
-numbers and max_hw_sectors_kb is set as
-
-blk_queue_max_hw_sectors(mq->queue, min(host->max_blk_count,
-host->max_req_size / 512));
-
-In case of 64bit IDMAC (one on exynos7) which given a different value
-for "ring_size", both the patches set the same max_hw_sectors_kb (512
-in this case)
-
-Do you see some performance degradation with some other variants of
-dw_mmc host controller with current ToT?
-
-Sonny,
-I ran iozone like: iozone -az -i0 -i1 -I -s 10M -f /home/test (on eMMC)
-
-> -Doug
+Is there any opportunity to merge the fix? Or exynos5440 will not be
+supported in future?
 
 
-
--- 
-Regards,
-Alim
+Thanks,
+Ming Lei
