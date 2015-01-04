@@ -1,174 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 4 Jan 2015 10:00:36 +0100
-Subject: [PATCHv2] media: i2c/adp1653: devicetree support for adp1653
-In-Reply-To: <20141230135701.GN17565@valkosipuli.retiisi.org.uk>
-References: <20141203214641.GA1390@amd> <20141224223434.GA20669@amd>
- <20141230135701.GN17565@valkosipuli.retiisi.org.uk>
-Message-ID: <20150104090036.GA30683@amd>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Sun, 4 Jan 2015 17:02:25 +0800
+Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel isi
+ and ov2640 sensor
+Message-ID: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patch series add ISI and ov2640 support on dts files.
 
-> Thanks for the patch! A few comments below.
-> 
-> On Wed, Dec 24, 2014 at 11:34:34PM +0100, Pavel Machek wrote:
-> > 
-> > We are moving to device tree support on OMAP3, but that currently
-> > breaks ADP1653 driver. This adds device tree support, plus required
-> > documentation.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > ---
-> > 
-> > Changed -microsec to -us, as requested by devicetree people.
-> > 
-> > Fixed checkpatch issues.
-> > 
-> > diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
-> > index 2d88816..2c6c7c5 100644
-> > --- a/Documentation/devicetree/bindings/leds/common.txt
-> > +++ b/Documentation/devicetree/bindings/leds/common.txt
-> > @@ -14,6 +14,15 @@ Optional properties for child nodes:
-> >       "ide-disk" - LED indicates disk activity
-> >       "timer" - LED flashes at a fixed, configurable rate
-> >  
-> > +- max-microamp : maximum intensity in microamperes of the LED
-> > +	         (torch LED for flash devices)
-> 
-> s/torch LED/torch mode/
-> 
-> > +- flash-max-microamp : maximum intensity in microamperes of the
-> > +                       flash LED; it is mandatory if the LED should
-> > +		       support the flash mode
-> > +- flash-timeout-microsec : timeout in microseconds after which the flash
-> > +                           LED is turned off
-> 
-> These should go to a different patch.
+As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
+So I want to send this dt patch early for a review.
 
-Actually these both should not be in this patch in the first place.
+v1 -> v2:
+  1. add one more patch to change the pin name of ISI_MCK
+  2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
+  3. move the common chip parts of ISI node to sama5d3.dtsi.
 
-> > +  - reg: I2C slave address
-> > +
-> > +  - gpios: References to the GPIO that controls the power for the chip.
-> > +
-> > +There are two led outputs available - flash and indicator. One led is
-> > +represented by one child node, nodes need to be named "flash" and "indicator".
-> 
-> 80 characters per line.
+Bo Shen (3):
+  ARM: at91: dts: sama5d3: split isi pinctrl
+  ARM: at91: dts: sama5d3: add missing pins of isi
+  ARM: at91: dts: sama5d3: move the isi mck pin to mb
 
-Count them. It is.
+Josh Wu (5):
+  ARM: at91: dts: sama5d3: add isi clock
+  ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
+  ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
+  ARM: at91: dts: sama5d3: add ov2640 camera sensor support
+  ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
 
-> > +
-> > +Required properties of the LED child node:
-> > +- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
-> > +
-> > +Required properties of the flash LED child node:
-> > +
-> > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
-> > +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
-> > +
-> > +Example:
-> > +
-> > +        adp1653: led-controller at 30 {
-> > +                compatible = "adi,adp1653";
-> > +		reg = <0x30>;
-> > +                gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-> 
-> Please use tabs for indentation above (and below).
-
-Ok.
-
-> > --- a/arch/arm/boot/dts/omap3-n900.dts
-> > +++ b/arch/arm/boot/dts/omap3-n900.dts
-> > @@ -553,6 +558,22 @@
-> >  
-> >  		ti,usb-charger-detection = <&isp1704>;
-> >  	};
-> > +
-> > +	adp1653: led-controller at 30 {
-> > +		compatible = "adi,adp1653";
-> > +		reg = <0x30>;
-> > +		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-> > +
-> > +		flash {
-> > +			flash-timeout-us = <500000>;
-> > +			flash-max-microamp = <320000>;
-> > +			max-microamp = <50000>;
-> > +		};
-> > +
-> > +		indicator {
-> > +			max-microamp = <17500>;
-> > +		};
-> > +	};
-> 
-> This should go to a separate patch as well.
-
-How many patches do I need to do for one trivial change? :-(.
-
-
-> > +	if (flash->platform_data->power)
-> > +		ret = flash->platform_data->power(&flash->subdev, on);
-> 
-> if () {
-> } else {
-> }
-
-Ok.
-
-> > +	else {
-> > +		gpio_set_value(flash->platform_data->power_gpio, on);
-> 
-> Shouldn't you add this to the platform data struct?
-
-I don't see what you mean.
-
-> power_gpio is actually a poor name for this, as is the "power" callback.
-> This is really "EN" gpio in the spec, I'd call it perhaps just "gpio", or
-> "enable_gpio".
-
-Feel free to clean that that up in followup patch.
-
-> > +		if (on) {
-> > +			/* Some delay is apparently required. */
-> > +			udelay(20);
-> 
-> The driver should always handle the delay, platform data or not. This
-> reminds me --- is there a need to retain the support for platform data? I
-> don't think it's being used anywhere. I'm fine with both keeping and
-> removing it.
-
-Lets do that in followup patch, if needed.
-
-> > +	child = of_get_child_by_name(node, "indicator");
-> > +	if (!child)
-> > +		return -EINVAL;
-> 
-> Do you require an indicator to be connected? I think it shouldn't be
-> mandatory, at least the driver should work without it, even if it
-> exposes
-> the control (making that conditional would be a subject for another patch,
-> but that doesn't need to be done now).
-
-Another patch, if someone needs it, yes.	
-
-> > +	if (of_property_read_u32(child, "max-microamp", &val))
-> > +		return -EINVAL;
-> > +	pd->max_indicator_intensity = val;
-> > +
-> > +	if (!of_find_property(node, "gpios", NULL)) {
-> > +		dev_err(&client->dev, "No gpio node\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	gpio = of_get_gpio_flags(node, 0, &flags);
-> 
-> You could assign to pd->... here.
-
-Ok.
-								Pavel
+ arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
+ arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
+ arch/arm/configs/sama5_defconfig  |  6 ++++++
+ 3 files changed, 61 insertions(+), 9 deletions(-)
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
