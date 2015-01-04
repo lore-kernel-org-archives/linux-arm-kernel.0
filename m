@@ -1,29 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 04 Jan 2015 17:55:21 +0100
-Subject: [PATCH V2 6/9] ARM: sirf: add two debug ports for CSRatlas7 SoC
-In-Reply-To: <1420249007-8262-7-git-send-email-21cnbao@gmail.com>
+Date: Sun, 04 Jan 2015 17:56:11 +0100
+Subject: [PATCH V2 0/9] ARM: sirf: drop CSR marco and add atlas7 platform
+In-Reply-To: <1420249007-8262-1-git-send-email-21cnbao@gmail.com>
 References: <1420249007-8262-1-git-send-email-21cnbao@gmail.com>
- <1420249007-8262-7-git-send-email-21cnbao@gmail.com>
-Message-ID: <1669662.yvb7yEMXTf@wuerfel>
+Message-ID: <3309819.CeluCPZVf1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 03 January 2015 09:36:44 Barry Song wrote:
-> From: Guo Zeng <Guo.Zeng@csr.com>
+On Saturday 03 January 2015 09:36:38 Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
 > 
-> this patch adds UART0 and UART1 as LLUART port, as the new atlas7
-> registers layout are different, it also refines some names of old
-> hard-coded MARCOs.
+> this patchset drops MARCO as it is not supported any more. its replacement
+> is atlas7.
+> some IPs from marco are moved to atlas7, for example timer. for this kind
+> of IPs, we rename to atlas7. some IPs need some change for atlas7, such as
+> platsmp, we break marco and move to atlas7 directly.
 > 
-> this patch also moves to CONFIG_DEBUG_UART_PHYS/DEBUG_UART_VIRT
-> and debug_ll_io_init().
-> 
-> Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> the patchset add debug ports, machine and devicetree for the new atlas7.
 > 
 
-The patch looks ok, but if you have the chance, better split it into
-two separate patches to do the two things you describe above.
+Looks all good, please add my
 
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
