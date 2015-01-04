@@ -1,32 +1,121 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 4 Jan 2015 15:23:47 +0800
-Subject: [PATCH 2/4] ARM: sirf: add atlas7 machine support
-In-Reply-To: <4739415.xM06V8YCmL@wuerfel>
-References: <1419496460-4929-1-git-send-email-21cnbao@gmail.com>
- <1419496460-4929-3-git-send-email-21cnbao@gmail.com>
- <4739415.xM06V8YCmL@wuerfel>
-Message-ID: <CAGsJ_4wegV1zOdNKA50zWLKik20=zOVxfiyNm19xR4Fjgd_tgw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 4 Jan 2015 16:47:42 +0900
+Subject: [PATCH V2 2/2] ARM: l2c: AM437x: Introduce support for cache
+ filter programming
+In-Reply-To: <54A81CC6.2010007@ti.com>
+References: <1420220628-23742-1-git-send-email-nm@ti.com>
+ <1420220628-23742-3-git-send-email-nm@ti.com>
+ <CA+Ln22Epd8VpA9DQPFYBdjewUY3ejODhaRHgBSNZAQCYjx5saw@mail.gmail.com>
+ <20150103153446.GA23591@kahuna>
+ <CA+Ln22Ejvwd9J=jnWAUeb=nn-cvWiptqOydax+z4BeMrww_xqg@mail.gmail.com>
+ <54A81CC6.2010007@ti.com>
+Message-ID: <CA+Ln22Eqe-tPrd66R_BVH734yvgbHsBS+TwzkWAjuafjaAgBuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-31 6:34 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 25 December 2014 16:34:18 Barry Song wrote:
->> +DT_MACHINE_START(ATLAS7_DT, "Generic ATLAS7 (Flattened Device Tree)")
->> +       /* Maintainer: Barry Song <baohua.song@csr.com> */
->> +       .smp            = smp_ops(sirfsoc_smp_ops),
->> +       .map_io         = sirfsoc_map_io,
->> +       .init_late      = sirfsoc_init_late,
->> +       .dt_compat      = atlas7_dt_match,
->> +MACHINE_END
+2015-01-04 1:45 GMT+09:00 Nishanth Menon <nm@ti.com>:
+> On 01/03/2015 10:16 AM, Tomasz Figa wrote:
+>>
+>> 2015-01-04 0:34 GMT+09:00 Nishanth Menon <nm@ti.com>:
+>>>
+>>> On 15:40-20150103, Tomasz Figa wrote:
+>>>>
+>>>> Hi Nishanth,
+>>>>
+>>>> 2015-01-03 2:43 GMT+09:00 Nishanth Menon <nm@ti.com>:
+>>>>>
+>>>>> AM437x generation of processors support programming the PL310 L2Cache
+>>>>> controller's address filter start and end registers using a secure
+>>>>> montior service.
+>>>>
+>>>>
+>>>> typo: s/montior/monitor/
+>>>>
+>>>> [snip]
+>>>
+>>>
+>>> Uggh.. yes indeed. I will post a v3 updating the comments. If the
+>>> following is ok.
+>>>>
+>>>>
+>>>>> +               base = omap4_get_l2cache_base();
+>>>>> +               filter_start = (reg == L310_ADDR_FILTER_START) ? val :
+>>>>> +                              readl_relaxed(base +
+>>>>> L310_ADDR_FILTER_START);
+>>>>> +               filter_end = (reg == L310_ADDR_FILTER_END) ? val :
+>>>>> +                              readl_relaxed(base +
+>>>>> L310_ADDR_FILTER_END);
+>>>>> +               omap_smc1_2(AM43X_MON_L2X0_SETFILTER_INDEX,
+>>>>> filter_start,
+>>>>> +                           filter_end);
+>>>>> +               return;
+>>>>
+>>>>
+>>>> I don't have any significant comments about this patch in particular,
+>>>> but just noticed that you need to do read-backs here (and the typo
+>>>> thanks to the spell checker of my mailing app). Maybe you should
+>>>> consider switching to the .configure() API I introduced in my series?
+>>>> This would let you get rid of the hardcoded static mapping.
+>>>
+>>>
+>>> Yeah, I have two choices there.. Either I provide the fundamental
+>>> write function for the generic l2c code to use OR I provide a
+>>> duplicate of resultant l2c_configure(aux write) + l2c310_configure.
+>>>
+>>> To allow for reuse of improvements or anything like errata
+>>> implementations in the future, OMAP L2C implementation has chosen to
+>>> provide the
+>>> low level code and allow the higherlevel configure/write/whatever of the
+>>> future to stay in arch/arm/mm/cache-l2x0.c. The write_sec operation is
+>>> not too complicated enough to warrant a replication of l2c310_configure.
+>>>
+>>> So, I prefer the current implementation than providing a .configure
+>>> handler for outer_cache.configure from SoC level.
+>>>
+>>> Let me know if anyone has a strong objection to this.
+>>
+>>
+>> Well, what l2c310_configure() does after my series is just writing the
+>> registers. If they cannot be written normally (without some tricks
+>> such as reading back other registers) then IMHO a separate function
+>> should be provided.
+>>
+>> This is becomes possible after patch 3/8 (ARM: l2c: Add interface to
+>> ask hypervisor to configure L2C) and what is used on Exynos which also
+>> updates multiple registers in single SMC calls. You can find an
+>> example of use in patch 6/8 (ARM: EXYNOS: Add .write_sec outer cache
+>> callback for L2C-310). What's even more interesting is that approaches
+>> similar to the one currently used on OMAP had been NAKed, when
+>> proposed for Exynos and this is why we have the solution proposed by
+>> my patches.
+>>
+>> Note that .write_sec() callback is still used for L2X0_CTRL and
+>> L2X0_DEBUG_CTRL registers, because there might be a need to write them
+>> separately (e.g. to disable the controller and to perform debug
+>> operations/workarounds when the controller is already enabled).
 >
-> Can you check if the sirfsoc_map_io function is still required?
-> My guess is that you can just replace sirfsoc_map_scu() with a
-> call of ioremap in sirfsoc_smp_prepare_cpus, and drop sirfsoc_map_lluart()
-> entirely in favor of the default debug_ll_io_init() function that
-> is called when map_io is NULL.
+>
+>
+> we dont have a machine descriptor for configure instead we overide the
+> logic(in you case after firmware load, in OMAP case, I need to figure out).
+> my point being unlike the exynos configure code, OMAP code will look exactly
+> like current pl310_configure-2 lines of code which really does not benefit
+> anything.
+>
+>
+> Thinking again, in fact, i'd rather drop this series than have to do a
+> duplicated configure code(and force a resultant maintenance for the future)
+> in OMAP code since none of OMAP4 or AM437x series need these patches.
+> Interest for this series was non-mandatory, but just to be complete from SoC
+> definition point of view.
+>
+> Let me know which way you guys want me to go.
 
-after dropping MARCO,  i can simply delete sirfsoc_map_scu() as for
-atlas7, this is not needed any more.
-then finally, i can delete all sirfsoc_map_io() and DEBUG_LL mapping.
+Right, dropping this series would definitely solve the the read-back issue. :)
 
--barry
+After all, if you don't need to override the latencies in the kernel
+(i.e. have sane firmware, unlike certain Exynos boards ;)), then I
+don't see a point of having this feature.
+
+Best regards,
+Tomasz
