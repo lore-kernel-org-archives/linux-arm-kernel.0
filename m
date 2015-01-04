@@ -1,69 +1,126 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Sun, 4 Jan 2015 13:16:02 +0800
-Subject: [PATCH v18 10/11] ARM: kprobes: check register usage for probed
- instruction.
-In-Reply-To: <54A8CA21.1060009@hitachi.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Sun, 04 Jan 2015 14:25:48 +0900
+Subject: [PATCH v18 11/11] ARM: optprobes: execute instruction during
+ restoring if possible.
+In-Reply-To: <1419826053-27988-1-git-send-email-wangnan0@huawei.com>
 References: <54A07FBE.3010206@hitachi.com>
- <1419826043-27935-1-git-send-email-wangnan0@huawei.com>
- <54A8CA21.1060009@hitachi.com>
-Message-ID: <54A8CC92.1080002@huawei.com>
+ <1419826053-27988-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <54A8CEDC.8060808@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/4 13:05, Masami Hiramatsu wrote:
-> Hi Wang,
+(2014/12/29 13:07), Wang Nan wrote:
+> This patch removes software emulation or simulation for most of probed
+> instructions. If the instruction doesn't use PC relative addressing,
+> it will be translated into following instructions in the restore code
+> in code template:
 > 
-> (2014/12/29 13:07), Wang Nan wrote:
->> This patch utilizes previous introduced checker to check register usage
->> for probed ARM instruction and saves it in a mask. Futher patch will
->> use such information to avoid simuation or emulation.
->>
->> Signed-off-by: Wang Nan <wangnan0@huawei.com>
->> ---
->>  arch/arm/include/asm/probes.h          |  12 ++++
->>  arch/arm/probes/decode.c               |   7 ++
->>  arch/arm/probes/kprobes/actions-arm.c  |   2 +-
->>  arch/arm/probes/kprobes/checkers-arm.c | 124 +++++++++++++++++++++++++++++++++
->>  arch/arm/probes/kprobes/checkers.h     |   1 +
->>  5 files changed, 145 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
->> index f0a1ee8..ee04067 100644
->> --- a/arch/arm/include/asm/probes.h
->> +++ b/arch/arm/include/asm/probes.h
->> @@ -41,6 +41,18 @@ struct arch_probes_insn {
->>  	probes_insn_singlestep_t	*insn_singlestep;
->>  	probes_insn_fn_t		*insn_fn;
->>  	int stack_space;
->> +
->> +	/* Use 2 bits for a register. One more bit for extension */
+>  ldmia {r0 - r14}  // restore all instruction except PC
+>  <instruction>     // direct execute the probed instruction
+>  b next_insn       // branch to next instruction.
 > 
-> Would you have any concrete idea for the extend bits? If not, we don't need
-> it at this point. I think we don't need to care about future binary compatibility :)
-> (moreover, if you need another bitflag, you can add another flag)
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+
+Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+
+[...]
+>  /*
+> + * See register_usage_mask. If the probed instruction doesn't use PC,
+> + * we can copy it into template and have it executed directly without
+> + * simulation or emulation.
+> + */
+> +#define can_kprobe_direct_exec(m)	(!((m) & __register_usage_mask(15)))
+
+BTW, is there any macro which indicates 15 is the number of PC register?
+If we can do something like below, it will be easier to understand.
+
+#define can_kprobe_direct_exec(m)	(!test_bit(ARM_REG_PC/* == 15*/, &m))
+
+Thank you,
+
+> +
+> +/*
+>   * NOTE: the first sub and add instruction will be modified according
+>   * to the stack cost of the instruction.
+>   */
+> @@ -66,7 +73,15 @@ asm (
+>  			"	orrne	r2, #1\n"
+>  			"	strne	r2, [sp, #60] @ set bit0 of PC for thumb\n"
+>  			"	msr	cpsr_cxsf, r1\n"
+> +			".global optprobe_template_restore_begin\n"
+> +			"optprobe_template_restore_begin:\n"
+>  			"	ldmia	sp, {r0 - r15}\n"
+> +			".global optprobe_template_restore_orig_insn\n"
+> +			"optprobe_template_restore_orig_insn:\n"
+> +			"	nop\n"
+> +			".global optprobe_template_restore_end\n"
+> +			"optprobe_template_restore_end:\n"
+> +			"	nop\n"
+>  			".global optprobe_template_val\n"
+>  			"optprobe_template_val:\n"
+>  			"1:	.long 0\n"
+> @@ -86,6 +101,12 @@ asm (
+>  	((unsigned long *)&optprobe_template_add_sp - (unsigned long *)&optprobe_template_entry)
+>  #define TMPL_SUB_SP \
+>  	((unsigned long *)&optprobe_template_sub_sp - (unsigned long *)&optprobe_template_entry)
+> +#define TMPL_RESTORE_BEGIN \
+> +	((unsigned long *)&optprobe_template_restore_begin - (unsigned long *)&optprobe_template_entry)
+> +#define TMPL_RESTORE_ORIGN_INSN \
+> +	((unsigned long *)&optprobe_template_restore_orig_insn - (unsigned long *)&optprobe_template_entry)
+> +#define TMPL_RESTORE_END \
+> +	((unsigned long *)&optprobe_template_restore_end - (unsigned long *)&optprobe_template_entry)
+>  
+>  /*
+>   * ARM can always optimize an instruction when using ARM ISA, except
+> @@ -155,8 +176,12 @@ optimized_callback(struct optimized_kprobe *op, struct pt_regs *regs)
+>  		__this_cpu_write(current_kprobe, NULL);
+>  	}
+>  
+> -	/* In each case, we must singlestep the replaced instruction. */
+> -	op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
+> +	/*
+> +	 * We singlestep the replaced instruction only when it can't be
+> +	 * executed directly during restore.
+> +	 */
+> +	if (!p->ainsn.kprobe_direct_exec)
+> +		op->kp.ainsn.insn_singlestep(p->opcode, &p->ainsn, regs);
+>  
+>  	local_irq_restore(flags);
+>  }
+> @@ -238,6 +263,28 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op, struct kprobe *or
+>  	val = (unsigned long)optimized_callback;
+>  	code[TMPL_CALL_IDX] = val;
+>  
+> +	/* If possible, copy insn and have it executed during restore */
+> +	orig->ainsn.kprobe_direct_exec = false;
+> +	if (can_kprobe_direct_exec(orig->ainsn.register_usage_mask)) {
+> +		kprobe_opcode_t final_branch = arm_gen_branch(
+> +				(unsigned long)(&code[TMPL_RESTORE_END]),
+> +				(unsigned long)(op->kp.addr) + 4);
+> +		if (final_branch != 0) {
+> +			/*
+> +			 * Replace original 'ldmia sp, {r0 - r15}' with
+> +			 * 'ldmia {r0 - r14}', restore all registers except pc.
+> +			 */
+> +			code[TMPL_RESTORE_BEGIN] = __opcode_to_mem_arm(0xe89d7fff);
+> +
+> +			/* The original probed instruction */
+> +			code[TMPL_RESTORE_ORIGN_INSN] = __opcode_to_mem_arm(orig->opcode);
+> +
+> +			/* Jump back to next instruction */
+> +			code[TMPL_RESTORE_END] = __opcode_to_mem_arm(final_branch);
+> +			orig->ainsn.kprobe_direct_exec = true;
+> +		}
+> +	}
+> +
+>  	flush_icache_range((unsigned long)code,
+>  			   (unsigned long)(&code[TMPL_END_IDX]));
+>  
 > 
 
-2 bits can describe the read/write direction of a register. With such information,
-futher code is possible to utilize unused register to do some optimization. However,
-as you pointed, it is not a very concrete idea.
 
-
->> +#define REG_NO_USE	(0)
->> +#define REG_USE		(1)
->> +#define REG_MASK	(3)
->> +#define __register_usage_flag(n, f)	((f) << ((n) * 2))
->> +#define __register_usage_mask(n)	(REG_MASK << ((n) * 2))
->> +#define __clean_register_flag(m, n)	((m) & (~(__register_usage_mask(n))))
->> +#define __set_register_flag(m, n, f)	(__clean_register_flag(m, n) | __register_usage_flag(n, f))
->> +#define set_register_nouse(m, n)	do {(m) = __set_register_flag(m, n, REG_NO_USE);} while(0)
->> +#define set_register_use(m, n)		do {(m) = __set_register_flag(m, n, REG_USE);} while(0)
->> +	int register_usage_mask;
-> 
-> Is this a mask or flag? It seems a bit flag, if so, it should be "register_usage_flag".
-> 
-> Thank you,
-> 
-
-OK, I'll rename it.
-
-Thanks to your comment.
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
