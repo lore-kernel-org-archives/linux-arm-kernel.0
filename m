@@ -1,100 +1,305 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat,  3 Jan 2015 09:36:47 +0800
-Subject: [PATCH V2 9/9] clocksource: marco: rename marco to atlas7
-In-Reply-To: <1420249007-8262-1-git-send-email-21cnbao@gmail.com>
-References: <1420249007-8262-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1420249007-8262-10-git-send-email-21cnbao@gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Sun, 04 Jan 2015 19:19:33 +0530
+Subject: [RFC 8/8] ARM64: Add uprobe support
+In-Reply-To: <20150102172333.GA6264@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
+ <20150102172333.GA6264@redhat.com>
+Message-ID: <54A944ED.5010408@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
 
-marco project is replaced by atlas7 and we should obliterate
-its all traces.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/clocksource/Makefile                          |  2 +-
- drivers/clocksource/{timer-marco.c => timer-atlas7.c} | 15 +++++++--------
- 2 files changed, 8 insertions(+), 9 deletions(-)
- rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
+On Friday 02 January 2015 10:53 PM, Oleg Nesterov wrote:
+> Hi Pratyush,
+>
+> I'll try to actually read this patch (and the whole series) later, just
+> a couple of quick questions for now.
+>
+> On 12/31, Pratyush Anand wrote:
+>>
+>> --- a/arch/arm64/include/asm/ptrace.h
+>> +++ b/arch/arm64/include/asm/ptrace.h
+>> @@ -205,6 +205,7 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
+>>
+>>   #define instruction_pointer(regs)	((regs)->pc)
+>>   #define stack_pointer(regs)		((regs)->sp)
+>> +#define procedure_link_pointer(regs)	((regs)->regs[30])
+>
+> perhaps it makes sense to change (at least) arch_prepare_kretprobe() to use
+> the new helper? OK, we can do this later.
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b2..306bc47 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -18,7 +18,7 @@ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
--obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
-+obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
- obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_ARCH_PXA)		+= pxa_timer.o
-diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-atlas7.c
-similarity index 95%
-rename from drivers/clocksource/timer-marco.c
-rename to drivers/clocksource/timer-atlas7.c
-index 361a789..60f9de3 100644
---- a/drivers/clocksource/timer-marco.c
-+++ b/drivers/clocksource/timer-atlas7.c
-@@ -38,7 +38,7 @@
- 
- #define SIRFSOC_TIMER_REG_CNT 6
- 
--static unsigned long marco_timer_rate;
-+static unsigned long atlas7_timer_rate;
- 
- static const u32 sirfsoc_timer_reg_list[SIRFSOC_TIMER_REG_CNT] = {
- 	SIRFSOC_TIMER_WATCHDOG_EN,
-@@ -195,7 +195,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
- 	ce->rating = 200;
- 	ce->set_mode = sirfsoc_timer_set_mode;
- 	ce->set_next_event = sirfsoc_timer_set_next_event;
--	clockevents_calc_mult_shift(ce, marco_timer_rate, 60);
-+	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
- 	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
- 	ce->min_delta_ns = clockevent_delta2ns(2, ce);
- 	ce->cpumask = cpumask_of(cpu);
-@@ -255,9 +255,8 @@ static void __init sirfsoc_clockevent_init(void)
- }
- 
- /* initialize the kernel jiffy timer source */
--static void __init sirfsoc_marco_timer_init(struct device_node *np)
-+static void __init sirfsoc_atlas7_timer_init(struct device_node *np)
- {
--	u32 timer_div;
- 	struct clk *clk;
- 
- 	clk = of_clk_get(np, 0);
-@@ -265,7 +264,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
- 
- 	BUG_ON(clk_prepare_enable(clk));
- 
--	marco_timer_rate = clk_get_rate(clk);
-+	atlas7_timer_rate = clk_get_rate(clk);
- 
- 	/* timer dividers: 0, not divided */
- 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
-@@ -283,7 +282,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
- 	/* Clear all interrupts */
- 	writel_relaxed(0xFFFF, sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
- 
--	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, marco_timer_rate));
-+	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, atlas7_timer_rate));
- 
- 	sirfsoc_clockevent_init();
- }
-@@ -302,6 +301,6 @@ static void __init sirfsoc_of_timer_init(struct device_node *np)
- 	if (!sirfsoc_timer1_irq.irq)
- 		panic("No irq passed for timer1 via DT\n");
- 
--	sirfsoc_marco_timer_init(np);
-+	sirfsoc_atlas7_timer_init(np);
- }
--CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick", sirfsoc_of_timer_init );
-+CLOCKSOURCE_OF_DECLARE(sirfsoc_atlas7_timer, "sirf,atlas7-tick", sirfsoc_of_timer_init);
--- 
-2.2.1
+Yes.
+
+>
+>> +/* Single step context for uprobe */
+>> +struct uprobe_step_ctx {
+>> +	struct list_head node;
+>> +	unsigned long match_addr;
+>> +};
+>
+> I don't understand this... please see below.
+>
+>> +struct arch_uprobe_task {
+>> +	unsigned long saved_fault_code;
+>> +	u64 saved_user_pc;
+>> +	struct uprobe_step_ctx ss_ctx;
+>> +};
+>
+> saved_user_pc looks unneeded, you can rely on uprobe_task->vaddr ?
+
+Probably yes. Will change.
+
+>
+>> +++ b/arch/arm64/kernel/uprobes.c
+>> @@ -0,0 +1,255 @@
+>> +/*
+>> + * Copyright (C) 2014 Pratyush Anand <panand@redhat.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +#include <linux/highmem.h>
+>> +#include <linux/ptrace.h>
+>> +#include <linux/uprobes.h>
+>> +#include <asm/debug-monitors.h>
+>> +#include <asm/probes.h>
+>> +
+>> +#include "probes-arm64.h"
+>> +
+>> +#define UPROBE_INV_FAULT_CODE	UINT_MAX
+>> +
+>> +static LIST_HEAD(step_ctx);
+>> +static DEFINE_RWLOCK(step_ctx_lock);
+>> +
+>> +static void add_ss_context(struct uprobe_task *utask)
+>> +{
+>> +	struct uprobe_step_ctx *ss_ctx = &utask->autask.ss_ctx;
+>> +
+>> +	ss_ctx->match_addr = utask->xol_vaddr;
+>> +	write_lock(&step_ctx_lock);
+>> +	list_add(&ss_ctx->node, &step_ctx);
+>> +	write_unlock(&step_ctx_lock);
+>> +}
+>> +
+>> +static struct uprobe_step_ctx *find_ss_context(unsigned long vaddr)
+>> +{
+>> +	struct uprobe_step_ctx *ss_ctx;
+>> +
+>> +	read_lock(&step_ctx_lock);
+>> +	list_for_each_entry(ss_ctx, &step_ctx, node)	{
+>> +		if (ss_ctx->match_addr == vaddr) {
+>> +			read_unlock(&step_ctx_lock);
+>> +			return ss_ctx;
+>> +		}
+>> +	}
+>> +	read_unlock(&step_ctx_lock);
+>> +
+>> +	return NULL;
+>> +}
+>
+> This looks very wrong to me, but perhaps because I do not understand
+> why do we need these *_ss_context() helpers.
+>
+>> +static void del_ss_context(struct uprobe_task *utask)
+>> +{
+>> +	struct uprobe_step_ctx *ss_ctx = find_ss_context(utask->xol_vaddr);
+>> +
+>> +	if (ss_ctx) {
+>> +		write_lock(&step_ctx_lock);
+>> +		list_del(&ss_ctx->node);
+>> +		write_unlock(&step_ctx_lock);
+>> +	} else {
+>> +		WARN_ON(1);
+>> +	}
+>> +}
+>
+> Don't we need del_ss_context() in arch_uprobe_abort_xol() ? But this is
+> minor.
+
+Thanks. Yes, we need del_ss_context() in arch_uprobe_abort_xol().
+
+>
+> Why we can trust find_ss_context() ? What if another thread also called
+> add_ss_context() with the same (virtual) ->xol_vaddr ?
+
+OK..So xol_vaddr is not unique, then need to look for something else 
+which could be unique for each probe.
+
+>
+> But the main question is: why do we need add/find_ss_context ?? Please
+> explain.
+>
+
+See arch/arm64/kernel/debug-monitors.c: call_step_hook
+
+Unlike breakpoint exception, there is no ESR info check for step 
+exception. So, it is the responsibility of step handler 
+(uprobe_single_step_handler) to make sure that exception was generated 
+for it.
+
+>> +int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
+>> +{
+>> +	struct uprobe_task *utask = current->utask;
+>> +
+>> +	/* saved fault code is restored in post_xol */
+>> +	utask->autask.saved_fault_code = current->thread.fault_code;
+>> +
+>> +	/* An invalid fault code between pre/post xol event */
+>> +	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
+>> +
+>> +	/* Save user pc */
+>> +	utask->autask.saved_user_pc = task_pt_regs(current)->user_regs.pc;
+>> +
+>> +	/* Instruction point to execute ol */
+>> +	instruction_pointer_set(regs, utask->xol_vaddr);
+>> +
+>> +	add_ss_context(utask);
+>> +
+>> +	user_enable_single_step(current);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
+>> +{
+>> +	struct uprobe_task *utask = current->utask;
+>> +
+>> +	WARN_ON_ONCE(current->thread.fault_code != UPROBE_INV_FAULT_CODE);
+>> +
+>> +	/* restore fault code */
+>> +	current->thread.fault_code = utask->autask.saved_fault_code;
+>> +
+>> +	/* restore user pc */
+>> +	task_pt_regs(current)->user_regs.pc = utask->autask.saved_user_pc;
+>> +
+>> +	/* Instruction point to execute next to breakpoint address */
+>> +	instruction_pointer_set(regs, utask->vaddr + 4);
+>> +
+>> +	del_ss_context(utask);
+>> +
+>> +	user_disable_single_step(current);
+>> +
+>> +	return 0;
+>> +}
+>
+> task_pt_regs() above looks strange. We we can't use "struct pt_regs *regs"
+> passed as an argument?
+>
+> See also the note about .saved_user_pc above. I think you can use
+> utask->vaddr instead.
+>
+> And why do you need to play with ->user_regs.pc?? instruction_pointer_set()
+> after that modifies the same word?
+>
+> Or it is possible that regs != task_pt_regs(current) ? (to remind, I do not
+> know arm ;)
+>
+> Could you also explain
+>
+> 	instruction_pointer_set(regs, utask->vaddr + 4);
+>
+> ?
+>
+
+Correct, saved_user_pc is not needed and also no need to play with 
+->user_regs.pc. instruction_pointer_set should be sufficient.
+
+
+> I mean, I do not understand why this is always correct. What if the probed
+> insn is "jmp" (I do not know arm64's name for jump) ?
+>
+> Probably this is correct because in this case arm_probe_decode_insn() should
+> return INSN_GOOD_NO_SLOT and this insn will be emulated? If yes, this needs a
+> comment, imo.
+>
+
+Yes, a branch instruction like b or bl or ret will be simulated.
+
+>> +static int uprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr)
+>> +{
+>> +	unsigned long flags;
+>> +
+>> +	local_irq_save(flags);
+>> +	uprobe_pre_sstep_notifier(regs);
+>> +	local_irq_restore(flags);
+>> +
+>> +	return 0;
+>> +}
+>
+> Again, you do not need to disable irqs around uprobe_pre_sstep_notifier().
+
+OK. (Actually took it from arch/arm/kernel/uprobe.c)
+
+>
+> And I am not sure I understand the logic... "return 0" actually means
+> "return DBG_HOOK_HANDLED", right?
+
+Yes. So better I will put return DBG_HOOK_HANDLED;
+
+>
+> I do not understand this register_break_hook() interface and the usage
+> of .esr_mask/esr_val. But given that this patch adds BRK64_ESR_UPROBES
+> and uses BRK64_OPCODE_UPROBES, I will assume that uprobe_breakpoint_handler()
+> will be called if this exception was triggered by UPROBE_SWBP_INSN.
+
+Correct.
+
+>
+> In this case, why the unconditional DBG_HOOK_HANDLED is correct? For example,
+> what if the application itself or debugger use UPROBE_SWBP_INSN for (self)
+> debugging and this task has no uprobes? In this case uprobe_pre_sstep_notifier()
+> will do nothing, it won't set TIF_UPROBES and handle_swbp() won't be called.
+>
+> IOW, shouldn't it do
+>
+> 	if (user_mode(regs) && uprobe_pre_sstep_notifier(regs))
+> 		return DBG_HOOK_HANDLED;
+> 	return DBG_HOOK_ERROR;
+>
+> ?
+
+Thanks for pointing out this bug with the code.
+Your point seems pretty valid.
+
+>
+>> +static int uprobe_single_step_handler(struct pt_regs *regs, unsigned int esr)
+>> +{
+>> +	unsigned long flags;
+>> +
+>> +	if (!find_ss_context(regs->pc - 4))
+>> +		return DBG_HOOK_ERROR;
+>> +
+>> +	local_irq_save(flags);
+>> +	uprobe_post_sstep_notifier(regs);
+>> +	local_irq_restore(flags);
+>> +
+>> +	return 0;
+>> +}
+>
+> The same. No need to clear irqs, and please explain why we can't rely
+> on user_mode() && uprobe_post_sstep_notifier(), and why do we
+> need find_ss_context().
+>
+
+I had not looked into uprobe_post_sstep_notifier implementtaion.I think, 
+you are right.
+
+
+Thanks for all these valuable comments.
+
+~Pratyush
+
+
+>> +void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
+>> +		void *kaddr, unsigned long len)
+>> +{
+>> +	__flush_ptrace_access(page, uaddr, kaddr, len);
+>> +}
+>
+> I have some concerns... I'll reply to 5/8 which adds __flush_ptrace_access.
+>
+> Oleg.
+>
