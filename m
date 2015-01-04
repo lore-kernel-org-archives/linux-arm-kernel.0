@@ -1,37 +1,70 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Sun, 4 Jan 2015 17:02:25 +0800
-Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel isi
- and ov2640 sensor
-Message-ID: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
+Date: Sun, 4 Jan 2015 17:02:27 +0800
+Subject: [PATCH v2 2/8] ARM: at91: dts: sama5d3: split isi pinctrl
+In-Reply-To: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
+References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1420362153-500-3-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add ISI and ov2640 support on dts files.
+From: Bo Shen <voice.shen@atmel.com>
 
-As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
-So I want to send this dt patch early for a review.
+As the ISI has 12 data lines, however we only use 8 data lines with
+sensor module. So, split the data line into two groups which make
+it can be choosed depends on the hardware design.
 
-v1 -> v2:
-  1. add one more patch to change the pin name of ISI_MCK
-  2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
-  3. move the common chip parts of ISI node to sama5d3.dtsi.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3.dtsi    | 11 ++++++++---
+ arch/arm/boot/dts/sama5d3xmb.dtsi |  2 +-
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-Bo Shen (3):
-  ARM: at91: dts: sama5d3: split isi pinctrl
-  ARM: at91: dts: sama5d3: add missing pins of isi
-  ARM: at91: dts: sama5d3: move the isi mck pin to mb
-
-Josh Wu (5):
-  ARM: at91: dts: sama5d3: add isi clock
-  ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
-  ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
-  ARM: at91: dts: sama5d3: add ov2640 camera sensor support
-  ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
-
- arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
- arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
- arch/arm/configs/sama5_defconfig  |  6 ++++++
- 3 files changed, 61 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 61746ef..595609f 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -547,7 +547,7 @@
+ 				};
+ 
+ 				isi {
+-					pinctrl_isi: isi-0 {
++					pinctrl_isi_data_0_7: isi-0-data-0-7 {
+ 						atmel,pins =
+ 							<AT91_PIOA 16 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PA16 periph C ISI_D0, conflicts with LCDDAT16 */
+ 							 AT91_PIOA 17 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PA17 periph C ISI_D1, conflicts with LCDDAT17 */
+@@ -559,10 +559,15 @@
+ 							 AT91_PIOA 23 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PA23 periph C ISI_D7, conflicts with LCDDAT23, PWML1 */
+ 							 AT91_PIOC 30 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PC30 periph C ISI_PCK, conflicts with UTXD0 */
+ 							 AT91_PIOA 31 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PA31 periph C ISI_HSYNC, conflicts with TWCK0, UTXD1 */
+-							 AT91_PIOA 30 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PA30 periph C ISI_VSYNC, conflicts with TWD0, URXD1 */
+-							 AT91_PIOC 29 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PC29 periph C ISI_PD8, conflicts with URXD0, PWMFI2 */
++							 AT91_PIOA 30 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PA30 periph C ISI_VSYNC, conflicts with TWD0, URXD1 */
++					};
++
++					pinctrl_isi_data_8_9: isi-0-data-8-9 {
++						atmel,pins =
++							<AT91_PIOC 29 AT91_PERIPH_C AT91_PINCTRL_NONE	/* PC29 periph C ISI_PD8, conflicts with URXD0, PWMFI2 */
+ 							 AT91_PIOC 28 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PC28 periph C ISI_PD9, conflicts with SPI1_NPCS3, PWMFI0 */
+ 					};
++
+ 					pinctrl_isi_pck_as_mck: isi_pck_as_mck-0 {
+ 						atmel,pins =
+ 							<AT91_PIOD 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PD31 periph B ISI_MCK */
+diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
+index 49c10d3..2530541 100644
+--- a/arch/arm/boot/dts/sama5d3xmb.dtsi
++++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
+@@ -61,7 +61,7 @@
+ 
+ 			isi: isi at f0034000 {
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&pinctrl_isi &pinctrl_isi_pck_as_mck &pinctrl_isi_power &pinctrl_isi_reset>;
++				pinctrl-0 = <&pinctrl_isi_data_0_7 &pinctrl_isi_pck_as_mck &pinctrl_isi_power &pinctrl_isi_reset>;
+ 			};
+ 
+ 			mmc1: mmc at f8000000 {
 -- 
 1.9.1
