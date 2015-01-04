@@ -1,50 +1,49 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Sun, 4 Jan 2015 17:02:31 +0800
-Subject: [PATCH v2 6/8] ARM: at91: dts: sama5d3: change name of pinctrl of
- ISI_MCK
-In-Reply-To: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
-References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1420362153-500-7-git-send-email-josh.wu@atmel.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sun, 04 Jan 2015 17:39:24 +0800
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20141224171815.GD13399@e104818-lin.cambridge.arm.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
+ <20141224171815.GD13399@e104818-lin.cambridge.arm.com>
+Message-ID: <54A90A4C.60908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For sama5d3xmb board, the pins: pinctrl_isi_pck_as_mck is pck1, and
-used to provide MCK for camera sensor.
+On 2014?12?25? 01:18, Catalin Marinas wrote:
+[...]
+>
+> In addition to the above and _DSD requirements/banning, I would also add
+> some clear statements around:
+>
+> _OSC: only global/published capabilities are allowed. For
+> device-specific _OSC we need a process or maybe we can ban them entirely
+> and rely on _DSD once we clarify the process.
+>
+> _OSI: firmware must not check for certain _OSI strings. Here I'm not
+> sure what we would have to do for ARM Linux. Reporting "Windows" does
+> not make any sense but not reporting anything can, as Matthew Garrett
+> pointed out, can be interpreted by firmware as "Linux". In addition to
+> any statements in this document, I suggest you patch
+> drivers/acpi/acpica/utosi.c accordingly, maybe report "Linux" for ARM
+> and print a kernel warning so that we notice earlier.
+>
+> ACPI_OS_NAME: this is globally defined as "Microsoft Windows NT". It
+> doesn't make much sense in the ARM context. Could we change it to
+> "Linux" when CONFIG_ARM64?
 
-We change its name to: pinctrl_pck1_as_isi_mck.
+We will work on this both on ASWG and linux ACPI driver side, as Dong
+and Charles pointed out, _OSI things can be solved in ACPI spec, when
+that is done, we can modify the kernel driver to fix the problems above.
 
-As we want camera sensor instead of ISI to configure the pck1 (ISI_MCK) pin.
-So we remove this pinctrl from ISI DT node. It will be added in sensor's
-DT node.
+>
+> Compatibility with older kernels: ACPI firmware must work, even though
+> not fully optimal, with the earliest kernel version implementing the
+> targeted ACPI spec. There may be a need for new drivers but otherwise
+> adding things like CPU power management should not break older kernel
+> versions. In addition, the ACPI firmware must also work with the latest
+> kernel version.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-new added in v2.
+It should be, and I think that's why we need ACPI (or DT) here :)
 
- arch/arm/boot/dts/sama5d3xmb.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
-index db47f8b..d9464fc 100644
---- a/arch/arm/boot/dts/sama5d3xmb.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
-@@ -61,7 +61,7 @@
- 
- 			isi: isi at f0034000 {
- 				pinctrl-names = "default";
--				pinctrl-0 = <&pinctrl_isi_data_0_7 &pinctrl_isi_pck_as_mck>;
-+				pinctrl-0 = <&pinctrl_isi_data_0_7>;
- 			};
- 
- 			mmc1: mmc at f8000000 {
-@@ -117,7 +117,7 @@
- 							<AT91_PIOD 30 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PD30 periph B */
- 					};
- 
--					pinctrl_isi_pck_as_mck: isi_pck_as_mck-0 {
-+					pinctrl_pck1_as_isi_mck: pck1_as_isi_mck-0 {
- 						atmel,pins =
- 							<AT91_PIOD 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PD31 periph B ISI_MCK */
- 					};
--- 
-1.9.1
+Thanks
+Hanjun
