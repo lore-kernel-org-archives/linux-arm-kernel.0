@@ -1,29 +1,38 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 5 Jan 2015 09:05:29 -0500
-Subject: [PATCH 2/2] ahci_xgene: Implement the workaround to support PMP
- enumeration and discovery for APM X-Gene SoC AHCI SATA Host Controller
- driver.
-In-Reply-To: <CAOHikRBedNy=CrrHA+7UYQJpL3t1BhU0VFixz80bPeSE28iHGw@mail.gmail.com>
-References: <1420453305-15986-1-git-send-email-stripathi@apm.com>
- <1420453305-15986-3-git-send-email-stripathi@apm.com>
- <20150105133005.GB15833@htj.dyndns.org>
- <20150105135950.GE15833@htj.dyndns.org>
- <CAOHikRBedNy=CrrHA+7UYQJpL3t1BhU0VFixz80bPeSE28iHGw@mail.gmail.com>
-Message-ID: <20150105140529.GG15833@htj.dyndns.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Jan 2015 15:05:46 +0100
+Subject: [PATCH v4 2/3] pinctrl: exynos: Fix GPIO setup failure because
+ domain clock being gated
+In-Reply-To: <1417777254-26579-3-git-send-email-k.kozlowski@samsung.com>
+References: <1417777254-26579-1-git-send-email-k.kozlowski@samsung.com>
+ <1417777254-26579-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CACRpkdaVJKmMzc0uNL1XK8w93Cf_yWcdW9w4E2NFxroWEkkzZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 07:33:06PM +0530, Suman Tripathi wrote:
-> Reverted due to conflicts with the endian fix patches.  Please rebase
-> these two on top of them.
-> 
-> Will do that .. I should have wait for the endian patch getting
-> accepted. Sorry for that.
+On Fri, Dec 5, 2014 at 12:00 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
 
-Ooh, please don't be sorry.  It's completely fine.  These things
-happen.
+> The audio subsystem on Exynos 5420 has separate clocks and GPIO. To
+> operate properly on GPIOs the main block clock 'mau_epll' must be
+> enabled.
+>
+> This was observed on Peach Pi/Pit and Arndale Octa (after enabling i2s0)
+> after introducing runtime PM to pl330 DMA driver. After that commit the
+> 'mau_epll' was gated, because the "amba" clock was disabled and there
+> were no more users of mau_epll.
+>
+> The system hang just before probing i2s0 because
+> samsung_pinmux_setup() tried to access memory from audss block which was
+> gated.
+>
+> Add a clock property to the pinctrl driver and enable the clock during
+> GPIO setup. During normal GPIO operations (set, get, set_direction) the
+> clock is not enabled.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Thanks.
+Tomasz, is this OK and should I apply it for fixes or next?
 
--- 
-tejun
+Yours,
+Linus Walleij
