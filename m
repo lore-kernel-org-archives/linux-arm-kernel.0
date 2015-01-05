@@ -1,43 +1,43 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 05 Jan 2015 15:15:01 +0530
-Subject: [PATCH] ARM: samsung: add exynos-chipid binding information
-In-Reply-To: <1417592664-10672-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1417592664-10672-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <54AA5D1D.9000409@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 05 Jan 2015 09:50:52 +0000
+Subject: [PATCH 0/9] ARM Versatile multi-platform support
+In-Reply-To: <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
+Message-ID: <54AA5E7C.1040706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle Ping.
+On 31/12/14 09:25, Peter Maydell wrote:
+> On 30 December 2014 at 19:28, Rob Herring <robherring2@gmail.com> wrote:
+>> This has been tested on QEMU. A previous version was tested on
+>> Versatile/AB by Linus Walleij. Linus reported a problem with the
+>> display panel detection. Investigation on h/w is needed still as I have
+>> not been able to identify the issue by inspection and the display
+>> detection seems to work correctly on QEMU.
+>>
+>> Linus had also mentioned to me that QEMU users may have some issue with
+>> removing non-DT code as the work flow has to change somewhat.
+> 
+> As long as you call out the requirement for a DT now in whatever
+> your equivalent of release notes is that should be fine. (Does
+> the kernel provide a useful message to serial in the absence of a
+> DT or does it now not have enough platform knowledge to do that?)
+> 
+>> Copying
+>> Peter Maydell here for comment (and there's rumors he may have actual PB
+>> h/w with PCI as well).
+> 
+> Will Deacon and Marc Zyngier are currently in possession of that h/w.
+> I'm sure they'd be delighted to pull it out of the cupboard and
+> give it a spin :-)
 
-On Wednesday 03 December 2014 01:14 PM, Pankaj Dubey wrote:
-> Exynos SoC's DT files are using Chipid device nodes, but it's binding
-> information is missing. This patch adds exynos-chipid binding information.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   .../bindings/arm/samsung/exynos-chipid.txt         |   12 ++++++++++++
->   1 file changed, 12 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
-> new file mode 100644
-> index 0000000..85c5dfd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
-> @@ -0,0 +1,12 @@
-> +SAMSUNG Exynos SoCs Chipid driver.
-> +
-> +Required properties:
-> +- compatible : Should at least contain "samsung,exynos4210-chipid".
-> +
-> +- reg: offset and length of the register set
-> +
-> +Example:
-> +	chipid at 10000000 {
-> +		compatible = "samsung,exynos4210-chipid";
-> +		reg = <0x10000000 0x100>;
-> +	};
->
+I'll try to find some time (or a victim to do the testing... ;-). To
+those interested, I have a few extra PCI backplanes (just the PCB, not
+the huge noisy carrier rack) I could be convinced to part with...
 
 Thanks,
-Pankaj Dubey
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
