@@ -1,48 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 5 Jan 2015 09:46:02 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock node names
-In-Reply-To: <1420418648-7815-1-git-send-email-horms+renesas@verge.net.au>
-References: <1420418648-7815-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20150105004602.GG2817@verge.net.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 4 Jan 2015 20:36:56 -0500
+Subject: [PATCH v3] irqchip: gic: Allow interrupt level to be set for PPIs.
+In-Reply-To: <20141209122919.GR821@e106497-lin.cambridge.arm.com>
+References: <1417437909-20923-1-git-send-email-Liviu.Dudau@arm.com>
+ <20141209122919.GR821@e106497-lin.cambridge.arm.com>
+Message-ID: <20150105013656.GA3486@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 09:44:08AM +0900, Simon Horman wrote:
-> Correct the SDHI clock node names to match their labels
-> and the documentation.
+On Tue, Dec 09, 2014 at 12:29:19PM +0000, Liviu Dudau wrote:
+> On Mon, Dec 01, 2014 at 12:45:09PM +0000, Liviu Dudau wrote:
+> > During a recent cleanup of the arm64 DTs it has become clear that
+> > the handling of PPIs in xxxx_set_type() is incorrect. The ARM TRMs
+> > for GICv2 and later allow for "implementation defined" support for
+> > setting the edge or level type of the PPI interrupts and don't restrict
+> > the activation level of the signal. Current ARM implementations
+> > do restrict the PPI level type to IRQ_TYPE_LEVEL_LOW, but licensees
+> > of the IP can decide to shoot themselves in the foot at any time.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> > 
+> > Made a stupid mistake in v2 and got my bit test confused with logical test.
 > 
-> This has no run-time affect as the clock nodes are not currently used.
+> Gentle ping!
 > 
-> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Any comments here? Russell, are you OK with this approach?
 
-This patch is based on renesas-devel-20141231-v3.19-rc2
+Now that the holidays are over, I'd like to get some feedback from Marc
+at a minimum...
 
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 8f78da5..9856e9c 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -294,14 +294,14 @@
->  					     "lb", "qspi", "sdh", "sd0", "z";
->  		};
->  		/* Variable factor clocks */
-> -		sd1_clk: sd2_clk at e6150078 {
-> +		sd1_clk: sd1_clk at e6150078 {
->  			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->  			reg = <0 0xe6150078 0 4>;
->  			clocks = <&pll1_div2_clk>;
->  			#clock-cells = <0>;
->  			clock-output-names = "sd1";
->  		};
-> -		sd2_clk: sd3_clk at e615007c {
-> +		sd2_clk: sd2_clk at e615007c {
->  			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->  			reg = <0 0xe615007c 0 4>;
->  			clocks = <&pll1_div2_clk>;
-> -- 
-> 2.1.3
-> 
+thx,
+
+Jason.
