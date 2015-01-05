@@ -1,23 +1,33 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Mon, 5 Jan 2015 19:00:05 +0100
-Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to
- input LEDs
-In-Reply-To: <20150105174205.GB35592@dtor-ws>
-References: <20141226232116.GA5069@type> <20141226232310.GD5069@type>
- <20150104232838.GA14912@dtor-glaptop>
- <20150104234501.GJ25336@type.youpi.perso.aquilenet.fr>
- <20150105174205.GB35592@dtor-ws>
-Message-ID: <20150105180005.GX3804@type.bordeaux.inria.fr>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 5 Jan 2015 19:05:31 +0100
+Subject: [PATCH v4 1/1] add support for Seagate BlackArmor NAS220
+In-Reply-To: <20141228104654.GA11638@anne>
+References: <20141215203855.GA28940@anne>
+ <20141228104654.GA11638@anne>
+Message-ID: <20150105180531.GA13910@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Torokhov, le Mon 05 Jan 2015 09:42:05 -0800, a ?crit :
-> The input device's capabilities (with the exception of keymap) should
-> not change after device registration. If uinput allows that we should
-> fix it there.
+On Sun, Dec 28, 2014 at 11:46:54AM +0100, Evgeni Dobrev wrote:
+> This patch adds support for Seagate BlackArmor NAS220.
+> 
+> The Seagate BlackArmor NAS 220 is a NAS system based on Marvell 88f6192. It has
+> 32MB NAND and 128MB DRAM. It has two SATA slots, one Gigabit Ethernet port, two
+> USB 2.0 ports, two buttons and three LEDs. There is a serial port available on
+> the CN5 connector on the board (1 - TX, 4 - RX, 6 - GND).
+> 
+> The only functionality still not implemented is the bi-color led on the front
+> panel (status). Pins mpp22 and mpp23 control this led. Setting mpp22 to high and
+> mpp23 to low results in orange color. Setting mpp22 to low and mpp23 to high
+> results in blue color.
+> 
+> The third led is wired to show the SATA activity on the two drives.
+> 
+> Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
 
-Ah, I didn't notice the content of uinput_set_bit() there.  It seems to
-be making sure that the device hasn't been created yet indeed.  All good
-then.
+Hi Evgeni
 
-Samuel
+I added this to mvebu/dt and will submit it for the next merge window.
+
+Thanks
+	Andrew
