@@ -1,80 +1,87 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 05 Jan 2015 10:30:38 +0200
-Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add Audio DMAC,
- PWM and Thermal clocks to device tree
-In-Reply-To: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
-References: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <8183635.VD1oYub01I@avalon>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 5 Jan 2015 14:05:32 +0530
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
+ without sysc
+In-Reply-To: <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
+References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
+ <5492F84E.7020706@ti.com>
+ <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
+Message-ID: <54AA4CD4.40105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Friday 19 December 2014 09:39:33 Simon Horman wrote:
-> This is based on the MSTP5 clocks in the r8a7791 device tree.
-> The main difference being that the r8a7794 does not have an Audio DMAC1
-> clock.
+Hi Paul,
+On Saturday 03 January 2015 02:40 AM, Paul Walmsley wrote:
+> + Suman, lakml
 > 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Hi Roger
+> 
+> On Thu, 18 Dec 2014, Roger Quadros wrote:
+> 
+>> Fixing up Paul's email id.
+>>
+>> cheers,
+>> -roger
+>>
+>> On 18/12/14 17:49, Roger Quadros wrote:
+>>> There are quite a few hwmods that don't have sysconfig register and so
+>>> _find_mpu_rt_port(oh) will return NULL thus preventing ready state check
+>>> on those modules after the module is enabled.
+> 
+> Hmm.  Any IP block that exposes registers that are accessible by the MPU 
+> should have an MPU register target port, even if there's no SYSCONFIG 
+> register.  And if an IP block doesn't have registers that are accessible 
+> from the MPU, then there shouldn't be much point to waiting for the module 
+> to become ready.
+> 
+> Looks like the real problem is the test for oh->class->sysc before the 
+> call to _init_mpu_rt_base().  That was introduced by commit 6423d6df1440 
+> ("ARM: OMAP2+: hwmod: check for module address space during init"). It's 
+> not clear to me why that test was added, since _init_mpu_rt_base() doesn't 
+> do anything with oh->class->sysc or SYSCONFIG registers.
+This was introduced by commit 
+97597b962529 (ARM: OMAP2+: hwmod: Don't call _init_mpu_rt_base if no sysc)
+Patch description states that "there are few hwmod which doesn't have sysconfig registers and hence
+no need to ioremap() them in early init code".
+Isn't this correct? 
+May be a dumb question: If IP doesn't have sysconfig, is there any case that hwmod does
+access the register address space of that IP? Why do we need to enable MPU register target port?
+
+Thanks and regards,
+Lokesh
+
+> 
+> Could you please test the following patch?
+> I don't have an AM437x-gp-evm.  
+> 
+> 
+> - Paul
 > 
 > ---
-> Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
+>  arch/arm/mach-omap2/omap_hwmod.c | 12 ++++--------
+>  1 file changed, 4 insertions(+), 8 deletions(-)
 > 
-> N.B: The R-Car Gen2 v1.8.0 BSP uses zs_clk whereas this patch uses hp_clk
->      as the parent clock for the Audio DMAC clock.
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index cbb908dc5cf0..ce6d11f3eda7 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2451,14 +2451,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+>  				oh->name, np->name);
+>  	}
+>  
+> -	if (oh->class->sysc) {
+> -		r = _init_mpu_rt_base(oh, NULL, index, np);
+> -		if (r < 0) {
+> -			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
+> -			     oh->name);
+> -			return 0;
+> -		}
+> -	}
+> +	r = _init_mpu_rt_base(oh, NULL, index, np);
+> +	if (r < 0)
+> +		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
+> +			 oh->name);
+>  
+>  	r = _init_clocks(oh, NULL);
+>  	if (r < 0) {
 > 
->      In that regard this patch follows the pattern used in mainline for the
->      r8a7790 and r8a7791 SoCs.
-> 
->      The BSP's parent clock is consistent for the r8a7790, r8a7791, r8a7793
->      and r8a7794 SoCs.
-
-Does this mean the BSP uses hp_clk for all Gen2 SoCs while mainline uses 
-zs_clk ? Can't we find out which one is correct ?
-
->      Support for the r8a7793 SoC is not present in mainline.
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi            | 11 +++++++++++
->  include/dt-bindings/clock/r8a7794-clock.h |  1 +
->  2 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 063bf56..7a03166 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -530,6 +530,17 @@
->  			        "sdhi2", "sdhi1", "sdhi0",
->  				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
->  		};
-> +		mstp5_clks: mstp5_clks at e6150144 {
-> +			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-
-clocks";
-> +			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
-> +			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
-> +			#clock-cells = <1>;
-> +			clock-indices = <
-> +				R8A7794_CLK_AUDIO_DMAC0
-> +				R8A7794_CLK_THERMAL R8A7794_CLK_PWM
-> +			>;
-> +			clock-output-names = "audmac0", "thermal", "pwm";
-> +		};
->  		mstp7_clks: mstp7_clks at e615014c {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-
-clocks";
->  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-> diff --git a/include/dt-bindings/clock/r8a7794-clock.h
-> b/include/dt-bindings/clock/r8a7794-clock.h index d5cfe62..58fa44d 100644
-> --- a/include/dt-bindings/clock/r8a7794-clock.h
-> +++ b/include/dt-bindings/clock/r8a7794-clock.h
-> @@ -61,6 +61,7 @@
->  #define R8A7794_CLK_USBDMAC1		31
-> 
->  /* MSTP5 */
-> +#define R8A7794_CLK_AUDIO_DMAC0		2
->  #define R8A7794_CLK_THERMAL		22
->  #define R8A7794_CLK_PWM			23
-
--- 
-Regards,
-
-Laurent Pinchart
