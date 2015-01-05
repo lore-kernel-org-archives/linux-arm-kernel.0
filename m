@@ -1,67 +1,159 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 5 Jan 2015 10:32:29 -0600
-Subject: [PATCH V4] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan node
-Message-ID: <1420475549-28492-1-git-send-email-nm@ti.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Mon, 5 Jan 2015 16:54:02 +0000
+Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150105165402.GE3163@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
-a fan (such as AFB02505HHB) over J1 connector for various purposes.
-Provide device tree node to enable the same.
+On Mon, 22 Dec, at 10:59:02AM, Ard Biesheuvel wrote:
+> In order to support kexec, the kernel needs to be able to deal with the
+> state of the UEFI firmware after SetVirtualAddressMap() has been called.
+> To avoid having separate code paths for non-kexec and kexec, let's move
+> the call to SetVirtualAddressMap() to the stub: this will guarantee us
+> that it will only be called once (since the stub is not executed during
+> kexec), and ensures that the UEFI state is identical between kexec and
+> normal boot.
+> 
+> This implies that the layout of the virtual mapping needs to be created
+> by the stub as well. All regions are rounded up to a naturally aligned
+> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
+> in the UEFI memory map. The kernel proper reads those values and installs
+> the mappings in a dedicated set of page tables that are swapped in during
+> UEFI Runtime Services calls.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/efi.h       |  20 +++-
+>  arch/arm64/kernel/efi.c            | 223 ++++++++++++++++++++-----------------
+>  arch/arm64/kernel/setup.c          |   1 +
+>  drivers/firmware/efi/libstub/fdt.c | 137 ++++++++++++++++++++++-
+>  4 files changed, 270 insertions(+), 111 deletions(-)
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-V4: Change format of the speed-map used.
-V3: https://patchwork.kernel.org/patch/5562121/
-V2: https://patchwork.kernel.org/patch/5445111/
-V1: https://patchwork.kernel.org/patch/5444911/
+[...]
 
-Enable and disable can be controlled by (post the RPM, it finds
-closest match - even a 1 will do)
+> @@ -45,5 +53,9 @@ extern void efi_idmap_init(void);
+>  #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
+>  
+>  #define EFI_ALLOC_ALIGN		SZ_64K
+> +#define EFI_VIRTMAP		EFI_ARCH_1
 
-echo '13000' > /sys/class/hwmon/hwmon0/fan1_target
-and
-echo '0' > /sys/class/hwmon/hwmon0/fan1_target
+Any chance of documenting what EFI_VIRTMAP means for posterity and why
+you want to use one of the EFI arch config bits? How is this different
+from EFI_RUNTIME_SERVICES?
 
-Test log: http://slexy.org/view/s2T0ajh46z
+Take a look at EFI_OLD_MEMMAP in arch/x86/include/asm/efi.h for a
+crackingly well documented example from Borislav.
 
-requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
-Applies on v3.19-rc1
+[...]
+  
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index c846a9608cbd..76bc8abf41d1 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -167,6 +167,94 @@ fdt_set_fail:
+>  #define EFI_FDT_ALIGN EFI_PAGE_SIZE
+>  #endif
+>  
+> +static efi_status_t get_memory_map(efi_system_table_t *sys_table_arg,
+> +				   efi_memory_desc_t **map,
+> +				   unsigned long *map_size,
+> +				   unsigned long *desc_size,
+> +				   u32 *desc_ver, unsigned long *key_ptr)
+> +{
+> +	efi_status_t status;
+> +
+> +	/*
+> +	 * Call get_memory_map() with 0 size to retrieve the size of the
+> +	 * required allocation.
+> +	 */
+> +	*map_size = 0;
+> +	status = efi_call_early(get_memory_map, map_size, NULL,
+> +				key_ptr, desc_size, desc_ver);
+> +	if (status != EFI_BUFFER_TOO_SMALL)
+> +		return EFI_LOAD_ERROR;
+> +
+> +	/*
+> +	 * Add an additional efi_memory_desc_t to map_size because we're doing
+> +	 * an allocation which may be in a new descriptor region. Then double it
+> +	 * to give us some scratch space to prepare the input virtmap to give
+> +	 * to SetVirtualAddressMap(). Note that this is EFI_LOADER_DATA memory,
+> +	 * and the kernel memblock_reserve()'s only the size of the actual
+> +	 * memory map, so the scratch space is freed again automatically.
+> +	 */
+> +	*map_size += *desc_size;
+> +	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+> +				*map_size * 2, (void **)map);
+> +	if (status != EFI_SUCCESS)
+> +		return status;
+> +
+> +	status = efi_call_early(get_memory_map, map_size, *map,
+> +				key_ptr, desc_size, desc_ver);
+> +	if (status != EFI_SUCCESS)
+> +		efi_call_early(free_pool, *map);
+> +	return status;
+> +}
 
- arch/arm/boot/dts/am57xx-beagle-x15.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+We've now got two (slightly different) versions of this function. Is
+there any way we could make do with just one?
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 6c2e8e4..c5d4cea 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -80,6 +80,14 @@
- 			default-state = "off";
- 		};
- 	};
-+
-+	gpio_fan: gpio_fan {
-+		/* Based on 5v 500mA AFB02505HHB */
-+		compatible = "gpio-fan";
-+		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
-+		gpio-fan,speed-map = <0     0>,
-+				     <13000 1>;
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -394,6 +402,12 @@
- 			wakeup-source;
- 			ti,palmas-long-press-seconds = <12>;
- 		};
-+
-+		tps659038_gpio: tps659038_gpio {
-+			compatible = "ti,palmas-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
- 	};
- 
- 	tmp102: tmp102 at 48 {
+> +/*
+> + * This is the base address at which to start allocating virtual memory ranges
+> + * for UEFI Runtime Services. This is a userland range so that we can use any
+> + * allocation we choose, and eliminate the risk of a conflict after kexec.
+> + */
+> +#define EFI_RT_VIRTUAL_BASE	0x40000000
+> +
+> +static void update_memory_map(efi_memory_desc_t *memory_map,
+> +			      unsigned long map_size, unsigned long desc_size,
+> +			      int *count)
+> +{
+> +	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
+> +	efi_memory_desc_t *out = (void *)memory_map + map_size;
+> +	int l;
+> +
+> +	for (l = 0; l < map_size; l += desc_size) {
+> +		efi_memory_desc_t *in = (void *)memory_map + l;
+> +		u64 paddr, size;
+> +
+> +		if (!(in->attribute & EFI_MEMORY_RUNTIME))
+> +			continue;
+> +
+> +		/*
+> +		 * Make the mapping compatible with 64k pages: this allows
+> +		 * a 4k page size kernel to kexec a 64k page size kernel and
+> +		 * vice versa.
+> +		 */
+> +		paddr = round_down(in->phys_addr, SZ_64K);
+> +		size = round_up(in->num_pages * EFI_PAGE_SIZE +
+> +				in->phys_addr - paddr, SZ_64K);
+> +
+> +		/*
+> +		 * Avoid wasting memory on PTEs by choosing a virtual base that
+> +		 * is compatible with section mappings if this region has the
+> +		 * appropriate size and physical alignment. (Sections are 2 MB
+> +		 * on 4k granule kernels)
+> +		 */
+> +		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
+> +			efi_virt_base = round_up(efi_virt_base, SZ_2M);
+> +
+> +		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
+> +		efi_virt_base += size;
+> +
+> +		memcpy(out, in, desc_size);
+> +		out = (void *)out + desc_size;
+> +		++*count;
+> +	}
+> +}
+> +
+
+fdt.c is starting to become a dumping ground for arm*-specific stuff :-(
+
+Is there no general solution for sharing code between arm and aarch64 in
+the kernel so we don't have to stick things like this in
+drivers/firmware/efi/?
+
 -- 
-1.7.9.5
+Matt Fleming, Intel Open Source Technology Center
