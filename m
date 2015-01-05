@@ -1,73 +1,25 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 05 Jan 2015 19:13:53 +0900
-Subject: kernel panic when booting on exynos 5440
-In-Reply-To: <CACVXFVOVS=sVqxe3q3_SShxoTkHy+yi4+2Go9k4gqhUgBjiZFQ@mail.gmail.com>
-References: <CACVXFVNCZdMyHQ1fzZDGs7h7X9vWmMVBJFRqWs7_P=WBQUYk1g@mail.gmail.com>
- <549BE7CC.1000005@samsung.com>
- <CACVXFVOVS=sVqxe3q3_SShxoTkHy+yi4+2Go9k4gqhUgBjiZFQ@mail.gmail.com>
-Message-ID: <035701d028d0$4ef0fff0$ecd2ffd0$@kernel.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 5 Jan 2015 11:15:46 +0100
+Subject: [PATCH v7] edac: synps: Added EDAC support for zynq ddr ecc
+ controller
+In-Reply-To: <CAGnW=BbrpMoMGSVmFXUAYsnyOPGpkz=HbL6mRzB7PqRhbq5HTA@mail.gmail.com>
+References: <d71411fd1be84d99af5936138cbcc9c7@BL2FFO11FD014.protection.gbl>
+ <20150102105008.GA31364@pd.tnic>
+ <CAGnW=BbrpMoMGSVmFXUAYsnyOPGpkz=HbL6mRzB7PqRhbq5HTA@mail.gmail.com>
+Message-ID: <20150105101546.GA19655@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ming Lei wrote:
-> 
-> Hi Guys,
-> 
-Hi,
+On Sat, Jan 03, 2015 at 08:01:29AM +0530, punnaiah choudary kalluri wrote:
+> p is pointing to the stack memory.
 
-Sorry for late response. 
+So you could go and allocate all that memory at driver init time and
+reuse it each time you handle an error instead of on the stack. This way
+your error handling paths are lean and fast.
 
-> On Thu, Dec 25, 2014 at 6:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> > +CC: Thomas Abraham
-> >
-> > Hi Ming,
-> >
-> > On Thursday 25 December 2014 02:18 PM, Ming Lei wrote:
-> >>
-> >> Hi Pankaj,
-> >>
-> >> In your commit fce9e5bb2(ARM: EXYNOS: Add support for
-> >> mapping PMU base address via DT), 'pmu_base_addr' is
-> >> only parsed for very limited machines from the table of
-> >> 'exynos_dt_pmu_match'.  For other boards, 'pmu_base_addr'
-> >> will keep its default value of null, then panic() is triggered.
-> >>
-> >
-> > Yes, it will.
-> > As exynos5440 DT does not have PMU device node, neither above mentioned
-> > patch added corresponding matching device_id.
-> > If I remember correctly, I might have missed this because exynos5440 DT was
-> > not having PMU node.
-> >
-> >> What do you think about the problem?
-> >
-> >
-> > I missed this part, and I should have taken care of this in original patch
-> > itself. Well as of now I can think of only one solution that if we really
-> > want to keep support for exynos5440 in mainline kernel, to avoid above issue
-> > we should skip pmu mapping for exynos5440. In this case following patch will
-> > do this work.
-> >
-> > Also I will like to know from Kukjin that what best can be done now.
-> > If he is OK with below solution I can post the same.
-> >
-> > ---------------------------------------------------------------
-> >
-> > Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
-> >
-> > Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
-> > of mapping of exynos5440 PMU register which will result in kernel panic.
-> > As of now let's avoid mapping of exynos5440 PMU.
-> >
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> Is there any opportunity to merge the fix? Or exynos5440 will not be
-> supported in future?
-> 
-Basically, I'm fine on the change like others for exynos5440 at this moment
-and if any other comments, I'll let you know on the patch in mailing list.
+-- 
+Regards/Gruss,
+    Boris.
 
-Happy new year.
-
-Thanks,
-Kukjin
+Sent from a fat crate under my desk. Formatting is fine.
+--
