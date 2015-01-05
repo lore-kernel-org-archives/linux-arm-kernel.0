@@ -1,15 +1,84 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 5 Jan 2015 11:53:03 +0100
-Subject: [PATCH FOR v3.19 - v2] iommu/ipmmu-vmsa: change IOMMU_EXEC to
- IOMMU_NOEXEC
-In-Reply-To: <1418668873-5091-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1418668873-5091-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <20150105105303.GA19590@8bytes.org>
+From: frediano.ziglio@huawei.com (Frediano Ziglio)
+Date: Mon, 5 Jan 2015 10:53:07 +0000
+Subject: [Ask for HELP] Should it support ustat syscall for arm64
+In-Reply-To: <54A10D8D.8060002@hisilicon.com>
+References: <54A0C35B.4010001@huawei.com> <54A10D8D.8060002@hisilicon.com>
+Message-ID: <B944B469BF5302468AC6EB05E56CC70DB3AD6D@lhreml503-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 08:41:13PM +0200, Laurent Pinchart wrote:
-> Joerg, this is a compilation breakage fix for v3.19. Could you please take it
-> in your tree and submit it early during the -rc cycle ?
+> On 2014/12/29 10:58, Wang Weidong wrote:
+> > Hi,
+> >
+> > As I ran LTP testcase ustat01 and ustat02 on Arm64, and got the
+> result:
+> >
+> > ustat01     1  TFAIL  :  ustat(2) failed and setthe errno to 38 :
+> Function not implemented
+> >
+> > ustat02     1  TFAIL  :  ustat(2) failed to produce expected error;
+> 22, errno: EINVAL:
+> >                          TEST_ERRNO=ENOSYS(38): Function not
+> implemented
+> > ustat02     2  TFAIL  :  ustat(2) failed to produce expected error;
+> 14, errno: EFAULT:
+> >                          TEST_ERRNO=ENOSYS(38): Function not
+> > implemented
+> >
+> > -----------------------
+> >
+> > I found the glibc and kernel's implementation:
+> > The glibc version is 2.19, kernel is 3.16.
+> >
+> > The glibc will use the sysdeps/unix/sysv/linux/generic/ustat.c
+> > But it only return ENOSYS.
+> >
+> > The kernel doesn't support the NR_ustat syscall.
+> >
+> > So I did that:
+> > 1. In glibc:
+> > I changed the sysdeps/unix/sysv/linux/generic/ustat.c:
+> >
+> > -#include <errno.h>
+> > -#include <sys/ustat.h>
+> > +#define __ARCH_WANT_SYSCALL_DEPRECATED #include
+> > +<sysdeps/unix/sysv/linux/ustat.c>
+> >
+> > -#include <sysdep.h>
+> > -#include <sys/syscall.h>
+> > -
+> > -/* This deprecated syscall is no longer used (replaced with fstat).
+> > */ -int -ustat (dev_t dev, struct ustat *ubuf) -{
+> > -  __set_errno (ENOSYS);
+> > -  return -1;
+> > -}
+> > -stub_warning (ustat)
+> >
+> > 2. In Kernel:
+> > I changed the arch/arm64/include/uapi/asm/unistd.h:
+> >
+> > +#define __ARCH_WANT_SYSCALL_DEPRECATED #define __ARCH_WANT_SYS_FORK
+> > +#define __ARCH_WANT_SYS_VFORK
+> >
+> > After the changing, These cases will Pass.
+> 
+> Hi Weidong,
+> 
+> > So, Does it need to support ustat syscall for arm64?
+> 
+> No, on arm64 the ustat syscall is obsolete.
+> You could find syscalls from "include/uapi/asm-generic/unistd.h".
+> And on arm64, there is no define for "__ARCH_WANT_SYSCALL_DEPRECATED".
+> So there is no support for the syscalls covered by the macro above.
+> 
+> Best Regards,
+> Wei
+> 
+> > Regards,
+> > Wang
+> >
 
-Patch applied, sorry for the delay.
+Hi,
+  Opened an issue at https://github.com/linux-test-project/ltp/issues/25
+
+Frediano
