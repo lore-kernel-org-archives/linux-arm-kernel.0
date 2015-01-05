@@ -1,79 +1,54 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 5 Jan 2015 12:34:55 +0200
-Subject: [PATCH 2/2] ARM: DRA7xx: hwmod: set DSS submodule parent hwmods
-In-Reply-To: <alpine.DEB.2.02.1501022250010.27058@utopia.booyaka.com>
-References: <1418985914-9027-1-git-send-email-tomi.valkeinen@ti.com>
- <1418985914-9027-3-git-send-email-tomi.valkeinen@ti.com>
- <alpine.DEB.2.02.1501022250010.27058@utopia.booyaka.com>
-Message-ID: <54AA68CF.9050904@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Jan 2015 11:37:47 +0100
+Subject: GIC_CPU_MASK_SIMPLE(8)" on big.LITTLE?
+Message-ID: <CAMuHMdWQQBECdXT1pbChT31y8YdHzcjvTGR1A2HhtdtwpRmdPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+A while ago, I wondered:
 
-On 03/01/15 00:50, Paul Walmsley wrote:
-> On Fri, 19 Dec 2014, Tomi Valkeinen wrote:
-> 
->> Set DSS core hwmod as the parent for all the DSS submodules. This fixes
->> the boot time DSS reset, removing the following warnings:
->>
->> omap_hwmod: dss_dispc: cannot be enabled for reset (3)
->> omap_hwmod: dss_hdmi: cannot be enabled for reset (3)
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> 
-> Thanks, queued for v3.19-rc.                         
-> 
-> Note that I cannot test this patch due to lack of a DRA7xx board here.
+| It's my understanding GIC_CPU_MASK_SIMPLE should reflect the actual number
+| of CPU cores the interrupt is wired too. Is that correct?
+|
+| [Fixes for incorrect masks on shmobile]
+|
+| Should it be "GIC_CPU_MASK_SIMPLE(8)" on big.LITTLE configurations
+| with four Cortex-A15 cores and four Cortex-A7 cores?
+| Or should the interrupts be delivered to the four Cortex-A15 cores
+| only by default?
+|
+| Note that incorrect masks for GIC PPI interrupts are not limited to
+| shmobile. Presumably the interrupt specifiers got copied around a lot,
+| cfr. the proliferation of "GIC_CPU_MASK_SIMPLE(4)" (and the older
+| hardcoded "0xf0x" variant) in various dtsi files, not always limited to
+| quad-core CPUs.
 
-Thanks. Unfortunately, I made a mistake with the DRA7xx patch. Well, the
-patch itself is correct, but we have some insanity in the HW that I missed:
+In the mean time, arch/arm64/boot/dts/arm/juno.dts got added, which has 2 A57
+cores and 4 A53 cores, and uses GIC_CPU_MASK_SIMPLE(6), so it seems like
+my two RFC patches to use GIC_CPU_MASK_SIMPLE(8) for 4 A15 cores and 4
+A7 cores are actually correct?
 
-DRA7xx has a CTRL_CORE_CONTROL_IO_2 register in the control module,
-which contains bits for various subsystems, including DCAN, PCIe, QSPI
-and DSS. At the moment only DCAN driver uses the register via syscon +
-regmap.
+Thanks for your comments!
 
-For DSS, the bit 0, DSS_DESHDCP_CLKEN is critical. While the bit is
-rather undocumented, it presumably enables a clock for DSS's HDCP. Now,
-we don't support HDPC in the display driver, but unfortunately the clock
-is required for the DSS hardware to initialize.
+References:
+  1. Original RFC series:
+     [PATCH/RFC 0/4] ARM: shmobile: Correct masks for GIC PPI interrupts
+     http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306743.html
+  2. RFC patches:
+       a. [PATCH/RFC 3/4] ARM: shmobile: r8a7790: Correct mask for GIC
+PPI interrupts
+          http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306741.html
+       b. [PATCH/RFC 4/4] ARM: shmobile: r8a73a4: Correct mask for GIC
+PPI interrupts
+          http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306740.html
 
-Without this patch, we see only the few warnings about dss hwmods
-"cannot be enabled", but with the patch, we see those and some WARN()s
-from hwmod as the DSS HW module does not start. So it's a bit worse.
+Gr{oetje,eeting}s,
 
-Why I didn't notice this is that I had an u-boot version that enables
-the DSS_DESHDCP_CLKEN bit and leaves it enabled.
+                        Geert
 
-So what to do about the issue? You could drop/revert this patch if we
-don't see a quick solution for the DSS_DESHDCP_CLKEN. It won't fix
-anything as such, but lessens the boot-up spam.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-I don't have a good idea how to manage the bit properly. As far as I
-see, the bit has to be managed via syscon, using remap_update_bits, so
-that we get proper locking. With a quick glance, I didn't see anything
-for that in the current clock code. And can we presume that syscon is
-probed before hwmods? I guess not.
-
-For the time being, I think the easiest solution would be to just set
-the bit and leave it enabled. My understanding (based on commits in TI's
-product kernel) is that leaving the DSS_DESHDCP_CLKEN enabled doesn't
-really affect much, and any increased power consumption would be too
-small to measure.
-
-If that's the route, the question is still where to enable it. As I
-said, I have an u-boot which enables it, but I'd rather do the enabling
-in the kernel. If in the kernel, where there? It has to happen before
-the hwmod init is ran.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/57514c2a/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
