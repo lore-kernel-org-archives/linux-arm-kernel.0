@@ -1,64 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 5 Jan 2015 13:28:49 +0100
-Subject: [PATCH 2/2] ARM: mediatek: dts: Add uart to Aquaris5
-In-Reply-To: <1420224485-11043-3-git-send-email-matthias.bgg@gmail.com>
-References: <1420224485-11043-1-git-send-email-matthias.bgg@gmail.com>
- <1420224485-11043-3-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <20150105122849.GF4544@pengutronix.de>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 5 Jan 2015 20:28:38 +0800
+Subject: [PATCH] ARM: mediatek: dts: Add UART dts for MT8127 and MT8135 boards
+Message-ID: <1420460918-24380-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+This patch enable UART for MT8127 moose board and MT8135 evalution board.
+Adding the dts, these two boards can show log and shell prompts.
+This patch base on my previous MT8135/MT8127 SoC UART dtsi patch [1] and
+Matthias's modification to disable SoC UART by default.
 
-On Fri, Jan 02, 2015 at 07:48:05PM +0100, Matthias Brugger wrote:
-> This patch enables uart port for the Aquaris5 mobile phone.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  arch/arm/boot/dts/mt6589-aquaris5.dts | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-> index 0da0470..d5cbfda 100644
-> --- a/arch/arm/boot/dts/mt6589-aquaris5.dts
-> +++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-> @@ -21,10 +21,16 @@
->  	compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
->  
->  	chosen {
-> -		bootargs = "earlyprintk";
-> +		bootargs = "console=ttyS0,921600n8 earlyprintk";
->  	};
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/312311.html
 
-		stdout-path = &uart0;
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ arch/arm/boot/dts/mt8127-moose.dts | 4 ++++
+ arch/arm/boot/dts/mt8135-evbp1.dts | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-Should work aswell and makes you independent from the way the kernel
-decides to number the UARTs.
-
->  
->  	memory {
->  		reg = <0x80000000 0x40000000>;
->  	};
-> +
-> +	soc {
-> +		uart0: serial at 11006000 {
-> +			status = "okay";
-> +		};
-> +	};
-
-By using the & notation you don't have to resemble the tree structure in
-the board file, like this:
-
-&uart0 {
-	status = "okay";
-};
-
-See for example the omap, i.MX or other dts files.
-
-Sascha
-
+diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
+index 13cba0e..073e295 100644
+--- a/arch/arm/boot/dts/mt8127-moose.dts
++++ b/arch/arm/boot/dts/mt8127-moose.dts
+@@ -23,3 +23,7 @@
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+ };
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
+index a5adf97..3667738 100644
+--- a/arch/arm/boot/dts/mt8135-evbp1.dts
++++ b/arch/arm/boot/dts/mt8135-evbp1.dts
+@@ -23,3 +23,7 @@
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+ };
++
++&uart3 {
++	status = "okay";
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.1.dirty
