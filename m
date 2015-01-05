@@ -1,15 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Jan 2015 14:41:33 +0100
-Subject: [PATCH v2] ARM: shmobile: r8a7791: add ADSP clocks
-In-Reply-To: <4692589.Khlcz7yVTN@wasted.cogentembedded.com>
-References: <4692589.Khlcz7yVTN@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWeGRZ_aTHyiE9ajmHarfBtZG+k3fr6uBXyYZjOB+GaTQ@mail.gmail.com>
+Date: Mon, 5 Jan 2015 14:42:01 +0100
+Subject: [PATCH] ARM: shmobile: r8a7790: add ADSP clocks
+In-Reply-To: <1909663.BCLINDXhVH@wasted.cogentembedded.com>
+References: <1909663.BCLINDXhVH@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUVyRgWYpX4ByWP45HFAfjD6YecH0jfZ=MRc9eZMR4qvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 9:20 PM, Sergei Shtylyov
+On Tue, Dec 30, 2014 at 9:21 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7791 device tree.
+> Add the ADSP clocks to the CPG and MSTP5 nodes of the R8A7790 device tree.
 >
 > Based on the original patch by Konstantin Kozhevnikov
 > <konstantin.kozhevnikov@cogentembedded.com>.
