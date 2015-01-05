@@ -1,343 +1,80 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Mon, 05 Jan 2015 17:18:46 +0900
-Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <54AA48E6.3040404@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 05 Jan 2015 10:30:38 +0200
+Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add Audio DMAC,
+ PWM and Thermal clocks to device tree
+In-Reply-To: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
+References: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <8183635.VD1oYub01I@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
+Hi Simon,
 
-On 12/05/2014 04:27 AM, Sjoerd Simons wrote:
-> Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
-> same as the vendors naming, which means it's prefixed with exynos5422
-> instead of exynos5800 as the SoC name even though it includes the
-> exyno5800 dtsi.
+On Friday 19 December 2014 09:39:33 Simon Horman wrote:
+> This is based on the MSTP5 clocks in the r8a7791 device tree.
+> The main difference being that the r8a7794 does not have an Audio DMAC1
+> clock.
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
 > ---
-> Changes since v1:
->   * Add chosen/linux,stdout-path to point the serial console device
->   * Change memory start offset to 0x40000000 to match the vendors DTS (pointed
->     out by Heesub Shin)
->   * Declare base address & size for the memory banks to be used by the MFC
+> Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
 > 
-> Kevin, Tyler, even though the changes are small i didn't want to just stick
-> your Tested-By on. Could you both be so kind to retest this on your XU3's ?
+> N.B: The R-Car Gen2 v1.8.0 BSP uses zs_clk whereas this patch uses hp_clk
+>      as the parent clock for the Audio DMAC clock.
 > 
-> Heesub, I would still love to know the reason for having the memory start
-> address at 0x40000000 for this board?
+>      In that regard this patch follows the pattern used in mainline for the
+>      r8a7790 and r8a7791 SoCs.
 > 
->  arch/arm/boot/dts/Makefile                 |   1 +
->  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 332 +++++++++++++++++++++++++++++
->  2 files changed, 333 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 38c89ca..0a898cc 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -86,6 +86,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->  	exynos5420-arndale-octa.dtb \
->  	exynos5420-peach-pit.dtb \
->  	exynos5420-smdk5420.dtb \
-> +	exynos5422-odroidxu3.dtb \
->  	exynos5440-sd5v1.dtb \
->  	exynos5440-ssdk5440.dtb \
->  	exynos5800-peach-pi.dtb
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> new file mode 100644
-> index 0000000..0dc9cf8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> @@ -0,0 +1,332 @@
-> +/*
-> + * Hardkernel Odroid XU3 board device tree source
-> + *
-> + * Copyright (c) 2014 Collabora Ltd.
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos5800.dtsi"
-> +
-> +/ {
-> +	model = "Hardkernel Odroid XU3";
-> +	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x80000000>;
-> +	};
-> +
-> +	chosen {
-> +		linux,stdout-path = &serial_2;
-> +	};
-> +
-> +	fimd at 14400000 {
-> +		status = "okay";
-> +	};
-> +
-> +	firmware at 02073000 {
-> +		compatible = "samsung,secure-firmware";
-> +		reg = <0x02073000 0x1000>;
-> +	};
-> +
-> +	fixed-rate-clocks {
-> +		oscclk {
-> +			compatible = "samsung,exynos5420-oscclk";
-> +			clock-frequency = <24000000>;
-> +		};
-> +	};
-> +
-> +	hsi2c_4: i2c at 12CA0000 {
-> +		status = "okay";
-> +
-> +		s2mps11_pmic at 66 {
-> +			compatible = "samsung,s2mps11-pmic";
-> +			reg = <0x66>;
-> +			s2mps11,buck2-ramp-delay = <12>;
-> +			s2mps11,buck34-ramp-delay = <12>;
-> +			s2mps11,buck16-ramp-delay = <12>;
-> +			s2mps11,buck6-ramp-enable = <1>;
-> +			s2mps11,buck2-ramp-enable = <1>;
-> +			s2mps11,buck3-ramp-enable = <1>;
-> +			s2mps11,buck4-ramp-enable = <1>;
-> +
-> +			s2mps11_osc: clocks {
-> +				#clock-cells = <1>;
-> +				clock-output-names = "s2mps11_ap",
-> +						"s2mps11_cp", "s2mps11_bt";
-> +			};
-> +
-> +			regulators {
-> +				ldo1_reg: LDO1 {
-> +					regulator-name = "vdd_ldo1";
-> +					regulator-min-microvolt = <1000000>;
-> +					regulator-max-microvolt = <1000000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo3_reg: LDO3 {
-> +					regulator-name = "vdd_ldo3";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo5_reg: LDO5 {
-> +					regulator-name = "vdd_ldo5";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo6_reg: LDO6 {
-> +					regulator-name = "vdd_ldo6";
-> +					regulator-min-microvolt = <1000000>;
-> +					regulator-max-microvolt = <1000000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo7_reg: LDO7 {
-> +					regulator-name = "vdd_ldo7";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo8_reg: LDO8 {
-> +					regulator-name = "vdd_ldo8";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo9_reg: LDO9 {
-> +					regulator-name = "vdd_ldo9";
-> +					regulator-min-microvolt = <3000000>;
-> +					regulator-max-microvolt = <3000000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo10_reg: LDO10 {
-> +					regulator-name = "vdd_ldo10";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo11_reg: LDO11 {
-> +					regulator-name = "vdd_ldo11";
-> +					regulator-min-microvolt = <1000000>;
-> +					regulator-max-microvolt = <1000000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo12_reg: LDO12 {
-> +					regulator-name = "vdd_ldo12";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo13_reg: LDO13 {
-> +					regulator-name = "vdd_ldo13";
-> +					regulator-min-microvolt = <2800000>;
-> +					regulator-max-microvolt = <2800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo15_reg: LDO15 {
-> +					regulator-name = "vdd_ldo15";
-> +					regulator-min-microvolt = <3100000>;
-> +					regulator-max-microvolt = <3100000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo16_reg: LDO16 {
-> +					regulator-name = "vdd_ldo16";
-> +					regulator-min-microvolt = <2200000>;
-> +					regulator-max-microvolt = <2200000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo17_reg: LDO17 {
-> +					regulator-name = "tsp_avdd";
-> +					regulator-min-microvolt = <3300000>;
-> +					regulator-max-microvolt = <3300000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo19_reg: LDO19 {
-> +					regulator-name = "vdd_sd";
-> +					regulator-min-microvolt = <2800000>;
-> +					regulator-max-microvolt = <2800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				ldo24_reg: LDO24 {
-> +					regulator-name = "tsp_io";
-> +					regulator-min-microvolt = <2800000>;
-> +					regulator-max-microvolt = <2800000>;
-> +					regulator-always-on;
-> +				};
-> +
-> +				buck1_reg: BUCK1 {
-> +					regulator-name = "vdd_mif";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1300000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck2_reg: BUCK2 {
-> +					regulator-name = "vdd_arm";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1500000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck3_reg: BUCK3 {
-> +					regulator-name = "vdd_int";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1400000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck4_reg: BUCK4 {
-> +					regulator-name = "vdd_g3d";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1400000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck5_reg: BUCK5 {
-> +					regulator-name = "vdd_mem";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1400000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck6_reg: BUCK6 {
-> +					regulator-name = "vdd_kfc";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1500000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck7_reg: BUCK7 {
-> +					regulator-name = "vdd_1.0v_ldo";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1500000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck8_reg: BUCK8 {
-> +					regulator-name = "vdd_1.8v_ldo";
-> +					regulator-min-microvolt = <800000>;
-> +					regulator-max-microvolt = <1500000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck9_reg: BUCK9 {
-> +					regulator-name = "vdd_2.8v_ldo";
-> +					regulator-min-microvolt = <3000000>;
-> +					regulator-max-microvolt = <3750000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
-> +				buck10_reg: BUCK10 {
-> +					regulator-name = "vdd_vmem";
-> +					regulator-min-microvolt = <2850000>;
-> +					regulator-max-microvolt = <2850000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	i2c_2: i2c at 12C80000 {
-> +		samsung,i2c-sda-delay = <100>;
-> +		samsung,i2c-max-bus-freq = <66000>;
-> +		status = "okay";
-> +
-> +		hdmiddc at 50 {
-> +			compatible = "samsung,exynos4210-hdmiddc";
-> +			reg = <0x50>;
-> +		};
-> +	};
-> +
-> +	rtc at 101E0000 {
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&hdmi {
-> +	status = "okay";
-> +	hpd-gpio = <&gpx3 7 0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&hdmi_hpd_irq>;
-> +
-> +	vdd_osc-supply = <&ldo10_reg>;
-> +	vdd_pll-supply = <&ldo8_reg>;
-> +	vdd-supply = <&ldo8_reg>;
+>      The BSP's parent clock is consistent for the r8a7790, r8a7791, r8a7793
+>      and r8a7794 SoCs.
 
-ldo10 and ldo8 are right? I think ldo7 and ldo6 are related with hdmi
-from schematic.
+Does this mean the BSP uses hp_clk for all Gen2 SoCs while mainline uses 
+zs_clk ? Can't we find out which one is correct ?
 
-Thanks.
+>      Support for the r8a7793 SoC is not present in mainline.
+> ---
+>  arch/arm/boot/dts/r8a7794.dtsi            | 11 +++++++++++
+>  include/dt-bindings/clock/r8a7794-clock.h |  1 +
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> index 063bf56..7a03166 100644
+> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -530,6 +530,17 @@
+>  			        "sdhi2", "sdhi1", "sdhi0",
+>  				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+>  		};
+> +		mstp5_clks: mstp5_clks at e6150144 {
+> +			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+> +			clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
+> +			#clock-cells = <1>;
+> +			clock-indices = <
+> +				R8A7794_CLK_AUDIO_DMAC0
+> +				R8A7794_CLK_THERMAL R8A7794_CLK_PWM
+> +			>;
+> +			clock-output-names = "audmac0", "thermal", "pwm";
+> +		};
+>  		mstp7_clks: mstp7_clks at e615014c {
+>  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+>  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+> diff --git a/include/dt-bindings/clock/r8a7794-clock.h
+> b/include/dt-bindings/clock/r8a7794-clock.h index d5cfe62..58fa44d 100644
+> --- a/include/dt-bindings/clock/r8a7794-clock.h
+> +++ b/include/dt-bindings/clock/r8a7794-clock.h
+> @@ -61,6 +61,7 @@
+>  #define R8A7794_CLK_USBDMAC1		31
+> 
+>  /* MSTP5 */
+> +#define R8A7794_CLK_AUDIO_DMAC0		2
+>  #define R8A7794_CLK_THERMAL		22
+>  #define R8A7794_CLK_PWM			23
+
+-- 
+Regards,
+
+Laurent Pinchart
