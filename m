@@ -1,38 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Jan 2015 21:26:49 +0800
-Subject: [PATCH v2 1/3] ARM: imx6sx: Set PLL2 as parent of QSPI clocks
-In-Reply-To: <1418758230-10246-1-git-send-email-festevam@gmail.com>
-References: <1418758230-10246-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150105132648.GD24511@dragon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Jan 2015 14:29:28 +0100
+Subject: [PATCH v4 1/3] ARM: shmobile: r8a7791: add CAN clocks
+In-Reply-To: <2098987.LzjA3c0AUx@wasted.cogentembedded.com>
+References: <6830301.90YaDPuTpx@wasted.cogentembedded.com>
+ <2098987.LzjA3c0AUx@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXmKV2_npgjaC+t4wDD6we8VCBFSzHFfkRHwELO30BMmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 05:30:28PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> The default qspi2_clk_sel field of register CCM_CS2CDR contains '110' which is
-> marked as 'reserved', so we can't rely on the default value.
-> 
-> Provide a proper parent for QSPI clocks to avoid a kernel oops:
-> 
-> [    1.037920] Division by zero in kernel.
-> [    1.041807] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.18.0-rc7-next-20141204-00002-g5aa23e1 #2143
-> [    1.050967] Hardware name: Freescale i.MX6 SoloX (Device Tree)
-> [    1.056853] Backtrace:
-> [    1.059360] [<80011ea0>] (dump_backtrace) from [<8001203c>] (show_stack+0x18/0x1c)
-> [    1.066982]  r6:00000000 r5:00000000 r4:00000000 r3:00000000
-> [    1.072754] [<80012024>] (show_stack) from [<806b7100>] (dump_stack+0x88/0xa4)
-> [    1.080038] [<806b7078>] (dump_stack) from [<80011d20>] (__div0+0x18/0x20)
-> [    1.086958]  r5:be018500 r4:be017c00
-> [    1.090600] [<80011d08>] (__div0) from [<802aa418>] (Ldiv0+0x8/0x10)
-> [    1.097012] [<80504fbc>] (clk_divider_set_rate) from [<80503ddc>] (clk_change_rate+0x14c/0x17c)
-> [    1.105759]  r7:00000000 r6:00000000 r5:be018500 r4:00000000
-> [    1.111516] [<80503c90>] (clk_change_rate) from [<80503ea0>] (clk_set_rate+0x94/0x98)
-> [    1.119391]  r8:be7e0368 r7:00000000 r6:be11a000 r5:be018500 r4:00000000 r3:00000000
-> [    1.127290] [<80503e0c>] (clk_set_rate) from [<80410558>] (fsl_qspi_probe+0x23c/0x75c)
-> [    1.135260]  r5:be11a010 r4:be350010
-> [    1.138900] [<8041031c>] (fsl_qspi_probe) from [<80385a18>] (platform_drv_probe+0x50/0xac)
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Sat, Dec 27, 2014 at 12:18 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> The R-Car CAN controllers can derive the CAN bus clock not only from their
+> peripheral clock input (clkp1) but also from the other internal clock (clkp2)
+> and external clock fed on CAN_CLK pin.  Describe those clocks in the device
+> tree,  along with  the USB_EXTAL clock  from which clkp2 is derived.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Applied all 3, thanks.
+Acked-by: arch/arm/boot/dts/r8a7790.dtsi
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
