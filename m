@@ -1,92 +1,55 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 05 Jan 2015 09:48:11 +0100
-Subject: [PATCH RESEND] ARM: exynos_defconfig: Enable options for display
- panel support
-In-Reply-To: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1420447691.3918.2.camel@AMDC1943>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Jan 2015 09:52:37 +0100
+Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add Audio DMAC, PWM and
+ Thermal clocks to device tree
+In-Reply-To: <8183635.VD1oYub01I@avalon>
+References: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
+ <8183635.VD1oYub01I@avalon>
+Message-ID: <CAMuHMdXcVrSXd2YzKVQKBFyTwkrOhci0MGs8uA1yk+kX9LDQkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2015-01-02 at 17:11 +0100, Javier Martinez Canillas wrote:
-> Many Exynos devices have a display panel. Most of them just have
-> a simple panel while others have more complex configurations that
-> requires an embedded DisplayPort (eDP) to LVDS bridges.
-> 
-> This patch enables the following features to be built in the kernel
-> image to support both setups:
-> 
-> - Direct Rendering Manager (DRM)
-> - DRM bridge registration and lookup framework
-> - Parade ps8622/ps8625 eDP/LVDS bridge
-> - NXP ptn3460 eDP/LVDS bridge
-> - Exynos Fully Interactive Mobile Display controller (FIMD)
-> - Panel registration and lookup framework
-> - Simple panels
-> - Backlight & LCD device support
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> 
-> Hello Kukjin,
-> 
-> You dropped this patch since exynos drm was causing boot hangs on some
-> platforms but the fix for that issue is already in linux-next (commit:
-> f1e9203 clk: samsung: Fix Exynos 5420 pinctrl setup and clock disable
-> failure due to domain being gated) so I think it makes sense to enable
-> the display options again.
+On Mon, Jan 5, 2015 at 9:30 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Friday 19 December 2014 09:39:33 Simon Horman wrote:
+>> This is based on the MSTP5 clocks in the r8a7791 device tree.
+>> The main difference being that the r8a7794 does not have an Audio DMAC1
+>> clock.
+>>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> ---
+>> Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
+>>
+>> N.B: The R-Car Gen2 v1.8.0 BSP uses zs_clk whereas this patch uses hp_clk
+>>      as the parent clock for the Audio DMAC clock.
+>>
+>>      In that regard this patch follows the pattern used in mainline for the
+>>      r8a7790 and r8a7791 SoCs.
+>>
+>>      The BSP's parent clock is consistent for the r8a7790, r8a7791, r8a7793
+>>      and r8a7794 SoCs.
+>
+> Does this mean the BSP uses hp_clk for all Gen2 SoCs while mainline uses
+> zs_clk ?
 
-I think these issues were unrelated to each other. DRM was disabled
-because of infinite deferred probing of DRM components. I saw Inki was
-sending some patches for it but I am not sure if they were merged.
+No, it's the other way around ;-)
 
-Best regards,
-Krzysztof
+> Can't we find out which one is correct ?
 
+Which clock is used doesn't seem to be documented.
+So either we have to check with the hardware guys, or measure the clock
+in some way, either by hardware or software (e.g. what's the maximum
+transfer rate
+that works?).
 
-> 
-> NOTE: Display panel is still not working since patch "arm: dts: Exynos5:
-> Use pmu_system_controller phandle for dp phy" is needed [0] but I think
-> we should enable display options to catch the regressions easier.
-> 
-> Best regards,
-> Javier
-> 
-> [0]: https://lkml.org/lkml/2014/11/24/10
-> 
->  arch/arm/configs/exynos_defconfig | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 22beed3..27cdd52 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -111,11 +111,26 @@ CONFIG_REGULATOR_S2MPA01=y
->  CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_REGULATOR_S5M8767=y
->  CONFIG_REGULATOR_TPS65090=y
-> +CONFIG_DRM=y
-> +CONFIG_DRM_BRIDGE=y
-> +CONFIG_DRM_PTN3460=y
-> +CONFIG_DRM_PS8622=y
-> +CONFIG_DRM_EXYNOS=y
-> +CONFIG_DRM_EXYNOS_FIMD=y
-> +CONFIG_DRM_EXYNOS_DP=y
-> +CONFIG_DRM_PANEL=y
-> +CONFIG_DRM_PANEL_SIMPLE=y
->  CONFIG_FB=y
->  CONFIG_FB_MODE_HELPERS=y
->  CONFIG_FB_SIMPLE=y
->  CONFIG_EXYNOS_VIDEO=y
->  CONFIG_EXYNOS_MIPI_DSI=y
-> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
-> +CONFIG_LCD_CLASS_DEVICE=y
-> +CONFIG_LCD_PLATFORM=y
-> +CONFIG_BACKLIGHT_CLASS_DEVICE=y
-> +CONFIG_BACKLIGHT_GENERIC=y
-> +CONFIG_BACKLIGHT_PWM=y
->  CONFIG_FRAMEBUFFER_CONSOLE=y
->  CONFIG_FONTS=y
->  CONFIG_FONT_7x14=y
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
