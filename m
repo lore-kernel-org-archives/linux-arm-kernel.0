@@ -1,22 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jan 2015 08:24:38 -0800
-Subject: [PATCH v11 4/9] ARM: l2c: Add interface to ask hypervisor to
- configure L2C
-In-Reply-To: <1420460348-20302-5-git-send-email-m.szyprowski@samsung.com>
+Date: Mon, 5 Jan 2015 08:25:09 -0800
+Subject: [PATCH v11 5/9] ARM: l2c: Get outer cache .write_sec callback
+ from mach_desc only if not NULL
+In-Reply-To: <1420460348-20302-6-git-send-email-m.szyprowski@samsung.com>
 References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
- <1420460348-20302-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20150105162438.GD4081@atomide.com>
+ <1420460348-20302-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20150105162508.GE4081@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Marek Szyprowski <m.szyprowski@samsung.com> [150105 04:22]:
 > From: Tomasz Figa <t.figa@samsung.com>
 > 
-> Because certain secure hypervisor do not allow writes to individual L2C
-> registers, but rather expect set of parameters to be passed as argument
-> to secure monitor calls, there is a need to provide an interface for the
-> L2C driver to ask the firmware to configure the hardware according to
-> specified parameters. This patch adds such.
+> Certain platforms (i.e. Exynos) might need to set .write_sec callback
+> from firmware initialization which is happenning in .init_early callback
+> of machine descriptor. However current code will overwrite the pointer
+> with whatever is present in machine descriptor, even though it can be
+> already set earlier. This patch fixes this by making the assignment
+> conditional, depending on whether current .write_sec callback is NULL.
 > 
 > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
@@ -24,55 +25,23 @@ List-Id: linux-arm-kernel.lists.infradead.org
 Acked-by: Tony Lindgren <tony@atomide.com>
 
 > ---
->  arch/arm/include/asm/outercache.h | 3 +++
->  arch/arm/mm/cache-l2x0.c          | 6 ++++++
->  2 files changed, 9 insertions(+)
+>  arch/arm/kernel/irq.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-> index 891a56b35bcf..563b92fc2f41 100644
-> --- a/arch/arm/include/asm/outercache.h
-> +++ b/arch/arm/include/asm/outercache.h
-> @@ -23,6 +23,8 @@
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index ad857bada96c..350f188c92d2 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -109,7 +109,8 @@ void __init init_IRQ(void)
 >  
->  #include <linux/types.h>
->  
-> +struct l2x0_regs;
-> +
->  struct outer_cache_fns {
->  	void (*inv_range)(unsigned long, unsigned long);
->  	void (*clean_range)(unsigned long, unsigned long);
-> @@ -36,6 +38,7 @@ struct outer_cache_fns {
->  
->  	/* This is an ARM L2C thing */
->  	void (*write_sec)(unsigned long, unsigned);
-> +	void (*configure)(const struct l2x0_regs *);
->  };
->  
->  extern struct outer_cache_fns outer_cache;
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index f9013320c8ce..dcde6086a228 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -110,6 +110,11 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
->  
->  static void l2c_configure(void __iomem *base)
->  {
-> +	if (outer_cache.configure) {
-> +		outer_cache.configure(&l2x0_saved_regs);
-> +		return;
-> +	}
-> +
->  	if (l2x0_data->configure)
->  		l2x0_data->configure(base);
->  
-> @@ -910,6 +915,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
->  
->  	fns = data->outer_cache;
->  	fns.write_sec = outer_cache.write_sec;
-> +	fns.configure = outer_cache.configure;
->  	if (data->fixup)
->  		data->fixup(l2x0_base, cache_id, &fns);
->  
+>  	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
+>  	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
+> -		outer_cache.write_sec = machine_desc->l2c_write_sec;
+> +		if (!outer_cache.write_sec)
+> +			outer_cache.write_sec = machine_desc->l2c_write_sec;
+>  		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+>  				   machine_desc->l2c_aux_mask);
+>  		if (ret)
 > -- 
 > 1.9.2
 > 
