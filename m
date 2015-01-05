@@ -1,9 +1,9 @@
 From: tony.kn@samsung.com (Tony K Nadackal)
-Date: Mon, 05 Jan 2015 10:43:08 +0530
-Subject: [PATCH] [media] s5p-jpeg: Initialize cb and cr to zero.
-In-Reply-To: <1418800881-7428-1-git-send-email-tony.kn@samsung.com>
-References: <1418800881-7428-1-git-send-email-tony.kn@samsung.com>
-Message-ID: <000201d028a6$55a31e20$00e95a60$@samsung.com>
+Date: Mon, 05 Jan 2015 10:45:11 +0530
+Subject: [PATCH v2 0/2] Adding support for Exynos7 Jpeg variant
+In-Reply-To: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
+References: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
+Message-ID: <000301d028a6$9c290300$d47b0900$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,41 +14,44 @@ Tony
 
 > -----Original Message-----
 > From: Tony K Nadackal [mailto:tony.kn at samsung.com]
-> Sent: Wednesday, December 17, 2014 12:51 PM
+> Sent: Friday, December 19, 2014 1:08 PM
 > To: linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> samsung-soc at vger.kernel.org
+> samsung-soc at vger.kernel.org; devicetree at vger.kernel.org
 > Cc: mchehab at osg.samsung.com; j.anaszewski at samsung.com;
 > kgene at kernel.org; k.debski at samsung.com; s.nawrocki at samsung.com;
-> bhushan.r at samsung.com; Tony K Nadackal
-> Subject: [PATCH] [media] s5p-jpeg: Initialize cb and cr to zero.
+> robh+dt at kernel.org; mark.rutland at arm.com; bhushan.r at samsung.com; Tony K
+> Nadackal
+> Subject: [PATCH v2 0/2] Adding support for Exynos7 Jpeg variant
 > 
-> To avoid garbage value written into image base address planes, initialize cb
-and cr
-> of structure s5p_jpeg_addr to zero.
+> This patch series adds support for Exynos7 JPEG variant, which is mostly same
+as
+> Exynos4 JPEG variants with few register configuration differences.
+> At the same time it modifies #define based JPEG variant macros into enum.
+> Patch 1/2 fixes possible bug in setting INT EN register, where
+> EXYNOS4_INT_EN_REG was getting modified without reading before.
 > 
-> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
-> ---
-> This patch is created and tested on top of linux-next-20141210.
-> It can be cleanly applied on media-next and kgene/for-next.
+> Patch set v1 and related discussion can be found here [1].
 > 
->  drivers/media/platform/s5p-jpeg/jpeg-core.c | 3 +++
->  1 file changed, 3 insertions(+)
+> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg40308.html
 > 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> index 91bd3e6..54fa5d9 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> @@ -1845,6 +1845,9 @@ static void exynos4_jpeg_set_img_addr(struct
-> s5p_jpeg_ctx *ctx)
->  	struct s5p_jpeg_addr jpeg_addr;
->  	u32 pix_size, padding_bytes = 0;
+> Changes since v1:
+>  - Added new patch 1/2 which fixes issues in writing EXYNOS4_INT_EN_REG.
+>  - Converted JPEG variant macros into enum as suggested by Jacek Anaszewski.
 > 
-> +	jpeg_addr.cb = 0;
-> +	jpeg_addr.cr = 0;
-> +
->  	pix_size = ctx->cap_q.w * ctx->cap_q.h;
 > 
->  	if (ctx->mode == S5P_JPEG_ENCODE) {
+> Tony K Nadackal (2):
+>   [media] s5p-jpeg: Fix modification sequence of interrupt enable
+>     register
+>   [media] s5p-jpeg: Adding Exynos7 Jpeg variant
+> 
+>  .../bindings/media/exynos-jpeg-codec.txt           |  2 +-
+>  drivers/media/platform/s5p-jpeg/jpeg-core.c        | 61 ++++++++++++++++++---
+> -
+>  drivers/media/platform/s5p-jpeg/jpeg-core.h        | 10 ++--
+>  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c  | 33 +++++++-----
+> drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h  |  8 +--
+>  drivers/media/platform/s5p-jpeg/jpeg-regs.h        | 17 ++++--
+>  6 files changed, 95 insertions(+), 36 deletions(-)
+> 
 > --
 > 2.2.0
