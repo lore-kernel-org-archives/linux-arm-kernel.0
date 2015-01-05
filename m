@@ -1,125 +1,86 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 05 Jan 2015 10:52:40 +0100
-Subject: [PATCH 1/2] clk: Add clk_unregister_{divider, gate,
- mux} to close memory leak
-Message-ID: <1420451561-12360-1-git-send-email-k.kozlowski@samsung.com>
+Date: Mon, 05 Jan 2015 10:52:41 +0100
+Subject: [PATCH 2/2] clk: exynos-audss: Fix memory leak on driver unbind or
+ probe failure
+In-Reply-To: <1420451561-12360-1-git-send-email-k.kozlowski@samsung.com>
+References: <1420451561-12360-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1420451561-12360-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clk_register_{divider,gate,mux} functions allocated memory
-for internal data which wasn't freed anywhere. Drivers using these
-helpers could only unregister clocks but the memory would still leak.
+The memory allocated by basic clock divider/gate/mux (struct clk_gate,
+clk_divider and clk_mux) was leaking. During driver unbind or probe
+failure the driver only unregistered the clocks.
 
-Add corresponding unregister functions which will release all resources.
+Use clk_unregister_{gate,divider,mux} to release all resources.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/clk-divider.c    | 16 ++++++++++++++++
- drivers/clk/clk-gate.c       | 16 ++++++++++++++++
- drivers/clk/clk-mux.c        | 16 ++++++++++++++++
- include/linux/clk-provider.h |  4 ++++
- 4 files changed, 52 insertions(+)
+ drivers/clk/samsung/clk-exynos-audss.c | 32 ++++++++++++++++++++++----------
+ 1 file changed, 22 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index c0a842b335c5..c2bb9f679ec6 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -463,3 +463,19 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
- 			width, clk_divider_flags, table, lock);
- }
- EXPORT_SYMBOL_GPL(clk_register_divider_table);
-+
-+void clk_unregister_divider(struct clk *clk)
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index f2c2ccce49bb..454b02ae486a 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -82,6 +82,26 @@ static const struct of_device_id exynos_audss_clk_of_match[] = {
+ 	{},
+ };
+ 
++static void exynos_audss_clk_teardown(void)
 +{
-+	struct clk_divider *div;
-+	struct clk_hw *hw;
++	int i;
 +
-+	hw = __clk_get_hw(clk);
-+	if (!hw)
-+		return;
++	for (i = EXYNOS_MOUT_AUDSS; i < EXYNOS_DOUT_SRP; i++) {
++		if (!IS_ERR(clk_table[i]))
++			clk_unregister_mux(clk_table[i]);
++	}
 +
-+	div = to_clk_divider(hw);
++	for (; i < EXYNOS_SRP_CLK; i++) {
++		if (!IS_ERR(clk_table[i]))
++			clk_unregister_divider(clk_table[i]);
++	}
 +
-+	clk_unregister(clk);
-+	kfree(div);
++	for (; i < clk_data.clk_num; i++) {
++		if (!IS_ERR(clk_table[i]))
++			clk_unregister_gate(clk_table[i]);
++	}
 +}
-+EXPORT_SYMBOL_GPL(clk_unregister_divider);
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 51fd87fb7ba6..186b96efeebf 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -162,3 +162,19 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 	return clk;
- }
- EXPORT_SYMBOL_GPL(clk_register_gate);
 +
-+void clk_unregister_gate(struct clk *clk)
-+{
-+	struct clk_gate *gate;
-+	struct clk_hw *hw;
-+
-+	hw = __clk_get_hw(clk);
-+	if (!hw)
-+		return;
-+
-+	gate = to_clk_gate(hw);
-+
-+	clk_unregister(clk);
-+	kfree(gate);
-+}
-+EXPORT_SYMBOL_GPL(clk_unregister_gate);
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 6e1ecf94bf58..69a094c3783d 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -177,3 +177,19 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- 				      NULL, lock);
- }
- EXPORT_SYMBOL_GPL(clk_register_mux);
-+
-+void clk_unregister_mux(struct clk *clk)
-+{
-+	struct clk_mux *mux;
-+	struct clk_hw *hw;
-+
-+	hw = __clk_get_hw(clk);
-+	if (!hw)
-+		return;
-+
-+	mux = to_clk_mux(hw);
-+
-+	clk_unregister(clk);
-+	kfree(mux);
-+}
-+EXPORT_SYMBOL_GPL(clk_unregister_mux);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index d936409520f8..ebb7055a6d84 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -294,6 +294,7 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 bit_idx,
- 		u8 clk_gate_flags, spinlock_t *lock);
-+void clk_unregister_gate(struct clk *clk);
+ /* register exynos_audss clocks */
+ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ {
+@@ -219,10 +239,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 	return 0;
  
- struct clk_div_table {
- 	unsigned int	val;
-@@ -361,6 +362,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_divider_flags, const struct clk_div_table *table,
- 		spinlock_t *lock);
-+void clk_unregister_divider(struct clk *clk);
+ unregister:
+-	for (i = 0; i < clk_data.clk_num; i++) {
+-		if (!IS_ERR(clk_table[i]))
+-			clk_unregister(clk_table[i]);
+-	}
++	exynos_audss_clk_teardown();
  
- /**
-  * struct clk_mux - multiplexer clock
-@@ -411,6 +413,8 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 		void __iomem *reg, u8 shift, u32 mask,
- 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
+ 	if (!IS_ERR(epll))
+ 		clk_disable_unprepare(epll);
+@@ -232,18 +249,13 @@ unregister:
  
-+void clk_unregister_mux(struct clk *clk);
-+
- void of_fixed_factor_clk_setup(struct device_node *node);
+ static int exynos_audss_clk_remove(struct platform_device *pdev)
+ {
+-	int i;
+-
+ #ifdef CONFIG_PM_SLEEP
+ 	unregister_syscore_ops(&exynos_audss_clk_syscore_ops);
+ #endif
  
- /**
+ 	of_clk_del_provider(pdev->dev.of_node);
+ 
+-	for (i = 0; i < clk_data.clk_num; i++) {
+-		if (!IS_ERR(clk_table[i]))
+-			clk_unregister(clk_table[i]);
+-	}
++	exynos_audss_clk_teardown();
+ 
+ 	if (!IS_ERR(epll))
+ 		clk_disable_unprepare(epll);
 -- 
 1.9.1
