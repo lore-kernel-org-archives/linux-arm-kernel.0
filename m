@@ -1,53 +1,212 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 05 Jan 2015 21:57:41 +0900
-Subject: [PATCH RESEND] ARM: exynos_defconfig: Enable options for display
- panel support
-In-Reply-To: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <047c01d028e7$311858e0$93490aa0$@kernel.org>
+Date: Mon, 05 Jan 2015 22:01:57 +0900
+Subject: [RESEND PATCH v6] ARM: EXYNOS: Remove i2c sys configuration
+ related code
+In-Reply-To: <1420450146-27112-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1420450146-27112-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <049e01d028e7$c9b4f360$5d1eda20$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
+Pankaj Dubey wrote:
 > 
-> Many Exynos devices have a display panel. Most of them just have
-> a simple panel while others have more complex configurations that
-> requires an embedded DisplayPort (eDP) to LVDS bridges.
+> As all these code has been moved into i2c driver, now we can
+> safely remove them from machine files.
 > 
-> This patch enables the following features to be built in the kernel
-> image to support both setups:
-> 
-> - Direct Rendering Manager (DRM)
-> - DRM bridge registration and lookup framework
-> - Parade ps8622/ps8625 eDP/LVDS bridge
-> - NXP ptn3460 eDP/LVDS bridge
-> - Exynos Fully Interactive Mobile Display controller (FIMD)
-> - Panel registration and lookup framework
-> - Simple panels
-> - Backlight & LCD device support
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
+> This patch is leftover patch from patch series [1], resending it after rebasing.
+> It can be cleanly applied on kgene/for-next and linux-next/next-20150103.
 > 
-> Hello Kukjin,
+> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg39440.html
 > 
-Hi Javier,
+Hi Pankaj,
 
-Happy new year :)
+Happy new year and looks good to me. Nice cleanup ;)
 
-> You dropped this patch since exynos drm was causing boot hangs on some
-> platforms but the fix for that issue is already in linux-next (commit:
-> f1e9203 clk: samsung: Fix Exynos 5420 pinctrl setup and clock disable
-> failure due to domain being gated) so I think it makes sense to enable
-> the display options again.
-> 
-> NOTE: Display panel is still not working since patch "arm: dts: Exynos5:
-> Use pmu_system_controller phandle for dp phy" is needed [0] but I think
-> we should enable display options to catch the regressions easier.
-> 
-Agreed with your suggestion and I'll pick this up into Samsung tree soon.
+Thanks for your gentle reminder and will apply.
 
-Thanks,
-Kukjin
+- Kukjin
+
+> 
+>  arch/arm/mach-exynos/exynos.c           | 39 ++-------------------------------
+>  arch/arm/mach-exynos/include/mach/map.h |  3 ---
+>  arch/arm/mach-exynos/pm.c               |  3 ++-
+>  arch/arm/mach-exynos/regs-sys.h         | 22 -------------------
+>  arch/arm/mach-exynos/suspend.c          |  7 ------
+>  5 files changed, 4 insertions(+), 70 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/regs-sys.h
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index c13d083..2c84439 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -27,20 +27,16 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/memory.h>
+> 
+> +#include <mach/map.h>
+> +
+>  #include "common.h"
+>  #include "mfc.h"
+>  #include "regs-pmu.h"
+> -#include "regs-sys.h"
+> 
+>  void __iomem *pmu_base_addr;
+> 
+>  static struct map_desc exynos4_iodesc[] __initdata = {
+>  	{
+> -		.virtual	= (unsigned long)S3C_VA_SYS,
+> -		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
+> -		.length		= SZ_64K,
+> -		.type		= MT_DEVICE,
+> -	}, {
+>  		.virtual	= (unsigned long)S5P_VA_SROMC,
+>  		.pfn		= __phys_to_pfn(EXYNOS4_PA_SROMC),
+>  		.length		= SZ_4K,
+> @@ -70,11 +66,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+> 
+>  static struct map_desc exynos5_iodesc[] __initdata = {
+>  	{
+> -		.virtual	= (unsigned long)S3C_VA_SYS,
+> -		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
+> -		.length		= SZ_64K,
+> -		.type		= MT_DEVICE,
+> -	}, {
+>  		.virtual	= (unsigned long)S5P_VA_SROMC,
+>  		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
+>  		.length		= SZ_4K,
+> @@ -213,32 +204,6 @@ static void __init exynos_init_irq(void)
+> 
+>  static void __init exynos_dt_machine_init(void)
+>  {
+> -	struct device_node *i2c_np;
+> -	const char *i2c_compat = "samsung,s3c2440-i2c";
+> -	unsigned int tmp;
+> -	int id;
+> -
+> -	/*
+> -	 * Exynos5's legacy i2c controller and new high speed i2c
+> -	 * controller have muxed interrupt sources. By default the
+> -	 * interrupts for 4-channel HS-I2C controller are enabled.
+> -	 * If node for first four channels of legacy i2c controller
+> -	 * are available then re-configure the interrupts via the
+> -	 * system register.
+> -	 */
+> -	if (soc_is_exynos5()) {
+> -		for_each_compatible_node(i2c_np, NULL, i2c_compat) {
+> -			if (of_device_is_available(i2c_np)) {
+> -				id = of_alias_get_id(i2c_np, "i2c");
+> -				if (id < 4) {
+> -					tmp = readl(EXYNOS5_SYS_I2C_CFG);
+> -					writel(tmp & ~(0x1 << id),
+> -							EXYNOS5_SYS_I2C_CFG);
+> -				}
+> -			}
+> -		}
+> -	}
+> -
+>  	/*
+>  	 * This is called from smp_prepare_cpus if we've built for SMP, but
+>  	 * we still need to set it up for PM and firmware ops if not.
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+> index 1ad3f49..de3ae59 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -24,9 +24,6 @@
+> 
+>  #define EXYNOS_PA_CHIPID		0x10000000
+> 
+> -#define EXYNOS4_PA_SYSCON		0x10010000
+> -#define EXYNOS5_PA_SYSCON		0x10050100
+> -
+>  #define EXYNOS4_PA_CMU			0x10030000
+>  #define EXYNOS5_PA_CMU			0x10010000
+> 
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 86f3ecd..dfc8594 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -23,12 +23,13 @@
+>  #include <asm/smp_scu.h>
+>  #include <asm/suspend.h>
+> 
+> +#include <mach/map.h>
+> +
+>  #include <plat/pm-common.h>
+> 
+>  #include "common.h"
+>  #include "exynos-pmu.h"
+>  #include "regs-pmu.h"
+> -#include "regs-sys.h"
+> 
+>  static inline void __iomem *exynos_boot_vector_addr(void)
+>  {
+> diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+> deleted file mode 100644
+> index 84332b0..0000000
+> --- a/arch/arm/mach-exynos/regs-sys.h
+> +++ /dev/null
+> @@ -1,22 +0,0 @@
+> -/*
+> - * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> - *             http://www.samsung.com
+> - *
+> - * EXYNOS - system register definition
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> -*/
+> -
+> -#ifndef __ASM_ARCH_REGS_SYS_H
+> -#define __ASM_ARCH_REGS_SYS_H __FILE__
+> -
+> -#include <mach/map.h>
+> -
+> -#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
+> -
+> -/* For EXYNOS5 */
+> -#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
+> -
+> -#endif /* __ASM_ARCH_REGS_SYS_H */
+> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+> index f8e7dcd..342797b 100644
+> --- a/arch/arm/mach-exynos/suspend.c
+> +++ b/arch/arm/mach-exynos/suspend.c
+> @@ -34,7 +34,6 @@
+> 
+>  #include "common.h"
+>  #include "regs-pmu.h"
+> -#include "regs-sys.h"
+>  #include "exynos-pmu.h"
+> 
+>  #define S5P_CHECK_SLEEP 0x00000BAD
+> @@ -53,10 +52,6 @@ struct exynos_wkup_irq {
+>  	u32 mask;
+>  };
+> 
+> -static struct sleep_save exynos5_sys_save[] = {
+> -	SAVE_ITEM(EXYNOS5_SYS_I2C_CFG),
+> -};
+> -
+>  static struct sleep_save exynos_core_save[] = {
+>  	/* SROM side */
+>  	SAVE_ITEM(S5P_SROM_BW),
+> @@ -497,8 +492,6 @@ static const struct exynos_pm_data exynos5250_pm_data = {
+>  	.wkup_irq	= exynos5250_wkup_irq,
+>  	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
+>  	.release_ret_regs = exynos_release_ret_regs,
+> -	.extra_save	= exynos5_sys_save,
+> -	.num_extra_save	= ARRAY_SIZE(exynos5_sys_save),
+>  	.pm_suspend	= exynos_pm_suspend,
+>  	.pm_resume	= exynos_pm_resume,
+>  	.pm_prepare	= exynos_pm_prepare,
+> --
+> 2.2.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
