@@ -1,60 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Jan 2015 12:32:52 +0000
-Subject: [PATCH] Revert 9fc2105aeaaf56b0cf75296a84702d0f9e64437b to fix
- pyaudio (and probably more)
-In-Reply-To: <20150105013436.GA23350@thunk.org>
-References: <20150104190123.GA20153@amd>
- <alpine.LFD.2.11.1501041438130.18844@knanqh.ubzr>
- <20150104201026.GA23427@amd>
- <alpine.LFD.2.11.1501041512440.18844@knanqh.ubzr>
- <20150104203724.GA16372@amd>
- <alpine.LFD.2.11.1501041547050.18844@knanqh.ubzr>
- <CA+55aFy5yB2d-1iXEUtU+puua4TAmV0kZF_7TBhXO1Y4Khqb9Q@mail.gmail.com>
- <alpine.LFD.2.11.1501041609290.18844@knanqh.ubzr>
- <20150104212659.GC12302@n2100.arm.linux.org.uk>
- <20150105013436.GA23350@thunk.org>
-Message-ID: <20150105123252.GB10116@arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 5 Jan 2015 20:31:15 +0800
+Subject: [PATCH] kprobes: bugfix: set kprobes_all_disarmed earlier to enable
+ re-optimization.
+Message-ID: <1420461075-27012-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ted,
+In original code, the probed instruction doesn't get optimized after
 
-On Mon, Jan 05, 2015 at 01:34:36AM +0000, Theodore Ts'o wrote:
-> On Sun, Jan 04, 2015 at 09:26:59PM +0000, Russell King - ARM Linux wrote:
-> > 
-> > With the revert in place, we now have insanely small bogomips values
-> > reported via /proc/cpuinfo when hardware timers are used.  That needs
-> > fixing.
-> 
-> Why does it need to be fixed?
-> 
-> It's clear that there are applications that are working OK with the
-> existing value,
+echo 0 > /sys/kernel/debug/kprobes/enabled
+echo 1 > /sys/kernel/debug/kprobes/enabled
 
-I'm not sure it is that clear -- the reported regression was on a processor
-that doesn't use the timer-backed delay loop, so the bogomips value will
-essentially be restored by reverting the patch.
+This is because original code checks kprobes_all_disarmed in
+optimize_kprobe(), but this flag is turned off after calling that
+function. Therefore, optimize_kprobe() will see
+kprobes_all_disarmed == true and doesn't do the optimization.
 
-The issue comes on newer CPUs, where there will now be a very small bogomips
-value reported and (to my knowledge) nobody has yet tried running some
-affected applications there to see if they can cope.
+This patch simply turns off kprobes_all_disarmed earlier to enable
+optimization.
 
-> and if you change it to fix it for some new applications, but it breaks
-> for others, then have you considered defining a new interface (perhaps
-> exported via sysfs) that exports a "sane" value and document that new
-> applications shoud use the new interface.
-> 
-> Or if the answer is that no one should be using the bogomips field at
-> all, then just document *that*, and then leave it be, so that existing
-> applications don't break.
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ kernel/kprobes.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-It never hurts to document our assumptions or anticipated/preferred use-cases
-but in this case I think bogomips is difficult enough to use on any
-half-recent SoCs that most developers have either (a) found another way to
-do what they want (perf counters, clock_gettime) or (b) stopped bothering to
-guess the CPU frequency when it's not actually needed, so I don't *think*
-that new applications are such an issue.
-
-Cheers,
-
-Will
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index bad4e95..b185464 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -2320,6 +2320,12 @@ static void arm_all_kprobes(void)
+ 	if (!kprobes_all_disarmed)
+ 		goto already_enabled;
+ 
++	/*
++	 * optimize_kprobe() called by arm_kprobe() checks
++	 * kprobes_all_disarmed, so set kprobes_all_disarmed before
++	 * arm_kprobe.
++	 */
++	kprobes_all_disarmed = false;
+ 	/* Arming kprobes doesn't optimize kprobe itself */
+ 	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
+ 		head = &kprobe_table[i];
+@@ -2328,7 +2334,6 @@ static void arm_all_kprobes(void)
+ 				arm_kprobe(p);
+ 	}
+ 
+-	kprobes_all_disarmed = false;
+ 	printk(KERN_INFO "Kprobes globally enabled\n");
+ 
+ already_enabled:
+-- 
+1.8.4
