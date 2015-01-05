@@ -1,57 +1,76 @@
-From: tony.kn@samsung.com (Tony K Nadackal)
-Date: Mon, 05 Jan 2015 10:45:11 +0530
-Subject: [PATCH v2 0/2] Adding support for Exynos7 Jpeg variant
-In-Reply-To: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
-References: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
-Message-ID: <000301d028a6$9c290300$d47b0900$@samsung.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 5 Jan 2015 14:51:28 +0800
+Subject: [PATCH net-next v10 0/3] add hisilicon hip04 ethernet driver
+Message-ID: <1420440691-20928-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle Reminder.
+v10:
+- According Arnd's suggestion, remove the skb_orphan and use the hrtimer
+  for the cleanup of the TX queue and add some modification for the hip04
+  drivers.
+  1) drop the broken skb_orphan call
+  2) drop the workqueue
+  3) batch cleanup based on tx_coalesce_frames/usecs for better throughput
+  4) use a reasonable default tx timeout (200us, could be shorted
+     based on measurements) with a range timer
+  5) fix napi poll function return value
+  6) use a lockless queue for cleanup
 
-Thanks,
-Tony
+v9:
+- There is no tx completion interrupts to free DMAd Tx packets, it means taht
+  we rely on new tx packets arriving to run the destructors of completed packets,
+  which open up space in their sockets's send queues. Sometimes we don't get such
+  new packets causing Tx to stall, a single UDP transmitter is a good example of
+  this situation, so we need a clean up workqueue to reclaims completed packets,
+  the workqueue will only free the last packets which is already stay for several jiffies.
+  Also fix some format cleanups.
 
-> -----Original Message-----
-> From: Tony K Nadackal [mailto:tony.kn at samsung.com]
-> Sent: Friday, December 19, 2014 1:08 PM
-> To: linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> samsung-soc at vger.kernel.org; devicetree at vger.kernel.org
-> Cc: mchehab at osg.samsung.com; j.anaszewski at samsung.com;
-> kgene at kernel.org; k.debski at samsung.com; s.nawrocki at samsung.com;
-> robh+dt at kernel.org; mark.rutland at arm.com; bhushan.r at samsung.com; Tony K
-> Nadackal
-> Subject: [PATCH v2 0/2] Adding support for Exynos7 Jpeg variant
-> 
-> This patch series adds support for Exynos7 JPEG variant, which is mostly same
-as
-> Exynos4 JPEG variants with few register configuration differences.
-> At the same time it modifies #define based JPEG variant macros into enum.
-> Patch 1/2 fixes possible bug in setting INT EN register, where
-> EXYNOS4_INT_EN_REG was getting modified without reading before.
-> 
-> Patch set v1 and related discussion can be found here [1].
-> 
-> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg40308.html
-> 
-> Changes since v1:
->  - Added new patch 1/2 which fixes issues in writing EXYNOS4_INT_EN_REG.
->  - Converted JPEG variant macros into enum as suggested by Jacek Anaszewski.
-> 
-> 
-> Tony K Nadackal (2):
->   [media] s5p-jpeg: Fix modification sequence of interrupt enable
->     register
->   [media] s5p-jpeg: Adding Exynos7 Jpeg variant
-> 
->  .../bindings/media/exynos-jpeg-codec.txt           |  2 +-
->  drivers/media/platform/s5p-jpeg/jpeg-core.c        | 61 ++++++++++++++++++---
-> -
->  drivers/media/platform/s5p-jpeg/jpeg-core.h        | 10 ++--
->  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c  | 33 +++++++-----
-> drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h  |  8 +--
->  drivers/media/platform/s5p-jpeg/jpeg-regs.h        | 17 ++++--
->  6 files changed, 95 insertions(+), 36 deletions(-)
-> 
-> --
-> 2.2.0
+v8:
+- Use poll to reclaim xmitted buffer as workaround since no tx done interrupt 
+
+v7:
+- Remove select NET_CORE in 0002
+
+v6:
+- Suggest by Russell: Use netdev_sent_queue & netdev_completed_queue to solve latency issue 
+  Also shorten the period of timer, which is used to wakeup the queue since no
+  tx completed interrupt.
+
+v5:
+- no big change, fix typo
+
+v4:
+- Modify accoringly to the suggetion from Arnd, Florian, Eric, David
+  Use of_parse_phandle_with_fixed_args & syscon_node_to_regmap get ppe info
+  Add skb_orphan() and tx_timer for reclaim since no tx_finished interrupt
+  Update timeout, and move of_phy_connect to probe to reuse open/stop
+
+v3:
+- Suggest from Arnd, use syscon & regmap_write/read to replace static void __iomem *ppebase.
+  Modify hisilicon-hip04-net.txt accrordingly to suggestion from Florian and Sergei.
+
+v2:
+- Got many suggestions from Russell, Arnd, Florian, Mark and Sergei
+  Remove memcpy, use dma_map/unmap_single, use dma_alloc_coherent rather than dma_pool, etc.
+  Refer property in ethernet.txt, change ppe description, etc.
+
+Ding Tianhong (1):
+  net: hisilicon: new hip04 ethernet driver
+
+Zhangfei Gao (2):
+  Documentation: add Device tree bindings for Hisilicon hip04 ethernet
+  net: hisilicon: new hip04 MDIO driver
+
+ .../bindings/net/hisilicon-hip04-net.txt           |  88 ++
+ drivers/net/ethernet/hisilicon/Kconfig             |   9 +
+ drivers/net/ethernet/hisilicon/Makefile            |   1 +
+ drivers/net/ethernet/hisilicon/hip04_eth.c         | 908 +++++++++++++++++++++
+ drivers/net/ethernet/hisilicon/hip04_mdio.c        | 186 +++++
+ 5 files changed, 1192 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_mdio.c
+
+-- 
+1.8.0
