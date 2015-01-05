@@ -1,25 +1,70 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Jan 2015 21:35:04 +0800
-Subject: [PATCH V2] ARM: imx: support arm power off in cpuidle for i.mx6sx
-In-Reply-To: <1418790252-12947-1-git-send-email-b20788@freescale.com>
-References: <1418790252-12947-1-git-send-email-b20788@freescale.com>
-Message-ID: <20150105133502.GG24511@dragon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 5 Jan 2015 14:36:52 +0100
+Subject: [PATCH v4 2/3] ARM: shmobile: r8a7791: add CAN DT support
+In-Reply-To: <2080620.GIKTJkNfbk@wasted.cogentembedded.com>
+References: <6830301.90YaDPuTpx@wasted.cogentembedded.com>
+ <2080620.GIKTJkNfbk@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdVuabRxKdpynaX0zaB-CvW8+dRb4TBtm7byT7znk6hxYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 12:24:12PM +0800, Anson Huang wrote:
-> This patch introduces an independent cpuidle driver for
-> i.MX6SX, and supports arm power off in idle, totally
-> 3 levels of cpuidle are supported as below:
-> 
-> 1. ARM WFI;
-> 2. SOC in WAIT mode;
-> 3. SOC in WAIT mode + ARM power off.
-> 
-> ARM power off can save at least 5mW power.
-> 
-> This patch also replaces imx6q_enable_rbc with imx6_enable_rbc.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+On Sat, Dec 27, 2014 at 12:20 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Define the generic R8A7791 parts of the CAN0/1 device nodes.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Applied, thanks. 
+Apart from the minor nit below:
+
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -816,6 +816,26 @@
+>                 };
+>         };
+>
+> +       can0: can at e6e80000 {
+> +               compatible = "renesas,can-r8a7791";
+> +               reg = <0 0xe6e80000 0 0x1000>;
+> +               interrupts = <0 186 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&mstp9_clks R8A7791_CLK_RCAN0>,
+> +                        <&cpg_clocks R8A7791_CLK_RCAN>, <&can_clk>;
+
+.git/rebase-apply/patch:18: space before tab in indent.
+      <&cpg_clocks R8A7790_CLK_RCAN>, <&can_clk>;
+
+> +               clock-names = "clkp1", "clkp2", "can_clk";
+> +               status = "disabled";
+> +       };
+> +
+> +       can1: can at e6e88000 {
+> +               compatible = "renesas,can-r8a7791";
+> +               reg = <0 0xe6e88000 0 0x1000>;
+> +               interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&mstp9_clks R8A7791_CLK_RCAN1>,
+> +                        <&cpg_clocks R8A7791_CLK_RCAN>, <&can_clk>;
+
+.git/rebase-apply/patch:28: space before tab in indent.
+      <&cpg_clocks R8A7790_CLK_RCAN>, <&can_clk>;
+warning: 2 lines add whitespace errors.
+
+> +               clock-names = "clkp1", "clkp2", "can_clk";
+> +               status = "disabled";
+> +       };
+> +
+
+
+
+
+-- 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
