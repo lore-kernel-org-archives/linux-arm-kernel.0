@@ -1,22 +1,19 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Jan 2015 22:19:56 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <54AAEBCC.2030900@ti.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
- <54AA4CD4.40105@ti.com> <54AAEBCC.2030900@ti.com>
-Message-ID: <alpine.DEB.2.02.1501052219240.28771@utopia.booyaka.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 06 Jan 2015 01:22:34 +0300
+Subject: [PATCH v5 0/3] Add R8A7791/Henninger board CAN DT support
+Message-ID: <1652479.NHBlqJ9OaR@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Jan 2015, Suman Anna wrote:
+Hello.
 
-> That's right, the test was present even before 6423d6df1440, I merely
-> made this a block.
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20141231-v3.19-rc2' tag. Here we add the CAN device tree support
+for the R8A7791-based Henninger board. It depends on the clk driver RCAN clock
+patch reposted today in order to work.
 
-Indeed, I misread the commit.  Sorry about ihat.
+[1/3] ARM: shmobile: r8a7791: add CAN clocks
+[2/3] ARM: shmobile: r8a7791: add CAN DT support
+[3/3] ARM: shmobile: henninger: add CAN0 DT support
 
-
-- Paul
+WBR, Sergei
