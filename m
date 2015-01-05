@@ -1,102 +1,198 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 05 Jan 2015 17:50:23 +0300
-Subject: [PATCH 1/2] ahci_xgene: Fix the xgene_ahci_restart_engine function
- to support Port Multiplier for APM X-Gene SoC AHCI SATA host controller
- driver.
-In-Reply-To: <1420453305-15986-2-git-send-email-stripathi@apm.com>
-References: <1420453305-15986-1-git-send-email-stripathi@apm.com>
- <1420453305-15986-2-git-send-email-stripathi@apm.com>
-Message-ID: <54AAA4AF.8030503@cogentembedded.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon,  5 Jan 2015 14:54:54 +0000
+Subject: [PATCH 3.19-rc2 v13 0/5] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1420469699-25350-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Thomas, Hi Jason:
+    Patches 1 to 3 are for you and, apart from the rebase, these
+    three patches haven't been changed since the last time I posted
+    them.
 
-On 1/5/2015 1:21 PM, Suman Tripathi wrote:
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature to
+implement arch_trigger_all_cpu_backtrace for arm.
 
-    Your patch summary seems too long.
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying on
+a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-> This patch implements the function xgene_ahci_poll_reg_val to poll
-> PxCI for multiple IDENTIFY DEVICE commands to finish before
-> restarting the DMA engine in case of Port Multiplier.
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->   drivers/ata/ahci_xgene.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++--
->   1 file changed, 54 insertions(+), 2 deletions(-)
+v13:
 
-> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-> index 0f8538f..2180223 100644
-> --- a/drivers/ata/ahci_xgene.c
-> +++ b/drivers/ata/ahci_xgene.c
-> @@ -105,17 +105,69 @@ static int xgene_ahci_init_memram(struct xgene_ahci_context *ctx)
->   }
->
->   /**
-> + * xgene_ahci_poll_reg_val- Poll a register on a specific value.
-> + * @ap : ATA port of interest.
-> + * @reg : Register of interest.
-> + * @val : Value to be attained.
-> + * @interval : waiting interval for polling.
-> + * @timeout : timeout for achieving the value.
-> + */
-> +static int xgene_ahci_poll_reg_val(struct ata_port *ap,
-> +				   void __iomem *reg, unsigned
-> +				   int val, unsigned long interval,
-> +				   unsigned long timeout)
-> +{
-> +	unsigned long deadline;
-> +	unsigned int tmp;
-> +
-> +	tmp = ioread32(reg);
-> +	deadline = ata_deadline(jiffies, timeout);
-> +
-> +	while ((tmp != val) && (time_before(jiffies, deadline))) {
+* Updated the code to print the backtrace to replicate Steven Rostedt's
+  x86 work to make SysRq-l safe. This is pretty much a total rewrite of
+  patches 4 and 5.
 
-    Parens around the operands of && are not needed, especially around the 
-right one.
+v12:
 
-> +		ata_msleep(ap, interval);
-> +		tmp = ioread32(reg);
-> +	}
-> +
-> +	return tmp;
-> +}
-> +
-> +/**
->    * xgene_ahci_restart_engine - Restart the dma engine.
->    * @ap : ATA port of interest
->    *
-> - * Restarts the dma engine inside the controller.
-> + * Waits for completion of multiple commands and restarts
-> + * the DMA engine inside the controller.
->    */
->   static int xgene_ahci_restart_engine(struct ata_port *ap)
->   {
->   	struct ahci_host_priv *hpriv = ap->host->private_data;
-> +	struct ahci_port_priv *pp = ap->private_data;
-> +	void __iomem *port_mmio = ahci_port_base(ap);
-> +	u32 fbs;
-> +
-> +	/*
-> +	 * In case of PMP multiple IDENTIFY DEVICE commands can be
-> +	 * issued inside PxCI. So need to poll PxCI for the
-> +	 * completion of outstanding IDENTIFY DEVICE commands before
-> +	 * we restart the DMA engine.
-> +	 */
-> +	if (xgene_ahci_poll_reg_val(ap, port_mmio +
-> +				    PORT_CMD_ISSUE, 0x0, 1, 100))
-> +		  return -EBUSY;
->
->   	ahci_stop_engine(ap);
->   	ahci_start_fis_rx(ap);
-> +
-> +	/*
-> +	 * Enable the PxFBS.FBS_EN bit as it
-> +	 * gets cleared due to stop engine.
+* Squash first two patches into a single one and re-describe
+  (Thomas Gleixner).
 
-    s/stop/stopping the/.
+* Improve description of "irqchip: gic: Make gic_raise_softirq FIQ-safe"
+  (Thomas Gleixner).
 
-[...]
+v11:
 
-MBR, Sergei
+* Optimized gic_raise_softirq() by replacing a register read with
+  a memory read (Jason Cooper).
+
+v10:
+
+* Add a further patch to optimize away some of the locking on systems
+  where CONFIG_BL_SWITCHER is not set (Marc Zyngier). Compiles OK with
+  exynos_defconfig (which is the only defconfig to set this option).
+
+* Whitespace fixes in patch 4. That patch previously used spaces for
+  alignment of new constants but the rest of the file used tabs.
+
+v9:
+
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
+
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
+
+v8:
+
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (5):
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  ARM: Add support for on-demand backtrace of other CPUs
+  ARM: Fix on-demand backtrace triggered by IRQ
+
+ arch/arm/include/asm/hardirq.h  |   2 +-
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           | 164 ++++++++++++++++++++++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ drivers/irqchip/irq-gic.c       | 203 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ 7 files changed, 376 insertions(+), 17 deletions(-)
+
+--
+1.9.3
