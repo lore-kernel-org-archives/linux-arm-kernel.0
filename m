@@ -1,114 +1,72 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 05 Jan 2015 13:19:00 +0100
-Subject: [PATCH v11 1/9] ARM: OMAP2+: use common l2cache initialization code
+Date: Mon, 05 Jan 2015 13:19:03 +0100
+Subject: [PATCH v11 4/9] ARM: l2c: Add interface to ask hypervisor to configure
+ L2C
 In-Reply-To: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
 References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1420460348-20302-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1420460348-20302-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements generic DT L2C initialisation (the one from
-init_IRQ in arch/arm/kernel/irq.c) for Omap4 and AM43 platforms and
-kills the SoC specific stuff in arch/arm/mach-omap2/omap4-common.c.
+From: Tomasz Figa <t.figa@samsung.com>
 
+Because certain secure hypervisor do not allow writes to individual L2C
+registers, but rather expect set of parameters to be passed as argument
+to secure monitor calls, there is a need to provide an interface for the
+L2C driver to ask the firmware to configure the hardware according to
+specified parameters. This patch adds such.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-omap2/board-generic.c |  6 ++++++
- arch/arm/mach-omap2/common.h        |  7 +++++++
- arch/arm/mach-omap2/omap4-common.c  | 16 +---------------
- 3 files changed, 14 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/outercache.h | 3 +++
+ arch/arm/mm/cache-l2x0.c          | 6 ++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 608079a1aba6..c5c480b76da5 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -171,6 +171,9 @@ static const char *const omap4_boards_compat[] __initconst = {
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 891a56b35bcf..563b92fc2f41 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -23,6 +23,8 @@
+ 
+ #include <linux/types.h>
+ 
++struct l2x0_regs;
++
+ struct outer_cache_fns {
+ 	void (*inv_range)(unsigned long, unsigned long);
+ 	void (*clean_range)(unsigned long, unsigned long);
+@@ -36,6 +38,7 @@ struct outer_cache_fns {
+ 
+ 	/* This is an ARM L2C thing */
+ 	void (*write_sec)(unsigned long, unsigned);
++	void (*configure)(const struct l2x0_regs *);
  };
  
- DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
-+	.l2c_aux_val	= OMAP_L2C_AUX_CTRL,
-+	.l2c_aux_mask	= 0xcf9fffff,
-+	.l2c_write_sec	= omap4_l2c310_write_sec,
- 	.reserve	= omap_reserve,
- 	.smp		= smp_ops(omap4_smp_ops),
- 	.map_io		= omap4_map_io,
-@@ -214,6 +217,9 @@ static const char *const am43_boards_compat[] __initconst = {
- };
+ extern struct outer_cache_fns outer_cache;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index f9013320c8ce..dcde6086a228 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -110,6 +110,11 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
  
- DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
-+	.l2c_aux_val	= OMAP_L2C_AUX_CTRL,
-+	.l2c_aux_mask	= 0xcf9fffff,
-+	.l2c_write_sec	= omap4_l2c310_write_sec,
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am43xx_init_early,
- 	.init_late	= am43xx_init_late,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 377eea849e7b..19c9144d8b38 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -35,6 +35,7 @@
- #include <linux/irqchip/irq-omap-intc.h>
- 
- #include <asm/proc-fns.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "i2c.h"
- #include "serial.h"
-@@ -94,11 +95,17 @@ extern void omap3_gptimer_timer_init(void);
- extern void omap4_local_timer_init(void);
- #ifdef CONFIG_CACHE_L2X0
- int omap_l2_cache_init(void);
-+#define OMAP_L2C_AUX_CTRL	(L2C_AUX_CTRL_SHARED_OVERRIDE | \
-+				 L310_AUX_CTRL_DATA_PREFETCH | \
-+				 L310_AUX_CTRL_INSTR_PREFETCH)
-+void omap4_l2c310_write_sec(unsigned long val, unsigned reg);
- #else
- static inline int omap_l2_cache_init(void)
+ static void l2c_configure(void __iomem *base)
  {
- 	return 0;
- }
-+#define OMAP_L2C_AUX_CTRL	0
-+#define omap4_l2c310_write_sec	NULL
- #endif
- extern void omap5_realtime_timer_init(void);
++	if (outer_cache.configure) {
++		outer_cache.configure(&l2x0_saved_regs);
++		return;
++	}
++
+ 	if (l2x0_data->configure)
+ 		l2x0_data->configure(base);
  
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index b7cb44abe49b..fe99ceff2e2d 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -166,7 +166,7 @@ void __iomem *omap4_get_l2cache_base(void)
- 	return l2cache_base;
- }
+@@ -910,6 +915,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
  
--static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
-+void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
- {
- 	unsigned smc_op;
+ 	fns = data->outer_cache;
+ 	fns.write_sec = outer_cache.write_sec;
++	fns.configure = outer_cache.configure;
+ 	if (data->fixup)
+ 		data->fixup(l2x0_base, cache_id, &fns);
  
-@@ -201,24 +201,10 @@ static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
- 
- int __init omap_l2_cache_init(void)
- {
--	u32 aux_ctrl;
--
- 	/* Static mapping, never released */
- 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
- 	if (WARN_ON(!l2cache_base))
- 		return -ENOMEM;
--
--	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
--	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
--		   L310_AUX_CTRL_DATA_PREFETCH |
--		   L310_AUX_CTRL_INSTR_PREFETCH;
--
--	outer_cache.write_sec = omap4_l2c310_write_sec;
--	if (of_have_populated_dt())
--		l2x0_of_init(aux_ctrl, 0xcf9fffff);
--	else
--		l2x0_init(l2cache_base, aux_ctrl, 0xcf9fffff);
--
- 	return 0;
- }
- #endif
 -- 
 1.9.2
