@@ -1,52 +1,41 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 05 Jan 2015 13:19:01 +0100
-Subject: [PATCH v11 2/9] ARM: l2c: use l2c_write_sec() for restoring latency
- and filter regs
+Date: Mon, 05 Jan 2015 13:19:04 +0100
+Subject: [PATCH v11 5/9] ARM: l2c: Get outer cache .write_sec callback from
+ mach_desc only if not NULL
 In-Reply-To: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
 References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1420460348-20302-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1420460348-20302-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All four register for latency and filter settings cannot be written in
-non-secure mode and they should go through l2c_write_sec(). More on this
-can be found in CoreLink Level 2 Cache Controller L2C-310 Technical
-Reference Manual, 3.2. Register summary, table 3.1. This have been checked
-the TRM for r3p3, but it should be uniform for all revisions.
+From: Tomasz Figa <t.figa@samsung.com>
 
-Reported-by: Nishanth Menon <nm@ti.com>
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+Certain platforms (i.e. Exynos) might need to set .write_sec callback
+from firmware initialization which is happenning in .init_early callback
+of machine descriptor. However current code will overwrite the pointer
+with whatever is present in machine descriptor, even though it can be
+already set earlier. This patch fixes this by making the assignment
+conditional, depending on whether current .write_sec callback is NULL.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mm/cache-l2x0.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/kernel/irq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 5e65ca8dea62..0aeeaa95c42d 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -623,14 +623,14 @@ static void l2c310_resume(void)
- 		unsigned revision;
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index ad857bada96c..350f188c92d2 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -109,7 +109,8 @@ void __init init_IRQ(void)
  
- 		/* restore pl310 setup */
--		writel_relaxed(l2x0_saved_regs.tag_latency,
--			       base + L310_TAG_LATENCY_CTRL);
--		writel_relaxed(l2x0_saved_regs.data_latency,
--			       base + L310_DATA_LATENCY_CTRL);
--		writel_relaxed(l2x0_saved_regs.filter_end,
--			       base + L310_ADDR_FILTER_END);
--		writel_relaxed(l2x0_saved_regs.filter_start,
--			       base + L310_ADDR_FILTER_START);
-+		l2c_write_sec(l2x0_saved_regs.tag_latency, base,
-+			      L310_TAG_LATENCY_CTRL);
-+		l2c_write_sec(l2x0_saved_regs.data_latency, base,
-+			      L310_DATA_LATENCY_CTRL);
-+		l2c_write_sec(l2x0_saved_regs.filter_end, base,
-+			      L310_ADDR_FILTER_END);
-+		l2c_write_sec(l2x0_saved_regs.filter_start, base,
-+			      L310_ADDR_FILTER_START);
- 
- 		revision = readl_relaxed(base + L2X0_CACHE_ID) &
- 				L2X0_CACHE_ID_RTL_MASK;
+ 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
+-		outer_cache.write_sec = machine_desc->l2c_write_sec;
++		if (!outer_cache.write_sec)
++			outer_cache.write_sec = machine_desc->l2c_write_sec;
+ 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+ 				   machine_desc->l2c_aux_mask);
+ 		if (ret)
 -- 
 1.9.2
