@@ -1,989 +1,249 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 06 Jan 2015 00:41:40 +0100
-Subject: [PATCH 1/4] mtd: nand: add NVIDIA Tegra NAND Flash controller
- driver
-In-Reply-To: <1420403960-26626-1-git-send-email-dev@lynxeye.de>
-References: <1420403960-26626-1-git-send-email-dev@lynxeye.de>
-Message-ID: <fdd128ec089a0669d66149aa4915e45d@agner.ch>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 06 Jan 2015 08:52:42 +0900
+Subject: [PATCH] arm64: kgdb: fix single stepping
+In-Reply-To: <1413868050-6173-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1413868050-6173-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <54AB23CA.2020502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+Hi Will,
 
-Thanks for picking that up!
+What's the current status of this patch?
+I'm pretty sure that the bug is reproducable and can be fixed
+with my patch since I've got a report from another guy
+who had the same problem and tried my patch.
 
-I did some short benchmarks on Colibri T20 V1.2, L4T. Write/read speeds
-I measured on the YAFFS2 based file system:
+Thanks,
+-Takahiro AKASHI
 
-# dd if=/dev/zero of=test bs=50M count=1 conv=fdatasync
-1+0 records in
-1+0 records out
-52428800 bytes (52 MB) copied, 9.88293 s, 5.3 MB/s
-
-echo 3 > /proc/sys/vm/drop_caches
-# dd if=test of=/dev/zero bs=50M count=1
-1+0 records in
-1+0 records out
-52428800 bytes (52 MB) copied, 5.97056 s, 8.8 MB/s
-
-So your values look quite realistic then!
-
-Some comments below...
-
-On 2015-01-04 21:39, Lucas Stach wrote:
-> Add support for the NAND flash controller found on NVIDIA
-> Tegra 2/3 SoCs. This is a largely reworked version of the driver
-> started by Thierry.
-> 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Signed-off-by: Lucas Stach <dev@lynxeye.de>
+On 10/21/2014 02:07 PM, AKASHI Takahiro wrote:
+> I tried to verify kgdb in vanilla kernel on fast model, but it seems that
+> the single stepping with kgdb doesn't work correctly since its first
+> appearance at v3.15.
+>
+> On v3.15, 'stepi' command after breaking the kernel at some breakpoint
+> steps forward to the next instruction, but the succeeding 'stepi' never
+> goes beyond that.
+> On v3.16, 'stepi' moves forward and stops at the next instruction just
+> after enable_dbg in el1_dbg, and never goes beyond that. This variance of
+> behavior seems to come in with the following patch in v3.16:
+>
+>      commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+>      paths where possible")
+>
+> This patch
+> (1) moves kgdb_disable_single_step() from 'c' command handling to single
+>      step handler.
+>      This makes sure that single stepping gets effective at every 's' command.
+>      Please note that, under the current implementation, single step bit in
+>      spsr, which is cleared by the first single stepping, will not be set
+>      again for the consecutive 's' commands because single step bit in mdscr
+>      is still kept on (that is, kernel_active_single_step() in
+>      kgdb_arch_handle_exception() is true).
+> (2) re-implements kgdb_roundup_cpus() because the current implementation
+>      enabled interrupts naively. See below.
+> (3) removes 'enable_dbg' in el1_dbg.
+>      Single step bit in mdscr is turned on in do_handle_exception()->
+>      kgdb_handle_expection() before returning to debugged context, and if
+>      debug exception is enabled in el1_dbg, we will see unexpected single-
+>      stepping in el1_dbg.
+>      Since v3.18, the following patch does the same:
+>        commit 1059c6bf8534 ("arm64: debug: don't re-enable debug exceptions
+>        on return from el1_dbg)
+> (4) masks interrupts while single-stepping one instruction.
+>      If an interrupt is caught during processing a single-stepping, debug
+>      exception is unintentionally enabled by el1_irq's 'enable_dbg' before
+>      returning to debugged context.
+>      Thus, like in (2), we will see unexpected single-stepping in el1_irq.
+>
+> Basically (1) and (2) are for v3.15, (3) and (4) for v3.1[67].
+>
+> * issue fixed by (2):
+> Without (2), we would see another problem if a breakpoint is set at
+> interrupt-sensible places, like gic_handle_irq():
+>
+>      KGDB: re-enter error: breakpoint removed ffffffc000081258
+>      ------------[ cut here ]------------
+>      WARNING: CPU: 0 PID: 650 at kernel/debug/debug_core.c:435
+> 					kgdb_handle_exception+0x1dc/0x1f4()
+>      Modules linked in:
+>      CPU: 0 PID: 650 Comm: sh Not tainted 3.17.0-rc2+ #177
+>      Call trace:
+>      [<ffffffc000087fac>] dump_backtrace+0x0/0x130
+>      [<ffffffc0000880ec>] show_stack+0x10/0x1c
+>      [<ffffffc0004d683c>] dump_stack+0x74/0xb8
+>      [<ffffffc0000ab824>] warn_slowpath_common+0x8c/0xb4
+>      [<ffffffc0000ab90c>] warn_slowpath_null+0x14/0x20
+>      [<ffffffc000121bfc>] kgdb_handle_exception+0x1d8/0x1f4
+>      [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>      [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>      [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>      Exception stack(0xffffffc07e027650 to 0xffffffc07e027770)
+>      ...
+>      [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>      [<ffffffc00012178c>] kgdb_cpu_enter+0x464/0x5c0
+>      [<ffffffc000121bb4>] kgdb_handle_exception+0x190/0x1f4
+>      [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>      [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>      [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>      Exception stack(0xffffffc07e027ac0 to 0xffffffc07e027be0)
+>      ...
+>      [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>      [<ffffffc00032e4b4>] __handle_sysrq+0x11c/0x190
+>      [<ffffffc00032e93c>] write_sysrq_trigger+0x4c/0x60
+>      [<ffffffc0001e7d58>] proc_reg_write+0x54/0x84
+>      [<ffffffc000192fa4>] vfs_write+0x98/0x1c8
+>      [<ffffffc0001939b0>] SyS_write+0x40/0xa0
+>
+> Once some interrupt occurs, a breakpoint at gic_handle_irq() triggers kgdb.
+> Kgdb then calls kgdb_roundup_cpus() to sync with other cpus.
+> Current kgdb_roundup_cpus() unmasks interrupts temporarily to
+> use smp_call_function().
+> This eventually allows another interrupt to occur and likely results in
+> hitting a breakpoint at gic_handle_irq() again since debug exception is
+> always enabled in el1_irq.
+>
+> We can avoid this issue by specifying "nokgdbroundup" in kernel parameter,
+> but this will also leave other cpus be in unknown state in terms of kgdb,
+> and may result in interfering with kgdb activity.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
-> I've tested this driver with the in-kernel mtd-tests and some
-> realworld workloads on a Colibri T20 module.
-> ---
->  .../bindings/mtd/nvidia,tegra20-nand.txt           |  30 +
->  MAINTAINERS                                        |   6 +
->  drivers/mtd/nand/Kconfig                           |   6 +
->  drivers/mtd/nand/Makefile                          |   1 +
->  drivers/mtd/nand/tegra_nand.c                      | 794 +++++++++++++++++++++
->  5 files changed, 837 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
->  create mode 100644 drivers/mtd/nand/tegra_nand.c
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
-> b/Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
-> new file mode 100644
-> index 0000000..088223c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
-> @@ -0,0 +1,30 @@
-> +NVIDIA Tegra NAND Flash controller
-> +
-> +Required properties:
-> +- compatible: Must be one of:
-> +  - "nvidia,tegra20-nand"
-> +  - "nvidia,tegra30-nand"
-> +- reg: MMIO address range
-> +- interrupts: interrupt output of the NFC controller
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries:
-> +  - nand
-> +- resets: Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names: Must include the following entries:
-> +  - nand
-> +
-> +Optional properties:
-> +- nvidia,wp-gpios: GPIO used to disable write protection of the flash
-> +
-> +  Example:
-> +	nand at 70008000 {
-> +		compatible = "nvidia,tegra20-nand";
-> +		reg = <0x70008000 0x100>;
-> +		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&tegra_car TEGRA20_CLK_NDFLASH>;
-> +		clock-names = "nand";
-> +		resets = <&tegra_car 13>;
-> +		reset-names = "nand";
-> +	};
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ddb9ac8..972e31d 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -9459,6 +9459,12 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
->  S:	Supported
->  F:	drivers/input/keyboard/tegra-kbc.c
->  
-> +TEGRA NAND DRIVER
-> +M:	Lucas Stach <dev@lynxeye.de>
-> +S:	Maintained
-> +F:	Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
-> +F:	drivers/mtd/nand/tegra_nand.c
-> +
->  TEGRA PWM DRIVER
->  M:	Thierry Reding <thierry.reding@gmail.com>
->  S:	Supported
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index 7d0150d..1eafd4e 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -524,4 +524,10 @@ config MTD_NAND_SUNXI
->  	help
->  	  Enables support for NAND Flash chips on Allwinner SoCs.
->  
-> +config MTD_NAND_TEGRA
-> +	tristate "Support for NAND on NVIDIA Tegra"
-> +	depends on ARCH_TEGRA || COMPILE_TEST
-> +	help
-> +	  Enables support for NAND flash on NVIDIA Tegra SoC based boards.
-> +
->  endif # MTD_NAND
-> diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-> index bd38f21..58399ce 100644
-> --- a/drivers/mtd/nand/Makefile
-> +++ b/drivers/mtd/nand/Makefile
-> @@ -51,5 +51,6 @@ obj-$(CONFIG_MTD_NAND_GPMI_NAND)	+= gpmi-nand/
->  obj-$(CONFIG_MTD_NAND_XWAY)		+= xway_nand.o
->  obj-$(CONFIG_MTD_NAND_BCM47XXNFLASH)	+= bcm47xxnflash/
->  obj-$(CONFIG_MTD_NAND_SUNXI)		+= sunxi_nand.o
-> +obj-$(CONFIG_MTD_NAND_TEGRA)		+= tegra_nand.o
->  
->  nand-objs := nand_base.o nand_bbt.o nand_timings.o
-> diff --git a/drivers/mtd/nand/tegra_nand.c b/drivers/mtd/nand/tegra_nand.c
-> new file mode 100644
-> index 0000000..b919a6e
-> --- /dev/null
-> +++ b/drivers/mtd/nand/tegra_nand.c
-> @@ -0,0 +1,794 @@
-> +/*
-> + * Copyright (C) 2014-2015 Lucas Stach <dev@lynxeye.de>
-> + * Copyright (C) 2012 Avionic Design GmbH
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/completion.h>
-> +#include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_mtd.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset.h>
-> +
-> +#define CMD				0x00
-> +#define   CMD_GO			(1 << 31)
-> +#define   CMD_CLE			(1 << 30)
-> +#define   CMD_ALE			(1 << 29)
-> +#define   CMD_PIO			(1 << 28)
-> +#define   CMD_TX			(1 << 27)
-> +#define   CMD_RX			(1 << 26)
-> +#define   CMD_SEC_CMD			(1 << 25)
-> +#define   CMD_AFT_DAT			(1 << 24)
-> +#define   CMD_TRANS_SIZE(x)		(((x) & 0xf) << 20)
-> +#define   CMD_A_VALID			(1 << 19)
-> +#define   CMD_B_VALID			(1 << 18)
-> +#define   CMD_RD_STATUS_CHK		(1 << 17)
-> +#define   CMD_RBSY_CHK			(1 << 16)
-> +#define   CMD_CE(x)			(1 << (8 + ((x) & 0x7)))
-> +#define   CMD_CLE_SIZE(x)		(((x) & 0x3) << 4)
-> +#define   CMD_ALE_SIZE(x)		(((x) & 0xf) << 0)
-> +
-> +#define STATUS				0x04
-> +
-> +#define ISR				0x08
-> +#define   ISR_UND			(1 << 7)
-> +#define   ISR_OVR			(1 << 6)
-> +#define   ISR_CMD_DONE			(1 << 5)
-> +#define   ISR_ECC_ERR			(1 << 4)
-> +
-> +#define IER				0x0c
-> +#define   IER_ERR_TRIG_VAL(x)		(((x) & 0xf) << 16)
-> +#define   IER_UND			(1 << 7)
-> +#define   IER_OVR			(1 << 6)
-> +#define   IER_CMD_DONE			(1 << 5)
-> +#define   IER_ECC_ERR			(1 << 4)
-> +#define   IER_GIE			(1 << 0)
-> +
-> +#define CFG				0x10
-> +#define   CFG_HW_ECC			(1 << 31)
-> +#define   CFG_ECC_SEL			(1 << 30)
-> +#define   CFG_ERR_COR			(1 << 29)
-> +#define   CFG_PIPE_EN			(1 << 28)
-> +#define   CFG_TVAL_4			(0 << 24)
-> +#define   CFG_TVAL_6			(1 << 24)
-> +#define   CFG_TVAL_8			(2 << 24)
-> +#define   CFG_SKIP_SPARE		(1 << 23)
-> +#define   CFG_BUS_WIDTH_8		(0 << 21)
-> +#define   CFG_BUS_WIDTH_16		(1 << 21)
-> +#define   CFG_COM_BSY			(1 << 20)
-> +#define   CFG_PS_256			(0 << 16)
-> +#define   CFG_PS_512			(1 << 16)
-> +#define   CFG_PS_1024			(2 << 16)
-> +#define   CFG_PS_2048			(3 << 16)
-> +#define   CFG_PS_4096			(4 << 16)
-> +#define   CFG_SKIP_SPARE_SIZE_4		(0 << 14)
-> +#define   CFG_SKIP_SPARE_SIZE_8		(1 << 14)
-> +#define   CFG_SKIP_SPARE_SIZE_12	(2 << 14)
-> +#define   CFG_SKIP_SPARE_SIZE_16	(3 << 14)
-> +#define   CFG_TAG_BYTE_SIZE(x)		((x) & 0xff)
-> +
-> +#define TIMING_1			0x14
-> +#define   TIMING_TRP_RESP(x)		(((x) & 0xf) << 28)
-> +#define   TIMING_TWB(x)			(((x) & 0xf) << 24)
-> +#define   TIMING_TCR_TAR_TRR(x)		(((x) & 0xf) << 20)
-> +#define   TIMING_TWHR(x)		(((x) & 0xf) << 16)
-> +#define   TIMING_TCS(x)			(((x) & 0xc) << 14)
-
-In Tegra 2 TRM v02p, this is 15:14. You shift the masked value by 14,
-hence the mask should be 0x3...
-
-> +#define   TIMING_TWH(x)			(((x) & 0x3) << 12)
-> +#define   TIMING_TWP(x)			(((x) & 0xf) <<  8)
-> +#define   TIMING_TRH(x)			(((x) & 0xf) <<  4)
-> +#define   TIMING_TRP(x)			(((x) & 0xf) <<  0)
-> +
-> +#define RESP				0x18
-> +
-> +#define TIMING_2			0x1c
-> +#define   TIMING_TADL(x)		((x) & 0xf)
-> +
-> +#define CMD_1				0x20
-> +#define CMD_2				0x24
-> +#define ADDR_1				0x28
-> +#define ADDR_2				0x2c
-> +
-> +#define DMA_CTRL			0x30
-> +#define   DMA_CTRL_GO			(1 << 31)
-> +#define   DMA_CTRL_IN			(0 << 30)
-> +#define   DMA_CTRL_OUT			(1 << 30)
-> +#define   DMA_CTRL_PERF_EN		(1 << 29)
-> +#define   DMA_CTRL_IE_DONE		(1 << 28)
-> +#define   DMA_CTRL_REUSE		(1 << 27)
-> +#define   DMA_CTRL_BURST_1		(2 << 24)
-> +#define   DMA_CTRL_BURST_4		(3 << 24)
-> +#define   DMA_CTRL_BURST_8		(4 << 24)
-> +#define   DMA_CTRL_BURST_16		(5 << 24)
-> +#define   DMA_CTRL_IS_DONE		(1 << 20)
-> +#define   DMA_CTRL_EN_A			(1 <<  2)
-> +#define   DMA_CTRL_EN_B			(1 <<  1)
-> +
-> +#define DMA_CFG_A			0x34
-> +#define DMA_CFG_B			0x38
-> +
-> +#define FIFO_CTRL			0x3c
-> +#define   FIFO_CTRL_CLR_ALL		(1 << 3)
-> +
-> +#define DATA_PTR			0x40
-> +#define TAG_PTR				0x44
-> +#define ECC_PTR				0x48
-> +
-> +#define HWSTATUS_CMD			0x50
-> +#define HWSTATUS_MASK			0x54
-> +#define   HWSTATUS_RDSTATUS_MASK(x)	(((x) & 0xff) << 24)
-> +#define   HWSTATUS_RDSTATUS_VALUE(x)	(((x) & 0xff) << 16)
-> +#define   HWSTATUS_RBSY_MASK(x)		(((x) & 0xff) << 8)
-> +#define   HWSTATUS_RBSY_VALUE(x)	(((x) & 0xff) << 0)
-> +
-> +#define DEC_RESULT			0xd0
-> +#define   DEC_RESULT_CORRFAIL		(1 << 8)
-> +
-> +#define DEC_STATUS_BUF			0xd4
-> +#define   DEC_STATUS_BUF_FAIL_SEC_FLAG(x)	((x) & (0xff << 24))
-> +#define   DEC_STATUS_BUF_CORR_SEC_FLAG(x)	((x) & (0xff << 16))
-> +#define   DEC_STATUS_BUF_MAX_CORR_CNT(x)	(((x) & 0xf00) >> 8)
-> +
-> +struct tegra_nand {
-> +	void __iomem *regs;
-> +	int irq;
-> +	struct clk *clk;
-> +	struct reset_control *rst;
-> +	int wp_gpio;
-> +	int buswidth;
-> +
-> +	struct nand_chip chip;
-> +	struct mtd_info mtd;
-> +	struct device *dev;
-> +
-> +	struct completion command_complete;
-> +	struct completion dma_complete;
-> +
-> +	dma_addr_t data_dma;
-> +	void *data_buf;
-> +	dma_addr_t oob_dma;
-> +	void *oob_buf;
-> +
-> +	int cur_chip;
-> +};
-> +
-> +static inline struct tegra_nand *to_tegra_nand(struct mtd_info *mtd)
-> +{
-> +	return container_of(mtd, struct tegra_nand, mtd);
-> +}
-> +
-> +static struct nand_ecclayout tegra_nand_oob_16 = {
-> +	.eccbytes = 4,
-> +	.eccpos = { 3, 4, 5, 6 },
-> +	.oobfree = {
-> +		{ .offset = 8, . length = 8 }
-> +	}
-> +};
-> +
-> +static struct nand_ecclayout tegra_nand_oob_64 = {
-> +	.eccbytes = 36,
-> +	.eccpos = {
-> +		 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-> +		19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-> +		35, 36, 37, 38, 39
-
-This list contains 37 bytes, is this intended?
-
-> +	},
-> +	.oobfree = {
-> +		{ .offset = 40, .length = 20 }
-> +	}
-> +};
-> +
-> +static struct nand_ecclayout tegra_nand_oob_128 = {
-> +	.eccbytes = 72,
-> +	.eccpos = {
-> +		 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-> +		19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-> +		35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-> +		51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66,
-> +		67, 68, 69, 70, 71, 72, 73, 74, 75
-> +	},
-> +	.oobfree = {
-> +		{ .offset = 76, .length = 52 }
-> +	}
-> +};
-> +
-> +static struct nand_ecclayout tegra_nand_oob_224 = {
-> +	.eccbytes = 144,
-> +	.eccpos = {
-> +		  3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,
-> +		 15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,
-> +		 27,  28,  29,  30,  31,  32,  33,  34,  35,  36,  37,  38,
-> +		 39,  40,  41,  42,  43,  44,  45,  46,  47,  48,  49,  50,
-> +		 51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,
-> +		 63,  64,  65,  66,  67,  68,  69,  70,  71,  72,  73,  74,
-> +		 75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  86,
-> +		 87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  97,  98,
-> +		 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
-> +		111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122,
-> +		123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
-> +		135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
-> +		147
-> +	},
-> +	.oobfree = {
-> +		{ .offset = 148, .length = 76 }
-> +	}
-> +};
-> +
-> +static irqreturn_t tegra_nand_irq(int irq, void *data)
-> +{
-> +	struct tegra_nand *nand = data;
-> +	irqreturn_t ret = IRQ_HANDLED;
-> +	u32 isr, dma;
-> +
-> +	isr = readl(nand->regs + ISR);
-> +	dma = readl(nand->regs + DMA_CTRL);
-> +
-> +	if (!isr && !(dma & DMA_CTRL_IS_DONE)) {
-> +		ret = IRQ_NONE;
-> +		goto out;
-
-The out label doesn't do anything more than just return. Why not just
-return IRQ_NONE here and return IRQ_HANDLED at the end, saves the local
-variable and helps readability...
-
-Why is this needed anyway, is the IRQ shared with other peripherals?
-
-In the L4T driver, there is a warning message about spurious interrupts,
-does this works around this interrupts?
-
-> +	}
-> +
-> +	if (isr & ISR_CMD_DONE)
-> +		complete(&nand->command_complete);
-> +
-> +	if (isr & ISR_UND)
-> +		dev_dbg(nand->dev, "  FIFO underrun\n");
-
-Two spaces?
-
-> +
-> +	if (isr & ISR_OVR)
-> +		dev_dbg(nand->dev, "  FIFO overrun\n");
-> +
-> +	/* handle DMA interrupts */
-> +	if (dma & DMA_CTRL_IS_DONE) {
-> +		writel(dma, nand->regs + DMA_CTRL);
-> +		complete(&nand->dma_complete);
-> +	}
-> +
-> +	/* clear interrupts */
-> +	writel(isr, nand->regs + ISR);
-> +
-> +out:
-> +	return ret;
-> +}
-> +
-> +static void tegra_nand_command(struct mtd_info *mtd, unsigned int command,
-> +			       int column, int page_addr)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +	u32 value;
-> +
-> +	switch (command) {
-> +	case NAND_CMD_READOOB:
-> +		column += mtd->writesize;
-> +		/* fall-through */
-> +
-> +	case NAND_CMD_READ0:
-> +		writel(NAND_CMD_READ0, nand->regs + CMD_1);
-> +		writel(NAND_CMD_READSTART, nand->regs + CMD_2);
-> +
-> +		value = (page_addr << 16) | (column & 0xffff);
-> +		writel(value, nand->regs + ADDR_1);
-> +
-> +		value = page_addr >> 16;
-> +		writel(value, nand->regs + ADDR_2);
-> +
-> +		value = CMD_CLE | CMD_ALE | CMD_ALE_SIZE(4) | CMD_SEC_CMD |
-> +			CMD_RBSY_CHK | CMD_CE(nand->cur_chip) | CMD_GO;
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_SEQIN:
-> +		writel(NAND_CMD_SEQIN, nand->regs + CMD_1);
-> +
-> +		value = (page_addr << 16) | (column & 0xffff);
-> +		writel(value, nand->regs + ADDR_1);
-> +
-> +		value = page_addr >> 16;
-> +		writel(value, nand->regs + ADDR_2);
-> +
-> +		value = CMD_CLE | CMD_ALE | CMD_ALE_SIZE(4) |
-> +			CMD_CE(nand->cur_chip) | CMD_GO;
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_PAGEPROG:
-> +		writel(NAND_CMD_PAGEPROG, nand->regs + CMD_1);
-> +
-> +		value = CMD_CLE | CMD_CE(nand->cur_chip) | CMD_GO;
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_READID:
-> +		writel(NAND_CMD_READID, nand->regs + CMD_1);
-> +		writel(column & 0xff, nand->regs + ADDR_1);
-> +
-> +		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_CE(nand->cur_chip);
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_ERASE1:
-> +		writel(NAND_CMD_ERASE1, nand->regs + CMD_1);
-> +		writel(NAND_CMD_ERASE2, nand->regs + CMD_2);
-> +		writel(page_addr, nand->regs + ADDR_1);
-> +
-> +		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_ALE_SIZE(2) |
-> +			CMD_SEC_CMD | CMD_RBSY_CHK | CMD_CE(nand->cur_chip);
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_ERASE2:
-> +		return;
-> +
-> +	case NAND_CMD_STATUS:
-> +		writel(NAND_CMD_STATUS, nand->regs + CMD_1);
-> +
-> +		value = CMD_GO | CMD_CLE | CMD_CE(nand->cur_chip);
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_PARAM:
-> +		writel(NAND_CMD_PARAM, nand->regs + CMD_1);
-> +		writel(column & 0xff, nand->regs + ADDR_1);
-> +		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_CE(nand->cur_chip);
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	case NAND_CMD_RESET:
-> +		writel(NAND_CMD_RESET, nand->regs + CMD_1);
-> +
-> +		value = CMD_GO | CMD_CLE | CMD_CE(nand->cur_chip);
-> +		writel(value, nand->regs + CMD);
-> +		break;
-> +
-> +	default:
-> +		dev_warn(nand->dev, "unsupported command: %x\n", command);
-> +		return;
-> +	}
-> +
-> +	wait_for_completion(&nand->command_complete);
-> +}
-> +
-> +static void tegra_nand_select_chip(struct mtd_info *mtd, int chip)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +
-> +	nand->cur_chip = chip;
-> +}
-> +
-> +static uint8_t tegra_nand_read_byte(struct mtd_info *mtd)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +	u32 value;
-> +
-> +	value = CMD_TRANS_SIZE(0) | CMD_CE(nand->cur_chip) |
-> +		CMD_PIO | CMD_RX | CMD_A_VALID | CMD_GO;
-> +
-> +	writel(value, nand->regs + CMD);
-> +	wait_for_completion(&nand->command_complete);
-> +
-> +	return readl(nand->regs + RESP) & 0xff;
-> +}
-> +
-> +static void tegra_nand_read_buf(struct mtd_info *mtd, uint8_t *buffer,
-> +				int length)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +	size_t i;
-> +
-> +	for (i = 0; i < length; i += 4) {
-> +		u32 value;
-> +		size_t n = min_t(size_t, length - i, 4);
-> +
-> +		value = CMD_GO | CMD_PIO | CMD_RX | CMD_A_VALID |
-> +			CMD_CE(nand->cur_chip) | CMD_TRANS_SIZE(n - 1);
-> +
-> +		writel(value, nand->regs + CMD);
-> +		wait_for_completion(&nand->command_complete);
-> +
-> +		value = readl(nand->regs + RESP);
-> +		memcpy(buffer + i, &value, n);
-> +	}
-> +}
-> +
-> +static void tegra_nand_write_buf(struct mtd_info *mtd, const uint8_t *buffer,
-> +				 int length)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +	size_t i;
-> +
-> +	for (i = 0; i < length; i += 4) {
-> +		u32 value;
-> +		size_t n = min_t(size_t, length - i, 4);
-> +
-> +		memcpy(&value, buffer + i, n);
-> +		writel(value, nand->regs + RESP);
-> +
-> +		value = CMD_GO | CMD_PIO | CMD_TX | CMD_A_VALID |
-> +			CMD_CE(nand->cur_chip) | CMD_TRANS_SIZE(n - 1);
-> +
-> +		writel(value, nand->regs + CMD);
-> +		wait_for_completion(&nand->command_complete);
-> +	}
-> +}
-> +
-> +static int tegra_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
-> +				uint8_t *buf, int oob_required, int page)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +	u32 value;
-> +
-> +	writel(mtd->writesize - 1, nand->regs + DMA_CFG_A);
-> +	writel(nand->data_dma, nand->regs + DATA_PTR);
-> +
-> +	if (oob_required) {
-> +		writel(mtd->oobsize - 1, nand->regs + DMA_CFG_B);
-> +		writel(nand->oob_dma, nand->regs + TAG_PTR);
-> +	} else {
-> +		writel(0, nand->regs + DMA_CFG_B);
-> +		writel(0, nand->regs + TAG_PTR);
-> +	}
-> +
-> +	value = DMA_CTRL_GO | DMA_CTRL_IN | DMA_CTRL_PERF_EN |
-> +		DMA_CTRL_REUSE | DMA_CTRL_IE_DONE | DMA_CTRL_IS_DONE |
-> +		DMA_CTRL_BURST_8 | DMA_CTRL_EN_A;
-> +
-> +	if (oob_required)
-> +		value |= DMA_CTRL_EN_B;
-> +
-> +	writel(value, nand->regs + DMA_CTRL);
-> +
-> +	value = CMD_GO | CMD_RX | CMD_TRANS_SIZE(8) |
-> +		CMD_A_VALID | CMD_CE(nand->cur_chip);
-> +	if (oob_required)
-> +		value |= CMD_B_VALID;
-> +	writel(value, nand->regs + CMD);
-> +
-> +	wait_for_completion(&nand->command_complete);
-> +	wait_for_completion(&nand->dma_complete);
-> +
-> +	if (oob_required)
-> +		memcpy(chip->oob_poi, nand->oob_buf, mtd->oobsize);
-> +	memcpy(buf, nand->data_buf, mtd->writesize);
-> +
-> +	value = readl(nand->regs + DEC_RESULT);
-> +	if (value & DEC_RESULT_CORRFAIL) {
-> +		value = readl(nand->regs + DEC_STATUS_BUF);
-> +
-> +		if (DEC_STATUS_BUF_FAIL_SEC_FLAG(value))
-> +			return -1;
-> +
-> +		if (DEC_STATUS_BUF_CORR_SEC_FLAG(value))
-> +			return DEC_STATUS_BUF_MAX_CORR_CNT(value);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra_nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
-> +				 const uint8_t *buf, int oob_required)
-> +{
-> +	struct tegra_nand *nand = to_tegra_nand(mtd);
-> +	unsigned long value;
-> +	int ret = 0;
-> +
-> +	memcpy(nand->data_buf, buf, mtd->writesize);
-> +
-> +	writel(mtd->writesize - 1, nand->regs + DMA_CFG_A);
-> +	writel(nand->data_dma, nand->regs + DATA_PTR);
-> +
-> +	writel(0, nand->regs + DMA_CFG_B);
-> +	writel(0, nand->regs + TAG_PTR);
-> +
-> +	value = DMA_CTRL_GO | DMA_CTRL_OUT | DMA_CTRL_PERF_EN |
-> +		DMA_CTRL_IE_DONE | DMA_CTRL_IS_DONE |
-> +		DMA_CTRL_BURST_8 | DMA_CTRL_EN_A;
-> +	writel(value, nand->regs + DMA_CTRL);
-> +
-> +	value = CMD_GO | CMD_TX | CMD_A_VALID | CMD_TRANS_SIZE(8) |
-> +		CMD_CE(nand->cur_chip);
-> +	writel(value, nand->regs + CMD);
-> +
-> +	wait_for_completion(&nand->command_complete);
-> +	wait_for_completion(&nand->dma_complete);
-> +
-> +	return ret;
-
-ret is never accessed in this function hence you can omit it.
-
-> +}
-> +
-> +static void tegra_nand_setup_timing(struct tegra_nand *nand, int mode)
-> +{
-> +	unsigned long rate = clk_get_rate(nand->clk) / 1000000;
-> +	unsigned long period = 1000000 / rate;
-
-Hm, period of a clock in ns... Sounds like a common use case. I searched
-for a macro/helper, but did not found anything. Well then.
-
-> +	const struct nand_sdr_timings *timings;
-> +	u32 val, reg = 0;
-> +
-> +	timings = onfi_async_timing_mode_to_sdr_timings(mode);
-> +
-> +	val = max3(timings->tAR_min, timings->tRR_min,
-> +		   timings->tRC_min) / period;
-> +	if (val > 2)
-> +		val -= 2;
-
-According to my TRM this is:
-Generated timing = (n+3) * NAND_CLK_PERIOD ns.
-
-Shouldn't this look like
-	if (val >= 3)
-		val -= 3;
-then?
-
-I see that all the calculations of the timings below are different then
-in TRM. I think we need to take the whole offset into account, or do I
-miss something here?
-
-
-> +	reg |= TIMING_TCR_TAR_TRR(val);
-> +
-> +	val = max(max(timings->tCS_min, timings->tCH_min),
-> +		  max(timings->tALS_min, timings->tALH_min)) / period;
-> +	if (val > 1)
-> +		val -= 1;
-> +	reg |= TIMING_TCS(val);
-
-See mask error in macro definition.
-
-> +
-> +	val = max(timings->tRP_min, timings->tREA_max) + 6000;
-> +	reg |= TIMING_TRP(val / 1000);
-> +	reg |= TIMING_TRP_RESP(val / period);
-> +
-> +	reg |= TIMING_TWB(timings->tWB_max / period);
-> +	reg |= TIMING_TWHR(timings->tWHR_min / period);
-> +	reg |= TIMING_TWH(timings->tWH_min / 1000);
-> +	reg |= TIMING_TWP(timings->tWP_min / 1000);
-> +	reg |= TIMING_TRH(timings->tRHW_min / 1000);
-
-Why 1000 for those three values? In my TRM, those values are in
-NAND_CLK_PERIOD too.
-
-> +
-> +	writel(reg, nand->regs + TIMING_1);
-> +
-> +	val = timings->tADL_min / period;
-> +	if (val > 2)
-> +		val -= 2;
-> +	reg = TIMING_TADL(val);
-> +
-> +	writel(reg, nand->regs + TIMING_2);
-> +}
-> +
-> +static void tegra_nand_setup_chiptiming(struct tegra_nand *nand)
-> +{
-> +	struct nand_chip *chip = &nand->chip;
-> +	int mode;
-> +
-> +	mode = onfi_get_async_timing_mode(chip);
-> +	if (mode == ONFI_TIMING_MODE_UNKNOWN)
-> +		mode = chip->onfi_timing_mode_default;
+>   arch/arm64/kernel/kgdb.c |   60 +++++++++++++++++++++++++++++++++++-----------
+>   1 file changed, 46 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+> index a0d10c5..81b5910 100644
+> --- a/arch/arm64/kernel/kgdb.c
+> +++ b/arch/arm64/kernel/kgdb.c
+> @@ -19,9 +19,13 @@
+>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>    */
+>
+> +#include <linux/cpumask.h>
+>   #include <linux/irq.h>
+> +#include <linux/irq_work.h>
+>   #include <linux/kdebug.h>
+>   #include <linux/kgdb.h>
+> +#include <linux/percpu.h>
+> +#include <asm/ptrace.h>
+>   #include <asm/traps.h>
+>
+>   struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+> @@ -95,6 +99,9 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+>   	{ "fpcr", 4, -1 },
+>   };
+>
+> +static DEFINE_PER_CPU(unsigned int, kgdb_pstate);
+> +static DEFINE_PER_CPU(struct irq_work, kgdb_irq_work);
+> +
+>   char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
+>   {
+>   	if (regno >= DBG_MAX_REG_NUM || regno < 0)
+> @@ -176,18 +183,14 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+>   		 * over and over again.
+>   		 */
+>   		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+> -		atomic_set(&kgdb_cpu_doing_single_step, -1);
+> -		kgdb_single_step =  0;
+> -
+> -		/*
+> -		 * Received continue command, disable single step
+> -		 */
+> -		if (kernel_active_single_step())
+> -			kernel_disable_single_step();
+>
+>   		err = 0;
+>   		break;
+>   	case 's':
+> +		/* mask interrupts while single stepping */
+> +		__this_cpu_write(kgdb_pstate, linux_regs->pstate);
+> +		linux_regs->pstate |= PSR_I_BIT;
+> +
+>   		/*
+>   		 * Update step address value with address passed
+>   		 * with step packet.
+> @@ -198,8 +201,6 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+>   		 */
+>   		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+>   		atomic_set(&kgdb_cpu_doing_single_step, raw_smp_processor_id());
+> -		kgdb_single_step =  1;
+> -
+>   		/*
+>   		 * Enable single step handling
+>   		 */
+> @@ -229,6 +230,18 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr)
+>
+>   static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+>   {
+> +	unsigned int pstate;
+> +
+> +	kernel_disable_single_step();
+> +	atomic_set(&kgdb_cpu_doing_single_step, -1);
+> +
+> +	/* restore interrupt mask status */
+> +	pstate = __this_cpu_read(kgdb_pstate);
+> +	if (pstate & PSR_I_BIT)
+> +		regs->pstate |= PSR_I_BIT;
 > +	else
-> +		mode = fls(mode);
+> +		regs->pstate &= ~PSR_I_BIT;
 > +
-> +	tegra_nand_setup_timing(nand, mode);
-> +}
+>   	kgdb_handle_exception(1, SIGTRAP, 0, regs);
+>   	return 0;
+>   }
+> @@ -249,16 +262,27 @@ static struct step_hook kgdb_step_hook = {
+>   	.fn		= kgdb_step_brk_fn
+>   };
+>
+> -static void kgdb_call_nmi_hook(void *ignored)
+> +static void kgdb_roundup_hook(struct irq_work *work)
+>   {
+>   	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
+>   }
+>
+>   void kgdb_roundup_cpus(unsigned long flags)
+>   {
+> -	local_irq_enable();
+> -	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
+> -	local_irq_disable();
+> +	int cpu;
+> +	struct cpumask mask;
+> +	struct irq_work *work;
 > +
-> +static int tegra_nand_parse_dt(struct device_node *node,
-> +			       struct tegra_nand *nand)
-> +{
-> +	enum of_gpio_flags flags;
+> +	mask = *cpu_online_mask;
+> +	cpumask_clear_cpu(smp_processor_id(), &mask);
+> +	cpu = cpumask_first(&mask);
+> +	if (cpu >= nr_cpu_ids)
+> +		return;
 > +
-> +	nand->wp_gpio = of_get_named_gpio_flags(node, "nvidia,wp-gpios", 0,
-> +						 &flags);
-
-There is a non flags variant, this should work fine for this case I
-guess.
-
-> +	if (nand->wp_gpio < 0)
-> +		nand->wp_gpio = 0;
+> +	for_each_cpu(cpu, &mask) {
+> +		work = per_cpu_ptr(&kgdb_irq_work, cpu);
+> +		irq_work_queue_on(work, cpu);
+> +	}
+>   }
+>
+>   static int __kgdb_notify(struct die_args *args, unsigned long cmd)
+> @@ -299,6 +323,8 @@ static struct notifier_block kgdb_notifier = {
+>   int kgdb_arch_init(void)
+>   {
+>   	int ret = register_die_notifier(&kgdb_notifier);
+> +	int cpu;
+> +	struct irq_work *work;
+>
+>   	if (ret != 0)
+>   		return ret;
+> @@ -306,6 +332,12 @@ int kgdb_arch_init(void)
+>   	register_break_hook(&kgdb_brkpt_hook);
+>   	register_break_hook(&kgdb_compiled_brkpt_hook);
+>   	register_step_hook(&kgdb_step_hook);
 > +
-> +	nand->buswidth = of_get_nand_bus_width(node);
-> +	if (nand->buswidth < 0)
-> +		return nand->buswidth;
-> +
-> +	return 0;
-> +}
-> +
-> +static const char * const part_probes[] = {
-> +	"cmdlinepart", "ofpart", NULL };
-> +
-> +static int tegra_nand_probe(struct platform_device *pdev)
-> +{
-> +	struct tegra_nand *nand;
-> +	struct nand_chip *chip;
-> +	struct mtd_info *mtd;
-> +	struct resource *res;
-> +	unsigned long value;
-> +	int err = 0;
-> +
-> +	nand = devm_kzalloc(&pdev->dev, sizeof(*nand), GFP_KERNEL);
-> +	if (!nand)
-> +		return -ENOMEM;
-> +
-> +	nand->dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	nand->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(nand->regs))
-> +		return PTR_ERR(nand->regs);
-> +
-> +	nand->irq  = platform_get_irq(pdev, 0);
-
-Double space...
-
-> +	err = devm_request_irq(&pdev->dev, nand->irq, tegra_nand_irq, 0,
-> +			       dev_name(&pdev->dev), nand);
-> +	if (err)
-> +		return err;
-> +
-> +	nand->rst = devm_reset_control_get(&pdev->dev, "nand");
-> +	if (IS_ERR(nand->rst))
-> +		return PTR_ERR(nand->rst);
-> +
-> +	nand->clk = devm_clk_get(&pdev->dev, "nand");
-> +	if (IS_ERR(nand->clk))
-> +		return PTR_ERR(nand->clk);
-> +
-> +	err = tegra_nand_parse_dt(pdev->dev.of_node, nand);
-> +	if (err)
-> +		return err;
-> +
-> +	err = clk_prepare_enable(nand->clk);
-> +	if (err)
-> +		return err;
-> +
-> +	reset_control_assert(nand->rst);
-> +	udelay(2);
-> +	reset_control_deassert(nand->rst);
-> +
-> +	if (gpio_is_valid(nand->wp_gpio)) {
-> +		err = devm_gpio_request_one(&pdev->dev, nand->wp_gpio,
-> +				GPIOF_OUT_INIT_HIGH, "tegra-nand-wp");
-> +		if (err)
-> +			return err;
+> +	for_each_possible_cpu(cpu) {
+> +		work = per_cpu_ptr(&kgdb_irq_work, cpu);
+> +		init_irq_work(work, kgdb_roundup_hook);
 > +	}
 > +
-> +	value = HWSTATUS_RDSTATUS_MASK(1) | HWSTATUS_RDSTATUS_VALUE(0) |
-> +		HWSTATUS_RBSY_MASK(NAND_STATUS_READY) |
-> +		HWSTATUS_RBSY_VALUE(NAND_STATUS_READY);
-> +	writel(NAND_CMD_STATUS, nand->regs + HWSTATUS_CMD);
-> +	writel(value, nand->regs + HWSTATUS_MASK);
-> +
-> +	init_completion(&nand->command_complete);
-> +	init_completion(&nand->dma_complete);
-> +
-> +	mtd = &nand->mtd;
-> +	mtd->name = dev_name(&pdev->dev);
-> +	mtd->owner = THIS_MODULE;
-> +	mtd->priv = &nand->chip;
-> +
-> +	mtd->type = MTD_NANDFLASH;
-> +	mtd->flags = MTD_CAP_NANDFLASH;
-> +
-> +	/* clear interrupts */
-> +	value = readl(nand->regs + ISR);
-> +	writel(value, nand->regs + ISR);
-> +
-> +	writel(DMA_CTRL_IS_DONE, nand->regs + DMA_CTRL);
-> +
-> +	/* enable interrupts */
-> +	value = IER_UND | IER_OVR | IER_CMD_DONE | IER_ECC_ERR | IER_GIE;
-> +	writel(value, nand->regs + IER);
-> +
-> +	chip = &nand->chip;
-> +	chip->cmdfunc = tegra_nand_command;
-> +	chip->select_chip = tegra_nand_select_chip;
-> +	chip->read_byte = tegra_nand_read_byte;
-> +	chip->read_buf = tegra_nand_read_buf;
-> +	chip->write_buf = tegra_nand_write_buf;
-> +
-> +	tegra_nand_setup_timing(nand, 0);
-> +
-> +	err = nand_scan_ident(mtd, 1, NULL);
-> +	if (err)
-> +		return err;
-> +
-> +	nand->data_buf = dmam_alloc_coherent(&pdev->dev, mtd->writesize,
-> +					    &nand->data_dma, GFP_KERNEL);
-> +	if (!nand->data_buf)
-> +		return -ENOMEM;
-> +
-> +	nand->oob_buf = dmam_alloc_coherent(&pdev->dev, mtd->oobsize,
-> +					    &nand->oob_dma, GFP_KERNEL);
-> +	if (!nand->oob_buf)
-> +		return -ENOMEM;
-> +
-> +	chip->ecc.mode = NAND_ECC_HW;
-> +	chip->ecc.size = 512;
-> +	chip->ecc.bytes = mtd->oobsize;
-> +	chip->ecc.read_page = tegra_nand_read_page;
-> +	chip->ecc.write_page = tegra_nand_write_page;
-> +
-> +	value = CFG_HW_ECC | CFG_ECC_SEL | CFG_ERR_COR | CFG_PIPE_EN |
-> +		CFG_TVAL_8 | CFG_SKIP_SPARE | CFG_SKIP_SPARE_SIZE_4;
-> +
-> +	switch (mtd->oobsize) {
-> +	case 16:
-> +		chip->ecc.layout = &tegra_nand_oob_16;
-> +		chip->ecc.strength = 1;
-> +		value |= CFG_TAG_BYTE_SIZE(4);
-> +		break;
-> +	case 64:
-> +		chip->ecc.layout = &tegra_nand_oob_64;
-> +		chip->ecc.strength = 8;
-> +		value |= CFG_TAG_BYTE_SIZE(36);
-> +		break;
-> +	case 128:
-> +		chip->ecc.layout = &tegra_nand_oob_128;
-> +		chip->ecc.strength = 8;
-> +		value |= CFG_TAG_BYTE_SIZE(72);
-> +		break;
-> +	case 224:
-> +		chip->ecc.layout = &tegra_nand_oob_224;
-> +		chip->ecc.strength = 8;
-> +		value |= CFG_TAG_BYTE_SIZE(144);
-> +		break;
-> +	default:
-> +		dev_err(&pdev->dev, "unhandled OOB size %d\n", mtd->oobsize);
-> +		return -ENODEV;
-> +	}
-> +
-> +	switch (mtd->writesize) {
-> +	case 256:
-> +		value |= CFG_PS_256;
-> +		break;
-> +	case 512:
-> +		value |= CFG_PS_512;
-> +		break;
-> +	case 1024:
-> +		value |= CFG_PS_1024;
-> +		break;
-> +	case 2048:
-> +		value |= CFG_PS_2048;
-> +		break;
-> +	case 4096:
-> +		value |= CFG_PS_4096;
-> +		break;
-> +	default:
-> +		dev_err(&pdev->dev, "unhandled writesize %d\n", mtd->writesize);
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (nand->buswidth == 16)
-> +		value |= CFG_BUS_WIDTH_16;
-> +
-> +	writel(value, nand->regs + CFG);
-> +
-> +	tegra_nand_setup_chiptiming(nand);
-> +
-> +	err = nand_scan_tail(mtd);
-> +	if (err)
-> +		return err;
-> +
-> +	mtd_device_parse_register(mtd, NULL,
-> +				  &(struct mtd_part_parser_data) {
-> +					.of_node = pdev->dev.of_node,
-> +				  },
-> +				  NULL, 0);
-> +
-> +	platform_set_drvdata(pdev, nand);
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra_nand_remove(struct platform_device *pdev)
-> +{
-> +	struct tegra_nand *nand = platform_get_drvdata(pdev);
-> +
-> +	nand_release(&nand->mtd);
-> +
-> +	clk_disable_unprepare(nand->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id tegra_nand_of_match[] = {
-> +	{ .compatible = "nvidia,tegra20-nand" },
-> +	{ .compatible = "nvidia,tegra30-nand" },
-> +	{ }
-> +};
-> +
-> +static struct platform_driver tegra_nand_driver = {
-> +	.driver = {
-> +		.name = "tegra-nand",
-> +		.of_match_table = tegra_nand_of_match,
-> +	},
-> +	.probe = tegra_nand_probe,
-> +	.remove = tegra_nand_remove,
-> +};
-> +module_platform_driver(tegra_nand_driver);
-> +
-> +MODULE_DESCRIPTION("NVIDIA Tegra NAND driver");
-> +MODULE_AUTHOR("Thierry Reding <thierry.reding@avionic-design.de");
-> +MODULE_AUTHOR("Lucas Stach <dev@lynxeye.de");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DEVICE_TABLE(of, tegra_nand_of_match);
+>   	return 0;
+>   }
+>
+>
