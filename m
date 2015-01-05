@@ -1,23 +1,17 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon,  5 Jan 2015 11:04:12 +0100
-Subject: [RESEND PATCH 0/2] pinctrl-st: various fixes 
-Message-ID: <1420452254-30625-1-git-send-email-patrice.chotard@st.com>
+From: hong-rong.hsu@mediatek.com (hong-rong hsu)
+Date: Mon, 5 Jan 2015 18:12:02 +0800
+Subject: Use armv8 instructions to optimize ARM32 crypto
+Message-ID: <1420452722.4402.70.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resend this series, it seems that the one i send in 
-December has been lost despite it was visible on lkml
+Hi,
 
-Two fixes for pinctrl-st pinctrl driver
+We are engineers from Mediatek. We have a patch to optimize ARM32 kernel
+crypto performance by armv8 instructions. Do you have interest in it?
 
-Francesco VIRLINZI (1):
-  pinctrl: st: avoid multiple mutex lock
+It may be helpful for some projects which running 32-bit kernel at
+armv8. Do you suggest that we maintain it at the main-stream :-)? (ex.
+add aes-armv8.S in arch/arm/crypto/ folder)
 
-Patrice Chotard (1):
-  pinctrl: st: Add irq_disable hook to st_gpio_irqchip
-
- drivers/pinctrl/pinctrl-st.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
--- 
-1.9.1
+Thanks.
