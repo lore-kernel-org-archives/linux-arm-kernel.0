@@ -1,88 +1,195 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Jan 2015 10:35:32 +0100
-Subject: [PATCH 4/9] pci: add DT based ARM Versatile PCI host driver
-In-Reply-To: <CAL_JsqKj3KCwgtb8SViiAFSqhOS0gSq2gLQU1G3kFmV6o=q5iQ@mail.gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <5205206.j8Q9x4GQsU@wuerfel>
- <CAL_JsqKj3KCwgtb8SViiAFSqhOS0gSq2gLQU1G3kFmV6o=q5iQ@mail.gmail.com>
-Message-ID: <29010664.sxfpXiecGs@wuerfel>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 05 Jan 2015 14:59:06 +0530
+Subject: [RESEND PATCH v6] ARM: EXYNOS: Remove i2c sys configuration related
+ code
+Message-ID: <1420450146-27112-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 January 2015 17:13:19 Rob Herring wrote:
-> On Fri, Jan 2, 2015 at 2:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 02 January 2015 12:14:43 Rob Herring wrote:
-> >> On Tue, Dec 30, 2014 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Tuesday 30 December 2014 13:28:33 Rob Herring wrote:
+As all these code has been moved into i2c driver, now we can
+safely remove them from machine files.
 
-> >> > Maybe just return PCIBIOS_BAD_REGISTER_NUMBER in this case?
-> >>
-> >> Perhaps. We could probably simplify the config space read/write
-> >> functions and just provide the PCI core a bus/devfn/offset to config
-> >> address translation function. That would not work in all cases, but
-> >> propably most that have memory mapped config space.
-> >
-> > Actually, thinking about this some more, the implementation seems to
-> > be "CAM" compliant, and we could share the confic space accessors with
-> > the ones from drivers/pci/host/pci-host-generic.c.
-> 
-> Almost. It uses readl for all size accesses. Yet writes support
-> different access sizes. I would guess that the h/w can support byte
-> and word reads if writes are supported, but I can't really verify.
-> Dword-only sized reads or reads and writes seem to be the main
-> variations for config space accesses. There's a few hosts with more
-> complex config space access setup, but quite a few only vary in
-> address decode.
+CC: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+This patch is leftover patch from patch series [1], resending it after rebasing.
+It can be cleanly applied on kgene/for-next and linux-next/next-20150103.
 
-It was probably just done the current way because it seemed simpler
-at the time, but I agree that we can just keep it like this if there
-is any chance it's required as a workaround for a hardware glitch.
+[1]: http://www.spinics.net/lists/linux-samsung-soc/msg39440.html
 
-With your other patch you just posted, it really becomes trivial
-to do.
 
-> >> I'm a bit puzzled myself. I think that the devices are not probed
-> >> until after pci_assign_unassigned_bus_resources. It certainly doesn't
-> >> work without that call. Really, I think of_irq_parse_and_map_pci
-> >> should be the default if no one else has set the device's irq (and the
-> >> host has a device node of course).
-> >>
-> >> It also seems to be a bit of random set of pci functions that are
-> >> called here. It would be nice to simplify this chunk of code.
-> >
-> > Yes, and we recently had some attempts at creating a better interface posted
-> > on the mailing list, not sure what the latest status on it is. I think we
-> > want to end up with a two-stage interface along the lines of:
-> >
-> >         /* allocate a pci_host_bridge, scan DT, set default operations, map
-> >            I/O space if necessary, request all resources ... */
-> >         phb = pci_host_bridge_create(parent, ..., sizeof(struct my_pci_private));
-> 
-> Humm, I wondered what happened to pci_host_bridge_create and thought
-> we had abandoned it. It wasn't too clear reading thru the threads. The
-> host drivers generally still have to walk thru the resources anyway to
-> setup inbound and outbound windows, so we don't gain too much moving
-> that out. 
-I think the discussion has not ended yet, I'm still in favor of
-doing it like that. The current of_pci_get_host_bridge_resources()
-function is indeed lacking a bit because it just returns the resources
-that are needed for setting up the PCI side, but it doesn't
-provide a list of the host side windows that may need to get programmed
-into hardware registers on machines without a firmware that has set them
-up in advance (i.e. most ARM32 and MIPS32 machines).
+ arch/arm/mach-exynos/exynos.c           | 39 ++-------------------------------
+ arch/arm/mach-exynos/include/mach/map.h |  3 ---
+ arch/arm/mach-exynos/pm.c               |  3 ++-
+ arch/arm/mach-exynos/regs-sys.h         | 22 -------------------
+ arch/arm/mach-exynos/suspend.c          |  7 ------
+ 5 files changed, 4 insertions(+), 70 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/regs-sys.h
 
-We could add another exported function to return those, or we could
-find a way to pass those back through the pci_host_bridge pointer
-from the common function.
-
-Setting up the PCI side by itself does seem useful to me though, mainly
-to prevent host controller drivers from getting it wrong.
-
-> And the error clean-up gets complicated too.
-
-In what way? I would hope that we could come up with a way to make
-pci_host_bridge_create() able to roll-back, so it does nothing in
-case of an error, and allocate all resources using devm_* so it
-all gets undone if probe() fails for another reason.
-
-	Arnd
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index c13d083..2c84439 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -27,20 +27,16 @@
+ #include <asm/mach/map.h>
+ #include <asm/memory.h>
+ 
++#include <mach/map.h>
++
+ #include "common.h"
+ #include "mfc.h"
+ #include "regs-pmu.h"
+-#include "regs-sys.h"
+ 
+ void __iomem *pmu_base_addr;
+ 
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
+-		.virtual	= (unsigned long)S3C_VA_SYS,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SROMC,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SROMC),
+ 		.length		= SZ_4K,
+@@ -70,11 +66,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 
+ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	{
+-		.virtual	= (unsigned long)S3C_VA_SYS,
+-		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SROMC,
+ 		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
+ 		.length		= SZ_4K,
+@@ -213,32 +204,6 @@ static void __init exynos_init_irq(void)
+ 
+ static void __init exynos_dt_machine_init(void)
+ {
+-	struct device_node *i2c_np;
+-	const char *i2c_compat = "samsung,s3c2440-i2c";
+-	unsigned int tmp;
+-	int id;
+-
+-	/*
+-	 * Exynos5's legacy i2c controller and new high speed i2c
+-	 * controller have muxed interrupt sources. By default the
+-	 * interrupts for 4-channel HS-I2C controller are enabled.
+-	 * If node for first four channels of legacy i2c controller
+-	 * are available then re-configure the interrupts via the
+-	 * system register.
+-	 */
+-	if (soc_is_exynos5()) {
+-		for_each_compatible_node(i2c_np, NULL, i2c_compat) {
+-			if (of_device_is_available(i2c_np)) {
+-				id = of_alias_get_id(i2c_np, "i2c");
+-				if (id < 4) {
+-					tmp = readl(EXYNOS5_SYS_I2C_CFG);
+-					writel(tmp & ~(0x1 << id),
+-							EXYNOS5_SYS_I2C_CFG);
+-				}
+-			}
+-		}
+-	}
+-
+ 	/*
+ 	 * This is called from smp_prepare_cpus if we've built for SMP, but
+ 	 * we still need to set it up for PM and firmware ops if not.
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 1ad3f49..de3ae59 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -24,9 +24,6 @@
+ 
+ #define EXYNOS_PA_CHIPID		0x10000000
+ 
+-#define EXYNOS4_PA_SYSCON		0x10010000
+-#define EXYNOS5_PA_SYSCON		0x10050100
+-
+ #define EXYNOS4_PA_CMU			0x10030000
+ #define EXYNOS5_PA_CMU			0x10010000
+ 
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 86f3ecd..dfc8594 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -23,12 +23,13 @@
+ #include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+ 
++#include <mach/map.h>
++
+ #include <plat/pm-common.h>
+ 
+ #include "common.h"
+ #include "exynos-pmu.h"
+ #include "regs-pmu.h"
+-#include "regs-sys.h"
+ 
+ static inline void __iomem *exynos_boot_vector_addr(void)
+ {
+diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+deleted file mode 100644
+index 84332b0..0000000
+--- a/arch/arm/mach-exynos/regs-sys.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+- *             http://www.samsung.com
+- *
+- * EXYNOS - system register definition
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_SYS_H
+-#define __ASM_ARCH_REGS_SYS_H __FILE__
+-
+-#include <mach/map.h>
+-
+-#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
+-
+-/* For EXYNOS5 */
+-#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
+-
+-#endif /* __ASM_ARCH_REGS_SYS_H */
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index f8e7dcd..342797b 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -34,7 +34,6 @@
+ 
+ #include "common.h"
+ #include "regs-pmu.h"
+-#include "regs-sys.h"
+ #include "exynos-pmu.h"
+ 
+ #define S5P_CHECK_SLEEP 0x00000BAD
+@@ -53,10 +52,6 @@ struct exynos_wkup_irq {
+ 	u32 mask;
+ };
+ 
+-static struct sleep_save exynos5_sys_save[] = {
+-	SAVE_ITEM(EXYNOS5_SYS_I2C_CFG),
+-};
+-
+ static struct sleep_save exynos_core_save[] = {
+ 	/* SROM side */
+ 	SAVE_ITEM(S5P_SROM_BW),
+@@ -497,8 +492,6 @@ static const struct exynos_pm_data exynos5250_pm_data = {
+ 	.wkup_irq	= exynos5250_wkup_irq,
+ 	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
+ 	.release_ret_regs = exynos_release_ret_regs,
+-	.extra_save	= exynos5_sys_save,
+-	.num_extra_save	= ARRAY_SIZE(exynos5_sys_save),
+ 	.pm_suspend	= exynos_pm_suspend,
+ 	.pm_resume	= exynos_pm_resume,
+ 	.pm_prepare	= exynos_pm_prepare,
+-- 
+2.2.0
