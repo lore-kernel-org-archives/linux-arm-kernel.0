@@ -1,51 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 05 Jan 2015 15:03:38 +0100
-Subject: [PATCH 3/3] ARM: mvebu: Add Armada 385 General Purpose Development
- Board support
-In-Reply-To: <20141227113401.GC21001@lunn.ch>
-References: <1419678035-10658-1-git-send-email-gregory.clement@free-electrons.com>
- <1419678035-10658-4-git-send-email-gregory.clement@free-electrons.com>
- <20141227113401.GC21001@lunn.ch>
-Message-ID: <54AA99BA.9060300@free-electrons.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 5 Jan 2015 09:03:48 -0500
+Subject: [PATCH v3 2/2] ahci_xgene: Fix the DMA state machine lockup for
+ the ATA_CMD_PACKET PIO mode command.
+In-Reply-To: <1419823367-11279-3-git-send-email-stripathi@apm.com>
+References: <1419823367-11279-1-git-send-email-stripathi@apm.com>
+ <1419823367-11279-3-git-send-email-stripathi@apm.com>
+Message-ID: <20150105140348.GF15833@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
->> + * Device Tree file for Marvell Armada 385 development board
->> + * (RD-88F6820-GP)
->> + *
->> + * Copyright (C) 2014 Marvell
->> + *
->> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
+On Mon, Dec 29, 2014 at 08:52:47AM +0530, Suman Tripathi wrote:
+> This patch addresses the issue with ATA_CMD_PACKET pio mode
+> command for enumeration and device detection with ATAPI devices.
+> The X-Gene AHCI controller has an errata in which it cannot clear
+> the BSY bit after the PIO setup FIS. The dma state machine enters
+> CMFatalErrorUpdate state and locks up.
 > 
-> Hi Gregory
-> 
-> I'm guessing here...
-> 
-> The file says Copyright Marvell. I guess Marvell released it GPL? Not
-> Dual license? So it would be nice to have a Signed-off-by: from
-> somebody in Marvell that they are O.K. with the dual license.
-> 
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 
-I wrote it from scratch and in the same time Marvell is aware and agrees
-about the Dual license. Until now all the files we wrote have the Marvell
-copyright but without any  Signed-off-by: from anyone in Marvell so I don't
-think we need it now.
+Ah, you already posted the updated versions.  Applied these instead.
 
-Thanks,
-
-Gregory
-
-
+Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+tejun
