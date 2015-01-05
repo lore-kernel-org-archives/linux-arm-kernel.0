@@ -1,64 +1,33 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 06 Jan 2015 01:25:25 +0300
-Subject: [PATCH v5 2/3] ARM: shmobile: r8a7791: add CAN DT support
-In-Reply-To: <1652479.NHBlqJ9OaR@wasted.cogentembedded.com>
-References: <1652479.NHBlqJ9OaR@wasted.cogentembedded.com>
-Message-ID: <2610028.tvJWHLiVKM@wasted.cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 05 Jan 2015 23:26:15 +0100
+Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <54AAEEE1.7020607@ti.com>
+References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
+ <2019516.ehiuEv0rdL@wuerfel> <54AAEEE1.7020607@ti.com>
+Message-ID: <1671700.LL29F8Iz6R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7791 parts of the CAN0/1 device nodes.
+On Monday 05 January 2015 15:06:57 Murali Karicheri wrote:
+> On 01/03/2015 04:37 PM, Arnd Bergmann wrote:
+> > Yes, but we also need to pass a PCI device specific identifier along
+> > with the root bus node, because some iommu drivers take the PCI
+> > bus/device/function number into account for creating per-function
+> > i/o page tables.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ...
 
----
-Changes in version 5:
-- fixed whitespace errors/warnings given by checkpatch.pl;
-- added Geert's ACK.
+> I will post v3 of the patch with what is agreed before in my response 
+> and I understand there is no additional change required based on this 
+> particular discussion about iommu. Right?
 
-Changes in version 4:
-- refreshed the patch.
+Actually regarding the bit I wrote above, it might be helpful to pass
+the PCI_DEVID() into both of_iommu_configure and of_dma_configure.
 
-Changes in version 3:
-- added 2 more CAN clocks along with "clock-names" property in the CAN0/1 device
-  nodes;
-- refreshed the patch.
+While this may or may not be sufficient, I think there is no question
+about it being needed for the ARM SMMU with PCI, so we may as well add
+it at the point when you touch the same lines already. In the platform
+bus case, just pass zero here.
 
-Changes in version 2:
-- fixed the "compatible" property in the CAN device nodes.
-
- arch/arm/boot/dts/r8a7791.dtsi |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -816,6 +816,26 @@
- 		};
- 	};
- 
-+	can0: can at e6e80000 {
-+		compatible = "renesas,can-r8a7791";
-+		reg = <0 0xe6e80000 0 0x1000>;
-+		interrupts = <0 186 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7791_CLK_RCAN0>,
-+			 <&cpg_clocks R8A7791_CLK_RCAN>, <&can_clk>;
-+		clock-names = "clkp1", "clkp2", "can_clk";
-+		status = "disabled";
-+	};
-+
-+	can1: can at e6e88000 {
-+		compatible = "renesas,can-r8a7791";
-+		reg = <0 0xe6e88000 0 0x1000>;
-+		interrupts = <0 187 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7791_CLK_RCAN1>,
-+			 <&cpg_clocks R8A7791_CLK_RCAN>, <&can_clk>;
-+		clock-names = "clkp1", "clkp2", "can_clk";
-+		status = "disabled";
-+	};
-+
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
+	Arnd
