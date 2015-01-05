@@ -1,134 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  5 Jan 2015 12:52:19 +0900
-Subject: [PATCH 1/5] PM / Domains: Add DT bindings for the R-Mobile System
- Controller
+Date: Mon,  5 Jan 2015 12:52:20 +0900
+Subject: [PATCH 2/5] ARM: shmobile: R-Mobile: Use
+ generic_pm_domain.attach_dev() for pm_clk setup
 In-Reply-To: <cover.1420429758.git.horms+renesas@verge.net.au>
 References: <cover.1420429758.git.horms+renesas@verge.net.au>
-Message-ID: <8f11ca0e0355dc8cdae31a71e06d628e0e95f588.1420429758.git.horms+renesas@verge.net.au>
+Message-ID: <280410aaf0aacc8445d06399f8b4ce72cef9639f.1420429758.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The Renesas R-Mobile System Controller provides a.o. power management
-support, following the generic PM domain bindings in
-Documentation/devicetree/bindings/power/power_domain.txt.
-
-For now this supports the R-Mobile A1 (r8a7740) only, but it should be
-sufficiently generic to handle other members of the SH-Mobile/R-Mobile
-family in the future.
+Use the just introduced genpd attach/detach callbacks to register the
+devices' module clocks, instead of doing it directly, to make it
+DT-proof.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../bindings/power/renesas,sysc-rmobile.txt        | 98 ++++++++++++++++++++++
- 1 file changed, 98 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
+ arch/arm/mach-shmobile/pm-rmobile.c | 34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-new file mode 100644
-index 0000000..2460476
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-@@ -0,0 +1,98 @@
-+DT bindings for the Renesas R-Mobile System Controller
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index 6f7d56e..4ea458d 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -101,6 +101,36 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
+ 	return true;
+ }
+ 
++static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
++				 struct device *dev)
++{
++	int error;
 +
-+== System Controller Node ==
++	error = pm_clk_create(dev);
++	if (error) {
++		dev_err(dev, "pm_clk_create failed %d\n", error);
++		return error;
++	}
 +
-+The R-Mobile System Controller provides the following functions:
-+  - Boot mode management,
-+  - Reset generation,
-+  - Power management.
++	error = pm_clk_add(dev, NULL);
++	if (error) {
++		dev_err(dev, "pm_clk_add failed %d\n", error);
++		goto fail;
++	}
 +
-+Required properties:
-+- compatible: Should be "renesas,sysc-<soctype>", "renesas,sysc-rmobile" as
-+	      fallback.
-+	      Examples with soctypes are:
-+		- "renesas,sysc-r8a7740" (R-Mobile A1)
-+- reg: Two address start and address range blocks for the device:
-+         - The first block refers to the normally accessible registers,
-+         - the second block refers to the registers protected by the HPB
-+	   semaphore.
++	return 0;
 +
-+Optional nodes:
-+- pm-domains: This node contains a hierarchy of PM domain nodes, which should
-+  match the Power Area Hierarchy in the Power Domain Specifications section of
-+  the device's datasheet.
++fail:
++	pm_clk_destroy(dev);
++	return error;
++}
 +
++static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
++				  struct device *dev)
++{
++	pm_clk_destroy(dev);
++}
 +
-+== PM Domain Nodes ==
-+
-+Each of the PM domain nodes represents a PM domain, as documented by the
-+generic PM domain bindings in
-+Documentation/devicetree/bindings/power/power_domain.txt.
-+
-+The nodes should be named by the real power area names, and thus their names
-+should be unique.
-+
-+Required properties:
-+  - #power-domain-cells: Must be 0.
-+
-+Optional properties:
-+- reg: If the PM domain is not always-on, this property must contain the bit
-+       index number for the corresponding power area in the various Power
-+       Control and Status Registers. The parent's node must contain the
-+       following two properties:
-+	 - #address-cells: Must be 1,
-+	 - #size-cells: Must be 0.
-+       If the PM domain is always-on, this property must be omitted.
-+
-+
-+Example:
-+
-+This shows a subset of the r8a7740 PM domain hierarchy, containing the
-+C5 "always-on" domain, 2 of its subdomains (A4S and A4SU), and the A3SP domain,
-+which is a subdomain of A4S.
-+
-+	sysc: system-controller at e6180000 {
-+		compatible = "renesas,sysc-r8a7740", "renesas,sysc-rmobile";
-+		reg = <0xe6180000 0x8000>, <0xe6188000 0x8000>;
-+
-+		pm-domains {
-+			pd_c5: c5 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#power-domain-cells = <0>;
-+
-+				pd_a4s: a4s at 10 {
-+					reg = <10>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+
-+					pd_a3sp: a3sp at 11 {
-+						reg = <11>;
-+						#power-domain-cells = <0>;
-+					};
-+				};
-+
-+				pd_a4su: a4su at 20 {
-+					reg = <20>;
-+					#power-domain-cells = <0>;
-+				};
-+			};
-+		};
-+	};
-+
-+
-+== PM Domain Consumers ==
-+
-+Hardware blocks belonging to a PM domain should contain a "power-domains"
-+property that is a phandle pointing to the corresponding PM domain node.
-+
-+Example:
-+
-+	tpu: pwm at e6600000 {
-+		compatible = "renesas,tpu-r8a7740", "renesas,tpu";
-+		reg = <0xe6600000 0x100>;
-+		clocks = <&mstp3_clks R8A7740_CLK_TPU0>;
-+		power-domains = <&pd_a3sp>;
-+		#pwm-cells = <3>;
-+	};
+ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ {
+ 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
+@@ -111,6 +141,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+ 	genpd->power_off		= rmobile_pd_power_down;
+ 	genpd->power_on			= rmobile_pd_power_up;
++	genpd->attach_dev		= rmobile_pd_attach_dev;
++	genpd->detach_dev		= rmobile_pd_detach_dev;
+ 	__rmobile_pd_power_up(rmobile_pd, false);
+ }
+ 
+@@ -129,8 +161,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
+ 	struct device *dev = &pdev->dev;
+ 
+ 	__pm_genpd_name_add_device(domain_name, dev, td);
+-	if (pm_clk_no_clocks(dev))
+-		pm_clk_add(dev, NULL);
+ }
+ 
+ void rmobile_add_devices_to_domains(struct pm_domain_device data[],
 -- 
 2.1.3
