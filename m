@@ -1,148 +1,47 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 5 Jan 2015 17:41:57 -0400
-Subject: [PATCH] thermal: add omap3 support
-In-Reply-To: <20150103220219.GA26747@amd>
-References: <20150103111146.GB7065@amd> <20150103123426.GA26069@developer>
- <20150103220219.GA26747@amd>
-Message-ID: <20150105214155.GE31536@developer>
+Date: Mon, 5 Jan 2015 17:44:38 -0400
+Subject: [PATCH] MAINTAINERS: Add linux-omap to list of reviewers for TI
+ Thermal
+In-Reply-To: <1420312410-4469-1-git-send-email-nm@ti.com>
+References: <1420312410-4469-1-git-send-email-nm@ti.com>
+Message-ID: <20150105214436.GF31536@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 03, 2015 at 11:02:19PM +0100, Pavel Machek wrote:
-> Hi!
+On Sat, Jan 03, 2015 at 01:13:30PM -0600, Nishanth Menon wrote:
+> Add linux-omap mailing list to the TI THERMAL list for wider review.
 > 
-> > Thanks for sending your code.
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  MAINTAINERS |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> You are welcome.
-> 
-> > > Add support for omap3430 sensor. Tested on Nokia N900.
-> > 
-> > To my understanding, and as already mentioned by Nishanth Menon
-> > (currently TIer), TI has intentionally avoided adding this support.
-> 
-> Well, Nokia had similar code in their kernel.
-> 
-> > There is a hardware accuracy limitation in this sensor, and therefore it
-> > is not advisable to use it, specially in Dynamic Thermal Management,
-> > such as the thermal framework.
-> 
-> We are talking cellphone here. Yes, sensor may be inacurate (but it
-> seems to work pretty well; perhaps TI can point us to some docs that
-> explains the details?), but it provides useful information (mostly
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ddb9ac8..dc9efd5 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -9533,6 +9533,7 @@ F:	drivers/platform/x86/thinkpad_acpi.c
+>  TI BANDGAP AND THERMAL DRIVER
+>  M:	Eduardo Valentin <edubezval@gmail.com>
+>  L:	linux-pm at vger.kernel.org
+> +L:	linux-omap at vger.kernel.org
 
-sure! you should demand TI the proper data pointers.
+OK. I will queue this one.
 
-> room temperature). I don't think we'll ever run anywhere close to
-> thermal limits where inacuracy would matter. (Battery can't really
-> take > 60C. AFAICT CPU limit is 120C. Battery is close to the CPU.)
+>  S:	Supported
 
-Well, when the sensor's accuracy is +-15C and there is variance across
-the sample distribution, well, that means you are gonna see products
-behaving way different from each other, even if you are attempting to
-find a threshold to shutdown a device. 
+I will also change this to random fixes too..
 
-BTW, I am not a TIer anymore, and I don't have the exact data to provide
-you.
-
-> 
-> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > 
-> > > diff --git a/drivers/thermal/ti-soc-thermal/Kconfig b/drivers/thermal/ti-soc-thermal/Kconfig
-> > > index bd4c7be..a49495f 100644
-> > > --- a/drivers/thermal/ti-soc-thermal/Kconfig
-> > > +++ b/drivers/thermal/ti-soc-thermal/Kconfig
-> > > @@ -21,6 +21,15 @@ config TI_THERMAL
-> > >  	  This includes trip points definitions, extrapolation rules and
-> > >  	  CPU cooling device bindings.
-> > >  
-> > > +config OMAP3_THERMAL
-> > > +	bool "Texas Instruments OMAP3 thermal support"
-> > > +	depends on TI_SOC_THERMAL
-> > > +	depends on ARCH_OMAP3
-> > > +	help
-> > > +	  If you say yes here you get thermal support for the Texas Instruments
-> > > +	  OMAP3 SoC family. The current chip supported are:
-> > > +	   - OMAP3430
-> > 
-> > But if you insist :-), I believe the user deserves at least a fair
-> > message saying this is on his / her own risk.
-> 
-> Something like this?
-> 
->           If you say yes here you get thermal support for the Texas Instruments
-> 	  OMAP3 SoC family. The current chip supported are:
-> 	              - OMAP3430
-> 
->           OMAP3 chips normally don't need thermal management, and sensors in
-> 	  this generation are not very accurate, nor they are very close to
->           the important hotspots.
-
-I would be stronger and rephrase with s/very//g. 
-
-
-> 
->           Say 'N' here.
-> 	  
-> 
-> > > +static struct temp_sensor_registers
-> > > +omap34xx_mpu_temp_sensor_registers = {
-> > > +	.temp_sensor_ctrl = 0,
-> > > +	.bgap_tempsoff_mask = 0, /* Unused, we don't have POWER_SWITCH */
-> > > +	.bgap_soc_mask = BIT(8),
-> > > +	.bgap_eocz_mask = BIT(7),
-> > > +	.bgap_dtemp_mask = 0x7f,
-> > > +
-> > > +	.bgap_mode_ctrl = 0,
-> > > +	.mode_ctrl_mask = BIT(9),
-> > > +
-> > > +	.bgap_efuse = 0,
-> > 
-> > The 0'ed filed may be removed here.
-> 
-> Ok; I'll keep temp_sensors_ctrl / bgap_mode_ctrl, because it is actually used.
-> 
-> 
-> > > diff --git a/drivers/thermal/ti-soc-thermal/ti-bandgap.c b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> > > index 634b6ce..3b4e72f 100644
-> > > --- a/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> > > +++ b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> > > @@ -1509,6 +1531,12 @@ static SIMPLE_DEV_PM_OPS(ti_bandgap_dev_pm_ops, ti_bandgap_suspend,
-> > >  #endif
-> > >  
-> > >  static const struct of_device_id of_ti_bandgap_match[] = {
-> > > +#ifdef CONFIG_OMAP3_THERMAL
-> > > +	{
-> > > +		.compatible = "ti,omap34xx-bandgap",
-> > 
-> > This needs to be updated in the binding documentation.
-> > Documentation/devicetree/bindings/thermal/ti_soc_thermal.txt
-> 
-> Ok.
-> 
-> > > +		.data = (void *)&omap34xx_data,
-> > 
-> > 
-> > Having a run time message intentionally advising users of the risk of
-> > using this sensor is also required.
-> 
-> Ok, what about?
-> 
->     if (TI_BANDGAP_HAS(bgp, UNRELIABLE))
->               dev_warn(&pdev->dev,
->                          "OMAP3 thermal sensor is unreliable and normally unneccessary\n");
-> 
-
-works for me.
-
-> Will not fit in 80 columns, but keeping message on one line is more important.
-> 									Pavel
+>  F:	drivers/thermal/ti-soc-thermal/
+>  
 > -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 1.7.9.5
+> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/c19793a2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/d1a4be94/attachment-0001.sig>
