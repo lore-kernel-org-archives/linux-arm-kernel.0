@@ -1,26 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 5 Jan 2015 11:24:45 +0000
-Subject: [PATCH v4 4/8] efi: efistub: allow allocation alignment larger
- than EFI_PAGE_SIZE
-In-Reply-To: <20141229094732.GA16051@nazgul.tnic>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-5-git-send-email-ard.biesheuvel@linaro.org>
- <20141223164549.GB3810@pd.tnic>
- <CAKv+Gu_+scCHYuXccgsvn9THsbP24OfyjvjN9XtEVe4nMdQtig@mail.gmail.com>
- <20141229094732.GA16051@nazgul.tnic>
-Message-ID: <CAKv+Gu9dP7pXkquv3d-64SsX0HBTE0qt92=ktN0rXWp6kF=a1Q@mail.gmail.com>
+From: ideal.song@samsung.com (Inha Song)
+Date: Mon, 05 Jan 2015 20:25:14 +0900
+Subject: [alsa-devel] [PATCH 0/3] Sound support for Exynos4412 Trats2 board
+Message-ID: <1420457117-11030-1-git-send-email-ideal.song@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 December 2014 at 09:47, Borislav Petkov <bp@alien8.de> wrote:
-> On Mon, Dec 29, 2014 at 09:25:15AM +0000, Ard Biesheuvel wrote:
->> Do you have any comments regarding patches #3 and #6 in this series?
->
-> Sorry, have had no time so far to take a look. Holidays and all...
-> You're on the TODO list though :-)
->
+This patch-set adds basic sound support for the Trats2 boards.
+It just support primary I2s and external speaker playback.
 
-No worries, business has been slow for everyone, I'm sure.
+Inha Song (3):
+  ASoC: samsung: Add machine driver for Trats2
+  ASoC: samsung: Document Trats2 audio subsystem bindings
+  ARM: dts: Add sound nodes for exynos4412-trats2
 
-Regards,
-Ard.
+ .../bindings/sound/samsung,trats2-wm1811.txt       |  31 +++
+ arch/arm/boot/dts/exynos4412-trats2.dts            |  38 ++++
+ sound/soc/samsung/Kconfig                          |   8 +
+ sound/soc/samsung/Makefile                         |   2 +
+ sound/soc/samsung/trats2_wm1811.c                  | 216 +++++++++++++++++++++
+ 5 files changed, 295 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/samsung,trats2-wm1811.txt
+ create mode 100644 sound/soc/samsung/trats2_wm1811.c
+
+-- 
+2.0.0.390.gcb682f8
