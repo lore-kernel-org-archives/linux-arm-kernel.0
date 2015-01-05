@@ -1,233 +1,136 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  5 Jan 2015 13:06:44 +0100
-Subject: [PATCH 7/8] clocksource: atmel-st: use syscon/regmap
-In-Reply-To: <1420459605-24561-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420459605-24561-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1420459605-24561-8-git-send-email-alexandre.belloni@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Jan 2015 12:11:36 +0000
+Subject: [PATCH] Revert 9fc2105aeaaf56b0cf75296a84702d0f9e64437b to fix
+ pyaudio (and probably more)
+In-Reply-To: <alpine.LFD.2.11.1501042343240.18844@knanqh.ubzr>
+References: <20150104190123.GA20153@amd>
+ <alpine.LFD.2.11.1501041438130.18844@knanqh.ubzr>
+ <20150104201026.GA23427@amd>
+ <alpine.LFD.2.11.1501041512440.18844@knanqh.ubzr>
+ <20150104203724.GA16372@amd>
+ <alpine.LFD.2.11.1501041547050.18844@knanqh.ubzr>
+ <CA+55aFy5yB2d-1iXEUtU+puua4TAmV0kZF_7TBhXO1Y4Khqb9Q@mail.gmail.com>
+ <alpine.LFD.2.11.1501041609290.18844@knanqh.ubzr>
+ <20150104212659.GC12302@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501042343240.18844@knanqh.ubzr>
+Message-ID: <20150105121126.GA10116@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register range from the system timer is also used by the watchdog driver.
-Use a regmap to handle concurrent accesses.
+Hi all,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clocksource/timer-atmel-st.c | 103 +++++++++++++----------------------
- 1 file changed, 39 insertions(+), 64 deletions(-)
+Sorry for the late reply, it seems that neither myself or the
+arm-linux-kernel list were on CC for this thread.
 
-diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-index ed0267f1c892..0a089b9fc3d2 100644
---- a/drivers/clocksource/timer-atmel-st.c
-+++ b/drivers/clocksource/timer-atmel-st.c
-@@ -24,20 +24,20 @@
- #include <linux/irq.h>
- #include <linux/clockchips.h>
- #include <linux/export.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
-+#include <linux/mfd/atmel-st.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of_irq.h>
-+#include <linux/regmap.h>
- 
- #include <asm/mach/time.h>
- #include <asm/system_misc.h>
- 
--#include <mach/at91_st.h>
--#include <mach/hardware.h>
--
- static unsigned long last_crtr;
- static u32 irqmask;
- static struct clock_event_device clkevt;
-+static struct regmap *regmap_st;
- 
-+#define AT91_SLOW_CLOCK		32768 /* DT compatibility */
- #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
- 
- /*
-@@ -47,11 +47,11 @@ static struct clock_event_device clkevt;
-  */
- static inline unsigned long read_CRTR(void)
- {
--	unsigned long x1, x2;
-+	unsigned int x1, x2;
- 
--	x1 = at91_st_read(AT91_ST_CRTR);
-+	regmap_read(regmap_st, AT91_ST_CRTR, &x1);
- 	do {
--		x2 = at91_st_read(AT91_ST_CRTR);
-+		regmap_read(regmap_st, AT91_ST_CRTR, &x2);
- 		if (x1 == x2)
- 			break;
- 		x1 = x2;
-@@ -64,7 +64,10 @@ static inline unsigned long read_CRTR(void)
-  */
- static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
- {
--	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
-+	u32 sr;
-+
-+	regmap_read(regmap_st, AT91_ST_SR, &sr);
-+	sr &= irqmask;
- 
- 	/*
- 	 * irqs should be disabled here, but as the irq is shared they are only
-@@ -97,7 +100,7 @@ static struct irqaction at91rm9200_timer_irq = {
- 	.name		= "at91_tick",
- 	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
- 	.handler	= at91rm9200_timer_interrupt,
--	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
-+	.irq		= 0,
- };
- 
- static cycle_t read_clk32k(struct clocksource *cs)
-@@ -116,23 +119,25 @@ static struct clocksource clk32k = {
- static void
- clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- {
-+	unsigned int val;
-+
- 	/* Disable and flush pending timer interrupts */
--	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
--	at91_st_read(AT91_ST_SR);
-+	regmap_write(regmap_st, AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
-+	regmap_read(regmap_st, AT91_ST_SR, &val);
- 
- 	last_crtr = read_CRTR();
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		/* PIT for periodic irqs; fixed rate of 1/HZ */
- 		irqmask = AT91_ST_PITS;
--		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
-+		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
- 		break;
- 	case CLOCK_EVT_MODE_ONESHOT:
- 		/* ALM for oneshot irqs, set by next_event()
- 		 * before 32 seconds have passed
- 		 */
- 		irqmask = AT91_ST_ALMS;
--		at91_st_write(AT91_ST_RTAR, last_crtr);
-+		regmap_write(regmap_st, AT91_ST_RTAR, last_crtr);
- 		break;
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	case CLOCK_EVT_MODE_UNUSED:
-@@ -140,7 +145,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
- 		irqmask = 0;
- 		break;
- 	}
--	at91_st_write(AT91_ST_IER, irqmask);
-+	regmap_write(regmap_st, AT91_ST_IER, irqmask);
- }
- 
- static int
-@@ -148,6 +153,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
- {
- 	u32		alm;
- 	int		status = 0;
-+	unsigned int	val;
- 
- 	BUG_ON(delta < 2);
- 
-@@ -163,12 +169,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
- 	alm = read_CRTR();
- 
- 	/* Cancel any pending alarm; flush any pending IRQ */
--	at91_st_write(AT91_ST_RTAR, alm);
--	at91_st_read(AT91_ST_SR);
-+	regmap_write(regmap_st, AT91_ST_RTAR, alm);
-+	regmap_read(regmap_st, AT91_ST_SR, &val);
- 
- 	/* Schedule alarm by writing RTAR. */
- 	alm += delta;
--	at91_st_write(AT91_ST_RTAR, alm);
-+	regmap_write(regmap_st, AT91_ST_RTAR, alm);
- 
- 	return status;
- }
-@@ -186,47 +192,8 @@ static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
- 	/*
- 	 * Perform a hardware reset with the use of the Watchdog timer.
- 	 */
--	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
--	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
--}
--
--void __iomem *at91_st_base;
--EXPORT_SYMBOL_GPL(at91_st_base);
--
--static struct of_device_id at91rm9200_st_timer_ids[] = {
--	{ .compatible = "atmel,at91rm9200-st" },
--	{ /* sentinel */ }
--};
--
--static int __init of_at91rm9200_st_init(void)
--{
--	struct device_node *np;
--	int ret;
--
--	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
--	if (!np)
--		goto err;
--
--	at91_st_base = of_iomap(np, 0);
--	if (!at91_st_base)
--		goto node_err;
--
--	/* Get the interrupts property */
--	ret = irq_of_parse_and_map(np, 0);
--	if (!ret)
--		goto ioremap_err;
--	at91rm9200_timer_irq.irq = ret;
--
--	of_node_put(np);
--
--	return 0;
--
--ioremap_err:
--	iounmap(at91_st_base);
--node_err:
--	of_node_put(np);
--err:
--	return -EINVAL;
-+	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-+	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
- }
- 
- /*
-@@ -234,13 +201,21 @@ err:
-  */
- static void __init atmel_st_timer_init(struct device_node *node)
- {
--	/* For device tree enabled device: initialize here */
--	of_at91rm9200_st_init();
-+	unsigned int val;
-+
-+	regmap_st = syscon_node_to_regmap(node);
-+	if (IS_ERR(regmap_st))
-+		panic(pr_fmt("Unable to get regmap\n"));
- 
- 	/* Disable all timer interrupts, and clear any pending ones */
--	at91_st_write(AT91_ST_IDR,
-+	regmap_write(regmap_st, AT91_ST_IDR,
- 		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
--	at91_st_read(AT91_ST_SR);
-+	regmap_read(regmap_st, AT91_ST_SR, &val);
-+
-+	/* Get the interrupts property */
-+	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
-+	if (!at91rm9200_timer_irq.irq)
-+		panic(pr_fmt("Unable to get IRQ from DT\n"));
- 
- 	/* Make IRQs happen for the system timer */
- 	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
-@@ -249,7 +224,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
- 	 * directly for the clocksource and all clockevents, after adjusting
- 	 * its prescaler from the 1 Hz default.
- 	 */
--	at91_st_write(AT91_ST_RTMR, 1);
-+	regmap_write(regmap_st, AT91_ST_RTMR, 1);
- 
- 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
- 	clkevt.cpumask = cpumask_of(0);
--- 
-2.1.0
+On Mon, Jan 05, 2015 at 04:51:31AM +0000, Nicolas Pitre wrote:
+> On Sun, 4 Jan 2015, Russell King - ARM Linux wrote:
+> > I encourage you *not* to back down like this.  Linus is right in so far
+> > as the regressions issue, but he is *totally* wrong to do the revert,
+> > which IMHO has been done out of nothing more than spite.
+> > 
+> > Either *with or without* the revert, the issue still remains, and needs
+> > to be addressed properly.
+> > 
+> > With the revert in place, we now have insanely small bogomips values
+> > reported via /proc/cpuinfo when hardware timers are used.  That needs
+> > fixing.
+> 
+> Here's my take on it.  Taking a step back, it was stupid to mix bogomips 
+> with timer based delays.
+
+Well, bogomips is directly related to loops_per_jiffy so I don't think the
+mechanism is "stupid"; the issue is that userspace makes assumptions
+(bogus or otherwise) about the relation of bogomips to cpu frequency which
+have historically been good enough. More below...
+
+> ----- >8
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date: Sun, 4 Jan 2015 22:28:58 -0500
+> Subject: [PATCH] ARM: disentangle timer based delays and bogomips calibration
+> 
+> The bogomips value is a pseudo CPU speed value originally used to calibrate
+> loop-based small delays.  It is also exported to user space through the
+> /proc filesystem and some user space apps started relying on it.
+> 
+> Modern hardware can vary their CPU clock at run time making the bogomips
+> value less reliable for delay purposes. With the advent of high resolution
+> timers, small delays migrated to timer polling loops instead.  Strangely
+> enough, the bogomips value calibration became timer based too, making it
+> way more bogus than it already was as a CPU speed representation and people
+> using it via /proc/cpuinfo started complaining.
+
+As you pointed out previously, these complaints were what prompted us to
+revisit the bogomips reporting. The class of application using the value
+was very much things like "How fast is my AwesomePhone-9000?":
+
+  https://play.google.com/store/apps/details?id=com.securiteinfo.android.bogomips&hl=en_GB
+  https://bugs.launchpad.net/ubuntu/+source/byobu/+bug/675442
+
+so actually, having *these* applications either exit early with an
+"unable to calculate CPU frequency" message or print something like "CPU
+freq: unknown" is arguably the right thing to do. What Pavel is now
+reporting is different; some useful piece of software has lost core
+functionality.
+
+Now, even with the loop-based bogomips values we have the following
+(user-visible) problems:
+
+  (1) It's not portable between microarchitectures (for example, some
+      CPUs can give you double the value if they predict the backwards
+      branch in the calibration loop)
+
+  (2) It's not reliable in the face of frequency scaling
+
+  (3) It's not reliable in the face of heterogeneous systems (big.LITTLE)
+
+  (4) The lpj calculation is susceptible to overflow, limiting the maximum
+      delay value depending on the CPU performance
+
+Essentially, the value is only really useful on relatively low-clocked,
+in-order, uniprocessor systems (like the one where Pavel reported the bug).
+
+> Since it was wrong for user space to rely on a "bogus" mips value to start
+> with, the initial responce from kernel people was to remove it.  This broke
+> user space even more as some applications then refused to run altogether.
+> The bogomips export was therefore reinstated in commit 4bf9636c39 ("Revert
+> 'ARM: 7830/1: delay: don't bother reporting bogomips in /proc/cpuinfo'").
+
+Actually, our initial response was to report a dummy value iirc. I remember
+even making it selectable in kconfig, but it bordered on the absurd. It's
+worth noting that, with the current revert in place, the value reported
+is now basically selectable via the "clock-frequency" property on the
+arch_timer node for systems using the timer implementation.
+
+> Because the reported bogomips is orders of magnitude away from the
+> traditionally expected value for a given CPU when timer based delays are
+> in use, and because lumping bogomips and timer based delay loops is rather
+> senseless anyway, let's calibrate bogomips using a CPU loop all the time
+> even when timer based delays are available.  Timer based delays don't
+> need any calibration and /proc/cpuinfo will provide somewhat sensible
+> values again.
+> 
+> In practice, calls to __delay() will now always use the CPU based loop.
+> Things remain unchanged for udelay() and its derivatives.
+
+Given that we have a hard limit of 3355 bogomips in our calibration code,
+could we not just report that instead? We already have all of the issues I
+highlighted above and the systems that are going to be hit by this are the
+more recent (more performant) cores that will be approaching this maximum
+value anyway.
+
+We also need something we can port to the arm64 compat layer, so a constant
+would be easier there too, doesn't require the calibration delay at boot
+and doesn't break __delay.
+
+One thing we're missing from all of this is what happens if Pavel's testcase
+is executed on a system using a timer-backed delay? If the program chokes
+on the next line anyway, then we could consider only advertising the
+bogomips line when the loop-based delay is in use.
+
+Pavel: do you have something we can run to observe the problem?
+
+Finally, the revert doesn't have a Cc stable tag which is probably needed
+if it's going to land in 3.19 final, irrespective of whether we agree that
+it's the right way forward.
+
+Will
