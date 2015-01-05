@@ -1,47 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 5 Jan 2015 21:52:27 +0100
-Subject: [RFC] ACPI on arm64 TODO List
-In-Reply-To: <548F9668.6080900@linaro.org>
-References: <548F9668.6080900@linaro.org>
-Message-ID: <20150105205227.GA24657@amd>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 05 Jan 2015 22:59:15 +0200
+Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add Audio DMAC,
+ PWM and Thermal clocks to device tree
+In-Reply-To: <CAMuHMdXcVrSXd2YzKVQKBFyTwkrOhci0MGs8uA1yk+kX9LDQkg@mail.gmail.com>
+References: <1418949573-24211-1-git-send-email-horms+renesas@verge.net.au>
+ <8183635.VD1oYub01I@avalon>
+ <CAMuHMdXcVrSXd2YzKVQKBFyTwkrOhci0MGs8uA1yk+kX9LDQkg@mail.gmail.com>
+Message-ID: <12485196.TRR13KWPuE@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Geert,
 
-> Back in September 2014, a meeting was held at Linaro Connect where we
-> discussed what issues remained before the arm64 ACPI core patches could
-> be merged into the kernel, creating the TODO list below.  I should have
-> published this list sooner; I got focused on trying to resolve some of
-> the issues instead.
+On Monday 05 January 2015 09:52:37 Geert Uytterhoeven wrote:
+> On Mon, Jan 5, 2015 at 9:30 AM, Laurent Pinchart wrote:
+> > On Friday 19 December 2014 09:39:33 Simon Horman wrote:
+> >> This is based on the MSTP5 clocks in the r8a7791 device tree.
+> >> The main difference being that the r8a7794 does not have an Audio DMAC1
+> >> clock.
+> >> 
+> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >> 
+> >> ---
+> >> Based on the renesas-devel-20141217-v3.18 tag of my renesas tree.
+> >> 
+> >> N.B: The R-Car Gen2 v1.8.0 BSP uses zs_clk whereas this patch uses hp_clk
+> >>      as the parent clock for the Audio DMAC clock.
+> >>      
+> >>      In that regard this patch follows the pattern used in mainline for
+> >>      the r8a7790 and r8a7791 SoCs.
+> >>      
+> >>      The BSP's parent clock is consistent for the r8a7790, r8a7791,
+> >>      r8a7793 and r8a7794 SoCs.
+> > 
+> > Does this mean the BSP uses hp_clk for all Gen2 SoCs while mainline uses
+> > zs_clk ?
 > 
-> We have made some progress on all of these items.  But, I want to make
-> sure we haven't missed something.  Since this list was compiled by only
-> the people in the room at Connect, it is probable we have.  I, for one,
-> do not yet claim omniscience.
+> No, it's the other way around ;-)
+
+Sorry, that's what I meant.
+
+> > Can't we find out which one is correct ?
 > 
-> So, I want to ask the ARM and ACPI communities:
-> 
->   -- Is this list correct?
-> 
->   -- Is this list complete?
+> Which clock is used doesn't seem to be documented.
+> So either we have to check with the hardware guys, or measure the clock
+> in some way, either by hardware or software (e.g. what's the maximum
+> transfer rate that works?).
 
-I'm not sure this is how kernel development works. Expect new issues
-to be raised as patches are being reviewed.
+Given the parent clock frequencies (130 MHz and 260 MHz) and the audio rates, 
+I'm not sure any useful measurement could be performed.
 
-> 7. Why is ACPI required?
->    * Problem:
->      * arm64 maintainers still haven't been convinced that ACPI is
->        necessary.
->      * Why do hardware and OS vendors say ACPI is required?
->    * Status: Al & Grant collecting statements from OEMs to be posted
->      publicly early in the new year; firmware summit for broader
->      discussion planned.
-
-This should be #1 really, right? I still hope the answer is "ACPI not
-needed".
-
-								Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards,
+
+Laurent Pinchart
