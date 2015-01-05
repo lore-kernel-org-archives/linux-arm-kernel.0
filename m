@@ -1,21 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jan 2015 08:21:12 -0800
-Subject: [PATCH v11 1/9] ARM: OMAP2+: use common l2cache initialization
- code
-In-Reply-To: <1420460348-20302-2-git-send-email-m.szyprowski@samsung.com>
+Date: Mon, 5 Jan 2015 08:22:14 -0800
+Subject: [PATCH v11 2/9] ARM: l2c: use l2c_write_sec() for restoring
+ latency and filter regs
+In-Reply-To: <1420460348-20302-3-git-send-email-m.szyprowski@samsung.com>
 References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
- <1420460348-20302-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20150105162111.GA4081@atomide.com>
+ <1420460348-20302-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20150105162214.GB4081@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Marek Szyprowski <m.szyprowski@samsung.com> [150105 04:22]:
-> This patch implements generic DT L2C initialisation (the one from
-> init_IRQ in arch/arm/kernel/irq.c) for Omap4 and AM43 platforms and
-> kills the SoC specific stuff in arch/arm/mach-omap2/omap4-common.c.
+> All four register for latency and filter settings cannot be written in
+> non-secure mode and they should go through l2c_write_sec(). More on this
+> can be found in CoreLink Level 2 Cache Controller L2C-310 Technical
+> Reference Manual, 3.2. Register summary, table 3.1. This have been checked
+> the TRM for r3p3, but it should be uniform for all revisions.
 > 
+> Reported-by: Nishanth Menon <nm@ti.com>
+> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Seems to work just fine for me:
-
 Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  arch/arm/mm/cache-l2x0.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 5e65ca8dea62..0aeeaa95c42d 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -623,14 +623,14 @@ static void l2c310_resume(void)
+>  		unsigned revision;
+>  
+>  		/* restore pl310 setup */
+> -		writel_relaxed(l2x0_saved_regs.tag_latency,
+> -			       base + L310_TAG_LATENCY_CTRL);
+> -		writel_relaxed(l2x0_saved_regs.data_latency,
+> -			       base + L310_DATA_LATENCY_CTRL);
+> -		writel_relaxed(l2x0_saved_regs.filter_end,
+> -			       base + L310_ADDR_FILTER_END);
+> -		writel_relaxed(l2x0_saved_regs.filter_start,
+> -			       base + L310_ADDR_FILTER_START);
+> +		l2c_write_sec(l2x0_saved_regs.tag_latency, base,
+> +			      L310_TAG_LATENCY_CTRL);
+> +		l2c_write_sec(l2x0_saved_regs.data_latency, base,
+> +			      L310_DATA_LATENCY_CTRL);
+> +		l2c_write_sec(l2x0_saved_regs.filter_end, base,
+> +			      L310_ADDR_FILTER_END);
+> +		l2c_write_sec(l2x0_saved_regs.filter_start, base,
+> +			      L310_ADDR_FILTER_START);
+>  
+>  		revision = readl_relaxed(base + L2X0_CACHE_ID) &
+>  				L2X0_CACHE_ID_RTL_MASK;
+> -- 
+> 1.9.2
+> 
