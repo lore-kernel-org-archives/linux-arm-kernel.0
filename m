@@ -1,74 +1,41 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon,  5 Jan 2015 18:33:54 +0000
-Subject: [PATCH 1/2] arm64: don't make early_*map() calls post paging_init()
-In-Reply-To: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
-References: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1420482835-6444-2-git-send-email-leif.lindholm@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Jan 2015 11:17:45 -0800
+Subject: [PATCH] ARM: omap2plus_defconfig: use CONFIG_CPUFREQ_DT
+In-Reply-To: <CAMuHMdW4CQz_n8b4-JOogDvc6ggBjWrFWcqr4Tezojj+mJD6pw@mail.gmail.com>
+References: <1418404738-19124-1-git-send-email-nm@ti.com>
+ <CAMuHMdW4CQz_n8b4-JOogDvc6ggBjWrFWcqr4Tezojj+mJD6pw@mail.gmail.com>
+Message-ID: <20150105191745.GI4081@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 early_ioremap/iounmap/memremap/memunmap are not supported beyond
-the call to paging_init(), but arm64_enter_virtual_mode() (an early
-initcall) makes one call to unmap the UEFI memory map.
+* Geert Uytterhoeven <geert@linux-m68k.org> [141215 02:44]:
+> On Fri, Dec 12, 2014 at 6:18 PM, Nishanth Menon <nm@ti.com> wrote:
+> > CONFIG_GENERIC_CPUFREQ_CPU0 disappeared with commit bbcf071969b20f
+> > ("cpufreq: cpu0: rename driver and internals to 'cpufreq_dt'")
+> >
+> > Use the renamed CONFIG_CPUFREQ_DT generic driver. It looks like with
+> > v3.18-rc1, commit bbcf071969b20f and fdc509b15eb3eb came in via
+> > different trees causing the resultant v3.18-rc1 to be non-functional for
+> > cpufreq as default supported with omap2plus_defconfig.
+> >
+> > Fixes: fdc509b15eb3eb ("ARM: omap2plus_defconfig: Add cpufreq to defconfig")
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> >
+> > NOTE: as of v3.18 tag, The following still need to be fixed - I do not have all
+> > the platforms impacted to make a generic change, so CCying folks who might be interested
+> >
+> > arch/arm/configs/shmobile_defconfig:CONFIG_GENERIC_CPUFREQ_CPU0=y
+> 
+> Thanks!
+> 
+> FTR: this has been fixed in Simon's defconfig-for-v3.20 branch.
+> 
+> > arch/arm/configs/multi_v7_defconfig:CONFIG_GENERIC_CPUFREQ_CPU0=y
 
-Rearrange the code to unmap this region before paging_init().
+Oops looks like this is still missing from omap2plus_defconfig, so
+applying into omap-for-v3.19/fixes.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- arch/arm64/kernel/efi.c   | 12 +++---------
- arch/arm64/kernel/setup.c |  2 --
- 2 files changed, 3 insertions(+), 11 deletions(-)
+Regards,
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 6fac253..790adb5 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -317,15 +317,8 @@ void __init efi_init(void)
- 		return;
- 
- 	reserve_regions();
--}
--
--void __init efi_idmap_init(void)
--{
--	if (!efi_enabled(EFI_BOOT))
--		return;
- 
--	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
--	efi_setup_idmap();
-+	early_memunmap(memmap.map, params.mmap_size);
- }
- 
- static int __init remap_region(efi_memory_desc_t *md, void **new)
-@@ -380,7 +373,6 @@ static int __init arm64_enter_virtual_mode(void)
- 	}
- 
- 	mapsize = memmap.map_end - memmap.map;
--	early_memunmap(memmap.map, mapsize);
- 
- 	if (efi_runtime_disabled()) {
- 		pr_info("EFI runtime services will be disabled.\n");
-@@ -393,6 +385,8 @@ static int __init arm64_enter_virtual_mode(void)
- 						   mapsize);
- 	memmap.map_end = memmap.map + mapsize;
- 
-+	efi_setup_idmap();
-+
- 	efi.memmap = &memmap;
- 
- 	/* Map the runtime regions */
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index b809911..c7eb3c5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -401,8 +401,6 @@ void __init setup_arch(char **cmdline_p)
- 	paging_init();
- 	request_standard_resources();
- 
--	efi_idmap_init();
--
- 	unflatten_device_tree();
- 
- 	psci_init();
--- 
-2.1.3
+Tony
