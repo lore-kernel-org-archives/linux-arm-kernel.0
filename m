@@ -1,75 +1,238 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 05 Jan 2015 16:59:44 +0800
-Subject: [PATCH v6 14/17] ARM64 / ACPI: Parse GTDT to initialize arch timer
-In-Reply-To: <D0CF9C94.CD69%suravee.suthikulpanit@amd.com>
-References: <D0CF9C94.CD69%suravee.suthikulpanit@amd.com>
-Message-ID: <54AA5280.3050802@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 05 Jan 2015 09:05:06 +0000
+Subject: [PATCH v3] irqchip: gic: Allow interrupt level to be set for PPIs.
+In-Reply-To: <1417437909-20923-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1417437909-20923-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <54AA53C2.9040903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?05? 15:55, Suthikulpanit, Suravee wrote:
-> On 1/4/15, 04:55, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
->
->> Using the information presented by GTDT to initialize the arch
->> timer (not memory-mapped).
->>
->> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->> arch/arm64/kernel/time.c             |   7 ++
->> drivers/clocksource/arm_arch_timer.c | 132
->> ++++++++++++++++++++++++++++-------
->> include/linux/clocksource.h          |   6 ++
->> 3 files changed, 118 insertions(+), 27 deletions(-)
-[...]
->> +static void __init arch_timer_of_init(struct device_node *np)
->> +{
->> +	int i;
->> +
->> +	if (arch_timers_present & ARCH_CP15_TIMER) {
->> +		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
->> +		return;
->> +	}
->> +
->> +	arch_timers_present |= ARCH_CP15_TIMER;
->> +	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
->> +		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
->> +
->> +	arch_timer_detect_rate(NULL, np);
->> +
->> +	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
->> +
->> +	/*
->> +	 * If we cannot rely on firmware initializing the timer registers then
->> +	 * we should use the physical timers instead.
->> +	 */
->> +	if (IS_ENABLED(CONFIG_ARM) &&
->> +	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
->> +			arch_timer_use_virtual = false;
->> +
->> +	arch_timer_init();
->> +}
->> +CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer",
->> arch_timer_of_init);
->> +CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer",
->> arch_timer_of_init);
->
-> Hanjun,
->
-> FYI, it seems that the tree that you have rebased the patch series has an
-> issue determining clocksource in ARM64 introduced by this commit.
->
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0
-> b46b8a718c6e90910a1b1b0fe797be3c167e186
->
-> Here is the fix from Catalin that already went upstream:
->
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drive
-> rs/clocksource/arm_arch_timer.c?id=d6ad36913083d683aad4e02e53580c995f1a6ede
+Hi Liviu,
 
-This bug fix patch was merged in Dec 30 by Linus, which is the date
-after 3.19-rc2 released :)
+On 01/12/14 12:45, Liviu Dudau wrote:
+> During a recent cleanup of the arm64 DTs it has become clear that
+> the handling of PPIs in xxxx_set_type() is incorrect. The ARM TRMs
+> for GICv2 and later allow for "implementation defined" support for
+> setting the edge or level type of the PPI interrupts and don't restrict
+> the activation level of the signal. Current ARM implementations
+> do restrict the PPI level type to IRQ_TYPE_LEVEL_LOW, but licensees
+> of the IP can decide to shoot themselves in the foot at any time.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+> 
+> Made a stupid mistake in v2 and got my bit test confused with logical test.
+> 
+>  Documentation/devicetree/bindings/arm/gic.txt |  8 ++++++--
+>  drivers/irqchip/irq-gic-common.c              | 21 +++++++++++++--------
+>  drivers/irqchip/irq-gic-common.h              |  2 +-
+>  drivers/irqchip/irq-gic-v3.c                  |  8 ++++----
+>  drivers/irqchip/irq-gic.c                     |  9 ++++++---
+>  drivers/irqchip/irq-hip04.c                   |  9 ++++++---
+>  6 files changed, 36 insertions(+), 21 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 8112d0c..c97484b 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -32,12 +32,16 @@ Main node required properties:
+>    The 3rd cell is the flags, encoded as follows:
+>  	bits[3:0] trigger type and level flags.
+>  		1 = low-to-high edge triggered
+> -		2 = high-to-low edge triggered
+> +		2 = high-to-low edge triggered (invalid for SPIs)
+>  		4 = active high level-sensitive
+> -		8 = active low level-sensitive
+> +		8 = active low level-sensitive (invalid for SPIs).
+>  	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
+>  	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
+>  	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
+> +	Also note that the configurability of PPI interrupts is IMPLEMENTATION
+> +	DEFINED and as such not guaranteed to be present (most SoC available
+> +	in 2014 seem to ignore the setting of this flag and use the hardware
+> +	default value).
+>  
+>  - reg : Specifies base physical address(s) and size of the GIC registers. The
+>    first region is the GIC distributor register base and size. The 2nd region is
+> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+> index 61541ff..ffee521 100644
+> --- a/drivers/irqchip/irq-gic-common.c
+> +++ b/drivers/irqchip/irq-gic-common.c
+> @@ -21,7 +21,7 @@
+>  
+>  #include "irq-gic-common.h"
+>  
+> -void gic_configure_irq(unsigned int irq, unsigned int type,
+> +int gic_configure_irq(unsigned int irq, unsigned int type,
+>  		       void __iomem *base, void (*sync_access)(void))
+>  {
+>  	u32 enablemask = 1 << (irq % 32);
+> @@ -29,16 +29,17 @@ void gic_configure_irq(unsigned int irq, unsigned int type,
+>  	u32 confmask = 0x2 << ((irq % 16) * 2);
+>  	u32 confoff = (irq / 16) * 4;
+>  	bool enabled = false;
+> -	u32 val;
+> +	u32 val, oldval;
+> +	int ret = 0;
+>  
+>  	/*
+>  	 * Read current configuration register, and insert the config
+>  	 * for "irq", depending on "type".
+>  	 */
+> -	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+> -	if (type == IRQ_TYPE_LEVEL_HIGH)
+> +	val = oldval = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+> +	if (type & IRQ_TYPE_LEVEL_MASK)
+>  		val &= ~confmask;
+> -	else if (type == IRQ_TYPE_EDGE_RISING)
+> +	else if (type & IRQ_TYPE_EDGE_BOTH)
+>  		val |= confmask;
+>  
+>  	/*
+> @@ -54,15 +55,19 @@ void gic_configure_irq(unsigned int irq, unsigned int type,
+>  
+>  	/*
+>  	 * Write back the new configuration, and possibly re-enable
+> -	 * the interrupt.
+> +	 * the interrupt. If we tried to write a new configuration and failed,
+> +	 * return an error.
+>  	 */
+>  	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
+> -
+> -	if (enabled)
+> +	if (readl_relaxed(base + GIC_DIST_CONFIG + confoff) != val && val != oldval)
+> +		ret = -EINVAL;
+> +	else if (enabled)
+>  		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
 
-Thanks
-Hanjun
+So if you change the configuration of an enabled interrupt and fail to
+do so, you end-up with the interrupt disabled. This is a change in
+behaviour, and is likely to introduce regressions.
+
+>  
+>  	if (sync_access)
+>  		sync_access();
+> +
+> +	return ret;
+>  }
+>  
+>  void __init gic_dist_config(void __iomem *base, int gic_irqs,
+> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+> index b41f024..35a9884 100644
+> --- a/drivers/irqchip/irq-gic-common.h
+> +++ b/drivers/irqchip/irq-gic-common.h
+> @@ -20,7 +20,7 @@
+>  #include <linux/of.h>
+>  #include <linux/irqdomain.h>
+>  
+> -void gic_configure_irq(unsigned int irq, unsigned int type,
+> +int gic_configure_irq(unsigned int irq, unsigned int type,
+>                         void __iomem *base, void (*sync_access)(void));
+>  void gic_dist_config(void __iomem *base, int gic_irqs,
+>  		     void (*sync_access)(void));
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 1a146cc..6e50803 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -238,7 +238,9 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>  	if (irq < 16)
+>  		return -EINVAL;
+>  
+> -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+> +	/* SPIs have restrictions on the supported types */
+> +	if (irq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+> +			 type != IRQ_TYPE_EDGE_RISING)
+>  		return -EINVAL;
+>  
+>  	if (gic_irq_in_rdist(d)) {
+> @@ -249,9 +251,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>  		rwp_wait = gic_dist_wait_for_rwp;
+>  	}
+>  
+> -	gic_configure_irq(irq, type, base, rwp_wait);
+> -
+> -	return 0;
+> +	return gic_configure_irq(irq, type, base, rwp_wait);
+>  }
+>  
+>  static u64 gic_mpidr_to_affinity(u64 mpidr)
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d617ee5..4634cf7 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -188,12 +188,15 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>  {
+>  	void __iomem *base = gic_dist_base(d);
+>  	unsigned int gicirq = gic_irq(d);
+> +	int ret;
+>  
+>  	/* Interrupt configuration for SGIs can't be changed */
+>  	if (gicirq < 16)
+>  		return -EINVAL;
+>  
+> -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+> +	/* SPIs have restrictions on the supported types */
+> +	if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+> +			    type != IRQ_TYPE_EDGE_RISING)
+>  		return -EINVAL;
+>  
+>  	raw_spin_lock(&irq_controller_lock);
+> @@ -201,11 +204,11 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>  	if (gic_arch_extn.irq_set_type)
+>  		gic_arch_extn.irq_set_type(d, type);
+>  
+> -	gic_configure_irq(gicirq, type, base, NULL);
+> +	ret = gic_configure_irq(gicirq, type, base, NULL);
+>  
+>  	raw_spin_unlock(&irq_controller_lock);
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  
+>  static int gic_retrigger(struct irq_data *d)
+> diff --git a/drivers/irqchip/irq-hip04.c b/drivers/irqchip/irq-hip04.c
+> index 29b8f21..d059e66 100644
+> --- a/drivers/irqchip/irq-hip04.c
+> +++ b/drivers/irqchip/irq-hip04.c
+> @@ -120,21 +120,24 @@ static int hip04_irq_set_type(struct irq_data *d, unsigned int type)
+>  {
+>  	void __iomem *base = hip04_dist_base(d);
+>  	unsigned int irq = hip04_irq(d);
+> +	int ret;
+>  
+>  	/* Interrupt configuration for SGIs can't be changed */
+>  	if (irq < 16)
+>  		return -EINVAL;
+>  
+> -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+> +	/* SPIs have restrictions on the supported types */
+> +	if (irq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+> +			 type != IRQ_TYPE_EDGE_RISING)
+>  		return -EINVAL;
+>  
+>  	raw_spin_lock(&irq_controller_lock);
+>  
+> -	gic_configure_irq(irq, type, base, NULL);
+> +	ret = gic_configure_irq(irq, type, base, NULL);
+>  
+>  	raw_spin_unlock(&irq_controller_lock);
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  
+>  #ifdef CONFIG_SMP
+> 
+
+I have exactly zero knowledge about the hip04 controller, and despite it
+looking like a GIC, it is quite different from the real thing. I'd like
+to see confirmation from the HiSilicon guys that this is the right thing
+to do, and possibly this to be moved to a separate patch if that
+requires extra changes.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
