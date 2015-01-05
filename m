@@ -1,43 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Jan 2015 14:50:02 +0100
-Subject: [PATCH] ARM: dts: Fix missing usb0_reset for sun4i / sun5i
-In-Reply-To: <1419448758-22371-2-git-send-email-hdegoede@redhat.com>
-References: <1419448758-22371-1-git-send-email-hdegoede@redhat.com>
- <1419448758-22371-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150105135002.GB32429@lukather>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 5 Jan 2015 08:59:10 -0500
+Subject: [PATCH 2/2] ahci_xgene: Fix the dma state machine lockup for the
+ ATA_CMD_PACKET PIO mode command.
+In-Reply-To: <1418748575-27301-3-git-send-email-stripathi@apm.com>
+References: <1418748575-27301-1-git-send-email-stripathi@apm.com>
+ <1418748575-27301-3-git-send-email-stripathi@apm.com>
+Message-ID: <20150105135910.GD15833@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Wed, Dec 24, 2014 at 08:19:18PM +0100, Hans de Goede wrote:
-> The recent sun4i-usb-phy changes to add (preliminary) support for the oth phy,
-> cause the ehci/ohci controllers to no longer work on sun4i / sun5i, because
-> the phy driver refuses to load due to a missing usb0_reset reset controller
-> in the dts files for sun4i / sun5i:
+On Tue, Dec 16, 2014 at 10:19:35PM +0530, Suman Tripathi wrote:
+> This patch addresses the issue with ATA_CMD_PACKET pio mode
+> command for enumeration and device detection with ATAPI devices.It is the
+> same issue as in patch
 > 
-> [    0.094293] sun4i-usb-phy 1c13400.phy: failed to get reset usb0_reset
-> [    0.094326] sun4i-usb-phy: probe of 1c13400.phy failed with error -22
+> www.spinics.net/lists/linux-ide/msg49092.html
 > 
-> This fixes this.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 
-Thanks for this. Chen-Yu submitted a similar patch before the holidays
-that I queued for 3.19, but didn't push at the time.
+Applied 1-2 to libata/for-3.18-fixes w/ Sergei's suggested edits.
 
-It's now pushed as part as sunxi/fixes-for-3.19, and sunxi/for-next.
-
-Maxime
+Thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/6207df47/attachment.sig>
+tejun
