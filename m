@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 05 Jan 2015 16:47:50 +0100
-Subject: [RFC PATCHv2 07/19] mfd: ab8500: Use power_supply_*() API for
+Date: Mon, 05 Jan 2015 16:47:51 +0100
+Subject: [RFC PATCHv2 08/19] power: apm_power: Use power_supply_*() API for
  accessing function attrs
 In-Reply-To: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
 References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1420472882-10463-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1420472882-10463-9-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,35 +16,26 @@ supply (e.g. by removing the driver). Replace:
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-sysctrl.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/power/apm_power.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index cfff0b643f1b..d4a4b24be7c6 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -49,7 +49,8 @@ static void ab8500_power_off(void)
- 		if (!psy)
- 			continue;
+diff --git a/drivers/power/apm_power.c b/drivers/power/apm_power.c
+index 39763015b360..2206f9ff6488 100644
+--- a/drivers/power/apm_power.c
++++ b/drivers/power/apm_power.c
+@@ -15,10 +15,10 @@
+ #include <linux/apm-emulation.h>
  
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
-+		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
-+				&val);
  
- 		if (!ret && val.intval) {
- 			charger_present = true;
-@@ -63,8 +64,8 @@ static void ab8500_power_off(void)
- 	/* Check if battery is known */
- 	psy = power_supply_get_by_name("ab8500_btemp");
- 	if (psy) {
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
--					&val);
-+		ret = power_supply_get_property(psy,
-+				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
- 		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
- 			printk(KERN_INFO
- 			       "Charger \"%s\" is connected with known battery."
+-#define PSY_PROP(psy, prop, val) (psy->get_property(psy, \
++#define PSY_PROP(psy, prop, val) (power_supply_get_property(psy, \
+ 			 POWER_SUPPLY_PROP_##prop, val))
+ 
+-#define _MPSY_PROP(prop, val) (main_battery->get_property(main_battery, \
++#define _MPSY_PROP(prop, val) (power_supply_get_property(main_battery, \
+ 							 prop, val))
+ 
+ #define MPSY_PROP(prop, val) _MPSY_PROP(POWER_SUPPLY_PROP_##prop, val)
 -- 
 1.9.1
