@@ -1,94 +1,127 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 5 Jan 2015 13:53:48 -0600
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <54AA4CD4.40105@ti.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
- <54AA4CD4.40105@ti.com>
-Message-ID: <54AAEBCC.2030900@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 5 Jan 2015 12:01:13 -0800
+Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
+ SoC) EVMs
+In-Reply-To: <54997AC2.1040507@linaro.org>
+References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
+ <CANMBJr5T6SJFiw4HwvK0cfJsyrM8WTPU6_aK0uzznEV4Mqcg3w@mail.gmail.com>
+ <5494B932.6060602@ti.com> <20141221102925.GJ10857@pengutronix.de>
+ <54983304.3080302@ti.com> <54997AC2.1040507@linaro.org>
+Message-ID: <CAGXu5jLNXa-B_67Ay_cFF+==9YwyKuATJ3aF+dUodTPAk-_37g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2015 02:35 AM, Lokesh Vutla wrote:
-> Hi Paul,
-> On Saturday 03 January 2015 02:40 AM, Paul Walmsley wrote:
->> + Suman, lakml
->>
->> Hi Roger
->>
->> On Thu, 18 Dec 2014, Roger Quadros wrote:
->>
->>> Fixing up Paul's email id.
+On Tue, Dec 23, 2014 at 6:22 AM, Grygorii.Strashko at linaro.org
+<grygorii.strashko@linaro.org> wrote:
+> On 12/22/2014 05:04 PM, Murali Karicheri wrote:
+>> On 12/21/2014 05:29 AM, Uwe Kleine-K?nig wrote:
+>>> Hello,
 >>>
->>> cheers,
->>> -roger
+>>> I cannot say anything here, but maybe the people being involved in
+>>> 1e6b48116a950 can. I added them to Cc and didn't trim the mail for them.
+>> Uwe,
+>>
+>> Thanks for copying the commit owners. Looking forward for a response
+>> from them.
+>>
+>> Murali
 >>>
->>> On 18/12/14 17:49, Roger Quadros wrote:
->>>> There are quite a few hwmods that don't have sysconfig register and so
->>>> _find_mpu_rt_port(oh) will return NULL thus preventing ready state check
->>>> on those modules after the module is enabled.
->>
->> Hmm.  Any IP block that exposes registers that are accessible by the MPU 
->> should have an MPU register target port, even if there's no SYSCONFIG 
->> register.  And if an IP block doesn't have registers that are accessible 
->> from the MPU, then there shouldn't be much point to waiting for the module 
->> to become ready.
->>
->> Looks like the real problem is the test for oh->class->sysc before the 
->> call to _init_mpu_rt_base().  That was introduced by commit 6423d6df1440 
->> ("ARM: OMAP2+: hwmod: check for module address space during init"). It's 
->> not clear to me why that test was added, since _init_mpu_rt_base() doesn't 
->> do anything with oh->class->sysc or SYSCONFIG registers.
-> This was introduced by commit 
-> 97597b962529 (ARM: OMAP2+: hwmod: Don't call _init_mpu_rt_base if no sysc)
+>>> Best regards
+>>> Uwe
+>>>
+>>> On Fri, Dec 19, 2014 at 06:48:02PM -0500, Murali Karicheri wrote:
+>>>> On 12/19/2014 04:25 PM, Tyler Baker wrote:
+>>>>> Hello,
+>>>>>
+>>>>> On 19 December 2014 at 13:18, Uwe Kleine-K?nig
+>>>>> <u.kleine-koenig@pengutronix.de>   wrote:
+>>>>>> Hello,
+>>>>>>
+>>>>>> On Fri, Dec 19, 2014 at 03:55:50PM -0500, Murali Karicheri wrote:
+>>>>>>> I have pulled the latest master from
+>>>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and
+>>>>>>> tried booting on keystone k2hk and k2e EVM. The boot hangs with
+>>>>>>> following log. Has anyone seen this? Keystone is an ARM v7 cortex
+>>>>>>> A15 SMP platform. I am assuming master branch is broken for ARM v7
+>>>>>>> and someone is working to address this. v3.18 booted up fine on my
+>>>>>>> EVM.
+>>>>>>>
+>>>>>>> Any idea?
+>>>>>> You forgot to attach the log?! So no, I don't have any idea. Did you
+>>>>>> bisect?
+>>>>
+>>>> This was my first git bisect work. git bisect showed me below commit
+>>>> as bad commit. But it is pretty old commit. I tried reverting the
+>>>> commit and my board booted up fine. The boot log attached below. I
+>>>> did following until I got the bad commit. v3.18 also worked fine.
+>>>>
+>>>> git bisect start
+>>>> git bisect good<working commit>
+>>>> git bisect bad<non working commit>
+>>>>
+>>>> I build and test. If boots fine, I did git bisect good and if not,
+>>>> git bisect bad until I got the bad commit. Can someone comment if my
+>>>> bisect steps look sane? If so, what is wrong with the below commit?
+>>>> Ours is a LPAE SoC.
+>>>>
+>>>> commit 1e6b48116a95046ec51f3d40f83aff8b006674d7
+>>>> Author: Kees Cook<keescook@chromium.org>
+>>>> Date:   Thu Apr 3 17:28:11 2014 -0700
+>>>>
+>>>>      ARM: mm: allow non-text sections to be non-executable
+>>>>
+>>>>      Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+>>>>      into section-sized areas that can have different permisions.
+>>>> Performs
+>>>>      the NX permission changes during free_initmem, so that init
+>>>> memory can be
+>>>>      reclaimed.
+>>>>
+>>>>      This uses section size instead of PMD size to reduce memory lost to
+>>>>      padding on non-LPAE systems.
+>>>>
+>>>>      Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+>>>>
+>>>>      Signed-off-by: Kees Cook<keescook@chromium.org>
+>>>>      Tested-by: Laura Abbott<lauraa@codeaurora.org>
+>>>>      Acked-by: Nicolas Pitre<nico@linaro.org>
+>>>>
+>
+> Looks like kernel_x_start, kernel_x_end are calculated wrongly in LPAE case.
+> kernel_x_start == 0x0000 0000
+> kernel_x_end   == 0x0080 0000
+>
+> but should be:
+> kernel_x_start == 0x0000 0008 0000 0000
+> kernel_x_end   == 0x0000 0008 0080 0000
+>
+> Below diff restores boot for me:
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index cda7c40..4e6ef89 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1329,8 +1329,8 @@ static void __init kmap_init(void)
+>  static void __init map_lowmem(void)
+>  {
+>         struct memblock_region *reg;
+> -       unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+> -       unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+> +       phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+> +       phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+>
+>         /* Map all the lowmem memory banks. */
+>         for_each_memblock(memory, reg) {
+> --
+> regards,
+> -grygorii
 
-That's right, the test was present even before 6423d6df1440, I merely
-made this a block.
+Thanks for tracking this down!
 
-> Patch description states that "there are few hwmod which doesn't have sysconfig registers and hence
-> no need to ioremap() them in early init code".
-> Isn't this correct? 
-> May be a dumb question: If IP doesn't have sysconfig, is there any case that hwmod does
-> access the register address space of that IP? Why do we need to enable MPU register target port?
-> 
-> Thanks and regards,
-> Lokesh
-> 
->>
->> Could you please test the following patch?
->> I don't have an AM437x-gp-evm.  
->>
->>
->> - Paul
->>
->> ---
->>  arch/arm/mach-omap2/omap_hwmod.c | 12 ++++--------
->>  1 file changed, 4 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->> index cbb908dc5cf0..ce6d11f3eda7 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -2451,14 +2451,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
->>  				oh->name, np->name);
->>  	}
->>  
->> -	if (oh->class->sysc) {
->> -		r = _init_mpu_rt_base(oh, NULL, index, np);
->> -		if (r < 0) {
->> -			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
->> -			     oh->name);
->> -			return 0;
->> -		}
->> -	}
->> +	r = _init_mpu_rt_base(oh, NULL, index, np);
->> +	if (r < 0)
->> +		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
->> +			 oh->name);
->>  
->>  	r = _init_clocks(oh, NULL);
->>  	if (r < 0) {
->>
-> 
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
