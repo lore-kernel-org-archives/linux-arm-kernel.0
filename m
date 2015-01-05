@@ -1,99 +1,68 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 5 Jan 2015 19:28:04 +0800
-Subject: [PATCH v19 00/11] ARM: kprobes: OPTPROBES and other improvements.
-Message-ID: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
+Date: Mon, 5 Jan 2015 19:29:14 +0800
+Subject: [PATCH v19 02/11] ARM: kprobes: remove unused ARM decoder actions.
+In-Reply-To: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
+References: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1420457354-77099-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Masami Hiramatsu's suggestion, there are some small code
-adjustments in this series of patch.
+There are 3 actions which is never used:
 
-Jon Medhurst (Tixy) (2):
-  ARM: kprobes: Add test cases for stack consuming instructions
-  ARM: kprobes: Fix unreliable MRS instruction tests
+ PROBES_MOV_HALFWORD,
+ PROBES_SEV,
+ PROBES_WFE,
 
-Masami Hiramatsu (1):
-  kprobes: Pass the original kprobe for preparing optimized kprobe
+This patch removes them.
 
-Wang Nan (8):
-  ARM: probes: move all probe code to dedicate directory
-  ARM: kprobes: remove unused ARM decoder actions.
-  ARM: kprobes: introduces checker
-  ARM: kprobes: collects stack consumption for store instructions
-  ARM: kprobes: disallow probing stack consuming instructions
-  ARM: kprobes: enable OPTPROBES for ARM 32
-  ARM: kprobes: check register usage for probed instruction.
-  ARM: optprobes: execute instruction during restoring if possible.
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ arch/arm/probes/decode-arm.h          | 3 ---
+ arch/arm/probes/kprobes/actions-arm.c | 3 ---
+ arch/arm/probes/uprobes/actions-arm.c | 3 ---
+ 3 files changed, 9 deletions(-)
 
- arch/arm/Kconfig                                   |   1 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/{kernel => include/asm}/insn.h            |   0
- arch/arm/include/asm/kprobes.h                     |  30 +-
- arch/arm/{kernel => include/asm}/patch.h           |   0
- arch/arm/include/asm/probes.h                      |  23 ++
- arch/arm/kernel/Makefile                           |  16 +-
- arch/arm/kernel/entry-armv.S                       |   3 +-
- arch/arm/kernel/ftrace.c                           |   3 +-
- arch/arm/kernel/jump_label.c                       |   5 +-
- arch/arm/kernel/patch.c                            |   3 +-
- arch/arm/probes/Makefile                           |   7 +
- .../{kernel/probes-arm.c => probes/decode-arm.c}   |  12 +-
- .../{kernel/probes-arm.h => probes/decode-arm.h}   |  10 +-
- .../probes-thumb.c => probes/decode-thumb.c}       |  16 +-
- .../probes-thumb.h => probes/decode-thumb.h}       |  10 +-
- arch/arm/{kernel/probes.c => probes/decode.c}      |  81 +++++-
- arch/arm/{kernel/probes.h => probes/decode.h}      |  13 +-
- arch/arm/probes/kprobes/Makefile                   |  12 +
- .../kprobes-arm.c => probes/kprobes/actions-arm.c} |  12 +-
- .../kprobes/actions-common.c}                      |   4 +-
- .../kprobes/actions-thumb.c}                       |  10 +-
- arch/arm/probes/kprobes/checkers-arm.c             | 223 +++++++++++++++
- arch/arm/probes/kprobes/checkers-common.c          | 101 +++++++
- arch/arm/probes/kprobes/checkers-thumb.c           | 110 +++++++
- arch/arm/probes/kprobes/checkers.h                 |  55 ++++
- .../{kernel/kprobes.c => probes/kprobes/core.c}    |  49 +++-
- .../{kernel/kprobes.h => probes/kprobes/core.h}    |  12 +-
- arch/arm/probes/kprobes/opt-arm.c                  | 317 +++++++++++++++++++++
- .../kprobes/test-arm.c}                            |  37 ++-
- .../kprobes-test.c => probes/kprobes/test-core.c}  |  36 ++-
- .../kprobes-test.h => probes/kprobes/test-core.h}  |  35 ++-
- .../kprobes/test-thumb.c}                          |  20 +-
- arch/arm/probes/uprobes/Makefile                   |   1 +
- .../uprobes-arm.c => probes/uprobes/actions-arm.c} |   9 +-
- .../{kernel/uprobes.c => probes/uprobes/core.c}    |   8 +-
- .../{kernel/uprobes.h => probes/uprobes/core.h}    |   0
- arch/x86/kernel/kprobes/opt.c                      |   3 +-
- include/linux/kprobes.h                            |   3 +-
- kernel/kprobes.c                                   |   4 +-
- 40 files changed, 1169 insertions(+), 126 deletions(-)
- rename arch/arm/{kernel => include/asm}/insn.h (100%)
- rename arch/arm/{kernel => include/asm}/patch.h (100%)
- create mode 100644 arch/arm/probes/Makefile
- rename arch/arm/{kernel/probes-arm.c => probes/decode-arm.c} (99%)
- rename arch/arm/{kernel/probes-arm.h => probes/decode-arm.h} (92%)
- rename arch/arm/{kernel/probes-thumb.c => probes/decode-thumb.c} (98%)
- rename arch/arm/{kernel/probes-thumb.h => probes/decode-thumb.h} (90%)
- rename arch/arm/{kernel/probes.c => probes/decode.c} (84%)
- rename arch/arm/{kernel/probes.h => probes/decode.h} (97%)
- create mode 100644 arch/arm/probes/kprobes/Makefile
- rename arch/arm/{kernel/kprobes-arm.c => probes/kprobes/actions-arm.c} (97%)
- rename arch/arm/{kernel/kprobes-common.c => probes/kprobes/actions-common.c} (98%)
- rename arch/arm/{kernel/kprobes-thumb.c => probes/kprobes/actions-thumb.c} (98%)
- create mode 100644 arch/arm/probes/kprobes/checkers-arm.c
- create mode 100644 arch/arm/probes/kprobes/checkers-common.c
- create mode 100644 arch/arm/probes/kprobes/checkers-thumb.c
- create mode 100644 arch/arm/probes/kprobes/checkers.h
- rename arch/arm/{kernel/kprobes.c => probes/kprobes/core.c} (94%)
- rename arch/arm/{kernel/kprobes.h => probes/kprobes/core.h} (79%)
- create mode 100644 arch/arm/probes/kprobes/opt-arm.c
- rename arch/arm/{kernel/kprobes-test-arm.c => probes/kprobes/test-arm.c} (97%)
- rename arch/arm/{kernel/kprobes-test.c => probes/kprobes/test-core.c} (98%)
- rename arch/arm/{kernel/kprobes-test.h => probes/kprobes/test-core.h} (92%)
- rename arch/arm/{kernel/kprobes-test-thumb.c => probes/kprobes/test-thumb.c} (97%)
- create mode 100644 arch/arm/probes/uprobes/Makefile
- rename arch/arm/{kernel/uprobes-arm.c => probes/uprobes/actions-arm.c} (96%)
- rename arch/arm/{kernel/uprobes.c => probes/uprobes/core.c} (97%)
- rename arch/arm/{kernel/uprobes.h => probes/uprobes/core.h} (100%)
-
+diff --git a/arch/arm/probes/decode-arm.h b/arch/arm/probes/decode-arm.h
+index 9c56b40..f0dbc5a 100644
+--- a/arch/arm/probes/decode-arm.h
++++ b/arch/arm/probes/decode-arm.h
+@@ -38,9 +38,6 @@ enum probes_arm_action {
+ 	PROBES_MOV_IP_SP,
+ 	PROBES_DATA_PROCESSING_REG,
+ 	PROBES_DATA_PROCESSING_IMM,
+-	PROBES_MOV_HALFWORD,
+-	PROBES_SEV,
+-	PROBES_WFE,
+ 	PROBES_SATURATE,
+ 	PROBES_REV,
+ 	PROBES_MMI,
+diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
+index 8797879..099aeb0 100644
+--- a/arch/arm/probes/kprobes/actions-arm.c
++++ b/arch/arm/probes/kprobes/actions-arm.c
+@@ -325,9 +325,6 @@ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+ 		.handler = emulate_rd12rn16rm0rs8_rwflags},
+ 	[PROBES_DATA_PROCESSING_IMM] = {
+ 		.handler = emulate_rd12rn16rm0rs8_rwflags},
+-	[PROBES_MOV_HALFWORD] = {.handler = emulate_rd12rm0_noflags_nopc},
+-	[PROBES_SEV] = {.handler = probes_emulate_none},
+-	[PROBES_WFE] = {.handler = probes_simulate_nop},
+ 	[PROBES_SATURATE] = {.handler = emulate_rd12rn16rm0_rwflags_nopc},
+ 	[PROBES_REV] = {.handler = emulate_rd12rm0_noflags_nopc},
+ 	[PROBES_MMI] = {.handler = emulate_rd12rn16rm0_rwflags_nopc},
+diff --git a/arch/arm/probes/uprobes/actions-arm.c b/arch/arm/probes/uprobes/actions-arm.c
+index 1dd4916..6a271d6 100644
+--- a/arch/arm/probes/uprobes/actions-arm.c
++++ b/arch/arm/probes/uprobes/actions-arm.c
+@@ -217,9 +217,6 @@ const union decode_action uprobes_probes_actions[] = {
+ 		.decoder = decode_rd12rn16rm0rs8_rwflags},
+ 	[PROBES_DATA_PROCESSING_IMM] = {
+ 		.decoder = decode_rd12rn16rm0rs8_rwflags},
+-	[PROBES_MOV_HALFWORD] = {.handler = probes_simulate_nop},
+-	[PROBES_SEV] = {.handler = probes_simulate_nop},
+-	[PROBES_WFE] = {.handler = probes_simulate_nop},
+ 	[PROBES_SATURATE] = {.handler = probes_simulate_nop},
+ 	[PROBES_REV] = {.handler = probes_simulate_nop},
+ 	[PROBES_MMI] = {.handler = probes_simulate_nop},
 -- 
 1.8.4
