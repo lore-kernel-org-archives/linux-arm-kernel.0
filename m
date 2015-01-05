@@ -1,47 +1,50 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 5 Jan 2015 17:44:38 -0400
-Subject: [PATCH] MAINTAINERS: Add linux-omap to list of reviewers for TI
- Thermal
-In-Reply-To: <1420312410-4469-1-git-send-email-nm@ti.com>
-References: <1420312410-4469-1-git-send-email-nm@ti.com>
-Message-ID: <20150105214436.GF31536@developer>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 5 Jan 2015 15:44:14 -0600
+Subject: [PATCH] arm: dts: am335x-bone-common: add collision and carrier sense
+ pinmux
+Message-ID: <1420494254-24314-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 03, 2015 at 01:13:30PM -0600, Nishanth Menon wrote:
-> Add linux-omap mailing list to the TI THERMAL list for wider review.
-> 
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  MAINTAINERS |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ddb9ac8..dc9efd5 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -9533,6 +9533,7 @@ F:	drivers/platform/x86/thinkpad_acpi.c
->  TI BANDGAP AND THERMAL DRIVER
->  M:	Eduardo Valentin <edubezval@gmail.com>
->  L:	linux-pm at vger.kernel.org
-> +L:	linux-omap at vger.kernel.org
+From: Schuyler Patton <spatton@ti.com>
 
-OK. I will queue this one.
+Added pin mux definitions for collision and carrier sense errors coming
+from the ethernet phy. Without these two signals the MAC ends up ignoring
+the errors detected by the PHY which end up causing a lower throughput
+problem when the phy is in half duplex mode such as connected through a hub.
 
->  S:	Supported
+Fixes: 2ba3549 (ARM: dts: am335x-bone*: add DT for BeagleBone Black)
+Cc: Koen Kooi <koen@dominion.thruhere.net>
+Cc: Tom Rini <trini@ti.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: <stable@vger.kernel.org> # v3.13+
+Signed-off-by: Schuyler Patton <spatton@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-I will also change this to random fixes too..
-
->  F:	drivers/thermal/ti-soc-thermal/
->  
-> -- 
-> 1.7.9.5
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/d1a4be94/attachment-0001.sig>
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 6cc25ed..4b29fad 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -97,6 +97,8 @@
+ 	cpsw_default: cpsw_default {
+ 		pinctrl-single,pins = <
+ 			/* Slave 1 */
++			0x108 (PIN_INPUT | MUX_MODE0)		/* mii1_col.mii1_col */
++			0x10c (PIN_INPUT | MUX_MODE0)		/* mii1_crs.mii1_crs */
+ 			0x110 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxerr.mii1_rxerr */
+ 			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txen.mii1_txen */
+ 			0x118 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxdv.mii1_rxdv */
+@@ -116,6 +118,8 @@
+ 	cpsw_sleep: cpsw_sleep {
+ 		pinctrl-single,pins = <
+ 			/* Slave 1 reset value */
++			0x108 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 			0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+ 			0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
+-- 
+2.2.0
