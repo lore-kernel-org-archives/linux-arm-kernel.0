@@ -1,49 +1,87 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Jan 2015 14:43:35 +0000
-Subject: [PATCH 4/5] cpufreq: imx6q: add ldo-bypass support
-In-Reply-To: <CAJ+vNU0S_=H=VDwxUXBGyNrvjg5MRe3UP-UV9Xnj3MkNdWM0ng@mail.gmail.com>
-References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
- <1414729631-11005-5-git-send-email-tharvey@gateworks.com>
- <CAOMZO5DzEe91pTv+UkCbj0DzgVDOb9hjuakt9NmpTJnEk-j8UA@mail.gmail.com>
- <CAJ+vNU3PQYCE4tABUiqU+vGkGqBEqdVKz25W88-ByOQZxunVLw@mail.gmail.com>
- <20141218142205.GZ11764@sirena.org.uk>
- <CAJ+vNU1YQWGFaEm8w8wtaFvUy1jig26jW3+3teMFHLB_oFyn8Q@mail.gmail.com>
- <20141219162343.GF11764@sirena.org.uk>
- <CAJ+vNU0S_=H=VDwxUXBGyNrvjg5MRe3UP-UV9Xnj3MkNdWM0ng@mail.gmail.com>
-Message-ID: <20150105144335.GR11764@sirena.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 5 Jan 2015 14:48:09 +0000
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <30239600.UAZhntKiNS@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20150102115533.GA25573@red-moon> <54A6E0DE.6090309@amd.com>
+ <30239600.UAZhntKiNS@wuerfel>
+Message-ID: <20150105144809.GA18003@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 06:38:50AM -0800, Tim Harvey wrote:
-> On Fri, Dec 19, 2014 at 8:23 AM, Mark Brown <broonie@kernel.org> wrote:
-> > On Fri, Dec 19, 2014 at 08:17:41AM -0800, Tim Harvey wrote:
+On Fri, Jan 02, 2015 at 09:09:33PM +0000, Arnd Bergmann wrote:
+> On Friday 02 January 2015 12:18:06 Suravee Suthikulanit wrote:
+> > On 1/2/2015 5:55 AM, Lorenzo Pieralisi wrote:
+> > > Hi Suravee,
+> > >
+> > > On Mon, Dec 29, 2014 at 07:32:44PM +0000, Suravee Suthikulpanit wrote:
+> > >> >Hi,
+> > >> >
+> > >> >I am not sure if this thread is still alive. I'm trying to see what I
+> > >> >can do to help clean up/convert to make the PCI GHC also works for arm64
+> > >> >w/ zero or minimal ifdefs.
+> > >> >
+> > >> >Please let me know if someone is already working on this. I noticed that
+> > >> >Lorenzo's patches has already been in 3.19-rc1, and in Bjorn's
+> > >> >pci/domain branch. Otherwise, I'll try to continue the work based on the
+> > >> >sample patch from Arnd here.
+> > > If I am not mistaken, the only bit missing to remove pci_sys_data (and so
+> > > having a generic host controller driver that works on ARM32/64) is generic
+> > > MSI management.
+> > 
+> > Lorenzo,
+> > 
+> > Do you mean to remove pci_sys_data from pci-host-generic.c or removing 
+> > it completely? I assume the former case.
+> 
+> Something inbetween: We should be able to remove pci_sys_data and
+> pci_common_init_dev from all drivers in drivers/pci/host/, but keep them
+> for all drivers in arch/arm/*/pci.c
+> 
+> > So, looking at the current code in the pci-host-generic.c, my 
+> > understanding is that the:
+> >      *gen_pci = pci_bus->sysdata->private_data
+> > will be changed to:
+> >      *gen_pci = pci_bus->sysdata
+> > 
+> > Then, we can simply just call pci_scan_root_bus() directly since we no 
+> > longer need to declare hw_pci for calling pci_common_init_dev().
+> 
+> Right.
+> 
+> > > I know for certain Marc is working on it, and the solution is WIP,
+> > > I think we should prevent adding more churn to pci_sys_data, since
+> > > I managed to remove most of the dependencies (domain, mem_offset).
+> > 
+> > Thanks for cleaning up the domain and mem_offset.
+> > 
+> > I saw Marc's irq/msi_domain patch series 
+> > (http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/msi_domain). 
+> > 
+> > 
+> > My understanding is that deals with associating the newly introduced 
+> > msi_domain to each device, which replaces the need for pci_bus->msi and 
+> > hw_pci->msi_ctrl when configure with CONFIG_PCI_MSI_IRQ_DOMAIN (not sure 
+> > if this would be the plan for all arm32).  For ARM32, if not define 
+> > CONFIG_PCI_MSI_IRQ_DOMAIN, it would still fall back to using the 
+> > [pci_sys_data|hw_pci]->msi_ctrl.
+> 
+> For all I can tell, we have two cases on ARM regarding MSI:
+> 
+> - arch/arm/mach-iop13xx/pci.c uses its own
+>   arch_setup_msi_irq/arch_teardown_msi_irq implementation and does not
+>   use pci_bus->msi.
+> 
+> - everything else that supports MSI has a modern driver with multiplatform
+>   support and uses msi_controller. If any platform wants to support GICv2m,
+>   we have to use CONFIG_PCI_MSI_IRQ_DOMAIN for all of them, and that
+>   seems like the best way forward.
 
-> >> frequency setpoint. If however you have an external PMIC that is
-> >> capable of adjusting the VDD_ARM and VDD_SOC to the IMX6 and an
-> >> appropriate regulator driver is capable of doing so, you must
-> >> configure the cpu nodes vddarm and vddsoc regulators to those provided
-> >> by your PMIC and 'bypass' the internal LDO's by setting their scaling
+Yes, I think that's the current situation. With a hook (added by Marc's
+code) in PCI core to set the msi domain (DT), all we need to do is convert
+the generic host controller code to pci_scan_root_bus() and remove the
+pcibios init calls, it is a mechanical change when all patches mentioned
+above are merged.
 
-> > You're describing the implementation again, not the system.  Describe
-> > the system then if you want to describe the solution you've come up with
-> > for modelling it do so separately.
-
-> > Please also try to use paragraphs to break up what you're saying a bit.
-
-> I'm not sure I'm understanding what your asking for or how to describe
-> it differently. Fabio / Shawn / Philipp could you help me out here
-> with the proper explanation of the IMX6 LDO's so that we can make some
-> progress on getting LDO bypass implemented?
-
-I have no idea what the context is any more, sorry.  The above looks
-like you're talking about the specifics of how you've implemented
-something instead of describing the hardware you're trying to abstract -
-you're taling about the "cpu nodes" in what sounds like it's supposed to
-be a description of the hardware for example.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/ed045e38/attachment.sig>
+Thanks,
+Lorenzo
