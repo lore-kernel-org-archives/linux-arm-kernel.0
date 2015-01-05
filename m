@@ -1,56 +1,66 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 5 Jan 2015 17:51:28 -0400
-Subject: [PATCH] MAINTAINERS: Add linux-omap to list of reviewers for TI
- Thermal
-In-Reply-To: <20150105214436.GF31536@developer>
-References: <1420312410-4469-1-git-send-email-nm@ti.com>
- <20150105214436.GF31536@developer>
-Message-ID: <20150105215126.GA3769@developer>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 5 Jan 2015 22:56:49 +0100
+Subject: [PATCH v4 3/8] efi: split off remapping code from
+ efi_config_init()
+In-Reply-To: <1419245944-2424-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419245944-2424-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150105215649.GI19655@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 05:44:38PM -0400, Eduardo Valentin wrote:
-> On Sat, Jan 03, 2015 at 01:13:30PM -0600, Nishanth Menon wrote:
-> > Add linux-omap mailing list to the TI THERMAL list for wider review.
-> > 
-> > Reported-by: Pavel Machek <pavel@ucw.cz>
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> > ---
-> >  MAINTAINERS |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index ddb9ac8..dc9efd5 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -9533,6 +9533,7 @@ F:	drivers/platform/x86/thinkpad_acpi.c
-> >  TI BANDGAP AND THERMAL DRIVER
-> >  M:	Eduardo Valentin <edubezval@gmail.com>
-> >  L:	linux-pm at vger.kernel.org
-> > +L:	linux-omap at vger.kernel.org
+On Mon, Dec 22, 2014 at 10:58:59AM +0000, Ard Biesheuvel wrote:
+> Split of the remapping code from efi_config_init() so that the caller
+> can perform its own remapping. This is necessary to correctly handle
+> virtually remapped UEFI memory regions under kexec, as efi.systab will
+> have been updated to a virtual address.
 > 
-> OK. I will queue this one.
-> 
-> >  S:	Supported
-> 
-> I will also change this to random fixes too..
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-changed to 'Maintained'.
+...
 
-Cheers,
+> @@ -344,13 +333,37 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
+>  		tablep += sz;
+>  	}
+>  	pr_cont("\n");
+> -	early_memunmap(config_tables, efi.systab->nr_tables * sz);
+> -
+>  	set_bit(EFI_CONFIG_TABLES, &efi.flags);
+> -
+>  	return 0;
+>  }
+>  
+> +int __init efi_config_init(efi_config_table_type_t *arch_tables)
+> +{
+> +	void *config_tables;
+> +	int sz, ret;
+> +
+> +	if (efi_enabled(EFI_64BIT))
+> +		sz = sizeof(efi_config_table_64_t);
+> +	else
+> +		sz = sizeof(efi_config_table_32_t);
+> +
+> +	/*
+> +	 * Let's see what config tables the firmware passed to us.
+> +	 */
+> +	config_tables = early_memremap(efi.systab->tables,
+> +				       efi.systab->nr_tables * sz);
+> +	if (config_tables == NULL) {
+> +		pr_err("Could not map Configuration table!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ret = efi_config_parse_tables(config_tables, efi.systab->nr_tables,
+> +				      arch_tables);
 
-> 
-> >  F:	drivers/thermal/ti-soc-thermal/
-> >  
-> > -- 
-> > 1.7.9.5
-> > 
+Just a nitpick:
 
+You could hand down @sz to this function so that you don't have to
+compute it again in efi_config_parse_tables().
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/e3b7333f/attachment.sig>
+-- 
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
