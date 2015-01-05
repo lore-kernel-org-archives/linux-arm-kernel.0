@@ -1,33 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 5 Jan 2015 12:16:32 +0100
-Subject: [PATCH 1/4] ARM: at91: remove at91sam9263 legacy board support
-In-Reply-To: <20141222094512.GA4194@piout.net>
-References: <cover.1416392687.git.nicolas.ferre@atmel.com>
- <cf26d39a4a251662dbc363092b319b788d223a7b.1416392687.git.nicolas.ferre@atmel.com>
- <1417434775.30245.29.camel@x220> <547C92A1.8000902@atmel.com>
- <1419240528.30945.12.camel@x220> <20141222094512.GA4194@piout.net>
-Message-ID: <54AA7290.7000502@atmel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 5 Jan 2015 13:17:31 +0200
+Subject: [PATCH] simplefb: Fix build failure on Sparc
+In-Reply-To: <1420445716-13468-1-git-send-email-hdegoede@redhat.com>
+References: <1420445716-13468-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <54AA72CB.1020303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/12/2014 10:45, Alexandre Belloni a ?crit :
-> Hi Paul,
+On 05/01/15 10:15, Hans de Goede wrote:
+> of_platform_device_create is only defined when CONFIG_OF_ADDRESS is set,
+> which is normally always the case when CONFIG_OF is defined, except on Sparc,
+> so explicitly check for CONFIG_OF_ADDRESS rather then for CONFIG_OF.
 > 
-> On 22/12/2014 at 10:28:48 +0100, Paul Bolle wrote :
->>> So, I suggest to get rid of them during 3.19-rc phase.
->>
->> There's still an entry for RTC_DRV_AT91SAM9_RTT in next-20141221 (and
->> v3.19-rc1). So this I send this message as a reminder that this cleanup
->> is still needed.
->>
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/video/fbdev/simplefb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Thanks for the reminder, the pull request was actually waiting for
-> 3.19-rc1 to get released before being sent. This should be solved in the
-> next rc.
+> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+> index 92cac80..1085c04 100644
+> --- a/drivers/video/fbdev/simplefb.c
+> +++ b/drivers/video/fbdev/simplefb.c
+> @@ -402,7 +402,7 @@ static int __init simplefb_init(void)
+>  	if (ret)
+>  		return ret;
+>  
+> -	if (IS_ENABLED(CONFIG_OF) && of_chosen) {
+> +	if (IS_ENABLED(CONFIG_OF_ADDRESS) && of_chosen) {
+>  		for_each_child_of_node(of_chosen, np) {
+>  			if (of_device_is_compatible(np, "simple-framebuffer"))
+>  				of_platform_device_create(np, NULL, NULL);
+> 
 
-Yes, a new version of this pull-request has just been sent: ([GIT PULL]
-at91: fixes for 3.19 #1 (bis)).
+Doesn't this depend on the compiler optimizing the
+of_platform_device_create call away? Isn't that rather dangerous assumption?
 
-Thanks a lot for the reminder Paul. Bye,
--- 
-Nicolas Ferre
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/2e912057/attachment.sig>
