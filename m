@@ -1,49 +1,146 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 5 Jan 2015 19:31:20 +0000
-Subject: [PATCH v2 1/2] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <20150105145739.GU30905@twins.programming.kicks-ass.net>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
- <20150105145739.GU30905@twins.programming.kicks-ass.net>
-Message-ID: <20150105193120.GA9167@sundance.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Jan 2015 11:37:45 -0800
+Subject: [PATCH V2 2/2] ARM: dra7xx: Fix counter frequency drift for
+ AM572x errata i856.
+In-Reply-To: <20141217153026.GB838@kahuna>
+References: <cover.1418762900.git.lsorense@csclub.uwaterloo.ca>
+ <89b793993eaa492af531bd7aa9dff1f871fb4a77.1418762900.git.lsorense@csclub.uwaterloo.ca>
+ <54914096.9060206@ti.com> <20141217153026.GB838@kahuna>
+Message-ID: <20150105193745.GJ4081@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 03:57:39PM +0100, Peter Zijlstra wrote:
-> On Fri, Nov 21, 2014 at 04:24:26PM +0000, Daniel Thompson wrote:
-> > diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> > index 266cba46db3e..ab68833c1e31 100644
-> > --- a/arch/arm/kernel/perf_event.c
-> > +++ b/arch/arm/kernel/perf_event.c
-> > @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
-> >  		ret = 1;
-> >  	}
-> >  
-> > -	if (left > (s64)armpmu->max_period)
-> > -		left = armpmu->max_period;
-> > +	/*
-> > +	 * Limit the maximum period to prevent the counter value
-> > +	 * from overtaking the one we are about to program. In
-> > +	 * effect we are reducing max_period to account for
-> > +	 * interrupt latency (and we are being very conservative).
-> > +	 */
-> > +	if (left > (armpmu->max_period >> 1))
-> > +		left = armpmu->max_period >> 1;
-> 
-> On x86 we simply half max_period, why did you choose to do differently?
+* Nishanth Menon <nm@ti.com> [141217 07:33]:
+> On 14:06-20141217, Lokesh Vutla wrote:
+> > Hi Len,
+> > On Wednesday 17 December 2014 02:38 AM, Lennart Sorensen wrote:
+> > > Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
+> > > crystal is not enabled at power up.  Instead the CPU falls back to using
+> > > an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
+> > > 20MHz on boards so far (which gives an emulated frequency of 32.786KHz),
+> > > but can also be 19.2 or 27MHz which result in much larger drift.
+> > > 
+> > > Since this is used to drive the master counter at 32.768KHz * 375 /
+> > > 2 = 6.144MHz, the emulated speed for 20MHz is of by 570ppm, or about 43
+> > > seconds per day, and more than the 500ppm NTP is able to tolerate.
+> > > 
+> > > Checking the CTRL_CORE_BOOTSTRAP register can determine if the CPU
+> > > is using the real 32.768KHz crystal or the emulated SYSCLK1/610, and
+> > > by known that the real counter frequency can be determined and used.
+> > > The real speed is then SYSCLK1 / 610 * 375 / 2 or SYSCLK1 * 75 / 244.
+> > Looks good to me.
+> > Tested this on DRA7 evm.
+> > 
+> > Tested-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > 
+> > Thanks and regards,
+> > Lokesh
+> > 
+> > > 
+> > > Signed-off-by: Len Sorensen <lsorense@csclub.uwaterloo.ca>
+> > > ---
+> > >  arch/arm/mach-omap2/control.h |    4 ++++
+> > >  arch/arm/mach-omap2/timer.c   |   36 ++++++++++++++++++++++++++++++++++--
+> > >  2 files changed, 38 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+> > > index a3c0133..a80ac2d 100644
+> > > --- a/arch/arm/mach-omap2/control.h
+> > > +++ b/arch/arm/mach-omap2/control.h
+> > > @@ -286,6 +286,10 @@
+> > >  #define OMAP5XXX_CONTROL_STATUS                0x134
+> > >  #define OMAP5_DEVICETYPE_MASK          (0x7 << 6)
+> > >  
+> > > +/* DRA7XX CONTROL CORE BOOTSTRAP */
+> > > +#define DRA7_CTRL_CORE_BOOTSTRAP	0x6c4
+> > > +#define DRA7_SPEEDSELECT_MASK		(0x3 << 8)
+> > > +
+> > >  /*
+> > >   * REVISIT: This list of registers is not comprehensive - there are more
+> > >   * that should be added.
+> > > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > > index fb0cb2b..7d45c84 100644
+> > > --- a/arch/arm/mach-omap2/timer.c
+> > > +++ b/arch/arm/mach-omap2/timer.c
+> > > @@ -54,6 +54,7 @@
+> > >  
+> > >  #include "soc.h"
+> > >  #include "common.h"
+> > > +#include "control.h"
+> > >  #include "powerdomain.h"
+> > >  #include "omap-secure.h"
+> > >  
+> > > @@ -496,7 +497,8 @@ static void __init realtime_counter_init(void)
+> > >  	void __iomem *base;
+> > >  	static struct clk *sys_clk;
+> > >  	unsigned long rate;
+> > > -	unsigned int reg, num, den;
+> > > +	unsigned int reg;
+> > > +	unsigned long long num, den;
+> > >  
+> > >  	base = ioremap(REALTIME_COUNTER_BASE, SZ_32);
+> > >  	if (!base) {
+> > > @@ -511,6 +513,35 @@ static void __init realtime_counter_init(void)
+> > >  	}
+> > >  
+> > >  	rate = clk_get_rate(sys_clk);
+> > > +
+> > > +	if (soc_is_dra7xx()) {
+> > > +		/*
+> > > +		 * Errata i856 says the 32.768KHz crystal does not start at
+> > > +		 * power on, so the CPU falls back to an emulated 32KHz clock
+> > > +		 * based on sysclk / 610 instead. This causes the master counter
+> > > +		 * frequency to not be 6.144MHz but at sysclk / 610 * 375 / 2
+> > > +		 * (OR sysclk * 75 / 244)
+> > > +		 *
+> > > +		 * This affects at least the DRA7/AM572x 1.0, 1.1 revisions.
+> > > +		 * Of course any board built without a populated 32.768KHz
+> > > +		 * crystal would also need this fix even if the CPU is fixed
+> > > +		 * later.
+> > > +		 *
+> > > +		 * Either case can be detected by using the two speedselect bits
+> > > +		 * If they are not 0, then the 32.768KHz clock driving the
+> > > +		 * coarse counter that corrects the fine counter every time it
+> > > +		 * ticks is actually rate/610 rather than 32.768KHz and we
+> > > +		 * should compensate to avoid the 570ppm (at 20MHz, much worse
+> > > +		 * at other rates) too fast system time.
+> > > +		 */
+> > > +		reg = omap_ctrl_readl(DRA7_CTRL_CORE_BOOTSTRAP);
+> > > +		if (reg & DRA7_SPEEDSELECT_MASK) {
+> > > +			num = 75;
+> > > +			den = 244;
+> > > +			goto sysclk1_based;
+> > > +		}
+> > > +	}
+> > > +
+> > >  	/* Numerator/denumerator values refer TRM Realtime Counter section */
+> > >  	switch (rate) {
+> > >  	case 12000000:
+> > > @@ -545,6 +576,7 @@ static void __init realtime_counter_init(void)
+> > >  		break;
+> > >  	}
+> > >  
+> > > +sysclk1_based:
+> > >  	/* Program numerator and denumerator registers */
+> > >  	reg = readl_relaxed(base + INCREMENTER_NUMERATOR_OFFSET) &
+> > >  			NUMERATOR_DENUMERATOR_MASK;
+> > > @@ -556,7 +588,7 @@ static void __init realtime_counter_init(void)
+> > >  	reg |= den;
+> > >  	writel_relaxed(reg, base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+> > >  
+> > > -	arch_timer_freq = (rate / den) * num;
+> > > +	arch_timer_freq = DIV_ROUND_UP_ULL(rate * num, den);
+> > >  	set_cntfreq();
+> > >  
+> > >  	iounmap(base);
+> > > 
+> > 
+> If tony is ok with the arch_timer_freq change in this patch, I am ok
+> with it as well.
 
-In truth because I didn't look at the x86 code... there is an existing
-halving of max_period in the arm code and that was enough to satisfy me
-that halving max_period was reasonable.
+Looks good to me thanks. Applying both into omap-for-v3.19/fixes with
+the first cc stable v3.7+ and the second cc stable v3.14+.
 
-Predividing max_period looks to me like it would work for ARM too although I
-don't think we could blame hardware insanity for doing so ;-).
+Regards,
 
-Will: Do you want me to update this?
-
--- 
-Daniel Thompson (STMicroelectronics) <daniel.thompson@st.com>
-1000 Aztec West, Almondsbury, Bristol, BS32 4SQ. 01454 462659
-
-If a car is a horseless carriage then is a motorcycle a horseless horse?
+Tony
