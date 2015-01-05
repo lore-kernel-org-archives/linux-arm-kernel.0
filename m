@@ -1,87 +1,102 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 5 Jan 2015 14:48:09 +0000
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <30239600.UAZhntKiNS@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20150102115533.GA25573@red-moon> <54A6E0DE.6090309@amd.com>
- <30239600.UAZhntKiNS@wuerfel>
-Message-ID: <20150105144809.GA18003@red-moon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 05 Jan 2015 17:50:23 +0300
+Subject: [PATCH 1/2] ahci_xgene: Fix the xgene_ahci_restart_engine function
+ to support Port Multiplier for APM X-Gene SoC AHCI SATA host controller
+ driver.
+In-Reply-To: <1420453305-15986-2-git-send-email-stripathi@apm.com>
+References: <1420453305-15986-1-git-send-email-stripathi@apm.com>
+ <1420453305-15986-2-git-send-email-stripathi@apm.com>
+Message-ID: <54AAA4AF.8030503@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 02, 2015 at 09:09:33PM +0000, Arnd Bergmann wrote:
-> On Friday 02 January 2015 12:18:06 Suravee Suthikulanit wrote:
-> > On 1/2/2015 5:55 AM, Lorenzo Pieralisi wrote:
-> > > Hi Suravee,
-> > >
-> > > On Mon, Dec 29, 2014 at 07:32:44PM +0000, Suravee Suthikulpanit wrote:
-> > >> >Hi,
-> > >> >
-> > >> >I am not sure if this thread is still alive. I'm trying to see what I
-> > >> >can do to help clean up/convert to make the PCI GHC also works for arm64
-> > >> >w/ zero or minimal ifdefs.
-> > >> >
-> > >> >Please let me know if someone is already working on this. I noticed that
-> > >> >Lorenzo's patches has already been in 3.19-rc1, and in Bjorn's
-> > >> >pci/domain branch. Otherwise, I'll try to continue the work based on the
-> > >> >sample patch from Arnd here.
-> > > If I am not mistaken, the only bit missing to remove pci_sys_data (and so
-> > > having a generic host controller driver that works on ARM32/64) is generic
-> > > MSI management.
-> > 
-> > Lorenzo,
-> > 
-> > Do you mean to remove pci_sys_data from pci-host-generic.c or removing 
-> > it completely? I assume the former case.
-> 
-> Something inbetween: We should be able to remove pci_sys_data and
-> pci_common_init_dev from all drivers in drivers/pci/host/, but keep them
-> for all drivers in arch/arm/*/pci.c
-> 
-> > So, looking at the current code in the pci-host-generic.c, my 
-> > understanding is that the:
-> >      *gen_pci = pci_bus->sysdata->private_data
-> > will be changed to:
-> >      *gen_pci = pci_bus->sysdata
-> > 
-> > Then, we can simply just call pci_scan_root_bus() directly since we no 
-> > longer need to declare hw_pci for calling pci_common_init_dev().
-> 
-> Right.
-> 
-> > > I know for certain Marc is working on it, and the solution is WIP,
-> > > I think we should prevent adding more churn to pci_sys_data, since
-> > > I managed to remove most of the dependencies (domain, mem_offset).
-> > 
-> > Thanks for cleaning up the domain and mem_offset.
-> > 
-> > I saw Marc's irq/msi_domain patch series 
-> > (http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/msi_domain). 
-> > 
-> > 
-> > My understanding is that deals with associating the newly introduced 
-> > msi_domain to each device, which replaces the need for pci_bus->msi and 
-> > hw_pci->msi_ctrl when configure with CONFIG_PCI_MSI_IRQ_DOMAIN (not sure 
-> > if this would be the plan for all arm32).  For ARM32, if not define 
-> > CONFIG_PCI_MSI_IRQ_DOMAIN, it would still fall back to using the 
-> > [pci_sys_data|hw_pci]->msi_ctrl.
-> 
-> For all I can tell, we have two cases on ARM regarding MSI:
-> 
-> - arch/arm/mach-iop13xx/pci.c uses its own
->   arch_setup_msi_irq/arch_teardown_msi_irq implementation and does not
->   use pci_bus->msi.
-> 
-> - everything else that supports MSI has a modern driver with multiplatform
->   support and uses msi_controller. If any platform wants to support GICv2m,
->   we have to use CONFIG_PCI_MSI_IRQ_DOMAIN for all of them, and that
->   seems like the best way forward.
+Hello.
 
-Yes, I think that's the current situation. With a hook (added by Marc's
-code) in PCI core to set the msi domain (DT), all we need to do is convert
-the generic host controller code to pci_scan_root_bus() and remove the
-pcibios init calls, it is a mechanical change when all patches mentioned
-above are merged.
+On 1/5/2015 1:21 PM, Suman Tripathi wrote:
 
-Thanks,
-Lorenzo
+    Your patch summary seems too long.
+
+> This patch implements the function xgene_ahci_poll_reg_val to poll
+> PxCI for multiple IDENTIFY DEVICE commands to finish before
+> restarting the DMA engine in case of Port Multiplier.
+
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   drivers/ata/ahci_xgene.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++--
+>   1 file changed, 54 insertions(+), 2 deletions(-)
+
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index 0f8538f..2180223 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+> @@ -105,17 +105,69 @@ static int xgene_ahci_init_memram(struct xgene_ahci_context *ctx)
+>   }
+>
+>   /**
+> + * xgene_ahci_poll_reg_val- Poll a register on a specific value.
+> + * @ap : ATA port of interest.
+> + * @reg : Register of interest.
+> + * @val : Value to be attained.
+> + * @interval : waiting interval for polling.
+> + * @timeout : timeout for achieving the value.
+> + */
+> +static int xgene_ahci_poll_reg_val(struct ata_port *ap,
+> +				   void __iomem *reg, unsigned
+> +				   int val, unsigned long interval,
+> +				   unsigned long timeout)
+> +{
+> +	unsigned long deadline;
+> +	unsigned int tmp;
+> +
+> +	tmp = ioread32(reg);
+> +	deadline = ata_deadline(jiffies, timeout);
+> +
+> +	while ((tmp != val) && (time_before(jiffies, deadline))) {
+
+    Parens around the operands of && are not needed, especially around the 
+right one.
+
+> +		ata_msleep(ap, interval);
+> +		tmp = ioread32(reg);
+> +	}
+> +
+> +	return tmp;
+> +}
+> +
+> +/**
+>    * xgene_ahci_restart_engine - Restart the dma engine.
+>    * @ap : ATA port of interest
+>    *
+> - * Restarts the dma engine inside the controller.
+> + * Waits for completion of multiple commands and restarts
+> + * the DMA engine inside the controller.
+>    */
+>   static int xgene_ahci_restart_engine(struct ata_port *ap)
+>   {
+>   	struct ahci_host_priv *hpriv = ap->host->private_data;
+> +	struct ahci_port_priv *pp = ap->private_data;
+> +	void __iomem *port_mmio = ahci_port_base(ap);
+> +	u32 fbs;
+> +
+> +	/*
+> +	 * In case of PMP multiple IDENTIFY DEVICE commands can be
+> +	 * issued inside PxCI. So need to poll PxCI for the
+> +	 * completion of outstanding IDENTIFY DEVICE commands before
+> +	 * we restart the DMA engine.
+> +	 */
+> +	if (xgene_ahci_poll_reg_val(ap, port_mmio +
+> +				    PORT_CMD_ISSUE, 0x0, 1, 100))
+> +		  return -EBUSY;
+>
+>   	ahci_stop_engine(ap);
+>   	ahci_start_fis_rx(ap);
+> +
+> +	/*
+> +	 * Enable the PxFBS.FBS_EN bit as it
+> +	 * gets cleared due to stop engine.
+
+    s/stop/stopping the/.
+
+[...]
+
+MBR, Sergei
