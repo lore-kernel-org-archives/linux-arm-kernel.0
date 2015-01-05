@@ -1,76 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Jan 2015 14:51:35 -0800
-Subject: [PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
-In-Reply-To: <54AB14E4.2010607@ti.com>
-References: <1420228817-41310-1-git-send-email-d-gerlach@ti.com>
- <1420228817-41310-3-git-send-email-d-gerlach@ti.com>
- <20150102201643.GE4920@saruman> <54AB14E4.2010607@ti.com>
-Message-ID: <20150105225134.GN4081@atomide.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 5 Jan 2015 15:21:11 -0800
+Subject: [PATCH v2 0/5] Add common clock support for Broadcom iProc
+ architecture
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1420500076-18302-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150105 14:51]:
-> Felipe,
-> On 01/02/2015 02:16 PM, Felipe Balbi wrote:
-> > On Fri, Jan 02, 2015 at 02:00:16PM -0600, Dave Gerlach wrote:
-> >> Introduce a wkup_m3_ipc driver to handle communication between the MPU
-> >> and Cortex M3 wkup_m3 present on am335x.
-> >>
-> >> This driver is responsible for actually booting the wkup_m3_rproc and
-> >> also handling all IPC which is done using the IPC registers in the control
-> >> module, a mailbox, and a separate interrupt back from the wkup_m3. A small
-> >> API is exposed for executing specific power commands, which include
-> >> configuring for low power mode, request a transition to a low power mode,
-> >> and status info on a previous transition.
-> >>
-> >> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >> ---
-> >>  drivers/soc/ti/Kconfig       |  11 ++
-> >>  drivers/soc/ti/Makefile      |   1 +
-> >>  drivers/soc/ti/wkup_m3_ipc.c | 451 +++++++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/wkup_m3_ipc.h  |  33 ++++
-> >>  4 files changed, 496 insertions(+)
-> >>  create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
-> >>  create mode 100644 include/linux/wkup_m3_ipc.h
-> >>
-> >> diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
-> >> index 7266b21..61cda85 100644
-> >> --- a/drivers/soc/ti/Kconfig
-> >> +++ b/drivers/soc/ti/Kconfig
-> >> @@ -28,4 +28,15 @@ config KEYSTONE_NAVIGATOR_DMA
-> >>  
-> >>  	  If unsure, say N.
-> >>  
-> >> +config WKUP_M3_IPC
-> >> +	bool "TI AM33XX Wkup-M3 IPC Driver"
-> > 
-> > tristate ?
-> 
-> If we want to allow this and the rproc driver to be built as modules than we can
-> change this.
+This patchset contains the initial common clock support for Broadcom's iProc
+family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
+ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
+basic reference clock for these PLLs. Each PLL may have several leaf clocks.
+One special group of clocks is the ASIU clocks, which are dervied directly
+from the crystal reference clock.
 
-Yes please, the PM is never needed early, and should be optional.
-And doing that will make it a lot easier for you to do further work
-on your driver ;)
+This patchset also contains the basic clock support for the Broadcom Cygnus
+SoC, which implements the iProc clock architecture
 
-And it will also make it easier to add support for other SoCs as
-it seems the same M3 is used at least on am437x.
- 
-> > 
-> >> +	depends on WKUP_M3_RPROC
-> >> +	select MAILBOX
-> >> +	select OMAP2PLUS_MBOX
-> > 
-> > selects are usually frowned upon.
-> 
-> Followed example set by OMAP_REMOTEPROC which selects the mailbox, thought that
-> would be alright.
+Changes from v1:
+ - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
 
-The select should be only done if the option selected is a silen
-Kconfig option where it's never selectable by the user. Otherwise
-you will errors sooner or later with make randconfig builds as the
-dependencies change. Using depends on is better for those cases.
+Ray Jui (5):
+  clk: iproc: define Broadcom iProc clock binding
+  clk: iproc: add initial common clock support
+  clk: Change bcm clocks build dependency
+  clk: cygnus: add clock support for Broadcom Cygnus
+  ARM: dts: enable clock support for Broadcom Cygnus
 
-Regards,
+ arch/arm/boot/dts/bcm-cygnus-clock.dtsi |  110 +++++--
+ arch/arm/boot/dts/bcm-cygnus.dtsi       |    2 +-
+ brcm,iproc-clocks.txt                   |  178 ++++++++++++
+ drivers/clk/Makefile                    |    2 +-
+ drivers/clk/bcm/Kconfig                 |    9 +
+ drivers/clk/bcm/Makefile                |    2 +
+ drivers/clk/bcm/clk-cygnus.c            |  277 ++++++++++++++++++
+ drivers/clk/bcm/clk-iproc-armpll.c      |  286 ++++++++++++++++++
+ drivers/clk/bcm/clk-iproc-asiu.c        |  275 ++++++++++++++++++
+ drivers/clk/bcm/clk-iproc-clk.c         |  238 +++++++++++++++
+ drivers/clk/bcm/clk-iproc-pll.c         |  483 +++++++++++++++++++++++++++++++
+ drivers/clk/bcm/clk-iproc.h             |  155 ++++++++++
+ include/dt-bindings/clock/bcm-cygnus.h  |   77 +++++
+ 13 files changed, 2067 insertions(+), 27 deletions(-)
+ create mode 100644 brcm,iproc-clocks.txt
+ create mode 100644 drivers/clk/bcm/clk-cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-armpll.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-asiu.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-clk.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-pll.c
+ create mode 100644 drivers/clk/bcm/clk-iproc.h
+ create mode 100644 include/dt-bindings/clock/bcm-cygnus.h
 
-Tony 
+-- 
+1.7.9.5
