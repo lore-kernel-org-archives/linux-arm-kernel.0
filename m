@@ -1,31 +1,35 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 5 Jan 2015 10:08:18 +0000
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-In-Reply-To: <54AA5E7C.1040706@arm.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
- <54AA5E7C.1040706@arm.com>
-Message-ID: <CAFEAcA8Nq6BPOerN7EhHpT_oa9W3+2Y_=5+zBuQD_c5fh0Yb1A@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon,  5 Jan 2015 11:04:14 +0100
+Subject: [RESEND PATCH 2/2] pinctrl: st: Add irq_disable hook to
+ st_gpio_irqchip
+In-Reply-To: <1420452254-30625-1-git-send-email-patrice.chotard@st.com>
+References: <1420452254-30625-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1420452254-30625-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2015 at 09:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 31/12/14 09:25, Peter Maydell wrote:
->> Will Deacon and Marc Zyngier are currently in possession of that h/w.
->> I'm sure they'd be delighted to pull it out of the cupboard and
->> give it a spin :-)
->
-> I'll try to find some time (or a victim to do the testing... ;-)
+Currently disable_irq() doesn't work for pinctrl-st driver, due to
+missing irq_disable hook in the driver.
+disable_irq() is required only for level-triggered interrupts, which
+is not the case normally.
 
-To save you some time in trying to debug things which didn't work
-before this patchset, the status last time I tested on h/w was:
- * PCI MMIO accesses work
- * PCI IO accesses work
- * PCI bus-master (DMA) doesn't work
+Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ drivers/pinctrl/pinctrl-st.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-with the failure symptom for DMA being that the card wrote to
-the correct area of memory but only every other word, so you
-got strings like "HellXXXXrld" with the Xs being garbage.
-This feels to me like a h/w issue rather than a driver problem.
-
--- PMM
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 87570e6..9e5ec00 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1445,6 +1445,7 @@ static struct gpio_chip st_gpio_template = {
+ 
+ static struct irq_chip st_gpio_irqchip = {
+ 	.name		= "GPIO",
++	.irq_disable	= st_gpio_irq_mask,
+ 	.irq_mask	= st_gpio_irq_mask,
+ 	.irq_unmask	= st_gpio_irq_unmask,
+ 	.irq_set_type	= st_gpio_irq_set_type,
+-- 
+1.9.1
