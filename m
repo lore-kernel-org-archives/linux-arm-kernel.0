@@ -1,181 +1,175 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Jan 2015 16:20:16 +0000
-Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150105162016.GD26699@leverpostej>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 Jan 2015 11:24:36 -0500 (EST)
+Subject: [PATCH] Revert 9fc2105aeaaf56b0cf75296a84702d0f9e64437b to fix
+ pyaudio (and probably more)
+In-Reply-To: <20150105121126.GA10116@arm.com>
+References: <20150104190123.GA20153@amd>
+ <alpine.LFD.2.11.1501041438130.18844@knanqh.ubzr>
+ <20150104201026.GA23427@amd>
+ <alpine.LFD.2.11.1501041512440.18844@knanqh.ubzr>
+ <20150104203724.GA16372@amd>
+ <alpine.LFD.2.11.1501041547050.18844@knanqh.ubzr>
+ <CA+55aFy5yB2d-1iXEUtU+puua4TAmV0kZF_7TBhXO1Y4Khqb9Q@mail.gmail.com>
+ <alpine.LFD.2.11.1501041609290.18844@knanqh.ubzr>
+ <20150104212659.GC12302@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1501042343240.18844@knanqh.ubzr>
+ <20150105121126.GA10116@arm.com>
+Message-ID: <alpine.LFD.2.11.1501051054120.18844@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Mon, 5 Jan 2015, Will Deacon wrote:
 
-I have a few (minor) comments below.
-
-On Mon, Dec 22, 2014 at 10:59:02AM +0000, Ard Biesheuvel wrote:
-> In order to support kexec, the kernel needs to be able to deal with the
-> state of the UEFI firmware after SetVirtualAddressMap() has been called.
-> To avoid having separate code paths for non-kexec and kexec, let's move
-> the call to SetVirtualAddressMap() to the stub: this will guarantee us
-> that it will only be called once (since the stub is not executed during
-> kexec), and ensures that the UEFI state is identical between kexec and
-> normal boot.
+> On Mon, Jan 05, 2015 at 04:51:31AM +0000, Nicolas Pitre wrote:
+> > On Sun, 4 Jan 2015, Russell King - ARM Linux wrote:
+> > > I encourage you *not* to back down like this.  Linus is right in so far
+> > > as the regressions issue, but he is *totally* wrong to do the revert,
+> > > which IMHO has been done out of nothing more than spite.
+> > > 
+> > > Either *with or without* the revert, the issue still remains, and needs
+> > > to be addressed properly.
+> > > 
+> > > With the revert in place, we now have insanely small bogomips values
+> > > reported via /proc/cpuinfo when hardware timers are used.  That needs
+> > > fixing.
+> > 
+> > Here's my take on it.  Taking a step back, it was stupid to mix bogomips 
+> > with timer based delays.
 > 
-> This implies that the layout of the virtual mapping needs to be created
-> by the stub as well. All regions are rounded up to a naturally aligned
-> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
-> in the UEFI memory map. The kernel proper reads those values and installs
-> the mappings in a dedicated set of page tables that are swapped in during
-> UEFI Runtime Services calls.
+> Well, bogomips is directly related to loops_per_jiffy so I don't think the
+> mechanism is "stupid";
+
+It is stupid to use loops_per_jiffy for timer based delay loops.  The 
+timer based loop simply polls the timer until the desired time has 
+passed.  Adding a loop count on top is completely artificial (may be 
+justified to avoid timer wraparounds) but bares no relationship with 
+loops_per_jiffy. Therefore determining loops_per_jiffy based on a timer 
+frequency is wrong.
+
+> the issue is that userspace makes assumptions
+> (bogus or otherwise) about the relation of bogomips to cpu frequency which
+> have historically been good enough. More below...
+
+Absolutely.  And that's what my patch is all about: restoring that "good 
+enough" for user space (mis)purpose.
+
+> > ----- >8
+> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Date: Sun, 4 Jan 2015 22:28:58 -0500
+> > Subject: [PATCH] ARM: disentangle timer based delays and bogomips calibration
+> > 
+> > The bogomips value is a pseudo CPU speed value originally used to calibrate
+> > loop-based small delays.  It is also exported to user space through the
+> > /proc filesystem and some user space apps started relying on it.
+> > 
+> > Modern hardware can vary their CPU clock at run time making the bogomips
+> > value less reliable for delay purposes. With the advent of high resolution
+> > timers, small delays migrated to timer polling loops instead.  Strangely
+> > enough, the bogomips value calibration became timer based too, making it
+> > way more bogus than it already was as a CPU speed representation and people
+> > using it via /proc/cpuinfo started complaining.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/efi.h       |  20 +++-
->  arch/arm64/kernel/efi.c            | 223 ++++++++++++++++++++-----------------
->  arch/arm64/kernel/setup.c          |   1 +
->  drivers/firmware/efi/libstub/fdt.c | 137 ++++++++++++++++++++++-
->  4 files changed, 270 insertions(+), 111 deletions(-)
-
-[...]
-
-> +static void efi_set_pgd(struct mm_struct *mm)
-> +{
-> +       cpu_switch_mm(mm->pgd, mm);
-> +       flush_tlb_all();
-> +       if (icache_is_aivivt())
-> +               __flush_icache_all();
-> +}
-
-Do we have any idea how often we call runtime services?
-
-I assume not all that often (read the RTC at boot, set/get variables).
-
-If we're nuking the TLBs and I-cache a lot we'll probably need to
-reserve an asid for the EFI virtmap.
-
-[...]
-
-> +void __init efi_virtmap_init(void)
-> +{
-> +       efi_memory_desc_t *md;
-> +
-> +       if (!efi_enabled(EFI_BOOT))
-> +               return;
-> +
-> +       for_each_efi_memory_desc(&memmap, md) {
-> +               u64 paddr, npages, size;
-> +               pgprot_t prot;
-> +
-> +               if (!(md->attribute & EFI_MEMORY_RUNTIME))
-> +                       continue;
-> +               if (WARN(md->virt_addr == 0,
-> +                        "UEFI virtual mapping incomplete or missing -- no entry found for 0x%llx\n",
-> +                        md->phys_addr))
-> +                       return;
-
-I wonder if we might want to use a different address to signal a bad
-mapping (e.g. 0UL-1 as it's not even EFI_PAGE_SIZE aligned), just in
-case we have to handle a valid use of zero in future for some reason --
-perhaps coming from another OS.
-
-> +
-> +               paddr = md->phys_addr;
-> +               npages = md->num_pages;
-> +               memrange_efi_to_native(&paddr, &npages);
-> +               size = npages << PAGE_SHIFT;
-> +
-> +               pr_info("  EFI remap 0x%012llx => %p\n",
-
-Why not use %016llx? We might only have 48-bit PAs currently, but we may
-as well keep the VA and PA equally long when printing out -- that'll
-also help to identify issues with garbage in the upper 16 bits of the
-PA field.
-
-[...]
-
-> +/*
-> + * This is the base address at which to start allocating virtual memory ranges
-> + * for UEFI Runtime Services. This is a userland range so that we can use any
-> + * allocation we choose, and eliminate the risk of a conflict after kexec.
-> + */
-> +#define EFI_RT_VIRTUAL_BASE    0x40000000
-
-Nit: I'm not keen on the term "userland" here. You can map stuff to EL0
-in the high half of the address space if you wanted, so TTBR0/TTBR1
-aren't architecturally user/kernel.
-
-s/userland/low half/, perhaps?
-
-It might also be worth pointing out that the arbitrary base address
-isn't zero so as to be less likely to be an idmap.
-
-> +
-> +static void update_memory_map(efi_memory_desc_t *memory_map,
-> +                             unsigned long map_size, unsigned long desc_size,
-> +                             int *count)
-> +{
-> +       u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
-> +       efi_memory_desc_t *out = (void *)memory_map + map_size;
-> +       int l;
-> +
-> +       for (l = 0; l < map_size; l += desc_size) {
-> +               efi_memory_desc_t *in = (void *)memory_map + l;
-> +               u64 paddr, size;
-> +
-> +               if (!(in->attribute & EFI_MEMORY_RUNTIME))
-> +                       continue;
-> +
-> +               /*
-> +                * Make the mapping compatible with 64k pages: this allows
-> +                * a 4k page size kernel to kexec a 64k page size kernel and
-> +                * vice versa.
-> +                */
-> +               paddr = round_down(in->phys_addr, SZ_64K);
-> +               size = round_up(in->num_pages * EFI_PAGE_SIZE +
-> +                               in->phys_addr - paddr, SZ_64K);
-> +
-> +               /*
-> +                * Avoid wasting memory on PTEs by choosing a virtual base that
-> +                * is compatible with section mappings if this region has the
-> +                * appropriate size and physical alignment. (Sections are 2 MB
-> +                * on 4k granule kernels)
-> +                */
-> +               if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
-> +                       efi_virt_base = round_up(efi_virt_base, SZ_2M);
-> +
-> +               in->virt_addr = efi_virt_base + in->phys_addr - paddr;
-> +               efi_virt_base += size;
-> +
-> +               memcpy(out, in, desc_size);
-> +               out = (void *)out + desc_size;
-> +               ++*count;
-> +       }
-> +}
-
-This feels like this should live in arch/arm64, or under some other
-directory specific to arm/arm64. That said, I guess the fdt stuff is
-currently arm-specific anyway, so perhaps this is fine.
-
-[...]
-
-> @@ -248,12 +337,52 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
->                 }
->         }
+> As you pointed out previously, these complaints were what prompted us to
+> revisit the bogomips reporting. The class of application using the value
+> was very much things like "How fast is my AwesomePhone-9000?":
 > 
-> +       /*
-> +        * Update the memory map with virtual addresses. The function will also
-> +        * populate the spare second half of the memory_map allocation with
-> +        * copies of just the EFI_MEMORY_RUNTIME entries so that we can pass it
-> +        * straight into SetVirtualAddressMap()
-> +        */
-> +       update_memory_map(memory_map, map_size, desc_size,
-> +                         &runtime_entry_count);
-> +
-> +       pr_efi(sys_table,
-> +              "Exiting boot services and installing virtual address map...\n");
+>   https://play.google.com/store/apps/details?id=com.securiteinfo.android.bogomips&hl=en_GB
+>   https://bugs.launchpad.net/ubuntu/+source/byobu/+bug/675442
+> 
+> so actually, having *these* applications either exit early with an
+> "unable to calculate CPU frequency" message or print something like "CPU
+> freq: unknown" is arguably the right thing to do.
 
-I believe that the memory map is allowed to change as a result of this
-call, so I think this needs to be moved before update_memory_map.
+Don't you dare!  Linus will shut you up. The sacred rule: "We don't 
+break user space, period" irrespective of the nefarious application 
+purpose for bogomips.
 
-Thanks,
-Mark.
+> What Pavel is now reporting is different; some useful piece of 
+> software has lost core functionality.
+> 
+> Now, even with the loop-based bogomips values we have the following
+> (user-visible) problems:
+> 
+>   (1) It's not portable between microarchitectures (for example, some
+>       CPUs can give you double the value if they predict the backwards
+>       branch in the calibration loop)
+
+Who cares?
+
+>   (2) It's not reliable in the face of frequency scaling
+
+loops_per_jiffy is already scaled accordingly.  Sure it is racy but 
+that's what non timer based delay loop using platforms have to live with 
+already.  For /proc/cpuinfo purposes that ought to be more than good 
+enough.  The MHz on X86 that some applications use in place of the 
+bogomips when available has the same issue.
+
+>   (3) It's not reliable in the face of heterogeneous systems (big.LITTLE)
+
+Actually, it is.  With my patch I do get different values in 
+/proc/cpuinfo for the A15's and the A7's which is kind of expected.
+
+>   (4) The lpj calculation is susceptible to overflow, limiting the maximum
+>       delay value depending on the CPU performance
+
+That's an orthogonal issue that can be fixed separately.
+
+> Essentially, the value is only really useful on relatively low-clocked,
+> in-order, uniprocessor systems (like the one where Pavel reported the bug).
+
+Sure.  Still on other systems it is some kind of ballpark figure that 
+prevents applications from breaking.
+
+> > Since it was wrong for user space to rely on a "bogus" mips value to start
+> > with, the initial responce from kernel people was to remove it.  This broke
+> > user space even more as some applications then refused to run altogether.
+> > The bogomips export was therefore reinstated in commit 4bf9636c39 ("Revert
+> > 'ARM: 7830/1: delay: don't bother reporting bogomips in /proc/cpuinfo'").
+> 
+> Actually, our initial response was to report a dummy value iirc. I remember
+> even making it selectable in kconfig, but it bordered on the absurd. It's
+> worth noting that, with the current revert in place, the value reported
+> is now basically selectable via the "clock-frequency" property on the
+> arch_timer node for systems using the timer implementation.
+
+Which is even more absurd, hence my patch.
+
+> > Because the reported bogomips is orders of magnitude away from the
+> > traditionally expected value for a given CPU when timer based delays are
+> > in use, and because lumping bogomips and timer based delay loops is rather
+> > senseless anyway, let's calibrate bogomips using a CPU loop all the time
+> > even when timer based delays are available.  Timer based delays don't
+> > need any calibration and /proc/cpuinfo will provide somewhat sensible
+> > values again.
+> > 
+> > In practice, calls to __delay() will now always use the CPU based loop.
+> > Things remain unchanged for udelay() and its derivatives.
+> 
+> Given that we have a hard limit of 3355 bogomips in our calibration code,
+> could we not just report that instead? We already have all of the issues I
+> highlighted above and the systems that are going to be hit by this are the
+> more recent (more performant) cores that will be approaching this maximum
+> value anyway.
+
+I suggested 1.00 before in this thread.  I also asked if 10, 100 or 1000 
+were any better. Apparently none of them were.  The least controvertial 
+value is certainly a runtime determined one.  The hard limit is 
+a rather weak excuse that can be fixed.
+
+> We also need something we can port to the arm64 compat layer, so a constant
+> would be easier there too, doesn't require the calibration delay at boot
+> and doesn't break __delay.
+
+That's a weak excuse too.
+
+> One thing we're missing from all of this is what happens if Pavel's testcase
+> is executed on a system using a timer-backed delay? If the program chokes
+> on the next line anyway, then we could consider only advertising the
+> bogomips line when the loop-based delay is in use.
+
+Won't fix the current user space issue on timer-based-delay systems so 
+this brings no good.
+
+
+
+Nicolas
