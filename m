@@ -1,54 +1,51 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Mon, 5 Jan 2015 19:33:06 +0530
-Subject: [PATCH 2/2] ahci_xgene: Implement the workaround to support PMP
- enumeration and discovery for APM X-Gene SoC AHCI SATA Host Controller driver.
-In-Reply-To: <20150105135950.GE15833@htj.dyndns.org>
-References: <1420453305-15986-1-git-send-email-stripathi@apm.com>
- <1420453305-15986-3-git-send-email-stripathi@apm.com>
- <20150105133005.GB15833@htj.dyndns.org>
- <20150105135950.GE15833@htj.dyndns.org>
-Message-ID: <CAOHikRBedNy=CrrHA+7UYQJpL3t1BhU0VFixz80bPeSE28iHGw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 05 Jan 2015 15:03:38 +0100
+Subject: [PATCH 3/3] ARM: mvebu: Add Armada 385 General Purpose Development
+ Board support
+In-Reply-To: <20141227113401.GC21001@lunn.ch>
+References: <1419678035-10658-1-git-send-email-gregory.clement@free-electrons.com>
+ <1419678035-10658-4-git-send-email-gregory.clement@free-electrons.com>
+ <20141227113401.GC21001@lunn.ch>
+Message-ID: <54AA99BA.9060300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reverted due to conflicts with the endian fix patches.  Please rebase
-these two on top of them.
+Hi Andrew,
 
-Will do that .. I should have wait for the endian patch getting
-accepted. Sorry for that.
+>> + * Device Tree file for Marvell Armada 385 development board
+>> + * (RD-88F6820-GP)
+>> + *
+>> + * Copyright (C) 2014 Marvell
+>> + *
+>> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+> 
+> Hi Gregory
+> 
+> I'm guessing here...
+> 
+> The file says Copyright Marvell. I guess Marvell released it GPL? Not
+> Dual license? So it would be nice to have a Signed-off-by: from
+> somebody in Marvell that they are O.K. with the dual license.
+> 
 
-On Mon, Jan 5, 2015 at 7:29 PM, Tejun Heo <tj@kernel.org> wrote:
-> On Mon, Jan 05, 2015 at 08:30:05AM -0500, Tejun Heo wrote:
->> On Mon, Jan 05, 2015 at 03:51:45PM +0530, Suman Tripathi wrote:
->> > Due to H/W errata, the controller is unable to save the PMP
->> > field fetched from command header before sending the H2D FIS.
->> > When the device returns the PMP port field in the D2H FIS, there is
->> > a mismatch and results in command completion failure. The workaround
->> > is to write the pmp value to PxFBS.DEV field before issuing any command
->> > to PMP.
->> >
->> > Signed-off-by: Suman Tripathi <stripathi@apm.com>
->>
->> Applied 1-2 to libata/for-3.20.
->
-> Reverted due to conflicts with the endian fix patches.  Please rebase
-> these two on top of them.
->
-> Thanks.
->
-> --
-> tejun
+I wrote it from scratch and in the same time Marvell is aware and agrees
+about the Dual license. Until now all the files we wrote have the Marvell
+copyright but without any  Signed-off-by: from anyone in Marvell so I don't
+think we need it now.
+
+Thanks,
+
+Gregory
 
 
 
 -- 
-Thanks,
-with regards,
-Suman Tripathi
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
