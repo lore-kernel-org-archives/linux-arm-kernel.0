@@ -1,61 +1,36 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 5 Jan 2015 10:21:53 +0100
-Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
-In-Reply-To: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
-References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
-Message-ID: <20150105092153.GJ13070@pengutronix.de>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 05 Jan 2015 14:44:28 +0530
+Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
+Message-ID: <1420449268-24707-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
+of mapping of exynos5440 PMU register which will result in kernel panic
+on exynos5440.
 
-On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
-> This patch adds the DTS bindings for the adxl34x digital
-> accelerometer.
-> 
-> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index 16ea6f5..d343e03 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -60,6 +60,22 @@
->  	rxc-skew-ps = <2000>;
->  };
->  
-> +&gpio2 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	status = "okay";
-> +
-> +	accel1: accelerometer at 53 {
-> +		compatible = "adxl34x";
-> +		reg = <0x53>;
-> +
-> +		interrupt-parent = <&portc>;
-> +		interrupts = <3 2>;
-> +	};
-> +};
-> +
->  &mmc0 {
->  	vmmc-supply = <&regulator_3_3v>;
->  	vqmmc-supply = <&regulator_3_3v>;
+As exynos5440 DTS does not have PMU node, and also we are skipping
+exynos_pm_init in case of exynos5440, let's avoid mapping of exynos5440 PMU.
 
-I just gave it a short spin. I get some interrupts and the position property
-changes, so it seems to work:
+Reported-by: Ming Lei <tom.leiming@gmail.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-	Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-
-Regards,
-Steffen
-
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index c13d083..1891b8c 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -208,7 +208,8 @@ static void __init exynos_init_irq(void)
+ 	 * DT is not unflatten so we can't use DT APIs before
+ 	 * init_irq
+ 	 */
+-	exynos_map_pmu();
++	if (!of_machine_is_compatible("samsung,exynos5440"))
++		exynos_map_pmu();
+ }
+ 
+ static void __init exynos_dt_machine_init(void)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.2.0
