@@ -1,46 +1,80 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 5 Jan 2015 20:28:38 +0800
-Subject: [PATCH] ARM: mediatek: dts: Add UART dts for MT8127 and MT8135 boards
-Message-ID: <1420460918-24380-1-git-send-email-eddie.huang@mediatek.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 5 Jan 2015 20:30:53 +0800
+Subject: [PATCH net-next v10 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <5940412.J23835FKcW@wuerfel>
+References: <1420440691-20928-1-git-send-email-dingtianhong@huawei.com>
+ <1420440691-20928-4-git-send-email-dingtianhong@huawei.com>
+ <5940412.J23835FKcW@wuerfel>
+Message-ID: <54AA83FD.9070008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable UART for MT8127 moose board and MT8135 evalution board.
-Adding the dts, these two boards can show log and shell prompts.
-This patch base on my previous MT8135/MT8127 SoC UART dtsi patch [1] and
-Matthias's modification to disable SoC UART by default.
+On 2015/1/5 16:56, Arnd Bergmann wrote:
+> On Monday 05 January 2015 14:51:31 Ding Tianhong wrote:
+>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
+>>
+>> According David Miller and Arnd Bergmann's suggestion, add some modification
+>> for v9 version:
+>> - drop the workqueue
+>> - batch cleanup based on tx_coalesce_frames/usecs for better throughput
+>> - use a reasonable default tx timeout (200us, could be shorted
+>>   based on measurements) with a range timer
+>> - fix napi poll function return value
+>> - use a lockless queue for cleanup
+> 
+> The driver looks ok to me now, but it would be good if you could list
+> any test results you got. Did the performance improve over the previous
+> versions? What is the maximum latency you get now?
+> 
+Really I miss it, I could get it and add them in next version.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/312311.html
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Adding my "Signed-off-by:" below yours is not the correct attribution here,
+> I only contributed a small part, and the last line should always list
+> the name of the person sending the patch. It would be ok if you change the
+> order of the lines to have yours last, or you could leave me out here entirely
+> and just mention me in the description.
+> 
+Ok.
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- arch/arm/boot/dts/mt8127-moose.dts | 4 ++++
- arch/arm/boot/dts/mt8135-evbp1.dts | 4 ++++
- 2 files changed, 8 insertions(+)
+>> +
+>> +	/* FIXME: make these adjustable through ethtool */
+>> +	int tx_coalesce_frames;
+>> +	int tx_coalesce_usecs;
+>> +	struct hrtimer tx_coalesce_timer;
+> 
+> The FIXME comment that I added was meant as a suggestion for you to look
+> into implementing that after you got the driver working. Did you try it
+> out, or do you have plans to do that as a follow-up patch?
+> 
+> I would assume that doing so would help in the performance evaluation and
+> to find good default values. The numbers I used were really just guessing
+> as I have no insight into how the hardware behaves in real-world systems.
+> 
+Yes, I was preparing another series patches when these patches is applied, or
+I could fix them in the next version for this patch.
 
-diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
-index 13cba0e..073e295 100644
---- a/arch/arm/boot/dts/mt8127-moose.dts
-+++ b/arch/arm/boot/dts/mt8127-moose.dts
-@@ -23,3 +23,7 @@
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
- };
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
-index a5adf97..3667738 100644
---- a/arch/arm/boot/dts/mt8135-evbp1.dts
-+++ b/arch/arm/boot/dts/mt8135-evbp1.dts
-@@ -23,3 +23,7 @@
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
- };
-+
-+&uart3 {
-+	status = "okay";
-+};
--- 
-1.8.1.1.dirty
+>> +
+>> +	/* FIXME: eliminate this mmio access if xmit_more is set */
+>> +	hip04_set_xmit_desc(priv, phys);
+>> +	priv->tx_head = TX_NEXT(tx_head);
+>> +	count++;
+>> +	netdev_sent_queue(ndev, skb->len);
+> 
+> Same thing here. I would assume that implementing xmit_more support can
+> boost tx performance significantly, but I don't have access to the hardware
+> data sheet, so I don't know what kind of interaction with the hardware
+> is required when you want to submit multiple tx frames at once.
+> 
+Ok, thanks.
+
+Ding
+
+> 	Arnd
+> 
+> .
+> 
