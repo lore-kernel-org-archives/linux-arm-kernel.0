@@ -1,127 +1,89 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 5 Jan 2015 12:01:13 -0800
-Subject: kernel.org - master not booting on keystone (ARM v7 Cortex A15
- SoC) EVMs
-In-Reply-To: <54997AC2.1040507@linaro.org>
-References: <549490D6.3090804@ti.com> <20141219211816.GH10857@pengutronix.de>
- <CANMBJr5T6SJFiw4HwvK0cfJsyrM8WTPU6_aK0uzznEV4Mqcg3w@mail.gmail.com>
- <5494B932.6060602@ti.com> <20141221102925.GJ10857@pengutronix.de>
- <54983304.3080302@ti.com> <54997AC2.1040507@linaro.org>
-Message-ID: <CAGXu5jLNXa-B_67Ay_cFF+==9YwyKuATJ3aF+dUodTPAk-_37g@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 5 Jan 2015 15:06:57 -0500
+Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <2019516.ehiuEv0rdL@wuerfel>
+References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
+ <CAL_Jsq+krOUA3BPvMCdaOBhALoi+pzWbw3YndXqR8x52OJogZg@mail.gmail.com>
+ <54A71CD1.4070107@ti.com> <2019516.ehiuEv0rdL@wuerfel>
+Message-ID: <54AAEEE1.7020607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 23, 2014 at 6:22 AM, Grygorii.Strashko at linaro.org
-<grygorii.strashko@linaro.org> wrote:
-> On 12/22/2014 05:04 PM, Murali Karicheri wrote:
->> On 12/21/2014 05:29 AM, Uwe Kleine-K?nig wrote:
->>> Hello,
->>>
->>> I cannot say anything here, but maybe the people being involved in
->>> 1e6b48116a950 can. I added them to Cc and didn't trim the mail for them.
->> Uwe,
+On 01/03/2015 04:37 PM, Arnd Bergmann wrote:
+> On Friday 02 January 2015 17:33:53 Murali Karicheri wrote:
 >>
->> Thanks for copying the commit owners. Looking forward for a response
->> from them.
+>> I have no experience with IOMMU and may not offer much help here as I
+>> originally wrote above. Will Deacon has added this API and probably able
+>> to offer some help in this discussion.
 >>
->> Murali
->>>
->>> Best regards
->>> Uwe
->>>
->>> On Fri, Dec 19, 2014 at 06:48:02PM -0500, Murali Karicheri wrote:
->>>> On 12/19/2014 04:25 PM, Tyler Baker wrote:
->>>>> Hello,
->>>>>
->>>>> On 19 December 2014 at 13:18, Uwe Kleine-K?nig
->>>>> <u.kleine-koenig@pengutronix.de>   wrote:
->>>>>> Hello,
->>>>>>
->>>>>> On Fri, Dec 19, 2014 at 03:55:50PM -0500, Murali Karicheri wrote:
->>>>>>> I have pulled the latest master from
->>>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git and
->>>>>>> tried booting on keystone k2hk and k2e EVM. The boot hangs with
->>>>>>> following log. Has anyone seen this? Keystone is an ARM v7 cortex
->>>>>>> A15 SMP platform. I am assuming master branch is broken for ARM v7
->>>>>>> and someone is working to address this. v3.18 booted up fine on my
->>>>>>> EVM.
->>>>>>>
->>>>>>> Any idea?
->>>>>> You forgot to attach the log?! So no, I don't have any idea. Did you
->>>>>> bisect?
->>>>
->>>> This was my first git bisect work. git bisect showed me below commit
->>>> as bad commit. But it is pretty old commit. I tried reverting the
->>>> commit and my board booted up fine. The boot log attached below. I
->>>> did following until I got the bad commit. v3.18 also worked fine.
->>>>
->>>> git bisect start
->>>> git bisect good<working commit>
->>>> git bisect bad<non working commit>
->>>>
->>>> I build and test. If boots fine, I did git bisect good and if not,
->>>> git bisect bad until I got the bad commit. Can someone comment if my
->>>> bisect steps look sane? If so, what is wrong with the below commit?
->>>> Ours is a LPAE SoC.
->>>>
->>>> commit 1e6b48116a95046ec51f3d40f83aff8b006674d7
->>>> Author: Kees Cook<keescook@chromium.org>
->>>> Date:   Thu Apr 3 17:28:11 2014 -0700
->>>>
->>>>      ARM: mm: allow non-text sections to be non-executable
->>>>
->>>>      Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
->>>>      into section-sized areas that can have different permisions.
->>>> Performs
->>>>      the NX permission changes during free_initmem, so that init
->>>> memory can be
->>>>      reclaimed.
->>>>
->>>>      This uses section size instead of PMD size to reduce memory lost to
->>>>      padding on non-LPAE systems.
->>>>
->>>>      Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
->>>>
->>>>      Signed-off-by: Kees Cook<keescook@chromium.org>
->>>>      Tested-by: Laura Abbott<lauraa@codeaurora.org>
->>>>      Acked-by: Nicolas Pitre<nico@linaro.org>
->>>>
+>> Will Deacon,
+>>
+>> Any comment?
 >
-> Looks like kernel_x_start, kernel_x_end are calculated wrongly in LPAE case.
-> kernel_x_start == 0x0000 0000
-> kernel_x_end   == 0x0080 0000
+> It's complicated :(
 >
-> but should be:
-> kernel_x_start == 0x0000 0008 0000 0000
-> kernel_x_end   == 0x0000 0008 0080 0000
+>> Looking at the iommu documentation and of_iommu.c, I get a feeling that
+>> this API is not really used at present as there are no callers of
+>> of_iommu_set_ops() and I assume this is a WIP.
 >
-> Below diff restores boot for me:
+> Right, but we have patches for some iommu drivers based on this API,
+> and we should migrate all of them eventually.
 >
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index cda7c40..4e6ef89 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1329,8 +1329,8 @@ static void __init kmap_init(void)
->  static void __init map_lowmem(void)
->  {
->         struct memblock_region *reg;
-> -       unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-> -       unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
-> +       phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-> +       phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+>> I believe the way it is
+>> expected to work is to have the iommu driver of the master IOMMU devices
+>> call of_iommu_set_ops(). The device node of this master IOMMU device is
+>> specified as a phandle in the OF node of the device (various bus devices
+>> such as platform, PCI etc). This allow to retrieve the iommu ops though
+>> the of_iommu_configure() API and use it in arch_setup_dma_ops(). So my
+>> gut feeling is that for PCI devices, as there are no DT node, the root
+>> bus node may specify iommus phandle to IOMMU master OF nodes.
 >
->         /* Map all the lowmem memory banks. */
->         for_each_memblock(memory, reg) {
-> --
-> regards,
-> -grygorii
+> Yes, but we also need to pass a PCI device specific identifier along
+> with the root bus node, because some iommu drivers take the PCI
+> bus/device/function number into account for creating per-function
+> i/o page tables.
+>
+>> W.r.t your comment "We may want to address the comment in
+>> of_iommu_configure about parent nodes. We should be sure these changes
+>> work with how we would do searching parent nodes",
+>>
+>> I believe, the parent node search itself should work the same way in the
+>> case of PCI as with platform bus case. PCI's case, we are providing the
+>> OF node of the root bus host bridge. Why should this be any different in
+>> terms of search?
+>>
+>> I see a potential issue with dma-ranges as described in the notes below.
+>> As noted below the usage of dma-range for iommu is to be determined. For
+>> keystone, the of_iommu_configure() always return false as we don't use
+>> the iommu. But don't know if this has any consequences for other
+>> platforms. Or I got your questions wrong. Any help here from others on
+>> the list?
+>>
+>> ========================================================================
+>> One possible extension to the above is to use an "iommus" property along
+>> with a "dma-ranges" property in a bus device node (such as PCI host
+>> bridges). This can be useful to describe how children on the bus relate
+>> to the IOMMU if they are not explicitly listed in the device tree (e.g.
+>> PCI devices). However, the requirements of that use-case haven't been
+>> fully determined yet. Implementing this is therefore not recommended
+>> without further discussion and extension of this binding.
+>> =========================================================================
+>
+> This probably won't ever apply to PCI devices, so let's ignore it for now.
+> For the moment (and for PCI), we should assume that we either configure
+> an iommu directly or we use dma-ranges if no iommu is in use.
+>
+Thanks Arnd,
 
-Thanks for tracking this down!
+I will post v3 of the patch with what is agreed before in my response 
+and I understand there is no additional change required based on this 
+particular discussion about iommu. Right?
 
-Acked-by: Kees Cook <keescook@chromium.org>
+Murali
+> 	Arnd
 
--Kees
 
 -- 
-Kees Cook
-Chrome OS Security
+Murali Karicheri
+Linux Kernel, Texas Instruments
