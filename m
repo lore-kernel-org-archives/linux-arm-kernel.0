@@ -1,47 +1,107 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 05 Jan 2015 16:48:00 +0100
-Subject: [RFC PATCHv2 17/19] power: bq2415x_charger: Decrement the power
- supply's device reference counter
+Date: Mon, 05 Jan 2015 16:47:55 +0100
+Subject: [RFC PATCHv2 12/19] power_supply: Add power_supply_put for
+ decrementing device reference counter
 In-Reply-To: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
 References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1420472882-10463-18-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1420472882-10463-13-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use power_supply_put() to decrement the power supply's device reference
-counter (increased by power_supply_get_by_name() or
-power_supply_get_by_phandle()).
+The power_supply_get_by_phandle() and power_supply_get_by_name() use
+function class_find_device() for obtaining the reference to power
+supply. Each use of class_find_device() increases the power supply's
+device reference counter.
+
+However the reference counter was not decreased by users of this API.
+Thus final device_unregister() call from power_supply_unregister() could
+not release the device and clean up its resources. This lead to memory
+leak if at least once power_supply_get_by_*() was called between
+registering and unregistering the power supply.
+
+Add and document new API power_supply_put() for decrementing the
+reference counter.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/power/bq2415x_charger.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/power/power_supply_core.c | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/power_supply.h      |  1 +
+ 2 files changed, 39 insertions(+)
 
-diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/bq2415x_charger.c
-index 2f80de0410d9..00809dcdd34e 100644
---- a/drivers/power/bq2415x_charger.c
-+++ b/drivers/power/bq2415x_charger.c
-@@ -1686,6 +1686,8 @@ error_4:
- error_3:
- 	bq2415x_power_supply_exit(bq);
- error_2:
-+	if (!IS_ERR(bq->notify_psy))
-+		power_supply_put(bq->notify_psy);
- 	kfree(name);
- error_1:
- 	mutex_lock(&bq2415x_id_mutex);
-@@ -1701,8 +1703,10 @@ static int bq2415x_remove(struct i2c_client *client)
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index ec9ac01074c7..074aedf6b2f2 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -335,6 +335,17 @@ static int power_supply_match_device_by_name(struct device *dev, const void *dat
+ 	return strcmp(psy->desc->name, name) == 0;
+ }
+ 
++/**
++ * power_supply_get_by_name() - Search for a power supply and returns its ref
++ * @name: Power supply name to fetch
++ *
++ * If power supply was found, it increases reference count for the
++ * internal power supply's device. The user should power_supply_put()
++ * after usage.
++ *
++ * Return: On success returns a reference to a power supply with
++ * matching name equals to @name, a NULL otherwise.
++ */
+ struct power_supply *power_supply_get_by_name(const char *name)
  {
- 	struct bq2415x_device *bq = i2c_get_clientdata(client);
+ 	struct device *dev = class_find_device(power_supply_class, NULL, name,
+@@ -344,12 +355,39 @@ struct power_supply *power_supply_get_by_name(const char *name)
+ }
+ EXPORT_SYMBOL_GPL(power_supply_get_by_name);
  
--	if (bq->notify_psy)
-+	if (bq->notify_psy) {
- 		power_supply_unreg_notifier(&bq->nb);
-+		power_supply_put(bq->notify_psy);
-+	}
++/**
++ * power_supply_put() - Drop reference obtained with power_supply_get_by_name
++ * @psy: Reference to put
++ *
++ * The reference to power supply should be put before unregistering
++ * the power supply.
++ */
++void power_supply_put(struct power_supply *psy)
++{
++	might_sleep();
++
++	put_device(&psy->dev);
++}
++EXPORT_SYMBOL_GPL(power_supply_put);
++
+ #ifdef CONFIG_OF
+ static int power_supply_match_device_node(struct device *dev, const void *data)
+ {
+ 	return dev->parent && dev->parent->of_node == data;
+ }
  
- 	bq2415x_sysfs_exit(bq);
- 	bq2415x_power_supply_exit(bq);
++/**
++ * power_supply_get_by_phandle() - Search for a power supply and returns its ref
++ * @np: Pointer to device node holding phandle property
++ * @phandle_name: Name of property holding a power supply name
++ *
++ * If power supply was found, it increases reference count for the
++ * internal power supply's device. The user should power_supply_put()
++ * after usage.
++ *
++ * Return: On success returns a reference to a power supply with
++ * matching name equals to value under @property, NULL or ERR_PTR otherwise.
++ */
+ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
+ 							const char *property)
+ {
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index 4afbba073c4a..56e68c9156ce 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -282,6 +282,7 @@ extern struct atomic_notifier_head power_supply_notifier;
+ extern int power_supply_reg_notifier(struct notifier_block *nb);
+ extern void power_supply_unreg_notifier(struct notifier_block *nb);
+ extern struct power_supply *power_supply_get_by_name(const char *name);
++extern void power_supply_put(struct power_supply *psy);
+ #ifdef CONFIG_OF
+ extern struct power_supply *power_supply_get_by_phandle(struct device_node *np,
+ 							const char *property);
 -- 
 1.9.1
