@@ -1,65 +1,89 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 05 Jan 2015 17:07:30 +0000
-Subject: [PATCH 3.19-rc2 v13 4/5] ARM: Add support for on-demand backtrace
- of other CPUs
-In-Reply-To: <20150105101925.64e8ecec@gandalf.local.home>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>	<1420469699-25350-1-git-send-email-daniel.thompson@linaro.org>	<1420469699-25350-5-git-send-email-daniel.thompson@linaro.org>
- <20150105101925.64e8ecec@gandalf.local.home>
-Message-ID: <54AAC4D2.1030606@linaro.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 5 Jan 2015 15:19:08 -0200
+Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
+Message-ID: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/15 15:19, Steven Rostedt wrote:
-> On Mon,  5 Jan 2015 14:54:58 +0000
-> Daniel Thompson <daniel.thompson@linaro.org> wrote:
-> 
->> +
->> +/* For reliability, we're prepared to waste bits here. */
->> +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
->> +static  cpumask_t printtrace_mask;
->> +
->> +#define NMI_BUF_SIZE		4096
->> +
->> +struct nmi_seq_buf {
->> +	unsigned char		buffer[NMI_BUF_SIZE];
->> +	struct seq_buf		seq;
->> +};
->> +
->> +/* Safe printing in NMI context */
->> +static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
->> +
->> +/* "in progress" flag of arch_trigger_all_cpu_backtrace */
->> +static unsigned long backtrace_flag;
->> +
->> +/*
->> + * It is not safe to call printk() directly from NMI handlers.
->> + * It may be fine if the NMI detected a lock up and we have no choice
->> + * but to do so, but doing a NMI on all other CPUs to get a back trace
->> + * can be done with a sysrq-l. We don't want that to lock up, which
->> + * can happen if the NMI interrupts a printk in progress.
->> + *
->> + * Instead, we redirect the vprintk() to this nmi_vprintk() that writes
->> + * the content into a per cpu seq_buf buffer. Then when the NMIs are
->> + * all done, we can safely dump the contents of the seq_buf to a printk()
->> + * from a non NMI context.
->> + */
->> +static int nmi_vprintk(const char *fmt, va_list args)
->> +{
->> +	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
->> +	unsigned int len = seq_buf_used(&s->seq);
->> +
->> +	seq_buf_vprintf(&s->seq, fmt, args);
->> +	return seq_buf_used(&s->seq) - len;
->> +}
->> +
-> 
-> This is the same code as in x86. I wonder if we should move the
-> duplicate code into kernel/printk/ and have it compiled if the arch
-> requests it (CONFIG_ARCH_WANT_NMI_PRINTK or something). That way we
-> don't have 20 copies of the same nmi_vprintk() and later find that we
-> need to change it, and have to change it in 20 different archs.
+GPIO2_5 is the reset GPIO for the USB3317 ULPI PHY. Instead of modelling it as
+a regulator, the correct approach is to use the 'reset_gpios' property of the
+"usb-nop-xceiv" node.
 
-Sounds like a good idea. I'll take a look at this.
+GPIO1_7 is the reset GPIO for the USB2517 USB hub. As we currently don't have
+dt bindings to describe a HUB reset, let's keep using the regulator approach.
 
+Rename the regulator to 'reg_hub_reset' to better describe its function and bind
+it with the USB host1 port instead.
 
-Daniel.
+USB host support has been introduced by commit 9bf206a9d13be3 ("ARM: dts:
+imx51-babbage: Add USB Host1 support"), which landed in 3.16 and it seems that
+USB has only been functional due to previous bootloader initialization.
+
+With this patch applied we can get USB host to work without relying on the 
+bootloader.
+
+Cc: <stable@vger.kernel.org> # 3.16+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 56569ce..649befe 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -127,24 +127,12 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		reg_usbh1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_usbh1reg>;
+-			reg = <0>;
+-			regulator-name = "usbh1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
+-
+-		reg_usbotg_vbus: regulator at 1 {
++		reg_hub_reset: regulator at 0 {
+ 			compatible = "regulator-fixed";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_usbotgreg>;
+-			reg = <1>;
+-			regulator-name = "usbotg_vbus";
++			reg = <0>;
++			regulator-name = "hub_reset";
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+@@ -176,6 +164,7 @@
+ 			reg = <0>;
+ 			clocks = <&clks IMX5_CLK_DUMMY>;
+ 			clock-names = "main_clk";
++			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ };
+@@ -419,7 +408,7 @@
+ &usbh1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh1>;
+-	vbus-supply = <&reg_usbh1_vbus>;
++	vbus-supply = <&reg_hub_reset>;
+ 	fsl,usbphy = <&usbh1phy>;
+ 	phy_type = "ulpi";
+ 	status = "okay";
+@@ -429,7 +418,6 @@
+ 	dr_mode = "otg";
+ 	disable-over-current;
+ 	phy_type = "utmi_wide";
+-	vbus-supply = <&reg_usbotg_vbus>;
+ 	status = "okay";
+ };
+ 
+-- 
+1.9.1
