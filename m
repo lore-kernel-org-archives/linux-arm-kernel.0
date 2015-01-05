@@ -1,43 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 05 Jan 2015 09:50:52 +0000
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-In-Reply-To: <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
-Message-ID: <54AA5E7C.1040706@arm.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 05 Jan 2015 10:52:13 +0100
+Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
+In-Reply-To: <1420449268-24707-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1420449268-24707-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1420451533.15910.19.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/12/14 09:25, Peter Maydell wrote:
-> On 30 December 2014 at 19:28, Rob Herring <robherring2@gmail.com> wrote:
->> This has been tested on QEMU. A previous version was tested on
->> Versatile/AB by Linus Walleij. Linus reported a problem with the
->> display panel detection. Investigation on h/w is needed still as I have
->> not been able to identify the issue by inspection and the display
->> detection seems to work correctly on QEMU.
->>
->> Linus had also mentioned to me that QEMU users may have some issue with
->> removing non-DT code as the work flow has to change somewhat.
+On Mon, 2015-01-05 at 14:44 +0530, Pankaj Dubey wrote:
+> Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
+> of mapping of exynos5440 PMU register which will result in kernel panic
+> on exynos5440.
 > 
-> As long as you call out the requirement for a DT now in whatever
-> your equivalent of release notes is that should be fine. (Does
-> the kernel provide a useful message to serial in the absence of a
-> DT or does it now not have enough platform knowledge to do that?)
+> As exynos5440 DTS does not have PMU node, and also we are skipping
+> exynos_pm_init in case of exynos5440, let's avoid mapping of exynos5440 PMU.
+
+
+> Reported-by: Ming Lei <tom.leiming@gmail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
->> Copying
->> Peter Maydell here for comment (and there's rumors he may have actual PB
->> h/w with PCI as well).
-> 
-> Will Deacon and Marc Zyngier are currently in possession of that h/w.
-> I'm sure they'd be delighted to pull it out of the cupboard and
-> give it a spin :-)
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index c13d083..1891b8c 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -208,7 +208,8 @@ static void __init exynos_init_irq(void)
+>  	 * DT is not unflatten so we can't use DT APIs before
+>  	 * init_irq
+>  	 */
+> -	exynos_map_pmu();
+> +	if (!of_machine_is_compatible("samsung,exynos5440"))
+> +		exynos_map_pmu();
+>  }
+>  
+>  static void __init exynos_dt_machine_init(void)
 
-I'll try to find some time (or a victim to do the testing... ;-). To
-those interested, I have a few extra PCI backplanes (just the PCB, not
-the huge noisy carrier rack) I could be convinced to part with...
+Why the blacklist approach rather then simply making exynos_map_pmu exit
+rather then panicing if it couldn't find a pmu node in the dts?
 
-Thanks,
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/72bb9903/attachment.bin>
