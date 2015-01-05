@@ -1,52 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Jan 2015 20:45:46 +0800
-Subject: [PATCH v2] ARM: i.MX53: dts: add sahara module
-In-Reply-To: <20150105123726.GA24511@dragon>
-References: <1418115412-20691-1-git-send-email-s.trumtrar@pengutronix.de>
- <20141216090442.GJ2411@dragon>
- <20141216092441.GD13070@pengutronix.de>
- <20150105123726.GA24511@dragon>
-Message-ID: <20150105124542.GA14108@dragon>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 05 Jan 2015 06:47:39 -0600
+Subject: [PATCH V3] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan
+ node
+In-Reply-To: <20150103233949.GA4108@earth.universe>
+References: <1420309826-7904-1-git-send-email-nm@ti.com>
+ <20150103233949.GA4108@earth.universe>
+Message-ID: <54AA87EB.1000004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 08:37:28PM +0800, Shawn Guo wrote:
-> On Tue, Dec 16, 2014 at 10:24:41AM +0100, Steffen Trumtrar wrote:
-> > On Tue, Dec 16, 2014 at 05:04:43PM +0800, Shawn Guo wrote:
-> > > On Tue, Dec 09, 2014 at 09:56:52AM +0100, Steffen Trumtrar wrote:
-> > > > The i.MX53 has a SAHARA v4 core. Add it to the dtsi.
-> > > > 
-> > > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > > > ---
-> > > > Changes since v1:
-> > > > 	- remove status property
-> > > > 
-> > > >  arch/arm/boot/dts/imx53.dtsi | 9 +++++++++
-> > > >  1 file changed, 9 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > > > index b96213ba0671..ff4fa7ecacd8 100644
-> > > > --- a/arch/arm/boot/dts/imx53.dtsi
-> > > > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > > > @@ -765,6 +765,15 @@
-> > > >  				resets = <&src 1>;
-> > > >  				iram = <&ocram>;
-> > > >  			};
-> > > > +
-> > > > +			sahara: crypto at 63ff8000 {
-> > > > +				compatible = "fsl,imx53-sahara";
-> > > 
-> > > Is there already a driver for it in the kernel?
-> > > 
-> > 
-> > Herbert Xu queued the driver in his crypto tree.
-> 
-> Okay.  I have seen the driver change in 3.19-rc.  But the compatible
-> string is still undocumented.
+On 01/03/2015 05:39 PM, Sebastian Reichel wrote:
 
-Ah, I see.  The compatible is written as "fsl,<soc>-sahara" in the
-binding doc.
+> On Sat, Jan 03, 2015 at 12:30:26PM -0600, Nishanth Menon wrote:
+>> [...]
+>> +		gpio-fan,speed-map = <0    0
+>> +				      13000 1>;
+>> [...]
+>
+> iirc DT maintainers prefer this format:
+>
+> gpio-fan,speed-map = <0     0>,
+>                       <13000 1>;
+>
+> This should result in the same .dtb, but is a bit easier to read.
+>
+yes indeed.. :( Thanks for catching it. will repost.
 
-Patch applied, thanks.
-
-Shawn
+Regards,
+Nishanth Menon
