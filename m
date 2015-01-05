@@ -1,143 +1,125 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Mon, 05 Jan 2015 21:40:39 +0900
-Subject: [alsa-devel] [PATCH 1/3] ASoC: samsung: Add machine driver for
- Trats2
-In-Reply-To: <54AA7A0B.2070004@metafoo.de>
-References: <1420457117-11030-1-git-send-email-ideal.song@samsung.com>
- <1420457117-11030-2-git-send-email-ideal.song@samsung.com>
- <54AA7A0B.2070004@metafoo.de>
-Message-ID: <20150105214039.2f6065fe@songinha-Samsung-DeskTop-System>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon,  5 Jan 2015 12:40:16 +0000
+Subject: [PATCH 3.19-rc2 v15 0/8] arm: Fix DEBUG_LL for multi-platform kernels
+ (without PL01X)
+Message-ID: <1420461624-4410-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset removes some single-platform compatibility tricks related
+to DEBUG_LL and, as a result, allows multi_v7_defconfig derived builds
+to enable DEBUG_LL. Currently the user selected kbuild setting is
+ignored and the PL01X's DEBUG_LL stub is silently selected instead. This
+is a pain if your hardware doesn't have this cell, not least because it
+takes a little time to figure out that kbuild built the wrong code.
 
-Thanks for your comments.
+Warning:
 
+    silentoldconfig on PL011 single platforms will result in DEBUG_LL
+    being directed at ICEDCC rather than PL011. This should only
+    affect silentoldconfig since oldconfig prompts and the defconfigs have
+    been updated to avoid this problem.
 
-> Hi,
-> 
-> A few small comments inline.
-> 
-> On 01/05/2015 12:25 PM, Inha Song wrote:
-> > --- /dev/null
-> > +++ b/sound/soc/samsung/trats2_wm1811.c
-> > @@ -0,0 +1,216 @@
-> >[...]
-> > +#include <linux/of.h>
-> > +#include <linux/module.h>
-> > +#include <linux/clk.h>
-> > +#include <sound/soc.h>
-> > +#include <sound/pcm_params.h>
-> > +#include "i2s.h"
-> > +#include "i2s-regs.h"
-> 
-> You probably don't need i2s-regs.h
+Changes sine v14:
+- Spell cns3xxx (was cnx3xxxx) correctly in the patch subject (Baruch
+  Siach)
 
-OK, I will remove.
+Changes since v13:
+- Rebased on 3.19-rc1 and dropped my patch for SA1100 which is
+  obsoleted by commit e6131fa38354 ("ARM: debug: move StrongARM debug
+  include to arch/arm/include/debug")
 
-> 
-> > +#include "../codecs/wm8994.h"
-> > +
-> > +struct trats2_machine_priv {
-> > +	struct clk *clk_mclk;
-> > +};
-> > +
-> > +static struct trats2_machine_priv trats2_wm1811_priv;
-> > +
-> > +static const struct snd_kcontrol_new trats2_controls[] = {
-> > +	SOC_DAPM_PIN_SWITCH("SPK"),
-> > +};
-> > +
-> > +const struct snd_soc_dapm_widget trats2_dapm_widgets[] = {
-> 
-> static
+Changes since v12:
+- v11 spuriously missed out changes from v10 and v11 (it was incorrectly
+  derived from v9). All changes have been reinstated after thorough
+  review of the diff between v13 and v11 (many thanks to Aaro Koskinen).
+- Merged the changes to 8250 related changes to defconfig files into
+  a single patch (Arnd Bergmann).
 
-Sorry for my mistake.
+Changes since v11:
+- Fixed sort order of Kconfig symbols (review of Russell King)
+- Reviewed all defconfigs for the selection of DEBUG_UART_NONE.  All
+  identified have 8250-based UARTs and are switched to DEBUG_LL_UART_8250
+  (review of Arnd Bergmann).
+- Fixed regression in the netx macros (bad setting of \rp and \rv.
+- Rebased on latest mainline (v3.18-rc1). Note that two patches from v11
+  were merged upstream and are no longer included here.
+- Added a trivial fix to the defaults list for DEBUG_UART_PHYS which came
+  to my attention as a merge conflict.
 
-> 
-> > +	SND_SOC_DAPM_SPK("SPK", NULL),
-> > +};
-> > +
-> > +static int trats2_aif1_hw_params(struct snd_pcm_substream *substream,
-> > +				 struct snd_pcm_hw_params *params)
-> > +{
-> > +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> > +	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-> > +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-> > +	struct trats2_machine_priv *priv = snd_soc_card_get_drvdata(rtd->card);
-> > +	unsigned int sysclk_rate;
-> > +	unsigned int mclk_rate =
-> > +			(unsigned int)clk_get_rate(priv->clk_mclk);
-> > +	int ret;
-> > +
-> > +	/* Set the codec DAI configuration to Master*/
-> > +	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_I2S
-> > +					| SND_SOC_DAIFMT_NB_NF
-> > +					| SND_SOC_DAIFMT_CBM_CFM);
-> > +	if (ret < 0) {
-> > +		dev_err(codec_dai->dev,
-> > +			"Failed to set codec dai format: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	/* Set the cpu DAI configuration to Slave */
-> > +	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S
-> > +					| SND_SOC_DAIFMT_NB_NF
-> > +					| SND_SOC_DAIFMT_CBM_CFM);
-> > +	if (ret < 0) {
-> > +		dev_err(cpu_dai->dev,
-> > +			"Failed to set cpu dai format: %d\n", ret);
-> > +		return ret;
-> > +	}
-> 
-> 
-> Use the dai_fmt field in the dai_link struct to setup the DAI link format. 
-> This will configure both the CPU and the CODEC DAI with the specified 
-> format, no need to do it manually.
+Changes since v10:
+- Fixed typos in the omap1 config help texts (review of Aaro Koskinen).
 
-Ok, move to dai_fmt.
+Changes since v9:
+- Removed a spuriously introduced (and unused) config variable from
+  the netx patch (review of Paul Bolle).
+- Fix netx macro to ensure \rv is correctly initialized.
+- Rebased on v3.17rc4.
 
-> 
-> >[...]
-> > +static struct snd_soc_ops trats2_aif1_ops = {
-> 
-> const
+Changes since v8:
+- Regenerated patch series with --find-renames to properly track code
+  movement.
 
-I will fix this.
+Changes since v7:
+- Killed DEBUG_LL_UART_NONE completely and migrated over the four remaining
+  platforms that relied on this (Arnd Bergmann, Russell King). This
+  fixes some problems with oldconfig builds.
+- Rebased on latest mainline (v3.17rc1).
 
-> 
-> > +	.hw_params = trats2_aif1_hw_params,
-> > +};
-> > +
-> > +static int trats2_init_paiftx(struct snd_soc_pcm_runtime *rtd)
-> > +{
-> > +	struct snd_soc_codec *codec = rtd->codec;
-> > +	struct snd_soc_card *card = rtd->card;
-> > +	struct trats2_machine_priv *priv = snd_soc_card_get_drvdata(card);
-> > +	int ret;
-> > +
-> > +	ret = clk_prepare_enable(priv->clk_mclk);
-> 
-> Maybe just do this in the platform device probe handler and you should have 
-> a matching disable call somewhere.
+Changes since v6:
+- Removed a patch to limit DEBUG_LL_UART_NONE to platforms that support
+  it because it almost time to drop DEBUG_LL_UART_NONE anyway (only
+  four platforms still use it).
+- Rebased on latest mainline (v3.16rc3).
 
-Ok, I will move clk_prepare_enable call to snd_soc_ops->startup
-and clk_disable_unprepare call to snd_soc_ops->shutdown.
+Changes since v5:
 
-Best Regards,
-Inha Song.
+- Shortened the list of platforms that can select DEBUG_LL_UART_NONE
+  (changes Arnd Bergmann)
+- Rebased on latest mainline (v3.15rc7).
 
-> 
-> > +	if (ret) {
-> > +		dev_err(codec->dev, "Failed to enable mclk: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> >[...]
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+Changes since v4:
+
+- Rebased to latest mainline (and tested again). No functional changes.
+
+Changes since v3:
+
+- Converted from a single patch to a series.
+- Tested defconfig builds of all impacted platforms.
+
+Changes since v2:
+
+- Switch from def_bool to bool (thanks Russell King)
+
+Changes since v1:
+
+- Remove pointless single platform support (thanks Arnd Bergmann)
+
+Daniel Thompson (8):
+  arm: cnx3xxx: Remove spurious default for DEBUG_CNS3xxx
+  arm: configs: Enable DEBUG_LL_UART_8250 where needed
+  arm: Remove DEBUG_LL_UART_NONE
+  arm: ks8695: Migrate debug_ll macros to shared directory
+  arm: omap1: Migrate debug_ll macros to use 8250.S
+  arm: netx: Migrate DEBUG_LL macros to shared directory
+  arm: Seperate DEBUG_UART_PHYS from DEBUG_LL on EP93XX
+  arm: Fix DEBUG_LL for multi-platform kernels (without PL01X)
+
+ arch/arm/Kconfig.debug                             | 101 +++++++++++++++++----
+ arch/arm/configs/iop32x_defconfig                  |   1 +
+ arch/arm/configs/iop33x_defconfig                  |   1 +
+ arch/arm/configs/ixp4xx_defconfig                  |   1 +
+ arch/arm/configs/lpc32xx_defconfig                 |   1 +
+ arch/arm/configs/mv78xx0_defconfig                 |   1 +
+ arch/arm/configs/orion5x_defconfig                 |   1 +
+ arch/arm/configs/rpc_defconfig                     |   1 +
+ .../mach/debug-macro.S => include/debug/ks8695.S}  |  10 +-
+ .../mach/debug-macro.S => include/debug/netx.S}    |  22 ++---
+ arch/arm/mach-omap1/include/mach/debug-macro.S     | 101 ---------------------
+ 11 files changed, 106 insertions(+), 135 deletions(-)
+ rename arch/arm/{mach-ks8695/include/mach/debug-macro.S => include/debug/ks8695.S} (80%)
+ rename arch/arm/{mach-netx/include/mach/debug-macro.S => include/debug/netx.S} (62%)
+ delete mode 100644 arch/arm/mach-omap1/include/mach/debug-macro.S
+
+--
+1.9.3
