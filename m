@@ -1,30 +1,74 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon,  5 Jan 2015 18:33:53 +0000
-Subject: [PATCH 0/2] arm64: don't call early_*map() post paging_init()
-Message-ID: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
+Date: Mon,  5 Jan 2015 18:33:54 +0000
+Subject: [PATCH 1/2] arm64: don't make early_*map() calls post paging_init()
+In-Reply-To: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
+References: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1420482835-6444-2-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This (tiny) series resolves a fairly serious problem with
-early_ioremap/iounmap/memremap/memunmap on arm64. These functions
-cannot safely be called after paging_init(), but the sanity check
-was not triggering.
+arm64 early_ioremap/iounmap/memremap/memunmap are not supported beyond
+the call to paging_init(), but arm64_enter_virtual_mode() (an early
+initcall) makes one call to unmap the UEFI memory map.
 
-As a result, a fixmap entry was incorrectly cleared during
-early_initcalls on arm64 UEFI systems.
+Rearrange the code to unmap this region before paging_init().
 
-1/2 reworks the arm64 UEFI support code to not attempt these calls
-and
-2/2 enables the sanity check
-
-Leif Lindholm (2):
-  arm64: don't make early_*map() calls post paging_init()
-  arm64: call early_ioremap_reset() in paging_init()
-
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
  arch/arm64/kernel/efi.c   | 12 +++---------
  arch/arm64/kernel/setup.c |  2 --
- arch/arm64/mm/mmu.c       |  1 +
- 3 files changed, 4 insertions(+), 11 deletions(-)
+ 2 files changed, 3 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 6fac253..790adb5 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -317,15 +317,8 @@ void __init efi_init(void)
+ 		return;
+ 
+ 	reserve_regions();
+-}
+-
+-void __init efi_idmap_init(void)
+-{
+-	if (!efi_enabled(EFI_BOOT))
+-		return;
+ 
+-	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
+-	efi_setup_idmap();
++	early_memunmap(memmap.map, params.mmap_size);
+ }
+ 
+ static int __init remap_region(efi_memory_desc_t *md, void **new)
+@@ -380,7 +373,6 @@ static int __init arm64_enter_virtual_mode(void)
+ 	}
+ 
+ 	mapsize = memmap.map_end - memmap.map;
+-	early_memunmap(memmap.map, mapsize);
+ 
+ 	if (efi_runtime_disabled()) {
+ 		pr_info("EFI runtime services will be disabled.\n");
+@@ -393,6 +385,8 @@ static int __init arm64_enter_virtual_mode(void)
+ 						   mapsize);
+ 	memmap.map_end = memmap.map + mapsize;
+ 
++	efi_setup_idmap();
++
+ 	efi.memmap = &memmap;
+ 
+ 	/* Map the runtime regions */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index b809911..c7eb3c5 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -401,8 +401,6 @@ void __init setup_arch(char **cmdline_p)
+ 	paging_init();
+ 	request_standard_resources();
+ 
+-	efi_idmap_init();
+-
+ 	unflatten_device_tree();
+ 
+ 	psci_init();
 -- 
 2.1.3
