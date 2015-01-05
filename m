@@ -1,80 +1,194 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Mon, 5 Jan 2015 00:45:01 +0100
-Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to
- input LEDs
-In-Reply-To: <20150104232838.GA14912@dtor-glaptop>
-References: <20141226232116.GA5069@type> <20141226232310.GD5069@type>
- <20150104232838.GA14912@dtor-glaptop>
-Message-ID: <20150104234501.GJ25336@type.youpi.perso.aquilenet.fr>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 05 Jan 2015 09:35:25 +0900
+Subject: [PATCH] ARM: EXYNOS: Add exynos3250 suspend-to-ram support
+In-Reply-To: <1419388629-27066-1-git-send-email-cw00.choi@samsung.com>
+References: <1419388629-27066-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <54A9DC4D.1050600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Torokhov, le Sun 04 Jan 2015 15:28:38 -0800, a ?crit :
-> I'd rather we did not have a separate config option for this. Do we really need to
-> support case where LEDs are disabled?
+Dear Kukjin,
 
-I don't really mind.
+Could you please review this patch-set?
 
-> I'd rather stub it out instead of providing 2 separate code paths.
+I tested this patch-set on Exynos3250-baesd Rinato board.
 
-Ok.
+Best Regards,
+Chanwoo Choi
 
-> > +/* LED state change for some keyboard, notify that keyboard.  */
-> > +static void perdevice_input_led_set(struct led_classdev *cdev,
-> > +			  enum led_brightness brightness)
-> > +{
-> > +	struct input_dev *dev;
-> > +	struct led_classdev *leds;
-> > +	int led;
-> > +
-> > +	dev = cdev->dev->platform_data;
+On 12/24/2014 11:37 AM, Chanwoo Choi wrote:
+> This patch adds the support for suspend-to-ram feature of Exynos3250 SoC.
+> Exynos3250 don't contain the L2 cache.
 > 
-> Umm, platform data is not the best place for storing this. Why not drvdata?
-
-Just because it didn't exist when I wrote the code :)
-Ok.
-
-> > +/* A new input device with potential LEDs to connect.  */
-> > +int input_led_connect(struct input_dev *dev)
-> > +{
-> > +	int i, error = -ENOMEM;
-> > +	struct led_classdev *leds;
-> > +	struct led_trigger *triggers;
-> > +
-> > +	leds = kcalloc(LED_CNT, sizeof(*leds), GFP_KERNEL);
-> > +	if (!leds)
-> > +		goto err;
+> The measured power-consumption in suspend state:
+> - before entering suspend : 31mA
+> - in suspend state : 16mA
 > 
-> Why do we allocate all possible led's for every device?
-
-Ah, right, that was making things simpler, but it could be
-squeezed.  I'm just afraid of one thing: may dev->ledbit change after
-input_register_device?  It seems that at least uinput somehow permits
-this.  It then means having to store the number of actually created LEDs
-and triggers alongside.
-
-> > +	dev->leds = leds;
-> > +
-> > +	triggers = kcalloc(LED_CNT, sizeof(*triggers), GFP_KERNEL);
-> > +	if (!triggers)
-> > +		goto err;
-> > +	dev->triggers = triggers;
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> This patch is based on v3.19-rc1 and is tested on Exynos3250-based Rinato board.
 > 
-> Hmm, maybe having per-device triggers is a bit of overkill and we could have
-> just "input-numl", "input-capsl", etc.
-
-No, that won't work, notably for evdev access: we have to respect the
-per-device semantic.
-
-> > +	/* No issue so far, we can register for real.  */
-> > +	for (i = 0; i < LED_CNT; i++)
-> > +		if (leds[i].name) {
-> > +			led_classdev_register(&dev->dev, &leds[i]);
-> > +			leds[i].dev->platform_data = dev;
-> > +			led_trigger_register(&triggers[i]);
+>  arch/arm/mach-exynos/regs-pmu.h |  3 ++
+>  arch/arm/mach-exynos/suspend.c  | 77 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 80 insertions(+)
 > 
-> We need error handling here.
-
-Right.
-
-Samuel
+> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+> index b5f4406..eb461e1 100644
+> --- a/arch/arm/mach-exynos/regs-pmu.h
+> +++ b/arch/arm/mach-exynos/regs-pmu.h
+> @@ -160,12 +160,14 @@
+>  #define EXYNOS5_L2RSTDISABLE_VALUE		BIT(3)
+>  
+>  #define S5P_PAD_RET_MAUDIO_OPTION		0x3028
+> +#define S5P_PAD_RET_MMC2_OPTION			0x30c8
+>  #define S5P_PAD_RET_GPIO_OPTION			0x3108
+>  #define S5P_PAD_RET_UART_OPTION			0x3128
+>  #define S5P_PAD_RET_MMCA_OPTION			0x3148
+>  #define S5P_PAD_RET_MMCB_OPTION			0x3168
+>  #define S5P_PAD_RET_EBIA_OPTION			0x3188
+>  #define S5P_PAD_RET_EBIB_OPTION			0x31A8
+> +#define S5P_PAD_RET_SPI_OPTION			0x31c8
+>  
+>  #define S5P_PS_HOLD_CONTROL			0x330C
+>  #define S5P_PS_HOLD_EN				(1 << 31)
+> @@ -326,6 +328,7 @@
+>  			(EXYNOS3_ARM_CORE0_OPTION + ((_nr) * 0x80))
+>  
+>  #define EXYNOS3_ARM_COMMON_OPTION			0x2408
+> +#define EXYNOS3_ARM_L2_OPTION				0x2608
+>  #define EXYNOS3_TOP_PWR_OPTION				0x2C48
+>  #define EXYNOS3_CORE_TOP_PWR_OPTION			0x2CA8
+>  #define EXYNOS3_XUSBXTI_DURATION			0x341C
+> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+> index f8e7dcd..d6feef3 100644
+> --- a/arch/arm/mach-exynos/suspend.c
+> +++ b/arch/arm/mach-exynos/suspend.c
+> @@ -91,6 +91,12 @@ static unsigned int exynos_pmu_spare3;
+>  
+>  static u32 exynos_irqwake_intmask = 0xffffffff;
+>  
+> +static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
+> +	{ 73, BIT(1) }, /* RTC alarm */
+> +	{ 74, BIT(2) }, /* RTC tick */
+> +	{ /* sentinel */ },
+> +};
+> +
+>  static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
+>  	{ 76, BIT(1) }, /* RTC alarm */
+>  	{ 77, BIT(2) }, /* RTC tick */
+> @@ -114,6 +120,19 @@ unsigned int exynos_release_ret_regs[] = {
+>  	REG_TABLE_END,
+>  };
+>  
+> +unsigned int exynos3250_release_ret_regs[] = {
+> +	S5P_PAD_RET_MAUDIO_OPTION,
+> +	S5P_PAD_RET_GPIO_OPTION,
+> +	S5P_PAD_RET_UART_OPTION,
+> +	S5P_PAD_RET_MMCA_OPTION,
+> +	S5P_PAD_RET_MMCB_OPTION,
+> +	S5P_PAD_RET_EBIA_OPTION,
+> +	S5P_PAD_RET_EBIB_OPTION,
+> +	S5P_PAD_RET_MMC2_OPTION,
+> +	S5P_PAD_RET_SPI_OPTION,
+> +	REG_TABLE_END,
+> +};
+> +
+>  unsigned int exynos5420_release_ret_regs[] = {
+>  	EXYNOS_PAD_RET_DRAM_OPTION,
+>  	EXYNOS_PAD_RET_MAUDIO_OPTION,
+> @@ -173,6 +192,12 @@ static int exynos_cpu_suspend(unsigned long arg)
+>  	return exynos_cpu_do_idle();
+>  }
+>  
+> +static int exynos3250_cpu_suspend(unsigned long arg)
+> +{
+> +	flush_cache_all();
+> +	return exynos_cpu_do_idle();
+> +}
+> +
+>  static int exynos5420_cpu_suspend(unsigned long arg)
+>  {
+>  	/* MCPM works with HW CPU identifiers */
+> @@ -230,6 +255,23 @@ static void exynos_pm_prepare(void)
+>  	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+>  }
+>  
+> +static void exynos3250_pm_prepare(void)
+> +{
+> +	unsigned int tmp;
+> +
+> +	/* Set wake-up mask registers */
+> +	exynos_pm_set_wakeup_mask();
+> +
+> +	tmp = pmu_raw_readl(EXYNOS3_ARM_L2_OPTION);
+> +	tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
+> +	pmu_raw_writel(tmp, EXYNOS3_ARM_L2_OPTION);
+> +
+> +	exynos_pm_enter_sleep_mode();
+> +
+> +	/* ensure at least INFORM0 has the resume address */
+> +	pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+> +}
+> +
+>  static void exynos5420_pm_prepare(void)
+>  {
+>  	unsigned int tmp;
+> @@ -344,6 +386,28 @@ early_wakeup:
+>  	pmu_raw_writel(0x0, S5P_INFORM1);
+>  }
+>  
+> +static void exynos3250_pm_resume(void)
+> +{
+> +	u32 cpuid = read_cpuid_part();
+> +
+> +	if (exynos_pm_central_resume())
+> +		goto early_wakeup;
+> +
+> +	/* For release retention */
+> +	exynos_pm_release_retention();
+> +
+> +	pmu_raw_writel(S5P_USE_STANDBY_WFI_ALL, S5P_CENTRAL_SEQ_OPTION);
+> +
+> +	if (call_firmware_op(resume) == -ENOSYS
+> +	    && cpuid == ARM_CPU_PART_CORTEX_A9)
+> +		exynos_cpu_restore_register();
+> +
+> +early_wakeup:
+> +
+> +	/* Clear SLEEP mode set in INFORM1 */
+> +	pmu_raw_writel(0x0, S5P_INFORM1);
+> +}
+> +
+>  static void exynos5420_prepare_pm_resume(void)
+>  {
+>  	if (IS_ENABLED(CONFIG_EXYNOS5420_MCPM))
+> @@ -483,6 +547,16 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+>  	.valid		= suspend_valid_only_mem,
+>  };
+>  
+> +static const struct exynos_pm_data exynos3250_pm_data = {
+> +	.wkup_irq	= exynos3250_wkup_irq,
+> +	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
+> +	.release_ret_regs = exynos3250_release_ret_regs,
+> +	.pm_suspend	= exynos_pm_suspend,
+> +	.pm_resume	= exynos3250_pm_resume,
+> +	.pm_prepare	= exynos3250_pm_prepare,
+> +	.cpu_suspend	= exynos3250_cpu_suspend,
+> +};
+> +
+>  static const struct exynos_pm_data exynos4_pm_data = {
+>  	.wkup_irq	= exynos4_wkup_irq,
+>  	.wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
+> @@ -518,6 +592,9 @@ static struct exynos_pm_data exynos5420_pm_data = {
+>  
+>  static struct of_device_id exynos_pmu_of_device_ids[] = {
+>  	{
+> +		.compatible = "samsung,exynos3250-pmu",
+> +		.data = &exynos3250_pm_data,
+> +	}, {
+>  		.compatible = "samsung,exynos4210-pmu",
+>  		.data = &exynos4_pm_data,
+>  	}, {
+> 
