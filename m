@@ -1,159 +1,150 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 5 Jan 2015 16:54:02 +0000
-Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150105165402.GE3163@console-pimps.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 5 Jan 2015 11:00:40 -0600
+Subject: [PATCH v11 0/9] Enable L2 cache support on Exynos4210/4x12 SoCs
+In-Reply-To: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
+References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <54AAC338.9030506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Dec, at 10:59:02AM, Ard Biesheuvel wrote:
-> In order to support kexec, the kernel needs to be able to deal with the
-> state of the UEFI firmware after SetVirtualAddressMap() has been called.
-> To avoid having separate code paths for non-kexec and kexec, let's move
-> the call to SetVirtualAddressMap() to the stub: this will guarantee us
-> that it will only be called once (since the stub is not executed during
-> kexec), and ensures that the UEFI state is identical between kexec and
-> normal boot.
+On 01/05/2015 06:18 AM, Marek Szyprowski wrote:
+> This is an updated patchset, which intends to add support for L2 cache
+> on Exynos4 SoCs on boards running under secure firmware, which requires
+> certain initialization steps to be done with help of firmware, as
+> selected registers are writable only from secure mode.
 > 
-> This implies that the layout of the virtual mapping needs to be created
-> by the stub as well. All regions are rounded up to a naturally aligned
-> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
-> in the UEFI memory map. The kernel proper reads those values and installs
-> the mappings in a dedicated set of page tables that are swapped in during
-> UEFI Runtime Services calls.
+> First patch updates Omap2+ platforms by moving l2cache initialization to
+> common code. This will resolve too early call to l2cache init, what might
+> cause kmalloc failure in code added in next patches.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/efi.h       |  20 +++-
->  arch/arm64/kernel/efi.c            | 223 ++++++++++++++++++++-----------------
->  arch/arm64/kernel/setup.c          |   1 +
->  drivers/firmware/efi/libstub/fdt.c | 137 ++++++++++++++++++++++-
->  4 files changed, 270 insertions(+), 111 deletions(-)
+> Next patch fixes access method to latency and filter settings in l2cache
+> driver.
+> 
+> Next four patches extend existing support for secure write in L2C driver
+> to account for design of secure firmware running on Exynos. Namely:
+>  1) direct read access to certain registers is needed on Exynos, because
+>     secure firmware calls set several registers at once,
+>  2) not all boards are running secure firmware, so .write_sec callback
+>     needs to be installed in Exynos firmware ops initialization code,
+>  3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
+>     is not allowed and so must use l2c_write_sec as well,
+>  4) on certain boards, default value of prefetch register is incorrect
+>     and must be overridden at L2C initialization.
+> For boards running with firmware that provides access to individual
+> L2C registers this series should introduce no functional changes. However
+> since the driver is widely used on other platforms I'd like to kindly ask
+> any interested people for testing.
+> 
+> Further three patches add implementation of .write_sec and .configure
+> callbacks for Exynos secure firmware and necessary DT nodes to enable
+> L2 cache.
+> 
+> Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
+> boards (both with secure firmware). There should be no functional change
+> for Exynos boards running without secure firmware. I do not have access
+> to affected non-Exynos boards, so I could not test on them.
+> 
+> Depends on:
+> - v3.19-rc2
+> 
+> Changelog:
+> 
+> Changes since v10:
+> (https://lkml.org/lkml/2014/12/23/151)
+> - Added patch, which fixes access method to latency and filter settings
+>   in l2cache
+> 
+> Changes since v9:
+> (https://lkml.org/lkml/2014/11/17/217)
+> - Rebased onto vanilla v3.19-rc1
+> - Added patch for Omap2+ (move l2cache initialization to common code), what
+>   fixes too early initialization (kmalloc failure)
+> 
+> Changes since v8:
+> (http://lkml.org/lkml/2014/11/13/263)
+> - Rebased onto vanilla v3.18-rc3 and added required includes, which were
+>   previously added by other patches
+> - Added Acked-by tags for Exynos part
+> 
+> Changes since v7:
+> (https://lkml.org/lkml/2014/10/29/158)
+> - rebased onto arm-soc/for-next kernel tree (depends on patches merged to
+>   v3.18-rc3 and arm-soc/samsung/pm2 branch)
+> - removed 'ARM: l2c: unify L2C-310 OF initialization error messages' patch
+>   (no longer needed)
+> 
+> Changes since v6:
+> (https://lkml.org/lkml/2014/10/27/233)
+> - changed PL310 to L2C-310 prefix in error messages
+> - added patch shortening the error message about incorrect associativity
+> 
+> Changes since v5:
+> (https://lkml.org/lkml/2014/9/24/364)
+> - rebased onto v3.18-rc2
+> - added error message about missing properties values
+> 
+> Changes since v4:
+> (https://lkml.org/lkml/2014/8/26/461)
+>  - rewrote the code accessing l2x0_saved_regs from assembly code
+>  - added comment and reworked unconditional call to SMC_CMD_L2X0INVALL
+> 
+> 
+> Patch summary:
+> 
+> Marek Szyprowski (2):
+>   ARM: OMAP2+: use common l2cache initialization code
+>   ARM: l2c: use l2c_write_sec() for restoring latency and filter regs
+> 
+> Tomasz Figa (7):
+>   ARM: l2c: Refactor the driver to use commit-like interface
+>   ARM: l2c: Add interface to ask hypervisor to configure L2C
+>   ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
+>     not NULL
+>   ARM: l2c: Add support for overriding prefetch settings
+>   ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
+>   ARM: EXYNOS: Add support for non-secure L2X0 resume
+>   ARM: dts: exynos4: Add nodes for L2 cache controller
+> 
+>  Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
+>  arch/arm/boot/dts/exynos4210.dtsi              |   9 +
+>  arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
+>  arch/arm/include/asm/outercache.h              |   3 +
+>  arch/arm/kernel/irq.c                          |   3 +-
+>  arch/arm/mach-exynos/firmware.c                |  50 +++++
+>  arch/arm/mach-exynos/sleep.S                   |  46 +++++
+>  arch/arm/mach-omap2/board-generic.c            |   6 +
+>  arch/arm/mach-omap2/common.h                   |   7 +
+>  arch/arm/mach-omap2/omap4-common.c             |  16 +-
+>  arch/arm/mm/cache-l2x0.c                       | 270 ++++++++++++++++---------
+>  11 files changed, 323 insertions(+), 111 deletions(-)
+> 
+Applied all 9 patches and tested on as many boards as I could get my
+hands on.. all boot fine, Thanks
 
-[...]
+ 1: am335x-evm: BOOT: PASS: http://slexy.org/raw/s21Q8Zw33s
+ 2: am335x-sk: BOOT: PASS: http://slexy.org/raw/s28O0bBEyM
+ 3: am437x-sk: BOOT: PASS: http://slexy.org/raw/s203dOrLId
+ 4: am43xx-epos: BOOT: PASS: http://slexy.org/raw/s2uWmV1XkM
+ 5: am43xx-gpevm: BOOT: PASS: http://slexy.org/raw/s20jVsjU00
+ 6: BeagleBoard-X15(am57xx-evm): BOOT: PASS:
+http://slexy.org/raw/s21ezwoOop
+ 7: BeagleBoard-XM: BOOT: PASS: http://slexy.org/raw/s21M0IYcdI
+ 8: beagleboard-vanilla: BOOT: PASS: http://slexy.org/raw/s2gCJ5VRr9
+ 9: beaglebone-black: BOOT: PASS: http://slexy.org/raw/s2vvB4u86O
+10: beaglebone: BOOT: PASS: http://slexy.org/raw/s208k0tU3V
+11: dra72x-evm: BOOT: PASS: http://slexy.org/raw/s212oTeZ2w
+12: dra7xx-evm: BOOT: PASS: http://slexy.org/raw/s24deU2xtY
+13: omap5-evm: BOOT: PASS: http://slexy.org/raw/s2DkUAGU0i
+14: pandaboard-es: BOOT: PASS: http://slexy.org/raw/s2UKuDaAFf
+15: pandaboard-vanilla: BOOT: PASS: http://slexy.org/raw/s21VAyb14r
+16: sdp4430: BOOT: PASS: http://slexy.org/raw/s2J6nAHynd
 
-> @@ -45,5 +53,9 @@ extern void efi_idmap_init(void);
->  #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
->  
->  #define EFI_ALLOC_ALIGN		SZ_64K
-> +#define EFI_VIRTMAP		EFI_ARCH_1
+for TI SoCs impacted OMAP4 and AM437x (other than the exynos patches):
 
-Any chance of documenting what EFI_VIRTMAP means for posterity and why
-you want to use one of the EFI arch config bits? How is this different
-from EFI_RUNTIME_SERVICES?
+Tested-by: Nishanth Menon <nm@ti.com>
+Acked-by: Nishanth Menon <nm@ti.com>
 
-Take a look at EFI_OLD_MEMMAP in arch/x86/include/asm/efi.h for a
-crackingly well documented example from Borislav.
-
-[...]
-  
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index c846a9608cbd..76bc8abf41d1 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -167,6 +167,94 @@ fdt_set_fail:
->  #define EFI_FDT_ALIGN EFI_PAGE_SIZE
->  #endif
->  
-> +static efi_status_t get_memory_map(efi_system_table_t *sys_table_arg,
-> +				   efi_memory_desc_t **map,
-> +				   unsigned long *map_size,
-> +				   unsigned long *desc_size,
-> +				   u32 *desc_ver, unsigned long *key_ptr)
-> +{
-> +	efi_status_t status;
-> +
-> +	/*
-> +	 * Call get_memory_map() with 0 size to retrieve the size of the
-> +	 * required allocation.
-> +	 */
-> +	*map_size = 0;
-> +	status = efi_call_early(get_memory_map, map_size, NULL,
-> +				key_ptr, desc_size, desc_ver);
-> +	if (status != EFI_BUFFER_TOO_SMALL)
-> +		return EFI_LOAD_ERROR;
-> +
-> +	/*
-> +	 * Add an additional efi_memory_desc_t to map_size because we're doing
-> +	 * an allocation which may be in a new descriptor region. Then double it
-> +	 * to give us some scratch space to prepare the input virtmap to give
-> +	 * to SetVirtualAddressMap(). Note that this is EFI_LOADER_DATA memory,
-> +	 * and the kernel memblock_reserve()'s only the size of the actual
-> +	 * memory map, so the scratch space is freed again automatically.
-> +	 */
-> +	*map_size += *desc_size;
-> +	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
-> +				*map_size * 2, (void **)map);
-> +	if (status != EFI_SUCCESS)
-> +		return status;
-> +
-> +	status = efi_call_early(get_memory_map, map_size, *map,
-> +				key_ptr, desc_size, desc_ver);
-> +	if (status != EFI_SUCCESS)
-> +		efi_call_early(free_pool, *map);
-> +	return status;
-> +}
-
-We've now got two (slightly different) versions of this function. Is
-there any way we could make do with just one?
-
-> +/*
-> + * This is the base address at which to start allocating virtual memory ranges
-> + * for UEFI Runtime Services. This is a userland range so that we can use any
-> + * allocation we choose, and eliminate the risk of a conflict after kexec.
-> + */
-> +#define EFI_RT_VIRTUAL_BASE	0x40000000
-> +
-> +static void update_memory_map(efi_memory_desc_t *memory_map,
-> +			      unsigned long map_size, unsigned long desc_size,
-> +			      int *count)
-> +{
-> +	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
-> +	efi_memory_desc_t *out = (void *)memory_map + map_size;
-> +	int l;
-> +
-> +	for (l = 0; l < map_size; l += desc_size) {
-> +		efi_memory_desc_t *in = (void *)memory_map + l;
-> +		u64 paddr, size;
-> +
-> +		if (!(in->attribute & EFI_MEMORY_RUNTIME))
-> +			continue;
-> +
-> +		/*
-> +		 * Make the mapping compatible with 64k pages: this allows
-> +		 * a 4k page size kernel to kexec a 64k page size kernel and
-> +		 * vice versa.
-> +		 */
-> +		paddr = round_down(in->phys_addr, SZ_64K);
-> +		size = round_up(in->num_pages * EFI_PAGE_SIZE +
-> +				in->phys_addr - paddr, SZ_64K);
-> +
-> +		/*
-> +		 * Avoid wasting memory on PTEs by choosing a virtual base that
-> +		 * is compatible with section mappings if this region has the
-> +		 * appropriate size and physical alignment. (Sections are 2 MB
-> +		 * on 4k granule kernels)
-> +		 */
-> +		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
-> +			efi_virt_base = round_up(efi_virt_base, SZ_2M);
-> +
-> +		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
-> +		efi_virt_base += size;
-> +
-> +		memcpy(out, in, desc_size);
-> +		out = (void *)out + desc_size;
-> +		++*count;
-> +	}
-> +}
-> +
-
-fdt.c is starting to become a dumping ground for arm*-specific stuff :-(
-
-Is there no general solution for sharing code between arm and aarch64 in
-the kernel so we don't have to stick things like this in
-drivers/firmware/efi/?
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Regards,
+Nishanth Menon
