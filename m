@@ -1,33 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 5 Jan 2015 19:05:31 +0100
-Subject: [PATCH v4 1/1] add support for Seagate BlackArmor NAS220
-In-Reply-To: <20141228104654.GA11638@anne>
-References: <20141215203855.GA28940@anne>
- <20141228104654.GA11638@anne>
-Message-ID: <20150105180531.GA13910@lunn.ch>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon,  5 Jan 2015 18:33:55 +0000
+Subject: [PATCH 2/2] arm64: call early_ioremap_reset() in paging_init()
+In-Reply-To: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
+References: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1420482835-6444-3-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 28, 2014 at 11:46:54AM +0100, Evgeni Dobrev wrote:
-> This patch adds support for Seagate BlackArmor NAS220.
-> 
-> The Seagate BlackArmor NAS 220 is a NAS system based on Marvell 88f6192. It has
-> 32MB NAND and 128MB DRAM. It has two SATA slots, one Gigabit Ethernet port, two
-> USB 2.0 ports, two buttons and three LEDs. There is a serial port available on
-> the CN5 connector on the board (1 - TX, 4 - RX, 6 - GND).
-> 
-> The only functionality still not implemented is the bi-color led on the front
-> panel (status). Pins mpp22 and mpp23 control this led. Setting mpp22 to high and
-> mpp23 to low results in orange color. Setting mpp22 to low and mpp23 to high
-> results in blue color.
-> 
-> The third led is wired to show the SATA activity on the two drives.
-> 
-> Signed-off-by: Evgeni Dobrev <evgeni@studio-punkt.com>
+arm64 does not support early_memremap/memunmap/ioremap/iounmap after
+paging_init() has been called. The core early_*remap code handles this
+via the after_paging_init variable, which is set by a call to
+early_ioremap_reset().
 
-Hi Evgeni
+However, arm64 currently does not call early_ioremap_reset(), which
+has made it possible to poke around in the fixmap region after kmap
+is enabled. Add the required call.
 
-I added this to mvebu/dt and will submit it for the next merge window.
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
-	Andrew
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 6032f3e..506544f 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -348,6 +348,7 @@ void __init paging_init(void)
+ {
+ 	void *zero_page;
+ 
++	early_ioremap_reset();
+ 	map_mem();
+ 
+ 	/*
+-- 
+2.1.3
