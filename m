@@ -1,87 +1,92 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 5 Jan 2015 14:05:32 +0530
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
-Message-ID: <54AA4CD4.40105@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 05 Jan 2015 09:48:11 +0100
+Subject: [PATCH RESEND] ARM: exynos_defconfig: Enable options for display
+ panel support
+In-Reply-To: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1420215089-2093-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1420447691.3918.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-On Saturday 03 January 2015 02:40 AM, Paul Walmsley wrote:
-> + Suman, lakml
+On pi?, 2015-01-02 at 17:11 +0100, Javier Martinez Canillas wrote:
+> Many Exynos devices have a display panel. Most of them just have
+> a simple panel while others have more complex configurations that
+> requires an embedded DisplayPort (eDP) to LVDS bridges.
 > 
-> Hi Roger
+> This patch enables the following features to be built in the kernel
+> image to support both setups:
 > 
-> On Thu, 18 Dec 2014, Roger Quadros wrote:
+> - Direct Rendering Manager (DRM)
+> - DRM bridge registration and lookup framework
+> - Parade ps8622/ps8625 eDP/LVDS bridge
+> - NXP ptn3460 eDP/LVDS bridge
+> - Exynos Fully Interactive Mobile Display controller (FIMD)
+> - Panel registration and lookup framework
+> - Simple panels
+> - Backlight & LCD device support
 > 
->> Fixing up Paul's email id.
->>
->> cheers,
->> -roger
->>
->> On 18/12/14 17:49, Roger Quadros wrote:
->>> There are quite a few hwmods that don't have sysconfig register and so
->>> _find_mpu_rt_port(oh) will return NULL thus preventing ready state check
->>> on those modules after the module is enabled.
-> 
-> Hmm.  Any IP block that exposes registers that are accessible by the MPU 
-> should have an MPU register target port, even if there's no SYSCONFIG 
-> register.  And if an IP block doesn't have registers that are accessible 
-> from the MPU, then there shouldn't be much point to waiting for the module 
-> to become ready.
-> 
-> Looks like the real problem is the test for oh->class->sysc before the 
-> call to _init_mpu_rt_base().  That was introduced by commit 6423d6df1440 
-> ("ARM: OMAP2+: hwmod: check for module address space during init"). It's 
-> not clear to me why that test was added, since _init_mpu_rt_base() doesn't 
-> do anything with oh->class->sysc or SYSCONFIG registers.
-This was introduced by commit 
-97597b962529 (ARM: OMAP2+: hwmod: Don't call _init_mpu_rt_base if no sysc)
-Patch description states that "there are few hwmod which doesn't have sysconfig registers and hence
-no need to ioremap() them in early init code".
-Isn't this correct? 
-May be a dumb question: If IP doesn't have sysconfig, is there any case that hwmod does
-access the register address space of that IP? Why do we need to enable MPU register target port?
-
-Thanks and regards,
-Lokesh
-
-> 
-> Could you please test the following patch?
-> I don't have an AM437x-gp-evm.  
-> 
-> 
-> - Paul
-> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  arch/arm/mach-omap2/omap_hwmod.c | 12 ++++--------
->  1 file changed, 4 insertions(+), 8 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index cbb908dc5cf0..ce6d11f3eda7 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2451,14 +2451,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
->  				oh->name, np->name);
->  	}
->  
-> -	if (oh->class->sysc) {
-> -		r = _init_mpu_rt_base(oh, NULL, index, np);
-> -		if (r < 0) {
-> -			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
-> -			     oh->name);
-> -			return 0;
-> -		}
-> -	}
-> +	r = _init_mpu_rt_base(oh, NULL, index, np);
-> +	if (r < 0)
-> +		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
-> +			 oh->name);
->  
->  	r = _init_clocks(oh, NULL);
->  	if (r < 0) {
+> Hello Kukjin,
 > 
+> You dropped this patch since exynos drm was causing boot hangs on some
+> platforms but the fix for that issue is already in linux-next (commit:
+> f1e9203 clk: samsung: Fix Exynos 5420 pinctrl setup and clock disable
+> failure due to domain being gated) so I think it makes sense to enable
+> the display options again.
+
+I think these issues were unrelated to each other. DRM was disabled
+because of infinite deferred probing of DRM components. I saw Inki was
+sending some patches for it but I am not sure if they were merged.
+
+Best regards,
+Krzysztof
+
+
+> 
+> NOTE: Display panel is still not working since patch "arm: dts: Exynos5:
+> Use pmu_system_controller phandle for dp phy" is needed [0] but I think
+> we should enable display options to catch the regressions easier.
+> 
+> Best regards,
+> Javier
+> 
+> [0]: https://lkml.org/lkml/2014/11/24/10
+> 
+>  arch/arm/configs/exynos_defconfig | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 22beed3..27cdd52 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -111,11 +111,26 @@ CONFIG_REGULATOR_S2MPA01=y
+>  CONFIG_REGULATOR_S2MPS11=y
+>  CONFIG_REGULATOR_S5M8767=y
+>  CONFIG_REGULATOR_TPS65090=y
+> +CONFIG_DRM=y
+> +CONFIG_DRM_BRIDGE=y
+> +CONFIG_DRM_PTN3460=y
+> +CONFIG_DRM_PS8622=y
+> +CONFIG_DRM_EXYNOS=y
+> +CONFIG_DRM_EXYNOS_FIMD=y
+> +CONFIG_DRM_EXYNOS_DP=y
+> +CONFIG_DRM_PANEL=y
+> +CONFIG_DRM_PANEL_SIMPLE=y
+>  CONFIG_FB=y
+>  CONFIG_FB_MODE_HELPERS=y
+>  CONFIG_FB_SIMPLE=y
+>  CONFIG_EXYNOS_VIDEO=y
+>  CONFIG_EXYNOS_MIPI_DSI=y
+> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> +CONFIG_LCD_CLASS_DEVICE=y
+> +CONFIG_LCD_PLATFORM=y
+> +CONFIG_BACKLIGHT_CLASS_DEVICE=y
+> +CONFIG_BACKLIGHT_GENERIC=y
+> +CONFIG_BACKLIGHT_PWM=y
+>  CONFIG_FRAMEBUFFER_CONSOLE=y
+>  CONFIG_FONTS=y
+>  CONFIG_FONT_7x14=y
