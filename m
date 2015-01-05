@@ -1,25 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Jan 2015 16:24:10 +0100
-Subject: [PATCH V3 00/10] ARM: sirf: drop CSR marco and add atlas7 platform
-In-Reply-To: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-References: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <2479441.FXiT5krZaN@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Jan 2015 15:29:18 +0000
+Subject: [alsa-devel] [PATCH 2/3] ASoC: samsung: Document Trats2 audio
+ subsystem bindings
+In-Reply-To: <1420457117-11030-3-git-send-email-ideal.song@samsung.com>
+References: <1420457117-11030-1-git-send-email-ideal.song@samsung.com>
+ <1420457117-11030-3-git-send-email-ideal.song@samsung.com>
+Message-ID: <20150105152918.GT11764@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 03 January 2015 16:27:34 Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
-> 
-> this patchset drops MARCO as it is not supported any more. its 
-> replacement is atlas7.
-> some IPs from marco are moved to atlas7, for example timer. for this 
-> kind of IPs, we rename to atlas7. some IPs need some change for 
-> atlas7, such as platsmp, we break marco and move to atlas7 directly.
-> 
-> the patchset add debug ports, machine and devicetree for the new atlas7.
+On Mon, Jan 05, 2015 at 08:25:16PM +0900, Inha Song wrote:
 
-Looks good. Please send separate pull requests for DT, core and driver
-bits, or send the patches for inclusion to arm at kernel.org so they don't
-get lost.
+> + - clocks : Reference to the codec master clock
+> + - clock-names : The clock should be named "mclk"
 
-	Arnd
+This should be done in the CODEC driver, not in the machine driver - the
+CODEC always needs the clock, it's not something specific to this
+machine.  Even if we decide that for Linux the best thing to do is to
+manage the clock in the machine driver it should be described in the DT
+as being attached to the CODEC.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/1b737f72/attachment.sig>
