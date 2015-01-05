@@ -1,64 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Jan 2015 09:56:56 +0100
-Subject: [PATCH net-next v10 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <1420440691-20928-4-git-send-email-dingtianhong@huawei.com>
-References: <1420440691-20928-1-git-send-email-dingtianhong@huawei.com>
- <1420440691-20928-4-git-send-email-dingtianhong@huawei.com>
-Message-ID: <5940412.J23835FKcW@wuerfel>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 05 Jan 2015 16:59:44 +0800
+Subject: [PATCH v6 14/17] ARM64 / ACPI: Parse GTDT to initialize arch timer
+In-Reply-To: <D0CF9C94.CD69%suravee.suthikulpanit@amd.com>
+References: <D0CF9C94.CD69%suravee.suthikulpanit@amd.com>
+Message-ID: <54AA5280.3050802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 January 2015 14:51:31 Ding Tianhong wrote:
-> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
-> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
-> 
-> According David Miller and Arnd Bergmann's suggestion, add some modification
-> for v9 version:
-> - drop the workqueue
-> - batch cleanup based on tx_coalesce_frames/usecs for better throughput
-> - use a reasonable default tx timeout (200us, could be shorted
->   based on measurements) with a range timer
-> - fix napi poll function return value
-> - use a lockless queue for cleanup
+On 2015?01?05? 15:55, Suthikulpanit, Suravee wrote:
+> On 1/4/15, 04:55, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
+>
+>> Using the information presented by GTDT to initialize the arch
+>> timer (not memory-mapped).
+>>
+>> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>> arch/arm64/kernel/time.c             |   7 ++
+>> drivers/clocksource/arm_arch_timer.c | 132
+>> ++++++++++++++++++++++++++++-------
+>> include/linux/clocksource.h          |   6 ++
+>> 3 files changed, 118 insertions(+), 27 deletions(-)
+[...]
+>> +static void __init arch_timer_of_init(struct device_node *np)
+>> +{
+>> +	int i;
+>> +
+>> +	if (arch_timers_present & ARCH_CP15_TIMER) {
+>> +		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
+>> +		return;
+>> +	}
+>> +
+>> +	arch_timers_present |= ARCH_CP15_TIMER;
+>> +	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
+>> +		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>> +
+>> +	arch_timer_detect_rate(NULL, np);
+>> +
+>> +	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+>> +
+>> +	/*
+>> +	 * If we cannot rely on firmware initializing the timer registers then
+>> +	 * we should use the physical timers instead.
+>> +	 */
+>> +	if (IS_ENABLED(CONFIG_ARM) &&
+>> +	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+>> +			arch_timer_use_virtual = false;
+>> +
+>> +	arch_timer_init();
+>> +}
+>> +CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer",
+>> arch_timer_of_init);
+>> +CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer",
+>> arch_timer_of_init);
+>
+> Hanjun,
+>
+> FYI, it seems that the tree that you have rebased the patch series has an
+> issue determining clocksource in ARM64 introduced by this commit.
+>
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0
+> b46b8a718c6e90910a1b1b0fe797be3c167e186
+>
+> Here is the fix from Catalin that already went upstream:
+>
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drive
+> rs/clocksource/arm_arch_timer.c?id=d6ad36913083d683aad4e02e53580c995f1a6ede
 
-The driver looks ok to me now, but it would be good if you could list
-any test results you got. Did the performance improve over the previous
-versions? What is the maximum latency you get now?
+This bug fix patch was merged in Dec 30 by Linus, which is the date
+after 3.19-rc2 released :)
 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Adding my "Signed-off-by:" below yours is not the correct attribution here,
-I only contributed a small part, and the last line should always list
-the name of the person sending the patch. It would be ok if you change the
-order of the lines to have yours last, or you could leave me out here entirely
-and just mention me in the description.
-
-> +
-> +	/* FIXME: make these adjustable through ethtool */
-> +	int tx_coalesce_frames;
-> +	int tx_coalesce_usecs;
-> +	struct hrtimer tx_coalesce_timer;
-
-The FIXME comment that I added was meant as a suggestion for you to look
-into implementing that after you got the driver working. Did you try it
-out, or do you have plans to do that as a follow-up patch?
-
-I would assume that doing so would help in the performance evaluation and
-to find good default values. The numbers I used were really just guessing
-as I have no insight into how the hardware behaves in real-world systems.
-
-> +
-> +	/* FIXME: eliminate this mmio access if xmit_more is set */
-> +	hip04_set_xmit_desc(priv, phys);
-> +	priv->tx_head = TX_NEXT(tx_head);
-> +	count++;
-> +	netdev_sent_queue(ndev, skb->len);
-
-Same thing here. I would assume that implementing xmit_more support can
-boost tx performance significantly, but I don't have access to the hardware
-data sheet, so I don't know what kind of interaction with the hardware
-is required when you want to submit multiple tx frames at once.
-
-	Arnd
+Thanks
+Hanjun
