@@ -1,47 +1,94 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 5 Jan 2015 17:41:05 +0000
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-In-Reply-To: <87y4ph79wb.fsf@approximate.cambridge.arm.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <CAFEAcA9pKdRNQ-fgKumQhjTjei-4NJ-OB1gSOxTCnCjShy10jw@mail.gmail.com>
- <54AA5E7C.1040706@arm.com>
- <CAFEAcA8Nq6BPOerN7EhHpT_oa9W3+2Y_=5+zBuQD_c5fh0Yb1A@mail.gmail.com>
- <87y4ph79wb.fsf@approximate.cambridge.arm.com>
-Message-ID: <CAFEAcA8qqAe-eauy65_EtOO6HaXC9QoG=YgpgsiUJvAB52=+Yg@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 5 Jan 2015 09:42:05 -0800
+Subject: [PATCHv5 2/2] INPUT: Introduce generic trigger/LED pairs to
+ input LEDs
+In-Reply-To: <20150104234501.GJ25336@type.youpi.perso.aquilenet.fr>
+References: <20141226232116.GA5069@type> <20141226232310.GD5069@type>
+ <20150104232838.GA14912@dtor-glaptop>
+ <20150104234501.GJ25336@type.youpi.perso.aquilenet.fr>
+Message-ID: <20150105174205.GB35592@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2015 at 11:19, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Mon, Jan 05 2015 at 10:08:18 am GMT, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 5 January 2015 at 09:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 31/12/14 09:25, Peter Maydell wrote:
->>>> Will Deacon and Marc Zyngier are currently in possession of that h/w.
->>>> I'm sure they'd be delighted to pull it out of the cupboard and
->>>> give it a spin :-)
->>>
->>> I'll try to find some time (or a victim to do the testing... ;-)
->>
->> To save you some time in trying to debug things which didn't work
->> before this patchset, the status last time I tested on h/w was:
->>  * PCI MMIO accesses work
->>  * PCI IO accesses work
->>  * PCI bus-master (DMA) doesn't work
->>
->> with the failure symptom for DMA being that the card wrote to
->> the correct area of memory but only every other word, so you
->> got strings like "HellXXXXrld" with the Xs being garbage.
->> This feels to me like a h/w issue rather than a driver problem.
->
-> Looks like some 64bit address decoding getting in the way. Or
-> something.... Do you remember the exact platform you tried this on (I
-> have PB926, PB1176, and a bunch of RealViews with an odd mix of
-> tiles...)?
+Hi Samuel,
 
-According to my coverletter email from the last time I did anything
-with versatile PCI:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/193990.html
-it was a PB926 (and an rtl8139 network card). I'm pretty sure I
-flashed the board with the latest IO FPGA image too.
+On Mon, Jan 05, 2015 at 12:45:01AM +0100, Samuel Thibault wrote:
+> Dmitry Torokhov, le Sun 04 Jan 2015 15:28:38 -0800, a ?crit :
+> > I'd rather we did not have a separate config option for this. Do we really need to
+> > support case where LEDs are disabled?
+> 
+> I don't really mind.
+> 
+> > I'd rather stub it out instead of providing 2 separate code paths.
+> 
+> Ok.
+> 
+> > > +/* LED state change for some keyboard, notify that keyboard.  */
+> > > +static void perdevice_input_led_set(struct led_classdev *cdev,
+> > > +			  enum led_brightness brightness)
+> > > +{
+> > > +	struct input_dev *dev;
+> > > +	struct led_classdev *leds;
+> > > +	int led;
+> > > +
+> > > +	dev = cdev->dev->platform_data;
+> > 
+> > Umm, platform data is not the best place for storing this. Why not drvdata?
+> 
+> Just because it didn't exist when I wrote the code :)
+> Ok.
+> 
+> > > +/* A new input device with potential LEDs to connect.  */
+> > > +int input_led_connect(struct input_dev *dev)
+> > > +{
+> > > +	int i, error = -ENOMEM;
+> > > +	struct led_classdev *leds;
+> > > +	struct led_trigger *triggers;
+> > > +
+> > > +	leds = kcalloc(LED_CNT, sizeof(*leds), GFP_KERNEL);
+> > > +	if (!leds)
+> > > +		goto err;
+> > 
+> > Why do we allocate all possible led's for every device?
+> 
+> Ah, right, that was making things simpler, but it could be
+> squeezed.  I'm just afraid of one thing: may dev->ledbit change after
+> input_register_device?  It seems that at least uinput somehow permits
+> this.  It then means having to store the number of actually created LEDs
+> and triggers alongside.
 
-thanks
--- PMM
+The input device's capabilities (with the exception of keymap) should
+not change after device registration. If uinput allows that we should
+fix it there.
+
+Thanks.
+
+> 
+> > > +	dev->leds = leds;
+> > > +
+> > > +	triggers = kcalloc(LED_CNT, sizeof(*triggers), GFP_KERNEL);
+> > > +	if (!triggers)
+> > > +		goto err;
+> > > +	dev->triggers = triggers;
+> > 
+> > Hmm, maybe having per-device triggers is a bit of overkill and we could have
+> > just "input-numl", "input-capsl", etc.
+> 
+> No, that won't work, notably for evdev access: we have to respect the
+> per-device semantic.
+> 
+> > > +	/* No issue so far, we can register for real.  */
+> > > +	for (i = 0; i < LED_CNT; i++)
+> > > +		if (leds[i].name) {
+> > > +			led_classdev_register(&dev->dev, &leds[i]);
+> > > +			leds[i].dev->platform_data = dev;
+> > > +			led_trigger_register(&triggers[i]);
+> > 
+> > We need error handling here.
+> 
+> Right.
+> 
+> Samuel
+
+-- 
+Dmitry
