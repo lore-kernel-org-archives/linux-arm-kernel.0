@@ -1,56 +1,72 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 5 Jan 2015 15:57:39 +0100
-Subject: [PATCH v2 1/2] arm: perf: Prevent wraparound during overflow
-In-Reply-To: <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
-References: <1416412346-8759-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-1-git-send-email-daniel.thompson@linaro.org>
- <1416587067-3220-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150105145739.GU30905@twins.programming.kicks-ass.net>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 05 Jan 2015 16:07:49 +0100
+Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <54AA48E6.3040404@samsung.com>
+References: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <54AA48E6.3040404@samsung.com>
+Message-ID: <1420470469.15910.134.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 21, 2014 at 04:24:26PM +0000, Daniel Thompson wrote:
-> If the overflow threshold for a counter is set above or near the
-> 0xffffffff boundary then the kernel may lose track of the overflow
-> causing only events that occur *after* the overflow to be recorded.
-> Specifically the problem occurs when the value of the performance counter
-> overtakes its original programmed value due to wrap around.
+On Mon, 2015-01-05 at 17:18 +0900, Joonyoung Shim wrote:
+> Hi Sjoerd,
 > 
-> Typical solutions to this problem are either to avoid programming in
-> values likely to be overtaken or to treat the overflow bit as the 33rd
-> bit of the counter.
-> 
-> Its somewhat fiddly to refactor the code to correctly handle the 33rd bit
-> during irqsave sections (context switches for example) so instead we take
-> the simpler approach of avoiding values likely to be overtaken.
-> 
-> We set the limit to half of max_period because this matches the limit
-> imposed in __hw_perf_event_init(). This causes a doubling of the interrupt
-> rate for large threshold values, however even with a very fast counter
-> ticking at 4GHz the interrupt rate would only be ~1Hz.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm/kernel/perf_event.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 266cba46db3e..ab68833c1e31 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -115,8 +115,14 @@ int armpmu_event_set_period(struct perf_event *event)
->  		ret = 1;
->  	}
->  
-> -	if (left > (s64)armpmu->max_period)
-> -		left = armpmu->max_period;
-> +	/*
-> +	 * Limit the maximum period to prevent the counter value
-> +	 * from overtaking the one we are about to program. In
-> +	 * effect we are reducing max_period to account for
-> +	 * interrupt latency (and we are being very conservative).
-> +	 */
-> +	if (left > (armpmu->max_period >> 1))
-> +		left = armpmu->max_period >> 1;
+> On 12/05/2014 04:27 AM, Sjoerd Simons wrote:
+> > Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
+> > same as the vendors naming, which means it's prefixed with exynos5422
+> > instead of exynos5800 as the SoC name even though it includes the
+> > exyno5800 dtsi.
+> > 
+> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> > ---
+> > Changes since v1:
+> >   * Add chosen/linux,stdout-path to point the serial console device
+> >   * Change memory start offset to 0x40000000 to match the vendors DTS (pointed
+> >     out by Heesub Shin)
+> >   * Declare base address & size for the memory banks to be used by the MFC
+> > 
+> > Kevin, Tyler, even though the changes are small i didn't want to just stick
+> > your Tested-By on. Could you both be so kind to retest this on your XU3's ?
+> > 
+> > Heesub, I would still love to know the reason for having the memory start
+> > address at 0x40000000 for this board?
+> > 
+> >  arch/arm/boot/dts/Makefile                 |   1 +
+> >  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 332 +++++++++++++++++++++++++++++
+> >  2 files changed, 333 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 38c89ca..0a898cc 100644
 
-On x86 we simply half max_period, why did you choose to do differently?
+
+> > +
+> > +&hdmi {
+> > +	status = "okay";
+> > +	hpd-gpio = <&gpx3 7 0>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&hdmi_hpd_irq>;
+> > +
+> > +	vdd_osc-supply = <&ldo10_reg>;
+> > +	vdd_pll-supply = <&ldo8_reg>;
+> > +	vdd-supply = <&ldo8_reg>;
+> 
+> ldo10 and ldo8 are right? I think ldo7 and ldo6 are related with hdmi
+> from schematic.
+
+Nice catch. I followed hardkernels dts here, which refers to ldo10 &
+ldo8, however double-checking the schematics indeed indicate that ldo7
+and ldo6 are used the HDMI supplies. 
+
+I'll do some testing and follow-up
+
+-- 
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/bb87f59f/attachment-0001.bin>
