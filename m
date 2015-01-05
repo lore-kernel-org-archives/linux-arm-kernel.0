@@ -1,80 +1,60 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 5 Jan 2015 20:30:53 +0800
-Subject: [PATCH net-next v10 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <5940412.J23835FKcW@wuerfel>
-References: <1420440691-20928-1-git-send-email-dingtianhong@huawei.com>
- <1420440691-20928-4-git-send-email-dingtianhong@huawei.com>
- <5940412.J23835FKcW@wuerfel>
-Message-ID: <54AA83FD.9070008@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Jan 2015 12:32:52 +0000
+Subject: [PATCH] Revert 9fc2105aeaaf56b0cf75296a84702d0f9e64437b to fix
+ pyaudio (and probably more)
+In-Reply-To: <20150105013436.GA23350@thunk.org>
+References: <20150104190123.GA20153@amd>
+ <alpine.LFD.2.11.1501041438130.18844@knanqh.ubzr>
+ <20150104201026.GA23427@amd>
+ <alpine.LFD.2.11.1501041512440.18844@knanqh.ubzr>
+ <20150104203724.GA16372@amd>
+ <alpine.LFD.2.11.1501041547050.18844@knanqh.ubzr>
+ <CA+55aFy5yB2d-1iXEUtU+puua4TAmV0kZF_7TBhXO1Y4Khqb9Q@mail.gmail.com>
+ <alpine.LFD.2.11.1501041609290.18844@knanqh.ubzr>
+ <20150104212659.GC12302@n2100.arm.linux.org.uk>
+ <20150105013436.GA23350@thunk.org>
+Message-ID: <20150105123252.GB10116@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/5 16:56, Arnd Bergmann wrote:
-> On Monday 05 January 2015 14:51:31 Ding Tianhong wrote:
->> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
->> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
->>
->> According David Miller and Arnd Bergmann's suggestion, add some modification
->> for v9 version:
->> - drop the workqueue
->> - batch cleanup based on tx_coalesce_frames/usecs for better throughput
->> - use a reasonable default tx timeout (200us, could be shorted
->>   based on measurements) with a range timer
->> - fix napi poll function return value
->> - use a lockless queue for cleanup
-> 
-> The driver looks ok to me now, but it would be good if you could list
-> any test results you got. Did the performance improve over the previous
-> versions? What is the maximum latency you get now?
-> 
-Really I miss it, I could get it and add them in next version.
+Hi Ted,
 
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Mon, Jan 05, 2015 at 01:34:36AM +0000, Theodore Ts'o wrote:
+> On Sun, Jan 04, 2015 at 09:26:59PM +0000, Russell King - ARM Linux wrote:
+> > 
+> > With the revert in place, we now have insanely small bogomips values
+> > reported via /proc/cpuinfo when hardware timers are used.  That needs
+> > fixing.
 > 
-> Adding my "Signed-off-by:" below yours is not the correct attribution here,
-> I only contributed a small part, and the last line should always list
-> the name of the person sending the patch. It would be ok if you change the
-> order of the lines to have yours last, or you could leave me out here entirely
-> and just mention me in the description.
+> Why does it need to be fixed?
 > 
-Ok.
+> It's clear that there are applications that are working OK with the
+> existing value,
 
->> +
->> +	/* FIXME: make these adjustable through ethtool */
->> +	int tx_coalesce_frames;
->> +	int tx_coalesce_usecs;
->> +	struct hrtimer tx_coalesce_timer;
-> 
-> The FIXME comment that I added was meant as a suggestion for you to look
-> into implementing that after you got the driver working. Did you try it
-> out, or do you have plans to do that as a follow-up patch?
-> 
-> I would assume that doing so would help in the performance evaluation and
-> to find good default values. The numbers I used were really just guessing
-> as I have no insight into how the hardware behaves in real-world systems.
-> 
-Yes, I was preparing another series patches when these patches is applied, or
-I could fix them in the next version for this patch.
+I'm not sure it is that clear -- the reported regression was on a processor
+that doesn't use the timer-backed delay loop, so the bogomips value will
+essentially be restored by reverting the patch.
 
->> +
->> +	/* FIXME: eliminate this mmio access if xmit_more is set */
->> +	hip04_set_xmit_desc(priv, phys);
->> +	priv->tx_head = TX_NEXT(tx_head);
->> +	count++;
->> +	netdev_sent_queue(ndev, skb->len);
-> 
-> Same thing here. I would assume that implementing xmit_more support can
-> boost tx performance significantly, but I don't have access to the hardware
-> data sheet, so I don't know what kind of interaction with the hardware
-> is required when you want to submit multiple tx frames at once.
-> 
-Ok, thanks.
+The issue comes on newer CPUs, where there will now be a very small bogomips
+value reported and (to my knowledge) nobody has yet tried running some
+affected applications there to see if they can cope.
 
-Ding
+> and if you change it to fix it for some new applications, but it breaks
+> for others, then have you considered defining a new interface (perhaps
+> exported via sysfs) that exports a "sane" value and document that new
+> applications shoud use the new interface.
+> 
+> Or if the answer is that no one should be using the bogomips field at
+> all, then just document *that*, and then leave it be, so that existing
+> applications don't break.
 
-> 	Arnd
-> 
-> .
-> 
+It never hurts to document our assumptions or anticipated/preferred use-cases
+but in this case I think bogomips is difficult enough to use on any
+half-recent SoCs that most developers have either (a) found another way to
+do what they want (perf counters, clock_gettime) or (b) stopped bothering to
+guess the CPU frequency when it's not actually needed, so I don't *think*
+that new applications are such an issue.
+
+Cheers,
+
+Will
