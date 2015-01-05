@@ -1,50 +1,56 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 5 Jan 2015 18:05:06 +0800
-Subject: [PATCH RFC v7 16/21] drm: panel: Add support for Himax HX8369A
- MIPI DSI panel
-In-Reply-To: <20150105085424.GP2711@phenom.ffwll.local>
-References: <1419910451-15268-1-git-send-email-Ying.Liu@freescale.com>
- <1419910451-15268-17-git-send-email-Ying.Liu@freescale.com>
- <20150105085424.GP2711@phenom.ffwll.local>
-Message-ID: <54AA61D2.1040002@freescale.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 05 Jan 2015 15:36:44 +0530
+Subject: [PATCH] ARM: EXYNOS: do not try to map PMU for exynos5440
+In-Reply-To: <1420451533.15910.19.camel@collabora.co.uk>
+References: <1420449268-24707-1-git-send-email-pankaj.dubey@samsung.com>
+ <1420451533.15910.19.camel@collabora.co.uk>
+Message-ID: <54AA6234.400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi,
 
-On 01/05/2015 04:54 PM, Daniel Vetter wrote:
-> On Tue, Dec 30, 2014 at 11:34:06AM +0800, Liu Ying wrote:
->> This patch adds support for Himax HX8369A MIPI DSI panel.
+On Monday 05 January 2015 03:22 PM, Sjoerd Simons wrote:
+> On Mon, 2015-01-05 at 14:44 +0530, Pankaj Dubey wrote:
+>> Commit id: 2e94ac42898f84d76e3c21dd91bc is not taking care
+>> of mapping of exynos5440 PMU register which will result in kernel panic
+>> on exynos5440.
 >>
->> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+>> As exynos5440 DTS does not have PMU node, and also we are skipping
+>> exynos_pm_init in case of exynos5440, let's avoid mapping of exynos5440 PMU.
+>
+>
+>> Reported-by: Ming Lei <tom.leiming@gmail.com>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 >> ---
->> v6->v7:
->>   * Address Andrzej Hajda's following comments.
->>   * Simplify the return logic in hx8369a_dcs_write().
->>   * Replace the macro hx8369a_dsi_init_helper() with a function array to improve
->>     the code quality.
->>   * Handle error cases during getting gpios in probe().
->>   * Add 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'.
+>>   arch/arm/mach-exynos/exynos.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index c13d083..1891b8c 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -208,7 +208,8 @@ static void __init exynos_init_irq(void)
+>>   	 * DT is not unflatten so we can't use DT APIs before
+>>   	 * init_irq
+>>   	 */
+>> -	exynos_map_pmu();
+>> +	if (!of_machine_is_compatible("samsung,exynos5440"))
+>> +		exynos_map_pmu();
+>>   }
+>>
+>>   static void __init exynos_dt_machine_init(void)
 >
-> If you only update one patch in a big series it's imo better to just
-> resend that one to avoid spamming the mailing list with noise. Imo it also
-> helps to keep the discussion all nicely grouped together.
-
-Thanks for your suggestion.  I would try to make people happy about
-the way the series is submitted for review.
-
+> Why the blacklist approach rather then simply making exynos_map_pmu exit
+> rather then panicing if it couldn't find a pmu node in the dts?
 >
-> In any case please give a short overview of what changed in the cover
-> letter when resending the entire series so that people don't have to go
-> through all the invidual patches.
 
-Yes, absolutely.  I gave short overviews of what changed in the very
-beginning of the cover letters from v2 to v8 and I will do this in
-every necessary follow-up version.
+exynos_map_pmu is panicking if it fails to iomap PMU, as for most of 
+exynos SoCs PMU based address is MUST for secondary core bootup in 
+platsmp.c, but with exynos5440 it is not the same case. In-fact 
+exynos_pm_init is also bypassed for exynos5440. For the same reason I 
+adopted this approach rather removing panic from exynos_map_pmu.
 
-Regards,
-Liu Ying
-
-> -Daniel
+Thanks,
+Pankaj Dubey
 >
