@@ -1,77 +1,180 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 05 Jan 2015 12:48:41 +0100
-Subject: [PATCH v5 1/5] regulator: Copy config passed during registration
+Date: Mon, 05 Jan 2015 12:48:43 +0100
+Subject: [PATCH v5 3/5] regulator: max77686: Add GPIO control
 In-Reply-To: <1420458525-22576-1-git-send-email-k.kozlowski@samsung.com>
 References: <1420458525-22576-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1420458525-22576-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1420458525-22576-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy the 'regulator_config' structure passed to regulator_register()
-function so the driver could safely modify it after parsing init data.
+Add enable control over GPIO for regulators supporting this: LDO20,
+LDO21, LDO22, buck8 and buck9.
 
-The driver may want to change the config as a result of specific init
-data parsed by regulator core (e.g. when core handled parsing device
-tree).
+This is needed for proper (and full) configuration of the Maxim 77686
+PMIC without creating redundant 'regulator-fixed' entries.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/regulator/core.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ drivers/regulator/max77686.c | 70 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 65 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index e225711bb8bc..c13b557a560e 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -3581,20 +3581,21 @@ static void rdev_init_debugfs(struct regulator_dev *rdev)
+diff --git a/drivers/regulator/max77686.c b/drivers/regulator/max77686.c
+index 10d206266ac2..15fb1416bfbd 100644
+--- a/drivers/regulator/max77686.c
++++ b/drivers/regulator/max77686.c
+@@ -26,6 +26,7 @@
+ #include <linux/bug.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/driver.h>
+@@ -46,6 +47,11 @@
+ #define MAX77686_DVS_UVSTEP	12500
+ 
+ /*
++ * Value for configuring buck[89] and LDO{20,21,22} as GPIO control.
++ * It is the same as 'off' for other regulators.
++ */
++#define MAX77686_GPIO_CONTROL		0x0
++/*
+  * Values used for configuring LDOs and bucks.
+  * Forcing low power mode: LDO1, 3-5, 9, 13, 17-26
   */
- struct regulator_dev *
- regulator_register(const struct regulator_desc *regulator_desc,
--		   const struct regulator_config *config)
-+		   const struct regulator_config *cfg)
- {
- 	const struct regulation_constraints *constraints = NULL;
- 	const struct regulator_init_data *init_data;
-+	struct regulator_config *config = NULL;
- 	static atomic_t regulator_no = ATOMIC_INIT(0);
- 	struct regulator_dev *rdev;
- 	struct device *dev;
- 	int ret, i;
- 	const char *supply = NULL;
+@@ -82,6 +88,8 @@ enum max77686_ramp_rate {
+ };
  
--	if (regulator_desc == NULL || config == NULL)
-+	if (regulator_desc == NULL || cfg == NULL)
- 		return ERR_PTR(-EINVAL);
+ struct max77686_data {
++	u64 gpio_enabled:MAX77686_REGULATORS;
++
+ 	/* Array indexed by regulator id */
+ 	unsigned int opmode[MAX77686_REGULATORS];
+ };
+@@ -100,6 +108,26 @@ static unsigned int max77686_get_opmode_shift(int id)
+ 	}
+ }
  
--	dev = config->dev;
-+	dev = cfg->dev;
- 	WARN_ON(!dev);
- 
- 	if (regulator_desc->name == NULL || regulator_desc->ops == NULL)
-@@ -3624,6 +3625,16 @@ regulator_register(const struct regulator_desc *regulator_desc,
- 	if (rdev == NULL)
- 		return ERR_PTR(-ENOMEM);
- 
-+	/*
-+	 * Duplicate the config so the driver could override it after
-+	 * parsing init data.
-+	 */
-+	config = kmemdup(cfg, sizeof(*cfg), GFP_KERNEL);
-+	if (config == NULL) {
-+		kfree(rdev);
-+		return ERR_PTR(-ENOMEM);
++/*
++ * When regulator is configured for GPIO control then it
++ * replaces "normal" mode. Any change from low power mode to normal
++ * should actually change to GPIO control.
++ * Map normal mode to proper value for such regulators.
++ */
++static unsigned int max77686_map_normal_mode(struct max77686_data *max77686,
++					     int id)
++{
++	switch (id) {
++	case MAX77686_BUCK8:
++	case MAX77686_BUCK9:
++	case MAX77686_LDO20 ... MAX77686_LDO22:
++		if (max77686->gpio_enabled & (1 << id))
++			return MAX77686_GPIO_CONTROL;
 +	}
 +
- 	init_data = regulator_of_get_init_data(dev, regulator_desc,
- 					       &rdev->dev.of_node);
- 	if (!init_data) {
-@@ -3752,6 +3763,7 @@ add_dev:
- 	rdev_init_debugfs(rdev);
- out:
- 	mutex_unlock(&regulator_list_mutex);
-+	kfree(config);
- 	return rdev;
++	return MAX77686_NORMAL;
++}
++
+ /* Some BUCKs and LDOs supports Normal[ON/OFF] mode during suspend */
+ static int max77686_set_suspend_disable(struct regulator_dev *rdev)
+ {
+@@ -136,7 +164,7 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
+ 		val = MAX77686_LDO_LOWPOWER_PWRREQ;
+ 		break;
+ 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
+-		val = MAX77686_NORMAL;
++		val = max77686_map_normal_mode(max77686, id);
+ 		break;
+ 	default:
+ 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
+@@ -160,7 +188,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
+ {
+ 	unsigned int val;
+ 	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
+-	int ret;
++	int ret, id = rdev_get_id(rdev);
  
- unset_supplies:
+ 	switch (mode) {
+ 	case REGULATOR_MODE_STANDBY:			/* switch off */
+@@ -170,7 +198,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
+ 		val = MAX77686_LDO_LOWPOWER_PWRREQ;
+ 		break;
+ 	case REGULATOR_MODE_NORMAL:			/* ON in Normal Mode */
+-		val = MAX77686_NORMAL;
++		val = max77686_map_normal_mode(max77686, id);
+ 		break;
+ 	default:
+ 		pr_warn("%s: regulator_suspend_mode : 0x%x not supported\n",
+@@ -184,7 +212,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
+ 	if (ret)
+ 		return ret;
+ 
+-	max77686->opmode[rdev_get_id(rdev)] = val;
++	max77686->opmode[id] = val;
+ 	return 0;
+ }
+ 
+@@ -197,7 +225,7 @@ static int max77686_enable(struct regulator_dev *rdev)
+ 	shift = max77686_get_opmode_shift(id);
+ 
+ 	if (max77686->opmode[id] == MAX77686_OFF_PWRREQ)
+-		max77686->opmode[id] = MAX77686_NORMAL;
++		max77686->opmode[id] = max77686_map_normal_mode(max77686, id);
+ 
+ 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+ 				  rdev->desc->enable_mask,
+@@ -229,6 +257,36 @@ static int max77686_set_ramp_delay(struct regulator_dev *rdev, int ramp_delay)
+ 				  MAX77686_RAMP_RATE_MASK, ramp_value << 6);
+ }
+ 
++static int max77686_of_parse_cb(struct device_node *np,
++		const struct regulator_desc *desc,
++		struct regulator_config *config)
++{
++	struct max77686_data *max77686 = config->driver_data;
++
++	switch (desc->id) {
++	case MAX77686_BUCK8:
++	case MAX77686_BUCK9:
++	case MAX77686_LDO20 ... MAX77686_LDO22:
++		config->ena_gpio = of_get_named_gpio(np,
++					"maxim,ena-gpios", 0);
++		config->ena_gpio_flags = GPIOF_OUT_INIT_HIGH;
++		config->ena_gpio_initialized = true;
++		break;
++	default:
++		return 0;
++	}
++
++	if (gpio_is_valid(config->ena_gpio)) {
++		max77686->gpio_enabled |= (1 << desc->id);
++
++		return regmap_update_bits(config->regmap, desc->enable_reg,
++					  desc->enable_mask,
++					  MAX77686_GPIO_CONTROL);
++	}
++
++	return 0;
++}
++
+ static struct regulator_ops max77686_ops = {
+ 	.list_voltage		= regulator_list_voltage_linear,
+ 	.map_voltage		= regulator_map_voltage_linear,
+@@ -283,6 +341,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
+ 	.name		= "LDO"#num,					\
+ 	.of_match	= of_match_ptr("LDO"#num),			\
+ 	.regulators_node	= of_match_ptr("voltage-regulators"),	\
++	.of_parse_cb	= max77686_of_parse_cb,				\
+ 	.id		= MAX77686_LDO##num,				\
+ 	.ops		= &max77686_ops,				\
+ 	.type		= REGULATOR_VOLTAGE,				\
+@@ -355,6 +414,7 @@ static struct regulator_ops max77686_buck_dvs_ops = {
+ 	.name		= "BUCK"#num,					\
+ 	.of_match	= of_match_ptr("BUCK"#num),			\
+ 	.regulators_node	= of_match_ptr("voltage-regulators"),	\
++	.of_parse_cb	= max77686_of_parse_cb,				\
+ 	.id		= MAX77686_BUCK##num,				\
+ 	.ops		= &max77686_ops,				\
+ 	.type		= REGULATOR_VOLTAGE,				\
 -- 
 1.9.1
