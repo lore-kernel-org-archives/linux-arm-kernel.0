@@ -1,57 +1,44 @@
-From: ideal.song@samsung.com (Inha Song)
-Date: Mon, 05 Jan 2015 20:25:16 +0900
-Subject: [alsa-devel] [PATCH 2/3] ASoC: samsung: Document Trats2 audio
- subsystem bindings
-In-Reply-To: <1420457117-11030-1-git-send-email-ideal.song@samsung.com>
-References: <1420457117-11030-1-git-send-email-ideal.song@samsung.com>
-Message-ID: <1420457117-11030-3-git-send-email-ideal.song@samsung.com>
+From: cychiang@chromium.org (Cheng-Yi Chiang)
+Date: Mon,  5 Jan 2015 19:26:59 +0800
+Subject: [PATCH] ASoC: ts3a227e: Check and report jack status at probe
+Message-ID: <1420457219-23098-1-git-send-email-cychiang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add Trats2 audio subsystem bindings document.
+ts3a227e does not trigger interrupt to report jack status when system
+boots from warm reset because ts3a227e's power remains on during warm reset.
+Read jack status at probe to get current jack status.
+Note that if system boots from EC reset, then this issue will not
+happen.
 
-Signed-off-by: Inha Song <ideal.song@samsung.com>
+Signed-off-by: Cheng-Yi Chiang <cychiang@chromium.org>
 ---
- .../bindings/sound/samsung,trats2-wm1811.txt       | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/samsung,trats2-wm1811.txt
+ sound/soc/codecs/ts3a227e.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/samsung,trats2-wm1811.txt b/Documentation/devicetree/bindings/sound/samsung,trats2-wm1811.txt
-new file mode 100644
-index 0000000..9d4d3f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/samsung,trats2-wm1811.txt
-@@ -0,0 +1,31 @@
-+Samsung Exynos Trats2 audio with WM1811 codec
+diff --git a/sound/soc/codecs/ts3a227e.c b/sound/soc/codecs/ts3a227e.c
+index 1d12057..9f2dced 100644
+--- a/sound/soc/codecs/ts3a227e.c
++++ b/sound/soc/codecs/ts3a227e.c
+@@ -254,6 +254,7 @@ static int ts3a227e_i2c_probe(struct i2c_client *i2c,
+ 	struct ts3a227e *ts3a227e;
+ 	struct device *dev = &i2c->dev;
+ 	int ret;
++	unsigned int acc_reg;
+ 
+ 	ts3a227e = devm_kzalloc(&i2c->dev, sizeof(*ts3a227e), GFP_KERNEL);
+ 	if (ts3a227e == NULL)
+@@ -283,6 +284,11 @@ static int ts3a227e_i2c_probe(struct i2c_client *i2c,
+ 			   INTB_DISABLE | ADC_COMPLETE_INT_DISABLE,
+ 			   ADC_COMPLETE_INT_DISABLE);
+ 
++	/* Read jack status because chip might not trigger interrupt at boot. */
++	regmap_read(ts3a227e->regmap, TS3A227E_REG_ACCESSORY_STATUS, &acc_reg);
++	ts3a227e_new_jack_state(ts3a227e, acc_reg);
++	ts3a227e_jack_report(ts3a227e);
 +
-+Required properties:
-+
-+ - compatible : Must be "samsung,trats2-audio"
-+
-+ - clocks : Reference to the codec master clock
-+ - clock-names : The clock should be named "mclk"
-+
-+ - samsung,i2s-controller : The phandle of the I2S controller
-+
-+ - samsung,model : The user visible name of this sound
-+
-+ - samsung,audio-routing : A list of the connections between audio
-+   components. each entry is a pair of strings, the first being the
-+   connection's sink, the second being the connection's source
-+
-+Example:
-+
-+sound {
-+	compatible = "samsung,trats2-audio";
-+	clocks = <&pmu_system_controller 0>;
-+	clock-names = "mclk";
-+	samsung,i2s-controller = <&i2s0>;
-+	samsung,model = "wm1811";
-+	samsung,audio-routing =
-+			"SPK", "SPKOUTLN",
-+			"SPK", "SPKOUTLP",
-+			"SPK", "SPKOUTRN",
-+			"SPK", "SPKOUTRP";
-+};
+ 	return 0;
+ }
+ 
 -- 
-2.0.0.390.gcb682f8
+2.1.2
