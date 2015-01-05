@@ -1,33 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 05 Jan 2015 23:26:15 +0100
-Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <54AAEEE1.7020607@ti.com>
-References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
- <2019516.ehiuEv0rdL@wuerfel> <54AAEEE1.7020607@ti.com>
-Message-ID: <1671700.LL29F8Iz6R@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 06 Jan 2015 01:26:45 +0300
+Subject: [PATCH v5 3/3] ARM: shmobile: henninger: add CAN0 DT support
+In-Reply-To: <1652479.NHBlqJ9OaR@wasted.cogentembedded.com>
+References: <1652479.NHBlqJ9OaR@wasted.cogentembedded.com>
+Message-ID: <2483119.HjgsDbcomx@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 January 2015 15:06:57 Murali Karicheri wrote:
-> On 01/03/2015 04:37 PM, Arnd Bergmann wrote:
-> > Yes, but we also need to pass a PCI device specific identifier along
-> > with the root bus node, because some iommu drivers take the PCI
-> > bus/device/function number into account for creating per-function
-> > i/o page tables.
+Define the Henninger board dependent part of the CAN0 device node.
 
-> ...
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> I will post v3 of the patch with what is agreed before in my response 
-> and I understand there is no additional change required based on this 
-> particular discussion about iommu. Right?
+---
+Changes in version 4:
+- refreshed the patch.
 
-Actually regarding the bit I wrote above, it might be helpful to pass
-the PCI_DEVID() into both of_iommu_configure and of_dma_configure.
+Changes in version 3:
+- changed "can0_data_a" to "can0_data", removed "can_clk_d" in the
+  "renesas,groups" property;
+- moved CAN0 node to go after all others;
+- refreshed the patch.
 
-While this may or may not be sufficient, I think there is no question
-about it being needed for the ARM SMMU with PCI, so we may as well add
-it at the point when you touch the same lines already. In the platform
-bus case, just pass zero here.
+ arch/arm/boot/dts/r8a7791-henninger.dts |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-	Arnd
+Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
++++ renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+@@ -147,6 +147,11 @@
+ 		renesas,groups = "vin0_data8", "vin0_clk";
+ 		renesas,function = "vin0";
+ 	};
++
++	can0_pins: can0 {
++		renesas,groups = "can0_data";
++		renesas,function = "can0";
++	};
+ };
+ 
+ &scif0 {
+@@ -321,3 +326,9 @@
+ 		};
+ 	};
+ };
++
++&can0 {
++	pinctrl-0 = <&can0_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++};
