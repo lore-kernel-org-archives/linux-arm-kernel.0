@@ -1,74 +1,42 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 05 Jan 2015 16:47:48 +0100
-Subject: [RFC PATCHv2 05/19] power: 88pm860x_charger: Use power_supply_*() API
- for accessing function attrs
+Date: Mon, 05 Jan 2015 16:47:58 +0100
+Subject: [RFC PATCHv2 15/19] x86/olpc/xo15/sci: Use newly added
+ power_supply_put API
 In-Reply-To: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
 References: <1420472882-10463-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1420472882-10463-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1420472882-10463-16-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace direct calls to power supply function attributes with wrappers.
-Wrappers provide safe access in case of unregistering the power
-supply (e.g. by removing the driver). Replace:
- - get_property -> power_supply_get_property
- - set_property -> power_supply_set_property
+Replace direct usage of put_device() with new API: power_supply_put().
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Jonghwa Lee <jonghwa3.lee@samusng.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/power/88pm860x_charger.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+ arch/x86/platform/olpc/olpc-xo15-sci.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/88pm860x_charger.c
-index 650930e4fa79..59d62665b526 100644
---- a/drivers/power/88pm860x_charger.c
-+++ b/drivers/power/88pm860x_charger.c
-@@ -296,12 +296,13 @@ static int set_charging_fsm(struct pm860x_charger_info *info)
- 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
- 	if (!psy)
- 		return -EINVAL;
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &data);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+			&data);
- 	if (ret)
- 		return ret;
- 	vbatt = data.intval / 1000;
+diff --git a/arch/x86/platform/olpc/olpc-xo15-sci.c b/arch/x86/platform/olpc/olpc-xo15-sci.c
+index 08e350e757dc..55130846ac87 100644
+--- a/arch/x86/platform/olpc/olpc-xo15-sci.c
++++ b/arch/x86/platform/olpc/olpc-xo15-sci.c
+@@ -83,7 +83,7 @@ static void battery_status_changed(void)
  
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
- 	if (ret)
- 		return ret;
+ 	if (psy) {
+ 		power_supply_changed(psy);
+-		put_device(psy->dev);
++		power_supply_put(psy);
+ 	}
+ }
  
-@@ -430,7 +431,7 @@ static irqreturn_t pm860x_temp_handler(int irq, void *data)
- 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
- 	if (!psy)
- 		goto out;
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
- 	if (ret)
- 		goto out;
- 	value = temp.intval / 10;
-@@ -485,7 +486,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
- 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
- 	if (!psy)
- 		goto out;
--	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
-+	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
-+			&val);
- 	if (ret)
- 		goto out;
- 	vbatt = val.intval / 1000;
-@@ -500,7 +502,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
- 	if (ret < 0)
- 		goto out;
- 	if (vbatt > CHARGE_THRESHOLD && ret & STATUS2_CHG)
--		psy->set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL, &val);
-+		power_supply_set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL,
-+				&val);
+@@ -93,7 +93,7 @@ static void ac_status_changed(void)
  
- out:
- 	mutex_unlock(&info->lock);
+ 	if (psy) {
+ 		power_supply_changed(psy);
+-		put_device(psy->dev);
++		power_supply_put(psy);
+ 	}
+ }
+ 
 -- 
 1.9.1
