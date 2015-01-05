@@ -1,170 +1,164 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Mon, 5 Jan 2015 19:29:29 +0800
-Subject: [PATCH v19 06/11] ARM: kprobes: Add test cases for stack consuming
- instructions
+Date: Mon, 5 Jan 2015 19:29:40 +0800
+Subject: [PATCH v19 09/11] ARM: kprobes: Fix unreliable MRS instruction tests
 In-Reply-To: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
 References: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1420457369-77280-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1420457380-77406-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Jon Medhurst (Tixy)" <tixy@linaro.org>
 
-These have extra 'checker' functions associated with them so lets make
-sure those get covered by testing. As they may create uninitialised
-space on the stack we also update the test code to ensure such space is
-consistent between test runs. This is done by disabling interrupts in
-setup_test_context().
+For the instruction 'mrs Rn, cpsr' the resulting value of Rn can vary due to
+external factors we can't control. So get the test code to mask out these
+indeterminate bits.
 
 Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
- arch/arm/probes/kprobes/test-arm.c   | 17 +++++++++++++++--
- arch/arm/probes/kprobes/test-core.c  |  9 +++++++++
- arch/arm/probes/kprobes/test-thumb.c | 12 ++++++++++++
- 3 files changed, 36 insertions(+), 2 deletions(-)
+ arch/arm/probes/kprobes/test-arm.c   |  6 +++---
+ arch/arm/probes/kprobes/test-core.c  | 19 ++++++++++---------
+ arch/arm/probes/kprobes/test-core.h  | 33 ++++++++++++++++++++++++++++-----
+ arch/arm/probes/kprobes/test-thumb.c |  4 ++--
+ 4 files changed, 43 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/probes/kprobes/test-arm.c b/arch/arm/probes/kprobes/test-arm.c
-index fdeb300..9b3b1b4 100644
+index 9b3b1b4..e72b07e 100644
 --- a/arch/arm/probes/kprobes/test-arm.c
 +++ b/arch/arm/probes/kprobes/test-arm.c
-@@ -12,6 +12,7 @@
- #include <linux/module.h>
- #include <asm/system_info.h>
- #include <asm/opcodes.h>
-+#include <asm/probes.h>
+@@ -204,9 +204,9 @@ void kprobe_arm_test_cases(void)
+ #endif
+ 	TEST_GROUP("Miscellaneous instructions")
  
- #include "test-core.h"
- 
-@@ -478,6 +479,7 @@ void kprobe_arm_test_cases(void)
- 	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
- 	TEST_RPR(  "streqh	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")
- 	TEST_UNSUPPORTED(  "streqh	r14, [r13, r12]")
-+	TEST_UNSUPPORTED(  "streqh	r14, [r12, r13]")
- 	TEST_RPR(  "strh	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")
- 	TEST_RPR(  "strneh	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strh	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")
-@@ -502,6 +504,9 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP(   "strplh	r",12,VAL2,", [r",11,24,", #-4]!")
- 	TEST_RP(   "strh	r",2, VAL1,", [r",3, 24,"], #48")
- 	TEST_RP(   "strh	r",10,VAL2,", [r",9, 64,"], #-48")
-+	TEST_RP(   "strh	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strh r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RP(   "strh	r",4, VAL1,", [r",14,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3b0) "	@ strh r12, [pc, #48]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe0c9f3b0) "	@ strh pc, [r9], #48")
- 
-@@ -568,6 +573,7 @@ void kprobe_arm_test_cases(void)
- 	TEST_RPR(  "strd	r",0, VAL1,", [r",1, 48,", -r",2,24,"]")
- 	TEST_RPR(  "strccd	r",8, VAL2,", [r",11,0, ", r",12,48,"]")
- 	TEST_UNSUPPORTED(  "strccd r8, [r13, r12]")
-+	TEST_UNSUPPORTED(  "strccd r8, [r12, r13]")
- 	TEST_RPR(  "strd	r",4, VAL1,", [r",2, 24,", r",3, 48,"]!")
- 	TEST_RPR(  "strcsd	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")
- 	TEST_RPR(  "strd	r",2, VAL1,", [r",5, 24,"], r",4,48,"")
-@@ -591,6 +597,9 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP(   "strvcd	r",12,VAL2,", [r",11,24,", #-16]!")
- 	TEST_RP(   "strd	r",2, VAL1,", [r",4, 24,"], #48")
- 	TEST_RP(   "strd	r",10,VAL2,", [r",9, 64,"], #-48")
-+	TEST_RP(   "strd	r",6, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strd r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RP(   "strd	r",4, VAL1,", [r",12,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_arm(0xe1efc3f0) "	@ strd r12, [pc, #48]!")
- 
- 	TEST_P(	   "ldrd	r0, [r",0, 24,", #-8]")
-@@ -639,16 +648,20 @@ void kprobe_arm_test_cases(void)
- 	TEST_RP( "str"byte"	r",12,VAL2,", [r",11,24,", #-4]!")		\
- 	TEST_RP( "str"byte"	r",2, VAL1,", [r",3, 24,"], #48")		\
- 	TEST_RP( "str"byte"	r",10,VAL2,", [r",9, 64,"], #-48")		\
-+	TEST_RP( "str"byte"	r",3, VAL1,", [r",13,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-+	TEST_UNSUPPORTED("str"byte" r3, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")				\
-+	TEST_RP( "str"byte"	r",4, VAL1,", [r",10,TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")	\
- 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 48,"]")	\
--	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")	\
-+	TEST_UNSUPPORTED("str"byte" r14, [r13, r12]")				\
-+	TEST_UNSUPPORTED("str"byte" r14, [r12, r13]")				\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  48,"]!")	\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,48,", -r",10,24,"]!")	\
- 	TEST_RPR("str"byte"	r",2, VAL1,", [r",3, 24,"], r",4, 48,"")	\
- 	TEST_RPR("str"byte"	r",10,VAL2,", [r",9, 48,"], -r",11,24,"")	\
- 	TEST_RPR("str"byte"	r",0, VAL1,", [r",1, 24,", r",2,  32,", asl #1]")\
- 	TEST_RPR("str"byte"	r",14,VAL2,", [r",11,0, ", r",12, 32,", lsr #2]")\
--	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")\
-+	TEST_UNSUPPORTED("str"byte"	r14, [r13, r12, lsr #2]")		\
- 	TEST_RPR("str"byte"	r",1, VAL1,", [r",2, 24,", r",3,  32,", asr #3]!")\
- 	TEST_RPR("str"byte"	r",12,VAL2,", [r",11,24,", r",10, 4,", ror #31]!")\
- 	TEST_P(  "ldr"byte"	r0, [r",0,  24,", #-2]")			\
+-	TEST("mrs	r0, cpsr")
+-	TEST("mrspl	r7, cpsr")
+-	TEST("mrs	r14, cpsr")
++	TEST_RMASKED("mrs	r",0,~PSR_IGNORE_BITS,", cpsr")
++	TEST_RMASKED("mrspl	r",7,~PSR_IGNORE_BITS,", cpsr")
++	TEST_RMASKED("mrs	r",14,~PSR_IGNORE_BITS,", cpsr")
+ 	TEST_UNSUPPORTED(__inst_arm(0xe10ff000) "	@ mrs r15, cpsr")
+ 	TEST_UNSUPPORTED("mrs	r0, spsr")
+ 	TEST_UNSUPPORTED("mrs	lr, spsr")
 diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
-index 7ab633d..7c5ddd5 100644
+index 7c5ddd5..e495127 100644
 --- a/arch/arm/probes/kprobes/test-core.c
 +++ b/arch/arm/probes/kprobes/test-core.c
-@@ -1196,6 +1196,13 @@ static void setup_test_context(struct pt_regs *regs)
- 			regs->uregs[arg->reg] =
- 				(unsigned long)current_stack + arg->val;
- 			memory_needs_checking = true;
-+			/*
-+			 * Test memory at an address below SP is in danger of
-+			 * being altered by an interrupt occurring and pushing
-+			 * data onto the stack. Disable interrupts to stop this.
-+			 */
-+			if (arg->reg == 13)
-+				regs->ARM_cpsr |= PSR_I_BIT;
- 			break;
- 		}
- 		case ARG_TYPE_MEM: {
-@@ -1272,6 +1279,8 @@ test_after_pre_handler(struct kprobe *p, struct pt_regs *regs)
+@@ -1056,15 +1056,6 @@ static int test_case_run_count;
+ static bool test_case_is_thumb;
+ static int test_instance;
+ 
+-/*
+- * We ignore the state of the imprecise abort disable flag (CPSR.A) because this
+- * can change randomly as the kernel doesn't take care to preserve or initialise
+- * this across context switches. Also, with Security Extentions, the flag may
+- * not be under control of the kernel; for this reason we ignore the state of
+- * the FIQ disable flag CPSR.F as well.
+- */
+-#define PSR_IGNORE_BITS (PSR_A_BIT | PSR_F_BIT)
+-
+ static unsigned long test_check_cc(int cc, unsigned long cpsr)
+ {
+ 	int ret = arm_check_condition(cc << 28, cpsr);
+@@ -1271,11 +1262,21 @@ test_case_pre_handler(struct kprobe *p, struct pt_regs *regs)
+ static int __kprobes
+ test_after_pre_handler(struct kprobe *p, struct pt_regs *regs)
+ {
++	struct test_arg *args;
++
+ 	if (container_of(p, struct test_probe, kprobe)->hit == test_instance)
+ 		return 0; /* Already run for this test instance */
+ 
+ 	result_regs = *regs;
++
++	/* Mask out results which are indeterminate */
+ 	result_regs.ARM_cpsr &= ~PSR_IGNORE_BITS;
++	for (args = current_args; args[0].type != ARG_TYPE_END; ++args)
++		if (args[0].type == ARG_TYPE_REG_MASKED) {
++			struct test_arg_regptr *arg =
++				(struct test_arg_regptr *)args;
++			result_regs.uregs[arg->reg] &= arg->val;
++		}
  
  	/* Undo any changes done to SP by the test case */
  	regs->ARM_sp = (unsigned long)current_stack;
-+	/* Enable interrupts in case setup_test_context disabled them */
-+	regs->ARM_cpsr &= ~PSR_I_BIT;
+diff --git a/arch/arm/probes/kprobes/test-core.h b/arch/arm/probes/kprobes/test-core.h
+index 9991754..9428520 100644
+--- a/arch/arm/probes/kprobes/test-core.h
++++ b/arch/arm/probes/kprobes/test-core.h
+@@ -45,10 +45,11 @@ extern int kprobe_test_cc_position;
+  *
+  */
  
- 	container_of(p, struct test_probe, kprobe)->hit = test_instance;
- 	return 0;
+-#define	ARG_TYPE_END	0
+-#define	ARG_TYPE_REG	1
+-#define	ARG_TYPE_PTR	2
+-#define	ARG_TYPE_MEM	3
++#define	ARG_TYPE_END		0
++#define	ARG_TYPE_REG		1
++#define	ARG_TYPE_PTR		2
++#define	ARG_TYPE_MEM		3
++#define	ARG_TYPE_REG_MASKED	4
+ 
+ #define ARG_FLAG_UNSUPPORTED	0x01
+ #define ARG_FLAG_SUPPORTED	0x02
+@@ -61,7 +62,7 @@ struct test_arg {
+ };
+ 
+ struct test_arg_regptr {
+-	u8	type;		/* ARG_TYPE_REG or ARG_TYPE_PTR */
++	u8	type;		/* ARG_TYPE_REG or ARG_TYPE_PTR or ARG_TYPE_REG_MASKED */
+ 	u8	reg;
+ 	u8	_padding[2];
+ 	u32	val;
+@@ -138,6 +139,12 @@ struct test_arg_end {
+ 	".short	0					\n\t"	\
+ 	".word	"#val"					\n\t"
+ 
++#define	TEST_ARG_REG_MASKED(reg, val)				\
++	".byte	"__stringify(ARG_TYPE_REG_MASKED)"	\n\t"	\
++	".byte	"#reg"					\n\t"	\
++	".short	0					\n\t"	\
++	".word	"#val"					\n\t"
++
+ #define	TEST_ARG_END(flags)					\
+ 	".byte	"__stringify(ARG_TYPE_END)"		\n\t"	\
+ 	".byte	"TEST_ISA flags"			\n\t"	\
+@@ -395,6 +402,22 @@ struct test_arg_end {
+ 	"	"codex"			\n\t"					\
+ 	TESTCASE_END
+ 
++#define TEST_RMASKED(code1, reg, mask, code2)		\
++	TESTCASE_START(code1 #reg code2)		\
++	TEST_ARG_REG_MASKED(reg, mask)			\
++	TEST_ARG_END("")				\
++	TEST_INSTRUCTION(code1 #reg code2)		\
++	TESTCASE_END
++
++/*
++ * We ignore the state of the imprecise abort disable flag (CPSR.A) because this
++ * can change randomly as the kernel doesn't take care to preserve or initialise
++ * this across context switches. Also, with Security Extensions, the flag may
++ * not be under control of the kernel; for this reason we ignore the state of
++ * the FIQ disable flag CPSR.F as well.
++ */
++#define PSR_IGNORE_BITS (PSR_A_BIT | PSR_F_BIT)
++
+ 
+ /*
+  * Macros for defining space directives spread over multiple lines.
 diff --git a/arch/arm/probes/kprobes/test-thumb.c b/arch/arm/probes/kprobes/test-thumb.c
-index 6c6e9a9..e8cf193 100644
+index e8cf193..b683b45 100644
 --- a/arch/arm/probes/kprobes/test-thumb.c
 +++ b/arch/arm/probes/kprobes/test-thumb.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <asm/opcodes.h>
-+#include <asm/probes.h>
+@@ -778,8 +778,8 @@ CONDITION_INSTRUCTIONS(22,
  
- #include "test-core.h"
+ 	TEST_UNSUPPORTED("subs	pc, lr, #4")
  
-@@ -416,6 +417,9 @@ void kprobe_thumb32_test_cases(void)
- 	TEST_RR( "strd	r",14,VAL2,", r",12,VAL1,", [sp, #16]!")
- 	TEST_RRP("strd	r",1, VAL1,", r",0, VAL2,", [r",7, 24,"], #16")
- 	TEST_RR( "strd	r",7, VAL2,", r",8, VAL1,", [sp], #-16")
-+	TEST_RRP("strd	r",6, VAL1,", r",7, VAL2,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!")
-+	TEST_UNSUPPORTED("strd r6, r7, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")
-+	TEST_RRP("strd	r",4, VAL1,", r",5, VAL2,", [r",14, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xe9efec04) "	@ strd	r14, r12, [pc, #16]!")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xe8efec04) "	@ strd	r14, r12, [pc], #16")
- 
-@@ -821,14 +825,22 @@ CONDITION_INSTRUCTIONS(22,
- 	TEST_RP( "str"size"	r",14,VAL2,", [r",1, 256,  ", #-128]!")		\
- 	TEST_RPR("str"size".w	r",0, VAL1,", [r",1, 0,", r",2, 4,"]")		\
- 	TEST_RPR("str"size"	r",14,VAL2,", [r",10,0,", r",11,4,", lsl #1]")	\
-+	TEST_UNSUPPORTED("str"size"	r0, [r13, r1]")				\
- 	TEST_R(  "str"size".w	r",7, VAL1,", [sp, #24]")			\
- 	TEST_RP( "str"size".w	r",0, VAL2,", [r",0,0, "]")			\
-+	TEST_RP( "str"size"	r",6, VAL1,", [r",13, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"]!") \
-+	TEST_UNSUPPORTED("str"size"	r6, [r13, #-"__stringify(MAX_STACK_SIZE)"-8]!")			\
-+	TEST_RP( "str"size"	r",4, VAL2,", [r",12, TEST_MEMORY_SIZE,", #-"__stringify(MAX_STACK_SIZE)"-8]!") \
- 	TEST_UNSUPPORTED("str"size"t	r0, [r1, #4]")
- 
- 	SINGLE_STORE("b")
- 	SINGLE_STORE("h")
- 	SINGLE_STORE("")
- 
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf801000d) "	@ strb	r0, [r1, r13]")
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf821000d) "	@ strh	r0, [r1, r13]")
-+	TEST_UNSUPPORTED(__inst_thumb32(0xf841000d) "	@ str	r0, [r1, r13]")
-+
- 	TEST("str	sp, [sp]")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cfe000) "	@ str	r14, [pc]")
- 	TEST_UNSUPPORTED(__inst_thumb32(0xf8cef000) "	@ str	pc, [r14]")
+-	TEST("mrs	r0, cpsr")
+-	TEST("mrs	r14, cpsr")
++	TEST_RMASKED("mrs	r",0,~PSR_IGNORE_BITS,", cpsr")
++	TEST_RMASKED("mrs	r",14,~PSR_IGNORE_BITS,", cpsr")
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xf3ef8d00) "	@ mrs	sp, spsr")
+ 	TEST_UNSUPPORTED(__inst_thumb32(0xf3ef8f00) "	@ mrs	pc, spsr")
+ 	TEST_UNSUPPORTED("mrs	r0, spsr")
 -- 
 1.8.4
