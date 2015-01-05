@@ -1,80 +1,38 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon,  5 Jan 2015 12:40:20 +0000
-Subject: [PATCH 3.19-rc2 v15 4/8] arm: ks8695: Migrate debug_ll macros to
- shared directory
+Date: Mon,  5 Jan 2015 12:40:23 +0000
+Subject: [PATCH 3.19-rc2 v15 7/8] arm: Seperate DEBUG_UART_PHYS from DEBUG_LL
+ on EP93XX
 In-Reply-To: <1420461624-4410-1-git-send-email-daniel.thompson@linaro.org>
 References: <1420461624-4410-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1420461624-4410-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1420461624-4410-8-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As part of the migration a couple of uart definitions have been copied
-from of the platform specific header files.
+On EP93XX uncompress.h uses CONFIG_DEBUG_UART_PHYS instead of a hard
+coded serial port. This means the build breaks when DEBUG_LL
+(and DEBUG_LL_UART_PL01X) is not enabled.
+
+This is fixed by adding a new dependency.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig.debug                                         |  8 ++++++++
- .../include/mach/debug-macro.S => include/debug/ks8695.S}      | 10 +++++++---
- 2 files changed, 15 insertions(+), 3 deletions(-)
- rename arch/arm/{mach-ks8695/include/mach/debug-macro.S => include/debug/ks8695.S} (80%)
+ arch/arm/Kconfig.debug | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6ee9b0d361ee..eba36e35bad2 100644
+index ff43ea38fe1f..e250505b9ae1 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -397,6 +397,13 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to UART1 serial port on KEYSTONE2 devices.
- 
-+	config DEBUG_KS8695_UART
-+		bool "KS8695 Debug UART"
-+		depends on ARCH_KS8695
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on KS8695.
-+
- 	config DEBUG_MESON_UARTAO
- 		bool "Kernel low-level debugging via Meson6 UARTAO"
- 		depends on ARCH_MESON
-@@ -1174,6 +1181,7 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX6Q_UART || \
- 				 DEBUG_IMX6SL_UART || \
- 				 DEBUG_IMX6SX_UART
-+	default "debug/ks8695.S" if DEBUG_KS8695_UART
- 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
- 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
- 	default "debug/renesas-scif.S" if DEBUG_R7S72100_SCIF2
-diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/include/debug/ks8695.S
-similarity index 80%
-rename from arch/arm/mach-ks8695/include/mach/debug-macro.S
-rename to arch/arm/include/debug/ks8695.S
-index a79e48981202..961da1f32ab3 100644
---- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
-+++ b/arch/arm/include/debug/ks8695.S
-@@ -1,5 +1,5 @@
- /*
-- * arch/arm/mach-ks8695/include/mach/debug-macro.S
-+ * arch/arm/include/debug/ks8695.S
-  *
-  * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
-  * Copyright (C) 2006 Simtec Electronics
-@@ -11,8 +11,12 @@
-  * published by the Free Software Foundation.
-  */
- 
--#include <mach/hardware.h>
--#include <mach/regs-uart.h>
-+#define KS8695_UART_PA	0x03ffe000
-+#define KS8695_UART_VA	0xf00fe000
-+#define KS8695_URTH	(0x04)
-+#define KS8695_URLS	(0x14)
-+#define URLS_URTE	(1 << 6)
-+#define URLS_URTHRE	(1 << 5)
- 
- 	.macro	addruart, rp, rv, tmp
- 		ldr	\rp, =KS8695_UART_PA		@ physical base address
+@@ -1370,7 +1370,8 @@ config DEBUG_UART_PHYS
+ 	default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
+ 	default 0xfffe8600 if DEBUG_UART_BCM63XX
+ 	default 0xfffff700 if ARCH_IOP33X
+-	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
++	depends on ARCH_EP93XX || \
++	        DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_NETX_UART || \
 -- 
 1.9.3
