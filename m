@@ -1,54 +1,26 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 05 Jan 2015 12:21:53 +0100
-Subject: [PATCH] simplefb: Fix build failure on Sparc
-In-Reply-To: <54AA72CB.1020303@ti.com>
-References: <1420445716-13468-1-git-send-email-hdegoede@redhat.com>
- <54AA72CB.1020303@ti.com>
-Message-ID: <54AA73D1.3@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Jan 2015 11:24:45 +0000
+Subject: [PATCH v4 4/8] efi: efistub: allow allocation alignment larger
+ than EFI_PAGE_SIZE
+In-Reply-To: <20141229094732.GA16051@nazgul.tnic>
+References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419245944-2424-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20141223164549.GB3810@pd.tnic>
+ <CAKv+Gu_+scCHYuXccgsvn9THsbP24OfyjvjN9XtEVe4nMdQtig@mail.gmail.com>
+ <20141229094732.GA16051@nazgul.tnic>
+Message-ID: <CAKv+Gu9dP7pXkquv3d-64SsX0HBTE0qt92=ktN0rXWp6kF=a1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05-01-15 12:17, Tomi Valkeinen wrote:
-> On 05/01/15 10:15, Hans de Goede wrote:
->> of_platform_device_create is only defined when CONFIG_OF_ADDRESS is set,
->> which is normally always the case when CONFIG_OF is defined, except on Sparc,
->> so explicitly check for CONFIG_OF_ADDRESS rather then for CONFIG_OF.
->>
->> Reported-by: kbuild test robot <fengguang.wu@intel.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   drivers/video/fbdev/simplefb.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
->> index 92cac80..1085c04 100644
->> --- a/drivers/video/fbdev/simplefb.c
->> +++ b/drivers/video/fbdev/simplefb.c
->> @@ -402,7 +402,7 @@ static int __init simplefb_init(void)
->>   	if (ret)
->>   		return ret;
->>
->> -	if (IS_ENABLED(CONFIG_OF) && of_chosen) {
->> +	if (IS_ENABLED(CONFIG_OF_ADDRESS) && of_chosen) {
->>   		for_each_child_of_node(of_chosen, np) {
->>   			if (of_device_is_compatible(np, "simple-framebuffer"))
->>   				of_platform_device_create(np, NULL, NULL);
->>
+On 29 December 2014 at 09:47, Borislav Petkov <bp@alien8.de> wrote:
+> On Mon, Dec 29, 2014 at 09:25:15AM +0000, Ard Biesheuvel wrote:
+>> Do you have any comments regarding patches #3 and #6 in this series?
 >
-> Doesn't this depend on the compiler optimizing the
-> of_platform_device_create call away?
+> Sorry, have had no time so far to take a look. Holidays and all...
+> You're on the TODO list though :-)
+>
 
-Yes it does.
-
-> Isn't that rather dangerous assumption?
-
-The kernel relies on being build with optimization enabled in various places,
-this specific construction was suggested during review (by Grant Likely IIRC)
-I initially had an #ifdef here. Note that this construction is used in various
-places throughout the kernel and it seems to be used more and more often.
+No worries, business has been slow for everyone, I'm sure.
 
 Regards,
-
-Hans
+Ard.
