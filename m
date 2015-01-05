@@ -1,52 +1,32 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 5 Jan 2015 15:59:19 +0800
-Subject: [PATCH next] mmc: sdhci-pxav3: Remove checks for optional core clock
- in error/remove path
-Message-ID: <1420444759-3812-1-git-send-email-jszhang@marvell.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon,  5 Jan 2015 09:15:16 +0100
+Subject: [PATCH] simplefb: Fix build failure on Sparc
+Message-ID: <1420445716-13468-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
-clk_{unprepare, disable}()") allows NULL or error pointer to be passed
-unconditionally.
+of_platform_device_create is only defined when CONFIG_OF_ADDRESS is set,
+which is normally always the case when CONFIG_OF is defined, except on Sparc,
+so explicitly check for CONFIG_OF_ADDRESS rather then for CONFIG_OF.
 
-This patch is to simplify probe error and remove code paths.
-
-However, we reserve the core clock checks in runtime suspend/resume code
-because we want a little smaller latency.
-
-This patch can be applied after the sdhci-pxav3 unbalanced pm/clock issues
-patches being merged.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313103.html
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/mmc/host/sdhci-pxav3.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/video/fbdev/simplefb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index 4de39fb..63967b8 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -398,8 +398,7 @@ err_of_parse:
- err_cd_req:
- err_mbus_win:
- 	clk_disable_unprepare(pxa->clk_io);
--	if (!IS_ERR(pxa->clk_core))
--		clk_disable_unprepare(pxa->clk_core);
-+	clk_disable_unprepare(pxa->clk_core);
- err_clk_get:
- 	sdhci_pltfm_free(pdev);
- 	return ret;
-@@ -418,8 +417,7 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
- 	sdhci_remove_host(host, 1);
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index 92cac80..1085c04 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -402,7 +402,7 @@ static int __init simplefb_init(void)
+ 	if (ret)
+ 		return ret;
  
- 	clk_disable_unprepare(pxa->clk_io);
--	if (!IS_ERR(pxa->clk_core))
--		clk_disable_unprepare(pxa->clk_core);
-+	clk_disable_unprepare(pxa->clk_core);
- 
- 	sdhci_pltfm_free(pdev);
- 
+-	if (IS_ENABLED(CONFIG_OF) && of_chosen) {
++	if (IS_ENABLED(CONFIG_OF_ADDRESS) && of_chosen) {
+ 		for_each_child_of_node(of_chosen, np) {
+ 			if (of_device_is_compatible(np, "simple-framebuffer"))
+ 				of_platform_device_create(np, NULL, NULL);
 -- 
-2.1.4
+2.1.0
