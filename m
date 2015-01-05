@@ -1,150 +1,220 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 5 Jan 2015 11:00:40 -0600
-Subject: [PATCH v11 0/9] Enable L2 cache support on Exynos4210/4x12 SoCs
-In-Reply-To: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
-References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54AAC338.9030506@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 05 Jan 2015 18:06:58 +0100
+Subject: [PATCH 3/3] ARM: mvebu: Add Armada 385 General Purpose Development
+ Board support
+In-Reply-To: <20141231113250.6ae98b19@free-electrons.com>
+References: <1419678035-10658-1-git-send-email-gregory.clement@free-electrons.com>	<1419678035-10658-4-git-send-email-gregory.clement@free-electrons.com>
+ <20141231113250.6ae98b19@free-electrons.com>
+Message-ID: <54AAC4B2.8040401@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2015 06:18 AM, Marek Szyprowski wrote:
-> This is an updated patchset, which intends to add support for L2 cache
-> on Exynos4 SoCs on boards running under secure firmware, which requires
-> certain initialization steps to be done with help of firmware, as
-> selected registers are writable only from secure mode.
-> 
-> First patch updates Omap2+ platforms by moving l2cache initialization to
-> common code. This will resolve too early call to l2cache init, what might
-> cause kmalloc failure in code added in next patches.
-> 
-> Next patch fixes access method to latency and filter settings in l2cache
-> driver.
-> 
-> Next four patches extend existing support for secure write in L2C driver
-> to account for design of secure firmware running on Exynos. Namely:
->  1) direct read access to certain registers is needed on Exynos, because
->     secure firmware calls set several registers at once,
->  2) not all boards are running secure firmware, so .write_sec callback
->     needs to be installed in Exynos firmware ops initialization code,
->  3) write access to {DATA,TAG}_LATENCY_CTRL registers fron non-secure world
->     is not allowed and so must use l2c_write_sec as well,
->  4) on certain boards, default value of prefetch register is incorrect
->     and must be overridden at L2C initialization.
-> For boards running with firmware that provides access to individual
-> L2C registers this series should introduce no functional changes. However
-> since the driver is widely used on other platforms I'd like to kindly ask
-> any interested people for testing.
-> 
-> Further three patches add implementation of .write_sec and .configure
-> callbacks for Exynos secure firmware and necessary DT nodes to enable
-> L2 cache.
-> 
-> Changes in this version tested on Exynos4412-based TRATS2 and OdroidU3+
-> boards (both with secure firmware). There should be no functional change
-> for Exynos boards running without secure firmware. I do not have access
-> to affected non-Exynos boards, so I could not test on them.
-> 
-> Depends on:
-> - v3.19-rc2
-> 
-> Changelog:
-> 
-> Changes since v10:
-> (https://lkml.org/lkml/2014/12/23/151)
-> - Added patch, which fixes access method to latency and filter settings
->   in l2cache
-> 
-> Changes since v9:
-> (https://lkml.org/lkml/2014/11/17/217)
-> - Rebased onto vanilla v3.19-rc1
-> - Added patch for Omap2+ (move l2cache initialization to common code), what
->   fixes too early initialization (kmalloc failure)
-> 
-> Changes since v8:
-> (http://lkml.org/lkml/2014/11/13/263)
-> - Rebased onto vanilla v3.18-rc3 and added required includes, which were
->   previously added by other patches
-> - Added Acked-by tags for Exynos part
-> 
-> Changes since v7:
-> (https://lkml.org/lkml/2014/10/29/158)
-> - rebased onto arm-soc/for-next kernel tree (depends on patches merged to
->   v3.18-rc3 and arm-soc/samsung/pm2 branch)
-> - removed 'ARM: l2c: unify L2C-310 OF initialization error messages' patch
->   (no longer needed)
-> 
-> Changes since v6:
-> (https://lkml.org/lkml/2014/10/27/233)
-> - changed PL310 to L2C-310 prefix in error messages
-> - added patch shortening the error message about incorrect associativity
-> 
-> Changes since v5:
-> (https://lkml.org/lkml/2014/9/24/364)
-> - rebased onto v3.18-rc2
-> - added error message about missing properties values
-> 
-> Changes since v4:
-> (https://lkml.org/lkml/2014/8/26/461)
->  - rewrote the code accessing l2x0_saved_regs from assembly code
->  - added comment and reworked unconditional call to SMC_CMD_L2X0INVALL
-> 
-> 
-> Patch summary:
-> 
-> Marek Szyprowski (2):
->   ARM: OMAP2+: use common l2cache initialization code
->   ARM: l2c: use l2c_write_sec() for restoring latency and filter regs
-> 
-> Tomasz Figa (7):
->   ARM: l2c: Refactor the driver to use commit-like interface
->   ARM: l2c: Add interface to ask hypervisor to configure L2C
->   ARM: l2c: Get outer cache .write_sec callback from mach_desc only if
->     not NULL
->   ARM: l2c: Add support for overriding prefetch settings
->   ARM: EXYNOS: Add .write_sec outer cache callback for L2C-310
->   ARM: EXYNOS: Add support for non-secure L2X0 resume
->   ARM: dts: exynos4: Add nodes for L2 cache controller
-> 
->  Documentation/devicetree/bindings/arm/l2cc.txt |  10 +
->  arch/arm/boot/dts/exynos4210.dtsi              |   9 +
->  arch/arm/boot/dts/exynos4x12.dtsi              |  14 ++
->  arch/arm/include/asm/outercache.h              |   3 +
->  arch/arm/kernel/irq.c                          |   3 +-
->  arch/arm/mach-exynos/firmware.c                |  50 +++++
->  arch/arm/mach-exynos/sleep.S                   |  46 +++++
->  arch/arm/mach-omap2/board-generic.c            |   6 +
->  arch/arm/mach-omap2/common.h                   |   7 +
->  arch/arm/mach-omap2/omap4-common.c             |  16 +-
->  arch/arm/mm/cache-l2x0.c                       | 270 ++++++++++++++++---------
->  11 files changed, 323 insertions(+), 111 deletions(-)
-> 
-Applied all 9 patches and tested on as many boards as I could get my
-hands on.. all boot fine, Thanks
+Hi Thomas,
 
- 1: am335x-evm: BOOT: PASS: http://slexy.org/raw/s21Q8Zw33s
- 2: am335x-sk: BOOT: PASS: http://slexy.org/raw/s28O0bBEyM
- 3: am437x-sk: BOOT: PASS: http://slexy.org/raw/s203dOrLId
- 4: am43xx-epos: BOOT: PASS: http://slexy.org/raw/s2uWmV1XkM
- 5: am43xx-gpevm: BOOT: PASS: http://slexy.org/raw/s20jVsjU00
- 6: BeagleBoard-X15(am57xx-evm): BOOT: PASS:
-http://slexy.org/raw/s21ezwoOop
- 7: BeagleBoard-XM: BOOT: PASS: http://slexy.org/raw/s21M0IYcdI
- 8: beagleboard-vanilla: BOOT: PASS: http://slexy.org/raw/s2gCJ5VRr9
- 9: beaglebone-black: BOOT: PASS: http://slexy.org/raw/s2vvB4u86O
-10: beaglebone: BOOT: PASS: http://slexy.org/raw/s208k0tU3V
-11: dra72x-evm: BOOT: PASS: http://slexy.org/raw/s212oTeZ2w
-12: dra7xx-evm: BOOT: PASS: http://slexy.org/raw/s24deU2xtY
-13: omap5-evm: BOOT: PASS: http://slexy.org/raw/s2DkUAGU0i
-14: pandaboard-es: BOOT: PASS: http://slexy.org/raw/s2UKuDaAFf
-15: pandaboard-vanilla: BOOT: PASS: http://slexy.org/raw/s21VAyb14r
-16: sdp4430: BOOT: PASS: http://slexy.org/raw/s2J6nAHynd
+On 31/12/2014 11:32, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Sat, 27 Dec 2014 12:00:35 +0100, Gregory CLEMENT wrote:
+> 
+>> +				spi-flash at 0 {
+>> +					#address-cells = <1>;
+>> +					#size-cells = <1>;
+>> +					compatible = "st,m25p128";
+>> +					reg = <0>; /* Chip select 0 */
+>> +					spi-max-frequency = <50000000>;
+> 
+> According to the m25p128 datasheet,  the max frequency is 54 Mhz.
 
-for TI SoCs impacted OMAP4 and AM437x (other than the exynos patches):
+It is the  max frequency for the 65nm devices, but the one on the GP board
+is a M25P128-VMF6P. As there was no 'B' in the part number then it was a
+130nm device which is limited to 50MHz.
 
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Nishanth Menon <nm@ti.com>
+> 
+>> +			i2c at 11000 {
+>> +				status = "okay";
+>> +				clock-frequency = <100000>;
+>> +
+>> +				pca9555_0: pca9555 at 20 {
+>> +					compatible = "nxp,pca9555";
+>> +					pinctrl-names = "default";
+>> +					pinctrl-0 = <&pca0_pins>;
+>> +					interrupt-parent = <&gpio0>;
+>> +					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+>> +					gpio-controller;
+>> +					#gpio-cells = <2>;
+>> +					interrupt-controller;
+>> +					#interrupt-cells = <2>;
+>> +					reg = <0x20>;
+>> +				};
+>> +
+>> +				pca9555_1: pca9555 at 21 {
+>> +					compatible = "nxp,pca9555";
+>> +					pinctrl-names = "default";
+>> +					interrupt-parent = <&gpio0>;
+>> +					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+>> +
+>> +					gpio-controller;
+>> +					#gpio-cells = <2>;
+>> +					interrupt-controller;
+>> +					#interrupt-cells = <2>;
+>> +
+>> +					reg = <0x21>;
+>> +				};
+> 
+> It would be good to align both description in terms of empty new lines.
+> 
+> Also, in the second controller, you have pinctrl-names, but no
+> pinctrl-0, so it doesn't make much sense.
+> 
+
+Yes it was a left over of from a previous version, I will remove it.
+
+>> +			ethernet at 70000 {
+>> +				status = "okay";
+>> +				phy = <&phy1>;
+>> +				phy-mode = "rgmii-id";
+>> +			};
+>> +
+>> +
+> 
+> One too many empty new line.
+> 
+>> +			mdio at 72004 {
+>> +				phy0: ethernet-phy at 0 {
+>> +					reg = <0>;
+>> +				};
+>> +
+>> +				phy1: ethernet-phy at 1 {
+>> +					reg = <1>;
+>> +				};
+>> +			};
+> 
+> Maybe this is confusing, but it seems like the port 0 (i.e the one at
+> 0x70000) is connected to the PHY at address 1, while the port 1 (i.e
+> the one at 0x30000) is connected to the PHY at address 0. According to
+> U-Boot:
+> 
+> | egiga0 |   RGMII   |     0x01     |
+> | egiga1 |   RGMII   |     0x00     |
+> 
+> So maybe we should have:
+> 
+> 	ethernet at 30000 {
+> 		phy = <&phy1>;
+> 	};
+> 
+> 	ethernet at 70000 {
+> 		phy = <&phy0>;
+> 	};
+> 
+> 	mdio at 72004 {
+> 		phy0: ethernet-phy at 1 {
+> 			reg = <1>;
+> 		};
+> 
+> 		phy1: ethernet-phy at 0 {
+> 			reg = <0>;
+> 		};
+> 	};
+> 
+> To reflect this, no?
+
+
+
+> 
+>> +			sata at a8000 {
+>> +				nr-ports = <2>;
+>> +				status = "okay";
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				sata0: sata-port at 0 {
+>> +					reg = <0>;
+>> +					target-supply = <&reg_5v_sata0>;
+>> +				};
+>> +
+>> +				sata1: sata-port at 1 {
+>> +					reg = <1>;
+>> +					target-supply = <&reg_5v_sata1>;
+>> +				};
+> 
+> Doesn't this part depends on the patches you have submitted to the AHCI
+> driver? If so, it would be good to state this in the cover letter, so
+> that the dependencies are known. Or for the moment, to not handle the
+> SATA part, until the DT binding for describing per-SATA port regulators
+> is sorted out (I saw that the feedback from Mark Brown on your patches
+> indicate that some rework will be needed).
+
+It was the same kind of DT binding which was used for PHY that I used for
+the regulator, I didn't imagine that it couldn't be accepted. But I was
+wrong DT bindings seems to be really dependent of each maintainers.
+
+I will move the regulator part of the SATA in a different patch.
+
+> 
+> Also, having a reg property into a child node that isn't part of a bus
+> looks wrong.
+
+But according to the binding documentation:
+Documentation/devicetree/bindings/ata/ahci-platform.txt, the reg property is a
+required property. If it is wrong that means that the bindings should be changed,
+but it also should be stable.
+
+> 
+>> +			};
+>> +
+>> +			sata at e0000 {
+>> +				nr-ports = <2>;
+>> +				status = "okay";
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				sata2: sata-port at 0 {
+>> +					reg = <0>;
+>> +					target-supply = <&reg_5v_sata2>;
+>> +				};
+>> +
+>> +				sata3: sata-port at 1 {
+>> +					reg = <1>;
+>> +					target-supply = <&reg_5v_sata3>;
+>> +				};
+>> +			};
+> 
+> Ditto.
+> 
+>> +			sdhci at d8000 {
+>> +				clock-frequency = <200000000>;
+> 
+> Why? There is already a 'clocks' property in armada-38x.dtsi. However,
+> the clock is actually 250 Mhz, not 200 Mhz. Any reason why you forced
+> 200 Mhz here?
+> 
+
+It was copied from the 385 DB dts before the patch "ARM: mvebu: remove
+clock-frequency from Armada 38x SDHCI Device Tree node" was applied. I will
+remove it
+
+
+>> +				cd-gpios = <&pca9555_0 5 GPIO_ACTIVE_LOW>;
+>> +				no-1-8-v;
+>> +				wp-inverted;
+> 
+> Why do you have a wp-inverted property, with no wp-gpios property? If I
+> understand the DT binding correctly, wp-inverted only makes sense when
+> wp-gpios is used.
+
+This part came also from the 385 DB board as the connector was similar. I
+thought you had introduced it on purpose so I kept it.
+
+
+Thanks,
+
+Gregory
+
 
 
 -- 
-Regards,
-Nishanth Menon
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
