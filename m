@@ -1,101 +1,57 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat,  3 Jan 2015 16:27:44 +0800
-Subject: [PATCH V3 10/10] clocksource: marco: rename marco to atlas7
-In-Reply-To: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-References: <1420273664-10438-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1420273664-10438-11-git-send-email-21cnbao@gmail.com>
+From: tony.kn@samsung.com (Tony K Nadackal)
+Date: Mon, 05 Jan 2015 10:41:55 +0530
+Subject: [PATCH] [media] s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
+ function
+In-Reply-To: <1418797339-27877-1-git-send-email-tony.kn@samsung.com>
+References: <1418797339-27877-1-git-send-email-tony.kn@samsung.com>
+Message-ID: <000001d028a6$2da27c90$88e775b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Gentle Reminder.
 
-marco project is replaced by atlas7 and we should obliterate
-its all traces.
+Thanks
+Tony
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/Makefile                          |  2 +-
- drivers/clocksource/{timer-marco.c => timer-atlas7.c} | 15 +++++++--------
- 2 files changed, 8 insertions(+), 9 deletions(-)
- rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
-
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b2..306bc47 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -18,7 +18,7 @@ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
--obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
-+obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
- obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_ARCH_PXA)		+= pxa_timer.o
-diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-atlas7.c
-similarity index 95%
-rename from drivers/clocksource/timer-marco.c
-rename to drivers/clocksource/timer-atlas7.c
-index 361a789..60f9de3 100644
---- a/drivers/clocksource/timer-marco.c
-+++ b/drivers/clocksource/timer-atlas7.c
-@@ -38,7 +38,7 @@
- 
- #define SIRFSOC_TIMER_REG_CNT 6
- 
--static unsigned long marco_timer_rate;
-+static unsigned long atlas7_timer_rate;
- 
- static const u32 sirfsoc_timer_reg_list[SIRFSOC_TIMER_REG_CNT] = {
- 	SIRFSOC_TIMER_WATCHDOG_EN,
-@@ -195,7 +195,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
- 	ce->rating = 200;
- 	ce->set_mode = sirfsoc_timer_set_mode;
- 	ce->set_next_event = sirfsoc_timer_set_next_event;
--	clockevents_calc_mult_shift(ce, marco_timer_rate, 60);
-+	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
- 	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
- 	ce->min_delta_ns = clockevent_delta2ns(2, ce);
- 	ce->cpumask = cpumask_of(cpu);
-@@ -255,9 +255,8 @@ static void __init sirfsoc_clockevent_init(void)
- }
- 
- /* initialize the kernel jiffy timer source */
--static void __init sirfsoc_marco_timer_init(struct device_node *np)
-+static void __init sirfsoc_atlas7_timer_init(struct device_node *np)
- {
--	u32 timer_div;
- 	struct clk *clk;
- 
- 	clk = of_clk_get(np, 0);
-@@ -265,7 +264,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
- 
- 	BUG_ON(clk_prepare_enable(clk));
- 
--	marco_timer_rate = clk_get_rate(clk);
-+	atlas7_timer_rate = clk_get_rate(clk);
- 
- 	/* timer dividers: 0, not divided */
- 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
-@@ -283,7 +282,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
- 	/* Clear all interrupts */
- 	writel_relaxed(0xFFFF, sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
- 
--	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, marco_timer_rate));
-+	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, atlas7_timer_rate));
- 
- 	sirfsoc_clockevent_init();
- }
-@@ -302,6 +301,6 @@ static void __init sirfsoc_of_timer_init(struct device_node *np)
- 	if (!sirfsoc_timer1_irq.irq)
- 		panic("No irq passed for timer1 via DT\n");
- 
--	sirfsoc_marco_timer_init(np);
-+	sirfsoc_atlas7_timer_init(np);
- }
--CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick", sirfsoc_of_timer_init );
-+CLOCKSOURCE_OF_DECLARE(sirfsoc_atlas7_timer, "sirf,atlas7-tick", sirfsoc_of_timer_init);
--- 
-2.2.1
+> -----Original Message-----
+> From: Tony K Nadackal [mailto:tony.kn at samsung.com]
+> Sent: Wednesday, December 17, 2014 11:52 AM
+> To: linux-media at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> samsung-soc at vger.kernel.org
+> Cc: mchehab at osg.samsung.com; j.anaszewski at samsung.com;
+> kgene at kernel.org; k.debski at samsung.com; s.nawrocki at samsung.com;
+> bhushan.r at samsung.com; Tony K Nadackal
+> Subject: [PATCH] [media] s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
+> function
+> 
+> Bits EXYNOS4_DEC_MODE and EXYNOS4_ENC_MODE do not get cleared on
+> software reset. These bits need to be cleared explicitly.
+> 
+> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> ---
+> This patch is created and tested on top of linux-next-20141210.
+> It can be cleanly applied on media-next and kgene/for-next.
+> 
+> 
+>  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> index ab6d6f43..e53f13a 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> @@ -21,6 +21,10 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
+>  	unsigned int reg;
+> 
+>  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+> +	writel(reg & ~(EXYNOS4_DEC_MODE | EXYNOS4_ENC_MODE),
+> +				base + EXYNOS4_JPEG_CNTL_REG);
+> +
+> +	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+>  	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base +
+> EXYNOS4_JPEG_CNTL_REG);
+> 
+>  	udelay(100);
+> --
+> 2.2.0
