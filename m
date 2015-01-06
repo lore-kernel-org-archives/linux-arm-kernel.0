@@ -1,62 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Jan 2015 22:47:39 +0100
-Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point Development
- Board support
-In-Reply-To: <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54AC57FB.8000003@free-electrons.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 06 Jan 2015 16:47:55 -0500
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+In-Reply-To: <6786513.g26uGMFKLE@wuerfel>
+References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
+ <9492211.AECobr3jIN@wuerfel> <54ABF1E2.1010905@hurleysoftware.com>
+ <6786513.g26uGMFKLE@wuerfel>
+Message-ID: <54AC580B.2050809@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-[...]
-> +				spi-flash at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +					compatible = "st,m25p128";
-> +					reg = <0>; /* Chip select 0 */
-> +					spi-max-frequency = <108000000>;
+On 01/06/2015 02:43 PM, Arnd Bergmann wrote:
+> On Tuesday 06 January 2015 09:32:02 Peter Hurley wrote:
+>> On 01/06/2015 08:13 AM, Arnd Bergmann wrote:
+>>> On Monday 05 January 2015 22:09:45 Peter Hurley wrote:
+>>>> Some arches have no need to create unprobed 8250 ports; these phantom
+>>>> ports are primarily required for ISA ports which have no probe
+>>>> mechanism or to provide non-operational ports for userspace to
+>>>> configure (via TIOCSSERIAL and TIOCSERCONFIG ioctls).
+>>>>
+>>>> Provide CONFIG_SERIAL_8250_PHANTOM_UARTS knob to disable phantom port
+>>>> registration; ie., CONFIG_SERIAL_8250_PHANTOM_UARTS=N only registers
+>>>> probed ports (ACPI/PNP, "serial8250" platform devices, PCI, etc).
+>>>>
+>>>> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>>> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+>>>
+>>> The intent is definitely right, but I think a better approach is
+>>> possible.
+>>>
+>>> I haven't tried it here, but how about moving the serial8250_init
+>>> function into a separate module, along with all the other parts
+>>> that are only used for ISA devices, but leaving the actual core
+>>> (all exported symbols) in this file?
+>>
+>> Unfortunately, I don't see a way to remove the stacked initialization
+>> without risking tons of breakage.
+>>
+>> Since later probes can "find" an already-existing port and
+>> re-initialize it, the probe order is crucial. For example, a PCI
+>> probe can "find" an existing "serial8250" platform device port,
+>> resulting in only one device node.
+> 
+> I'm probably missing something important, by why would that
+> be any different if the PCI driver gets loaded first and the
+> ISA driver second?
 
-The SPI flahs used on the AP board is the same that the one used on the GP board:
-M25P128-VMF6P and the maximum frequency it can handle is 50MHz.
+Well, the PCI driver would have the proper irq, for one. So, if the
+the platform driver re-initialized the port to the wrong irq...
 
-[...]
+>> And the configuration knob will be required on all arches anyway because
+>> that's how user-configurable device nodes are created.
+> 
+> I think that's fine: The user-configurable ports are the same as
+> the "ISA" or "phantom" ports we were talking about above, right?
 
-> +
-> +			mdio at 72004 {
-> +				pinctrl-names = <&mdio_pins>;
-> +
-> +				phy0: ethernet-phy at 0 {
-Why don't you use the PHY address after the '@' ?
-Here I expected something like
-phy0: ethernet-phy at 1 {
+Yes.
 
-> +					reg = <1>;
-> +				};
-> +
-> +				phy1: ethernet-phy at 1 {
-and here:
-phy0: ethernet-phy at 6 {
-> +					reg = <6>;
-> +				};
-> +
-> +				phy2: ethernet-phy at 2 {
-and here:
-phy0: ethernet-phy at 4 {
-> +					reg = <4>;
-> +				};
-> +			};
+> If those are part of a separate (possibly loadable) module, having
+> a configuration knob is the obvious way to do it. A lot of architectures
+> can just turn it off because they know exactly which ports are present
+> and there is no need for user-configurability. The ones that don't know
+> can load the module.
 
+Let me give this some more thought.
 
-Thanks,
-
-Gregory
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Peter Hurley
