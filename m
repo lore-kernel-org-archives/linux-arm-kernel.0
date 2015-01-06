@@ -1,79 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 21:21:02 +0100
-Subject: [PATCH v2 4/5] clk: cygnus: add clock support for Broadcom Cygnus
-In-Reply-To: <1420500076-18302-5-git-send-email-rjui@broadcom.com>
-References: <1420500076-18302-5-git-send-email-rjui@broadcom.com>
-Message-ID: <2048376.BFrtW5tszK@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Jan 2015 14:28:57 -0600
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106175115.GA19487@amd>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd>
+Message-ID: <20150106202857.GB32308@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 January 2015 15:21:15 Ray Jui wrote:
-> +static const struct iproc_clk_ctrl mipipll_clk[BCM_CYGNUS_NUM_MIPIPLL_CLKS] = {
-> +	[BCM_CYGNUS_MIPIPLL_CH0_UNUSED] = {
-> +		.channel = BCM_CYGNUS_MIPIPLL_CH0_UNUSED,
-> +		.enable = enable_val(0x4, 12, 6, 18),
-> +		.mdiv = reg_val(0x20, 0, 8),
-> +	},
-> +	[BCM_CYGNUS_MIPIPLL_CH1_LCD] = {
-> +		.channel = BCM_CYGNUS_MIPIPLL_CH1_LCD,
-> +		.enable = enable_val(0x4, 13, 7, 19),
-> +		.mdiv = reg_val(0x20, 10, 8),
-> +	},
-> +	[BCM_CYGNUS_MIPIPLL_CH2_UNUSED] = {
-> +		.channel = BCM_CYGNUS_MIPIPLL_CH2_UNUSED,
-> +		.enable = enable_val(0x4, 14, 8, 20),
-> +		.mdiv = reg_val(0x20, 20, 8),
-> +	},
-> +	[BCM_CYGNUS_MIPIPLL_CH3_UNUSED] = {
-> +		.channel = BCM_CYGNUS_MIPIPLL_CH3_UNUSED,
-> +		.enable = enable_val(0x4, 15, 9, 21),
-> +		.mdiv = reg_val(0x24, 0, 8),
-> +	},
-> +	[BCM_CYGNUS_MIPIPLL_CH4_UNUSED] = {
-> +		.channel = BCM_CYGNUS_MIPIPLL_CH4_UNUSED,
-> +		.enable = enable_val(0x4, 16, 10, 22),
-> +		.mdiv = reg_val(0x24, 10, 8),
-> +	},
-> +	[BCM_CYGNUS_MIPIPLL_CH5_UNUSED] = {
-> +		.channel = BCM_CYGNUS_MIPIPLL_CH5_UNUSED,
-> +		.enable = enable_val(0x4, 17, 11, 23),
-> +		.mdiv = reg_val(0x24, 20, 8),
-> +	},
-> +};
+On Tue, Jan 06, 2015 at 06:51:15PM +0100, Pavel Machek wrote:
+> 
+> On Tue 2015-01-06 11:25:45, Felipe Balbi wrote:
+> > On Tue, Jan 06, 2015 at 06:04:33PM +0100, Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > In 3.18, sound is nice and clear.
+> > > 
+> > > In 3.19, sound is unusable. It produces nasty tone when it should be
+> > > quiet, and there's at least as much noise as is sound.
+> > > 
+> > > Unfortunately, list of mixers also changed (and there's cca 120
+> > > settings), but a) it does not work with the old list and b) nothing I
+> > > could figure out did make the sound usable. Some setting resulted in
+> > > even more noise.
+> > > 
+> > > Any idea what could have caused it?
+> > 
+> > $ git bisect start
+> > $ git bisect good v3.18
+> > $ git bisect bad
+> > 
+> > that'll help find what caused it.
+> 
+> Telling someone to do hard and time consuming job that probably will
+> not succeed, instead of actually providing help. Very very funny.
 
-The tables look fairly regular. Is it possible that it's common
-to all iproc variants with a standard way to derive all other
-values from the channel index?
+you're getting code for free, you're getting help for free. Not many
+people have N900s lying around. Running a bisection is just politeness.
 
-> +static const struct iproc_asiu_gate asiu_gate[BCM_CYGNUS_NUM_ASIU_CLKS] = {
-> +	[BCM_CYGNUS_ASIU_KEYPAD_CLK] =
-> +		asiu_gate_val(0x0, 7),
-> +	[BCM_CYGNUS_ASIU_ADC_CLK] =
-> +		asiu_gate_val(0x0, 9),
-> +	[BCM_CYGNUS_ASIU_PWM_CLK] =
-> +		asiu_gate_val(IPROC_CLK_INVALID_OFFSET, 0),
-> +};
-
-Here I think a better binding would be to pass the gate value in the
-clock specifier, rather than an artificial index. That would let
-you get rid of the BCM_CYGNUS_ASIU_KEYPAD_CLK/BCM_CYGNUS_ASIU_ADC_CLK
-macros.
-
-> +static void __init cygnus_armpll_init(struct device_node *node)
-> +{
-> +	iproc_armpll_setup(node);
-> +}
-> +CLK_OF_DECLARE(cygnus_armpll, "brcm,cygnus-armpll", cygnus_armpll_init);
-
-How about moving all of these directly next to the tables, to keep
-each clock controller?
-
-> +static void __init cygnus_genpll_clk_init(struct device_node *node)
-> +{
-> +	iproc_clk_setup(node, genpll_clk, BCM_CYGNUS_NUM_GENPLL_CLKS);
-> +}
-
-If you use ARRAY_SIZE here, you can remove the BCM_CYGNUS_NUM_GENPLL_CLKS
-macro that is not useful to the DT binding.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/d1dda60c/attachment.sig>
