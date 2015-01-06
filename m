@@ -1,28 +1,22 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 06 Jan 2015 21:55:17 +0100
-Subject: [PATCH] arm: pxa: fix pxa27x device-tree support kconfig
-In-Reply-To: <1420502687.14308.54.camel@x220> (Paul Bolle's message of "Tue,
- 06 Jan 2015 01:04:47 +0100")
-References: <1417206768-5840-1-git-send-email-robert.jarzmik@free.fr>
- <87a933yuzo.fsf@free.fr> <1420502687.14308.54.camel@x220>
-Message-ID: <87lhlf4oju.fsf@free.fr>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 6 Jan 2015 22:57:30 +0200
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106205000.GB13902@amd>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
+ <20150106205000.GB13902@amd>
+Message-ID: <20150106205730.GA6071@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle <pebolle@tiscali.nl> writes:
+Hi,
 
-> Hi Robert,
-> This patch is not urgent, of course, but by now I would have expected it
-> to hit linux-next. So I decided to send out this reminder.
+On Tue, Jan 06, 2015 at 09:50:00PM +0100, Pavel Machek wrote:
+> PS: Unfortunately, N900 will not boot using nfsroot in 3.16+ at least,
+> and boot from MMC card is broken and has been for quite some time.
 
-Hi Paul,
+USB networking works fine with 3.19-rc3 and also MMC card rootfs.
 
-I didn't make the pull request yet. I was waiting for -rc4, but as it looks my
-tree is stable now, I will request before the end of this week.
+What issues are you seeing?
 
-Don't worry, I have forgotten.
-
-Cheers.
-
--- 
-Robert
+A.
