@@ -1,54 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 Jan 2015 16:45:06 +0100
-Subject: [PATCH 0/4] ARM: mvebu: Enable XHCI on the A385-AP
-Message-ID: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue,  6 Jan 2015 16:45:09 +0100
+Subject: [PATCH 3/4] usb: xhci: plat: Add USB phy support
+In-Reply-To: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1420559110-8043-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The Marvell Armada 385 AP needs a dumb phy in order to enable the USB3 VBUS.
 
-This serie enables the Armada 385 AP XHCI controller.
+Add a call to retrieve a USB PHY to XHCI plat in order to support this.
 
-Since the controller uses a GPIO-controlled VBUS, we used the
-phy-generic driver, and made the needed additions to the xhci-plat
-driver to retrieve a USB phy.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/usb/host/xhci-plat.c | 13 +++++++++++++
+ drivers/usb/host/xhci.h      |  2 ++
+ 2 files changed, 15 insertions(+)
 
-Unfortunately, some glitches were also found along the way, mostly
-because of the probe deferring that was introduced by this phy
-retrieval.
-
-First, the commit 1290a958d48e ("usb: phy: propagate
-__of_usb_find_phy()'s error on failure") introduced in 3.19 broke the
-deferred probing for consumer drivers. The first patch attempts at
-fixing this while keeping the original intention of the author, and
-should probably go in as a fix for 3.19.
-
-Then, since the introduction of the Armada 38x support in 3.16, the
-driver was attempting to write into registers while the clock wasn't
-enabled yet. This was working because the bootloader left it enabled,
-but in the case of a deferred probing, the clock would have been
-disabled by the error path of our driver, and this would fail. This
-should go in 3.19 as well, and any stable kernel for 3.16+.
-
-The two patches remaining are "regular" patches, and are aimed at
-3.20. The last patch depend on my previous serie to introduce support
-for the the A385 AP board.
-
-Thanks,
-Maxime
-
-Maxime Ripard (4):
-  usb: phy: Fix deferred probing
-  usb: XHCI: platform: Move the Marvell quirks after the enabling the
-    clocks
-  usb: xhci: plat: Add USB phy support
-  ARM: mvebu: armada-385-ap: Enable USB3 port
-
- arch/arm/boot/dts/armada-385-ap.dts | 28 ++++++++++++++++++++++++++++
- drivers/usb/host/xhci-plat.c        | 32 ++++++++++++++++++++++----------
- drivers/usb/host/xhci.h             |  2 ++
- drivers/usb/phy/phy.c               |  6 +++---
- 4 files changed, 55 insertions(+), 13 deletions(-)
-
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 34c2f6d3e5d0..284ab70f13a3 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/usb/phy.h>
+ #include <linux/slab.h>
+ #include <linux/usb/xhci_pdriver.h>
+ 
+@@ -155,6 +156,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
++	xhci->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
++	if (IS_ERR(xhci->phy)) {
++		ret = PTR_ERR(xhci->phy);
++		if (ret == -EPROBE_DEFER)
++			goto put_usb3_hcd;
++		xhci->phy = NULL;
++	} else {
++		ret = usb_phy_init(xhci->phy);
++		if (ret)
++			goto put_usb3_hcd;
++	}
++
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+ 		goto put_usb3_hcd;
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index cc7c5bb7cbcf..d9468af2a8e4 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1474,6 +1474,8 @@ struct xhci_hcd {
+ 	struct msix_entry	*msix_entries;
+ 	/* optional clock */
+ 	struct clk		*clk;
++	/* optional phy */
++	struct usb_phy		*phy;
+ 	/* data structures */
+ 	struct xhci_device_context_array *dcbaa;
+ 	struct xhci_ring	*cmd_ring;
 -- 
 2.2.1
