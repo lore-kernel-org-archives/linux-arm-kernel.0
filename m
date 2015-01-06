@@ -1,43 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Jan 2015 14:04:50 +0000
-Subject: [PATCH v2 0/2] arm64: don't call early_*map() post paging_init()
-In-Reply-To: <20150106135941.GA3484@arm.com>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
- <20150106135941.GA3484@arm.com>
-Message-ID: <CAKv+Gu-nYC1VaJW6ULY0AantA681xZyxqqC+nQq91nj5t7w4OQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 6 Jan 2015 08:05:17 -0600
+Subject: [PATCH] ARM: DRA7: beagle-x15: hwmod: Fix boot crash with DEBUG_LL
+In-Reply-To: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
+References: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20150106140517.GA3897@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2015 at 13:59, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jan 06, 2015 at 01:41:11PM +0000, Leif Lindholm wrote:
->> This (tiny) series resolves a fairly serious problem with
->> early_ioremap/iounmap/memremap/memunmap on arm64. These functions
->> cannot safely be called after paging_init(), but the sanity check
->> was not triggering.
->>
->> As a result, a fixmap entry was incorrectly cleared during
->> early_initcalls on arm64 UEFI systems.
->>
->> 1/2 reworks the arm64 UEFI support code to not attempt these calls
->> and
->> 2/2 enables the sanity check
->>
->> Changes since v1:
->> - Rebased to v3.19-rc3
->> - Added 'Fixes:' tags
->> - Reworked 1/2 to restore call to efi_setup_idmap() to the original
->>   location in the boot process.
->
-> Looks reasonable to me; do they need a CC stable,
+$subject should probably need a cleanup: this is hwmod support for
+DEBUG_LL on UART3 - x15 happens to be one of the platforms that uses
+that, but not the only one.. I suggest removing x15 from $subject and
+rephrasing accordingly.
 
-Yes, but with a note that both patches should be taken and the order
-is retained, or we break bisect.
+On 13:54-20150106, Lokesh Vutla wrote:
+> With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with
+> DEBUG_LL' we moved from parsing cmdline to identify uart used for earlycon
+> to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
+> 
+> On beagle-x15, we use uart3 for console and missed enabling this flag
+
+Official name of the platform is BeagleBoard-X15
+
+> for uart3 hwmod, so boot fails with DEBUG_LL. Enable DEBUG_OMAP4UART3_FLAGS for
+> uart3 hwmod.
+
+Could you align your commit message to 70 chars if possible?
+> 
+> For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
+> 
+> Fixes: 90020c7 (ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data)
+
+Fixes: 90020c7b2c5e ("ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data")
+
+> Cc: <stable@vger.kernel.org> # v3.12+
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index ffd6604..b6ea88f 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -2017,7 +2017,7 @@ static struct omap_hwmod dra7xx_uart3_hwmod = {
+>  	.class		= &dra7xx_uart_hwmod_class,
+>  	.clkdm_name	= "l4per_clkdm",
+>  	.main_clk	= "uart3_gfclk_mux",
+> -	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+> +	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP4UART3_FLAGS,
+>  	.prcm = {
+>  		.omap4 = {
+>  			.clkctrl_offs = DRA7XX_CM_L4PER_UART3_CLKCTRL_OFFSET,
+> -- 
+> 1.9.1
+> 
 
 -- 
-Ard.
-
-
-> or is this not a problem
-> that matters in practice?
->
-> Will
+Regards,
+Nishanth Menon
