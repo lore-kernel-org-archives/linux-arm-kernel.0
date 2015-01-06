@@ -1,69 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 06 Jan 2015 16:14:09 +0200
-Subject: [PATCH] ARM: shmobile: sh73a0 legacy: Set .control_parent for all
- irqpin instances
-In-Reply-To: <1420551550-27512-1-git-send-email-geert+renesas@glider.be>
-References: <1420551550-27512-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <4452252.suqURC1IYD@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Jan 2015 14:15:07 +0000
+Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
+In-Reply-To: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
+References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20150106141507.GB3484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Mitch,
 
-Thank you for the patch.
+On Tue, Dec 23, 2014 at 05:39:22PM +0000, Mitchel Humpherys wrote:
+> Currently we do a STLBIALL when we initialize the SMMU.  However, in
+> some configurations that register is not supposed to be touched and is
+> marked as "Secure only" in the spec.  Rip it out.
+> 
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 60558f794922..9170bbced5e5 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -173,7 +173,6 @@
+>  #define PIDR2_ARCH_MASK			0xf
+>  
+>  /* Global TLB invalidation */
+> -#define ARM_SMMU_GR0_STLBIALL		0x60
+>  #define ARM_SMMU_GR0_TLBIVMID		0x64
+>  #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
+>  #define ARM_SMMU_GR0_TLBIALLH		0x6c
+> @@ -1686,7 +1685,6 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	}
+>  
+>  	/* Invalidate the TLB, just in case */
+> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+>  	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+>  	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
 
-On Tuesday 06 January 2015 14:39:10 Geert Uytterhoeven wrote:
-> The sh73a0 INTC can't mask interrupts properly most likely due to a
-> hardware bug. Set the .control_parent flag to delegate masking to the
-> parent interrupt controller, like was already done for irqpin1.
-> 
-> Without this, accessing the three-axis digital accelerometer ADXL345
-> on kzm9g through /dev/input/event1 causes an interrupt storm, which
-> requires a power-cycle to recover from.
-> 
-> This was inspired by a patch for arch/arm/boot/dts/sh73a0.dtsi from
-> Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
+I was slightly worried that this would break the Calxeda implementation
+with ARM_SMMU_OPT_SECURE_CFG_ACCESS, but actually these registers aren't
+even aliased there so I think there's a bigger bug for them.
 
-This looks correct to me, but shouldn't we concentrate on getting rid of 
-legacy code instead ?
+Anyway, given that their hardware has gone the way of the dodo, I'll take
+the patch as-is unless you have any further comments?
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Fixes: 341eb5465f67437a ("ARM: shmobile: INTC External IRQ pin driver on
-> sh73a0") ---
->  arch/arm/mach-shmobile/setup-sh73a0.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
-> b/arch/arm/mach-shmobile/setup-sh73a0.c index
-> 354cab111bf17ea6..613ce65184a6648c 100644
-> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> @@ -595,6 +595,7 @@ static struct platform_device ipmmu_device = {
-> 
->  static struct renesas_intc_irqpin_config irqpin0_platform_data = {
->  	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
-> +	.control_parent = true,
->  };
-> 
->  static struct resource irqpin0_resources[] = {
-> @@ -656,6 +657,7 @@ static struct platform_device irqpin1_device = {
-> 
->  static struct renesas_intc_irqpin_config irqpin2_platform_data = {
->  	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
-> +	.control_parent = true,
->  };
-> 
->  static struct resource irqpin2_resources[] = {
-> @@ -686,6 +688,7 @@ static struct platform_device irqpin2_device = {
-> 
->  static struct renesas_intc_irqpin_config irqpin3_platform_data = {
->  	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
-> +	.control_parent = true,
->  };
-> 
->  static struct resource irqpin3_resources[] = {
-
--- 
-Regards,
-
-Laurent Pinchart
+Will
