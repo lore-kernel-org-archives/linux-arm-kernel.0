@@ -1,37 +1,62 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 06 Jan 2015 18:37:01 -0300
-Subject: [PATCH] spi: orion: Add multiple chip select support for Armada
- 370 and 375
-In-Reply-To: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
-References: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
-Message-ID: <54AC557D.1080605@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 06 Jan 2015 22:47:39 +0100
+Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point Development
+ Board support
+In-Reply-To: <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54AC57FB.8000003@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2015 06:30 PM, Ken Wilson wrote:
-> Create a new dt binding for the Armada 375 that supports up to
-> 3 chip selects but uses the same prescaler values and algorithm
-> as the basic orion binding.
-> 
-> Update the Armada 370 so that it supports up to 4 chip selects.
-> 
-> This has been tested on the Armada 375 with multiple SPI-NOR chips.
-> 
-> Signed-off-by: Ken Wilson <ken.wilson@opengear.com>
-> ---
->  .../devicetree/bindings/spi/spi-orion.txt          |  3 ++-
->  arch/arm/boot/dts/armada-375.dtsi                  |  4 +--
->  drivers/spi/spi-orion.c                            | 29 +++++++++++++++++++---
+Hi Maxime,
+[...]
+> +				spi-flash at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					compatible = "st,m25p128";
+> +					reg = <0>; /* Chip select 0 */
+> +					spi-max-frequency = <108000000>;
 
-You will have to split this changeset in three patches, given these
-three files carry different kind of changes:
+The SPI flahs used on the AP board is the same that the one used on the GP board:
+M25P128-VMF6P and the maximum frequency it can handle is 50MHz.
 
-1. The driver change itself
-2. The devicetree binding documentation change
-3. The devicetree dtsi change
+[...]
 
-Regards,
+> +
+> +			mdio at 72004 {
+> +				pinctrl-names = <&mdio_pins>;
+> +
+> +				phy0: ethernet-phy at 0 {
+Why don't you use the PHY address after the '@' ?
+Here I expected something like
+phy0: ethernet-phy at 1 {
+
+> +					reg = <1>;
+> +				};
+> +
+> +				phy1: ethernet-phy at 1 {
+and here:
+phy0: ethernet-phy at 6 {
+> +					reg = <6>;
+> +				};
+> +
+> +				phy2: ethernet-phy at 2 {
+and here:
+phy0: ethernet-phy at 4 {
+> +					reg = <4>;
+> +				};
+> +			};
+
+
+Thanks,
+
+Gregory
+
+
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
