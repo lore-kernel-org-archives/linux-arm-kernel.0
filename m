@@ -1,12 +1,12 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 6 Jan 2015 20:32:22 +0000 (UTC)
-Subject: [PATCH 4/4] arm64: fix missing asm/io.h include in
- kernel/smp_spin_table.c
-In-Reply-To: <20150106103404.GB4858@leverpostej>
+Date: Tue, 6 Jan 2015 20:34:18 +0000 (UTC)
+Subject: [PATCH 1/4] arm64: fix missing asm/pgtable-hwdef.h include in
+ asm/processor.h
+In-Reply-To: <20150106103722.GC4858@leverpostej>
 References: <20150106014554.27249.89116.stgit@dusk.lan>
- <20150106015220.27249.74970.stgit@dusk.lan>
- <20150106103404.GB4858@leverpostej>
-Message-ID: <alpine.DEB.2.02.1501062031170.28771@utopia.booyaka.com>
+ <20150106015156.27249.32173.stgit@dusk.lan>
+ <20150106103722.GC4858@leverpostej>
+Message-ID: <alpine.DEB.2.02.1501062032420.28771@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,27 +14,22 @@ Hi Mark,
 
 On Tue, 6 Jan 2015, Mark Rutland wrote:
 
-> Nit: please move between the include of asm/cputype and asm/smp_plat.h,
-> so as to keep the list in alphabetical order.
+> If you can move this above the include of asm/ptrace.h,
 
-Done.  Updated patch below.  Thanks for the review,
+Done; updated patch below.  Thanks for the review,
 
 
 - Paul
 
-
 From: Paul Walmsley <pwalmsley@nvidia.com>
-Date: Mon, 5 Jan 2015 17:38:42 -0700
-Subject: [PATCH 4/4] arm64: fix missing asm/io.h include in kernel/smp_spin_table.c
+Date: Mon, 5 Jan 2015 17:38:41 -0700
+Subject: [PATCH 1/4] arm64: fix missing asm/pgtable-hwdef.h include in asm/processor.h
 
 On next-20150105, defconfig compilation breaks with:
 
-arch/arm64/kernel/smp_spin_table.c:80:2: error: implicit declaration of function ?ioremap_cache? [-Werror=implicit-function-declaration]
-arch/arm64/kernel/smp_spin_table.c:92:2: error: implicit declaration of function ?writeq_relaxed? [-Werror=implicit-function-declaration]
-arch/arm64/kernel/smp_spin_table.c:101:2: error: implicit declaration of function ?iounmap? [-Werror=implicit-function-declaration]
+./arch/arm64/include/asm/processor.h:47:32: error: ?PHYS_MASK? undeclared (first use in this function)
 
-Fix by including asm/io.h, which contains definitions or prototypes
-for these macros or functions.
+Fix by including asm/pgtable-hwdef.h, where PHYS_MASK is defined.
 
 This second version incorporates a comment from Mark Rutland
 <mark.rutland@arm.com> to keep the includes in alphabetical order
@@ -46,20 +41,20 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/kernel/smp_spin_table.c | 1 +
+ arch/arm64/include/asm/processor.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 4f93c67e63de..14944e5b28da 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -25,6 +25,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cpu_ops.h>
- #include <asm/cputype.h>
-+#include <asm/io.h>
- #include <asm/smp_plat.h>
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 286b1bec547c..d646241a78f6 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -31,6 +31,7 @@
  
- extern void secondary_holding_pen(void);
+ #include <asm/fpsimd.h>
+ #include <asm/hw_breakpoint.h>
++#include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/types.h>
+ 
 -- 
 2.1.4
