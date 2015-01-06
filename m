@@ -1,72 +1,99 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:15 +0800
-Subject: [PATCH 05/17] ARM: dts: sunxi: Enable thermal sensor support for RTP
- on sun[457]i
+Date: Tue,  6 Jan 2015 10:35:18 +0800
+Subject: [PATCH 08/17] ARM: dts: sun7i: cubieboard2: add axp209 regulator nodes
 In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-6-git-send-email-wens@csie.org>
+Message-ID: <1420511727-8242-9-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the resistive touchpanel driver supports thermal sensors,
-add the "#thermal-sensor-cells" property as required by the thermal
-framework.
+This patch adds the regulator nodes for the axp209 by including
+the axp209 dtsi. As the inputs of these regulators are from the
+axp209's PS output, which is basically just a mux over the 2
+inputs, it is considered to be unregulated. Thus we do not provide
+input supply properties for them.
+
+The regulator names and constraints are based on the board
+schematics and the SoC datasheet.
+
+DCDC2 is used as the cpu power supply. This patch also references
+it from the cpu node.
+
+Also get rid of axp209 properties already set in axp209.dtsi.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi  | 1 +
- arch/arm/boot/dts/sun5i-a10s.dtsi | 1 +
- arch/arm/boot/dts/sun5i-a13.dtsi  | 1 +
- arch/arm/boot/dts/sun7i-a20.dtsi  | 1 +
- 4 files changed, 4 insertions(+)
+ arch/arm/boot/dts/axp209.dtsi               |  4 ++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 35 +++++++++++++++++++++++++----
+ 2 files changed, 35 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 847d5e09fcfb..f92635ecb937 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -712,6 +712,7 @@
- 			compatible = "allwinner,sun4i-a10-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <29>;
-+			#thermal-sensor-cells = <0>;
+diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+index 3c38cbafe285..fec3364b2110 100644
+--- a/arch/arm/boot/dts/axp209.dtsi
++++ b/arch/arm/boot/dts/axp209.dtsi
+@@ -54,6 +54,10 @@
+  */
+ 
+ &axp209 {
++	compatible = "x-powers,axp209";
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <1500>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 53680983461a..61e61c0eb829 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -84,13 +84,9 @@
+ 			status = "okay";
+ 
+ 			axp209: pmic at 34 {
+-				compatible = "x-powers,axp209";
+ 				reg = <0x34>;
+ 				interrupt-parent = <&nmi_intc>;
+ 				interrupts = <0 8>;
+-
+-				interrupt-controller;
+-				#interrupt-cells = <1>;
+ 			};
  		};
  
- 		uart0: serial at 01c28000 {
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 3c3c1920788a..8d324ef7e46e 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -535,6 +535,7 @@
- 			compatible = "allwinner,sun4i-a10-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <29>;
-+			#thermal-sensor-cells = <0>;
- 		};
- 
- 		uart0: serial at 01c28000 {
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 2448d7f38d6b..4fe0bd192e29 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -469,6 +469,7 @@
- 			compatible = "allwinner,sun4i-a10-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <29>;
-+			#thermal-sensor-cells = <0>;
- 		};
- 
- 		uart1: serial at 01c28400 {
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index e21ce5992d56..01c7133e699c 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -926,6 +926,7 @@
- 			compatible = "allwinner,sun4i-a10-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <0 29 4>;
-+			#thermal-sensor-cells = <0>;
- 		};
- 
- 		uart0: serial at 01c28000 {
+@@ -141,3 +137,34 @@
+ 		status = "okay";
+ 	};
+ };
++
++/include/ "axp209.dtsi"
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
 -- 
 2.1.4
