@@ -1,47 +1,54 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue,  6 Jan 2015 11:37:29 +0100
-Subject: [PATCH 4/4] ARM: tegra: remove wp-gpios from the generic nyan dtsi
-In-Reply-To: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1420540653-14816-5-git-send-email-tomeu.vizoso@collabora.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 6 Jan 2015 10:40:08 +0000
+Subject: [PATCH 3/4] arm64: fix missing asm/alternative.h include in
+ kernel/module.c
+In-Reply-To: <20150106015215.27249.86394.stgit@dusk.lan>
+References: <20150106014554.27249.89116.stgit@dusk.lan>
+ <20150106015215.27249.86394.stgit@dusk.lan>
+Message-ID: <20150106104008.GD4858@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the nyan-blaze has a micro-sd slot, as opposed to nyan-big, which has a full SD
-slot.
+On Tue, Jan 06, 2015 at 01:52:20AM +0000, Paul Walmsley wrote:
+> On next-20150105, defconfig compilation breaks with:
+> 
+> arch/arm64/kernel/module.c:408:4: error: implicit declaration of function ?apply_alternatives? [-Werror=implicit-function-declaration]
+> 
+> Fix by including asm/alternative.h, where the apply_alternatives()
+> prototype is declared.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Paul Walmsley <pwalmsley@nvidia.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/module.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index fd027b101de5..ac081d6fe184 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/vmalloc.h>
+>  #include <asm/insn.h>
+>  #include <asm/sections.h>
+> +#include <asm/alternative.h>
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- arch/arm/boot/dts/tegra124-nyan-big.dts | 4 ++++
- arch/arm/boot/dts/tegra124-nyan.dtsi    | 1 -
- 2 files changed, 4 insertions(+), 1 deletion(-)
+If this can move above the include of asm/insn.h:
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
-index 2041077..598c090 100644
---- a/arch/arm/boot/dts/tegra124-nyan-big.dts
-+++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
-@@ -6,6 +6,10 @@
- 	model = "Acer Chromebook 13 CB5-311";
- 	compatible = "google,nyan-big", "google,nyan", "nvidia,tegra124";
- 
-+	sdhci at 0,700b0400 { /* SD Card on this bus */
-+		wp-gpios = <&gpio TEGRA_GPIO(Q, 4) GPIO_ACTIVE_LOW>;
-+	};
-+
- 	sound {
- 		nvidia,model = "Acer Chromebook 13 CB5-311";
- 	};
-diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index 4c68658..12d757e 100644
---- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-+++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -820,7 +820,6 @@
- 		status = "okay";
- 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
- 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
--		wp-gpios = <&gpio TEGRA_GPIO(Q, 4) GPIO_ACTIVE_LOW>;
- 		bus-width = <4>;
- 		no-1-8-v;
- 		vqmmc-supply = <&vddio_sdmmc3>;
--- 
-1.9.3
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+>  
+>  #define	AARCH64_INSN_IMM_MOVNZ		AARCH64_INSN_IMM_MAX
+>  #define	AARCH64_INSN_IMM_MOVK		AARCH64_INSN_IMM_16
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
