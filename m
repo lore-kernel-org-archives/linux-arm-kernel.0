@@ -1,5 +1,5 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 6 Jan 2015 23:56:14 +0100
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Jan 2015 14:52:20 -0800
 Subject: 3.19 on Nokia n900: audio quality awful
 In-Reply-To: <20150106224622.GA13752@saruman>
 References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
@@ -9,11 +9,11 @@ References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
  <20150106220805.GD13902@amd>
  <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
  <20150106224622.GA13752@saruman>
-Message-ID: <20150106225614.GA31990@amd>
+Message-ID: <20150106225219.GB4081@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-01-06 16:46:22, Felipe Balbi wrote:
+* Felipe Balbi <balbi@ti.com> [150106 14:49]:
 > Hi,
 > 
 > On Wed, Jan 07, 2015 at 12:27:17AM +0200, Aaro Koskinen wrote:
@@ -23,9 +23,9 @@ On Tue 2015-01-06 16:46:22, Felipe Balbi wrote:
 > 
 > yeah, rootwait should do it.
 
-No, rootwait does not solve it. Try it. Tested many times. (And yes,
-you need to actually fool the rear cover sensor or close the phone.)
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+AFAIK you need to use rootwait and make USB into loadable modules.
+Built in Ethernet won't work without the patch I posted earlier.
+
+Regards,
+
+Tony
