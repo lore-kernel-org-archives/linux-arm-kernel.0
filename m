@@ -1,66 +1,31 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Tue, 6 Jan 2015 19:06:53 +0530
-Subject: [PATCH v1 0/2] Add the PMP support for APM X-Gene SoC AHCI SATA
- Host Controller driver.
-In-Reply-To: <20150106125252.GB3077@htj.dyndns.org>
-References: <1420538536-32165-1-git-send-email-stripathi@apm.com>
- <20150106125252.GB3077@htj.dyndns.org>
-Message-ID: <CAOHikRBs=tH+MTPTmhDkEpV67grLWJK+6a-i8qeMyx_dJ9oyeA@mail.gmail.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Tue, 6 Jan 2015 19:06:56 +0530
+Subject: [PATCH] ARM: imx: clk-vf610: Add clock for UART4 and UART5
+Message-ID: <1420551416-4537-1-git-send-email-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ,
+Add support for clock gating of UART4 and UART5.
+We use these UART's in a (not yet mainlined)
+device tree.
 
-On Tue, Jan 06, 2015 at 03:32:14PM +0530, Suman Tripathi wrote:
-> This patch set implements the PMP support for APM X-Gene SoC AHCI SATA Host Controller driver.
+Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+---
+ arch/arm/mach-imx/clk-vf610.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Hmm... still doesn't apply to for-3.20 after pulling in
-for-3.19-fixes.
-
- git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git for-3.20
-
-What am I doing wrong?
-
-I just again cloned git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git
-
-switched to remotes/origin/for-3.20
-
-git apply 0001-ahci_xgene-Implement-the-xgene_ahci_poll_reg_val-to-.patch
-git apply 0002-ahci_xgene-Implement-the-workaround-to-support-PMP-e.patch
-
-Even tried with
-
-patch -p1 < 0001-ahci_xgene-Implement-the-xgene_ahci_poll_reg_val-to-.patch
-patch -p1 <  0002-ahci_xgene-Implement-the-workaround-to-support-PMP-e.patch
-
-Both are working fine. Not sure what's wrong with your environment.
-
-On Tue, Jan 6, 2015 at 6:22 PM, Tejun Heo <tj@kernel.org> wrote:
-> On Tue, Jan 06, 2015 at 03:32:14PM +0530, Suman Tripathi wrote:
->> This patch set implements the PMP support for APM X-Gene SoC AHCI SATA Host Controller driver.
->
-> Hmm... still doesn't apply to for-3.20 after pulling in
-> for-3.19-fixes.
->
->  git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git for-3.20
->
-> What am I doing wrong?
->
-> Thanks.
->
-> --
-> tejun
-
-
-
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index cb21777..af338d2 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -267,6 +267,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_UART1] = imx_clk_gate2("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8));
+ 	clk[VF610_CLK_UART2] = imx_clk_gate2("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9));
+ 	clk[VF610_CLK_UART3] = imx_clk_gate2("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10));
++	clk[VF610_CLK_UART4] = imx_clk_gate2("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9));
++	clk[VF610_CLK_UART5] = imx_clk_gate2("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10));
+ 
+ 	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
+ 	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
 -- 
-Thanks,
-with regards,
-Suman Tripathi
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+1.7.9.5
