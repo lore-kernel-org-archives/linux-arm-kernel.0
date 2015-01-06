@@ -1,71 +1,33 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 6 Jan 2015 15:04:26 +0530
-Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <1741288.B6kbjm5Uq5@wuerfel>
-References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1420011208-7051-4-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1741288.B6kbjm5Uq5@wuerfel>
-Message-ID: <CAFpQJXXnM==4AmmNHf8yp2x0aK4Lnp2cy-4JpzuxsgXX3A=J4A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 10:33:15 +0100
+Subject: [PATCH resend 0/3] ARM: dts: sunxi: Add lradc nodes
+In-Reply-To: <1419329602-11552-1-git-send-email-hdegoede@redhat.com>
+References: <1419329602-11552-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150106093315.GF7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
->> +
->> +     memory at 00000000 {
->> +             device_type = "memory";
->> +             reg = <0x0 0x00000000 0x0 0x80000000>;
->> +             /* board 0, socket 0, no specific core */
->> +             arm,associativity = <0 0 0xffff>;
->> +     };
->> +
->> +     memory at 10000000000 {
->> +             device_type = "memory";
->> +             reg = <0x100 0x00000000 0x0 0x80000000>;
->> +             /* board 1, socket 0, no specific core */
->> +             arm,associativity = <1 0 0xffff>;
->> +     };
->> +};
->
-> So no memory in any other socket?
->
->> +             cpu at 00f {
->> +                     device_type = "cpu";
->> +                     compatible = "cavium,thunder", "arm,armv8";
->> +                     reg = <0x0 0x00f>;
->> +                     enable-method = "psci";
->> +                     arm,associativity = <0 0 0x00f>;
->> +             };
->> +             cpu at 100 {
->> +                     device_type = "cpu";
->> +                     compatible = "cavium,thunder", "arm,armv8";
->> +                     reg = <0x0 0x100>;
->> +                     enable-method = "psci";
->> +                     arm,associativity = <0 0 0x100>;
->> +             };
->
-> What is the 0x100 offset in the last-level topology field? Does this have
-> no significance to topology at all? I would expect that to be something
-> like cluster number that is relevant to caching and should be represented
-> as a separate level.
-i did not understand, can you please explain little more about "
-should be represented as a separate level."
-at present, i have put the hwid of a cpu.
->
-> In contrast, the level-two topology information seems to always be
-> zero for all CPUs, so you could probably leave that one out.
->
->> +     soc {
->> +             compatible = "simple-bus";
->> +             #address-cells = <2>;
->> +             #size-cells = <2>;
->> +             ranges;
->
-> The soc node is missing a topology information, please add one.
-ok, will be added.
->
->         Arnd
+On Tue, Dec 23, 2014 at 11:13:19AM +0100, Hans de Goede wrote:
+> Hi Maxime, et al,
+> 
+> Here is a resend of the sun4i-lradc dts bits, which seems to have fallen
+> through the cracks. This is a resend of the last version (I don't remember
+> what version we were at). The kernel bits have been queued up for merging
+> by Dmitry in the mean time, so these should be ready to get queued up too,
+> let me know if you want any changes.
 
-thanks
-ganapat
+Applied all three, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/70fbd92d/attachment-0001.sig>
