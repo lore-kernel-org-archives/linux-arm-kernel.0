@@ -1,49 +1,61 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Jan 2015 14:28:57 -0600
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150106175115.GA19487@amd>
-References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
- <20150106175115.GA19487@amd>
-Message-ID: <20150106202857.GB32308@saruman>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 6 Jan 2015 20:30:59 +0000 (UTC)
+Subject: [PATCH 2/4] arm64: fix missing linux/bug.h include in
+ asm/arch_timer.h
+In-Reply-To: <20150106102736.GA4858@leverpostej>
+References: <20150106014554.27249.89116.stgit@dusk.lan>
+ <20150106015210.27249.91222.stgit@dusk.lan>
+ <20150106102736.GA4858@leverpostej>
+Message-ID: <alpine.DEB.2.02.1501062029140.28771@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 06:51:15PM +0100, Pavel Machek wrote:
-> 
-> On Tue 2015-01-06 11:25:45, Felipe Balbi wrote:
-> > On Tue, Jan 06, 2015 at 06:04:33PM +0100, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > In 3.18, sound is nice and clear.
-> > > 
-> > > In 3.19, sound is unusable. It produces nasty tone when it should be
-> > > quiet, and there's at least as much noise as is sound.
-> > > 
-> > > Unfortunately, list of mixers also changed (and there's cca 120
-> > > settings), but a) it does not work with the old list and b) nothing I
-> > > could figure out did make the sound usable. Some setting resulted in
-> > > even more noise.
-> > > 
-> > > Any idea what could have caused it?
-> > 
-> > $ git bisect start
-> > $ git bisect good v3.18
-> > $ git bisect bad
-> > 
-> > that'll help find what caused it.
-> 
-> Telling someone to do hard and time consuming job that probably will
-> not succeed, instead of actually providing help. Very very funny.
+Hi Mark,
 
-you're getting code for free, you're getting help for free. Not many
-people have N900s lying around. Running a bisection is just politeness.
+On Tue, 6 Jan 2015, Mark Rutland wrote:
 
+> Nit: could you move this above the include of linux/init.h so as to keep
+> these in alphabetical order?
+
+Done.  Updated patch below.  Thanks for the review,
+
+
+- Paul
+
+From: Paul Walmsley <pwalmsley@nvidia.com>
+Date: Mon, 5 Jan 2015 17:38:41 -0700
+Subject: [PATCH 2/4] arm64: fix missing linux/bug.h include in asm/arch_timer.h
+
+On next-20150105, defconfig compilation breaks with:
+
+./arch/arm64/include/asm/arch_timer.h:112:2: error: implicit declaration of function ?BUG? [-Werror=implicit-function-declaration]
+
+Fix by including linux/bug.h, where the BUG macro is defined.
+
+This second version incorporates a comment from Mark Rutland
+<mark.rutland@arm.com> to keep the includes in alphabetical order
+by filename.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/arch_timer.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index b1fa4e614718..fbe0ca31a99c 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -21,6 +21,7 @@
+ 
+ #include <asm/barrier.h>
+ 
++#include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/types.h>
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/d1dda60c/attachment.sig>
+2.1.4
