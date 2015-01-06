@@ -1,101 +1,129 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Jan 2015 09:52:49 -0800
-Subject: [PATCH] irqchip: omap-intc: fix legacy DMA regression
-In-Reply-To: <20150106174805.GF30544@fuloong-minipc.musicnaut.iki.fi>
-References: <20150106123830.GD30544@fuloong-minipc.musicnaut.iki.fi>
- <1420563093-26026-1-git-send-email-balbi@ti.com>
- <20150106174805.GF30544@fuloong-minipc.musicnaut.iki.fi>
-Message-ID: <20150106175249.GU4081@atomide.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 6 Jan 2015 18:01:20 +0000
+Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <20150105165402.GE3163@console-pimps.org>
+References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20150105165402.GE3163@console-pimps.org>
+Message-ID: <20150106180120.GF3827@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [150106 09:51]:
-> On Tue, Jan 06, 2015 at 10:51:33AM -0600, Felipe Balbi wrote:
-> > commit 55601c9f2467 (arm: omap: intc: switch over
-> > to linear irq domain) introduced a regression with
-> > SDMA legacy driver because that driver strictly depends
-> > on INTC's IRQs starting at NR_IRQs. Aparently
-> > irq_domain_add_linear() won't guarantee that, since we see
-> > a 7 IRQs difference when booting with and without the
-> > commit cited above.
-> > 
-> > Until arch/arm/plat-omap/dma.c is properly fixed, we
-> > must maintain OMAP2/3 using irq_domain_add_legacy().
-> > 
-> > A FIXME note was added so people know to delete that
-> > code once that legacy DMA driver is fixed up.
-> > 
-> > Fixes: 55601c9f2467 (arm: omap: intc: switch over to linear irq domain)
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> 
-> I tested this on N950 with 3.19-rc3, and /proc/interrupts looks sane
-> and also the "In-band Error" is gone.
-> 
-> Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> 
-> BTW, I guess people still using 3.18.x will get the wrong IRQ for DMA,
-> so maybe you should consider adding also Cc: stable...
+On Mon, Jan 05, 2015 at 04:54:02PM +0000, Matt Fleming wrote:
 
-Yeah this one should be cc stable. Fixes the error for me too:
-
-Tested-by: Tony Lindgren <tony@atomide.com>
-
-> > ---
-> >  drivers/irqchip/irq-omap-intc.c | 26 +++++++++++++++++++++-----
-> >  1 file changed, 21 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-> > index 3c970259c0eb..6ef88f56cf8d 100644
-> > --- a/drivers/irqchip/irq-omap-intc.c
-> > +++ b/drivers/irqchip/irq-omap-intc.c
-> > @@ -263,7 +263,7 @@ static int __init omap_init_irq_of(struct device_node *node)
-> >  	return ret;
-> >  }
-> >  
-> > -static int __init omap_init_irq_legacy(u32 base)
-> > +static int __init omap_init_irq_legacy(u32 base, struct device_node *node)
-> >  {
-> >  	int j, irq_base;
-> >  
-> > @@ -277,7 +277,7 @@ static int __init omap_init_irq_legacy(u32 base)
-> >  		irq_base = 0;
-> >  	}
-> >  
-> > -	domain = irq_domain_add_legacy(NULL, omap_nr_irqs, irq_base, 0,
-> > +	domain = irq_domain_add_legacy(node, omap_nr_irqs, irq_base, 0,
-> >  			&irq_domain_simple_ops, NULL);
-> >  
-> >  	omap_irq_soft_reset();
-> > @@ -301,10 +301,26 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
-> >  {
-> >  	int ret;
-> >  
-> > -	if (node)
+> > +static efi_status_t get_memory_map(efi_system_table_t *sys_table_arg,
+> > +				   efi_memory_desc_t **map,
+> > +				   unsigned long *map_size,
+> > +				   unsigned long *desc_size,
+> > +				   u32 *desc_ver, unsigned long *key_ptr)
+> > +{
+> > +	efi_status_t status;
+> > +
 > > +	/*
-> > +	 * FIXME legacy OMAP DMA driver sitting under arch/arm/plat-omap/dma.c
-> > +	 * depends is still not ready for linear IRQ domains; because of that
-> > +	 * we need to temporarily "blacklist" OMAP2 and OMAP3 devices from using
-> > +	 * linear IRQ Domain until that driver is finally fixed.
+> > +	 * Call get_memory_map() with 0 size to retrieve the size of the
+> > +	 * required allocation.
 > > +	 */
-> > +	if (of_device_is_compatible(node, "ti,omap2-intc") ||
-> > +			of_device_is_compatible(node, "ti,omap3-intc")) {
-> > +		struct resource res;
+> > +	*map_size = 0;
+> > +	status = efi_call_early(get_memory_map, map_size, NULL,
+> > +				key_ptr, desc_size, desc_ver);
+> > +	if (status != EFI_BUFFER_TOO_SMALL)
+> > +		return EFI_LOAD_ERROR;
 > > +
-> > +		if (of_address_to_resource(node, 0, &res))
-> > +			return -ENOMEM;
+> > +	/*
+> > +	 * Add an additional efi_memory_desc_t to map_size because we're doing
+> > +	 * an allocation which may be in a new descriptor region. Then double it
+> > +	 * to give us some scratch space to prepare the input virtmap to give
+> > +	 * to SetVirtualAddressMap(). Note that this is EFI_LOADER_DATA memory,
+> > +	 * and the kernel memblock_reserve()'s only the size of the actual
+> > +	 * memory map, so the scratch space is freed again automatically.
+> > +	 */
+> > +	*map_size += *desc_size;
+> > +	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+> > +				*map_size * 2, (void **)map);
+> > +	if (status != EFI_SUCCESS)
+> > +		return status;
 > > +
-> > +		base = res.start;
-> > +		ret = omap_init_irq_legacy(base, node);
-> > +	} else if (node) {
-> >  		ret = omap_init_irq_of(node);
-> > -	else
-> > -		ret = omap_init_irq_legacy(base);
-> > +	} else {
-> > +		ret = omap_init_irq_legacy(base, NULL);
+> > +	status = efi_call_early(get_memory_map, map_size, *map,
+> > +				key_ptr, desc_size, desc_ver);
+> > +	if (status != EFI_SUCCESS)
+> > +		efi_call_early(free_pool, *map);
+> > +	return status;
+> > +}
+> 
+> We've now got two (slightly different) versions of this function. Is
+> there any way we could make do with just one?
+
+I think all we really need above what efi_get_memory_map() provides is
+the scratch space. Would we care about temporarily wasting a little
+bit of EFI_LOADER_DATA on all platforms, or could we just swap the
+function body in efi-stub-helper.c for Ard's version above?
+
+(I would guess memory maps with <= 32 entries are uncommon anyway, so
+the existing version would already make the bootservice call twice.)
+
+> > +/*
+> > + * This is the base address at which to start allocating virtual memory ranges
+> > + * for UEFI Runtime Services. This is a userland range so that we can use any
+> > + * allocation we choose, and eliminate the risk of a conflict after kexec.
+> > + */
+> > +#define EFI_RT_VIRTUAL_BASE	0x40000000
+> > +
+> > +static void update_memory_map(efi_memory_desc_t *memory_map,
+> > +			      unsigned long map_size, unsigned long desc_size,
+> > +			      int *count)
+> > +{
+> > +	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
+> > +	efi_memory_desc_t *out = (void *)memory_map + map_size;
+> > +	int l;
+> > +
+> > +	for (l = 0; l < map_size; l += desc_size) {
+> > +		efi_memory_desc_t *in = (void *)memory_map + l;
+> > +		u64 paddr, size;
+> > +
+> > +		if (!(in->attribute & EFI_MEMORY_RUNTIME))
+> > +			continue;
+> > +
+> > +		/*
+> > +		 * Make the mapping compatible with 64k pages: this allows
+> > +		 * a 4k page size kernel to kexec a 64k page size kernel and
+> > +		 * vice versa.
+> > +		 */
+> > +		paddr = round_down(in->phys_addr, SZ_64K);
+> > +		size = round_up(in->num_pages * EFI_PAGE_SIZE +
+> > +				in->phys_addr - paddr, SZ_64K);
+> > +
+> > +		/*
+> > +		 * Avoid wasting memory on PTEs by choosing a virtual base that
+> > +		 * is compatible with section mappings if this region has the
+> > +		 * appropriate size and physical alignment. (Sections are 2 MB
+> > +		 * on 4k granule kernels)
+> > +		 */
+> > +		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
+> > +			efi_virt_base = round_up(efi_virt_base, SZ_2M);
+> > +
+> > +		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
+> > +		efi_virt_base += size;
+> > +
+> > +		memcpy(out, in, desc_size);
+> > +		out = (void *)out + desc_size;
+> > +		++*count;
 > > +	}
-> >  
-> >  	if (ret == 0)
-> >  		omap_irq_enable_protection();
-> > -- 
-> > 2.2.0
-> > 
+> > +}
+> > +
+> 
+> fdt.c is starting to become a dumping ground for arm*-specific stuff :-(
+
+Mmm, not optimal.
+That said, the only arm*-specific things about this particular
+function are the page sizes. Should this move to efi-stub-helper.c
+with EFI_RT_VIRTUAL_BASE moved to arch/<x>/include/asm/efi.h and
+joined by EFI_RT_VIRTUAL_BASE_ALIGN and EFI_RT_VIRTUAL_REGION_ALIGN?
+ 
+> Is there no general solution for sharing code between arm and aarch64 in
+> the kernel so we don't have to stick things like this in
+> drivers/firmware/efi/?
+
+Not currently.
+
+/
+    Leif
