@@ -1,25 +1,122 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Jan 2015 16:55:32 +0100
-Subject: [PATCH 01/17] ARM: sunxi: Register cpufreq-dt for sun[45678]i
-In-Reply-To: <1420511727-8242-2-git-send-email-wens@csie.org>
+Date: Tue, 6 Jan 2015 16:58:38 +0100
+Subject: [PATCH 04/17] ARM: dts: sunxi: Add dtsi for AXP209 PMIC
+In-Reply-To: <1420511727-8242-5-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-2-git-send-email-wens@csie.org>
-Message-ID: <20150106155532.GR7853@lukather>
+ <1420511727-8242-5-git-send-email-wens@csie.org>
+Message-ID: <20150106155838.GS7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jan 06, 2015 at 10:35:11AM +0800, Chen-Yu Tsai wrote:
-> On sun[45678]i, we have one cluster of identical cores sharing a
-> clock, which is ideal for using cpufreq-dt. Register a platform
-> device for cpufreq-dt.
+On Tue, Jan 06, 2015 at 10:35:14AM +0800, Chen-Yu Tsai wrote:
+> The AXP209 PMIC is used with some Allwinner SoCs. This patch adds
+> a dtsi file listing all the regulator nodes. The regulators are
+> initialized based on their device node names.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/axp209.dtsi | 87 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 87 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/axp209.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+> new file mode 100644
+> index 000000000000..3c38cbafe285
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/axp209.dtsi
+> @@ -0,0 +1,87 @@
+> +/*
+> + * Copyright 2015 Chen-Yu Tsai
+> + *
+> + * Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this file; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/*
+> + * AXP202/209 Integrated Power Management Chip
+> + * http://www.x-powers.com/product/AXP20X.php
+> + * http://dl.linux-sunxi.org/AXP/AXP209%20Datasheet%20v1.0_cn.pdf
+> + */
+> +
+> +&axp209 {
+> +	regulators {
+> +		/* Default work frequency for buck regulators */
+> +		x-powers,dcdc-freq = <1500>;
+> +
+> +		/* This section lists all the regulators */
 
-While I don't have anything against this patch, I seem to recall that
-it was not necessary anymore, or that there was some work in the
-direction of removing that kind of code, have you looked into that?
+I don't think this comment is necessary.
+
+> +		reg_dcdc2: dcdc2 {
+> +		};
+> +
+> +		reg_dcdc3: dcdc3 {
+> +		};
+> +
+> +		reg_ldo1: ldo1 {
+> +			/* LDO1 is a fixed output regulator */
+> +			regulator-always-on;
+> +			regulator-min-microvolt = <1300000>;
+> +			regulator-max-microvolt = <1300000>;
+> +		};
+> +
+> +		reg_ldo2: ldo2 {
+> +		};
+> +
+> +		reg_ldo3: ldo3 {
+> +		};
+> +
+> +		reg_ldo4: ldo4 {
+> +		};
+> +
+> +		reg_ldo5: ldo5 {
+> +		};
+
+Some default names for the regulator would be great!
 
 Thanks,
 Maxime
@@ -34,4 +131,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/b24f0ed7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/f7efc798/attachment.sig>
