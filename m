@@ -1,42 +1,50 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  6 Jan 2015 14:46:57 +0100
-Subject: [PATCH v2 0/5] usb: atmel_usba_udc: Rework errata handling
-Message-ID: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue,  6 Jan 2015 14:47:01 +0100
+Subject: [PATCH v2 4/5] usb: atmel_usba_udc: Mask status with enabled irqs
+In-Reply-To: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1420552022-8422-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Avoid interpreting useless status flags when we're not waiting for such
+events by masking the status variable with the interrupt enabled register
+value.
 
-Here is a set of patches porting existing at91sam9rl erratum handling to
-DT and adding new code to handle at91sam9g45/9x5 erratum.
-It also adds several compatible strings to differentiate those errata.
+Reported-by: Patrice VILCHEZ <patrice.vilchez@atmel.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-These patches should be backported to 3.17 and 3.18 stable releases but
-they do not apply cleanly on those stable branches.
-I'll send a backport of this series once it is merged in mainline.
-
-Regards,
-
-Boris
-
-Changes since v1:
-- cache INT_ENB value to speedup INT_ENB read operations
-
-Boris Brezillon (5):
-  usb: atmel_usba_udc: Rework at91sam9rl errata handling
-  usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
-  ARM: at91/dt: update udc compatible strings
-  usb: atmel_usba_udc: Mask status with enabled irqs
-  usb: gadget: atmel_usba: Cache INT_ENB register value
-
- .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
- arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
- drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
- drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
- 7 files changed, 111 insertions(+), 57 deletions(-)
-
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 55c8dde..bc3a532 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1612,12 +1612,14 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 
+ 	spin_lock(&udc->lock);
+ 
+-	status = usba_readl(udc, INT_STA);
++	status = usba_readl(udc, INT_STA) & usba_readl(udc, INT_ENB);
+ 	DBG(DBG_INT, "irq, status=%#08x\n", status);
+ 
+ 	if (status & USBA_DET_SUSPEND) {
+ 		toggle_bias(udc, 0);
+ 		usba_writel(udc, INT_CLR, USBA_DET_SUSPEND);
++		usba_writel(udc, INT_ENB,
++			    usba_readl(udc, INT_ENB) | USBA_WAKE_UP);
+ 		udc->bias_pulse_needed = true;
+ 		DBG(DBG_BUS, "Suspend detected\n");
+ 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
+@@ -1631,6 +1633,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	if (status & USBA_WAKE_UP) {
+ 		toggle_bias(udc, 1);
+ 		usba_writel(udc, INT_CLR, USBA_WAKE_UP);
++		usba_writel(udc, INT_ENB,
++			    usba_readl(udc, INT_ENB) & ~USBA_WAKE_UP);
+ 		DBG(DBG_BUS, "Wake Up CPU detected\n");
+ 	}
+ 
 -- 
 1.9.1
