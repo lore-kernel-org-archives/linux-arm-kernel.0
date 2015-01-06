@@ -1,36 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 6 Jan 2015 22:47:56 +0100
-Subject: [PATCH] spi: orion: Add multiple chip select support for Armada
- 370 and 375
-In-Reply-To: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
-References: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
-Message-ID: <20150106214756.GE25030@lunn.ch>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 6 Jan 2015 23:51:15 +0200
+Subject: [PATCH v2 03/40] arm64/uaccess: fix sparse errors
+In-Reply-To: <20150106214820.GA18895@redhat.com>
+References: <1420558883-10131-1-git-send-email-mst@redhat.com>
+ <1420558883-10131-4-git-send-email-mst@redhat.com>
+ <20150106191432.GC32449@arm.com>
+ <20150106214820.GA18895@redhat.com>
+Message-ID: <20150106215115.GA21594@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ken
+On Tue, Jan 06, 2015 at 11:48:20PM +0200, Michael S. Tsirkin wrote:
+> On Tue, Jan 06, 2015 at 07:14:32PM +0000, Will Deacon wrote:
+> > Hi Michael,
+> > 
+> > On Tue, Jan 06, 2015 at 03:43:40PM +0000, Michael S. Tsirkin wrote:
+> > > virtio wants to read bitwise types from userspace using get_user.  At the
+> > > moment this triggers sparse errors, since the value is passed through an
+> > > integer.
+> > > 
+> > > Fix that up using __force.
+> > > 
+> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > > 
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > 
+> > Did you want us to take this via the arm64 tree, or are you planning to
+> > merge it via another route?
+> > 
+> > Will
+> 
+> Up to you really: if you don't pick it up, Arnd said he'll merge
+> through his tree.
 
-> -static const struct orion_spi_dev armada_spi_dev_data = {
-> +static const struct orion_spi_dev armada_370_spi_dev_data = {
->  	.typ = ARMADA_SPI,
->  	.min_divisor = 1,
->  	.max_divisor = 1920,
->  	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
-> +	.num_cs = 4,
-> +};
-> +
-> +static const struct orion_spi_dev armada_375_spi_dev_data = {
-> +	.typ = ORION_SPI,
-> +	.min_divisor = 4,
-> +	.max_divisor = 30,
-> +	.prescale_mask = ORION_SPI_CLK_PRESCALE_MASK,
-> +	.num_cs = 3,
->  };
+Though if you do pick it up, need to also pick up the follow-up
+patch - maybe my tree is easier.
 
-Documentation/devicetree/bindings/spi/spi-bus.txt has the optional property:
-
-- num-cs : total number of chipselects
-
-Would it be better to use that?
-
-      Andrew
+> > >  arch/arm64/include/asm/uaccess.h | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> > > index 3bf8f4e..9a2069b 100644
+> > > --- a/arch/arm64/include/asm/uaccess.h
+> > > +++ b/arch/arm64/include/asm/uaccess.h
+> > > @@ -147,7 +147,7 @@ do {									\
+> > >  	default:							\
+> > >  		BUILD_BUG();						\
+> > >  	}								\
+> > > -	(x) = (__typeof__(*(ptr)))__gu_val;				\
+> > > +	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
+> > >  } while (0)
+> > >  
+> > >  #define __get_user(x, ptr)						\
+> > > -- 
+> > > MST
+> > > 
+> > > 
