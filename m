@@ -1,30 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 6 Jan 2015 14:08:39 +0100
-Subject: [PATCH 4/4] ARM: tegra: remove wp-gpios from the generic nyan dtsi
-In-Reply-To: <1420540653-14816-5-git-send-email-tomeu.vizoso@collabora.com>
-References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
- <1420540653-14816-5-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150106130838.GG31830@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Jan 2015 14:13:59 +0100
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+In-Reply-To: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
+References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
+Message-ID: <9492211.AECobr3jIN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 11:37:29AM +0100, Tomeu Vizoso wrote:
-> As the nyan-blaze has a micro-sd slot, as opposed to nyan-big, which has a full SD
-> slot.
+On Monday 05 January 2015 22:09:45 Peter Hurley wrote:
+> Some arches have no need to create unprobed 8250 ports; these phantom
+> ports are primarily required for ISA ports which have no probe
+> mechanism or to provide non-operational ports for userspace to
+> configure (via TIOCSSERIAL and TIOCSERCONFIG ioctls).
 > 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
->  arch/arm/boot/dts/tegra124-nyan-big.dts | 4 ++++
->  arch/arm/boot/dts/tegra124-nyan.dtsi    | 1 -
->  2 files changed, 4 insertions(+), 1 deletion(-)
+> Provide CONFIG_SERIAL_8250_PHANTOM_UARTS knob to disable phantom port
+> registration; ie., CONFIG_SERIAL_8250_PHANTOM_UARTS=N only registers
+> probed ports (ACPI/PNP, "serial8250" platform devices, PCI, etc).
+> 
+> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
 
-Shouldn't this be squashed into patch 2/4?
+The intent is definitely right, but I think a better approach is
+possible.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/ed6766f3/attachment.sig>
+I haven't tried it here, but how about moving the serial8250_init
+function into a separate module, along with all the other parts
+that are only used for ISA devices, but leaving the actual core
+(all exported symbols) in this file?
+
+At the same time, the serial8250_pnp_init/serial8250_pnp_exit calls
+can be removed from the serial8250_init function and become
+standalone initcalls.
+
+	Arnd
