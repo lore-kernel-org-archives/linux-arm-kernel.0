@@ -1,39 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Jan 2015 09:40:10 -0800
-Subject: [PATCH 2/4] ARM: tegra: Move out nyan-generic parts out from the
- nyan-big DT
-In-Reply-To: <CAL1qeaETERAm6aTwWycCat-RzQz8UmixWtc-uK4dFsu7wL8HAg@mail.gmail.com>
-References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
- <1420540653-14816-3-git-send-email-tomeu.vizoso@collabora.com>
- <20150106130656.GF31830@ulmo.nvidia.com>
- <CAL1qeaETERAm6aTwWycCat-RzQz8UmixWtc-uK4dFsu7wL8HAg@mail.gmail.com>
-Message-ID: <CAOesGMj5EFr89SvskxjwjG8UdVPMJLO4-Up_5WLPUabqyqmXNw@mail.gmail.com>
+From: moon.linux@yahoo.com (Anand Moon)
+Date: Tue,  6 Jan 2015 23:12:31 +0530
+Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
+Message-ID: <1420566151-7136-1-git-send-email-moon.linux@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 6, 2015 at 9:30 AM, Andrew Bresticker <abrestic@google.com> wrote:
-> On Tue, Jan 6, 2015 at 5:06 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
+ARM Enable CONFIG_LOCKUP_DETECTOR to validaion of kernel locks
 
->>
->> Back when we merged the nyan-big DTS there was some discussion and it
->> was concluded that the devices are very similar, with the panel being
->> one notable exception. So I think that this belongs in the nyan-big
->> DTS and you need to add a similar property to the nyan-blaze DTS with
->> the compatible for the panel used in the design. And you might need
->> to add an entry for the panel in the panel-simple driver, too.
->
-> That's correct.  There are also variants of big and blaze with 1080p
-> panels, so those will definitely need their own panel nodes as well.
->
-> Other than that,
->
-> Acked-by: Andrew Bresticker <abrestic@chromium.org>
+Tested on Exynos5422 ODROID XU3 board.
 
-Shame on both of you for not pruning the patch when replying -- the
-emails go too long for gmail to show them by default. :) :P
+Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-And yeah, this split looks reasonable to me (with the panel comment fixed)
-
-Feel free to carry:
-
-Acked-by: Olof Johansson <olof@lixom.net>
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 5ef14de..ecd9987 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
+ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_RT_MUTEXES=y
+ CONFIG_DEBUG_SPINLOCK=y
+-- 
+2.1.0
