@@ -1,45 +1,41 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 7 Jan 2015 00:27:17 +0200
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150106220805.GD13902@amd>
-References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
- <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
- <20150106205000.GB13902@amd>
- <20150106205730.GA6071@fuloong-minipc.musicnaut.iki.fi>
- <20150106220805.GD13902@amd>
-Message-ID: <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 6 Jan 2015 16:35:28 -0600
+Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
+In-Reply-To: <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
+References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
+ <20150106141507.GB3484@arm.com> <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 11:08:05PM +0100, Pavel Machek wrote:
-> On Tue 2015-01-06 22:57:30, Aaro Koskinen wrote:
-> > Hi,
-> > 
-> > On Tue, Jan 06, 2015 at 09:50:00PM +0100, Pavel Machek wrote:
-> > > PS: Unfortunately, N900 will not boot using nfsroot in 3.16+ at least,
-> > > and boot from MMC card is broken and has been for quite some time.
-> > 
-> > USB networking works fine with 3.19-rc3 and also MMC card rootfs.
-> 
-> Does nfsroot work for you? USB networking works as a module but not
-> build-in. [Patch is available for this one.]
-> 
-> u-SD card seems to have similar problem. If I try it after boot, I can
-> access it ok, but using u-SD card for rootfs fails. If it works for
-> you, it would be interesting to know.
+On Tue, Jan 6, 2015 at 2:16 PM, Mitchel Humpherys
+<mitchelh@codeaurora.org> wrote:
+> On Tue, Jan 06 2015 at 06:15:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+>>>      /* Invalidate the TLB, just in case */
+>>> -    writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+>>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+>>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
+>>
+>> I was slightly worried that this would break the Calxeda implementation
+>> with ARM_SMMU_OPT_SECURE_CFG_ACCESS, but actually these registers aren't
+>> even aliased there so I think there's a bigger bug for them.
+>>
+>> Anyway, given that their hardware has gone the way of the dodo, I'll take
+>> the patch as-is unless you have any further comments?
+>>
+>> Will
+>
+> Yeah I agree that this shouldn't affect the (now defunct) Calxeda
+> implementation.  I've tested this on some hardware here and we crash
+> when we touch that register since it's secure-only (not banked, as you
+> mentioned).
 
-I haven't tried nfsroot, but I've been using USB networking for ssh
-for a couple of years without issues. I have g_ether as module.
+It's not quite dead:
 
-Also I recently switched rootfs to u-SD card, and it (MMC) works fine
-as builtin.
+http://www.eweek.com/servers/calxedas-arm-based-server-chips-re-emerge-with-new-company.html
 
-But I'm mounting it from userspace (using builtin initramfs inside
-zImage), with a poll loop that waits for a device to appear. Maybe if you
-do it from kernel you need to use root wait/delay etc. options?
+But AFAIK, production systems don't enable the SMMU, but someone could
+still want to at some point. A note in the commit log here would be
+nice so it gets recorded.
 
-> I'm loading zImage using 0xffff directly from the PC.
-
-Same here.
-
-A.
+Rob
