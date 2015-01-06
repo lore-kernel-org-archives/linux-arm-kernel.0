@@ -1,9 +1,9 @@
 From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Tue,  6 Jan 2015 15:15:53 +0100
+Date: Tue,  6 Jan 2015 15:16:33 +0100
 Subject: [PATCH] pm: at91: pm_slowclock: improve reliability of suspend/resume
 In-Reply-To: <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
 References: <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
-Message-ID: <1420553753-13795-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <1420553793-13935-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,15 +21,15 @@ reduce cumulated suspend time and resume time from ~17ms to ~15ms.
 
 Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
 ---
- arch/arm/mach-at91/pm.c           |  12 +++++
- arch/arm/mach-at91/pm_slowclock.S | 101 ++------------------------------------
- 2 files changed, 16 insertions(+), 97 deletions(-)
+ arch/arm/mach-at91/pm.c           | 12 ++++++++
+ arch/arm/mach-at91/pm_slowclock.S | 62 ++-------------------------------------
+ 2 files changed, 15 insertions(+), 59 deletions(-)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index d213a00..3b0d804 100644
+index 9b15169..1cfd6e9 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -168,6 +168,18 @@ static int at91_pm_verify_clocks(void)
+@@ -98,6 +98,18 @@ static int at91_pm_verify_clocks(void)
  		}
  	}
  
@@ -47,12 +47,12 @@ index d213a00..3b0d804 100644
 +
  	return 1;
  }
- #endif
+ 
 diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 6194749..530b996 100644
+index 2001877..75d8b19 100644
 --- a/arch/arm/mach-at91/pm_slowclock.S
 +++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -33,12 +33,6 @@
+@@ -34,11 +34,6 @@
   */
  #undef SLOWDOWN_MASTER_CLOCK
  
@@ -60,18 +60,11 @@ index 6194749..530b996 100644
 -#define MOSCRDY_TIMEOUT 	1000
 -#define PLLALOCK_TIMEOUT	1000
 -#define PLLBLOCK_TIMEOUT	1000
--#define UPLLLOCK_TIMEOUT	1000
 -
  pmc	.req	r0
  sdramc	.req	r1
  ramc1	.req	r2
-@@ -46,76 +40,32 @@ memctrl	.req	r3
- tmp1	.req	r4
- tmp2	.req	r5
- ddrcid	.req	r6
--flag	.req	r7
- 
- /*
+@@ -50,56 +45,27 @@ tmp2	.req	r5
   * Wait until master clock is ready (after switching master clock source)
   */
  	.macro wait_mckrdy
@@ -128,34 +121,12 @@ index 6194749..530b996 100644
 -	tst	tmp1, #AT91_PMC_LOCKB
 -	beq	1b
 -2:
--	.endm
--
--/*
-- * Wait until UTMI PLL has locked.
-- */
--	.macro wait_uplllock
--	mov	tmp2, #UPLLLOCK_TIMEOUT
--1:	sub	tmp2, tmp2, #1
--	cmp	tmp2, #0
--	beq	2f
--	ldr	tmp1, [pmc, #AT91_PMC_SR]
--	tst	tmp1, #AT91_PMC_LOCKU
--	beq	1b
--2:
  	.endm
  
- /*
-@@ -126,6 +76,7 @@ flag	.req	r7
- #if defined(CONFIG_CPU_V7)
- 	dsb
- 
-+	/* Disable the processor clock */
- 	mov	tmp1, #AT91_PMC_PCK
- 	str	tmp1, [pmc, #AT91_PMC_SCDR]
- 
-@@ -234,25 +185,6 @@ sdr_sr_done:
- 	mov 	tmp1, #AT91_PMC_SYS_DDR
- 	str	tmp1, [pmc, #AT91_PMC_SCDR]
+ 	.text
+@@ -207,13 +173,6 @@ sdr_sr_done:
+ 	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
+ 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
  
 -	/* Save PLLB setting and disable it */
 -	ldr	tmp1, [pmc, #AT91_CKGR_PLLBR]
@@ -164,35 +135,13 @@ index 6194749..530b996 100644
 -	mov	tmp1, #AT91_PMC_PLLCOUNT
 -	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
 -
--	/* Disable UTMI PLL */
--	ldr	tmp1, [pmc, #AT91_CKGR_UCKR]
--	tst	tmp1, #AT91_PMC_UPLLEN
--	beq	1f
--	mov	flag, #1
--	bic	tmp1, tmp1, #AT91_PMC_UPLLEN
--	str	tmp1, [pmc, #AT91_CKGR_UCKR]
--	b	2f
--1:
--	mov	flag, #0
--2:
--
- 	/* Save Master clock setting */
- 	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
- 	str	tmp1, .saved_mckr
-@@ -338,28 +270,6 @@ sdr_sr_done:
+ 	/* Turn off the main oscillator */
+ 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+ 	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+@@ -229,18 +188,6 @@ sdr_sr_done:
  
- 	wait_mckrdy
+ 	wait_moscrdy
  
--	/* Turn on UTMI PLL */
--	cmp	flag, #1
--	bne	1f
--	ldr	tmp1, [pmc, #AT91_CKGR_UCKR]
--	orr	tmp1, tmp1, #AT91_PMC_UPLLEN
--	str	tmp1, [pmc, #AT91_CKGR_UCKR]
--
--	wait_uplllock
--1:
--
 -	/* Restore PLLB setting */
 -	ldr	tmp1, .saved_pllbr
 -	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
@@ -205,10 +154,10 @@ index 6194749..530b996 100644
 -	wait_pllblock
 -2:
 -
- 	/* Enable MPDDRC Clock*/
- 	cmp	ddrcid, #0
- 	beq	4f
-@@ -421,9 +331,6 @@ ram_restored:
+ 	/* Restore PLLA setting */
+ 	ldr	tmp1, .saved_pllar
+ 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+@@ -319,9 +266,6 @@ ram_restored:
  .saved_pllar:
  	.word 0
  
