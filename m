@@ -1,28 +1,42 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 06 Jan 2015 01:04:47 +0100
-Subject: [PATCH] arm: pxa: fix pxa27x device-tree support kconfig
-In-Reply-To: <87a933yuzo.fsf@free.fr>
-References: <1417206768-5840-1-git-send-email-robert.jarzmik@free.fr>
- <87a933yuzo.fsf@free.fr>
-Message-ID: <1420502687.14308.54.camel@x220>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 5 Jan 2015 17:07:18 -0800
+Subject: [PATCH v3 1/4] mmc: dw_mmc: exynos: incorporate ciu_div into
+ timing property
+In-Reply-To: <CAGOxZ509kASim7keNkAGj5gAGO02=7vZM=VL-MRMObv3x+CzTg@mail.gmail.com>
+References: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
+ <1420008185-24758-2-git-send-email-alim.akhtar@samsung.com>
+ <CAD=FV=WXzPt=VKxB=KHK+hC=RN6WbmdnQcLUT4zFQ0Ud7BFanQ@mail.gmail.com>
+ <CAGOxZ509kASim7keNkAGj5gAGO02=7vZM=VL-MRMObv3x+CzTg@mail.gmail.com>
+Message-ID: <CAD=FV=U0U2ycmd4jyVyFiEq0+3ujSpdBeFg27iYYbMRxpRCmmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Alim,
 
-On Thu, 2014-12-04 at 22:18 +0100, Robert Jarzmik wrote:
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
-> 
-> > Remove the useless CPU_PXA27x non existing kconfig option.
-> > The true options is PXA27x, which is already selected.
-> >
-> > Reported-by: Paul Bolle <pebolle@tiscali.nl>
-> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> 
-> Queued to pxa/for-next.
+On Sun, Jan 4, 2015 at 2:43 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>> You are breaking backward compatibility here.  If your change is
+>> merged then all old boards will instantly break.  Since the "dts" and
+>> code changes will likely be merged through different trees you'll end
+>> up with a bunch of broken trees until everything is merged together.
+>> Even if you don't subscribe to the stable bindings theory this is not
+>> acceptable.
+>>
+> yes the major concern in this series is probably this, which breaks
+> things unless everything merge in one go and via one tree. Thats why I
+> re-based everything including dts change on mmc-tree for this case and
+> added device-tree mailing list for more opinion etc.
 
-This patch is not urgent, of course, but by now I would have expected it
-to hit linux-next. So I decided to send out this reminder.
+Got it.  I doubt that folks will like this, but I could be wrong.  In
+order for this to work, you'd need all changes in the series to land
+in _both_ the ARMSoC tree and the MMC tree.  That's not unheard of,
+but it doesn't seem ideal.
+
+You also break bisect-ability here since without the code the DTS
+change will break things and without the DTS change the code will
+break things.
+
+If you add all the above to the fact that bindings are supposed to be
+stable (ish) I'm not convinced this will land.
 
 
-Paul Bolle
+-Doug
