@@ -1,177 +1,82 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Jan 2015 23:00:54 +0100
-Subject: [PATCH] spi: orion: Add multiple chip select support for Armada
- 370 and 375
-In-Reply-To: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
-References: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
-Message-ID: <54AC5B16.9020206@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Jan 2015 16:02:30 -0600
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106215744.GC13902@amd>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
+ <20150106205000.GB13902@amd> <20150106205413.GF32308@saruman>
+ <20150106215744.GC13902@amd>
+Message-ID: <20150106220230.GG32308@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ken,
+Hi,
 
-On 06/01/2015 22:30, Ken Wilson wrote:
-> Create a new dt binding for the Armada 375 that supports up to
-> 3 chip selects but uses the same prescaler values and algorithm
-> as the basic orion binding.
-
-There was already a patch that have been sent for this:
-http://thread.gmane.org/gmane.linux.kernel.spi.devel/17808/focus=17809
-
-but in the end it has not been merged. The last email on the thread was
-about doing the manipulation in set_cs and not in setup_transfer(). And I
-didn't find a newer version.
-
-Maybe it just fell through the cracks.
-Thomas did you remember of it?
-
-Gregory
-
+On Tue, Jan 06, 2015 at 10:57:44PM +0100, Pavel Machek wrote:
+> > > > > > > In 3.18, sound is nice and clear.
+> > > > > > > 
+> > > > > > > In 3.19, sound is unusable. It produces nasty tone when it should be
+> > > > > > > quiet, and there's at least as much noise as is sound.
+> > > > > > > 
+> > > > > > > Unfortunately, list of mixers also changed (and there's cca 120
+> > > > > > > settings), but a) it does not work with the old list and b) nothing I
+> > > > > > > could figure out did make the sound usable. Some setting resulted in
+> > > > > > > even more noise.
+> > > > > > > 
+> > > > > > > Any idea what could have caused it?
+> > > > > > 
+> > > > > > $ git bisect start
+> > > > > > $ git bisect good v3.18
+> > > > > > $ git bisect bad
+> > > > > > 
+> > > > > > that'll help find what caused it.
+> > > > > 
+> > > > > Telling someone to do hard and time consuming job that probably will
+> > > > > not succeed, instead of actually providing help. Very very funny.
+> > > > 
+> > > > you're getting code for free, you're getting help for free. Not many
+> > > > people have N900s lying around. Running a bisection is just
+> > > > politeness.
+> > > 
+> > > Now you are speaking for yourself or for TI?
+> > 
+> > why bring my employer into the discussion ?
 > 
-> Update the Armada 370 so that it supports up to 4 chip selects.
-> 
-> This has been tested on the Armada 375 with multiple SPI-NOR chips.
-> 
-> Signed-off-by: Ken Wilson <ken.wilson@opengear.com>
-> ---
->  .../devicetree/bindings/spi/spi-orion.txt          |  3 ++-
->  arch/arm/boot/dts/armada-375.dtsi                  |  4 +--
->  drivers/spi/spi-orion.c                            | 29 +++++++++++++++++++---
->  3 files changed, 29 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-> index 50c3a3d..2aeeb85 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-orion.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-> @@ -1,7 +1,8 @@
->  Marvell Orion SPI device
->  
->  Required properties:
-> -- compatible : should be "marvell,orion-spi" or "marvell,armada-370-spi".
-> +- compatible : should be "marvell,orion-spi", "marvell,armada-370-spi",
-> +	or "marvell,armada-375-spi".
->  - reg : offset and length of the register set for the device
->  - cell-index : Which of multiple SPI controllers is this.
->  Optional properties:
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index de65714..f7a5ce2 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -192,7 +192,7 @@
->  			};
->  
->  			spi0: spi at 10600 {
-> -				compatible = "marvell,orion-spi";
-> +				compatible = "marvell,armada-375-spi", "marvell,orion-spi";
->  				reg = <0x10600 0x50>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> @@ -203,7 +203,7 @@
->  			};
->  
->  			spi1: spi at 10680 {
-> -				compatible = "marvell,orion-spi";
-> +				compatible = "marvell,armada-375-spi", "marvell,orion-spi";
->  				reg = <0x10680 0x50>;
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> index c76b7d7..4129c37 100644
-> --- a/drivers/spi/spi-orion.c
-> +++ b/drivers/spi/spi-orion.c
-> @@ -28,7 +28,6 @@
->  /* Runtime PM autosuspend timeout: PM is fairly light on this driver */
->  #define SPI_AUTOSUSPEND_TIMEOUT		200
->  
-> -#define ORION_NUM_CHIPSELECTS		1 /* only one slave is supported*/
->  #define ORION_SPI_WAIT_RDY_MAX_LOOP	2000 /* in usec */
->  
->  #define ORION_SPI_IF_CTRL_REG		0x00
-> @@ -44,6 +43,7 @@
->  #define ARMADA_SPI_CLK_PRESCALE_MASK	0xDF
->  #define ORION_SPI_MODE_MASK		(ORION_SPI_MODE_CPOL | \
->  					 ORION_SPI_MODE_CPHA)
-> +#define ORION_SPI_CS_MASK	0x1C
->  
->  enum orion_spi_type {
->  	ORION_SPI,
-> @@ -55,6 +55,7 @@ struct orion_spi_dev {
->  	unsigned int		min_divisor;
->  	unsigned int		max_divisor;
->  	u32			prescale_mask;
-> +	u8			num_cs;
->  };
->  
->  struct orion_spi {
-> @@ -201,6 +202,13 @@ orion_spi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
->  
->  	orion_spi_mode_set(spi);
->  
-> +	if (orion_spi->master->num_chipselect > 1) {
-> +		orion_spi_clrbits(orion_spi, ORION_SPI_IF_CTRL_REG,
-> +				ORION_SPI_CS_MASK);
-> +		orion_spi_setbits(orion_spi, ORION_SPI_IF_CTRL_REG,
-> +				(spi->chip_select) << 2);
-> +	}
-> +
->  	rc = orion_spi_baudrate_set(spi, speed);
->  	if (rc)
->  		return rc;
-> @@ -398,18 +406,31 @@ static const struct orion_spi_dev orion_spi_dev_data = {
->  	.min_divisor = 4,
->  	.max_divisor = 30,
->  	.prescale_mask = ORION_SPI_CLK_PRESCALE_MASK,
-> +	.num_cs = 1,
->  };
->  
-> -static const struct orion_spi_dev armada_spi_dev_data = {
-> +static const struct orion_spi_dev armada_370_spi_dev_data = {
->  	.typ = ARMADA_SPI,
->  	.min_divisor = 1,
->  	.max_divisor = 1920,
->  	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
-> +	.num_cs = 4,
-> +};
-> +
-> +static const struct orion_spi_dev armada_375_spi_dev_data = {
-> +	.typ = ORION_SPI,
-> +	.min_divisor = 4,
-> +	.max_divisor = 30,
-> +	.prescale_mask = ORION_SPI_CLK_PRESCALE_MASK,
-> +	.num_cs = 3,
->  };
->  
->  static const struct of_device_id orion_spi_of_match_table[] = {
->  	{ .compatible = "marvell,orion-spi", .data = &orion_spi_dev_data, },
-> -	{ .compatible = "marvell,armada-370-spi", .data = &armada_spi_dev_data, },
-> +	{ .compatible = "marvell,armada-370-spi",
-> +		.data = &armada_370_spi_dev_data, },
-> +	{ .compatible = "marvell,armada-375-spi",
-> +		.data = &armada_375_spi_dev_data, },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, orion_spi_of_match_table);
-> @@ -444,7 +465,6 @@ static int orion_spi_probe(struct platform_device *pdev)
->  	master->mode_bits = SPI_CPHA | SPI_CPOL;
->  
->  	master->transfer_one_message = orion_spi_transfer_one_message;
-> -	master->num_chipselect = ORION_NUM_CHIPSELECTS;
->  	master->bits_per_word_mask = SPI_BPW_MASK(8) | SPI_BPW_MASK(16);
->  	master->auto_runtime_pm = true;
->  
-> @@ -470,6 +490,7 @@ static int orion_spi_probe(struct platform_device *pdev)
->  	tclk_hz = clk_get_rate(spi->clk);
->  	master->max_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->min_divisor);
->  	master->min_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->max_divisor);
-> +	master->num_chipselect = devdata->num_cs;
->  
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	spi->base = devm_ioremap_resource(&pdev->dev, r);
-> 
+> Because you are speaking of getting help for free, and I don't
 
+are you not getting help for free ?
+
+> remember getting any useful help from you; so I'd like to know who do
+
+how come ? I gave you a very helpful list of commands which will direct
+you at finding the root of the issue you found.
+
+> you speak for.
+
+for myself.
+
+> > > Thanks for your very valuable help. I know how to do a bisection,
+> > > thank you.
+> > 
+> > then please do it.
+> 
+> No, sorry, I don't think that would be reasonable use of my time at
+> this point. First steps are "confirm it happens on other N900 boards,
+> too", ruling out config issues at my part, and "try to get
+> verification from other development boards if they have same
+> problems", because most other boards are easier to work with.
+
+you don't want to do due diligence with a bug *you* found, then there's
+no way people can help you out. Sorry.
+
+Good luck
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/ef1df610/attachment.sig>
