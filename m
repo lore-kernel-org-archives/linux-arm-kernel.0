@@ -1,53 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Jan 2015 10:37:22 +0000
-Subject: [PATCH 1/4] arm64: fix missing asm/pgtable-hwdef.h include in
- asm/processor.h
-In-Reply-To: <20150106015156.27249.32173.stgit@dusk.lan>
-References: <20150106014554.27249.89116.stgit@dusk.lan>
- <20150106015156.27249.32173.stgit@dusk.lan>
-Message-ID: <20150106103722.GC4858@leverpostej>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue,  6 Jan 2015 11:37:25 +0100
+Subject: [PATCH 0/4] Add support for nyan-blaze
+Message-ID: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 01:52:10AM +0000, Paul Walmsley wrote:
-> On next-20150105, defconfig compilation breaks with:
-> 
-> ./arch/arm64/include/asm/processor.h:47:32: error: ?PHYS_MASK? undeclared (first use in this function)
-> 
-> Fix by including asm/pgtable-hwdef.h, where PHYS_MASK is defined.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Paul Walmsley <pwalmsley@nvidia.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/processor.h |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 286b1bec547c..e271690753ff 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -33,6 +33,7 @@
->  #include <asm/hw_breakpoint.h>
->  #include <asm/ptrace.h>
->  #include <asm/types.h>
-> +#include <asm/pgtable-hwdef.h>
+Hi,
 
-If you can move this above the include of asm/ptrace.h,
+the nyan-blaze board is the HP Chromebook 14. This series reuses the DTS that we currently have for nyan-big and also contains two fixes needed to get it to feature parity.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cheers,
 
-Thanks,
-Mark.
+Tomeu
 
->  
->  #ifdef __KERNEL__
->  #define STACK_TOP_MAX		TASK_SIZE_64
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Tomeu Vizoso (4):
+  ARM: tegra: rely on bootloader pinmux programming on nyan-big
+  ARM: tegra: Move out nyan-generic parts out from the nyan-big DT
+  ARM: tegra: Add DTS for the nyan-blaze board
+  ARM: tegra: remove wp-gpios from the generic nyan dtsi
+
+ arch/arm/boot/dts/Makefile                |    1 +
+ arch/arm/boot/dts/tegra124-nyan-big.dts   | 1127 +---------------------------
+ arch/arm/boot/dts/tegra124-nyan-blaze.dts |   12 +
+ arch/arm/boot/dts/tegra124-nyan.dtsi      | 1132 +++++++++++++++++++++++++++++
+ 4 files changed, 1148 insertions(+), 1124 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra124-nyan-blaze.dts
+ create mode 100644 arch/arm/boot/dts/tegra124-nyan.dtsi
+
+-- 
+1.9.3
