@@ -1,42 +1,55 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 06 Jan 2015 15:03:09 +0100
-Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
-In-Reply-To: <CAOMZO5A32HOQkEP7_VQJ8_NhkR7kmFHQSqoO+Lnu+MG4o=X3zQ@mail.gmail.com>
-References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
- <20150106124343.GM24511@dragon> <1420551365.2333.15.camel@pengutronix.de>
- <CAOMZO5Bn58O2Mr4SsBqWbiwecOKOiQMDDugLzi+aRVf+jOx=Sg@mail.gmail.com>
- <1420552459.2333.18.camel@pengutronix.de>
- <CAOMZO5A32HOQkEP7_VQJ8_NhkR7kmFHQSqoO+Lnu+MG4o=X3zQ@mail.gmail.com>
-Message-ID: <1420552989.2333.20.camel@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Jan 2015 14:03:06 +0000
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <CAGCh1+kYRPg8QJ57bamH7Ctb1vJKmn2rirMUpbXcrU=Qw_VF2A@mail.gmail.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <54A28B22.7090305@linaro.org>
+ <20150105131302.GB14967@e104818-lin.cambridge.arm.com>
+ <1797489.PjmKzBFdQA@wuerfel>
+ <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
+ <CAGCh1+kYRPg8QJ57bamH7Ctb1vJKmn2rirMUpbXcrU=Qw_VF2A@mail.gmail.com>
+Message-ID: <20150106140305.GE8829@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 06.01.2015, 11:59 -0200 schrieb Fabio Estevam:
-> On Tue, Jan 6, 2015 at 11:54 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> 
-> >> Actually the ULPI PHY reset is properly handled now. What is missing
-> >> is the USB Hub reset to be properly handled.
+On Tue, Jan 06, 2015 at 01:51:27PM +0000, G Gregory wrote:
+> On 6 January 2015 at 11:20, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Jan 05, 2015 at 08:16:30PM +0000, Arnd Bergmann wrote:
+> >> On Monday 05 January 2015 13:13:02 Catalin Marinas wrote:
+> >> > > since passing no DT tables to OS but
+> >> > > acpi=force is missing is a corner case, we can do a follow up patch to
+> >> > > fix that, does it make sense?
+> >> >
+> >> > Not entirely. Why would no dtb and no acpi=force be a corner case? I
+> >> > thought this should be the default when only ACPI tables are passed, no
+> >> > need for an additional acpi=force argument.
 > >>
-> > No it is not. A regulator isn't the proper abstraction for a reset at
-> > all. Even if you (ab)use the regulator drivers ability to toggle a reset
-> > GPIO.
-> > A ULPI PHY reset needs to be modeled as a GPIO reset attached to USB
-> > controller node. There is no other way to describe the hardware
-> > accurately.
-> 
-> The ULPI PHY is modelled as a GPIO reset via reset-gpios property.
-> This is documented at
-> Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:
-> 
-> - reset-gpios: Should specify the GPIO for reset.
-> 
-> This is the property we use right now for resetting the ULPI PHY.
+> >> We don't really support the case of only ACPI tables for now. The expectation
+> >> is that you always have working DT support, at least for the next few years
+> >> as ACPI features are ramping up, and without acpi=force it should not try
+> >> to use ACPI at all.
+> >
+> > So if both DT and ACPI are present, just use DT unless acpi=force is
+> > passed. So far I think we agree but what I want to avoid is always
+> > mandating acpi=force even when the DT tables are missing (in the long
+> > run).
+> >
+> > Now, what's preventing a vendor firmware from providing only ACPI
+> > tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
+> > that both DT and ACPI are supported, or at least that dts files are
+> > merged in the kernel first?
+>
+> How do we tell the difference between a DT passed purely for booting purposes
+> ie a skeleton DT. And one which actually has hardware description as this needs
+> to be done before unpacking the DT.
 
-Right. I misread that part of the patch. Sorry about that.
+You do the check in EFI_STUB (part of the kernel). An ACPI-only firmware
+should never pass a DT to the kernel, not even for booting purposes
+(EFI_STUB builds one on the fly to pass parameters to the kernel but
+that's purely an internal kernel decision).
 
-Regards,
-Lucas 
+There are other ways as well, but if we decide to enforce this, I think
+EFI_STUB is the best option.
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Catalin
