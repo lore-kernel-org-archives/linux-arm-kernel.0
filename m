@@ -1,124 +1,147 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Jan 2015 11:29:29 +0000
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54ABC2CB.6@linaro.org>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1413553034-20956-19-git-send-email-hanjun.guo@linaro.org>
- <20141224171815.GD13399@e104818-lin.cambridge.arm.com>
- <54A90A4C.60908@linaro.org>
- <20150105110533.GA14967@e104818-lin.cambridge.arm.com>
- <54ABC2CB.6@linaro.org>
-Message-ID: <20150106112929.GB8829@e104818-lin.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  6 Jan 2015 12:35:45 +0100
+Subject: [PATCH v9 0/2] drm: add support for Atmel HLCDC Display Controller
+Message-ID: <1420544147-18379-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 11:11:07AM +0000, Hanjun Guo wrote:
-> On 2015?01?05? 19:05, Catalin Marinas wrote:
-> > On Sun, Jan 04, 2015 at 09:39:24AM +0000, Hanjun Guo wrote:
-> >> On 2014?12?25? 01:18, Catalin Marinas wrote:
-> >> [...]
-> >>>
-> >>> In addition to the above and _DSD requirements/banning, I would also add
-> >>> some clear statements around:
-> >>>
-> >>> _OSC: only global/published capabilities are allowed. For
-> >>> device-specific _OSC we need a process or maybe we can ban them entirely
-> >>> and rely on _DSD once we clarify the process.
-> >>>
-> >>> _OSI: firmware must not check for certain _OSI strings. Here I'm not
-> >>> sure what we would have to do for ARM Linux. Reporting "Windows" does
-> >>> not make any sense but not reporting anything can, as Matthew Garrett
-> >>> pointed out, can be interpreted by firmware as "Linux". In addition to
-> >>> any statements in this document, I suggest you patch
-> >>> drivers/acpi/acpica/utosi.c accordingly, maybe report "Linux" for ARM
-> >>> and print a kernel warning so that we notice earlier.
-> >>>
-> >>> ACPI_OS_NAME: this is globally defined as "Microsoft Windows NT". It
-> >>> doesn't make much sense in the ARM context. Could we change it to
-> >>> "Linux" when CONFIG_ARM64?
-> 
-> I think we can introduce a Kconfig such as CONFIG_ACPI_OS_NAME_LINUX,
-> selected by ARM64 and change ACPI_OS_NAME to "Linux" when
-> CONFIG_ACPI_OS_NAME_LINUX defined. (we can not add CONFIG_ARM64 in
-> ACPICA code directly since it will be used by windows too)
-> 
-> some code like below:
+Hi Dave,
 
-This looks fine for me (with some minor comments below) but I'm not an
-ACPI expert to say there wouldn't be any issues.
+As I already said here [1], I'd really like to have the Atmel HLCDC driver
+merged in 3.20 (it's already floating around for quite some time now).
+So, unless someone complain about this version, I plan to send a PR soon,
+is that okay for you ?
+Please note that this series depends on [1] (which I can also include in my
+PR).
 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index b1f9a20..de567a3 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1,5 +1,6 @@
->   config ARM64
->          def_bool y
-> +       select ACPI_OS_NAME_LINUX if ACPI
->          select ARCH_BINFMT_ELF_RANDOMIZE_PIE
->          select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->          select ARCH_HAS_GCOV_PROFILE_ALL
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 8951cef..11a10ac 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -369,6 +369,10 @@ config ACPI_REDUCED_HARDWARE_ONLY
-> 
->            If you are unsure what to do, do not enable this option.
-> 
-> +config ACPI_OS_NAME_LINUX
-> +       bool "Using Linux for _OS method" if EXPERT
-> +       def_bool n
+Here comes the usual description:
 
-No need for a default n, it is off by default. Alternatively you could
-say:
+This patch series adds support for the Atmel HLCDC Display Controller
+embedded in the HLCDC block.
 
-	default y if ARM64
+The drivers supports basic CRTC functionalities, several overlays and
+provides an hardware cursor.
 
-> +
->   source "drivers/acpi/apei/Kconfig"
-> 
->   config ACPI_EXTLOG
-> diff --git a/include/acpi/acconfig.h b/include/acpi/acconfig.h
-> index 5a0a3e5..db5e13e 100644
-> --- a/include/acpi/acconfig.h
-> +++ b/include/acpi/acconfig.h
-> @@ -69,7 +69,11 @@
->    * code that will not execute the _OSI method unless _OS matches the 
-> string
->    * below.  Therefore, change this string at your own risk.
->    */
-> +#ifndef ACPI_OS_NAME_USING_LINUX
->   #define ACPI_OS_NAME                    "Microsoft Windows NT"
-> +#else
-> +#define ACPI_OS_NAME                    "Linux"
-> +#endif
+At the moment, it only supports connection to LCD panels through an RGB
+connector (defined as an LVDS connector in my implementation), though
+connection to other kind of devices (like DRM bridges) could be added later.
 
-Can you not use CONFIG_ACPI_OS_NAME_LINUX directly here without
-introducing another macro?
+It also supports several RGB formats on all planes and some YUV formats on
+the HEO overlay plane.
 
-> >> We will work on this both on ASWG and linux ACPI driver side, as Dong
-> >> and Charles pointed out, _OSI things can be solved in ACPI spec, when
-> >> that is done, we can modify the kernel driver to fix the problems above.
-> >
-> > Which driver?
-> 
-> the ACPICA core driver as you suggested, sorry for the confusion.
-> 
-> > What about ACPI_OS_NAME? Would you suggest it is fine to report
-> > "Microsoft Windows NT" on an ARM system? That _OS_ not _OSI.
-> 
-> No, not at all. I prefer "Linux"
-> In include/acpi/acconfig.h, when ACPI_OS_NAME defined, it says:
-> "OS name, used for the _OS object.  The _OS object is essentially
-> obsolete,..."
-> for some legacy reasons, we needed  "Microsoft Windows NT", but ACPI
-> for ARM64 on linux is totally new, I think we can change it to
-> "Linux" when CONFIG_ARM64 as you suggested.
+Best Regards,
 
-We could ignore this change for now if we don't expect the _OS object to
-be used at all. But do we have any other way to check the AML code for
-this? Would FWTS catch such obsolete cases?
+Boris
+
+[1]https://lkml.org/lkml/2015/1/6/171
+
+Changes since v8:
+ - remove dependency on this series https://lkml.org/lkml/2014/11/16/12
+   (which did not make it into 3.19) to avoid cross subsystem dependency
+   issues
+
+Changes since v7:
+ - split MFD, PWM and Display Controller drivers in several patch series
+ - fix inline documentation (suggested by Nicolas)
+ - fix DMA BURST LEN config (suggested by Nicolas)
+ - call load and unload in probe and remove functions instead of setting
+   them in drm_driver struct
+
+Changes since v6:
+- move interrupts property from hlcdc display controller node to its
+  parent node (the MFD device)
+- add mode_set_base implementation
+- rework page flip handling to rely on vblank events instead of DMA
+  transfer events (the end of a DMA transfer does not mean the frame
+  is actually flipped: data are first copied to an output FIFO before
+  being sent on the RGB/DPI connector)
+- few minor coding style fixes
+
+Changes since v5:
+- fix Kconfig dependency bug
+- use adjusted mode in crtc config
+- move signal config (clk, hsync, vsync) from connector to crtc mode_set
+  function
+- use standard rotation property
+- check display_mode validity in connecto mode_valid function
+- remove dma_set_coherent mask call (now done in MFD core)
+- do not use drm_platform_init
+
+Changes since v4:
+- fix a few more bugs in rotation handling (rotation was buggy on some
+  formats)
+- return connector_status_unknown until a panel is exposed by the
+  drm_panel infrastructure (prevent fbdev creation until everyting is
+  in place)
+- rework Kconfig MFD_ATMEL_HLCDC selection to simplify the configuration
+  (automatically select this option when selecting the HLCDC PMW or DRM
+  driver, instead of depending on this option)
+
+Changes since v3:
+- rework the layer code to simplify several parts (locking and layer
+  disabling)
+- make use of the drm_flip_work infrastructure
+- rely on default HW cursor implementation using on the cursor plane
+- rework the display controller DT bindings (based on OF graph
+  representation)
+- add rotation support
+- retrieve RGB bus format from drm_display_info
+- drop the dynamic pinctrl state selection
+- rework HLCDC output handling (previously specialized to interface
+  with LCD panels)
+- drop ".module = THIS_MODULE" lines
+- change display controller compatible string
+
+Changes since v2:
+- fix coding style issues (macro indentation)
+- make use of GENMASK in several places
+- declare regmap config as a static structure
+- rework hlcdc plane update API
+- rework cursor handling to make use of the new plane update API
+- fix backporch config
+- do not use devm_regmap_init_mmio_clk to avoid extra clk_enable
+  clk disable calls when accessing registers
+- explicitly include regmap and clk headers instead of relying on
+  atmel-hlcdc.h inclusions
+- make the atmel-hlcdc driver depends on CONFIG_OF
+- separate DT bindings documentation from driver implementation
+- support several pin muxing for HLCDC pins on sama5d3 SoCs
+
+Changes since v1:
+- replace the backlight driver by a PWM driver
+- make use of drm_panel infrastructure
+- split driver code in several subsystem: MFD, PWM and DRM
+- add support for overlays
+- add support for hardware cursor
+
+
+Boris Brezillon (2):
+  drm: add Atmel HLCDC Display Controller support
+  drm: add DT bindings documentation for atmel-hlcdc-dc driver
+
+ .../devicetree/bindings/drm/atmel/hlcdc-dc.txt     |  53 ++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/atmel-hlcdc/Kconfig                |  11 +
+ drivers/gpu/drm/atmel-hlcdc/Makefile               |   7 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 406 ++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c       | 579 ++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       | 213 +++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c    | 667 ++++++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h    | 398 ++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 319 ++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c    | 856 +++++++++++++++++++++
+ 12 files changed, 3512 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+ create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
 
 -- 
-Catalin
+1.9.1
