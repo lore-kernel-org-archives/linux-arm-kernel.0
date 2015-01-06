@@ -1,74 +1,46 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 6 Jan 2015 09:04:07 +0000
-Subject: [PATCH 1/8] arm64/efi: use UEFI memory map unconditionally if
- available
-In-Reply-To: <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150106090407.GF3163@console-pimps.org>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Tue,  6 Jan 2015 18:07:36 +0900
+Subject: [PATCH] kernel/module.c: Mark module state before set RO and NX
+ regions
+Message-ID: <1420535256-6091-1-git-send-email-js07.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Dec, at 07:08:35PM, Ard Biesheuvel wrote:
-> On systems that boot via UEFI, all memory nodes are deleted from the
-> device tree, and instead, the size and location of system RAM is derived
-> from the UEFI memory map. This is handled by reserve_regions, which not only
-> reserves parts of memory that UEFI declares as reserved, but also installs
-> the memblocks that cover the remaining usable memory.
-> 
-> Currently, reserve_regions() is only called if uefi_init() succeeds.
-> However, it does not actually depend on anything that uefi_init() does,
-> and not calling reserve_regions() results in a broken boot, so it is
-> better to just call it unconditionally.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index d7d2e818c856..d2f483a7cffe 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -208,8 +208,7 @@ void __init efi_init(void)
->  	memmap.desc_size = params.desc_size;
->  	memmap.desc_version = params.desc_ver;
->  
-> -	if (uefi_init() < 0)
-> -		return;
-> +	WARN_ON(uefi_init() < 0);
->  
->  	reserve_regions();
->  }
-> @@ -218,15 +217,13 @@ static int __init arm64_enter_virtual_mode(void)
->  {
->  	u64 mapsize;
->  
-> -	if (!efi_enabled(EFI_BOOT)) {
-> -		pr_info("EFI services will not be available.\n");
-> -		return -1;
-> -	}
-> +	if (!efi_enabled(EFI_MEMMAP))
-> +		return 0;
->  
->  	mapsize = memmap.map_end - memmap.map;
->  	early_memunmap(memmap.map, mapsize);
->  
-> -	if (efi_runtime_disabled()) {
-> +	if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
->  		pr_info("EFI runtime services will be disabled.\n");
->  		return -1;
->  	}
+In some architectures like arm/arm64, set_memory_*() check module address
+and state as well. Mark module state before set RO and NX regions for
+the routine is passed.
 
-Am I correct in thinking that it's possible to have EFI_MEMMAP set but
-not EFI_BOOT? That's not how things work on x86. EFI_BOOT means "I am an
-EFI-enabled platform and I was booted using EFI."
+It will fix wrong RO/NX protection for loadable kernel modules on arm/arm64.
 
-In other words, EFI_MEMMAP should imply EFI_BOOT (how did you get the
-memmap if you weren't booted using EFI?)
+Signed-off-by: Jungseung Lee <js07.lee@gmail.com>
+---
+ kernel/module.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-It looks like you should be setting EFI_BOOT (and EFI_64BIT) in
-efi_init() if efi_get_fdt_params() succeeds.
-
+diff --git a/kernel/module.c b/kernel/module.c
+index 3965511..7e7cc9f 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -3152,6 +3152,10 @@ static int complete_formation(struct module *mod, struct load_info *info)
+ 	/* This relies on module_mutex for list integrity. */
+ 	module_bug_finalize(info->hdr, info->sechdrs, mod);
+ 
++	/* Mark state as coming so strong_try_module_get() ignores us,
++	 * but kallsyms etc. can see us. */
++	mod->state = MODULE_STATE_COMING;
++
+ 	/* Set RO and NX regions for core */
+ 	set_section_ro_nx(mod->module_core,
+ 				mod->core_text_size,
+@@ -3164,9 +3168,6 @@ static int complete_formation(struct module *mod, struct load_info *info)
+ 				mod->init_ro_size,
+ 				mod->init_size);
+ 
+-	/* Mark state as coming so strong_try_module_get() ignores us,
+-	 * but kallsyms etc. can see us. */
+-	mod->state = MODULE_STATE_COMING;
+ 	mutex_unlock(&module_mutex);
+ 
+ 	blocking_notifier_call_chain(&module_notify_list,
 -- 
-Matt Fleming, Intel Open Source Technology Center
+1.9.1
