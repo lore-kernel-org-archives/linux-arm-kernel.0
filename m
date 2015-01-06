@@ -1,24 +1,31 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 06 Jan 2015 11:24:43 -0500
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <54A28B22.7090305@linaro.org>
- <20150105131302.GB14967@e104818-lin.cambridge.arm.com>
- <1797489.PjmKzBFdQA@wuerfel>
- <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
-Message-ID: <54AC0C4B.1000907@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 17:34:27 +0100
+Subject: [PATCH v8 6/6] ARM: sunxi: Add AXP20x support multi_v7_defconfig
+In-Reply-To: <1419303194-3075-7-git-send-email-wens@csie.org>
+References: <1419303194-3075-1-git-send-email-wens@csie.org>
+ <1419303194-3075-7-git-send-email-wens@csie.org>
+Message-ID: <20150106163427.GZ7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2015 06:20 AM, Catalin Marinas wrote:
+On Tue, Dec 23, 2014 at 10:53:14AM +0800, Chen-Yu Tsai wrote:
+> From: Carlo Caione <carlo@caione.org>
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-> Now, what's preventing a vendor firmware from providing only ACPI
-> tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
-> that both DT and ACPI are supported, or at least that dts files are
-> merged in the kernel first?
+Applied, thanks!
 
-I know of some (server) firmware that will only provide ACPI in the
-medium term, so this is coming.
+Maxime
 
-Jon.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/285b437e/attachment.sig>
