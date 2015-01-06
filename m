@@ -1,59 +1,70 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 6 Jan 2015 23:51:15 +0200
-Subject: [PATCH v2 03/40] arm64/uaccess: fix sparse errors
-In-Reply-To: <20150106214820.GA18895@redhat.com>
-References: <1420558883-10131-1-git-send-email-mst@redhat.com>
- <1420558883-10131-4-git-send-email-mst@redhat.com>
- <20150106191432.GC32449@arm.com>
- <20150106214820.GA18895@redhat.com>
-Message-ID: <20150106215115.GA21594@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 6 Jan 2015 22:57:44 +0100
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106205413.GF32308@saruman>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
+ <20150106205000.GB13902@amd> <20150106205413.GF32308@saruman>
+Message-ID: <20150106215744.GC13902@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 11:48:20PM +0200, Michael S. Tsirkin wrote:
-> On Tue, Jan 06, 2015 at 07:14:32PM +0000, Will Deacon wrote:
-> > Hi Michael,
-> > 
-> > On Tue, Jan 06, 2015 at 03:43:40PM +0000, Michael S. Tsirkin wrote:
-> > > virtio wants to read bitwise types from userspace using get_user.  At the
-> > > moment this triggers sparse errors, since the value is passed through an
-> > > integer.
-> > > 
-> > > Fix that up using __force.
-> > > 
-> > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> > > 
-> > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > 
-> > Did you want us to take this via the arm64 tree, or are you planning to
-> > merge it via another route?
-> > 
-> > Will
+On Tue 2015-01-06 14:54:13, Felipe Balbi wrote:
+> Hi,
 > 
-> Up to you really: if you don't pick it up, Arnd said he'll merge
-> through his tree.
+> On Tue, Jan 06, 2015 at 09:50:00PM +0100, Pavel Machek wrote:
+> > On Tue 2015-01-06 14:28:57, Felipe Balbi wrote:
+> > > On Tue, Jan 06, 2015 at 06:51:15PM +0100, Pavel Machek wrote:
+> > > > 
+> > > > On Tue 2015-01-06 11:25:45, Felipe Balbi wrote:
+> > > > > On Tue, Jan 06, 2015 at 06:04:33PM +0100, Pavel Machek wrote:
+> > > > > > Hi!
+> > > > > > 
+> > > > > > In 3.18, sound is nice and clear.
+> > > > > > 
+> > > > > > In 3.19, sound is unusable. It produces nasty tone when it should be
+> > > > > > quiet, and there's at least as much noise as is sound.
+> > > > > > 
+> > > > > > Unfortunately, list of mixers also changed (and there's cca 120
+> > > > > > settings), but a) it does not work with the old list and b) nothing I
+> > > > > > could figure out did make the sound usable. Some setting resulted in
+> > > > > > even more noise.
+> > > > > > 
+> > > > > > Any idea what could have caused it?
+> > > > > 
+> > > > > $ git bisect start
+> > > > > $ git bisect good v3.18
+> > > > > $ git bisect bad
+> > > > > 
+> > > > > that'll help find what caused it.
+> > > > 
+> > > > Telling someone to do hard and time consuming job that probably will
+> > > > not succeed, instead of actually providing help. Very very funny.
+> > > 
+> > > you're getting code for free, you're getting help for free. Not many
+> > > people have N900s lying around. Running a bisection is just
+> > > politeness.
+> > 
+> > Now you are speaking for yourself or for TI?
+> 
+> why bring my employer into the discussion ?
 
-Though if you do pick it up, need to also pick up the follow-up
-patch - maybe my tree is easier.
+Because you are speaking of getting help for free, and I don't
+remember getting any useful help from you; so I'd like to know who do
+you speak for.
 
-> > >  arch/arm64/include/asm/uaccess.h | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> > > index 3bf8f4e..9a2069b 100644
-> > > --- a/arch/arm64/include/asm/uaccess.h
-> > > +++ b/arch/arm64/include/asm/uaccess.h
-> > > @@ -147,7 +147,7 @@ do {									\
-> > >  	default:							\
-> > >  		BUILD_BUG();						\
-> > >  	}								\
-> > > -	(x) = (__typeof__(*(ptr)))__gu_val;				\
-> > > +	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
-> > >  } while (0)
-> > >  
-> > >  #define __get_user(x, ptr)						\
-> > > -- 
-> > > MST
-> > > 
-> > > 
+> > Thanks for your very valuable help. I know how to do a bisection,
+> > thank you.
+> 
+> then please do it.
+
+No, sorry, I don't think that would be reasonable use of my time at
+this point. First steps are "confirm it happens on other N900 boards,
+too", ruling out config issues at my part, and "try to get
+verification from other development boards if they have same
+problems", because most other boards are easier to work with.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
