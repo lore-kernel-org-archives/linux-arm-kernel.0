@@ -1,39 +1,51 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue,  6 Jan 2015 13:41:13 +0000
-Subject: [PATCH v2 2/2] arm64: call early_ioremap_reset() in paging_init()
-In-Reply-To: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1420551673-31416-3-git-send-email-leif.lindholm@linaro.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 6 Jan 2015 08:41:54 -0500
+Subject: [PATCH v1 0/2] Add the PMP support for APM X-Gene SoC AHCI SATA
+ Host Controller driver.
+In-Reply-To: <CAOHikRAcSnD=5gvNkNZz8vUXTjkXQo8W4-KQcGajMeajxd73HQ@mail.gmail.com>
+References: <1420538536-32165-1-git-send-email-stripathi@apm.com>
+ <20150106125252.GB3077@htj.dyndns.org>
+ <CAOHikRBs=tH+MTPTmhDkEpV67grLWJK+6a-i8qeMyx_dJ9oyeA@mail.gmail.com>
+ <CAOHikRAcSnD=5gvNkNZz8vUXTjkXQo8W4-KQcGajMeajxd73HQ@mail.gmail.com>
+Message-ID: <20150106134154.GC3077@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 does not support early_memremap/memunmap/ioremap/iounmap after
-paging_init() has been called. The core early_*remap code handles this
-via the after_paging_init variable, which is set by a call to
-early_ioremap_reset().
+On Tue, Jan 06, 2015 at 07:10:31PM +0530, Suman Tripathi wrote:
+> Hi ,
+> 
+> For more info here is the git log output before applying the patch.
+> 
+> git log
+> 
+> commit b84b25cb0900b99b28c742dd33101be779f58259
+> Merge: 0628ee7 36aae28
+> Author: Tejun Heo <tj@kernel.org>
+> Date:   Tue Jan 6 07:48:24 2015 -0500
+>  Merge branch 'for-3.19-fixes' of git://git.kernel.org/pub/scm/linux/kernel/g
+> 
+>     Pull to receive the following two ahci_xgene fixes for the planned
+>     xgene PMP support patches.
+> 
+>      5c0b8e0de76a8 ("ahci_xgene: Fix the endianess issue in APM X-Gene SoC AHCI
+>      1102407bb714d ("ahci_xgene: Fix the DMA state machine lockup for the ATA_CM
+> 
+>     Signed-off-by: Tejun Heo <tj@kernel.org>
+> 
+> commit 36aae28e3df4127e296f2680d65cb6310ce61021
+> Author: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Date:   Fri Dec 12 17:16:31 2014 +0200
+> 
+>     libata: export ata_get_cmd_descript()
+> 
+>     The driver sata_dwc_460ex is using this symbol. To build it as a
+>     module we have to have the symbol exported. This patch adds
+> Broken pipe
 
-However, arm64 currently does not call early_ioremap_reset(), which
-has made it possible to poke around in the fixmap region after kmap
-is enabled. Add the required call.
+Ah, this was me being stupid.  I was using the old patches.  Sorry
+about that.  Applied to libata/for-3.20.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Fixes: bf4b558eba92 ("arm64: add early_ioremap support")
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/mmu.c | 1 +
- 1 file changed, 1 insertion(+)
+Thanks.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6032f3e..506544f 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -348,6 +348,7 @@ void __init paging_init(void)
- {
- 	void *zero_page;
- 
-+	early_ioremap_reset();
- 	map_mem();
- 
- 	/*
 -- 
-2.1.3
+tejun
