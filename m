@@ -1,180 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 Jan 2015 16:28:20 +0100
-Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point Development
- Board support
-In-Reply-To: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 6 Jan 2015 11:30:04 -0400
+Subject: [PATCH 11/17] ARM: dts: sun5i: Add cpu thermal zones to dtsi
+In-Reply-To: <1420511727-8242-12-git-send-email-wens@csie.org>
+References: <1420511727-8242-1-git-send-email-wens@csie.org>
+ <1420511727-8242-12-git-send-email-wens@csie.org>
+Message-ID: <20150106153002.GE6276@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A385-AP is a board produced by Marvell that holds 3 mPCIe slot, a 16MB
-SPI-NOR, 3 Gigabit Ethernet ports, USB3 and NAND flash storage.
+On Tue, Jan 06, 2015 at 10:35:21AM +0800, Chen-Yu Tsai wrote:
+> The core temperature sensor now supports thermal zones. Add a thermal
+> zone mapping for the cpus with passive cooling (cpufreq throttling).
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun5i-a13.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index dd93d227865e..9140cc7c8944 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -47,6 +47,38 @@
+>  		};
+>  	};
+>  
+> +	thermal-zones {
+> +		cpu_thermal {
+> +			/* milliseconds */
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +			thermal-sensors = <&rtp>;
+> +
+> +			cooling-maps {
+> +				map0 {
+> +					trip = <&cpu_alert0>;
+> +					cooling-device = <&cpu0 (-1) (-1)>;
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/armada-385-ap.dts | 140 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 141 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-385-ap.dts
+same
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd62857..3faf688564d4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -534,6 +534,7 @@ dtb-$(CONFIG_MACH_ARMADA_370) += \
- dtb-$(CONFIG_MACH_ARMADA_375) += \
- 	armada-375-db.dtb
- dtb-$(CONFIG_MACH_ARMADA_38X) += \
-+	armada-385-ap.dtb \
- 	armada-385-db.dtb \
- 	armada-385-rd.dtb
- dtb-$(CONFIG_MACH_ARMADA_XP) += \
-diff --git a/arch/arm/boot/dts/armada-385-ap.dts b/arch/arm/boot/dts/armada-385-ap.dts
-new file mode 100644
-index 000000000000..ab88dc4be636
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-385-ap.dts
-@@ -0,0 +1,140 @@
-+/*
-+ * Device Tree file for Marvell Armada 385 Access Point Development board
-+ * (DB-88F6820-AP)
-+ *
-+ *  Copyright (C) 2014 Marvell
-+ *
-+ * Nadav Haklai <nadavh@marvell.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "armada-385.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Marvell Armada 385 Access Point Development Board";
-+	compatible = "marvell,a385-db-ap", "marvell,armada385", "marvell,armada38x";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x80000000>; /* 2GB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+			spi1: spi at 10680 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&spi1_pins>;
-+				status = "okay";
-+
-+				spi-flash at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					compatible = "st,m25p128";
-+					reg = <0>; /* Chip select 0 */
-+					spi-max-frequency = <108000000>;
-+				};
-+			};
-+
-+			i2c0: i2c at 11000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2c0_pins>;
-+				status = "okay";
-+				clock-frequency = <100000>;
-+			};
-+
-+			i2c1: i2c at 11100 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+			};
-+
-+			mdio at 72004 {
-+				pinctrl-names = <&mdio_pins>;
-+
-+				phy0: ethernet-phy at 0 {
-+					reg = <1>;
-+				};
-+
-+				phy1: ethernet-phy at 1 {
-+					reg = <6>;
-+				};
-+
-+				phy2: ethernet-phy at 2 {
-+					reg = <4>;
-+				};
-+			};
-+
-+			uart0: serial at 12000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&uart0_pins>;
-+				status = "okay";
-+			};
-+
-+			uart1: serial at 12100 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&uart1_pins>;
-+				status = "okay";
-+			};
-+
-+			ethernet at 30000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "sgmii";
-+			};
-+
-+			ethernet at 34000 {
-+				status = "okay";
-+				phy = <&phy2>;
-+				phy-mode = "sgmii";
-+			};
-+
-+			ethernet at 70000 {
-+				pinctrl-names = "default";
-+
-+				/*
-+				 * The Reference Clock 0 is used to
-+				 * provide a clock to the PHY
-+				 */
-+				pinctrl-0 = <&ge0_rgmii_pins>, <&ref_clk0_pins>;
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii-id";
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			/*
-+			 * The three PCIe units are accessible through
-+			 * standard mini-PCIe slots on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 3,0 {
-+				/* Port 2, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
--- 
-2.2.1
+
+Could you please:
++#include <dt-bindings/thermal/thermal.h>
+
+and
+
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+
+?
+
+> +				};
+> +			};
+> +
+> +			trips {
+> +				cpu_alert0: cpu_alert0 {
+> +					/* milliCelsius */
+> +					temperature = <850000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit: cpu_crit {
+> +					/* milliCelsius */
+> +					temperature = <100000>;
+> +					hysteresis = <2000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+>  	memory {
+>  		reg = <0x40000000 0x20000000>;
+>  	};
+> -- 
+> 2.1.4
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/f78fded6/attachment.sig>
