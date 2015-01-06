@@ -1,116 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  6 Jan 2015 14:46:59 +0100
-Subject: [PATCH v2 2/5] usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5
- errata handling
-In-Reply-To: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1420552022-8422-3-git-send-email-boris.brezillon@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 6 Jan 2015 11:47:18 -0200
+Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
+In-Reply-To: <1420551365.2333.15.camel@pengutronix.de>
+References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
+ <20150106124343.GM24511@dragon>
+ <1420551365.2333.15.camel@pengutronix.de>
+Message-ID: <CAOMZO5Bn58O2Mr4SsBqWbiwecOKOiQMDDugLzi+aRVf+jOx=Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9g45 and at91sam9x5 SoCs have an hardware bug forcing us to
-generate a pulse on the BIAS signal on "USB end of reset? and
-?USB end of resume" events.
+On Tue, Jan 6, 2015 at 11:36 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-Reported-by: Patrice VILCHEZ <patrice.vilchez@atmel.com>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 28 +++++++++++++++++++++++++++-
- drivers/usb/gadget/udc/atmel_usba_udc.h |  2 ++
- 2 files changed, 29 insertions(+), 1 deletion(-)
+> For the record:
+> I'm not happy with this patch. It still abuses the regulator API for
+> something completely unrelated and this may well break again in the
+> future. But given that it fixes an actual regression and you already
+> sent a pull including this I'm okay to keep it.
+>
+> We still need a proper fix to handle ULPI resets to get rid of this
+> hackery.
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 36fd34b..55c8dde 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -331,6 +331,17 @@ static void toggle_bias(struct usba_udc *udc, int is_on)
- 		udc->errata->toggle_bias(udc, is_on);
- }
- 
-+static void generate_bias_pulse(struct usba_udc *udc)
-+{
-+	if (!udc->bias_pulse_needed)
-+		return;
-+
-+	if (udc->errata && udc->errata->pulse_bias)
-+		udc->errata->pulse_bias(udc);
-+
-+	udc->bias_pulse_needed = false;
-+}
-+
- static void next_fifo_transaction(struct usba_ep *ep, struct usba_request *req)
- {
- 	unsigned int transaction_len;
-@@ -1607,6 +1618,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 	if (status & USBA_DET_SUSPEND) {
- 		toggle_bias(udc, 0);
- 		usba_writel(udc, INT_CLR, USBA_DET_SUSPEND);
-+		udc->bias_pulse_needed = true;
- 		DBG(DBG_BUS, "Suspend detected\n");
- 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
- 				&& udc->driver && udc->driver->suspend) {
-@@ -1624,6 +1636,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 
- 	if (status & USBA_END_OF_RESUME) {
- 		usba_writel(udc, INT_CLR, USBA_END_OF_RESUME);
-+		generate_bias_pulse(udc);
- 		DBG(DBG_BUS, "Resume detected\n");
- 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
- 				&& udc->driver && udc->driver->resume) {
-@@ -1659,6 +1672,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 		struct usba_ep *ep0;
- 
- 		usba_writel(udc, INT_CLR, USBA_END_OF_RESET);
-+		generate_bias_pulse(udc);
- 		reset_all_endpoints(udc);
- 
- 		if (udc->gadget.speed != USB_SPEED_UNKNOWN && udc->driver) {
-@@ -1818,13 +1832,25 @@ static void at91sam9rl_toggle_bias(struct usba_udc *udc, int is_on)
- 		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
- }
- 
-+static void at91sam9g45_pulse_bias(struct usba_udc *udc)
-+{
-+	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
-+
-+	at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
-+	at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
-+}
-+
- static const struct usba_udc_errata at91sam9rl_errata = {
- 	.toggle_bias = at91sam9rl_toggle_bias,
- };
- 
-+static const struct usba_udc_errata at91sam9g45_errata = {
-+	.pulse_bias = at91sam9g45_pulse_bias,
-+};
-+
- static const struct of_device_id atmel_udc_dt_ids[] = {
- 	{ .compatible = "atmel,at91sam9rl-udc", .data = &at91sam9rl_errata },
--	{ .compatible = "atmel,at91sam9g45-udc" },
-+	{ .compatible = "atmel,at91sam9g45-udc", .data = &at91sam9g45_errata },
- 	{ .compatible = "atmel,sama5d3-udc" },
- 	{ /* sentinel */ }
- };
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index 456899e..72b3537 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
-@@ -306,6 +306,7 @@ struct usba_request {
- 
- struct usba_udc_errata {
- 	void (*toggle_bias)(struct usba_udc *udc, int is_on);
-+	void (*pulse_bias)(struct usba_udc *udc);
- };
- 
- struct usba_udc {
-@@ -326,6 +327,7 @@ struct usba_udc {
- 	struct clk *pclk;
- 	struct clk *hclk;
- 	struct usba_ep *usba_ep;
-+	bool bias_pulse_needed;
- 
- 	u16 devstatus;
- 
--- 
-1.9.1
+Actually the ULPI PHY reset is properly handled now. What is missing
+is the USB Hub reset to be properly handled.
+
+According to the USB maintainer, Alan Stern, a proper solution has not
+come up yet:
+http://www.spinics.net/lists/linux-usb/msg97483.html
+
+When a proper USB hub reset solution shows up, we can certainly use
+it, but for now let's have USB host functional by using the regulator
+API hack.
