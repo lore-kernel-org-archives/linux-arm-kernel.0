@@ -1,38 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Jan 2015 17:00:27 +0100
-Subject: [PATCH 02/17] clk: sunxi: Propagate rate changes to parent for
- mux clocks
-In-Reply-To: <1420511727-8242-3-git-send-email-wens@csie.org>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-3-git-send-email-wens@csie.org>
-Message-ID: <20150106160027.GT7853@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Jan 2015 16:05:12 +0000
+Subject: [PATCH v2 0/2] arm64: don't call early_*map() post paging_init()
+In-Reply-To: <CAKv+Gu9uWRmLBrnoUNsEcymguiUwgXUc8UVkLO0N21UywuGT=A@mail.gmail.com>
+References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
+ <20150106135941.GA3484@arm.com>
+ <CAKv+Gu-nYC1VaJW6ULY0AantA681xZyxqqC+nQq91nj5t7w4OQ@mail.gmail.com>
+ <20150106155208.GC3827@bivouac.eciton.net>
+ <CAKv+Gu9uWRmLBrnoUNsEcymguiUwgXUc8UVkLO0N21UywuGT=A@mail.gmail.com>
+Message-ID: <20150106160511.GD3484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 10:35:12AM +0800, Chen-Yu Tsai wrote:
-> The cpu clock on sunxi machines is just a mux clock, which is normally
-> fed by the main PLL, but can be muxed to the main or low power oscillator.
+On Tue, Jan 06, 2015 at 03:54:29PM +0000, Ard Biesheuvel wrote:
+> On 6 January 2015 at 15:52, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> > On Tue, Jan 06, 2015 at 02:04:50PM +0000, Ard Biesheuvel wrote:
+> >> >> Changes since v1:
+> >> >> - Rebased to v3.19-rc3
+> >> >> - Added 'Fixes:' tags
+> >> >> - Reworked 1/2 to restore call to efi_setup_idmap() to the original
+> >> >>   location in the boot process.
+> >> >
+> >> > Looks reasonable to me; do they need a CC stable,
+> >>
+> >> Yes, but with a note that both patches should be taken and the order
+> >> is retained, or we break bisect.
+> >
+> > Where would one add such a note?
+> >
 > 
-> Make the mux clock propagate rate changes to its parent, so we can
-> change the clock rate of the PLL, and thus actually implement rate
-> changing on the cpu clock.
-> 
-> This patch also removes the no reparenting limit.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> I guess the best way would be to not add a 'Cc: stable' tag, but send
+> an email to Greg once the patches have been merged by Linus.
 
-Applied, thanks!
+I thought Greg didn't take anything until it had hit mainline anyway? I
+think it should be fine with just the Cc...
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/2182b9dc/attachment.sig>
+Will
