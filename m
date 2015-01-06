@@ -1,50 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 21:02:18 +0100
-Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <CAFpQJXXnM==4AmmNHf8yp2x0aK4Lnp2cy-4JpzuxsgXX3A=J4A@mail.gmail.com>
-References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1741288.B6kbjm5Uq5@wuerfel>
- <CAFpQJXXnM==4AmmNHf8yp2x0aK4Lnp2cy-4JpzuxsgXX3A=J4A@mail.gmail.com>
-Message-ID: <3372289.4AUgcSNZN5@wuerfel>
+Date: Tue, 06 Jan 2015 14:01:50 +0100
+Subject: [PATCH] Revert 9fc2105aeaaf56b0cf75296a84702d0f9e64437b to fix
+ pyaudio (and probably more)
+In-Reply-To: <alpine.LFD.2.11.1501052259230.18844@knanqh.ubzr>
+References: <20150104190123.GA20153@amd> <20150105121126.GA10116@arm.com>
+ <alpine.LFD.2.11.1501052259230.18844@knanqh.ubzr>
+Message-ID: <1923550.h5Fs9u5gUy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 15:04:26 Ganapatrao Kulkarni wrote:
-> On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
-> >> +             cpu at 00f {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "cavium,thunder", "arm,armv8";
-> >> +                     reg = <0x0 0x00f>;
-> >> +                     enable-method = "psci";
-> >> +                     arm,associativity = <0 0 0x00f>;
-> >> +             };
-> >> +             cpu at 100 {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "cavium,thunder", "arm,armv8";
-> >> +                     reg = <0x0 0x100>;
-> >> +                     enable-method = "psci";
-> >> +                     arm,associativity = <0 0 0x100>;
-> >> +             };
-> >
-> > What is the 0x100 offset in the last-level topology field? Does this have
-> > no significance to topology at all? I would expect that to be something
-> > like cluster number that is relevant to caching and should be represented
-> > as a separate level.
->
-> i did not understand, can you please explain little more about "
-> should be represented as a separate level."
-> at present, i have put the hwid of a cpu.
+On Monday 05 January 2015 23:09:00 Nicolas Pitre wrote:
+> 
+> Now here's the bogomips hard limit gone:
+> 
+> ----- >8
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date: Mon, 5 Jan 2015 22:43:56 -0500
+> Subject: [PATCH] ARM: loop_udelay: remove bogomips value limitation
+> 
+> Now that we don't support ARMv3 anymore, the loop based delay code can
+> convert microsecs into number of loops using a 64-bit multiplication.
+> This allows us to lift the hard limit of 3355 on the bogomips value with
+> loops_per_jiffy that can safely span the full 32-bit range.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
->From what I undertand, the hwid of the CPU contains the "cluster" number in
-this bit position, so you typically have a shared L2 or L3 cache between
-all cores within a cluster, but separate caches in other clusters.
-
-If this is the case, there will be a measurable difference in performance
-between two processes sharing memory when running on the same cluster,
-or when running on different clusters on the same socket. If the
-performance difference is relevant, it should be described as a separate
-level in the associativity property.
+I think we still build RPC with gcc -march=armv3. Is that a problem
+with this patch?
 
 	Arnd
