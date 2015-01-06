@@ -1,26 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 6 Jan 2015 18:04:33 +0100
-Subject: 3.19 on Nokia n900: audio quality awful
-Message-ID: <20150106170433.GA5408@amd>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 06 Jan 2015 10:09:04 -0700
+Subject: [PATCH 1/4] ARM: tegra: rely on bootloader pinmux programming
+ on nyan-big
+In-Reply-To: <1420540653-14816-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1420540653-14816-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <54AC16B0.5050703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 01/06/2015 03:37 AM, Tomeu Vizoso wrote:
+> Following 6dbaff2b, the kernel expects that the bootloader has correctly
+> programmed the Tegra pinmux.
+>
+> DTs for the Jetson and the Venice2 had been updated already but this one
+> was left behind.
 
-In 3.18, sound is nice and clear.
+So this setup is true for NVIDIA-controlled development/reference boards 
+where we've ensured that the bootloader sets up 100% of the pinmux.
 
-In 3.19, sound is unusable. It produces nasty tone when it should be
-quiet, and there's at least as much noise as is sound.
+However, I know that Coreboot on this board doesn't set up everything in 
+the pinmux, and since it's in r/o flash never will. As such, I'm not 
+sure this change is safe for this board. That is, unless you want to 
+force upstream kernels to be booted via a chain-loaded path: Coreboot 
+(r/o) -> U-Boot (r/w with full pinmux setup) -> kernel.
 
-Unfortunately, list of mixers also changed (and there's cca 120
-settings), but a) it does not work with the old list and b) nothing I
-could figure out did make the sound usable. Some setting resulted in
-even more noise.
+> Have tested this with the stock vendor firmware (coreboot) and have found no
+> issues.
 
-Any idea what could have caused it?
-
-Thanks,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+There are presumably a bunch of features which aren't yet supported 
+upstream, and hence you couldn't test though? That means we might find 
+that parts of the pinmux aren't yet programmed but need to be to enable 
+those features.
