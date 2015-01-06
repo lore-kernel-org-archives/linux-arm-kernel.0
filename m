@@ -1,91 +1,103 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Jan 2015 20:10:05 -0600
-Subject: [PATCH 2/3] soc: ti: Add wkup_m3_ipc driver
-In-Reply-To: <54AB14E4.2010607@ti.com>
-References: <1420228817-41310-1-git-send-email-d-gerlach@ti.com>
- <1420228817-41310-3-git-send-email-d-gerlach@ti.com>
- <20150102201643.GE4920@saruman> <54AB14E4.2010607@ti.com>
-Message-ID: <20150106021005.GC24980@saruman>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Mon, 5 Jan 2015 18:27:24 -0800
+Subject: [PATCH v3 1/3] mmc: dw_mmc: fix the max_blk_count in IDMAC
+In-Reply-To: <CAGOxZ539VQ1fJbGpnJ-Awp0fQrU=-32zQYg4Tg8Vc67=8TnN+w@mail.gmail.com>
+References: <1419250324-11743-1-git-send-email-alim.akhtar@samsung.com>
+ <1419250324-11743-2-git-send-email-alim.akhtar@samsung.com>
+ <CAD=FV=WQkkEM1aMPNX6oeKC4Bf2-D8z8uwf6z4btcdxiCpSvJw@mail.gmail.com>
+ <CAGOxZ539VQ1fJbGpnJ-Awp0fQrU=-32zQYg4Tg8Vc67=8TnN+w@mail.gmail.com>
+Message-ID: <CAPz6YkV=j-E=tE-2-p0ukbQ0+GJWNtkY5uwA=VrFQ5s1OPm_GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jan 3, 2015 at 4:51 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> Hi Doug / Sonny
+> New year greetings!!
+>
+> On Sat, Jan 3, 2015 at 4:37 AM, Doug Anderson <dianders@chromium.org> wrote:
+>> Alim,
+>>
+>> On Mon, Dec 22, 2014 at 4:12 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+>>> From: Seungwon Jeon <tgih.jun@samsung.com>
+>>>
+>>> Even though 1MB is reserved for descriptor table in IDMAC,
+>>> the dw_mmc host driver is allowed to receive only maximum
+>>> 128KB block length in one request. This is caused by setting
+>>> improper max_blk_count. It needs to be e adjusted so that
+>>> descriptor table is used fully. It is found that the performance
+>>> is improved with the increased the max_blk_count.
+>>>
+>>> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+>>> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>> ---
+>>>  drivers/mmc/host/dw_mmc.c |    4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>> index 64ea042..a1b80e5 100644
+>>> --- a/drivers/mmc/host/dw_mmc.c
+>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>> @@ -2332,9 +2332,9 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+>>>  #ifdef CONFIG_MMC_DW_IDMAC
+>>>                 mmc->max_segs = host->ring_size;
+>>>                 mmc->max_blk_size = 65536;
+>>> -               mmc->max_blk_count = host->ring_size;
+>>>                 mmc->max_seg_size = 0x1000;
+>>> -               mmc->max_req_size = mmc->max_seg_size * mmc->max_blk_count;
+>>> +               mmc->max_req_size = mmc->max_seg_size * host->ring_size;
+>>> +               mmc->max_blk_count = mmc->max_req_size / 512;
+>>
+>> The numbers are a little different than the ones you and Sonny arrived
+>> at about a year ago at
+>> <https://chromium-review.googlesource.com/#/c/176488/>
+>>
+>> You end up with the same max_req_size I think, but it looks as if
+>> max_blk_count is 0x800 in your series and ix 0xffff in the one from a
+>> year ago.  Do you have any explanation for why it is max_req_size /
+>> 512?
+>>
+> Before taking this patch, I went over all the discussions that had
+> happened in past
+> http://marc.info/?l=linux-mmc&m=133039478518090&w=2 (way back in 2012)
+> http://www.spinics.net/lists/linux-mmc/msg25549.html
+> and
+> http://www.spinics.net/lists/linux-mmc/msg25797.html
+>
+> and the last one was having an ACK from maintainer.
+>
+> Having said that, I did check the performance number with current
+> patch which has landed and with one which sets max_blk_count as
+> 0xFFFF.
+> And both given exactly the same numbers on peach-pi (Write: ~52MB/s
+> and Read: ~146MB/s (HS200) using iozone),
+>
+> I checked it a bit more and found that in both the case
+> max_hw_sectors_kb is set to 1024 (max request size to block layer) and
+> max_hw_sectors_kb is the one which actually affect the Performance
+> numbers and max_hw_sectors_kb is set as
+>
+> blk_queue_max_hw_sectors(mq->queue, min(host->max_blk_count,
+> host->max_req_size / 512));
+>
+> In case of 64bit IDMAC (one on exynos7) which given a different value
+> for "ring_size", both the patches set the same max_hw_sectors_kb (512
+> in this case)
+>
+> Do you see some performance degradation with some other variants of
+> dw_mmc host controller with current ToT?
 
-On Mon, Jan 05, 2015 at 04:49:08PM -0600, Dave Gerlach wrote:
-> >> +	/*
-> >> +	 * Write a dummy message to the mailbox in order to trigger the RX
-> >> +	 * interrupt to alert the M3 that data is available in the IPC
-> >> +	 * registers. We must enable the IRQ here and disable it after in
-> >> +	 * the RX callback to avoid multiple interrupts being received
-> >> +	 * by the CM3.
-> >> +	 */
-> >> +	omap_mbox_enable_irq(m3_ipc_state.mbox, IRQ_RX);
-> >> +	ret = mbox_send_message(m3_ipc_state.mbox, (void *)dummy_msg);
-> > 
-> > unnecessary cast.
-> 
-> I get a compiler warning without this one, may need it.
+Looks like Doug test it and saw a performance improvement on rk3288
+Thanks!
 
-right, try with:
-
-	ret = mbox_send_mesage(m3->mbox, &dummy_msg);
-
-Another option is to just get rid of mbox_msg_t altogether since that's
-just a u32 anyway. Then fix omap-mailbox.c::omap_mbox_chan_send_data()
-so it knows it's receiving a void *, then it could:
-
-	u32 data = *(u32 *)mssg;
-
-but as Tony said, better not to add more dependencies to this series.
-
-> >> +	m3_rproc = rproc_get_by_phandle(rproc_phandle);
-> >> +	if (!m3_rproc) {
-> >> +		dev_err(&pdev->dev, "could not get rproc handle\n");
-> >> +		ret = -EPROBE_DEFER;
-> >> +		goto err;
-> >> +	}
-> >> +
-> >> +	m3_ipc_state.rproc = m3_rproc;
-> >> +	m3_ipc_state.dev = dev;
-> >> +	m3_ipc_state.state = M3_STATE_RESET;
-> >> +
-> >> +	/*
-> >> +	 * Wait for firmware loading completion in a thread so we
-> >> +	 * can boot the wkup_m3 as soon as it's ready without holding
-> >> +	 * up kernel boot
-> >> +	 */
-> >> +	task = kthread_run((void *)wkup_m3_rproc_boot_thread, m3_rproc,
-> >> +			   "wkup_m3_rproc_loader");
-> > 
-> > I wonder two things:
-> > 
-> > 1) This thread will only be used during boot up. Do we really need a
-> > thread or would request_firmware_nowait() be enough ?
-> > 
-> > 2) what's the size of the firmware ? Is it really so large that we must
-> > run this as a separate thread ? Meaning, why isn't request_firmware()
-> > enough ? How much time would we be waiting ?
-> 
-> The issue here comes from the case where you attempt to load a firmware stored
-> in the rootfs which is the typical use case for this. Remoteproc core requests
-> the firmware twice, first with _nowait to load the resource table and then again
-
-sounds like a bug to me. Or am I missing something ?
-
-> without nowait to boot the rproc. rproc_boot requires the resource table to be
-> loaded. The thread is really to wait for the firmware loaded completion, which
-> gets set after the resource table has been loaded, to let boot proceed. System
-> boot will get stuck otherwise as this driver can probe before rootfs is available.
-
-IMO, that should be fixed in remoteproc, but it probably goes towards
-"let's not add more dependencies".
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150105/855bbdb1/attachment.sig>
+>
+> Sonny,
+> I ran iozone like: iozone -az -i0 -i1 -I -s 10M -f /home/test (on eMMC)
+>
+>> -Doug
+>
+>
+>
+> --
+> Regards,
+> Alim
