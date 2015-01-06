@@ -1,129 +1,39 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 6 Jan 2015 18:01:20 +0000
-Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <20150105165402.GE3163@console-pimps.org>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
- <20150105165402.GE3163@console-pimps.org>
-Message-ID: <20150106180120.GF3827@bivouac.eciton.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Jan 2015 18:05:32 +0000
+Subject: [PATCH] irqchip: omap-intc: fix legacy DMA regression
+In-Reply-To: <1420563093-26026-1-git-send-email-balbi@ti.com>
+References: <20150106123830.GD30544@fuloong-minipc.musicnaut.iki.fi>
+ <1420563093-26026-1-git-send-email-balbi@ti.com>
+Message-ID: <20150106180532.GO11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 04:54:02PM +0000, Matt Fleming wrote:
+On Tue, Jan 06, 2015 at 10:51:33AM -0600, Felipe Balbi wrote:
+> +	/*
+> +	 * FIXME legacy OMAP DMA driver sitting under arch/arm/plat-omap/dma.c
+> +	 * depends is still not ready for linear IRQ domains; because of that
+> +	 * we need to temporarily "blacklist" OMAP2 and OMAP3 devices from using
+> +	 * linear IRQ Domain until that driver is finally fixed.
 
-> > +static efi_status_t get_memory_map(efi_system_table_t *sys_table_arg,
-> > +				   efi_memory_desc_t **map,
-> > +				   unsigned long *map_size,
-> > +				   unsigned long *desc_size,
-> > +				   u32 *desc_ver, unsigned long *key_ptr)
-> > +{
-> > +	efi_status_t status;
-> > +
-> > +	/*
-> > +	 * Call get_memory_map() with 0 size to retrieve the size of the
-> > +	 * required allocation.
-> > +	 */
-> > +	*map_size = 0;
-> > +	status = efi_call_early(get_memory_map, map_size, NULL,
-> > +				key_ptr, desc_size, desc_ver);
-> > +	if (status != EFI_BUFFER_TOO_SMALL)
-> > +		return EFI_LOAD_ERROR;
-> > +
-> > +	/*
-> > +	 * Add an additional efi_memory_desc_t to map_size because we're doing
-> > +	 * an allocation which may be in a new descriptor region. Then double it
-> > +	 * to give us some scratch space to prepare the input virtmap to give
-> > +	 * to SetVirtualAddressMap(). Note that this is EFI_LOADER_DATA memory,
-> > +	 * and the kernel memblock_reserve()'s only the size of the actual
-> > +	 * memory map, so the scratch space is freed again automatically.
-> > +	 */
-> > +	*map_size += *desc_size;
-> > +	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
-> > +				*map_size * 2, (void **)map);
-> > +	if (status != EFI_SUCCESS)
-> > +		return status;
-> > +
-> > +	status = efi_call_early(get_memory_map, map_size, *map,
-> > +				key_ptr, desc_size, desc_ver);
-> > +	if (status != EFI_SUCCESS)
-> > +		efi_call_early(free_pool, *map);
-> > +	return status;
-> > +}
-> 
-> We've now got two (slightly different) versions of this function. Is
-> there any way we could make do with just one?
+"finally fixed" or finally killed off like it really needs to be, once
+all users of it are killed.
 
-I think all we really need above what efi_get_memory_map() provides is
-the scratch space. Would we care about temporarily wasting a little
-bit of EFI_LOADER_DATA on all platforms, or could we just swap the
-function body in efi-stub-helper.c for Ard's version above?
+We've been trying to do this for, what, three years now... I finally
+pushed a WARN_ON() into that code to make it obvious to anyone who
+uses omap_request_dma() that they really need to update their code.
 
-(I would guess memory maps with <= 32 entries are uncommon anyway, so
-the existing version would already make the bootservice call twice.)
+Here's the list of references to that symbol which *still* need to be
+fixed so that we can kill the legacy DMA driver:
 
-> > +/*
-> > + * This is the base address at which to start allocating virtual memory ranges
-> > + * for UEFI Runtime Services. This is a userland range so that we can use any
-> > + * allocation we choose, and eliminate the risk of a conflict after kexec.
-> > + */
-> > +#define EFI_RT_VIRTUAL_BASE	0x40000000
-> > +
-> > +static void update_memory_map(efi_memory_desc_t *memory_map,
-> > +			      unsigned long map_size, unsigned long desc_size,
-> > +			      int *count)
-> > +{
-> > +	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
-> > +	efi_memory_desc_t *out = (void *)memory_map + map_size;
-> > +	int l;
-> > +
-> > +	for (l = 0; l < map_size; l += desc_size) {
-> > +		efi_memory_desc_t *in = (void *)memory_map + l;
-> > +		u64 paddr, size;
-> > +
-> > +		if (!(in->attribute & EFI_MEMORY_RUNTIME))
-> > +			continue;
-> > +
-> > +		/*
-> > +		 * Make the mapping compatible with 64k pages: this allows
-> > +		 * a 4k page size kernel to kexec a 64k page size kernel and
-> > +		 * vice versa.
-> > +		 */
-> > +		paddr = round_down(in->phys_addr, SZ_64K);
-> > +		size = round_up(in->num_pages * EFI_PAGE_SIZE +
-> > +				in->phys_addr - paddr, SZ_64K);
-> > +
-> > +		/*
-> > +		 * Avoid wasting memory on PTEs by choosing a virtual base that
-> > +		 * is compatible with section mappings if this region has the
-> > +		 * appropriate size and physical alignment. (Sections are 2 MB
-> > +		 * on 4k granule kernels)
-> > +		 */
-> > +		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
-> > +			efi_virt_base = round_up(efi_virt_base, SZ_2M);
-> > +
-> > +		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
-> > +		efi_virt_base += size;
-> > +
-> > +		memcpy(out, in, desc_size);
-> > +		out = (void *)out + desc_size;
-> > +		++*count;
-> > +	}
-> > +}
-> > +
-> 
-> fdt.c is starting to become a dumping ground for arm*-specific stuff :-(
+drivers/media/platform/omap/omap_vout_vrfb.c:   ret = omap_request_dma(vout->vrfb_dma_tx.dev_id, "VRFB DMA TX",
+drivers/media/platform/omap3isp/isphist.c:              ret = omap_request_dma(OMAP24XX_DMA_NO_DEVICE, "DMA_ISP_HIST",
+drivers/media/platform/soc_camera/omap1_camera.c:       err = omap_request_dma(OMAP_DMA_CAMERA_IF_RX, DRIVER_NAME,
+drivers/mtd/onenand/omap2.c:            r = omap_request_dma(0, pdev->dev.driver->name,
+drivers/usb/gadget/udc/omap_udc.c:              status = omap_request_dma(dma_channel,
+drivers/usb/gadget/udc/omap_udc.c:              status = omap_request_dma(dma_channel,
+drivers/usb/musb/tusb6010_omap.c:               ret = omap_request_dma(chdat->sync_dev, dev_name,
+drivers/usb/musb/tusb6010_omap.c:               ret = omap_request_dma(tusb_dma->sync_dev, "TUSB shared",
 
-Mmm, not optimal.
-That said, the only arm*-specific things about this particular
-function are the page sizes. Should this move to efi-stub-helper.c
-with EFI_RT_VIRTUAL_BASE moved to arch/<x>/include/asm/efi.h and
-joined by EFI_RT_VIRTUAL_BASE_ALIGN and EFI_RT_VIRTUAL_REGION_ALIGN?
- 
-> Is there no general solution for sharing code between arm and aarch64 in
-> the kernel so we don't have to stick things like this in
-> drivers/firmware/efi/?
-
-Not currently.
-
-/
-    Leif
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
