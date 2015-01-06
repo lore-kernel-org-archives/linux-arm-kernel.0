@@ -1,51 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 6 Jan 2015 23:58:56 +0100
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Jan 2015 17:04:15 -0600
 Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
+In-Reply-To: <20150106225614.GA31990@amd>
 References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
  <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
  <20150106205000.GB13902@amd>
  <20150106205730.GA6071@fuloong-minipc.musicnaut.iki.fi>
  <20150106220805.GD13902@amd>
  <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
-Message-ID: <20150106225856.GB31990@amd>
+ <20150106224622.GA13752@saruman> <20150106225614.GA31990@amd>
+Message-ID: <20150106230415.GC13752@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-01-07 00:27:17, Aaro Koskinen wrote:
-> On Tue, Jan 06, 2015 at 11:08:05PM +0100, Pavel Machek wrote:
-> > On Tue 2015-01-06 22:57:30, Aaro Koskinen wrote:
-> > > Hi,
-> > > 
-> > > On Tue, Jan 06, 2015 at 09:50:00PM +0100, Pavel Machek wrote:
-> > > > PS: Unfortunately, N900 will not boot using nfsroot in 3.16+ at least,
-> > > > and boot from MMC card is broken and has been for quite some time.
-> > > 
-> > > USB networking works fine with 3.19-rc3 and also MMC card rootfs.
-> > 
-> > Does nfsroot work for you? USB networking works as a module but not
-> > build-in. [Patch is available for this one.]
-> > 
-> > u-SD card seems to have similar problem. If I try it after boot, I can
-> > access it ok, but using u-SD card for rootfs fails. If it works for
-> > you, it would be interesting to know.
-> 
-> I haven't tried nfsroot, but I've been using USB networking for ssh
-> for a couple of years without issues. I have g_ether as module.
-> 
-> Also I recently switched rootfs to u-SD card, and it (MMC) works fine
-> as builtin.
-> 
-> But I'm mounting it from userspace (using builtin initramfs inside
-> zImage), with a poll loop that waits for a device to appear. Maybe if you
-> do it from kernel you need to use root wait/delay etc. options?
+Hi,
 
-Yes, it works if I mount it later. It fails when done directly using
-root=, even with rootwait etc. Hard to believe, yes, but try it. You
-can watch the results on console.
+On Tue, Jan 06, 2015 at 11:56:14PM +0100, Pavel Machek wrote:
+> > > But I'm mounting it from userspace (using builtin initramfs inside
+> > > zImage), with a poll loop that waits for a device to appear. Maybe if you
+> > > do it from kernel you need to use root wait/delay etc. options?
+> > 
+> > yeah, rootwait should do it.
+> 
+> No, rootwait does not solve it. Try it. Tested many times. (And yes,
+> you need to actually fool the rear cover sensor or close the phone.)
 
-									Pavel
+yeah, just put a magnet or, if you have spare back covers, cut one so
+that you "close" it, but still allow you to put the thing on a
+development jig.
+
+Also, if why doesn't rootwait work ? You never have a new mmc node or is
+the mmc node changing names ?
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/abeafef3/attachment-0001.sig>
