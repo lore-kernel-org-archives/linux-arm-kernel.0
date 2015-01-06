@@ -1,32 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Jan 2015 11:59:22 -0200
-Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
-In-Reply-To: <1420552459.2333.18.camel@pengutronix.de>
-References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
- <20150106124343.GM24511@dragon>
- <1420551365.2333.15.camel@pengutronix.de>
- <CAOMZO5Bn58O2Mr4SsBqWbiwecOKOiQMDDugLzi+aRVf+jOx=Sg@mail.gmail.com>
- <1420552459.2333.18.camel@pengutronix.de>
-Message-ID: <CAOMZO5A32HOQkEP7_VQJ8_NhkR7kmFHQSqoO+Lnu+MG4o=X3zQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Jan 2015 13:59:42 +0000
+Subject: [PATCH v2 0/2] arm64: don't call early_*map() post paging_init()
+In-Reply-To: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
+References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20150106135941.GA3484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 6, 2015 at 11:54 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+On Tue, Jan 06, 2015 at 01:41:11PM +0000, Leif Lindholm wrote:
+> This (tiny) series resolves a fairly serious problem with
+> early_ioremap/iounmap/memremap/memunmap on arm64. These functions
+> cannot safely be called after paging_init(), but the sanity check
+> was not triggering.
+> 
+> As a result, a fixmap entry was incorrectly cleared during
+> early_initcalls on arm64 UEFI systems.
+> 
+> 1/2 reworks the arm64 UEFI support code to not attempt these calls
+> and
+> 2/2 enables the sanity check
+> 
+> Changes since v1:
+> - Rebased to v3.19-rc3
+> - Added 'Fixes:' tags
+> - Reworked 1/2 to restore call to efi_setup_idmap() to the original
+>   location in the boot process.
 
->> Actually the ULPI PHY reset is properly handled now. What is missing
->> is the USB Hub reset to be properly handled.
->>
-> No it is not. A regulator isn't the proper abstraction for a reset at
-> all. Even if you (ab)use the regulator drivers ability to toggle a reset
-> GPIO.
-> A ULPI PHY reset needs to be modeled as a GPIO reset attached to USB
-> controller node. There is no other way to describe the hardware
-> accurately.
+Looks reasonable to me; do they need a CC stable, or is this not a problem
+that matters in practice?
 
-The ULPI PHY is modelled as a GPIO reset via reset-gpios property.
-This is documented at
-Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:
-
-- reset-gpios: Should specify the GPIO for reset.
-
-This is the property we use right now for resetting the ULPI PHY.
+Will
