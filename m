@@ -1,34 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Jan 2015 16:01:23 +0000
-Subject: [PATCH] ASoC: sam9g20_wm8731: drop machine_is_xxx
-In-Reply-To: <20150106122751.GO4194@piout.net>
-References: <1420542872-10015-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150106120049.GX2634@sirena.org.uk>
- <20150106122751.GO4194@piout.net>
-Message-ID: <20150106160123.GA2634@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 17:00:27 +0100
+Subject: [PATCH 02/17] clk: sunxi: Propagate rate changes to parent for
+ mux clocks
+In-Reply-To: <1420511727-8242-3-git-send-email-wens@csie.org>
+References: <1420511727-8242-1-git-send-email-wens@csie.org>
+ <1420511727-8242-3-git-send-email-wens@csie.org>
+Message-ID: <20150106160027.GT7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 01:27:51PM +0100, Alexandre Belloni wrote:
-> On 06/01/2015 at 12:00:49 +0000, Mark Brown wrote :
-> > On Tue, Jan 06, 2015 at 12:14:32PM +0100, Alexandre Belloni wrote:
+On Tue, Jan 06, 2015 at 10:35:12AM +0800, Chen-Yu Tsai wrote:
+> The cpu clock on sunxi machines is just a mux clock, which is normally
+> fed by the main PLL, but can be muxed to the main or low power oscillator.
+> 
+> Make the mux clock propagate rate changes to its parent, so we can
+> change the clock rate of the PLL, and thus actually implement rate
+> changing on the cpu clock.
+> 
+> This patch also removes the no reparenting limit.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-> > > Atmel based boards can now only be used with device tree. Drop non DT
-> > > initialization.
+Applied, thanks!
 
-> > This doesn't apply against current code, please check and resend.
+Maxime
 
-> It should apply after "sound: soc: atmel sam9g20_wm8731: remove useless
-> include". I was based on 3.19-rc2.
-
-So, one reason you should use subject lines matching the style for the
-subsystem is that this is a big part of how people find patches to
-review...  I'm not 100% sure I still have the patch, the volume is
-rather high right now.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/f9a1c300/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/2182b9dc/attachment.sig>
