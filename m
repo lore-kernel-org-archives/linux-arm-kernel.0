@@ -1,70 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 Jan 2015 16:45:10 +0100
-Subject: [PATCH 4/4] ARM: mvebu: armada-385-ap: Enable USB3 port
+Date: Tue,  6 Jan 2015 16:45:07 +0100
+Subject: [PATCH 1/4] usb: phy: Fix deferred probing
 In-Reply-To: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420559110-8043-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1420559110-8043-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
-VBUS line. Enable the needed drivers to support this.
+Commit 1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error on
+failure") actually broke the deferred probing mechanism, since it now returns
+EPROBE_DEFER only when the try_module_get call fails, but not when the phy
+lookup does.
+
+All the other similar functions seem to return ENODEV when try_module_get
+fails, and the error code of either __usb_find_phy or __of_usb_find_phy
+otherwise.
+
+In order to have a consistent behaviour, and a meaningful EPROBE_DEFER, always
+return EPROBE_DEFER when __(of_)usb_find_phy fails to look up the requested
+phy, that will be propagated by the caller, and ENODEV if try_module_get fails.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-385-ap.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/usb/phy/phy.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-ap.dts b/arch/arm/boot/dts/armada-385-ap.dts
-index ab88dc4be636..a9dea82ef34b 100644
---- a/arch/arm/boot/dts/armada-385-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-ap.dts
-@@ -88,6 +88,13 @@
- 				status = "okay";
- 			};
+diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
+index b4066a001ba0..353c686498d4 100644
+--- a/drivers/usb/phy/phy.c
++++ b/drivers/usb/phy/phy.c
+@@ -34,7 +34,7 @@ static struct usb_phy *__usb_find_phy(struct list_head *list,
+ 		return phy;
+ 	}
  
-+			pinctrl at 18000 {
-+				xhci0_vbus_pins: xhci0-vbus-pins {
-+					marvell,pins = "mpp44";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy = <&phy1>;
-@@ -112,6 +119,11 @@
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
- 			};
-+
-+			usb3 at f0000 {
-+				status = "okay";
-+				usb-phy = <&usb3_phy>;
-+			};
- 		};
+-	return ERR_PTR(-ENODEV);
++	return ERR_PTR(-EPROBE_DEFER);
+ }
  
- 		pcie-controller {
-@@ -137,4 +149,20 @@
- 			};
- 		};
- 	};
-+
-+	usb3_phy: usb3_phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&reg_xhci0_vbus>;
-+	};
-+
-+	reg_xhci0_vbus: xhci0-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&xhci0_vbus_pins>;
-+		regulator-name = "xhci0-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+	};
- };
+ static struct usb_phy *__usb_find_phy_dev(struct device *dev,
+@@ -66,7 +66,7 @@ static struct usb_phy *__of_usb_find_phy(struct device_node *node)
+ 		return phy;
+ 	}
+ 
+-	return ERR_PTR(-ENODEV);
++	return ERR_PTR(-EPROBE_DEFER);
+ }
+ 
+ static void devm_usb_phy_release(struct device *dev, void *res)
+@@ -192,7 +192,7 @@ struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
+ 	phy = __of_usb_find_phy(node);
+ 	if (IS_ERR(phy) || !try_module_get(phy->dev->driver->owner)) {
+ 		if (!IS_ERR(phy))
+-			phy = ERR_PTR(-EPROBE_DEFER);
++			phy = ERR_PTR(-ENODEV);
+ 
+ 		devres_free(ptr);
+ 		goto err1;
 -- 
 2.2.1
