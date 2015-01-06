@@ -1,38 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 14:13:59 +0100
-Subject: [PATCH] serial: 8250: Make ISA ports optional
-In-Reply-To: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
-References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
-Message-ID: <9492211.AECobr3jIN@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue,  6 Jan 2015 14:20:07 +0100
+Subject: [PATCH] ARM: tegra: Regenerate defconfig based on v3.19-rc1
+Message-ID: <1420550407-4059-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 January 2015 22:09:45 Peter Hurley wrote:
-> Some arches have no need to create unprobed 8250 ports; these phantom
-> ports are primarily required for ISA ports which have no probe
-> mechanism or to provide non-operational ports for userspace to
-> configure (via TIOCSSERIAL and TIOCSERCONFIG ioctls).
-> 
-> Provide CONFIG_SERIAL_8250_PHANTOM_UARTS knob to disable phantom port
-> registration; ie., CONFIG_SERIAL_8250_PHANTOM_UARTS=N only registers
-> probed ports (ACPI/PNP, "serial8250" platform devices, PCI, etc).
-> 
-> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+From: Thierry Reding <treding@nvidia.com>
 
-The intent is definitely right, but I think a better approach is
-possible.
+Removes the following entries from the default configuration:
 
-I haven't tried it here, but how about moving the serial8250_init
-function into a separate module, along with all the other parts
-that are only used for ISA devices, but leaving the actual core
-(all exported symbols) in this file?
+- PM: enabled by default (via PM_SLEEP -> SUSPEND)
+- RESOURCE_COUNTERS: removed
 
-At the same time, the serial8250_pnp_init/serial8250_pnp_exit calls
-can be removed from the serial8250_init function and become
-standalone initcalls.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+I intend to apply this to the for-3.20/defconfig branch if nobody
+objects.
 
-	Arnd
+ arch/arm/configs/tegra_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 3ea9c3377ccb..d199eb249151 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -8,7 +8,6 @@ CONFIG_CGROUPS=y
+ CONFIG_CGROUP_DEBUG=y
+ CONFIG_CGROUP_FREEZER=y
+ CONFIG_CGROUP_CPUACCT=y
+-CONFIG_RESOURCE_COUNTERS=y
+ CONFIG_CGROUP_SCHED=y
+ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_BLK_DEV_INITRD=y
+@@ -46,7 +45,6 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+-CONFIG_PM=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+-- 
+2.1.3
