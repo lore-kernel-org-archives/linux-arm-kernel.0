@@ -1,96 +1,134 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 6 Jan 2015 17:13:59 +0000
-Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <20150105162016.GD26699@leverpostej>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
- <20150105162016.GD26699@leverpostej>
-Message-ID: <20150106171359.GE3827@bivouac.eciton.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 6 Jan 2015 11:14:40 -0600
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
+ without sysc
+In-Reply-To: <54AB9983.1040703@ti.com>
+References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
+ <5492F84E.7020706@ti.com>
+ <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
+ <54AA4CD4.40105@ti.com>
+ <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
+ <54AB9983.1040703@ti.com>
+Message-ID: <54AC1800.1020406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 04:20:16PM +0000, Mark Rutland wrote:
-> Hi Ard,
+Hi Paul,
+
+On 01/06/2015 02:14 AM, Lokesh Vutla wrote:
+> Hi Paul,
+> On Tuesday 06 January 2015 07:34 AM, Paul Walmsley wrote:
+>>
+>> Roger, Lokesh, could you try this one instead?
+> Yep, the below patch works on AM437x.
+> Boot logs here: http://paste.ubuntu.com/9680938/
 > 
-> I have a few (minor) comments below.
+> Thanks and regards,
+> Lokesh
+>>
+>> It passes all the basic tests here except it does not boot on the 4460 
+>> VAR-SOM-OM - unclear why at this point - but it would be good to see if it 
+>> works on your AM4372 boards, since I don't have that one.
+>>
+>> Test logs are here:
+>>
+>> http://www.pwsan.com/omap/testlogs/hwmod_skip_only_remap_v3.19-rc/20150105171744/
+>>
+>>
+>> - Paul
+>>
+>>
+>> From 4f2e13bd2181e0ebede3aabc484aa2339830748a Mon Sep 17 00:00:00 2001
+>> From: Paul Walmsley <paul@pwsan.com>
+>> Date: Mon, 5 Jan 2015 15:49:57 -0700
+>> Subject: [PATCH] Only skip ioremap() if IP block does not have OCP header
+>>  registers. Experimental.
+>>
+>> ---
+>>  arch/arm/mach-omap2/omap_hwmod.c | 33 +++++++++++++++++++++------------
+>>  1 file changed, 21 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index cbb908dc5cf0..03df8833d399 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>> @@ -1938,6 +1938,8 @@ static int _reset(struct omap_hwmod *oh)
+>>  	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
+>>  
+>>  	if (oh->class->reset) {
+>> +		WARN(!oh->_mpu_rt_va, "Attempt to call custom reset with no MPU register target ioremapped: %s",
+>> +		     oh->name);
+>>  		r = oh->class->reset(oh);
+>>  	} else {
+>>  		if (oh->rst_lines_cnt > 0) {
+>> @@ -2358,15 +2360,19 @@ static int of_dev_hwmod_lookup(struct device_node *np,
+>>  }
+>>  
+>>  /**
+>> - * _init_mpu_rt_base - populate the virtual address for a hwmod
+>> + * _init_mpu_rt_base - populate the MPU port and virtual address
+>>   * @oh: struct omap_hwmod * to locate the virtual address
+>>   * @data: (unused, caller should pass NULL)
+>>   * @index: index of the reg entry iospace in device tree
+>>   * @np: struct device_node * of the IP block's device node in the DT data
+>>   *
+>> - * Cache the virtual address used by the MPU to access this IP block's
+>> - * registers.  This address is needed early so the OCP registers that
+>> - * are part of the device's address space can be ioremapped properly.
+>> + * Cache the interconnect target port and the virtual address used by
+>> + * the MPU to access this IP block's registers.  The address is needed
+>> + * early so the OCP registers that are part of the device's address
+>> + * space can be ioremapped properly.  The presence or absence of the
+>> + * interconnect target port also indicates whether the hwmod code
+>> + * should wait for the IP block to indicate readiness after it is
+>> + * enabled.
+>>   *
+>>   * Returns 0 on success, -EINVAL if an invalid hwmod is passed, and
+>>   * -ENXIO on absent or invalid register target address space.
+>> @@ -2385,6 +2391,13 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
+>>  	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
+>>  		return -ENXIO;
+>>  
+>> +	/*
+>> +	 * If there's no need for the hwmod code to read or write to
+>> +	 * the IP block registers, bail out early before the ioremap()
+>> +	 */
+>> +	if (!oh->class->sysc)
+>> +		return 0;
+>> +
+>>  	mem = _find_mpu_rt_addr_space(oh);
+>>  	if (!mem) {
+>>  		pr_debug("omap_hwmod: %s: no MPU register target found\n",
+>> @@ -2451,14 +2464,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+>>  				oh->name, np->name);
+>>  	}
+>>  
+>> -	if (oh->class->sysc) {
+>> -		r = _init_mpu_rt_base(oh, NULL, index, np);
+>> -		if (r < 0) {
+>> -			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
+>> -			     oh->name);
+>> -			return 0;
+>> -		}
+>> -	}
+>> +	r = _init_mpu_rt_base(oh, NULL, index, np);
+>> +	if (r < 0)
+>> +		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
+>> +			 oh->name);
+
+You have removed the return from the above block on failure. If any DT
+entry doesn't have the reg property, this will hang the kernel boot.
+Just remove the "reg" entry from any of the existing DT, and you will
+run into the issue, this is what 6423d6df1440 ("ARM: OMAP2+: hwmod:
+check for module address space during init") fixed. Also, are you sure
+you want to turn the WARN into a pr_debug, it won't even show during the
+kernel boot log if the reg base is missing.
+
+regards
+Suman
+
+>>  
+>>  	r = _init_clocks(oh, NULL);
+>>  	if (r < 0) {
+>>
 > 
-> On Mon, Dec 22, 2014 at 10:59:02AM +0000, Ard Biesheuvel wrote:
-> > In order to support kexec, the kernel needs to be able to deal with the
-> > state of the UEFI firmware after SetVirtualAddressMap() has been called.
-> > To avoid having separate code paths for non-kexec and kexec, let's move
-> > the call to SetVirtualAddressMap() to the stub: this will guarantee us
-> > that it will only be called once (since the stub is not executed during
-> > kexec), and ensures that the UEFI state is identical between kexec and
-> > normal boot.
-> > 
-> > This implies that the layout of the virtual mapping needs to be created
-> > by the stub as well. All regions are rounded up to a naturally aligned
-> > multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
-> > in the UEFI memory map. The kernel proper reads those values and installs
-> > the mappings in a dedicated set of page tables that are swapped in during
-> > UEFI Runtime Services calls.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/efi.h       |  20 +++-
-> >  arch/arm64/kernel/efi.c            | 223 ++++++++++++++++++++-----------------
-> >  arch/arm64/kernel/setup.c          |   1 +
-> >  drivers/firmware/efi/libstub/fdt.c | 137 ++++++++++++++++++++++-
-> >  4 files changed, 270 insertions(+), 111 deletions(-)
-> 
-> [...]
-> 
-> > +static void efi_set_pgd(struct mm_struct *mm)
-> > +{
-> > +       cpu_switch_mm(mm->pgd, mm);
-> > +       flush_tlb_all();
-> > +       if (icache_is_aivivt())
-> > +               __flush_icache_all();
-> > +}
-> 
-> Do we have any idea how often we call runtime services?
-
-Very rarely.
- 
-> I assume not all that often (read the RTC at boot, set/get variables).
-
-And in future possibly:
-- adding capsules
-- getwakeuptime/setwakeuptime
-- saving time to RTC on shutdown
-- reboot
-
-All of which are uid0-invoked manual operations.
-
-The only exception I can think of is if we're using the efivarfs
-backend for pstore.
-
-> If we're nuking the TLBs and I-cache a lot we'll probably need to
-> reserve an asid for the EFI virtmap.
-
-> > @@ -248,12 +337,52 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
-> >                 }
-> >         }
-> > 
-> > +       /*
-> > +        * Update the memory map with virtual addresses. The function will also
-> > +        * populate the spare second half of the memory_map allocation with
-> > +        * copies of just the EFI_MEMORY_RUNTIME entries so that we can pass it
-> > +        * straight into SetVirtualAddressMap()
-> > +        */
-> > +       update_memory_map(memory_map, map_size, desc_size,
-> > +                         &runtime_entry_count);
-> > +
-> > +       pr_efi(sys_table,
-> > +              "Exiting boot services and installing virtual address map...\n");
-> 
-> I believe that the memory map is allowed to change as a result of this
-> call, so I think this needs to be moved before update_memory_map.
-
-You are absolutely correct - but update_memory_map() only modifies the
-copy of the memory map. The message needs to move all the way to
-before the calll to get_memory_map(), and for practical reasons
-perhaps before the while(1) loop.
-
-/
-    Leif
