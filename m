@@ -1,36 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Jan 2015 19:09:16 +0800
-Subject: [PATCH] ARM: dts: imx6dl-udoo: Add board support based off
- imx6q-udoo
-In-Reply-To: <CAOCHtYgr3uXkmZgBmmy_KDQxjCrnbE5WyR5d+ONRXJABj=xNUg@mail.gmail.com>
-References: <1419269361-6095-1-git-send-email-robertcnelson@gmail.com>
- <CAOMZO5ByFrTFoPUeRPBYxjB74Xn1BPQXzDxSaa+SiW_Ks5JZOw@mail.gmail.com>
- <CAOCHtYgr3uXkmZgBmmy_KDQxjCrnbE5WyR5d+ONRXJABj=xNUg@mail.gmail.com>
-Message-ID: <20150106110913.GJ24511@dragon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 12:08:32 +0100
+Subject: [PATCH 1/6] ARM: sunxi: DT: Convert to device tree includes
+In-Reply-To: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1418767199-20957-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150106110832.GK7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 11:48:19AM -0600, Robert Nelson wrote:
-> On Mon, Dec 22, 2014 at 11:41 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Mon, Dec 22, 2014 at 3:29 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> >
-> >> +/dts-v1/;
-> >> +#include "imx6dl.dtsi"
-> >> +#include "imx6qdl-udoo.dtsi"
-> >> +
-> >> +/ {
-> >> +       model = "Udoo i.MX6 Dual Board";
-> >
-> > It would be better to use "Udoo i.MX6 Dual-lite Board" in order to
-> > avoid confusion with the i.MX6 Dual variant.
-> >
-> > Other than that:
-> >
-> > Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Dec 16, 2014 at 10:59:54PM +0100, Maxime Ripard wrote:
+> Prepare the device trees to use the C preprocessor.
 > 
-> True! That would correctly match the other dual-lite boards on mainline too.
-> 
-> Shawn, if you want me to respin the patch i will, otherwise can you
-> tweak that line?
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Fixed it up and applied.
+Applied all these patches
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/616e119e/attachment-0001.sig>
