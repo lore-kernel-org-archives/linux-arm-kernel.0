@@ -1,88 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Jan 2015 22:25:40 +0100
-Subject: [PATCH v2 6/7] ARM: mvebu: Add a number of pinctrl functions
-In-Reply-To: <1420558100-4700-7-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420558100-4700-7-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54AC52D4.4030509@free-electrons.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Jan 2015 16:27:05 -0500 (EST)
+Subject: [PATCH] Revert 9fc2105aeaaf56b0cf75296a84702d0f9e64437b to fix
+ pyaudio (and probably more)
+In-Reply-To: <alpine.LFD.2.11.1501061519090.18844@knanqh.ubzr>
+References: <20150104190123.GA20153@amd> <20150105121126.GA10116@arm.com>
+ <alpine.LFD.2.11.1501052259230.18844@knanqh.ubzr>
+ <1923550.h5Fs9u5gUy@wuerfel>
+ <alpine.LFD.2.11.1501061519090.18844@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.11.1501061618340.18844@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, 6 Jan 2015, Nicolas Pitre wrote:
 
-On 06/01/2015 16:28, Maxime Ripard wrote:
-> Some pinctrl functions can be shared with all DTS out there, since they are
-> generic, SoC-wide muxing options. Add a number of these to the DTSI to avoid
-> duplication.
+> On Tue, 6 Jan 2015, Arnd Bergmann wrote:
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
+> > I think we still build RPC with gcc -march=armv3. Is that a problem
+> > with this patch?
 > 
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 40200084c6c8..98885c58be29 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -195,6 +195,45 @@
->  
->  			pinctrl at 18000 {
->  				reg = <0x18000 0x20>;
-> +
-> +				ge0_rgmii_pins: ge-rgmii-pins-0 {
-> +					marvell,pins = "mpp6", "mpp7", "mpp8",
-> +						       "mpp9", "mpp10", "mpp11",
-> +						       "mpp12", "mpp13", "mpp14",
-> +						       "mpp15", "mpp16", "mpp17";
-> +					marvell,function = "ge0";
-> +				};
-> +
-> +				i2c0_pins: i2c-pins-0 {
-> +					marvell,pins = "mpp2", "mpp3";
-> +					marvell,function = "i2c0";
-> +				};
-> +
-> +				mdio_pins: mdio-pins {
-> +					marvell,pins = "mpp4", "mpp5";
-> +					marvell,function = "ge";
-> +				};
-> +
-> +				ref_clk0_pins: ref-clk-pins-0 {
-> +					marvell,pins = "mpp45";
-> +					marvell,function = "ref";
-> +				};
-> +
-> +				spi1_pins: spi-pins-1 {
-> +					marvell,pins = "mpp56", "mpp57", "mpp58",
-> +						       "mpp59";
-> +					marvell,function = "spi1";
-> +				};
-> +
-> +				uart0_pins: uart-pins-0 {
-> +					marvell,pins = "mpp0", "mpp1";
-> +					marvell,function = "ua0";
-> +				};
-> +
-> +				uart1_pins: uart-pins-1 {
-> +					marvell,pins = "mpp19", "mpp20";
-> +					marvell,function = "ua1";
-> +				};
->  			};
->  
->  			gpio0: gpio at 18100 {
+> It is.
 > 
+> Tangential question: does anyone still own a working RPC?
+> 
+> For sure we no longer support the RPC unless it is fitted with a SA110.  
+> And IIRC the reason why -march=armv3 is used in that case has to do with 
+> the RPC memory bus not able to accommodate the SA110's LDRH/STRH 
+> instructions. However it should be able to execute UMULL regardless.
+> 
+> Now I could add ".arch armv7-a" in the file to make it compile for RPC.  
+> I can't just make it ".arch armv4" as this prevents Thumb2 compilation 
+> for that file.
+> 
+> Other ideas?
+
+I settled on the following:
+
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index 0573faab96..0eb8de1c6f 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -40,7 +40,10 @@ else
+   lib-y	+= io-readsw-armv4.o io-writesw-armv4.o
+ endif
+ 
+-lib-$(CONFIG_ARCH_RPC)		+= ecard.o io-acorn.o floppydma.o
++ifeq ($(CONFIG_ARCH_RPC),y)
++  lib-y				+= ecard.o io-acorn.o floppydma.o
++  AFLAGS_delay-loop.o		+= -march=armv4
++endif
+ 
+ $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
+ $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
+
+That'll make things easier to sort out in the context of 
+$tangential_question.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas
