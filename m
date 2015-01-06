@@ -1,49 +1,66 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 06 Jan 2015 14:36:05 +0100
-Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
-In-Reply-To: <20150106124343.GM24511@dragon>
-References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
- <20150106124343.GM24511@dragon>
-Message-ID: <1420551365.2333.15.camel@pengutronix.de>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Tue, 6 Jan 2015 19:06:53 +0530
+Subject: [PATCH v1 0/2] Add the PMP support for APM X-Gene SoC AHCI SATA
+ Host Controller driver.
+In-Reply-To: <20150106125252.GB3077@htj.dyndns.org>
+References: <1420538536-32165-1-git-send-email-stripathi@apm.com>
+ <20150106125252.GB3077@htj.dyndns.org>
+Message-ID: <CAOHikRBs=tH+MTPTmhDkEpV67grLWJK+6a-i8qeMyx_dJ9oyeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 06.01.2015, 20:43 +0800 schrieb Shawn Guo:
-> On Mon, Jan 05, 2015 at 03:19:08PM -0200, Fabio Estevam wrote:
-> > GPIO2_5 is the reset GPIO for the USB3317 ULPI PHY. Instead of modelling it as
-> > a regulator, the correct approach is to use the 'reset_gpios' property of the
-> > "usb-nop-xceiv" node.
-> > 
-> > GPIO1_7 is the reset GPIO for the USB2517 USB hub. As we currently don't have
-> > dt bindings to describe a HUB reset, let's keep using the regulator approach.
-> > 
-> > Rename the regulator to 'reg_hub_reset' to better describe its function and bind
-> > it with the USB host1 port instead.
-> > 
-> > USB host support has been introduced by commit 9bf206a9d13be3 ("ARM: dts:
-> > imx51-babbage: Add USB Host1 support"), which landed in 3.16 and it seems that
-> > USB has only been functional due to previous bootloader initialization.
-> > 
-> > With this patch applied we can get USB host to work without relying on the 
-> > bootloader.
-> > 
-> > Cc: <stable@vger.kernel.org> # 3.16+
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Applied, thanks.
-> 
-For the record:
-I'm not happy with this patch. It still abuses the regulator API for
-something completely unrelated and this may well break again in the
-future. But given that it fixes an actual regression and you already
-sent a pull including this I'm okay to keep it.
+Hi ,
 
-We still need a proper fix to handle ULPI resets to get rid of this
-hackery.
+On Tue, Jan 06, 2015 at 03:32:14PM +0530, Suman Tripathi wrote:
+> This patch set implements the PMP support for APM X-Gene SoC AHCI SATA Host Controller driver.
 
-Regards,
-Lucas
+Hmm... still doesn't apply to for-3.20 after pulling in
+for-3.19-fixes.
+
+ git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git for-3.20
+
+What am I doing wrong?
+
+I just again cloned git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git
+
+switched to remotes/origin/for-3.20
+
+git apply 0001-ahci_xgene-Implement-the-xgene_ahci_poll_reg_val-to-.patch
+git apply 0002-ahci_xgene-Implement-the-workaround-to-support-PMP-e.patch
+
+Even tried with
+
+patch -p1 < 0001-ahci_xgene-Implement-the-xgene_ahci_poll_reg_val-to-.patch
+patch -p1 <  0002-ahci_xgene-Implement-the-workaround-to-support-PMP-e.patch
+
+Both are working fine. Not sure what's wrong with your environment.
+
+On Tue, Jan 6, 2015 at 6:22 PM, Tejun Heo <tj@kernel.org> wrote:
+> On Tue, Jan 06, 2015 at 03:32:14PM +0530, Suman Tripathi wrote:
+>> This patch set implements the PMP support for APM X-Gene SoC AHCI SATA Host Controller driver.
+>
+> Hmm... still doesn't apply to for-3.20 after pulling in
+> for-3.19-fixes.
+>
+>  git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git for-3.20
+>
+> What am I doing wrong?
+>
+> Thanks.
+>
+> --
+> tejun
+
+
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Thanks,
+with regards,
+Suman Tripathi
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
+is for the sole use of the intended recipient(s) and contains information
+that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
+It is to be used solely for the purpose of furthering the parties' business relationship. 
+All unauthorized review, use, disclosure or distribution is prohibited. 
+If you are not the intended recipient, please contact the sender by reply e-mail 
+and destroy all copies of the original message.
