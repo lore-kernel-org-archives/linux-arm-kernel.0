@@ -1,42 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Jan 2015 09:42:40 +0100
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <CABx3TkXKf=BY-1fGNhqTNAAfG5rtRMicxU-beofuu8LDs2KmZg@mail.gmail.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>	<54AA7DA6.3030707@free-electrons.com>
- <CABx3TkXKf=BY-1fGNhqTNAAfG5rtRMicxU-beofuu8LDs2KmZg@mail.gmail.com>
-Message-ID: <54ABA000.1020503@free-electrons.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 6 Jan 2015 09:04:07 +0000
+Subject: [PATCH 1/8] arm64/efi: use UEFI memory map unconditionally if
+ available
+In-Reply-To: <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150106090407.GF3163@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
-
-On 06/01/2015 03:05, Ryan Press wrote:
-> On Mon, Jan 5, 2015 at 4:03 AM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> You didn't give your ack (or nack) about the license change for the files
->> you have contributed. I would like to have your answer on the followings
->> patches:
+On Mon, 22 Dec, at 07:08:35PM, Ard Biesheuvel wrote:
+> On systems that boot via UEFI, all memory nodes are deleted from the
+> device tree, and instead, the size and location of system RAM is derived
+> from the UEFI memory map. This is handled by reserve_regions, which not only
+> reserves parts of memory that UEFI declares as reserved, but also installs
+> the memblocks that cover the remaining usable memory.
 > 
->> And for Ryan Press:
->> ARM: mvebu: armada-370-mirabox: Relicense the device tree under GPLv2+/X11
->> ARM: mvebu: armada-370: Relicense the device tree under GPLv2+/X11
->>
->> Thanks again,
->>
->> Gregory
+> Currently, reserve_regions() is only called if uefi_init() succeeds.
+> However, it does not actually depend on anything that uefi_init() does,
+> and not calling reserve_regions() results in a broken boot, so it is
+> better to just call it unconditionally.
 > 
-> Acked-by: Ryan Press <ryan@presslab.us>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index d7d2e818c856..d2f483a7cffe 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -208,8 +208,7 @@ void __init efi_init(void)
+>  	memmap.desc_size = params.desc_size;
+>  	memmap.desc_version = params.desc_ver;
+>  
+> -	if (uefi_init() < 0)
+> -		return;
+> +	WARN_ON(uefi_init() < 0);
+>  
+>  	reserve_regions();
+>  }
+> @@ -218,15 +217,13 @@ static int __init arm64_enter_virtual_mode(void)
+>  {
+>  	u64 mapsize;
+>  
+> -	if (!efi_enabled(EFI_BOOT)) {
+> -		pr_info("EFI services will not be available.\n");
+> -		return -1;
+> -	}
+> +	if (!efi_enabled(EFI_MEMMAP))
+> +		return 0;
+>  
+>  	mapsize = memmap.map_end - memmap.map;
+>  	early_memunmap(memmap.map, mapsize);
+>  
+> -	if (efi_runtime_disabled()) {
+> +	if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
+>  		pr_info("EFI runtime services will be disabled.\n");
+>  		return -1;
+>  	}
 
-I assume it is for both patches.
+Am I correct in thinking that it's possible to have EFI_MEMMAP set but
+not EFI_BOOT? That's not how things work on x86. EFI_BOOT means "I am an
+EFI-enabled platform and I was booted using EFI."
 
-Thanks,
+In other words, EFI_MEMMAP should imply EFI_BOOT (how did you get the
+memmap if you weren't booted using EFI?)
 
-Gregory
-
+It looks like you should be setting EFI_BOOT (and EFI_64BIT) in
+efi_init() if efi_get_fdt_params() succeeds.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Matt Fleming, Intel Open Source Technology Center
