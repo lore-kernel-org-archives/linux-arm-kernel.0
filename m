@@ -1,31 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Jan 2015 20:43:45 +0800
-Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
-In-Reply-To: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
-References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20150106124343.GM24511@dragon>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Tue,  6 Jan 2015 18:15:01 +0530
+Subject: [PATCH] video: vt8500lcdfb: remove unneeded continue
+Message-ID: <1420548302-11489-1-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 03:19:08PM -0200, Fabio Estevam wrote:
-> GPIO2_5 is the reset GPIO for the USB3317 ULPI PHY. Instead of modelling it as
-> a regulator, the correct approach is to use the 'reset_gpios' property of the
-> "usb-nop-xceiv" node.
-> 
-> GPIO1_7 is the reset GPIO for the USB2517 USB hub. As we currently don't have
-> dt bindings to describe a HUB reset, let's keep using the regulator approach.
-> 
-> Rename the regulator to 'reg_hub_reset' to better describe its function and bind
-> it with the USB host1 port instead.
-> 
-> USB host support has been introduced by commit 9bf206a9d13be3 ("ARM: dts:
-> imx51-babbage: Add USB Host1 support"), which landed in 3.16 and it seems that
-> USB has only been functional due to previous bootloader initialization.
-> 
-> With this patch applied we can get USB host to work without relying on the 
-> bootloader.
-> 
-> Cc: <stable@vger.kernel.org> # 3.16+
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+continue is not needed at the end of a for loop
 
-Applied, thanks.
+Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+---
+ drivers/video/fbdev/vt8500lcdfb.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/video/fbdev/vt8500lcdfb.c b/drivers/video/fbdev/vt8500lcdfb.c
+index ffaf29e..6716bf5 100644
+--- a/drivers/video/fbdev/vt8500lcdfb.c
++++ b/drivers/video/fbdev/vt8500lcdfb.c
+@@ -115,7 +115,6 @@ static int vt8500lcd_set_par(struct fb_info *info)
+ 	for (i = 0; i < 8; i++) {
+ 		if (bpp_values[i] == info->var.bits_per_pixel) {
+ 			reg_bpp = i;
+-			continue;
+ 		}
+ 	}
+ 
+-- 
+1.8.1.2
