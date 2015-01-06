@@ -1,83 +1,39 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 6 Jan 2015 10:49:44 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <54818768.3080303@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk>
- <54818768.3080303@samsung.com>
-Message-ID: <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 10:54:10 +0100
+Subject: [PATCH] ARM: dts: sun6i: ippo-q8h-v5: Fix serial0 alias
+In-Reply-To: <1419510319-32400-2-git-send-email-hdegoede@redhat.com>
+References: <1419510319-32400-1-git-send-email-hdegoede@redhat.com>
+ <1419510319-32400-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150106095410.GG7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+On Thu, Dec 25, 2014 at 01:25:19PM +0100, Hans de Goede wrote:
+> The Ippo q8h has its serial console connected to the r-uart. Adjust the
+> serial0 alias to match.
+> 
+> This fixes the kernel serial console no longer working since 3.19-rc1, because
+> 8250_dw.c now honors dt aliases, causing the serial console to be ttyS5 rather
+> then being ttyS0, as it was in 3.18 and before.
+> 
+> Note that adjusting bootargs instead is not an acceptable fix, because
+> console=ttyS0,115200 is used by a lot of bootscripts, etc. and this should
+> continue to work.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-On Fri, Dec 5, 2014 at 11:22 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> On 2014-12-02 10:59, Sjoerd Simons wrote:
->>>
->>> This is another attempt to finally make Exynos SYSMMU driver fully
->>> integrated with DMA-mapping subsystem. The main change from previous
->>> version is a rebase onto latest "automatic DMA configuration for IOMMU
->>> masters" patches from Will Deacon.
->>
->> Do you happen to know if anyone is working on iommu/dma-mapping patches
->> for Exynos 5 based on this patchset?
->
->
-> I hope to add Exynos5 SYSMMU patches to the next iteration of my patchset,
-> but I doubt it will get into v3.19-rc1.
->
->> For some background to that question, We (re-)discovered yesterday that
->> the out-of-tree exynos-reference kernel iommu patches are required to
->> get HDMI out working on exynos 5 boards. The current situation in
->> mainline is rather broken, HDMI output without CONFIG_DRM_EXYNOS_IOMMU
->> results in just displaying stripes[0]. While turning on
->> CONFIG_DRM_EXYNOS_IOMMU causes a kernel oops at boot....
->
->
-> We have observed similar issues with Exynos4 based boards, when LCD0 power
-> domain was turned off and only TV power domain has been powered on. Please
-> check the power domain configuration. Maybe in case of Exynos5 the same
+Applied, thanks!
 
-So IIUC what you are saying is that enabling the Exynos DRM IOMMU
-support has the side effect of turning on all the power domains needed
-by HDMI? I've compared the power domains configuration in mainline
-with the downstream exynos-reference [0] tree and I didn't find any
-differences.
+Maxime
 
-> issue
-> is caused by the interaction between DISP1 and GSCL domains.
->
-
-I was also not able to find a dependency betwen GSCL and DISP1 power
-domains in the Exynos 5420 manual. But If that's the case then your
-patch to add support for sub-power domains on Exynos [1] will also be
-needed, right?
-
-AFAICT from the manual, all the used modules in the case of HDMI +
-Display (LCD, DP, HDMI and MIXER) needs only the DISP1 power domain to
-be enabled which BTW was removed for Exynos5420 on commit d51cad7
-("ARM: dts: remove display power domain for exynos5420"). It seems to
-work just because the power domain is turned on by the bootloader.
-
-Also I tried forcing the kernel to not disable unused power domains by
-passing the pd_ignore_unused parameter to the kernel command line. I
-see on the kernel log a "genpd: Not disabling unused power domains"
-message but HDMI output still has the stripes that Sjoerd mentioned.
-Do you know if Exynos DRM HDMI in mainline is supposed to work without
-SysMMU / IOMMU support?
-
-Thanks a lot for your help and suggestions.
-
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
-
-Best regards,
-Javier
-
-[0]: https://github.com/exynos-reference/kernel/commits/exynos5-v3.17-rc1-chrome
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308335.html
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/5f4fad5a/attachment.sig>
