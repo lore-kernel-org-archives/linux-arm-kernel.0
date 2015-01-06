@@ -1,56 +1,50 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  6 Jan 2015 20:17:37 +0100
-Subject: [PATCH v2 0/2] ARM: shmobile: kzm9g: Declare the full 512 MiB of RAM
-Message-ID: <1420571859-11655-1-git-send-email-geert+renesas@glider.be>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Jan 2015 19:18:34 +0000
+Subject: [PATCH v2 0/2] arm64: don't call early_*map() post paging_init()
+In-Reply-To: <CAKv+Gu8nsdCiKM3fOZ6KSMKJ2-1==TyNv8W2Fo6R4jeO3AsgDg@mail.gmail.com>
+References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
+ <20150106135941.GA3484@arm.com>
+ <CAKv+Gu-nYC1VaJW6ULY0AantA681xZyxqqC+nQq91nj5t7w4OQ@mail.gmail.com>
+ <20150106155208.GC3827@bivouac.eciton.net>
+ <CAKv+Gu9uWRmLBrnoUNsEcymguiUwgXUc8UVkLO0N21UywuGT=A@mail.gmail.com>
+ <20150106160511.GD3484@arm.com>
+ <CAKv+Gu8nsdCiKM3fOZ6KSMKJ2-1==TyNv8W2Fo6R4jeO3AsgDg@mail.gmail.com>
+Message-ID: <20150106191833.GD32449@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+On Tue, Jan 06, 2015 at 04:23:58PM +0000, Ard Biesheuvel wrote:
+> On 6 January 2015 at 16:05, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jan 06, 2015 at 03:54:29PM +0000, Ard Biesheuvel wrote:
+> >> On 6 January 2015 at 15:52, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> >> > On Tue, Jan 06, 2015 at 02:04:50PM +0000, Ard Biesheuvel wrote:
+> >> >> >> Changes since v1:
+> >> >> >> - Rebased to v3.19-rc3
+> >> >> >> - Added 'Fixes:' tags
+> >> >> >> - Reworked 1/2 to restore call to efi_setup_idmap() to the original
+> >> >> >>   location in the boot process.
+> >> >> >
+> >> >> > Looks reasonable to me; do they need a CC stable,
+> >> >>
+> >> >> Yes, but with a note that both patches should be taken and the order
+> >> >> is retained, or we break bisect.
+> >> >
+> >> > Where would one add such a note?
+> >> >
+> >>
+> >> I guess the best way would be to not add a 'Cc: stable' tag, but send
+> >> an email to Greg once the patches have been merged by Linus.
+> >
+> > I thought Greg didn't take anything until it had hit mainline anyway? I
+> > think it should be fine with just the Cc...
+> >
+> 
+> I know he doesn't, but do you know for a fact that he always takes
+> patches in the same order they appear in mainline? It would seem like
+> the reasonable thing to do, I guess, but we just have to make sure.
 
-This patch series prepares kzm9g and kzm9g-reference dts for booting a
-multi-platform kernel.
+If we really want to make sure we could either fold the two patches into
+one or add a dependency without a corresponding sha. I don't like waiting
+until they've hit mainline, because I'm sure that I'll forget!
 
-Traditionally, the first 16 MiB of RAM was reserved for the RT
-processor.  However, this is incompatible with CONFIG_AUTO_ZRELADDR=y,
-which requires that the start address of physical memory is a multiple
-of 128 MiB.
-
-As CONFIG_AUTO_ZRELADDR=y is enabled for multi-platform kernels, declare
-RAM to start at 0x40000000.
-
-While at it, reclaim the last 8 MiB of RAM, too, so the full 512 MiB is
-available. We don't know the exact reason why the last 8 MiB of RAM
-was reserved, but thanks to Simon we know it is not used for a U-Boot
-splash screen.  Note that kzm9g_defconfig still has
-CONFIG_MEMORY_START=0x41000000 and CONFIG_MEMORY_SIZE=0x1f000000, so
-before the advent of DT we scribbled over the last 8 MiB, too.
-
-This is an alternative solution for "[PATCH v2 01/05] ARM: shmobile:
-kzm9g-reference: 0x48008000 load address"
-(http://www.spinics.net/lists/linux-sh/msg38385.html), which
-(a) doesn't loose 112 MiB of RAM, and
-(b) doesn't force to switch from zImage to uImage.
-
-Thanks for applying!
-
-Geert Uytterhoeven (2):
-  ARM: shmobile: kzm9g dts: Declare the full 512 MiB of RAM
-  ARM: shmobile: kzm9g-reference dts: Declare the full 512 MiB of RAM
-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 2 +-
- arch/arm/boot/dts/sh73a0-kzm9g.dts           | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
--- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Will
