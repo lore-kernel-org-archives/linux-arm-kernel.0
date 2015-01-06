@@ -1,128 +1,63 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 06 Jan 2015 15:35:22 -0500
-Subject: [PATCH v2 1/2] arm64: don't make early_*map() calls post
- paging_init()
-In-Reply-To: <1420551673-31416-2-git-send-email-leif.lindholm@linaro.org>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
- <1420551673-31416-2-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1420576522.16211.30.camel@t520.localdomain>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 6 Jan 2015 20:36:16 +0000 (UTC)
+Subject: [PATCH 3/4] arm64: fix missing asm/alternative.h include in
+ kernel/module.c
+In-Reply-To: <20150106104008.GD4858@leverpostej>
+References: <20150106014554.27249.89116.stgit@dusk.lan>
+ <20150106015215.27249.86394.stgit@dusk.lan>
+ <20150106104008.GD4858@leverpostej>
+Message-ID: <alpine.DEB.2.02.1501062034560.28771@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-01-06 at 13:41 +0000, Leif Lindholm wrote:
-> arm64 early_ioremap/iounmap/memremap/memunmap are not supported beyond
-> the call to paging_init(), but arm64_enter_virtual_mode() (an early
-> initcall) makes one call to unmap the UEFI memory map.
-> 
-> Rearrange the code to unmap this region before paging_init(), and then
-> pull back the remapping of the EFI memory map to the second part of
-> UEFI initialisation - efi_idmap_init() - renaming that function as
-> efi_memmap_init(), which better describes what it now does.
+Hi Mark,
 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Fixes: f84d02755f5a ("arm64: add EFI runtime services")
-> ---
->  arch/arm64/include/asm/efi.h |  4 ++--
->  arch/arm64/kernel/efi.c      | 27 ++++++++++++++-------------
->  arch/arm64/kernel/setup.c    |  2 +-
->  3 files changed, 17 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index a34fd3b..92f4d44 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -6,10 +6,10 @@
->  
->  #ifdef CONFIG_EFI
->  extern void efi_init(void);
-> -extern void efi_idmap_init(void);
-> +extern void efi_memmap_init(void);
->  #else
->  #define efi_init()
-> -#define efi_idmap_init()
-> +#define efi_memmap_init()
->  #endif
->  
->  #define efi_call_virt(f, ...)						\
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 6fac253..e311066 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -313,17 +313,26 @@ void __init efi_init(void)
->  	memmap.desc_size = params.desc_size;
->  	memmap.desc_version = params.desc_ver;
->  
-> -	if (uefi_init() < 0)
-> -		return;
-> +	if (uefi_init() >= 0)
-> +		reserve_regions();
->  
-> -	reserve_regions();
-> +	early_memunmap(memmap.map, params.mmap_size);
->  }
->  
-> -void __init efi_idmap_init(void)
-> +void __init efi_memmap_init(void)
->  {
-> +	u64 mapsize;
-> +
->  	if (!efi_enabled(EFI_BOOT))
->  		return;
->  
-> +	/* replace early memmap mapping with permanent mapping */
-> +	mapsize = memmap.map_end - memmap.map;
-> +	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
-> +						   mapsize);
+On Tue, 6 Jan 2015, Mark Rutland wrote:
 
-ioremap_cache() could potententially fail here if the phys_map address
-doesn't have a valid pfn (not in the kernel linear ram mapping) because
-some of the underlying vm support hasn't been initialized yet.
+> If this can move above the include of asm/insn.h:
 
-Since this is a mapping which we need during early boot and beyond, why
-not just create a fixed mapping for it similar to what we do for the
-early console (see FIX_EARLYCON_MEM_BASE)? 
+Done; updated patch below.  
 
-> +	memmap.map_end = memmap.map + mapsize;
-> +	efi.memmap = &memmap;
-> +
->  	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
->  	efi_setup_idmap();
->  }
-> @@ -379,23 +388,15 @@ static int __init arm64_enter_virtual_mode(void)
->  		return -1;
->  	}
->  
-> -	mapsize = memmap.map_end - memmap.map;
-> -	early_memunmap(memmap.map, mapsize);
-> -
->  	if (efi_runtime_disabled()) {
->  		pr_info("EFI runtime services will be disabled.\n");
->  		return -1;
->  	}
->  
->  	pr_info("Remapping and enabling EFI services.\n");
-> -	/* replace early memmap mapping with permanent mapping */
-> -	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
-> -						   mapsize);
-> -	memmap.map_end = memmap.map + mapsize;
-> -
-> -	efi.memmap = &memmap;
->  
->  	/* Map the runtime regions */
-> +	mapsize = memmap.map_end - memmap.map;
->  	virtmap = kmalloc(mapsize, GFP_KERNEL);
->  	if (!virtmap) {
->  		pr_err("Failed to allocate EFI virtual memmap\n");
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index b809911..ebf7820 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -401,7 +401,7 @@ void __init setup_arch(char **cmdline_p)
->  	paging_init();
->  	request_standard_resources();
->  
-> -	efi_idmap_init();
-> +	efi_memmap_init();
->  
->  	unflatten_device_tree();
->  
+cheers,
+
+- Paul
+
+
+From: Paul Walmsley <pwalmsley@nvidia.com>
+Date: Mon, 5 Jan 2015 17:38:41 -0700
+Subject: [PATCH 3/4] arm64: fix missing asm/alternative.h include in kernel/module.c
+
+On next-20150105, defconfig compilation breaks with:
+
+arch/arm64/kernel/module.c:408:4: error: implicit declaration of function ?apply_alternatives? [-Werror=implicit-function-declaration]
+
+Fix by including asm/alternative.h, where the apply_alternatives()
+prototype is declared.
+
+This second version incorporates a comment from Mark Rutland
+<mark.rutland@arm.com> to keep the includes in alphabetical order
+by filename.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/kernel/module.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index fd027b101de5..9b6f71db2709 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -25,6 +25,7 @@
+ #include <linux/mm.h>
+ #include <linux/moduleloader.h>
+ #include <linux/vmalloc.h>
++#include <asm/alternative.h>
+ #include <asm/insn.h>
+ #include <asm/sections.h>
+ 
+-- 
+2.1.4
