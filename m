@@ -1,127 +1,145 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 6 Jan 2015 10:58:28 +0530
-Subject: [RFC PATCH v3 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <5205211.ZMrS3F6Zab@wuerfel>
-References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1420011208-7051-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <5205211.ZMrS3F6Zab@wuerfel>
-Message-ID: <CAFpQJXUWGW2M+mzv5apz0CjZnjM7UMHCZYWDcH3NaqT4PKRLnQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 6 Jan 2015 07:00:29 +0000 (UTC)
+Subject: OMAP baseline test results for v3.19-rc3
+Message-ID: <alpine.DEB.2.02.1501060650390.28771@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+
+Here are some basic OMAP test results for Linux v3.19-rc3.
+Logs and other details at:
+
+    http://www.pwsan.com/omap/testlogs/test_v3.19-rc3/20150105224749/
 
 
-On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 31 December 2014 13:03:26 Ganapatrao Kulkarni wrote:
->> DT bindings for numa map for memory, cores and IOs using arm,associativity
->> device node property.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
->> ---
->>  Documentation/devicetree/bindings/arm/numa.txt | 198 +++++++++++++++++++++++++
->>  1 file changed, 198 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
->> new file mode 100644
->> index 0000000..4f51e25
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/numa.txt
->> @@ -0,0 +1,198 @@
->> +==============================================================================
->> +NUMA binding description.
->> +==============================================================================
->> +
->> +==============================================================================
->> +1 - Introduction
->> +==============================================================================
->> +
->> +Systems employing a Non Uniform Memory Access (NUMA) architecture contain
->> +collections of hardware resources including processors, memory, and I/O buses,
->> +that comprise what is commonly known as a ???NUMA node?? .
->> +Processor accesses to memory within the local NUMA node is generally faster
->> +than processor accesses to memory outside of the local NUMA node.
->> +DT defines interfaces that allow the platform to convey NUMA node
->> +topology information to OS.
->> +
->> +==============================================================================
->> +2 - arm,associativity
->> +==============================================================================
->> +
->> +The mapping is done using arm,associativity device property.
->> +this property needs to be present in every device node which needs to to be
->> +mapped to numa nodes.
->> +
->> +arm,associativity property is set of 32-bit integers. representing the
->> +board id, socket id and core id.
->> +
->> +ex:
->> +     /* board 0, socket 0, core 0 */
->> +     arm,associativity = <0 0 0x000>;
->> +
->> +     /* board 1, socket 0, core 8 */
->> +     arm,associativity = <1 0 0x08>;
->
-> This is way too specific to Cavium machines. Most other vendors will not (at first)
-> have multiple boards or multiple sockets, but need to represent multiple clusters
-> and/or SMT threads instead. Also the wording suggests that this is only relevant
-> for NUMA, which I don't think is helpful because we will also want to describe
-> the topology within one NUMA node for locality.
->
-> I think we should stick to the powerpc definition here and not define what the
-> levels mean at the binding level. Something like:
->
-> "Each level of topology defines a boundary in the system at which a significant
-> difference in performance can be measured between cross-device accesses within
-> a single location and those spanning multiple locations. The first cell always
-> contains the broadest subdivision within the system, while the last cell enumerates
-> the individual devices, such as an SMT thread of a CPU, or a bus bridge within
-> an SoC".
-Ok,, i will change as suggested.
->
->> +==============================================================================
->> +3 - arm,associativity-reference-points
->> +==============================================================================
->> +This property is a set of 32-bit integers, each representing an index into
->> +the arm,associativity nodes. The first integer is the most significant
->> +NUMA boundary and the following are progressively less significant boundaries.
->> +There can be more than one level of NUMA.
->> +
->> +Ex:
->> +     arm,associativity-reference-points = <0 1>;
->> +     The board Id(index 0) used first to calculate the associativity (node
->> +     distance), then follows the  socket id(index 1).
->> +
->> +     arm,associativity-reference-points = <1 0>;
->> +     The socket Id(index 1) used first to calculate the associativity,
->> +     then follows the board id(index 0).
->> +
->> +     arm,associativity-reference-points = <0>;
->> +     Only the board Id(index 0) used to calculate the associativity.
->> +
->> +     arm,associativity-reference-points = <1>;
->> +     Only socket Id(index 1) used to calculate the associativity.
->> +
->> +==============================================================================
->> +4 - Example dts
->> +==============================================================================
->> +
->> +Example: 2 Node system consists of 2 boards and each board having one socket
->> +and 8 core in each socket.
->
-> I think the example should also include a PCI controller.
-Yes, i will add pci.
->
->> +
->> +     arm,associativity-reference-points = <0 1>;
->
-> This doesn't really match the associativity properties, because the
-> second level in the cpus nodes is completely meaningless and should
-> not be listed as a secondary reference point.
-agreed, will remove second entry.
->
->         Arnd
+Test summary
+------------
 
-thanks
-ganapat
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    FAIL ( 1/ 3): omap1_defconfig_1510innovator_only
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 2/17): omap2plus_defconfig_no_pm, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/12): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 2430sdp, 5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 7/17): 4430es2panda, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.19-rc2 (b7392d2247cfe6771f95d256374f1a8e6a6f48d6)):
+   text     data      bss    total  kernel
+  +1820      -16        0    +1804  omap1_defconfig
+   +796       -8        0     +788  omap1_defconfig_1510innovator_only
+   +796      +24        0     +820  omap1_defconfig_5912osk_only
+ +10827     +472        0   +11299  multi_v7_defconfig
+   +532      +56        0     +588  omap2plus_defconfig
+   +352      +72        0     +424  omap2plus_defconfig_2430sdp_only
+   +468      +48        0     +516  omap2plus_defconfig_am33xx_only
+   +468      +88      -64     +492  omap2plus_defconfig_am43xx_only
+   +532      +48        0     +580  omap2plus_defconfig_cpupm
+   +404      +48      -64     +388  omap2plus_defconfig_dra7xx_only
+     -8        0        0       -8  omap2plus_defconfig_n800_multi_omap2xxx
+    +24        0        0      +24  omap2plus_defconfig_n800_only_a
+  +4556      +80        0    +4636  omap2plus_defconfig_no_pm
+   +468      +80        0     +548  omap2plus_defconfig_omap2_4_only
+   +532      +48        0     +580  omap2plus_defconfig_omap3_4_only
+   +468      +80      -64     +484  omap2plus_defconfig_omap5_only
+   -112      +32      -56     -136  rmk_omap3430_ldp_allnoconfig
+   +668       +8        0     +676  rmk_omap3430_ldp_oldconfig
+   -104      +64      -64     -104  rmk_omap4430_sdp_allnoconfig
+   +808       -8        0     +800  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.19-rc2 (b7392d2247cfe6771f95d256374f1a8e6a6f48d6))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
+
+
+The "pass" and "skip" lines have been removed for the warning test 
+summaries; I thought they cluttered up the report too much.  If someone 
+out there has strong opinions on whether they should be added back in, 
+please let me know by private E-mail.
+
+The validation scripts now scan the build transcripts for warnings 
+generated from the toolchain (as opposed to warnings generated when the 
+preprocessor encounters a #warning pragma in the source code, e.g., for 
+missing syscalls).  If toolchain warnings are detected, the board will be 
+marked as failing one of the "Build warnings" tests (above).  The warning 
+text can be observed by looking at the build transcript - for example, 
+http://www.pwsan.com/omap/testlogs/test_v3.19-rc3/20150105224749/build_z/omap2plus_defconfig_no_pm/build_z_20150105224749_log.txt
