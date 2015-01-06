@@ -1,61 +1,40 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Tue,  6 Jan 2015 08:15:43 -0800
-Subject: [PATCH 3/4] documentation: dts: Add the device tree binding for APM
- X-Gene v1 PCIe MSI device tree node.
+Date: Tue,  6 Jan 2015 08:15:44 -0800
+Subject: [PATCH 4/4] PCI: X-Gene: Add the MAINTAINERS entry for APM X-Gene v1
+ PCIe MSI driver
 In-Reply-To: <cover.1420499393.git.dhdang@apm.com>
 References: <cover.1420499393.git.dhdang@apm.com>
-Message-ID: <33cd03155176a77c673eee4a4598e677a3a9b8b4.1420499393.git.dhdang@apm.com>
+Message-ID: <9fd7f3ec58431a0fcba3600a0325920c86bc69fa.1420499393.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver for this binding is under 'drivers/pci/host/pci-xgene-msi.c'
+This patch adds information of maintainers for APM X-Gene v1 PCIe
+MSI/MSIX termination driver
 
 Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
 Signed-off-by: Duc Dang <dhdang@apm.com>
 ---
- .../devicetree/bindings/pci/xgene-pci-msi.txt      | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-new file mode 100644
-index 0000000..386782c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-@@ -0,0 +1,34 @@
-+* AppliedMicro X-Gene PCIe MSI interface
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddb9ac8..283f09a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7303,6 +7303,14 @@ L:	linux-pci at vger.kernel.org
+ S:	Maintained
+ F:	drivers/pci/host/*spear*
+ 
++PCI MSI DRIVER FOR APPLIEDMICRO XGENE
++M:	Duc Dang <dhdang@apm.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
++F:	drivers/pci/host/pci-xgene-msi.c
 +
-+Required properties:
-+
-+- compatible: should contain "apm,xgene-pcie-msi" or "apm,xgene-storm-pcie-msi"
-+	to identify the core.
-+- reg: A list of physical base address and length for each set of controller
-+       registers.
-+- interrupts: A list of interrupt outputs of the controller.
-+
-+Examples:
-+
-+SoC DTSI:
-+
-+	msi at 79000000 {
-+	     compatible = "apm,xgene-storm-pcie-msi", "apm,xgene-pcie-msi";
-+	     reg = <0x00 0x79000000 0x0 0x900000>;
-+	     interrupts = <  0x0 0x10 0x4
-+		     0x0 0x11 0x4
-+		     0x0 0x12 0x4
-+		     0x0 0x13 0x4
-+		     0x0 0x14 0x4
-+		     0x0 0x15 0x4
-+		     0x0 0x16 0x4
-+		     0x0 0x17 0x4
-+		     0x0 0x18 0x4
-+		     0x0 0x19 0x4
-+		     0x0 0x1a 0x4
-+		     0x0 0x1b 0x4
-+		     0x0 0x1c 0x4
-+		     0x0 0x1d 0x4
-+		     0x0 0x1e 0x4
-+		     0x0 0x1f 0x4>;
-+	};
+ PCMCIA SUBSYSTEM
+ P:	Linux PCMCIA Team
+ L:	linux-pcmcia at lists.infradead.org
 -- 
 1.9.1
