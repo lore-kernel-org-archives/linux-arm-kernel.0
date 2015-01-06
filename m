@@ -1,48 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Jan 2015 21:41:41 +0800
-Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
-In-Reply-To: <1420551365.2333.15.camel@pengutronix.de>
-References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
- <20150106124343.GM24511@dragon>
- <1420551365.2333.15.camel@pengutronix.de>
-Message-ID: <20150106134140.GB21729@dragon>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  6 Jan 2015 14:46:57 +0100
+Subject: [PATCH v2 0/5] usb: atmel_usba_udc: Rework errata handling
+Message-ID: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 02:36:05PM +0100, Lucas Stach wrote:
-> Am Dienstag, den 06.01.2015, 20:43 +0800 schrieb Shawn Guo:
-> > On Mon, Jan 05, 2015 at 03:19:08PM -0200, Fabio Estevam wrote:
-> > > GPIO2_5 is the reset GPIO for the USB3317 ULPI PHY. Instead of modelling it as
-> > > a regulator, the correct approach is to use the 'reset_gpios' property of the
-> > > "usb-nop-xceiv" node.
-> > > 
-> > > GPIO1_7 is the reset GPIO for the USB2517 USB hub. As we currently don't have
-> > > dt bindings to describe a HUB reset, let's keep using the regulator approach.
-> > > 
-> > > Rename the regulator to 'reg_hub_reset' to better describe its function and bind
-> > > it with the USB host1 port instead.
-> > > 
-> > > USB host support has been introduced by commit 9bf206a9d13be3 ("ARM: dts:
-> > > imx51-babbage: Add USB Host1 support"), which landed in 3.16 and it seems that
-> > > USB has only been functional due to previous bootloader initialization.
-> > > 
-> > > With this patch applied we can get USB host to work without relying on the 
-> > > bootloader.
-> > > 
-> > > Cc: <stable@vger.kernel.org> # 3.16+
-> > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Applied, thanks.
-> > 
-> For the record:
-> I'm not happy with this patch. It still abuses the regulator API for
-> something completely unrelated and this may well break again in the
-> future. But given that it fixes an actual regression and you already
-> sent a pull including this I'm okay to keep it.
-> 
-> We still need a proper fix to handle ULPI resets to get rid of this
-> hackery.
+Hello,
 
-Yeah, at least this fix patch removes one user of the regulator hackery.
+Here is a set of patches porting existing at91sam9rl erratum handling to
+DT and adding new code to handle at91sam9g45/9x5 erratum.
+It also adds several compatible strings to differentiate those errata.
 
-Shawn
+These patches should be backported to 3.17 and 3.18 stable releases but
+they do not apply cleanly on those stable branches.
+I'll send a backport of this series once it is merged in mainline.
+
+Regards,
+
+Boris
+
+Changes since v1:
+- cache INT_ENB value to speedup INT_ENB read operations
+
+Boris Brezillon (5):
+  usb: atmel_usba_udc: Rework at91sam9rl errata handling
+  usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
+  ARM: at91/dt: update udc compatible strings
+  usb: atmel_usba_udc: Mask status with enabled irqs
+  usb: gadget: atmel_usba: Cache INT_ENB register value
+
+ .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
+ arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
+ arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
+ drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
+ 7 files changed, 111 insertions(+), 57 deletions(-)
+
+-- 
+1.9.1
