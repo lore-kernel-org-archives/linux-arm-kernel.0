@@ -1,54 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 20:34:50 +0100
-Subject: [PATCH 3/4] documentation: dts: Add the device tree binding for
- APM X-Gene v1 PCIe MSI device tree node.
-In-Reply-To: <33cd03155176a77c673eee4a4598e677a3a9b8b4.1420499393.git.dhdang@apm.com>
-References: <cover.1420499393.git.dhdang@apm.com>
- <33cd03155176a77c673eee4a4598e677a3a9b8b4.1420499393.git.dhdang@apm.com>
-Message-ID: <1715051.BWgXSpP5LC@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 06 Jan 2015 22:39:15 +0300
+Subject: [PATCH 3/4] usb: xhci: plat: Add USB phy support
+In-Reply-To: <1420559110-8043-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420559110-8043-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54AC39E3.8050109@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 08:15:43 Duc Dang wrote:
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
-> @@ -0,0 +1,34 @@
-> +* AppliedMicro X-Gene PCIe MSI interface
-> +
-> +Required properties:
-> +
-> +- compatible: should contain "apm,xgene-pcie-msi" or "apm,xgene-storm-pcie-msi"
-> +       to identify the core.
-> +- reg: A list of physical base address and length for each set of controller
-> +       registers.
-> +- interrupts: A list of interrupt outputs of the controller.
-> +
-> +Examples:
-> +
-> +SoC DTSI:
-> +
-> +       msi at 79000000 {
-> +            compatible = "apm,xgene-storm-pcie-msi", "apm,xgene-pcie-msi";
-> +            reg = <0x00 0x79000000 0x0 0x900000>;
-> +            interrupts = <  0x0 0x10 0x4
-> +                    0x0 0x11 0x4
-> +                    0x0 0x12 0x4
-> +                    0x0 0x13 0x4
-> +                    0x0 0x14 0x4
-> +                    0x0 0x15 0x4
-> +                    0x0 0x16 0x4
-> +                    0x0 0x17 0x4
-> +                    0x0 0x18 0x4
-> +                    0x0 0x19 0x4
-> +                    0x0 0x1a 0x4
-> +                    0x0 0x1b 0x4
-> +                    0x0 0x1c 0x4
-> +                    0x0 0x1d 0x4
-> +                    0x0 0x1e 0x4
-> +                    0x0 0x1f 0x4>;
-> +       };
+Hello.
 
-I think the example should contain the pci controller with the respective
-msi-parent property.
+On 01/06/2015 06:45 PM, Maxime Ripard wrote:
 
-	Arnd
+> The Marvell Armada 385 AP needs a dumb phy in order to enable the USB3 VBUS.
+
+> Add a call to retrieve a USB PHY to XHCI plat in order to support this.
+
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+[...]
+
+> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+> index cc7c5bb7cbcf..d9468af2a8e4 100644
+> --- a/drivers/usb/host/xhci.h
+> +++ b/drivers/usb/host/xhci.h
+> @@ -1474,6 +1474,8 @@ struct xhci_hcd {
+>   	struct msix_entry	*msix_entries;
+>   	/* optional clock */
+>   	struct clk		*clk;
+> +	/* optional phy */
+> +	struct usb_phy		*phy;
+
+    Can't you reuse the one in 'struct usb_hcd'?
+
+[...]
+
+WBR, Sergei
