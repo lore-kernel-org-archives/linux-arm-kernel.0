@@ -1,82 +1,133 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:25 +0800
-Subject: [PATCH 15/17] ARM: dts: sun4i: cubieboard: add axp209 regulator nodes
-In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-16-git-send-email-wens@csie.org>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon,  5 Jan 2015 22:09:45 -0500
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+Message-ID: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the regulator nodes for the axp209 by including
-the axp209 dtsi. As the inputs of these regulators are from the
-axp209's PS output, which is basically just a mux over the 2
-inputs, it is considered to be unregulated. Thus we do not provide
-input supply properties for them.
+Some arches have no need to create unprobed 8250 ports; these phantom
+ports are primarily required for ISA ports which have no probe
+mechanism or to provide non-operational ports for userspace to
+configure (via TIOCSSERIAL and TIOCSERCONFIG ioctls).
 
-The regulator names and constraints are based on the board
-schematics and the SoC datasheet.
+Provide CONFIG_SERIAL_8250_PHANTOM_UARTS knob to disable phantom port
+registration; ie., CONFIG_SERIAL_8250_PHANTOM_UARTS=N only registers
+probed ports (ACPI/PNP, "serial8250" platform devices, PCI, etc).
 
-DCDC2 is used as the cpu power supply. This patch also references
-it from the cpu node.
-
-Also get rid of axp209 properties already set in axp209.dtsi.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
 ---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 35 ++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+ drivers/tty/serial/8250/8250.h      |  6 ++++++
+ drivers/tty/serial/8250/8250_core.c | 13 +++++++++++--
+ drivers/tty/serial/8250/Kconfig     | 24 +++++++++++++++++++-----
+ 3 files changed, 36 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 140e3ee0c15f..312bb288d764 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -134,12 +134,8 @@
- 			status = "okay";
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index b008368..bda82f7 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -96,6 +96,12 @@ struct serial8250_config {
+ #define SERIAL8250_SHARE_IRQS 0
+ #endif
  
- 			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
- 				reg = <0x34>;
- 				interrupts = <0>;
++#ifdef CONFIG_SERIAL_8250_PHANTOM_UARTS
++#define SERIAL8250_PHANTOM_UARTS 1
++#else
++#define SERIAL8250_PHANTOM_UARTS 0
++#endif
++
+ static inline int serial_in(struct uart_8250_port *up, int offset)
+ {
+ 	return up->port.serial_in(&up->port, offset);
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 3bfcfdb..1b27b2f 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -52,10 +52,13 @@
+  * Configuration:
+  *   share_irqs - whether we pass IRQF_SHARED to request_irq().  This option
+  *                is unsafe when used on edge-triggered interrupts.
++ *   nr_uarts - max # of ports which can be registered
++ *   phantom_uarts - whether we pre-register "nr_uarts". Required for ISA ports
++ *		     and providing unprobed ports for userspace to configure.
+  */
+ static unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 -
--				interrupt-controller;
--				#interrupt-cells = <1>;
- 			};
- 		};
+ static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
++static unsigned int phantom_uarts = SERIAL8250_PHANTOM_UARTS;
  
-@@ -185,3 +181,34 @@
- 		status = "okay";
- 	};
- };
+ static struct uart_driver serial8250_reg;
+ 
+@@ -3155,6 +3158,9 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
+ {
+ 	int i;
+ 
++	if (!phantom_uarts)
++		return;
 +
-+/include/ "axp209.dtsi"
+ 	for (i = 0; i < nr_uarts; i++) {
+ 		struct uart_8250_port *up = &serial8250_ports[i];
+ 
+@@ -3662,7 +3668,7 @@ void serial8250_unregister_port(int line)
+ 
+ 	mutex_lock(&serial_mutex);
+ 	uart_remove_one_port(&serial8250_reg, &uart->port);
+-	if (serial8250_isa_devs) {
++	if (serial8250_isa_devs && phantom_uarts) {
+ 		uart->port.flags &= ~UPF_BOOT_AUTOCONF;
+ 		uart->port.type = PORT_UNKNOWN;
+ 		uart->port.dev = &serial8250_isa_devs->dev;
+@@ -3769,6 +3775,9 @@ MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"
+ module_param(nr_uarts, uint, 0644);
+ MODULE_PARM_DESC(nr_uarts, "Maximum number of UARTs supported. (1-" __MODULE_STRING(CONFIG_SERIAL_8250_NR_UARTS) ")");
+ 
++module_param(phantom_uarts, uint, 0644);
++MODULE_PARM_DESC(phantom_uarts, "Enable UARTs with no hardware");
 +
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
+ module_param(skip_txen_test, uint, 0644);
+ MODULE_PARM_DESC(skip_txen_test, "Skip checking for the TXEN bug at init time");
+ 
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index 0fcbcd2..87e649b 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -145,15 +145,29 @@ config SERIAL_8250_NR_UARTS
+ 	  via hot-plug, or any ISA multi-port serial cards.
+ 
+ config SERIAL_8250_RUNTIME_UARTS
+-	int "Number of 8250/16550 serial ports to register at runtime"
++	int "Maximum number of 8250/16550 serial ports to enable"
+ 	depends on SERIAL_8250
+ 	range 0 SERIAL_8250_NR_UARTS
+ 	default "4"
+ 	help
+-	  Set this to the maximum number of serial ports you want
+-	  the kernel to register at boot time.  This can be overridden
+-	  with the module parameter "nr_uarts", or boot-time parameter
+-	  8250.nr_uarts
++	  Set this to the maximum number of 8250/16550 serial ports you
++	  want the kernel to allow. This can be overridden with the module
++	  parameter "nr_uarts", or boot-time parameter, 8250.nr_uarts,
++	  up to the maximum.
 +
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1450000>;
-+	regulator-name = "vdd-cpu";
-+};
++config SERIAL_8250_PHANTOM_UARTS
++	bool
++	prompt "Enable phantom 8250/16550 serial ports" if !ISA
++	depends on SERIAL_8250
++	default y
++	---help---
++	  Say Y here to create all 8250/16550 serial ports at module load time.
++	  Saying N here prevents the creation of unprobed ports, but also
++	  disables userspace probe/configure (since no device node is created
++	  for userspace to open). This can be overridden with the module
++	  parameter "phantom_uarts", or boot-time parameter, 8250.phantom_uarts
 +
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
++	  If unsure, say Y.
+ 
+ config SERIAL_8250_EXTENDED
+ 	bool "Extended 8250/16550 serial driver options"
 -- 
-2.1.4
+2.2.1
