@@ -1,9 +1,9 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:18 +0800
-Subject: [PATCH 08/17] ARM: dts: sun7i: cubieboard2: add axp209 regulator nodes
+Date: Tue,  6 Jan 2015 10:35:19 +0800
+Subject: [PATCH 09/17] ARM: dts: sun7i: cubietruck: add axp209 regulator nodes
 In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-9-git-send-email-wens@csie.org>
+Message-ID: <1420511727-8242-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,30 +23,14 @@ Also get rid of axp209 properties already set in axp209.dtsi.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/axp209.dtsi               |  4 ++++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 35 +++++++++++++++++++++++++----
- 2 files changed, 35 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 35 ++++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
-index 3c38cbafe285..fec3364b2110 100644
---- a/arch/arm/boot/dts/axp209.dtsi
-+++ b/arch/arm/boot/dts/axp209.dtsi
-@@ -54,6 +54,10 @@
-  */
- 
- &axp209 {
-+	compatible = "x-powers,axp209";
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
- 	regulators {
- 		/* Default work frequency for buck regulators */
- 		x-powers,dcdc-freq = <1500>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 53680983461a..61e61c0eb829 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -84,13 +84,9 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index a281d259b9b8..48ceb4130b3b 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -126,13 +126,9 @@
  			status = "okay";
  
  			axp209: pmic at 34 {
@@ -60,8 +44,8 @@ index 53680983461a..61e61c0eb829 100644
  			};
  		};
  
-@@ -141,3 +137,34 @@
- 		status = "okay";
+@@ -218,3 +214,34 @@
+ 		gpio = <&pio 7 9 0>;
  	};
  };
 +
