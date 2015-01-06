@@ -1,82 +1,70 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Jan 2015 16:02:30 -0600
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150106215744.GC13902@amd>
-References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
- <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
- <20150106205000.GB13902@amd> <20150106205413.GF32308@saruman>
- <20150106215744.GC13902@amd>
-Message-ID: <20150106220230.GG32308@saruman>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 06 Jan 2015 17:06:15 -0500
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <1596791.jNp4rCPpnN@wuerfel>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
+ <54AC0C4B.1000907@redhat.com> <1596791.jNp4rCPpnN@wuerfel>
+Message-ID: <54AC5C57.7050504@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On Tue, Jan 06, 2015 at 10:57:44PM +0100, Pavel Machek wrote:
-> > > > > > > In 3.18, sound is nice and clear.
-> > > > > > > 
-> > > > > > > In 3.19, sound is unusable. It produces nasty tone when it should be
-> > > > > > > quiet, and there's at least as much noise as is sound.
-> > > > > > > 
-> > > > > > > Unfortunately, list of mixers also changed (and there's cca 120
-> > > > > > > settings), but a) it does not work with the old list and b) nothing I
-> > > > > > > could figure out did make the sound usable. Some setting resulted in
-> > > > > > > even more noise.
-> > > > > > > 
-> > > > > > > Any idea what could have caused it?
-> > > > > > 
-> > > > > > $ git bisect start
-> > > > > > $ git bisect good v3.18
-> > > > > > $ git bisect bad
-> > > > > > 
-> > > > > > that'll help find what caused it.
-> > > > > 
-> > > > > Telling someone to do hard and time consuming job that probably will
-> > > > > not succeed, instead of actually providing help. Very very funny.
-> > > > 
-> > > > you're getting code for free, you're getting help for free. Not many
-> > > > people have N900s lying around. Running a bisection is just
-> > > > politeness.
-> > > 
-> > > Now you are speaking for yourself or for TI?
-> > 
-> > why bring my employer into the discussion ?
+Happy New Year!
+
+On 01/06/2015 02:21 PM, Arnd Bergmann wrote:
+> On Tuesday 06 January 2015 11:24:43 Jon Masters wrote:
+>> On 01/06/2015 06:20 AM, Catalin Marinas wrote:
+>>
+>>> Now, what's preventing a vendor firmware from providing only ACPI
+>>> tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
+>>> that both DT and ACPI are supported, or at least that dts files are
+>>> merged in the kernel first?
+>>
+>> I know of some (server) firmware that will only provide ACPI in the
+>> medium term, so this is coming.
 > 
-> Because you are speaking of getting help for free, and I don't
+> Medium term is fine, as long as they are not expecting their hardware
+> to be supported by Linux before ACPI support is stable enough for
+> general consumption.
 
-are you not getting help for free ?
+To be clear, I think that's reasonable for upstream. I may love ACPI,
+but vendors can always ship kernels with a config supporting ACPI only
+platforms in the interim period if they have a commercial justification
+and that doesn't have to be supported in terms of the upstream default.
 
-> remember getting any useful help from you; so I'd like to know who do
+But, perhaps there's a way to have it both ways, you could consider also
+a CONFIG_EXPERT option that would allow you to build a kernel with ACPI
+only support in the medium term. That way, if someone is running a
+vendor kernel, but wants to track upstream development more closely,
+they can do so on such hardware by enabling the expert config bit.
 
-how come ? I gave you a very helpful list of commands which will direct
-you at finding the root of the issue you found.
+> I have no idea how long that will take, but my
+> guess is that we shouldn't plan on supporting ACPI-only platforms in
+> Linux for the next couple of years and just demand that all drivers
+> have DT support to let users add a valid DTB that can describe the
+> hardware.
 
-> you speak for.
+I'm not opposed. It was particularly useful in the early days of ACPI to
+be able to boot our internal systems (which now all default to ACPI on
+by default) with acpi=off when there were glitches that needed to be
+isolated to whether they were ACPI related. One reason I was very keen
+for a DT UUID in UEFI early on was so that there was a clean way to
+specify both sets of tables on a UEFI platform. Keeping them in sync is
+not something we can rely on in the longer term, but during bringup
+timeframe I suspect you'll continue to see many platforms with both sets
+of tables. This is especially true for early silicon that might be
+supporting both embedded and server environments - hence a platform that
+appears to be a server might have a DT posted upstream anyway if such a
+platform is also being used for unrelated embedded work.
 
-for myself.
+> That should always be possible using something like grub2 as an
+> intermediate that boots using the UEFI interfaces and loads the
+> kernel and DT from disk.
 
-> > > Thanks for your very valuable help. I know how to do a bisection,
-> > > thank you.
-> > 
-> > then please do it.
-> 
-> No, sorry, I don't think that would be reasonable use of my time at
-> this point. First steps are "confirm it happens on other N900 boards,
-> too", ruling out config issues at my part, and "try to get
-> verification from other development boards if they have same
-> problems", because most other boards are easier to work with.
+This is another reason (but it's up to you, I understand your position)
+why it may not be a huge problem if there are ACPI only systems, since
+the "devicetree" directive in GRUB2 configs is always possible.
 
-you don't want to do due diligence with a bug *you* found, then there's
-no way people can help you out. Sorry.
-
-Good luck
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/ef1df610/attachment.sig>
+Jon.
