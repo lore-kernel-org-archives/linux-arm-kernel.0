@@ -1,32 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 21:49:21 +0100
-Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH v6 17/17] Documentation: ACPI for
- ARM64
-In-Reply-To: <D0F5605BA99F0B4594FB1EEC24E785CC654879C3@SZXEMA510-MBX.china.huawei.com>
-References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
- <1420368918-5086-18-git-send-email-hanjun.guo@linaro.org>
- <D0F5605BA99F0B4594FB1EEC24E785CC654879C3@SZXEMA510-MBX.china.huawei.com>
-Message-ID: <9429675.LhiSR5rsOc@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 6 Jan 2015 21:50:00 +0100
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106202857.GB32308@saruman>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
+Message-ID: <20150106205000.GB13902@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 09:52:05 liyi 00215672 wrote:
-> In traditional telecom market, what confused us(Huawei) was our software
-> and hardware coupling together oftentimes. So if we change some hardware
-> then we MUST modify our software, which was not our customer?s
-> expectation. In x86 world, we have UEFI and ACPI technologies, they are
-> suitable to solve this problem very well, we just upgrade our hardware
-> and don?t need to upgrade their software, in the meantime ACPI provides
-> many methods on power management.
+On Tue 2015-01-06 14:28:57, Felipe Balbi wrote:
+> On Tue, Jan 06, 2015 at 06:51:15PM +0100, Pavel Machek wrote:
+> > 
+> > On Tue 2015-01-06 11:25:45, Felipe Balbi wrote:
+> > > On Tue, Jan 06, 2015 at 06:04:33PM +0100, Pavel Machek wrote:
+> > > > Hi!
+> > > > 
+> > > > In 3.18, sound is nice and clear.
+> > > > 
+> > > > In 3.19, sound is unusable. It produces nasty tone when it should be
+> > > > quiet, and there's at least as much noise as is sound.
+> > > > 
+> > > > Unfortunately, list of mixers also changed (and there's cca 120
+> > > > settings), but a) it does not work with the old list and b) nothing I
+> > > > could figure out did make the sound usable. Some setting resulted in
+> > > > even more noise.
+> > > > 
+> > > > Any idea what could have caused it?
+> > > 
+> > > $ git bisect start
+> > > $ git bisect good v3.18
+> > > $ git bisect bad
+> > > 
+> > > that'll help find what caused it.
+> > 
+> > Telling someone to do hard and time consuming job that probably will
+> > not succeed, instead of actually providing help. Very very funny.
+> 
+> you're getting code for free, you're getting help for free. Not many
+> people have N900s lying around. Running a bisection is just
+> politeness.
 
-Can you give an example of how ACPI solves the problem of supporting a
-particular piece of new hardware?
+Now you are speaking for yourself or for TI?
 
-I assume that for a completely new SoC, it won't help because you
-still need device drivers for all the major parts of the hardware
-that have changed, so this is about parts of the system that can
-be abstracted in AML but not fully described in DT without the need
-for new device drivers. Which are the main ones you are interested in
-here?
+Thanks for your very valuable help. I know how to do a bisection,
+thank you.
+									Pavel
+									
+PS: Unfortunately, N900 will not boot using nfsroot in 3.16+ at least,
+and boot from MMC card is broken and has been for quite some time.
 
-	Arnd
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
