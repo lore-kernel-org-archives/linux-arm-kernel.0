@@ -1,228 +1,401 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue,  6 Jan 2015 21:45:39 +0100
-Subject: [PATCH 2/2] arm: pxa: switch pxa3xx to clock framework
-In-Reply-To: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
-References: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1420577139-30556-2-git-send-email-robert.jarzmik@free.fr>
+Date: Tue,  6 Jan 2015 21:45:38 +0100
+Subject: [PATCH 1/2] clk: pxa: add pxa3xx clock driver
+Message-ID: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pxa3xx clocks being now in place in the clock framework, remove now
-useless clock code. All clock handling is now in driver/clk/pxa.
+Move pxa25x clock drivers from arch/arm/mach-pxa to driver/clk.
+In the move :
+ - convert to new clock framework legacy clocks
+ - provide clocks as before for platform data based boards
+ - provide clocks through devicetree with clk-pxa-dt
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/Kconfig            |  2 +-
- arch/arm/mach-pxa/Makefile  |  2 +-
- arch/arm/mach-pxa/generic.c |  2 ++
- arch/arm/mach-pxa/generic.h |  1 +
- arch/arm/mach-pxa/pxa300.c  | 19 +--------------
- arch/arm/mach-pxa/pxa320.c  |  9 -------
- arch/arm/mach-pxa/pxa3xx.c  | 59 ---------------------------------------------
- 7 files changed, 6 insertions(+), 88 deletions(-)
+ drivers/clk/pxa/Makefile     |   1 +
+ drivers/clk/pxa/clk-pxa3xx.c | 364 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 365 insertions(+)
+ create mode 100644 drivers/clk/pxa/clk-pxa3xx.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 466ebc2..5afd70b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -611,7 +611,7 @@ config ARCH_PXA
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_CPU_SUSPEND if PM
- 	select AUTO_ZRELADDR
--	select COMMON_CLK if PXA27x || PXA25x
-+	select COMMON_CLK
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
-diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
-index 1566a27..4591c11 100644
---- a/arch/arm/mach-pxa/Makefile
-+++ b/arch/arm/mach-pxa/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_PM)		+= pm.o sleep.o standby.o
- # SoC-specific code
- obj-$(CONFIG_PXA25x)		+= mfp-pxa2xx.o pxa2xx.o pxa25x.o
- obj-$(CONFIG_PXA27x)		+= mfp-pxa2xx.o pxa2xx.o pxa27x.o
--obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o clock.o clock-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
-+obj-$(CONFIG_PXA3xx)		+= mfp-pxa3xx.o pxa3xx.o smemc.o pxa3xx-ulpi.o
- obj-$(CONFIG_CPU_PXA300)	+= pxa300.o
- obj-$(CONFIG_CPU_PXA320)	+= pxa320.o
- obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index d988c53..ec510ec 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -67,6 +67,8 @@ void __init pxa_timer_init(void)
- 		pxa25x_clocks_init();
- 	if (cpu_is_pxa27x())
- 		pxa27x_clocks_init();
-+	if (cpu_is_pxa3xx())
-+		pxa3xx_clocks_init();
- 	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
- 			    get_clock_tick_rate());
- }
-diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
-index 149087c..0b1dbb5 100644
---- a/arch/arm/mach-pxa/generic.h
-+++ b/arch/arm/mach-pxa/generic.h
-@@ -39,6 +39,7 @@ extern void __init pxa27x_init_irq(void);
- extern void __init pxa27x_map_io(void);
- 
- #define pxa3xx_handle_irq ichp_handle_irq
-+extern int __init pxa3xx_clocks_init(void);
- extern void __init pxa3xx_dt_init_irq(void);
- extern void __init pxa3xx_init_irq(void);
- extern void __init pxa3xx_map_io(void);
-diff --git a/arch/arm/mach-pxa/pxa300.c b/arch/arm/mach-pxa/pxa300.c
-index 17cbc0c..a8af7cb 100644
---- a/arch/arm/mach-pxa/pxa300.c
-+++ b/arch/arm/mach-pxa/pxa300.c
-@@ -84,32 +84,15 @@ static struct mfp_addr_map pxa310_mfp_addr_map[] __initdata = {
- 	MFP_ADDR_END,
- };
- 
--static DEFINE_PXA3_CKEN(common_nand, NAND, 156000000, 0);
--static DEFINE_PXA3_CKEN(gcu, PXA300_GCU, 0, 0);
--
--static struct clk_lookup common_clkregs[] = {
--	INIT_CLKREG(&clk_common_nand, "pxa3xx-nand", NULL),
--	INIT_CLKREG(&clk_gcu, "pxa3xx-gcu", NULL),
--};
--
--static DEFINE_PXA3_CKEN(pxa310_mmc3, MMC3, 19500000, 0);
--
--static struct clk_lookup pxa310_clkregs[] = {
--	INIT_CLKREG(&clk_pxa310_mmc3, "pxa2xx-mci.2", NULL),
--};
--
- static int __init pxa300_init(void)
- {
- 	if (cpu_is_pxa300() || cpu_is_pxa310()) {
- 		mfp_init_base(io_p2v(MFPR_BASE));
- 		mfp_init_addr(pxa300_mfp_addr_map);
--		clkdev_add_table(ARRAY_AND_SIZE(common_clkregs));
- 	}
- 
--	if (cpu_is_pxa310()) {
-+	if (cpu_is_pxa310())
- 		mfp_init_addr(pxa310_mfp_addr_map);
--		clkdev_add_table(ARRAY_AND_SIZE(pxa310_clkregs));
--	}
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-pxa/pxa320.c b/arch/arm/mach-pxa/pxa320.c
-index 6dc99d4..395c12a 100644
---- a/arch/arm/mach-pxa/pxa320.c
-+++ b/arch/arm/mach-pxa/pxa320.c
-@@ -78,20 +78,11 @@ static struct mfp_addr_map pxa320_mfp_addr_map[] __initdata = {
- 	MFP_ADDR_END,
- };
- 
--static DEFINE_PXA3_CKEN(pxa320_nand, NAND, 104000000, 0);
--static DEFINE_PXA3_CKEN(gcu, PXA320_GCU, 0, 0);
--
--static struct clk_lookup pxa320_clkregs[] = {
--	INIT_CLKREG(&clk_pxa320_nand, "pxa3xx-nand", NULL),
--	INIT_CLKREG(&clk_gcu, "pxa3xx-gcu", NULL),
--};
--
- static int __init pxa320_init(void)
- {
- 	if (cpu_is_pxa320()) {
- 		mfp_init_base(io_p2v(MFPR_BASE));
- 		mfp_init_addr(pxa320_mfp_addr_map);
--		clkdev_add_table(ARRAY_AND_SIZE(pxa320_clkregs));
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index edcbd9c..bd4cbef 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -37,67 +37,11 @@
- 
- #include "generic.h"
- #include "devices.h"
--#include "clock.h"
- 
- #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
- #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
- 
- extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
--
--static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
--static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
--static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
--static DEFINE_PXA3_CKEN(pxa3xx_i2c, I2C, 32842000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_udc, UDC, 48000000, 5);
--static DEFINE_PXA3_CKEN(pxa3xx_usbh, USBH, 48000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_u2d, USB2, 48000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_keypad, KEYPAD, 32768, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp1, SSP1, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp2, SSP2, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp3, SSP3, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_ssp4, SSP4, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_pwm0, PWM0, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_pwm1, PWM1, 13000000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_mmc1, MMC1, 19500000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_mmc2, MMC2, 19500000, 0);
--static DEFINE_PXA3_CKEN(pxa3xx_gpio, GPIO, 13000000, 0);
--
--static DEFINE_CK(pxa3xx_lcd, LCD, &clk_pxa3xx_hsio_ops);
--static DEFINE_CK(pxa3xx_smemc, SMC, &clk_pxa3xx_smemc_ops);
--static DEFINE_CK(pxa3xx_camera, CAMERA, &clk_pxa3xx_hsio_ops);
--static DEFINE_CK(pxa3xx_ac97, AC97, &clk_pxa3xx_ac97_ops);
--static DEFINE_CLK(pxa3xx_pout, &clk_pxa3xx_pout_ops, 13000000, 70);
--
--static struct clk_lookup pxa3xx_clkregs[] = {
--	INIT_CLKREG(&clk_pxa3xx_pout, NULL, "CLK_POUT"),
--	/* Power I2C clock is always on */
--	INIT_CLKREG(&clk_dummy, "pxa3xx-pwri2c.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_lcd, "pxa2xx-fb", NULL),
--	INIT_CLKREG(&clk_pxa3xx_camera, NULL, "CAMCLK"),
--	INIT_CLKREG(&clk_pxa3xx_ac97, NULL, "AC97CLK"),
--	INIT_CLKREG(&clk_pxa3xx_ffuart, "pxa2xx-uart.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_btuart, "pxa2xx-uart.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_stuart, "pxa2xx-uart.2", NULL),
--	INIT_CLKREG(&clk_pxa3xx_stuart, "pxa2xx-ir", "UARTCLK"),
--	INIT_CLKREG(&clk_pxa3xx_i2c, "pxa2xx-i2c.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_udc, "pxa27x-udc", NULL),
--	INIT_CLKREG(&clk_pxa3xx_usbh, "pxa27x-ohci", NULL),
--	INIT_CLKREG(&clk_pxa3xx_u2d, "pxa3xx-u2d", NULL),
--	INIT_CLKREG(&clk_pxa3xx_keypad, "pxa27x-keypad", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp1, "pxa3xx-ssp.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp2, "pxa3xx-ssp.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp3, "pxa3xx-ssp.2", NULL),
--	INIT_CLKREG(&clk_pxa3xx_ssp4, "pxa3xx-ssp.3", NULL),
--	INIT_CLKREG(&clk_pxa3xx_pwm0, "pxa27x-pwm.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_pwm1, "pxa27x-pwm.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_mmc1, "pxa2xx-mci.0", NULL),
--	INIT_CLKREG(&clk_pxa3xx_mmc2, "pxa2xx-mci.1", NULL),
--	INIT_CLKREG(&clk_pxa3xx_smemc, "pxa2xx-pcmcia", NULL),
--	INIT_CLKREG(&clk_pxa3xx_gpio, "pxa3xx-gpio", NULL),
--	INIT_CLKREG(&clk_pxa3xx_gpio, "pxa93x-gpio", NULL),
--	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
--};
--
- #ifdef CONFIG_PM
- 
- #define ISRAM_START	0x5c000000
-@@ -476,8 +420,6 @@ static int __init pxa3xx_init(void)
- 		 */
- 		ASCR &= ~(ASCR_RDH | ASCR_D1S | ASCR_D2S | ASCR_D3S);
- 
--		clkdev_add_table(pxa3xx_clkregs, ARRAY_SIZE(pxa3xx_clkregs));
--
- 		if ((ret = pxa_init_dma(IRQ_DMA, 32)))
- 			return ret;
- 
-@@ -485,7 +427,6 @@ static int __init pxa3xx_init(void)
- 
- 		register_syscore_ops(&pxa_irq_syscore_ops);
- 		register_syscore_ops(&pxa3xx_mfp_syscore_ops);
--		register_syscore_ops(&pxa3xx_clock_syscore_ops);
- 
- 		if (of_have_populated_dt())
- 			return 0;
+diff --git a/drivers/clk/pxa/Makefile b/drivers/clk/pxa/Makefile
+index 38e9153..38e37bf 100644
+--- a/drivers/clk/pxa/Makefile
++++ b/drivers/clk/pxa/Makefile
+@@ -1,3 +1,4 @@
+ obj-y				+= clk-pxa.o
+ obj-$(CONFIG_PXA25x)		+= clk-pxa25x.o
+ obj-$(CONFIG_PXA27x)		+= clk-pxa27x.o
++obj-$(CONFIG_PXA3xx)		+= clk-pxa3xx.o
+diff --git a/drivers/clk/pxa/clk-pxa3xx.c b/drivers/clk/pxa/clk-pxa3xx.c
+new file mode 100644
+index 0000000..39f891b
+--- /dev/null
++++ b/drivers/clk/pxa/clk-pxa3xx.c
+@@ -0,0 +1,364 @@
++/*
++ * Marvell PXA3xxx family clocks
++ *
++ * Copyright (C) 2014 Robert Jarzmik
++ *
++ * Heavily inspired from former arch/arm/mach-pxa/pxa3xx.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * For non-devicetree platforms. Once pxa is fully converted to devicetree, this
++ * should go away.
++ */
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/of.h>
++#include <mach/smemc.h>
++#include <mach/pxa3xx-regs.h>
++
++#include <dt-bindings/clock/pxa-clock.h>
++#include "clk-pxa.h"
++
++#define KHz 1000
++#define MHz (1000 * 1000)
++
++enum {
++	PXA_CORE_60Mhz = 0,
++	PXA_CORE_RUN,
++	PXA_CORE_TURBO,
++};
++
++enum {
++	PXA_BUS_60Mhz = 0,
++	PXA_BUS_HSS,
++};
++
++/* crystal frequency to HSIO bus frequency multiplier (HSS) */
++static unsigned char hss_mult[4] = { 8, 12, 16, 24 };
++
++/* crystal frequency to static memory controller multiplier (SMCFS) */
++static unsigned int smcfs_mult[8] = { 6, 0, 8, 0, 0, 16, };
++static unsigned int df_clkdiv[4] = { 1, 2, 4, 1 };
++
++static const char * const get_freq_khz[] = {
++	"core", "ring_osc_60mhz", "run", "cpll", "system_bus"
++};
++
++/*
++ * Get the clock frequency as reflected by ACSR and the turbo flag.
++ * We assume these values have been applied via a fcs.
++ * If info is not 0 we also display the current settings.
++ */
++unsigned int pxa3xx_get_clk_frequency_khz(int info)
++{
++	struct clk *clk;
++	unsigned long clks[5];
++	int i;
++
++	for (i = 0; i < 5; i++) {
++		clk = clk_get(NULL, get_freq_khz[i]);
++		if (IS_ERR(clk)) {
++			clks[i] = 0;
++		} else {
++			clks[i] = clk_get_rate(clk);
++			clk_put(clk);
++		}
++	}
++	if (info) {
++		pr_info("RO Mode clock: %ld.%02ldMHz\n",
++			clks[1] / 1000000, (clks[0] % 1000000) / 10000);
++		pr_info("Run Mode clock: %ld.%02ldMHz\n",
++			clks[2] / 1000000, (clks[1] % 1000000) / 10000);
++		pr_info("Turbo Mode clock: %ld.%02ldMHz\n",
++			clks[3] / 1000000, (clks[2] % 1000000) / 10000);
++		pr_info("System bus clock: %ld.%02ldMHz\n",
++			clks[4] / 1000000, (clks[4] % 1000000) / 10000);
++	}
++	return (unsigned int)clks[0];
++}
++
++static unsigned long clk_pxa3xx_ac97_get_rate(struct clk_hw *hw,
++					     unsigned long parent_rate)
++{
++	unsigned long ac97_div, rate;
++
++	ac97_div = AC97_DIV;
++
++	/* This may loose precision for some rates but won't for the
++	 * standard 24.576MHz.
++	 */
++	rate = parent_rate / 2;
++	rate /= ((ac97_div >> 12) & 0x7fff);
++	rate *= (ac97_div & 0xfff);
++
++	return rate;
++}
++PARENTS(clk_pxa3xx_ac97) = { "spll_624mhz" };
++RATE_RO_OPS(clk_pxa3xx_ac97, "ac97");
++
++static unsigned long clk_pxa3xx_smemc_get_rate(struct clk_hw *hw,
++					      unsigned long parent_rate)
++{
++	unsigned long acsr = ACSR;
++	unsigned long memclkcfg = __raw_readl(MEMCLKCFG);
++
++	return (parent_rate / 48)  * smcfs_mult[(acsr >> 23) & 0x7] /
++		df_clkdiv[(memclkcfg >> 16) & 0x3];
++}
++PARENTS(clk_pxa3xx_smemc) = { "spll_624mhz" };
++RATE_RO_OPS(clk_pxa3xx_smemc, "smemc");
++
++static bool pxa3xx_is_ring_osc_forced(void)
++{
++	unsigned long acsr = ACSR;
++
++	return acsr & ACCR_D0CS;
++}
++
++PARENTS(pxa3xx_pbus) = { "ring_osc_60mhz", "spll_624mhz" };
++PARENTS(pxa3xx_32Khz_bus) = { "osc_32_768khz", "osc_32_768khz" };
++PARENTS(pxa3xx_13MHz_bus) = { "osc_13mhz", "osc_13mhz" };
++PARENTS(pxa3xx_ac97_bus) = { "ring_osc_60mhz", "ac97" };
++PARENTS(pxa3xx_sbus) = { "ring_osc_60mhz", "system_bus" };
++PARENTS(pxa3xx_smemcbus) = { "ring_osc_60mhz", "smemc" };
++
++#define CKEN_AB(bit) ((CKEN_ ## bit > 31) ? &CKENA : &CKENB)
++#define PXA3XX_CKEN(dev_id, con_id, parents, mult_lp, div_lp, mult_hp,	\
++		    div_hp, bit, is_lp, flags)				\
++	PXA_CKEN(dev_id, con_id, bit, parents, mult_lp, div_lp,		\
++		 mult_hp, div_hp, is_lp,  CKEN_AB(bit),			\
++		 (CKEN_ ## bit % 32), flags)
++#define PXA3XX_PBUS_CKEN(dev_id, con_id, bit, mult_lp, div_lp,		\
++			 mult_hp, div_hp, delay)			\
++	PXA3XX_CKEN(dev_id, con_id, pxa3xx_pbus_parents, mult_lp,	\
++		    div_lp, mult_hp, div_hp, bit, pxa3xx_is_ring_osc_forced, 0)
++#define PXA3XX_CKEN_1RATE(dev_id, con_id, bit, parents)			\
++	PXA_CKEN_1RATE(dev_id, con_id, bit, parents,			\
++		       CKEN_AB(bit), (CKEN_ ## bit % 32), 0)
++
++static struct desc_clk_cken pxa3xx_clocks[] __initdata = {
++	PXA3XX_PBUS_CKEN("pxa2xx-uart.0", NULL, FFUART, 1, 4, 1, 42, 1),
++	PXA3XX_PBUS_CKEN("pxa2xx-uart.1", NULL, BTUART, 1, 4, 1, 42, 1),
++	PXA3XX_PBUS_CKEN("pxa2xx-uart.2", NULL, STUART, 1, 4, 1, 42, 1),
++	PXA3XX_PBUS_CKEN("pxa2xx-i2c.0", NULL, I2C, 2, 5, 1, 19, 0),
++	PXA3XX_PBUS_CKEN("pxa27x-udc", NULL, UDC, 1, 4, 1, 13, 5),
++	PXA3XX_PBUS_CKEN("pxa27x-ohci", NULL, USBH, 1, 4, 1, 13, 0),
++	PXA3XX_PBUS_CKEN("pxa3xx-u2d", NULL, USB2, 1, 4, 1, 13, 0),
++	PXA3XX_PBUS_CKEN("pxa27x-pwm.0", NULL, PWM0, 1, 6, 1, 48, 0),
++	PXA3XX_PBUS_CKEN("pxa27x-pwm.1", NULL, PWM1, 1, 6, 1, 48, 0),
++	PXA3XX_PBUS_CKEN("pxa2xx-mci.0", NULL, MMC1, 1, 4, 1, 24, 0),
++	PXA3XX_PBUS_CKEN("pxa2xx-mci.1", NULL, MMC2, 1, 4, 1, 24, 0),
++	PXA3XX_PBUS_CKEN("pxa2xx-mci.2", NULL, MMC3, 1, 4, 1, 24, 0),
++
++	PXA3XX_CKEN_1RATE("pxa27x-keypad", NULL, KEYPAD,
++			  pxa3xx_32Khz_bus_parents),
++	PXA3XX_CKEN_1RATE("pxa3xx-ssp.0", NULL, SSP1, pxa3xx_13MHz_bus_parents),
++	PXA3XX_CKEN_1RATE("pxa3xx-ssp.1", NULL, SSP2, pxa3xx_13MHz_bus_parents),
++	PXA3XX_CKEN_1RATE("pxa3xx-ssp.2", NULL, SSP3, pxa3xx_13MHz_bus_parents),
++	PXA3XX_CKEN_1RATE("pxa3xx-ssp.3", NULL, SSP4, pxa3xx_13MHz_bus_parents),
++
++	PXA3XX_CKEN(NULL, "AC97CLK", pxa3xx_ac97_bus_parents, 1, 4, 1, 1, AC97,
++		    pxa3xx_is_ring_osc_forced, 0),
++	PXA3XX_CKEN(NULL, "CAMCLK", pxa3xx_sbus_parents, 1, 2, 1, 1, CAMERA,
++		    pxa3xx_is_ring_osc_forced, 0),
++	PXA3XX_CKEN("pxa2xx-fb", NULL, pxa3xx_sbus_parents, 1, 1, 1, 1, LCD,
++		    pxa3xx_is_ring_osc_forced, 0),
++	PXA3XX_CKEN("pxa2xx-pcmcia", NULL, pxa3xx_smemcbus_parents, 1, 4,
++		    1, 1, SMC, pxa3xx_is_ring_osc_forced, CLK_IGNORE_UNUSED),
++};
++
++static struct desc_clk_cken pxa300_310_clocks[] __initdata = {
++
++	PXA3XX_PBUS_CKEN("pxa3xx-gcu", NULL, PXA300_GCU, 1, 1, 1, 1, 0),
++	PXA3XX_PBUS_CKEN("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0),
++	PXA3XX_CKEN_1RATE("pxa3xx-gpio", NULL, GPIO, pxa3xx_13MHz_bus_parents),
++};
++
++static struct desc_clk_cken pxa320_clocks[] __initdata = {
++	PXA3XX_PBUS_CKEN("pxa3xx-nand", NULL, NAND, 1, 2, 1, 6, 0),
++	PXA3XX_PBUS_CKEN("pxa3xx-gcu", NULL, PXA320_GCU, 1, 1, 1, 1, 0),
++	PXA3XX_CKEN_1RATE("pxa3xx-gpio", NULL, GPIO, pxa3xx_13MHz_bus_parents),
++};
++
++static struct desc_clk_cken pxa93x_clocks[] __initdata = {
++
++	PXA3XX_PBUS_CKEN("pxa3xx-gcu", NULL, PXA300_GCU, 1, 1, 1, 1, 0),
++	PXA3XX_PBUS_CKEN("pxa3xx-nand", NULL, NAND, 1, 2, 1, 4, 0),
++	PXA3XX_CKEN_1RATE("pxa93x-gpio", NULL, GPIO, pxa3xx_13MHz_bus_parents),
++};
++
++static unsigned long clk_pxa3xx_system_bus_get_rate(struct clk_hw *hw,
++					    unsigned long parent_rate)
++{
++	unsigned long acsr = ACSR;
++	unsigned int hss = (acsr >> 14) & 0x3;
++
++	if (pxa3xx_is_ring_osc_forced())
++		return parent_rate;
++	return parent_rate / 48 * hss_mult[hss];
++}
++
++static u8 clk_pxa3xx_system_bus_get_parent(struct clk_hw *hw)
++{
++	if (pxa3xx_is_ring_osc_forced())
++		return PXA_BUS_60Mhz;
++	else
++		return PXA_BUS_HSS;
++}
++
++PARENTS(clk_pxa3xx_system_bus) = { "ring_osc_60mhz", "spll_624mhz" };
++MUX_RO_RATE_RO_OPS(clk_pxa3xx_system_bus, "system_bus");
++
++static unsigned long clk_pxa3xx_core_get_rate(struct clk_hw *hw,
++					      unsigned long parent_rate)
++{
++	return parent_rate;
++}
++
++static u8 clk_pxa3xx_core_get_parent(struct clk_hw *hw)
++{
++	unsigned long xclkcfg;
++	unsigned int t;
++
++	if (pxa3xx_is_ring_osc_forced())
++		return PXA_CORE_60Mhz;
++
++	/* Read XCLKCFG register turbo bit */
++	__asm__ __volatile__("mrc\tp14, 0, %0, c6, c0, 0" : "=r"(xclkcfg));
++	t = xclkcfg & 0x1;
++
++	if (t)
++		return PXA_CORE_TURBO;
++	return PXA_CORE_RUN;
++}
++PARENTS(clk_pxa3xx_core) = { "ring_osc_60mhz", "run", "cpll" };
++MUX_RO_RATE_RO_OPS(clk_pxa3xx_core, "core");
++
++static unsigned long clk_pxa3xx_run_get_rate(struct clk_hw *hw,
++					     unsigned long parent_rate)
++{
++	unsigned long acsr = ACSR;
++	unsigned int xn = (acsr & ACCR_XN_MASK) >> 8;
++	unsigned int t, xclkcfg;
++
++	/* Read XCLKCFG register turbo bit */
++	__asm__ __volatile__("mrc\tp14, 0, %0, c6, c0, 0" : "=r"(xclkcfg));
++	t = xclkcfg & 0x1;
++
++	return t ? (parent_rate / xn) * 2 : parent_rate;
++}
++PARENTS(clk_pxa3xx_run) = { "cpll" };
++RATE_RO_OPS(clk_pxa3xx_run, "run");
++
++static unsigned long clk_pxa3xx_cpll_get_rate(struct clk_hw *hw,
++	unsigned long parent_rate)
++{
++	unsigned long acsr = ACSR;
++	unsigned int xn = (acsr & ACCR_XN_MASK) >> 8;
++	unsigned int xl = acsr & ACCR_XL_MASK;
++	unsigned int t, xclkcfg;
++
++	/* Read XCLKCFG register turbo bit */
++	__asm__ __volatile__("mrc\tp14, 0, %0, c6, c0, 0" : "=r"(xclkcfg));
++	t = xclkcfg & 0x1;
++
++	pr_info("RJK: parent_rate=%lu, xl=%u, xn=%u\n", parent_rate, xl, xn);
++	return t ? parent_rate * xl * xn : parent_rate * xl;
++}
++PARENTS(clk_pxa3xx_cpll) = { "osc_13mhz" };
++RATE_RO_OPS(clk_pxa3xx_cpll, "cpll");
++
++static void __init pxa3xx_register_core(void)
++{
++	clk_register_clk_pxa3xx_cpll();
++	clk_register_clk_pxa3xx_run();
++
++	clkdev_pxa_register(CLK_CORE, "core", NULL,
++			    clk_register_clk_pxa3xx_core());
++}
++
++static void __init pxa3xx_register_plls(void)
++{
++	clk_register_fixed_rate(NULL, "osc_13mhz", NULL,
++				CLK_GET_RATE_NOCACHE | CLK_IS_ROOT,
++				13 * MHz);
++	clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
++				CLK_GET_RATE_NOCACHE | CLK_IS_ROOT,
++				32768);
++	clk_register_fixed_rate(NULL, "ring_osc_120mhz", NULL,
++				CLK_GET_RATE_NOCACHE | CLK_IS_ROOT,
++				120 * MHz);
++	clk_register_fixed_rate(NULL, "clk_dummy", NULL, CLK_IS_ROOT, 0);
++	clk_register_fixed_factor(NULL, "spll_624mhz", "osc_13mhz", 0, 48, 1);
++	clk_register_fixed_factor(NULL, "ring_osc_60mhz", "ring_osc_120mhz",
++				  0, 1, 2);
++}
++
++#define DUMMY_CLK(_con_id, _dev_id, _parent) \
++	{ .con_id = _con_id, .dev_id = _dev_id, .parent = _parent }
++struct dummy_clk {
++	const char *con_id;
++	const char *dev_id;
++	const char *parent;
++};
++static struct dummy_clk dummy_clks[] __initdata = {
++	DUMMY_CLK(NULL, "pxa93x-gpio", "osc_13mhz"),
++	DUMMY_CLK(NULL, "sa1100-rtc", "osc_32_768khz"),
++	DUMMY_CLK("UARTCLK", "pxa2xx-ir", "STUART"),
++	DUMMY_CLK(NULL, "pxa3xx-pwri2c.1", "osc_13mhz"),
++};
++
++static void __init pxa3xx_dummy_clocks_init(void)
++{
++	struct clk *clk;
++	struct dummy_clk *d;
++	const char *name;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(dummy_clks); i++) {
++		d = &dummy_clks[i];
++		name = d->dev_id ? d->dev_id : d->con_id;
++		clk = clk_register_fixed_factor(NULL, name, d->parent, 0, 1, 1);
++		clk_register_clkdev(clk, d->con_id, d->dev_id);
++	}
++}
++
++static void __init pxa3xx_base_clocks_init(void)
++{
++	pxa3xx_register_plls();
++	pxa3xx_register_core();
++	clk_register_clk_pxa3xx_system_bus();
++	clk_register_clk_pxa3xx_ac97();
++	clk_register_clk_pxa3xx_smemc();
++	clk_register_gate(NULL, "CLK_POUT", "osc_13mhz", 0,
++			  (void __iomem *)&OSCC, 11, 0, NULL);
++}
++
++int __init pxa3xx_clocks_init(void)
++{
++	int ret;
++
++	pxa3xx_base_clocks_init();
++	pxa3xx_dummy_clocks_init();
++	ret = clk_pxa_cken_init(pxa3xx_clocks, ARRAY_SIZE(pxa3xx_clocks));
++	if (ret)
++		return ret;
++	if (cpu_is_pxa320())
++		return clk_pxa_cken_init(pxa320_clocks,
++					 ARRAY_SIZE(pxa320_clocks));
++	if (cpu_is_pxa300() || cpu_is_pxa310())
++		return clk_pxa_cken_init(pxa300_310_clocks,
++					 ARRAY_SIZE(pxa300_310_clocks));
++	return clk_pxa_cken_init(pxa93x_clocks, ARRAY_SIZE(pxa93x_clocks));
++}
++
++static void __init pxa3xx_dt_clocks_init(struct device_node *np)
++{
++	pxa3xx_clocks_init();
++	clk_pxa_dt_common_init(np);
++}
++CLK_OF_DECLARE(pxa_clks, "marvell,pxa300-clocks", pxa3xx_dt_clocks_init);
 -- 
 2.1.0
