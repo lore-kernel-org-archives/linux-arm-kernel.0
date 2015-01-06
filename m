@@ -1,144 +1,238 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 6 Jan 2015 18:17:57 +0000
-Subject: [PATCH v4 8/8] arm64/efi: remove idmap manipulations from UEFI
- code
-In-Reply-To: <1419245944-2424-9-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-9-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150106181757.GH3827@bivouac.eciton.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 6 Jan 2015 19:19:36 +0100
+Subject: v3.18: Audio recording, Nokia N900
+Message-ID: <20150106181936.GA25319@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 10:59:04AM +0000, Ard Biesheuvel wrote:
-> Now that we have moved the call to SetVirtualAddressMap() to the stub,
-> UEFI has no use for the ID map, so we can drop the code that installs
-> ID mappings for UEFI memory regions.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/efi.h |  2 --
->  arch/arm64/include/asm/mmu.h |  2 --
->  arch/arm64/kernel/efi.c      | 30 ------------------------------
->  arch/arm64/kernel/setup.c    |  1 -
->  arch/arm64/mm/mmu.c          | 12 ------------
->  5 files changed, 47 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 6cc668a378c5..84c50853b5dc 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -6,11 +6,9 @@
->  
->  #ifdef CONFIG_EFI
->  extern void efi_init(void);
-> -extern void efi_idmap_init(void);
->  extern void efi_virtmap_init(void);
->  #else
->  #define efi_init()
-> -#define efi_idmap_init()
->  #define efi_virtmap_init
->  #endif
->  
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index 5fd40c43be80..3d311761e3c2 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -31,8 +31,6 @@ extern void paging_init(void);
->  extern void setup_mm_for_reboot(void);
->  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
->  extern void init_mem_pgprot(void);
-> -/* create an identity mapping for memory (or io if map_io is true) */
-> -extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
->  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->  			       unsigned long virt, phys_addr_t size,
->  			       pgprot_t prot);
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index e969c5076713..d7d2e818c856 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -53,27 +53,6 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
->  	return 0;
->  }
->  
-> -static void __init efi_setup_idmap(void)
-> -{
-> -	struct memblock_region *r;
-> -	efi_memory_desc_t *md;
-> -	u64 paddr, npages, size;
-> -
-> -	for_each_memblock(memory, r)
-> -		create_id_mapping(r->base, r->size, 0);
-> -
-> -	/* map runtime io spaces */
-> -	for_each_efi_memory_desc(&memmap, md) {
-> -		if (!(md->attribute & EFI_MEMORY_RUNTIME) || is_normal_ram(md))
-> -			continue;
-> -		paddr = md->phys_addr;
-> -		npages = md->num_pages;
-> -		memrange_efi_to_native(&paddr, &npages);
-> -		size = npages << PAGE_SHIFT;
-> -		create_id_mapping(paddr, size, 1);
-> -	}
-> -}
-> -
->  /*
->   * Translate a EFI virtual address into a physical address: this is necessary,
->   * as some data members of the EFI system table are virtually remapped after
-> @@ -235,15 +214,6 @@ void __init efi_init(void)
->  	reserve_regions();
->  }
->  
-> -void __init efi_idmap_init(void)
-> -{
-> -	if (!efi_enabled(EFI_BOOT))
-> -		return;
-> -
-> -	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
-> -	efi_setup_idmap();
-> -}
-> -
->  static int __init arm64_enter_virtual_mode(void)
->  {
->  	u64 mapsize;
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index d8390f507da0..0771de962f37 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -401,7 +401,6 @@ void __init setup_arch(char **cmdline_p)
->  	paging_init();
->  	request_standard_resources();
->  
-> -	efi_idmap_init();
->  	efi_virtmap_init();
->  
->  	unflatten_device_tree();
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 3f3d5aa4a8b1..328638548871 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -271,18 +271,6 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
->  			 size, PAGE_KERNEL_EXEC);
->  }
->  
-> -void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-> -{
-> -	if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
-> -		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
-> -		return;
-> -	}
-> -	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
-> -			 addr, addr, size,
-> -			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
-> -				: PAGE_KERNEL_EXEC);
-> -}
-> -
->  void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->  			       unsigned long virt, phys_addr_t size,
->  			       pgprot_t prot)
-> -- 
-> 1.8.3.2
+Hi!
 
-So, this one will clearly need to be reworked if it is to fit on top
-of the patches I sent out today. However, this is trivial rework, so:
+I tried to get "latency" example from ALSA to work (it basically
+records audio, pauses for a while, then plays it back) on N900, and
+all I'm getting is silence... plus now it oopsed.
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Any idea?
+
+Is there any version where audio recording works?
+
+What do you use for testing?
+
+Are there any mixer settings I should know about?
+
+Thanks,
+								Pavel
+
+[ 4207.949096] omap_i2c 48072000.i2c: controller timed out
+[ 4207.950836] power_supply bq24150a-0: driver failed to report
+`status' property: -110
+[ 4216.949035] omap_i2c 48070000.i2c: controller timed out
+[ 4216.951354] twl: Write failed (mod 14, reg 0x06 count 2)
+[ 4216.953613] twl4030_madc 48070000.i2c:twl at 48:madc: unable to write
+sel register 0x6
+[ 4216.956207] rx51-battery n900-battery: Could not read ADC: -110
+[ 4217.969085] omap_i2c 48070000.i2c: controller timed out
+[ 4217.972259] twl: Write failed (mod 14, reg 0x06 count 2)
+[ 4217.975372] twl4030_madc 48070000.i2c:twl at 48:madc: unable to write
+sel register 0x6
+[ 4217.978790] rx51-battery n900-battery: Could not read ADC: -110
+[ 4218.989135] omap_i2c 48070000.i2c: controller timed out
+[ 4218.993164] twl: Write failed (mod 14, reg 0x06 count 2)
+[ 4218.997100] twl4030_madc 48070000.i2c:twl at 48:madc: unable to write
+sel register 0x6
+[ 4219.959686] rx51-battery n900-battery: Could not read ADC: -110
+[ 4220.959136] omap_i2c 48070000.i2c: controller timed out
+[ 4220.963989] twl: Write failed (mod 14, reg 0x06 count 2)
+[ 4220.968749] twl4030_madc 48070000.i2c:twl at 48:madc: unable to write
+sel register 0x6
+[ 4220.993530] rx51-battery n900-battery: Could not read ADC: -110
+[ 4222.959136] omap_i2c 48072000.i2c: controller timed out
+[ 4226.639495] Unhandled fault: external abort on non-linefetch
+(0x1028) at 0xfa070004
+[ 4226.645568] Internal error: : 1028 [#1] PREEMPT ARM
+[ 4226.651519] Modules linked in:
+[ 4226.657531] CPU: 0 PID: 737 Comm: irq/225-4807000 Tainted: G
+W      3.18.0-omap3-69644-g0ed746d #837
+[ 4226.670471] task: cf000c00 ti: cf094000 task.ti: cf094000
+[ 4226.677307] PC is at omap_i2c_isr_thread+0x44/0x414
+[ 4226.684295] LR is at walk_stackframe+0x24/0x40
+[ 4226.691375] pc : [<c036dcdc>]    lr : [<c00113d8>]    psr: 60000093
+[ 4226.691375] sp : cf095ee8  ip : cf095e80  fp : cf095f14
+[ 4226.706146] r10: c0065744  r9 : cf000810  r8 : 20000013
+[ 4226.713409] r7 : 00000002  r6 : 00000004  r5 : 00000000  r4 :
+00000065
+[ 4226.720611] r3 : cf000c00  r2 : fa070004  r1 : fa070000  r0 :
+00000001
+[ 4226.727600] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
+Segment kernel
+[ 4226.734741] Control: 10c5387d  Table: 8f058019  DAC: 00000015
+[ 4226.741821] Process irq/225-4807000 (pid: 737, stack limit =
+0xcf094238)
+[ 4226.748870] Stack: (0xcf095ee8 to 0xcf096000)
+[ 4226.755859] 5ee0:                   c036dc98 cf027bc0 cf094000
+cf8e9240 cf8e9240 cf8e9294
+[ 4226.763122] 5f00: 00000000 c0065744 cf095f34 cf095f18 c0065768
+c036dca4 cf000c00 cf027bc0
+[ 4226.770385] 5f20: cf094000 00000001 cf095f64 cf095f38 c0065508
+c0065750 00000000 c0065684
+[ 4226.777526] 5f40: 00000000 cf027c00 cf027bc0 c0065424 00000000
+00000000 cf095fac cf095f68
+[ 4226.784698] 5f60: c0050d2c c0065430 cf095f94 00000000 c0055854
+cf027bc0 00000000 cf095f7c
+[ 4226.791839] 5f80: cf095f7c 00000000 cf095f88 cf095f88 cf027c00
+c0050c64 00000000 00000000
+[ 4226.798950] 5fa0: 00000000 cf095fb0 c000ebd8 c0050c70 00000000
+00000000 00000000 00000000
+[ 4226.805969] 5fc0: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[ 4226.812896] 5fe0: 00000000 00000000 00000000 00000000 00000013
+00000000 edff7fff fffbfffe
+[ 4226.819702] Backtrace:
+[ 4226.826324] [<c036dc98>] (omap_i2c_isr_thread) from [<c0065768>]
+(irq_thread_fn+0x24/0x3c)
+[ 4226.833221]  r10:c0065744 r9:00000000 r8:cf8e9294 r7:cf8e9240
+r6:cf8e9240 r5:cf094000
+[ 4226.840301]  r4:cf027bc0 r3:c036dc98
+[ 4226.847106] [<c0065744>] (irq_thread_fn) from [<c0065508>]
+(irq_thread+0xe4/0x12c)
+[ 4226.854034]  r6:00000001 r5:cf094000 r4:cf027bc0 r3:cf000c00
+[ 4226.861083] [<c0065424>] (irq_thread) from [<c0050d2c>]
+(kthread+0xc8/0xe4)
+[ 4226.868072]  r10:00000000 r8:00000000 r7:c0065424 r6:cf027bc0
+r5:cf027c00 r4:00000000
+[ 4226.875213] [<c0050c64>] (kthread) from [<c000ebd8>]
+(ret_from_fork+0x14/0x3c)
+[ 4226.882263]  r7:00000000 r6:00000000 r5:c0050c64 r4:cf027c00
+[ 4226.889373] Code: e599200c e5991004 e5d00001 e0812210 (e1d210b0)
+[ 4227.101501] ---[ end trace 43582f7728e0496b ]---
+[ 4227.108642] note: irq/225-4807000[737] exited with preempt_count 1
+[ 4227.115905] Unable to handle kernel paging request at virtual
+address fffffff0
+[ 4227.123321] pgd = c0004000
+[ 4227.130584] [fffffff0] *pgd=8fefd821, *pte=00000000, *ppte=00000000
+[ 4227.138214] Internal error: Oops: 17 [#2] PREEMPT ARM
+[ 4227.145660] Modules linked in:
+[ 4227.152954] CPU: 0 PID: 737 Comm: irq/225-4807000 Tainted: G      D
+W      3.18.0-omap3-69644-g0ed746d #837
+[ 4227.167785] task: cf000c00 ti: cf094000 task.ti: cf094000
+[ 4227.175201] PC is at kthread_data+0x10/0x18
+[ 4227.182525] LR is at irq_thread_dtor+0x30/0xc0
+[ 4227.189819] pc : [<c00512a8>]    lr : [<c00656b4>]    psr: 20000013
+[ 4227.189819] sp : cf095cd8  ip : cf095ce8  fp : cf095ce4
+[ 4227.204406] r10: c036dcde  r9 : c07c2144  r8 : cf094000
+[ 4227.211608] r7 : 00000000  r6 : c07c37f4  r5 : cf000c00  r4 :
+cf000f60
+[ 4227.218841] r3 : 00000000  r2 : cf095ce8  r1 : cf095f38  r0 :
+cf000c00
+[ 4227.226074] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+Segment user
+[ 4227.233520] Control: 10c5387d  Table: 8c6ac019  DAC: 00000015
+[ 4227.240844] Process irq/225-4807000 (pid: 737, stack limit =
+0xcf094238)
+[ 4227.248138] Stack: (0xcf095cd8 to 0xcf096000)
+[ 4227.255218] 5cc0:
+cf095cfc cf095ce8
+[ 4227.262420] 5ce0: c00656b4 c00512a4 cf000f60 cf000c00 cf095d1c
+cf095d00 c004f624 c0065690
+[ 4227.269683] 5d00: 0000000b cf094000 cf000c00 00000000 cf095d54
+cf095d20 c003ac28 c004f5a0
+[ 4227.276794] 5d20: cf094000 00000001 c0782f90 cf095d38 c07c2144
+c036dcde cf095d54 cf095d48
+[ 4227.283874] 5d40: c003954c c0782f90 cf095ddc cf095d58 c0011aa8
+c003a9b8 cf094238 0000000b
+[ 4227.290863] 5d60: 00000000 00000000 cf095ea0 00000008 00000000
+60000193 657c1d47 32393935
+[ 4227.297790] 5d80: 20633030 39393565 34303031 64356520 30303030
+30652031 32323138 28203031
+[ 4227.304779] 5da0: 32643165 30623031 cf002029 c0065744 cf095ddc
+00001028 00000007 c0783d44
+[ 4227.311828] 5dc0: fa070004 cf095ea0 cf000810 c0065744 cf095dec
+cf095de0 c0011b44 c00117dc
+[ 4227.318847] 5de0: cf095e9c cf095df0 c0008594 c0011b30 00000000
+0000ee6b 00000007 00000000
+[ 4227.325836] 5e00: 00000000 fa070004 00007735 00000000 ffffffff
+00000000 cf095e4c cf095e28
+[ 4227.332824] 5e20: c0051a20 c00133b4 ffffffff c07c2054 ffffffff
+cc7c2000 ffffffff 00000000
+[ 4227.339782] 5e40: cf095e74 cf095e50 c0051d4c c006a7e0 00000000
+c07995b0 cc7c201c cf000c00
+[ 4227.346771] 5e60: cc41e000 00000000 cf000c00 c07995b0 cf095e9c
+cf095e80 c00113d8 c036dcdc
+[ 4227.353759] 5e80: 60000093 ffffffff cf095ed4 20000013 cf095f14
+cf095ea0 c0012218 c0008510
+[ 4227.360748] 5ea0: 00000001 fa070000 fa070004 cf000c00 00000065
+00000000 00000004 00000002
+[ 4227.367706] 5ec0: 20000013 cf000810 c0065744 cf095f14 cf095e80
+cf095ee8 c00113d8 c036dcdc
+[ 4227.374572] 5ee0: 60000093 ffffffff c036dc98 cf027bc0 cf094000
+cf8e9240 cf8e9240 cf8e9294
+[ 4227.381408] 5f00: 00000000 c0065744 cf095f34 cf095f18 c0065768
+c036dca4 cf000c00 cf027bc0
+[ 4227.388305] 5f20: cf094000 00000001 cf095f64 cf095f38 c0065508
+c0065750 00000000 c0065684
+[ 4227.395202] 5f40: 00000000 cf027c00 cf027bc0 c0065424 00000000
+00000000 cf095fac cf095f68
+[ 4227.402130] 5f60: c0050d2c c0065430 cf095f94 00000000 c0055854
+cf027bc0 00000000 cf095f7c
+[ 4227.409088] 5f80: cf095f7c 00000001 cf095f88 cf095f88 cf027c00
+c0050c64 00000000 00000000
+[ 4227.416107] 5fa0: 00000000 cf095fb0 c000ebd8 c0050c70 00000000
+00000000 00000000 00000000
+[ 4227.423156] 5fc0: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[ 4227.430206] 5fe0: 00000000 00000000 00000000 00000000 00000013
+00000000 edff7fff fffbfffe
+[ 4227.437072] Backtrace:
+[ 4227.443786] [<c0051298>] (kthread_data) from [<c00656b4>]
+(irq_thread_dtor+0x30/0xc0)
+[ 4227.450775] [<c0065684>] (irq_thread_dtor) from [<c004f624>]
+(task_work_run+0x90/0xc4)
+[ 4227.457794]  r5:cf000c00 r4:cf000f60
+[ 4227.464721] [<c004f594>] (task_work_run) from [<c003ac28>]
+(do_exit+0x27c/0x8f8)
+[ 4227.471771]  r7:00000000 r6:cf000c00 r5:cf094000 r4:0000000b
+[ 4227.478973] [<c003a9ac>] (do_exit) from [<c0011aa8>]
+(die+0x2d8/0x354)
+[ 4227.486114]  r7:c0782f90
+[ 4227.493103] [<c00117d0>] (die) from [<c0011b44>]
+(arm_notify_die+0x20/0x58)
+[ 4227.500244]  r10:c0065744 r9:cf000810 r8:cf095ea0 r7:fa070004
+r6:c0783d44 r5:00000007
+[ 4227.507598]  r4:00001028
+[ 4227.514678] [<c0011b24>] (arm_notify_die) from [<c0008594>]
+(do_DataAbort+0x90/0xa0)
+[ 4227.522033] [<c0008504>] (do_DataAbort) from [<c0012218>]
+(__dabt_svc+0x38/0x60)
+[ 4227.529388] Exception stack(0xcf095ea0 to 0xcf095ee8)
+[ 4227.536651] 5ea0: 00000001 fa070000 fa070004 cf000c00 00000065
+00000000 00000004 00000002
+[ 4227.544158] 5ec0: 20000013 cf000810 c0065744 cf095f14 cf095e80
+cf095ee8 c00113d8 c036dcdc
+[ 4227.551666] 5ee0: 60000093 ffffffff
+[ 4227.558959]  r8:20000013 r7:cf095ed4 r6:ffffffff r5:60000093
+r4:c036dcdc
+[ 4227.566558] [<c036dc98>] (omap_i2c_isr_thread) from [<c0065768>]
+(irq_thread_fn+0x24/0x3c)
+[ 4227.574188]  r10:c0065744 r9:00000000 r8:cf8e9294 r7:cf8e9240
+r6:cf8e9240 r5:cf094000
+[ 4227.582000]  r4:cf027bc0 r3:c036dc98
+[ 4227.589630] [<c0065744>] (irq_thread_fn) from [<c0065508>]
+(irq_thread+0xe4/0x12c)
+[ 4227.597442]  r6:00000001 r5:cf094000 r4:cf027bc0 r3:cf000c00
+[ 4227.605346] [<c0065424>] (irq_thread) from [<c0050d2c>]
+(kthread+0xc8/0xe4)
+[ 4227.613281]  r10:00000000 r8:00000000 r7:c0065424 r6:cf027bc0
+r5:cf027c00 r4:00000000
+[ 4227.621459] [<c0050c64>] (kthread) from [<c000ebd8>]
+(ret_from_fork+0x14/0x3c)
+[ 4227.629547]  r7:00000000 r6:00000000 r5:c0050c64 r4:cf027c00
+[ 4227.637756] Code: e1a0c00d e92dd800 e24cb004 e59031e8 (e5130010)
+[ 4227.646057] ---[ end trace 43582f7728e0496c ]---
+[ 4227.654388] Fixing recursive fault but reboot is needed!
+[ 4229.004913] bq27x00-battery 2-0055: battery is not calibrated!
+ignoring capacity values
+[ 4232.909301] omap_i2c 48070000.i2c: controller timed out
+[ 4232.917816] twl: Write failed (mod 10, reg 0x09 count 1)
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
