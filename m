@@ -1,101 +1,39 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:13 +0800
-Subject: [PATCH 03/17] Input: sun4i-ts: Add thermal zone sensor support
+Date: Tue,  6 Jan 2015 10:35:12 +0800
+Subject: [PATCH 02/17] clk: sunxi: Propagate rate changes to parent for mux
+ clocks
 In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-4-git-send-email-wens@csie.org>
+Message-ID: <1420511727-8242-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The touchscreen controller has a temperature sensor embedded in the SoC,
-which already has hwmon support in the driver.
+The cpu clock on sunxi machines is just a mux clock, which is normally
+fed by the main PLL, but can be muxed to the main or low power oscillator.
 
-Add DT thermal zone support so we can use it with cpufreq for thermal
-throttling.
+Make the mux clock propagate rate changes to its parent, so we can
+change the clock rate of the PLL, and thus actually implement rate
+changing on the cpu clock.
+
+This patch also removes the no reparenting limit.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../bindings/input/touchscreen/sun4i.txt           |  1 +
- drivers/input/touchscreen/sun4i-ts.c               | 27 ++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+ drivers/clk/sunxi/clk-sunxi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-index aef57791f40b..7f1110adbd24 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-@@ -5,6 +5,7 @@ Required properties:
-  - compatible: "allwinner,sun4i-a10-ts"
-  - reg: mmio address range of the chip
-  - interrupts: interrupt to which the chip is connected
-+ - #thermal-sensor-cells: shall be 0
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index d8f17bbcb8e3..df18a2af33ad 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -778,7 +778,7 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
+ 	of_property_read_string(node, "clock-output-names", &clk_name);
  
- Optional properties:
-  - allwinner,ts-attached: boolean indicating that an actual touchscreen is
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-index 28a06749ae42..b6e9043446d6 100644
---- a/drivers/input/touchscreen/sun4i-ts.c
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -34,6 +34,7 @@
- 
- #include <linux/err.h>
- #include <linux/hwmon.h>
-+#include <linux/thermal.h>
- #include <linux/init.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
-@@ -107,6 +108,7 @@
- struct sun4i_ts_data {
- 	struct device *dev;
- 	struct input_dev *input;
-+	struct thermal_zone_device *tz;
- 	void __iomem *base;
- 	unsigned int irq;
- 	bool ignore_fifo_data;
-@@ -180,6 +182,23 @@ static void sun4i_ts_close(struct input_dev *dev)
- 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
- }
- 
-+static int get_temp(void *data, long *temp)
-+{
-+	struct sun4i_ts_data *ts = data;
-+
-+	/* No temp_data until the first irq */
-+	if (ts->temp_data == -1)
-+		return -EAGAIN;
-+
-+	*temp = (ts->temp_data - 1447) * 100;
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
-+	.get_temp = get_temp,
-+};
-+
- static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
- 			 char *buf)
- {
-@@ -288,6 +307,11 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 	if (IS_ERR(hwmon))
- 		return PTR_ERR(hwmon);
- 
-+	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
-+						 &sun4i_ts_tz_ops);
-+	if (IS_ERR(ts->tz))
-+		ts->tz = NULL;
-+
- 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
- 
- 	if (ts_attached) {
-@@ -310,6 +334,9 @@ static int sun4i_ts_remove(struct platform_device *pdev)
- 	if (ts->input)
- 		input_unregister_device(ts->input);
- 
-+	if (ts->tz)
-+		thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
-+
- 	/* Deactivate all IRQs */
- 	writel(0, ts->base + TP_INT_FIFOC);
+ 	clk = clk_register_mux(NULL, clk_name, parents, i,
+-			       CLK_SET_RATE_NO_REPARENT, reg,
++			       CLK_SET_RATE_PARENT, reg,
+ 			       data->shift, SUNXI_MUX_GATE_WIDTH,
+ 			       0, &clk_lock);
  
 -- 
 2.1.4
