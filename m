@@ -1,82 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Jan 2015 22:08:48 +0100
-Subject: [PATCH v2 2/7] ARM: mvebu: Add UART1 as DEBUG_LL possible target
-In-Reply-To: <1420558100-4700-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420558100-4700-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54AC4EE0.7090200@free-electrons.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 6 Jan 2015 16:08:43 -0500
+Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <20150106195033.GH32449@arm.com>
+References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
+ <1419459099-6667-2-git-send-email-m-karicheri2@ti.com>
+ <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
+ <54A6D375.6050604@ti.com>
+ <CAL_Jsq+krOUA3BPvMCdaOBhALoi+pzWbw3YndXqR8x52OJogZg@mail.gmail.com>
+ <54A71CD1.4070107@ti.com> <20150106195033.GH32449@arm.com>
+Message-ID: <54AC4EDB.1000400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 01/06/2015 02:50 PM, Will Deacon wrote:
+> On Fri, Jan 02, 2015 at 10:33:53PM +0000, Murali Karicheri wrote:
+>> On 01/02/2015 03:45 PM, Rob Herring wrote:
+>>> On Fri, Jan 2, 2015 at 11:20 AM, Murali Karicheri<m-karicheri2@ti.com>   wrote:
+>>>> On 12/26/2014 02:33 PM, Rob Herring wrote:
+>>>>> On Wed, Dec 24, 2014 at 4:11 PM, Murali Karicheri<m-karicheri2@ti.com>
+>>>>>> +               coherent = of_dma_is_coherent(parent_np);
+>>>>>> +               dev_dbg(dev, "device is%sdma coherent\n",
+>>>>>> +                       coherent ? " " : " not ");
+>>>>>> +
+>>>>>> +               arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
+>>>>>
+>>>>>
+>>>>> This is the same code as of_dma_configure. The only difference I see
+>>>>> is which node ptr is passed to of_dma_get_range. You need to make that
+>>>>> a function param of of_dma_configure.
+>>>>>
+>>>>> of_dma_configure also has iommu handling now. You will probably need
+>>>>> something similar for PCI in that you setup an iommu based on the root
+>>>>> bus DT properties.
+>>>>>
+>>>> Initially I had the same idea to re-use the existing function
+>>>> of_dma_configure() for this. I wanted to defer this until we have an
+>>>> agreement on the changes required for the subject functionality. My quick
+>>>> review of the code suggestio this would require additional API changes as
+>>>> below. I did a quick test of the changes and it works for Keystone, but need
+>>>> to be reviewed by everyone as I touch the IOMMU functionality here and I
+>>>> don't have a platform with IOMMU. Need test by someone to make sure I don't
+>>>> break anything.
+>>>
+>>> The IOMMU changes look trivial. We may want to address the comment in
+>>> of_iommu_configure about parent nodes. We should be sure these changes
+>>> work with how we would do searching parent nodes.
+>>
+>> I have no experience with IOMMU and may not offer much help here as I
+>> originally wrote above. Will Deacon has added this API and probably able
+>> to offer some help in this discussion.
+>>
+>> Will Deacon,
+>>
+>> Any comment?
+>
+> Sorry for the delay; I'm still catching up on email after the Christmas
+> break, but I *will* get around to looking at this. If you have a new version
+> to post based on the comments from Rob and Arnd, feel free to send that and
+> I'll look at that instead.
+>
+> Will
+Will,
 
-On 06/01/2015 16:28, Maxime Ripard wrote:
-> Some mvebu boards have the UART1 more easily accessible than the other UARTs
-> found on the system.
-> 
-> Add a debug_ll option for this case.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+I will be posting v3 of the patch tomorrow and you can review that.
 
+Regards,
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm/Kconfig.debug | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index eb3991cf63ab..7bd1bbccc43c 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -489,6 +489,21 @@ choice
->  		  when u-boot hands over to the kernel, the system
->  		  silently crashes, with no serial output at all.
->  
-> +	config DEBUG_MVEBU_UART1_ALTERNATE
-> +		bool "Kernel low-level debugging messages via MVEBU UART1 (new bootloaders)"
-> +		depends on ARCH_MVEBU
-> +		select DEBUG_UART_8250
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on MVEBU based platforms on UART1.
-> +
-> +		  This option should be used with the new bootloaders
-> +		  that remap the internal registers at 0xf1000000.
-> +
-> +		  If the wrong DEBUG_MVEBU_UART* option is selected,
-> +		  when u-boot hands over to the kernel, the system
-> +		  silently crashes, with no serial output at all.
-> +
->  	config DEBUG_VF_UART
->  		bool "Vybrid UART"
->  		depends on SOC_VF610
-> @@ -1297,6 +1312,7 @@ config DEBUG_UART_PHYS
->  	default 0xf0000be0 if ARCH_EBSA110
->  	default 0xf040ab00 if DEBUG_BRCMSTB_UART
->  	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
-> +	default 0xf1012100 if DEBUG_MVEBU_UART1_ALTERNATE
->  	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
->  				ARCH_ORION5X
->  	default 0xf7fc9000 if DEBUG_BERLIN_UART
-> @@ -1378,6 +1394,7 @@ config DEBUG_UART_VIRT
->  	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
->  	default 0xfec02000 if DEBUG_SOCFPGA_UART
->  	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
-> +	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
->  	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
->  	default 0xfec90000 if DEBUG_RK32_UART2
->  	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
-> 
+Murali
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Murali Karicheri
+Linux Kernel, Texas Instruments
