@@ -1,75 +1,116 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 6 Jan 2015 16:08:43 -0500
-Subject: [PATCH v2 1/2] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <20150106195033.GH32449@arm.com>
-References: <1419459099-6667-1-git-send-email-m-karicheri2@ti.com>
- <1419459099-6667-2-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqJtVnP_5zAiUvMwL00JQV0mjw-R_hEkxiv13ZuNrQ8nAA@mail.gmail.com>
- <54A6D375.6050604@ti.com>
- <CAL_Jsq+krOUA3BPvMCdaOBhALoi+pzWbw3YndXqR8x52OJogZg@mail.gmail.com>
- <54A71CD1.4070107@ti.com> <20150106195033.GH32449@arm.com>
-Message-ID: <54AC4EDB.1000400@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 06 Jan 2015 22:10:14 +0100
+Subject: [PATCH v2 3/7] ARM: mvebu: a38x: Fix node names
+In-Reply-To: <1420558100-4700-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420558100-4700-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54AC4F36.6060907@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2015 02:50 PM, Will Deacon wrote:
-> On Fri, Jan 02, 2015 at 10:33:53PM +0000, Murali Karicheri wrote:
->> On 01/02/2015 03:45 PM, Rob Herring wrote:
->>> On Fri, Jan 2, 2015 at 11:20 AM, Murali Karicheri<m-karicheri2@ti.com>   wrote:
->>>> On 12/26/2014 02:33 PM, Rob Herring wrote:
->>>>> On Wed, Dec 24, 2014 at 4:11 PM, Murali Karicheri<m-karicheri2@ti.com>
->>>>>> +               coherent = of_dma_is_coherent(parent_np);
->>>>>> +               dev_dbg(dev, "device is%sdma coherent\n",
->>>>>> +                       coherent ? " " : " not ");
->>>>>> +
->>>>>> +               arch_setup_dma_ops(dev, dma_addr, size, NULL, coherent);
->>>>>
->>>>>
->>>>> This is the same code as of_dma_configure. The only difference I see
->>>>> is which node ptr is passed to of_dma_get_range. You need to make that
->>>>> a function param of of_dma_configure.
->>>>>
->>>>> of_dma_configure also has iommu handling now. You will probably need
->>>>> something similar for PCI in that you setup an iommu based on the root
->>>>> bus DT properties.
->>>>>
->>>> Initially I had the same idea to re-use the existing function
->>>> of_dma_configure() for this. I wanted to defer this until we have an
->>>> agreement on the changes required for the subject functionality. My quick
->>>> review of the code suggestio this would require additional API changes as
->>>> below. I did a quick test of the changes and it works for Keystone, but need
->>>> to be reviewed by everyone as I touch the IOMMU functionality here and I
->>>> don't have a platform with IOMMU. Need test by someone to make sure I don't
->>>> break anything.
->>>
->>> The IOMMU changes look trivial. We may want to address the comment in
->>> of_iommu_configure about parent nodes. We should be sure these changes
->>> work with how we would do searching parent nodes.
->>
->> I have no experience with IOMMU and may not offer much help here as I
->> originally wrote above. Will Deacon has added this API and probably able
->> to offer some help in this discussion.
->>
->> Will Deacon,
->>
->> Any comment?
->
-> Sorry for the delay; I'm still catching up on email after the Christmas
-> break, but I *will* get around to looking at this. If you have a new version
-> to post based on the comments from Rob and Arnd, feel free to send that and
-> I'll look at that instead.
->
-> Will
-Will,
+Hi Maxime,
 
-I will be posting v3 of the patch tomorrow and you can review that.
+On 06/01/2015 16:28, Maxime Ripard wrote:
+> Some nodes in the DTs have a reg property but no unit name in their node name.
+> 
+> This contradicts the way the ePAPR defines the node names. Fix this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Regards,
 
-Murali
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+> ---
+>  arch/arm/boot/dts/armada-380.dtsi   | 2 +-
+>  arch/arm/boot/dts/armada-385-db.dts | 2 +-
+>  arch/arm/boot/dts/armada-385-rd.dts | 2 +-
+>  arch/arm/boot/dts/armada-385.dtsi   | 2 +-
+>  arch/arm/boot/dts/armada-38x.dtsi   | 4 ++--
+>  5 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+> index 4173a8ab34e7..13400ce88c54 100644
+> --- a/arch/arm/boot/dts/armada-380.dtsi
+> +++ b/arch/arm/boot/dts/armada-380.dtsi
+> @@ -32,7 +32,7 @@
+>  
+>  	soc {
+>  		internal-regs {
+> -			pinctrl {
+> +			pinctrl at 18000 {
+>  				compatible = "marvell,mv88f6810-pinctrl";
+>  				reg = <0x18000 0x20>;
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+> index 2aaa9d2ac284..212605ccc7b6 100644
+> --- a/arch/arm/boot/dts/armada-385-db.dts
+> +++ b/arch/arm/boot/dts/armada-385-db.dts
+> @@ -74,7 +74,7 @@
+>  				phy-mode = "rgmii-id";
+>  			};
+>  
+> -			mdio {
+> +			mdio at 72004 {
+>  				phy0: ethernet-phy at 0 {
+>  					reg = <0>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
+> index aaca2861dc87..74a3bfe6efd7 100644
+> --- a/arch/arm/boot/dts/armada-385-rd.dts
+> +++ b/arch/arm/boot/dts/armada-385-rd.dts
+> @@ -67,7 +67,7 @@
+>  			};
+>  
+>  
+> -			mdio {
+> +			mdio at 72004 {
+>  				phy0: ethernet-phy at 0 {
+>  					reg = <0>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+> index 6283d7912f71..5249a4d3c207 100644
+> --- a/arch/arm/boot/dts/armada-385.dtsi
+> +++ b/arch/arm/boot/dts/armada-385.dtsi
+> @@ -37,7 +37,7 @@
+>  
+>  	soc {
+>  		internal-regs {
+> -			pinctrl {
+> +			pinctrl at 18000 {
+>  				compatible = "marvell,mv88f6820-pinctrl";
+>  				reg = <0x18000 0x20>;
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 74391dace9e7..ada1f206028b 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -193,7 +193,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			pinctrl {
+> +			pinctrl at 18000 {
+>  				compatible = "marvell,mv88f6820-pinctrl";
+>  				reg = <0x18000 0x20>;
+>  			};
+> @@ -373,7 +373,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			mdio {
+> +			mdio at 72004 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  				compatible = "marvell,orion-mdio";
+> 
 
 
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
