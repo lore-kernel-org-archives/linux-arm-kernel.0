@@ -1,57 +1,41 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Tue, 6 Jan 2015 13:51:15 +0530
-Subject: [PATCH 2/2] ahci_xgene: Fix the dma state machine lockup for the
- ATA_CMD_PACKET PIO mode command.
-In-Reply-To: <20150105135910.GD15833@htj.dyndns.org>
-References: <1418748575-27301-1-git-send-email-stripathi@apm.com>
- <1418748575-27301-3-git-send-email-stripathi@apm.com>
- <20150105135910.GD15833@htj.dyndns.org>
-Message-ID: <CAOHikRDXvN2guikwBr8E+pdRsm9UKeqMCA7LStGCxOMWRvHdBg@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 6 Jan 2015 13:54:50 +0530
+Subject: [PATCH] ARM: DRA7: beagle-x15: hwmod: Fix boot crash with DEBUG_LL
+Message-ID: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with
+DEBUG_LL' we moved from parsing cmdline to identify uart used for earlycon
+to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
 
-On Tue, Dec 16, 2014 at 10:19:35PM +0530, Suman Tripathi wrote:
-> This patch addresses the issue with ATA_CMD_PACKET pio mode
-> command for enumeration and device detection with ATAPI devices.It is the
-> same issue as in patch
->
-> www.spinics.net/lists/linux-ide/msg49092.html
->
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+On beagle-x15, we use uart3 for console and missed enabling this flag
+for uart3 hwmod, so boot fails with DEBUG_LL. Enable DEBUG_OMAP4UART3_FLAGS for
+uart3 hwmod.
 
-Applied 1-2 to libata/for-3.18-fixes w/ Sergei's suggested edits.
+For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
 
-The patch is applied to libata/for-3.19-fixes not libata/for-3.18-fixes ??
+Fixes: 90020c7 (ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data)
+Cc: <stable@vger.kernel.org> # v3.12+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Mon, Jan 5, 2015 at 7:29 PM, Tejun Heo <tj@kernel.org> wrote:
-> On Tue, Dec 16, 2014 at 10:19:35PM +0530, Suman Tripathi wrote:
->> This patch addresses the issue with ATA_CMD_PACKET pio mode
->> command for enumeration and device detection with ATAPI devices.It is the
->> same issue as in patch
->>
->> www.spinics.net/lists/linux-ide/msg49092.html
->>
->> Signed-off-by: Suman Tripathi <stripathi@apm.com>
->
-> Applied 1-2 to libata/for-3.18-fixes w/ Sergei's suggested edits.
->
-> Thanks.
->
-> --
-> tejun
-
-
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index ffd6604..b6ea88f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -2017,7 +2017,7 @@ static struct omap_hwmod dra7xx_uart3_hwmod = {
+ 	.class		= &dra7xx_uart_hwmod_class,
+ 	.clkdm_name	= "l4per_clkdm",
+ 	.main_clk	= "uart3_gfclk_mux",
+-	.flags		= HWMOD_SWSUP_SIDLE_ACT,
++	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP4UART3_FLAGS,
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_offs = DRA7XX_CM_L4PER_UART3_CLKCTRL_OFFSET,
 -- 
-Thanks,
-with regards,
-Suman Tripathi
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+1.9.1
