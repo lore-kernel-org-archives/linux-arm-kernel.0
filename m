@@ -1,29 +1,44 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 6 Jan 2015 09:17:59 -0600
-Subject: [PATCH] ARM: DRA7: beagle-x15: hwmod: Fix boot crash with DEBUG_LL
-In-Reply-To: <20150106150851.GB6502@saruman>
-References: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
- <20150106140517.GA3897@kahuna> <20150106150851.GB6502@saruman>
-Message-ID: <54ABFCA7.3080306@ti.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Tue, 06 Jan 2015 17:24:22 +0200
+Subject: [PATCH 5/5] ARM: qcom: Add Qualcomm APQ8084 SoC
+In-Reply-To: <1671186.DiHNtkP1SP@wuerfel>
+References: <1418404441-5518-1-git-send-email-svarbanov@mm-sol.com>
+ <1418404441-5518-6-git-send-email-svarbanov@mm-sol.com>
+ <1671186.DiHNtkP1SP@wuerfel>
+Message-ID: <54ABFE26.9010208@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2015 09:08 AM, Felipe Balbi wrote:
-> On Tue, Jan 06, 2015 at 08:05:17AM -0600, Nishanth Menon wrote:
->>> For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
->>>
->>> Fixes: 90020c7 (ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data)
->>
->> Fixes: 90020c7b2c5e ("ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data")
-> 
-> what's the difference ? why do you want that many more characters if
-> those 7 are enough for git to find a uniq commit ? Try this:
-> 
-> $ git show --abbrev-commit 90020c7b2c5e02200bc752c8cfeba91c4435588c
-> 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n160
+Hi Arnd,
 
+Thanks for the comments!
+
+On 12/12/2014 07:33 PM, Arnd Bergmann wrote:
+> On Friday 12 December 2014 19:14:01 Stanimir Varbanov wrote:
+>> +config ARCH_APQ8084
+>> +       bool "Enable support for APQ8084"
+>> +       select HAVE_ARM_ARCH_TIMER
+>> +       select PCI
+>> +       select PCI_DOMAINS
+>> +       select PCI_MSI
+>> +
+> 
+> I would prefer not to see 'select PCI' here. Also the driver is written
+> to work without PCI_MSI, so I'd be much happier with just
+> 
+> config ARCH_APQ8084
+> 	bool "Enable support for APQ8084"
+> 	select HAVE_ARM_ARCH_TIMER
+> 	select PCI_DOMAINS if PCI
+
+What about this
+
+config ARCH_APQ8084
+	bool "Enable support for APQ8084"
+	select HAVE_ARM_ARCH_TIMER
+	select MIGHT_HAVE_PCI
+	select PCI_DOMAINS if PCI
 
 -- 
-Regards,
-Nishanth Menon
+regards,
+Stan
