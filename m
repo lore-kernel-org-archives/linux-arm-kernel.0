@@ -1,62 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 6 Jan 2015 08:05:17 -0600
-Subject: [PATCH] ARM: DRA7: beagle-x15: hwmod: Fix boot crash with DEBUG_LL
-In-Reply-To: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
-References: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20150106140517.GA3897@kahuna>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Jan 2015 15:05:12 +0100
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20150106112929.GB8829@e104818-lin.cambridge.arm.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <54ABC2CB.6@linaro.org> <20150106112929.GB8829@e104818-lin.cambridge.arm.com>
+Message-ID: <2647669.mQf6pODdjV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-$subject should probably need a cleanup: this is hwmod support for
-DEBUG_LL on UART3 - x15 happens to be one of the platforms that uses
-that, but not the only one.. I suggest removing x15 from $subject and
-rephrasing accordingly.
-
-On 13:54-20150106, Lokesh Vutla wrote:
-> With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset() with
-> DEBUG_LL' we moved from parsing cmdline to identify uart used for earlycon
-> to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
+On Tuesday 06 January 2015 11:29:29 Catalin Marinas wrote:
+> > >> We will work on this both on ASWG and linux ACPI driver side, as Dong
+> > >> and Charles pointed out, _OSI things can be solved in ACPI spec, when
+> > >> that is done, we can modify the kernel driver to fix the problems above.
+> > >
+> > > Which driver?
+> > 
+> > the ACPICA core driver as you suggested, sorry for the confusion.
+> > 
+> > > What about ACPI_OS_NAME? Would you suggest it is fine to report
+> > > "Microsoft Windows NT" on an ARM system? That _OS_ not _OSI.
+> > 
+> > No, not at all. I prefer "Linux"
+> > In include/acpi/acconfig.h, when ACPI_OS_NAME defined, it says:
+> > "OS name, used for the _OS object.  The _OS object is essentially
+> > obsolete,..."
+> > for some legacy reasons, we needed  "Microsoft Windows NT", but ACPI
+> > for ARM64 on linux is totally new, I think we can change it to
+> > "Linux" when CONFIG_ARM64 as you suggested.
 > 
-> On beagle-x15, we use uart3 for console and missed enabling this flag
+> We could ignore this change for now if we don't expect the _OS object to
+> be used at all. But do we have any other way to check the AML code for
+> this? Would FWTS catch such obsolete cases?
 
-Official name of the platform is BeagleBoard-X15
+How about just leaving it out? It's clearly not used for anything
+good, so I don't see the point in passing either Linux or "Microsoft
+Windows NT" here.
 
-> for uart3 hwmod, so boot fails with DEBUG_LL. Enable DEBUG_OMAP4UART3_FLAGS for
-> uart3 hwmod.
-
-Could you align your commit message to 70 chars if possible?
-> 
-> For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
-> 
-> Fixes: 90020c7 (ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data)
-
-Fixes: 90020c7b2c5e ("ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data")
-
-> Cc: <stable@vger.kernel.org> # v3.12+
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index ffd6604..b6ea88f 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -2017,7 +2017,7 @@ static struct omap_hwmod dra7xx_uart3_hwmod = {
->  	.class		= &dra7xx_uart_hwmod_class,
->  	.clkdm_name	= "l4per_clkdm",
->  	.main_clk	= "uart3_gfclk_mux",
-> -	.flags		= HWMOD_SWSUP_SIDLE_ACT,
-> +	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP4UART3_FLAGS,
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs = DRA7XX_CM_L4PER_UART3_CLKCTRL_OFFSET,
-> -- 
-> 1.9.1
-> 
-
--- 
-Regards,
-Nishanth Menon
+	Arnd
