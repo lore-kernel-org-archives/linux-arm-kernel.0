@@ -1,50 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Jan 2015 19:18:34 +0000
-Subject: [PATCH v2 0/2] arm64: don't call early_*map() post paging_init()
-In-Reply-To: <CAKv+Gu8nsdCiKM3fOZ6KSMKJ2-1==TyNv8W2Fo6R4jeO3AsgDg@mail.gmail.com>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
- <20150106135941.GA3484@arm.com>
- <CAKv+Gu-nYC1VaJW6ULY0AantA681xZyxqqC+nQq91nj5t7w4OQ@mail.gmail.com>
- <20150106155208.GC3827@bivouac.eciton.net>
- <CAKv+Gu9uWRmLBrnoUNsEcymguiUwgXUc8UVkLO0N21UywuGT=A@mail.gmail.com>
- <20150106160511.GD3484@arm.com>
- <CAKv+Gu8nsdCiKM3fOZ6KSMKJ2-1==TyNv8W2Fo6R4jeO3AsgDg@mail.gmail.com>
-Message-ID: <20150106191833.GD32449@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Jan 2015 20:21:35 +0100
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54AC0C4B.1000907@redhat.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
+ <54AC0C4B.1000907@redhat.com>
+Message-ID: <1596791.jNp4rCPpnN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 04:23:58PM +0000, Ard Biesheuvel wrote:
-> On 6 January 2015 at 16:05, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jan 06, 2015 at 03:54:29PM +0000, Ard Biesheuvel wrote:
-> >> On 6 January 2015 at 15:52, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> >> > On Tue, Jan 06, 2015 at 02:04:50PM +0000, Ard Biesheuvel wrote:
-> >> >> >> Changes since v1:
-> >> >> >> - Rebased to v3.19-rc3
-> >> >> >> - Added 'Fixes:' tags
-> >> >> >> - Reworked 1/2 to restore call to efi_setup_idmap() to the original
-> >> >> >>   location in the boot process.
-> >> >> >
-> >> >> > Looks reasonable to me; do they need a CC stable,
-> >> >>
-> >> >> Yes, but with a note that both patches should be taken and the order
-> >> >> is retained, or we break bisect.
-> >> >
-> >> > Where would one add such a note?
-> >> >
-> >>
-> >> I guess the best way would be to not add a 'Cc: stable' tag, but send
-> >> an email to Greg once the patches have been merged by Linus.
-> >
-> > I thought Greg didn't take anything until it had hit mainline anyway? I
-> > think it should be fine with just the Cc...
-> >
+On Tuesday 06 January 2015 11:24:43 Jon Masters wrote:
+> On 01/06/2015 06:20 AM, Catalin Marinas wrote:
 > 
-> I know he doesn't, but do you know for a fact that he always takes
-> patches in the same order they appear in mainline? It would seem like
-> the reasonable thing to do, I guess, but we just have to make sure.
+> > Now, what's preventing a vendor firmware from providing only ACPI
+> > tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
+> > that both DT and ACPI are supported, or at least that dts files are
+> > merged in the kernel first?
+> 
+> I know of some (server) firmware that will only provide ACPI in the
+> medium term, so this is coming.
 
-If we really want to make sure we could either fold the two patches into
-one or add a dependency without a corresponding sha. I don't like waiting
-until they've hit mainline, because I'm sure that I'll forget!
+Medium term is fine, as long as they are not expecting their hardware
+to be supported by Linux before ACPI support is stable enough for
+general consumption. I have no idea how long that will take, but my
+guess is that we shouldn't plan on supporting ACPI-only platforms in
+Linux for the next couple of years and just demand that all drivers
+have DT support to let users add a valid DTB that can describe the
+hardware.
 
-Will
+That should always be possible using something like grub2 as an
+intermediate that boots using the UEFI interfaces and loads the
+kernel and DT from disk.
+
+	Arnd
