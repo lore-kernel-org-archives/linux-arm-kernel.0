@@ -1,41 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 6 Jan 2015 16:35:28 -0600
-Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
-In-Reply-To: <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
-References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
- <20150106141507.GB3484@arm.com> <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Jan 2015 16:46:22 -0600
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
+ <20150106205000.GB13902@amd>
+ <20150106205730.GA6071@fuloong-minipc.musicnaut.iki.fi>
+ <20150106220805.GD13902@amd>
+ <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
+Message-ID: <20150106224622.GA13752@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 6, 2015 at 2:16 PM, Mitchel Humpherys
-<mitchelh@codeaurora.org> wrote:
-> On Tue, Jan 06 2015 at 06:15:07 AM, Will Deacon <will.deacon@arm.com> wrote:
->>>      /* Invalidate the TLB, just in case */
->>> -    writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
->>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
->>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
->>
->> I was slightly worried that this would break the Calxeda implementation
->> with ARM_SMMU_OPT_SECURE_CFG_ACCESS, but actually these registers aren't
->> even aliased there so I think there's a bigger bug for them.
->>
->> Anyway, given that their hardware has gone the way of the dodo, I'll take
->> the patch as-is unless you have any further comments?
->>
->> Will
->
-> Yeah I agree that this shouldn't affect the (now defunct) Calxeda
-> implementation.  I've tested this on some hardware here and we crash
-> when we touch that register since it's secure-only (not banked, as you
-> mentioned).
+Hi,
 
-It's not quite dead:
+On Wed, Jan 07, 2015 at 12:27:17AM +0200, Aaro Koskinen wrote:
+> But I'm mounting it from userspace (using builtin initramfs inside
+> zImage), with a poll loop that waits for a device to appear. Maybe if you
+> do it from kernel you need to use root wait/delay etc. options?
 
-http://www.eweek.com/servers/calxedas-arm-based-server-chips-re-emerge-with-new-company.html
+yeah, rootwait should do it.
 
-But AFAIK, production systems don't enable the SMMU, but someone could
-still want to at some point. A note in the commit log here would be
-nice so it gets recorded.
-
-Rob
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/890d4363/attachment.sig>
