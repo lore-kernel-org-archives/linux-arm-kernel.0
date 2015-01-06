@@ -1,37 +1,55 @@
 From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 6 Jan 2015 17:43:40 +0200
-Subject: [PATCH v2 03/40] arm64/uaccess: fix sparse errors
+Date: Tue, 6 Jan 2015 17:44:27 +0200
+Subject: [PATCH v2 17/40] arm: fix put_user sparse errors
 In-Reply-To: <1420558883-10131-1-git-send-email-mst@redhat.com>
 References: <1420558883-10131-1-git-send-email-mst@redhat.com>
-Message-ID: <1420558883-10131-4-git-send-email-mst@redhat.com>
+Message-ID: <1420558883-10131-18-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-virtio wants to read bitwise types from userspace using get_user.  At the
-moment this triggers sparse errors, since the value is passed through an
-integer.
+virtio wants to write bitwise types to userspace using put_user.
+At the moment this triggers sparse errors, since the value is passed
+through an integer.
+
+For example:
+
+	__le32 __user *p;
+	__le32 x;
+	put_user(x, p);
+
+is safe, but currently triggers a sparse warning.
 
 Fix that up using __force.
 
+Note: this does not suppress any useful sparse checks since caller
+assigns x to typeof(*p), which in turn forces all the necessary type
+checks.
+
 Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-
-Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/uaccess.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/uaccess.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 3bf8f4e..9a2069b 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -147,7 +147,7 @@ do {									\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
--	(x) = (__typeof__(*(ptr)))__gu_val;				\
-+	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
- } while (0)
- 
- #define __get_user(x, ptr)						\
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 4767eb9..74fcde7 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -413,14 +413,14 @@ do {									\
+ #ifndef __ARMEB__
+ #define __put_user_asm_half(x,__pu_addr,err)			\
+ ({								\
+-	unsigned long __temp = (unsigned long)(x);		\
++	unsigned long __temp = (__force unsigned long)(x);	\
+ 	__put_user_asm_byte(__temp, __pu_addr, err);		\
+ 	__put_user_asm_byte(__temp >> 8, __pu_addr + 1, err);	\
+ })
+ #else
+ #define __put_user_asm_half(x,__pu_addr,err)			\
+ ({								\
+-	unsigned long __temp = (unsigned long)(x);		\
++	unsigned long __temp = (__force unsigned long)(x);	\
+ 	__put_user_asm_byte(__temp >> 8, __pu_addr, err);	\
+ 	__put_user_asm_byte(__temp, __pu_addr + 1, err);	\
+ })
 -- 
 MST
