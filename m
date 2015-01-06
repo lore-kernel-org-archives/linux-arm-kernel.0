@@ -1,63 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 14:55:51 +0100
-Subject: [PATCH 1/2] mmc: host: arasan: Add addition of-arasan quirks and
- add IOMMU support.
-In-Reply-To: <CAOHikRCV7RaxJz-A_s6g++ueg3CDe9Jrqcog1Lc2_+KXR9QqnQ@mail.gmail.com>
-References: <1418662867-9210-1-git-send-email-stripathi@apm.com>
- <3866536.C6OiUcuGCr@wuerfel>
- <CAOHikRCV7RaxJz-A_s6g++ueg3CDe9Jrqcog1Lc2_+KXR9QqnQ@mail.gmail.com>
-Message-ID: <3924494.iNyoV2USme@wuerfel>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 6 Jan 2015 13:58:18 +0000
+Subject: [PATCH v5 08/19] arm/arm64: KVM: make the maximum number of vCPUs
+ a per-VM value
+In-Reply-To: <54AACB0A.9080207@arm.com>
+References: <1418042274-3246-1-git-send-email-andre.przywara@arm.com>
+ <1418042274-3246-9-git-send-email-andre.przywara@arm.com>
+ <86d27a1seb.fsf@arm.com> <54AACB0A.9080207@arm.com>
+Message-ID: <CAFEAcA_v5BYi6Dm2yj_p27nSrN8ai+Z2-YJwBMbADuoUtNEW2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 17:10:29 Suman Tripathi wrote:
-> Hi Arnd,
-> > On Monday 15 December 2014 22:31:06 Suman Tripathi wrote:
-> > > @@ -162,6 +206,16 @@ static int sdhci_arasan_probe(struct
-> > > platform_device *pdev)> > > 
-> > >                 goto clk_dis_ahb;
-> > >         
-> > >         }
-> > > 
-> > > +#if defined(CONFIG_IOMMU_SUPPORT)
-> > > +       sdhci_arasan->domain = iommu_domain_alloc(&amba_bustype);
-> > > +       if (!sdhci_arasan->domain) {
-> > > +               dev_err(&pdev->dev, "Unable to allocate iommu
-> > > domain\n");
-> > > +               return PTR_ERR(sdhci_arasan->domain);
-> > > +       }
-> > > +
-> > > +       iommu_attach_device(sdhci_arasan->domain, &pdev->dev);
-> > > +#endif
-> > > +
-> > 
-> > Device drivers should never care about the implementation details
-> > of the iommu. Please change the code to use the regular dma_map_*
-> > interfaces that will work both with and without IOMMU.
->
-> After refer to iommu binding , there is a service that allows "Remap
-> address space to allow devices to access physical memory ranges that
-> they otherwise wouldn't be capable of accessing." eg : 32-bit to 64
-> bit DMA .
-> 
-> So do we have any existing driver that uses this service ? Just asking
-> for suggestions.
+On 5 January 2015 at 17:34, Andre Przywara <andre.przywara@arm.com> wrote:
+> Mmmh, fair point. I guess we should just allow KVM_MAX_VCPUS in this
+> case, right? Has anyone tested userland GIC emulation recently?
+> I will see if I find some method of testing this with QEMU.
 
-The interface is completely transparent to device drivers, it is
-implemented as a separate 'struct dma_map_ops' that is normally
-architecture independent, and that handles all sorts of DMA remapping
-issues for the driver, including
+I did actually use this when I was trying to track down the bugs
+that turned out to be vgic-init-ordering last month. If you add
+-machine kernel_irqchip=off to your QEMU command line it will
+try to use an emulated userspace GIC. But as Christoffer says,
+there is a catch: there's no way to get the vcpu's generic timers
+to tell userspace that there's been a timer interrupt that needs
+to be fed into the userspace GIC. So you need to fiddle with the
+device tree to tell the guest the generic timers don't exist,
+and provide a different timer, at least in theory [though I
+didn't actually end up having to do that, I think it was just
+fluke that it worked for my testing].
 
-- address space limits
-- offsets between CPU and device addresses for the same memory
-- cache flushes
-- bus-level synchronization
-
-On arm32, we currently support six sets of dma_map_ops including
-two for IOMMU (coherent and noncoherent). On arm64, we currently
-always use swiotlb, which solves your problem by copying memory to
-bounce buffers. This is rather inefficient, and a new implementation
-is being worked on, based on the arm32 implementation to support
-IOMMUs in a generic way.
-
-	Arnd
+-- PMM
