@@ -1,32 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Jan 2015 17:13:15 +0100
-Subject: [PATCH 16/17] ARM: sunxi_defconfig: Enable TOUCHSCREEN_SUN4I,
- CPUFREQ_DT, CPU_THERMAL
-In-Reply-To: <1420511727-8242-17-git-send-email-wens@csie.org>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-17-git-send-email-wens@csie.org>
-Message-ID: <20150106161315.GX7853@lukather>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue,  6 Jan 2015 08:15:40 -0800
+Subject: [PATCH 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX termination driver
+Message-ID: <cover.1420499393.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 10:35:26AM +0800, Chen-Yu Tsai wrote:
-> This patch enables TOUCHSCREEN_SUN4I, CPUFREQ_DT, and CPU_THERMAL to
-> enable cpufreq support with passive cpu cooling (thermal throttling)
-> by default.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+to GIC V2M specification for MSI Termination.
 
-Applied, thanks!
-Maxime
+There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports. This MSI
+block supports 2688 MSI termination ports coalesced into 16 physical HW IRQ lines 
+and shared across all 5 PCIe ports.
+
+ .../devicetree/bindings/pci/xgene-pci-msi.txt      |  34 ++
+ MAINTAINERS                                        |   8 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  21 ++
+ drivers/pci/host/Kconfig                           |   4 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-xgene-msi.c                   | 370 +++++++++++++++++++++
+ 6 files changed, 438 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+ create mode 100644 drivers/pci/host/pci-xgene-msi.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/334f594f/attachment-0001.sig>
+1.9.1
