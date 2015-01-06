@@ -1,44 +1,37 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 05 Jan 2015 18:51:56 -0700
-Subject: [PATCH 0/4] ARM64 compilation fixes for missing header includes
-Message-ID: <20150106014554.27249.89116.stgit@dusk.lan>
+Date: Mon, 05 Jan 2015 18:52:20 -0700
+Subject: [PATCH 3/4] arm64: fix missing asm/alternative.h include in
+ kernel/module.c
+In-Reply-To: <20150106014554.27249.89116.stgit@dusk.lan>
+References: <20150106014554.27249.89116.stgit@dusk.lan>
+Message-ID: <20150106015215.27249.86394.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will & Catalin,
+On next-20150105, defconfig compilation breaks with:
 
-An ARM64 build here on next-20150105 breaks due to some missing
-header file includes.  Looks like someone reorganized some
-headers - although I have not tracked down what the root cause
-is.  These patches get the kernel building again.  They are based
-on the arm64 fixes/core branch.
+arch/arm64/kernel/module.c:408:4: error: implicit declaration of function ?apply_alternatives? [-Werror=implicit-function-declaration]
 
-The patches are also available via git at this signed tag:
+Fix by including asm/alternative.h, where the apply_alternatives()
+prototype is declared.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/pjw/tegra-pending tags/arm64-header-fixes-20150105
-
-
-Compile-tested only.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
+ arch/arm64/kernel/module.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Paul Walmsley (4):
-      arm64: fix missing asm/pgtable-hwdef.h include in asm/processor.h
-      arm64: fix missing linux/bug.h include in asm/arch_timer.h
-      arm64: fix missing asm/alternative.h include in kernel/module.c
-      arm64: fix missing asm/io.h include in kernel/smp_spin_table.c
-
-
- arch/arm64/include/asm/arch_timer.h |    1 +
- arch/arm64/include/asm/processor.h  |    1 +
- arch/arm64/kernel/module.c          |    1 +
- arch/arm64/kernel/smp_spin_table.c  |    1 +
- 4 files changed, 4 insertions(+)
-
-arm64-header-file-fixes-v3.19-rc1
-   text	   data	    bss	    dec	    hex	filename
-7173728	 449984	 199064	7822776	 775db8	vmlinux
-7173728	 449984	 199064	7822776	 775db8	vmlinux
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index fd027b101de5..ac081d6fe184 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -27,6 +27,7 @@
+ #include <linux/vmalloc.h>
+ #include <asm/insn.h>
+ #include <asm/sections.h>
++#include <asm/alternative.h>
+ 
+ #define	AARCH64_INSN_IMM_MOVNZ		AARCH64_INSN_IMM_MAX
+ #define	AARCH64_INSN_IMM_MOVK		AARCH64_INSN_IMM_16
