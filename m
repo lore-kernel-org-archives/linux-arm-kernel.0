@@ -1,65 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Jan 2015 14:11:33 +0000
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <3538097.dWBy3R9lty@wuerfel>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1797489.PjmKzBFdQA@wuerfel>
- <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
- <3538097.dWBy3R9lty@wuerfel>
-Message-ID: <20150106141133.GF8829@e104818-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 06 Jan 2015 16:14:09 +0200
+Subject: [PATCH] ARM: shmobile: sh73a0 legacy: Set .control_parent for all
+ irqpin instances
+In-Reply-To: <1420551550-27512-1-git-send-email-geert+renesas@glider.be>
+References: <1420551550-27512-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <4452252.suqURC1IYD@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 01:59:27PM +0000, Arnd Bergmann wrote:
-> On Tuesday 06 January 2015 11:20:01 Catalin Marinas wrote:
-> > On Mon, Jan 05, 2015 at 08:16:30PM +0000, Arnd Bergmann wrote:
-> > > On Monday 05 January 2015 13:13:02 Catalin Marinas wrote:
-> > > > > since passing no DT tables to OS but
-> > > > > acpi=force is missing is a corner case, we can do a follow up patch to
-> > > > > fix that, does it make sense?
-> > > > 
-> > > > Not entirely. Why would no dtb and no acpi=force be a corner case? I
-> > > > thought this should be the default when only ACPI tables are passed, no
-> > > > need for an additional acpi=force argument.
-> > > 
-> > > We don't really support the case of only ACPI tables for now. The expectation
-> > > is that you always have working DT support, at least for the next few years
-> > > as ACPI features are ramping up, and without acpi=force it should not try
-> > > to use ACPI at all.
-> > 
-> > So if both DT and ACPI are present, just use DT unless acpi=force is
-> > passed. So far I think we agree but what I want to avoid is always
-> > mandating acpi=force even when the DT tables are missing (in the long
-> > run).
-> > 
-> > Now, what's preventing a vendor firmware from providing only ACPI
-> > tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
-> > that both DT and ACPI are supported, or at least that dts files are
-> > merged in the kernel first?
+Hi Geert,
+
+Thank you for the patch.
+
+On Tuesday 06 January 2015 14:39:10 Geert Uytterhoeven wrote:
+> The sh73a0 INTC can't mask interrupts properly most likely due to a
+> hardware bug. Set the .control_parent flag to delegate masking to the
+> parent interrupt controller, like was already done for irqpin1.
 > 
-> We have no way of enforcing what a board vendor ships, so if they want
-> to have ACPI-only machines for MS Windows, they just won't work by
-> default on Linux.
+> Without this, accessing the three-axis digital accelerometer ADXL345
+> on kzm9g through /dev/input/event1 causes an interrupt storm, which
+> requires a power-cycle to recover from.
+> 
+> This was inspired by a patch for arch/arm/boot/dts/sh73a0.dtsi from
+> Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
 
-What do you mean by "won't work by default on Linux"? Assuming no
-additional drivers are needed (i.e. a few devices mentioned in SBSA and
-the rest on a PCIe bus, using existing drivers without further
-modifications), do you still want mainline to fail to boot on such
-ACPI-only systems?
+This looks correct to me, but shouldn't we concentrate on getting rid of 
+legacy code instead ?
 
-> Once ACPI support is mature enough, we can also have a whitelist or a
-> different default for using it automatically when no DT is present.
-
-Having a white-list requires some for of SoC identification. Does ACPI
-provide such thing (like "model" or "compatible" strings in the top DT
-node)?
-
-> For drivers merged upstream, I would insist that every driver merged
-> for an ARM64 platform has a documented DT binding that is used in the
-> driver.
-
-That's fine by me. I just hope that for hardware aimed at ACPI we won't
-need many non-PCIe drivers.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Fixes: 341eb5465f67437a ("ARM: shmobile: INTC External IRQ pin driver on
+> sh73a0") ---
+>  arch/arm/mach-shmobile/setup-sh73a0.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
+> b/arch/arm/mach-shmobile/setup-sh73a0.c index
+> 354cab111bf17ea6..613ce65184a6648c 100644
+> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> @@ -595,6 +595,7 @@ static struct platform_device ipmmu_device = {
+> 
+>  static struct renesas_intc_irqpin_config irqpin0_platform_data = {
+>  	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
+> +	.control_parent = true,
+>  };
+> 
+>  static struct resource irqpin0_resources[] = {
+> @@ -656,6 +657,7 @@ static struct platform_device irqpin1_device = {
+> 
+>  static struct renesas_intc_irqpin_config irqpin2_platform_data = {
+>  	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
+> +	.control_parent = true,
+>  };
+> 
+>  static struct resource irqpin2_resources[] = {
+> @@ -686,6 +688,7 @@ static struct platform_device irqpin2_device = {
+> 
+>  static struct renesas_intc_irqpin_config irqpin3_platform_data = {
+>  	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
+> +	.control_parent = true,
+>  };
+> 
+>  static struct resource irqpin3_resources[] = {
 
 -- 
-Catalin
+Regards,
+
+Laurent Pinchart
