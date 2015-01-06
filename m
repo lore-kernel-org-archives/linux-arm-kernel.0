@@ -1,68 +1,46 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 6 Jan 2015 11:32:29 -0400
-Subject: [PATCH 16/17] ARM: sunxi_defconfig: Enable TOUCHSCREEN_SUN4I,
- CPUFREQ_DT, CPU_THERMAL
-In-Reply-To: <1420511727-8242-17-git-send-email-wens@csie.org>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-17-git-send-email-wens@csie.org>
-Message-ID: <20150106153227.GG6276@developer>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 16:31:33 +0100
+Subject: Generic slave capabilities reporting
+In-Reply-To: <CAOMZO5CPcRFJEsnYuATESSArcCbiVCGuAhdq67iR7hF3UPbs6Q@mail.gmail.com>
+References: <CAOMZO5CPcRFJEsnYuATESSArcCbiVCGuAhdq67iR7hF3UPbs6Q@mail.gmail.com>
+Message-ID: <20150106153133.GN7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 10:35:26AM +0800, Chen-Yu Tsai wrote:
-> This patch enables TOUCHSCREEN_SUN4I, CPUFREQ_DT, and CPU_THERMAL to
-> enable cpufreq support with passive cpu cooling (thermal throttling)
-> by default.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi Fabio,
 
-For the thermal part:
-
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
-
-> ---
->  arch/arm/configs/sunxi_defconfig | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+On Mon, Dec 29, 2014 at 02:25:24PM -0200, Fabio Estevam wrote:
+> Hi Maxime,
 > 
-> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-> index 7a342d2780a8..46a8688bd49a 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -9,6 +9,8 @@ CONFIG_HIGHMEM=y
->  CONFIG_HIGHPTE=y
->  CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_ARM_ATAG_DTB_COMPAT=y
-> +CONFIG_CPU_FREQ=y
-> +CONFIG_CPUFREQ_DT=y
->  CONFIG_VFP=y
->  CONFIG_NEON=y
->  CONFIG_PM=y
-> @@ -54,6 +56,8 @@ CONFIG_STMMAC_ETH=y
->  # CONFIG_INPUT_MOUSEDEV is not set
->  # CONFIG_INPUT_KEYBOARD is not set
->  # CONFIG_INPUT_MOUSE is not set
-> +CONFIG_INPUT_TOUCHSCREEN=y
-> +CONFIG_TOUCHSCREEN_SUN4I=y
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_SERIAL_8250_NR_UARTS=8
-> @@ -71,7 +75,8 @@ CONFIG_GPIO_SYSFS=y
->  CONFIG_POWER_SUPPLY=y
->  CONFIG_POWER_RESET=y
->  CONFIG_POWER_RESET_SUN6I=y
-> -# CONFIG_HWMON is not set
-> +CONFIG_THERMAL=y
-> +CONFIG_CPU_THERMAL=y
->  CONFIG_WATCHDOG=y
->  CONFIG_SUNXI_WATCHDOG=y
->  CONFIG_MFD_AXP20X=y
-> -- 
-> 2.1.4
+> Since commit ecc19d17868be9c ("dmaengine: Add a warning for drivers
+> not using the generic slave caps retrieval") I am getting the
+> following warning on mx6:
 > 
+> [    0.113023] ------------[ cut here ]------------
+> [    0.113053] WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:830
+> dma_async_device_register+0x2a0/0x4c8()
+> [    0.113063] this driver doesn't support generic slave capabilities reporting
+> [    0.113073] Modules linked in:
+> [    0.113094] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+> 3.19.0-rc1-next-20141226 #2297
+> [    0.113104] Hardware name: Freescale i.MX6 SoloX (Device Tree)
+> 
+> What dma driver could I take as an example to implement this generic
+> slave capabilities reporting?
+
+Any of the recent ones will do: sun6i, bcm2835, at_xdmac for example.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/b14c1176/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/2315fc59/attachment.sig>
