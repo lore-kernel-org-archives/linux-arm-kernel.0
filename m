@@ -1,54 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Jan 2015 14:17:01 +0000
-Subject: [PATCH] arm64: add ioremap physical address information
-In-Reply-To: <CAHkaATSM=V+BNZvAXC+VG6NDjOK9m0ZP3Q=SUaoxtgDw4SKZog@mail.gmail.com>
-References: <CAHkaATSM=V+BNZvAXC+VG6NDjOK9m0ZP3Q=SUaoxtgDw4SKZog@mail.gmail.com>
-Message-ID: <20150106141701.GC3484@arm.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 6 Jan 2015 15:25:28 +0100
+Subject: AT91 slow clock mode regression/fixes, improvement proposal
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
+References: <20141218203904.GA25215@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
+ <20141219152625.GA30666@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6CA0@penmbx01>
+ <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
+Message-ID: <20150106142528.GA10330@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 26, 2014 at 04:52:10PM +0000, Min-Hua Chen wrote:
-> In /proc/vmallocinfo, it's good to show the physical address
-> of each ioremap in vmallocinfo. Add physical address information
-> in arm64 ioremap.
+Hello Wenyou,
+
+On Mon, Jan 05, 2015 at 03:32:42AM +0000, Yang, Wenyou wrote:
 > 
-> 0xffffc900047f2000-0xffffc900047f4000    8192 _nv013519rm+0x57/0xa0
-> [nvidia] phys=f8100000 ioremap
-> 0xffffc900047f4000-0xffffc900047f6000    8192 _nv013519rm+0x57/0xa0
-> [nvidia] phys=f8008000 ioremap
-> 0xffffc90004800000-0xffffc90004821000  135168 e1000_probe+0x22c/0xb95
-> [e1000e] phys=f4300000 ioremap
-> 0xffffc900049c0000-0xffffc900049e1000  135168 _nv013521rm+0x4d/0xd0
-> [nvidia] phys=e0140000 ioremap
-> 
-> Signed-off-by: Min-Hua Chen <orca.chen@gmail.com>
-> ---
+> I remembered you said this patch is not formal. Now, would you like 
+> send a formal one?
 
-Thanks, this looks useful for debugging.
+Here it is, the first one is based on linux-at91/linux-3.10-at91 branch, 
+the second one is rebased on linux-3.18 (Is this the right way when 
+playing with multiple branch?).
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+By the way, Wenyou fixed some bugs in the linux-3.10-at91 branch about 
+slow clock mode which should IMHO be merged and pushed to other 
+branches.
 
-I assume this can wait for 3.20?
-
-Will
-
-
->  arch/arm64/mm/ioremap.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> index cbb99c8..01e88c8 100644
-> --- a/arch/arm64/mm/ioremap.c
-> +++ b/arch/arm64/mm/ioremap.c
-> @@ -62,6 +62,7 @@ static void __iomem *__ioremap_caller(phys_addr_t
-> phys_addr, size_t size,
->      if (!area)
->          return NULL;
->      addr = (unsigned long)area->addr;
-> +    area->phys_addr = phys_addr;
-> 
->      err = ioremap_page_range(addr, addr + size, phys_addr, prot);
->      if (err) {
-> --
-> 1.7.10.4
-> 
+Regards,
+Sylvain
