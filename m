@@ -1,75 +1,106 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 6 Jan 2015 20:59:46 +0000 (UTC)
-Subject: [GIT PULL] arm64: fix compilation breakage due to missing headers
- in next-20150105
-Message-ID: <alpine.DEB.2.02.1501062058210.28771@utopia.booyaka.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 06 Jan 2015 22:07:49 +0100
+Subject: [PATCH v2 1/7] ARM: mvebu: Rename DEBUG_LL to indicate UART index
+In-Reply-To: <1420558100-4700-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420558100-4700-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54AC4EA5.3060904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hi Maxime,
 
-Hi Will & Catalin,
+On 06/01/2015 16:28, Maxime Ripard wrote:
+> The mvebu SoCs actually have more UARTs than just the one exposed in DEBUG_LL
+> yet.
+> 
+> In order to differentiate them, Add the index in the configuration options and
+> their help.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-In the event you'd prefer to pull these changes from git
-rather than apply them off the mailing lists:
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The following changes since commit 5d96e0cba26323c3daeb9f7cdfd4efe70985e2c6:
 
-  arm64: mm: Add pgd_page to support RCU fast_gup (2014-12-23 16:39:17 +0000)
+Thanks,
 
-are available in the git repository at:
+Gregory
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/tegra-pending tags/arm64-header-fixes-v2-20150105
+> ---
+>  arch/arm/Kconfig.debug | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 5ddd4906f7a7..eb3991cf63ab 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -455,13 +455,13 @@ choice
+>  		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE configuration
+>  		  options based on your needs.
+>  
+> -	config DEBUG_MVEBU_UART
+> -		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
+> +	config DEBUG_MVEBU_UART0
+> +		bool "Kernel low-level debugging messages via MVEBU UART0 (old bootloaders)"
+>  		depends on ARCH_MVEBU
+>  		select DEBUG_UART_8250
+>  		help
+>  		  Say Y here if you want kernel low-level debugging support
+> -		  on MVEBU based platforms.
+> +		  on MVEBU based platforms on UART0.
+>  
+>  		  This option should be used with the old bootloaders
+>  		  that left the internal registers mapped at
+> @@ -474,13 +474,13 @@ choice
+>  		  when u-boot hands over to the kernel, the system
+>  		  silently crashes, with no serial output at all.
+>  
+> -	config DEBUG_MVEBU_UART_ALTERNATE
+> -		bool "Kernel low-level debugging messages via MVEBU UART (new bootloaders)"
+> +	config DEBUG_MVEBU_UART0_ALTERNATE
+> +		bool "Kernel low-level debugging messages via MVEBU UART0 (new bootloaders)"
+>  		depends on ARCH_MVEBU
+>  		select DEBUG_UART_8250
+>  		help
+>  		  Say Y here if you want kernel low-level debugging support
+> -		  on MVEBU based platforms.
+> +		  on MVEBU based platforms on UART0.
+>  
+>  		  This option should be used with the new bootloaders
+>  		  that remap the internal registers at 0xf1000000.
+> @@ -1282,7 +1282,7 @@ config DEBUG_UART_PHYS
+>  	default 0xc8000000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
+>  	default 0xc8000003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+>  	default 0xd0000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+> -	default 0xd0012000 if DEBUG_MVEBU_UART
+> +	default 0xd0012000 if DEBUG_MVEBU_UART0
+>  	default 0xc81004c0 if DEBUG_MESON_UARTAO
+>  	default 0xd4017000 if DEBUG_MMP_UART2
+>  	default 0xd4018000 if DEBUG_MMP_UART3
+> @@ -1296,7 +1296,7 @@ config DEBUG_UART_PHYS
+>  	default 0xe8008000 if DEBUG_R7S72100_SCIF2
+>  	default 0xf0000be0 if ARCH_EBSA110
+>  	default 0xf040ab00 if DEBUG_BRCMSTB_UART
+> -	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+> +	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
+>  	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
+>  				ARCH_ORION5X
+>  	default 0xf7fc9000 if DEBUG_BERLIN_UART
+> @@ -1377,7 +1377,7 @@ config DEBUG_UART_VIRT
+>  	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
+>  	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
+>  	default 0xfec02000 if DEBUG_SOCFPGA_UART
+> -	default 0xfec12000 if DEBUG_MVEBU_UART || DEBUG_MVEBU_UART_ALTERNATE
+> +	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
+>  	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
+>  	default 0xfec90000 if DEBUG_RK32_UART2
+>  	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
+> 
 
-for you to fetch changes up to 22ae7f2aaa6206c1ee9275607be26bdc82f8b580:
 
-  arm64: fix missing asm/io.h include in kernel/smp_spin_table.c (2015-01-06 13:37:10 -0700)
-
-- ----------------------------------------------------------------
-ARM64 compilation fixes for missing header includes
-
-An ARM64 build here on next-20150105 breaks due to some missing header
-file includes. Looks like someone reorganized some headers - although
-I have not tracked down what the root cause is. These patches get the
-kernel building again. They are based on the arm64 fixes/core
-branch.
-
-This second version includes comments from Mark Rutland
-<mark.rutland@arm.com>.
-
-Compile-tested only.
-
-- ----------------------------------------------------------------
-Paul Walmsley (4):
-      arm64: fix missing asm/pgtable-hwdef.h include in asm/processor.h
-      arm64: fix missing linux/bug.h include in asm/arch_timer.h
-      arm64: fix missing asm/alternative.h include in kernel/module.c
-      arm64: fix missing asm/io.h include in kernel/smp_spin_table.c
-
- arch/arm64/include/asm/arch_timer.h | 1 +
- arch/arm64/include/asm/processor.h  | 1 +
- arch/arm64/kernel/module.c          | 1 +
- arch/arm64/kernel/smp_spin_table.c  | 1 +
- 4 files changed, 4 insertions(+)
-
-   text	   data	    bss	    dec	    hex	filename
-7173728	 449984	 199064	7822776	 775db8	vmlinux.old
-7173728	 449984	 199064	7822776	 775db8	vmlinux
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJUrExOAAoJEMePsQ0LvSpLMe0P/0NVStCPq7KYd9Uwqfj2uOz8
-odiM8m+BznB8NFGtqvRttPl/oJFqmh7GG7zJvZGA3BQfX0vEhf48snyk/vEcQe2O
-deyML6wcRf5+GxNAPJ0/bg16/8Zzcj8FSd6MJcd0Eearg9KTxDnfoQU4060+gyhR
-dr+8CZISovqc7ChRC8Cl3EPQg+BWF0KdKYB1vcD36T6cYVtwk0H1q7JhJhurBLcX
-cLWJcDd2sRyiCIPHWGjVPvcdnD5ooIrI/G523dC7NGNR2ButvjgWqbY8EnAiAXCy
-QS4xRb4LHe0WU/dsQPHq08AFWgOInK5tXr5+Q4KbOO2tO8xReeAEVFLVrQfuPiHa
-UH7G+nFwuCEm1BNWWTIBOroyT72Ef/u19cgBbaxtX3QyXdGaweNL3SEMlXPdu/Be
-7aCqP95sjyZ23jxmoLyaAsjgrjZcArYx+VufRcJKNRDvWW8+c+Kh2yMKkeJB3y+v
-dhqrajq1LhoaHRp7YXpLk3vEliCLyOFkaYao6UJ5eQ9AO/oa2Trb50whfIO5TZec
-fJEK0xt9RwYeYLyAldeIJnMM7P0+1BNwboqSmtGKCTgUpLdhr2nnoy5t7j931dv3
-AdJSt05BtUH1qlDbTlO0kSH39efiYVVu2M0GBS7L6Fadi7FHc1+/wyB1Nd+wvfkO
-9c8Y8BxEYwA6uIDHV2TB
-=6xVW
------END PGP SIGNATURE-----
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
