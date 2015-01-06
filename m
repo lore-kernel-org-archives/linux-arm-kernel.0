@@ -1,46 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Jan 2015 16:31:33 +0100
-Subject: Generic slave capabilities reporting
-In-Reply-To: <CAOMZO5CPcRFJEsnYuATESSArcCbiVCGuAhdq67iR7hF3UPbs6Q@mail.gmail.com>
-References: <CAOMZO5CPcRFJEsnYuATESSArcCbiVCGuAhdq67iR7hF3UPbs6Q@mail.gmail.com>
-Message-ID: <20150106153133.GN7853@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Jan 2015 15:38:26 +0000
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
+ <20141215174336.GJ11285@n2100.arm.linux.org.uk>
+ <3353119.0CuA8fKaup@vostro.rjw.lan>
+ <20141215230922.GL11285@n2100.arm.linux.org.uk>
+ <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
+Message-ID: <20150106153825.GH12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Mon, Dec 29, 2014 at 02:25:24PM -0200, Fabio Estevam wrote:
-> Hi Maxime,
+On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
+> On 16 December 2014 at 04:39, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Well, here's a patch which I'm running on top of 3.18 at the moment,
+> > which is basically what I described in my email, and I'm running with it
+> > and it is without any lockdep complaint.
 > 
-> Since commit ecc19d17868be9c ("dmaengine: Add a warning for drivers
-> not using the generic slave caps retrieval") I am getting the
-> following warning on mx6:
-> 
-> [    0.113023] ------------[ cut here ]------------
-> [    0.113053] WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:830
-> dma_async_device_register+0x2a0/0x4c8()
-> [    0.113063] this driver doesn't support generic slave capabilities reporting
-> [    0.113073] Modules linked in:
-> [    0.113094] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-> 3.19.0-rc1-next-20141226 #2297
-> [    0.113104] Hardware name: Freescale i.MX6 SoloX (Device Tree)
-> 
-> What dma driver could I take as an example to implement this generic
-> slave capabilities reporting?
+> We need two separate patches now, one for 3.18 and other one for 3.19-rc.
+> 3.19 has see lots of changes in this particular file and so we need to
+> change few things here.
 
-Any of the recent ones will do: sun6i, bcm2835, at_xdmac for example.
-
-Thanks!
-Maxime
+I'm sorry, I don't have the bandwidth to create a patch for 3.19-rc
+right now.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/2315fc59/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
