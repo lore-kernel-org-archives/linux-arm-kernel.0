@@ -1,31 +1,44 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue,  6 Jan 2015 11:37:25 +0100
-Subject: [PATCH 0/4] Add support for nyan-blaze
-Message-ID: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+Date: Tue,  6 Jan 2015 11:37:26 +0100
+Subject: [PATCH 1/4] ARM: tegra: rely on bootloader pinmux programming on
+ nyan-big
+In-Reply-To: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1420540653-14816-2-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Following 6dbaff2b, the kernel expects that the bootloader has correctly
+programmed the Tegra pinmux.
 
-the nyan-blaze board is the HP Chromebook 14. This series reuses the DTS that we currently have for nyan-big and also contains two fixes needed to get it to feature parity.
+DTs for the Jetson and the Venice2 had been updated already but this one
+was left behind.
 
-Cheers,
+Have tested this with the stock vendor firmware (coreboot) and have found no
+issues.
 
-Tomeu
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ arch/arm/boot/dts/tegra124-nyan-big.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Tomeu Vizoso (4):
-  ARM: tegra: rely on bootloader pinmux programming on nyan-big
-  ARM: tegra: Move out nyan-generic parts out from the nyan-big DT
-  ARM: tegra: Add DTS for the nyan-blaze board
-  ARM: tegra: remove wp-gpios from the generic nyan dtsi
-
- arch/arm/boot/dts/Makefile                |    1 +
- arch/arm/boot/dts/tegra124-nyan-big.dts   | 1127 +---------------------------
- arch/arm/boot/dts/tegra124-nyan-blaze.dts |   12 +
- arch/arm/boot/dts/tegra124-nyan.dtsi      | 1132 +++++++++++++++++++++++++++++
- 4 files changed, 1148 insertions(+), 1124 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra124-nyan-blaze.dts
- create mode 100644 arch/arm/boot/dts/tegra124-nyan.dtsi
-
+diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
+index 53181d3..4752572 100644
+--- a/arch/arm/boot/dts/tegra124-nyan-big.dts
++++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+@@ -44,10 +44,10 @@
+ 	};
+ 
+ 	pinmux at 0,70000868 {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinmux_default>;
++		pinctrl-names = "boot";
++		pinctrl-0 = <&pinmux_boot>;
+ 
+-		pinmux_default: common {
++		pinmux_boot: common {
+ 			dap_mclk1_pw4 {
+ 				nvidia,pins = "dap_mclk1_pw4";
+ 				nvidia,function = "extperiph1";
 -- 
 1.9.3
