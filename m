@@ -1,89 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 20:30:40 +0100
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150106141133.GF8829@e104818-lin.cambridge.arm.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <3538097.dWBy3R9lty@wuerfel>
- <20150106141133.GF8829@e104818-lin.cambridge.arm.com>
-Message-ID: <40609667.NRBYGys7aL@wuerfel>
+Date: Tue, 06 Jan 2015 20:33:41 +0100
+Subject: [PATCH 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <94f9823d9a8c9c7ef819173f0a5ab06fb8fff408.1420499393.git.dhdang@apm.com>
+References: <cover.1420499393.git.dhdang@apm.com>
+ <94f9823d9a8c9c7ef819173f0a5ab06fb8fff408.1420499393.git.dhdang@apm.com>
+Message-ID: <22570652.F088Afk9OX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 14:11:33 Catalin Marinas wrote:
-> On Tue, Jan 06, 2015 at 01:59:27PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 06 January 2015 11:20:01 Catalin Marinas wrote:
-> > > On Mon, Jan 05, 2015 at 08:16:30PM +0000, Arnd Bergmann wrote:
-> > > > On Monday 05 January 2015 13:13:02 Catalin Marinas wrote:
-> > > > > > since passing no DT tables to OS but
-> > > > > > acpi=force is missing is a corner case, we can do a follow up patch to
-> > > > > > fix that, does it make sense?
-> > > > > 
-> > > > > Not entirely. Why would no dtb and no acpi=force be a corner case? I
-> > > > > thought this should be the default when only ACPI tables are passed, no
-> > > > > need for an additional acpi=force argument.
-> > > > 
-> > > > We don't really support the case of only ACPI tables for now. The expectation
-> > > > is that you always have working DT support, at least for the next few years
-> > > > as ACPI features are ramping up, and without acpi=force it should not try
-> > > > to use ACPI at all.
-> > > 
-> > > So if both DT and ACPI are present, just use DT unless acpi=force is
-> > > passed. So far I think we agree but what I want to avoid is always
-> > > mandating acpi=force even when the DT tables are missing (in the long
-> > > run).
-> > > 
-> > > Now, what's preventing a vendor firmware from providing only ACPI
-> > > tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
-> > > that both DT and ACPI are supported, or at least that dts files are
-> > > merged in the kernel first?
-> > 
-> > We have no way of enforcing what a board vendor ships, so if they want
-> > to have ACPI-only machines for MS Windows, they just won't work by
-> > default on Linux.
+On Tuesday 06 January 2015 08:15:41 Duc Dang wrote:
+> X-Gene v1 SOC supports total 2688 MSI/MSIX vectors coalesced into
+> 16 HW IRQ lines.
 > 
-> What do you mean by "won't work by default on Linux"? Assuming no
-> additional drivers are needed (i.e. a few devices mentioned in SBSA and
-> the rest on a PCIe bus, using existing drivers without further
-> modifications), do you still want mainline to fail to boot on such
-> ACPI-only systems?
-
-I mean it won't work without acpi=force on the command line.
-
-> > Once ACPI support is mature enough, we can also have a whitelist or a
-> > different default for using it automatically when no DT is present.
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> Signed-off-by: Duc Dang <dhdang@apm.com>
 > 
-> Having a white-list requires some for of SoC identification. Does ACPI
-> provide such thing (like "model" or "compatible" strings in the top DT
-> node)?
 
-This is independent of the SoC: All SoCs we support have DT drivers, so
-machines like this would be board whose vendor doesn't care about Linux,
-but happens to use a SoC that we support. What we would need here is
-a whitelist of boards.
-
-> > For drivers merged upstream, I would insist that every driver merged
-> > for an ARM64 platform has a documented DT binding that is used in the
-> > driver.
-> 
-> That's fine by me. I just hope that for hardware aimed at ACPI we won't
-> need many non-PCIe drivers.
-
-Yes, that is a reasonable assumption. Looking at the AMD patches that
-were posted already, there are however a few devices that are not on
-the PCI bus:
-
-- pl011 uart
-- pl022 spi
-- pl061 gpio
-- pl330 dma
-- designware i2c
-- custom 10gbit ethernet
-- probably some I forgot
-
-Most of these will likely just not be needed on servers (pl330) or
-handled by AML (spi, i2c, gpio) transparently without needing a
-driver, but we do need to support the ethernet port and the uart.
-I expect that other SoCs come with different ethernet implementations
-that are also not discoverable through PCI.
+I might be a little behind the latest development, but why is this
+not a struct msi_controller?
 
 	Arnd
