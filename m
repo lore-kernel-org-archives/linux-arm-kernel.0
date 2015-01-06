@@ -1,34 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 6 Jan 2015 14:37:53 +0100
-Subject: [PATCH v3 0/2] ARM: mediatek: Add driver for Mediatek I2C
- controller
-In-Reply-To: <1418352022.4994.44.camel@mtksdaap41>
-References: <1416821928-11453-1-git-send-email-xudong.chen@mediatek.com>
- <20141124121555.GG3733@katana>
- <1417096856.12707.59.camel@mtksdaap41>
- <20141127164536.GC5667@katana>
- <1418352022.4994.44.camel@mtksdaap41>
-Message-ID: <20150106133753.GA3754@katana>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 6 Jan 2015 13:39:17 +0000
+Subject: [PATCH 1/2] arm64: don't make early_*map() calls post
+ paging_init()
+In-Reply-To: <CAKv+Gu_EWCYYcmsLuojGGQ+6x+Lp5fWJQ+4fvR-4fqXqU2f53Q@mail.gmail.com>
+References: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
+ <1420482835-6444-2-git-send-email-leif.lindholm@linaro.org>
+ <CAKv+Gu_EWCYYcmsLuojGGQ+6x+Lp5fWJQ+4fvR-4fqXqU2f53Q@mail.gmail.com>
+Message-ID: <20150106133917.GB3827@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 06, 2015 at 09:38:24AM +0000, Ard Biesheuvel wrote:
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 6fac253..790adb5 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
 
-> We've started upstream work for MT8173[1].
+> > @@ -393,6 +385,8 @@ static int __init arm64_enter_virtual_mode(void)
+> >                                                    mapsize);
+> >         memmap.map_end = memmap.map + mapsize;
+> >
+> > +       efi_setup_idmap();
+> > +
 > 
-> We've fixed these issues for new SoC, and we believe it is fully I2C
-> compatible now. We'll add mt8173 support to this driver, so this driver
-> will support both fully I2C compatible SoC and the current one.
+> I think this is incorrect: we may call early_alloc() here which is
+> only allowed before paging_init()
 
->From what you tell, I'd rather add the MT8173 support incrementally.
-Let's get first the limited support properly implemented, then add
-another controller.
+Hmm...
+Technically, the existing code is already breaking this restriction
+then - but my patch moved that _way_ later in the boot process (early
+initcall instead of setup_arch()).
 
-I'll send out my draft for describing the quirks later today.
+I'll resend with an alternative solution that leaves the
+efi_setup_idmap() ordering vs paging init() in its current state.
+Since efi_setup_idmap() goes away with your "stable UEFI virtual
+mappings for kexec" series, I don't want to make changes here and for
+potential backports too invasive.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/7564d3c5/attachment-0001.sig>
+/
+    Leif
