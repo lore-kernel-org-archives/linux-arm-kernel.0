@@ -1,56 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 20:59:04 +0100
-Subject: [RFC PATCH v3 4/4] arm64:numa: adding numa support for arm64
- platforms.
-In-Reply-To: <CAFpQJXVQnRY9wZRk-83bQLw0m=41ZxH2v-YZCHdF0fvC8LS_Tw@mail.gmail.com>
+Date: Tue, 06 Jan 2015 21:02:18 +0100
+Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <CAFpQJXXnM==4AmmNHf8yp2x0aK4Lnp2cy-4JpzuxsgXX3A=J4A@mail.gmail.com>
 References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1849719.f6Z6RhZjTc@wuerfel>
- <CAFpQJXVQnRY9wZRk-83bQLw0m=41ZxH2v-YZCHdF0fvC8LS_Tw@mail.gmail.com>
-Message-ID: <2425557.4DHPZVafv4@wuerfel>
+ <1741288.B6kbjm5Uq5@wuerfel>
+ <CAFpQJXXnM==4AmmNHf8yp2x0aK4Lnp2cy-4JpzuxsgXX3A=J4A@mail.gmail.com>
+Message-ID: <3372289.4AUgcSNZN5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 14:55:53 Ganapatrao Kulkarni wrote:
-> On Sat, Jan 3, 2015 at 2:40 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> +int dt_get_cpu_node_id(int cpu)
-> >> +{
-> >> +     struct device_node *dn = NULL;
-> >> +
-> >> +     while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> >> +             const u32 *cell;
-> >> +             u64 hwid;
-> >> +
-> >> +             /*
-> >> +              * A cpu node with missing "reg" property is
-> >> +              * considered invalid to build a cpu_logical_map
-> >> +              * entry.
-> >> +              */
-> >> +             cell = of_get_property(dn, "reg", NULL);
-> >> +             if (!cell) {
-> >> +                     pr_err("%s: missing reg property\n", dn->full_name);
-> >> +                     return default_nid;
-> >> +             }
-> >> +             hwid = of_read_number(cell, of_n_addr_cells(dn));
-> >> +
-> >> +             if (cpu_logical_map(cpu) == hwid)
-> >> +             return of_node_to_nid_single(dn);
-> >> +     }
-> >> +     return NUMA_NO_NODE;
-> >> +}
-> >> +EXPORT_SYMBOL(dt_get_cpu_node_id);
+On Tuesday 06 January 2015 15:04:26 Ganapatrao Kulkarni wrote:
+> On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
+> >> +             cpu at 00f {
+> >> +                     device_type = "cpu";
+> >> +                     compatible = "cavium,thunder", "arm,armv8";
+> >> +                     reg = <0x0 0x00f>;
+> >> +                     enable-method = "psci";
+> >> +                     arm,associativity = <0 0 0x00f>;
+> >> +             };
+> >> +             cpu at 100 {
+> >> +                     device_type = "cpu";
+> >> +                     compatible = "cavium,thunder", "arm,armv8";
+> >> +                     reg = <0x0 0x100>;
+> >> +                     enable-method = "psci";
+> >> +                     arm,associativity = <0 0 0x100>;
+> >> +             };
 > >
-> > Maybe just expose a function to the device node for a CPU ID here, and
-> > expect callers to use of_node_to_nid?
-> shall i make this wrapper function in dt_numa.c, which will use
-> functions _of_node_to_nid and  _of_cpu_to_node(cpu)
+> > What is the 0x100 offset in the last-level topology field? Does this have
+> > no significance to topology at all? I would expect that to be something
+> > like cluster number that is relevant to caching and should be represented
+> > as a separate level.
+>
+> i did not understand, can you please explain little more about "
+> should be represented as a separate level."
+> at present, i have put the hwid of a cpu.
 
-Yes, I guess that would work.
+>From what I undertand, the hwid of the CPU contains the "cluster" number in
+this bit position, so you typically have a shared L2 or L3 cache between
+all cores within a cluster, but separate caches in other clusters.
 
-> And,  this function can be a weak function in numa.c which returns 0.
-
-No, please don't use weak functions. You can either use IS_ENABLED()
-tricks to remove function calls at compile-time, or in the header
-file provide an inline function as an alternative to the extern
-declaration, based on a configuration symbol.
+If this is the case, there will be a measurable difference in performance
+between two processes sharing memory when running on the same cluster,
+or when running on different clusters on the same socket. If the
+performance difference is relevant, it should be described as a separate
+level in the associativity property.
 
 	Arnd
