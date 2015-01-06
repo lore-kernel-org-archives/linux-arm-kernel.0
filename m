@@ -1,33 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 6 Jan 2015 15:54:29 +0000
-Subject: [PATCH v2 0/2] arm64: don't call early_*map() post paging_init()
-In-Reply-To: <20150106155208.GC3827@bivouac.eciton.net>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
- <20150106135941.GA3484@arm.com>
- <CAKv+Gu-nYC1VaJW6ULY0AantA681xZyxqqC+nQq91nj5t7w4OQ@mail.gmail.com>
- <20150106155208.GC3827@bivouac.eciton.net>
-Message-ID: <CAKv+Gu9uWRmLBrnoUNsEcymguiUwgXUc8UVkLO0N21UywuGT=A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Jan 2015 16:52:58 +0100
+Subject: [PATCH 05/17] ARM: dts: sunxi: Enable thermal sensor support for
+ RTP on sun[457]i
+In-Reply-To: <1420511727-8242-6-git-send-email-wens@csie.org>
+References: <1420511727-8242-1-git-send-email-wens@csie.org>
+ <1420511727-8242-6-git-send-email-wens@csie.org>
+Message-ID: <20150106155258.GQ7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2015 at 15:52, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On Tue, Jan 06, 2015 at 02:04:50PM +0000, Ard Biesheuvel wrote:
->> >> Changes since v1:
->> >> - Rebased to v3.19-rc3
->> >> - Added 'Fixes:' tags
->> >> - Reworked 1/2 to restore call to efi_setup_idmap() to the original
->> >>   location in the boot process.
->> >
->> > Looks reasonable to me; do they need a CC stable,
->>
->> Yes, but with a note that both patches should be taken and the order
->> is retained, or we break bisect.
->
-> Where would one add such a note?
->
+On Tue, Jan 06, 2015 at 10:35:15AM +0800, Chen-Yu Tsai wrote:
+> Now that the resistive touchpanel driver supports thermal sensors,
+> add the "#thermal-sensor-cells" property as required by the thermal
+> framework.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I guess the best way would be to not add a 'Cc: stable' tag, but send
-an email to Greg once the patches have been merged by Linus.
+Applied, thanks!
+
+Maxime
 
 -- 
-Ard.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/6ba7e47b/attachment.sig>
