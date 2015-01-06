@@ -1,51 +1,48 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 6 Jan 2015 08:41:54 -0500
-Subject: [PATCH v1 0/2] Add the PMP support for APM X-Gene SoC AHCI SATA
- Host Controller driver.
-In-Reply-To: <CAOHikRAcSnD=5gvNkNZz8vUXTjkXQo8W4-KQcGajMeajxd73HQ@mail.gmail.com>
-References: <1420538536-32165-1-git-send-email-stripathi@apm.com>
- <20150106125252.GB3077@htj.dyndns.org>
- <CAOHikRBs=tH+MTPTmhDkEpV67grLWJK+6a-i8qeMyx_dJ9oyeA@mail.gmail.com>
- <CAOHikRAcSnD=5gvNkNZz8vUXTjkXQo8W4-KQcGajMeajxd73HQ@mail.gmail.com>
-Message-ID: <20150106134154.GC3077@htj.dyndns.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Jan 2015 21:41:41 +0800
+Subject: [PATCH] ARM: dts: imx51-babbage: Fix ULPI PHY reset modelling
+In-Reply-To: <1420551365.2333.15.camel@pengutronix.de>
+References: <1420478348-2754-1-git-send-email-fabio.estevam@freescale.com>
+ <20150106124343.GM24511@dragon>
+ <1420551365.2333.15.camel@pengutronix.de>
+Message-ID: <20150106134140.GB21729@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 07:10:31PM +0530, Suman Tripathi wrote:
-> Hi ,
+On Tue, Jan 06, 2015 at 02:36:05PM +0100, Lucas Stach wrote:
+> Am Dienstag, den 06.01.2015, 20:43 +0800 schrieb Shawn Guo:
+> > On Mon, Jan 05, 2015 at 03:19:08PM -0200, Fabio Estevam wrote:
+> > > GPIO2_5 is the reset GPIO for the USB3317 ULPI PHY. Instead of modelling it as
+> > > a regulator, the correct approach is to use the 'reset_gpios' property of the
+> > > "usb-nop-xceiv" node.
+> > > 
+> > > GPIO1_7 is the reset GPIO for the USB2517 USB hub. As we currently don't have
+> > > dt bindings to describe a HUB reset, let's keep using the regulator approach.
+> > > 
+> > > Rename the regulator to 'reg_hub_reset' to better describe its function and bind
+> > > it with the USB host1 port instead.
+> > > 
+> > > USB host support has been introduced by commit 9bf206a9d13be3 ("ARM: dts:
+> > > imx51-babbage: Add USB Host1 support"), which landed in 3.16 and it seems that
+> > > USB has only been functional due to previous bootloader initialization.
+> > > 
+> > > With this patch applied we can get USB host to work without relying on the 
+> > > bootloader.
+> > > 
+> > > Cc: <stable@vger.kernel.org> # 3.16+
+> > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Applied, thanks.
+> > 
+> For the record:
+> I'm not happy with this patch. It still abuses the regulator API for
+> something completely unrelated and this may well break again in the
+> future. But given that it fixes an actual regression and you already
+> sent a pull including this I'm okay to keep it.
 > 
-> For more info here is the git log output before applying the patch.
-> 
-> git log
-> 
-> commit b84b25cb0900b99b28c742dd33101be779f58259
-> Merge: 0628ee7 36aae28
-> Author: Tejun Heo <tj@kernel.org>
-> Date:   Tue Jan 6 07:48:24 2015 -0500
->  Merge branch 'for-3.19-fixes' of git://git.kernel.org/pub/scm/linux/kernel/g
-> 
->     Pull to receive the following two ahci_xgene fixes for the planned
->     xgene PMP support patches.
-> 
->      5c0b8e0de76a8 ("ahci_xgene: Fix the endianess issue in APM X-Gene SoC AHCI
->      1102407bb714d ("ahci_xgene: Fix the DMA state machine lockup for the ATA_CM
-> 
->     Signed-off-by: Tejun Heo <tj@kernel.org>
-> 
-> commit 36aae28e3df4127e296f2680d65cb6310ce61021
-> Author: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Date:   Fri Dec 12 17:16:31 2014 +0200
-> 
->     libata: export ata_get_cmd_descript()
-> 
->     The driver sata_dwc_460ex is using this symbol. To build it as a
->     module we have to have the symbol exported. This patch adds
-> Broken pipe
+> We still need a proper fix to handle ULPI resets to get rid of this
+> hackery.
 
-Ah, this was me being stupid.  I was using the old patches.  Sorry
-about that.  Applied to libata/for-3.20.
+Yeah, at least this fix patch removes one user of the regulator hackery.
 
-Thanks.
-
--- 
-tejun
+Shawn
