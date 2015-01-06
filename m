@@ -1,31 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Jan 2015 15:38:26 +0000
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
- <20141215174336.GJ11285@n2100.arm.linux.org.uk>
- <3353119.0CuA8fKaup@vostro.rjw.lan>
- <20141215230922.GL11285@n2100.arm.linux.org.uk>
- <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
-Message-ID: <20150106153825.GH12302@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Jan 2015 09:42:56 -0600
+Subject: [PATCH] ARM: DRA7: beagle-x15: hwmod: Fix boot crash with DEBUG_LL
+In-Reply-To: <54ABFCA7.3080306@ti.com>
+References: <1420532690-29340-1-git-send-email-lokeshvutla@ti.com>
+ <20150106140517.GA3897@kahuna> <20150106150851.GB6502@saruman>
+ <54ABFCA7.3080306@ti.com>
+Message-ID: <20150106154256.GF6502@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
-> On 16 December 2014 at 04:39, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Well, here's a patch which I'm running on top of 3.18 at the moment,
-> > which is basically what I described in my email, and I'm running with it
-> > and it is without any lockdep complaint.
-> 
-> We need two separate patches now, one for 3.18 and other one for 3.19-rc.
-> 3.19 has see lots of changes in this particular file and so we need to
-> change few things here.
+Hi,
 
-I'm sorry, I don't have the bandwidth to create a patch for 3.19-rc
-right now.
+On Tue, Jan 06, 2015 at 09:17:59AM -0600, Nishanth Menon wrote:
+> On 01/06/2015 09:08 AM, Felipe Balbi wrote:
+> > On Tue, Jan 06, 2015 at 08:05:17AM -0600, Nishanth Menon wrote:
+> >>> For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
+> >>>
+> >>> Fixes: 90020c7 (ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data)
+> >>
+> >> Fixes: 90020c7b2c5e ("ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data")
+> > 
+> > what's the difference ? why do you want that many more characters if
+> > those 7 are enough for git to find a uniq commit ? Try this:
+> > 
+> > $ git show --abbrev-commit 90020c7b2c5e02200bc752c8cfeba91c4435588c
+> > 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/SubmittingPatches#n160
+
+alright, if it's Documented, it's best done ;-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/ead50429/attachment.sig>
