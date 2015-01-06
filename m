@@ -1,72 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Jan 2015 11:37:34 -0600
-Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
- volatile
-In-Reply-To: <1419622104-25812-2-git-send-email-balbi@ti.com>
-References: <1419622104-25812-1-git-send-email-balbi@ti.com>
- <1419622104-25812-2-git-send-email-balbi@ti.com>
-Message-ID: <20150106173734.GL6502@saruman>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Jan 2015 09:40:10 -0800
+Subject: [PATCH 2/4] ARM: tegra: Move out nyan-generic parts out from the
+ nyan-big DT
+In-Reply-To: <CAL1qeaETERAm6aTwWycCat-RzQz8UmixWtc-uK4dFsu7wL8HAg@mail.gmail.com>
+References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1420540653-14816-3-git-send-email-tomeu.vizoso@collabora.com>
+ <20150106130656.GF31830@ulmo.nvidia.com>
+ <CAL1qeaETERAm6aTwWycCat-RzQz8UmixWtc-uK4dFsu7wL8HAg@mail.gmail.com>
+Message-ID: <CAOesGMj5EFr89SvskxjwjG8UdVPMJLO4-Up_5WLPUabqyqmXNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
-> STATUS register can be modified by the HW, so we
-> should bypass cache because of that.
-> 
-> In the case of INT[12] registers, they are the ones
-> that actually clear the IRQ source at the time they
-> are read. If we rely on the cache for them, we will
-> never be able to clear the interrupt, which will cause
-> our IRQ line to be disabled due to IRQ throttling.
-> 
-> Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
-> Cc: <stable@vger.kernel.org> # v3.15+
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+On Tue, Jan 6, 2015 at 9:30 AM, Andrew Bresticker <abrestic@google.com> wrote:
+> On Tue, Jan 6, 2015 at 5:06 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
 
-ping
+>>
+>> Back when we merged the nyan-big DTS there was some discussion and it
+>> was concluded that the devices are very similar, with the panel being
+>> one notable exception. So I think that this belongs in the nyan-big
+>> DTS and you need to add a similar property to the nyan-blaze DTS with
+>> the compatible for the panel used in the design. And you might need
+>> to add an entry for the panel in the panel-simple driver, too.
+>
+> That's correct.  There are also variants of big and blaze with 1080p
+> panels, so those will definitely need their own panel nodes as well.
+>
+> Other than that,
+>
+> Acked-by: Andrew Bresticker <abrestic@chromium.org>
 
-> ---
->  drivers/mfd/tps65218.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-> index 0d256cb..2243f75 100644
-> --- a/drivers/mfd/tps65218.c
-> +++ b/drivers/mfd/tps65218.c
-> @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
->  }
->  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
->  
-> +static const struct regmap_range tps65218_yes_ranges[] = {
-> +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
-> +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
-> +};
-> +
-> +static const struct regmap_access_table tps65218_volatile_table = {
-> +	.yes_ranges = tps65218_yes_ranges,
-> +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
-> +};
-> +
->  static struct regmap_config tps65218_regmap_config = {
->  	.reg_bits = 8,
->  	.val_bits = 8,
->  	.cache_type = REGCACHE_RBTREE,
-> +	.volatile_table = &tps65218_volatile_table,
->  };
->  
->  static const struct regmap_irq tps65218_irqs[] = {
-> -- 
-> 2.2.0
-> 
+Shame on both of you for not pruning the patch when replying -- the
+emails go too long for gmail to show them by default. :) :P
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/bc31b617/attachment-0001.sig>
+And yeah, this split looks reasonable to me (with the panel comment fixed)
+
+Feel free to carry:
+
+Acked-by: Olof Johansson <olof@lixom.net>
