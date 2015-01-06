@@ -1,71 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  6 Jan 2015 16:45:08 +0100
-Subject: [PATCH 2/4] usb: XHCI: platform: Move the Marvell quirks after the
- enabling the clocks
-In-Reply-To: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420559110-8043-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue,  6 Jan 2015 16:45:06 +0100
+Subject: [PATCH 0/4] ARM: mvebu: Enable XHCI on the A385-AP
+Message-ID: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 973747928514 ("usb: host: xhci-plat: add support for the Armada
-375/38x XHCI controllers") extended the xhci-plat driver to support the Armada
-375/38x SoCs, mostly by adding a quirk configuring the MBUS window.
+Hi all,
 
-However, that quirk was run before the clock the controllers needs has been
-enabled. This usually worked because the clock was first enabled by the
-bootloader, and left as such until the driver is probe, where it tries to
-access the MBUS configuration registers before enabling the clock.
+This serie enables the Armada 385 AP XHCI controller.
 
-Things get messy when EPROBE_DEFER is involved during the probe, since as part
-of its error path, the driver will rightfully disable the clock. When the
-driver will be reprobed, it will retry to access the MBUS registers, but this
-time with the clock disabled, which hangs forever.
+Since the controller uses a GPIO-controlled VBUS, we used the
+phy-generic driver, and made the needed additions to the xhci-plat
+driver to retrieve a USB phy.
 
-Fix this by running the quirks after the clock has been enabled by the driver.
+Unfortunately, some glitches were also found along the way, mostly
+because of the probe deferring that was introduced by this phy
+retrieval.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.16+
----
- drivers/usb/host/xhci-plat.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+First, the commit 1290a958d48e ("usb: phy: propagate
+__of_usb_find_phy()'s error on failure") introduced in 3.19 broke the
+deferred probing for consumer drivers. The first patch attempts at
+fixing this while keeping the original intention of the author, and
+should probably go in as a fix for 3.19.
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 08d402b15482..34c2f6d3e5d0 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -83,16 +83,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return -ENODEV;
- 
--
--	if (of_device_is_compatible(pdev->dev.of_node,
--				    "marvell,armada-375-xhci") ||
--	    of_device_is_compatible(pdev->dev.of_node,
--				    "marvell,armada-380-xhci")) {
--		ret = xhci_mvebu_mbus_init_quirk(pdev);
--		if (ret)
--			return ret;
--	}
--
- 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
- 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
- 	if (ret)
-@@ -127,6 +117,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 			goto put_hcd;
- 	}
- 
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "marvell,armada-375-xhci") ||
-+	    of_device_is_compatible(pdev->dev.of_node,
-+				    "marvell,armada-380-xhci")) {
-+		ret = xhci_mvebu_mbus_init_quirk(pdev);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto disable_clk;
+Then, since the introduction of the Armada 38x support in 3.16, the
+driver was attempting to write into registers while the clock wasn't
+enabled yet. This was working because the bootloader left it enabled,
+but in the case of a deferred probing, the clock would have been
+disabled by the error path of our driver, and this would fail. This
+should go in 3.19 as well, and any stable kernel for 3.16+.
+
+The two patches remaining are "regular" patches, and are aimed at
+3.20. The last patch depend on my previous serie to introduce support
+for the the A385 AP board.
+
+Thanks,
+Maxime
+
+Maxime Ripard (4):
+  usb: phy: Fix deferred probing
+  usb: XHCI: platform: Move the Marvell quirks after the enabling the
+    clocks
+  usb: xhci: plat: Add USB phy support
+  ARM: mvebu: armada-385-ap: Enable USB3 port
+
+ arch/arm/boot/dts/armada-385-ap.dts | 28 ++++++++++++++++++++++++++++
+ drivers/usb/host/xhci-plat.c        | 32 ++++++++++++++++++++++----------
+ drivers/usb/host/xhci.h             |  2 ++
+ drivers/usb/phy/phy.c               |  6 +++---
+ 4 files changed, 55 insertions(+), 13 deletions(-)
+
 -- 
 2.2.1
