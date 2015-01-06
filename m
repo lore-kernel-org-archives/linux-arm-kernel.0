@@ -1,48 +1,61 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 6 Jan 2015 11:31:14 -0400
-Subject: [PATCH 17/17] ARM: multi_v7_defconfig: Enable TOUCHSCREEN_SUN4I,
- CPU_THERMAL
-In-Reply-To: <1420511727-8242-18-git-send-email-wens@csie.org>
+Date: Tue, 6 Jan 2015 11:32:29 -0400
+Subject: [PATCH 16/17] ARM: sunxi_defconfig: Enable TOUCHSCREEN_SUN4I,
+ CPUFREQ_DT, CPU_THERMAL
+In-Reply-To: <1420511727-8242-17-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-18-git-send-email-wens@csie.org>
-Message-ID: <20150106153111.GF6276@developer>
+ <1420511727-8242-17-git-send-email-wens@csie.org>
+Message-ID: <20150106153227.GG6276@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 10:35:27AM +0800, Chen-Yu Tsai wrote:
-> This patch enables TOUCHSCREEN_SUN4I and CPU_THERMAL to enable cpufreq
-> support with passive cpu cooling (thermal throttling) on sunxi by default.
+On Tue, Jan 06, 2015 at 10:35:26AM +0800, Chen-Yu Tsai wrote:
+> This patch enables TOUCHSCREEN_SUN4I, CPUFREQ_DT, and CPU_THERMAL to
+> enable cpufreq support with passive cpu cooling (thermal throttling)
+> by default.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-for the CPU_THERMAL
+For the thermal part:
 
 Acked-by: Eduardo Valentin <edubezval@gmail.com>
 
 > ---
->  arch/arm/configs/multi_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/configs/sunxi_defconfig | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 2328fe752e9c..0e7159ad269b 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -189,6 +189,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
->  CONFIG_INPUT_TOUCHSCREEN=y
->  CONFIG_TOUCHSCREEN_ATMEL_MXT=y
->  CONFIG_TOUCHSCREEN_STMPE=y
+> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+> index 7a342d2780a8..46a8688bd49a 100644
+> --- a/arch/arm/configs/sunxi_defconfig
+> +++ b/arch/arm/configs/sunxi_defconfig
+> @@ -9,6 +9,8 @@ CONFIG_HIGHMEM=y
+>  CONFIG_HIGHPTE=y
+>  CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+> +CONFIG_CPU_FREQ=y
+> +CONFIG_CPUFREQ_DT=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  CONFIG_PM=y
+> @@ -54,6 +56,8 @@ CONFIG_STMMAC_ETH=y
+>  # CONFIG_INPUT_MOUSEDEV is not set
+>  # CONFIG_INPUT_KEYBOARD is not set
+>  # CONFIG_INPUT_MOUSE is not set
+> +CONFIG_INPUT_TOUCHSCREEN=y
 > +CONFIG_TOUCHSCREEN_SUN4I=y
->  CONFIG_INPUT_MISC=y
->  CONFIG_INPUT_MPU3050=y
->  CONFIG_SERIO_AMBAKMI=y
-> @@ -267,6 +268,7 @@ CONFIG_POWER_RESET_SUN6I=y
->  CONFIG_SENSORS_LM90=y
->  CONFIG_SENSORS_LM95245=y
->  CONFIG_THERMAL=y
+>  CONFIG_SERIAL_8250=y
+>  CONFIG_SERIAL_8250_CONSOLE=y
+>  CONFIG_SERIAL_8250_NR_UARTS=8
+> @@ -71,7 +75,8 @@ CONFIG_GPIO_SYSFS=y
+>  CONFIG_POWER_SUPPLY=y
+>  CONFIG_POWER_RESET=y
+>  CONFIG_POWER_RESET_SUN6I=y
+> -# CONFIG_HWMON is not set
+> +CONFIG_THERMAL=y
 > +CONFIG_CPU_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
->  CONFIG_ST_THERMAL_SYSCFG=y
->  CONFIG_ST_THERMAL_MEMMAP=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_SUNXI_WATCHDOG=y
+>  CONFIG_MFD_AXP20X=y
 > -- 
 > 2.1.4
 > 
@@ -52,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/5c411822/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/b14c1176/attachment.sig>
