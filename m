@@ -1,39 +1,72 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:12 +0800
-Subject: [PATCH 02/17] clk: sunxi: Propagate rate changes to parent for mux
- clocks
+Date: Tue,  6 Jan 2015 10:35:11 +0800
+Subject: [PATCH 01/17] ARM: sunxi: Register cpufreq-dt for sun[45678]i
 In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-3-git-send-email-wens@csie.org>
+Message-ID: <1420511727-8242-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu clock on sunxi machines is just a mux clock, which is normally
-fed by the main PLL, but can be muxed to the main or low power oscillator.
-
-Make the mux clock propagate rate changes to its parent, so we can
-change the clock rate of the PLL, and thus actually implement rate
-changing on the cpu clock.
-
-This patch also removes the no reparenting limit.
+On sun[45678]i, we have one cluster of identical cores sharing a
+clock, which is ideal for using cpufreq-dt. Register a platform
+device for cpufreq-dt.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-sunxi/sunxi.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index d8f17bbcb8e3..df18a2af33ad 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -778,7 +778,7 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
- 	of_property_read_string(node, "clock-output-names", &clk_name);
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index d4bb2395d39c..1bc811a74a9f 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -13,9 +13,15 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+ #include <linux/init.h>
++#include <linux/platform_device.h>
  
- 	clk = clk_register_mux(NULL, clk_name, parents, i,
--			       CLK_SET_RATE_NO_REPARENT, reg,
-+			       CLK_SET_RATE_PARENT, reg,
- 			       data->shift, SUNXI_MUX_GATE_WIDTH,
- 			       0, &clk_lock);
+ #include <asm/mach/arch.h>
  
++static void __init sunxi_dt_cpufreq_init(void)
++{
++	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++}
++
+ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun4i-a10",
+ 	"allwinner,sun5i-a10s",
+@@ -25,6 +31,7 @@ static const char * const sunxi_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+ 	.dt_compat	= sunxi_board_dt_compat,
++	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
+ 
+ static const char * const sun6i_board_dt_compat[] = {
+@@ -45,6 +52,7 @@ static void __init sun6i_timer_init(void)
+ DT_MACHINE_START(SUN6I_DT, "Allwinner sun6i (A31) Family")
+ 	.init_time	= sun6i_timer_init,
+ 	.dt_compat	= sun6i_board_dt_compat,
++	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
+ 
+ static const char * const sun7i_board_dt_compat[] = {
+@@ -54,6 +62,7 @@ static const char * const sun7i_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+ 	.dt_compat	= sun7i_board_dt_compat,
++	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
+ 
+ static const char * const sun8i_board_dt_compat[] = {
+@@ -63,6 +72,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
++	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
+ 
+ static const char * const sun9i_board_dt_compat[] = {
 -- 
 2.1.4
