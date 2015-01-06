@@ -1,39 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Jan 2015 15:05:12 +0100
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150106112929.GB8829@e104818-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Jan 2015 14:11:33 +0000
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <3538097.dWBy3R9lty@wuerfel>
 References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <54ABC2CB.6@linaro.org> <20150106112929.GB8829@e104818-lin.cambridge.arm.com>
-Message-ID: <2647669.mQf6pODdjV@wuerfel>
+ <1797489.PjmKzBFdQA@wuerfel>
+ <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
+ <3538097.dWBy3R9lty@wuerfel>
+Message-ID: <20150106141133.GF8829@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 11:29:29 Catalin Marinas wrote:
-> > >> We will work on this both on ASWG and linux ACPI driver side, as Dong
-> > >> and Charles pointed out, _OSI things can be solved in ACPI spec, when
-> > >> that is done, we can modify the kernel driver to fix the problems above.
-> > >
-> > > Which driver?
+On Tue, Jan 06, 2015 at 01:59:27PM +0000, Arnd Bergmann wrote:
+> On Tuesday 06 January 2015 11:20:01 Catalin Marinas wrote:
+> > On Mon, Jan 05, 2015 at 08:16:30PM +0000, Arnd Bergmann wrote:
+> > > On Monday 05 January 2015 13:13:02 Catalin Marinas wrote:
+> > > > > since passing no DT tables to OS but
+> > > > > acpi=force is missing is a corner case, we can do a follow up patch to
+> > > > > fix that, does it make sense?
+> > > > 
+> > > > Not entirely. Why would no dtb and no acpi=force be a corner case? I
+> > > > thought this should be the default when only ACPI tables are passed, no
+> > > > need for an additional acpi=force argument.
+> > > 
+> > > We don't really support the case of only ACPI tables for now. The expectation
+> > > is that you always have working DT support, at least for the next few years
+> > > as ACPI features are ramping up, and without acpi=force it should not try
+> > > to use ACPI at all.
 > > 
-> > the ACPICA core driver as you suggested, sorry for the confusion.
+> > So if both DT and ACPI are present, just use DT unless acpi=force is
+> > passed. So far I think we agree but what I want to avoid is always
+> > mandating acpi=force even when the DT tables are missing (in the long
+> > run).
 > > 
-> > > What about ACPI_OS_NAME? Would you suggest it is fine to report
-> > > "Microsoft Windows NT" on an ARM system? That _OS_ not _OSI.
-> > 
-> > No, not at all. I prefer "Linux"
-> > In include/acpi/acconfig.h, when ACPI_OS_NAME defined, it says:
-> > "OS name, used for the _OS object.  The _OS object is essentially
-> > obsolete,..."
-> > for some legacy reasons, we needed  "Microsoft Windows NT", but ACPI
-> > for ARM64 on linux is totally new, I think we can change it to
-> > "Linux" when CONFIG_ARM64 as you suggested.
+> > Now, what's preventing a vendor firmware from providing only ACPI
+> > tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
+> > that both DT and ACPI are supported, or at least that dts files are
+> > merged in the kernel first?
 > 
-> We could ignore this change for now if we don't expect the _OS object to
-> be used at all. But do we have any other way to check the AML code for
-> this? Would FWTS catch such obsolete cases?
+> We have no way of enforcing what a board vendor ships, so if they want
+> to have ACPI-only machines for MS Windows, they just won't work by
+> default on Linux.
 
-How about just leaving it out? It's clearly not used for anything
-good, so I don't see the point in passing either Linux or "Microsoft
-Windows NT" here.
+What do you mean by "won't work by default on Linux"? Assuming no
+additional drivers are needed (i.e. a few devices mentioned in SBSA and
+the rest on a PCIe bus, using existing drivers without further
+modifications), do you still want mainline to fail to boot on such
+ACPI-only systems?
 
-	Arnd
+> Once ACPI support is mature enough, we can also have a whitelist or a
+> different default for using it automatically when no DT is present.
+
+Having a white-list requires some for of SoC identification. Does ACPI
+provide such thing (like "model" or "compatible" strings in the top DT
+node)?
+
+> For drivers merged upstream, I would insist that every driver merged
+> for an ARM64 platform has a documented DT binding that is used in the
+> driver.
+
+That's fine by me. I just hope that for hardware aimed at ACPI we won't
+need many non-PCIe drivers.
+
+-- 
+Catalin
