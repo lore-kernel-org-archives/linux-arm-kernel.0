@@ -1,47 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  6 Jan 2015 20:16:44 +0800
-Subject: [PATCH] ARM: imx: drop CPUIDLE_FLAG_TIME_VALID from cpuidle-imx6sx
-Message-ID: <1420546604-14709-1-git-send-email-shawn.guo@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 6 Jan 2015 13:27:51 +0100
+Subject: [PATCH] ASoC: sam9g20_wm8731: drop machine_is_xxx
+In-Reply-To: <20150106120049.GX2634@sirena.org.uk>
+References: <1420542872-10015-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150106120049.GX2634@sirena.org.uk>
+Message-ID: <20150106122751.GO4194@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the result of commit b82b6cca4880 ("cpuidle: Invert
-CPUIDLE_FLAG_TIME_VALID logic"), the flag gets removed and hence we see
-the compile error below.
+Hi,
 
-  CC      arch/arm/mach-imx/cpuidle-imx6sx.o
-arch/arm/mach-imx/cpuidle-imx6sx.c:69:13: error: ?CPUIDLE_FLAG_TIME_VALID? undeclared here (not in a function)
+On 06/01/2015 at 12:00:49 +0000, Mark Brown wrote :
+> On Tue, Jan 06, 2015 at 12:14:32PM +0100, Alexandre Belloni wrote:
+> > Atmel based boards can now only be used with device tree. Drop non DT
+> > initialization.
+> 
+> This doesn't apply against current code, please check and resend.
 
-Since the behavior of the original flag has been the default, we can
-simply drop the flag now.
+It should apply after "sound: soc: atmel sam9g20_wm8731: remove useless
+include". I was based on 3.19-rc2.
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/cpuidle-imx6sx.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-index d8a9f219e028..5a36722b089d 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-@@ -66,8 +66,7 @@ static struct cpuidle_driver imx6sx_cpuidle_driver = {
- 		{
- 			.exit_latency = 50,
- 			.target_residency = 75,
--			.flags = CPUIDLE_FLAG_TIME_VALID |
--				CPUIDLE_FLAG_TIMER_STOP,
-+			.flags = CPUIDLE_FLAG_TIMER_STOP,
- 			.enter = imx6sx_enter_wait,
- 			.name = "WAIT",
- 			.desc = "Clock off",
-@@ -81,7 +80,6 @@ static struct cpuidle_driver imx6sx_cpuidle_driver = {
- 			 */
- 			.exit_latency = 300,
- 			.target_residency = 500,
--			.flags = CPUIDLE_FLAG_TIME_VALID,
- 			.enter = imx6sx_enter_wait,
- 			.name = "LOW-POWER-IDLE",
- 			.desc = "ARM power off",
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
