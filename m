@@ -1,186 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Jan 2015 10:39:51 +0100
-Subject: Build regressions/improvements in v3.19-rc3
-In-Reply-To: <1420536979-31149-1-git-send-email-geert@linux-m68k.org>
-References: <1420536979-31149-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdXXw_GiaDrtwmBSExwyYQe2t2io5j3V0fCawAc64-tXrA@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 6 Jan 2015 10:49:44 +0100
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54818768.3080303@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk>
+ <54818768.3080303@samsung.com>
+Message-ID: <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 6, 2015 at 10:36 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v3.19-rc3[1] to v3.19-rc2[3], the summaries are:
->   - build errors: +64/-9
+Hello Marek,
 
-  + /home/kisskb/slave/src/arch/arm/mm/dma-mapping.c: error:
-'VM_ARM_DMA_CONSISTENT' undeclared (first use in this function):  =>
-1200:4, 1281:29, 1410:4
-  + /home/kisskb/slave/src/arch/arm/mm/dma-mapping.c: error:
-'atomic_pool' undeclared (first use in this function):  => 1264:31
-  + /home/kisskb/slave/src/arch/arm/mm/dma-mapping.c: error: implicit
-declaration of function '__in_atomic_pool'
-[-Werror=implicit-function-declaration]:  => 1274:2
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_BUFFERABLE' undeclared here (not in a function):  => 81:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_DEV_CACHED' undeclared here (not in a function):  => 117:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_DEV_NONSHARED' undeclared here (not in a function):  =>
-108:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_DEV_SHARED' undeclared here (not in a function):  => 103:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_DEV_WC' undeclared here (not in a function):  => 113:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_MT_MASK'
-undeclared here (not in a function):  => 76:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_MINICACHE' undeclared here (not in a function):  => 94:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_UNCACHED' undeclared here (not in a function):  => 77:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_WRITEALLOC' undeclared here (not in a function):  => 99:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_WRITEBACK' undeclared here (not in a function):  => 89:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'L_PTE_MT_WRITETHROUGH' undeclared here (not in a function):  => 85:10
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_RDONLY'
-undeclared here (not in a function):  => 61:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_SHARED'
-undeclared here (not in a function):  => 71:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_USER'
-undeclared here (not in a function):  => 56:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_XN'
-undeclared here (not in a function):  => 66:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'PMD_SECT_AP_READ' undeclared here (not in a function):  => 153:13
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'PMD_SECT_AP_WRITE' undeclared here (not in a function):  => 153:32
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PMD_SECT_S'
-undeclared here (not in a function):  => 175:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PMD_SECT_XN'
-undeclared here (not in a function):  => 170:11
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PMD_SIZE'
-undeclared (first use in this function):  => 279:22
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PTRS_PER_PGD'
-undeclared (first use in this function):  => 319:23
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PTRS_PER_PMD'
-undeclared (first use in this function):  => 278:18
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PTRS_PER_PTE'
-undeclared (first use in this function):  => 266:18
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'SECTION_SIZE'
-undeclared (first use in this function):  => 285:7
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
-'USER_PGTABLES_CEILING' undeclared (first use in this function):  =>
-223:13, 311:23
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[0].mask'):  => 153:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[1].mask'):  => 157:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[1].val'):  => 158:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[2].mask'):  => 161:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[2].val'):  => 162:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[3].mask'):  => 165:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[3].val'):  => 166:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[4].mask'):  => 170:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[4].val'):  => 171:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[5].mask'):  => 175:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
-initialization for 'section_bits[5].val'):  => 176:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
-declaration of function 'pmd_large'
-[-Werror=implicit-function-declaration]:  => 280:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
-declaration of function 'pmd_none'
-[-Werror=implicit-function-declaration]:  => 280:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
-declaration of function 'pmd_present'
-[-Werror=implicit-function-declaration]:  => 280:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
-declaration of function 'pte_offset_kernel'
-[-Werror=implicit-function-declaration]:  => 262:2
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: initializer
-element is not constant:  => 158:3, 162:3, 176:3, 170:3, 157:3, 175:3,
-161:3, 153:3, 171:3, 165:3, 166:3
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: invalid operands
-to binary * (have 'unsigned int' and 'const struct prot_bits *'):  =>
-279:20
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: invalid operands
-to binary / (have 'const struct prot_bits *' and 'long unsigned int'):
- => 311:45
-  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: invalid operands
-to binary | (have 'const struct prot_bits *' and 'const struct
-prot_bits *'):  => 165:30, 153:30, 166:30, 157:30, 161:30
-  + /home/kisskb/slave/src/arch/arm/mm/init.c: error: 'SECTION_SIZE'
-undeclared (first use in this function):  => 733:2
-  + /home/kisskb/slave/src/arch/arm/mm/init.c: error: 'pmdval_t'
-undeclared here (not in a function):  => 633:12
-  + /home/kisskb/slave/src/arch/arm/mm/init.c: error: expected
-declaration specifiers or '...' before 'pmdval_t':  => 678:7, 677:55
-  + /home/kisskb/slave/src/arch/arm/mm/init.c: error: implicit
-declaration of function 'section_update'
-[-Werror=implicit-function-declaration]:  => 733:2
-  + /home/kisskb/slave/src/arch/arm/mm/init.c: error: unknown type
-name 'pmdval_t':  => 625:2, 623:2, 624:2
+On Fri, Dec 5, 2014 at 11:22 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> On 2014-12-02 10:59, Sjoerd Simons wrote:
+>>>
+>>> This is another attempt to finally make Exynos SYSMMU driver fully
+>>> integrated with DMA-mapping subsystem. The main change from previous
+>>> version is a rebase onto latest "automatic DMA configuration for IOMMU
+>>> masters" patches from Will Deacon.
+>>
+>> Do you happen to know if anyone is working on iommu/dma-mapping patches
+>> for Exynos 5 based on this patchset?
+>
+>
+> I hope to add Exynos5 SYSMMU patches to the next iteration of my patchset,
+> but I doubt it will get into v3.19-rc1.
+>
+>> For some background to that question, We (re-)discovered yesterday that
+>> the out-of-tree exynos-reference kernel iommu patches are required to
+>> get HDMI out working on exynos 5 boards. The current situation in
+>> mainline is rather broken, HDMI output without CONFIG_DRM_EXYNOS_IOMMU
+>> results in just displaying stripes[0]. While turning on
+>> CONFIG_DRM_EXYNOS_IOMMU causes a kernel oops at boot....
+>
+>
+> We have observed similar issues with Exynos4 based boards, when LCD0 power
+> domain was turned off and only TV power domain has been powered on. Please
+> check the power domain configuration. Maybe in case of Exynos5 the same
 
-arm-randconfig (CONFIG_ARM_PTDUMP is broken?)
+So IIUC what you are saying is that enabling the Exynos DRM IOMMU
+support has the side effect of turning on all the power domains needed
+by HDMI? I've compared the power domains configuration in mainline
+with the downstream exynos-reference [0] tree and I didn't find any
+differences.
 
-  + /home/kisskb/slave/src/drivers/coresight/coresight-etb10.c: error:
-implicit declaration of function 'of_get_coresight_platform_data'
-[-Werror=implicit-function-declaration]:  => 430:3
-  + /home/kisskb/slave/src/drivers/coresight/coresight-funnel.c:
-error: implicit declaration of function
-'of_get_coresight_platform_data'
-[-Werror=implicit-function-declaration]:  => 189:3
-  + /home/kisskb/slave/src/drivers/coresight/coresight-replicator.c:
-error: implicit declaration of function
-'of_get_coresight_platform_data'
-[-Werror=implicit-function-declaration]:  => 72:3
-  + /home/kisskb/slave/src/drivers/coresight/coresight-tmc.c: error:
-implicit declaration of function 'of_get_coresight_platform_data'
-[-Werror=implicit-function-declaration]:  => 625:3
-  + /home/kisskb/slave/src/drivers/coresight/coresight-tpiu.c: error:
-implicit declaration of function 'of_get_coresight_platform_data'
-[-Werror=implicit-function-declaration]:  => 131:3
+> issue
+> is caused by the interaction between DISP1 and GSCL domains.
+>
 
-arm-randconfig
+I was also not able to find a dependency betwen GSCL and DISP1 power
+domains in the Exynos 5420 manual. But If that's the case then your
+patch to add support for sub-power domains on Exynos [1] will also be
+needed, right?
 
-  + /home/kisskb/slave/src/arch/sh/mm/cache-sh4.c: error:
-'cached_to_uncached' undeclared (first use in this function):  =>
-99:17
-  + /home/kisskb/slave/src/arch/sh/mm/cache-sh4.c: error: implicit
-declaration of function 'cpu_context'
-[-Werror=implicit-function-declaration]:  => 192:2
+AFAICT from the manual, all the used modules in the case of HDMI +
+Display (LCD, DP, HDMI and MIXER) needs only the DISP1 power domain to
+be enabled which BTW was removed for Exynos5420 on commit d51cad7
+("ARM: dts: remove display power domain for exynos5420"). It seems to
+work just because the power domain is turned on by the bootloader.
 
-sh-randconfig
+Also I tried forcing the kernel to not disable unused power domains by
+passing the pd_ignore_unused parameter to the kernel command line. I
+see on the kernel log a "genpd: Not disabling unused power domains"
+message but HDMI output still has the stripes that Sjoerd mentioned.
+Do you know if Exynos DRM HDMI in mainline is supposed to work without
+SysMMU / IOMMU support?
 
-  + /home/kisskb/slave/src/kernel/bounds.c: error: -mcall-aixdesc must
-be big endian:  => 1:0
-  + /home/kisskb/slave/src/scripts/mod/devicetable-offsets.c: error:
--mcall-aixdesc must be big endian:  => 1:0
-  + /home/kisskb/slave/src/scripts/mod/empty.c: error: -mcall-aixdesc
-must be big endian:  => 1:0
-  + <stdin>: error: -mcall-aixdesc must be big endian:  => 1:0
+Thanks a lot for your help and suggestions.
 
-powerpc-randconfig
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/8277/ (255 out of 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/8257/ (all 262 configs)
+Best regards,
+Javier
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[0]: https://github.com/exynos-reference/kernel/commits/exynos5-v3.17-rc1-chrome
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308335.html
