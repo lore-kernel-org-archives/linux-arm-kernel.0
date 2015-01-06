@@ -1,63 +1,86 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 6 Jan 2015 20:36:16 +0000 (UTC)
-Subject: [PATCH 3/4] arm64: fix missing asm/alternative.h include in
- kernel/module.c
-In-Reply-To: <20150106104008.GD4858@leverpostej>
-References: <20150106014554.27249.89116.stgit@dusk.lan>
- <20150106015215.27249.86394.stgit@dusk.lan>
- <20150106104008.GD4858@leverpostej>
-Message-ID: <alpine.DEB.2.02.1501062034560.28771@utopia.booyaka.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Jan 2015 14:38:08 -0600
+Subject: [PATCH v2] irqchip: omap-intc: fix legacy DMA regression
+In-Reply-To: <1420563093-26026-1-git-send-email-balbi@ti.com>
+References: <1420563093-26026-1-git-send-email-balbi@ti.com>
+Message-ID: <1420576688-10604-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+commit 55601c9f2467 (arm: omap: intc: switch over
+to linear irq domain) introduced a regression with
+SDMA legacy driver because that driver strictly depends
+on INTC's IRQs starting at NR_IRQs. Aparently
+irq_domain_add_linear() won't guarantee that, since we see
+a 7 IRQs difference when booting with and without the
+commit cited above.
 
-On Tue, 6 Jan 2015, Mark Rutland wrote:
+Until arch/arm/plat-omap/dma.c is properly fixed, we
+must maintain OMAP2/3 using irq_domain_add_legacy().
 
-> If this can move above the include of asm/insn.h:
+A FIXME note was added so people know to delete that
+code once that legacy DMA driver is fixed up.
 
-Done; updated patch below.  
-
-cheers,
-
-- Paul
-
-
-From: Paul Walmsley <pwalmsley@nvidia.com>
-Date: Mon, 5 Jan 2015 17:38:41 -0700
-Subject: [PATCH 3/4] arm64: fix missing asm/alternative.h include in kernel/module.c
-
-On next-20150105, defconfig compilation breaks with:
-
-arch/arm64/kernel/module.c:408:4: error: implicit declaration of function ?apply_alternatives? [-Werror=implicit-function-declaration]
-
-Fix by including asm/alternative.h, where the apply_alternatives()
-prototype is declared.
-
-This second version incorporates a comment from Mark Rutland
-<mark.rutland@arm.com> to keep the includes in alphabetical order
-by filename.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Paul Walmsley <pwalmsley@nvidia.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 55601c9f2467 (arm: omap: intc: switch over to linear irq domain)
+Cc: <stable@vger.kernel.org> # v3.18
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm64/kernel/module.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-omap-intc.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index fd027b101de5..9b6f71db2709 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -25,6 +25,7 @@
- #include <linux/mm.h>
- #include <linux/moduleloader.h>
- #include <linux/vmalloc.h>
-+#include <asm/alternative.h>
- #include <asm/insn.h>
- #include <asm/sections.h>
+diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+index 3c970259c0eb..6ef88f56cf8d 100644
+--- a/drivers/irqchip/irq-omap-intc.c
++++ b/drivers/irqchip/irq-omap-intc.c
+@@ -263,7 +263,7 @@ static int __init omap_init_irq_of(struct device_node *node)
+ 	return ret;
+ }
  
+-static int __init omap_init_irq_legacy(u32 base)
++static int __init omap_init_irq_legacy(u32 base, struct device_node *node)
+ {
+ 	int j, irq_base;
+ 
+@@ -277,7 +277,7 @@ static int __init omap_init_irq_legacy(u32 base)
+ 		irq_base = 0;
+ 	}
+ 
+-	domain = irq_domain_add_legacy(NULL, omap_nr_irqs, irq_base, 0,
++	domain = irq_domain_add_legacy(node, omap_nr_irqs, irq_base, 0,
+ 			&irq_domain_simple_ops, NULL);
+ 
+ 	omap_irq_soft_reset();
+@@ -301,10 +301,26 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
+ {
+ 	int ret;
+ 
+-	if (node)
++	/*
++	 * FIXME legacy OMAP DMA driver sitting under arch/arm/plat-omap/dma.c
++	 * depends is still not ready for linear IRQ domains; because of that
++	 * we need to temporarily "blacklist" OMAP2 and OMAP3 devices from using
++	 * linear IRQ Domain until that driver is finally fixed.
++	 */
++	if (of_device_is_compatible(node, "ti,omap2-intc") ||
++			of_device_is_compatible(node, "ti,omap3-intc")) {
++		struct resource res;
++
++		if (of_address_to_resource(node, 0, &res))
++			return -ENOMEM;
++
++		base = res.start;
++		ret = omap_init_irq_legacy(base, node);
++	} else if (node) {
+ 		ret = omap_init_irq_of(node);
+-	else
+-		ret = omap_init_irq_legacy(base);
++	} else {
++		ret = omap_init_irq_legacy(base, NULL);
++	}
+ 
+ 	if (ret == 0)
+ 		omap_irq_enable_protection();
 -- 
-2.1.4
+2.2.0
