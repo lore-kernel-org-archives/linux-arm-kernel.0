@@ -1,47 +1,90 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 6 Jan 2015 17:16:57 +0800
-Subject: [PATCH v4 4/5] ARM: mediatek: Add EINT support to MTK pinctrl
- driver.
-In-Reply-To: <1418807365.6443.17.camel@mtksdaap41>
-References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
- <1418772873-19747-5-git-send-email-hongzhou.yang@mediatek.com>
- <1418807365.6443.17.camel@mtksdaap41>
-Message-ID: <1420535817.17567.10.camel@mtksdaap41>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 6 Jan 2015 09:19:18 +0000
+Subject: [PATCH 4/8] memblock: introduce memblock_add_phys() and
+ memblock_is_physmem()
+In-Reply-To: <1419275322-29811-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419275322-29811-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150106091918.GI3163@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-12-17 at 17:09 +0800, Yingjoe Chen wrote:
-> On Wed, 2014-12-17 at 07:34 +0800, Hongzhou Yang wrote:
-> > From: Maoguang Meng <maoguang.meng@mediatek.com>
-> > 
-> > MTK SoC support external interrupt(EINT) from most SoC pins.
-> > Add EINT support to pinctrl driver.
-> > 
-> > Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
-> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+(Moar reviewers)
+
+On Mon, 22 Dec, at 07:08:38PM, Ard Biesheuvel wrote:
+> This introduces the following functions:
+> - memblock_add_phys(), that registers regions in the 'physmem' memblock map if
+>   CONFIG_HAVE_MEMBLOCK_PHYS_MAP is set; otherwise, it is a nop
+> - memblock_is_physmem(), returns whether a physical address is classified as
+>   physical memory.
 > 
-> Hi Linus,
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  include/linux/memblock.h | 10 ++++++++++
+>  mm/memblock.c            | 15 +++++++++++++++
+>  2 files changed, 25 insertions(+)
 > 
-> This patch add EINT support to the pinctrl driver. We've surveyed
-> GPIOLIB_IRQCHIP, but we didn't use it because:
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index e8cc45307f8f..d32fe838c6ca 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -365,6 +365,16 @@ static inline unsigned long memblock_region_reserved_end_pfn(const struct memblo
+>  #define __initdata_memblock
+>  #endif
+>  
+> +#ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+> +int memblock_add_phys(phys_addr_t base, phys_addr_t size);
+> +int memblock_is_physmem(phys_addr_t addr);
+> +#else
+> +static inline int memblock_add_phys(phys_addr_t base, phys_addr_t size)
+> +{
+> +	return 0;
+> +}
+> +#endif /* CONFIG_HAVE_MEMBLOCK_PHYS_MAP */
+> +
+>  #else
+>  static inline phys_addr_t memblock_alloc(phys_addr_t size, phys_addr_t align)
+>  {
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index c27353beb260..107aa5ee2d7b 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -586,6 +586,14 @@ int __init_memblock memblock_add(phys_addr_t base, phys_addr_t size)
+>  				   MAX_NUMNODES, 0);
+>  }
+>  
+> +#ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+> +int __init_memblock memblock_add_phys(phys_addr_t base, phys_addr_t size)
+> +{
+> +	return memblock_add_range(&memblock.physmem, base, size,
+> +				  MAX_NUMNODES, 0);
+> +}
+> +#endif
+> +
+>  /**
+>   * memblock_isolate_range - isolate given range into disjoint memblocks
+>   * @type: memblock type to isolate range for
+> @@ -1398,6 +1406,13 @@ int __init_memblock memblock_is_memory(phys_addr_t addr)
+>  	return memblock_search(&memblock.memory, addr) != -1;
+>  }
+>  
+> +#ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+> +int __init_memblock memblock_is_physmem(phys_addr_t addr)
+> +{
+> +	return memblock_search(&memblock.physmem, addr) != -1;
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>  int __init_memblock memblock_search_pfn_nid(unsigned long pfn,
+>  			 unsigned long *start_pfn, unsigned long *end_pfn)
+> -- 
+> 1.8.3.2
 > 
-> - Not every GPIO pin support interrupt.
-> - EINT use a different numbering to GPIO. eg, from the mt8135 table,
-> GPIO29 is EINT158. It is more nature & efficient to use EINT number as
-> hwirq.
-> 
-> +               MTK_EINT_FUNCTION(2, 158),
-> +               MTK_FUNCTION(0, "GPIO29"),
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-
-Hi Linus,
-
-After further looking into this, we could use GPIOLIB_IRQCHIP if we add
-an extension gpiochip_irqchip_add() to accept interrupt numbers and
-custom .to_irq function for our SoC. We could still reuse other code
-GPIOLIB_IRQCHIP provide.
-
-Please let me know what you think about this idea.
-Thanks.
-
-Joe.C
+-- 
+Matt Fleming, Intel Open Source Technology Center
