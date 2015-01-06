@@ -1,131 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 7 Jan 2015 03:09:09 +0800
-Subject: [PATCH 04/17] ARM: dts: sunxi: Add dtsi for AXP209 PMIC
-In-Reply-To: <20150106155838.GS7853@lukather>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-5-git-send-email-wens@csie.org>
- <20150106155838.GS7853@lukather>
-Message-ID: <CAGb2v6653HaBidzGhNSbiiWM5iUJDQ8_TyDsSLu=nSYju+a+Vg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Jan 2015 19:14:32 +0000
+Subject: [PATCH v2 03/40] arm64/uaccess: fix sparse errors
+In-Reply-To: <1420558883-10131-4-git-send-email-mst@redhat.com>
+References: <1420558883-10131-1-git-send-email-mst@redhat.com>
+ <1420558883-10131-4-git-send-email-mst@redhat.com>
+Message-ID: <20150106191432.GC32449@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Michael,
 
-On Tue, Jan 6, 2015 at 11:58 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Jan 06, 2015 at 10:35:14AM +0800, Chen-Yu Tsai wrote:
->> The AXP209 PMIC is used with some Allwinner SoCs. This patch adds
->> a dtsi file listing all the regulator nodes. The regulators are
->> initialized based on their device node names.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/axp209.dtsi | 87 +++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 87 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/axp209.dtsi
->>
->> diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
->> new file mode 100644
->> index 000000000000..3c38cbafe285
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/axp209.dtsi
->> @@ -0,0 +1,87 @@
->> +/*
->> + * Copyright 2015 Chen-Yu Tsai
->> + *
->> + * Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + *     You should have received a copy of the GNU General Public
->> + *     License along with this file; if not, write to the Free
->> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->> + *     MA 02110-1301 USA
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/*
->> + * AXP202/209 Integrated Power Management Chip
->> + * http://www.x-powers.com/product/AXP20X.php
->> + * http://dl.linux-sunxi.org/AXP/AXP209%20Datasheet%20v1.0_cn.pdf
->> + */
->> +
->> +&axp209 {
->> +     regulators {
->> +             /* Default work frequency for buck regulators */
->> +             x-powers,dcdc-freq = <1500>;
->> +
->> +             /* This section lists all the regulators */
->
-> I don't think this comment is necessary.
->
->> +             reg_dcdc2: dcdc2 {
->> +             };
->> +
->> +             reg_dcdc3: dcdc3 {
->> +             };
->> +
->> +             reg_ldo1: ldo1 {
->> +                     /* LDO1 is a fixed output regulator */
->> +                     regulator-always-on;
->> +                     regulator-min-microvolt = <1300000>;
->> +                     regulator-max-microvolt = <1300000>;
->> +             };
->> +
->> +             reg_ldo2: ldo2 {
->> +             };
->> +
->> +             reg_ldo3: ldo3 {
->> +             };
->> +
->> +             reg_ldo4: ldo4 {
->> +             };
->> +
->> +             reg_ldo5: ldo5 {
->> +             };
->
-> Some default names for the regulator would be great!
+On Tue, Jan 06, 2015 at 03:43:40PM +0000, Michael S. Tsirkin wrote:
+> virtio wants to read bitwise types from userspace using get_user.  At the
+> moment this triggers sparse errors, since the value is passed through an
+> integer.
+> 
+> Fix that up using __force.
+> 
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> ---
 
-Default names are already given through the regulator driver.
-They are full uppercase names, like in the datasheet.
+Did you want us to take this via the arm64 tree, or are you planning to
+merge it via another route?
 
-I could add lowercase names here for the default.
+Will
 
-ChenYu
+>  arch/arm64/include/asm/uaccess.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 3bf8f4e..9a2069b 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -147,7 +147,7 @@ do {									\
+>  	default:							\
+>  		BUILD_BUG();						\
+>  	}								\
+> -	(x) = (__typeof__(*(ptr)))__gu_val;				\
+> +	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
+>  } while (0)
+>  
+>  #define __get_user(x, ptr)						\
+> -- 
+> MST
+> 
+> 
