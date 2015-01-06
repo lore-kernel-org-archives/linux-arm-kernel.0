@@ -1,41 +1,55 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 6 Jan 2015 13:39:17 +0000
-Subject: [PATCH 1/2] arm64: don't make early_*map() calls post
- paging_init()
-In-Reply-To: <CAKv+Gu_EWCYYcmsLuojGGQ+6x+Lp5fWJQ+4fvR-4fqXqU2f53Q@mail.gmail.com>
-References: <1420482835-6444-1-git-send-email-leif.lindholm@linaro.org>
- <1420482835-6444-2-git-send-email-leif.lindholm@linaro.org>
- <CAKv+Gu_EWCYYcmsLuojGGQ+6x+Lp5fWJQ+4fvR-4fqXqU2f53Q@mail.gmail.com>
-Message-ID: <20150106133917.GB3827@bivouac.eciton.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue,  6 Jan 2015 14:39:10 +0100
+Subject: [PATCH] ARM: shmobile: sh73a0 legacy: Set .control_parent for all
+ irqpin instances
+Message-ID: <1420551550-27512-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 09:38:24AM +0000, Ard Biesheuvel wrote:
-> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > index 6fac253..790adb5 100644
-> > --- a/arch/arm64/kernel/efi.c
-> > +++ b/arch/arm64/kernel/efi.c
+The sh73a0 INTC can't mask interrupts properly most likely due to a
+hardware bug. Set the .control_parent flag to delegate masking to the
+parent interrupt controller, like was already done for irqpin1.
 
-> > @@ -393,6 +385,8 @@ static int __init arm64_enter_virtual_mode(void)
-> >                                                    mapsize);
-> >         memmap.map_end = memmap.map + mapsize;
-> >
-> > +       efi_setup_idmap();
-> > +
-> 
-> I think this is incorrect: we may call early_alloc() here which is
-> only allowed before paging_init()
+Without this, accessing the three-axis digital accelerometer ADXL345
+on kzm9g through /dev/input/event1 causes an interrupt storm, which
+requires a power-cycle to recover from.
 
-Hmm...
-Technically, the existing code is already breaking this restriction
-then - but my patch moved that _way_ later in the boot process (early
-initcall instead of setup_arch()).
+This was inspired by a patch for arch/arm/boot/dts/sh73a0.dtsi from
+Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
 
-I'll resend with an alternative solution that leaves the
-efi_setup_idmap() ordering vs paging init() in its current state.
-Since efi_setup_idmap() goes away with your "stable UEFI virtual
-mappings for kexec" series, I don't want to make changes here and for
-potential backports too invasive.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fixes: 341eb5465f67437a ("ARM: shmobile: INTC External IRQ pin driver on sh73a0")
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-/
-    Leif
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 354cab111bf17ea6..613ce65184a6648c 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -595,6 +595,7 @@ static struct platform_device ipmmu_device = {
+ 
+ static struct renesas_intc_irqpin_config irqpin0_platform_data = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
++	.control_parent = true,
+ };
+ 
+ static struct resource irqpin0_resources[] = {
+@@ -656,6 +657,7 @@ static struct platform_device irqpin1_device = {
+ 
+ static struct renesas_intc_irqpin_config irqpin2_platform_data = {
+ 	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
++	.control_parent = true,
+ };
+ 
+ static struct resource irqpin2_resources[] = {
+@@ -686,6 +688,7 @@ static struct platform_device irqpin2_device = {
+ 
+ static struct renesas_intc_irqpin_config irqpin3_platform_data = {
+ 	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
++	.control_parent = true,
+ };
+ 
+ static struct resource irqpin3_resources[] = {
+-- 
+1.9.1
