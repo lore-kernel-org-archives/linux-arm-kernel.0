@@ -1,62 +1,72 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:17 +0800
-Subject: [PATCH 07/17] ARM: dts: sun7i: Add cpu thermal zones to dtsi
+Date: Tue,  6 Jan 2015 10:35:15 +0800
+Subject: [PATCH 05/17] ARM: dts: sunxi: Enable thermal sensor support for RTP
+ on sun[457]i
 In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-8-git-send-email-wens@csie.org>
+Message-ID: <1420511727-8242-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core temperature sensor now supports thermal zones. Add a thermal
-zone mapping for the cpus with passive cooling (cpufreq throttling).
+Now that the resistive touchpanel driver supports thermal sensors,
+add the "#thermal-sensor-cells" property as required by the thermal
+framework.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 1 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 1 +
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 1 +
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 1 +
+ 4 files changed, 4 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 847d5e09fcfb..f92635ecb937 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -712,6 +712,7 @@
+ 			compatible = "allwinner,sun4i-a10-ts";
+ 			reg = <0x01c25000 0x100>;
+ 			interrupts = <29>;
++			#thermal-sensor-cells = <0>;
+ 		};
+ 
+ 		uart0: serial at 01c28000 {
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 3c3c1920788a..8d324ef7e46e 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -535,6 +535,7 @@
+ 			compatible = "allwinner,sun4i-a10-ts";
+ 			reg = <0x01c25000 0x100>;
+ 			interrupts = <29>;
++			#thermal-sensor-cells = <0>;
+ 		};
+ 
+ 		uart0: serial at 01c28000 {
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 2448d7f38d6b..4fe0bd192e29 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -469,6 +469,7 @@
+ 			compatible = "allwinner,sun4i-a10-ts";
+ 			reg = <0x01c25000 0x100>;
+ 			interrupts = <29>;
++			#thermal-sensor-cells = <0>;
+ 		};
+ 
+ 		uart1: serial at 01c28400 {
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 887b0521bbfb..951e99ed3aa9 100644
+index e21ce5992d56..01c7133e699c 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -111,6 +111,38 @@
+@@ -926,6 +926,7 @@
+ 			compatible = "allwinner,sun4i-a10-ts";
+ 			reg = <0x01c25000 0x100>;
+ 			interrupts = <0 29 4>;
++			#thermal-sensor-cells = <0>;
  		};
- 	};
  
-+	thermal-zones {
-+		cpu_thermal {
-+			/* milliseconds */
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&rtp>;
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert0>;
-+					cooling-device = <&cpu0 (-1) (-1)>;
-+				};
-+			};
-+
-+			trips {
-+				cpu_alert0: cpu_alert0 {
-+					/* milliCelsius */
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit: cpu_crit {
-+					/* milliCelsius */
-+					temperature = <100000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 	};
+ 		uart0: serial at 01c28000 {
 -- 
 2.1.4
