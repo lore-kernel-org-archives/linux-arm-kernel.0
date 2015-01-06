@@ -1,80 +1,63 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Tue, 6 Jan 2015 17:10:29 +0530
-Subject: [PATCH 1/2] mmc: host: arasan: Add addition of-arasan quirks and
- add IOMMU support.
-In-Reply-To: <3866536.C6OiUcuGCr@wuerfel>
-References: <1418662867-9210-1-git-send-email-stripathi@apm.com>
- <1418662867-9210-2-git-send-email-stripathi@apm.com>
- <3866536.C6OiUcuGCr@wuerfel>
-Message-ID: <CAOHikRCV7RaxJz-A_s6g++ueg3CDe9Jrqcog1Lc2_+KXR9QqnQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Jan 2015 11:53:28 +0000
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <20150105205227.GA24657@amd>
+References: <548F9668.6080900@linaro.org>
+ <20150105205227.GA24657@amd>
+Message-ID: <20150106115328.GC8829@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, Jan 05, 2015 at 08:52:27PM +0000, Pavel Machek wrote:
+> > Back in September 2014, a meeting was held at Linaro Connect where we
+> > discussed what issues remained before the arm64 ACPI core patches could
+> > be merged into the kernel, creating the TODO list below.  I should have
+> > published this list sooner; I got focused on trying to resolve some of
+> > the issues instead.
+> > 
+> > We have made some progress on all of these items.  But, I want to make
+> > sure we haven't missed something.  Since this list was compiled by only
+> > the people in the room at Connect, it is probable we have.  I, for one,
+> > do not yet claim omniscience.
+> > 
+> > So, I want to ask the ARM and ACPI communities:
+> > 
+> >   -- Is this list correct?
+> > 
+> >   -- Is this list complete?
+> 
+> I'm not sure this is how kernel development works. Expect new issues
+> to be raised as patches are being reviewed.
 
-On Monday 15 December 2014 22:31:06 Suman Tripathi wrote:
-> @@ -162,6 +206,16 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->                 goto clk_dis_ahb;
->         }
->
-> +#if defined(CONFIG_IOMMU_SUPPORT)
-> +       sdhci_arasan->domain = iommu_domain_alloc(&amba_bustype);
-> +       if (!sdhci_arasan->domain) {
-> +               dev_err(&pdev->dev, "Unable to allocate iommu domain\n");
-> +               return PTR_ERR(sdhci_arasan->domain);
-> +       }
-> +
-> +       iommu_attach_device(sdhci_arasan->domain, &pdev->dev);
-> +#endif
-> +
->
+The problem with ACPI is not just the core patches but the entire
+hardware/firmware/kernel ecosystem and their interaction, which cannot
+always be captured in Linux patches (e.g. firmware test suite, LuvOS,
+_DSD properties review process, hardware standardisation).
 
-Device drivers should never care about the implementation details
-of the iommu. Please change the code to use the regular dma_map_*
-interfaces that will work both with and without IOMMU.
+The above is a to-do list that we raised last year. Of course, new
+issues will appear, that's just some items where we can say (for the
+time being) that the situation got to an acceptable state once
+implemented.
 
-After refer to iommu binding , there is a service that allows "Remap
-address space to allow devices to access physical memory ranges that
-they otherwise wouldn't be capable of accessing." eg : 32-bit to 64
-bit DMA .
+> > 7. Why is ACPI required?
+> >    * Problem:
+> >      * arm64 maintainers still haven't been convinced that ACPI is
+> >        necessary.
+> >      * Why do hardware and OS vendors say ACPI is required?
+> >    * Status: Al & Grant collecting statements from OEMs to be posted
+> >      publicly early in the new year; firmware summit for broader
+> >      discussion planned.
+> 
+> This should be #1 really, right? I still hope the answer is "ACPI not
+> needed".
 
-So do we have any existing driver that uses this service ? Just asking
-for suggestions.
+I lost this hope some time ago ;).
 
-On Tue, Dec 16, 2014 at 2:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 15 December 2014 22:31:06 Suman Tripathi wrote:
->> @@ -162,6 +206,16 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->>                 goto clk_dis_ahb;
->>         }
->>
->> +#if defined(CONFIG_IOMMU_SUPPORT)
->> +       sdhci_arasan->domain = iommu_domain_alloc(&amba_bustype);
->> +       if (!sdhci_arasan->domain) {
->> +               dev_err(&pdev->dev, "Unable to allocate iommu domain\n");
->> +               return PTR_ERR(sdhci_arasan->domain);
->> +       }
->> +
->> +       iommu_attach_device(sdhci_arasan->domain, &pdev->dev);
->> +#endif
->> +
->>
->
-> Device drivers should never care about the implementation details
-> of the iommu. Please change the code to use the regular dma_map_*
-> interfaces that will work both with and without IOMMU.
->
->         Arnd
-
-
+>From my perspective, the "why" above still needs to be publicly stated;
+there have been several private discussions on the pros and cons and
+some of them cannot be made in the open. My main concern is no longer
+"why" but "how" to do it properly (and if we can't, we should rather not
+do it at all).
 
 -- 
-Thanks,
-with regards,
-Suman Tripathi
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+Catalin
