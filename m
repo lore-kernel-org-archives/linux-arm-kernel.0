@@ -1,135 +1,78 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 6 Jan 2015 11:24:28 -0400
-Subject: [PATCH 03/17] Input: sun4i-ts: Add thermal zone sensor support
-In-Reply-To: <1420511727-8242-4-git-send-email-wens@csie.org>
+Date: Tue, 6 Jan 2015 11:25:33 -0400
+Subject: [PATCH 05/17] ARM: dts: sunxi: Enable thermal sensor support for
+ RTP on sun[457]i
+In-Reply-To: <1420511727-8242-6-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-4-git-send-email-wens@csie.org>
-Message-ID: <20150106152425.GA6276@developer>
+ <1420511727-8242-6-git-send-email-wens@csie.org>
+Message-ID: <20150106152531.GB6276@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chen-Yu,
-
-
-On Tue, Jan 06, 2015 at 10:35:13AM +0800, Chen-Yu Tsai wrote:
-> The touchscreen controller has a temperature sensor embedded in the SoC,
-> which already has hwmon support in the driver.
-> 
-> Add DT thermal zone support so we can use it with cpufreq for thermal
-> throttling.
+On Tue, Jan 06, 2015 at 10:35:15AM +0800, Chen-Yu Tsai wrote:
+> Now that the resistive touchpanel driver supports thermal sensors,
+> add the "#thermal-sensor-cells" property as required by the thermal
+> framework.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+
 > ---
->  .../bindings/input/touchscreen/sun4i.txt           |  1 +
->  drivers/input/touchscreen/sun4i-ts.c               | 27 ++++++++++++++++++++++
->  2 files changed, 28 insertions(+)
+>  arch/arm/boot/dts/sun4i-a10.dtsi  | 1 +
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 1 +
+>  arch/arm/boot/dts/sun5i-a13.dtsi  | 1 +
+>  arch/arm/boot/dts/sun7i-a20.dtsi  | 1 +
+>  4 files changed, 4 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> index aef57791f40b..7f1110adbd24 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> @@ -5,6 +5,7 @@ Required properties:
->   - compatible: "allwinner,sun4i-a10-ts"
->   - reg: mmio address range of the chip
->   - interrupts: interrupt to which the chip is connected
-> + - #thermal-sensor-cells: shall be 0
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 847d5e09fcfb..f92635ecb937 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -712,6 +712,7 @@
+>  			compatible = "allwinner,sun4i-a10-ts";
+>  			reg = <0x01c25000 0x100>;
+>  			interrupts = <29>;
+> +			#thermal-sensor-cells = <0>;
+>  		};
 >  
-
-You may want to update your Example section too, below.
-Example:
-
-	rtp: rtp at 01c25000 {
-		compatible = "allwinner,sun4i-a10-ts";
-		reg = <0x01c25000 0x100>;
-		interrupts = <29>;
-		allwinner,ts-attached;
-		#thermal-sensor-cells = <0>;
-	};
-
-
->  Optional properties:
->   - allwinner,ts-attached: boolean indicating that an actual touchscreen is
-> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-> index 28a06749ae42..b6e9043446d6 100644
-> --- a/drivers/input/touchscreen/sun4i-ts.c
-> +++ b/drivers/input/touchscreen/sun4i-ts.c
-> @@ -34,6 +34,7 @@
+>  		uart0: serial at 01c28000 {
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 3c3c1920788a..8d324ef7e46e 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -535,6 +535,7 @@
+>  			compatible = "allwinner,sun4i-a10-ts";
+>  			reg = <0x01c25000 0x100>;
+>  			interrupts = <29>;
+> +			#thermal-sensor-cells = <0>;
+>  		};
 >  
->  #include <linux/err.h>
->  #include <linux/hwmon.h>
-> +#include <linux/thermal.h>
->  #include <linux/init.h>
->  #include <linux/input.h>
->  #include <linux/interrupt.h>
-> @@ -107,6 +108,7 @@
->  struct sun4i_ts_data {
->  	struct device *dev;
->  	struct input_dev *input;
-> +	struct thermal_zone_device *tz;
->  	void __iomem *base;
->  	unsigned int irq;
->  	bool ignore_fifo_data;
-> @@ -180,6 +182,23 @@ static void sun4i_ts_close(struct input_dev *dev)
->  	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
->  }
+>  		uart0: serial at 01c28000 {
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 2448d7f38d6b..4fe0bd192e29 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -469,6 +469,7 @@
+>  			compatible = "allwinner,sun4i-a10-ts";
+>  			reg = <0x01c25000 0x100>;
+>  			interrupts = <29>;
+> +			#thermal-sensor-cells = <0>;
+>  		};
 >  
-> +static int get_temp(void *data, long *temp)
-> +{
-> +	struct sun4i_ts_data *ts = data;
-> +
-> +	/* No temp_data until the first irq */
-> +	if (ts->temp_data == -1)
-> +		return -EAGAIN;
-> +
-> +	*temp = (ts->temp_data - 1447) * 100;
-> +
-
-Care to explain the formula in a simple comment?
-
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
-> +	.get_temp = get_temp,
-> +};
-> +
->  static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
->  			 char *buf)
->  {
-> @@ -288,6 +307,11 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->  	if (IS_ERR(hwmon))
->  		return PTR_ERR(hwmon);
+>  		uart1: serial at 01c28400 {
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index e21ce5992d56..01c7133e699c 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -926,6 +926,7 @@
+>  			compatible = "allwinner,sun4i-a10-ts";
+>  			reg = <0x01c25000 0x100>;
+>  			interrupts = <0 29 4>;
+> +			#thermal-sensor-cells = <0>;
+>  		};
 >  
-> +	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
-> +						 &sun4i_ts_tz_ops);
-> +	if (IS_ERR(ts->tz))
-> +		ts->tz = NULL;
-> +
->  	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
->  
->  	if (ts_attached) {
-
-here.. if input_register_device fails, you will keep an orphan thermal zone
-registered in your system:
-
-		error = input_register_device(ts->input);
-		if (error) {
-			writel(0, ts->base + TP_INT_FIFOC);
-			return error;
-		}
-		...
-
-
-> @@ -310,6 +334,9 @@ static int sun4i_ts_remove(struct platform_device *pdev)
->  	if (ts->input)
->  		input_unregister_device(ts->input);
->  
-> +	if (ts->tz)
-> +		thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
-> +
->  	/* Deactivate all IRQs */
->  	writel(0, ts->base + TP_INT_FIFOC);
->  
+>  		uart0: serial at 01c28000 {
 > -- 
 > 2.1.4
 > 
@@ -139,4 +82,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/3f91471b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150106/d93ec1a3/attachment.sig>
