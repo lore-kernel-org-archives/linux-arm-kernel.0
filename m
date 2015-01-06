@@ -1,9 +1,9 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  6 Jan 2015 10:35:19 +0800
-Subject: [PATCH 09/17] ARM: dts: sun7i: cubietruck: add axp209 regulator nodes
+Date: Tue,  6 Jan 2015 10:35:22 +0800
+Subject: [PATCH 12/17] ARM: dts: sun5i: hsg-h702: add axp209 regulator nodes
 In-Reply-To: <1420511727-8242-1-git-send-email-wens@csie.org>
 References: <1420511727-8242-1-git-send-email-wens@csie.org>
-Message-ID: <1420511727-8242-10-git-send-email-wens@csie.org>
+Message-ID: <1420511727-8242-13-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,33 +19,47 @@ schematics and the SoC datasheet.
 DCDC2 is used as the cpu power supply. This patch also references
 it from the cpu node.
 
+LDO3 powers the USB WiFi module. This patch also references it
+from the usb-phy node.
+
 Also get rid of axp209 properties already set in axp209.dtsi.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 35 ++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 46 ++++++++++++++++++++++++++------
+ 1 file changed, 38 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index a281d259b9b8..48ceb4130b3b 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -126,13 +126,9 @@
+diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+index eeed1f236ee8..ec9b2e4e25ee 100644
+--- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
++++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+@@ -65,11 +65,7 @@
+ 		};
+ 
+ 		usbphy: phy at 01c13400 {
+-			/*
+-			 * There doesn't seem to be a GPIO for controlling
+-			 * usb1 vbus, despite the fex file saying otherwise.
+-			 */
+-			usb1_vbus-supply = <&reg_vcc5v0>;
++			usb1_vbus-supply = <&reg_ldo3>;
+ 			status = "okay";
+ 		};
+ 
+@@ -102,11 +98,8 @@
  			status = "okay";
  
  			axp209: pmic at 34 {
 -				compatible = "x-powers,axp209";
  				reg = <0x34>;
- 				interrupt-parent = <&nmi_intc>;
- 				interrupts = <0 8>;
--
+ 				interrupts = <0>;
 -				interrupt-controller;
 -				#interrupt-cells = <1>;
  			};
  		};
  
-@@ -218,3 +214,34 @@
- 		gpio = <&pio 7 9 0>;
+@@ -128,3 +121,40 @@
+ 		};
  	};
  };
 +
@@ -58,7 +72,7 @@ index a281d259b9b8..48ceb4130b3b 100644
 +&reg_dcdc2 {
 +	regulator-always-on;
 +	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1450000>;
++	regulator-max-microvolt = <1500000>;
 +	regulator-name = "vdd-cpu";
 +};
 +
@@ -78,6 +92,12 @@ index a281d259b9b8..48ceb4130b3b 100644
 +	regulator-min-microvolt = <3000000>;
 +	regulator-max-microvolt = <3000000>;
 +	regulator-name = "avcc";
++};
++
++&reg_ldo3 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
 +};
 -- 
 2.1.4
