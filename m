@@ -1,88 +1,33 @@
-From: moon.linux@yahoo.com (Anand Moon)
-Date: Wed, 7 Jan 2015 14:39:07 +0000 (UTC)
-Subject: [PATCH v2] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
-In-Reply-To: <1420640600.32552.7.camel@AMDC1943>
-References: <1420635542-7202-1-git-send-email-moon.linux@yahoo.com>
- <1420637261.32552.4.camel@AMDC1943>
- <157605903.5809859.1420638996780.JavaMail.yahoo@jws10677.mail.bf1.yahoo.com>
- <1420640600.32552.7.camel@AMDC1943>
-Message-ID: <1208619911.5855211.1420641548080.JavaMail.yahoo@jws106113.mail.bf1.yahoo.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 7 Jan 2015 15:40:42 +0100
+Subject: [PATCH] ARM: dts: tegra20: fix GR3D, DSI unit and reg base
+ addresses
+In-Reply-To: <1418397559-19646-1-git-send-email-digetx@gmail.com>
+References: <1418397559-19646-1-git-send-email-digetx@gmail.com>
+Message-ID: <20150107144041.GE1621@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Kszysztof KozlowskiHi,
+On Fri, Dec 12, 2014 at 06:19:19PM +0300, Dmitry Osipenko wrote:
+> Commit 58ecb23f64ee ("ARM: tegra: add missing unit addresses to DT") added
+> unit address and changed reg base for GR3D and DSI host1x modules, but these
+> addresses belongs to GR2D and TVO modules respectively. Fix it by changing
+> modules unit and reg base addresses to proper ones.
+> 
+> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+> Fixes: 58ecb23f64ee (ARM: tegra: add missing unit addresses to DT)
+> Cc: <stable@vger.kernel.org> # v3.13+
+> ---
+>  arch/arm/boot/dts/tegra20.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Sorry for the noise. Drop it.
+Applied, thanks.
 
-
--Anand Moon
-
-
-
-On Wednesday, January 7, 2015 7:53 PM, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-On ?ro, 2015-01-07 at 13:56 +0000, Anand Moon wrote:
-> Hi Kszysztof Kozlowski,
-> 
-> I picked up the bellow line from 
-> 
-> 
-> Documentation/locking/lockdep-design.txt  line no 18
-> 
-> I understand that by enabling this flag we could detect possible 
-> 
-> deadlock situation with the kernel. Sorry for the noise.
-
-...and lockdep-design.txt describes LOCKDEP. Not LOCKUP. So why you are
-enabling lockup?
-
-Best regards,
-Krzysztof
-
-
-> 
-> 
-> -Anand Moon
-> 
-> 
-> 
-> On Wednesday, January 7, 2015 6:57 PM, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> On ?ro, 2015-01-07 at 18:29 +0530, Anand Moon wrote:
-> > Enable CONFIG_LOCKUP_DETECTOR to validate kernel locks state for exynos SOC.
-> > 
-> > Enabling CONFIG_LOCKUP_DETECTOR help validator tracks the 'state' of lock-classes,
-> > and it tracks dependencies between different lock-classes.
-> > The validator maintains a rolling proof that the state and
-> > the dependencies are correct.
-> 
-> Unfortunately this is not correct. Lockup detector does something else.
-> Please read the help/manual for LOCKUP_DETECTOR. You can find in
-> lib/Kconfig.debug (around line 667).
-> 
-> Best regards,
-> Krzysztof
-> 
-> > 
-> > Changes since v2:
-> >  * Made commit message more clear
-> >  * Corrected grammer in code comment
-> > 
-> > Tested on Exynos5422 ODROID XU3 board.
-> > 
-> > Signed-off-by: Anand Moon <moon.linux@yahoo.com>
-> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  arch/arm/configs/exynos_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> > index 5ef14de..ecd9987 100644
-> > --- a/arch/arm/configs/exynos_defconfig
-> > +++ b/arch/arm/configs/exynos_defconfig
-> > @@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
-> >  CONFIG_DEBUG_FS=y
-> >  CONFIG_MAGIC_SYSRQ=y
-> >  CONFIG_DEBUG_KERNEL=y
-> > +CONFIG_LOCKUP_DETECTOR=y
-> >  CONFIG_DETECT_HUNG_TASK=y
-> >  CONFIG_DEBUG_RT_MUTEXES=y
-> >  CONFIG_DEBUG_SPINLOCK=y
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/73b2c502/attachment.sig>
