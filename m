@@ -1,59 +1,71 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Jan 2015 17:59:04 -0500
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54AD917A.2040307@redhat.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <2161376.07iV9ANMSk@wuerfel>
- <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
- <1520439.Y1rXzXY1eS@wuerfel> <20150107172741.GY2634@sirena.org.uk>
- <20150107184158.GO24989@titan.lakedaemon.net>
- <54AD8FF2.60407@redhat.com> <54AD917A.2040307@redhat.com>
-Message-ID: <20150107225904.GQ24989@titan.lakedaemon.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  7 Jan 2015 23:59:26 +0100
+Subject: [PATCH] net/at91_ether: prepare and unprepare clock
+Message-ID: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 03:05:14PM -0500, Jon Masters wrote:
-> On 01/07/2015 02:58 PM, Jon Masters wrote:
-> > On 01/07/2015 01:41 PM, Jason Cooper wrote:
-> 
-> >> One of the reasons I've really enjoyed working with ARM platforms and DT
-> >> is the absence of this type of 'feature'.  I honestly don't care whether
-> >> the kernel gets the board configuration info from DT or ACPI or FOO, as
-> >> long as we can avoid the security mistakes of the past:
-> >>
-> >>   http://www.spiegel.de/international/world/catalog-reveals-nsa-has-back-doors-for-numerous-devices-a-940994.html
-> > 
-> > ACPI is not the great satan. I'm aware certain others in the community
-> > have written missinformed blog posts and G+ rants equating ACPI with SMI
-> > and even with various other system firmware. I can't force someone to
-> > become informed on a topic, especially if it's politically useful to
-> > them to hate on ACPI and use the security paranoia handwavy argument.
-> 
-> To clarify, and this is not directed at you Jason, it is politically
-> useful to some who have written rants those business models are built
-> upon being paid to enable platforms. For those folks, standardized
-> platforms which allow a common OS approach are seen as threatening.
+The clock is enabled without being prepared, this leads to:
 
-Ahh, thanks for clarifying.
+WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
 
-> In the previous rants (which were really instigated as a result of the
-> above) ACPI was equated with SMM (System Management Mode), which is a
-> bit like the Secure/Trusted world on AArch64 in which you might run
-> another "Trusted" OS. These are the places where you want to watch out
-> to malware of the kind cited in your link, not in ACPI tables.
+and a non working ethernet interface.
 
-fwiw, I *am* concerned about those spaces.  It seems we agree on their
-vulnerability to attack (plus being meaty targets).
+Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
 
-To more concisely state my other reply to you, wrt to AML, I'm primarily
-concerned about a malicious update to the ACPI tables.  The ACPI tables
-in the update would be otherwise normal, except for the AML blob that
-contains some extra code.  The malicious payload.  Then, a routine call
-into an AML (for pinctrl, say) executes the malicious code.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/net/ethernet/cadence/at91_ether.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-The plausibility and preventability of that style of attack is what I'm
-hoping to nail down with this discussion.
-
-thx,
-
-Jason.
+diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+index 55eb7f2af2b4..7ef55f5fa664 100644
+--- a/drivers/net/ethernet/cadence/at91_ether.c
++++ b/drivers/net/ethernet/cadence/at91_ether.c
+@@ -340,7 +340,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+ 		res = PTR_ERR(lp->pclk);
+ 		goto err_free_dev;
+ 	}
+-	clk_enable(lp->pclk);
++	clk_prepare_enable(lp->pclk);
+ 
+ 	lp->hclk = ERR_PTR(-ENOENT);
+ 	lp->tx_clk = ERR_PTR(-ENOENT);
+@@ -406,7 +406,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+ err_out_unregister_netdev:
+ 	unregister_netdev(dev);
+ err_disable_clock:
+-	clk_disable(lp->pclk);
++	clk_disable_unprepare(lp->pclk);
+ err_free_dev:
+ 	free_netdev(dev);
+ 	return res;
+@@ -424,7 +424,7 @@ static int at91ether_remove(struct platform_device *pdev)
+ 	kfree(lp->mii_bus->irq);
+ 	mdiobus_free(lp->mii_bus);
+ 	unregister_netdev(dev);
+-	clk_disable(lp->pclk);
++	clk_disable_unprepare(lp->pclk);
+ 	free_netdev(dev);
+ 
+ 	return 0;
+@@ -440,7 +440,7 @@ static int at91ether_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		netif_stop_queue(net_dev);
+ 		netif_device_detach(net_dev);
+ 
+-		clk_disable(lp->pclk);
++		clk_disable_unprepare(lp->pclk);
+ 	}
+ 	return 0;
+ }
+@@ -451,7 +451,7 @@ static int at91ether_resume(struct platform_device *pdev)
+ 	struct macb *lp = netdev_priv(net_dev);
+ 
+ 	if (netif_running(net_dev)) {
+-		clk_enable(lp->pclk);
++		clk_prepare_enable(lp->pclk);
+ 
+ 		netif_device_attach(net_dev);
+ 		netif_start_queue(net_dev);
+-- 
+2.1.0
