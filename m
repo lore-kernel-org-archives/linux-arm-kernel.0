@@ -1,211 +1,83 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 7 Jan 2015 13:49:52 -0500
-Subject: [PATCH v3 2/4] of: move of_dma_configure() to device, c to help re-use
-In-Reply-To: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1420656594-8908-3-git-send-email-m-karicheri2@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 18:53:22 +0000
+Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
+In-Reply-To: <vnkwh9w2bfr6.fsf@mitchelh-linux.qualcomm.com>
+References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
+ <20150106141507.GB3484@arm.com>
+ <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
+ <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
+ <vnkw61cjebbq.fsf@mitchelh-linux.qualcomm.com>
+ <20150107101300.GC7485@arm.com>
+ <vnkw4ms2cwb5.fsf@mitchelh-linux.qualcomm.com>
+ <20150107180420.GR7485@arm.com>
+ <vnkwh9w2bfr6.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20150107185322.GU7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move of_dma_configure() to device.c so that same function can be re-used
-for PCI devices to obtain DMA configuration from DT. Also add a second
-argument so that for PCI, DT node of root bus host bridge can be used to
-obtain the DMA configuration for the slave PCI device. Additionally fix
-the dma-range size when the DT attribute is missing. i.e  set size to
-dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask.
+On Wed, Jan 07, 2015 at 06:35:41PM +0000, Mitchel Humpherys wrote:
+> On Wed, Jan 07 2015 at 10:04:20 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Jan 07, 2015 at 05:52:46PM +0000, Mitchel Humpherys wrote:
+> >> On Wed, Jan 07 2015 at 02:13:00 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > If would be better to check for the ARM_SMMU_OPT_SECURE_CFG_ACCESS feature
+> >> > and, if it's set then zero ARM_SMMU_GR0_STLBIALL at the correct address
+> >> > otherwise do the ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH.
+> >> 
+> >> I'm confused.  The problem I'm addressing here is that we're touching a
+> >> register that's marked as "secure only", which causes our system to
+> >> crash.  Why would we ever want to touch a secure only register, calxeda
+> >> workaround or not?
+> >
+> > Because I think the way the SMMU is wired for Calxeda is that the CPU can
+> > only see the secure side of the register interface, so the only way to nuke
+> > the whole TLB would be to use ARM_SMMU_GR0_STLBIALL.
+> 
+> Still not sure I understand what "the correct address" is for STLBIALL
+> on Calxeda (i.e. whether or not we need to use ARM_SMMU_GR0_NS), but
+> something like:
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/of/device.c       |   58 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/of/platform.c     |   58 ++-------------------------------------------
- include/linux/of_device.h |    2 ++
- 3 files changed, 62 insertions(+), 56 deletions(-)
+Hehe, I wasn't actually expecting a patch, but thanks!
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 46d6c75c..ccbc958 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -2,6 +2,9 @@
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/of_iommu.h>
-+#include <linux/dma-mapping.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/mod_devicetable.h>
-@@ -66,6 +69,61 @@ int of_device_add(struct platform_device *ofdev)
- 	return device_add(&ofdev->dev);
- }
- 
-+/**
-+ * of_dma_configure - Setup DMA configuration
-+ * @dev:	Device to apply DMA configuration
-+ * @np:		ptr to of node having dma configuration
-+ *
-+ * Try to get devices's DMA configuration from DT and update it
-+ * accordingly.
-+ *
-+ * In case if platform code need to use own special DMA configuration,it
-+ * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-+ * to fix up DMA configuration.
-+ */
-+void of_dma_configure(struct device *dev, struct device_node *np)
-+{
-+	u64 dma_addr, paddr, size;
-+	int ret;
-+	bool coherent;
-+	unsigned long offset;
-+	struct iommu_ops *iommu;
-+
-+	/*
-+	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-+	 * the correct supported dma_mask.
-+	 */
-+	dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	/*
-+	 * Set it to coherent_dma_mask by default if the architecture
-+	 * code has not set it.
-+	 */
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-+	if (ret < 0) {
-+		dma_addr = offset = 0;
-+		size = dev->coherent_dma_mask + 1;
-+	} else {
-+		offset = PFN_DOWN(paddr - dma_addr);
-+		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-+	}
-+	dev->dma_pfn_offset = offset;
-+
-+	coherent = of_dma_is_coherent(np);
-+	dev_dbg(dev, "device is%sdma coherent\n",
-+		coherent ? " " : " not ");
-+
-+	iommu = of_iommu_configure(dev, np);
-+	dev_dbg(dev, "device is%sbehind an iommu\n",
-+		iommu ? " " : " not ");
-+
-+	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-+}
-+EXPORT_SYMBOL_GPL(of_dma_configure);
-+
- int of_device_register(struct platform_device *pdev)
- {
- 	device_initialize(&pdev->dev);
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 7675b79..6403501 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -19,7 +19,6 @@
- #include <linux/slab.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
--#include <linux/of_iommu.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -150,59 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
- }
- EXPORT_SYMBOL(of_device_alloc);
- 
--/**
-- * of_dma_configure - Setup DMA configuration
-- * @dev:	Device to apply DMA configuration
-- *
-- * Try to get devices's DMA configuration from DT and update it
-- * accordingly.
-- *
-- * In case if platform code need to use own special DMA configuration,it
-- * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-- * to fix up DMA configuration.
-- */
--static void of_dma_configure(struct device *dev)
--{
--	u64 dma_addr, paddr, size;
--	int ret;
--	bool coherent;
--	unsigned long offset;
--	struct iommu_ops *iommu;
--
--	/*
--	 * Set default dma-mask to 32 bit. Drivers are expected to setup
--	 * the correct supported dma_mask.
--	 */
--	dev->coherent_dma_mask = DMA_BIT_MASK(32);
--
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
--
--	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
--	if (ret < 0) {
--		dma_addr = offset = 0;
--		size = dev->coherent_dma_mask;
--	} else {
--		offset = PFN_DOWN(paddr - dma_addr);
--		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
--	}
--	dev->dma_pfn_offset = offset;
--
--	coherent = of_dma_is_coherent(dev->of_node);
--	dev_dbg(dev, "device is%sdma coherent\n",
--		coherent ? " " : " not ");
--
--	iommu = of_iommu_configure(dev, dev->of_node);
--	dev_dbg(dev, "device is%sbehind an iommu\n",
--		iommu ? " " : " not ");
--
--	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
--}
--
- static void of_dma_deconfigure(struct device *dev)
- {
- 	arch_teardown_dma_ops(dev);
-@@ -236,7 +182,7 @@ static struct platform_device *of_platform_device_create_pdata(
- 
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
--	of_dma_configure(&dev->dev);
-+	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	if (of_device_add(dev) != 0) {
- 		of_dma_deconfigure(&dev->dev);
-@@ -299,7 +245,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 		dev_set_name(&dev->dev, "%s", bus_id);
- 	else
- 		of_device_make_bus_id(&dev->dev);
--	of_dma_configure(&dev->dev);
-+	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	/* Allow the HW Peripheral ID to be overridden */
- 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index ef37021..c661496 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -53,6 +53,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- 	return of_node_get(cpu_dev->of_node);
- }
- 
-+void of_dma_configure(struct device *dev, struct device_node *np);
- #else /* CONFIG_OF */
- 
- static inline int of_driver_match_device(struct device *dev,
-@@ -90,6 +91,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- {
- 	return NULL;
- }
-+void of_dma_configure(struct device *dev, struct device_node *np) { }
- #endif /* CONFIG_OF */
- 
- #endif /* _LINUX_OF_DEVICE_H */
--- 
-1.7.9.5
+> -- >8 --
+> Subject: [PATCH v2] iommu/arm-smmu: don't touch the secure STLBIALL register
+> 
+> Currently we do a STLBIALL when we initialize the SMMU.  However, on
+> systems with sane secure
+> configurations (i.e. !ARM_SMMU_OPT_SECURE_CFG_ACCESS) that register is
+> not supposed to be touched and is marked as "Secure only" in the spec.
+> Touching it results in a crash on those platforms.  However, on
+> platforms with ARM_SMMU_OPT_SECURE_CFG_ACCESS it's the only way to nuke
+> the whole TLB, so leave it in for them but rip it out for everyone else.
+> 
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 60558f794922..d4c149d83f3d 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1686,9 +1686,12 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	}
+>  
+>  	/* Invalidate the TLB, just in case */
+> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
+> +	if (smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS) {
+> +		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+
+Right, so this is the bit where we'd need some Calxeda information about
+whether or not to subtract 0x400 from gr0_base or not.
+
+> +	} else {
+> +		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+> +		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
+> +	}
+
+For now, I've applied your original patch pending any insight on the above.
+
+Cheers,
+
+Will
