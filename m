@@ -1,74 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 7 Jan 2015 09:25:44 +0900
-Subject: [PATCH] ARM: shmobile: sh73a0 legacy: Set .control_parent for
- all irqpin instances
-In-Reply-To: <4452252.suqURC1IYD@avalon>
-References: <1420551550-27512-1-git-send-email-geert+renesas@glider.be>
- <4452252.suqURC1IYD@avalon>
-Message-ID: <20150107002541.GA20459@verge.net.au>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 6 Jan 2015 16:43:40 -0800
+Subject: [RFC] mm:change meminfo cached calculation
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103EDAF89E160@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+ <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
+ <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
+ <20141208114601.GA28846@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
+ <CALYGNiMEytHuND37f+hNdMKqCPzN0k_uha6CaeL_fyzrj-obNQ@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B31408@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E14C@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E160@CNBJMBX05.corpusers.net>
+Message-ID: <20150106164340.55e83f742d6f57c19e6500ff@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 04:14:09PM +0200, Laurent Pinchart wrote:
-> Hi Geert,
-> 
-> Thank you for the patch.
-> 
-> On Tuesday 06 January 2015 14:39:10 Geert Uytterhoeven wrote:
-> > The sh73a0 INTC can't mask interrupts properly most likely due to a
-> > hardware bug. Set the .control_parent flag to delegate masking to the
-> > parent interrupt controller, like was already done for irqpin1.
-> > 
-> > Without this, accessing the three-axis digital accelerometer ADXL345
-> > on kzm9g through /dev/input/event1 causes an interrupt storm, which
-> > requires a power-cycle to recover from.
-> > 
-> > This was inspired by a patch for arch/arm/boot/dts/sh73a0.dtsi from
-> > Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
-> 
-> This looks correct to me, but shouldn't we concentrate on getting rid of 
-> legacy code instead ?
+On Fri, 26 Dec 2014 19:56:49 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
 
-Probably, but as we now have this patch I'm inclined to apply it.
+> This patch subtract sharedram from cached,
+> sharedram can only be swap into swap partitions,
+> they should be treated as swap pages, not as cached pages.
+> 
+> ...
+>
+> --- a/fs/proc/meminfo.c
+> +++ b/fs/proc/meminfo.c
+> @@ -45,7 +45,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
+>  	committed = percpu_counter_read_positive(&vm_committed_as);
+>  
+>  	cached = global_page_state(NR_FILE_PAGES) -
+> -			total_swapcache_pages() - i.bufferram;
+> +			total_swapcache_pages() - i.bufferram - i.sharedram;
+>  	if (cached < 0)
+>  		cached = 0;
 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Fixes: 341eb5465f67437a ("ARM: shmobile: INTC External IRQ pin driver on
-> > sh73a0") ---
-> >  arch/arm/mach-shmobile/setup-sh73a0.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
-> > b/arch/arm/mach-shmobile/setup-sh73a0.c index
-> > 354cab111bf17ea6..613ce65184a6648c 100644
-> > --- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> > +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> > @@ -595,6 +595,7 @@ static struct platform_device ipmmu_device = {
-> > 
-> >  static struct renesas_intc_irqpin_config irqpin0_platform_data = {
-> >  	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
-> > +	.control_parent = true,
-> >  };
-> > 
-> >  static struct resource irqpin0_resources[] = {
-> > @@ -656,6 +657,7 @@ static struct platform_device irqpin1_device = {
-> > 
-> >  static struct renesas_intc_irqpin_config irqpin2_platform_data = {
-> >  	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
-> > +	.control_parent = true,
-> >  };
-> > 
-> >  static struct resource irqpin2_resources[] = {
-> > @@ -686,6 +688,7 @@ static struct platform_device irqpin2_device = {
-> > 
-> >  static struct renesas_intc_irqpin_config irqpin3_platform_data = {
-> >  	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
-> > +	.control_parent = true,
-> >  };
-> > 
-> >  static struct resource irqpin3_resources[] = {
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+Documentation/filesystems/proc.txt says
+
+:      Cached: in-memory cache for files read from the disk (the
+:              pagecache).  Doesn't include SwapCached
+
+So yes, I guess it should not include shmem.
+
+And why not do this as well?
+
+
+--- a/Documentation/filesystems/proc.txt~mm-change-meminfo-cached-calculation-fix
++++ a/Documentation/filesystems/proc.txt
+@@ -811,7 +811,7 @@ MemAvailable: An estimate of how much me
+      Buffers: Relatively temporary storage for raw disk blocks
+               shouldn't get tremendously large (20MB or so)
+       Cached: in-memory cache for files read from the disk (the
+-              pagecache).  Doesn't include SwapCached
++              pagecache).  Doesn't include SwapCached or Shmem.
+   SwapCached: Memory that once was swapped out, is swapped back in but
+               still also is in the swapfile (if memory is needed it
+               doesn't need to be swapped out AGAIN because it is already
+_
