@@ -1,86 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Jan 2015 15:44:42 -0800
-Subject: [PATCH V2] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan
- node
-In-Reply-To: <1417801732-24620-1-git-send-email-nm@ti.com>
-References: <1417800739-13146-1-git-send-email-nm@ti.com>
- <1417801732-24620-1-git-send-email-nm@ti.com>
-Message-ID: <20150107234442.GI13010@atomide.com>
+From: j.stone@samsung.com (Jonathan Stone -SISA)
+Date: Wed, 07 Jan 2015 23:49:22 +0000
+Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <1420670333.6075.2.camel@collabora.co.uk>
+References: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <54AA48E6.3040404@samsung.com> <1420470469.15910.134.camel@collabora.co.uk>
+ <69242715.30115.1420655868687.JavaMail.yahoo@jws10659.mail.bf1.yahoo.com>
+ <1420670333.6075.2.camel@collabora.co.uk>
+Message-ID: <6203C077F070A646AA0FCB4B5F1795D248114CA6@sisaex01sj>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [141205 09:51]:
-> TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
-> a fan (such as AFB02505HHB) over J1 connector for various purposes.
-> Provide device tree node to enable the same.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-Applying into omap-for-v3.20/dt thanks.
+On On Wed, 2015-01-07 at 18:37 +0000, Sjoerd Simons writes wrote:
+>On Wed, 2015-01-07 at 18:37 +0000, Anand Moon wrote:>
+[...]
 
-Tony
+>> Only 4 core cpu's are on my board. Also CpuFreq is not working.
+> 
+> Can you share some point on this.
 
-> ---
-> 
-> V2: review comment updates
-> 	review comments update
-> 		- Sanitized outlook-ified name back to normal ;) 
-> 		- removed unnecessary pinctrl-names property.
-> V1: https://patchwork.kernel.org/patch/5444911/
-> 
-> 
-> Depends on the following:
-> https://patchwork.kernel.org/patch/5439201/
-> https://patchwork.kernel.org/patch/5439191/
-> 
-> enable and disable can be controlled by (post the RPM, it finds
-> closest match - even a 1 will do)
-> 
-> echo '13000' > /sys/class/hwmon/hwmon0/fan1_target
-> and
-> echo '0' > /sys/class/hwmon/hwmon0/fan1_target
-> 
-> Test log: http://slexy.org/view/s2T0ajh46z
-> 
-> requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
-> Applies on 
-> https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v3.19/dt-v2
-> 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index 49edbda..4e55e94 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -80,6 +80,14 @@
->  			default-state = "off";
->  		};
->  	};
-> +
-> +	gpio_fan {
-> +		/* Based on 5v 500mA AFB02505HHB */
-> +		compatible = "gpio-fan";
-> +		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
-> +		gpio-fan,speed-map = <0    0
-> +				      13000 1>;
-> +	};
->  };
->  
->  &dra7_pmx_core {
-> @@ -314,6 +322,12 @@
->  			wakeup-source;
->  			ti,palmas-long-press-seconds = <12>;
->  		};
-> +
-> +		tps659038_gpio: tps659038_gpio {
-> +			compatible = "ti,palmas-gpio";
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +		};
->  	};
->  
->  	tmp102: tmp102 at 48 {
-> -- 
-> 1.7.9.5
-> 
+>The defconfig is using the bL switcher, which pairs up big and little cores to make them appear as one core.. So for 8 real cores, you'll get
+>4 "virtual cores".
+
+That configuration is appropriate for the 5420, which allegedly has a hardware bug in the cache-coherence between the Cortex-A7 block and the Cortex-A15 block.
+Newer Exynos 5 SoCs -- 5422/5800, 5620, etc -- don't have that bug. The scheduler should configured to  do HMP on all 8 (or 6) cores.
+I don't have a 5410, but I assume it has the same bug as the 5420.
+
+The XU3 kernel supplied by HardKernel shows all 8 cores, and does HMP scheduling across all 8.
+
+I tried v1.0 of the Odroid-XU3 DTB patch, applied to linux-next 20150107.  I'm only seeing 1 core running on my Odroid-XU3.  The USB 3.0 port works (great!) but I'm not getting any HDMI output.  I didn't try DisplayPort.   I'll gladly try v2 of the patch on an XU3; is there a better base to apply the patch to?
