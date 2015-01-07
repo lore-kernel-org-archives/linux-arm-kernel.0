@@ -1,66 +1,26 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 7 Jan 2015 17:08:11 -0600
-Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
-In-Reply-To: <54ADBBCF.8020206@ti.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <54ADBBCF.8020206@ti.com>
-Message-ID: <CAErSpo46UAn9ckbzrgzAoQbu2D=oyOOL_rO24NWEg_iDLSuCLA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Jan 2015 15:14:38 -0800
+Subject: [PATCH] ARM: dts: am437x-sk-evm: Hook dcdc2 as the cpu0-supply
+In-Reply-To: <20141222203854.GD3083@saruman>
+References: <1417706679-22294-1-git-send-email-balbi@ti.com>
+ <20141222203854.GD3083@saruman>
+Message-ID: <20150107231438.GF13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 7, 2015 at 5:05 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> On 01/07/2015 01:49 PM, Murali Karicheri wrote:
->>
->> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This
->> patch
->> add capability to set the dma configuration such as dma-mask,
->> dma_pfn_offset,
->> and dma ops etc using the information from DT. The prior RFCs and
->> discussions
->> are available at [1] and [2] below.
->>
->> [2] :
->> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
->> [1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
->>
->> Change history:
->>         v3 - addressed comments to re-use of_dma_configure() for PCI
->>            - To help re-use, change of_iommu_configure() function argument
->>                 - Move of_dma_configure to of/device.c
->>                 - Limit the of_iommu_configure to non pci devices
->>         v2 - update size to coherent_dma_mask + 1 if dma-range info is
->> missing
->>            - also check the np for null.
->>         v1 - updates based on the comments against initial RFC.
->>            - Added a helper function to get the OF node of the parent
->>            - Added an API in of_pci.c to update DMA configuration of the
->> pci
->>              device.
->>
->> Murali Karicheri (4):
->>    of: iommu: add ptr to OF node arg to of_iommu_configure()
->>    of: move of_dma_configure() to device,c to help re-use
->>    of/pci: add of_pci_dma_configure() update dma configuration
->>    PCI: update dma configuration from DT
->>
->>   drivers/iommu/of_iommu.c  |   10 ++++++--
->>   drivers/of/device.c       |   58
->> +++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/of/of_pci.c       |   39 ++++++++++++++++++++++++++++++
->>   drivers/of/platform.c     |   58
->> ++-------------------------------------------
->>   drivers/pci/probe.c       |    2 ++
->>   include/linux/of_device.h |    2 ++
->>   include/linux/of_iommu.h  |    6 +++--
->>   include/linux/of_pci.h    |   12 ++++++++++
->>   8 files changed, 127 insertions(+), 60 deletions(-)
->>
-> Bjorn,
->
-> Could you review this series from the PCI subsystem point of view?
+* Felipe Balbi <balbi@ti.com> [141222 12:41]:
+> On Thu, Dec 04, 2014 at 09:24:39AM -0600, Felipe Balbi wrote:
+> > From: Dave Gerlach <d-gerlach@ti.com>
+> > 
+> > Hook dcdc2 as the cpu0-supply.
+> > 
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> btw, before sending this, I tested on my AM437x Starter Kit, so
+> 
+> Tested-by: Felipe Balbi <balbi@ti.com>
 
-Will do, it's in my patchwork queue.  I'm just returning after a
-couple weeks of vacation, during which I moved across the country, so
-it will take me a bit to catch up.
+Applying into omap-for-v3.20/dt thanks.
 
-Bjorn
+Tony
