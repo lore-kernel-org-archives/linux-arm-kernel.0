@@ -1,47 +1,50 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Wed, 7 Jan 2015 10:16:42 +0530
-Subject: [PATCH] video: vt8500lcdfb: remove unneeded continue
-In-Reply-To: <54AC2A0B.3040807@cogentembedded.com>
-References: <1420548302-11489-1-git-send-email-sudipm.mukherjee@gmail.com>
- <54AC2A0B.3040807@cogentembedded.com>
-Message-ID: <20150107044642.GA2543@sudip-PC>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 06 Jan 2015 23:55:58 -0500
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54AC5C57.7050504@redhat.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
+ <54AC0C4B.1000907@redhat.com> <1596791.jNp4rCPpnN@wuerfel>
+ <54AC5C57.7050504@redhat.com>
+Message-ID: <54ACBC5E.3040905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 09:31:39PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On 01/06/2015 05:06 PM, Jon Masters wrote:
+> Hi Arnd,
 > 
-> On 01/06/2015 03:45 PM, Sudip Mukherjee wrote:
+> Happy New Year!
 > 
-> >continue is not needed at the end of a for loop
+> On 01/06/2015 02:21 PM, Arnd Bergmann wrote:
+>> On Tuesday 06 January 2015 11:24:43 Jon Masters wrote:
+>>> On 01/06/2015 06:20 AM, Catalin Marinas wrote:
+>>>
+>>>> Now, what's preventing a vendor firmware from providing only ACPI
+>>>> tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
+>>>> that both DT and ACPI are supported, or at least that dts files are
+>>>> merged in the kernel first?
+>>>
+>>> I know of some (server) firmware that will only provide ACPI in the
+>>> medium term, so this is coming.
+>>
+>> Medium term is fine, as long as they are not expecting their hardware
+>> to be supported by Linux before ACPI support is stable enough for
+>> general consumption.
 > 
-> >Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
-> >---
-> >  drivers/video/fbdev/vt8500lcdfb.c | 1 -
-> >  1 file changed, 1 deletion(-)
+> To be clear, I think that's reasonable for upstream. I may love ACPI,
+> but vendors can always ship kernels with a config supporting ACPI only
+> platforms in the interim period if they have a commercial justification
+> and that doesn't have to be supported in terms of the upstream default.
 > 
-> >diff --git a/drivers/video/fbdev/vt8500lcdfb.c b/drivers/video/fbdev/vt8500lcdfb.c
-> >index ffaf29e..6716bf5 100644
-> >--- a/drivers/video/fbdev/vt8500lcdfb.c
-> >+++ b/drivers/video/fbdev/vt8500lcdfb.c
-> >@@ -115,7 +115,6 @@ static int vt8500lcd_set_par(struct fb_info *info)
-> >  	for (i = 0; i < 8; i++) {
-> >  		if (bpp_values[i] == info->var.bits_per_pixel) {
-> >  			reg_bpp = i;
-> >-			continue;
-> >  		}
-> 
->    {} are not needed any more either. ;-)
+> But, perhaps there's a way to have it both ways, you could consider also
+> a CONFIG_EXPERT option that would allow you to build a kernel with ACPI
+> only support in the medium term. That way, if someone is running a
+> vendor kernel, but wants to track upstream development more closely,
+> they can do so on such hardware by enabling the expert config bit.
 
-i have noticed that but thought that will be again a different type of change in a single patch.
-but now it seems that this patch will introduce a new checkpatch warning, so i should have corrected that in it.
-i will send a v2.
+Clarification: I'm suggesting that in the medium term the dependency
+upon CONFIG_EXPERT either goes away or is replaced with requiring ACPI
+and DTB in the non "expert" case and requiring "expert" selected to
+allow a kernel that will boot with ACPI only. But only a suggestion.
 
-thanks
-sudip
-
-> 
-> [...]
-> 
-> WBR, Sergei
-> 
+Jon.
