@@ -1,32 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 7 Jan 2015 17:37:56 -0600
-Subject: [PATCH v3 2/4] of: move of_dma_configure() to device,
- c to help re-use
-In-Reply-To: <1420656594-8908-3-git-send-email-m-karicheri2@ti.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <1420656594-8908-3-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CAL_Jsq+pKeXuGnZV_NYHn6iZgeOs404OPhcUb0FJs=-7j2P1Ug@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Jan 2015 15:43:18 -0800
+Subject: [PATCH v2] ARM: dts: am57xx-beagle-x15: Add dual ethernet
+In-Reply-To: <1417726977-2496-1-git-send-email-balbi@ti.com>
+References: <5480CADE.5010200@ti.com>
+ <1417726977-2496-1-git-send-email-balbi@ti.com>
+Message-ID: <20150107234318.GH13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 7, 2015 at 12:49 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> Move of_dma_configure() to device.c so that same function can be re-used
-> for PCI devices to obtain DMA configuration from DT. Also add a second
-> argument so that for PCI, DT node of root bus host bridge can be used to
-> obtain the DMA configuration for the slave PCI device. Additionally fix
-> the dma-range size when the DT attribute is missing. i.e  set size to
-> dev->coherent_dma_mask + 1 instead of dev->coherent_dma_mask.
+* Felipe Balbi <balbi@ti.com> [141204 13:05]:
+> Add CPSW DT binding to beagle X15 DTS in order to
+> get ethernet working with this board.
+> 
+> Note that we're also adding sleep state which will
+> place all pins in mux mode 15 - which means "driver
+> off" - thus conserving power.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+> 
+> Changes since v1:
+> 	- removed duplicated SoB from myself
+> 	- Fixed s/Slave 1/Slave2/ in one comment
+> 	- slightly improved commit log
+> 
 
-Additionally is a red flag for put in another patch. There is an issue
-I think as well.
+Applying into omap-for-v3.20/dt thanks.
 
-> +       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-> +       if (ret < 0) {
-> +               dma_addr = offset = 0;
-> +               size = dev->coherent_dma_mask + 1;
-
-If coherent_dma_mask is DMA_BIT_MASK(64), then you will overflow and
-have a size of 0. There may also be a problem when the mask is only
-32-bit type.
-
-Rob
+Tony
