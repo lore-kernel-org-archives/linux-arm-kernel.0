@@ -1,75 +1,102 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Jan 2015 12:30:19 +0100
-Subject: [PATCH v12 4/9] ARM: l2c: Add interface to ask hypervisor to configure
- L2C
+Date: Wed, 07 Jan 2015 12:30:22 +0100
+Subject: [PATCH v12 7/9] ARM: EXYNOS: Add .write_sec outer cache callback for
+ L2C-310
 In-Reply-To: <1420630224-8887-1-git-send-email-m.szyprowski@samsung.com>
 References: <1420630224-8887-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1420630224-8887-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1420630224-8887-8-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Figa <t.figa@samsung.com>
 
-Because certain secure hypervisor do not allow writes to individual L2C
-registers, but rather expect set of parameters to be passed as argument
-to secure monitor calls, there is a need to provide an interface for the
-L2C driver to ask the firmware to configure the hardware according to
-specified parameters. This patch adds such.
+Exynos4 SoCs equipped with an L2C-310 cache controller and running under
+secure firmware require certain registers of aforementioned IP to be
+accessed only from secure mode. This means that SMC calls are required
+for certain register writes. To handle this, an implementation of
+.write_sec and .configure callbacks is provided by this patch.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+[added comment and reworked unconditional call to SMC_CMD_L2X0INVALL]
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Nishanth Menon <nm@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/include/asm/outercache.h | 3 +++
- arch/arm/mm/cache-l2x0.c          | 6 ++++++
- 2 files changed, 9 insertions(+)
+ arch/arm/mach-exynos/firmware.c | 50 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 891a56b35bcf..563b92fc2f41 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -23,6 +23,8 @@
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 766f57d2f029..4791a3cc00f9 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -17,6 +17,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <asm/firmware.h>
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/suspend.h>
  
- #include <linux/types.h>
- 
-+struct l2x0_regs;
-+
- struct outer_cache_fns {
- 	void (*inv_range)(unsigned long, unsigned long);
- 	void (*clean_range)(unsigned long, unsigned long);
-@@ -36,6 +38,7 @@ struct outer_cache_fns {
- 
- 	/* This is an ARM L2C thing */
- 	void (*write_sec)(unsigned long, unsigned);
-+	void (*configure)(const struct l2x0_regs *);
+ #include <mach/map.h>
+@@ -136,6 +137,43 @@ static const struct firmware_ops exynos_firmware_ops = {
+ 	.resume			= IS_ENABLED(CONFIG_EXYNOS_CPU_SUSPEND) ? exynos_resume : NULL,
  };
  
- extern struct outer_cache_fns outer_cache;
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index dde0d54ac41e..5288153f28b8 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -110,6 +110,11 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
- 
- static void l2c_configure(void __iomem *base)
- {
-+	if (outer_cache.configure) {
-+		outer_cache.configure(&l2x0_saved_regs);
-+		return;
-+	}
++static void exynos_l2_write_sec(unsigned long val, unsigned reg)
++{
++	static int l2cache_enabled;
 +
- 	if (l2x0_data->configure)
- 		l2x0_data->configure(base);
++	switch (reg) {
++	case L2X0_CTRL:
++		if (val & L2X0_CTRL_EN) {
++			/*
++			 * Before the cache can be enabled, due to firmware
++			 * design, SMC_CMD_L2X0INVALL must be called.
++			 */
++			if (!l2cache_enabled) {
++				exynos_smc(SMC_CMD_L2X0INVALL, 0, 0, 0);
++				l2cache_enabled = 1;
++			}
++		} else {
++			l2cache_enabled = 0;
++		}
++		exynos_smc(SMC_CMD_L2X0CTRL, val, 0, 0);
++		break;
++
++	case L2X0_DEBUG_CTRL:
++		exynos_smc(SMC_CMD_L2X0DEBUG, val, 0, 0);
++		break;
++
++	default:
++		WARN_ONCE(1, "%s: ignoring write to reg 0x%x\n", __func__, reg);
++	}
++}
++
++static void exynos_l2_configure(const struct l2x0_regs *regs)
++{
++	exynos_smc(SMC_CMD_L2X0SETUP1, regs->tag_latency, regs->data_latency,
++		   regs->prefetch_ctrl);
++	exynos_smc(SMC_CMD_L2X0SETUP2, regs->pwr_ctrl, regs->aux_ctrl, 0);
++}
++
+ void __init exynos_firmware_init(void)
+ {
+ 	struct device_node *nd;
+@@ -155,4 +193,16 @@ void __init exynos_firmware_init(void)
+ 	pr_info("Running under secure firmware.\n");
  
-@@ -910,6 +915,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 
- 	fns = data->outer_cache;
- 	fns.write_sec = outer_cache.write_sec;
-+	fns.configure = outer_cache.configure;
- 	if (data->fixup)
- 		data->fixup(l2x0_base, cache_id, &fns);
- 
+ 	register_firmware_ops(&exynos_firmware_ops);
++
++	/*
++	 * Exynos 4 SoCs (based on Cortex A9 and equipped with L2C-310),
++	 * running under secure firmware, require certain registers of L2
++	 * cache controller to be written in secure mode. Here .write_sec
++	 * callback is provided to perform necessary SMC calls.
++	 */
++	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
++		outer_cache.write_sec = exynos_l2_write_sec;
++		outer_cache.configure = exynos_l2_configure;
++	}
+ }
 -- 
 1.9.2
