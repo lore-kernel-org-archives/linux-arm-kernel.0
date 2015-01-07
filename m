@@ -1,48 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Jan 2015 14:25:14 +0000
-Subject: [PATCH] arm64: mm: support instruction SETEND
-In-Reply-To: <20150107102543.GD7485@arm.com>
-References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
- <54AD061A.6090602@arm.com> <20150107102543.GD7485@arm.com>
-Message-ID: <20150107142513.GB2199@e104818-lin.cambridge.arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 7 Jan 2015 22:22:09 +0800
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <54AD3EAE.6090009@gmail.com>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+ <54AD3EAE.6090009@gmail.com>
+Message-ID: <20150107222209.64ed24a0@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 10:25:43AM +0000, Will Deacon wrote:
-> On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
-> > On 07/01/15 05:52, Leo Yan wrote:
-> > > Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
-> > > instruction will be treated as UNALLOCATED; this error can be
-> > > reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
-> > > mode, finally kernel will trap the exception if the userspace
-> > > libs use SETEND instruction.
-> > >
-> > > So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
-> > >
-> > The best way to do this, is via the instruction emulation framework 
-> > added by Punit, which handles the armv8 deprecated/obsoleted 
-> > instructions. This is now queued for 3.19.
-> > I have a patchset which adds the 'SETEND' emulation support to the 
-> > framework. This will enable better handling of the feature, including 
-> > finding out the users of the deprecated instruction (when we switch to 
-> > the emulation mode).
-> > 
-> > Btw, there is one open question that I am seeking answer for.
-> > 
-> > What should be the endianness of the signal handlers ? Should we leave 
-> > it to the application ? Or restore the 'default' endianness for the 
-> > signal handler ?
+Dear Sebastian,
+
+On Wed, 7 Jan 2015 06:11:58 -0800
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+
+> On 31.12.2014 09:57, Jisheng Zhang wrote:
+> > The "smemc" clock is removed on BG2Q SoCs. In fact, bit19 of clkenable
+> > register is for nfc. Current code use bit19 for non-exist "smemc"
+> > incorrectly, this prevents eMMC from working due to the sdhci's
+> > "core" clk is still gated.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > Cc: stable at vger.kernel.org # 3.16+
+> > ---
+> >   drivers/clk/berlin/bg2q.c | 1 -
+> >   1 file changed, 1 deletion(-)
+> >
+> > diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+> > index 21784e4..440ef81 100644
+> > --- a/drivers/clk/berlin/bg2q.c
+> > +++ b/drivers/clk/berlin/bg2q.c
+> > @@ -285,7 +285,6 @@ static const struct berlin2_gate_data bg2q_gates[]
+> > __initconst = { { "pbridge",	"perif",	15,
+> > CLK_IGNORE_UNUSED }, { "sdio",	"perif",	16,
+> > CLK_IGNORE_UNUSED }, { "nfc",	"perif",	18 },
+
+The nfc here is really confusing, we call it as nfccore internally. Is it better
+to rename it as nfccore?
+
+> > -	{ "smemc",	"perif",	19 },
 > 
-> I think we should restore the default endianness, otherwise you're
-> essentially forcing signal handlers to do a setend as their first
-> instruction to get into a consistent state. That also matches the endianness
-> of the sigframe that we push onto the stack, right?
+> Jisheng,
+> 
+> if bit 19 is for nfc, how does that work out with bit 18 which is
+> still assigned to nfc? Can you re-evaluate clkenable registers for
 
-It looks like this is what setup_return() already does on arm32
-(switching to the default endianness).
+bit 19 is for nfcEcc, the "io" clock; bit 18 is for nfcCore, the "core" clock.
 
-Now that we plan to allow SETEND in AArch32 applications, we need
-something similar in the arm64 compat_setup_return().
 
--- 
-Catalin
+> BG2Q and fix it up accordingly? I'd suggest to still disable as many
+
+I'll recheck the clk driver for BG2Q.
+
+Thanks very much,
+Jisheng
