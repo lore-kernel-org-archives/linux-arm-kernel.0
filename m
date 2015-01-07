@@ -1,63 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 7 Jan 2015 13:13:06 +0000
-Subject: [PATCH v2 1/2] arm64: don't make early_*map() calls post
- paging_init()
-In-Reply-To: <20150107105841.GE7485@arm.com>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
- <1420551673-31416-2-git-send-email-leif.lindholm@linaro.org>
- <1420576522.16211.30.camel@t520.localdomain>
- <20150107105841.GE7485@arm.com>
-Message-ID: <CAKv+Gu9NRRFZG0S6oFJqPG1+1O2-SZah4wqoi0YPofL33X3nJw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 07 Jan 2015 14:27:41 +0100
+Subject: [PATCH v2] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
+In-Reply-To: <1420635542-7202-1-git-send-email-moon.linux@yahoo.com>
+References: <1420635542-7202-1-git-send-email-moon.linux@yahoo.com>
+Message-ID: <1420637261.32552.4.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2015 at 10:58, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jan 06, 2015 at 08:35:22PM +0000, Mark Salter wrote:
->> On Tue, 2015-01-06 at 13:41 +0000, Leif Lindholm wrote:
->> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> > index 6fac253..e311066 100644
->> > --- a/arch/arm64/kernel/efi.c
->> > +++ b/arch/arm64/kernel/efi.c
->> > @@ -313,17 +313,26 @@ void __init efi_init(void)
->> >     memmap.desc_size = params.desc_size;
->> >     memmap.desc_version = params.desc_ver;
->> >
->> > -   if (uefi_init() < 0)
->> > -           return;
->> > +   if (uefi_init() >= 0)
->> > +           reserve_regions();
->> >
->> > -   reserve_regions();
->> > +   early_memunmap(memmap.map, params.mmap_size);
->> >  }
->> >
->> > -void __init efi_idmap_init(void)
->> > +void __init efi_memmap_init(void)
->> >  {
->> > +   u64 mapsize;
->> > +
->> >     if (!efi_enabled(EFI_BOOT))
->> >             return;
->> >
->> > +   /* replace early memmap mapping with permanent mapping */
->> > +   mapsize = memmap.map_end - memmap.map;
->> > +   memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
->> > +                                              mapsize);
->>
->> ioremap_cache() could potententially fail here if the phys_map address
->> doesn't have a valid pfn (not in the kernel linear ram mapping) because
->> some of the underlying vm support hasn't been initialized yet.
->
-> Can you be more specific about the case you have in mind, please? pfn_valid
-> uses the memblocks on arm64, and that should all have been sorted out in
-> paging_init(). What's the issue that you're anticipating?
->
+On ?ro, 2015-01-07 at 18:29 +0530, Anand Moon wrote:
+> Enable CONFIG_LOCKUP_DETECTOR to validate kernel locks state for exynos SOC.
+> 
+> Enabling CONFIG_LOCKUP_DETECTOR help validator tracks the 'state' of lock-classes,
+> and it tracks dependencies between different lock-classes.
+> The validator maintains a rolling proof that the state and
+> the dependencies are correct.
 
-I think Mark's concern is that it is too early to call
-__get_free_page(), which is what happens if ioremap_cache() finds that
-the requested address is not covered by the existing linear mapping.
-Currently, UEFI reserved RAM regions are covered by the linear
-mapping, but that is something we intend to change in the future.
+Unfortunately this is not correct. Lockup detector does something else.
+Please read the help/manual for LOCKUP_DETECTOR. You can find in
+lib/Kconfig.debug (around line 667).
 
--- 
-Ard.
+Best regards,
+Krzysztof
+
+> 
+> Changes since v2:
+>  * Made commit message more clear
+>  * Corrected grammer in code comment
+> 
+> Tested on Exynos5422 ODROID XU3 board.
+> 
+> Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 5ef14de..ecd9987 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
+>  CONFIG_DEBUG_FS=y
+>  CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_DEBUG_KERNEL=y
+> +CONFIG_LOCKUP_DETECTOR=y
+>  CONFIG_DETECT_HUNG_TASK=y
+>  CONFIG_DEBUG_RT_MUTEXES=y
+>  CONFIG_DEBUG_SPINLOCK=y
