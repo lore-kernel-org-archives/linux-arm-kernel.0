@@ -1,44 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 7 Jan 2015 15:34:20 +0100
-Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point
- Development Board support
-In-Reply-To: <20150107095936.GG7853@lukather>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
- <20150106155705.GB23784@lunn.ch> <20150106173101.GB7853@lukather>
- <20150106180757.GC25030@lunn.ch> <20150107095936.GG7853@lukather>
-Message-ID: <20150107143420.GA30268@lunn.ch>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 7 Jan 2015 23:37:09 +0900
+Subject: [PATCH v11 1/9] ARM: OMAP2+: use common l2cache initialization
+ code
+In-Reply-To: <2975078.sXsfBJkaoi@wuerfel>
+References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
+ <1420460348-20302-2-git-send-email-m.szyprowski@samsung.com>
+ <2975078.sXsfBJkaoi@wuerfel>
+Message-ID: <CA+Ln22ECR_rCLz8VW0WYDNqa3xb0b-b4Em-8156wNR60GvB1cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > > +			i2c0: i2c at 11000 {
-> > > > > +				pinctrl-names = "default";
-> > > > > +				pinctrl-0 = <&i2c0_pins>;
-> > > > > +				status = "okay";
-> > > > > +				clock-frequency = <100000>;
-> > > > > +			};
-> > > > > +
-> > > > > +			i2c1: i2c at 11100 {
-> > > > > +				status = "okay";
-> > > > > +				clock-frequency = <100000>;
-> > > > > +			};
-> > > > 
-> > > > Is there anything on these two i2c busses?
-> > > 
-> > > One goes to some pin of the mPCIe slot, the other is connected to the
-> > > EEPROM.
-> > 
-> > So could you add the EEPROM, and a comment about the mPCIe slot?
-> 
-> I can't really add the EEPROM: it actually goes to two DIP sockets,
-> one of them holding that EEPROM, the other one being empty.
-> 
-> The default EEPROM also contains the board ID, that will be used by
-> the bootloader. Erasing this will result in a board that can't be
-> booted, so I'm not really sure exposing it to the user is a good idea.
+2015-01-06 5:25 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 05 January 2015 13:19:00 Marek Szyprowski wrote:
+>>  DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+>> +       .l2c_aux_val    = OMAP_L2C_AUX_CTRL,
+>> +       .l2c_aux_mask   = 0xcf9fffff,
+>> +       .l2c_write_sec  = omap4_l2c310_write_sec,
+>>         .reserve        = omap_reserve,
+>>         .smp            = smp_ops(omap4_smp_ops),
+>>         .map_io         = omap4_map_io,
+>>
+>
+> Could we also get those values into the dts files? Clearly we
+> can't remove them here without breaking compatibility with old
+> dtbs, but it would be nice to have all new dtbs do the right thing.
 
-O.K, please add a comment. People like me tend to run i2c-detect to
-see if there is anything interesting on the bus. A warning you can
-brick the board could save somebody an interesting time.
+Sounds like a good next step after merging this series. :)
 
-      Andrew
+Best regards,
+Tomasz
