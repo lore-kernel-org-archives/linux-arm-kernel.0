@@ -1,55 +1,57 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 7 Jan 2015 09:06:30 +0100
-Subject: [PATCH 1/4] ARM: tegra: rely on bootloader pinmux programming on
- nyan-big
-In-Reply-To: <54AC16B0.5050703@wwwdotorg.org>
-References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
- <1420540653-14816-2-git-send-email-tomeu.vizoso@collabora.com>
- <54AC16B0.5050703@wwwdotorg.org>
-Message-ID: <CAAObsKB1gMcLZ=n8Mc6JSLQHn5-6VWOhERLgYTdi6nit6yCj5w@mail.gmail.com>
+From: ken.wilson@opengear.com (Ken Wilson)
+Date: Wed, 7 Jan 2015 18:08:29 +1000
+Subject: [PATCH] spi: orion: Add multiple chip select support for Armada
+ 370 and 375
+In-Reply-To: <20150107074154.1334b5c0@free-electrons.com>
+References: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
+ <54AC5B16.9020206@free-electrons.com>
+ <20150107074154.1334b5c0@free-electrons.com>
+Message-ID: <DA2CCB3A-D11B-4861-8DE1-7316C16E561D@opengear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2015 at 18:09, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 01/06/2015 03:37 AM, Tomeu Vizoso wrote:
->>
->> Following 6dbaff2b, the kernel expects that the bootloader has correctly
->> programmed the Tegra pinmux.
->>
->> DTs for the Jetson and the Venice2 had been updated already but this one
->> was left behind.
->
->
-> So this setup is true for NVIDIA-controlled development/reference boards
-> where we've ensured that the bootloader sets up 100% of the pinmux.
->
-> However, I know that Coreboot on this board doesn't set up everything in the
-> pinmux, and since it's in r/o flash never will. As such, I'm not sure this
-> change is safe for this board. That is, unless you want to force upstream
-> kernels to be booted via a chain-loaded path: Coreboot (r/o) -> U-Boot (r/w
-> with full pinmux setup) -> kernel.
->
->> Have tested this with the stock vendor firmware (coreboot) and have found
->> no
->> issues.
->
->
-> There are presumably a bunch of features which aren't yet supported
-> upstream, and hence you couldn't test though? That means we might find that
-> parts of the pinmux aren't yet programmed but need to be to enable those
-> features.
+Hi Thomas,
+> On 7 Jan 2015, at 4:41 pm, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> 
+> Dear Gregory CLEMENT,
+> 
+> On Tue, 06 Jan 2015 23:00:54 +0100, Gregory CLEMENT wrote:
+> 
+>> On 06/01/2015 22:30, Ken Wilson wrote:
+>>> Create a new dt binding for the Armada 375 that supports up to
+>>> 3 chip selects but uses the same prescaler values and algorithm
+>>> as the basic orion binding.
+>> 
+>> There was already a patch that have been sent for this:
+>> http://thread.gmane.org/gmane.linux.kernel.spi.devel/17808/focus=17809
+>> 
+>> but in the end it has not been merged. The last email on the thread was
+>> about doing the manipulation in set_cs and not in setup_transfer(). And I
+>> didn't find a newer version.
+>> 
+>> Maybe it just fell through the cracks.
+>> Thomas did you remember of it?
+> 
+> Yes, it is still on my TODO-list, but I haven't yet gotten around to
+> submitting a new version. So I haven't looked at Ken's contribution,
+> but if Ken is willing to bring it up to a state where it can be
+> mainlined, that would definitely be welcome.
 
-Sure, there's no chance that my testing could have been extensive enough.
-
-Following Andrew's feedback, I will be looking at getting the pinmux
-programming right in the DTs.
+I?m happy to do that
 
 Thanks,
+Ken
 
-Tomeu
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> Thanks,
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
