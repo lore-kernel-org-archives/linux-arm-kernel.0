@@ -1,24 +1,68 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Wed, 07 Jan 2015 01:50:30 +0100
-Subject: [PATCH] ARM: tegra: use generated pinmux for Beaver board
-In-Reply-To: <54AB0B68.7050704@wwwdotorg.org>
-References: <1420495066-19221-1-git-send-email-dev@lynxeye.de>
- <54AB0B68.7050704@wwwdotorg.org>
-Message-ID: <1420591830.25483.16.camel@lynxeye.de>
+From: hughd@google.com (Hugh Dickins)
+Date: Tue, 6 Jan 2015 17:04:33 -0800 (PST)
+Subject: [RFC] mm:change meminfo cached calculation
+In-Reply-To: <20150106164340.55e83f742d6f57c19e6500ff@linux-foundation.org>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+ <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
+ <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
+ <20141208114601.GA28846@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
+ <CALYGNiMEytHuND37f+hNdMKqCPzN0k_uha6CaeL_fyzrj-obNQ@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B31408@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E14C@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E160@CNBJMBX05.corpusers.net>
+ <20150106164340.55e83f742d6f57c19e6500ff@linux-foundation.org>
+Message-ID: <alpine.LSU.2.11.1501061654340.1497@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 05.01.2015, 15:08 -0700 schrieb Stephen Warren:
-> On 01/05/2015 02:57 PM, Lucas Stach wrote:
-> > Replace the current incomplete pinmux setup with a proper one generated
-> > using the tegra pinmux scripts.
+On Tue, 6 Jan 2015, Andrew Morton wrote:
+> On Fri, 26 Dec 2014 19:56:49 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
 > 
-> I assume this is identical to the existing content, it's just that the 
-> node sort order changed to match the auto-generation order?
+> > This patch subtract sharedram from cached,
+> > sharedram can only be swap into swap partitions,
+> > they should be treated as swap pages, not as cached pages.
+> > 
+> > ...
+> >
+> > --- a/fs/proc/meminfo.c
+> > +++ b/fs/proc/meminfo.c
+> > @@ -45,7 +45,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
+> >  	committed = percpu_counter_read_positive(&vm_committed_as);
+> >  
+> >  	cached = global_page_state(NR_FILE_PAGES) -
+> > -			total_swapcache_pages() - i.bufferram;
+> > +			total_swapcache_pages() - i.bufferram - i.sharedram;
+> >  	if (cached < 0)
+> >  		cached = 0;
 > 
-Yes auto-generation changes the representation of the nodes a bit, but I
-made sure to keep the properties of the existing kernel DT pinmux where
-they were different from the U-Boot pinmux.
+> Documentation/filesystems/proc.txt says
+> 
+> :      Cached: in-memory cache for files read from the disk (the
+> :              pagecache).  Doesn't include SwapCached
+> 
+> So yes, I guess it should not include shmem.
+> 
+> And why not do this as well?
+> 
+> 
+> --- a/Documentation/filesystems/proc.txt~mm-change-meminfo-cached-calculation-fix
+> +++ a/Documentation/filesystems/proc.txt
+> @@ -811,7 +811,7 @@ MemAvailable: An estimate of how much me
+>       Buffers: Relatively temporary storage for raw disk blocks
+>                shouldn't get tremendously large (20MB or so)
+>        Cached: in-memory cache for files read from the disk (the
+> -              pagecache).  Doesn't include SwapCached
+> +              pagecache).  Doesn't include SwapCached or Shmem.
+>    SwapCached: Memory that once was swapped out, is swapped back in but
+>                still also is in the swapfile (if memory is needed it
+>                doesn't need to be swapped out AGAIN because it is already
 
-> If so,
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+Whoa.  Changes of this kind would have made good sense about 14 years ago.
+And there's plenty more which would benefit from having anon/shmem/file
+properly distinguished.  But how can we make such a change now,
+breaking everything that has made its own sense of these counts?
+
+Hugh
