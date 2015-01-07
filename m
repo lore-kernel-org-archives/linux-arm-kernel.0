@@ -1,49 +1,115 @@
-From: mchitale@apm.com (Mayuresh Chitale)
-Date: Wed, 7 Jan 2015 16:15:54 +0530
-Subject: [PATCH 3/4] arm64: dts: Add APM X-Gene PCIe DMA device tree nodes
-In-Reply-To: <6884775.IcL8KCPQhi@wuerfel>
-References: <1420608537-12296-1-git-send-email-mchitale@apm.com>
- <1420608537-12296-4-git-send-email-mchitale@apm.com>
- <6884775.IcL8KCPQhi@wuerfel>
-Message-ID: <CAL-zptPDU2qoot-aZMDwRmPQ_4QoCsqtQZ=kc-fN-Ts68qrVDQ@mail.gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Wed, 7 Jan 2015 18:45:40 +0800
+Subject: [RFC PATCH 07/11] kprobes: introduces macros for allocing early
+ kprobe resources.
+In-Reply-To: <1420616151-43023-1-git-send-email-wangnan0@huawei.com>
+References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
+ <1420616151-43023-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <54AD0E54.9060900@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 2015/1/7 15:35, Wang Nan wrote:
+> Introduces macros to genearte common early kprobe related resource
+> allocator.
+> 
+> All early kprobe related resources are statically allocated during
+> linking for each early kprobe slot. For each type of resource, a bitmap
+> is used to track allocation. __DEFINE_EKPROBE_ALLOC_OPS defines alloc
+> and free handler for them. The range of the resource and the bitmap
+> should be provided for allocaing and freeing. DEFINE_EKPROBE_ALLOC_OPS
+> defines bitmap and the array used by it.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> ---
+>  include/linux/kprobes.h | 69 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 69 insertions(+)
+> 
+> diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
+> index b0265f9..9a18188 100644
+> --- a/include/linux/kprobes.h
+> +++ b/include/linux/kprobes.h
+> @@ -270,6 +270,75 @@ extern void show_registers(struct pt_regs *regs);
+>  extern void kprobes_inc_nmissed_count(struct kprobe *p);
+>  extern bool arch_within_kprobe_blacklist(unsigned long addr);
+>  
+> +#ifdef CONFIG_EARLY_KPROBES
+> +
+> +#define NR_EARLY_KPROBES_SLOTS	CONFIG_NR_EARLY_KPROBES_SLOTS
+> +#define ALIGN_UP(v, a)	(((v) + ((a) - 1)) & ~((a) - 1))
+> +#define EARLY_KPROBES_BITMAP_SZ	ALIGN_UP(NR_EARLY_KPROBES_SLOTS, BITS_PER_LONG)
+> +
+> +#define __ek_in_range(v, s, e)	(((v) >= (s)) && ((v) < (e)))
+> +#define __ek_buf_sz(s, e)	((void *)(e) - (void *)(s))
+> +#define __ek_elem_sz_b(s, e)	(__ek_buf_sz(s, e) / NR_EARLY_KPROBES_SLOTS)
+> +#define __ek_elem_sz(s, e)	(__ek_elem_sz_b(s, e) / sizeof(s[0]))
+> +#define __ek_elem_idx(v, s, e)	(__ek_buf_sz(s, v) / __ek_elem_sz_b(s, e))
+> +#define __ek_get_elem(i, s, e)	(&((s)[__ek_elem_sz(s, e) * (i)]))
+> +#define __DEFINE_EKPROBE_ALLOC_OPS(__t, __name)				\
+> +static inline __t *__ek_alloc_##__name(__t *__s, __t *__e, unsigned long *__b)\
+> +{									\
+> +	int __i = find_next_zero_bit(__b, NR_EARLY_KPROBES_SLOTS, 0);	\
+> +	if (__i >= NR_EARLY_KPROBES_SLOTS)				\
+> +		return NULL;						\
+> +	set_bit(__i, __b);						\
+> +	return __ek_get_elem(__i, __s, __e);				\
+> +}									\
+> +static inline int __ek_free_##__name(__t *__v, __t *__s, __t *__e, unsigned long *__b)	\
+> +{									\
+> +	if (!__ek_in_range(__v, __s, __e))				\
+> +		return 0;						\
+> +	clear_bit(__ek_elem_idx(__v, __s, __e), __b);			\
+> +	return 1;							\
+> +}
+> +
+> +#define DEFINE_EKPROBE_ALLOC_OPS(__t, __name, __static)			\
+> +__static __t __ek_##__name##_slots[NR_EARLY_KPROBES_SLOTS];		\
+> +__static unsigned long __ek_##__name##_bitmap[EARLY_KPROBES_BITMAP_SZ];	\
+> +__DEFINE_EKPROBE_ALLOC_OPS(__t, __name)					\
+> +static inline __t *ek_alloc_##__name(void)				\
+> +{									\
+> +	return __ek_alloc_##__name(&((__ek_##__name##_slots)[0]),	\
+> +			&((__ek_##__name##_slots)[NR_EARLY_KPROBES_SLOTS]),\
+> +			(__ek_##__name##_bitmap));			\
+> +}									\
+> +static inline int ek_free_##__name(__t *__s)				\
+> +{									\
+> +	return __ek_free_##__name(__s, &((__ek_##__name##_slots)[0]),	\
+> +			&((__ek_##__name##_slots)[NR_EARLY_KPROBES_SLOTS]),\
+> +			(__ek_##__name##_bitmap));			\
+> +}
+> +
+> +
+> +#else
+> +#define __DEFINE_EKPROBE_ALLOC_OPS(__t, __name)				\
+> +static inline __t *__ek_alloc_##__name(__t *__s, __t *__e, unsigned long *__b)\
+> +{									\
+> +	return NULL;							\
+> +}									\
+> +static inline int __ek_free_##__name(__t *__v, __t *__s, __t *__e, unsigned long *__b)\
+> +{									\
+> +	return 0;							\
+> +}
+> +
+> +#define DEFINE_EKPROBE_ALLOC_OPS(__t, __name, __static)			\
+> +static inline __t *ek_alloc_##__name(void)				\
+> +{									\
+> +	return NULL;							\
+> +}									\
+> +static inline void ek_free_##__name(__t *__s)				\
+> +{									\
+> +}
+> +
 
-Actually the addresses are different. For e.g port 0 base address is
-1F2B0000 and port 1 base address is 1F2C0000 and so on.
+Sorry, here is a small problem. Should be:
+static inline int ek_free_##__name(__t *__s)				\
+{									\
+	return 0;							\
+}
 
-Thanks,
-Mayuresh.
-
-On Wed, Jan 7, 2015 at 2:07 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 07 January 2015 10:58:56 Mayuresh Chitale wrote:
->>
->> +               xpdma0: dma0 at 1f2b0154 {
->> +                       status = "disabled";
->> +                       compatible = "apm,xgene-pciedma";
->> +                       reg = < 0x0 0x1f2b0154 0x0 0xc
->> +                               0x0 0x1f2b0058 0x0 0x8>;
->> +                       interrupts = <0x0 0xc6 0x4>;
->> +               };
->> +
->> +               xpdma1: dma1 at 1f2c0154 {
->> +                       status = "disabled";
->> +                       compatible = "apm,xgene-pciedma";
->> +                       reg = < 0x0 0x1f2c0154 0x0 0xc
->> +                               0x0 0x1f2c0058 0x0 0x8>;
->> +                       interrupts = <0x0 0xcc 0x4>;
->> +               };
->> +
->>
->
-> Something's wrong here: you have the same addresses for
-> all the nodes but use different names. Please change the names
-> to all say 'dma' and set the correct addresses.
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +#endif
+> +
+>  struct kprobe_insn_cache {
+>  	struct mutex mutex;
+>  	void *(*alloc)(void);	/* allocate insn page */
+> 
