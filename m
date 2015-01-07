@@ -1,23 +1,57 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  7 Jan 2015 15:29:31 +0000
-Subject: [RFC PATCH 3/3] drivers: pci: host: update the pcie designware driver
- to new range parsing API
-In-Reply-To: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1420644571-18928-4-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed,  7 Jan 2015 15:29:28 +0000
+Subject: [RFC PATCH 0/3] drivers: port PCIe designware to new DT parsing API
+Message-ID: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new OF pci API of_pci_get_host_bridge_resources() implemented by:
+The introduction of the DT API:
 
-'commit cbe4097f8ae699ebbdaf8c95 ("of/pci: Add support for parsing PCI host bridge resources from DT")'
+of_pci_get_host_bridge_resources()
 
-and subsequent changes allow to parse PCI DT ranges in a generic way
-through a new API that can be used to consolidate the DT range parsing for
-all PCIe controllers in the kernel that are configured through DT.
+allows to retrieve PCI resources from the device tree in a generic way.
 
-This patch updates the PCIe designware driver in order for it to use the
-new OF range parsing API and remove driver specific parsing code.
+Some PCI host controllers, in addition to standard IO and MEM resources and
+corresponding CPU addresses, require to retrieve the addresses that are used
+for bus routing of IO/MEM regions as seen at the bus level corresponding
+to the bus segment the host controller is sitting on, so that the host
+controller can programme its inbound/outbound memory regions correctly to
+respond to bus transactions coming from the CPU on the host controller bus
+ports.
+
+The DT generic layer provides functions that carry out the PCI
+ranges <-> resources translation from PCI addresses to CPU addresses (as
+seen at the CPU top level bus, through all required hierarchical bus layers),
+but there is no generic API to retrieve the PCI range CPU untranslated
+addresses, so PCI host controllers have to do it in a driver specific way
+through the DT property parsing methods.
+
+This patchset converts the PCIe designware host controller driver to
+use the API:
+
+of_pci_get_host_bridge_resources()
+
+in order to retrieve the PCI regions resources. To achieve generality, it
+also augments the parsing API so that a new DT struct is created out of
+PCI ranges, that contains the PCI resource and the range parser itself
+so that it can be passed back to PCI host controllers drivers that
+can, if needed, use it to parse the CPU untranslated addresses
+corresponding to the resource in question.
+
+The first patch in the series is a fix/update for the parsing function:
+
+of_pci_get_host_bridge_resources()
+
+It is part of the RFC series since it is a controversial fix to be
+discussed before getting merged.
+
+Patch [2-3] augment the parsing API and convert the PCIe designware
+driver code.
+
+The current API stays unchanged, so that the existing drivers using it
+do not need patching and changes are limited.
+
+Tested on an iMX6 Sabrelite board.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Liviu Dudau <liviu.dudau@arm.com>
@@ -25,233 +59,19 @@ Cc: Mohit Kumar <mohit.kumar@st.com>
 Cc: Jingoo Han <jg1.han@samsung.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Rob Herring <robh+dt@kernel.org>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
+
+Lorenzo Pieralisi (3):
+  drivers: of: fix resources freeing in
+    of_pci_get_host_bridge_resources()
+  drivers: of: of_pci_get_host_bridge_resources() range parsing update
+  drivers: pci: host: update the pcie designware driver to new range
+    parsing API
+
+ drivers/of/of_pci.c                |  36 +++++++--
  drivers/pci/host/pcie-designware.c | 145 +++++++++++++++++--------------------
  drivers/pci/host/pcie-designware.h |   5 +-
- 2 files changed, 69 insertions(+), 81 deletions(-)
+ include/linux/of_address.h         |   5 ++
+ 4 files changed, 104 insertions(+), 87 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index df781cd..95cce40 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -69,8 +69,6 @@
- 
- static struct hw_pci dw_pci;
- 
--static unsigned long global_io_offset;
--
- static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
- {
- 	BUG_ON(!sys->private_data);
-@@ -343,18 +341,21 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- {
- 	struct device_node *np = pp->dev->of_node;
- 	struct platform_device *pdev = to_platform_device(pp->dev);
--	struct of_pci_range range;
--	struct of_pci_range_parser parser;
- 	struct resource *cfg_res;
--	u32 val, na, ns;
-+	u32 val, na;
- 	const __be32 *addrp;
- 	int i, index, ret;
-+	resource_size_t io_base;
-+	struct pci_host_bridge_window *win;
-+	struct of_pci_resource *of_pci_res;
- 
--	/* Find the address cell size and the number of cells in order to get
--	 * the untranslated address.
-+	/*
-+	 * Find the address cell size (ie must be 3 for DT PCI addresses) to
-+	 * get the untranslated address.
- 	 */
- 	of_property_read_u32(np, "#address-cells", &na);
--	ns = of_n_size_cells(np);
-+
-+	INIT_LIST_HEAD(&pp->resources);
- 
- 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
- 	if (cfg_res) {
-@@ -366,84 +367,79 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 		/* Find the untranslated configuration space address */
- 		index = of_property_match_string(np, "reg-names", "config");
- 		addrp = of_get_address(np, index, NULL, NULL);
--		pp->cfg0_mod_base = of_read_number(addrp, ns);
-+		pp->cfg0_mod_base = of_read_number(addrp, of_n_addr_cells(np));
- 		pp->cfg1_mod_base = pp->cfg0_mod_base + pp->cfg0_size;
- 	} else {
- 		dev_err(pp->dev, "missing *config* reg space\n");
- 	}
- 
--	if (of_pci_range_parser_init(&parser, np)) {
--		dev_err(pp->dev, "missing ranges property\n");
--		return -EINVAL;
--	}
-+	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &pp->resources,
-+					       &io_base);
-+	if (ret)
-+		return ret;
- 
--	/* Get the I/O and memory ranges from DT */
--	for_each_of_pci_range(&parser, &range) {
--		unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
--
--		if (restype == IORESOURCE_IO) {
--			of_pci_range_to_resource(&range, np, &pp->io);
--			pp->io.name = "I/O";
--			pp->io.start = max_t(resource_size_t,
--					     PCIBIOS_MIN_IO,
--					     range.pci_addr + global_io_offset);
--			pp->io.end = min_t(resource_size_t,
-+	list_for_each_entry(win, &pp->resources, list) {
-+		u64 pci_addr;
-+		struct resource *res = win->res;
-+
-+		pci_addr = res->start - win->offset;
-+		of_pci_res = container_of(res, struct of_pci_resource, res);
-+
-+		if (resource_type(res) == IORESOURCE_IO) {
-+			res->name = "I/O";
-+			res->start = max_t(resource_size_t, PCIBIOS_MIN_IO,
-+					   pci_addr);
-+			res->end = min_t(resource_size_t,
- 					   IO_SPACE_LIMIT,
--					   range.pci_addr + range.size
--					   + global_io_offset - 1);
--			pp->io_size = resource_size(&pp->io);
--			pp->io_bus_addr = range.pci_addr;
--			pp->io_base = range.cpu_addr;
-+					   pci_addr + resource_size(res) - 1);
-+			pp->io_size = resource_size(res);
-+			pp->io_bus_addr = pci_addr;
-+			pp->io_base = io_base;
- 
- 			/* Find the untranslated IO space address */
--			pp->io_mod_base = of_read_number(parser.range -
--							 parser.np + na, ns);
-+			pp->io_mod_base =
-+				of_read_number(of_pci_res->parser.range + na,
-+					       of_pci_res->parser.pna);
-+			pci_remap_iospace(res, io_base);
- 		}
--		if (restype == IORESOURCE_MEM) {
--			of_pci_range_to_resource(&range, np, &pp->mem);
--			pp->mem.name = "MEM";
--			pp->mem_size = resource_size(&pp->mem);
--			pp->mem_bus_addr = range.pci_addr;
-+
-+		if (resource_type(res) == IORESOURCE_MEM) {
-+			res->name = "MEM";
-+			pp->mem_size = resource_size(res);
-+			pp->mem_bus_addr = pci_addr;
-+			pp->mem_base = res->start;
- 
- 			/* Find the untranslated MEM space address */
--			pp->mem_mod_base = of_read_number(parser.range -
--							  parser.np + na, ns);
-+			pp->mem_mod_base =
-+				of_read_number(of_pci_res->parser.range + na,
-+					       of_pci_res->parser.pna);
- 		}
--		if (restype == 0) {
--			of_pci_range_to_resource(&range, np, &pp->cfg);
--			pp->cfg0_size = resource_size(&pp->cfg)/2;
--			pp->cfg1_size = resource_size(&pp->cfg)/2;
--			pp->cfg0_base = pp->cfg.start;
--			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
-+
-+		if (resource_type(res) == 0) {
-+			pp->cfg0_size = resource_size(res)/2;
-+			pp->cfg1_size = resource_size(res)/2;
-+			pp->cfg0_base = res->start;
-+			pp->cfg1_base = res->start + pp->cfg0_size;
- 
- 			/* Find the untranslated configuration space address */
--			pp->cfg0_mod_base = of_read_number(parser.range -
--							   parser.np + na, ns);
-+			pp->cfg0_mod_base =
-+				of_read_number(of_pci_res->parser.range + na,
-+					       of_pci_res->parser.pna);
- 			pp->cfg1_mod_base = pp->cfg0_mod_base +
- 					    pp->cfg0_size;
--		}
--	}
--
--	ret = of_pci_parse_bus_range(np, &pp->busn);
--	if (ret < 0) {
--		pp->busn.name = np->name;
--		pp->busn.start = 0;
--		pp->busn.end = 0xff;
--		pp->busn.flags = IORESOURCE_BUS;
--		dev_dbg(pp->dev, "failed to parse bus-range property: %d, using default %pR\n",
--			ret, &pp->busn);
--	}
- 
--	if (!pp->dbi_base) {
--		pp->dbi_base = devm_ioremap(pp->dev, pp->cfg.start,
--					resource_size(&pp->cfg));
--		if (!pp->dbi_base) {
--			dev_err(pp->dev, "error with ioremap\n");
--			return -ENOMEM;
-+			if (!pp->dbi_base) {
-+				pp->dbi_base = devm_ioremap(pp->dev,
-+						res->start,
-+						resource_size(res));
-+				if (!pp->dbi_base) {
-+					dev_err(pp->dev, "error with ioremap\n");
-+					return -ENOMEM;
-+				}
-+			}
- 		}
--	}
- 
--	pp->mem_base = pp->mem.start;
-+	}
- 
- 	if (!pp->va_cfg0_base) {
- 		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
-@@ -704,20 +700,15 @@ static struct pci_ops dw_pcie_ops = {
- static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
- {
- 	struct pcie_port *pp;
-+	struct pci_host_bridge_window *win, *tmp;
- 
- 	pp = sys_to_pcie(sys);
-+	/* remove the configuration aperture in case it is there */
-+	list_for_each_entry_safe(win, tmp, &pp->resources, list)
-+		if (!resource_type(win->res))
-+			list_del(&win->list);
- 
--	if (global_io_offset < SZ_1M && pp->io_size > 0) {
--		sys->io_offset = global_io_offset - pp->io_bus_addr;
--		pci_ioremap_io(global_io_offset, pp->io_base);
--		global_io_offset += SZ_64K;
--		pci_add_resource_offset(&sys->resources, &pp->io,
--					sys->io_offset);
--	}
--
--	sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
--	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
--	pci_add_resource(&sys->resources, &pp->busn);
-+	list_splice(&pp->resources, &sys->resources);
- 
- 	return 1;
- }
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index d0bbd27..2479e9c 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -42,10 +42,7 @@ struct pcie_port {
- 	u64			mem_mod_base;
- 	phys_addr_t		mem_bus_addr;
- 	u32			mem_size;
--	struct resource		cfg;
--	struct resource		io;
--	struct resource		mem;
--	struct resource		busn;
-+	struct list_head	resources;
- 	int			irq;
- 	u32			lanes;
- 	struct pcie_host_ops	*ops;
 -- 
 2.2.1
