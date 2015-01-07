@@ -1,87 +1,120 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 7 Jan 2015 11:48:51 +0000
-Subject: [PATCH 1/8] arm64/efi: use UEFI memory map unconditionally if
- available
-In-Reply-To: <20150106090407.GF3163@console-pimps.org>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150106090407.GF3163@console-pimps.org>
-Message-ID: <CAKv+Gu_q5wFhjb8M7VptVtHfm5vfp6_YiqN_XoTs9qV5=8OOdg@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 07 Jan 2015 11:50:36 +0000
+Subject: [PATCH v19 02/11] ARM: kprobes: remove unused ARM decoder actions.
+In-Reply-To: <1420457354-77099-1-git-send-email-wangnan0@huawei.com>
+References: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
+ <1420457354-77099-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1420631436.4044.26.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 January 2015 at 09:04, Matt Fleming <matt@console-pimps.org> wrote:
-> On Mon, 22 Dec, at 07:08:35PM, Ard Biesheuvel wrote:
->> On systems that boot via UEFI, all memory nodes are deleted from the
->> device tree, and instead, the size and location of system RAM is derived
->> from the UEFI memory map. This is handled by reserve_regions, which not only
->> reserves parts of memory that UEFI declares as reserved, but also installs
->> the memblocks that cover the remaining usable memory.
->>
->> Currently, reserve_regions() is only called if uefi_init() succeeds.
->> However, it does not actually depend on anything that uefi_init() does,
->> and not calling reserve_regions() results in a broken boot, so it is
->> better to just call it unconditionally.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi.c | 11 ++++-------
->>  1 file changed, 4 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index d7d2e818c856..d2f483a7cffe 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -208,8 +208,7 @@ void __init efi_init(void)
->>       memmap.desc_size = params.desc_size;
->>       memmap.desc_version = params.desc_ver;
->>
->> -     if (uefi_init() < 0)
->> -             return;
->> +     WARN_ON(uefi_init() < 0);
->>
->>       reserve_regions();
->>  }
->> @@ -218,15 +217,13 @@ static int __init arm64_enter_virtual_mode(void)
->>  {
->>       u64 mapsize;
->>
->> -     if (!efi_enabled(EFI_BOOT)) {
->> -             pr_info("EFI services will not be available.\n");
->> -             return -1;
->> -     }
->> +     if (!efi_enabled(EFI_MEMMAP))
->> +             return 0;
->>
->>       mapsize = memmap.map_end - memmap.map;
->>       early_memunmap(memmap.map, mapsize);
->>
->> -     if (efi_runtime_disabled()) {
->> +     if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
->>               pr_info("EFI runtime services will be disabled.\n");
->>               return -1;
->>       }
->
-> Am I correct in thinking that it's possible to have EFI_MEMMAP set but
-> not EFI_BOOT? That's not how things work on x86. EFI_BOOT means "I am an
-> EFI-enabled platform and I was booted using EFI."
->
-> In other words, EFI_MEMMAP should imply EFI_BOOT (how did you get the
-> memmap if you weren't booted using EFI?)
->
+On Mon, 2015-01-05 at 19:29 +0800, Wang Nan wrote:
+> There are 3 actions which is never used:
+> 
+>  PROBES_MOV_HALFWORD,
+>  PROBES_SEV,
+>  PROBES_WFE,
+> 
+> This patch removes them.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
 
-In the arm64 case, the memory map is retrieved by the stub, and its
-address is passed via the /chosen DT node, which also contains the
-address of the EFI system table. In the unlikely event that, for
-instance, the FEI system table signature is corrupted, we will not set
-EFI_BOOT (nor EFI_64BIT).
+I think that PROBES_MOV_HALFWORD should be used, for MOVW and MOVT.
+Currently those instructions use PROBES_DATA_PROCESSING_IMM which,
+whilst it will work it ends up using a less efficient emulation routine
+than necessary.
 
-> It looks like you should be setting EFI_BOOT (and EFI_64BIT) in
-> efi_init() if efi_get_fdt_params() succeeds.
->
+The other unused actions, PROBES_SEV and PROBES_WFE, could possibly be
+removed as redundant, but there are are Thumb equivalents for those
+which are used, so for symmetry I think we should use them. That will
+let us remove PROBES_EMULATE_NONE and PROBES_SIMULATE_NOP.
 
-Yes, I agree. We should probably set EFI_SYSTEM_TABLES in uefi_init()
-then, and possibly unset it again if we fail to remap it.
+So how about the following patch instead...
 
+----------------------------------------------------------------------------
+
+From: Jon Medhurst <tixy@linaro.org>
+Date: Wed, 7 Jan 2015 11:42:30 +0000
+Subject: [PATCH] ARM: probes: Use correct action types for MOVW, SEV and WFI
+
+This doesn't correct any bugs when probing these instructions but makes
+MOVW slightly faster and makes everything more symmetric with the Thumb
+instruction cases.
+
+We can also remove the now redundant PROBES_EMULATE_NONE and
+PROBES_SIMULATE_NOP actions.
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+ arch/arm/probes/decode-arm.c          | 6 +++---
+ arch/arm/probes/decode-arm.h          | 2 --
+ arch/arm/probes/kprobes/actions-arm.c | 2 --
+ arch/arm/probes/uprobes/actions-arm.c | 2 --
+ 4 files changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/probes/decode-arm.c b/arch/arm/probes/decode-arm.c
+index f46d8fc..f72c33a 100644
+--- a/arch/arm/probes/decode-arm.c
++++ b/arch/arm/probes/decode-arm.c
+@@ -370,17 +370,17 @@ static const union decode_item arm_cccc_001x_table[] = {
+ 
+ 	/* MOVW			cccc 0011 0000 xxxx xxxx xxxx xxxx xxxx */
+ 	/* MOVT			cccc 0011 0100 xxxx xxxx xxxx xxxx xxxx */
+-	DECODE_EMULATEX	(0x0fb00000, 0x03000000, PROBES_DATA_PROCESSING_IMM,
++	DECODE_EMULATEX	(0x0fb00000, 0x03000000, PROBES_MOV_HALFWORD,
+ 						 REGS(0, NOPC, 0, 0, 0)),
+ 
+ 	/* YIELD		cccc 0011 0010 0000 xxxx xxxx 0000 0001 */
+ 	DECODE_OR	(0x0fff00ff, 0x03200001),
+ 	/* SEV			cccc 0011 0010 0000 xxxx xxxx 0000 0100 */
+-	DECODE_EMULATE	(0x0fff00ff, 0x03200004, PROBES_EMULATE_NONE),
++	DECODE_EMULATE	(0x0fff00ff, 0x03200004, PROBES_SEV),
+ 	/* NOP			cccc 0011 0010 0000 xxxx xxxx 0000 0000 */
+ 	/* WFE			cccc 0011 0010 0000 xxxx xxxx 0000 0010 */
+ 	/* WFI			cccc 0011 0010 0000 xxxx xxxx 0000 0011 */
+-	DECODE_SIMULATE	(0x0fff00fc, 0x03200000, PROBES_SIMULATE_NOP),
++	DECODE_SIMULATE	(0x0fff00fc, 0x03200000, PROBES_WFE),
+ 	/* DBG			cccc 0011 0010 0000 xxxx xxxx ffff xxxx */
+ 	/* unallocated hints	cccc 0011 0010 0000 xxxx xxxx xxxx xxxx */
+ 	/* MSR (immediate)	cccc 0011 0x10 xxxx xxxx xxxx xxxx xxxx */
+diff --git a/arch/arm/probes/decode-arm.h b/arch/arm/probes/decode-arm.h
+index a7b0398..b3b80f6 100644
+--- a/arch/arm/probes/decode-arm.h
++++ b/arch/arm/probes/decode-arm.h
+@@ -18,8 +18,6 @@
+ #include "decode.h"
+ 
+ enum probes_arm_action {
+-	PROBES_EMULATE_NONE,
+-	PROBES_SIMULATE_NOP,
+ 	PROBES_PRELOAD_IMM,
+ 	PROBES_PRELOAD_REG,
+ 	PROBES_BRANCH_IMM,
+diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
+index 1e67839..06988ef 100644
+--- a/arch/arm/probes/kprobes/actions-arm.c
++++ b/arch/arm/probes/kprobes/actions-arm.c
+@@ -303,8 +303,6 @@ emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(probes_opcode_t insn,
+ }
+ 
+ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+-	[PROBES_EMULATE_NONE] = {.handler = probes_emulate_none},
+-	[PROBES_SIMULATE_NOP] = {.handler = probes_simulate_nop},
+ 	[PROBES_PRELOAD_IMM] = {.handler = probes_simulate_nop},
+ 	[PROBES_PRELOAD_REG] = {.handler = probes_simulate_nop},
+ 	[PROBES_BRANCH_IMM] = {.handler = simulate_blx1},
+diff --git a/arch/arm/probes/uprobes/actions-arm.c b/arch/arm/probes/uprobes/actions-arm.c
+index 1dd4916..76eb449 100644
+--- a/arch/arm/probes/uprobes/actions-arm.c
++++ b/arch/arm/probes/uprobes/actions-arm.c
+@@ -195,8 +195,6 @@ uprobe_decode_ldmstm(probes_opcode_t insn,
+ }
+ 
+ const union decode_action uprobes_probes_actions[] = {
+-	[PROBES_EMULATE_NONE] = {.handler = probes_simulate_nop},
+-	[PROBES_SIMULATE_NOP] = {.handler = probes_simulate_nop},
+ 	[PROBES_PRELOAD_IMM] = {.handler = probes_simulate_nop},
+ 	[PROBES_PRELOAD_REG] = {.handler = probes_simulate_nop},
+ 	[PROBES_BRANCH_IMM] = {.handler = simulate_blx1},
 -- 
-Ard.
+2.1.4
