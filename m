@@ -1,63 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Jan 2015 11:05:14 +0100
-Subject: [PATCH] serial: 8250: Make ISA ports optional
-In-Reply-To: <54AC580B.2050809@hurleysoftware.com>
-References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
- <6786513.g26uGMFKLE@wuerfel> <54AC580B.2050809@hurleysoftware.com>
-Message-ID: <2241604.rliP7ovaYi@wuerfel>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 07 Jan 2015 11:08:11 +0100
+Subject: [PATCH v2 1/2] [media] s5p-jpeg: Fix modification sequence of
+ interrupt enable register
+In-Reply-To: <1418974680-5837-2-git-send-email-tony.kn@samsung.com>
+References: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
+ <1418974680-5837-2-git-send-email-tony.kn@samsung.com>
+Message-ID: <54AD058B.6070900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 16:47:55 Peter Hurley wrote:
-> On 01/06/2015 02:43 PM, Arnd Bergmann wrote:
-> > On Tuesday 06 January 2015 09:32:02 Peter Hurley wrote:
-> >> On 01/06/2015 08:13 AM, Arnd Bergmann wrote:
-> >>> On Monday 05 January 2015 22:09:45 Peter Hurley wrote:
-> >>>> Some arches have no need to create unprobed 8250 ports; these phantom
-> >>>> ports are primarily required for ISA ports which have no probe
-> >>>> mechanism or to provide non-operational ports for userspace to
-> >>>> configure (via TIOCSSERIAL and TIOCSERCONFIG ioctls).
-> >>>>
-> >>>> Provide CONFIG_SERIAL_8250_PHANTOM_UARTS knob to disable phantom port
-> >>>> registration; ie., CONFIG_SERIAL_8250_PHANTOM_UARTS=N only registers
-> >>>> probed ports (ACPI/PNP, "serial8250" platform devices, PCI, etc).
-> >>>>
-> >>>> Cc: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> >>>> Cc: Tony Lindgren <tony@atomide.com>
-> >>>> Cc: Grant Likely <grant.likely@linaro.org>
-> >>>> Cc: Arnd Bergmann <arnd@arndb.de>
-> >>>> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
-> >>>
-> >>> The intent is definitely right, but I think a better approach is
-> >>> possible.
-> >>>
-> >>> I haven't tried it here, but how about moving the serial8250_init
-> >>> function into a separate module, along with all the other parts
-> >>> that are only used for ISA devices, but leaving the actual core
-> >>> (all exported symbols) in this file?
-> >>
-> >> Unfortunately, I don't see a way to remove the stacked initialization
-> >> without risking tons of breakage.
-> >>
-> >> Since later probes can "find" an already-existing port and
-> >> re-initialize it, the probe order is crucial. For example, a PCI
-> >> probe can "find" an existing "serial8250" platform device port,
-> >> resulting in only one device node.
-> > 
-> > I'm probably missing something important, by why would that
-> > be any different if the PCI driver gets loaded first and the
-> > ISA driver second?
-> 
-> Well, the PCI driver would have the proper irq, for one. So, if the
-> the platform driver re-initialized the port to the wrong irq...
+Hi Tony,
 
-I see. So we must still ensure that the ISA driver either gets loaded
-before the PCI driver, or never. It is already closely coupled with
-the PNP driver, but I think we can still get to the point where you
-don't load the ISA driver at all if you only have platform 8250
-ports that are not supposed to be reconfigurable.
+On 12/19/2014 08:37 AM, Tony K Nadackal wrote:
+> Fix the bug in modifying the interrupt enable register.
 
-On most non-x86 machines, I would think we also want a way to build
-the PCI driver without that dependency.
+For Exynos4 this was not a bug as there are only five bit fields
+used in the EXYNOS4_INT_EN_REG - all of them enable related
+interrupt signal and EXYNOS4_INT_EN_ALL value is 0x1f which
+just sets these bit fields to 1.
 
-	Arnd
+If for Exynos7 there are other bit fields in this register
+and it has to be read prior setting to find out current
+state then I'd parametrize this function with version argument
+as you do it in the patch adding support for Exynos7, but
+for Exynos4 case I'd left the behaviour as it is currenlty, i.e.
+avoid reading the register and do it only for Exynos7 case.
+Effectively, this patch is not required, as it doesn't fix
+anything but adds redundant call to readl.
+
+> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> ---
+>   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 5 ++++-
+>   1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> index e53f13a..a61ff7e 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> @@ -155,7 +155,10 @@ void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt)
+>
+>   void exynos4_jpeg_set_interrupt(void __iomem *base)
+>   {
+> -	writel(EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
+> +	unsigned int reg;
+> +
+> +	reg = readl(base + EXYNOS4_INT_EN_REG) & ~EXYNOS4_INT_EN_MASK;
+> +	writel(reg | EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
+>   }
+>
+>   unsigned int exynos4_jpeg_get_int_status(void __iomem *base)
+>
+
+
+-- 
+Best Regards,
+Jacek Anaszewski
