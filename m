@@ -1,67 +1,60 @@
-From: moon.linux@yahoo.com (Anand Moon)
-Date: Wed, 7 Jan 2015 13:56:36 +0000 (UTC)
-Subject: [PATCH v2] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
-In-Reply-To: <1420637261.32552.4.camel@AMDC1943>
-References: <1420635542-7202-1-git-send-email-moon.linux@yahoo.com>
- <1420637261.32552.4.camel@AMDC1943>
-Message-ID: <157605903.5809859.1420638996780.JavaMail.yahoo@jws10677.mail.bf1.yahoo.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 7 Jan 2015 22:06:12 +0800
+Subject: [PATCH] arm64: mm: support instruction SETEND
+In-Reply-To: <20150107111148.GH7485@arm.com>
+References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
+ <54AD061A.6090602@arm.com> <20150107105824.GA13620@leoy.com>
+ <20150107111148.GH7485@arm.com>
+Message-ID: <20150107140612.GA5994@leoy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kszysztof Kozlowski,
-
-I picked up the bellow line from 
-
-
-Documentation/locking/lockdep-design.txt  line no 18
-
-I understand that by enabling this flag we could detect possible 
-
-deadlock situation with the kernel. Sorry for the noise.
-
-
--Anand Moon
-
-
-
-On Wednesday, January 7, 2015 6:57 PM, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-On ?ro, 2015-01-07 at 18:29 +0530, Anand Moon wrote:
-> Enable CONFIG_LOCKUP_DETECTOR to validate kernel locks state for exynos SOC.
+On Wed, Jan 07, 2015 at 11:11:48AM +0000, Will Deacon wrote:
+> On Wed, Jan 07, 2015 at 10:58:24AM +0000, Leo Yan wrote:
+> > On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
+> > > On 07/01/15 05:52, Leo Yan wrote:
+> > > >Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
+> > > >instruction will be treated as UNALLOCATED; this error can be
+> > > >reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
+> > > >mode, finally kernel will trap the exception if the userspace
+> > > >libs use SETEND instruction.
+> > > >
+> > > >So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
+> > > >
+> > > The best way to do this, is via the instruction emulation framework
+> > > added by Punit, which handles the armv8 deprecated/obsoleted
+> > > instructions. This is now queued for 3.19.
+> > > I have a patchset which adds the 'SETEND' emulation support to the
+> > > framework. This will enable better handling of the feature,
+> > > including finding out the users of the deprecated instruction (when
+> > > we switch to the emulation mode).
+> > > 
+> > 
+> > i'm a little confuse for this point:
+> > 
+> > if the deprecated instructions cannot be supported by CPU, then only
+> > can use emulation; on the other hand, if CPU can natively support the
+> > deprecated instruction, why we cannot directly enable this h/w feature?
+> > if use the emulation mode, suppose here will have performance penalty.
+> > 
+> > how about u think for this? :-)
 > 
-> Enabling CONFIG_LOCKUP_DETECTOR help validator tracks the 'state' of lock-classes,
-> and it tracks dependencies between different lock-classes.
-> The validator maintains a rolling proof that the state and
-> the dependencies are correct.
+> A *huge* advantage of emulation is that we can print a diagnostic to dmesg
+> warning the user that they are making use of a CPU feature that is likely to
+> disappear from future revisions of the hardware. We've not been great at
+> doing this in the past, which led to all the fun around SWP emulation that
+> you can find in the list archives.
+> 
+> Furthermore, I think the emulation framework does allow the hardware support
+> to be enabled, it just doesn't make that the default behaviour.
+> 
+> In other words; use the emulation to find out where SETEND is being used
+> and fix those applications wherever you can. In the cases where you're
+> stuck with a legacy binary, you can enable CPU support if it is available
+> but that's not a longterm solution.
+> 
 
-Unfortunately this is not correct. Lockup detector does something else.
-Please read the help/manual for LOCKUP_DETECTOR. You can find in
-lib/Kconfig.debug (around line 667).
+Thanks for clarification; Let's use emulation framework as formal method.
 
-Best regards,
-Krzysztof
-
-> 
-> Changes since v2:
->  * Made commit message more clear
->  * Corrected grammer in code comment
-> 
-> Tested on Exynos5422 ODROID XU3 board.
-> 
-> Signed-off-by: Anand Moon <moon.linux@yahoo.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 5ef14de..ecd9987 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
->  CONFIG_DEBUG_FS=y
->  CONFIG_MAGIC_SYSRQ=y
->  CONFIG_DEBUG_KERNEL=y
-> +CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_DETECT_HUNG_TASK=y
->  CONFIG_DEBUG_RT_MUTEXES=y
->  CONFIG_DEBUG_SPINLOCK=y
+Thanks,
+Leo Yan
