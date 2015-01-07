@@ -1,85 +1,42 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 7 Jan 2015 11:30:52 -0600
-Subject: [RFC PATCH 1/3] of/device: manage resources similar to
- platform_device_add
+Date: Wed, 7 Jan 2015 11:30:54 -0600
+Subject: [RFC PATCH 3/3] of/unittest: fix trailing semi-colons on conditional
+ selftest
 In-Reply-To: <1420651854-17768-1-git-send-email-s-anna@ti.com>
 References: <1420651854-17768-1-git-send-email-s-anna@ti.com>
-Message-ID: <1420651854-17768-2-git-send-email-s-anna@ti.com>
+Message-ID: <1420651854-17768-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers can use of_platform_populate() to create platform devices
-for children of the device main node, and a complementary API
-of_platform_depopulate() is provided to delete these child platform
-devices. The of_platform_depopulate() leverages the platform API
-for performing the cleanup of these devices.
+The of_platform_populate() and of_platform_depopulate() tests
+are not really being tested because of some additional trailing
+semi-colons after the conditional checks on couple of selftest
+macro usage. Remove them to properly run all the platform
+tests.
 
-The platform device resources are managed differently between
-of_device_add and platform_device_add, and this asymmetry causes
-a kernel oops in platform_device_del during removal of the resources.
-Manage the platform device resources similar to platform_device_add
-to fix this kernel oops.
-
+Fixes: 851da976dc1d (of/unittest: Remove test devices after adding them)
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/of/device.c | 38 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 37 insertions(+), 1 deletion(-)
+ drivers/of/unittest.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 46d6c75c1404..fa27c1c71f29 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -50,6 +50,8 @@ EXPORT_SYMBOL(of_dev_put);
+diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+index 844838e11ef1..c67e50264e82 100644
+--- a/drivers/of/unittest.c
++++ b/drivers/of/unittest.c
+@@ -765,11 +765,11 @@ static void __init of_selftest_platform_populate(void)
+ 	selftest(irq < 0 && irq != -EPROBE_DEFER, "device parsing error failed - %d\n", irq);
  
- int of_device_add(struct platform_device *ofdev)
- {
-+	int i, ret;
-+
- 	BUG_ON(ofdev->dev.of_node == NULL);
+ 	if (selftest(np = of_find_node_by_path("/testcase-data/platform-tests"),
+-		     "No testcase data in device tree\n"));
++		     "No testcase data in device tree\n"))
+ 		return;
  
- 	/* name and id have to be set so that the platform bus doesn't get
-@@ -63,7 +65,41 @@ int of_device_add(struct platform_device *ofdev)
- 	if (!ofdev->dev.parent)
- 		set_dev_node(&ofdev->dev, of_node_to_nid(ofdev->dev.of_node));
+ 	if (selftest(!(rc = device_register(&test_bus)),
+-		     "testbus registration failed; rc=%i\n", rc));
++		     "testbus registration failed; rc=%i\n", rc))
+ 		return;
  
--	return device_add(&ofdev->dev);
-+	for (i = 0; i < ofdev->num_resources; i++) {
-+		struct resource *p, *r = &ofdev->resource[i];
-+
-+		if (!r->name)
-+			r->name = dev_name(&ofdev->dev);
-+
-+		p = r->parent;
-+		if (!p) {
-+			if (resource_type(r) == IORESOURCE_MEM)
-+				p = &iomem_resource;
-+			else if (resource_type(r) == IORESOURCE_IO)
-+				p = &ioport_resource;
-+		}
-+
-+		if (p && insert_resource(p, r)) {
-+			dev_err(&ofdev->dev, "failed to claim resource %d\n",
-+				i);
-+			ret = -EBUSY;
-+			goto failed;
-+		}
-+	}
-+
-+	ret = device_add(&ofdev->dev);
-+	if (ret == 0)
-+		return ret;
-+
-+failed:
-+	while (--i >= 0) {
-+		struct resource *r = &ofdev->resource[i];
-+		unsigned long type = resource_type(r);
-+
-+		if (type == IORESOURCE_MEM || type == IORESOURCE_IO)
-+			release_resource(r);
-+	}
-+	return ret;
- }
- 
- int of_device_register(struct platform_device *pdev)
+ 	for_each_child_of_node(np, child) {
 -- 
 2.2.1
