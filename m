@@ -1,41 +1,76 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 07 Jan 2015 15:22:50 +0100
-Subject: [PATCH 2/3] ARM: berlin: add broken-cd and set bus width for
- eMMC in Marvell DMP DT
-In-Reply-To: <1420016272-6789-3-git-send-email-jszhang@marvell.com>
-References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
- <1420016272-6789-3-git-send-email-jszhang@marvell.com>
-Message-ID: <54AD413A.8030208@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 07 Jan 2015 15:23:20 +0100
+Subject: [PATCH v2] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
+In-Reply-To: <157605903.5809859.1420638996780.JavaMail.yahoo@jws10677.mail.bf1.yahoo.com>
+References: <1420635542-7202-1-git-send-email-moon.linux@yahoo.com>
+ <1420637261.32552.4.camel@AMDC1943>
+ <157605903.5809859.1420638996780.JavaMail.yahoo@jws10677.mail.bf1.yahoo.com>
+Message-ID: <1420640600.32552.7.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.12.2014 09:57, Jisheng Zhang wrote:
-> There's no card detection for the eMMC, so this patch adds the missing
-> broken-cd property. This patch also sets bus width as 8 to add
-> MMC_CAP_8_BIT_DATA in the Host capabilities.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Cc: stable at vger.kernel.org # 3.16+
+On ?ro, 2015-01-07 at 13:56 +0000, Anand Moon wrote:
+> Hi Kszysztof Kozlowski,
+> 
+> I picked up the bellow line from 
+> 
+> 
+> Documentation/locking/lockdep-design.txt  line no 18
+> 
+> I understand that by enabling this flag we could detect possible 
+> 
+> deadlock situation with the kernel. Sorry for the noise.
 
-Applied to berlin/fixes.
+...and lockdep-design.txt describes LOCKDEP. Not LOCKUP. So why you are
+enabling lockup?
 
-Thanks!
+Best regards,
+Krzysztof
 
-> ---
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index 28e7e20..a98ac1b 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> @@ -65,6 +65,8 @@
->   };
->
->   &sdhci2 {
-> +	broken-cd;
-> +	bus-width = <8>;
->   	non-removable;
->   	status = "okay";
->   };
->
+> 
+> 
+> -Anand Moon
+> 
+> 
+> 
+> On Wednesday, January 7, 2015 6:57 PM, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> On ?ro, 2015-01-07 at 18:29 +0530, Anand Moon wrote:
+> > Enable CONFIG_LOCKUP_DETECTOR to validate kernel locks state for exynos SOC.
+> > 
+> > Enabling CONFIG_LOCKUP_DETECTOR help validator tracks the 'state' of lock-classes,
+> > and it tracks dependencies between different lock-classes.
+> > The validator maintains a rolling proof that the state and
+> > the dependencies are correct.
+> 
+> Unfortunately this is not correct. Lockup detector does something else.
+> Please read the help/manual for LOCKUP_DETECTOR. You can find in
+> lib/Kconfig.debug (around line 667).
+> 
+> Best regards,
+> Krzysztof
+> 
+> > 
+> > Changes since v2:
+> >  * Made commit message more clear
+> >  * Corrected grammer in code comment
+> > 
+> > Tested on Exynos5422 ODROID XU3 board.
+> > 
+> > Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/configs/exynos_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> > index 5ef14de..ecd9987 100644
+> > --- a/arch/arm/configs/exynos_defconfig
+> > +++ b/arch/arm/configs/exynos_defconfig
+> > @@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
+> >  CONFIG_DEBUG_FS=y
+> >  CONFIG_MAGIC_SYSRQ=y
+> >  CONFIG_DEBUG_KERNEL=y
+> > +CONFIG_LOCKUP_DETECTOR=y
+> >  CONFIG_DETECT_HUNG_TASK=y
+> >  CONFIG_DEBUG_RT_MUTEXES=y
+> >  CONFIG_DEBUG_SPINLOCK=y
