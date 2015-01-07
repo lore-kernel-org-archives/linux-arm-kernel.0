@@ -1,107 +1,106 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 7 Jan 2015 15:35:51 +0800
-Subject: [RFC PATCH 07/11] kprobes: introduces macros for allocing early
- kprobe resources.
+Date: Wed, 7 Jan 2015 15:36:04 +0800
+Subject: [RFC PATCH 10/11] kprobes: enable 'ekprobe=' cmdline option for early
+ kprobes.
 In-Reply-To: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
 References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1420616151-43023-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1420616164-43153-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduces macros to genearte common early kprobe related resource
-allocator.
-
-All early kprobe related resources are statically allocated during
-linking for each early kprobe slot. For each type of resource, a bitmap
-is used to track allocation. __DEFINE_EKPROBE_ALLOC_OPS defines alloc
-and free handler for them. The range of the resource and the bitmap
-should be provided for allocaing and freeing. DEFINE_EKPROBE_ALLOC_OPS
-defines bitmap and the array used by it.
+This patch shows the basic idea of usage of early kprobes. By adding
+kernel cmdline options such as 'ekprobe=__alloc_pages_nodemask' or
+'ekprobe=0xc00f3c2c', early kprobes are installed. When the probed
+instructions get hit, a message is printed.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- include/linux/kprobes.h | 69 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+ kernel/kprobes.c | 71 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
-diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
-index b0265f9..9a18188 100644
---- a/include/linux/kprobes.h
-+++ b/include/linux/kprobes.h
-@@ -270,6 +270,75 @@ extern void show_registers(struct pt_regs *regs);
- extern void kprobes_inc_nmissed_count(struct kprobe *p);
- extern bool arch_within_kprobe_blacklist(unsigned long addr);
- 
-+#ifdef CONFIG_EARLY_KPROBES
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 9c3ea9b..73f9b7f 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -2611,8 +2611,79 @@ convert_early_kprobes(void)
+ 	hlist_for_each_entry_safe(p, tmp, &early_kprobe_hlist, hlist)
+ 		convert_early_kprobe(p);
+ };
 +
-+#define NR_EARLY_KPROBES_SLOTS	CONFIG_NR_EARLY_KPROBES_SLOTS
-+#define ALIGN_UP(v, a)	(((v) + ((a) - 1)) & ~((a) - 1))
-+#define EARLY_KPROBES_BITMAP_SZ	ALIGN_UP(NR_EARLY_KPROBES_SLOTS, BITS_PER_LONG)
++static int early_kprobe_pre_handler(struct kprobe *p, struct pt_regs *regs)
++{
++	const char *sym = NULL;
++	char *modname, namebuf[KSYM_NAME_LEN];
++	unsigned long offset = 0;
 +
-+#define __ek_in_range(v, s, e)	(((v) >= (s)) && ((v) < (e)))
-+#define __ek_buf_sz(s, e)	((void *)(e) - (void *)(s))
-+#define __ek_elem_sz_b(s, e)	(__ek_buf_sz(s, e) / NR_EARLY_KPROBES_SLOTS)
-+#define __ek_elem_sz(s, e)	(__ek_elem_sz_b(s, e) / sizeof(s[0]))
-+#define __ek_elem_idx(v, s, e)	(__ek_buf_sz(s, v) / __ek_elem_sz_b(s, e))
-+#define __ek_get_elem(i, s, e)	(&((s)[__ek_elem_sz(s, e) * (i)]))
-+#define __DEFINE_EKPROBE_ALLOC_OPS(__t, __name)				\
-+static inline __t *__ek_alloc_##__name(__t *__s, __t *__e, unsigned long *__b)\
-+{									\
-+	int __i = find_next_zero_bit(__b, NR_EARLY_KPROBES_SLOTS, 0);	\
-+	if (__i >= NR_EARLY_KPROBES_SLOTS)				\
-+		return NULL;						\
-+	set_bit(__i, __b);						\
-+	return __ek_get_elem(__i, __s, __e);				\
-+}									\
-+static inline int __ek_free_##__name(__t *__v, __t *__s, __t *__e, unsigned long *__b)	\
-+{									\
-+	if (!__ek_in_range(__v, __s, __e))				\
-+		return 0;						\
-+	clear_bit(__ek_elem_idx(__v, __s, __e), __b);			\
-+	return 1;							\
++	sym = kallsyms_lookup((unsigned long)p->addr, NULL,
++			&offset, &modname, namebuf);
++	if (sym)
++		pr_info("Hit early kprobe at %s+0x%lx%s%s\n",
++				sym, offset,
++				(modname ? " " : ""),
++				(modname ? modname : ""));
++	else
++		pr_info("Hit early kprobe at %p\n", p->addr);
++	return 0;
 +}
 +
-+#define DEFINE_EKPROBE_ALLOC_OPS(__t, __name, __static)			\
-+__static __t __ek_##__name##_slots[NR_EARLY_KPROBES_SLOTS];		\
-+__static unsigned long __ek_##__name##_bitmap[EARLY_KPROBES_BITMAP_SZ];	\
-+__DEFINE_EKPROBE_ALLOC_OPS(__t, __name)					\
-+static inline __t *ek_alloc_##__name(void)				\
-+{									\
-+	return __ek_alloc_##__name(&((__ek_##__name##_slots)[0]),	\
-+			&((__ek_##__name##_slots)[NR_EARLY_KPROBES_SLOTS]),\
-+			(__ek_##__name##_bitmap));			\
-+}									\
-+static inline int ek_free_##__name(__t *__s)				\
-+{									\
-+	return __ek_free_##__name(__s, &((__ek_##__name##_slots)[0]),	\
-+			&((__ek_##__name##_slots)[NR_EARLY_KPROBES_SLOTS]),\
-+			(__ek_##__name##_bitmap));			\
++DEFINE_EKPROBE_ALLOC_OPS(struct kprobe, early_kprobe_setup, static);
++static int __init early_kprobe_setup(char *p)
++{
++	unsigned long long addr;
++	struct kprobe *kp;
++	int len = strlen(p);
++	int err;
++
++	if (len <= 0) {
++		pr_err("early kprobe: wrong param: %s\n", p);
++		return 0;
++	}
++
++	if ((p[0] == '0') && (p[1] == 'x')) {
++		err = kstrtoull(p, 16, &addr);
++		if (err) {
++			pr_err("early kprobe: wrong address: %p\n", p);
++			return 0;
++		}
++	} else {
++		addr = kallsyms_lookup_name(p);
++		if (!addr) {
++			pr_err("early kprobe: wrong symbol: %s\n", p);
++			return 0;
++		}
++	}
++
++	if ((addr < (unsigned long)_text) ||
++			(addr >= (unsigned long)_etext))
++		pr_err("early kprobe: address of %p out of range\n", p);
++
++	kp = ek_alloc_early_kprobe_setup();
++	if (kp == NULL) {
++		pr_err("early kprobe: no enough early kprobe slot\n");
++		return 0;
++	}
++	kp->addr = (void *)(unsigned long)(addr);
++	kp->pre_handler = early_kprobe_pre_handler;
++	err = register_kprobe(kp);
++	if (err) {
++		pr_err("early kprobe: register early kprobe %s failed\n", p);
++		ek_free_early_kprobe_setup(kp);
++	}
++	return 0;
 +}
+ #else
+ static int register_early_kprobe(struct kprobe *p) { return -ENOSYS; }
+ static int ek_free_early_kprobe(struct early_kprobe_slot *slot) { return 0; }
+ static void convert_early_kprobes(void) {};
 +
-+
-+#else
-+#define __DEFINE_EKPROBE_ALLOC_OPS(__t, __name)				\
-+static inline __t *__ek_alloc_##__name(__t *__s, __t *__e, unsigned long *__b)\
-+{									\
-+	return NULL;							\
-+}									\
-+static inline int __ek_free_##__name(__t *__v, __t *__s, __t *__e, unsigned long *__b)\
-+{									\
-+	return 0;							\
++static int __init early_kprobe_setup(char *p)
++{
++	return 0;
 +}
+ #endif
 +
-+#define DEFINE_EKPROBE_ALLOC_OPS(__t, __name, __static)			\
-+static inline __t *ek_alloc_##__name(void)				\
-+{									\
-+	return NULL;							\
-+}									\
-+static inline void ek_free_##__name(__t *__s)				\
-+{									\
-+}
-+
-+#endif
-+
- struct kprobe_insn_cache {
- 	struct mutex mutex;
- 	void *(*alloc)(void);	/* allocate insn page */
++early_param("ekprobe", early_kprobe_setup);
 -- 
 1.8.4
