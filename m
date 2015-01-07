@@ -1,135 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Jan 2015 17:51:02 +0000
-Subject: [PATCH v3 3/3] irqchip: GICv3: Add support for irq_{get,
- set}_irqchip_state
-In-Reply-To: <1420653062-23361-1-git-send-email-marc.zyngier@arm.com>
-References: <1420653062-23361-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420653062-23361-4-git-send-email-marc.zyngier@arm.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 07 Jan 2015 09:52:46 -0800
+Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
+In-Reply-To: <20150107101300.GC7485@arm.com> (Will Deacon's message of "Wed, 7
+ Jan 2015 10:13:00 +0000")
+References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
+ <20150106141507.GB3484@arm.com>
+ <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
+ <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
+ <vnkw61cjebbq.fsf@mitchelh-linux.qualcomm.com>
+ <20150107101300.GC7485@arm.com>
+Message-ID: <vnkw4ms2cwb5.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the required hooks for the internal state of an interrupt
-to be exposed to other subsystems.
+On Wed, Jan 07 2015 at 02:13:00 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jan 06, 2015 at 11:30:49PM +0000, Mitchel Humpherys wrote:
+>> On Tue, Jan 06 2015 at 02:35:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> > On Tue, Jan 6, 2015 at 2:16 PM, Mitchel Humpherys
+>> > <mitchelh@codeaurora.org> wrote:
+>> >> On Tue, Jan 06 2015 at 06:15:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> >>>>      /* Invalidate the TLB, just in case */
+>> >>>> -    writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+>> >>>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+>> >>>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
+>> >>>
+>> >>> I was slightly worried that this would break the Calxeda implementation
+>> >>> with ARM_SMMU_OPT_SECURE_CFG_ACCESS, but actually these registers aren't
+>> >>> even aliased there so I think there's a bigger bug for them.
+>> >>>
+>> >>> Anyway, given that their hardware has gone the way of the dodo, I'll take
+>> >>> the patch as-is unless you have any further comments?
+>> >>>
+>> >>> Will
+>> >>
+>> >> Yeah I agree that this shouldn't affect the (now defunct) Calxeda
+>> >> implementation.  I've tested this on some hardware here and we crash
+>> >> when we touch that register since it's secure-only (not banked, as you
+>> >> mentioned).
+>> >
+>> > It's not quite dead:
+>> >
+>> > http://www.eweek.com/servers/calxedas-arm-based-server-chips-re-emerge-with-new-company.html
+>> >
+>> > But AFAIK, production systems don't enable the SMMU, but someone could
+>> > still want to at some point. A note in the commit log here would be
+>> > nice so it gets recorded.
+>> 
+>> Actually, as Will mentioned this shouldn't affect Calxeda since this
+>> isn't a banked register.  I think the confusion is from the `S' prefix
+>> in the spec.  The /s/ (lower-case, italic) prefix means that there are
+>> secure and non-secure versions of the register, while the S (upper-case,
+>> non-italic) prefix means "this is a secure register" (which may or may
+>> not have a banked non-secure counterpart).  This particular register is
+>> an S-only register (there's no non-secure counterpart) so the Calxeda
+>> workaround isn't relevant here, AFAICT.
+>
+> Right, but I think the problem is that we go and write zero to
+> ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH at what *would be* their
+> non-secure aliases for the secure side (i.e. + 0x400).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3.c | 83 +++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 70 insertions(+), 13 deletions(-)
+This sounds like a separate problem.  Since these GR0 registers aren't
+banked the calxeda workaround doesn't work...  SMMU_STLBIALL, on the
+other hand, is not only not banked but it's also "secure only" so I
+don't think we have any business touching it ever.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1a146cc..6e73846 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -195,6 +195,19 @@ static void gic_enable_redist(bool enable)
- /*
-  * Routines to disable, enable, EOI and route interrupts
-  */
-+static int gic_peek_irq(struct irq_data *d, u32 offset)
-+{
-+	u32 mask = 1 << (gic_irq(d) % 32);
-+	void __iomem *base;
-+
-+	if (gic_irq_in_rdist(d))
-+		base = gic_data_rdist_sgi_base();
-+	else
-+		base = gic_data.dist_base;
-+
-+	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
-+}
-+
- static void gic_poke_irq(struct irq_data *d, u32 offset)
- {
- 	u32 mask = 1 << (gic_irq(d) % 32);
-@@ -223,6 +236,61 @@ static void gic_unmask_irq(struct irq_data *d)
- 	gic_poke_irq(d, GICD_ISENABLER);
- }
- 
-+static int gic_irq_set_irqchip_state(struct irq_data *d,
-+				     enum irqchip_irq_state which, bool val)
-+{
-+	u32 reg;
-+
-+	if (d->hwirq >= gic_data.irq_nr) /* PPI/SPI only */
-+		return -EINVAL;
-+
-+	switch (which) {
-+	case IRQCHIP_STATE_PENDING:
-+		reg = val ? GICD_ISPENDR : GICD_ICPENDR;
-+		break;
-+
-+	case IRQCHIP_STATE_ACTIVE:
-+		reg = val ? GICD_ISACTIVER : GICD_ICACTIVER;
-+		break;
-+
-+	case IRQCHIP_STATE_MASKED:
-+		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	gic_poke_irq(d, reg);
-+	return 0;
-+}
-+
-+static int gic_irq_get_irqchip_state(struct irq_data *d,
-+				     enum irqchip_irq_state which, bool *val)
-+{
-+	if (d->hwirq >= gic_data.irq_nr) /* PPI/SPI only */
-+		return -EINVAL;
-+
-+	switch (which) {
-+	case IRQCHIP_STATE_PENDING:
-+		*val = gic_peek_irq(d, GICD_ISPENDR);
-+		break;
-+
-+	case IRQCHIP_STATE_ACTIVE:
-+		*val = gic_peek_irq(d, GICD_ISACTIVER);
-+		break;
-+
-+	case IRQCHIP_STATE_MASKED:
-+		*val = !gic_peek_irq(d, GICD_ISENABLER);
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static void gic_eoi_irq(struct irq_data *d)
- {
- 	gic_write_eoir(gic_irq(d));
-@@ -418,19 +486,6 @@ static void gic_cpu_init(void)
- }
- 
- #ifdef CONFIG_SMP
--static int gic_peek_irq(struct irq_data *d, u32 offset)
--{
--	u32 mask = 1 << (gic_irq(d) % 32);
--	void __iomem *base;
--
--	if (gic_irq_in_rdist(d))
--		base = gic_data_rdist_sgi_base();
--	else
--		base = gic_data.dist_base;
--
--	return !!(readl_relaxed(base + offset + (gic_irq(d) / 32) * 4) & mask);
--}
--
- static int gic_secondary_init(struct notifier_block *nfb,
- 			      unsigned long action, void *hcpu)
- {
-@@ -597,6 +652,8 @@ static struct irq_chip gic_chip = {
- 	.irq_eoi		= gic_eoi_irq,
- 	.irq_set_type		= gic_set_type,
- 	.irq_set_affinity	= gic_set_affinity,
-+	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
-+	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
- };
- 
- #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
+> If would be better to check for the ARM_SMMU_OPT_SECURE_CFG_ACCESS feature
+> and, if it's set then zero ARM_SMMU_GR0_STLBIALL at the correct address
+> otherwise do the ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH.
+
+I'm confused.  The problem I'm addressing here is that we're touching a
+register that's marked as "secure only", which causes our system to
+crash.  Why would we ever want to touch a secure only register, calxeda
+workaround or not?
+
+
+-Mitch
+
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
