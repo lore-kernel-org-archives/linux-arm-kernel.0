@@ -1,61 +1,45 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 7 Jan 2015 12:39:46 +0530
-Subject: [RFC PATCH v3 4/4] arm64:numa: adding numa support for arm64
- platforms.
-In-Reply-To: <2425557.4DHPZVafv4@wuerfel>
-References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <1849719.f6Z6RhZjTc@wuerfel>
- <CAFpQJXVQnRY9wZRk-83bQLw0m=41ZxH2v-YZCHdF0fvC8LS_Tw@mail.gmail.com>
- <2425557.4DHPZVafv4@wuerfel>
-Message-ID: <CAFpQJXVFbpgNUCSF9qPCR28FNXZQ46RpFezX9+QSB0nFRzaz5Q@mail.gmail.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Wed,  7 Jan 2015 12:39:29 +0530
+Subject: [PATCH 1/2] ARM: imx: clk-vf610: Add clock for SNVS
+In-Reply-To: <cover.1420612799.git.maitysanchayan@gmail.com>
+References: <cover.1420612799.git.maitysanchayan@gmail.com>
+Message-ID: <832a4b2b28431f8e73606dfec5f9acac75ecae49.1420612799.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 7, 2015 at 1:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 06 January 2015 14:55:53 Ganapatrao Kulkarni wrote:
->> On Sat, Jan 3, 2015 at 2:40 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> +int dt_get_cpu_node_id(int cpu)
->> >> +{
->> >> +     struct device_node *dn = NULL;
->> >> +
->> >> +     while ((dn = of_find_node_by_type(dn, "cpu"))) {
->> >> +             const u32 *cell;
->> >> +             u64 hwid;
->> >> +
->> >> +             /*
->> >> +              * A cpu node with missing "reg" property is
->> >> +              * considered invalid to build a cpu_logical_map
->> >> +              * entry.
->> >> +              */
->> >> +             cell = of_get_property(dn, "reg", NULL);
->> >> +             if (!cell) {
->> >> +                     pr_err("%s: missing reg property\n", dn->full_name);
->> >> +                     return default_nid;
->> >> +             }
->> >> +             hwid = of_read_number(cell, of_n_addr_cells(dn));
->> >> +
->> >> +             if (cpu_logical_map(cpu) == hwid)
->> >> +             return of_node_to_nid_single(dn);
->> >> +     }
->> >> +     return NUMA_NO_NODE;
->> >> +}
->> >> +EXPORT_SYMBOL(dt_get_cpu_node_id);
->> >
->> > Maybe just expose a function to the device node for a CPU ID here, and
->> > expect callers to use of_node_to_nid?
->> shall i make this wrapper function in dt_numa.c, which will use
->> functions _of_node_to_nid and  _of_cpu_to_node(cpu)
->
-> Yes, I guess that would work.
->
->> And,  this function can be a weak function in numa.c which returns 0.
->
-> No, please don't use weak functions. You can either use IS_ENABLED()
-> tricks to remove function calls at compile-time, or in the header
-> file provide an inline function as an alternative to the extern
-> declaration, based on a configuration symbol.
-ok
->
->         Arnd
-thanks
-ganaapat
+Add support for clock gating of the SNVS peripheral.
+
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ arch/arm/mach-imx/clk-vf610.c           |    2 ++
+ include/dt-bindings/clock/vf610-clock.h |    3 ++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index cb21777..b7688b6 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -380,6 +380,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
+ 	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
+ 
++	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs-rtc", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
++
+ 	imx_check_clocks(clk, ARRAY_SIZE(clk));
+ 
+ 	clk_set_parent(clk[VF610_CLK_QSPI0_SEL], clk[VF610_CLK_PLL1_PFD4]);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 801c0ac..68f1886 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -192,6 +192,7 @@
+ #define VF610_PLL5_BYPASS		179
+ #define VF610_PLL6_BYPASS		180
+ #define VF610_PLL7_BYPASS		181
+-#define VF610_CLK_END			182
++#define VF610_CLK_SNVS			182
++#define VF610_CLK_END			183
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
+-- 
+1.7.9.5
