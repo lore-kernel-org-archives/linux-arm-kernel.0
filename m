@@ -1,149 +1,103 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 7 Jan 2015 10:14:53 -0600
-Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
-In-Reply-To: <54888F3A.5010800@ti.com>
-References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
- <20141207171646.GA12049@kahuna> <20141207180322.GA15688@kahuna>
- <54856B21.6070104@arm.com> <20141208224116.GA2538@kahuna>
- <5486C6A6.8060702@arm.com> <20141209181719.GA2569@kahuna>
- <54874223.2000805@arm.com> <54888F3A.5010800@ti.com>
-Message-ID: <20150107161453.GA27791@kahuna>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Wed,  7 Jan 2015 16:16:43 +0000
+Subject: [PATCH 0/2] Support deprecated SETEND instruction for AArch32
+Message-ID: <1420647405-3907-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:21-20141210, Nishanth Menon wrote:
-> On 12/09/2014 12:40 PM, Marc Zyngier wrote:
-> > On 09/12/14 18:17, Nishanth Menon wrote:
-> >> On 09:53-20141209, Marc Zyngier wrote:
-> >>> On 08/12/14 22:41, Nishanth Menon wrote:
-> >>>
-> >>>> Anyways.. The following diff[1] on top of your branch makes DRA7 work - I
-> >>>> assume you will squash as needed and repost with linux-omap mailing list
-> >>>> in CC.
-> >>>
-> >>> Brilliant. I'll squash that into my tree and repost at some point.
-> >>
-> >> K, it will be nice to have a reflow of the series based on v3.19-rc1
-> >> since there are dts dependencies and we dont want folks to have
-> >> regressions on their platforms of choice..
-> >>
-> >> Obviously, my tests are basic boot tests and should get a few weeks(as
-> >> you already mentioned) on linux-next to get properly soaked
-> >>
-> >>>
-> >>>> I increased the scope of testing knowing that WUGEN is present in many
-> >>>> A9 based TI platforms as well.. and at least OMAP4 showed flakiness in
-> >>>> my testing.. Also a few notes:
-> >>>>
-> >>>> Stuff like: am437x is a bit questionable (interrupt-parent probably should be wugen?)
-> >>>> 175:          0       GIC  39  tps65218 
-> >>>>
-> >>>> OMAP5: (should be wugen?)
-> >>>> 308:       4323          0       GIC 106  OMAP UART2
-> >>>> 411:          0          0       GIC 151  twl6040
-> >>>> 405:          1          0       GIC  39  palmas
-> >>>
-> >>> Well, I can't really tell. Someone with access to the documentation
-> >>> should be able to find out.
-> >>
-> >> AM437x: http://www.ti.com/lit/pdf/spruhl7
-> >> OMAP5: http://www.ti.com/lit/pdf/swpu249
-> >>
-> >> yeah, we should be able to do them as well - trivially since they follow
-> >> the same structure as other SoCs without crossbar.
-> > 
-> > Done some stuff in that department.
-> > 
-> >>>
-> >>>> OMAP4 serial port is flaky -> not sure if it is due to routing of GIC to UART2 and not via WUGEN
-> >>>> IRQ branch: with my fix applied:
-> >>>> ---------------------------------
-> >>>
-> >>> [...]
-> >>>
-> >>>> 18: pandaboard-es:  Boot FAIL: http://slexy.org/raw/s20ty0Z6i5 (not expected)
-> >>>> 19: pandaboard-vanilla:  Boot FAIL: http://slexy.org/raw/s20BYfaMd2 (not expected)
-> >>>
-> >>> If I read the log correctly, the serial port stops responding after a while?
-> >>
-> >> yeah - dug at the omap4 ones a bit, obviously once the deeper c states
-> >> are hit, we'd like wakeupgen to wakeup CPU else we will be "sluggish" in
-> >> the sense that the event is detected when some other wakeupgen enabled
-> >> interrupt takes place.
-> > 
-> > I realised that as well once I got a panda up and running.
-> > 
-> >> Adding the following makes my panda work fine.
-> >> 1: pandaboard-es:  Boot PASS: http://slexy.org/raw/s20o8DaBvh
-> >> 2: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s222JndDdh
-> >>
-> >>
-> >> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> >> index 1505135..8b6d50e 100644
-> >> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> >> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> >> @@ -371,8 +371,8 @@
-> >>  	twl: twl at 48 {
-> >>  		reg = <0x48>;
-> >>  		/* IRQ# = 7 */
-> >> -		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to gic */
-> >> -		interrupt-parent = <&gic>;
-> >> +		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to wakeupgen to gic */
-> >> +		interrupt-parent = <&wakeupgen>;
-> >>  	};
-> > 
-> > [...]
-> > 
-> > I already fixed those in my tree, in a slightly different way: no need
-> > to have an interrupt parent at all, as we're going to inherit the
-> > default anyway.
-> > 
-> > I've pushed another version of the branch, with the crossbar rework
-> > sitting *before* the WUGEN hacks. That should hopefully make bisection work.
-> > 
-> > If you can give it a shake, that'd be most appreciated. I'll repost the
-> > branch in a couple of days.
-> > 
-> 
-> Did a quick run.. and thought of testing power management and found
-> that CPUFreq for my platforms are broken in v3.18-rc7 and my scripts
-> broke (so much for my cronjob testing daily boot... now I gotta add
-> some PM test as well.. Sigh..) anyways.. just boot log..
-> 
-> based on
-> irq/die-gic-arch-extn-die-die-die c0024cb irqchip: gic: Drop support
-> for gic_arch_extn
-> 
-> 
->  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s201YeK4dW
->  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s20nydiyVx
->  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2aTrenePo
->  4:  am437x-sk:  Boot FAIL: http://slexy.org/raw/s20NNiEa4W
->  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2gghhhyOy
->  6: am43xx-gpevm:  Boot PASS: http://slexy.org/raw/s2LY4Cb75N
->  7: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s2e8iJMUXu
->  8: beagleboard-vanilla:  Boot PASS: http://slexy.org/raw/s20wqxUmvr
->  9: beaglebone-black:  Boot PASS: http://slexy.org/raw/s21I0g2Ba3
-> 10: beaglebone:  Boot PASS: http://slexy.org/raw/s2lpED0qW4
-> 11: craneboard:  Boot PASS: http://slexy.org/raw/s230RKflY3
-> 12: dra72x-evm:  Boot FAIL: http://slexy.org/raw/s21fWVnjaB
-> 13: dra7xx-evm:  Boot PASS: http://slexy.org/raw/s20yEhfruO
-> 14: OMAP3430-Labrador(LDP):  Boot PASS: http://slexy.org/raw/s20qZaXwz0
-> 15:       n900:  Boot PASS: http://slexy.org/raw/s21LNTXZP7
-> 16:  omap5-evm:  Boot PASS: http://slexy.org/raw/s2WF8eAcK2
-> 17: pandaboard-es:  Boot PASS: http://slexy.org/raw/s21PVo7ENF
-> 18: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s2BcMbSrVF
-> 19:    sdp2430:  Boot PASS: http://slexy.org/raw/s24LgXbav1
-> 20:    sdp3430:  Boot PASS: http://slexy.org/raw/s21IaKdkUs
-> TOTAL = 20 boards, Booted Boards = 18, No Boot boards = 2
-> 
-> 
-> will try to first try and save a bit of cpufreq and reinstate my
-> scripts and once you post based on 3.19-rc1, will do a retest..
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Assuming you are yet to post a renewed revision with the vacation going
-on.. :).. Hopefully this does not mess up Tony's plans for 3.20 queue.
+This series add support for controlling the 'setend' instruction,
+which is deprecated in ARMv8, using the legacy instruction emulation
+framework, introduced by Punit Agrawal.
+
+Patch 1 re-organises the infrastructure a little bit to avoid multiple
+CPU hotplug notifiers.
+
+Patch 2 adds the support for SETEND.
+
+Testing :
+
+ $ cat setend_sig.c 
+ #include <stdio.h>
+ #include <signal.h>
+
+ #define setend_be(a)	asm __volatile__ ( "setend be" ::: "memory" )
+ #define setend_le(a)	asm __volatile__ ( "setend le" ::: "memory" )
+
+ volatile int flag = 1;
+
+ void sigint(int sig)
+ {
+	printf("in sighandler %d\n", sig);
+	flag = 0;
+	return;
+ }
+
+ main()
+ {
+	volatile int a = 0x0;
+
+	(void)signal(SIGINT, sigint);
+	printf("Press Ctrl+C to continue\n");
+	setend_be();
+	a ++;
+
+	while (flag);
+
+	setend_le();
+	a ++;
+
+	printf("a: 0x%x\n", a);
+	return 0;
+ }
+ $ cat /proc/sys/abi/setend 
+ 1
+ $ echo 1 > /sys/kernel/debug/tracing/events/emulation/instruction_emulation/enable 
+ $ echo 1 > /sys/kernel/debug/tracing/tracing_on 
+ $ ./setend_sig_a32 
+ Press Ctrl+C to continue
+ ^Cin sighandler 2
+ a: 0x1000001
+ $ cat /sys/kernel/debug/tracing/trace
+ # tracer: nop
+ #
+ # entries-in-buffer/entries-written: 2/2   #P:2
+ #
+ #                              _-----=> irqs-off
+ #                             / _----=> need-resched
+ #                            | / _---=> hardirq/softirq
+ #                            || / _--=> preempt-depth
+ #                            ||| /     delay
+ #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+ #              | |       |   ||||       |         |
+   setend_sig_a32-1373  [000] ...1   491.554499: instruction_emulation: instr="setend be" addr=0x8460
+   setend_sig_a32-1373  [000] ...1   492.833056: instruction_emulation: instr="setend le" addr=0x8488
+ $ dmesg | tail
+ [  491.554807] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8460
+ [  492.833285] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8488
+ $ echo 2 > /proc/sys/abi/setend
+ $ ./setend_sig_t16 
+ Press Ctrl+C to continue
+ ^Cin sighandler 2
+ a: 0x1000001
+ $ dmesg | tail
+ [  491.554807] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8460
+ [  492.833285] "setend_sig_a32" (1373) uses deprecated setend instruction at 0x8488
+ [  537.426216] Removed setend emulation handler
+ [  537.426624] Enabled setend support
+ ---
+
+Suzuki K. Poulose (2):
+  arm64: Consolidate hotplug notifier for instruction emulation
+  arm64: Emulate SETEND for AArch32 tasks
+
+ Documentation/arm64/legacy_instructions.txt |    5 +
+ arch/arm64/Kconfig                          |   10 ++
+ arch/arm64/include/asm/ptrace.h             |    7 ++
+ arch/arm64/kernel/armv8_deprecated.c        |  174 +++++++++++++++++++--------
+ arch/arm64/kernel/signal32.c                |    5 +-
+ 5 files changed, 151 insertions(+), 50 deletions(-)
 
 -- 
-Regards,
-Nishanth Menon
+1.7.9.5
