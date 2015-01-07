@@ -1,63 +1,54 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Wed,  7 Jan 2015 16:39:40 +0530
-Subject: [PATCH v2 2/3] arm64: dts: Add APM X-Gene DMA device and DMA clock
- DTS nodes
-In-Reply-To: <1420628981-22774-1-git-send-email-rsahu@apm.com>
-References: <1420628981-22774-1-git-send-email-rsahu@apm.com>
-Message-ID: <1420628981-22774-3-git-send-email-rsahu@apm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 11:11:48 +0000
+Subject: [PATCH] arm64: mm: support instruction SETEND
+In-Reply-To: <20150107105824.GA13620@leoy.com>
+References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
+ <54AD061A.6090602@arm.com> <20150107105824.GA13620@leoy.com>
+Message-ID: <20150107111148.GH7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree node for APM X-Gene SoC
-DMA controller and DMA clock.
+On Wed, Jan 07, 2015 at 10:58:24AM +0000, Leo Yan wrote:
+> On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
+> > On 07/01/15 05:52, Leo Yan wrote:
+> > >Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
+> > >instruction will be treated as UNALLOCATED; this error can be
+> > >reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
+> > >mode, finally kernel will trap the exception if the userspace
+> > >libs use SETEND instruction.
+> > >
+> > >So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
+> > >
+> > The best way to do this, is via the instruction emulation framework
+> > added by Punit, which handles the armv8 deprecated/obsoleted
+> > instructions. This is now queued for 3.19.
+> > I have a patchset which adds the 'SETEND' emulation support to the
+> > framework. This will enable better handling of the feature,
+> > including finding out the users of the deprecated instruction (when
+> > we switch to the emulation mode).
+> > 
+> 
+> i'm a little confuse for this point:
+> 
+> if the deprecated instructions cannot be supported by CPU, then only
+> can use emulation; on the other hand, if CPU can natively support the
+> deprecated instruction, why we cannot directly enable this h/w feature?
+> if use the emulation mode, suppose here will have performance penalty.
+> 
+> how about u think for this? :-)
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+A *huge* advantage of emulation is that we can print a diagnostic to dmesg
+warning the user that they are making use of a CPU feature that is likely to
+disappear from future revisions of the hardware. We've not been great at
+doing this in the past, which led to all the fun around SWP emulation that
+you can find in the list archives.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index f1ad9c2..95b30c2 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -352,6 +352,15 @@
- 				reg-names = "csr-reg";
- 				clock-output-names = "pcie4clk";
- 			};
-+
-+			dmaclk: dmaclk at 1f27c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				reg = <0x0 0x1f27c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "dmaclk";
-+			};
- 		};
+Furthermore, I think the emulation framework does allow the hardware support
+to be enabled, it just doesn't make that the default behaviour.
 
- 		pcie0: pcie at 1f2b0000 {
-@@ -656,5 +665,21 @@
- 			interrupts = <0x0 0x41 0x4>;
- 			clocks = <&rngpkaclk 0>;
- 		};
-+
-+		dma: dma at 1f270000 {
-+			compatible = "apm,xgene-dma";
-+			device_type = "dma";
-+			reg = <0x0 0x1f270000 0x0 0x10000>,
-+			      <0x0 0x1f200000 0x0 0x10000>,
-+			      <0x0 0x1b008000 0x0 0x2000>;
-+			reg-names = "dma_csr", "ring_csr", "ring_cmd";
-+			interrupts = <0x0 0x82 0x4>,
-+				     <0x0 0xb8 0x4>,
-+				     <0x0 0xb9 0x4>,
-+				     <0x0 0xba 0x4>,
-+				     <0x0 0xbb 0x4>;
-+			dma-coherent;
-+			clocks = <&dmaclk 0>;
-+		};
- 	};
- };
---
-1.8.2.1
+In other words; use the emulation to find out where SETEND is being used
+and fix those applications wherever you can. In the cases where you're
+stuck with a legacy binary, you can enable CPU support if it is available
+but that's not a longterm solution.
+
+Will
