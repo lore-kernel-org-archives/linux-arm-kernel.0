@@ -1,77 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 7 Jan 2015 10:04:11 +0100
-Subject: [PATCH] irqchip: atmel-aic-common: prevent clobbering of priority
- when changing IRQ type
-In-Reply-To: <20150107030922.GF24989@titan.lakedaemon.net>
-References: <1420598843-8409-1-git-send-email-gavinli@thegavinli.com>
- <20150107030922.GF24989@titan.lakedaemon.net>
-Message-ID: <54ACF68B.2040000@atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 07 Jan 2015 10:04:30 +0100
+Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
+In-Reply-To: <1420566151-7136-1-git-send-email-moon.linux@yahoo.com>
+References: <1420566151-7136-1-git-send-email-moon.linux@yahoo.com>
+Message-ID: <1420621470.3893.6.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/01/2015 04:09, Jason Cooper a ?crit :
-> atmel maintainers,
+On wto, 2015-01-06 at 23:12 +0530, Anand Moon wrote:
+> ARM Enable CONFIG_LOCKUP_DETECTOR to validaion of kernel locks
+s/validaion/validation/
+
+This config item helps getting some useful information when lockup
+happens. If you want to validate locks then probably you want
+PROVE_LOCKING... but its overhead is larger.
+
+Anyway the overhead of LOCKUP_DETECTOR is small and multi_v7_defconfig
+has it enabled so I guess exynos may do it as well.
+
+Could you only fix up the commit msg?
+
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+
+Best regards,
+Krzysztof
+
 > 
-> On Tue, Jan 06, 2015 at 06:47:23PM -0800, gavinli at thegavinli.com wrote:
->> From: Gavin Li <git@thegavinli.com>
->>
->> This patch makes the bitmask for AIC_SRCTYPE consistent
->> with that of its valid values, and prevents the priority
->> field at bits 2:0 from being clobbered by an incorrect
->> AND with the AIC_SRCTYPE mask.
->>
->> Signed-off-by: Gavin Li <gavinli@thegavinli.com>
->> ---
->>  drivers/irqchip/irq-atmel-aic-common.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+> Tested on Exynos5422 ODROID XU3 board.
 > 
-> Please give an Acked-by if this looks good to you.  I'd like to get it
-> pushed fairly soon.
-
-Hi Jason,
-
-After a private message with Boris, here is our:
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-It is indeed a pretty important fix.
-
-(I added the linux-arm-kernel mailing-list for the record).
-
-Moreover, can you please add a stable tag like:
-Cc: <stable@vger.kernel.org> # 3.17+
-
-Thanks a lot Gavin Li for having spotted this bug!
-
-Bye,
-
->> diff --git a/drivers/irqchip/irq-atmel-aic-common.c b/drivers/irqchip/irq-atmel-aic-common.c
->> index cc4f9d8..fa22e5b 100644
->> --- a/drivers/irqchip/irq-atmel-aic-common.c
->> +++ b/drivers/irqchip/irq-atmel-aic-common.c
->> @@ -28,7 +28,7 @@
->>  #define AT91_AIC_IRQ_MIN_PRIORITY	0
->>  #define AT91_AIC_IRQ_MAX_PRIORITY	7
->>  
->> -#define AT91_AIC_SRCTYPE		GENMASK(7, 6)
->> +#define AT91_AIC_SRCTYPE		GENMASK(6, 5)
->>  #define AT91_AIC_SRCTYPE_LOW		(0 << 5)
->>  #define AT91_AIC_SRCTYPE_FALLING	(1 << 5)
->>  #define AT91_AIC_SRCTYPE_HIGH		(2 << 5)
->> @@ -74,7 +74,7 @@ int aic_common_set_type(struct irq_data *d, unsigned type, unsigned *val)
->>  		return -EINVAL;
->>  	}
->>  
->> -	*val &= AT91_AIC_SRCTYPE;
->> +	*val &= ~AT91_AIC_SRCTYPE;
->>  	*val |= aic_type;
->>  
->>  	return 0;
->> -- 
->> 2.2.1
->>
+> Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-
-
--- 
-Nicolas Ferre
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 5ef14de..ecd9987 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
+>  CONFIG_DEBUG_FS=y
+>  CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_DEBUG_KERNEL=y
+> +CONFIG_LOCKUP_DETECTOR=y
+>  CONFIG_DETECT_HUNG_TASK=y
+>  CONFIG_DEBUG_RT_MUTEXES=y
+>  CONFIG_DEBUG_SPINLOCK=y
