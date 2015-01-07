@@ -1,47 +1,50 @@
-From: mchitale@apm.com (Mayuresh Chitale)
-Date: Wed, 7 Jan 2015 16:12:36 +0530
-Subject: [PATCH 2/4] Documentation: dt-bindings: Add the binding info for
- APM X-Gene PCIe DMA driver
-In-Reply-To: <2098807.VbUeJKFBVr@wuerfel>
-References: <1420608537-12296-1-git-send-email-mchitale@apm.com>
- <1420608537-12296-3-git-send-email-mchitale@apm.com>
- <2098807.VbUeJKFBVr@wuerfel>
-Message-ID: <CAL-zptOMnD_c_HPOke_27O4bfmg_W7jgfBNvUccykWneyv0JUw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  7 Jan 2015 10:45:03 +0000
+Subject: [PATCH] arm64: KVM: Fix HCR setting for 32bit guests
+Message-ID: <1420627503-25183-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Commit b856a59141b1 (arm/arm64: KVM: Reset the HCR on each vcpu
+when resetting the vcpu) moved the init of the HCR register to
+happen later in the init of a vcpu, but left out the fixup
+done in kvm_reset_vcpu when preparing for a 32bit guest.
 
-Thanks for you comments. Please see inline.
+As a result, the 32bit guest is run as a 64bit guest, but the
+rest of the kernel still manages it as a 32bit. Fun follows.
 
---Mayuresh.
+Moving the fixup to vcpu_reset_hcr solves the problem for good.
 
-On Wed, Jan 7, 2015 at 2:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 07 January 2015 10:58:55 Mayuresh Chitale wrote:
->> +Required properties:
->> +- compatible :
->> +       - "apm,xgene-pciedma" for pcie DMA on X-Gene SoC
->> +- interrupts : An interrupt-specifier which is used to handle DMA interrupts
->> +
->> +Examples:
->> +               pciedma0 {
->> +                       status = "disabled";
->> +                       compatible = "apm,xgene-pciedma";
->> +                       reg = < 0x0 0x1F2B0154 0x0 0xC
->> +                               0x0 0x1F2B0058 0x0 0x8>;
->> +                       reg-names = "cfg", "intr";
->> +                       interrupts = <0x0 0xC6 0x4>;
->> +               };
->>
->
-> The example contains a "reg-names" property that is neither listed
-> as optional nor mandatory, and that is not used by the driver.
-> Bettter drop that from the example.
->
-> The 'reg' property is not documented in the binding. Please
-> document which register each index refers to.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_emulate.h | 2 ++
+ arch/arm64/kvm/reset.c               | 1 -
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-Ok. I will make those changes.
-
->
->         Arnd
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 8127e45..36dcef6 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -41,6 +41,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
++	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) 
++		vcpu->arch.hcr_el2 &= ~HCR_RW;
+ }
+ 
+ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 70a7816..0b43265 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -90,7 +90,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 			if (!cpu_has_32bit_el1())
+ 				return -EINVAL;
+ 			cpu_reset = &default_regs_reset32;
+-			vcpu->arch.hcr_el2 &= ~HCR_RW;
+ 		} else {
+ 			cpu_reset = &default_regs_reset;
+ 		}
+-- 
+2.1.4
