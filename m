@@ -1,59 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 7 Jan 2015 15:25:21 +0100
-Subject: [PATCH 0/2] arm64: first set of Kconfig patches for Tegra132
- support
-In-Reply-To: <20150107110738.GF7485@arm.com>
-References: <20150107081638.14381.42444.stgit@dusk.lan>
- <20150107110738.GF7485@arm.com>
-Message-ID: <20150107142520.GB1621@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Jan 2015 14:25:14 +0000
+Subject: [PATCH] arm64: mm: support instruction SETEND
+In-Reply-To: <20150107102543.GD7485@arm.com>
+References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
+ <54AD061A.6090602@arm.com> <20150107102543.GD7485@arm.com>
+Message-ID: <20150107142513.GB2199@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 11:07:38AM +0000, Will Deacon wrote:
-> On Wed, Jan 07, 2015 at 08:17:29AM +0000, Paul Walmsley wrote:
-> > Hi Catalin & Will,
-> 
-> Hi Paul,
-> 
-> > These patches start the ARM64 Kconfig and defconfig changes to
-> > support the Tegra132 (aka Tegra K1 64-bit) SoC and the NVIDIA
-> > Norrin64 FFD board.
+On Wed, Jan 07, 2015 at 10:25:43AM +0000, Will Deacon wrote:
+> On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
+> > On 07/01/15 05:52, Leo Yan wrote:
+> > > Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
+> > > instruction will be treated as UNALLOCATED; this error can be
+> > > reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
+> > > mode, finally kernel will trap the exception if the userspace
+> > > libs use SETEND instruction.
+> > >
+> > > So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
+> > >
+> > The best way to do this, is via the instruction emulation framework 
+> > added by Punit, which handles the armv8 deprecated/obsoleted 
+> > instructions. This is now queued for 3.19.
+> > I have a patchset which adds the 'SETEND' emulation support to the 
+> > framework. This will enable better handling of the feature, including 
+> > finding out the users of the deprecated instruction (when we switch to 
+> > the emulation mode).
 > > 
-> > Tegra132 support is made conditional on CONFIG_BROKEN, since
-> > there are some patches pending for other maintainers to fix
-> > compilation when CONFIG_ARCH_TEGRA is set during an ARM64 build.
-> > Once those patches have been merged, a subsequent patch will be
-> > sent to remove the CONFIG_BROKEN dependency and to make a few other
-> > defconfig changes that are dependent on CONFIG_ARCH_TEGRA.
+> > Btw, there is one open question that I am seeking answer for.
 > > 
-> > These patches apply on the arm64 fixes/core branch, commit
-> > 5d96e0cba263.  They have been boot-tested on QEMU 2.2.0 AArch64,
-> > and (after other patches have been applied) have been boot-tested
-> > on the Tegra132 Norrin64 FFD board.
+> > What should be the endianness of the signal handlers ? Should we leave 
+> > it to the application ? Or restore the 'default' endianness for the 
+> > signal handler ?
 > 
-> Whilst I'm happy to take the second patch for 3.20 (getting those
-> dependencies building and keeping them building is a Good Thing), can we
-> hold off on the first patch until it's not broken? Having an unconditional
-> depends on BROKEN isn't really that useful.
+> I think we should restore the default endianness, otherwise you're
+> essentially forcing signal handlers to do a setend as their first
+> instruction to get into a consistent state. That also matches the endianness
+> of the sigframe that we push onto the stack, right?
 
-The two patches that require the BROKEN dependency are fairly trivial,
-so I don't think it would be a stretch to merge them for 3.20. But they
-apply to different trees (one to the clocksource tree, the other to the
-Tegra tree).
+It looks like this is what setup_return() already does on arm32
+(switching to the default endianness).
 
-How do you usually handle the ARM64 patches? Do you manually pick up the
-patches that touch arch/arm64 or would you prefer for me to collect them
-in a pull request?
+Now that we plan to allow SETEND in AArch32 applications, we need
+something similar in the arm64 compat_setup_return().
 
-Either way I could probably provide a stable branch for you to pull into
-the arm64 tree to resolve the build dependencies provided that Daniel or
-Thomas will ack the clocksource patch.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/f54cd099/attachment.sig>
+-- 
+Catalin
