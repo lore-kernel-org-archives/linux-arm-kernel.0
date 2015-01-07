@@ -1,22 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Jan 2015 20:26:22 +0100
-Subject: [PATCH v3 0/5] Add common clock support for Broadcom iProc
- architecture
-In-Reply-To: <1420658568-22879-1-git-send-email-rjui@broadcom.com>
-References: <1420658568-22879-1-git-send-email-rjui@broadcom.com>
-Message-ID: <3144204.or2m7FRv17@wuerfel>
+Date: Wed, 07 Jan 2015 20:29:15 +0100
+Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
+ of_dma_configure
+In-Reply-To: <20150107185704.GV7485@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <7693528.krAZff0s6I@wuerfel> <20150107185704.GV7485@arm.com>
+Message-ID: <2577020.XPDvrs2bDx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 January 2015 11:22:43 Ray Jui wrote:
-> This patchset contains the initial common clock support for Broadcom's iProc
-> family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
-> ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
-> basic reference clock for these PLLs. Each PLL may have several leaf clocks.
-> One special group of clocks is the ASIU clocks, which are dervied directly
-> from the crystal reference clock.
+On Wednesday 07 January 2015 18:57:05 Will Deacon wrote:
 > 
+> Sorry for the delay on this, I had to do a bit of digging.
+> 
+> On Mon, Dec 22, 2014 at 01:36:01PM +0000, Arnd Bergmann wrote:
+> > Do you think it's possible that we might have to deal with a single PCI host
+> > that is connected two different SMMU instances for the purposes of extending
+> > the StreamID space from 15 to 16 bits? I think we would have trouble
+> > expressing this with the current syntax.
+> 
+> Unfortunately, this sounds like something we may well have to support.
+> Whilst the SMMUv2 architecture did grow a late extension to support 16-bit
+> StreamIDs, that may have been too late for all silicon vendors and, as such,
+> I'm not confident that such systems will present a single software interface
+> for their SMMU.
 
-Looks good to me now.
+So it's technically possible to connect two SMMU instances to a single
+PCIe root complex? I knew that there is at least one vendor (AMD) that
+can only do 128 bus numbers on PCIe, which seems a much simpler workaround.
 
 	Arnd
