@@ -1,105 +1,113 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 07 Jan 2015 23:37:52 +0800
-Subject: [Bugfix] x86/apic: Fix xen IRQ allocation failure caused by commit
- b81975eade8c
-In-Reply-To: <20150107145050.GC30457@l.oracle.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 7 Jan 2015 10:44:16 -0500
+Subject: [Bugfix] x86/apic: Fix xen IRQ allocation failure caused by
+ commit b81975eade8c
+In-Reply-To: <54AD52D0.5050303@linux.intel.com>
 References: <1420611244-25624-1-git-send-email-jiang.liu@linux.intel.com>
  <20150107145050.GC30457@l.oracle.com>
-Message-ID: <54AD52D0.5050303@linux.intel.com>
+ <54AD52D0.5050303@linux.intel.com>
+Message-ID: <20150107154416.GB30955@l.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/7 22:50, Konrad Rzeszutek Wilk wrote:
-> On Wed, Jan 07, 2015 at 02:13:49PM +0800, Jiang Liu wrote:
->> Commit b81975eade8c ("x86, irq: Clean up irqdomain transition code")
->> breaks xen IRQ allocation because xen_smp_prepare_cpus() doesn't invoke
->> setup_IO_APIC(), so no irqdomains created for IOAPICs and
->> mp_map_pin_to_irq() fails at the very beginning.
->> --- a/arch/x86/kernel/apic/io_apic.c
->> +++ b/arch/x86/kernel/apic/io_apic.c
->> @@ -2369,31 +2369,29 @@ static void ioapic_destroy_irqdomain(int idx)
->>  	ioapics[idx].pin_info = NULL;
->>  }
->>  
->> -void __init setup_IO_APIC(void)
->> +void __init setup_IO_APIC(bool xen_smp)
->>  {
->>  	int ioapic;
->>  
->> -	/*
->> -	 * calling enable_IO_APIC() is moved to setup_local_APIC for BP
->> -	 */
->> -	io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
->> +	if (!xen_smp) {
->> +		apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
->> +		io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
->> +
->> +		/* Set up IO-APIC IRQ routing. */
->> +		x86_init.mpparse.setup_ioapic_ids();
->> +		sync_Arb_IDs();
->> +	}
-> 
-> 
-> Is there a specific reason that this cannot run in all cases?
-> 
-> What I am asking is why are we doing a special case here? The description
-> at the top implied that we were just missing an call to
-> setup_IO_APIC.. 
-Hi Konrad,
-	I'm not very familiar with Xen IRQ yet, so I just enabled the
-code to create irqdomains for IOAPICs and keep other part as is. I will
-try to check whether we could enable other part all together:)
-Regards!
-Gerry
+On Wed, Jan 07, 2015 at 11:37:52PM +0800, Jiang Liu wrote:
+> On 2015/1/7 22:50, Konrad Rzeszutek Wilk wrote:
+> > On Wed, Jan 07, 2015 at 02:13:49PM +0800, Jiang Liu wrote:
+> >> Commit b81975eade8c ("x86, irq: Clean up irqdomain transition code")
+> >> breaks xen IRQ allocation because xen_smp_prepare_cpus() doesn't invoke
+> >> setup_IO_APIC(), so no irqdomains created for IOAPICs and
+> >> mp_map_pin_to_irq() fails at the very beginning.
+> >> --- a/arch/x86/kernel/apic/io_apic.c
+> >> +++ b/arch/x86/kernel/apic/io_apic.c
+> >> @@ -2369,31 +2369,29 @@ static void ioapic_destroy_irqdomain(int idx)
+> >>  	ioapics[idx].pin_info = NULL;
+> >>  }
+> >>  
+> >> -void __init setup_IO_APIC(void)
+> >> +void __init setup_IO_APIC(bool xen_smp)
+> >>  {
+> >>  	int ioapic;
+> >>  
+> >> -	/*
+> >> -	 * calling enable_IO_APIC() is moved to setup_local_APIC for BP
+> >> -	 */
+> >> -	io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
+> >> +	if (!xen_smp) {
+> >> +		apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
+> >> +		io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
+> >> +
+> >> +		/* Set up IO-APIC IRQ routing. */
+> >> +		x86_init.mpparse.setup_ioapic_ids();
+> >> +		sync_Arb_IDs();
+> >> +	}
+> > 
+> > 
+> > Is there a specific reason that this cannot run in all cases?
+> > 
+> > What I am asking is why are we doing a special case here? The description
+> > at the top implied that we were just missing an call to
+> > setup_IO_APIC.. 
+> Hi Konrad,
+> 	I'm not very familiar with Xen IRQ yet, so I just enabled the
+> code to create irqdomains for IOAPICs and keep other part as is. I will
+> try to check whether we could enable other part all together:)
 
+If you want you can (privately) send me (or Sander) and patch that I would
+be happy to test out. It is quite amusing that I have not used the power
+button for quite a while  - I always rebooting the machine to install
+a new kernel :-)
+
+> Regards!
+> Gerry
 > 
->>  
->> -	apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
->>  	for_each_ioapic(ioapic)
->>  		BUG_ON(mp_irqdomain_create(ioapic));
->> -
->> -	/*
->> -         * Set up IO-APIC IRQ routing.
->> -         */
->> -	x86_init.mpparse.setup_ioapic_ids();
->> -
->> -	sync_Arb_IDs();
->>  	setup_IO_APIC_irqs();
->> -	init_IO_APIC_traps();
->> -	if (nr_legacy_irqs())
->> -		check_timer();
->> -
->>  	ioapic_initialized = 1;
->> +
->> +	if (!xen_smp) {
->> +		init_IO_APIC_traps();
->> +		if (nr_legacy_irqs())
->> +			check_timer();
->> +	}
->>  }
->>  
->>  /*
->> diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
->> index 4c071aeb8417..7eb0283901fa 100644
->> --- a/arch/x86/xen/smp.c
->> +++ b/arch/x86/xen/smp.c
->> @@ -326,7 +326,10 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
->>  
->>  		xen_raw_printk(m);
->>  		panic(m);
->> +	} else {
->> +		setup_IO_APIC(true);
->>  	}
->> +
->>  	xen_init_lock_cpu(0);
->>  
->>  	smp_store_boot_cpu_info();
->> -- 
->> 1.7.10.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+> > 
+> >>  
+> >> -	apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
+> >>  	for_each_ioapic(ioapic)
+> >>  		BUG_ON(mp_irqdomain_create(ioapic));
+> >> -
+> >> -	/*
+> >> -         * Set up IO-APIC IRQ routing.
+> >> -         */
+> >> -	x86_init.mpparse.setup_ioapic_ids();
+> >> -
+> >> -	sync_Arb_IDs();
+> >>  	setup_IO_APIC_irqs();
+> >> -	init_IO_APIC_traps();
+> >> -	if (nr_legacy_irqs())
+> >> -		check_timer();
+> >> -
+> >>  	ioapic_initialized = 1;
+> >> +
+> >> +	if (!xen_smp) {
+> >> +		init_IO_APIC_traps();
+> >> +		if (nr_legacy_irqs())
+> >> +			check_timer();
+> >> +	}
+> >>  }
+> >>  
+> >>  /*
+> >> diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
+> >> index 4c071aeb8417..7eb0283901fa 100644
+> >> --- a/arch/x86/xen/smp.c
+> >> +++ b/arch/x86/xen/smp.c
+> >> @@ -326,7 +326,10 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
+> >>  
+> >>  		xen_raw_printk(m);
+> >>  		panic(m);
+> >> +	} else {
+> >> +		setup_IO_APIC(true);
+> >>  	}
+> >> +
+> >>  	xen_init_lock_cpu(0);
+> >>  
+> >>  	smp_store_boot_cpu_info();
+> >> -- 
+> >> 1.7.10.4
+> >>
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> > 
