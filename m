@@ -1,150 +1,47 @@
 From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 7 Jan 2015 15:35:37 +0800
-Subject: [RFC PATCH 04/11] x86: kprobes: introduce early kprobes related code
- area.
+Date: Wed, 7 Jan 2015 15:35:46 +0800
+Subject: [RFC PATCH 06/11] kprobes: makes kprobes_initialized globally visable.
 In-Reply-To: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
 References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1420616137-42898-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1420616146-42980-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces EARLY_KPROBES_CODES_AREA in x86 vmlinux for early
-kprobes.
+Following patches will enable kprobe registering very early, before
+kprobe system initialized. Arch code can use it to do special treatments
+for such kprobes.
 
 Signed-off-by: Wang Nan <wangnan0@huawei.com>
 ---
- arch/x86/include/asm/insn.h    |  7 ++++---
- arch/x86/include/asm/kprobes.h | 45 ++++++++++++++++++++++++++++++++++--------
- arch/x86/kernel/vmlinux.lds.S  |  2 ++
- 3 files changed, 43 insertions(+), 11 deletions(-)
+ include/linux/kprobes.h | 2 ++
+ kernel/kprobes.c        | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/include/asm/insn.h b/arch/x86/include/asm/insn.h
-index 47f29b1..ea6f318 100644
---- a/arch/x86/include/asm/insn.h
-+++ b/arch/x86/include/asm/insn.h
-@@ -20,6 +20,9 @@
-  * Copyright (C) IBM Corporation, 2009
-  */
+diff --git a/include/linux/kprobes.h b/include/linux/kprobes.h
+index fa0de88..b0265f9 100644
+--- a/include/linux/kprobes.h
++++ b/include/linux/kprobes.h
+@@ -50,6 +50,8 @@
+ #define KPROBE_REENTER		0x00000004
+ #define KPROBE_HIT_SSDONE	0x00000008
  
-+#define MAX_INSN_SIZE	16
++extern int kprobes_initialized;
 +
-+#ifndef __ASSEMBLY__
- /* insn_attr_t is defined in inat.h */
- #include <asm/inat.h>
+ #else /* CONFIG_KPROBES */
+ typedef int kprobe_opcode_t;
+ struct arch_specific_insn {
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 9fbe0c3..4591cae 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -67,7 +67,7 @@
+ 	addr = ((kprobe_opcode_t *)(kallsyms_lookup_name(name)))
+ #endif
  
-@@ -69,8 +72,6 @@ struct insn {
- 	const insn_byte_t *next_byte;
- };
+-static int kprobes_initialized;
++int kprobes_initialized;
+ static struct hlist_head kprobe_table[KPROBE_TABLE_SIZE];
+ static struct hlist_head kretprobe_inst_table[KPROBE_TABLE_SIZE];
  
--#define MAX_INSN_SIZE	16
--
- #define X86_MODRM_MOD(modrm) (((modrm) & 0xc0) >> 6)
- #define X86_MODRM_REG(modrm) (((modrm) & 0x38) >> 3)
- #define X86_MODRM_RM(modrm) ((modrm) & 0x07)
-@@ -197,5 +198,5 @@ static inline int insn_offset_immediate(struct insn *insn)
- {
- 	return insn_offset_displacement(insn) + insn->displacement.nbytes;
- }
--
-+#endif /* __ASSEMBLY__ */
- #endif /* _ASM_X86_INSN_H */
-diff --git a/arch/x86/include/asm/kprobes.h b/arch/x86/include/asm/kprobes.h
-index 4421b5d..017f4bb 100644
---- a/arch/x86/include/asm/kprobes.h
-+++ b/arch/x86/include/asm/kprobes.h
-@@ -21,23 +21,52 @@
-  *
-  * See arch/x86/kernel/kprobes.c for x86 kprobes history.
-  */
--#include <linux/types.h>
--#include <linux/ptrace.h>
--#include <linux/percpu.h>
--#include <asm/insn.h>
- 
- #define  __ARCH_WANT_KPROBES_INSN_SLOT
- 
--struct pt_regs;
--struct kprobe;
-+#include <linux/types.h>
-+#include <asm/insn.h>
- 
--typedef u8 kprobe_opcode_t;
- #define BREAKPOINT_INSTRUCTION	0xcc
- #define RELATIVEJUMP_OPCODE 0xe9
- #define RELATIVEJUMP_SIZE 5
- #define RELATIVECALL_OPCODE 0xe8
- #define RELATIVE_ADDR_SIZE 4
- #define MAX_STACK_SIZE 64
-+#define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
-+
-+#ifdef __ASSEMBLY__
-+
-+#define KPROBE_OPCODE_SIZE     1
-+#define MAX_OPTINSN_SIZE ((optprobe_template_end - optprobe_template_entry) + \
-+	MAX_OPTIMIZED_LENGTH + RELATIVEJUMP_SIZE)
-+
-+#ifdef CONFIG_EARLY_KPROBES
-+# define EARLY_KPROBES_CODES_AREA					\
-+	. = ALIGN(8);							\
-+	VMLINUX_SYMBOL(__early_kprobes_code_area_start) = .;		\
-+	. = . + MAX_OPTINSN_SIZE * CONFIG_NR_EARLY_KPROBES_SLOTS;	\
-+	VMLINUX_SYMBOL(__early_kprobes_code_area_end) = .;		\
-+	. = ALIGN(8);							\
-+	VMLINUX_SYMBOL(__early_kprobes_insn_slot_start) = .;		\
-+	. = . + MAX_INSN_SIZE * KPROBE_OPCODE_SIZE *			\
-+		CONFIG_NR_EARLY_KPROBES_SLOTS;				\
-+	VMLINUX_SYMBOL(__early_kprobes_insn_slot_end) = .;
-+#else
-+# define EARLY_KPROBES_CODES_AREA
-+#endif
-+
-+#else
-+
-+#include <linux/ptrace.h>
-+#include <linux/percpu.h>
-+
-+
-+struct pt_regs;
-+struct kprobe;
-+
-+typedef u8 kprobe_opcode_t;
-+#define KPROBE_OPCODE_SIZE     sizeof(kprobe_opcode_t)
- #define MIN_STACK_SIZE(ADDR)					       \
- 	(((MAX_STACK_SIZE) < (((unsigned long)current_thread_info()) + \
- 			      THREAD_SIZE - (unsigned long)(ADDR)))    \
-@@ -52,7 +81,6 @@ extern __visible kprobe_opcode_t optprobe_template_entry;
- extern __visible kprobe_opcode_t optprobe_template_val;
- extern __visible kprobe_opcode_t optprobe_template_call;
- extern __visible kprobe_opcode_t optprobe_template_end;
--#define MAX_OPTIMIZED_LENGTH (MAX_INSN_SIZE + RELATIVE_ADDR_SIZE)
- #define MAX_OPTINSN_SIZE 				\
- 	(((unsigned long)&optprobe_template_end -	\
- 	  (unsigned long)&optprobe_template_entry) +	\
-@@ -117,4 +145,5 @@ extern int kprobe_exceptions_notify(struct notifier_block *self,
- 				    unsigned long val, void *data);
- extern int kprobe_int3_handler(struct pt_regs *regs);
- extern int kprobe_debug_handler(struct pt_regs *regs);
-+#endif /* __ASSEMBLY__ */
- #endif /* _ASM_X86_KPROBES_H */
-diff --git a/arch/x86/kernel/vmlinux.lds.S b/arch/x86/kernel/vmlinux.lds.S
-index 00bf300..69f3f0e 100644
---- a/arch/x86/kernel/vmlinux.lds.S
-+++ b/arch/x86/kernel/vmlinux.lds.S
-@@ -26,6 +26,7 @@
- #include <asm/page_types.h>
- #include <asm/cache.h>
- #include <asm/boot.h>
-+#include <asm/kprobes.h>
- 
- #undef i386     /* in case the preprocessor is a 32bit one */
- 
-@@ -100,6 +101,7 @@ SECTIONS
- 		SCHED_TEXT
- 		LOCK_TEXT
- 		KPROBES_TEXT
-+		EARLY_KPROBES_CODES_AREA
- 		ENTRY_TEXT
- 		IRQENTRY_TEXT
- 		*(.fixup)
 -- 
 1.8.4
