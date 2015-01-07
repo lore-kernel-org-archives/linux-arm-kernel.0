@@ -1,43 +1,40 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 7 Jan 2015 12:56:39 +0000
-Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <CAKv+Gu-aRkoRj5zVXrsBc0APCehZ9W926J6fxH380K9EURXe_Q@mail.gmail.com>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
- <20150107120608.GJ3827@bivouac.eciton.net>
- <CAKv+Gu_k0_anqvm24P8J4WaMrFLMxOhQETAfUb6xmzaJ+Z2vBQ@mail.gmail.com>
- <20150107122515.GK3827@bivouac.eciton.net>
- <CAKv+Gu-aRkoRj5zVXrsBc0APCehZ9W926J6fxH380K9EURXe_Q@mail.gmail.com>
-Message-ID: <20150107125639.GL3827@bivouac.eciton.net>
+From: moon.linux@yahoo.com (Anand Moon)
+Date: Wed,  7 Jan 2015 18:29:02 +0530
+Subject: [PATCH v2] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
+Message-ID: <1420635542-7202-1-git-send-email-moon.linux@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 12:30:27PM +0000, Ard Biesheuvel wrote:
-> >> >> +     kernel_neon_begin();    /* disables preemption */               \
-> >> >
-> >> > Same nitpick.
-> >> >
-> >>
-> >> Is there anything wrong with that?
-> >
-> > I said nitpick.
-> >
-> > My (very minor) objection is that a (very reasonable) comment is added
-> > to existing functionality by a patch that adds new functionality. It
-> > makes the git blame/praise output less clear.
-> >
-> >> Would you prefer the comment to be on a separate line?
-> >
-> > I would _prefer_ the comments to be a separate patch.
-> > But again, a nitpick.
-> >
-> 
-> Well, adding the comment is relevant to this patch, as we need to
-> disable preemption now before switching to the new address space. In
-> fact, it might be better even to drop the comment, and add an explicit
-> (if redundant) preempt_disable/preempt_enable pair.
+Enable CONFIG_LOCKUP_DETECTOR to validate kernel locks state for exynos SOC.
 
-That would be more clear, yes.
+Enabling CONFIG_LOCKUP_DETECTOR help validator tracks the 'state' of lock-classes,
+and it tracks dependencies between different lock-classes.
+The validator maintains a rolling proof that the state and
+the dependencies are correct.
 
-/
-    Leif
+Changes since v2:
+ * Made commit message more clear
+ * Corrected grammer in code comment
+
+Tested on Exynos5422 ODROID XU3 board.
+
+Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 5ef14de..ecd9987 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
++CONFIG_LOCKUP_DETECTOR=y
+ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_RT_MUTEXES=y
+ CONFIG_DEBUG_SPINLOCK=y
+-- 
+2.1.0
