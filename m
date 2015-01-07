@@ -1,50 +1,53 @@
-From: bart.tanghe@thomasmore.be (Bart Tanghe)
-Date: Wed,  7 Jan 2015 12:00:58 +0100
-Subject: [PATCH v2] ARM: dts: add bcm2835-pwm bindings
-Message-ID: <1420628458-11459-1-git-send-email-bart.tanghe@thomasmore.be>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 7 Jan 2015 11:03:18 +0000
+Subject: [PATCH] ARM: vexpress_defconfig: enable ACL and security labels
+ for ext4
+In-Reply-To: <87fvbmubqq.fsf%l.stelmach@samsung.com>
+References: <1418383877-29685-1-git-send-email-l.stelmach@samsung.com>
+ <3238168.YKYh95mZKp@wuerfel>
+ <87fvbmubqq.fsf%l.stelmach@samsung.com>
+Message-ID: <20150107110318.GA29344@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To probe the bcm2835-pwm driver properly, this dts bindings has to be added 
-to the bcm2835 dtsi file.
-In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
----
-Changes in v2:
- - status set to disabled
- - follow the clock naming convention
+On Wed, Jan 07, 2015 at 10:27:25AM +0000, ?ukasz Stelmach wrote:
+> It was <2014-12-12 pi? 12:38>, when Arnd Bergmann wrote:
+> > On Friday 12 December 2014 12:31:17 ?ukasz Stelmach wrote:
+> >> This patch enables security features of ext4 file-system required
+> >> by many conteporary user-space setups.
+> >> 
+> >> Signed-off-by: ?ukasz Stelmach <l.stelmach@samsung.com>
+> >> ---
+> >>  arch/arm/configs/vexpress_defconfig | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >
+> > The patch looks good, but should be addressed to the vexpress maintainers
+> > (Liviu, Sudeep, Lorenzo)
+> >
+> > 	Arnd
+> 
+> ...?
+> ping?
 
-Signed-off-by: Bart Tanghe <bart.tanghe@thomasmore.be>
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310300.html
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 3342cb1..ba76bb4 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -146,6 +147,14 @@
- 			interrupts = <1 9>;
- 		};
- 
-+		pwm: pwm at 7e20e000 {
-+			compatible = "brcm,bcm2835-pwm";
-+			reg = <0x7e20c000 0x28>;
-+			clocks = <&clk_pwm>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
- 		arm-pmu {
- 			compatible = "arm,arm1176-pmu";
- 		};
-@@ -179,5 +188,13 @@
- 			clock-output-names = "spi";
- 			clock-frequency = <250000000>;
- 		};
-+
-+		clk_pwm: clock at 3 {
-+			compatible = "fixed-clock";
-+			reg = <3>;
-+			#clock-cells = <0>;
-+			clock-output-names = "pwm";
-+			clock-frequency = <9200000>;
-+		};
- 	};
- };
+Lorenzo
+
+> >> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+> >> index f489fda..1d9dd6e 100644
+> >> --- a/arch/arm/configs/vexpress_defconfig
+> >> +++ b/arch/arm/configs/vexpress_defconfig
+> >> @@ -138,6 +138,8 @@ CONFIG_EXT3_FS=y
+> >>  # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+> >>  # CONFIG_EXT3_FS_XATTR is not set
+> >>  CONFIG_EXT4_FS=y
+> >> +CONFIG_EXT4_FS_POSIX_ACL=y
+> >> +CONFIG_EXT4_FS_SECURITY=y
+> >>  CONFIG_VFAT_FS=y
+> >>  CONFIG_TMPFS=y
+> >>  CONFIG_JFFS2_FS=y
+> 
+> -- 
+> ?ukasz Stelmach
+> Samsung R&D Institute Poland
+> Samsung Electronics
