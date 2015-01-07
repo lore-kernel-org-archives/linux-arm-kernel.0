@@ -1,63 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Jan 2015 17:27:41 +0000
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <1520439.Y1rXzXY1eS@wuerfel>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <2161376.07iV9ANMSk@wuerfel>
- <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
- <1520439.Y1rXzXY1eS@wuerfel>
-Message-ID: <20150107172741.GY2634@sirena.org.uk>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 7 Jan 2015 11:30:53 -0600
+Subject: [RFC PATCH 2/3] core: platform: fix an invalid kfree during
+ of_platform_depopulate
+In-Reply-To: <1420651854-17768-1-git-send-email-s-anna@ti.com>
+References: <1420651854-17768-1-git-send-email-s-anna@ti.com>
+Message-ID: <1420651854-17768-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 02:06:28PM +0100, Arnd Bergmann wrote:
-> On Wednesday 07 January 2015 11:50:39 Catalin Marinas wrote:
+Drivers can use of_platform_populate() to create platform devices
+for children of the device main node, and a complementary API
+of_platform_depopulate() is provided to delete these child devices.
+Any platform_data supplied for the OF devices through auxdata lookup
+data is populated directly in the device's platform_data field, unlike
+those created using platform API. The of_platform_depopulate()
+leverages the platform code for cleanup, and this will result in a
+kernel oops due to an invalid kfree on this direct populated
+platform_data.
 
-> > From what I gathered so far, the main reason for _some_ vendors is not
-> > support for "other" OS but actually features that ACPI has and DT
-> > doesn't (like AML; I deliberately ignore statements like "industry
-> > standard"). _If_ such reasons are sound, maybe they have a case for
-> > ACPI-only machines targeted primarily at Linux.
+Fix this by resetting the platform data for OF devices during
+platform device cleanup.
 
-> What I got from the replies from HP, Huawei and from earlier discussions
-> with Jon is that they all hope to get to the point of relying on AML
-> alone to bridge the differences between SoC families. However, I don't
-> see that happening with the limited hardware compatibility that the
-> existing SBSA provides:
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ drivers/base/platform.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I tend to agree with you that it's an overreach to think that this is
-going to completely abstract away the differences between SoCs from
-different vendors without substantial further standardization work.
-However it does seem reasonable to expect that features like AML are
-going to be more successful in handling board differences and
-incremental revisions of SoCs - things like interactions with system
-power controllers for example.  That seems like a useful win in and of
-itself, and one that's worth supporting.
-
-> The main problem here is that can AML only cover part of the problem:
-> it can talk to a clock controller e.g. over I2C, SPI, GPIO, UART
-> or IPMI, but you still need a device driver in the kernel to talk to
-> those, and SBSA doesn't mandate a specific implementation so you can
-> expect every other SoC that is coming out to have a different one.
-
-> Similarly, SBSA is rather vague about some peripherals it mandates,
-> and if a new SoC has a slightly different AHCI variation, there is
-> nothing you can do about it in AML.
-
-> x86 gets around this problem by having an extreme level of hardware
-> backwards compatibility, so you don't even need AML for this and
-> can generally boot a (almost) full-featured Linux kernel with
-> acpi=off on the command line.
-
-That level of hardware compatibility does partly come from the need to
-run existing software.  I'd expect that similar effects will start to
-come into play with ARMv8 ACPI systems if they become successful; people
-will do things like ensure compatibility with common IPs that have
-existing Linux drivers that distros tend to include as standard.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/6c534e32/attachment-0001.sig>
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 9421fed40905..129e69c8c894 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -200,6 +200,8 @@ static void platform_device_release(struct device *dev)
+ 	struct platform_object *pa = container_of(dev, struct platform_object,
+ 						  pdev.dev);
+ 
++	if (pa->pdev.dev.of_node)
++		pa->pdev.dev.platform_data = NULL;
+ 	of_device_node_put(&pa->pdev.dev);
+ 	kfree(pa->pdev.dev.platform_data);
+ 	kfree(pa->pdev.mfd_cell);
+-- 
+2.2.1
