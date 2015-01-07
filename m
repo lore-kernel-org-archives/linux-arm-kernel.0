@@ -1,35 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 7 Jan 2015 16:18:47 +0100
-Subject: [PATCH] ARM: tegra: Regenerate defconfig based on v3.19-rc1
-In-Reply-To: <1420550407-4059-1-git-send-email-thierry.reding@gmail.com>
-References: <1420550407-4059-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20150107151843.GA2912@ulmo>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 07 Jan 2015 16:25:37 +0100
+Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point Development
+ Board support
+In-Reply-To: <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <54AD4FF1.8030508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 02:20:07PM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> Removes the following entries from the default configuration:
-> 
-> - PM: enabled by default (via PM_SLEEP -> SUSPEND)
-> - RESOURCE_COUNTERS: removed
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> I intend to apply this to the for-3.20/defconfig branch if nobody
-> objects.
-> 
->  arch/arm/configs/tegra_defconfig | 2 --
->  1 file changed, 2 deletions(-)
+Hi Maxime,
+[..]
 
-I've applied this to the for-3.20/defconfig branch.
+> +
+> +			mdio at 72004 {
+> +				pinctrl-names = <&mdio_pins>;
+I guess it is a typo and you meant:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/1df81029/attachment.sig>
+				pinctrl-names = "default;
+				pinctrl-0 = <&mdio_pins>;
+
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
