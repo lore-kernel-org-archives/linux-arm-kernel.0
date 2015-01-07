@@ -1,111 +1,111 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Jan 2015 11:09:44 -0500
-Subject: [PATCH 0/5] irqchip: kill the GIC routable domain
-In-Reply-To: <54874223.2000805@arm.com>
-References: <1417873576-10463-1-git-send-email-marc.zyngier@arm.com>
- <20141207171646.GA12049@kahuna> <20141207180322.GA15688@kahuna>
- <54856B21.6070104@arm.com> <20141208224116.GA2538@kahuna>
- <5486C6A6.8060702@arm.com> <20141209181719.GA2569@kahuna>
- <54874223.2000805@arm.com>
-Message-ID: <20150107160944.GK24989@titan.lakedaemon.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 07 Jan 2015 16:09:54 +0000
+Subject: [PATCH v2 1/3] genirq: Allow the irqchip state of an IRQ to be
+ save/restored
+In-Reply-To: <20150107160502.GJ24989@titan.lakedaemon.net>
+References: <1417623503-30261-1-git-send-email-marc.zyngier@arm.com>
+ <1417623503-30261-2-git-send-email-marc.zyngier@arm.com>
+ <CAJAp7OijMW4_VMp29K1UxtURJT-WgwwsN-O1x3Lqi-gHrAj6Sw@mail.gmail.com>
+ <5486C2D6.6020006@arm.com> <20150107160502.GJ24989@titan.lakedaemon.net>
+Message-ID: <54AD5A52.4090608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 09, 2014 at 06:40:35PM +0000, Marc Zyngier wrote:
-> On 09/12/14 18:17, Nishanth Menon wrote:
-> > On 09:53-20141209, Marc Zyngier wrote:
-> >> On 08/12/14 22:41, Nishanth Menon wrote:
-> >>
-> >>> Anyways.. The following diff[1] on top of your branch makes DRA7 work - I
-> >>> assume you will squash as needed and repost with linux-omap mailing list
-> >>> in CC.
-> >>
-> >> Brilliant. I'll squash that into my tree and repost at some point.
-> > 
-> > K, it will be nice to have a reflow of the series based on v3.19-rc1
-> > since there are dts dependencies and we dont want folks to have
-> > regressions on their platforms of choice..
-> > 
-> > Obviously, my tests are basic boot tests and should get a few weeks(as
-> > you already mentioned) on linux-next to get properly soaked
-> > 
-> >>
-> >>> I increased the scope of testing knowing that WUGEN is present in many
-> >>> A9 based TI platforms as well.. and at least OMAP4 showed flakiness in
-> >>> my testing.. Also a few notes:
-> >>>
-> >>> Stuff like: am437x is a bit questionable (interrupt-parent probably should be wugen?)
-> >>> 175:          0       GIC  39  tps65218 
-> >>>
-> >>> OMAP5: (should be wugen?)
-> >>> 308:       4323          0       GIC 106  OMAP UART2
-> >>> 411:          0          0       GIC 151  twl6040
-> >>> 405:          1          0       GIC  39  palmas
-> >>
-> >> Well, I can't really tell. Someone with access to the documentation
-> >> should be able to find out.
-> > 
-> > AM437x: http://www.ti.com/lit/pdf/spruhl7
-> > OMAP5: http://www.ti.com/lit/pdf/swpu249
-> > 
-> > yeah, we should be able to do them as well - trivially since they follow
-> > the same structure as other SoCs without crossbar.
+On 07/01/15 16:05, Jason Cooper wrote:
+> Marc,
 > 
-> Done some stuff in that department.
+> On Tue, Dec 09, 2014 at 09:37:26AM +0000, Marc Zyngier wrote:
+>> On 08/12/14 22:42, Bjorn Andersson wrote:
+>>> On Wed, Dec 3, 2014 at 8:18 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> There is a number of cases where a kernel subsystem may want to
+>>>> introspect the state of an interrupt at the irqchip level:
+>>>>
+>>>> - When a peripheral is shared between virtual machines,
+>>>>   its interrupt state becomes part of the guest's state,
+>>>>   and must be switched accordingly. KVM on arm/arm64 requires
+>>>>   this for its guest-visible timer
+>>>> - Some GPIO controllers seem to require peeking into the
+>>>>   interrupt controller they are connected to to report
+>>>>   their internal state
+>>>>
+>>>> This seem to be a pattern that is common enough for the core code
+>>>> to try and support this without too many horrible hacks. Introduce
+>>>> a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
+>>>> to retrieve the bits that can be of interest to another subsystem:
+>>>> pending, active, and masked.
+>>>>
+>>>> - irq_get_irqchip_state returns the state of the interrupt according
+>>>>   to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
+>>>>   IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
+>>>> - irq_set_irqchip_state similarly sets the state of the interrupt.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>
+>>> With the addition of actually assigning err to something useful in the
+>>> setter below:
+>>>
+>>> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>>> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>>>
+>>>> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+>>>
+>>> [..]
+>>>
+>>>> +/**
+>>>> + *     irq_set_irqchip_state - set the state of a forwarded interrupt.
+>>>> + *     @irq: Interrupt line that is forwarded to a VM
+>>>> + *     @which: State to be restored (one of IRQCHIP_STATE_*)
+>>>> + *     @val: Value corresponding to @which
+>>>> + *
+>>>> + *     This call sets the internal irqchip state of an interrupt,
+>>>> + *     depending on the value of @which.
+>>>> + *
+>>>> + *     This function should be called with preemption disabled if the
+>>>> + *     interrupt controller has per-cpu registers.
+>>>> + */
+>>>> +int irq_set_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
+>>>> +                         bool val)
+>>>> +{
+>>>> +       struct irq_desc *desc;
+>>>> +       struct irq_data *data;
+>>>> +       struct irq_chip *chip;
+>>>> +       unsigned long flags;
+>>>> +       int err = -EINVAL;
+>>>> +
+>>>> +       desc = irq_get_desc_buslock(irq, &flags, 0);
+>>>> +       if (!desc)
+>>>> +               return err;
+>>>> +
+>>>> +       data = irq_desc_get_irq_data(desc);
+>>>> +
+>>>> +       do {
+>>>> +               chip = irq_data_get_irq_chip(data);
+>>>> +               if (chip->irq_set_irqchip_state)
+>>>> +                       break;
+>>>> +#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+>>>> +               data = data->parent_data;
+>>>> +#else
+>>>> +               data = NULL;
+>>>> +#endif
+>>>> +       } while (data);
+>>>> +
+>>>> +       if (data)
+>>>> +               chip->irq_set_irqchip_state(data, which, val);
+>>>
+>>> err =
+>>
+>> Ah, that will teach me to write test code that actually checks the
+>> return value! :-)
+>>
+>> Thanks for the fix and the tags.
 > 
-> >>
-> >>> OMAP4 serial port is flaky -> not sure if it is due to routing of GIC to UART2 and not via WUGEN
-> >>> IRQ branch: with my fix applied:
-> >>> ---------------------------------
-> >>
-> >> [...]
-> >>
-> >>> 18: pandaboard-es:  Boot FAIL: http://slexy.org/raw/s20ty0Z6i5 (not expected)
-> >>> 19: pandaboard-vanilla:  Boot FAIL: http://slexy.org/raw/s20BYfaMd2 (not expected)
-> >>
-> >> If I read the log correctly, the serial port stops responding after a while?
-> > 
-> > yeah - dug at the omap4 ones a bit, obviously once the deeper c states
-> > are hit, we'd like wakeupgen to wakeup CPU else we will be "sluggish" in
-> > the sense that the event is detected when some other wakeupgen enabled
-> > interrupt takes place.
-> 
-> I realised that as well once I got a panda up and running.
-> 
-> > Adding the following makes my panda work fine.
-> > 1: pandaboard-es:  Boot PASS: http://slexy.org/raw/s20o8DaBvh
-> > 2: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s222JndDdh
-> > 
-> > 
-> > diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> > index 1505135..8b6d50e 100644
-> > --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> > +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> > @@ -371,8 +371,8 @@
-> >  	twl: twl at 48 {
-> >  		reg = <0x48>;
-> >  		/* IRQ# = 7 */
-> > -		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to gic */
-> > -		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_1N cascaded to wakeupgen to gic */
-> > +		interrupt-parent = <&wakeupgen>;
-> >  	};
-> 
-> [...]
-> 
-> I already fixed those in my tree, in a slightly different way: no need
-> to have an interrupt parent at all, as we're going to inherit the
-> default anyway.
-> 
-> I've pushed another version of the branch, with the crossbar rework
-> sitting *before* the WUGEN hacks. That should hopefully make bisection work.
-> 
-> If you can give it a shake, that'd be most appreciated. I'll repost the
-> branch in a couple of days.
+> Did I miss the new version of this?
 
-Hmmm, I'm sensing a pattern here :)  My email, only to the MLs, was
-messed up for a few days.  I probably missed it in there...
+I'm rebasing all my stuff at the moment. Expect something later today
+(or tomorrow morning worse case).
 
-thx,
+Thanks,
 
-Jason.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
