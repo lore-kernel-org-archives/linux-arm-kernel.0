@@ -1,66 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jan 2015 10:27:24 +0100
-Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point
- Development Board support
-In-Reply-To: <54AC57FB.8000003@free-electrons.com>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
- <54AC57FB.8000003@free-electrons.com>
-Message-ID: <20150107092724.GF7853@lukather>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 07 Jan 2015 10:33:29 +0100
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54AC93E0.8010705@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+ <54AC93E0.8010705@samsung.com>
+Message-ID: <54ACFD69.1020500@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Joonyoung,
 
-On Tue, Jan 06, 2015 at 10:47:39PM +0100, Gregory CLEMENT wrote:
-> > +				spi-flash at 0 {
-> > +					#address-cells = <1>;
-> > +					#size-cells = <1>;
-> > +					compatible = "st,m25p128";
-> > +					reg = <0>; /* Chip select 0 */
-> > +					spi-max-frequency = <108000000>;
+On 01/07/2015 03:03 AM, Joonyoung Shim wrote:
+> On 01/06/2015 06:49 PM, Javier Martinez Canillas wrote:
+>> 
+>> Also I tried forcing the kernel to not disable unused power domains by
+>> passing the pd_ignore_unused parameter to the kernel command line. I
+>> see on the kernel log a "genpd: Not disabling unused power domains"
+>> message but HDMI output still has the stripes that Sjoerd mentioned.
+>> Do you know if Exynos DRM HDMI in mainline is supposed to work without
+>> SysMMU / IOMMU support?
+>> 
 > 
-> The SPI flahs used on the AP board is the same that the one used on the GP board:
-> M25P128-VMF6P and the maximum frequency it can handle is 50MHz.
-
-Actually, the one on the AP is a M25P128-VMF6PB, that has a max
-frequency of 54MHz, but yeah, the frequency is wrong.
-
-> > +
-> > +			mdio at 72004 {
-> > +				pinctrl-names = <&mdio_pins>;
-> > +
-> > +				phy0: ethernet-phy at 0 {
-> Why don't you use the PHY address after the '@' ?
-> Here I expected something like
-> phy0: ethernet-phy at 1 {
+> I don't think iommu support and power domain issue are related. I also
+> get displaying stripes via hdmi but it is just power domain issue
+> regardless iommu support.
 > 
-> > +					reg = <1>;
-> > +				};
-> > +
-> > +				phy1: ethernet-phy at 1 {
-> and here:
-> phy0: ethernet-phy at 6 {
-> > +					reg = <6>;
-> > +				};
-> > +
-> > +				phy2: ethernet-phy at 2 {
-> and here:
-> phy0: ethernet-phy at 4 {
+> I observed 8th bit from 0x1445000C register of mixer is set to 1 with
+> displaying stripes. It means "The graphic layer0 line buffer underflow".
+> There was same underflow issue on Exynos4 based boards. As Marek said,
+> because LCD0 power domain was turned off.
+>
 
-Indeed.
+Interesting, thanks a lot for sharing this information.
+ 
+> I just tried to turn off DISP1 power domain at u-boot and DISP1 power
+> domain is turned on from kernel hdmi and mixer driver on odroid xu3 
+> board. As the result, i can see displaying penguin logo from hdmi.
+>
 
-Thanks!
-Maxime
+Can you share the patches you are using to turn on the DISP1 power domain
+since AFAIU the kernel does not know about the DISP1 power domain after
+commit d51cad7df871 ("ARM: dts: remove display power domain for exynos5420").
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/cd05791e/attachment.sig>
+I tried reverting that commit before so the kernel knows about the DISP1
+power domain and booting with pd_ignore_unused but still had the stripes.
+ 
+> But the problem exists still because it is failed to control on/off of
+> DISP1 power domain more than twice from kernel hdmi and mixer driver.[0]
+>
+
+Something that is not clear to me is how display panel is working on the
+Peach boards if this is a power domain issue since according to the manual
+both the modules used for display (LCD controller and DP) and the modules
+used for HDMI (MIXER and HDMI) belong to the same power domain (DISP1).
+
+Or am I misunderstanding something? 
+
+Thanks a lot for your help and best regards,
+Javier
