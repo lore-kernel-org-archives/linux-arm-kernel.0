@@ -1,382 +1,59 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed,  7 Jan 2015 23:53:48 +0100
-Subject: [PATCH v3] ARM: dts: Add dts file for odroid XU3 board
-Message-ID: <1420671228-24692-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 7 Jan 2015 17:59:04 -0500
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54AD917A.2040307@redhat.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <2161376.07iV9ANMSk@wuerfel>
+ <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
+ <1520439.Y1rXzXY1eS@wuerfel> <20150107172741.GY2634@sirena.org.uk>
+ <20150107184158.GO24989@titan.lakedaemon.net>
+ <54AD8FF2.60407@redhat.com> <54AD917A.2040307@redhat.com>
+Message-ID: <20150107225904.GQ24989@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
-same as the vendors naming, which means it's prefixed with exynos5422
-instead of exynos5800 as the SoC name even though it includes the
-exyno5800 dtsi.
+On Wed, Jan 07, 2015 at 03:05:14PM -0500, Jon Masters wrote:
+> On 01/07/2015 02:58 PM, Jon Masters wrote:
+> > On 01/07/2015 01:41 PM, Jason Cooper wrote:
+> 
+> >> One of the reasons I've really enjoyed working with ARM platforms and DT
+> >> is the absence of this type of 'feature'.  I honestly don't care whether
+> >> the kernel gets the board configuration info from DT or ACPI or FOO, as
+> >> long as we can avoid the security mistakes of the past:
+> >>
+> >>   http://www.spiegel.de/international/world/catalog-reveals-nsa-has-back-doors-for-numerous-devices-a-940994.html
+> > 
+> > ACPI is not the great satan. I'm aware certain others in the community
+> > have written missinformed blog posts and G+ rants equating ACPI with SMI
+> > and even with various other system firmware. I can't force someone to
+> > become informed on a topic, especially if it's politically useful to
+> > them to hate on ACPI and use the security paranoia handwavy argument.
+> 
+> To clarify, and this is not directed at you Jason, it is politically
+> useful to some who have written rants those business models are built
+> upon being paid to enable platforms. For those folks, standardized
+> platforms which allow a common OS approach are seen as threatening.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
-Changes since v1:
- * Add chosen/linux,stdout-path to point the serial console device
- * Change memory start offset to 0x40000000 to match the vendors DTS (pointed
-   out by Heesub Shin)
-  * Declare base address & size for the memory banks to be used by the MFC
+Ahh, thanks for clarifying.
 
-Changes since v2:
-  * Correct hdmi supplies (spotted by Joonyoung Shim). This currently doesn't
-    have a practical impact as all supplies are always-on, but makes the dts
-    match the schematics.
+> In the previous rants (which were really instigated as a result of the
+> above) ACPI was equated with SMM (System Management Mode), which is a
+> bit like the Secure/Trusted world on AArch64 in which you might run
+> another "Trusted" OS. These are the places where you want to watch out
+> to malware of the kind cited in your link, not in ACPI tables.
 
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/exynos5422-odroidxu3.dts | 332 +++++++++++++++++++++++++++++
- 2 files changed, 333 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3.dts
+fwiw, I *am* concerned about those spaces.  It seems we agree on their
+vulnerability to attack (plus being meaty targets).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 91bd5bd..df397c2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -98,6 +98,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-monk.dtb \
- 	exynos5420-arndale-octa.dtb \
- 	exynos5420-peach-pit.dtb \
- 	exynos5420-smdk5420.dtb \
-+	exynos5422-odroidxu3.dtb \
- 	exynos5440-sd5v1.dtb \
- 	exynos5440-ssdk5440.dtb \
- 	exynos5800-peach-pi.dtb
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-new file mode 100644
-index 0000000..c29123c
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -0,0 +1,332 @@
-+/*
-+ * Hardkernel Odroid XU3 board device tree source
-+ *
-+ * Copyright (c) 2014 Collabora Ltd.
-+ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+#include "exynos5800.dtsi"
-+
-+/ {
-+	model = "Hardkernel Odroid XU3";
-+	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
-+
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+
-+	chosen {
-+		linux,stdout-path = &serial_2;
-+	};
-+
-+	fimd at 14400000 {
-+		status = "okay";
-+	};
-+
-+	firmware at 02073000 {
-+		compatible = "samsung,secure-firmware";
-+		reg = <0x02073000 0x1000>;
-+	};
-+
-+	fixed-rate-clocks {
-+		oscclk {
-+			compatible = "samsung,exynos5420-oscclk";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	hsi2c_4: i2c at 12CA0000 {
-+		status = "okay";
-+
-+		s2mps11_pmic at 66 {
-+			compatible = "samsung,s2mps11-pmic";
-+			reg = <0x66>;
-+			s2mps11,buck2-ramp-delay = <12>;
-+			s2mps11,buck34-ramp-delay = <12>;
-+			s2mps11,buck16-ramp-delay = <12>;
-+			s2mps11,buck6-ramp-enable = <1>;
-+			s2mps11,buck2-ramp-enable = <1>;
-+			s2mps11,buck3-ramp-enable = <1>;
-+			s2mps11,buck4-ramp-enable = <1>;
-+
-+			s2mps11_osc: clocks {
-+				#clock-cells = <1>;
-+				clock-output-names = "s2mps11_ap",
-+						"s2mps11_cp", "s2mps11_bt";
-+			};
-+
-+			regulators {
-+				ldo1_reg: LDO1 {
-+					regulator-name = "vdd_ldo1";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo3_reg: LDO3 {
-+					regulator-name = "vdd_ldo3";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo5_reg: LDO5 {
-+					regulator-name = "vdd_ldo5";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo6_reg: LDO6 {
-+					regulator-name = "vdd_ldo6";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo7_reg: LDO7 {
-+					regulator-name = "vdd_ldo7";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo8_reg: LDO8 {
-+					regulator-name = "vdd_ldo8";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo9_reg: LDO9 {
-+					regulator-name = "vdd_ldo9";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo10_reg: LDO10 {
-+					regulator-name = "vdd_ldo10";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo11_reg: LDO11 {
-+					regulator-name = "vdd_ldo11";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo12_reg: LDO12 {
-+					regulator-name = "vdd_ldo12";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo13_reg: LDO13 {
-+					regulator-name = "vdd_ldo13";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo15_reg: LDO15 {
-+					regulator-name = "vdd_ldo15";
-+					regulator-min-microvolt = <3100000>;
-+					regulator-max-microvolt = <3100000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo16_reg: LDO16 {
-+					regulator-name = "vdd_ldo16";
-+					regulator-min-microvolt = <2200000>;
-+					regulator-max-microvolt = <2200000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo17_reg: LDO17 {
-+					regulator-name = "tsp_avdd";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo19_reg: LDO19 {
-+					regulator-name = "vdd_sd";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo24_reg: LDO24 {
-+					regulator-name = "tsp_io";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <2800000>;
-+					regulator-always-on;
-+				};
-+
-+				buck1_reg: BUCK1 {
-+					regulator-name = "vdd_mif";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck2_reg: BUCK2 {
-+					regulator-name = "vdd_arm";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck3_reg: BUCK3 {
-+					regulator-name = "vdd_int";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck4_reg: BUCK4 {
-+					regulator-name = "vdd_g3d";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck5_reg: BUCK5 {
-+					regulator-name = "vdd_mem";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck6_reg: BUCK6 {
-+					regulator-name = "vdd_kfc";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck7_reg: BUCK7 {
-+					regulator-name = "vdd_1.0v_ldo";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck8_reg: BUCK8 {
-+					regulator-name = "vdd_1.8v_ldo";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck9_reg: BUCK9 {
-+					regulator-name = "vdd_2.8v_ldo";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3750000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck10_reg: BUCK10 {
-+					regulator-name = "vdd_vmem";
-+					regulator-min-microvolt = <2850000>;
-+					regulator-max-microvolt = <2850000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+			};
-+		};
-+	};
-+
-+	i2c_2: i2c at 12C80000 {
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <66000>;
-+		status = "okay";
-+
-+		hdmiddc at 50 {
-+			compatible = "samsung,exynos4210-hdmiddc";
-+			reg = <0x50>;
-+		};
-+	};
-+
-+	rtc at 101E0000 {
-+		status = "okay";
-+	};
-+};
-+
-+&hdmi {
-+	status = "okay";
-+	hpd-gpio = <&gpx3 7 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_hpd_irq>;
-+
-+	vdd_osc-supply = <&ldo7_reg>;
-+	vdd_pll-supply = <&ldo6_reg>;
-+	vdd-supply = <&ldo6_reg>;
-+};
-+
-+&mfc {
-+	samsung,mfc-r = <0x43000000 0x800000>;
-+	samsung,mfc-l = <0x51000000 0x800000>;
-+};
-+
-+&mmc_0 {
-+	status = "okay";
-+	broken-cd;
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <0 4>;
-+	samsung,dw-mshc-ddr-timing = <0 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+};
-+
-+&mmc_2 {
-+	status = "okay";
-+	card-detect-delay = <200>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <0 4>;
-+	samsung,dw-mshc-ddr-timing = <0 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+};
-+
-+&pinctrl_0 {
-+	hdmi_hpd_irq: hdmi-hpd-irq {
-+		samsung,pins = "gpx3-7";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <1>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
-+&usbdrd_dwc3_0 {
-+	dr_mode = "host";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "otg";
-+};
--- 
-2.1.4
+To more concisely state my other reply to you, wrt to AML, I'm primarily
+concerned about a malicious update to the ACPI tables.  The ACPI tables
+in the update would be otherwise normal, except for the AML blob that
+contains some extra code.  The malicious payload.  Then, a routine call
+into an AML (for pinctrl, say) executes the malicious code.
+
+The plausibility and preventability of that style of attack is what I'm
+hoping to nail down with this discussion.
+
+thx,
+
+Jason.
