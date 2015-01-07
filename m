@@ -1,176 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 7 Jan 2015 18:15:25 +0000
-Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <20150105165402.GE3163@console-pimps.org>
-References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
- <20150105165402.GE3163@console-pimps.org>
-Message-ID: <CAKv+Gu8Ks4iDDM=oyg8BNe2dcQE6fLFpwVZAC4Et3DPH1zodWg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 18:16:57 +0000
+Subject: [PATCH] ARM: mm: fix PMD_SECT_RDONLY undeclared compile error
+In-Reply-To: <1420653969-4048-1-git-send-email-victor.kamensky@linaro.org>
+References: <1420653969-4048-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20150107181657.GS7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 January 2015 at 16:54, Matt Fleming <matt@console-pimps.org> wrote:
-> On Mon, 22 Dec, at 10:59:02AM, Ard Biesheuvel wrote:
->> In order to support kexec, the kernel needs to be able to deal with the
->> state of the UEFI firmware after SetVirtualAddressMap() has been called.
->> To avoid having separate code paths for non-kexec and kexec, let's move
->> the call to SetVirtualAddressMap() to the stub: this will guarantee us
->> that it will only be called once (since the stub is not executed during
->> kexec), and ensures that the UEFI state is identical between kexec and
->> normal boot.
->>
->> This implies that the layout of the virtual mapping needs to be created
->> by the stub as well. All regions are rounded up to a naturally aligned
->> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
->> in the UEFI memory map. The kernel proper reads those values and installs
->> the mappings in a dedicated set of page tables that are swapped in during
->> UEFI Runtime Services calls.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/efi.h       |  20 +++-
->>  arch/arm64/kernel/efi.c            | 223 ++++++++++++++++++++-----------------
->>  arch/arm64/kernel/setup.c          |   1 +
->>  drivers/firmware/efi/libstub/fdt.c | 137 ++++++++++++++++++++++-
->>  4 files changed, 270 insertions(+), 111 deletions(-)
->
-> [...]
->
->> @@ -45,5 +53,9 @@ extern void efi_idmap_init(void);
->>  #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
->>
->>  #define EFI_ALLOC_ALIGN              SZ_64K
->> +#define EFI_VIRTMAP          EFI_ARCH_1
->
-> Any chance of documenting what EFI_VIRTMAP means for posterity and why
-> you want to use one of the EFI arch config bits? How is this different
-> from EFI_RUNTIME_SERVICES?
->
+On Wed, Jan 07, 2015 at 06:06:09PM +0000, Victor Kamensky wrote:
+> From: Victor Kamensky <kamensky@coreos-lnx2.cisco.com>
+> 
+> In v3.19-rc3 tree when CONFIG_ARM_LPAE and CONFIG_DEBUG_RODATA are enabled
+> image failed to compile with the following error:
+> 
+> arch/arm/mm/init.c:661:14: error: ?PMD_SECT_RDONLY? undeclared here (not in a function)
+> 
+> It seems that '80d6b0c ARM: mm: allow text and rodata sections to be read-only'
+> and 'ded9477 ARM: 8109/1: mm: Modify pte_write and pmd_write logic for LPAE'
+> commits crossed. 80d6b0c uses PMD_SECT_RDONLY macro but ded9477 renames it
+> and uses software bits L_PMD_SECT_RDONLY instead.
+> 
+> Fix is to use L_PMD_SECT_RDONLY instead PMD_SECT_RDONLY as ded9477 does in
+> another places.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  arch/arm/mm/init.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Will do. It means the virtmap page tables have been set up, based on
-the virtual-to-physical mapping that the stub inserted into the memory
-map.
-This becomes a prereq for enabling the runtime services.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> Take a look at EFI_OLD_MEMMAP in arch/x86/include/asm/efi.h for a
-> crackingly well documented example from Borislav.
->
-> [...]
->
->> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
->> index c846a9608cbd..76bc8abf41d1 100644
->> --- a/drivers/firmware/efi/libstub/fdt.c
->> +++ b/drivers/firmware/efi/libstub/fdt.c
->> @@ -167,6 +167,94 @@ fdt_set_fail:
->>  #define EFI_FDT_ALIGN EFI_PAGE_SIZE
->>  #endif
->>
->> +static efi_status_t get_memory_map(efi_system_table_t *sys_table_arg,
->> +                                efi_memory_desc_t **map,
->> +                                unsigned long *map_size,
->> +                                unsigned long *desc_size,
->> +                                u32 *desc_ver, unsigned long *key_ptr)
->> +{
->> +     efi_status_t status;
->> +
->> +     /*
->> +      * Call get_memory_map() with 0 size to retrieve the size of the
->> +      * required allocation.
->> +      */
->> +     *map_size = 0;
->> +     status = efi_call_early(get_memory_map, map_size, NULL,
->> +                             key_ptr, desc_size, desc_ver);
->> +     if (status != EFI_BUFFER_TOO_SMALL)
->> +             return EFI_LOAD_ERROR;
->> +
->> +     /*
->> +      * Add an additional efi_memory_desc_t to map_size because we're doing
->> +      * an allocation which may be in a new descriptor region. Then double it
->> +      * to give us some scratch space to prepare the input virtmap to give
->> +      * to SetVirtualAddressMap(). Note that this is EFI_LOADER_DATA memory,
->> +      * and the kernel memblock_reserve()'s only the size of the actual
->> +      * memory map, so the scratch space is freed again automatically.
->> +      */
->> +     *map_size += *desc_size;
->> +     status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
->> +                             *map_size * 2, (void **)map);
->> +     if (status != EFI_SUCCESS)
->> +             return status;
->> +
->> +     status = efi_call_early(get_memory_map, map_size, *map,
->> +                             key_ptr, desc_size, desc_ver);
->> +     if (status != EFI_SUCCESS)
->> +             efi_call_early(free_pool, *map);
->> +     return status;
->> +}
->
-> We've now got two (slightly different) versions of this function. Is
-> there any way we could make do with just one?
->
+Will
 
-I have seen some ludicrously large memory maps on some of my x86
-boxes, so I was reluctant to just double the size for all users. I am
-happy to make this the default implementation, but I am not sure if
-x86 frees the second half implicitly as arm does.
-
->> +/*
->> + * This is the base address at which to start allocating virtual memory ranges
->> + * for UEFI Runtime Services. This is a userland range so that we can use any
->> + * allocation we choose, and eliminate the risk of a conflict after kexec.
->> + */
->> +#define EFI_RT_VIRTUAL_BASE  0x40000000
->> +
->> +static void update_memory_map(efi_memory_desc_t *memory_map,
->> +                           unsigned long map_size, unsigned long desc_size,
->> +                           int *count)
->> +{
->> +     u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
->> +     efi_memory_desc_t *out = (void *)memory_map + map_size;
->> +     int l;
->> +
->> +     for (l = 0; l < map_size; l += desc_size) {
->> +             efi_memory_desc_t *in = (void *)memory_map + l;
->> +             u64 paddr, size;
->> +
->> +             if (!(in->attribute & EFI_MEMORY_RUNTIME))
->> +                     continue;
->> +
->> +             /*
->> +              * Make the mapping compatible with 64k pages: this allows
->> +              * a 4k page size kernel to kexec a 64k page size kernel and
->> +              * vice versa.
->> +              */
->> +             paddr = round_down(in->phys_addr, SZ_64K);
->> +             size = round_up(in->num_pages * EFI_PAGE_SIZE +
->> +                             in->phys_addr - paddr, SZ_64K);
->> +
->> +             /*
->> +              * Avoid wasting memory on PTEs by choosing a virtual base that
->> +              * is compatible with section mappings if this region has the
->> +              * appropriate size and physical alignment. (Sections are 2 MB
->> +              * on 4k granule kernels)
->> +              */
->> +             if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
->> +                     efi_virt_base = round_up(efi_virt_base, SZ_2M);
->> +
->> +             in->virt_addr = efi_virt_base + in->phys_addr - paddr;
->> +             efi_virt_base += size;
->> +
->> +             memcpy(out, in, desc_size);
->> +             out = (void *)out + desc_size;
->> +             ++*count;
->> +     }
->> +}
->> +
->
-> fdt.c is starting to become a dumping ground for arm*-specific stuff :-(
->
-> Is there no general solution for sharing code between arm and aarch64 in
-> the kernel so we don't have to stick things like this in
-> drivers/firmware/efi/?
->
-
-I will put these functions in arm-stub.c instead.
-
--- 
-Ard.
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 98ad9c7..2495c8c 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -658,8 +658,8 @@ static struct section_perm ro_perms[] = {
+>  		.start  = (unsigned long)_stext,
+>  		.end    = (unsigned long)__init_begin,
+>  #ifdef CONFIG_ARM_LPAE
+> -		.mask   = ~PMD_SECT_RDONLY,
+> -		.prot   = PMD_SECT_RDONLY,
+> +		.mask   = ~L_PMD_SECT_RDONLY,
+> +		.prot   = L_PMD_SECT_RDONLY,
+>  #else
+>  		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
+>  		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
+> -- 
+> 1.9.3
+> 
+> 
