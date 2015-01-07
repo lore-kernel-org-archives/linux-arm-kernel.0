@@ -1,53 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Jan 2015 11:03:18 +0000
-Subject: [PATCH] ARM: vexpress_defconfig: enable ACL and security labels
- for ext4
-In-Reply-To: <87fvbmubqq.fsf%l.stelmach@samsung.com>
-References: <1418383877-29685-1-git-send-email-l.stelmach@samsung.com>
- <3238168.YKYh95mZKp@wuerfel>
- <87fvbmubqq.fsf%l.stelmach@samsung.com>
-Message-ID: <20150107110318.GA29344@red-moon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 11:07:38 +0000
+Subject: [PATCH 0/2] arm64: first set of Kconfig patches for Tegra132
+ support
+In-Reply-To: <20150107081638.14381.42444.stgit@dusk.lan>
+References: <20150107081638.14381.42444.stgit@dusk.lan>
+Message-ID: <20150107110738.GF7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 10:27:25AM +0000, ?ukasz Stelmach wrote:
-> It was <2014-12-12 pi? 12:38>, when Arnd Bergmann wrote:
-> > On Friday 12 December 2014 12:31:17 ?ukasz Stelmach wrote:
-> >> This patch enables security features of ext4 file-system required
-> >> by many conteporary user-space setups.
-> >> 
-> >> Signed-off-by: ?ukasz Stelmach <l.stelmach@samsung.com>
-> >> ---
-> >>  arch/arm/configs/vexpress_defconfig | 2 ++
-> >>  1 file changed, 2 insertions(+)
-> >
-> > The patch looks good, but should be addressed to the vexpress maintainers
-> > (Liviu, Sudeep, Lorenzo)
-> >
-> > 	Arnd
+On Wed, Jan 07, 2015 at 08:17:29AM +0000, Paul Walmsley wrote:
+> Hi Catalin & Will,
+
+Hi Paul,
+
+> These patches start the ARM64 Kconfig and defconfig changes to
+> support the Tegra132 (aka Tegra K1 64-bit) SoC and the NVIDIA
+> Norrin64 FFD board.
 > 
-> ...?
-> ping?
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310300.html
-
-Lorenzo
-
-> >> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-> >> index f489fda..1d9dd6e 100644
-> >> --- a/arch/arm/configs/vexpress_defconfig
-> >> +++ b/arch/arm/configs/vexpress_defconfig
-> >> @@ -138,6 +138,8 @@ CONFIG_EXT3_FS=y
-> >>  # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-> >>  # CONFIG_EXT3_FS_XATTR is not set
-> >>  CONFIG_EXT4_FS=y
-> >> +CONFIG_EXT4_FS_POSIX_ACL=y
-> >> +CONFIG_EXT4_FS_SECURITY=y
-> >>  CONFIG_VFAT_FS=y
-> >>  CONFIG_TMPFS=y
-> >>  CONFIG_JFFS2_FS=y
+> Tegra132 support is made conditional on CONFIG_BROKEN, since
+> there are some patches pending for other maintainers to fix
+> compilation when CONFIG_ARCH_TEGRA is set during an ARM64 build.
+> Once those patches have been merged, a subsequent patch will be
+> sent to remove the CONFIG_BROKEN dependency and to make a few other
+> defconfig changes that are dependent on CONFIG_ARCH_TEGRA.
 > 
-> -- 
-> ?ukasz Stelmach
-> Samsung R&D Institute Poland
-> Samsung Electronics
+> These patches apply on the arm64 fixes/core branch, commit
+> 5d96e0cba263.  They have been boot-tested on QEMU 2.2.0 AArch64,
+> and (after other patches have been applied) have been boot-tested
+> on the Tegra132 Norrin64 FFD board.
+
+Whilst I'm happy to take the second patch for 3.20 (getting those
+dependencies building and keeping them building is a Good Thing), can we
+hold off on the first patch until it's not broken? Having an unconditional
+depends on BROKEN isn't really that useful.
+
+Cheers,
+
+Will
