@@ -1,51 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Jan 2015 10:11:38 +0100
-Subject: [PATCH v2 4/5] clk: cygnus: add clock support for Broadcom Cygnus
-In-Reply-To: <54AC99F3.8040703@broadcom.com>
-References: <1420500076-18302-5-git-send-email-rjui@broadcom.com>
- <2048376.BFrtW5tszK@wuerfel> <54AC99F3.8040703@broadcom.com>
-Message-ID: <2938966.fY2WjearG6@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 7 Jan 2015 10:14:12 +0100
+Subject: AT91 slow clock mode regression/fixes, improvement proposal
+In-Reply-To: <20150106142528.GA10330@gradator.net>
+References: <20141218203904.GA25215@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
+ <20141219152625.GA30666@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6CA0@penmbx01>
+ <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
+ <20150106142528.GA10330@gradator.net>
+Message-ID: <20150107091412.GA23398@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 18:29:07 Ray Jui wrote:
-> On 1/6/2015 12:21 PM, Arnd Bergmann wrote:
-> > On Monday 05 January 2015 15:21:15 Ray Jui wrote:
-> > 
-> > The tables look fairly regular. Is it possible that it's common
-> > to all iproc variants with a standard way to derive all other
-> > values from the channel index?
-> > 
-> Ah no. Not only it's different between different iproc variants, it's
-> also different between plls on the same soc.
+Hi,
 
-Ok, I see.
- 
-> >> +static const struct iproc_asiu_gate asiu_gate[BCM_CYGNUS_NUM_ASIU_CLKS] = {
-> >> +	[BCM_CYGNUS_ASIU_KEYPAD_CLK] =
-> >> +		asiu_gate_val(0x0, 7),
-> >> +	[BCM_CYGNUS_ASIU_ADC_CLK] =
-> >> +		asiu_gate_val(0x0, 9),
-> >> +	[BCM_CYGNUS_ASIU_PWM_CLK] =
-> >> +		asiu_gate_val(IPROC_CLK_INVALID_OFFSET, 0),
-> >> +};
+On 06/01/2015 at 15:25:28 +0100, Sylvain Rochet wrote :
+> Hello Wenyou,
+> 
+> On Mon, Jan 05, 2015 at 03:32:42AM +0000, Yang, Wenyou wrote:
 > > 
-> > Here I think a better binding would be to pass the gate value in the
-> > clock specifier, rather than an artificial index. That would let
-> > you get rid of the BCM_CYGNUS_ASIU_KEYPAD_CLK/BCM_CYGNUS_ASIU_ADC_CLK
-> > macros.
-> > 
-> You meant to pass in both the gate register offset and its bit shift
-> through the clock specifier? But isn't the current ASIU clock code much
-> more consistent with the rest of the iProc clock code?
+> > I remembered you said this patch is not formal. Now, would you like 
+> > send a formal one?
+> 
+> Here it is, the first one is based on linux-at91/linux-3.10-at91 branch, 
+> the second one is rebased on linux-3.18 (Is this the right way when 
+> playing with multiple branch?).
 
-For simple devices that don't need an index macro, I would always
-prefer not defining them, because they are a pain to maintain.
-For a simple gate clock controller, we could compute both the offset
-and bit number from a single integer.
+You can include that kind of information after the --- marker in the
+patch so that it is clearer.
 
-However, I now saw upon taking a closer look that the asiu has both
-a gate and a divider, and the latter one is not as simple, so
-my comment doesn't apply here.
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
