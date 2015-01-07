@@ -1,54 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 11:11:48 +0000
-Subject: [PATCH] arm64: mm: support instruction SETEND
-In-Reply-To: <20150107105824.GA13620@leoy.com>
-References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
- <54AD061A.6090602@arm.com> <20150107105824.GA13620@leoy.com>
-Message-ID: <20150107111148.GH7485@arm.com>
+From: syntheticpp@gmx.net (=?ISO-8859-15?Q?Peter_K=FCmmel?=)
+Date: Wed, 07 Jan 2015 12:12:34 +0100
+Subject: [PATCH] irqchip: omap-intc: fix legacy DMA regression
+In-Reply-To: <1420563093-26026-1-git-send-email-balbi@ti.com>
+References: <20150106123830.GD30544@fuloong-minipc.musicnaut.iki.fi>
+ <1420563093-26026-1-git-send-email-balbi@ti.com>
+Message-ID: <54AD14A2.1060006@gmx.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 10:58:24AM +0000, Leo Yan wrote:
-> On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
-> > On 07/01/15 05:52, Leo Yan wrote:
-> > >Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
-> > >instruction will be treated as UNALLOCATED; this error can be
-> > >reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
-> > >mode, finally kernel will trap the exception if the userspace
-> > >libs use SETEND instruction.
-> > >
-> > >So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
-> > >
-> > The best way to do this, is via the instruction emulation framework
-> > added by Punit, which handles the armv8 deprecated/obsoleted
-> > instructions. This is now queued for 3.19.
-> > I have a patchset which adds the 'SETEND' emulation support to the
-> > framework. This will enable better handling of the feature,
-> > including finding out the users of the deprecated instruction (when
-> > we switch to the emulation mode).
-> > 
-> 
-> i'm a little confuse for this point:
-> 
-> if the deprecated instructions cannot be supported by CPU, then only
-> can use emulation; on the other hand, if CPU can natively support the
-> deprecated instruction, why we cannot directly enable this h/w feature?
-> if use the emulation mode, suppose here will have performance penalty.
-> 
-> how about u think for this? :-)
 
-A *huge* advantage of emulation is that we can print a diagnostic to dmesg
-warning the user that they are making use of a CPU feature that is likely to
-disappear from future revisions of the hardware. We've not been great at
-doing this in the past, which led to all the fun around SWP emulation that
-you can find in the list archives.
 
-Furthermore, I think the emulation framework does allow the hardware support
-to be enabled, it just doesn't make that the default behaviour.
+Am 06.01.2015 um 17:51 schrieb Felipe Balbi:
+> commit 55601c9f2467 (arm: omap: intc: switch over
+> to linear irq domain) introduced a regression with
+> SDMA legacy driver because that driver strictly depends
+> on INTC's IRQs starting at NR_IRQs. Aparently
+> irq_domain_add_linear() won't guarantee that, since we see
+> a 7 IRQs difference when booting with and without the
+> commit cited above.
+>
+> Until arch/arm/plat-omap/dma.c is properly fixed, we
+> must maintain OMAP2/3 using irq_domain_add_legacy().
+>
+> A FIXME note was added so people know to delete that
+> code once that legacy DMA driver is fixed up.
+>
+> Fixes: 55601c9f2467 (arm: omap: intc: switch over to linear irq domain)
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>   drivers/irqchip/irq-omap-intc.c | 26 +++++++++++++++++++++-----
+>   1 file changed, 21 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+> index 3c970259c0eb..6ef88f56cf8d 100644
+> --- a/drivers/irqchip/irq-omap-intc.c
+> +++ b/drivers/irqchip/irq-omap-intc.c
+> @@ -263,7 +263,7 @@ static int __init omap_init_irq_of(struct device_node *node)
+>   	return ret;
+>   }
+>
+> -static int __init omap_init_irq_legacy(u32 base)
+> +static int __init omap_init_irq_legacy(u32 base, struct device_node *node)
+>   {
+>   	int j, irq_base;
+>
+> @@ -277,7 +277,7 @@ static int __init omap_init_irq_legacy(u32 base)
+>   		irq_base = 0;
+>   	}
+>
+> -	domain = irq_domain_add_legacy(NULL, omap_nr_irqs, irq_base, 0,
+> +	domain = irq_domain_add_legacy(node, omap_nr_irqs, irq_base, 0,
+>   			&irq_domain_simple_ops, NULL);
+>
+>   	omap_irq_soft_reset();
+> @@ -301,10 +301,26 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
+>   {
+>   	int ret;
+>
+> -	if (node)
+> +	/*
+> +	 * FIXME legacy OMAP DMA driver sitting under arch/arm/plat-omap/dma.c
+> +	 * depends is still not ready for linear IRQ domains; because of that
+> +	 * we need to temporarily "blacklist" OMAP2 and OMAP3 devices from using
+> +	 * linear IRQ Domain until that driver is finally fixed.
+> +	 */
+> +	if (of_device_is_compatible(node, "ti,omap2-intc") ||
+> +			of_device_is_compatible(node, "ti,omap3-intc")) {
+> +		struct resource res;
+> +
+> +		if (of_address_to_resource(node, 0, &res))
+> +			return -ENOMEM;
+> +
+> +		base = res.start;
+> +		ret = omap_init_irq_legacy(base, node);
+> +	} else if (node) {
+>   		ret = omap_init_irq_of(node);
+> -	else
+> -		ret = omap_init_irq_legacy(base);
+> +	} else {
+> +		ret = omap_init_irq_legacy(base, NULL);
+> +	}
+>
+>   	if (ret == 0)
+>   		omap_irq_enable_protection();
+>
 
-In other words; use the emulation to find out where SETEND is being used
-and fix those applications wherever you can. In the cases where you're
-stuck with a legacy binary, you can enable CPU support if it is available
-but that's not a longterm solution.
+Thanks, works on DM3730.
 
-Will
+Peter
