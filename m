@@ -1,57 +1,44 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 07 Jan 2015 11:08:11 +0100
-Subject: [PATCH v2 1/2] [media] s5p-jpeg: Fix modification sequence of
- interrupt enable register
-In-Reply-To: <1418974680-5837-2-git-send-email-tony.kn@samsung.com>
-References: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
- <1418974680-5837-2-git-send-email-tony.kn@samsung.com>
-Message-ID: <54AD058B.6070900@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 10:09:10 +0000
+Subject: [PATCH v2 03/40] arm64/uaccess: fix sparse errors
+In-Reply-To: <20150106215115.GA21594@redhat.com>
+References: <1420558883-10131-1-git-send-email-mst@redhat.com>
+ <1420558883-10131-4-git-send-email-mst@redhat.com>
+ <20150106191432.GC32449@arm.com>
+ <20150106214820.GA18895@redhat.com>
+ <20150106215115.GA21594@redhat.com>
+Message-ID: <20150107100910.GA7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, Jan 06, 2015 at 09:51:15PM +0000, Michael S. Tsirkin wrote:
+> On Tue, Jan 06, 2015 at 11:48:20PM +0200, Michael S. Tsirkin wrote:
+> > On Tue, Jan 06, 2015 at 07:14:32PM +0000, Will Deacon wrote:
+> > > Hi Michael,
+> > > 
+> > > On Tue, Jan 06, 2015 at 03:43:40PM +0000, Michael S. Tsirkin wrote:
+> > > > virtio wants to read bitwise types from userspace using get_user.  At the
+> > > > moment this triggers sparse errors, since the value is passed through an
+> > > > integer.
+> > > > 
+> > > > Fix that up using __force.
+> > > > 
+> > > > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > > > 
+> > > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > > > ---
+> > > 
+> > > Did you want us to take this via the arm64 tree, or are you planning to
+> > > merge it via another route?
+> > > 
+> > > Will
+> > 
+> > Up to you really: if you don't pick it up, Arnd said he'll merge
+> > through his tree.
+> 
+> Though if you do pick it up, need to also pick up the follow-up
+> patch - maybe my tree is easier.
 
-On 12/19/2014 08:37 AM, Tony K Nadackal wrote:
-> Fix the bug in modifying the interrupt enable register.
+Ok, I'll go ack that whitespace fix for you to take then.
 
-For Exynos4 this was not a bug as there are only five bit fields
-used in the EXYNOS4_INT_EN_REG - all of them enable related
-interrupt signal and EXYNOS4_INT_EN_ALL value is 0x1f which
-just sets these bit fields to 1.
-
-If for Exynos7 there are other bit fields in this register
-and it has to be read prior setting to find out current
-state then I'd parametrize this function with version argument
-as you do it in the patch adding support for Exynos7, but
-for Exynos4 case I'd left the behaviour as it is currenlty, i.e.
-avoid reading the register and do it only for Exynos7 case.
-Effectively, this patch is not required, as it doesn't fix
-anything but adds redundant call to readl.
-
-> Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
-> ---
->   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> index e53f13a..a61ff7e 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> @@ -155,7 +155,10 @@ void exynos4_jpeg_set_enc_out_fmt(void __iomem *base, unsigned int out_fmt)
->
->   void exynos4_jpeg_set_interrupt(void __iomem *base)
->   {
-> -	writel(EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
-> +	unsigned int reg;
-> +
-> +	reg = readl(base + EXYNOS4_INT_EN_REG) & ~EXYNOS4_INT_EN_MASK;
-> +	writel(reg | EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
->   }
->
->   unsigned int exynos4_jpeg_get_int_status(void __iomem *base)
->
-
-
--- 
-Best Regards,
-Jacek Anaszewski
+Will
