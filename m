@@ -1,35 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Jan 2015 10:14:12 +0100
-Subject: AT91 slow clock mode regression/fixes, improvement proposal
-In-Reply-To: <20150106142528.GA10330@gradator.net>
-References: <20141218203904.GA25215@gradator.net>
- <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
- <20141219152625.GA30666@gradator.net>
- <B256D81BAE5131468A838E5D7A243641BFCB6CA0@penmbx01>
- <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
- <20150106142528.GA10330@gradator.net>
-Message-ID: <20150107091412.GA23398@piout.net>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Wed, 07 Jan 2015 10:26:18 +0100
+Subject: [PATCH v1] ARM:sunxi:sid: Make use of the of_match_ptr
+In-Reply-To: <12820267.9PZueKuf7O@wuerfel>
+References: <1420616468-3782-1-git-send-email-oliver+list@schinagl.nl>
+ <12820267.9PZueKuf7O@wuerfel>
+Message-ID: <54ACFBBA.3020201@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hey Arnd,
+On 07-01-15 10:00, Arnd Bergmann wrote:
+> On Wednesday 07 January 2015 08:41:08 Olliver Schinagl wrote:
+>> From: Olliver Schinagl <oliver@schinagl.nl>
+>>
+>> I probably have forgotten to use this macro for the of_match pointer, so
+>> this patch adds the of_match_ptr macro.
+>>
+>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>> ---
+>>   drivers/misc/eeprom/sunxi_sid.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
+>> index 8385177..5a330d9 100644
+>> --- a/drivers/misc/eeprom/sunxi_sid.c
+>> +++ b/drivers/misc/eeprom/sunxi_sid.c
+>> @@ -25,6 +25,7 @@
+>>   #include <linux/kernel.h>
+>>   #include <linux/kobject.h>
+>>   #include <linux/module.h>
+>> +#include <linux/of.h>
+>>   #include <linux/of_device.h>
+>>   #include <linux/platform_device.h>
+>>   #include <linux/random.h>
+>> @@ -146,7 +147,7 @@ static struct platform_driver sunxi_sid_driver = {
+>>          .remove = sunxi_sid_remove,
+>>          .driver = {
+>>                  .name = DRV_NAME,
+>> -               .of_match_table = sunxi_sid_of_match,
+>> +               .of_match_table = of_match_ptr(sunxi_sid_of_match),
+>>          },
+>>   };
+>>   module_platform_driver(sunxi_sid_driver);
+> This looks wrong: sunxi_sid_of_match is defined unconditionally, so
+> now you get a compiler warning if CONFIG_OF is disabled.
+>
+> The existing code is good, we only add the of_match_ptr() for drivers
+> that are useful without CONFIG_OF and that want to save a few bytes
+> in .data size.
+Ah, I missunderstood its use then!It looked like the of_match_ptr() got 
+defined away otherwise. Sorry for the noise!
 
-On 06/01/2015 at 15:25:28 +0100, Sylvain Rochet wrote :
-> Hello Wenyou,
-> 
-> On Mon, Jan 05, 2015 at 03:32:42AM +0000, Yang, Wenyou wrote:
-> > 
-> > I remembered you said this patch is not formal. Now, would you like 
-> > send a formal one?
-> 
-> Here it is, the first one is based on linux-at91/linux-3.10-at91 branch, 
-> the second one is rebased on linux-3.18 (Is this the right way when 
-> playing with multiple branch?).
-
-You can include that kind of information after the --- marker in the
-patch so that it is clearer.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Olliver
+>
+> 	Arnd
