@@ -1,66 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Jan 2015 16:57:53 +0000
-Subject: [PATCH 1/7] arm64: introduce common ESR_ELx_* definitions
-In-Reply-To: <20150107164203.GB23642@leverpostej>
-References: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
- <1420632260-8798-2-git-send-email-mark.rutland@arm.com>
- <20150107162320.GG2199@e104818-lin.cambridge.arm.com>
- <20150107164203.GB23642@leverpostej>
-Message-ID: <20150107165753.GH2199@e104818-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 07 Jan 2015 10:15:56 -0700
+Subject: [PATCH 1/4] ARM: tegra: rely on bootloader pinmux programming
+ on nyan-big
+In-Reply-To: <CAAObsKB1gMcLZ=n8Mc6JSLQHn5-6VWOhERLgYTdi6nit6yCj5w@mail.gmail.com>
+References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1420540653-14816-2-git-send-email-tomeu.vizoso@collabora.com>
+ <54AC16B0.5050703@wwwdotorg.org>
+ <CAAObsKB1gMcLZ=n8Mc6JSLQHn5-6VWOhERLgYTdi6nit6yCj5w@mail.gmail.com>
+Message-ID: <54AD69CC.7010902@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 04:42:04PM +0000, Mark Rutland wrote:
-> On Wed, Jan 07, 2015 at 04:23:20PM +0000, Catalin Marinas wrote:
-> > On Wed, Jan 07, 2015 at 12:04:14PM +0000, Mark Rutland wrote:
-> > > Currently we have separate ESR_EL{1,2}_* macros, despite the fact that
-> > > the encodings are common. While encodings are architected to refer to
-> > > the current EL or a lower EL, the macros refer to particular ELs (e.g.
-> > > ESR_ELx_EC_DABT_EL0). Having these duplicate definitions is redundant,
-> > > and their naming is misleading.
-> > > 
-> > > This patch introduces common ESR_ELx_* macros that can be used in all
-> > > cases, in preparation for later patches which will migrate existing
-> > > users over. Some additional cleanups are made in the process:
-> > > 
-> > > * Suffixes for particular exception levelts (e.g. _EL0, _EL1) are
-> > >   replaced with more general _LOW and _CUR suffixes, matching the
-> > >   architectural intent.
-> > > 
-> > > * ESR_ELx_EC_WFx, rather than ESR_ELx_EC_WFI is introduced, as this
-> > >   EC encoding covers traps from both WFE and WFI. Similarly,
-> > >   ESR_ELx_WFx_ISS_WFE rather than ESR_ELx_EC_WFI_ISS_WFE is introduced.
-> > > 
-> > > * Multi-bit fields are given consistently named _SHIFT and _MASK macros.
-> > > 
-> > > * UL() is used for compatiblity with assembly files.
-> > > 
-> > > * Comments are added for currently unallocated ESR_ELx.EC encodings.
-> > > 
-> > > For fields other than ESR_ELx.EC, macros are only implemented for fields
-> > > for which there is already an ESR_EL{1,2}_* macro.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > Cc: Peter Maydell <peter.maydell@linaro.org>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > 
-> > I assume this series would go in via the kvm tree. In which case, for
-> > the first two patches in the series:
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> Thanks!
-> 
-> Patches 3 and 4 also affect the arm64 core code and shouldn't affect
-> KVM. Can I get your ack for those too, or do you have any comments?
+On 01/07/2015 01:06 AM, Tomeu Vizoso wrote:
+> On 6 January 2015 at 18:09, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 01/06/2015 03:37 AM, Tomeu Vizoso wrote:
+>>>
+>>> Following 6dbaff2b, the kernel expects that the bootloader has correctly
+>>> programmed the Tegra pinmux.
+>>>
+>>> DTs for the Jetson and the Venice2 had been updated already but this one
+>>> was left behind.
+>>
+>>
+>> So this setup is true for NVIDIA-controlled development/reference boards
+>> where we've ensured that the bootloader sets up 100% of the pinmux.
+>>
+>> However, I know that Coreboot on this board doesn't set up everything in the
+>> pinmux, and since it's in r/o flash never will. As such, I'm not sure this
+>> change is safe for this board. That is, unless you want to force upstream
+>> kernels to be booted via a chain-loaded path: Coreboot (r/o) -> U-Boot (r/w
+>> with full pinmux setup) -> kernel.
+>>
+>>> Have tested this with the stock vendor firmware (coreboot) and have found
+>>> no
+>>> issues.
+>>
+>>
+>> There are presumably a bunch of features which aren't yet supported
+>> upstream, and hence you couldn't test though? That means we might find that
+>> parts of the pinmux aren't yet programmed but need to be to enable those
+>> features.
+>
+> Sure, there's no chance that my testing could have been extensive enough.
+>
+> Following Andrew's feedback, I will be looking at getting the pinmux
+> programming right in the DTs.
 
-They look fine to me. For the first 4 patches:
+As an FYI, the way this typically works (for NVIDIA reference boards, 
+and many/most customer boards) is that NVIDIA syseng publishes an Excel 
+spreadsheet that can be edited to define the board's pinmux, and which 
+performs some error checks. This spreadsheet can directly generate (via 
+Excel macros/...) pinmux data tables and/or DT files for our 
+product/internal/downstream Android and L4T kernels. For recent SoCs, 
+the tegra-pinmux-scripts project[1] can take a CSV representation of the 
+spreadsheet and generate both a U-Boot header file (for upstream or L4T; 
+they're the same) and upstream Linux kernel DT files that represent the 
+pinmux.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+So, your best bet is to see if such a spreadsheet exists for these 
+platforms, and import it into tegra-pinmux-scripts. That will save a lot 
+of work if the spreadsheet exists (and is up-to-date).
 
-(BTW, I'll start preparing the merging window next week, if we get
-conflicts, we may need to put the first 4 patches on some common branch;
-I don't expect any though)
+[1] https://github.com/NVIDIA/tegra-pinmux-scripts
