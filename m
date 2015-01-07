@@ -1,149 +1,42 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed,  7 Jan 2015 14:13:49 +0800
-Subject: [Bugfix] x86/apic: Fix xen IRQ allocation failure caused by commit
- b81975eade8c
-Message-ID: <1420611244-25624-1-git-send-email-jiang.liu@linux.intel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 Jan 2015 07:41:54 +0100
+Subject: [PATCH] spi: orion: Add multiple chip select support for Armada
+ 370 and 375
+In-Reply-To: <54AC5B16.9020206@free-electrons.com>
+References: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
+ <54AC5B16.9020206@free-electrons.com>
+Message-ID: <20150107074154.1334b5c0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b81975eade8c ("x86, irq: Clean up irqdomain transition code")
-breaks xen IRQ allocation because xen_smp_prepare_cpus() doesn't invoke
-setup_IO_APIC(), so no irqdomains created for IOAPICs and
-mp_map_pin_to_irq() fails at the very beginning.
+Dear Gregory CLEMENT,
 
-Enhance xen_smp_prepare_cpus() to call setup_IO_APIC() to initialize
-irqdomain for IOAPICs.
+On Tue, 06 Jan 2015 23:00:54 +0100, Gregory CLEMENT wrote:
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-Reported-and-tested-by: Sander Eikelenboom <linux@eikelenboom.it>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
----
-Hi all,
-	This patch should be backported to v3.17, but there are
-conflicts. So I will send backported patch to 3.17/3.18 stable tree
-once this patch has been merged into mainstream kernel.
-Thanks!
-Gerry
----
- arch/x86/include/asm/io_apic.h       |    2 +-
- arch/x86/include/asm/smpboot_hooks.h |    5 ++---
- arch/x86/kernel/apic/apic.c          |    5 ++---
- arch/x86/kernel/apic/io_apic.c       |   32 +++++++++++++++-----------------
- arch/x86/xen/smp.c                   |    3 +++
- 5 files changed, 23 insertions(+), 24 deletions(-)
+> On 06/01/2015 22:30, Ken Wilson wrote:
+> > Create a new dt binding for the Armada 375 that supports up to
+> > 3 chip selects but uses the same prescaler values and algorithm
+> > as the basic orion binding.
+> 
+> There was already a patch that have been sent for this:
+> http://thread.gmane.org/gmane.linux.kernel.spi.devel/17808/focus=17809
+> 
+> but in the end it has not been merged. The last email on the thread was
+> about doing the manipulation in set_cs and not in setup_transfer(). And I
+> didn't find a newer version.
+> 
+> Maybe it just fell through the cracks.
+> Thomas did you remember of it?
 
-diff --git a/arch/x86/include/asm/io_apic.h b/arch/x86/include/asm/io_apic.h
-index bf006cce9418..72a1298658bb 100644
---- a/arch/x86/include/asm/io_apic.h
-+++ b/arch/x86/include/asm/io_apic.h
-@@ -237,7 +237,7 @@ static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned
- 
- extern void io_apic_eoi(unsigned int apic, unsigned int vector);
- 
--extern void setup_IO_APIC(void);
-+extern void setup_IO_APIC(bool xen_smp);
- extern void enable_IO_APIC(void);
- extern void disable_IO_APIC(void);
- extern void setup_ioapic_dest(void);
-diff --git a/arch/x86/include/asm/smpboot_hooks.h b/arch/x86/include/asm/smpboot_hooks.h
-index 0da7409f0bec..e47df710a588 100644
---- a/arch/x86/include/asm/smpboot_hooks.h
-+++ b/arch/x86/include/asm/smpboot_hooks.h
-@@ -53,10 +53,9 @@ static inline void __init smpboot_setup_io_apic(void)
- 	 * go and set it up:
- 	 */
- 	if (!skip_ioapic_setup && nr_ioapics)
--		setup_IO_APIC();
--	else {
-+		setup_IO_APIC(false);
-+	else
- 		nr_ioapics = 0;
--	}
- #endif
- }
- 
-diff --git a/arch/x86/kernel/apic/apic.c b/arch/x86/kernel/apic/apic.c
-index 29b5b18afa27..71b8a6cb7f0e 100644
---- a/arch/x86/kernel/apic/apic.c
-+++ b/arch/x86/kernel/apic/apic.c
-@@ -1913,10 +1913,9 @@ int __init APIC_init_uniprocessor(void)
- 
- #ifdef CONFIG_X86_IO_APIC
- 	if (smp_found_config && !skip_ioapic_setup && nr_ioapics)
--		setup_IO_APIC();
--	else {
-+		setup_IO_APIC(false);
-+	else
- 		nr_ioapics = 0;
--	}
- #endif
- 
- 	x86_init.timers.setup_percpu_clockev();
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index 3f5f60406ab1..13cddc75e4c0 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -2369,31 +2369,29 @@ static void ioapic_destroy_irqdomain(int idx)
- 	ioapics[idx].pin_info = NULL;
- }
- 
--void __init setup_IO_APIC(void)
-+void __init setup_IO_APIC(bool xen_smp)
- {
- 	int ioapic;
- 
--	/*
--	 * calling enable_IO_APIC() is moved to setup_local_APIC for BP
--	 */
--	io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
-+	if (!xen_smp) {
-+		apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
-+		io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
-+
-+		/* Set up IO-APIC IRQ routing. */
-+		x86_init.mpparse.setup_ioapic_ids();
-+		sync_Arb_IDs();
-+	}
- 
--	apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
- 	for_each_ioapic(ioapic)
- 		BUG_ON(mp_irqdomain_create(ioapic));
--
--	/*
--         * Set up IO-APIC IRQ routing.
--         */
--	x86_init.mpparse.setup_ioapic_ids();
--
--	sync_Arb_IDs();
- 	setup_IO_APIC_irqs();
--	init_IO_APIC_traps();
--	if (nr_legacy_irqs())
--		check_timer();
--
- 	ioapic_initialized = 1;
-+
-+	if (!xen_smp) {
-+		init_IO_APIC_traps();
-+		if (nr_legacy_irqs())
-+			check_timer();
-+	}
- }
- 
- /*
-diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
-index 4c071aeb8417..7eb0283901fa 100644
---- a/arch/x86/xen/smp.c
-+++ b/arch/x86/xen/smp.c
-@@ -326,7 +326,10 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
- 
- 		xen_raw_printk(m);
- 		panic(m);
-+	} else {
-+		setup_IO_APIC(true);
- 	}
-+
- 	xen_init_lock_cpu(0);
- 
- 	smp_store_boot_cpu_info();
+Yes, it is still on my TODO-list, but I haven't yet gotten around to
+submitting a new version. So I haven't looked at Ken's contribution,
+but if Ken is willing to bring it up to a state where it can be
+mainlined, that would definitely be welcome.
+
+Thanks,
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
