@@ -1,49 +1,155 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Jan 2015 16:23:20 +0000
-Subject: [PATCH 1/7] arm64: introduce common ESR_ELx_* definitions
-In-Reply-To: <1420632260-8798-2-git-send-email-mark.rutland@arm.com>
-References: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
- <1420632260-8798-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150107162320.GG2199@e104818-lin.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 8 Jan 2015 00:24:11 +0800
+Subject: [PATCH 03/17] Input: sun4i-ts: Add thermal zone sensor support
+In-Reply-To: <20150106152425.GA6276@developer>
+References: <1420511727-8242-1-git-send-email-wens@csie.org>
+ <1420511727-8242-4-git-send-email-wens@csie.org>
+ <20150106152425.GA6276@developer>
+Message-ID: <CAGb2v66L-ZD1Ep-rnKXKP7PuJH+dA=26tV35KyKCNnKHgM4Hmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 12:04:14PM +0000, Mark Rutland wrote:
-> Currently we have separate ESR_EL{1,2}_* macros, despite the fact that
-> the encodings are common. While encodings are architected to refer to
-> the current EL or a lower EL, the macros refer to particular ELs (e.g.
-> ESR_ELx_EC_DABT_EL0). Having these duplicate definitions is redundant,
-> and their naming is misleading.
-> 
-> This patch introduces common ESR_ELx_* macros that can be used in all
-> cases, in preparation for later patches which will migrate existing
-> users over. Some additional cleanups are made in the process:
-> 
-> * Suffixes for particular exception levelts (e.g. _EL0, _EL1) are
->   replaced with more general _LOW and _CUR suffixes, matching the
->   architectural intent.
-> 
-> * ESR_ELx_EC_WFx, rather than ESR_ELx_EC_WFI is introduced, as this
->   EC encoding covers traps from both WFE and WFI. Similarly,
->   ESR_ELx_WFx_ISS_WFE rather than ESR_ELx_EC_WFI_ISS_WFE is introduced.
-> 
-> * Multi-bit fields are given consistently named _SHIFT and _MASK macros.
-> 
-> * UL() is used for compatiblity with assembly files.
-> 
-> * Comments are added for currently unallocated ESR_ELx.EC encodings.
-> 
-> For fields other than ESR_ELx.EC, macros are only implemented for fields
-> for which there is already an ESR_EL{1,2}_* macro.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi,
 
-I assume this series would go in via the kvm tree. In which case, for
-the first two patches in the series:
+On Tue, Jan 6, 2015 at 11:24 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
+> Hello Chen-Yu,
+>
+>
+> On Tue, Jan 06, 2015 at 10:35:13AM +0800, Chen-Yu Tsai wrote:
+>> The touchscreen controller has a temperature sensor embedded in the SoC,
+>> which already has hwmon support in the driver.
+>>
+>> Add DT thermal zone support so we can use it with cpufreq for thermal
+>> throttling.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  .../bindings/input/touchscreen/sun4i.txt           |  1 +
+>>  drivers/input/touchscreen/sun4i-ts.c               | 27 ++++++++++++++++++++++
+>>  2 files changed, 28 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>> index aef57791f40b..7f1110adbd24 100644
+>> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>> @@ -5,6 +5,7 @@ Required properties:
+>>   - compatible: "allwinner,sun4i-a10-ts"
+>>   - reg: mmio address range of the chip
+>>   - interrupts: interrupt to which the chip is connected
+>> + - #thermal-sensor-cells: shall be 0
+>>
+>
+> You may want to update your Example section too, below.
+> Example:
+>
+>         rtp: rtp at 01c25000 {
+>                 compatible = "allwinner,sun4i-a10-ts";
+>                 reg = <0x01c25000 0x100>;
+>                 interrupts = <29>;
+>                 allwinner,ts-attached;
+>                 #thermal-sensor-cells = <0>;
+>         };
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Ok.
+
+>
+>
+>>  Optional properties:
+>>   - allwinner,ts-attached: boolean indicating that an actual touchscreen is
+>> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+>> index 28a06749ae42..b6e9043446d6 100644
+>> --- a/drivers/input/touchscreen/sun4i-ts.c
+>> +++ b/drivers/input/touchscreen/sun4i-ts.c
+>> @@ -34,6 +34,7 @@
+>>
+>>  #include <linux/err.h>
+>>  #include <linux/hwmon.h>
+>> +#include <linux/thermal.h>
+>>  #include <linux/init.h>
+>>  #include <linux/input.h>
+>>  #include <linux/interrupt.h>
+>> @@ -107,6 +108,7 @@
+>>  struct sun4i_ts_data {
+>>       struct device *dev;
+>>       struct input_dev *input;
+>> +     struct thermal_zone_device *tz;
+>>       void __iomem *base;
+>>       unsigned int irq;
+>>       bool ignore_fifo_data;
+>> @@ -180,6 +182,23 @@ static void sun4i_ts_close(struct input_dev *dev)
+>>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>>  }
+>>
+>> +static int get_temp(void *data, long *temp)
+>> +{
+>> +     struct sun4i_ts_data *ts = data;
+>> +
+>> +     /* No temp_data until the first irq */
+>> +     if (ts->temp_data == -1)
+>> +             return -EAGAIN;
+>> +
+>> +     *temp = (ts->temp_data - 1447) * 100;
+>> +
+>
+> Care to explain the formula in a simple comment?
+
+This was just copied from the hwmon section. AFAIK there is no documentation
+for the formula. It was probably copied from Allwinner's SDK code.
+
+Hans? Do you remember where you got this?
+
+>> +     return 0;
+>> +}
+>> +
+>> +static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
+>> +     .get_temp = get_temp,
+>> +};
+>> +
+>>  static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+>>                        char *buf)
+>>  {
+>> @@ -288,6 +307,11 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>>       if (IS_ERR(hwmon))
+>>               return PTR_ERR(hwmon);
+>>
+>> +     ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
+>> +                                              &sun4i_ts_tz_ops);
+>> +     if (IS_ERR(ts->tz))
+>> +             ts->tz = NULL;
+>> +
+>>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>>
+>>       if (ts_attached) {
+>
+> here.. if input_register_device fails, you will keep an orphan thermal zone
+> registered in your system:
+>
+>                 error = input_register_device(ts->input);
+>                 if (error) {
+>                         writel(0, ts->base + TP_INT_FIFOC);
+
+Will add an unregister call here.
+
+
+Thanks for the review.
+
+ChenYu
+
+>                         return error;
+>                 }
+>                 ...
+>
+>
+>> @@ -310,6 +334,9 @@ static int sun4i_ts_remove(struct platform_device *pdev)
+>>       if (ts->input)
+>>               input_unregister_device(ts->input);
+>>
+>> +     if (ts->tz)
+>> +             thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+>> +
+>>       /* Deactivate all IRQs */
+>>       writel(0, ts->base + TP_INT_FIFOC);
+>>
+>> --
+>> 2.1.4
+>>
