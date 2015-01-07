@@ -1,155 +1,98 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 07 Jan 2015 11:03:12 +0900
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
- <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
-Message-ID: <54AC93E0.8010705@samsung.com>
+From: hughd@google.com (Hugh Dickins)
+Date: Tue, 6 Jan 2015 18:03:47 -0800 (PST)
+Subject: [RFC] mm:change meminfo cached calculation
+In-Reply-To: <20150106172518.8f84bffdfa0d35336b233d07@linux-foundation.org>
+References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
+ <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
+ <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
+ <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
+ <20141208114601.GA28846@node.dhcp.inet.fi>
+ <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
+ <CALYGNiMEytHuND37f+hNdMKqCPzN0k_uha6CaeL_fyzrj-obNQ@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D103E688B31408@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E14C@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E160@CNBJMBX05.corpusers.net>
+ <20150106164340.55e83f742d6f57c19e6500ff@linux-foundation.org>
+ <alpine.LSU.2.11.1501061654340.1497@eggly.anvils>
+ <20150106172518.8f84bffdfa0d35336b233d07@linux-foundation.org>
+Message-ID: <alpine.LSU.2.11.1501061747540.2041@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/2015 06:49 PM, Javier Martinez Canillas wrote:
-> Hello Marek,
+On Tue, 6 Jan 2015, Andrew Morton wrote:
+> On Tue, 6 Jan 2015 17:04:33 -0800 (PST) Hugh Dickins <hughd@google.com> wrote:
+> > On Tue, 6 Jan 2015, Andrew Morton wrote:
+> > > On Fri, 26 Dec 2014 19:56:49 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
+> > > 
+> > > > This patch subtract sharedram from cached,
+> > > > sharedram can only be swap into swap partitions,
+> > > > they should be treated as swap pages, not as cached pages.
+> > > > 
+> > > > ...
+> > > >
+> > > > --- a/fs/proc/meminfo.c
+> > > > +++ b/fs/proc/meminfo.c
+> > > > @@ -45,7 +45,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
+> > > >  	committed = percpu_counter_read_positive(&vm_committed_as);
+> > > >  
+> > > >  	cached = global_page_state(NR_FILE_PAGES) -
+> > > > -			total_swapcache_pages() - i.bufferram;
+> > > > +			total_swapcache_pages() - i.bufferram - i.sharedram;
+> > > >  	if (cached < 0)
+> > > >  		cached = 0;
+> > > 
+> > > Documentation/filesystems/proc.txt says
+> > > 
+> > > :      Cached: in-memory cache for files read from the disk (the
+> > > :              pagecache).  Doesn't include SwapCached
+> > > 
+> > > So yes, I guess it should not include shmem.
+> > > 
+> > > And why not do this as well?
+> > > 
+> > > 
+> > > --- a/Documentation/filesystems/proc.txt~mm-change-meminfo-cached-calculation-fix
+> > > +++ a/Documentation/filesystems/proc.txt
+> > > @@ -811,7 +811,7 @@ MemAvailable: An estimate of how much me
+> > >       Buffers: Relatively temporary storage for raw disk blocks
+> > >                shouldn't get tremendously large (20MB or so)
+> > >        Cached: in-memory cache for files read from the disk (the
+> > > -              pagecache).  Doesn't include SwapCached
+> > > +              pagecache).  Doesn't include SwapCached or Shmem.
+> > >    SwapCached: Memory that once was swapped out, is swapped back in but
+> > >                still also is in the swapfile (if memory is needed it
+> > >                doesn't need to be swapped out AGAIN because it is already
+> > 
+> > Whoa.  Changes of this kind would have made good sense about 14 years ago.
+> > And there's plenty more which would benefit from having anon/shmem/file
+> > properly distinguished.  But how can we make such a change now,
+> > breaking everything that has made its own sense of these counts?
 > 
-> On Fri, Dec 5, 2014 at 11:22 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> On 2014-12-02 10:59, Sjoerd Simons wrote:
->>>>
->>>> This is another attempt to finally make Exynos SYSMMU driver fully
->>>> integrated with DMA-mapping subsystem. The main change from previous
->>>> version is a rebase onto latest "automatic DMA configuration for IOMMU
->>>> masters" patches from Will Deacon.
->>>
->>> Do you happen to know if anyone is working on iommu/dma-mapping patches
->>> for Exynos 5 based on this patchset?
->>
->>
->> I hope to add Exynos5 SYSMMU patches to the next iteration of my patchset,
->> but I doubt it will get into v3.19-rc1.
->>
->>> For some background to that question, We (re-)discovered yesterday that
->>> the out-of-tree exynos-reference kernel iommu patches are required to
->>> get HDMI out working on exynos 5 boards. The current situation in
->>> mainline is rather broken, HDMI output without CONFIG_DRM_EXYNOS_IOMMU
->>> results in just displaying stripes[0]. While turning on
->>> CONFIG_DRM_EXYNOS_IOMMU causes a kernel oops at boot....
->>
->>
->> We have observed similar issues with Exynos4 based boards, when LCD0 power
->> domain was turned off and only TV power domain has been powered on. Please
->> check the power domain configuration. Maybe in case of Exynos5 the same
-> 
-> So IIUC what you are saying is that enabling the Exynos DRM IOMMU
-> support has the side effect of turning on all the power domains needed
-> by HDMI? I've compared the power domains configuration in mainline
-> with the downstream exynos-reference [0] tree and I didn't find any
-> differences.
-> 
->> issue
->> is caused by the interaction between DISP1 and GSCL domains.
->>
-> 
-> I was also not able to find a dependency betwen GSCL and DISP1 power
-> domains in the Exynos 5420 manual. But If that's the case then your
-> patch to add support for sub-power domains on Exynos [1] will also be
-> needed, right?
-> 
-> AFAICT from the manual, all the used modules in the case of HDMI +
-> Display (LCD, DP, HDMI and MIXER) needs only the DISP1 power domain to
-> be enabled which BTW was removed for Exynos5420 on commit d51cad7
-> ("ARM: dts: remove display power domain for exynos5420"). It seems to
-> work just because the power domain is turned on by the bootloader.
-> 
-> Also I tried forcing the kernel to not disable unused power domains by
-> passing the pd_ignore_unused parameter to the kernel command line. I
-> see on the kernel log a "genpd: Not disabling unused power domains"
-> message but HDMI output still has the stripes that Sjoerd mentioned.
-> Do you know if Exynos DRM HDMI in mainline is supposed to work without
-> SysMMU / IOMMU support?
-> 
+> That's what I was wondering, but I was having some trouble picking a
+> situation where it mattered much.
 
-I don't think iommu support and power domain issue are related. I also
-get displaying stripes via hdmi but it is just power domain issue
-regardless iommu support.
+If it doesn't matter, then we don't need to change it.
 
-I observed 8th bit from 0x1445000C register of mixer is set to 1 with
-displaying stripes. It means "The graphic layer0 line buffer underflow".
-There was same underflow issue on Exynos4 based boards. As Marek said,
-because LCD0 power domain was turned off.
+> What's the problematic scenario
+> here?  Userspace that is taking Cached, saying "that was silly" and
+> subtracting Shmem from it by hand?
 
-I just tried to turn off DISP1 power domain at u-boot and DISP1 power
-domain is turned on from kernel hdmi and mixer driver on odroid xu3 
-board. As the result, i can see displaying penguin logo from hdmi.
+Someone a long time ago saw "that was silly", worked out it was because
+of Shmem, adjusted their scripts or whatever accordingly, and has run
+happily ever since.
 
-But the problem exists still because it is failed to control on/off of
-DISP1 power domain more than twice from kernel hdmi and mixer driver.[0]
+> 
+> I suppose that as nobody knows we should err on the side of caution and
+> leave this alone.  But the situation is pretty sad - it would be nice
+> to make the code agree with the documentation at least.
 
-Thanks.
+By all means fix the documentation.  And work on a /proc/meminfo.2015
+which has sensibly differentiated counts (and probably omits that
+wonderful Linux 2.2-compatible "Buffers").
 
-[0]:
-[   63.477922] Power domain power-domain disable failed
-[   63.481416] power-domain: Power-off latency exceeded, new value 10613042 ns
-[   63.499805] power-domain: Power-on latency exceeded, new value 8863333 ns
-[   63.506766] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf0280000
-[   63.514191] Internal error: : 1008 [#1] PREEMPT SMP ARM
-[   63.519386] Modules linked in:
-[   63.522425] CPU: 0 PID: 1499 Comm: modetest Not tainted 3.18.1-00007-g04f5a4b-dirty #13
-[   63.530393] task: eddd3400 ti: edfd0000 task.ti: edfd0000
-[   63.535779] PC is at mixer_dpms+0x1dc/0x704
-[   63.539931] LR is at __mutex_unlock_slowpath+0xa8/0x194
-[   63.545125] pc : [<c02c0540>]    lr : [<c04c3eb8>]    psr: 60000013
-[   63.545125] sp : edfd1c98  ip : ee709ef4  fp : ee752aa0
-[   63.556561] r10: c07124b8  r9 : ee752800  r8 : c0712a38
-[   63.561761] r7 : c0712a38  r6 : ee451a80  r5 : ee523a28  r4 : ee523a10
-[   63.568260] r3 : f0280000  r2 : eddd3400  r1 : 035c035b  r0 : ee523a28
-[   63.574760] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   63.581864] Control: 10c5387d  Table: 6d81006a  DAC: 00000015
-[   63.587584] Process modetest (pid: 1499, stack limit = 0xedfd0238)
-[   63.593736] Stack: (0xedfd1c98 to 0xedfd2000)
-[   63.598070] 1c80:                                                       c02c0364 c0766b8c
-[   63.606219] 1ca0: 00000000 edf8d000 c0712a38 ee753c00 ee752800 c07124b8 ee752aa0 c02b5118
-[   63.614365] 1cc0: edf8d900 ee422c08 ee422810 ee753c00 edf8d900 ee752800 ee753c00 c0712a38
-[   63.622510] 1ce0: edf8d000 00000001 edf8d900 c02b52c4 ee752a9c ee753c00 edf8d000 c02901cc
-[   63.630656] 1d00: 00000000 00000000 00000001 edf8d014 00000000 00000000 00000000 ee753c68
-[   63.638801] 1d20: ee753c00 c0766b8c 00000000 00000000 00000018 dededede 00000000 30323931
-[   63.646946] 1d40: 38303178 00000030 00000000 00000000 00000000 00000000 00000000 00000000
-[   63.655092] 1d60: 00000048 00024414 00000780 000007d8 00000804 00000898 00000000 00000438
-[   63.663237] 1d80: 0000043c 00000441 00000465 00000000 00000005 00000256 00000150 00024414
-[   63.671382] 1da0: 00000780 00000780 00000898 000007d8 00000804 00000898 00000000 00000438
-[   63.679528] 1dc0: 00000438 00000465 0000043c 00000441 00000465 00000000 00000000 0000003c
-[   63.687674] 1de0: 00000000 00000000 00000001 ee753c00 ee752a7c ee5a2b80 ee752a88 ee752aa0
-[   63.695820] 1e00: eddd2c00 c0766b8c 00000001 c0290d18 00000000 c0040374 ee753c10 edfd0000
-[   63.703965] 1e20: ee752800 00000001 00000000 ed82bec0 00000000 00000000 ee753c00 ee752aa0
-[   63.712110] 1e40: c07124b8 00000000 ee753c10 edfa8580 ee753c00 00000000 edc8b500 00000000
-[   63.720256] 1e60: ed8827a8 ee525580 ee752958 c02a5f58 ee5a2b80 00000001 00000000 edc8b500
-[   63.728402] 1e80: 00000000 c02971b8 ee752800 edc8b500 ee752800 edc8b500 ee75285c ee752800
-[   63.736547] 1ea0: ee752834 c02971f4 ee752800 c0766b8c ee75285c c029c3c0 ed8827ac ed882700
-[   63.744692] 1ec0: ee75285c c029c7c4 ee24b0e8 00000001 edfa8f80 ee752960 60000013 00000000
-[   63.752838] 1ee0: ee7a9508 ed882000 ede78d60 00000000 edf8d490 ee0bd7b8 00000008 ed882008
-[   63.760983] 1f00: 00000000 c00cbf78 00000000 00000000 eddd374c 00000000 c072ad84 eddd3400
-[   63.769129] 1f20: edfd0008 00000000 ed874e44 c003777c eddd375c eddd3400 edfd0000 ed874e00
-[   63.777274] 1f40: edfd0008 c0022af8 00000000 00000001 ed874e04 ee78d898 ee78d8a0 c00b1d2c
-[   63.785420] 1f60: 000000dd edcdb700 00000000 edfd0000 000000f8 c000e824 edfd0000 00000000
-[   63.793566] 1f80: 00000000 c0023ee8 000a3d78 b6f2a770 b6f2a770 000000f8 c000e824 c0023f64
-[   63.801711] 1fa0: 000a3d78 c000e6a0 000a3d78 b6f2a770 00000000 000a3d64 00000008 00000000
-[   63.809857] 1fc0: 000a3d78 b6f2a770 b6f2a770 000000f8 b6e56248 00000000 0000fd4c 00000000
-[   63.818002] 1fe0: b6fa2000 bed38ba8 b6e1a4dc b6e883d4 60000010 00000000 ffffffff ffffffff
-[   63.826162] [<c02c0540>] (mixer_dpms) from [<c02b5118>] (exynos_drm_crtc_dpms+0x6c/0x17c)
-[   63.834296] [<c02b5118>] (exynos_drm_crtc_dpms) from [<c02b52c4>] (exynos_drm_crtc_commit+0x14/0x44)
-[   63.843400] [<c02b52c4>] (exynos_drm_crtc_commit) from [<c02901cc>] (drm_crtc_helper_set_mode+0x3d0/0x51c)
-[   63.853016] [<c02901cc>] (drm_crtc_helper_set_mode) from [<c0290d18>] (drm_crtc_helper_set_config+0x87c/0x9dc)
-[   63.862982] [<c0290d18>] (drm_crtc_helper_set_config) from [<c02a5f58>] (drm_mode_set_config_internal+0x58/0xd4)
-[   63.873119] [<c02a5f58>] (drm_mode_set_config_internal) from [<c02971b8>] (restore_fbdev_mode+0xcc/0xec)
-[   63.882562] [<c02971b8>] (restore_fbdev_mode) from [<c02971f4>] (drm_fb_helper_restore_fbdev_mode_unlocked+0x1c/0x30)
-[   63.893135] [<c02971f4>] (drm_fb_helper_restore_fbdev_mode_unlocked) from [<c029c3c0>] (drm_lastclose+0x34/0x118)
-[   63.903358] [<c029c3c0>] (drm_lastclose) from [<c029c7c4>] (drm_release+0x320/0x4c8)
-[   63.911071] [<c029c7c4>] (drm_release) from [<c00cbf78>] (__fput+0x80/0x1c8)
-[   63.918095] [<c00cbf78>] (__fput) from [<c003777c>] (task_work_run+0xac/0xe4)
-[   63.925204] [<c003777c>] (task_work_run) from [<c0022af8>] (do_exit+0x2cc/0x958)
-[   63.932563] [<c0022af8>] (do_exit) from [<c0023ee8>] (do_group_exit+0x4c/0xb8)
-[   63.939754] [<c0023ee8>] (do_group_exit) from [<c0023f64>] (__wake_up_parent+0x0/0x18)
-[   63.947636] Code: e1a00005 e5c43011 eb080e99 e5943044 (e5936000) 
-[   63.953701] ---[ end trace d3294b7b867ca713 ]---
-[   63.958290] Fixing recursive fault but reboot is needed!
+But there's more to do than I can think of.  Cc'ing Jerome who has a
+particular interest in this (no, I haven't forgotten his patches,
+but nor have I had a moment to reconsider them).
+
+Hugh
