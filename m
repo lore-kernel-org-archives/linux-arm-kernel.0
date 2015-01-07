@@ -1,302 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  7 Jan 2015 21:16:14 +0100
-Subject: [PATCH 2/3] ARM: dts: sun7i: Add dts file for Bananapro board
-In-Reply-To: <1420661775-20424-1-git-send-email-hdegoede@redhat.com>
-References: <1420661775-20424-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1420661775-20424-2-git-send-email-hdegoede@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 7 Jan 2015 22:03:13 +0100
+Subject: [PATCH v2 0/5] usb: atmel_usba_udc: Rework errata handling
+In-Reply-To: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150107210313.GC2447@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new Bananapro A20 development board from lemaker.org.
-This board features 1G RAM, 2 USB A receptacles, 1 micro USB receptacle for
-OTG, 1 micro USB receptacle for power, HDMI, sata, Gbit ethernet, ir receiver,
-3.5 mm jack for a/v out, on board microphone, 40 gpio pins and sdio wifi.
+Hi,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/sun7i-a20-bananapro.dts | 261 ++++++++++++++++++++++++++++++
- 2 files changed, 262 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapro.dts
+The whole series looks good to me, you can add my
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 548520f..4142831 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -467,6 +467,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31s-cs908.dtb
- dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-bananapi.dtb \
-+	sun7i-a20-bananapro.dtb \
- 	sun7i-a20-cubieboard2.dtb \
- 	sun7i-a20-cubietruck.dtb \
- 	sun7i-a20-hummingbird.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-new file mode 100644
-index 0000000..3b4764d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
-@@ -0,0 +1,261 @@
-+/*
-+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "LeMaker Banana Pro";
-+	compatible = "lemaker,bananapro", "allwinner,sun7i-a20";
-+
-+	soc at 01c00000 {
-+		spi0: spi at 01c05000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
-+			vmmc-supply = <&reg_vcc3v3>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 7 10 0>; /* PH10 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		mmc3: mmc at 01c12000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc3_pins_a>;
-+			vmmc-supply = <&reg_vmmc3>;
-+			bus-width = <4>;
-+			non-removable;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus>;
-+			usb2_vbus-supply = <&reg_usb2_vbus>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		ahci: sata at 01c18000 {
-+			status = "okay";
-+		};
-+
-+		ehci1: usb at 01c1c000 {
-+			status = "okay";
-+		};
-+
-+		ohci1: usb at 01c1c400 {
-+			status = "okay";
-+		};
-+
-+		pinctrl at 01c20800 {
-+			usb1_vbus_pin_bananapro: usb1_vbus_pin at 0 {
-+				allwinner,pins = "PH0";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			usb2_vbus_pin_bananapro: usb2_vbus_pin at 0 {
-+				allwinner,pins = "PH1";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PH10";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
-+			vmmc3_pin_bananapro: vmmc3_pin at 0 {
-+				allwinner,pins = "PH22";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			gmac_power_pin_bananapi: gmac_power_pin at 0 {
-+				allwinner,pins = "PH23";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			led_pins_bananapi: led_pins at 0 {
-+				allwinner,pins = "PH24", "PG2";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart2: serial at 01c28800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart2_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart7: serial at 01c29c00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart7_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_rgmii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "rgmii";
-+			phy-supply = <&reg_gmac_3v3>;
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_bananapi>;
-+
-+		green {
-+			label = "bananapi:green:usr";
-+			gpios = <&pio 7 24 0>;
-+		};
-+		blue {
-+			label = "bananapi:blue:usr";
-+			gpios = <&pio 6 2 0>;
-+		};
-+	};
-+
-+	reg_usb1_vbus: usb1-vbus {
-+		pinctrl-0 = <&usb1_vbus_pin_bananapro>;
-+		gpio = <&pio 7 0 0>; /* PH0 */
-+		status = "okay";
-+	};
-+
-+	reg_usb2_vbus: usb2-vbus {
-+		pinctrl-0 = <&usb2_vbus_pin_bananapro>;
-+		gpio = <&pio 7 1 0>; /* PH1 */
-+		status = "okay";
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_power_pin_bananapi>;
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 7 23 0>;
-+	};
-+
-+	reg_vmmc3: vmmc3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vmmc3_pin_bananapro>;
-+		regulator-name = "vmmc3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		enable-active-high;
-+		gpio = <&pio 7 22 0>;
-+	};
-+};
+
+
+On 06/01/2015 at 14:46:57 +0100, Boris Brezillon wrote :
+> Hello,
+> 
+> Here is a set of patches porting existing at91sam9rl erratum handling to
+> DT and adding new code to handle at91sam9g45/9x5 erratum.
+> It also adds several compatible strings to differentiate those errata.
+> 
+> These patches should be backported to 3.17 and 3.18 stable releases but
+> they do not apply cleanly on those stable branches.
+> I'll send a backport of this series once it is merged in mainline.
+> 
+> Regards,
+> 
+> Boris
+> 
+> Changes since v1:
+> - cache INT_ENB value to speedup INT_ENB read operations
+> 
+> Boris Brezillon (5):
+>   usb: atmel_usba_udc: Rework at91sam9rl errata handling
+>   usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
+>   ARM: at91/dt: update udc compatible strings
+>   usb: atmel_usba_udc: Mask status with enabled irqs
+>   usb: gadget: atmel_usba: Cache INT_ENB register value
+> 
+>  .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
+>  arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
+>  arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
+>  drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
+>  drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
+>  7 files changed, 111 insertions(+), 57 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
+
 -- 
-2.1.0
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
