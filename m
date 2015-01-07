@@ -1,42 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 Jan 2015 07:41:54 +0100
-Subject: [PATCH] spi: orion: Add multiple chip select support for Armada
- 370 and 375
-In-Reply-To: <54AC5B16.9020206@free-electrons.com>
-References: <1420579846-31962-1-git-send-email-ken.wilson@opengear.com>
- <54AC5B16.9020206@free-electrons.com>
-Message-ID: <20150107074154.1334b5c0@free-electrons.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 7 Jan 2015 12:37:51 +0530
+Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <3372289.4AUgcSNZN5@wuerfel>
+References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1741288.B6kbjm5Uq5@wuerfel>
+ <CAFpQJXXnM==4AmmNHf8yp2x0aK4Lnp2cy-4JpzuxsgXX3A=J4A@mail.gmail.com>
+ <3372289.4AUgcSNZN5@wuerfel>
+Message-ID: <CAFpQJXUB8=XhmAn9-SPKaRHoTaTDynfD8xd-mVJOYrAwo50Rzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+Hi Arnd,
 
-On Tue, 06 Jan 2015 23:00:54 +0100, Gregory CLEMENT wrote:
-
-> On 06/01/2015 22:30, Ken Wilson wrote:
-> > Create a new dt binding for the Armada 375 that supports up to
-> > 3 chip selects but uses the same prescaler values and algorithm
-> > as the basic orion binding.
-> 
-> There was already a patch that have been sent for this:
-> http://thread.gmane.org/gmane.linux.kernel.spi.devel/17808/focus=17809
-> 
-> but in the end it has not been merged. The last email on the thread was
-> about doing the manipulation in set_cs and not in setup_transfer(). And I
-> didn't find a newer version.
-> 
-> Maybe it just fell through the cracks.
-> Thomas did you remember of it?
-
-Yes, it is still on my TODO-list, but I haven't yet gotten around to
-submitting a new version. So I haven't looked at Ken's contribution,
-but if Ken is willing to bring it up to a state where it can be
-mainlined, that would definitely be welcome.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On Wed, Jan 7, 2015 at 1:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 06 January 2015 15:04:26 Ganapatrao Kulkarni wrote:
+>> On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
+>> >> +             cpu at 00f {
+>> >> +                     device_type = "cpu";
+>> >> +                     compatible = "cavium,thunder", "arm,armv8";
+>> >> +                     reg = <0x0 0x00f>;
+>> >> +                     enable-method = "psci";
+>> >> +                     arm,associativity = <0 0 0x00f>;
+>> >> +             };
+>> >> +             cpu at 100 {
+>> >> +                     device_type = "cpu";
+>> >> +                     compatible = "cavium,thunder", "arm,armv8";
+>> >> +                     reg = <0x0 0x100>;
+>> >> +                     enable-method = "psci";
+>> >> +                     arm,associativity = <0 0 0x100>;
+>> >> +             };
+>> >
+>> > What is the 0x100 offset in the last-level topology field? Does this have
+>> > no significance to topology at all? I would expect that to be something
+>> > like cluster number that is relevant to caching and should be represented
+>> > as a separate level.
+>>
+>> i did not understand, can you please explain little more about "
+>> should be represented as a separate level."
+>> at present, i have put the hwid of a cpu.
+>
+> From what I undertand, the hwid of the CPU contains the "cluster" number in
+> this bit position, so you typically have a shared L2 or L3 cache between
+> all cores within a cluster, but separate caches in other clusters.
+>
+> If this is the case, there will be a measurable difference in performance
+> between two processes sharing memory when running on the same cluster,
+> or when running on different clusters on the same socket. If the
+> performance difference is relevant, it should be described as a separate
+> level in the associativity property.
+you mean, the associativity as array of  <board> <socket> <cluster>
+>
+>         Arnd
+thanks
+ganapat
