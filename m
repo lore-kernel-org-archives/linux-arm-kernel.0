@@ -1,46 +1,41 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 7 Jan 2015 15:20:06 +0100
-Subject: [PATCH 1/2] arm64: Kconfig: add basic support for the Tegra SoC
- family and the Tegra132 SoC
-In-Reply-To: <20150107081729.14381.47835.stgit@dusk.lan>
-References: <20150107081638.14381.42444.stgit@dusk.lan>
- <20150107081729.14381.47835.stgit@dusk.lan>
-Message-ID: <20150107142005.GA1621@ulmo>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 07 Jan 2015 15:22:30 +0100
+Subject: [PATCH 1/3] ARM: dts: berlin: fix io clk and add missing core
+ clk for BG2Q sdhci2 host
+In-Reply-To: <1420016272-6789-2-git-send-email-jszhang@marvell.com>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-2-git-send-email-jszhang@marvell.com>
+Message-ID: <54AD4126.6030807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 01:17:33AM -0700, Paul Walmsley wrote:
-> Add basic Kbuild support for the Tegra SoC family, and specifically,
-> the Tegra132 SoC.  Tegra132 pairs the NVIDIA Denver CPU complex with
-> the SoC integration of Tegra124 - hence the use of ARCH_TEGRA and the
-> Tegra124 pinctrl option.
-> 
-> For the time being, Tegra ARM64 support is added with a dependency on
-> CONFIG_BROKEN.  This is temporary and can be removed when the
-> following two patches for compilation failures have been merged:
-> 
-> "soc: tegra: pmc: restrict compilation of suspend-related support to ARM"
-> https://git.kernel.org/cgit/linux/kernel/git/pjw/tegra-dev.git/commit/?id=053decbf3900d4e8fee799f9a29cf8d905b2fcb1
+On 31.12.2014 09:57, Jisheng Zhang wrote:
+> On BG2Q, the sdhci2 host uses nfcecc for "io" clk and nfc for "core" clk.
+> The shdci2 can't work Without this patch due to the "core" clk is gated.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Cc: stable at vger.kernel.org # 3.16+
 
-I think you said you were going to respin this on top of v3.19-rc1, but
-the above doesn't seem to be rebased yet. Given that the only comments
-were bikeshed from my part, do you have any objections to me taking the
-patch and apply the bikeshed myself?
+Applied to berlin/fixes.
 
-> "clocksource: tegra: wrap arch/arm-specific sections in CONFIG_ARM"
-> https://git.kernel.org/cgit/linux/kernel/git/pjw/tegra-dev.git/commit/?id=220aa7fcc74a1a089916be6cb34b0e326f31841f
+Thanks!
 
-I don't think I've seen any comments other than mine on this patch.
-Given that this patch depends on the above to get rid of the BROKEN
-dependency, it might still be preferable to take both via the Tegra
-tree. Otherwise we probably have to wait until v3.21 before we can
-apply this.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/f7299807/attachment.sig>
+> ---
+>   arch/arm/boot/dts/berlin2q.dtsi | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 35253c9..903f3bb 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -83,7 +83,8 @@
+>   			compatible = "mrvl,pxav3-mmc";
+>   			reg = <0xab1000 0x200>;
+>   			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> -			clocks = <&chip CLKID_SDIO1XIN>;
+> +			clocks = <&chip CLKID_NFC_ECC>, <&chip CLKID_NFC>;
+> +			clock-names = "io", "core";
+>   			status = "disabled";
+>   		};
+>
+>
