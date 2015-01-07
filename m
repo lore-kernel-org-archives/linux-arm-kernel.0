@@ -1,167 +1,129 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 07 Jan 2015 13:39:25 +0100
-Subject: [PATCH] [media] s5p-jpeg: Adding Exynos7 Jpeg variant support
-In-Reply-To: <000a01d02a72$bc6e06b0$354a1410$@samsung.com>
-References: <1418801229-7532-1-git-send-email-tony.kn@samsung.com>
- <54919010.8020507@samsung.com> <001801d01b3d$2cb181d0$86148570$@samsung.com>
- <54AD0033.1020103@samsung.com> <000a01d02a72$bc6e06b0$354a1410$@samsung.com>
-Message-ID: <54AD28FD.4020703@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Jan 2015 13:46:10 +0100
+Subject: [PATCH 4/4] dma: X-Gene PCIE DMA Driver
+In-Reply-To: <CAL-zptNyLVBEvMBjSUbhE0WEj7-E81g7PF7_WFX1nM4AdYj7_g@mail.gmail.com>
+References: <1420608537-12296-1-git-send-email-mchitale@apm.com>
+ <4187918.PUaMnn04Vq@wuerfel>
+ <CAL-zptNyLVBEvMBjSUbhE0WEj7-E81g7PF7_WFX1nM4AdYj7_g@mail.gmail.com>
+Message-ID: <9430055.pMHRTP0RMA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Wednesday 07 January 2015 16:55:33 Mayuresh Chitale wrote:
+> 
+> On Wed, Jan 7, 2015 at 2:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 07 January 2015 10:58:57 Mayuresh Chitale wrote:
+> >> This patch implements DMA engine API for DMA controller on APM
+> >> X-Gene PCIe controller. DMA engine can support up to 4 channels per port
+> >> and up to 2048 outstanding requests per channel.  This is intended
+> >> to be used on ports that are configured in EP mode or to transfer
+> >> data from a RC port that is connected to a X-Gene EP port.
+> >
+> > Linux currently does not support PCIe endpoints. Do you plan to submit
+> > a driver for that as well?
+> >
+> >> +
+> >> +static void xpdma_setup_dma_dev(struct dma_device *dev)
+> >> +{
+> >> +     dma_cap_zero(dev->cap_mask);
+> >> +     dma_cap_set(DMA_SLAVE, dev->cap_mask);
+> >> +     dma_cap_set(DMA_PRIVATE, dev->cap_mask);
+> >> +
+> >> +     dev->device_alloc_chan_resources = xpdma_alloc_chan_resources;
+> >> +     dev->device_free_chan_resources = xpdma_free_chan_resources;
+> >> +     dev->device_tx_status = xpdma_tx_status;
+> >> +     dev->device_issue_pending = xpdma_issue_pending;
+> >> +     dev->device_prep_slave_sg = xpdma_prep_slave_sg;
+> >> +     dev->device_control = xpdma_device_control;
+> >> +}
+> >
+> > You are setting up DMA_SLAVE here but do not use the DT binding
+> > for slave DMA. Can your driver handle slave DMA? If it can,
+> > you should use the appropriate binding, if not then don't
+> > set DMA_SLAVE here.
+> 
+> Are you referring to  DT DMA helpers? If so, I will add it.
 
-On 01/07/2015 01:08 PM, Tony K Nadackal wrote:
-> Dear Jacek,
->
-> On Wednesday, January 07, 2015 3:15 PM Jacek Anaszewski wrote,
->
->> Hi Tony,
->>
->> Sorry for late response, just got back from vacation.
->>
->> On 12/19/2014 04:37 AM, Tony K Nadackal wrote:
->>> Hi Jacek,
->>>
->>> On Wednesday, December 17, 2014 7:46 PM Jacek Anaszewski wrote,
->>>> Hi Tony,
->>>>
->>>> Thanks for the patches.
->>>>
->>>
->>> Thanks for the review.
->>>
->>>> Please process them with scripts/checkpatch.pl as you will be
->>>> submitting the
->>> next
->>>> version - they contain many coding style related issues.
->>>>
->>>
->>> I ran checkpatch before posting. Do you find any checkpatch related
->>> issues in the patch?
->>
->> There was a problem on my side, sorry for making confusion.
->>
->>>> My remaining comments below.
->>>>
->>>
->>> [snip]
->>>
->>>>> +		if (ctx->jpeg->variant->version == SJPEG_EXYNOS7) {
->>>>> +			exynos4_jpeg_set_interrupt(jpeg->regs,
->>>> SJPEG_EXYNOS7);
->>>>> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
->>>>> +					ctx->subsampling,
->>>> EXYNOS7_ENC_FMT_MASK);
->>>>> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
->>>>> +					ctx->out_q.fmt->fourcc,
->>>>> +					EXYNOS7_SWAP_CHROMA_SHIFT);
->>>>> +		} else {
->>>>> +			exynos4_jpeg_set_interrupt(jpeg->regs,
->>>> SJPEG_EXYNOS4);
->>>>> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
->>>>> +					ctx->subsampling,
->>>> EXYNOS4_ENC_FMT_MASK);
->>>>> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
->>>>> +					ctx->out_q.fmt->fourcc,
->>>>> +					EXYNOS4_SWAP_CHROMA_SHIFT);
->>>>> +		}
->>>>> +
->>>>
->>>> I'd implement it this way:
->>>>
->>>> exynos4_jpeg_set_interrupt(jpeg->regs, ctx->jpeg->variant->version);
->>>> exynos4_jpeg_set_enc_out_fmt(jpeg->regs, ctx->subsampling,
->>>> 			(ctx->jpeg->variant->version == SJPEG_EXYNOS4) ?
->>>> 				EXYNOS4_ENC_FMT_MASK :
->>>> 				EXYNOS7_ENC_FMT_MASK);
->>>> exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->out_q.fmt->fourcc,
->>>> 			(ctx->jpeg->variant->version == SJPEG_EXYNOS4) ?
->>>> 				EXYNOS4_SWAP_CHROMA_SHIFT :
->>>> 				EXYNOS7_SWAP_CHROMA_SHIFT);
->>>>
->>>
->>> OK. Looks goods to me. Thanks for the suggestion.
->>>
->>>>>     		exynos4_jpeg_set_img_addr(ctx);
->>>>>     		exynos4_jpeg_set_jpeg_addr(ctx);
->>>>>     		exynos4_jpeg_set_encode_hoff_cnt(jpeg->regs,
->>>>>
-> ctx->out_q.fmt->fourcc);
->>>>>     	} else {
->>>>>     		exynos4_jpeg_sw_reset(jpeg->regs);
->>>>> -		exynos4_jpeg_set_interrupt(jpeg->regs);
->>>>>     		exynos4_jpeg_set_img_addr(ctx);
->>>>>     		exynos4_jpeg_set_jpeg_addr(ctx);
->>>>> -		exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->cap_q.fmt-
->>>>> fourcc);
->>>>>
->>>>> -		bitstream_size = DIV_ROUND_UP(ctx->out_q.size, 32);
->>>>> +		if (ctx->jpeg->variant->version == SJPEG_EXYNOS7) {
->>>>> +			exynos4_jpeg_set_interrupt(jpeg->regs,
->>>> SJPEG_EXYNOS7);
->>>>> +			exynos4_jpeg_set_huff_tbl(jpeg->regs);
->>>>> +			exynos4_jpeg_set_huf_table_enable(jpeg->regs, 1);
->>>>> +
->>>>> +			/*
->>>>> +			 * JPEG IP allows storing 4 quantization tables
->>>>> +			 * We fill table 0 for luma and table 1 for chroma
->>>>> +			 */
->>>>> +			exynos4_jpeg_set_qtbl_lum(jpeg->regs,
->>>>> +							ctx->compr_quality);
->>>>> +			exynos4_jpeg_set_qtbl_chr(jpeg->regs,
->>>>> +							ctx->compr_quality);
->>>>
->>>> Is it really required to setup quantization tables for encoding?
->>>>
->>>
->>> Without setting up the quantization tables, encoder is working fine.
->>> But, as per Exynos7 User Manual setting up the quantization tables are
->>> required for encoding also.
->>
->
-> Sorry I also got it mixed up.
-> *Decoder* works fine without setting up the quantization tables. But this step
-> is mentioned in User Manual.
+Yes, you will need a '#dma-cells' property in the device node,
+and call of_dma_controller_register with an appropriate xlate
+function so a slave can find the right channel.
 
-I'm ok with it provided that you will get an ack from Samsung SOCs
-maintainer.
+> >> +static int xpdma_setup_dma_channel(struct platform_device *pdev,
+> >> +             struct xpdma_port *port)
+> >> +{
+> >> +     int i, ret = 0;
+> >> +     struct xpdma_chan *chan;
+> >> +     resource_size_t dma_base;
+> >> +
+> >> +     dma_base = MAKE_U64(readl(port->cfg + PORT_CFG_HI), readl(port->cfg)) +
+> >> +             CHAN_REG_BASE;
+> >> +     port->dma = devm_ioremap(&pdev->dev, dma_base,
+> >> +                     CHAN_REG_SIZE * MAX_DMA_CHAN);
+> >> +     if (port->dma == NULL) {
+> >> +             dev_err(&pdev->dev, "Could not get base addressc$\n");
+> >> +             return -ENOMEM;
+> >> +     }
+> >
+> > The registers are not listed in the 'reg' property. Why is that?
+> Actually these registers have to accessed via the PCIe config space
+> region for that port. Since the config space base address is
+> programmed by host controller driver we can know the base address only
+> by reading the corresponding config space bar at runtime.
 
->> Actually I intended to ask if setting the quantization tables is required for
->> *decoding*, as you set it also in decoding path, whereas for Exynos4 it is not
->> required. I looks strange for me as quantization tables are usually required
-> only
->> for encoding raw images.
->> The same is related to huffman tables.
->
-> Huffman table is required for Exynos7 decoding.
-> User Manual says about  Update_Huf_Tbl [bit 19 of PEG_CNTL], "User/Host should
-> mandatory program this Bit as "1" for every decoder operation. SFR
-> "HUFF_TBL_ENT" and SFR "HUFF_CNT" should be programmed accordingly for every
-> encoder/decoder operation."
+I think I'm missing something important here. What exactly is the
+interaction with PCI here? Is it possible to use the dmaengine
+driver at all when the PCI host controller is not in endpoint mode?
 
-Same situation as above.
+Does the dmaengine show up as a PCI device when the PCI controller is
+in host mode?
 
->>
->>>>> +			exynos4_jpeg_set_stream_size(jpeg->regs, ctx-
->>>>> cap_q.w,
->>>>> +					ctx->cap_q.h);
->>>>
->>>> For exynos4 this function writes the number of samples per line and
->>>> number lines of the resulting JPEG image and is used only during
->>>> encoding. Is the semantics of the related register different in case of
-> Exynos7?
->>>>
->>>
->>> Yes. In case of Exynos7 Encoding, This step is required.
->>
->> Ack.
->
-> I will request Kukjin or any Samsung colleagues who has access to Exynos7 Manual
-> to give ack or tested by.
+> > You should probably use devm_request_mem_region or devm_ioremap_resource
+> > here to ensure manage the mmio range.
+> >
+> >> +static int xpdma_probe(struct platform_device *pdev)
+> >> +{
+> >> +     int err;
+> >> +     u32 mask;
+> >> +     struct resource *res;
+> >> +     struct xpdma_port *port;
+> >> +
+> >> +     port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
+> >> +     if (!port)
+> >> +             return -ENOMEM;
+> >> +
+> >> +     port->dma_dev.dev = &pdev->dev;
+> >> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >> +     if (!res) {
+> >> +             dev_err(&pdev->dev, "No cfg resource\n");
+> >> +             return -EINVAL;
+> >> +     }
+> >> +
+> >> +     port->cfg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> >> +     if (IS_ERR(port->cfg))
+> >> +             return PTR_ERR(port->cfg);
+> >> +
+> >> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> >> +     if (!res) {
+> >> +             dev_err(&pdev->dev, "No intr resource\n");
+> >> +             return -EINVAL;
+> >> +     }
+> >
+> > from binding, these two register ranges look like they are part of
+> > another device. Which device is that:
+> >
+> > +                       reg = < 0x0 0x1f2b0154 0x0 0xc
+> > +                               0x0 0x1f2b0058 0x0 0x8>;
+> 
+> These are registers inside PCIe host controller that contains
+> information required such as the dma base address, interrupt
+> configuration. So this will be used for the channels. I am not aware
+> about syscon but will see if it better represents these registers.
 
-This is a good idea.
+If the dmaengine is tightly connected to the PCI host controller
+and only usable in endpoint mode, maybe it's better to use a completely
+different model here, depending on how the PCI endpoint programming
+model will look like in the end. We are in fact in need of a generic
+abstraction for endpoints. There are some beginnings in drivers/ntb,
+and maybe it should build on that instead?
 
--- 
-Best Regards,
-Jacek Anaszewski
+	Arnd
