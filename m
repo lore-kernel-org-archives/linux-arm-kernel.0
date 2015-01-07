@@ -1,81 +1,123 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Jan 2015 13:41:58 -0500
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150107172741.GY2634@sirena.org.uk>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <2161376.07iV9ANMSk@wuerfel>
- <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
- <1520439.Y1rXzXY1eS@wuerfel> <20150107172741.GY2634@sirena.org.uk>
-Message-ID: <20150107184158.GO24989@titan.lakedaemon.net>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 07 Jan 2015 10:45:58 -0800
+Subject: [PATCH v2 00/21] irqchip: gic: killing gic_arch_extn and co,
+ slowly
+In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54AD7EE6.8090009@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 05:27:41PM +0000, Mark Brown wrote:
-> On Wed, Jan 07, 2015 at 02:06:28PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 07 January 2015 11:50:39 Catalin Marinas wrote:
-> 
-> > > From what I gathered so far, the main reason for _some_ vendors is not
-> > > support for "other" OS but actually features that ACPI has and DT
-> > > doesn't (like AML; I deliberately ignore statements like "industry
-> > > standard"). _If_ such reasons are sound, maybe they have a case for
-> > > ACPI-only machines targeted primarily at Linux.
-> 
-> > What I got from the replies from HP, Huawei and from earlier discussions
-> > with Jon is that they all hope to get to the point of relying on AML
-> > alone to bridge the differences between SoC families. However, I don't
-> > see that happening with the limited hardware compatibility that the
-> > existing SBSA provides:
-> 
-> I tend to agree with you that it's an overreach to think that this is
-> going to completely abstract away the differences between SoCs from
-> different vendors without substantial further standardization work.
-> However it does seem reasonable to expect that features like AML are
-> going to be more successful in handling board differences and
-> incremental revisions of SoCs - things like interactions with system
-> power controllers for example.  That seems like a useful win in and of
-> itself, and one that's worth supporting.
+Marc,
 
-This piqued my interest, so I did a little research and found the
-following to describe AML (second para under "What does this mean?")
+On 1/7/2015 9:42 AM, Marc Zyngier wrote:
+> The gic_arch_extn hack that a number of platform use has been nagging
+> me for too long. It is only there for the benefit of a few platform,
+> and yet it impacts all GIC users. Moreover, it gives people the wrong
+> idea ("let's use it to put some new custom hack in there"...).
+>
+> But now that stacked irq domains have landed in -next, the time has
+> come for gic_arch_extn to meet the Big Bit Bucket.
+>
+> This patch series takes several steps towards the elimination of
+> gic_arch_extn:
+>
+> - moves Tegra's legacy interrupt controller support to
+>    drivers/irqchip, implementing a stacked domain on top of the
+>    standard GIC.
+>
+> - OMAP, imx6 and exynos are also converted to stacked domains, but
+>    their implementation is left in place (the code is far too
+>    intricately mixed with other details of the platform for me to even
+>    try to move it). Some OMAP variants get a special treatment as we
+>    also kill the crossbar horror (more on that below).
+>
+> - shmobile, ux500 and zynq are only slightly modified.
+>
+> - The GIC itself is cleaned up, and some other bits and bobs are
+>    adjusted for a good measure.
+>
+> About the TI crossbar:
+>
+> - The allocation of interrupts in this domain is fairly similar to
+>    what we do for MSI (see the GICv2m driver), and stacked domains have
+>    proved to be a fitting solution.
+>
+> - The current description in DT is currently entierely inaccurate, and
+>    as we already broke it for the OMAP WUGEN block, we might as well do
+>    it again for the TI crossbar.
+>
+> - The way crossbar, WUGEN and GIC interract is quite complex (this is
+>    effectively a stack of three interrupt controllers with interesting
+>    exceptions and braindead routing), and stacked domains are the right
+>    abstraction for that.
+>
+> - Other platforms (Freescale Vybrid) are starting to come up with the
+>    same type of things, and it'd be good to avoid them following the
+>    same broken model.
+>
+> - It removes a few lines from the code base so it can't completely be
+>    a bad idea!
+>
+> So this patch series does exactly that: make the crossbar a stacked
+> interrupt controller that only takes care of setting up the routing,
+> fix the DTs to represent the actual HW, and remove a bit of the
+> craziness from the GIC code.
+>
+> It is worth realizing that:
+>
+> - I haven't been able to test this as much as I would have wanted to
+>    (it's only been tested on tegra2 and omap5).
+>
+> - I've created DT bindings when needed, updated existing ones, but I
+>    haven't created a binding for platforms that already used an
+>    undocumented one (imx6, I'm looking at you).
+>
+> - I've relaxed quite a bit of the locking in the GIC code. I believe
+>    this is safe, but someone else should give it a long hard look.
+>
+> - This actively *breaks* existing setups. Once you boot a new kernel
+>    with an old DT, suspend/resume *will* be broken. Old kernels on a
+>    new DT won't even boot! You've been warned. This really outline the
+>    necessity of actually describing the HW in device trees...
+>
+> As for the patches, they are on top of 3.19-rc3.
+>
+> I've pushed the code to:
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/die-gic-arch-extn-die-die-die
+>
+> Comments welcome,
+>
+> 	 M.
+>
+> Marc Zyngier (21):
+>    ARM: tegra: irq: nuke leftovers from non-DT support
+>    irqchip: tegra: add DT-based support for legacy interrupt controller
+>    ARM: tegra: skip gic_arch_extn setup if DT has a LIC node
+>    ARM: tegra: update DTs to expose legacy interrupt controller
+>    DT: tegra: add binding for the legacy interrupt controller
+>    ARM: tegra: remove old LIC support
+>    genirq: Add irqchip_set_wake_parent
+>    irqchip: crossbar: convert dra7 crossbar to stacked domains
+>    DT: update ti,irq-crossbar binding
+>    irqchip: GIC: get rid of routable domain
+>    DT: arm,gic: kill arm,routable-irqs
+>    ARM: omap: convert wakeupgen to stacked domains
+>    DT: omap4/5: add binding for the wake-up generator
+>    ARM: imx6: convert GPC to stacked domains
+>    ARM: exynos4/5: convert pmu wakeup to stacked domains
+>    DT: exynos: update PMU binding
+>    irqchip: gic: add an entry point to set up irqchip flags
+>    ARM: shmobile: remove use of gic_arch_extn.irq_set_wake
+>    ARM: ux500: switch from gic_arch_extn to gic_set_irqchip_flags
+>    ARM: zynq: switch from gic_arch_extn to gic_set_irqchip_flags
+>    irqchip: gic: Drop support for gic_arch_extn
+>
+Thanks a lot for killing those gic_arch_extn and cross-bar with
+newly added stacked domains. It cleans up the GIC code for better.
+Feel free to add my ack if you need one.
 
-  http://community.arm.com/groups/processors/blog/2014/05/01/let-s-talk-acpi-for-servers
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-iiuc, AML are basically drivers for some low-level functions provided as
-binary blobs via the ACPI tables.  How does this work in a trusted boot
-scenario?  Can the ACPI tables, and these binary blobs with it, be
-updated from userspace?  If so, is there an authentication mechanism
-(including for non-secure boot scenarios)?
-
-One of the reasons I've really enjoyed working with ARM platforms and DT
-is the absence of this type of 'feature'.  I honestly don't care whether
-the kernel gets the board configuration info from DT or ACPI or FOO, as
-long as we can avoid the security mistakes of the past:
-
-  http://www.spiegel.de/international/world/catalog-reveals-nsa-has-back-doors-for-numerous-devices-a-940994.html
-
-"""
-... The ANT developers have a clear preference for planting their
-malicious code in so-called BIOS, software located on a computer's
-motherboard that is the first thing to load when a computer is turned
-on.
-
-This has a number of valuable advantages: an infected PC or server
-appears to be functioning normally, so the infection remains invisible
-to virus protection and other security programs. And even if the hard
-drive of an infected computer has been completely erased and a new
-operating system is installed, the ANT malware can continue to function
-and ensures that new spyware can once again be loaded onto what is
-presumed to be a clean computer. ...
-"""
-
-I'm not advocating "throw out AML and ACPI with it!", rather I'd like to
-see a serious, open, discussion about the security implications of a
-convenience feature such as AML.
-
-And wrt the kernel, we should ensure we can always provide a fallback
-for users who prefer not to trust the binary blobs.  Which shouldn't be
-too difficult as we aren't dependent on AML or similar atm.
-
-thx,
-
-Jason.
+Regards,
+Snatosh
