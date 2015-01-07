@@ -1,109 +1,36 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 7 Jan 2015 10:31:02 +0800
-Subject: [PATCH] ARM: EXYNOS: enable 4 cores secondary cpu up for
- exynos5440
-In-Reply-To: <1356980980-3387-1-git-send-email-kgene.kim@samsung.com>
-References: <1356980980-3387-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CACVXFVMWJa3rg45s2CmC_Oz=eO5Oxa+s0PEUjKdYhRqeYu73Hw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 6 Jan 2015 21:36:19 -0500
+Subject: [PATCH] irqchip: gicv3-its: fix use of max with decimal constant
+In-Reply-To: <1418825469-30529-1-git-send-email-will.deacon@arm.com>
+References: <1418825469-30529-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150107023619.GC24989@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On Tue, Jan 1, 2013 at 3:09 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> No need to check power on/off with pmu control to support hotplug
-> in/out on exynos5440. And this patch enables 4 cores on exynos5440.
-
-Without this patch, oops will be triggered during kernel booting on
-exynos5440, so could this one be pushed out?
-
-Thanks,
-Ming Lei
-
->
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+On Wed, Dec 17, 2014 at 02:11:09PM +0000, Will Deacon wrote:
+> arm64 defconfig spits out the following compiler warning from the ITS
+> driver:
+> 
+> In file included from include/linux/bitmap.h:9:0,
+>                  from drivers/irqchip/irq-gic-v3-its.c:18:
+> drivers/irqchip/irq-gic-v3-its.c: In function ?its_create_device?:
+> include/linux/kernel.h:716:17: warning: comparison of distinct pointer types lacks a cast
+>   (void) (&_max1 == &_max2);  \
+>                  ^
+> drivers/irqchip/irq-gic-v3-its.c:1056:12: note: in expansion of macro ?max?
+>   nr_ites = max(2, roundup_pow_of_two(nvecs));
+> 
+> Fix the warning by specifying the decimal constant `2' explicitly as an
+> unsigned long type.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/mach-exynos/platsmp.c |   37 ++++++++++++++++++++++---------------
->  1 file changed, 22 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index c5c840e..495a501 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -40,6 +40,8 @@ static inline void __iomem *cpu_boot_reg_base(void)
->  {
->         if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
->                 return S5P_INFORM5;
-> +       else if (soc_is_exynos5440())
-> +               return (S5P_VA_CHIPID + 0x560);
->         return S5P_VA_SYSRAM;
->  }
->
-> @@ -116,27 +118,30 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
->          */
->         write_pen_release(phys_cpu);
->
-> -       if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-> -               __raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> -                            S5P_ARM_CORE1_CONFIGURATION);
-> +       if (!soc_is_exynos5440()) {
-> +               if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-> +                       __raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> +                                    S5P_ARM_CORE1_CONFIGURATION);
->
-> -               timeout = 10;
-> +                       timeout = 10;
->
-> -               /* wait max 10 ms until cpu1 is on */
-> -               while ((__raw_readl(S5P_ARM_CORE1_STATUS)
-> -                       & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
-> -                       if (timeout-- == 0)
-> -                               break;
-> +                       /* wait max 10 ms until cpu1 is on */
-> +                       while ((__raw_readl(S5P_ARM_CORE1_STATUS)
-> +                               & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
-> +                               if (timeout-- == 0)
-> +                                       break;
->
-> -                       mdelay(1);
-> -               }
-> +                               mdelay(1);
-> +                       }
->
-> -               if (timeout == 0) {
-> -                       printk(KERN_ERR "cpu1 power enable failed");
-> -                       spin_unlock(&boot_lock);
-> -                       return -ETIMEDOUT;
-> +                       if (timeout == 0) {
-> +                               printk(KERN_ERR "cpu1 power enable failed");
-> +                               spin_unlock(&boot_lock);
-> +                               return -ETIMEDOUT;
-> +                       }
->                 }
->         }
-> +
->         /*
->          * Send the secondary CPU a soft interrupt, thereby causing
->          * the boot monitor to read the system wide flags register,
-> @@ -178,6 +183,8 @@ static void __init exynos_smp_init_cpus(void)
->
->         if (soc_is_exynos5250())
->                 ncores = 2;
-> +       else if (soc_is_exynos5440())
-> +               ncores = 4;
->         else
->                 ncores = scu_base ? scu_get_core_count(scu_base) : 1;
->
-> --
-> 1.7.10.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  drivers/irqchip/irq-gic-v3-its.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
+Applied to irqchip/urgent with Marc's Ack.
 
+thx,
 
--- 
-Ming Lei
+Jason.
