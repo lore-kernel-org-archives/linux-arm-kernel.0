@@ -1,60 +1,45 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 7 Jan 2015 22:06:12 +0800
-Subject: [PATCH] arm64: mm: support instruction SETEND
-In-Reply-To: <20150107111148.GH7485@arm.com>
-References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
- <54AD061A.6090602@arm.com> <20150107105824.GA13620@leoy.com>
- <20150107111148.GH7485@arm.com>
-Message-ID: <20150107140612.GA5994@leoy.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 07 Jan 2015 15:11:58 +0100
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+Message-ID: <54AD3EAE.6090009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 11:11:48AM +0000, Will Deacon wrote:
-> On Wed, Jan 07, 2015 at 10:58:24AM +0000, Leo Yan wrote:
-> > On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
-> > > On 07/01/15 05:52, Leo Yan wrote:
-> > > >Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
-> > > >instruction will be treated as UNALLOCATED; this error can be
-> > > >reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
-> > > >mode, finally kernel will trap the exception if the userspace
-> > > >libs use SETEND instruction.
-> > > >
-> > > >So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
-> > > >
-> > > The best way to do this, is via the instruction emulation framework
-> > > added by Punit, which handles the armv8 deprecated/obsoleted
-> > > instructions. This is now queued for 3.19.
-> > > I have a patchset which adds the 'SETEND' emulation support to the
-> > > framework. This will enable better handling of the feature,
-> > > including finding out the users of the deprecated instruction (when
-> > > we switch to the emulation mode).
-> > > 
-> > 
-> > i'm a little confuse for this point:
-> > 
-> > if the deprecated instructions cannot be supported by CPU, then only
-> > can use emulation; on the other hand, if CPU can natively support the
-> > deprecated instruction, why we cannot directly enable this h/w feature?
-> > if use the emulation mode, suppose here will have performance penalty.
-> > 
-> > how about u think for this? :-)
-> 
-> A *huge* advantage of emulation is that we can print a diagnostic to dmesg
-> warning the user that they are making use of a CPU feature that is likely to
-> disappear from future revisions of the hardware. We've not been great at
-> doing this in the past, which led to all the fun around SWP emulation that
-> you can find in the list archives.
-> 
-> Furthermore, I think the emulation framework does allow the hardware support
-> to be enabled, it just doesn't make that the default behaviour.
-> 
-> In other words; use the emulation to find out where SETEND is being used
-> and fix those applications wherever you can. In the cases where you're
-> stuck with a legacy binary, you can enable CPU support if it is available
-> but that's not a longterm solution.
-> 
+On 31.12.2014 09:57, Jisheng Zhang wrote:
+> The "smemc" clock is removed on BG2Q SoCs. In fact, bit19 of clkenable
+> register is for nfc. Current code use bit19 for non-exist "smemc"
+> incorrectly, this prevents eMMC from working due to the sdhci's
+> "core" clk is still gated.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Cc: stable at vger.kernel.org # 3.16+
+> ---
+>   drivers/clk/berlin/bg2q.c | 1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+> index 21784e4..440ef81 100644
+> --- a/drivers/clk/berlin/bg2q.c
+> +++ b/drivers/clk/berlin/bg2q.c
+> @@ -285,7 +285,6 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
+>   	{ "pbridge",	"perif",	15, CLK_IGNORE_UNUSED },
+>   	{ "sdio",	"perif",	16, CLK_IGNORE_UNUSED },
+>   	{ "nfc",	"perif",	18 },
+> -	{ "smemc",	"perif",	19 },
 
-Thanks for clarification; Let's use emulation framework as formal method.
+Jisheng,
 
-Thanks,
-Leo Yan
+if bit 19 is for nfc, how does that work out with bit 18 which is
+still assigned to nfc? Can you re-evaluate clkenable registers for
+BG2Q and fix it up accordingly? I'd suggest to still disable as many
+clocks as possible rather than removing the corresponding clk_gates.
+
+Sebastian
+
+>   	{ "pcie",	"perif",	22 },
+>   };
+>
+>
