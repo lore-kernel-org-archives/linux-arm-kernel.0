@@ -1,155 +1,112 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 8 Jan 2015 00:24:11 +0800
-Subject: [PATCH 03/17] Input: sun4i-ts: Add thermal zone sensor support
-In-Reply-To: <20150106152425.GA6276@developer>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-4-git-send-email-wens@csie.org>
- <20150106152425.GA6276@developer>
-Message-ID: <CAGb2v66L-ZD1Ep-rnKXKP7PuJH+dA=26tV35KyKCNnKHgM4Hmg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 7 Jan 2015 17:25:41 +0100
+Subject: [PATCH v3 4/4] dts: mediatek: Enable clock support for Mediatek
+ MT8135.
+In-Reply-To: <1420601123-25859-5-git-send-email-jamesjj.liao@mediatek.com>
+References: <1420601123-25859-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1420601123-25859-5-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <CABuKBeL34hV63t+zDy3Nbz_V4qAvCF87+=hV=eUUCTrKybBFjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2015-01-07 4:25 GMT+01:00 James Liao <jamesjj.liao@mediatek.com>:
+> This patch adds MT8135 clock controllers into device tree.
+>
+> Change-Id: I9c5bab9289bbd6eb444aad97d015b8f26ca88a8a
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt8135.dtsi | 47 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+> index ec83e69..09fcf0d 100644
+> --- a/arch/arm/boot/dts/mt8135.dtsi
+> +++ b/arch/arm/boot/dts/mt8135.dtsi
+> @@ -12,6 +12,7 @@
+>   * GNU General Public License for more details.
+>   */
+>
+> +#include <dt-bindings/clock/mt8135-clk.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include "skeleton64.dtsi"
+> @@ -92,6 +93,24 @@
+>                         clock-frequency = <26000000>;
+>                         #clock-cells = <0>;
+>                 };
+> +
+> +               clk_null: clk_null {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <0>;
+> +               };
+> +
+> +               clk26m: clk26m {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <26000000>;
+> +               };
+> +
+> +               rtc32k: rtc32k {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <32000>;
+> +               };
 
-On Tue, Jan 6, 2015 at 11:24 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> Hello Chen-Yu,
->
->
-> On Tue, Jan 06, 2015 at 10:35:13AM +0800, Chen-Yu Tsai wrote:
->> The touchscreen controller has a temperature sensor embedded in the SoC,
->> which already has hwmon support in the driver.
->>
->> Add DT thermal zone support so we can use it with cpufreq for thermal
->> throttling.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  .../bindings/input/touchscreen/sun4i.txt           |  1 +
->>  drivers/input/touchscreen/sun4i-ts.c               | 27 ++++++++++++++++++++++
->>  2 files changed, 28 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
->> index aef57791f40b..7f1110adbd24 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
->> @@ -5,6 +5,7 @@ Required properties:
->>   - compatible: "allwinner,sun4i-a10-ts"
->>   - reg: mmio address range of the chip
->>   - interrupts: interrupt to which the chip is connected
->> + - #thermal-sensor-cells: shall be 0
->>
->
-> You may want to update your Example section too, below.
-> Example:
->
->         rtp: rtp at 01c25000 {
->                 compatible = "allwinner,sun4i-a10-ts";
->                 reg = <0x01c25000 0x100>;
->                 interrupts = <29>;
->                 allwinner,ts-attached;
->                 #thermal-sensor-cells = <0>;
+Why do you add this clocks here?
+This clocks are not represented by the clock tree? If so, what are the
+consumers of this clocks?
+
 >         };
-
-Ok.
-
 >
+>         soc {
+> @@ -100,6 +119,28 @@
+>                 compatible = "simple-bus";
+>                 ranges;
 >
->>  Optional properties:
->>   - allwinner,ts-attached: boolean indicating that an actual touchscreen is
->> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
->> index 28a06749ae42..b6e9043446d6 100644
->> --- a/drivers/input/touchscreen/sun4i-ts.c
->> +++ b/drivers/input/touchscreen/sun4i-ts.c
->> @@ -34,6 +34,7 @@
->>
->>  #include <linux/err.h>
->>  #include <linux/hwmon.h>
->> +#include <linux/thermal.h>
->>  #include <linux/init.h>
->>  #include <linux/input.h>
->>  #include <linux/interrupt.h>
->> @@ -107,6 +108,7 @@
->>  struct sun4i_ts_data {
->>       struct device *dev;
->>       struct input_dev *input;
->> +     struct thermal_zone_device *tz;
->>       void __iomem *base;
->>       unsigned int irq;
->>       bool ignore_fifo_data;
->> @@ -180,6 +182,23 @@ static void sun4i_ts_close(struct input_dev *dev)
->>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
->>  }
->>
->> +static int get_temp(void *data, long *temp)
->> +{
->> +     struct sun4i_ts_data *ts = data;
->> +
->> +     /* No temp_data until the first irq */
->> +     if (ts->temp_data == -1)
->> +             return -EAGAIN;
->> +
->> +     *temp = (ts->temp_data - 1447) * 100;
->> +
+> +               topckgen: topckgen at 10000000 {
+> +                       compatible = "mediatek,mt8135-topckgen";
+> +                       reg = <0 0x10000000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               infracfg: syscon at 10001000 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       compatible = "mediatek,mt8135-infracfg", "syscon";
+> +                       reg = <0 0x10001000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               pericfg: syscon at 10003000 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       compatible = "mediatek,mt8135-pericfg", "syscon";
+> +                       reg = <0 0x10003000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+>                 timer: timer at 10008000 {
+>                         compatible = "mediatek,mt8135-timer",
+>                                         "mediatek,mt6577-timer";
+> @@ -128,6 +169,12 @@
+>                               <0 0x10216000 0 0x2000>;
+>                 };
 >
-> Care to explain the formula in a simple comment?
-
-This was just copied from the hwmon section. AFAIK there is no documentation
-for the formula. It was probably copied from Allwinner's SDK code.
-
-Hans? Do you remember where you got this?
-
->> +     return 0;
->> +}
->> +
->> +static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
->> +     .get_temp = get_temp,
->> +};
->> +
->>  static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
->>                        char *buf)
->>  {
->> @@ -288,6 +307,11 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->>       if (IS_ERR(hwmon))
->>               return PTR_ERR(hwmon);
->>
->> +     ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
->> +                                              &sun4i_ts_tz_ops);
->> +     if (IS_ERR(ts->tz))
->> +             ts->tz = NULL;
->> +
->>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
->>
->>       if (ts_attached) {
+> +               apmixedsys: apmixedsys at 10209000 {
+> +                       compatible = "mediatek,mt8135-apmixedsys";
+> +                       reg = <0 0x10209000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+>                 uart0: serial at 11006000 {
+>                         compatible = "mediatek,mt8135-uart","mediatek,mt6577-uart";
+>                         reg = <0 0x11006000 0 0x400>;
+> --
+> 1.8.1.1.dirty
 >
-> here.. if input_register_device fails, you will keep an orphan thermal zone
-> registered in your system:
->
->                 error = input_register_device(ts->input);
->                 if (error) {
->                         writel(0, ts->base + TP_INT_FIFOC);
-
-Will add an unregister call here.
 
 
-Thanks for the review.
 
-ChenYu
-
->                         return error;
->                 }
->                 ...
->
->
->> @@ -310,6 +334,9 @@ static int sun4i_ts_remove(struct platform_device *pdev)
->>       if (ts->input)
->>               input_unregister_device(ts->input);
->>
->> +     if (ts->tz)
->> +             thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
->> +
->>       /* Deactivate all IRQs */
->>       writel(0, ts->base + TP_INT_FIFOC);
->>
->> --
->> 2.1.4
->>
+-- 
+motzblog.wordpress.com
