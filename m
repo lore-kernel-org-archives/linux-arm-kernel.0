@@ -1,173 +1,43 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 07 Jan 2015 10:45:23 +0100
-Subject: [PATCH] [media] s5p-jpeg: Adding Exynos7 Jpeg variant support
-In-Reply-To: <001801d01b3d$2cb181d0$86148570$@samsung.com>
-References: <1418801229-7532-1-git-send-email-tony.kn@samsung.com>
- <54919010.8020507@samsung.com> <001801d01b3d$2cb181d0$86148570$@samsung.com>
-Message-ID: <54AD0033.1020103@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 07 Jan 2015 17:49:25 +0800
+Subject: [PATCH v6 01/17] ACPI / processor: Convert apic_id to phys_id
+ to make it arch agnostic
+In-Reply-To: <1463717.XWsK98imMv@vostro.rjw.lan>
+References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
+ <1420368918-5086-2-git-send-email-hanjun.guo@linaro.org>
+ <1463717.XWsK98imMv@vostro.rjw.lan>
+Message-ID: <54AD0125.9060601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 2015?01?07? 09:50, Rafael J. Wysocki wrote:
+> On Sunday, January 04, 2015 06:55:02 PM Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.com>
+>>
+>> apic_id in MADT table is the CPU hardware id which identify
+>> it self in the system for x86 and ia64, OSPM will use it for
+>> SMP init to map APIC ID to logical cpu number in the early
+>> boot, when the DSDT/SSDT (ACPI namespace) is scanned later, the
+>> ACPI processor driver is probed and the driver will use acpi_id
+>> in DSDT to get the apic_id, then map to the logical cpu number
+>> which is needed by the processor driver.
+>>
+>> Before ACPI 5.0, only x86 and ia64 were supported in ACPI spec,
+>> so apic_id is used both in arch code and ACPI core which is
+>> pretty fine. Since ACPI 5.0, ARM is supported by ACPI and
+>> APIC is not available on ARM, this will confuse people when
+>> apic_id is both used by x86 and ARM in one function.
+>>
+>> So convert apic_id to phys_id (which is the original meaning)
+>> in ACPI processor dirver to make it arch agnostic, but leave the
+>> arch dependent code unchanged, no functional change.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> I've queued up this one and [2/17] for 3.19-rc4 as I promised I'd push these
+> two for 3.19.
 
-Sorry for late response, just got back from vacation.
+Great, thanks a lot. I thought you will queued them for 3.20 :)
 
-On 12/19/2014 04:37 AM, Tony K Nadackal wrote:
-> Hi Jacek,
->
-> On Wednesday, December 17, 2014 7:46 PM Jacek Anaszewski wrote,
->> Hi Tony,
->>
->> Thanks for the patches.
->>
->
-> Thanks for the review.
->
->> Please process them with scripts/checkpatch.pl as you will be submitting the
-> next
->> version - they contain many coding style related issues.
->>
->
-> I ran checkpatch before posting. Do you find any checkpatch related issues in
-> the patch?
-
-There was a problem on my side, sorry for making confusion.
-
->> My remaining comments below.
->>
->
-> [snip]
->
->>> +		if (ctx->jpeg->variant->version == SJPEG_EXYNOS7) {
->>> +			exynos4_jpeg_set_interrupt(jpeg->regs,
->> SJPEG_EXYNOS7);
->>> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
->>> +					ctx->subsampling,
->> EXYNOS7_ENC_FMT_MASK);
->>> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
->>> +					ctx->out_q.fmt->fourcc,
->>> +					EXYNOS7_SWAP_CHROMA_SHIFT);
->>> +		} else {
->>> +			exynos4_jpeg_set_interrupt(jpeg->regs,
->> SJPEG_EXYNOS4);
->>> +			exynos4_jpeg_set_enc_out_fmt(jpeg->regs,
->>> +					ctx->subsampling,
->> EXYNOS4_ENC_FMT_MASK);
->>> +			exynos4_jpeg_set_img_fmt(jpeg->regs,
->>> +					ctx->out_q.fmt->fourcc,
->>> +					EXYNOS4_SWAP_CHROMA_SHIFT);
->>> +		}
->>> +
->>
->> I'd implement it this way:
->>
->> exynos4_jpeg_set_interrupt(jpeg->regs, ctx->jpeg->variant->version);
->> exynos4_jpeg_set_enc_out_fmt(jpeg->regs, ctx->subsampling,
->> 			(ctx->jpeg->variant->version == SJPEG_EXYNOS4) ?
->> 				EXYNOS4_ENC_FMT_MASK :
->> 				EXYNOS7_ENC_FMT_MASK);
->> exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->out_q.fmt->fourcc,
->> 			(ctx->jpeg->variant->version == SJPEG_EXYNOS4) ?
->> 				EXYNOS4_SWAP_CHROMA_SHIFT :
->> 				EXYNOS7_SWAP_CHROMA_SHIFT);
->>
->
-> OK. Looks goods to me. Thanks for the suggestion.
->
->>>    		exynos4_jpeg_set_img_addr(ctx);
->>>    		exynos4_jpeg_set_jpeg_addr(ctx);
->>>    		exynos4_jpeg_set_encode_hoff_cnt(jpeg->regs,
->>>    							ctx->out_q.fmt->fourcc);
->>>    	} else {
->>>    		exynos4_jpeg_sw_reset(jpeg->regs);
->>> -		exynos4_jpeg_set_interrupt(jpeg->regs);
->>>    		exynos4_jpeg_set_img_addr(ctx);
->>>    		exynos4_jpeg_set_jpeg_addr(ctx);
->>> -		exynos4_jpeg_set_img_fmt(jpeg->regs, ctx->cap_q.fmt-
->>> fourcc);
->>>
->>> -		bitstream_size = DIV_ROUND_UP(ctx->out_q.size, 32);
->>> +		if (ctx->jpeg->variant->version == SJPEG_EXYNOS7) {
->>> +			exynos4_jpeg_set_interrupt(jpeg->regs,
->> SJPEG_EXYNOS7);
->>> +			exynos4_jpeg_set_huff_tbl(jpeg->regs);
->>> +			exynos4_jpeg_set_huf_table_enable(jpeg->regs, 1);
->>> +
->>> +			/*
->>> +			 * JPEG IP allows storing 4 quantization tables
->>> +			 * We fill table 0 for luma and table 1 for chroma
->>> +			 */
->>> +			exynos4_jpeg_set_qtbl_lum(jpeg->regs,
->>> +							ctx->compr_quality);
->>> +			exynos4_jpeg_set_qtbl_chr(jpeg->regs,
->>> +							ctx->compr_quality);
->>
->> Is it really required to setup quantization tables for encoding?
->>
->
-> Without setting up the quantization tables, encoder is working fine.
-> But, as per Exynos7 User Manual setting up the quantization tables are required
-> for encoding also.
-
-Actually I intended to ask if setting the quantization tables is
-required for *decoding*, as you set it also in decoding path, whereas
-for Exynos4 it is not required. I looks strange for me as quantization
-tables are usually required only for encoding raw images.
-The same is related to huffman tables.
-
->>> +			exynos4_jpeg_set_stream_size(jpeg->regs, ctx-
->>> cap_q.w,
->>> +					ctx->cap_q.h);
->>
->> For exynos4 this function writes the number of samples per line and number
->> lines of the resulting JPEG image and is used only during encoding. Is the
->> semantics of the related register different in case of Exynos7?
->>
->
-> Yes. In case of Exynos7 Encoding, This step is required.
-
-Ack.
-
-> [snip]
->
->>> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.h
->>> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.h
->>> @@ -71,6 +71,7 @@
->>>    #define SJPEG_S5P		1
->>>    #define SJPEG_EXYNOS3250	2
->>>    #define SJPEG_EXYNOS4		3
->>> +#define SJPEG_EXYNOS7		4
->>
->> As you adding a new variant I propose to turn these macros into enum.
->>
->
-> Ok. I will make this change in my next version.
-
-Thanks.
-
-> [snip]
->
->>> -void exynos4_jpeg_set_interrupt(void __iomem *base)
->>> +void exynos4_jpeg_set_interrupt(void __iomem *base, unsigned int
->>> +version)
->>>    {
->>> -	writel(EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
->>> +	unsigned int reg;
->>> +
->>> +	reg = readl(base + EXYNOS4_INT_EN_REG) &
->> ~EXYNOS4_INT_EN_MASK(version);
->>> +	writel(EXYNOS4_INT_EN_ALL(version), base + EXYNOS4_INT_EN_REG);
->>>    }
->>
->> I believe that adding readl is a fix. I'd enclose it into separate patch and
-> explain its
->> merit.
->>
->
-> Thanks for the suggestion.  I will make a separate patch for this bug fix.
-
-Great.
-
--- 
-Best Regards,
-Jacek Anaszewski
+Regards
+Hanjun
