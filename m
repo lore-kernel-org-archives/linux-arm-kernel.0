@@ -1,205 +1,381 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Jan 2015 17:42:39 +0000
-Subject: [PATCH v2 04/21] ARM: tegra: update DTs to expose legacy interrupt
- controller
+Date: Wed,  7 Jan 2015 17:42:37 +0000
+Subject: [PATCH v2 02/21] irqchip: tegra: add DT-based support for legacy
+ interrupt controller
 In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
 References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420652576-22309-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420652576-22309-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the legacy interrupt controller in every tegra DTSI files,
-and make it the parent of most interrupts.
+Tegra's LIC (Legacy Interrupt Controller) has been so far only
+supported as a weird extension of the GIC, which is not exactly
+pretty.
+
+The stacked irq domain framework fits this pretty well, and allows
+the LIC code to be turned into a standalone irqchip. In the process,
+make the driver DT aware, something that was sorely missing from
+the mach-tegra implementation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi | 16 +++++++++++++++-
- arch/arm/boot/dts/tegra124.dtsi | 16 +++++++++++++++-
- arch/arm/boot/dts/tegra20.dtsi  | 15 ++++++++++++++-
- arch/arm/boot/dts/tegra30.dtsi  | 16 +++++++++++++++-
- 4 files changed, 59 insertions(+), 4 deletions(-)
+ drivers/irqchip/Makefile    |   1 +
+ drivers/irqchip/irq-tegra.c | 335 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 336 insertions(+)
+ create mode 100644 drivers/irqchip/irq-tegra.c
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 4296b53..f70bed0 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -8,7 +8,7 @@
- 
- / {
- 	compatible = "nvidia,tegra114";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&ictlr>;
- 
- 	host1x at 50000000 {
- 		compatible = "nvidia,tegra114-host1x", "simple-bus";
-@@ -134,6 +134,19 @@
- 		      <0x50046000 0x2000>;
- 		interrupts = <GIC_PPI 9
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupt-parent = <&gic>;
-+	};
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 9516a32..59f34be 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+ obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
++obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
+ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
+ obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
+ obj-$(CONFIG_METAG)			+= irq-metag-ext.o
+diff --git a/drivers/irqchip/irq-tegra.c b/drivers/irqchip/irq-tegra.c
+new file mode 100644
+index 0000000..b4fc2e3
+--- /dev/null
++++ b/drivers/irqchip/irq-tegra.c
+@@ -0,0 +1,335 @@
++/*
++ * Driver code for Tegra's Legacy Interrupt Controller
++ *
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Heavily based on the original arch/arm/mach-tegra/irq.c code:
++ * Copyright (C) 2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *
++ * Copyright (C) 2010,2013, NVIDIA Corporation
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+	ictlr: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra114-ictlr", "nvidia,tegra-ictlr";
-+		reg = <0x60004000 64>,
-+		      <0x60004100 64>,
-+		      <0x60004200 64>,
-+		      <0x60004300 64>,
-+		      <0x60004400 64>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
- 	};
- 
- 	timer at 60005000 {
-@@ -766,5 +779,6 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 			<GIC_PPI 10
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&gic>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 4be06c6..6ed6ca0 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -10,7 +10,7 @@
- 
- / {
- 	compatible = "nvidia,tegra124";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&ictlr>;
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-@@ -173,6 +173,7 @@
- 		      <0x0 0x50046000 0x0 0x2000>;
- 		interrupts = <GIC_PPI 9
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupt-parent = <&gic>;
- 	};
- 
- 	gpu at 0,57000000 {
-@@ -190,6 +191,18 @@
- 		status = "disabled";
- 	};
- 
-+	ictlr: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra124-ictlr", "nvidia,tegra-ictlr";
-+		reg = <0x0 0x60004000 0x0 0x40>,
-+		      <0x0 0x60004100 0x0 0x40>,
-+		      <0x0 0x60004200 0x0 0x40>,
-+		      <0x0 0x60004300 0x0 0x40>,
-+		      <0x0 0x60004400 0x0 0x40>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+	};
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/syscore_ops.h>
 +
- 	timer at 0,60005000 {
- 		compatible = "nvidia,tegra124-timer", "nvidia,tegra20-timer";
- 		reg = <0x0 0x60005000 0x0 0x400>;
-@@ -955,5 +968,6 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 			     <GIC_PPI 10
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&gic>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 8acf5d8..ab2f004 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -7,7 +7,7 @@
- 
- / {
- 	compatible = "nvidia,tegra20";
--	interrupt-parent = <&intc>;
-+	interrupt-parent = <&ictlr>;
- 
- 	host1x at 50000000 {
- 		compatible = "nvidia,tegra20-host1x", "simple-bus";
-@@ -142,6 +142,7 @@
- 
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
-+		interrupt-parent = <&intc>;
- 		reg = <0x50040600 0x20>;
- 		interrupts = <GIC_PPI 13
- 			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-@@ -154,6 +155,7 @@
- 		       0x50040100 0x0100>;
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
- 	};
- 
- 	cache-controller at 50043000 {
-@@ -165,6 +167,17 @@
- 		cache-level = <2>;
- 	};
- 
-+	ictlr: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
-+		reg = <0x60004000 64>,
-+		      <0x60004100 64>,
-+		      <0x60004200 64>,
-+		      <0x60004300 64>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
-+	};
++#include "irqchip.h"
 +
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x60>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 99475f6..c621e30 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -8,7 +8,7 @@
- 
- / {
- 	compatible = "nvidia,tegra30";
--	interrupt-parent = <&intc>;
-+	interrupt-parent = <&ictlr>;
- 
- 	pcie-controller at 00003000 {
- 		compatible = "nvidia,tegra30-pcie";
-@@ -228,6 +228,7 @@
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
-+		interrupt-parent = <&intc>;
- 		interrupts = <GIC_PPI 13
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		clocks = <&tegra_car TEGRA30_CLK_TWD>;
-@@ -239,6 +240,7 @@
- 		       0x50040100 0x0100>;
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
- 	};
- 
- 	cache-controller at 50043000 {
-@@ -250,6 +252,18 @@
- 		cache-level = <2>;
- 	};
- 
-+	ictlr: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra30-ictlr", "nvidia,tegra-ictlr";
-+		reg = <0x60004000 64>,
-+		      <0x60004100 64>,
-+		      <0x60004200 64>,
-+		      <0x60004300 64>,
-+		      <0x60004400 64>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
-+	};
++#define ICTLR_CPU_IEP_VFIQ	0x08
++#define ICTLR_CPU_IEP_FIR	0x14
++#define ICTLR_CPU_IEP_FIR_SET	0x18
++#define ICTLR_CPU_IEP_FIR_CLR	0x1c
 +
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x400>;
++#define ICTLR_CPU_IER		0x20
++#define ICTLR_CPU_IER_SET	0x24
++#define ICTLR_CPU_IER_CLR	0x28
++#define ICTLR_CPU_IEP_CLASS	0x2C
++
++#define ICTLR_COP_IER		0x30
++#define ICTLR_COP_IER_SET	0x34
++#define ICTLR_COP_IER_CLR	0x38
++#define ICTLR_COP_IEP_CLASS	0x3c
++
++#define TEGRA_MAX_NUM_ICTLRS	5
++
++static int num_ictlrs;
++
++struct tegra_ictlr_info {
++	void __iomem *ictlr_reg_base[TEGRA_MAX_NUM_ICTLRS];
++#ifdef CONFIG_PM_SLEEP
++	u32 cop_ier[TEGRA_MAX_NUM_ICTLRS];
++	u32 cop_iep[TEGRA_MAX_NUM_ICTLRS];
++	u32 cpu_ier[TEGRA_MAX_NUM_ICTLRS];
++	u32 cpu_iep[TEGRA_MAX_NUM_ICTLRS];
++
++	u32 ictlr_wake_mask[TEGRA_MAX_NUM_ICTLRS];
++#endif
++};
++
++static struct tegra_ictlr_info *tegra_ictlr_info;
++
++static inline void tegra_ictlr_write_mask(struct irq_data *d, unsigned long reg)
++{
++	void __iomem *base = d->chip_data;
++	u32 mask;
++
++	mask = BIT(d->hwirq % 32);
++	writel_relaxed(mask, base + reg);
++}
++
++static void tegra_mask(struct irq_data *d)
++{
++	tegra_ictlr_write_mask(d, ICTLR_CPU_IER_CLR);
++	irq_chip_mask_parent(d);
++}
++
++static void tegra_unmask(struct irq_data *d)
++{
++	tegra_ictlr_write_mask(d, ICTLR_CPU_IER_SET);
++	irq_chip_unmask_parent(d);
++}
++
++static void tegra_eoi(struct irq_data *d)
++{
++	tegra_ictlr_write_mask(d, ICTLR_CPU_IEP_FIR_CLR);
++	irq_chip_eoi_parent(d);
++}
++
++static int tegra_retrigger(struct irq_data *d)
++{
++	tegra_ictlr_write_mask(d, ICTLR_CPU_IEP_FIR_SET);
++	return irq_chip_retrigger_hierarchy(d);
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int tegra_set_wake(struct irq_data *d, unsigned int enable)
++{
++	u32 irq = d->hwirq;
++	u32 index, mask;
++
++	index = (irq / 32);
++	mask = BIT(irq % 32);
++	if (enable)
++		tegra_ictlr_info->ictlr_wake_mask[index] |= mask;
++	else
++		tegra_ictlr_info->ictlr_wake_mask[index] &= ~mask;
++
++	/*
++	 * Do *not* call into the parent, as the GIC doesn't have any
++	 * wake-up facility...
++	 */
++	return 0;
++}
++
++static int tegra_ictlr_suspend(void)
++{
++	unsigned long flags;
++	int i;
++
++	local_irq_save(flags);
++	for (i = 0; i < num_ictlrs; i++) {
++		void __iomem *ictlr = tegra_ictlr_info->ictlr_reg_base[i];
++		/* Save interrupt state */
++		tegra_ictlr_info->cpu_ier[i] = readl_relaxed(ictlr + ICTLR_CPU_IER);
++		tegra_ictlr_info->cpu_iep[i] = readl_relaxed(ictlr + ICTLR_CPU_IEP_CLASS);
++		tegra_ictlr_info->cop_ier[i] = readl_relaxed(ictlr + ICTLR_COP_IER);
++		tegra_ictlr_info->cop_iep[i] = readl_relaxed(ictlr + ICTLR_COP_IEP_CLASS);
++
++		/* Disable COP interrupts */
++		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
++
++		/* Disable CPU interrupts */
++		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
++
++		/* Enable the wakeup sources of ictlr */
++		writel_relaxed(tegra_ictlr_info->ictlr_wake_mask[i], ictlr + ICTLR_CPU_IER_SET);
++	}
++	local_irq_restore(flags);
++
++	return 0;
++}
++
++static void tegra_ictlr_resume(void)
++{
++	unsigned long flags;
++	int i;
++
++	local_irq_save(flags);
++	for (i = 0; i < num_ictlrs; i++) {
++		void __iomem *ictlr = tegra_ictlr_info->ictlr_reg_base[i];
++		writel_relaxed(tegra_ictlr_info->cpu_iep[i],
++			       ictlr + ICTLR_CPU_IEP_CLASS);
++		writel_relaxed(~0ul, ictlr + ICTLR_CPU_IER_CLR);
++		writel_relaxed(tegra_ictlr_info->cpu_ier[i],
++			       ictlr + ICTLR_CPU_IER_SET);
++		writel_relaxed(tegra_ictlr_info->cop_iep[i],
++			       ictlr + ICTLR_COP_IEP_CLASS);
++		writel_relaxed(~0ul, ictlr + ICTLR_COP_IER_CLR);
++		writel_relaxed(tegra_ictlr_info->cop_ier[i],
++			       ictlr + ICTLR_COP_IER_SET);
++	}
++	local_irq_restore(flags);
++}
++
++static struct syscore_ops tegra_ictlr_syscore_ops = {
++	.suspend	= tegra_ictlr_suspend,
++	.resume		= tegra_ictlr_resume,
++};
++
++static int tegra_ictlr_syscore_init(void)
++{
++	register_syscore_ops(&tegra_ictlr_syscore_ops);
++
++	return 0;
++}
++#else
++#define tegra_set_wake	NULL
++static inline void tegra_ictlr_syscore_init(void) {}
++#endif
++
++static struct irq_chip tegra_ictlr_chip = {
++	.name		= "ICTLR",
++	.irq_eoi	= tegra_eoi,
++	.irq_mask	= tegra_mask,
++	.irq_unmask	= tegra_unmask,
++	.irq_retrigger	= tegra_retrigger,
++	.irq_set_wake	= tegra_set_wake,
++	.flags		= IRQCHIP_MASK_ON_SUSPEND,
++};
++
++static int tegra_ictlr_domain_xlate(struct irq_domain *domain,
++				    struct device_node *controller,
++				    const u32 *intspec,
++				    unsigned int intsize,
++				    unsigned long *out_hwirq,
++				    unsigned int *out_type)
++{
++	if (domain->of_node != controller)
++		return -EINVAL;	/* Shouldn't happen, really... */
++	if (intsize != 3)
++		return -EINVAL;	/* Not GIC compliant */
++	if (intspec[0] != 0)
++		return -EINVAL;	/* No PPI should point to this domain */
++
++	*out_hwirq = intspec[1];
++	*out_type = intspec[2];
++	return 0;
++}
++
++static int tegra_ictlr_domain_alloc(struct irq_domain *domain,
++				    unsigned int virq,
++				    unsigned int nr_irqs, void *data)
++{
++	struct of_phandle_args *args = data;
++	struct of_phandle_args parent_args;
++	struct tegra_ictlr_info *info = domain->host_data;
++	irq_hw_number_t hwirq;
++	int i;
++
++	if (args->args_count != 3)
++		return -EINVAL;	/* Not GIC compliant */
++	if (args->args[0] != 0)
++		return -EINVAL;	/* No PPI should point to this domain */
++
++	hwirq = args->args[1];
++	if (hwirq >= (num_ictlrs * 32))
++		return -EINVAL;	/* Can't deal with this */
++
++	for (i = 0; i < nr_irqs; i++) {
++		int ictlr = (hwirq + i) / 32;
++
++		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
++					      &tegra_ictlr_chip,
++					      &info->ictlr_reg_base[ictlr]);
++	}
++
++	parent_args = *args;
++	parent_args.np = domain->parent->of_node;
++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
++}
++
++
++static void tegra_ictlr_domain_free(struct irq_domain *domain,
++				    unsigned int virq,
++				    unsigned int nr_irqs)
++{
++	int i;
++
++	for (i = 0; i < nr_irqs; i++) {
++		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
++		irq_domain_reset_irq_data(d);
++	}
++}
++
++static struct irq_domain_ops tegra_ictlr_domain_ops = {
++	.xlate	= tegra_ictlr_domain_xlate,
++	.alloc	= tegra_ictlr_domain_alloc,
++	.free	= tegra_ictlr_domain_free,
++};
++
++static int __init tegra_ictlr_init(struct device_node *node,
++				   struct device_node *parent)
++{
++	struct irq_domain *parent_domain, *domain;
++	int err;
++	int i;
++
++	if (!parent) {
++		pr_err("%s: no parent, giving up\n", node->full_name);
++		return -ENODEV;
++	}
++
++	parent_domain = irq_find_host(parent);
++	if (!parent_domain) {
++		pr_err("%s: unable to obtain parent domain\n", node->full_name);
++		return -ENXIO;
++	}
++
++	tegra_ictlr_info = kzalloc(sizeof(*tegra_ictlr_info), GFP_KERNEL);
++	if (!tegra_ictlr_info)
++		return -ENOMEM;
++
++	for (i = 0; i < TEGRA_MAX_NUM_ICTLRS; i++) {
++		void __iomem *base;
++
++		base = of_iomap(node, i);
++		if (!base)
++			break;
++
++		tegra_ictlr_info->ictlr_reg_base[i] = base;
++
++		/* Disable all interrupts */
++		writel_relaxed(~0, base + ICTLR_CPU_IER_CLR);
++		/* All interrupts target IRQ */
++		writel_relaxed(0, base + ICTLR_CPU_IEP_CLASS);
++
++		num_ictlrs++;
++	}
++
++	if (!num_ictlrs) {
++		pr_err("%s: no valid regions, giving up\n", node->full_name);
++		err = -ENOMEM;
++		goto out_free;
++	}
++
++	domain = irq_domain_add_hierarchy(parent_domain, 0, num_ictlrs * 32,
++					  node, &tegra_ictlr_domain_ops,
++					  tegra_ictlr_info);
++	if (!domain) {
++		pr_err("%s: failed to allocated domain\n", node->full_name);
++		err = -ENOMEM;
++		goto out_unmap;
++	}
++
++	tegra_ictlr_syscore_init();
++
++	pr_info("%s: %d interrupts forwarded to %s\n",
++		node->full_name, num_ictlrs * 32, parent->full_name);
++
++	return 0;
++
++out_unmap:
++	for (i = 0; i < num_ictlrs; i++)
++		iounmap(tegra_ictlr_info->ictlr_reg_base[i]);
++out_free:
++	kfree(tegra_ictlr_info);
++	return err;
++}
++
++IRQCHIP_DECLARE(tegra_ictlr, "nvidia,tegra-ictlr", tegra_ictlr_init);
 -- 
 2.1.4
