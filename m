@@ -1,40 +1,149 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed,  7 Jan 2015 13:52:10 +0800
-Subject: [PATCH] arm64: mm: support instruction SETEND
-Message-ID: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed,  7 Jan 2015 14:13:49 +0800
+Subject: [Bugfix] x86/apic: Fix xen IRQ allocation failure caused by commit
+ b81975eade8c
+Message-ID: <1420611244-25624-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
-instruction will be treated as UNALLOCATED; this error can be
-reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
-mode, finally kernel will trap the exception if the userspace
-libs use SETEND instruction.
+Commit b81975eade8c ("x86, irq: Clean up irqdomain transition code")
+breaks xen IRQ allocation because xen_smp_prepare_cpus() doesn't invoke
+setup_IO_APIC(), so no irqdomains created for IOAPICs and
+mp_map_pin_to_irq() fails at the very beginning.
 
-So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
+Enhance xen_smp_prepare_cpus() to call setup_IO_APIC() to initialize
+irqdomain for IOAPICs.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Signed-off-by: Xiaolong Ye <yexl@marvell.com>
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Reported-and-tested-by: Sander Eikelenboom <linux@eikelenboom.it>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- arch/arm64/mm/proc.S | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Hi all,
+	This patch should be backported to v3.17, but there are
+conflicts. So I will send backported patch to 3.17/3.18 stable tree
+once this patch has been merged into mainstream kernel.
+Thanks!
+Gerry
+---
+ arch/x86/include/asm/io_apic.h       |    2 +-
+ arch/x86/include/asm/smpboot_hooks.h |    5 ++---
+ arch/x86/kernel/apic/apic.c          |    5 ++---
+ arch/x86/kernel/apic/io_apic.c       |   32 +++++++++++++++-----------------
+ arch/x86/xen/smp.c                   |    3 +++
+ 5 files changed, 23 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 4e778b1..66a7363 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -249,9 +249,9 @@ ENDPROC(__cpu_setup)
- 	 *       CE0      XWHW CZ     ME TEEA S
- 	 * .... .IEE .... NEAI TE.I ..AD DEN0 ACAM
- 	 * 0011 0... 1101 ..0. ..0. 10.. .... .... < hardware reserved
--	 * .... .1.. .... 01.1 11.1 ..01 0001 1101 < software settings
-+	 * .... .1.. .... 01.1 11.1 ..00 0001 1101 < software settings
+diff --git a/arch/x86/include/asm/io_apic.h b/arch/x86/include/asm/io_apic.h
+index bf006cce9418..72a1298658bb 100644
+--- a/arch/x86/include/asm/io_apic.h
++++ b/arch/x86/include/asm/io_apic.h
+@@ -237,7 +237,7 @@ static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned
+ 
+ extern void io_apic_eoi(unsigned int apic, unsigned int vector);
+ 
+-extern void setup_IO_APIC(void);
++extern void setup_IO_APIC(bool xen_smp);
+ extern void enable_IO_APIC(void);
+ extern void disable_IO_APIC(void);
+ extern void setup_ioapic_dest(void);
+diff --git a/arch/x86/include/asm/smpboot_hooks.h b/arch/x86/include/asm/smpboot_hooks.h
+index 0da7409f0bec..e47df710a588 100644
+--- a/arch/x86/include/asm/smpboot_hooks.h
++++ b/arch/x86/include/asm/smpboot_hooks.h
+@@ -53,10 +53,9 @@ static inline void __init smpboot_setup_io_apic(void)
+ 	 * go and set it up:
  	 */
- 	.type	crval, #object
- crval:
--	.word	0x000802e2			// clear
--	.word	0x0405d11d			// set
-+	.word	0x000803e2			// clear
-+	.word	0x0405d01d			// set
+ 	if (!skip_ioapic_setup && nr_ioapics)
+-		setup_IO_APIC();
+-	else {
++		setup_IO_APIC(false);
++	else
+ 		nr_ioapics = 0;
+-	}
+ #endif
+ }
+ 
+diff --git a/arch/x86/kernel/apic/apic.c b/arch/x86/kernel/apic/apic.c
+index 29b5b18afa27..71b8a6cb7f0e 100644
+--- a/arch/x86/kernel/apic/apic.c
++++ b/arch/x86/kernel/apic/apic.c
+@@ -1913,10 +1913,9 @@ int __init APIC_init_uniprocessor(void)
+ 
+ #ifdef CONFIG_X86_IO_APIC
+ 	if (smp_found_config && !skip_ioapic_setup && nr_ioapics)
+-		setup_IO_APIC();
+-	else {
++		setup_IO_APIC(false);
++	else
+ 		nr_ioapics = 0;
+-	}
+ #endif
+ 
+ 	x86_init.timers.setup_percpu_clockev();
+diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
+index 3f5f60406ab1..13cddc75e4c0 100644
+--- a/arch/x86/kernel/apic/io_apic.c
++++ b/arch/x86/kernel/apic/io_apic.c
+@@ -2369,31 +2369,29 @@ static void ioapic_destroy_irqdomain(int idx)
+ 	ioapics[idx].pin_info = NULL;
+ }
+ 
+-void __init setup_IO_APIC(void)
++void __init setup_IO_APIC(bool xen_smp)
+ {
+ 	int ioapic;
+ 
+-	/*
+-	 * calling enable_IO_APIC() is moved to setup_local_APIC for BP
+-	 */
+-	io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
++	if (!xen_smp) {
++		apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
++		io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
++
++		/* Set up IO-APIC IRQ routing. */
++		x86_init.mpparse.setup_ioapic_ids();
++		sync_Arb_IDs();
++	}
+ 
+-	apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
+ 	for_each_ioapic(ioapic)
+ 		BUG_ON(mp_irqdomain_create(ioapic));
+-
+-	/*
+-         * Set up IO-APIC IRQ routing.
+-         */
+-	x86_init.mpparse.setup_ioapic_ids();
+-
+-	sync_Arb_IDs();
+ 	setup_IO_APIC_irqs();
+-	init_IO_APIC_traps();
+-	if (nr_legacy_irqs())
+-		check_timer();
+-
+ 	ioapic_initialized = 1;
++
++	if (!xen_smp) {
++		init_IO_APIC_traps();
++		if (nr_legacy_irqs())
++			check_timer();
++	}
+ }
+ 
+ /*
+diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
+index 4c071aeb8417..7eb0283901fa 100644
+--- a/arch/x86/xen/smp.c
++++ b/arch/x86/xen/smp.c
+@@ -326,7 +326,10 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 		xen_raw_printk(m);
+ 		panic(m);
++	} else {
++		setup_IO_APIC(true);
+ 	}
++
+ 	xen_init_lock_cpu(0);
+ 
+ 	smp_store_boot_cpu_info();
 -- 
-1.9.1
+1.7.10.4
