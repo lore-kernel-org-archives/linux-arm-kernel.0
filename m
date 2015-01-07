@@ -1,49 +1,42 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  7 Jan 2015 21:16:15 +0100
-Subject: [PATCH 3/3] ARM: dts: sun8i: Add dts file for Ippo Q8H v1.2 tablets
+Date: Wed,  7 Jan 2015 21:16:14 +0100
+Subject: [PATCH 2/3] ARM: dts: sun7i: Add dts file for Bananapro board
 In-Reply-To: <1420661775-20424-1-git-send-email-hdegoede@redhat.com>
 References: <1420661775-20424-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1420661775-20424-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1420661775-20424-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ippo Q8H v1.2 is almost identical to the v5, still it needs a separate
-dtb file since some gpio-s surrounding the wlan/bluetooth are different,
-it uses different camera sensors, and different DRAM timings.
-
-Note that atm neither the wlan/bluetooth nor the camera are supported, so
-atm their is no difference between the dts files, but because of the different
-DRAM timings there are already separate u-boot configs for the 2 different
-versions, and the 1.2 config refers to sun8i-a23-ippo-q8h-v1.2.dtb to be
-future proof, so we need to provide a sun8i-a23-ippo-q8h-v1.2.dtb file.
+Add support for the new Bananapro A20 development board from lemaker.org.
+This board features 1G RAM, 2 USB A receptacles, 1 micro USB receptacle for
+OTG, 1 micro USB receptacle for power, HDMI, sata, Gbit ethernet, ir receiver,
+3.5 mm jack for a/v out, on board microphone, 40 gpio pins and sdio wifi.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile                    |  3 +-
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts | 58 +++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts | 261 ++++++++++++++++++++++++++++++
+ 2 files changed, 262 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapro.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4142831..7f66bab 100644
+index 548520f..4142831 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -478,7 +478,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-olinuxino-micro.dtb \
- 	sun7i-a20-pcduino3.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
--	sun8i-a23-ippo-q8h-v5.dtb
-+	sun8i-a23-ippo-q8h-v5.dtb \
-+	sun8i-a23-ippo-q8h-v1.2.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
+@@ -467,6 +467,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+ 	sun6i-a31s-cs908.dtb
+ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-bananapi.dtb \
++	sun7i-a20-bananapro.dtb \
+ 	sun7i-a20-cubieboard2.dtb \
+ 	sun7i-a20-cubietruck.dtb \
+ 	sun7i-a20-hummingbird.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
 new file mode 100644
-index 0000000..7056fc2
+index 0000000..3b4764d
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
-@@ -0,0 +1,58 @@
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -0,0 +1,261 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -91,16 +84,219 @@ index 0000000..7056fc2
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+/*
-+ * The Ippo Q8H v1.2 is almost identical to the v5, still it needs a separate
-+ * dtb file since some gpio-s surrounding the wlan/bluetooth are different,
-+ * and it uses different camera sensors.
-+ */
-+
-+#include "sun8i-a23-ippo-q8h-v5.dts"
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
 +
 +/ {
-+	model = "Ippo Q8H Dual Core Tablet (v1.2)";
++	model = "LeMaker Banana Pro";
++	compatible = "lemaker,bananapro", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++		spi0: spi at 01c05000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi0_pins_a>;
++			status = "okay";
++		};
++
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 10 0>; /* PH10 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		mmc3: mmc at 01c12000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc3_pins_a>;
++			vmmc-supply = <&reg_vmmc3>;
++			bus-width = <4>;
++			non-removable;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c14000 {
++			status = "okay";
++		};
++
++		ohci0: usb at 01c14400 {
++			status = "okay";
++		};
++
++		ahci: sata at 01c18000 {
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		ohci1: usb at 01c1c400 {
++			status = "okay";
++		};
++
++		pinctrl at 01c20800 {
++			usb1_vbus_pin_bananapro: usb1_vbus_pin at 0 {
++				allwinner,pins = "PH0";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			usb2_vbus_pin_bananapro: usb2_vbus_pin at 0 {
++				allwinner,pins = "PH1";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
++				allwinner,pins = "PH10";
++				allwinner,function = "gpio_in";
++				allwinner,drive = <0>;
++				allwinner,pull = <1>;
++			};
++
++			vmmc3_pin_bananapro: vmmc3_pin at 0 {
++				allwinner,pins = "PH22";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			gmac_power_pin_bananapi: gmac_power_pin at 0 {
++				allwinner,pins = "PH23";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			led_pins_bananapi: led_pins at 0 {
++				allwinner,pins = "PH24", "PG2";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		ir0: ir at 01c21800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&ir0_pins_a>;
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		uart2: serial at 01c28800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart2_pins_a>;
++			status = "okay";
++		};
++
++		uart7: serial at 01c29c00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart7_pins_a>;
++			status = "okay";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++		};
++
++		i2c2: i2c at 01c2b400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			status = "okay";
++		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_rgmii_a>;
++			phy = <&phy1>;
++			phy-mode = "rgmii";
++			phy-supply = <&reg_gmac_3v3>;
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_bananapi>;
++
++		green {
++			label = "bananapi:green:usr";
++			gpios = <&pio 7 24 0>;
++		};
++		blue {
++			label = "bananapi:blue:usr";
++			gpios = <&pio 6 2 0>;
++		};
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		pinctrl-0 = <&usb1_vbus_pin_bananapro>;
++		gpio = <&pio 7 0 0>; /* PH0 */
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		pinctrl-0 = <&usb2_vbus_pin_bananapro>;
++		gpio = <&pio 7 1 0>; /* PH1 */
++		status = "okay";
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gmac_power_pin_bananapi>;
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 7 23 0>;
++	};
++
++	reg_vmmc3: vmmc3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&vmmc3_pin_bananapro>;
++		regulator-name = "vmmc3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		enable-active-high;
++		gpio = <&pio 7 22 0>;
++	};
 +};
 -- 
 2.1.0
