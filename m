@@ -1,57 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 14:54:23 +0000
-Subject: [PATCH 0/2] arm64: first set of Kconfig patches for Tegra132
- support
-In-Reply-To: <20150107142520.GB1621@ulmo>
-References: <20150107081638.14381.42444.stgit@dusk.lan>
- <20150107110738.GF7485@arm.com> <20150107142520.GB1621@ulmo>
-Message-ID: <20150107145423.GM7485@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed,  7 Jan 2015 15:04:06 +0000
+Subject: [PATCH v2 1/7] phy: phy-stih407-usb: Pass sysconfig register offsets
+ via syscfg property.
+In-Reply-To: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
+References: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1420643052-4506-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 02:25:21PM +0000, Thierry Reding wrote:
-> On Wed, Jan 07, 2015 at 11:07:38AM +0000, Will Deacon wrote:
-> > On Wed, Jan 07, 2015 at 08:17:29AM +0000, Paul Walmsley wrote:
-> > > These patches start the ARM64 Kconfig and defconfig changes to
-> > > support the Tegra132 (aka Tegra K1 64-bit) SoC and the NVIDIA
-> > > Norrin64 FFD board.
-> > > 
-> > > Tegra132 support is made conditional on CONFIG_BROKEN, since
-> > > there are some patches pending for other maintainers to fix
-> > > compilation when CONFIG_ARCH_TEGRA is set during an ARM64 build.
-> > > Once those patches have been merged, a subsequent patch will be
-> > > sent to remove the CONFIG_BROKEN dependency and to make a few other
-> > > defconfig changes that are dependent on CONFIG_ARCH_TEGRA.
-> > > 
-> > > These patches apply on the arm64 fixes/core branch, commit
-> > > 5d96e0cba263.  They have been boot-tested on QEMU 2.2.0 AArch64,
-> > > and (after other patches have been applied) have been boot-tested
-> > > on the Tegra132 Norrin64 FFD board.
-> > 
-> > Whilst I'm happy to take the second patch for 3.20 (getting those
-> > dependencies building and keeping them building is a Good Thing), can we
-> > hold off on the first patch until it's not broken? Having an unconditional
-> > depends on BROKEN isn't really that useful.
-> 
-> The two patches that require the BROKEN dependency are fairly trivial,
-> so I don't think it would be a stretch to merge them for 3.20. But they
-> apply to different trees (one to the clocksource tree, the other to the
-> Tegra tree).
-> 
-> How do you usually handle the ARM64 patches? Do you manually pick up the
-> patches that touch arch/arm64 or would you prefer for me to collect them
-> in a pull request?
+Based on Arnds review comments here https://lkml.org/lkml/2014/11/13/161,
+update the phy driver to not use the reg property to access the sysconfig
+register offsets.
 
-Either is fine; if it's a large series then a pull request tends to work
-better. Catalin is handling the 3.20 merge window (we take it in turns).
+This is because other phy's (miphy28, miphy365) have a combination of
+memory mapped registers and sysconfig control regs, and we shouldn't
+be mixing address spaces in the reg property. In addition we would
+ideally like the sysconfig offsets to be passed via DT in a uniform way.
 
-> Either way I could probably provide a stable branch for you to pull into
-> the arm64 tree to resolve the build dependencies provided that Daniel or
-> Thomas will ack the clocksource patch.
+This new method will also allow us to support devices which have sysconfig
+registers in different banks more easily and it is also analagous to how
+keystone and bcm7745 platforms pass there syscon offsets in DT.
 
-Sure; if you have dependencies in other subsystems then we'd need either an
-ack from the relevant subsystem maintainer or for them to publish a stable
-branch that we can pull in. There's not really a hard-and-fast rule for
-this but we can work something out.
+This breaks DT compatibility, but this platform is considered WIP, and
+is only used by a few developers who are upstreaming support for it.
 
-Will
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+---
+ .../devicetree/bindings/phy/phy-stih407-usb.txt    | 10 ++-------
+ drivers/phy/phy-stih407-usb.c                      | 25 ++++++++++++----------
+ 2 files changed, 16 insertions(+), 19 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt b/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt
+index 1ef8228..de6a706 100644
+--- a/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt
++++ b/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt
+@@ -5,10 +5,7 @@ host controllers (when controlling usb2/1.1 devices) available on STiH407 SoC fa
+ 
+ Required properties:
+ - compatible		: should be "st,stih407-usb2-phy"
+-- reg			: contain the offset and length of the system configuration registers
+-			  used as glue logic to control & parameter phy
+-- reg-names		: the names of the system configuration registers in "reg", should be "param" and "reg"
+-- st,syscfg		: sysconfig register to manage phy parameter at driver level
++- st,syscfg		: phandle of sysconfig bank plus integer array containing phyparam and phyctrl register offsets
+ - resets		: list of phandle and reset specifier pairs. There should be two entries, one
+ 			  for the whole phy and one for the port
+ - reset-names		: list of reset signal names. Should be "global" and "port"
+@@ -19,11 +16,8 @@ Example:
+ 
+ usb2_picophy0: usbpicophy at f8 {
+ 	compatible	= "st,stih407-usb2-phy";
+-	reg		= <0xf8 0x04>,	/* syscfg 5062 */
+-			  <0xf4 0x04>;	/* syscfg 5061 */
+-	reg-names	= "param", "ctrl";
+ 	#phy-cells	= <0>;
+-	st,syscfg	= <&syscfg_core>;
++	st,syscfg	= <&syscfg_core 0x100 0xf4>;
+ 	resets		= <&softreset STIH407_PICOPHY_SOFTRESET>,
+ 			  <&picophyreset STIH407_PICOPHY0_RESET>;
+ 	reset-names	= "global", "port";
+diff --git a/drivers/phy/phy-stih407-usb.c b/drivers/phy/phy-stih407-usb.c
+index 74f0fab..1d5ae5f 100644
+--- a/drivers/phy/phy-stih407-usb.c
++++ b/drivers/phy/phy-stih407-usb.c
+@@ -22,6 +22,9 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/phy/phy.h>
+ 
++#define PHYPARAM_REG	1
++#define PHYCTRL_REG	2
++
+ /* Default PHY_SEL and REFCLKSEL configuration */
+ #define STIH407_USB_PICOPHY_CTRL_PORT_CONF	0x6
+ #define STIH407_USB_PICOPHY_CTRL_PORT_MASK	0x1f
+@@ -93,7 +96,7 @@ static int stih407_usb2_picophy_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	struct phy_provider *phy_provider;
+ 	struct phy *phy;
+-	struct resource *res;
++	int ret;
+ 
+ 	phy_dev = devm_kzalloc(dev, sizeof(*phy_dev), GFP_KERNEL);
+ 	if (!phy_dev)
+@@ -123,19 +126,19 @@ static int stih407_usb2_picophy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(phy_dev->regmap);
+ 	}
+ 
+-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
+-	if (!res) {
+-		dev_err(dev, "No ctrl reg found\n");
+-		return -ENXIO;
++	ret = of_property_read_u32_index(np, "st,syscfg", PHYPARAM_REG,
++					&phy_dev->param);
++	if (ret) {
++		dev_err(dev, "can't get phyparam offset (%d)\n", ret);
++		return ret;
+ 	}
+-	phy_dev->ctrl = res->start;
+ 
+-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "param");
+-	if (!res) {
+-		dev_err(dev, "No param reg found\n");
+-		return -ENXIO;
++	ret = of_property_read_u32_index(np, "st,syscfg", PHYCTRL_REG,
++					&phy_dev->ctrl);
++	if (ret) {
++		dev_err(dev, "can't get phyctrl offset (%d)\n", ret);
++		return ret;
+ 	}
+-	phy_dev->param = res->start;
+ 
+ 	phy = devm_phy_create(dev, NULL, &stih407_usb2_picophy_data);
+ 	if (IS_ERR(phy)) {
+-- 
+1.9.1
