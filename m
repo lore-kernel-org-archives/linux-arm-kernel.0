@@ -1,59 +1,34 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 07 Jan 2015 12:15:42 -0500
-Subject: [RFC PATCH 01/11] ARM: kprobes: directly modify code if
- kprobe is not initialized.
-In-Reply-To: <1420616124-42765-1-git-send-email-wangnan0@huawei.com>
-References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
- <1420616124-42765-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <54AD69BE.6050007@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Jan 2015 09:16:26 -0800
+Subject: [PATCH] arch: arm: mach-omap2: omap_hwmod.c: Remove some unused
+ functions
+In-Reply-To: <1417973047-12972-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+References: <1417973047-12972-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+Message-ID: <20150107171626.GA13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2015 02:35 AM, Wang Nan wrote:
-> If kprobe is optimized before kprobe is initialized, there should
-> be only one core, the probed instruction is not armed with breakpoint,
-> so simply patch text is okay.
+* Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se> [141207 09:23]:
+> Removes some functions that are not used anywhere:
+> omap_hwmod_pad_route_irq() omap_hwmod_no_setup_reset()
+> omap_hwmod_read_hardreset() omap_hwmod_del_initiator_dep()
+> omap_hwmod_enable_clocks() omap_hwmod_reset() omap_hwmod_ocp_barrier()
+> omap_hwmod_disable_clocks() omap_hwmod_add_initiator_dep()
 > 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> ---
->  arch/arm/probes/kprobes/opt-arm.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
-> index 15b37c0..a021474 100644
-> --- a/arch/arm/probes/kprobes/opt-arm.c
-> +++ b/arch/arm/probes/kprobes/opt-arm.c
-> @@ -325,8 +325,17 @@ void __kprobes arch_optimize_kprobes(struct list_head *oplist)
->  		 * Similar to __arch_disarm_kprobe, operations which
->  		 * removing breakpoints must be wrapped by stop_machine
->  		 * to avoid racing.
-> +		 *
-> +		 * If this function is called before kprobes initialized,
-> +		 * the kprobe should be an early kprobe, the instruction
-> +		 * is not armed with breakpoint. There should be only
-> +		 * one core now, so directly __patch_text is enough.
->  		 */
-> -		kprobes_remove_breakpoint(op->kp.addr, insn);
-> +		if (unlikely(!kprobes_initialized)) {
-> +			BUG_ON(!(op->kp.flags & KPROBE_FLAG_EARLY));
-> +			__patch_text(op->kp.addr, insn);
-> +		} else
-> +			kprobes_remove_breakpoint(op->kp.addr, insn);
+> This was partially found by using a static code analysis program called cppcheck.
 
-"...if only one branch of a conditional statement is a single statement ...
-use braces in both branches".
+Nice, we should probably run cppcheck for unused functions on
+regular basis as we're slowly removing the legacy booting
+support in favor of device tree based booting.
 
-https://www.kernel.org/doc/Documentation/CodingStyle
+Paul, I'm applying all your arch/arm/*omap*/ cppcheck patches
+into omap-for-v3.20/cleanup branch that can then be used as a
+base for other branches in case of conflicts.
 
->  
->  		list_del_init(&op->list);
->  	}
-> 
+Richard, I've also unified the subject lines to start with
+ARM: OMAP2+: and so on to make my pull requests will look
+a bit nicer.
 
 Regards,
-Chris
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
