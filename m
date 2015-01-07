@@ -1,77 +1,105 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  7 Jan 2015 15:29:28 +0000
-Subject: [RFC PATCH 0/3] drivers: port PCIe designware to new DT parsing API
-Message-ID: <1420644571-18928-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 07 Jan 2015 23:37:52 +0800
+Subject: [Bugfix] x86/apic: Fix xen IRQ allocation failure caused by commit
+ b81975eade8c
+In-Reply-To: <20150107145050.GC30457@l.oracle.com>
+References: <1420611244-25624-1-git-send-email-jiang.liu@linux.intel.com>
+ <20150107145050.GC30457@l.oracle.com>
+Message-ID: <54AD52D0.5050303@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of the DT API:
+On 2015/1/7 22:50, Konrad Rzeszutek Wilk wrote:
+> On Wed, Jan 07, 2015 at 02:13:49PM +0800, Jiang Liu wrote:
+>> Commit b81975eade8c ("x86, irq: Clean up irqdomain transition code")
+>> breaks xen IRQ allocation because xen_smp_prepare_cpus() doesn't invoke
+>> setup_IO_APIC(), so no irqdomains created for IOAPICs and
+>> mp_map_pin_to_irq() fails at the very beginning.
+>> --- a/arch/x86/kernel/apic/io_apic.c
+>> +++ b/arch/x86/kernel/apic/io_apic.c
+>> @@ -2369,31 +2369,29 @@ static void ioapic_destroy_irqdomain(int idx)
+>>  	ioapics[idx].pin_info = NULL;
+>>  }
+>>  
+>> -void __init setup_IO_APIC(void)
+>> +void __init setup_IO_APIC(bool xen_smp)
+>>  {
+>>  	int ioapic;
+>>  
+>> -	/*
+>> -	 * calling enable_IO_APIC() is moved to setup_local_APIC for BP
+>> -	 */
+>> -	io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
+>> +	if (!xen_smp) {
+>> +		apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
+>> +		io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
+>> +
+>> +		/* Set up IO-APIC IRQ routing. */
+>> +		x86_init.mpparse.setup_ioapic_ids();
+>> +		sync_Arb_IDs();
+>> +	}
+> 
+> 
+> Is there a specific reason that this cannot run in all cases?
+> 
+> What I am asking is why are we doing a special case here? The description
+> at the top implied that we were just missing an call to
+> setup_IO_APIC.. 
+Hi Konrad,
+	I'm not very familiar with Xen IRQ yet, so I just enabled the
+code to create irqdomains for IOAPICs and keep other part as is. I will
+try to check whether we could enable other part all together:)
+Regards!
+Gerry
 
-of_pci_get_host_bridge_resources()
-
-allows to retrieve PCI resources from the device tree in a generic way.
-
-Some PCI host controllers, in addition to standard IO and MEM resources and
-corresponding CPU addresses, require to retrieve the addresses that are used
-for bus routing of IO/MEM regions as seen at the bus level corresponding
-to the bus segment the host controller is sitting on, so that the host
-controller can programme its inbound/outbound memory regions correctly to
-respond to bus transactions coming from the CPU on the host controller bus
-ports.
-
-The DT generic layer provides functions that carry out the PCI
-ranges <-> resources translation from PCI addresses to CPU addresses (as
-seen at the CPU top level bus, through all required hierarchical bus layers),
-but there is no generic API to retrieve the PCI range CPU untranslated
-addresses, so PCI host controllers have to do it in a driver specific way
-through the DT property parsing methods.
-
-This patchset converts the PCIe designware host controller driver to
-use the API:
-
-of_pci_get_host_bridge_resources()
-
-in order to retrieve the PCI regions resources. To achieve generality, it
-also augments the parsing API so that a new DT struct is created out of
-PCI ranges, that contains the PCI resource and the range parser itself
-so that it can be passed back to PCI host controllers drivers that
-can, if needed, use it to parse the CPU untranslated addresses
-corresponding to the resource in question.
-
-The first patch in the series is a fix/update for the parsing function:
-
-of_pci_get_host_bridge_resources()
-
-It is part of the RFC series since it is a controversial fix to be
-discussed before getting merged.
-
-Patch [2-3] augment the parsing API and convert the PCIe designware
-driver code.
-
-The current API stays unchanged, so that the existing drivers using it
-do not need patching and changes are limited.
-
-Tested on an iMX6 Sabrelite board.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Mohit Kumar <mohit.kumar@st.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-
-Lorenzo Pieralisi (3):
-  drivers: of: fix resources freeing in
-    of_pci_get_host_bridge_resources()
-  drivers: of: of_pci_get_host_bridge_resources() range parsing update
-  drivers: pci: host: update the pcie designware driver to new range
-    parsing API
-
- drivers/of/of_pci.c                |  36 +++++++--
- drivers/pci/host/pcie-designware.c | 145 +++++++++++++++++--------------------
- drivers/pci/host/pcie-designware.h |   5 +-
- include/linux/of_address.h         |   5 ++
- 4 files changed, 104 insertions(+), 87 deletions(-)
-
--- 
-2.2.1
+> 
+>>  
+>> -	apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
+>>  	for_each_ioapic(ioapic)
+>>  		BUG_ON(mp_irqdomain_create(ioapic));
+>> -
+>> -	/*
+>> -         * Set up IO-APIC IRQ routing.
+>> -         */
+>> -	x86_init.mpparse.setup_ioapic_ids();
+>> -
+>> -	sync_Arb_IDs();
+>>  	setup_IO_APIC_irqs();
+>> -	init_IO_APIC_traps();
+>> -	if (nr_legacy_irqs())
+>> -		check_timer();
+>> -
+>>  	ioapic_initialized = 1;
+>> +
+>> +	if (!xen_smp) {
+>> +		init_IO_APIC_traps();
+>> +		if (nr_legacy_irqs())
+>> +			check_timer();
+>> +	}
+>>  }
+>>  
+>>  /*
+>> diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
+>> index 4c071aeb8417..7eb0283901fa 100644
+>> --- a/arch/x86/xen/smp.c
+>> +++ b/arch/x86/xen/smp.c
+>> @@ -326,7 +326,10 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
+>>  
+>>  		xen_raw_printk(m);
+>>  		panic(m);
+>> +	} else {
+>> +		setup_IO_APIC(true);
+>>  	}
+>> +
+>>  	xen_init_lock_cpu(0);
+>>  
+>>  	smp_store_boot_cpu_info();
+>> -- 
+>> 1.7.10.4
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
