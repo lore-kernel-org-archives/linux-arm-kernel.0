@@ -1,81 +1,216 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 18:04:20 +0000
-Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
-In-Reply-To: <vnkw4ms2cwb5.fsf@mitchelh-linux.qualcomm.com>
-References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
- <20150106141507.GB3484@arm.com>
- <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
- <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
- <vnkw61cjebbq.fsf@mitchelh-linux.qualcomm.com>
- <20150107101300.GC7485@arm.com>
- <vnkw4ms2cwb5.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20150107180420.GR7485@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 7 Jan 2015 18:05:26 +0000
+Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <20150105162016.GD26699@leverpostej>
+References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20150105162016.GD26699@leverpostej>
+Message-ID: <CAKv+Gu-DQ3DDZkHA5keV77RYwwSUXemmKffMWfBZT_rr8JrJYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 05:52:46PM +0000, Mitchel Humpherys wrote:
-> On Wed, Jan 07 2015 at 02:13:00 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jan 06, 2015 at 11:30:49PM +0000, Mitchel Humpherys wrote:
-> >> On Tue, Jan 06 2015 at 02:35:28 PM, Rob Herring <robherring2@gmail.com> wrote:
-> >> > On Tue, Jan 6, 2015 at 2:16 PM, Mitchel Humpherys
-> >> > <mitchelh@codeaurora.org> wrote:
-> >> >> On Tue, Jan 06 2015 at 06:15:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> >>>>      /* Invalidate the TLB, just in case */
-> >> >>>> -    writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
-> >> >>>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
-> >> >>>>      writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
-> >> >>>
-> >> >>> I was slightly worried that this would break the Calxeda implementation
-> >> >>> with ARM_SMMU_OPT_SECURE_CFG_ACCESS, but actually these registers aren't
-> >> >>> even aliased there so I think there's a bigger bug for them.
-> >> >>>
-> >> >>> Anyway, given that their hardware has gone the way of the dodo, I'll take
-> >> >>> the patch as-is unless you have any further comments?
-> >> >>>
-> >> >>> Will
-> >> >>
-> >> >> Yeah I agree that this shouldn't affect the (now defunct) Calxeda
-> >> >> implementation.  I've tested this on some hardware here and we crash
-> >> >> when we touch that register since it's secure-only (not banked, as you
-> >> >> mentioned).
-> >> >
-> >> > It's not quite dead:
-> >> >
-> >> > http://www.eweek.com/servers/calxedas-arm-based-server-chips-re-emerge-with-new-company.html
-> >> >
-> >> > But AFAIK, production systems don't enable the SMMU, but someone could
-> >> > still want to at some point. A note in the commit log here would be
-> >> > nice so it gets recorded.
-> >> 
-> >> Actually, as Will mentioned this shouldn't affect Calxeda since this
-> >> isn't a banked register.  I think the confusion is from the `S' prefix
-> >> in the spec.  The /s/ (lower-case, italic) prefix means that there are
-> >> secure and non-secure versions of the register, while the S (upper-case,
-> >> non-italic) prefix means "this is a secure register" (which may or may
-> >> not have a banked non-secure counterpart).  This particular register is
-> >> an S-only register (there's no non-secure counterpart) so the Calxeda
-> >> workaround isn't relevant here, AFAICT.
-> >
-> > Right, but I think the problem is that we go and write zero to
-> > ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH at what *would be* their
-> > non-secure aliases for the secure side (i.e. + 0x400).
-> 
-> This sounds like a separate problem.  Since these GR0 registers aren't
-> banked the calxeda workaround doesn't work...  SMMU_STLBIALL, on the
-> other hand, is not only not banked but it's also "secure only" so I
-> don't think we have any business touching it ever.
-> 
-> > If would be better to check for the ARM_SMMU_OPT_SECURE_CFG_ACCESS feature
-> > and, if it's set then zero ARM_SMMU_GR0_STLBIALL at the correct address
-> > otherwise do the ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH.
-> 
-> I'm confused.  The problem I'm addressing here is that we're touching a
-> register that's marked as "secure only", which causes our system to
-> crash.  Why would we ever want to touch a secure only register, calxeda
-> workaround or not?
+On 5 January 2015 at 16:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
+>
+> I have a few (minor) comments below.
+>
+> On Mon, Dec 22, 2014 at 10:59:02AM +0000, Ard Biesheuvel wrote:
+>> In order to support kexec, the kernel needs to be able to deal with the
+>> state of the UEFI firmware after SetVirtualAddressMap() has been called.
+>> To avoid having separate code paths for non-kexec and kexec, let's move
+>> the call to SetVirtualAddressMap() to the stub: this will guarantee us
+>> that it will only be called once (since the stub is not executed during
+>> kexec), and ensures that the UEFI state is identical between kexec and
+>> normal boot.
+>>
+>> This implies that the layout of the virtual mapping needs to be created
+>> by the stub as well. All regions are rounded up to a naturally aligned
+>> multiple of 64 KB (for compatibility with 64k pages kernels) and recorded
+>> in the UEFI memory map. The kernel proper reads those values and installs
+>> the mappings in a dedicated set of page tables that are swapped in during
+>> UEFI Runtime Services calls.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/efi.h       |  20 +++-
+>>  arch/arm64/kernel/efi.c            | 223 ++++++++++++++++++++-----------------
+>>  arch/arm64/kernel/setup.c          |   1 +
+>>  drivers/firmware/efi/libstub/fdt.c | 137 ++++++++++++++++++++++-
+>>  4 files changed, 270 insertions(+), 111 deletions(-)
+>
+> [...]
+>
+>> +static void efi_set_pgd(struct mm_struct *mm)
+>> +{
+>> +       cpu_switch_mm(mm->pgd, mm);
+>> +       flush_tlb_all();
+>> +       if (icache_is_aivivt())
+>> +               __flush_icache_all();
+>> +}
+>
+> Do we have any idea how often we call runtime services?
+>
+> I assume not all that often (read the RTC at boot, set/get variables).
+>
+> If we're nuking the TLBs and I-cache a lot we'll probably need to
+> reserve an asid for the EFI virtmap.
+>
 
-Because I think the way the SMMU is wired for Calxeda is that the CPU can
-only see the secure side of the register interface, so the only way to nuke
-the whole TLB would be to use ARM_SMMU_GR0_STLBIALL.
+As pointed out by Leif, we should not be calling runtime services
+often enough for this to have an impact imo
 
-Will
+>> +void __init efi_virtmap_init(void)
+>> +{
+>> +       efi_memory_desc_t *md;
+>> +
+>> +       if (!efi_enabled(EFI_BOOT))
+>> +               return;
+>> +
+>> +       for_each_efi_memory_desc(&memmap, md) {
+>> +               u64 paddr, npages, size;
+>> +               pgprot_t prot;
+>> +
+>> +               if (!(md->attribute & EFI_MEMORY_RUNTIME))
+>> +                       continue;
+>> +               if (WARN(md->virt_addr == 0,
+>> +                        "UEFI virtual mapping incomplete or missing -- no entry found for 0x%llx\n",
+>> +                        md->phys_addr))
+>> +                       return;
+>
+> I wonder if we might want to use a different address to signal a bad
+> mapping (e.g. 0UL-1 as it's not even EFI_PAGE_SIZE aligned), just in
+> case we have to handle a valid use of zero in future for some reason --
+> perhaps coming from another OS.
+>
+
+The spec suggests that a failed call to SetVirtualAddressMap() means
+that the old 1:1 mapping is still in effect, and booting can continue
+as if the call was never made (This is suggested by the list of return
+codes, which are all based on validation of the input) That is also
+why efi_to_phys() returns the physical address if it doesn't find a
+virtual address, i.e., so that we can at least initialize EFI and the
+memory map. So afaict, there is really no reason to distinguish
+between 'SVAM() was not called' and 'SVAM() was called but didn't like
+its input args'.
+
+>> +
+>> +               paddr = md->phys_addr;
+>> +               npages = md->num_pages;
+>> +               memrange_efi_to_native(&paddr, &npages);
+>> +               size = npages << PAGE_SHIFT;
+>> +
+>> +               pr_info("  EFI remap 0x%012llx => %p\n",
+>
+> Why not use %016llx? We might only have 48-bit PAs currently, but we may
+> as well keep the VA and PA equally long when printing out -- that'll
+> also help to identify issues with garbage in the upper 16 bits of the
+> PA field.
+>
+> [...]
+>
+
+Sure, why not. It is code I carried over from the previous version,
+but I am happy to change it here
+
+
+>> +/*
+>> + * This is the base address at which to start allocating virtual memory ranges
+>> + * for UEFI Runtime Services. This is a userland range so that we can use any
+>> + * allocation we choose, and eliminate the risk of a conflict after kexec.
+>> + */
+>> +#define EFI_RT_VIRTUAL_BASE    0x40000000
+>
+> Nit: I'm not keen on the term "userland" here. You can map stuff to EL0
+> in the high half of the address space if you wanted, so TTBR0/TTBR1
+> aren't architecturally user/kernel.
+>
+> s/userland/low half/, perhaps?
+>
+
+OK
+
+> It might also be worth pointing out that the arbitrary base address
+> isn't zero so as to be less likely to be an idmap.
+>
+
+It is the largest non-zero base2 boundary that can reasonably be
+shared with v7, even with a 2:2 split.
+I will add a comment to that effect.
+
+>> +
+>> +static void update_memory_map(efi_memory_desc_t *memory_map,
+>> +                             unsigned long map_size, unsigned long desc_size,
+>> +                             int *count)
+>> +{
+>> +       u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
+>> +       efi_memory_desc_t *out = (void *)memory_map + map_size;
+>> +       int l;
+>> +
+>> +       for (l = 0; l < map_size; l += desc_size) {
+>> +               efi_memory_desc_t *in = (void *)memory_map + l;
+>> +               u64 paddr, size;
+>> +
+>> +               if (!(in->attribute & EFI_MEMORY_RUNTIME))
+>> +                       continue;
+>> +
+>> +               /*
+>> +                * Make the mapping compatible with 64k pages: this allows
+>> +                * a 4k page size kernel to kexec a 64k page size kernel and
+>> +                * vice versa.
+>> +                */
+>> +               paddr = round_down(in->phys_addr, SZ_64K);
+>> +               size = round_up(in->num_pages * EFI_PAGE_SIZE +
+>> +                               in->phys_addr - paddr, SZ_64K);
+>> +
+>> +               /*
+>> +                * Avoid wasting memory on PTEs by choosing a virtual base that
+>> +                * is compatible with section mappings if this region has the
+>> +                * appropriate size and physical alignment. (Sections are 2 MB
+>> +                * on 4k granule kernels)
+>> +                */
+>> +               if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
+>> +                       efi_virt_base = round_up(efi_virt_base, SZ_2M);
+>> +
+>> +               in->virt_addr = efi_virt_base + in->phys_addr - paddr;
+>> +               efi_virt_base += size;
+>> +
+>> +               memcpy(out, in, desc_size);
+>> +               out = (void *)out + desc_size;
+>> +               ++*count;
+>> +       }
+>> +}
+>
+> This feels like this should live in arch/arm64, or under some other
+> directory specific to arm/arm64. That said, I guess the fdt stuff is
+> currently arm-specific anyway, so perhaps this is fine.
+>
+> [...]
+>
+
+I can move this function (and get_memory_map) to arm-stub.c instead.
+
+>> @@ -248,12 +337,52 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+>>                 }
+>>         }
+>>
+>> +       /*
+>> +        * Update the memory map with virtual addresses. The function will also
+>> +        * populate the spare second half of the memory_map allocation with
+>> +        * copies of just the EFI_MEMORY_RUNTIME entries so that we can pass it
+>> +        * straight into SetVirtualAddressMap()
+>> +        */
+>> +       update_memory_map(memory_map, map_size, desc_size,
+>> +                         &runtime_entry_count);
+>> +
+>> +       pr_efi(sys_table,
+>> +              "Exiting boot services and installing virtual address map...\n");
+>
+> I believe that the memory map is allowed to change as a result of this
+> call, so I think this needs to be moved before update_memory_map.
+>
+
+Yes, you mentioned that before but I forgot about it.
+I will fix that as well.
+
+-- 
+Ard.
