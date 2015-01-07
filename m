@@ -1,41 +1,55 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 7 Jan 2015 15:36:08 +0800
-Subject: [RFC PATCH 11/11] kprobes: add CONFIG_EARLY_KPROBES option.
-In-Reply-To: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
-References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1420616168-43196-1-git-send-email-wangnan0@huawei.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 7 Jan 2015 09:06:30 +0100
+Subject: [PATCH 1/4] ARM: tegra: rely on bootloader pinmux programming on
+ nyan-big
+In-Reply-To: <54AC16B0.5050703@wwwdotorg.org>
+References: <1420540653-14816-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1420540653-14816-2-git-send-email-tomeu.vizoso@collabora.com>
+ <54AC16B0.5050703@wwwdotorg.org>
+Message-ID: <CAAObsKB1gMcLZ=n8Mc6JSLQHn5-6VWOhERLgYTdi6nit6yCj5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable early kprobes in Kconfig.
+On 6 January 2015 at 18:09, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 01/06/2015 03:37 AM, Tomeu Vizoso wrote:
+>>
+>> Following 6dbaff2b, the kernel expects that the bootloader has correctly
+>> programmed the Tegra pinmux.
+>>
+>> DTs for the Jetson and the Venice2 had been updated already but this one
+>> was left behind.
+>
+>
+> So this setup is true for NVIDIA-controlled development/reference boards
+> where we've ensured that the bootloader sets up 100% of the pinmux.
+>
+> However, I know that Coreboot on this board doesn't set up everything in the
+> pinmux, and since it's in r/o flash never will. As such, I'm not sure this
+> change is safe for this board. That is, unless you want to force upstream
+> kernels to be booted via a chain-loaded path: Coreboot (r/o) -> U-Boot (r/w
+> with full pinmux setup) -> kernel.
+>
+>> Have tested this with the stock vendor firmware (coreboot) and have found
+>> no
+>> issues.
+>
+>
+> There are presumably a bunch of features which aren't yet supported
+> upstream, and hence you couldn't test though? That means we might find that
+> parts of the pinmux aren't yet programmed but need to be to enable those
+> features.
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
----
- arch/Kconfig | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Sure, there's no chance that my testing could have been extensive enough.
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 05d7a8a..06dff4b 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -46,6 +46,18 @@ config KPROBES
- 	  for kernel debugging, non-intrusive instrumentation and testing.
- 	  If in doubt, say "N".
- 
-+config EARLY_KPROBES
-+	depends on KPROBES && OPTPROBES
-+	def_bool y
-+
-+config NR_EARLY_KPROBES_SLOTS
-+	int "Number of possible early kprobes"
-+	range 1 64
-+	default 16
-+	depends on EARLY_KPROBES
-+	help
-+	  Number of early kprobes slots.
-+
- config JUMP_LABEL
-        bool "Optimize very unlikely/likely branches"
-        depends on HAVE_ARCH_JUMP_LABEL
--- 
-1.8.4
+Following Andrew's feedback, I will be looking at getting the pinmux
+programming right in the DTs.
+
+Thanks,
+
+Tomeu
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
