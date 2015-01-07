@@ -1,15 +1,13 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jan 2015 09:49:12 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Jan 2015 10:00:55 +0100
 Subject: [PATCH v1] ARM:sunxi:sid: Make use of the of_match_ptr
 In-Reply-To: <1420616468-3782-1-git-send-email-oliver+list@schinagl.nl>
 References: <1420616468-3782-1-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <20150107084912.GD7853@lukather>
+Message-ID: <12820267.9PZueKuf7O@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jan 07, 2015 at 08:41:08AM +0100, Olliver Schinagl wrote:
+On Wednesday 07 January 2015 08:41:08 Olliver Schinagl wrote:
 > From: Olliver Schinagl <oliver@schinagl.nl>
 > 
 > I probably have forgotten to use this macro for the of_match pointer, so
@@ -33,24 +31,20 @@ On Wed, Jan 07, 2015 at 08:41:08AM +0100, Olliver Schinagl wrote:
 >  #include <linux/platform_device.h>
 >  #include <linux/random.h>
 > @@ -146,7 +147,7 @@ static struct platform_driver sunxi_sid_driver = {
->  	.remove = sunxi_sid_remove,
->  	.driver = {
->  		.name = DRV_NAME,
-> -		.of_match_table = sunxi_sid_of_match,
-> +		.of_match_table = of_match_ptr(sunxi_sid_of_match),
+>         .remove = sunxi_sid_remove,
+>         .driver = {
+>                 .name = DRV_NAME,
+> -               .of_match_table = sunxi_sid_of_match,
+> +               .of_match_table = of_match_ptr(sunxi_sid_of_match),
+>         },
+>  };
+>  module_platform_driver(sunxi_sid_driver);
 
-Why do you need this ? The sunxi_sid_of_match array is always defined.
+This looks wrong: sunxi_sid_of_match is defined unconditionally, so
+now you get a compiler warning if CONFIG_OF is disabled.
 
-Maxime
+The existing code is good, we only add the of_match_ptr() for drivers
+that are useful without CONFIG_OF and that want to save a few bytes
+in .data size.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/27a0aa53/attachment.sig>
+	Arnd
