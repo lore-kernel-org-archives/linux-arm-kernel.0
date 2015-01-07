@@ -1,49 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 07 Jan 2015 10:04:30 +0100
-Subject: [PATCH] ARM: exynos_defconfig: Enable CONFIG_LOCKUP_DETECTOR
-In-Reply-To: <1420566151-7136-1-git-send-email-moon.linux@yahoo.com>
-References: <1420566151-7136-1-git-send-email-moon.linux@yahoo.com>
-Message-ID: <1420621470.3893.6.camel@AMDC1943>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 7 Jan 2015 17:07:10 +0800
+Subject: [PATCH 01/17] ARM: sunxi: Register cpufreq-dt for sun[45678]i
+In-Reply-To: <20150106155532.GR7853@lukather>
+References: <1420511727-8242-1-git-send-email-wens@csie.org>
+ <1420511727-8242-2-git-send-email-wens@csie.org>
+ <20150106155532.GR7853@lukather>
+Message-ID: <CAGb2v64Qv1Nhy2w--4T7ujw9NC17QhJdmrn0VyDtTajv+tu+NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2015-01-06 at 23:12 +0530, Anand Moon wrote:
-> ARM Enable CONFIG_LOCKUP_DETECTOR to validaion of kernel locks
-s/validaion/validation/
+Hi,
 
-This config item helps getting some useful information when lockup
-happens. If you want to validate locks then probably you want
-PROVE_LOCKING... but its overhead is larger.
+On Tue, Jan 6, 2015 at 11:55 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Jan 06, 2015 at 10:35:11AM +0800, Chen-Yu Tsai wrote:
+>> On sun[45678]i, we have one cluster of identical cores sharing a
+>> clock, which is ideal for using cpufreq-dt. Register a platform
+>> device for cpufreq-dt.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> While I don't have anything against this patch, I seem to recall that
+> it was not necessary anymore, or that there was some work in the
+> direction of removing that kind of code, have you looked into that?
 
-Anyway the overhead of LOCKUP_DETECTOR is small and multi_v7_defconfig
-has it enabled so I guess exynos may do it as well.
+I believe you are referring to the work done by Viresh Kumar (CCed),
+specifically the 2 series "[RFC V1 0/8] CPUFreq: create platform-dev
+for DT based cpufreq drivers" and "[RFC] OPP: Redefine bindings to
+overcome shortcomings". So far the new code has not appeared in
+linux-next. If it does, I will happily use it.
 
-Could you only fix up the commit msg?
-
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-
-Best regards,
-Krzysztof
-
-> 
-> Tested on Exynos5422 ODROID XU3 board.
-> 
-> Signed-off-by: Anand Moon <moon.linux@yahoo.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 5ef14de..ecd9987 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -178,6 +178,7 @@ CONFIG_PRINTK_TIME=y
->  CONFIG_DEBUG_FS=y
->  CONFIG_MAGIC_SYSRQ=y
->  CONFIG_DEBUG_KERNEL=y
-> +CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_DETECT_HUNG_TASK=y
->  CONFIG_DEBUG_RT_MUTEXES=y
->  CONFIG_DEBUG_SPINLOCK=y
+ChenYu
