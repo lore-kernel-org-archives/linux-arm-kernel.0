@@ -1,109 +1,65 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Jan 2015 11:47:59 +0100
-Subject: [PATCH v11 2/9] ARM: l2c: use l2c_write_sec() for restoring
- latency and filter regs
-In-Reply-To: <20150105172028.GA19579@kahuna>
-References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
- <1420460348-20302-3-git-send-email-m.szyprowski@samsung.com>
- <20150105172028.GA19579@kahuna>
-Message-ID: <54AD0EDF.6080709@samsung.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 7 Jan 2015 10:54:01 +0000
+Subject: [PATCH] arm64: KVM: Fix HCR setting for 32bit guests
+In-Reply-To: <1420627503-25183-1-git-send-email-marc.zyngier@arm.com>
+References: <1420627503-25183-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54AD1049.9050202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Marc,
 
-On 2015-01-05 18:20, Nishanth Menon wrote:
-> On 13:19-20150105, Marek Szyprowski wrote:
->> All four register for latency and filter settings cannot be written in
->> non-secure mode and they should go through l2c_write_sec(). More on this
->> can be found in CoreLink Level 2 Cache Controller L2C-310 Technical
->> Reference Manual, 3.2. Register summary, table 3.1. This have been checked
->> the TRM for r3p3, but it should be uniform for all revisions.
->>
->> Reported-by: Nishanth Menon <nm@ti.com>
->> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   arch/arm/mm/cache-l2x0.c | 16 ++++++++--------
->>   1 file changed, 8 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index 5e65ca8dea62..0aeeaa95c42d 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -623,14 +623,14 @@ static void l2c310_resume(void)
->>   		unsigned revision;
->>   
->>   		/* restore pl310 setup */
->> -		writel_relaxed(l2x0_saved_regs.tag_latency,
->> -			       base + L310_TAG_LATENCY_CTRL);
->> -		writel_relaxed(l2x0_saved_regs.data_latency,
->> -			       base + L310_DATA_LATENCY_CTRL);
->> -		writel_relaxed(l2x0_saved_regs.filter_end,
->> -			       base + L310_ADDR_FILTER_END);
->> -		writel_relaxed(l2x0_saved_regs.filter_start,
->> -			       base + L310_ADDR_FILTER_START);
->> +		l2c_write_sec(l2x0_saved_regs.tag_latency, base,
->> +			      L310_TAG_LATENCY_CTRL);
->> +		l2c_write_sec(l2x0_saved_regs.data_latency, base,
->> +			      L310_DATA_LATENCY_CTRL);
->> +		l2c_write_sec(l2x0_saved_regs.filter_end, base,
->> +			      L310_ADDR_FILTER_END);
->> +		l2c_write_sec(l2x0_saved_regs.filter_start, base,
->> +			      L310_ADDR_FILTER_START);
->>   
->>   		revision = readl_relaxed(base + L2X0_CACHE_ID) &
->>   				L2X0_CACHE_ID_RTL_MASK;
-> Do you need the following as well at this point in the patch series?
-> Agreed that the writes will disappear later in the series.
+On 07/01/15 10:45, Marc Zyngier wrote:
+> Commit b856a59141b1 (arm/arm64: KVM: Reset the HCR on each vcpu
+> when resetting the vcpu) moved the init of the HCR register to
+> happen later in the init of a vcpu, but left out the fixup
+> done in kvm_reset_vcpu when preparing for a 32bit guest.
+>
+> As a result, the 32bit guest is run as a 64bit guest, but the
+> rest of the kernel still manages it as a 32bit. Fun follows.
+>
+> Moving the fixup to vcpu_reset_hcr solves the problem for good.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_emulate.h | 2 ++
+>  arch/arm64/kvm/reset.c               | 1 -
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 8127e45..36dcef6 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -41,6 +41,8 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>  static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+>  {
+>       vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+> +     if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+                                                                  ^
+                                                   whitespace is here
 
-Right. Thanks for pointing this. I will send an updated version, which
-will also fix the checkpatch --strict issues.
+Vladimir
 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 0aeeaa9..7afab37 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1135,28 +1135,28 @@ static void __init l2c310_of_parse(const struct device_node *np,
->   
->   	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
->   	if (tag[0] && tag[1] && tag[2])
-> -		writel_relaxed(
-> +		l2c_write_sec(
->   			L310_LATENCY_CTRL_RD(tag[0] - 1) |
->   			L310_LATENCY_CTRL_WR(tag[1] - 1) |
->   			L310_LATENCY_CTRL_SETUP(tag[2] - 1),
-> -			l2x0_base + L310_TAG_LATENCY_CTRL);
-> +			l2x0_base, L310_TAG_LATENCY_CTRL);
->   
->   	of_property_read_u32_array(np, "arm,data-latency",
->   				   data, ARRAY_SIZE(data));
->   	if (data[0] && data[1] && data[2])
-> -		writel_relaxed(
-> +		l2c_write_sec(
->   			L310_LATENCY_CTRL_RD(data[0] - 1) |
->   			L310_LATENCY_CTRL_WR(data[1] - 1) |
->   			L310_LATENCY_CTRL_SETUP(data[2] - 1),
-> -			l2x0_base + L310_DATA_LATENCY_CTRL);
-> +			l2x0_base,  L310_DATA_LATENCY_CTRL);
->   
->   	of_property_read_u32_array(np, "arm,filter-ranges",
->   				   filter, ARRAY_SIZE(filter));
->   	if (filter[1]) {
-> -		writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
-> -			       l2x0_base + L310_ADDR_FILTER_END);
-> -		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
-> -			       l2x0_base + L310_ADDR_FILTER_START);
-> +		l2c_write_sec(ALIGN(filter[0] + filter[1], SZ_1M),
-> +			       l2x0_base, L310_ADDR_FILTER_END);
-> +		l2c_write_sec((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
-> +			       l2x0_base, L310_ADDR_FILTER_START);
->   	}
->   
->   	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_512K);
->   
+> +             vcpu->arch.hcr_el2 &= ~HCR_RW;
+>  }
+>
+>  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 70a7816..0b43265 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -90,7 +90,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>                       if (!cpu_has_32bit_el1())
+>                               return -EINVAL;
+>                       cpu_reset = &default_regs_reset32;
+> -                     vcpu->arch.hcr_el2 &= ~HCR_RW;
+>               } else {
+>                       cpu_reset = &default_regs_reset;
+>               }
+>
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
