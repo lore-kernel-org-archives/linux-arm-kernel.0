@@ -1,231 +1,164 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Jan 2015 11:39:03 +0000
-Subject: [PATCH 7/9] ARM: vexpress/TC2: Add generic power domain
- awareness to scp driver
-In-Reply-To: <1420562233-2015-8-git-send-email-mathieu.poirier@linaro.org>
-References: <1420562233-2015-1-git-send-email-mathieu.poirier@linaro.org>
- <1420562233-2015-8-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20150107113903.GA29630@red-moon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 7 Jan 2015 11:41:02 +0000
+Subject: [PATCH 0/8] arm64: improved memory map handling for /dev/mem,
+ ACPI etc
+In-Reply-To: <20150106081635.GE2113@darkstar.redhat.com>
+References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20141226093528.GA26133@darkstar.redhat.com>
+ <CAKv+Gu_1VCJK7y5U9H-mhjjN6AFW8+SGvbKUZfuzx6qGEpVg0A@mail.gmail.com>
+ <20141230092514.GF2457@darkstar.redhat.com>
+ <CAKv+Gu_Ou6Fv7-AUcpbUJAijwEJ8=PCB1mQU3mCfctLFAMhu_w@mail.gmail.com>
+ <20150104081905.GA6231@darkstar.redhat.com>
+ <CAKv+Gu-P7AeMNveZMe814FgrEr_z26vaYKWa=borKoPSc76Y6g@mail.gmail.com>
+ <20150106081635.GE2113@darkstar.redhat.com>
+Message-ID: <CAKv+Gu9DQLZnvNyF0qdk5jSH6=NvdsKYTX+E46U=kGRzCEfwHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+On 6 January 2015 at 08:16, Dave Young <dyoung@redhat.com> wrote:
+> On 01/05/15 at 09:18am, Ard Biesheuvel wrote:
+>> On 4 January 2015 at 08:19, Dave Young <dyoung@redhat.com> wrote:
+>> > On 12/30/14 at 01:21pm, Ard Biesheuvel wrote:
+>> >> On 30 December 2014 at 09:25, Dave Young <dyoung@redhat.com> wrote:
+>> >> > On 12/29/14 at 09:22am, Ard Biesheuvel wrote:
+>> >> >> On 26 December 2014 at 09:35, Dave Young <dyoung@redhat.com> wrote:
+>> >> >> > On 12/22/14 at 07:08pm, Ard Biesheuvel wrote:
+>> >> >> >> This series was split off from the UEFI virtmap for kexec series that I posted
+>> >> >> >> earlier today. The main purpose is to deal with the need to classify memory
+>> >> >> >> ranges as RAM or non-RAM in a consistent and comprehensive manner. This series
+>> >> >> >> applies on top of the other series.
+>> >> >> >>
+>> >> >> >> Patch #1 avoids an early panic if the UEFI memory map is available but UEFI
+>> >> >> >> support itself fails to initialize. In this case, there is no need to panic
+>> >> >> >> early, and we have a better chance of being able to inform the user if we deal
+>> >> >> >> with this error condition at a later time.
+>> >> >> >>
+>> >> >> >> Patch #2 adds iomem resource registration of UEFI memory regions. This is
+>> >> >> >> necessary because otherwise, drivers could potentially claim regions that
+>> >> >> >> are in active use by the firmware. This applies to both MMIO (NOR flash, RTC)
+>> >> >> >> and RAM ranges (runtime services code and data).
+>> >> >> >>
+>> >> >> >> Patch #3-6 adds support to UEFI and non-UEFI code paths to record all memory
+>> >> >> >> known to the system in the 'physmem' memblock table (if enabled). This fulfils
+>> >> >> >> a need in the /dev/mem and (upcoming) ACPI layers to be able to classify ranges
+>> >> >> >> as being backed by normal RAM even if they are not covered by the 'memory'
+>> >> >> >> memblock table, and are hence not covered by the linear direct mapping.
+>> >> >> >> The physmem code is pre-existing code that only needs minor tweaking to be made
+>> >> >> >> suitable for this purpose.
+>> >> >> >>
+>> >> >> >> Patch #7 enables the 'physmem' memblock table for arm64, and wires it into the
+>> >> >> >> handling of /dev/mem mappings, both to decide whether it should be mapped as
+>> >> >> >> MT_NORMAL, and whether read-write access can be allowed. (Non-RAM regions can
+>> >> >> >> be mapped read-write as long as they are not claimed by a driver in the iomem
+>> >> >> >> resource table. RAM regions can only be mapped read-only, and only if they are
+>> >> >> >> not covered by the 'memory' memblock table, and hence not covered by the linear
+>> >> >> >> mapping)
+>> >> >> >>
+>> >> >> >> Finally, patch #8 changes the way the virtual memory map is handled by the
+>> >> >> >> early UEFI code. Specifically, it memblock_remove()s rather than _reserves()
+>> >> >> >> UEFI reserved RAM regions, so that they are removed entirely from the linear
+>> >> >> >> mapping.
+>> >> >> >>
+>> >> >> >> Ard Biesheuvel (8):
+>> >> >> >>   arm64/efi: use UEFI memory map unconditionally if available
+>> >> >> >>   arm64/efi: register UEFI reserved regions as iomem resources
+>> >> >> >>   memblock: add physmem to memblock_dump_all() output
+>> >> >> >>   memblock: introduce memblock_add_phys() and memblock_is_physmem()
+>> >> >> >>   of: fdt: register physmem in early_init_dt_scan_memory()
+>> >> >> >>   arm64/efi: register physmem in reserve_regions()
+>> >> >> >>   arm64: use 'physmem' memblock to improve CONFIG_STRICT_DEVMEM handling
+>> >> >> >>   arm64/efi: memblock_remove rather than _reserve UEFI reserved RAM
+>> >> >> >
+>> >> >> > Ard, It is much cleaner for this splitting.
+>> >> >> >
+>> >> >>
+>> >> >> Thanks for having a look.
+>> >> >>
+>> >> >> > I wonder if some of them can become general code such as register reserved
+>> >> >> > regions as iomem resources?
+>> >> >> >
+>> >> >>
+>> >> >> AFAICT, the x86 code adds reservations for such regions to the E820
+>> >> >> memory map, which in turn is used to memblock_reserve() the actual
+>> >> >> memory. Also, sharing of the RTC is handled with a dedicated mutex in
+>> >> >> the runtime services wrapper code (and x86 does not even use the time
+>> >> >> related runtime services as they are broken on many firmware
+>> >> >> implementations) so blindly applying the same logic to x86 or ia64
+>> >> >> would likely break stuff.
+>> >> >
+>> >> > Ok, I think bootloader will pass the E820 ranges though it can not tell
+>> >> > which region is for what.
+>> >> >
+>> >> >>
+>> >> >> Do you (or Mark) have any feedback on the utility of this series in
+>> >> >> the ACPI context? I failed to mention in the cover letter that
+>> >> >> memblock_is_physmem() now serves the purpose of page_is_ram(), i.e.,
+>> >> >> whether a physical region is backed by a slice of RAM that was left
+>> >> >> out of the kernel's linear mapping.
+>> >> >
+>> >> > I will do some test later along with the stable mapping stuff.
+>> >
+>> > The whole patchset works well without the last patch.
+>> >
+>> > I found that patch 8/8 caused system boot hangs very early.
+>> > Just after stub print something about virtmap..
+>> >
+>>
+>> Which platform is this?
+>> Do you have earlycon enabled?
+>
+> It is apm mustang, earlycon was enabled.
+>
 
-On Tue, Jan 06, 2015 at 04:37:11PM +0000, mathieu.poirier at linaro.org wrote:
+That's odd. reserve_regions() is called after uefi_init(), and the
+latter prints the EFI: string, so I don't think the patch should
+affect anything else before that either. Could you please double check
+if you do see the console enabled/disabled messages?
 
-[...]
+>>
+>> > Any idea about it? I tested your patches upon 3.18.
+>> >
+>>
+>> I suppose you tested both the virtmap series and this one, but did you
+>> also take the 3.19 changes we did for UEFI? Not sure it would make a
+>> difference, though.
+>
+> Yes, both virtmap series and this one, I did not take UEFI 3.19 changes,
+> Which patchset do you have in mind? If no clue I will try rebase to test 3.19
+>
 
-> diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-> index f61158c6ce71..4ff1009f2d16 100644
-> --- a/arch/arm/mach-vexpress/spc.c
-> +++ b/arch/arm/mach-vexpress/spc.c
-> @@ -28,6 +28,8 @@
->  #include <linux/pm_opp.h>
->  #include <linux/slab.h>
->  #include <linux/semaphore.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/pm_domain.h>
->  
->  #include <asm/cacheflush.h>
->  
-> @@ -92,6 +94,9 @@
->  #define STAT_ERR(type)		((1 << 1) << (type << 2))
->  #define RESPONSE_MASK(type)	(STAT_COMPLETE(type) | STAT_ERR(type))
->  
-> +static atomic_t gpd_A7_cluster_on = ATOMIC_INIT(0);
-> +static atomic_t gpd_A15_cluster_on = ATOMIC_INIT(0);
-> +
->  struct ve_spc_opp {
->  	unsigned long freq;
->  	unsigned long u_volt;
-> @@ -209,12 +214,19 @@ void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr)
->   */
->  void ve_spc_powerdown(u32 cluster, bool enable)
->  {
-> +	bool is_a15;
->  	u32 pwdrn_reg;
->  
->  	if (cluster >= MAX_CLUSTERS)
->  		return;
->  
-> -	pwdrn_reg = cluster_is_a15(cluster) ? A15_PWRDN_EN : A7_PWRDN_EN;
-> +	is_a15 = cluster_is_a15(cluster);
-> +	if (is_a15 && atomic_read(&gpd_A15_cluster_on))
-> +		return;
-> +	else if (!is_a15 && atomic_read(&gpd_A7_cluster_on))
-> +		return;
-> +
-> +	pwdrn_reg = is_a15 ? A15_PWRDN_EN : A7_PWRDN_EN;
->  	writel_relaxed(enable, info->baseaddr + pwdrn_reg);
+Well, there is patch 61139eb04056bba69aeef6c481802c4ea028bf4d that
+changes the definition of is_reserve_region(), which may or may not be
+relevant. Other than that, I don't think any of those patches could
+make a difference here.
 
-I do not like this, for multiple reasons.
-
-(1) It might not do what you want. I am not sure that nuking the power
-    down request is safe. I have to check the power controller behaviour
-    when a core is going through power down sequence but the PWRDN_EN
-    bit is not set. You might end up with cores that are just being
-    reset on pending IRQ (defeating your purpose) or stuck forever.
-(2) It must be done by attaching the power domains to CPUidle states.
-    Idle states are automagically disabled when the domain is turned on, it
-    is cleaner, and more robust than what you do here. On the downside,
-    we have to work together to add power domain information to DT idle
-    states specifications/bindings.
-
-    (see pm_genpd_attach_cpuidle() drivers/base/power/domain.c)
-
-(3) I do not like the is_a15 comparisons, I think this can be done with
-    cluster indexing the atomic variable, but since you are removing
-    this code ;-) it does not really matter.
-
->  }
->  
-> @@ -447,6 +459,116 @@ static int ve_init_opp_table(struct device *cpu_dev)
->  	return ret;
->  }
->  
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-> +static int scp_power_on_pd_A7(struct generic_pm_domain *domain)
-> +{
-> +	/*
-> +	 * Simply tell mcpm we need power.  Nothing else needs to be done
-> +	 * as CPUs in the cluster are already powered when we reach this point.
-> +	 */
-> +	atomic_set(&gpd_A7_cluster_on, 1);
-> +	return 0;
-> +}
-> +
-> +static int scp_power_off_pd_A7(struct generic_pm_domain *domain)
-> +{
-> +	atomic_set(&gpd_A7_cluster_on, 0);
-> +	return 0;
-> +}
-> +
-> +static int scp_power_on_pd_A15(struct generic_pm_domain *domain)
-> +{
-> +	/*
-> +	 * Simply tell mcpm we need power.  Nothing else needs to be done
-> +	 * as CPUs in the cluster are already powered when we reach this point.
-> +	 */
-> +	atomic_set(&gpd_A15_cluster_on, 1);
-> +	return 0;
-> +}
-> +
-> +static int scp_power_off_pd_A15(struct generic_pm_domain *domain)
-> +{
-> +	atomic_set(&gpd_A15_cluster_on, 0);
-> +	return 0;
-> +}
-> +
-> +static int (*const scp_power_fct[MAX_CLUSTERS * 2])
-> +		(struct generic_pm_domain *domain) = {
-> +		scp_power_on_pd_A15, scp_power_off_pd_A15,
-> +		scp_power_on_pd_A7, scp_power_off_pd_A7};
-
-I think you can remove the functions above and the corresponding atomic
-variables, see my comment above.
-
-> +static void scp_init_pd(struct generic_pm_domain *pd,
-> +			    struct device_node *np,
-> +			    struct platform_device *pdev, int cluster)
-> +{
-> +	char name[50];
-> +	int index = cluster * 2;
-> +
-> +	snprintf(name, sizeof(name), "%s-%d", np->name, cluster);
-> +
-> +	pd->name = kstrdup(name, GFP_KERNEL);
-> +	pd->power_on = scp_power_fct[index];
-> +	pd->power_off =  scp_power_fct[index + 1];
-> +	platform_set_drvdata(pdev, pd);
-> +
-> +	pm_genpd_init(pd, NULL, true);
-> +	pm_genpd_poweron(pd);
-> +}
-> +
-> +static __init int ve_spc_gpd_init(void)
-> +{
-> +	struct genpd_onecell_data *data;
-> +	struct generic_pm_domain *pd, **cluster_pds;
-> +	struct platform_device *pdev;
-> +	struct device *dev;
-> +	struct device_node *np;
-> +	int count;
-> +
-> +	np = of_find_compatible_node(NULL, NULL,
-> +				     "arm,vexpress-power-controller");
-
-See the bindings discussions, there is not such a thing as
-vexpress-power-controller.
-
-> +	if (!np)
-> +		return -EINVAL;
-> +
-> +	cluster_pds = kzalloc(sizeof(struct generic_pm_domain *) * MAX_CLUSTERS,
-> +			      GFP_KERNEL);
-> +	if (!cluster_pds)
-> +		goto err_cluster_kzalloc;
-
-You are freeing a pointer that failed to be allocated.
-
-> +
-> +	data = kzalloc(sizeof(struct genpd_onecell_data), GFP_KERNEL);
-> +	if (!data)
-> +		goto err_data;
-
-Mmm...is that the label you want to jump to ? it fails to put the OF
-node.
-
-> +
-> +	pdev = of_find_device_by_node(np);
-> +	dev = &pdev->dev;
-> +
-> +	for (count = 0; count < MAX_CLUSTERS; count++) {
-> +		pd = kzalloc(sizeof(struct generic_pm_domain), GFP_KERNEL);
-> +		if (!pd)
-> +			goto err_pd_kzalloc;
-
-This label does not free the data pointer. I think you should rework
-the error exit paths.
-
-> +		scp_init_pd(pd, np, pdev, count);
-> +		cluster_pds[count] = pd;
-> +	}
-> +
-> +	data->num_domains = count;
-> +	data->domains = cluster_pds;
-> +
-> +	of_genpd_add_provider_onecell(np, data);
-> +	return 0;
-> +
-> +err_pd_kzalloc:
-> +	while (--count >= 0)
-> +		kfree(cluster_pds[count]);
-> +
-> +err_cluster_kzalloc:
-> +	of_node_put(np);
-> +err_data:
-> +	kfree(cluster_pds);
-> +	return -ENOMEM;
-> +
-> +}
-> +arch_initcall(ve_spc_gpd_init);
-
-It should not be an arch initcall, call it from spc_init, and make it an
-empty static inline if !CONFIG_PM_GENERIC_DOMAINS_OF, eg:
-
-static inline int ve_spc_gpd_init(void)
-{
-	return -ENOTSUPP;
-}
-
-Lorenzo
-
-> +#endif
-> +
->  int __init ve_spc_init(void __iomem *baseaddr, u32 a15_clusid, int irq)
->  {
->  	int ret;
-> -- 
-> 1.9.1
-> 
-> 
+>>
+>> >> > BTW, with previous stable mapping patches on modified 3.18 tree kexec kernel
+>> >> > panics because of damaged efi mempry map arrays. It contains some
+>> >> > random value instead of right addresses so that virt_to_phys return
+>> >> > same value for vendor field. Will do more debugging maybe I missed something.
+>> >> > Any clue for debugging above issue will be appreciated.
+>> >> >
+>> >>
+>> >> No clues, unfortunately. The memory map is not used after early boot,
+>> >> so it may be getting clobbered at any point between the first boot and
+>> >> the second boot.
+>> >
+>> > It was caused by uefi sys table/mmap start addresses changes.
+>> > I generate dtb from acpi=off boot /proc/device-tree, and use the dtb for kexec
+>> > boot, but seems mmap addresses changes sometimes.
+>> >
+>> > Do you know have plan or status in Linaro for exporting dtb for acpi booting?
+>> >
+>>
+>> We have this patch upstream now
+>>
+>> 08d53aa58cb1 of/fdt: export fdt blob as /sys/firmware/fdt
+>>
+>> which exports whatever FDT the kernel received from the bootloader or
+>> the EFI stub, regardless of whether the kernel uses DT or not.
+>
+> Great, will try.
+>
+> Thanks
+> Dave
