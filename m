@@ -1,32 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 7 Jan 2015 11:23:19 +0100
-Subject: [PATCH 01/17] ARM: sunxi: Register cpufreq-dt for sun[45678]i
-In-Reply-To: <1420511727-8242-2-git-send-email-wens@csie.org>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-2-git-send-email-wens@csie.org>
-Message-ID: <20150107102319.GH7853@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 10:25:43 +0000
+Subject: [PATCH] arm64: mm: support instruction SETEND
+In-Reply-To: <54AD061A.6090602@arm.com>
+References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
+ <54AD061A.6090602@arm.com>
+Message-ID: <20150107102543.GD7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 10:35:11AM +0800, Chen-Yu Tsai wrote:
-> On sun[45678]i, we have one cluster of identical cores sharing a
-> clock, which is ideal for using cpufreq-dt. Register a platform
-> device for cpufreq-dt.
+On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
+> On 07/01/15 05:52, Leo Yan wrote:
+> > Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
+> > instruction will be treated as UNALLOCATED; this error can be
+> > reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
+> > mode, finally kernel will trap the exception if the userspace
+> > libs use SETEND instruction.
+> >
+> > So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
+> >
+> The best way to do this, is via the instruction emulation framework 
+> added by Punit, which handles the armv8 deprecated/obsoleted 
+> instructions. This is now queued for 3.19.
+> I have a patchset which adds the 'SETEND' emulation support to the 
+> framework. This will enable better handling of the feature, including 
+> finding out the users of the deprecated instruction (when we switch to 
+> the emulation mode).
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Btw, there is one open question that I am seeking answer for.
+> 
+> What should be the endianness of the signal handlers ? Should we leave 
+> it to the application ? Or restore the 'default' endianness for the 
+> signal handler ?
 
-Applied, thanks!
+I think we should restore the default endianness, otherwise you're
+essentially forcing signal handlers to do a setend as their first
+instruction to get into a consistent state. That also matches the endianness
+of the sigframe that we push onto the stack, right?
 
-Maxime
+setjmp/longjmp could be fun, but I think that an application would need
+to take care not to make endianness assumptions across those anyway.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/aeefe19e/attachment-0001.sig>
+Will
