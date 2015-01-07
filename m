@@ -1,71 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  7 Jan 2015 23:59:26 +0100
-Subject: [PATCH] net/at91_ether: prepare and unprepare clock
-Message-ID: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Jan 2015 15:00:07 -0800
+Subject: [PATCH 00/11] ARM: OMAP3: legacy clock data move under clk driver
+In-Reply-To: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
+References: <1418746856-17173-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20150107230006.GE13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock is enabled without being prepared, this leads to:
+* Tero Kristo <t-kristo@ti.com> [141216 08:22]:
+> Hi,
+> 
+> These patches move the legacy clock data for omap3 under drivers/clk/ti.
+> After these patches are applied, it should be possible to get rid of
+> clk-private.h (long pending project for Mike.)
+> 
+> Testing done (on top of 3.18-rc1):
+> 
+> omap3-beagle: boot / suspend-resume (ret/off) / cpuidle (ret/off)
+> omap3-beagle-xm: boot upto fs mount (see note below)
+> sdp3430: boot
+> n900: boot
+> 
+> Note: beagle-xm failed with FS mount on the board I have access to, but
+>       this happens with clean 3.18-rc1 and linux-next also at the moment.
+>       The board has probably corrupted filesystem image but I am unable
+>       to fix this atm (remote board.)
+> 
+> Test branch:
+> tree: https://github.com/t-kristo/linux-pm.git
+> branch: 3.18-rc1-omap3-clk-rework
 
-WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
+Great, hopefully this will finally allow Mike to make the
+generic struct clk private to drivers/clk :)
 
-and a non working ethernet interface.
+Seems to boot just fine based on a quick legacy booting test
+on n900.
 
-Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
+Mike, assuming no other issues, can you please apply these into a
+immutable branch against v3.19-rc1 that Paul and I can also merge
+in as needed?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/net/ethernet/cadence/at91_ether.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Please also feel free to add:
 
-diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-index 55eb7f2af2b4..7ef55f5fa664 100644
---- a/drivers/net/ethernet/cadence/at91_ether.c
-+++ b/drivers/net/ethernet/cadence/at91_ether.c
-@@ -340,7 +340,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
- 		res = PTR_ERR(lp->pclk);
- 		goto err_free_dev;
- 	}
--	clk_enable(lp->pclk);
-+	clk_prepare_enable(lp->pclk);
- 
- 	lp->hclk = ERR_PTR(-ENOENT);
- 	lp->tx_clk = ERR_PTR(-ENOENT);
-@@ -406,7 +406,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
- err_out_unregister_netdev:
- 	unregister_netdev(dev);
- err_disable_clock:
--	clk_disable(lp->pclk);
-+	clk_disable_unprepare(lp->pclk);
- err_free_dev:
- 	free_netdev(dev);
- 	return res;
-@@ -424,7 +424,7 @@ static int at91ether_remove(struct platform_device *pdev)
- 	kfree(lp->mii_bus->irq);
- 	mdiobus_free(lp->mii_bus);
- 	unregister_netdev(dev);
--	clk_disable(lp->pclk);
-+	clk_disable_unprepare(lp->pclk);
- 	free_netdev(dev);
- 
- 	return 0;
-@@ -440,7 +440,7 @@ static int at91ether_suspend(struct platform_device *pdev, pm_message_t mesg)
- 		netif_stop_queue(net_dev);
- 		netif_device_detach(net_dev);
- 
--		clk_disable(lp->pclk);
-+		clk_disable_unprepare(lp->pclk);
- 	}
- 	return 0;
- }
-@@ -451,7 +451,7 @@ static int at91ether_resume(struct platform_device *pdev)
- 	struct macb *lp = netdev_priv(net_dev);
- 
- 	if (netif_running(net_dev)) {
--		clk_enable(lp->pclk);
-+		clk_prepare_enable(lp->pclk);
- 
- 		netif_device_attach(net_dev);
- 		netif_start_queue(net_dev);
--- 
-2.1.0
+Acked-by: Tony Lindgren <tony@atomide.com>
