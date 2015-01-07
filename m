@@ -1,54 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 11:20:19 +0000
-Subject: arm64 fails to build in -next
-In-Reply-To: <20150107111642.GU2634@sirena.org.uk>
-References: <E1Y8ilQ-00009L-4i@debutante> <20150107111642.GU2634@sirena.org.uk>
-Message-ID: <20150107112019.GI7485@arm.com>
+From: tony.kn@samsung.com (Tony K Nadackal)
+Date: Wed, 07 Jan 2015 16:52:51 +0530
+Subject: [PATCH v2 2/2] [media] s5p-jpeg: Adding Exynos7 JPEG variant
+In-Reply-To: <54AD068F.8030001@samsung.com>
+References: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
+ <1418974680-5837-3-git-send-email-tony.kn@samsung.com>
+ <54AD068F.8030001@samsung.com>
+Message-ID: <000801d02a6c$59fdbc60$0df93520$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 11:16:42AM +0000, Mark Brown wrote:
-> On Wed, Jan 07, 2015 at 05:02:36AM +0000, Build bot for Mark Brown wrote:
-> 
-> > Failed defconfigs:
-> > 	arm64-allnoconfig
-> > 	arm64-allmodconfig
-> > 	arm64-defconfig
-> 
-> For the past few days the arm64 tree hasn't built at all in -next as far
-> as I can see:
-> 
-> > 	arm64-allmodconfig
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/mm/dump.c:55:20: error: 'PCI_IOBASE' undeclared here (not in a function)
-> > ../arch/arm64/include/asm/arch_timer.h:112:2: error: implicit declaration of function 'BUG' [-Werror=implicit-function-declaration]
-> > ../arch/arm64/kernel/module.c:408:4: error: implicit declaration of function 'apply_alternatives' [-Werror=implicit-function-declaration]
-> > ../arch/arm64/kernel/smp_spin_table.c:80:2: error: implicit declaration of function 'ioremap_cache' [-Werror=implicit-function-declaration]
-> > ../arch/arm64/kernel/smp_spin_table.c:92:2: error: implicit declaration of function 'writeq_relaxed' [-Werror=implicit-function-declaration]
-> > ../arch/arm64/kernel/smp_spin_table.c:101:2: error: implicit declaration of function 'iounmap' [-Werror=implicit-function-declaration]
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> > ../arch/arm64/include/asm/processor.h:47:32: error: 'PHYS_MASK' undeclared (first use in this function)
-> 
-> The other builds have a subset of these errors.  I spoke to Will on IRC
-> yesterday and he mentioned a missing includes fix from Paul Walmsley,
-> I've not seen that fix but it sounds like it may well be relevant.
+Hi Jacek,
 
-Paul posted a new series of his fixes this morning, so I'll send them in the
-pull for -rc4.
+On  Wednesday, January 07, 2015 3:43 PM : Jacek Anaszewski wrote,
 
-Will
+> Hi Tony,
+> 
+> On 12/19/2014 08:38 AM, Tony K Nadackal wrote:
+> > Fimp_jpeg used in Exynos7 is a revised version. Some register
+> > configurations are slightly different from JPEG in Exynos4.
+> > Added one more variant SJPEG_EXYNOS7 to handle these differences.
+> >
+> > Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> > ---
+> >   .../bindings/media/exynos-jpeg-codec.txt           |  2 +-
+> >   drivers/media/platform/s5p-jpeg/jpeg-core.c        | 61
+++++++++++++++++++-
+> ---
+> >   drivers/media/platform/s5p-jpeg/jpeg-core.h        | 10 ++--
+> >   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c  | 32 ++++++------
+> >   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h  |  8 +--
+> >   drivers/media/platform/s5p-jpeg/jpeg-regs.h        | 17 ++++--
+> >   6 files changed, 93 insertions(+), 37 deletions(-)
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> > b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> > index bf52ed4..cd19417 100644
+> > --- a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> > +++ b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
+> > @@ -4,7 +4,7 @@ Required properties:
+> >
+> >   - compatible	: should be one of:
+> >   		  "samsung,s5pv210-jpeg", "samsung,exynos4210-jpeg",
+> > -		  "samsung,exynos3250-jpeg";
+> > +		  "samsung,exynos3250-jpeg", "samsung,exynos7-jpeg";
+> >   - reg		: address and length of the JPEG codec IP register set;
+> >   - interrupts	: specifies the JPEG codec IP interrupt;
+> >   - clock-names   : should contain:
+> 
+> This should be put in a separate patch.
+
+Checkpatch gives warning if this change is not there.
+If that is ok with you, I will make this change a separate patch. 
+
+[snip]
+
+> --
+> Best Regards,
+> Jacek Anaszewski
+
+Thanks and Regards,
+Tony
