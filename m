@@ -1,25 +1,78 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 7 Jan 2015 09:44:37 -0200
-Subject: LCD support on mx25
-Message-ID: <CAOMZO5BRk_A4=0=xgbXysbE6ZepRozp7HPPZxZci3_aqq1NwAg@mail.gmail.com>
+From: tony.kn@samsung.com (Tony K Nadackal)
+Date: Wed, 07 Jan 2015 17:16:44 +0530
+Subject: [PATCH v2 1/2] [media] s5p-jpeg: Fix modification sequence of
+ interrupt enable register
+In-Reply-To: <54AD058B.6070900@samsung.com>
+References: <1418974680-5837-1-git-send-email-tony.kn@samsung.com>
+ <1418974680-5837-2-git-send-email-tony.kn@samsung.com>
+ <54AD058B.6070900@samsung.com>
+Message-ID: <000901d02a6f$b3ac62e0$1b0528a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jacek,
 
-In order to convert mx25 into a dt-only platform the only missing
-piece is to add LCD support for imx25-pdk.dts.
+On Wednesday, January 07, 2015 3:38 PM Jacek Anaszewski wrote,
 
-I have tried it and it is not working for me. Also, when I try the
-non-dt mx25pdk the LCD is also not functional anymore. I know the
-hardware is fine because LCD works with FSL kernel. I haven't started
-any bisect work yet.
+> Hi Tony,
+> 
+> On 12/19/2014 08:37 AM, Tony K Nadackal wrote:
+> > Fix the bug in modifying the interrupt enable register.
+> 
+> For Exynos4 this was not a bug as there are only five bit fields used in the
+> EXYNOS4_INT_EN_REG - all of them enable related interrupt signal and
+> EXYNOS4_INT_EN_ALL value is 0x1f which just sets these bit fields to 1.
+> 
 
-Eric/Dennis,
+I agree that it is not a bug. 
+I added the register read before modifying it to avoid any potential bugs in the
+future.
 
-I am wondering if imx25-eukrea-mbimxsd25 boards has LCD functional
-with a 3.19-rc kernel? Could you please confirm?
+> If for Exynos7 there are other bit fields in this register and it has to be
+read prior
+> setting to find out current state then I'd parametrize this function with
+version
+> argument as you do it in the patch adding support for Exynos7, but for Exynos4
+> case I'd left the behaviour as it is currenlty, i.e.
+> avoid reading the register and do it only for Exynos7 case.
 
-Thanks,
+Directly writing the value EXYNOS4_INT_EN_ALL (0x1B6 in Exynos7) to
+EXYNOS4_INT_EN_REG works in case of Exynos7 too.
+I  will parametrize this function with version to take care of the Exynos7 bit
+fields.
 
-Fabio Estevam
+> Effectively, this patch is not required, as it doesn't fix anything but adds
+> redundant call to readl.
+> 
+> > Signed-off-by: Tony K Nadackal <tony.kn@samsung.com>
+> > ---
+> >   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 5 ++++-
+> >   1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > index e53f13a..a61ff7e 100644
+> > --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > @@ -155,7 +155,10 @@ void exynos4_jpeg_set_enc_out_fmt(void __iomem
+> > *base, unsigned int out_fmt)
+> >
+> >   void exynos4_jpeg_set_interrupt(void __iomem *base)
+> >   {
+> > -	writel(EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
+> > +	unsigned int reg;
+> > +
+> > +	reg = readl(base + EXYNOS4_INT_EN_REG) & ~EXYNOS4_INT_EN_MASK;
+> > +	writel(reg | EXYNOS4_INT_EN_ALL, base + EXYNOS4_INT_EN_REG);
+> >   }
+> >
+> >   unsigned int exynos4_jpeg_get_int_status(void __iomem *base)
+> >
+> 
+> 
+> --
+> Best Regards,
+> Jacek Anaszewski
+
+Thanks and Regards,
+Tony
