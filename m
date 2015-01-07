@@ -1,147 +1,134 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 08 Jan 2015 08:51:07 +0900
-Subject: [PATCHv7 00/10] devfreq: Add devfreq-event class to provide raw data
- for devfreq device
-Message-ID: <1420674677-3077-1-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 08 Jan 2015 08:51:10 +0900
+Subject: [PATCHv7 03/10] devfreq: event: Add resource-managed function for
+ devfreq-event device
+In-Reply-To: <1420674677-3077-1-git-send-email-cw00.choi@samsung.com>
+References: <1420674677-3077-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1420674677-3077-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add new devfreq_event class to provide raw data to determine
-current utilization of device  which is used for devfreq governor.
+This patch add the resource-managed function for devfreq-event device as
+following functions. The devm_devfreq_event_add_edev() manages automatically
+the memory of devfreq-event device using resource management.
+- devm_devfreq_event_add_edev()
+- devm_devfreq_event_remove_edev()
 
-The following description explains the feature of two kind of devfreq class:
-- devfreq class (existing)
- : devfreq consumer device use raw data from devfreq_event device for
-   determining proper current system state and change voltage/frequency
-   dynamically using various governors.
-- devfreq_event class (new)
- : Provide measured raw data to devfreq device for governor
+Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/devfreq/devfreq-event.c | 63 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/devfreq-event.h   | 16 +++++++++++
+ 2 files changed, 79 insertions(+)
 
----------------
-Changes from v6:
-- This patchset is based on v3.19-rc3.
-1. devfreq-event class driver
-- Fix build break if devfreq-event framework is off
-- Add resource-managed function for devfreq-event device
-: devm_devfreq_event_add_edev()
-: devm_devfreq_event_remove_edev()
-
-Changes from v5:
-- Rebase these patch-set on v3.19-rc1 and Test it.
-1. exynos-ppmu.c
-- Change the error value when of_iomap() fail to map the memory
-- Remove owner setting of platform_driver
-- Add exynos_ppmu_disable() function
-2. exynos dts file
-- Add PPMU node to Exynos3250-based Monk board
-- Remove ppmu_cpu node on Exynos4412-based TRATS2 board and add ppmu_leftbus/rightbus node
-
-Changes from v4:
-1. devfreq-event class driver
-- Add devfreq_event_get_edev_count() function
-- Modify the simple description of devfreq-event framework in devfreq-event.c
-- Minimize the usage range of global lock usage in devfreq_event_add_edev()
-- Remove '_is_enabled()' function pointer in devfreq_event_ops structure
-- Add separte CONFIG_PM_DEVFREQ_EVENT configuration
-- Add new devfreq-event.h header file including devfreq-event helper functions
-2. exynos dts file
-- Add new patch to support PPMU with DEVFREQ-event on Exynos4412-based TRATS2
-
-Changes from v3:
-1. devfreq-event class driver
-- Fix return value of devfreq_event_get_event()
-- Add new structure devfreq_event_data for devfreq_event_get_event()
-- Modify the prototype of devfreq_event_get_event() function
-- Call of_node_put after calling of_parse_phandle() to decrement refcount
-2. exynos-ppmu driver
-- Modify usage of devfreq_event_get_event() function
-  according to new prototype of this funciton
-- Add the additional description to exynos-ppmu.txt how to add PPMU node
-  in board dts file
-- Use 'PPMU_EVENT' macro to remove duplicate codes
-- Add the support of PPMU for Exynos5260
-3. exynos dts file
-- Add missing PPMU_FSYS node to exynos3250.dtsi
-- Fix 'ppmu_mfc_l' node name as 'ppmu_mfc' because exynos3250 has only one MFC IP.
-- Add missing PPMU_ACP/G3D to exynos4.dtsi
-4. etc
-- Fix wrong abbreviation of PPMU (PPMU :Platform Performance Monitoring Unit)
-- Add new patch to support the PPMU of Exynos5260 SoC
-
-Changes from v2:
-1. devfreq-event class driver
-- Rename all the helper functions of devfreq-event device
-- Add devfreq_event_remove_edev() instead of devfreq_put_event_dev()
-- Add devfreq_event_release_edev() to initialize it before put device
-- Add the detailed description of devfreq-event API
-- Add the attributes of devfreq-event class (enable_count)
-- Check the overflow about event/total_event data in devfreq_event_get_event()
-- Remove the 'exclusive flag' feature
-- Set set_event()/get_event() functions as mandary
-- Add missing of_node_put() call
-- Change variable type of 'get_event()' funciton from 'int' to 'u64'
-2. exynos-ppmu driver
-- Remove un-used field (struct devfreq)
-- Use 'of_get_child_by_name()' instead of 'of_find_node_by_name()'
-- Add missing of_node_put() call
-- Fix wrong clock control
-- Use devfreq_event_remove_edev() instead of devfreq_remove_device()
-- Add the documentation for exynos-ppmu driver
-- Remove 'enable/disable/is_enabled/reset' function of exynos-ppmu driver
-3. exynos3250-rinato.dts
-- Add ppmu_{leftbus|rightbus} dt node and remove ppmu_cpu dt node
-
-Changes from v1:
-- Code clean
-- Add the description of devfreq-event structure
-- Add 'is_enabled' function to devfreq_event_ops structure
-- Add 'enable_count' field to devfreq_event_dev structure
-- Check whether devfreq-event device is enabled or not
-  during calling devfreq_event API
-- Define the type of devfreq-event device as following
-  : DEVFREQ_EVENT_TYPE_RAW_DATA
-  : DEVFREQ_EVENT_TYPE_UTILIZATION
-  : DEVFREQ_EVENT_TYPE_BANDWIDTH
-  : DEVFREQ_EVENT_TYPE_LATENCY
-- Add the exclusive feature of devfreq-event device.
-  If devfreq-event device is used on only on devfreq driver,
-  should used 'devfreq_enable_event_dev_exclusive()' function
-- Add new patch6 for test on Exynos3250-based Rinato board
-
-Chanwoo Choi (10):
-  devfreq: event: Add new devfreq_event class to provide basic data for devfreq governor
-  devfreq: event: Add the list of supported devfreq-event type
-  devfreq: event: Add resource-managed function for devfreq-event device
-  devfreq: event: Add exynos-ppmu devfreq-event driver
-  devfreq: event: Add documentation for exynos-ppmu devfreq-event driver
-  ARM: dts: Add PPMU dt node for Exynos3250 SoC
-  ARM: dts: Add PPMU dt node for Exynos4 SoCs
-  ARM: dts: Add PPMU dt node for Exynos5260 SoC
-  ARM: dts: exynos: Add PPMU node to Exynos3250-based Rinato/Monk board
-  ARM: dts: exynos: Add PPMU node for Exynos4412-based TRATS2 board
-
- .../bindings/devfreq/event/exynos-ppmu.txt         | 110 ++++
- arch/arm/boot/dts/exynos3250-monk.dts              |  40 ++
- arch/arm/boot/dts/exynos3250-rinato.dts            |  40 ++
- arch/arm/boot/dts/exynos3250.dtsi                  |  74 +++
- arch/arm/boot/dts/exynos4.dtsi                     | 108 ++++
- arch/arm/boot/dts/exynos4210.dtsi                  |   8 +
- arch/arm/boot/dts/exynos4412-trats2.dts            |  40 ++
- arch/arm/boot/dts/exynos5260.dtsi                  |  90 ++++
- drivers/devfreq/Kconfig                            |   2 +
- drivers/devfreq/Makefile                           |   6 +-
- drivers/devfreq/devfreq-event.c                    | 573 +++++++++++++++++++++
- drivers/devfreq/event/Kconfig                      |  25 +
- drivers/devfreq/event/Makefile                     |   2 +
- drivers/devfreq/event/exynos-ppmu.c                | 399 ++++++++++++++
- include/linux/devfreq-event.h                      | 205 ++++++++
- 15 files changed, 1721 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
- create mode 100644 drivers/devfreq/devfreq-event.c
- create mode 100644 drivers/devfreq/event/Kconfig
- create mode 100644 drivers/devfreq/event/Makefile
- create mode 100644 drivers/devfreq/event/exynos-ppmu.c
- create mode 100644 include/linux/devfreq-event.h
-
+diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
+index 64c1764..5301e2b 100644
+--- a/drivers/devfreq/devfreq-event.c
++++ b/drivers/devfreq/devfreq-event.c
+@@ -451,6 +451,69 @@ int devfreq_event_remove_edev(struct devfreq_event_dev *edev)
+ }
+ EXPORT_SYMBOL_GPL(devfreq_event_remove_edev);
+ 
++static int devm_devfreq_event_match(struct device *dev, void *res, void *data)
++{
++	struct devfreq_event_dev **r = res;
++
++	if (WARN_ON(!r || !*r))
++		return 0;
++
++	return *r == data;
++}
++
++static void devm_devfreq_event_release(struct device *dev, void *res)
++{
++	devfreq_event_remove_edev(*(struct devfreq_event_dev **)res);
++}
++
++/**
++ * devm_devfreq_event_add_edev() - Resource-managed devfreq_event_add_edev()
++ * @dev		: the device owning the devfreq-event device being created
++ * @desc	: the devfreq-event device's decriptor which include essential
++ *		  data for devfreq-event device.
++ *
++ * Note that this function manages automatically the memory of devfreq-event
++ * device using device resource management and simplify the free operation
++ * for memory of devfreq-event device.
++ */
++struct devfreq_event_dev *devm_devfreq_event_add_edev(struct device *dev,
++						struct devfreq_event_desc *desc)
++{
++	struct devfreq_event_dev **ptr, *edev;
++
++	ptr = devres_alloc(devm_devfreq_event_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	edev = devfreq_event_add_edev(dev, desc);
++	if (IS_ERR(edev)) {
++		devres_free(ptr);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	*ptr = edev;
++	devres_add(dev, ptr);
++
++	return edev;
++}
++EXPORT_SYMBOL(devm_devfreq_event_add_edev);
++
++/**
++ * devm_devfreq_event_remove_edev()- Resource-managed devfreq_event_remove_edev()
++ * @dev		: the device owning the devfreq-event device being created
++ * @edev	: the devfreq-event device
++ *
++ * Note that this function manages automatically the memory of devfreq-event
++ * device using device resource management.
++ */
++void devm_devfreq_event_remove_edev(struct device *dev,
++				struct devfreq_event_dev *edev)
++{
++	WARN_ON(devres_release(dev, devm_devfreq_event_release,
++			       devm_devfreq_event_match, edev));
++}
++EXPORT_SYMBOL(devm_devfreq_event_remove_edev);
++
+ /*
+  * Device attributes for devfreq-event class.
+  */
+diff --git a/include/linux/devfreq-event.h b/include/linux/devfreq-event.h
+index 13a5703..3c44ad1 100644
+--- a/include/linux/devfreq-event.h
++++ b/include/linux/devfreq-event.h
+@@ -123,6 +123,10 @@ extern int devfreq_event_get_edev_count(struct device *dev);
+ extern struct devfreq_event_dev *devfreq_event_add_edev(struct device *dev,
+ 				struct devfreq_event_desc *desc);
+ extern int devfreq_event_remove_edev(struct devfreq_event_dev *edev);
++extern struct devfreq_event_dev *devm_devfreq_event_add_edev(struct device *dev,
++				struct devfreq_event_desc *desc);
++extern void devm_devfreq_event_remove_edev(struct device *dev,
++				struct devfreq_event_dev *edev);
+ 
+ #else
+ static inline int devfreq_event_enable_edev(struct devfreq_event_dev *edev)
+@@ -184,6 +188,18 @@ static inline int devfreq_event_remove_edev(struct devfreq_event_dev *edev)
+ {
+ 	return -EINVAL;
+ }
++
++static inline struct devfreq_event_dev *devm_devfreq_event_add_edev(
++					struct device *dev,
++					struct devfreq_event_desc *desc)
++{
++	return ERR_PTR(-EINVAL);
++}
++
++static inline void devm_devfreq_event_remove_edev(struct device *dev,
++					struct devfreq_event_dev *edev)
++{
++}
+ #endif /* CONFIG_PM_DEVFREQ_EVENT */
+ 
+ #endif /* __LINUX_DEVFREQ_EVENT_H__ */
 -- 
 1.8.5.5
