@@ -1,38 +1,16 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  7 Jan 2015 12:04:14 +0000
-Subject: [PATCH 1/7] arm64: introduce common ESR_ELx_* definitions
+Date: Wed,  7 Jan 2015 12:04:15 +0000
+Subject: [PATCH 2/7] arm64: move to ESR_ELx macros
 In-Reply-To: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
 References: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1420632260-8798-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1420632260-8798-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have separate ESR_EL{1,2}_* macros, despite the fact that
-the encodings are common. While encodings are architected to refer to
-the current EL or a lower EL, the macros refer to particular ELs (e.g.
-ESR_ELx_EC_DABT_EL0). Having these duplicate definitions is redundant,
-and their naming is misleading.
+Now that we have common ESR_ELx_* macros, move the core arm64 code over
+to them.
 
-This patch introduces common ESR_ELx_* macros that can be used in all
-cases, in preparation for later patches which will migrate existing
-users over. Some additional cleanups are made in the process:
-
-* Suffixes for particular exception levelts (e.g. _EL0, _EL1) are
-  replaced with more general _LOW and _CUR suffixes, matching the
-  architectural intent.
-
-* ESR_ELx_EC_WFx, rather than ESR_ELx_EC_WFI is introduced, as this
-  EC encoding covers traps from both WFE and WFI. Similarly,
-  ESR_ELx_WFx_ISS_WFE rather than ESR_ELx_EC_WFI_ISS_WFE is introduced.
-
-* Multi-bit fields are given consistently named _SHIFT and _MASK macros.
-
-* UL() is used for compatiblity with assembly files.
-
-* Comments are added for currently unallocated ESR_ELx.EC encodings.
-
-For fields other than ESR_ELx.EC, macros are only implemented for fields
-for which there is already an ESR_EL{1,2}_* macro.
+There should be no functional change as a result of this patch.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -41,95 +19,157 @@ Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Peter Maydell <peter.maydell@linaro.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/esr.h | 78 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
+ arch/arm64/kernel/entry.S    | 64 ++++++++++++++++++++++----------------------
+ arch/arm64/kernel/signal32.c |  2 +-
+ arch/arm64/mm/fault.c        |  2 +-
+ 3 files changed, 34 insertions(+), 34 deletions(-)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 72674f4..eaee379 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -54,4 +54,82 @@
- #define ESR_EL1_EC_BKPT32	(0x38)
- #define ESR_EL1_EC_BRK64	(0x3C)
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index fd4fa37..02e6af1 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -269,18 +269,18 @@ ENDPROC(el1_error_invalid)
+ el1_sync:
+ 	kernel_entry 1
+ 	mrs	x1, esr_el1			// read the syndrome register
+-	lsr	x24, x1, #ESR_EL1_EC_SHIFT	// exception class
+-	cmp	x24, #ESR_EL1_EC_DABT_EL1	// data abort in EL1
++	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
++	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+ 	b.eq	el1_da
+-	cmp	x24, #ESR_EL1_EC_SYS64		// configurable trap
++	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+ 	b.eq	el1_undef
+-	cmp	x24, #ESR_EL1_EC_SP_ALIGN	// stack alignment exception
++	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+ 	b.eq	el1_sp_pc
+-	cmp	x24, #ESR_EL1_EC_PC_ALIGN	// pc alignment exception
++	cmp	x24, #ESR_ELx_EC_PC_ALIGN	// pc alignment exception
+ 	b.eq	el1_sp_pc
+-	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL1
++	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL1
+ 	b.eq	el1_undef
+-	cmp	x24, #ESR_EL1_EC_BREAKPT_EL1	// debug exception in EL1
++	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+ 	b.ge	el1_dbg
+ 	b	el1_inv
+ el1_da:
+@@ -318,7 +318,7 @@ el1_dbg:
+ 	/*
+ 	 * Debug exception handling
+ 	 */
+-	cmp	x24, #ESR_EL1_EC_BRK64		// if BRK64
++	cmp	x24, #ESR_ELx_EC_BRK64		// if BRK64
+ 	cinc	x24, x24, eq			// set bit '0'
+ 	tbz	x24, #0, el1_inv		// EL1 only
+ 	mrs	x0, far_el1
+@@ -375,26 +375,26 @@ el1_preempt:
+ el0_sync:
+ 	kernel_entry 0
+ 	mrs	x25, esr_el1			// read the syndrome register
+-	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+-	cmp	x24, #ESR_EL1_EC_SVC64		// SVC in 64-bit state
++	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
++	cmp	x24, #ESR_ELx_EC_SVC64		// SVC in 64-bit state
+ 	b.eq	el0_svc
+-	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
++	cmp	x24, #ESR_ELx_EC_DABT_LOW	// data abort in EL0
+ 	b.eq	el0_da
+-	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
++	cmp	x24, #ESR_ELx_EC_IABT_LOW	// instruction abort in EL0
+ 	b.eq	el0_ia
+-	cmp	x24, #ESR_EL1_EC_FP_ASIMD	// FP/ASIMD access
++	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
+ 	b.eq	el0_fpsimd_acc
+-	cmp	x24, #ESR_EL1_EC_FP_EXC64	// FP/ASIMD exception
++	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+-	cmp	x24, #ESR_EL1_EC_SYS64		// configurable trap
++	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_SP_ALIGN	// stack alignment exception
++	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+ 	b.eq	el0_sp_pc
+-	cmp	x24, #ESR_EL1_EC_PC_ALIGN	// pc alignment exception
++	cmp	x24, #ESR_ELx_EC_PC_ALIGN	// pc alignment exception
+ 	b.eq	el0_sp_pc
+-	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL0
++	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_BREAKPT_EL0	// debug exception in EL0
++	cmp	x24, #ESR_ELx_EC_BREAKPT_LOW	// debug exception in EL0
+ 	b.ge	el0_dbg
+ 	b	el0_inv
  
-+#define ESR_ELx_EC_UNKNOWN	(0x00)
-+#define ESR_ELx_EC_WFx		(0x01)
-+/* Unallocated EC: 0x02 */
-+#define ESR_ELx_EC_CP15_32	(0x03)
-+#define ESR_ELx_EC_CP15_64	(0x04)
-+#define ESR_ELx_EC_CP14_MR	(0x05)
-+#define ESR_ELx_EC_CP14_LS	(0x06)
-+#define ESR_ELx_EC_FP_ASIMD	(0x07)
-+#define ESR_ELx_EC_CP10_ID	(0x08)
-+/* Unallocated EC: 0x09 - 0x0B */
-+#define ESR_ELx_EC_CP14_64	(0x0C)
-+/* Unallocated: 0x0d */
-+#define ESR_ELx_EC_ILL		(0x0E)
-+/* Unallocated EC: 0x0F - 0x10 */
-+#define ESR_ELx_EC_SVC32	(0x11)
-+#define ESR_ELx_EC_HVC32	(0x12)
-+#define ESR_ELx_EC_SMC32	(0x13)
-+/* Unallocated EC: 0x14 */
-+#define ESR_ELx_EC_SVC64	(0x15)
-+#define ESR_ELx_EC_HVC64	(0x16)
-+#define ESR_ELx_EC_SMC64	(0x17)
-+#define ESR_ELx_EC_SYS64	(0x18)
-+/* Unallocated EC: 0x19 - 0x1E */
-+#define ESR_ELx_EC_IMP_DEF	(0x1f)
-+#define ESR_ELx_EC_IABT_LOW	(0x20)
-+#define ESR_ELx_EC_IABT_CUR	(0x21)
-+#define ESR_ELx_EC_PC_ALIGN	(0x22)
-+/* Unallocated EC: 0x23 */
-+#define ESR_ELx_EC_DABT_LOW	(0x24)
-+#define ESR_ELx_EC_DABT_CUR	(0x25)
-+#define ESR_ELx_EC_SP_ALIGN	(0x26)
-+/* Unallocated EC: 0x27 */
-+#define ESR_ELx_EC_FP_EXC32	(0x28)
-+/* Unallocated EC: 0x29 - 0x2B */
-+#define ESR_ELx_EC_FP_EXC64	(0x2C)
-+/* Unallocated EC: 0x2D - 0x2E */
-+#define ESR_ELx_EC_SERROR	(0x2F)
-+#define ESR_ELx_EC_BREAKPT_LOW	(0x30)
-+#define ESR_ELx_EC_BREAKPT_CUR	(0x31)
-+#define ESR_ELx_EC_SOFTSTP_LOW	(0x32)
-+#define ESR_ELx_EC_SOFTSTP_CUR	(0x33)
-+#define ESR_ELx_EC_WATCHPT_LOW	(0x34)
-+#define ESR_ELx_EC_WATCHPT_CUR	(0x35)
-+/* Unallocated EC: 0x36 - 0x37 */
-+#define ESR_ELx_EC_BKPT32	(0x38)
-+/* Unallocated EC: 0x39 */
-+#define ESR_ELx_EC_VECTOR32	(0x3A)
-+/* Unallocted EC: 0x3B */
-+#define ESR_ELx_EC_BRK64	(0x3C)
-+/* Unallocated EC: 0x3D - 0x3F */
-+#define ESR_ELx_EC_MAX		(0x3F)
-+
-+#define ESR_ELx_EC_SHIFT	(26)
-+#define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
-+
-+#define ESR_ELx_IL		(UL(1) << 25)
-+#define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
-+#define ESR_ELx_ISV		(UL(1) << 24)
-+#define ESR_ELx_SAS		(UL(1) << 22)
-+#define ESR_ELx_SSE		(UL(1) << 21)
-+#define ESR_ELx_SRT_SHIFT	(16)
-+#define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
-+#define ESR_ELx_SF 		(UL(1) << 15)
-+#define ESR_ELx_AR 		(UL(1) << 14)
-+#define ESR_ELx_EA 		(UL(1) << 9)
-+#define ESR_ELx_CM 		(UL(1) << 8)
-+#define ESR_ELx_S1PTW 		(UL(1) << 7)
-+#define ESR_ELx_WNR		(UL(1) << 6)
-+#define ESR_ELx_FSC		(0x3F)
-+#define ESR_ELx_FSC_TYPE	(0x3C)
-+#define ESR_ELx_FSC_EXTABT	(0x10)
-+#define ESR_ELx_FSC_FAULT	(0x04)
-+#define ESR_ELx_FSC_PERM	(0x0F)
-+#define ESR_ELx_CV		(UL(1) << 24)
-+#define ESR_ELx_COND_SHIFT	(20)
-+#define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
-+#define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
-+
- #endif /* __ASM_ESR_H */
+@@ -403,30 +403,30 @@ el0_sync:
+ el0_sync_compat:
+ 	kernel_entry 0, 32
+ 	mrs	x25, esr_el1			// read the syndrome register
+-	lsr	x24, x25, #ESR_EL1_EC_SHIFT	// exception class
+-	cmp	x24, #ESR_EL1_EC_SVC32		// SVC in 32-bit state
++	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
++	cmp	x24, #ESR_ELx_EC_SVC32		// SVC in 32-bit state
+ 	b.eq	el0_svc_compat
+-	cmp	x24, #ESR_EL1_EC_DABT_EL0	// data abort in EL0
++	cmp	x24, #ESR_ELx_EC_DABT_LOW	// data abort in EL0
+ 	b.eq	el0_da
+-	cmp	x24, #ESR_EL1_EC_IABT_EL0	// instruction abort in EL0
++	cmp	x24, #ESR_ELx_EC_IABT_LOW	// instruction abort in EL0
+ 	b.eq	el0_ia
+-	cmp	x24, #ESR_EL1_EC_FP_ASIMD	// FP/ASIMD access
++	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
+ 	b.eq	el0_fpsimd_acc
+-	cmp	x24, #ESR_EL1_EC_FP_EXC32	// FP/ASIMD exception
++	cmp	x24, #ESR_ELx_EC_FP_EXC32	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+-	cmp	x24, #ESR_EL1_EC_UNKNOWN	// unknown exception in EL0
++	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_CP15_32	// CP15 MRC/MCR trap
++	cmp	x24, #ESR_ELx_EC_CP15_32	// CP15 MRC/MCR trap
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_CP15_64	// CP15 MRRC/MCRR trap
++	cmp	x24, #ESR_ELx_EC_CP15_64	// CP15 MRRC/MCRR trap
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_CP14_MR	// CP14 MRC/MCR trap
++	cmp	x24, #ESR_ELx_EC_CP14_MR	// CP14 MRC/MCR trap
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_CP14_LS	// CP14 LDC/STC trap
++	cmp	x24, #ESR_ELx_EC_CP14_LS	// CP14 LDC/STC trap
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_CP14_64	// CP14 MRRC/MCRR trap
++	cmp	x24, #ESR_ELx_EC_CP14_64	// CP14 MRRC/MCRR trap
+ 	b.eq	el0_undef
+-	cmp	x24, #ESR_EL1_EC_BREAKPT_EL0	// debug exception in EL0
++	cmp	x24, #ESR_ELx_EC_BREAKPT_LOW	// debug exception in EL0
+ 	b.ge	el0_dbg
+ 	b	el0_inv
+ el0_svc_compat:
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 5a1ba6e..192d900 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -501,7 +501,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ 
+ 	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.trap_no, err);
+ 	/* set the compat FSR WnR */
+-	__put_user_error(!!(current->thread.fault_code & ESR_EL1_WRITE) <<
++	__put_user_error(!!(current->thread.fault_code & ESR_ELx_WNR) <<
+ 			 FSR_WRITE_SHIFT, &sf->uc.uc_mcontext.error_code, err);
+ 	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
+ 	__put_user_error(set->sig[0], &sf->uc.uc_mcontext.oldmask, err);
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c11cd27..96da131 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -219,7 +219,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 
+ 	if (esr & ESR_LNX_EXEC) {
+ 		vm_flags = VM_EXEC;
+-	} else if ((esr & ESR_EL1_WRITE) && !(esr & ESR_EL1_CM)) {
++	} else if ((esr & ESR_ELx_WNR) && !(esr & ESR_ELx_CM)) {
+ 		vm_flags = VM_WRITE;
+ 		mm_flags |= FAULT_FLAG_WRITE;
+ 	}
 -- 
 1.9.1
