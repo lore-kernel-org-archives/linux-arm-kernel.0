@@ -1,68 +1,47 @@
-From: hughd@google.com (Hugh Dickins)
-Date: Tue, 6 Jan 2015 17:04:33 -0800 (PST)
-Subject: [RFC] mm:change meminfo cached calculation
-In-Reply-To: <20150106164340.55e83f742d6f57c19e6500ff@linux-foundation.org>
-References: <35FD53F367049845BC99AC72306C23D103E688B313EE@CNBJMBX05.corpusers.net>
- <CALYGNiOuBKz8shHSrFCp0BT5AV6XkNOCHj+LJedQQ-2YdZtM7w@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F2@CNBJMBX05.corpusers.net>
- <20141205143134.37139da2208c654a0d3cd942@linux-foundation.org>
- <35FD53F367049845BC99AC72306C23D103E688B313F4@CNBJMBX05.corpusers.net>
- <20141208114601.GA28846@node.dhcp.inet.fi>
- <35FD53F367049845BC99AC72306C23D103E688B313FB@CNBJMBX05.corpusers.net>
- <CALYGNiMEytHuND37f+hNdMKqCPzN0k_uha6CaeL_fyzrj-obNQ@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D103E688B31408@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103EDAF89E14C@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103EDAF89E160@CNBJMBX05.corpusers.net>
- <20150106164340.55e83f742d6f57c19e6500ff@linux-foundation.org>
-Message-ID: <alpine.LSU.2.11.1501061654340.1497@eggly.anvils>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 7 Jan 2015 01:17:52 +0000
+Subject: AT91 slow clock mode regression/fixes, improvement proposal
+In-Reply-To: <20150106142528.GA10330@gradator.net>
+References: <20141218203904.GA25215@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6762@penmbx01>
+ <20141219152625.GA30666@gradator.net>
+ <B256D81BAE5131468A838E5D7A243641BFCB6CA0@penmbx01>
+ <B256D81BAE5131468A838E5D7A243641BFCD1D0C@penmbx01>
+ <20150106142528.GA10330@gradator.net>
+Message-ID: <B256D81BAE5131468A838E5D7A243641BFCD89D6@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Jan 2015, Andrew Morton wrote:
-> On Fri, 26 Dec 2014 19:56:49 +0800 "Wang, Yalin" <Yalin.Wang@sonymobile.com> wrote:
+Hi Sylvain,
+
+> -----Original Message-----
+> From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
+> Sent: Tuesday, January 06, 2015 10:25 PM
+> To: Yang, Wenyou
+> Cc: Ferre, Nicolas; Desroches, Ludovic; 'Alexandre Belloni'; 'Maxime Ripard';
+> 'linux-arm-kernel at lists.infradead.org'
+> Subject: Re: AT91 slow clock mode regression/fixes, improvement proposal
 > 
-> > This patch subtract sharedram from cached,
-> > sharedram can only be swap into swap partitions,
-> > they should be treated as swap pages, not as cached pages.
-> > 
-> > ...
+> Hello Wenyou,
+> 
+> On Mon, Jan 05, 2015 at 03:32:42AM +0000, Yang, Wenyou wrote:
 > >
-> > --- a/fs/proc/meminfo.c
-> > +++ b/fs/proc/meminfo.c
-> > @@ -45,7 +45,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
-> >  	committed = percpu_counter_read_positive(&vm_committed_as);
-> >  
-> >  	cached = global_page_state(NR_FILE_PAGES) -
-> > -			total_swapcache_pages() - i.bufferram;
-> > +			total_swapcache_pages() - i.bufferram - i.sharedram;
-> >  	if (cached < 0)
-> >  		cached = 0;
+> > I remembered you said this patch is not formal. Now, would you like
+> > send a formal one?
 > 
-> Documentation/filesystems/proc.txt says
+> Here it is, the first one is based on linux-at91/linux-3.10-at91 branch, the second
+> one is rebased on linux-3.18 (Is this the right way when playing with multiple
+> branch?).
 > 
-> :      Cached: in-memory cache for files read from the disk (the
-> :              pagecache).  Doesn't include SwapCached
-> 
-> So yes, I guess it should not include shmem.
-> 
-> And why not do this as well?
-> 
-> 
-> --- a/Documentation/filesystems/proc.txt~mm-change-meminfo-cached-calculation-fix
-> +++ a/Documentation/filesystems/proc.txt
-> @@ -811,7 +811,7 @@ MemAvailable: An estimate of how much me
->       Buffers: Relatively temporary storage for raw disk blocks
->                shouldn't get tremendously large (20MB or so)
->        Cached: in-memory cache for files read from the disk (the
-> -              pagecache).  Doesn't include SwapCached
-> +              pagecache).  Doesn't include SwapCached or Shmem.
->    SwapCached: Memory that once was swapped out, is swapped back in but
->                still also is in the swapfile (if memory is needed it
->                doesn't need to be swapped out AGAIN because it is already
+> By the way, Wenyou fixed some bugs in the linux-3.10-at91 branch about slow
+> clock mode which should IMHO be merged and pushed to other branches.
+Yes, I will push to the mainline after verification passed.
 
-Whoa.  Changes of this kind would have made good sense about 14 years ago.
-And there's plenty more which would benefit from having anon/shmem/file
-properly distinguished.  But how can we make such a change now,
-breaking everything that has made its own sense of these counts?
+Thank you very much.
 
-Hugh
+> 
+> Regards,
+> Sylvain
+
+Best Regagrds,
+Wenyou Yang
