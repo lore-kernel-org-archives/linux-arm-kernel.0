@@ -1,160 +1,510 @@
-From: mchitale@apm.com (Mayuresh Chitale)
-Date: Wed, 7 Jan 2015 16:55:33 +0530
-Subject: [PATCH 4/4] dma: X-Gene PCIE DMA Driver
-In-Reply-To: <4187918.PUaMnn04Vq@wuerfel>
-References: <1420608537-12296-1-git-send-email-mchitale@apm.com>
- <1420608537-12296-5-git-send-email-mchitale@apm.com>
- <4187918.PUaMnn04Vq@wuerfel>
-Message-ID: <CAL-zptNyLVBEvMBjSUbhE0WEj7-E81g7PF7_WFX1nM4AdYj7_g@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 07 Jan 2015 12:28:09 +0100
+Subject: [PATCH v11 3/9] ARM: l2c: Refactor the driver to use commit-like
+ interface
+In-Reply-To: <20150105172245.GA19667@kahuna>
+References: <1420460348-20302-1-git-send-email-m.szyprowski@samsung.com>
+ <1420460348-20302-4-git-send-email-m.szyprowski@samsung.com>
+ <20150105172245.GA19667@kahuna>
+Message-ID: <54AD1849.2020404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-Please see inline.
-
-Thanks,
-Mayuresh.
-
-On Wed, Jan 7, 2015 at 2:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 07 January 2015 10:58:57 Mayuresh Chitale wrote:
->> This patch implements DMA engine API for DMA controller on APM
->> X-Gene PCIe controller. DMA engine can support up to 4 channels per port
->> and up to 2048 outstanding requests per channel.  This is intended
->> to be used on ports that are configured in EP mode or to transfer
->> data from a RC port that is connected to a X-Gene EP port.
->
-> Linux currently does not support PCIe endpoints. Do you plan to submit
-> a driver for that as well?
->
->> +
->> +static void xpdma_setup_dma_dev(struct dma_device *dev)
+On 2015-01-05 18:22, Nishanth Menon wrote:
+> On 13:19-20150105, Marek Szyprowski wrote:
+>> From: Tomasz Figa <t.figa@samsung.com>
+>>
+>> Certain implementations of secure hypervisors (namely the one found on
+>> Samsung Exynos-based boards) do not provide access to individual L2C
+>> registers. This makes the .write_sec()-based interface insufficient and
+>> provoking ugly hacks.
+>>
+>> This patch is first step to make the driver not rely on availability of
+>> writes to individual registers. This is achieved by refactoring the
+>> driver to use a commit-like operation scheme: all register values are
+>> prepared first and stored in an instance of l2x0_regs struct and then a
+>> single callback is responsible to flush those values to the hardware.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> [mszyprow: rebased onto 'ARM: l2c: use l2c_write_sec() for restoring
+>>   latency and filter regs' patch]
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   arch/arm/mm/cache-l2x0.c | 210 ++++++++++++++++++++++++++---------------------
+>>   1 file changed, 115 insertions(+), 95 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+>> index 0aeeaa95c42d..f9013320c8ce 100644
+>> --- a/arch/arm/mm/cache-l2x0.c
+>> +++ b/arch/arm/mm/cache-l2x0.c
+>> @@ -41,12 +41,14 @@ struct l2c_init_data {
+>>   	void (*enable)(void __iomem *, u32, unsigned);
+>>   	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
+>>   	void (*save)(void __iomem *);
+>> +	void (*configure)(void __iomem *);
+>>   	struct outer_cache_fns outer_cache;
+>>   };
+>>   
+>>   #define CACHE_LINE_SIZE		32
+>>   
+>>   static void __iomem *l2x0_base;
+>> +static const struct l2c_init_data *l2x0_data;
+>>   static DEFINE_RAW_SPINLOCK(l2x0_lock);
+>>   static u32 l2x0_way_mask;	/* Bitmask of active ways */
+>>   static u32 l2x0_size;
+>> @@ -106,6 +108,14 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
+>>   	}
+>>   }
+>>   
+>> +static void l2c_configure(void __iomem *base)
 >> +{
->> +     dma_cap_zero(dev->cap_mask);
->> +     dma_cap_set(DMA_SLAVE, dev->cap_mask);
->> +     dma_cap_set(DMA_PRIVATE, dev->cap_mask);
+>> +	if (l2x0_data->configure)
+>> +		l2x0_data->configure(base);
 >> +
->> +     dev->device_alloc_chan_resources = xpdma_alloc_chan_resources;
->> +     dev->device_free_chan_resources = xpdma_free_chan_resources;
->> +     dev->device_tx_status = xpdma_tx_status;
->> +     dev->device_issue_pending = xpdma_issue_pending;
->> +     dev->device_prep_slave_sg = xpdma_prep_slave_sg;
->> +     dev->device_control = xpdma_device_control;
+>> +	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
 >> +}
->
-> You are setting up DMA_SLAVE here but do not use the DT binding
-> for slave DMA. Can your driver handle slave DMA? If it can,
-> you should use the appropriate binding, if not then don't
-> set DMA_SLAVE here.
-
-Are you referring to  DT DMA helpers? If so, I will add it.
-
->
->> +static int xpdma_setup_dma_channel(struct platform_device *pdev,
->> +             struct xpdma_port *port)
+>> +
+>>   /*
+>>    * Enable the L2 cache controller.  This function must only be
+>>    * called when the cache controller is known to be disabled.
+>> @@ -114,7 +124,12 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>>   {
+>>   	unsigned long flags;
+>>   
+>> -	l2c_write_sec(aux, base, L2X0_AUX_CTRL);
+>> +	/* Do not touch the controller if already enabled. */
+>> +	if (readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)
+>> +		return;
+>> +
+>> +	l2x0_saved_regs.aux_ctrl = aux;
+>> +	l2c_configure(base);
+>>   
+>>   	l2c_unlock(base, num_lock);
+>>   
+>> @@ -208,6 +223,11 @@ static void l2c_save(void __iomem *base)
+>>   	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+>>   }
+>>   
+>> +static void l2c_resume(void)
 >> +{
->> +     int i, ret = 0;
->> +     struct xpdma_chan *chan;
->> +     resource_size_t dma_base;
+>> +	l2c_enable(l2x0_base, l2x0_saved_regs.aux_ctrl, l2x0_data->num_lock);
+>> +}
 >> +
->> +     dma_base = MAKE_U64(readl(port->cfg + PORT_CFG_HI), readl(port->cfg)) +
->> +             CHAN_REG_BASE;
->> +     port->dma = devm_ioremap(&pdev->dev, dma_base,
->> +                     CHAN_REG_SIZE * MAX_DMA_CHAN);
->> +     if (port->dma == NULL) {
->> +             dev_err(&pdev->dev, "Could not get base addressc$\n");
->> +             return -ENOMEM;
->> +     }
->
-> The registers are not listed in the 'reg' property. Why is that?
-Actually these registers have to accessed via the PCIe config space
-region for that port. Since the config space base address is
-programmed by host controller driver we can know the base address only
-by reading the corresponding config space bar at runtime.
-
->
-> You should probably use devm_request_mem_region or devm_ioremap_resource
-> here to ensure manage the mmio range.
->
->> +static int xpdma_probe(struct platform_device *pdev)
+>>   /*
+>>    * L2C-210 specific code.
+>>    *
+>> @@ -288,14 +308,6 @@ static void l2c210_sync(void)
+>>   	__l2c210_cache_sync(l2x0_base);
+>>   }
+>>   
+>> -static void l2c210_resume(void)
+>> -{
+>> -	void __iomem *base = l2x0_base;
+>> -
+>> -	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN))
+>> -		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 1);
+>> -}
+>> -
+>>   static const struct l2c_init_data l2c210_data __initconst = {
+>>   	.type = "L2C-210",
+>>   	.way_size_0 = SZ_8K,
+>> @@ -309,7 +321,7 @@ static const struct l2c_init_data l2c210_data __initconst = {
+>>   		.flush_all = l2c210_flush_all,
+>>   		.disable = l2c_disable,
+>>   		.sync = l2c210_sync,
+>> -		.resume = l2c210_resume,
+>> +		.resume = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -466,7 +478,7 @@ static const struct l2c_init_data l2c220_data = {
+>>   		.flush_all = l2c220_flush_all,
+>>   		.disable = l2c_disable,
+>>   		.sync = l2c220_sync,
+>> -		.resume = l2c210_resume,
+>> +		.resume = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -615,39 +627,29 @@ static void __init l2c310_save(void __iomem *base)
+>>   							L310_POWER_CTRL);
+>>   }
+>>   
+>> -static void l2c310_resume(void)
+>> +static void l2c310_configure(void __iomem *base)
+>>   {
+>> -	void __iomem *base = l2x0_base;
+>> +	unsigned revision;
+>>   
+>> -	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+>> -		unsigned revision;
+>> -
+>> -		/* restore pl310 setup */
+>> -		l2c_write_sec(l2x0_saved_regs.tag_latency, base,
+>> -			      L310_TAG_LATENCY_CTRL);
+>> -		l2c_write_sec(l2x0_saved_regs.data_latency, base,
+>> -			      L310_DATA_LATENCY_CTRL);
+>> -		l2c_write_sec(l2x0_saved_regs.filter_end, base,
+>> -			      L310_ADDR_FILTER_END);
+>> -		l2c_write_sec(l2x0_saved_regs.filter_start, base,
+>> -			      L310_ADDR_FILTER_START);
+>> -
+>> -		revision = readl_relaxed(base + L2X0_CACHE_ID) &
+>> -				L2X0_CACHE_ID_RTL_MASK;
+>> -
+>> -		if (revision >= L310_CACHE_ID_RTL_R2P0)
+>> -			l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
+>> -				      L310_PREFETCH_CTRL);
+>> -		if (revision >= L310_CACHE_ID_RTL_R3P0)
+>> -			l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
+>> -				      L310_POWER_CTRL);
+>> -
+>> -		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
+>> -
+>> -		/* Re-enable full-line-of-zeros for Cortex-A9 */
+>> -		if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
+>> -			set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+>> -	}
+>> +	/* restore pl310 setup */
+>> +	l2c_write_sec(l2x0_saved_regs.tag_latency, base,
+>> +		      L310_TAG_LATENCY_CTRL);
+>> +	l2c_write_sec(l2x0_saved_regs.data_latency, base,
+>> +		      L310_DATA_LATENCY_CTRL);
+>> +	l2c_write_sec(l2x0_saved_regs.filter_end, base,
+>> +		      L310_ADDR_FILTER_END);
+>> +	l2c_write_sec(l2x0_saved_regs.filter_start, base,
+>> +		      L310_ADDR_FILTER_START);
+>> +
+>> +	revision = readl_relaxed(base + L2X0_CACHE_ID) &
+>> +				 L2X0_CACHE_ID_RTL_MASK;
+>> +
+>> +	if (revision >= L310_CACHE_ID_RTL_R2P0)
+>> +		l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
+>> +			      L310_PREFETCH_CTRL);
+>> +	if (revision >= L310_CACHE_ID_RTL_R3P0)
+>> +		l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
+>> +			      L310_POWER_CTRL);
+>>   }
+>>   
+>>   static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, void *data)
+>> @@ -699,6 +701,23 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>>   		aux &= ~(L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP);
+>>   	}
+>>   
+>> +	/* r3p0 or later has power control register */
+>> +	if (rev >= L310_CACHE_ID_RTL_R3P0)
+>> +		l2x0_saved_regs.pwr_ctrl = L310_DYNAMIC_CLK_GATING_EN |
+>> +						L310_STNDBY_MODE_EN;
+>> +
+>> +	/*
+>> +	 * Always enable non-secure access to the lockdown registers -
+>> +	 * we write to them as part of the L2C enable sequence so they
+>> +	 * need to be accessible.
+>> +	 */
+>> +	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
+>> +
+>> +	l2c_enable(base, aux, num_lock);
+>> +
+>> +	/* Read back resulting AUX_CTRL value as it could have been altered. */
+>> +	aux = readl_relaxed(base + L2X0_AUX_CTRL);
+>> +
+>>   	if (aux & (L310_AUX_CTRL_DATA_PREFETCH | L310_AUX_CTRL_INSTR_PREFETCH)) {
+>>   		u32 prefetch = readl_relaxed(base + L310_PREFETCH_CTRL);
+>>   
+>> @@ -712,23 +731,12 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>>   	if (rev >= L310_CACHE_ID_RTL_R3P0) {
+>>   		u32 power_ctrl;
+>>   
+>> -		l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+>> -			      base, L310_POWER_CTRL);
+>>   		power_ctrl = readl_relaxed(base + L310_POWER_CTRL);
+>>   		pr_info("L2C-310 dynamic clock gating %sabled, standby mode %sabled\n",
+>>   			power_ctrl & L310_DYNAMIC_CLK_GATING_EN ? "en" : "dis",
+>>   			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+>>   	}
+>>   
+>> -	/*
+>> -	 * Always enable non-secure access to the lockdown registers -
+>> -	 * we write to them as part of the L2C enable sequence so they
+>> -	 * need to be accessible.
+>> -	 */
+>> -	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
+>> -
+>> -	l2c_enable(base, aux, num_lock);
+>> -
+>>   	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
+>>   		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+>>   		cpu_notifier(l2c310_cpu_enable_flz, 0);
+>> @@ -760,11 +768,11 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+>>   
+>>   	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
+>>   	    revision < L310_CACHE_ID_RTL_R3P2) {
+>> -		u32 val = readl_relaxed(base + L310_PREFETCH_CTRL);
+>> +		u32 val = l2x0_saved_regs.prefetch_ctrl;
+>>   		/* I don't think bit23 is required here... but iMX6 does so */
+>>   		if (val & (BIT(30) | BIT(23))) {
+>>   			val &= ~(BIT(30) | BIT(23));
+>> -			l2c_write_sec(val, base, L310_PREFETCH_CTRL);
+>> +			l2x0_saved_regs.prefetch_ctrl = val;
+>>   			errata[n++] = "752271";
+>>   		}
+>>   	}
+>> @@ -800,6 +808,15 @@ static void l2c310_disable(void)
+>>   	l2c_disable();
+>>   }
+>>   
+>> +static void l2c310_resume(void)
 >> +{
->> +     int err;
->> +     u32 mask;
->> +     struct resource *res;
->> +     struct xpdma_port *port;
+>> +	l2c_resume();
 >> +
->> +     port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
->> +     if (!port)
->> +             return -ENOMEM;
+>> +	/* Re-enable full-line-of-zeros for Cortex-A9 */
+>> +	if (l2x0_saved_regs.aux_ctrl & L310_AUX_CTRL_FULL_LINE_ZERO)
+>> +		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+>> +}
 >> +
->> +     port->dma_dev.dev = &pdev->dev;
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     if (!res) {
->> +             dev_err(&pdev->dev, "No cfg resource\n");
->> +             return -EINVAL;
->> +     }
+>>   static const struct l2c_init_data l2c310_init_fns __initconst = {
+>>   	.type = "L2C-310",
+>>   	.way_size_0 = SZ_8K,
+>> @@ -807,6 +824,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+>>   	.enable = l2c310_enable,
+>>   	.fixup = l2c310_fixup,
+>>   	.save = l2c310_save,
+>> +	.configure = l2c310_configure,
+>>   	.outer_cache = {
+>>   		.inv_range = l2c210_inv_range,
+>>   		.clean_range = l2c210_clean_range,
+>> @@ -818,7 +836,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+>>   	},
+>>   };
+>>   
+>> -static void __init __l2c_init(const struct l2c_init_data *data,
+>> +static int __init __l2c_init(const struct l2c_init_data *data,
+>>   	u32 aux_val, u32 aux_mask, u32 cache_id)
+>>   {
+>>   	struct outer_cache_fns fns;
+>> @@ -826,6 +844,14 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+>>   	u32 aux, old_aux;
+>>   
+>>   	/*
+>> +	 * Save the pointer globally so that callbacks which do not receive
+>> +	 * context from callers can access the structure.
+>> +	 */
+>> +	l2x0_data = kmemdup(data, sizeof(*data), GFP_KERNEL);
+>> +	if (!l2x0_data)
+>> +		return -ENOMEM;
 >> +
->> +     port->cfg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
->> +     if (IS_ERR(port->cfg))
->> +             return PTR_ERR(port->cfg);
+>> +	/*
+>>   	 * Sanity check the aux values.  aux_mask is the bits we preserve
+>>   	 * from reading the hardware register, and aux_val is the bits we
+>>   	 * set.
+>> @@ -910,6 +936,8 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+>>   		data->type, ways, l2x0_size >> 10);
+>>   	pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
+>>   		data->type, cache_id, aux);
 >> +
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->> +     if (!res) {
->> +             dev_err(&pdev->dev, "No intr resource\n");
->> +             return -EINVAL;
->> +     }
->
-> from binding, these two register ranges look like they are part of
-> another device. Which device is that:
->
-> +                       reg = < 0x0 0x1f2b0154 0x0 0xc
-> +                               0x0 0x1f2b0058 0x0 0x8>;
+>> +	return 0;
+>>   }
+>>   
+>>   void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+>> @@ -936,6 +964,10 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+>>   		break;
+>>   	}
+>>   
+>> +	/* Read back current (default) hardware configuration */
+>> +	if (data->save)
+>> +		data->save(l2x0_base);
+>> +
+>>   	__l2c_init(data, aux_val, aux_mask, cache_id);
+>>   }
+>>   
+>> @@ -1102,7 +1134,7 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
+>>   		.flush_all   = l2c210_flush_all,
+>>   		.disable     = l2c_disable,
+>>   		.sync        = l2c210_sync,
+>> -		.resume      = l2c210_resume,
+>> +		.resume      = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -1120,7 +1152,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
+>>   		.flush_all   = l2c220_flush_all,
+>>   		.disable     = l2c_disable,
+>>   		.sync        = l2c220_sync,
+>> -		.resume      = l2c210_resume,
+>> +		.resume      = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -1135,28 +1167,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
+>>   
+>>   	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+>>   	if (tag[0] && tag[1] && tag[2])
+>> -		writel_relaxed(
+>> +		l2x0_saved_regs.tag_latency =
+>>   			L310_LATENCY_CTRL_RD(tag[0] - 1) |
+>>   			L310_LATENCY_CTRL_WR(tag[1] - 1) |
+>> -			L310_LATENCY_CTRL_SETUP(tag[2] - 1),
+>> -			l2x0_base + L310_TAG_LATENCY_CTRL);
+>> +			L310_LATENCY_CTRL_SETUP(tag[2] - 1);
+>>   
+>>   	of_property_read_u32_array(np, "arm,data-latency",
+>>   				   data, ARRAY_SIZE(data));
+>>   	if (data[0] && data[1] && data[2])
+>> -		writel_relaxed(
+>> +		l2x0_saved_regs.data_latency =
+>>   			L310_LATENCY_CTRL_RD(data[0] - 1) |
+>>   			L310_LATENCY_CTRL_WR(data[1] - 1) |
+>> -			L310_LATENCY_CTRL_SETUP(data[2] - 1),
+>> -			l2x0_base + L310_DATA_LATENCY_CTRL);
+>> +			L310_LATENCY_CTRL_SETUP(data[2] - 1);
+>>   
+>>   	of_property_read_u32_array(np, "arm,filter-ranges",
+>>   				   filter, ARRAY_SIZE(filter));
+>>   	if (filter[1]) {
+>> -		writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
+>> -			       l2x0_base + L310_ADDR_FILTER_END);
+>> -		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
+>> -			       l2x0_base + L310_ADDR_FILTER_START);
+>> +		l2x0_saved_regs.filter_end =
+>> +					ALIGN(filter[0] + filter[1], SZ_1M);
+>> +		l2x0_saved_regs.filter_start = (filter[0] & ~(SZ_1M - 1))
+>> +					| L310_ADDR_FILTER_EN;
+>>   	}
+>>   
+>>   	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_512K);
+>> @@ -1188,6 +1218,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+>>   	.enable = l2c310_enable,
+>>   	.fixup = l2c310_fixup,
+>>   	.save  = l2c310_save,
+>> +	.configure = l2c310_configure,
+>>   	.outer_cache = {
+>>   		.inv_range   = l2c210_inv_range,
+>>   		.clean_range = l2c210_clean_range,
+>> @@ -1216,6 +1247,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
+>>   	.enable = l2c310_enable,
+>>   	.fixup = l2c310_fixup,
+>>   	.save  = l2c310_save,
+>> +	.configure = l2c310_configure,
+>>   	.outer_cache = {
+>>   		.inv_range   = l2c210_inv_range,
+>>   		.clean_range = l2c210_clean_range,
+>> @@ -1330,16 +1362,6 @@ static void aurora_save(void __iomem *base)
+>>   	l2x0_saved_regs.aux_ctrl = readl_relaxed(base + L2X0_AUX_CTRL);
+>>   }
+>>   
+>> -static void aurora_resume(void)
+>> -{
+>> -	void __iomem *base = l2x0_base;
+>> -
+>> -	if (!(readl(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+>> -		writel_relaxed(l2x0_saved_regs.aux_ctrl, base + L2X0_AUX_CTRL);
+>> -		writel_relaxed(l2x0_saved_regs.ctrl, base + L2X0_CTRL);
+>> -	}
+>> -}
+>> -
+>>   /*
+>>    * For Aurora cache in no outer mode, enable via the CP15 coprocessor
+>>    * broadcasting of cache commands to L2.
+>> @@ -1401,7 +1423,7 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
+>>   		.flush_all   = l2x0_flush_all,
+>>   		.disable     = l2x0_disable,
+>>   		.sync        = l2x0_cache_sync,
+>> -		.resume      = aurora_resume,
+>> +		.resume      = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -1414,7 +1436,7 @@ static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
+>>   	.fixup = aurora_fixup,
+>>   	.save  = aurora_save,
+>>   	.outer_cache = {
+>> -		.resume      = aurora_resume,
+>> +		.resume      = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -1562,6 +1584,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
+>>   	.of_parse = l2c310_of_parse,
+>>   	.enable = l2c310_enable,
+>>   	.save  = l2c310_save,
+>> +	.configure = l2c310_configure,
+>>   	.outer_cache = {
+>>   		.inv_range   = bcm_inv_range,
+>>   		.clean_range = bcm_clean_range,
+>> @@ -1583,18 +1606,12 @@ static void __init tauros3_save(void __iomem *base)
+>>   		readl_relaxed(base + L310_PREFETCH_CTRL);
+>>   }
+>>   
+>> -static void tauros3_resume(void)
+>> +static void tauros3_configure(void __iomem *base)
+>>   {
+>> -	void __iomem *base = l2x0_base;
+>> -
+>> -	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+>> -		writel_relaxed(l2x0_saved_regs.aux2_ctrl,
+>> -			       base + TAUROS3_AUX2_CTRL);
+>> -		writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
+>> -			       base + L310_PREFETCH_CTRL);
+>> -
+>> -		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
+>> -	}
+>> +	writel_relaxed(l2x0_saved_regs.aux2_ctrl,
+>> +		       base + TAUROS3_AUX2_CTRL);
+>> +	writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
+>> +		       base + L310_PREFETCH_CTRL);
+>>   }
+>>   
+>>   static const struct l2c_init_data of_tauros3_data __initconst = {
+>> @@ -1603,9 +1620,10 @@ static const struct l2c_init_data of_tauros3_data __initconst = {
+>>   	.num_lock = 8,
+>>   	.enable = l2c_enable,
+>>   	.save  = tauros3_save,
+>> +	.configure = tauros3_configure,
+>>   	/* Tauros3 broadcasts L1 cache operations to L2 */
+>>   	.outer_cache = {
+>> -		.resume      = tauros3_resume,
+>> +		.resume      = l2c_resume,
+>>   	},
+>>   };
+>>   
+>> @@ -1661,6 +1679,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>>   	if (!of_property_read_bool(np, "cache-unified"))
+>>   		pr_err("L2C: device tree omits to specify unified cache\n");
+>>   
+>> +	/* Read back current (default) hardware configuration */
+>> +	if (data->save)
+>> +		data->save(l2x0_base);
+>> +
+>>   	/* L2 configuration can only be changed if the cache is disabled */
+>>   	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN))
+>>   		if (data->of_parse)
+>> @@ -1671,8 +1693,6 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>>   	else
+>>   		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+>>   
+>> -	__l2c_init(data, aux_val, aux_mask, cache_id);
+>> -
+>> -	return 0;
+>> +	return __l2c_init(data, aux_val, aux_mask, cache_id);
+>>   }
+>>   #endif
+>> -- 
+>> 1.9.2
+> Based on two painful debugs.. It would really be nice to have this patch
+> split up into tinier pieces.. I know I have no issues with this patch
+> anymore, but for others who might discover similar behavior, debug is a
+> little easier with a split up series.
 
-These are registers inside PCIe host controller that contains
-information required such as the dma base address, interrupt
-configuration. So this will be used for the channels. I am not aware
-about syscon but will see if it better represents these registers.
->
-> Is this some kind of syscon node that contains all sorts of
-> registers munged together, or is this the same register set that
-> is used for the channels?
->
-> In the former case, better use a syscon reference instead of 'reg'
-> and use syscon_regmap_lookup_by_phandle to get the regmap, in the
-> second case, just list the entire registers.
->
->> +
->> +     xpdma_setup_dma_dev(&port->dma_dev);
->> +     /* Setup DMA mask - 32 for 32-bit system and 64 for 64-bit system */
->> +     err = dma_set_mask_and_coherent(&pdev->dev,
->> +                     DMA_BIT_MASK(8*sizeof(void *)));
->> +     if (err) {
->> +             dev_err(&pdev->dev, "Unable to set dma mask\n");
->> +             return err;
->> +     }
->
-> Just use a 64-bit dma-mask all the time, and fall back to a 32-bit
-> mask if that doesn't work, the dma mask is completely independent
-> of the word size of the CPU.
-okay.
->
-> You also have to make sure that the parent of the device contains
-> a proper dma-ranges property that allows a 64-bit mask. We currently
-> have a bug in the kernel that makes dma_set_mask_and_coherent
-> always succeed, and we need to fix that so it fails if you have
-> a 64-bit dma capable device on a 32-bit wide bus.
->
->> +static const struct of_device_id xpdma_match_table[] = {
->> +     {.compatible = "apm,xgene-pciedma",},
->> +     {},
->> +};
->
-> This is a rather generic compatible string. Is this device present
-> in identical form on all xgene variants?
-Yes.
->
-> As xgene is a marketing name and you have now announce the speciifc
-> model numbers, better use the first model that has this hardware.
-okay.
->
->         Arnd
+Frankly, I really doubt that there is any benefit in splitting this patch.
+The issues you have encountered were not really related to this patch, 
+although
+it revealed them. Maybe it will make more sense to give this patch series a
+serious testing in linux-next instead of further discussing the potential
+places of polishing patches.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
