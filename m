@@ -1,86 +1,92 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 7 Jan 2015 21:43:59 +0200
-Subject: 3.19 on Nokia n900: audio quality awful
-In-Reply-To: <20150106225856.GB31990@amd>
-References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
- <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
- <20150106205000.GB13902@amd>
- <20150106205730.GA6071@fuloong-minipc.musicnaut.iki.fi>
- <20150106220805.GD13902@amd>
- <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
- <20150106225856.GB31990@amd>
-Message-ID: <20150107194359.GE6071@fuloong-minipc.musicnaut.iki.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Jan 2015 20:48:48 +0100
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54AD7098.5010700@redhat.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <20150107172741.GY2634@sirena.org.uk> <54AD7098.5010700@redhat.com>
+Message-ID: <1610983.9vqJdsL27R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jan 06, 2015 at 11:58:56PM +0100, Pavel Machek wrote:
-> On Wed 2015-01-07 00:27:17, Aaro Koskinen wrote:
-> > On Tue, Jan 06, 2015 at 11:08:05PM +0100, Pavel Machek wrote:
-> > > On Tue 2015-01-06 22:57:30, Aaro Koskinen wrote:
-> > > > Hi,
-> > > > 
-> > > > On Tue, Jan 06, 2015 at 09:50:00PM +0100, Pavel Machek wrote:
-> > > > > PS: Unfortunately, N900 will not boot using nfsroot in 3.16+ at least,
-> > > > > and boot from MMC card is broken and has been for quite some time.
-> > > > 
-> > > > USB networking works fine with 3.19-rc3 and also MMC card rootfs.
-> > > 
-> > > Does nfsroot work for you? USB networking works as a module but not
-> > > build-in. [Patch is available for this one.]
-> > > 
-> > > u-SD card seems to have similar problem. If I try it after boot, I can
-> > > access it ok, but using u-SD card for rootfs fails. If it works for
-> > > you, it would be interesting to know.
+On Wednesday 07 January 2015 12:44:56 Jon Masters wrote:
+> On 01/07/2015 12:27 PM, Mark Brown wrote:
+> > On Wed, Jan 07, 2015 at 02:06:28PM +0100, Arnd Bergmann wrote:
+> >> On Wednesday 07 January 2015 11:50:39 Catalin Marinas wrote:
 > > 
-> > I haven't tried nfsroot, but I've been using USB networking for ssh
-> > for a couple of years without issues. I have g_ether as module.
+> >>> From what I gathered so far, the main reason for _some_ vendors is not
+> >>> support for "other" OS but actually features that ACPI has and DT
+> >>> doesn't (like AML; I deliberately ignore statements like "industry
+> >>> standard"). _If_ such reasons are sound, maybe they have a case for
+> >>> ACPI-only machines targeted primarily at Linux.
 > > 
-> > Also I recently switched rootfs to u-SD card, and it (MMC) works fine
-> > as builtin.
-> > 
-> > But I'm mounting it from userspace (using builtin initramfs inside
-> > zImage), with a poll loop that waits for a device to appear. Maybe if you
-> > do it from kernel you need to use root wait/delay etc. options?
+> >> What I got from the replies from HP, Huawei and from earlier discussions
+> >> with Jon is that they all hope to get to the point of relying on AML
+> >> alone to bridge the differences between SoC families.
 > 
-> Yes, it works if I mount it later. It fails when done directly using
-> root=, even with rootwait etc. Hard to believe, yes, but try it. You
-> can watch the results on console.
+> I'm expecting to need new drivers for SoC IP blocks that are net new,
+> but generational differences between iterations of the same SoC should
+> be abstracted behind the firmware (and we are already seeing this with
+> at least one platform). Platform wise, it's nice to already see e.g.
+> mmconfig working to handle the specific ways a platform wires PCI.
 
-Well, I tried and it works. 3.19-rc3 mounting logs are below.
+Yes, the parts that are mandated by SBSA, like the way that PCI needs
+to be done are generally good. Unfortunately a lot of the hardware that
+I've seen has a rather lax interpretation of the spec, so just because
+something is mandated doesn't mean it's done that way ;-)
 
-I used "root=/dev/mmcblk0p2 rootwait". Note that the external MMC
-is "mmcblk0" from kernel point of view.
+In other cases that's actually a good thing. One such example is the
+"Principles of ARM Memory Maps" document that tells hardware implementers
+to do a rather complex mapping "To support 36-bit x86 PAE compatible operating
+systems, such as Linux." but makes life much harder in the process than
+any of the random mappings we have seen in the wild.
 
-Without serial console I guess you could maybe capture the failure
-logs using mtdoops (assuming the kernel panics when it fails to mount
-the rootfs). mtdoops was used even in the sales model kernel, so there
-is MTD partition reserved already for it called "log".
+> > I tend to agree with you that it's an overreach to think that this is
+> > going to completely abstract away the differences between SoCs from
+> > different vendors without substantial further standardization work.
+> 
+> (which we plan to do - I intend ultimately for us to have an answer to
+> the Windows Hardware Qualification guides for ARM server systems)
 
-I would also recommend using initramfs to do the mounting etc. Then you
-could use the framebuffer console to observe and debug some obvious issues
-(assuming the framebuffer works, it often regresses unfortunately...).
+Ok, good.
 
-A.
+> >> The main problem here is that can AML only cover part of the problem:
+> >> it can talk to a clock controller e.g. over I2C, SPI, GPIO, UART
+> >> or IPMI, but you still need a device driver in the kernel to talk to
+> >> those, and SBSA doesn't mandate a specific implementation so you can
+> >> expect every other SoC that is coming out to have a different one.
+> > 
+> >> Similarly, SBSA is rather vague about some peripherals it mandates,
+> >> and if a new SoC has a slightly different AHCI variation, there is
+> >> nothing you can do about it in AML.
+> > 
+> >> x86 gets around this problem by having an extreme level of hardware
+> >> backwards compatibility, so you don't even need AML for this and
+> >> can generally boot a (almost) full-featured Linux kernel with
+> >> acpi=off on the command line.
+> > 
+> > That level of hardware compatibility does partly come from the need to
+> > run existing software.  I'd expect that similar effects will start to
+> > come into play with ARMv8 ACPI systems if they become successful; people
+> > will do things like ensure compatibility with common IPs that have
+> > existing Linux drivers that distros tend to include as standard.
+> 
+> Agreed.
 
-...
+There are two problems I see in trying to do the same thing on ARM:
 
-[    2.145721] Waiting for root device /dev/mmcblk0p2...
-[    2.194335] mmc0: host does not support reading read-only switch, assuming write-enable
-[    2.213775] mmc0: new high speed SDHC card at address aaaa
-[    2.227905] mmcblk0: mmc0:aaaa SL32G 29.7 GiB
-[    2.252227]  mmcblk0: p1 p2
-[    2.381958] EXT4-fs (mmcblk0p2): couldn't mount as ext3 due to feature incompatibilities
-[    2.399627] EXT4-fs (mmcblk0p2): couldn't mount as ext2 due to feature incompatibilities
-[    2.420196] EXT4-fs (mmcblk0p2): INFO: recovery required on readonly filesystem
-[    2.435485] EXT4-fs (mmcblk0p2): write access will be enabled during recovery[    2.497375] mmc1: switch to bus width 2 failed
-[    2.510620] mmc1: switch to bus width 1 failed
-[    2.524658] mmc1: new high speed MMC card at address 0001
-[    2.541229] mmcblk1: mmc1:0001 MMC32G 29.8 GiB
-[    2.553710] mmcblk1boot0: mmc1:0001 MMC32G partition 1 512 KiB
-[    2.569854] mmcblk1boot1: mmc1:0001 MMC32G partition 2 512 KiB
-[    2.587646]  mmcblk1: p1 p2 p3
-[    2.827606] EXT4-fs (mmcblk0p2): recovery complete
-[    2.848327] EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
-[    2.863464] VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
+* we don't have a single vendor that makes de-facto standards that
+  everyone else has to copy in the way that the few remaining x86
+  vendors copy everything that Intel does. In fact, we prefer to
+  have a large number of independent vendors.
+
+* There is a general mindset about deprecating unwanted features
+  early. ARMv8 aarch32 bit mode removes support for older instructions
+  or makes them optional. Even the virtualization mode doesn't allow
+  to trap on architecture version specific differences, so you can't
+  completely emulate an older architecture level.
+  This is nice for implementers but not so much for users that rely
+  on old (mis-)features. It's also not just the CPU core, other
+  components also get easily replaced, like a GICv3 that is not
+  a strict superset of GICv2.
+
+	Arnd
