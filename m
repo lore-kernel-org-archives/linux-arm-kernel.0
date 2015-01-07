@@ -1,53 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 10:58:41 +0000
-Subject: [PATCH v2 1/2] arm64: don't make early_*map() calls post
- paging_init()
-In-Reply-To: <1420576522.16211.30.camel@t520.localdomain>
-References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
- <1420551673-31416-2-git-send-email-leif.lindholm@linaro.org>
- <1420576522.16211.30.camel@t520.localdomain>
-Message-ID: <20150107105841.GE7485@arm.com>
+From: bart.tanghe@thomasmore.be (Bart Tanghe)
+Date: Wed,  7 Jan 2015 12:00:58 +0100
+Subject: [PATCH v2] ARM: dts: add bcm2835-pwm bindings
+Message-ID: <1420628458-11459-1-git-send-email-bart.tanghe@thomasmore.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 08:35:22PM +0000, Mark Salter wrote:
-> On Tue, 2015-01-06 at 13:41 +0000, Leif Lindholm wrote:
-> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > index 6fac253..e311066 100644
-> > --- a/arch/arm64/kernel/efi.c
-> > +++ b/arch/arm64/kernel/efi.c
-> > @@ -313,17 +313,26 @@ void __init efi_init(void)
-> >  	memmap.desc_size = params.desc_size;
-> >  	memmap.desc_version = params.desc_ver;
-> >  
-> > -	if (uefi_init() < 0)
-> > -		return;
-> > +	if (uefi_init() >= 0)
-> > +		reserve_regions();
-> >  
-> > -	reserve_regions();
-> > +	early_memunmap(memmap.map, params.mmap_size);
-> >  }
-> >  
-> > -void __init efi_idmap_init(void)
-> > +void __init efi_memmap_init(void)
-> >  {
-> > +	u64 mapsize;
-> > +
-> >  	if (!efi_enabled(EFI_BOOT))
-> >  		return;
-> >  
-> > +	/* replace early memmap mapping with permanent mapping */
-> > +	mapsize = memmap.map_end - memmap.map;
-> > +	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
-> > +						   mapsize);
-> 
-> ioremap_cache() could potententially fail here if the phys_map address
-> doesn't have a valid pfn (not in the kernel linear ram mapping) because
-> some of the underlying vm support hasn't been initialized yet.
+To probe the bcm2835-pwm driver properly, this dts bindings has to be added 
+to the bcm2835 dtsi file.
+In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
+---
+Changes in v2:
+ - status set to disabled
+ - follow the clock naming convention
 
-Can you be more specific about the case you have in mind, please? pfn_valid
-uses the memblocks on arm64, and that should all have been sorted out in
-paging_init(). What's the issue that you're anticipating?
+Signed-off-by: Bart Tanghe <bart.tanghe@thomasmore.be>
 
-Will
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 3342cb1..ba76bb4 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -146,6 +147,14 @@
+ 			interrupts = <1 9>;
+ 		};
+ 
++		pwm: pwm at 7e20e000 {
++			compatible = "brcm,bcm2835-pwm";
++			reg = <0x7e20c000 0x28>;
++			clocks = <&clk_pwm>;
++			#pwm-cells = <2>;
++			status = "disabled";
++		};
++
+ 		arm-pmu {
+ 			compatible = "arm,arm1176-pmu";
+ 		};
+@@ -179,5 +188,13 @@
+ 			clock-output-names = "spi";
+ 			clock-frequency = <250000000>;
+ 		};
++
++		clk_pwm: clock at 3 {
++			compatible = "fixed-clock";
++			reg = <3>;
++			#clock-cells = <0>;
++			clock-output-names = "pwm";
++			clock-frequency = <9200000>;
++		};
+ 	};
+ };
