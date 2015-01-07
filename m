@@ -1,68 +1,205 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Jan 2015 17:42:38 +0000
-Subject: [PATCH v2 03/21] ARM: tegra: skip gic_arch_extn setup if DT has a LIC
- node
+Date: Wed,  7 Jan 2015 17:42:39 +0000
+Subject: [PATCH v2 04/21] ARM: tegra: update DTs to expose legacy interrupt
+ controller
 In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
 References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420652576-22309-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420652576-22309-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we detect that our DT has a LIC node, don't setup gic_arch_extn,
-and skip tegra_legacy_irq_syscore_init as well.
-
-This is only a temporary measure until that code is removed for good.
+Describe the legacy interrupt controller in every tegra DTSI files,
+and make it the parent of most interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/irq.c   | 11 +++++++++++
- arch/arm/mach-tegra/tegra.c |  1 -
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra114.dtsi | 16 +++++++++++++++-
+ arch/arm/boot/dts/tegra124.dtsi | 16 +++++++++++++++-
+ arch/arm/boot/dts/tegra20.dtsi  | 15 ++++++++++++++-
+ arch/arm/boot/dts/tegra30.dtsi  | 16 +++++++++++++++-
+ 4 files changed, 59 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 7f87a50..b37141d 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -255,11 +255,21 @@ static void tegra114_gic_cpu_pm_registration(void)
- static void tegra114_gic_cpu_pm_registration(void) { }
- #endif
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 4296b53..f70bed0 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -8,7 +8,7 @@
  
-+static const struct of_device_id tegra_ictlr_match[] __initconst = {
-+	{ .compatible = "nvidia,tegra-ictlr" },
-+	{ }
-+};
+ / {
+ 	compatible = "nvidia,tegra114";
+-	interrupt-parent = <&gic>;
++	interrupt-parent = <&ictlr>;
+ 
+ 	host1x at 50000000 {
+ 		compatible = "nvidia,tegra114-host1x", "simple-bus";
+@@ -134,6 +134,19 @@
+ 		      <0x50046000 0x2000>;
+ 		interrupts = <GIC_PPI 9
+ 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		interrupt-parent = <&gic>;
++	};
 +
- void __init tegra_init_irq(void)
- {
- 	int i;
- 	void __iomem *distbase;
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra114-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>,
++		      <0x60004400 64>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
+ 	};
  
-+	if (of_find_matching_node(NULL, tegra_ictlr_match))
-+		goto skip_extn_setup;
+ 	timer at 60005000 {
+@@ -766,5 +779,6 @@
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 			<GIC_PPI 10
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupt-parent = <&gic>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 4be06c6..6ed6ca0 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -10,7 +10,7 @@
+ 
+ / {
+ 	compatible = "nvidia,tegra124";
+-	interrupt-parent = <&gic>;
++	interrupt-parent = <&ictlr>;
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
+@@ -173,6 +173,7 @@
+ 		      <0x0 0x50046000 0x0 0x2000>;
+ 		interrupts = <GIC_PPI 9
+ 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		interrupt-parent = <&gic>;
+ 	};
+ 
+ 	gpu at 0,57000000 {
+@@ -190,6 +191,18 @@
+ 		status = "disabled";
+ 	};
+ 
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra124-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x0 0x60004000 0x0 0x40>,
++		      <0x0 0x60004100 0x0 0x40>,
++		      <0x0 0x60004200 0x0 0x40>,
++		      <0x0 0x60004300 0x0 0x40>,
++		      <0x0 0x60004400 0x0 0x40>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++	};
 +
-+	tegra_legacy_irq_syscore_init();
+ 	timer at 0,60005000 {
+ 		compatible = "nvidia,tegra124-timer", "nvidia,tegra20-timer";
+ 		reg = <0x0 0x60005000 0x0 0x400>;
+@@ -955,5 +968,6 @@
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 			     <GIC_PPI 10
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupt-parent = <&gic>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 8acf5d8..ab2f004 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -7,7 +7,7 @@
+ 
+ / {
+ 	compatible = "nvidia,tegra20";
+-	interrupt-parent = <&intc>;
++	interrupt-parent = <&ictlr>;
+ 
+ 	host1x at 50000000 {
+ 		compatible = "nvidia,tegra20-host1x", "simple-bus";
+@@ -142,6 +142,7 @@
+ 
+ 	timer at 50004600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
++		interrupt-parent = <&intc>;
+ 		reg = <0x50040600 0x20>;
+ 		interrupts = <GIC_PPI 13
+ 			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -154,6 +155,7 @@
+ 		       0x50040100 0x0100>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
+ 	};
+ 
+ 	cache-controller at 50043000 {
+@@ -165,6 +167,17 @@
+ 		cache-level = <2>;
+ 	};
+ 
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++	};
 +
- 	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
- 	num_ictlrs = readl_relaxed(distbase + GIC_DIST_CTR) & 0x1f;
+ 	timer at 60005000 {
+ 		compatible = "nvidia,tegra20-timer";
+ 		reg = <0x60005000 0x60>;
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 99475f6..c621e30 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -8,7 +8,7 @@
  
-@@ -283,5 +293,6 @@ void __init tegra_init_irq(void)
- 	gic_arch_extn.irq_set_wake = tegra_set_wake;
- 	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+ / {
+ 	compatible = "nvidia,tegra30";
+-	interrupt-parent = <&intc>;
++	interrupt-parent = <&ictlr>;
  
-+skip_extn_setup:
- 	tegra114_gic_cpu_pm_registration();
- }
-diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-index ef016af..c33fba7 100644
---- a/arch/arm/mach-tegra/tegra.c
-+++ b/arch/arm/mach-tegra/tegra.c
-@@ -82,7 +82,6 @@ static void __init tegra_dt_init_irq(void)
- {
- 	tegra_init_irq();
- 	irqchip_init();
--	tegra_legacy_irq_syscore_init();
- }
+ 	pcie-controller at 00003000 {
+ 		compatible = "nvidia,tegra30-pcie";
+@@ -228,6 +228,7 @@
+ 	timer at 50004600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
++		interrupt-parent = <&intc>;
+ 		interrupts = <GIC_PPI 13
+ 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		clocks = <&tegra_car TEGRA30_CLK_TWD>;
+@@ -239,6 +240,7 @@
+ 		       0x50040100 0x0100>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
+ 	};
  
- static void __init tegra_dt_init(void)
+ 	cache-controller at 50043000 {
+@@ -250,6 +252,18 @@
+ 		cache-level = <2>;
+ 	};
+ 
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra30-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>,
++		      <0x60004400 64>;
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++	};
++
+ 	timer at 60005000 {
+ 		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
+ 		reg = <0x60005000 0x400>;
 -- 
 2.1.4
