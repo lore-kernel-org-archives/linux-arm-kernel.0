@@ -1,71 +1,198 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 07 Jan 2015 12:44:56 -0500
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150107172741.GY2634@sirena.org.uk>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <2161376.07iV9ANMSk@wuerfel>
- <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
- <1520439.Y1rXzXY1eS@wuerfel> <20150107172741.GY2634@sirena.org.uk>
-Message-ID: <54AD7098.5010700@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  7 Jan 2015 17:51:00 +0000
+Subject: [PATCH v3 1/3] genirq: Allow the irqchip state of an IRQ to be
+ save/restored
+In-Reply-To: <1420653062-23361-1-git-send-email-marc.zyngier@arm.com>
+References: <1420653062-23361-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420653062-23361-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2015 12:27 PM, Mark Brown wrote:
-> On Wed, Jan 07, 2015 at 02:06:28PM +0100, Arnd Bergmann wrote:
->> On Wednesday 07 January 2015 11:50:39 Catalin Marinas wrote:
-> 
->>> From what I gathered so far, the main reason for _some_ vendors is not
->>> support for "other" OS but actually features that ACPI has and DT
->>> doesn't (like AML; I deliberately ignore statements like "industry
->>> standard"). _If_ such reasons are sound, maybe they have a case for
->>> ACPI-only machines targeted primarily at Linux.
-> 
->> What I got from the replies from HP, Huawei and from earlier discussions
->> with Jon is that they all hope to get to the point of relying on AML
->> alone to bridge the differences between SoC families.
+There is a number of cases where a kernel subsystem may want to
+introspect the state of an interrupt at the irqchip level:
 
-I'm expecting to need new drivers for SoC IP blocks that are net new,
-but generational differences between iterations of the same SoC should
-be abstracted behind the firmware (and we are already seeing this with
-at least one platform). Platform wise, it's nice to already see e.g.
-mmconfig working to handle the specific ways a platform wires PCI.
+- When a peripheral is shared between virtual machines,
+  its interrupt state becomes part of the guest's state,
+  and must be switched accordingly. KVM on arm/arm64 requires
+  this for its guest-visible timer
+- Some GPIO controllers seem to require peeking into the
+  interrupt controller they are connected to to report
+  their internal state
 
-> I tend to agree with you that it's an overreach to think that this is
-> going to completely abstract away the differences between SoCs from
-> different vendors without substantial further standardization work.
+This seem to be a pattern that is common enough for the core code
+to try and support this without too many horrible hacks. Introduce
+a pair of accessors (irq_get_irqchip_state/irq_set_irqchip_state)
+to retrieve the bits that can be of interest to another subsystem:
+pending, active, and masked.
 
-(which we plan to do - I intend ultimately for us to have an answer to
-the Windows Hardware Qualification guides for ARM server systems)
+- irq_get_irqchip_state returns the state of the interrupt according
+  to a parameter set to IRQCHIP_STATE_PENDING, IRQCHIP_STATE_ACTIVE,
+  IRQCHIP_STATE_MASKED or IRQCHIP_STATE_LINE_LEVEL.
+- irq_set_irqchip_state similarly sets the state of the interrupt.
 
-> However it does seem reasonable to expect that features like AML are
-> going to be more successful in handling board differences and
-> incremental revisions of SoCs - things like interactions with system
-> power controllers for example.  That seems like a useful win in and of
-> itself, and one that's worth supporting.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/interrupt.h | 14 ++++++++
+ include/linux/irq.h       |  6 ++++
+ kernel/irq/manage.c       | 91 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 111 insertions(+)
 
-Indeed.
-
->> The main problem here is that can AML only cover part of the problem:
->> it can talk to a clock controller e.g. over I2C, SPI, GPIO, UART
->> or IPMI, but you still need a device driver in the kernel to talk to
->> those, and SBSA doesn't mandate a specific implementation so you can
->> expect every other SoC that is coming out to have a different one.
-> 
->> Similarly, SBSA is rather vague about some peripherals it mandates,
->> and if a new SoC has a slightly different AHCI variation, there is
->> nothing you can do about it in AML.
-> 
->> x86 gets around this problem by having an extreme level of hardware
->> backwards compatibility, so you don't even need AML for this and
->> can generally boot a (almost) full-featured Linux kernel with
->> acpi=off on the command line.
-> 
-> That level of hardware compatibility does partly come from the need to
-> run existing software.  I'd expect that similar effects will start to
-> come into play with ARMv8 ACPI systems if they become successful; people
-> will do things like ensure compatibility with common IPs that have
-> existing Linux drivers that distros tend to include as standard.
-
-Agreed.
-
-Jon.
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index d9b05b5..fa7040e 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -356,6 +356,20 @@ static inline int disable_irq_wake(unsigned int irq)
+ 	return irq_set_irq_wake(irq, 0);
+ }
+ 
++/*
++ * irq_get_irqchip_state/irq_set_irqchip_state specific flags
++ */
++enum irqchip_irq_state {
++	IRQCHIP_STATE_PENDING,		/* Is interrupt pending? */
++	IRQCHIP_STATE_ACTIVE,		/* Is interrupt in progress? */
++	IRQCHIP_STATE_MASKED,		/* Is interrupt masked? */
++	IRQCHIP_STATE_LINE_LEVEL,	/* Is IRQ line high? */
++};
++
++extern int irq_get_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
++				 bool *state);
++extern int irq_set_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
++				 bool state);
+ 
+ #ifdef CONFIG_IRQ_FORCED_THREADING
+ extern bool force_irqthreads;
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index d09ec7a..77dd2e7 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -30,6 +30,7 @@
+ struct seq_file;
+ struct module;
+ struct msi_msg;
++enum irqchip_irq_state;
+ 
+ /*
+  * IRQ line status.
+@@ -324,6 +325,8 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+  *				irq_request_resources
+  * @irq_compose_msi_msg:	optional to compose message content for MSI
+  * @irq_write_msi_msg:	optional to write message content for MSI
++ * @irq_get_irqchip_state:	return the internal state of an interrupt
++ * @irq_set_irqchip_state:	set the internal state of a interrupt
+  * @flags:		chip specific flags
+  */
+ struct irq_chip {
+@@ -363,6 +366,9 @@ struct irq_chip {
+ 	void		(*irq_compose_msi_msg)(struct irq_data *data, struct msi_msg *msg);
+ 	void		(*irq_write_msi_msg)(struct irq_data *data, struct msi_msg *msg);
+ 
++	int		(*irq_get_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool *state);
++	int		(*irq_set_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool state);
++
+ 	unsigned long	flags;
+ };
+ 
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 8069237..acb401f5 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1758,3 +1758,94 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+ 
+ 	return retval;
+ }
++
++/**
++ *	irq_get_irqchip_state - returns the irqchip state of a interrupt.
++ *	@irq: Interrupt line that is forwarded to a VM
++ *	@which: One of IRQCHIP_STATE_* the caller wants to know about
++ *	@state: a pointer to a boolean where the state is to be storeed
++ *
++ *	This call snapshots the internal irqchip state of an
++ *	interrupt, returning into @state the bit corresponding to
++ *	stage @which
++ *
++ *	This function should be called with preemption disabled if the
++ *	interrupt controller has per-cpu registers.
++ */
++int irq_get_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
++			  bool *state)
++{
++	struct irq_desc *desc;
++	struct irq_data *data;
++	struct irq_chip *chip;
++	unsigned long flags;
++	int err = -EINVAL;
++
++	desc = irq_get_desc_buslock(irq, &flags, 0);
++	if (!desc)
++		return err;
++
++	data = irq_desc_get_irq_data(desc);
++
++	do {
++		chip = irq_data_get_irq_chip(data);
++		if (chip->irq_get_irqchip_state)
++			break;
++#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
++		data = data->parent_data;
++#else
++		data = NULL;
++#endif
++	} while (data);
++
++	if (data)
++		err = chip->irq_get_irqchip_state(data, which, state);
++
++	irq_put_desc_busunlock(desc, flags);
++	return err;
++}
++
++/**
++ *	irq_set_irqchip_state - set the state of a forwarded interrupt.
++ *	@irq: Interrupt line that is forwarded to a VM
++ *	@which: State to be restored (one of IRQCHIP_STATE_*)
++ *	@val: Value corresponding to @which
++ *
++ *	This call sets the internal irqchip state of an interrupt,
++ *	depending on the value of @which.
++ *
++ *	This function should be called with preemption disabled if the
++ *	interrupt controller has per-cpu registers.
++ */
++int irq_set_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
++			  bool val)
++{
++	struct irq_desc *desc;
++	struct irq_data *data;
++	struct irq_chip *chip;
++	unsigned long flags;
++	int err = -EINVAL;
++
++	desc = irq_get_desc_buslock(irq, &flags, 0);
++	if (!desc)
++		return err;
++
++	data = irq_desc_get_irq_data(desc);
++
++	do {
++		chip = irq_data_get_irq_chip(data);
++		if (chip->irq_set_irqchip_state)
++			break;
++#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
++		data = data->parent_data;
++#else
++		data = NULL;
++#endif
++	} while (data);
++
++	if (data)
++		err = chip->irq_set_irqchip_state(data, which, val);
++
++	irq_put_desc_busunlock(desc, flags);
++	return err;
++}
+-- 
+2.1.4
