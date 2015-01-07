@@ -1,43 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 10:25:43 +0000
-Subject: [PATCH] arm64: mm: support instruction SETEND
-In-Reply-To: <54AD061A.6090602@arm.com>
-References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
- <54AD061A.6090602@arm.com>
-Message-ID: <20150107102543.GD7485@arm.com>
+From: l.stelmach@samsung.com (=?utf-8?Q?=C5=81ukasz?= Stelmach)
+Date: Wed, 07 Jan 2015 11:27:25 +0100
+Subject: [PATCH] ARM: vexpress_defconfig: enable ACL and security labels
+ for ext4
+In-Reply-To: <3238168.YKYh95mZKp@wuerfel>
+References: <1418383877-29685-1-git-send-email-l.stelmach@samsung.com>
+ <3238168.YKYh95mZKp@wuerfel>
+Message-ID: <87fvbmubqq.fsf%l.stelmach@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 10:10:34AM +0000, Suzuki K. Poulose wrote:
-> On 07/01/15 05:52, Leo Yan wrote:
-> > Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
-> > instruction will be treated as UNALLOCATED; this error can be
-> > reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
-> > mode, finally kernel will trap the exception if the userspace
-> > libs use SETEND instruction.
-> >
-> > So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
-> >
-> The best way to do this, is via the instruction emulation framework 
-> added by Punit, which handles the armv8 deprecated/obsoleted 
-> instructions. This is now queued for 3.19.
-> I have a patchset which adds the 'SETEND' emulation support to the 
-> framework. This will enable better handling of the feature, including 
-> finding out the users of the deprecated instruction (when we switch to 
-> the emulation mode).
-> 
-> Btw, there is one open question that I am seeking answer for.
-> 
-> What should be the endianness of the signal handlers ? Should we leave 
-> it to the application ? Or restore the 'default' endianness for the 
-> signal handler ?
+It was <2014-12-12 pi? 12:38>, when Arnd Bergmann wrote:
+> On Friday 12 December 2014 12:31:17 ?ukasz Stelmach wrote:
+>> This patch enables security features of ext4 file-system required
+>> by many conteporary user-space setups.
+>> 
+>> Signed-off-by: ?ukasz Stelmach <l.stelmach@samsung.com>
+>> ---
+>>  arch/arm/configs/vexpress_defconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>
+> The patch looks good, but should be addressed to the vexpress maintainers
+> (Liviu, Sudeep, Lorenzo)
+>
+> 	Arnd
 
-I think we should restore the default endianness, otherwise you're
-essentially forcing signal handlers to do a setend as their first
-instruction to get into a consistent state. That also matches the endianness
-of the sigframe that we push onto the stack, right?
+...?
+ping?
 
-setjmp/longjmp could be fun, but I think that an application would need
-to take care not to make endianness assumptions across those anyway.
+>> diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+>> index f489fda..1d9dd6e 100644
+>> --- a/arch/arm/configs/vexpress_defconfig
+>> +++ b/arch/arm/configs/vexpress_defconfig
+>> @@ -138,6 +138,8 @@ CONFIG_EXT3_FS=y
+>>  # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+>>  # CONFIG_EXT3_FS_XATTR is not set
+>>  CONFIG_EXT4_FS=y
+>> +CONFIG_EXT4_FS_POSIX_ACL=y
+>> +CONFIG_EXT4_FS_SECURITY=y
+>>  CONFIG_VFAT_FS=y
+>>  CONFIG_TMPFS=y
+>>  CONFIG_JFFS2_FS=y
 
-Will
+-- 
+?ukasz Stelmach
+Samsung R&D Institute Poland
+Samsung Electronics
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/1375935f/attachment.sig>
