@@ -1,129 +1,154 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Jan 2015 13:46:10 +0100
-Subject: [PATCH 4/4] dma: X-Gene PCIE DMA Driver
-In-Reply-To: <CAL-zptNyLVBEvMBjSUbhE0WEj7-E81g7PF7_WFX1nM4AdYj7_g@mail.gmail.com>
-References: <1420608537-12296-1-git-send-email-mchitale@apm.com>
- <4187918.PUaMnn04Vq@wuerfel>
- <CAL-zptNyLVBEvMBjSUbhE0WEj7-E81g7PF7_WFX1nM4AdYj7_g@mail.gmail.com>
-Message-ID: <9430055.pMHRTP0RMA@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Jan 2015 13:47:44 +0100
+Subject: [PATCH v15 10/11] KVM: arm/arm64: Enable Dirty Page logging for
+ ARMv8
+In-Reply-To: <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
+References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
+ <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20150107124744.GC21092@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 January 2015 16:55:33 Mayuresh Chitale wrote:
+On Sun, Dec 14, 2014 at 11:28:07PM -0800, Mario Smarduch wrote:
+> This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
+
+                           dirty
+
+> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
+> logging at architecture layer.
 > 
-> On Wed, Jan 7, 2015 at 2:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 07 January 2015 10:58:57 Mayuresh Chitale wrote:
-> >> This patch implements DMA engine API for DMA controller on APM
-> >> X-Gene PCIe controller. DMA engine can support up to 4 channels per port
-> >> and up to 2048 outstanding requests per channel.  This is intended
-> >> to be used on ports that are configured in EP mode or to transfer
-> >> data from a RC port that is connected to a X-Gene EP port.
-> >
-> > Linux currently does not support PCIe endpoints. Do you plan to submit
-> > a driver for that as well?
-> >
-> >> +
-> >> +static void xpdma_setup_dma_dev(struct dma_device *dev)
-> >> +{
-> >> +     dma_cap_zero(dev->cap_mask);
-> >> +     dma_cap_set(DMA_SLAVE, dev->cap_mask);
-> >> +     dma_cap_set(DMA_PRIVATE, dev->cap_mask);
-> >> +
-> >> +     dev->device_alloc_chan_resources = xpdma_alloc_chan_resources;
-> >> +     dev->device_free_chan_resources = xpdma_free_chan_resources;
-> >> +     dev->device_tx_status = xpdma_tx_status;
-> >> +     dev->device_issue_pending = xpdma_issue_pending;
-> >> +     dev->device_prep_slave_sg = xpdma_prep_slave_sg;
-> >> +     dev->device_control = xpdma_device_control;
-> >> +}
-> >
-> > You are setting up DMA_SLAVE here but do not use the DT binding
-> > for slave DMA. Can your driver handle slave DMA? If it can,
-> > you should use the appropriate binding, if not then don't
-> > set DMA_SLAVE here.
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h | 12 ------------
+>  arch/arm/kvm/arm.c              |  4 ----
+>  arch/arm/kvm/mmu.c              | 19 +++++++++++--------
+>  arch/arm64/kvm/Kconfig          |  2 ++
+>  4 files changed, 13 insertions(+), 24 deletions(-)
 > 
-> Are you referring to  DT DMA helpers? If so, I will add it.
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index b138431..088ea87 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -223,18 +223,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>  }
+>  
+> -/**
+> - * kvm_flush_remote_tlbs() - flush all VM TLB entries
+> - * @kvm:	pointer to kvm structure.
+> - *
+> - * Interface to HYP function to flush all VM TLB entries without address
+> - * parameter.
+> - */
+> -static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+> -{
+> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> -}
+> -
+>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>  {
+>  	return 0;
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 6e4290c..1b6577c 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -740,7 +740,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>   */
+>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>  {
+> -#ifdef CONFIG_ARM
+>  	bool is_dirty = false;
+>  	int r;
+>  
+> @@ -753,9 +752,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>  
+>  	mutex_unlock(&kvm->slots_lock);
+>  	return r;
+> -#else /* arm64 */
+> -	return -EINVAL;
+> -#endif
+>  }
+>  
+>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index dc763bb..59003df 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
+>  
+>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+>  {
+> -#ifdef CONFIG_ARM
+>  	return !!memslot->dirty_bitmap;
+> -#else
+> -	return false;
+> -#endif
+> +}
+> +
+> +/**
+> + * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
+> + * @kvm:	pointer to kvm structure.
+> + *
+> + * Interface to HYP function to flush all VM TLB entries
+> + */
+> +inline void kvm_flush_remote_tlbs(struct kvm *kvm)
 
-Yes, you will need a '#dma-cells' property in the device node,
-and call of_dma_controller_register with an appropriate xlate
-function so a slave can find the right channel.
+did you intend for a non-staic inline here?
 
-> >> +static int xpdma_setup_dma_channel(struct platform_device *pdev,
-> >> +             struct xpdma_port *port)
-> >> +{
-> >> +     int i, ret = 0;
-> >> +     struct xpdma_chan *chan;
-> >> +     resource_size_t dma_base;
-> >> +
-> >> +     dma_base = MAKE_U64(readl(port->cfg + PORT_CFG_HI), readl(port->cfg)) +
-> >> +             CHAN_REG_BASE;
-> >> +     port->dma = devm_ioremap(&pdev->dev, dma_base,
-> >> +                     CHAN_REG_SIZE * MAX_DMA_CHAN);
-> >> +     if (port->dma == NULL) {
-> >> +             dev_err(&pdev->dev, "Could not get base addressc$\n");
-> >> +             return -ENOMEM;
-> >> +     }
-> >
-> > The registers are not listed in the 'reg' property. Why is that?
-> Actually these registers have to accessed via the PCIe config space
-> region for that port. Since the config space base address is
-> programmed by host controller driver we can know the base address only
-> by reading the corresponding config space bar at runtime.
-
-I think I'm missing something important here. What exactly is the
-interaction with PCI here? Is it possible to use the dmaengine
-driver at all when the PCI host controller is not in endpoint mode?
-
-Does the dmaengine show up as a PCI device when the PCI controller is
-in host mode?
-
-> > You should probably use devm_request_mem_region or devm_ioremap_resource
-> > here to ensure manage the mmio range.
-> >
-> >> +static int xpdma_probe(struct platform_device *pdev)
-> >> +{
-> >> +     int err;
-> >> +     u32 mask;
-> >> +     struct resource *res;
-> >> +     struct xpdma_port *port;
-> >> +
-> >> +     port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
-> >> +     if (!port)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     port->dma_dev.dev = &pdev->dev;
-> >> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> +     if (!res) {
-> >> +             dev_err(&pdev->dev, "No cfg resource\n");
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     port->cfg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> >> +     if (IS_ERR(port->cfg))
-> >> +             return PTR_ERR(port->cfg);
-> >> +
-> >> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> >> +     if (!res) {
-> >> +             dev_err(&pdev->dev, "No intr resource\n");
-> >> +             return -EINVAL;
-> >> +     }
-> >
-> > from binding, these two register ranges look like they are part of
-> > another device. Which device is that:
-> >
-> > +                       reg = < 0x0 0x1f2b0154 0x0 0xc
-> > +                               0x0 0x1f2b0058 0x0 0x8>;
+> +{
+> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+>  }
+>  
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> @@ -895,7 +902,6 @@ static bool kvm_is_device_pfn(unsigned long pfn)
+>  	return !pfn_valid(pfn);
+>  }
+>  
+> -#ifdef CONFIG_ARM
+>  /**
+>   * stage2_wp_ptes - write protect PMD range
+>   * @pmd:	pointer to pmd entry
+> @@ -1040,7 +1046,6 @@ void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
+>  
+>  	stage2_wp_range(kvm, start, end);
+>  }
+> -#endif
+>  
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  			  struct kvm_memory_slot *memslot, unsigned long hva,
+> @@ -1445,7 +1450,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>  				   const struct kvm_memory_slot *old,
+>  				   enum kvm_mr_change change)
+>  {
+> -#ifdef CONFIG_ARM
+>  	/*
+>  	 * At this point memslot has been committed and there is an
+>  	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
+> @@ -1453,7 +1457,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>  	 */
+>  	if (change != KVM_MR_DELETE && mem->flags & KVM_MEM_LOG_DIRTY_PAGES)
+>  		kvm_mmu_wp_memory_region(kvm, mem->slot);
+> -#endif
+>  }
+>  
+>  int kvm_arch_prepare_memory_region(struct kvm *kvm,
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 8ba85e9..3ce389b 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -22,10 +22,12 @@ config KVM
+>  	select PREEMPT_NOTIFIERS
+>  	select ANON_INODES
+>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
+> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
+>  	select KVM_MMIO
+>  	select KVM_ARM_HOST
+>  	select KVM_ARM_VGIC
+>  	select KVM_ARM_TIMER
+> +	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  
+> -- 
+> 1.9.1
 > 
-> These are registers inside PCIe host controller that contains
-> information required such as the dma base address, interrupt
-> configuration. So this will be used for the channels. I am not aware
-> about syscon but will see if it better represents these registers.
-
-If the dmaengine is tightly connected to the PCI host controller
-and only usable in endpoint mode, maybe it's better to use a completely
-different model here, depending on how the PCI endpoint programming
-model will look like in the end. We are in fact in need of a generic
-abstraction for endpoints. There are some beginnings in drivers/ntb,
-and maybe it should build on that instead?
-
-	Arnd
