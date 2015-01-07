@@ -1,17 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Jan 2015 16:40:55 -0500
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 7 Jan 2015 17:10:14 -0500 (EST)
 Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54AD8FF2.60407@redhat.com>
+In-Reply-To: <20150107214055.GP24989@titan.lakedaemon.net>
 References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
  <2161376.07iV9ANMSk@wuerfel>
  <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
  <1520439.Y1rXzXY1eS@wuerfel> <20150107172741.GY2634@sirena.org.uk>
- <20150107184158.GO24989@titan.lakedaemon.net>
- <54AD8FF2.60407@redhat.com>
-Message-ID: <20150107214055.GP24989@titan.lakedaemon.net>
+ <20150107184158.GO24989@titan.lakedaemon.net> <54AD8FF2.60407@redhat.com>
+ <20150107214055.GP24989@titan.lakedaemon.net>
+Message-ID: <1796283731.6904840.1420668614408.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Jason,
+
+Will followup more later...was being a little sarcastic before...no raw nerve ;) but sarcasm translates badly so apologies. Will send a better reply when back online :) Good points!
+
+Jon.
+
+-- 
+Computer Architect | Sent from my #ARM Powered Mobile Device
+
+On Jan 7, 2015 4:41 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+>
+> On Wed, Jan 07, 2015 at 02:58:42PM -0500, Jon Masters wrote: 
+> > On 01/07/2015 01:41 PM, Jason Cooper wrote: 
 On Wed, Jan 07, 2015 at 02:58:42PM -0500, Jon Masters wrote:
 > On 01/07/2015 01:41 PM, Jason Cooper wrote:
 > > On Wed, Jan 07, 2015 at 05:27:41PM +0000, Mark Brown wrote:
@@ -163,3 +176,7 @@ bringing it up. ;-)
 thx,
 
 Jason.
+--
+To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
