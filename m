@@ -1,35 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 7 Jan 2015 17:07:10 +0800
-Subject: [PATCH 01/17] ARM: sunxi: Register cpufreq-dt for sun[45678]i
-In-Reply-To: <20150106155532.GR7853@lukather>
-References: <1420511727-8242-1-git-send-email-wens@csie.org>
- <1420511727-8242-2-git-send-email-wens@csie.org>
- <20150106155532.GR7853@lukather>
-Message-ID: <CAGb2v64Qv1Nhy2w--4T7ujw9NC17QhJdmrn0VyDtTajv+tu+NQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Jan 2015 10:11:38 +0100
+Subject: [PATCH v2 4/5] clk: cygnus: add clock support for Broadcom Cygnus
+In-Reply-To: <54AC99F3.8040703@broadcom.com>
+References: <1420500076-18302-5-git-send-email-rjui@broadcom.com>
+ <2048376.BFrtW5tszK@wuerfel> <54AC99F3.8040703@broadcom.com>
+Message-ID: <2938966.fY2WjearG6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 06 January 2015 18:29:07 Ray Jui wrote:
+> On 1/6/2015 12:21 PM, Arnd Bergmann wrote:
+> > On Monday 05 January 2015 15:21:15 Ray Jui wrote:
+> > 
+> > The tables look fairly regular. Is it possible that it's common
+> > to all iproc variants with a standard way to derive all other
+> > values from the channel index?
+> > 
+> Ah no. Not only it's different between different iproc variants, it's
+> also different between plls on the same soc.
 
-On Tue, Jan 6, 2015 at 11:55 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Jan 06, 2015 at 10:35:11AM +0800, Chen-Yu Tsai wrote:
->> On sun[45678]i, we have one cluster of identical cores sharing a
->> clock, which is ideal for using cpufreq-dt. Register a platform
->> device for cpufreq-dt.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> While I don't have anything against this patch, I seem to recall that
-> it was not necessary anymore, or that there was some work in the
-> direction of removing that kind of code, have you looked into that?
+Ok, I see.
+ 
+> >> +static const struct iproc_asiu_gate asiu_gate[BCM_CYGNUS_NUM_ASIU_CLKS] = {
+> >> +	[BCM_CYGNUS_ASIU_KEYPAD_CLK] =
+> >> +		asiu_gate_val(0x0, 7),
+> >> +	[BCM_CYGNUS_ASIU_ADC_CLK] =
+> >> +		asiu_gate_val(0x0, 9),
+> >> +	[BCM_CYGNUS_ASIU_PWM_CLK] =
+> >> +		asiu_gate_val(IPROC_CLK_INVALID_OFFSET, 0),
+> >> +};
+> > 
+> > Here I think a better binding would be to pass the gate value in the
+> > clock specifier, rather than an artificial index. That would let
+> > you get rid of the BCM_CYGNUS_ASIU_KEYPAD_CLK/BCM_CYGNUS_ASIU_ADC_CLK
+> > macros.
+> > 
+> You meant to pass in both the gate register offset and its bit shift
+> through the clock specifier? But isn't the current ASIU clock code much
+> more consistent with the rest of the iProc clock code?
 
-I believe you are referring to the work done by Viresh Kumar (CCed),
-specifically the 2 series "[RFC V1 0/8] CPUFreq: create platform-dev
-for DT based cpufreq drivers" and "[RFC] OPP: Redefine bindings to
-overcome shortcomings". So far the new code has not appeared in
-linux-next. If it does, I will happily use it.
+For simple devices that don't need an index macro, I would always
+prefer not defining them, because they are a pain to maintain.
+For a simple gate clock controller, we could compute both the offset
+and bit number from a single integer.
 
-ChenYu
+However, I now saw upon taking a closer look that the asiu has both
+a gate and a divider, and the latter one is not as simple, so
+my comment doesn't apply here.
+
+	Arnd
