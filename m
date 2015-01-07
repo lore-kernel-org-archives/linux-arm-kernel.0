@@ -1,61 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 07 Jan 2015 10:10:34 +0000
-Subject: [PATCH] arm64: mm: support instruction SETEND
-In-Reply-To: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
-References: <1420609930-1689-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <54AD061A.6090602@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Jan 2015 10:10:56 +0000
+Subject: [PATCH v2 31/40] arm64: macro whitespace fixes
+In-Reply-To: <1420558883-10131-32-git-send-email-mst@redhat.com>
+References: <1420558883-10131-1-git-send-email-mst@redhat.com>
+ <1420558883-10131-32-git-send-email-mst@redhat.com>
+Message-ID: <20150107101055.GB7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/15 05:52, Leo Yan wrote:
-> Currently kernel has set the bit SCTLR_EL1.SED, so the SETEND
-> instruction will be treated as UNALLOCATED; this error can be
-> reproduced when ARMv8 cpu runs with EL1/aarch64 and EL0/aarch32
-> mode, finally kernel will trap the exception if the userspace
-> libs use SETEND instruction.
->
-> So this patch clears bit SCTLR_EL1.SED to support SETEND instruction.
->
-The best way to do this, is via the instruction emulation framework 
-added by Punit, which handles the armv8 deprecated/obsoleted 
-instructions. This is now queued for 3.19.
-I have a patchset which adds the 'SETEND' emulation support to the 
-framework. This will enable better handling of the feature, including 
-finding out the users of the deprecated instruction (when we switch to 
-the emulation mode).
-
-Btw, there is one open question that I am seeking answer for.
-
-What should be the endianness of the signal handlers ? Should we leave 
-it to the application ? Or restore the 'default' endianness for the 
-signal handler ?
-
-
-Thanks
-Suzuki
-
-
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: Xiaolong Ye <yexl@marvell.com>
+On Tue, Jan 06, 2015 at 03:45:15PM +0000, Michael S. Tsirkin wrote:
+> While working on arch/arm64/include/asm/uaccess.h, I noticed
+> that one macro within this header is made harder to read because it
+> violates a coding style rule: space is missing after comma.
+> 
+> Fix it up.
+> 
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 > ---
->   arch/arm64/mm/proc.S | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 4e778b1..66a7363 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -249,9 +249,9 @@ ENDPROC(__cpu_setup)
->   	 *       CE0      XWHW CZ     ME TEEA S
->   	 * .... .IEE .... NEAI TE.I ..AD DEN0 ACAM
->   	 * 0011 0... 1101 ..0. ..0. 10.. .... .... < hardware reserved
-> -	 * .... .1.. .... 01.1 11.1 ..01 0001 1101 < software settings
-> +	 * .... .1.. .... 01.1 11.1 ..00 0001 1101 < software settings
->   	 */
->   	.type	crval, #object
->   crval:
-> -	.word	0x000802e2			// clear
-> -	.word	0x0405d11d			// set
-> +	.word	0x000803e2			// clear
-> +	.word	0x0405d01d			// set
->
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+>  arch/arm64/include/asm/uaccess.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 9a2069b..07e1ba44 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -63,7 +63,7 @@ static inline void set_fs(mm_segment_t fs)
+>  	current_thread_info()->addr_limit = fs;
+>  }
+>  
+> -#define segment_eq(a,b)	((a) == (b))
+> +#define segment_eq(a, b)	((a) == (b))
+>  
+>  /*
+>   * Return 1 if addr < current->addr_limit, 0 otherwise.
+> -- 
+> MST
+> 
+> 
