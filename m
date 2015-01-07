@@ -1,58 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Jan 2015 22:03:13 +0100
-Subject: [PATCH v2 0/5] usb: atmel_usba_udc: Rework errata handling
-In-Reply-To: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1420552022-8422-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150107210313.GC2447@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Jan 2015 22:18:35 +0100
+Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
+In-Reply-To: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <4057859.4ynbgz66iN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 07 January 2015 13:49:50 Murali Karicheri wrote:
+> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
+> add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
+> and dma ops etc using the information from DT. The prior RFCs and discussions
+> are available at [1] and [2] below.
+> 
+> [2] : https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
+> [1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
 
-The whole series looks good to me, you can add my
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Looks all good to me in this version, I'm just unsure about one thing:
 
+>                - Limit the of_iommu_configure to non pci devices
 
+My last recommendation was to pass the b/d/f number into
+of_pci_dma_configure to handle this correctly. What was your
+reason for not doing it in the end?
 
-On 06/01/2015 at 14:46:57 +0100, Boris Brezillon wrote :
-> Hello,
-> 
-> Here is a set of patches porting existing at91sam9rl erratum handling to
-> DT and adding new code to handle at91sam9g45/9x5 erratum.
-> It also adds several compatible strings to differentiate those errata.
-> 
-> These patches should be backported to 3.17 and 3.18 stable releases but
-> they do not apply cleanly on those stable branches.
-> I'll send a backport of this series once it is merged in mainline.
-> 
-> Regards,
-> 
-> Boris
-> 
-> Changes since v1:
-> - cache INT_ENB value to speedup INT_ENB read operations
-> 
-> Boris Brezillon (5):
->   usb: atmel_usba_udc: Rework at91sam9rl errata handling
->   usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
->   ARM: at91/dt: update udc compatible strings
->   usb: atmel_usba_udc: Mask status with enabled irqs
->   usb: gadget: atmel_usba: Cache INT_ENB register value
-> 
->  .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
->  arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
->  arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
->  drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
->  drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
->  7 files changed, 111 insertions(+), 57 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
+We will likely have to change this again if we take your current version,
+but that can be a follow-up patch. I believe AMD requires it to use
+PCI on their their Seattle platform.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
