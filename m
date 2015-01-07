@@ -1,43 +1,65 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 07 Jan 2015 17:49:25 +0800
-Subject: [PATCH v6 01/17] ACPI / processor: Convert apic_id to phys_id
- to make it arch agnostic
-In-Reply-To: <1463717.XWsK98imMv@vostro.rjw.lan>
-References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
- <1420368918-5086-2-git-send-email-hanjun.guo@linaro.org>
- <1463717.XWsK98imMv@vostro.rjw.lan>
-Message-ID: <54AD0125.9060601@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 07 Jan 2015 10:50:32 +0100
+Subject: [PATCH] ARM: dts: exynos4412-trats2: Add Maxim 77693 fuel gauge node
+Message-ID: <1420624232-31238-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?07? 09:50, Rafael J. Wysocki wrote:
-> On Sunday, January 04, 2015 06:55:02 PM Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.com>
->>
->> apic_id in MADT table is the CPU hardware id which identify
->> it self in the system for x86 and ia64, OSPM will use it for
->> SMP init to map APIC ID to logical cpu number in the early
->> boot, when the DSDT/SSDT (ACPI namespace) is scanned later, the
->> ACPI processor driver is probed and the driver will use acpi_id
->> in DSDT to get the apic_id, then map to the logical cpu number
->> which is needed by the processor driver.
->>
->> Before ACPI 5.0, only x86 and ia64 were supported in ACPI spec,
->> so apic_id is used both in arch code and ACPI core which is
->> pretty fine. Since ACPI 5.0, ARM is supported by ACPI and
->> APIC is not available on ARM, this will confuse people when
->> apic_id is both used by x86 and ARM in one function.
->>
->> So convert apic_id to phys_id (which is the original meaning)
->> in ACPI processor dirver to make it arch agnostic, but leave the
->> arch dependent code unchanged, no functional change.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->
-> I've queued up this one and [2/17] for 3.19-rc4 as I promised I'd push these
-> two for 3.19.
+Add node for fuel gauge present in Maxim 77693 PMIC. This allows control
+over battery charging state on Trats2 board.
 
-Great, thanks a lot. I thought you will queued them for 3.20 :)
+The fuel gauge is compatible with max17042 battery driver (Maxim
+17042/17047/17050).  Although datasheet rev 2.2 for MAX77693 describes
+fuel gauge as Maxim 17042-like, the chip on Trats2 board identifies
+itself as Maxim 17047-like.
 
-Regards
-Hanjun
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 496a05faca37..7b3e58d781d8 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -15,6 +15,7 @@
+ /dts-v1/;
+ #include "exynos4412.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+ 	model = "Samsung Trats 2 based on Exynos4412";
+@@ -24,6 +25,7 @@
+ 		i2c9 = &i2c_ak8975;
+ 		i2c10 = &i2c_cm36651;
+ 		i2c11 = &i2c_max77693;
++		i2c12 = &i2c_max77693_fuel;
+ 	};
+ 
+ 	memory {
+@@ -562,6 +564,22 @@
+ 		};
+ 	};
+ 
++	i2c_max77693_fuel: i2c-gpio-3 {
++		compatible = "i2c-gpio";
++		gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>, <&gpf1 4 GPIO_ACTIVE_HIGH>;
++		i2c-gpio,delay-us = <2>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++
++		max77693-fuel-gauge at 36 {
++			compatible = "maxim,max17047";
++			interrupt-parent = <&gpx2>;
++			interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++			reg = <0x36>;
++		};
++	};
++
+ 	mmc at 12550000 {
+ 		num-slots = <1>;
+ 		broken-cd;
+-- 
+1.9.1
