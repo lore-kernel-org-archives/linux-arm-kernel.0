@@ -1,56 +1,66 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Wed, 07 Jan 2015 10:26:18 +0100
-Subject: [PATCH v1] ARM:sunxi:sid: Make use of the of_match_ptr
-In-Reply-To: <12820267.9PZueKuf7O@wuerfel>
-References: <1420616468-3782-1-git-send-email-oliver+list@schinagl.nl>
- <12820267.9PZueKuf7O@wuerfel>
-Message-ID: <54ACFBBA.3020201@schinagl.nl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 7 Jan 2015 10:27:24 +0100
+Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point
+ Development Board support
+In-Reply-To: <54AC57FB.8000003@free-electrons.com>
+References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+ <54AC57FB.8000003@free-electrons.com>
+Message-ID: <20150107092724.GF7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Arnd,
-On 07-01-15 10:00, Arnd Bergmann wrote:
-> On Wednesday 07 January 2015 08:41:08 Olliver Schinagl wrote:
->> From: Olliver Schinagl <oliver@schinagl.nl>
->>
->> I probably have forgotten to use this macro for the of_match pointer, so
->> this patch adds the of_match_ptr macro.
->>
->> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->> ---
->>   drivers/misc/eeprom/sunxi_sid.c | 3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
->> index 8385177..5a330d9 100644
->> --- a/drivers/misc/eeprom/sunxi_sid.c
->> +++ b/drivers/misc/eeprom/sunxi_sid.c
->> @@ -25,6 +25,7 @@
->>   #include <linux/kernel.h>
->>   #include <linux/kobject.h>
->>   #include <linux/module.h>
->> +#include <linux/of.h>
->>   #include <linux/of_device.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/random.h>
->> @@ -146,7 +147,7 @@ static struct platform_driver sunxi_sid_driver = {
->>          .remove = sunxi_sid_remove,
->>          .driver = {
->>                  .name = DRV_NAME,
->> -               .of_match_table = sunxi_sid_of_match,
->> +               .of_match_table = of_match_ptr(sunxi_sid_of_match),
->>          },
->>   };
->>   module_platform_driver(sunxi_sid_driver);
-> This looks wrong: sunxi_sid_of_match is defined unconditionally, so
-> now you get a compiler warning if CONFIG_OF is disabled.
->
-> The existing code is good, we only add the of_match_ptr() for drivers
-> that are useful without CONFIG_OF and that want to save a few bytes
-> in .data size.
-Ah, I missunderstood its use then!It looked like the of_match_ptr() got 
-defined away otherwise. Sorry for the noise!
+Hi,
 
-Olliver
->
-> 	Arnd
+On Tue, Jan 06, 2015 at 10:47:39PM +0100, Gregory CLEMENT wrote:
+> > +				spi-flash at 0 {
+> > +					#address-cells = <1>;
+> > +					#size-cells = <1>;
+> > +					compatible = "st,m25p128";
+> > +					reg = <0>; /* Chip select 0 */
+> > +					spi-max-frequency = <108000000>;
+> 
+> The SPI flahs used on the AP board is the same that the one used on the GP board:
+> M25P128-VMF6P and the maximum frequency it can handle is 50MHz.
+
+Actually, the one on the AP is a M25P128-VMF6PB, that has a max
+frequency of 54MHz, but yeah, the frequency is wrong.
+
+> > +
+> > +			mdio at 72004 {
+> > +				pinctrl-names = <&mdio_pins>;
+> > +
+> > +				phy0: ethernet-phy at 0 {
+> Why don't you use the PHY address after the '@' ?
+> Here I expected something like
+> phy0: ethernet-phy at 1 {
+> 
+> > +					reg = <1>;
+> > +				};
+> > +
+> > +				phy1: ethernet-phy at 1 {
+> and here:
+> phy0: ethernet-phy at 6 {
+> > +					reg = <6>;
+> > +				};
+> > +
+> > +				phy2: ethernet-phy at 2 {
+> and here:
+> phy0: ethernet-phy at 4 {
+
+Indeed.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/cd05791e/attachment.sig>
