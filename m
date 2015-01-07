@@ -1,32 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Jan 2015 20:29:15 +0100
-Subject: [PATCH v6 6/8] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <20150107185704.GV7485@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <7693528.krAZff0s6I@wuerfel> <20150107185704.GV7485@arm.com>
-Message-ID: <2577020.XPDvrs2bDx@wuerfel>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 7 Jan 2015 21:43:59 +0200
+Subject: 3.19 on Nokia n900: audio quality awful
+In-Reply-To: <20150106225856.GB31990@amd>
+References: <20150106170433.GA5408@amd> <20150106172545.GK6502@saruman>
+ <20150106175115.GA19487@amd> <20150106202857.GB32308@saruman>
+ <20150106205000.GB13902@amd>
+ <20150106205730.GA6071@fuloong-minipc.musicnaut.iki.fi>
+ <20150106220805.GD13902@amd>
+ <20150106222717.GC6071@fuloong-minipc.musicnaut.iki.fi>
+ <20150106225856.GB31990@amd>
+Message-ID: <20150107194359.GE6071@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 January 2015 18:57:05 Will Deacon wrote:
-> 
-> Sorry for the delay on this, I had to do a bit of digging.
-> 
-> On Mon, Dec 22, 2014 at 01:36:01PM +0000, Arnd Bergmann wrote:
-> > Do you think it's possible that we might have to deal with a single PCI host
-> > that is connected two different SMMU instances for the purposes of extending
-> > the StreamID space from 15 to 16 bits? I think we would have trouble
-> > expressing this with the current syntax.
-> 
-> Unfortunately, this sounds like something we may well have to support.
-> Whilst the SMMUv2 architecture did grow a late extension to support 16-bit
-> StreamIDs, that may have been too late for all silicon vendors and, as such,
-> I'm not confident that such systems will present a single software interface
-> for their SMMU.
+Hi,
 
-So it's technically possible to connect two SMMU instances to a single
-PCIe root complex? I knew that there is at least one vendor (AMD) that
-can only do 128 bus numbers on PCIe, which seems a much simpler workaround.
+On Tue, Jan 06, 2015 at 11:58:56PM +0100, Pavel Machek wrote:
+> On Wed 2015-01-07 00:27:17, Aaro Koskinen wrote:
+> > On Tue, Jan 06, 2015 at 11:08:05PM +0100, Pavel Machek wrote:
+> > > On Tue 2015-01-06 22:57:30, Aaro Koskinen wrote:
+> > > > Hi,
+> > > > 
+> > > > On Tue, Jan 06, 2015 at 09:50:00PM +0100, Pavel Machek wrote:
+> > > > > PS: Unfortunately, N900 will not boot using nfsroot in 3.16+ at least,
+> > > > > and boot from MMC card is broken and has been for quite some time.
+> > > > 
+> > > > USB networking works fine with 3.19-rc3 and also MMC card rootfs.
+> > > 
+> > > Does nfsroot work for you? USB networking works as a module but not
+> > > build-in. [Patch is available for this one.]
+> > > 
+> > > u-SD card seems to have similar problem. If I try it after boot, I can
+> > > access it ok, but using u-SD card for rootfs fails. If it works for
+> > > you, it would be interesting to know.
+> > 
+> > I haven't tried nfsroot, but I've been using USB networking for ssh
+> > for a couple of years without issues. I have g_ether as module.
+> > 
+> > Also I recently switched rootfs to u-SD card, and it (MMC) works fine
+> > as builtin.
+> > 
+> > But I'm mounting it from userspace (using builtin initramfs inside
+> > zImage), with a poll loop that waits for a device to appear. Maybe if you
+> > do it from kernel you need to use root wait/delay etc. options?
+> 
+> Yes, it works if I mount it later. It fails when done directly using
+> root=, even with rootwait etc. Hard to believe, yes, but try it. You
+> can watch the results on console.
 
-	Arnd
+Well, I tried and it works. 3.19-rc3 mounting logs are below.
+
+I used "root=/dev/mmcblk0p2 rootwait". Note that the external MMC
+is "mmcblk0" from kernel point of view.
+
+Without serial console I guess you could maybe capture the failure
+logs using mtdoops (assuming the kernel panics when it fails to mount
+the rootfs). mtdoops was used even in the sales model kernel, so there
+is MTD partition reserved already for it called "log".
+
+I would also recommend using initramfs to do the mounting etc. Then you
+could use the framebuffer console to observe and debug some obvious issues
+(assuming the framebuffer works, it often regresses unfortunately...).
+
+A.
+
+...
+
+[    2.145721] Waiting for root device /dev/mmcblk0p2...
+[    2.194335] mmc0: host does not support reading read-only switch, assuming write-enable
+[    2.213775] mmc0: new high speed SDHC card at address aaaa
+[    2.227905] mmcblk0: mmc0:aaaa SL32G 29.7 GiB
+[    2.252227]  mmcblk0: p1 p2
+[    2.381958] EXT4-fs (mmcblk0p2): couldn't mount as ext3 due to feature incompatibilities
+[    2.399627] EXT4-fs (mmcblk0p2): couldn't mount as ext2 due to feature incompatibilities
+[    2.420196] EXT4-fs (mmcblk0p2): INFO: recovery required on readonly filesystem
+[    2.435485] EXT4-fs (mmcblk0p2): write access will be enabled during recovery[    2.497375] mmc1: switch to bus width 2 failed
+[    2.510620] mmc1: switch to bus width 1 failed
+[    2.524658] mmc1: new high speed MMC card at address 0001
+[    2.541229] mmcblk1: mmc1:0001 MMC32G 29.8 GiB
+[    2.553710] mmcblk1boot0: mmc1:0001 MMC32G partition 1 512 KiB
+[    2.569854] mmcblk1boot1: mmc1:0001 MMC32G partition 2 512 KiB
+[    2.587646]  mmcblk1: p1 p2 p3
+[    2.827606] EXT4-fs (mmcblk0p2): recovery complete
+[    2.848327] EXT4-fs (mmcblk0p2): mounted filesystem with ordered data mode. Opts: (null)
+[    2.863464] VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
