@@ -1,281 +1,155 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 07 Jan 2015 02:50:17 +0100
-Subject: [PATCH v6 01/17] ACPI / processor: Convert apic_id to phys_id to
- make it arch agnostic
-In-Reply-To: <1420368918-5086-2-git-send-email-hanjun.guo@linaro.org>
-References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
- <1420368918-5086-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1463717.XWsK98imMv@vostro.rjw.lan>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Wed, 07 Jan 2015 11:03:12 +0900
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+Message-ID: <54AC93E0.8010705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, January 04, 2015 06:55:02 PM Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.com>
+On 01/06/2015 06:49 PM, Javier Martinez Canillas wrote:
+> Hello Marek,
 > 
-> apic_id in MADT table is the CPU hardware id which identify
-> it self in the system for x86 and ia64, OSPM will use it for
-> SMP init to map APIC ID to logical cpu number in the early
-> boot, when the DSDT/SSDT (ACPI namespace) is scanned later, the
-> ACPI processor driver is probed and the driver will use acpi_id
-> in DSDT to get the apic_id, then map to the logical cpu number
-> which is needed by the processor driver.
+> On Fri, Dec 5, 2014 at 11:22 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> On 2014-12-02 10:59, Sjoerd Simons wrote:
+>>>>
+>>>> This is another attempt to finally make Exynos SYSMMU driver fully
+>>>> integrated with DMA-mapping subsystem. The main change from previous
+>>>> version is a rebase onto latest "automatic DMA configuration for IOMMU
+>>>> masters" patches from Will Deacon.
+>>>
+>>> Do you happen to know if anyone is working on iommu/dma-mapping patches
+>>> for Exynos 5 based on this patchset?
+>>
+>>
+>> I hope to add Exynos5 SYSMMU patches to the next iteration of my patchset,
+>> but I doubt it will get into v3.19-rc1.
+>>
+>>> For some background to that question, We (re-)discovered yesterday that
+>>> the out-of-tree exynos-reference kernel iommu patches are required to
+>>> get HDMI out working on exynos 5 boards. The current situation in
+>>> mainline is rather broken, HDMI output without CONFIG_DRM_EXYNOS_IOMMU
+>>> results in just displaying stripes[0]. While turning on
+>>> CONFIG_DRM_EXYNOS_IOMMU causes a kernel oops at boot....
+>>
+>>
+>> We have observed similar issues with Exynos4 based boards, when LCD0 power
+>> domain was turned off and only TV power domain has been powered on. Please
+>> check the power domain configuration. Maybe in case of Exynos5 the same
 > 
-> Before ACPI 5.0, only x86 and ia64 were supported in ACPI spec,
-> so apic_id is used both in arch code and ACPI core which is
-> pretty fine. Since ACPI 5.0, ARM is supported by ACPI and
-> APIC is not available on ARM, this will confuse people when
-> apic_id is both used by x86 and ARM in one function.
+> So IIUC what you are saying is that enabling the Exynos DRM IOMMU
+> support has the side effect of turning on all the power domains needed
+> by HDMI? I've compared the power domains configuration in mainline
+> with the downstream exynos-reference [0] tree and I didn't find any
+> differences.
 > 
-> So convert apic_id to phys_id (which is the original meaning)
-> in ACPI processor dirver to make it arch agnostic, but leave the
-> arch dependent code unchanged, no functional change.
+>> issue
+>> is caused by the interaction between DISP1 and GSCL domains.
+>>
 > 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-I've queued up this one and [2/17] for 3.19-rc4 as I promised I'd push these
-two for 3.19.
-
-> ---
->  drivers/acpi/acpi_processor.c | 21 +++++++++-------
->  drivers/acpi/processor_core.c | 56 +++++++++++++++++++++----------------------
->  include/acpi/processor.h      |  8 +++----
->  3 files changed, 44 insertions(+), 41 deletions(-)
+> I was also not able to find a dependency betwen GSCL and DISP1 power
+> domains in the Exynos 5420 manual. But If that's the case then your
+> patch to add support for sub-power domains on Exynos [1] will also be
+> needed, right?
 > 
-> diff --git a/drivers/acpi/acpi_processor.c b/drivers/acpi/acpi_processor.c
-> index 1fdf5e0..f02b29e 100644
-> --- a/drivers/acpi/acpi_processor.c
-> +++ b/drivers/acpi/acpi_processor.c
-> @@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
->  	acpi_status status;
->  	int ret;
->  
-> -	if (pr->apic_id == -1)
-> +	if (pr->phys_id == -1)
->  		return -ENODEV;
->  
->  	status = acpi_evaluate_integer(pr->handle, "_STA", NULL, &sta);
-> @@ -180,7 +180,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
->  	cpu_maps_update_begin();
->  	cpu_hotplug_begin();
->  
-> -	ret = acpi_map_lsapic(pr->handle, pr->apic_id, &pr->id);
-> +	ret = acpi_map_lsapic(pr->handle, pr->phys_id, &pr->id);
->  	if (ret)
->  		goto out;
->  
-> @@ -215,7 +215,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
->  	union acpi_object object = { 0 };
->  	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
->  	struct acpi_processor *pr = acpi_driver_data(device);
-> -	int apic_id, cpu_index, device_declaration = 0;
-> +	int phys_id, cpu_index, device_declaration = 0;
->  	acpi_status status = AE_OK;
->  	static int cpu0_initialized;
->  	unsigned long long value;
-> @@ -262,15 +262,18 @@ static int acpi_processor_get_info(struct acpi_device *device)
->  		pr->acpi_id = value;
->  	}
->  
-> -	apic_id = acpi_get_apicid(pr->handle, device_declaration, pr->acpi_id);
-> -	if (apic_id < 0)
-> -		acpi_handle_debug(pr->handle, "failed to get CPU APIC ID.\n");
-> -	pr->apic_id = apic_id;
-> +	phys_id = acpi_get_phys_id(pr->handle, device_declaration, pr->acpi_id);
-> +	if (phys_id < 0)
-> +		acpi_handle_debug(pr->handle, "failed to get CPU physical ID.\n");
-> +	pr->phys_id = phys_id;
->  
-> -	cpu_index = acpi_map_cpuid(pr->apic_id, pr->acpi_id);
-> +	cpu_index = acpi_map_cpuid(pr->phys_id, pr->acpi_id);
->  	if (!cpu0_initialized && !acpi_has_cpu_in_madt()) {
->  		cpu0_initialized = 1;
-> -		/* Handle UP system running SMP kernel, with no LAPIC in MADT */
-> +		/*
-> +		 * Handle UP system running SMP kernel, with no CPU
-> +		 * entry in MADT
-> +		 */
->  		if ((cpu_index == -1) && (num_online_cpus() == 1))
->  			cpu_index = 0;
->  	}
-> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-> index 342942f..02e4839 100644
-> --- a/drivers/acpi/processor_core.c
-> +++ b/drivers/acpi/processor_core.c
-> @@ -69,7 +69,7 @@ static int map_madt_entry(int type, u32 acpi_id)
->  	unsigned long madt_end, entry;
->  	static struct acpi_table_madt *madt;
->  	static int read_madt;
-> -	int apic_id = -1;
-> +	int phys_id = -1;	/* CPU hardware ID */
->  
->  	if (!read_madt) {
->  		if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_MADT, 0,
-> @@ -79,7 +79,7 @@ static int map_madt_entry(int type, u32 acpi_id)
->  	}
->  
->  	if (!madt)
-> -		return apic_id;
-> +		return phys_id;
->  
->  	entry = (unsigned long)madt;
->  	madt_end = entry + madt->header.length;
-> @@ -91,18 +91,18 @@ static int map_madt_entry(int type, u32 acpi_id)
->  		struct acpi_subtable_header *header =
->  			(struct acpi_subtable_header *)entry;
->  		if (header->type == ACPI_MADT_TYPE_LOCAL_APIC) {
-> -			if (!map_lapic_id(header, acpi_id, &apic_id))
-> +			if (!map_lapic_id(header, acpi_id, &phys_id))
->  				break;
->  		} else if (header->type == ACPI_MADT_TYPE_LOCAL_X2APIC) {
-> -			if (!map_x2apic_id(header, type, acpi_id, &apic_id))
-> +			if (!map_x2apic_id(header, type, acpi_id, &phys_id))
->  				break;
->  		} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
-> -			if (!map_lsapic_id(header, type, acpi_id, &apic_id))
-> +			if (!map_lsapic_id(header, type, acpi_id, &phys_id))
->  				break;
->  		}
->  		entry += header->length;
->  	}
-> -	return apic_id;
-> +	return phys_id;
->  }
->  
->  static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
-> @@ -110,7 +110,7 @@ static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
->  	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
->  	union acpi_object *obj;
->  	struct acpi_subtable_header *header;
-> -	int apic_id = -1;
-> +	int phys_id = -1;
->  
->  	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
->  		goto exit;
-> @@ -126,38 +126,38 @@ static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
->  
->  	header = (struct acpi_subtable_header *)obj->buffer.pointer;
->  	if (header->type == ACPI_MADT_TYPE_LOCAL_APIC)
-> -		map_lapic_id(header, acpi_id, &apic_id);
-> +		map_lapic_id(header, acpi_id, &phys_id);
->  	else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC)
-> -		map_lsapic_id(header, type, acpi_id, &apic_id);
-> +		map_lsapic_id(header, type, acpi_id, &phys_id);
->  	else if (header->type == ACPI_MADT_TYPE_LOCAL_X2APIC)
-> -		map_x2apic_id(header, type, acpi_id, &apic_id);
-> +		map_x2apic_id(header, type, acpi_id, &phys_id);
->  
->  exit:
->  	kfree(buffer.pointer);
-> -	return apic_id;
-> +	return phys_id;
->  }
->  
-> -int acpi_get_apicid(acpi_handle handle, int type, u32 acpi_id)
-> +int acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
->  {
-> -	int apic_id;
-> +	int phys_id;
->  
-> -	apic_id = map_mat_entry(handle, type, acpi_id);
-> -	if (apic_id == -1)
-> -		apic_id = map_madt_entry(type, acpi_id);
-> +	phys_id = map_mat_entry(handle, type, acpi_id);
-> +	if (phys_id == -1)
-> +		phys_id = map_madt_entry(type, acpi_id);
->  
-> -	return apic_id;
-> +	return phys_id;
->  }
->  
-> -int acpi_map_cpuid(int apic_id, u32 acpi_id)
-> +int acpi_map_cpuid(int phys_id, u32 acpi_id)
->  {
->  #ifdef CONFIG_SMP
->  	int i;
->  #endif
->  
-> -	if (apic_id == -1) {
-> +	if (phys_id == -1) {
->  		/*
->  		 * On UP processor, there is no _MAT or MADT table.
-> -		 * So above apic_id is always set to -1.
-> +		 * So above phys_id is always set to -1.
->  		 *
->  		 * BIOS may define multiple CPU handles even for UP processor.
->  		 * For example,
-> @@ -170,7 +170,7 @@ int acpi_map_cpuid(int apic_id, u32 acpi_id)
->  		 *     Processor (CPU3, 0x03, 0x00000410, 0x06) {}
->  		 * }
->  		 *
-> -		 * Ignores apic_id and always returns 0 for the processor
-> +		 * Ignores phys_id and always returns 0 for the processor
->  		 * handle with acpi id 0 if nr_cpu_ids is 1.
->  		 * This should be the case if SMP tables are not found.
->  		 * Return -1 for other CPU's handle.
-> @@ -178,28 +178,28 @@ int acpi_map_cpuid(int apic_id, u32 acpi_id)
->  		if (nr_cpu_ids <= 1 && acpi_id == 0)
->  			return acpi_id;
->  		else
-> -			return apic_id;
-> +			return phys_id;
->  	}
->  
->  #ifdef CONFIG_SMP
->  	for_each_possible_cpu(i) {
-> -		if (cpu_physical_id(i) == apic_id)
-> +		if (cpu_physical_id(i) == phys_id)
->  			return i;
->  	}
->  #else
->  	/* In UP kernel, only processor 0 is valid */
-> -	if (apic_id == 0)
-> -		return apic_id;
-> +	if (phys_id == 0)
-> +		return phys_id;
->  #endif
->  	return -1;
->  }
->  
->  int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
->  {
-> -	int apic_id;
-> +	int phys_id;
->  
-> -	apic_id = acpi_get_apicid(handle, type, acpi_id);
-> +	phys_id = acpi_get_phys_id(handle, type, acpi_id);
->  
-> -	return acpi_map_cpuid(apic_id, acpi_id);
-> +	return acpi_map_cpuid(phys_id, acpi_id);
->  }
->  EXPORT_SYMBOL_GPL(acpi_get_cpuid);
-> diff --git a/include/acpi/processor.h b/include/acpi/processor.h
-> index 3ca9b75..b95dc32 100644
-> --- a/include/acpi/processor.h
-> +++ b/include/acpi/processor.h
-> @@ -196,8 +196,8 @@ struct acpi_processor_flags {
->  struct acpi_processor {
->  	acpi_handle handle;
->  	u32 acpi_id;
-> -	u32 apic_id;
-> -	u32 id;
-> +	u32 phys_id;	/* CPU hardware ID such as APIC ID for x86 */
-> +	u32 id;		/* CPU logical ID allocated by OS */
->  	u32 pblk;
->  	int performance_platform_limit;
->  	int throttling_platform_limit;
-> @@ -310,8 +310,8 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
->  #endif				/* CONFIG_CPU_FREQ */
->  
->  /* in processor_core.c */
-> -int acpi_get_apicid(acpi_handle, int type, u32 acpi_id);
-> -int acpi_map_cpuid(int apic_id, u32 acpi_id);
-> +int acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
-> +int acpi_map_cpuid(int phys_id, u32 acpi_id);
->  int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
->  
->  /* in processor_pdc.c */
+> AFAICT from the manual, all the used modules in the case of HDMI +
+> Display (LCD, DP, HDMI and MIXER) needs only the DISP1 power domain to
+> be enabled which BTW was removed for Exynos5420 on commit d51cad7
+> ("ARM: dts: remove display power domain for exynos5420"). It seems to
+> work just because the power domain is turned on by the bootloader.
+> 
+> Also I tried forcing the kernel to not disable unused power domains by
+> passing the pd_ignore_unused parameter to the kernel command line. I
+> see on the kernel log a "genpd: Not disabling unused power domains"
+> message but HDMI output still has the stripes that Sjoerd mentioned.
+> Do you know if Exynos DRM HDMI in mainline is supposed to work without
+> SysMMU / IOMMU support?
 > 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+I don't think iommu support and power domain issue are related. I also
+get displaying stripes via hdmi but it is just power domain issue
+regardless iommu support.
+
+I observed 8th bit from 0x1445000C register of mixer is set to 1 with
+displaying stripes. It means "The graphic layer0 line buffer underflow".
+There was same underflow issue on Exynos4 based boards. As Marek said,
+because LCD0 power domain was turned off.
+
+I just tried to turn off DISP1 power domain at u-boot and DISP1 power
+domain is turned on from kernel hdmi and mixer driver on odroid xu3 
+board. As the result, i can see displaying penguin logo from hdmi.
+
+But the problem exists still because it is failed to control on/off of
+DISP1 power domain more than twice from kernel hdmi and mixer driver.[0]
+
+Thanks.
+
+[0]:
+[   63.477922] Power domain power-domain disable failed
+[   63.481416] power-domain: Power-off latency exceeded, new value 10613042 ns
+[   63.499805] power-domain: Power-on latency exceeded, new value 8863333 ns
+[   63.506766] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf0280000
+[   63.514191] Internal error: : 1008 [#1] PREEMPT SMP ARM
+[   63.519386] Modules linked in:
+[   63.522425] CPU: 0 PID: 1499 Comm: modetest Not tainted 3.18.1-00007-g04f5a4b-dirty #13
+[   63.530393] task: eddd3400 ti: edfd0000 task.ti: edfd0000
+[   63.535779] PC is at mixer_dpms+0x1dc/0x704
+[   63.539931] LR is at __mutex_unlock_slowpath+0xa8/0x194
+[   63.545125] pc : [<c02c0540>]    lr : [<c04c3eb8>]    psr: 60000013
+[   63.545125] sp : edfd1c98  ip : ee709ef4  fp : ee752aa0
+[   63.556561] r10: c07124b8  r9 : ee752800  r8 : c0712a38
+[   63.561761] r7 : c0712a38  r6 : ee451a80  r5 : ee523a28  r4 : ee523a10
+[   63.568260] r3 : f0280000  r2 : eddd3400  r1 : 035c035b  r0 : ee523a28
+[   63.574760] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[   63.581864] Control: 10c5387d  Table: 6d81006a  DAC: 00000015
+[   63.587584] Process modetest (pid: 1499, stack limit = 0xedfd0238)
+[   63.593736] Stack: (0xedfd1c98 to 0xedfd2000)
+[   63.598070] 1c80:                                                       c02c0364 c0766b8c
+[   63.606219] 1ca0: 00000000 edf8d000 c0712a38 ee753c00 ee752800 c07124b8 ee752aa0 c02b5118
+[   63.614365] 1cc0: edf8d900 ee422c08 ee422810 ee753c00 edf8d900 ee752800 ee753c00 c0712a38
+[   63.622510] 1ce0: edf8d000 00000001 edf8d900 c02b52c4 ee752a9c ee753c00 edf8d000 c02901cc
+[   63.630656] 1d00: 00000000 00000000 00000001 edf8d014 00000000 00000000 00000000 ee753c68
+[   63.638801] 1d20: ee753c00 c0766b8c 00000000 00000000 00000018 dededede 00000000 30323931
+[   63.646946] 1d40: 38303178 00000030 00000000 00000000 00000000 00000000 00000000 00000000
+[   63.655092] 1d60: 00000048 00024414 00000780 000007d8 00000804 00000898 00000000 00000438
+[   63.663237] 1d80: 0000043c 00000441 00000465 00000000 00000005 00000256 00000150 00024414
+[   63.671382] 1da0: 00000780 00000780 00000898 000007d8 00000804 00000898 00000000 00000438
+[   63.679528] 1dc0: 00000438 00000465 0000043c 00000441 00000465 00000000 00000000 0000003c
+[   63.687674] 1de0: 00000000 00000000 00000001 ee753c00 ee752a7c ee5a2b80 ee752a88 ee752aa0
+[   63.695820] 1e00: eddd2c00 c0766b8c 00000001 c0290d18 00000000 c0040374 ee753c10 edfd0000
+[   63.703965] 1e20: ee752800 00000001 00000000 ed82bec0 00000000 00000000 ee753c00 ee752aa0
+[   63.712110] 1e40: c07124b8 00000000 ee753c10 edfa8580 ee753c00 00000000 edc8b500 00000000
+[   63.720256] 1e60: ed8827a8 ee525580 ee752958 c02a5f58 ee5a2b80 00000001 00000000 edc8b500
+[   63.728402] 1e80: 00000000 c02971b8 ee752800 edc8b500 ee752800 edc8b500 ee75285c ee752800
+[   63.736547] 1ea0: ee752834 c02971f4 ee752800 c0766b8c ee75285c c029c3c0 ed8827ac ed882700
+[   63.744692] 1ec0: ee75285c c029c7c4 ee24b0e8 00000001 edfa8f80 ee752960 60000013 00000000
+[   63.752838] 1ee0: ee7a9508 ed882000 ede78d60 00000000 edf8d490 ee0bd7b8 00000008 ed882008
+[   63.760983] 1f00: 00000000 c00cbf78 00000000 00000000 eddd374c 00000000 c072ad84 eddd3400
+[   63.769129] 1f20: edfd0008 00000000 ed874e44 c003777c eddd375c eddd3400 edfd0000 ed874e00
+[   63.777274] 1f40: edfd0008 c0022af8 00000000 00000001 ed874e04 ee78d898 ee78d8a0 c00b1d2c
+[   63.785420] 1f60: 000000dd edcdb700 00000000 edfd0000 000000f8 c000e824 edfd0000 00000000
+[   63.793566] 1f80: 00000000 c0023ee8 000a3d78 b6f2a770 b6f2a770 000000f8 c000e824 c0023f64
+[   63.801711] 1fa0: 000a3d78 c000e6a0 000a3d78 b6f2a770 00000000 000a3d64 00000008 00000000
+[   63.809857] 1fc0: 000a3d78 b6f2a770 b6f2a770 000000f8 b6e56248 00000000 0000fd4c 00000000
+[   63.818002] 1fe0: b6fa2000 bed38ba8 b6e1a4dc b6e883d4 60000010 00000000 ffffffff ffffffff
+[   63.826162] [<c02c0540>] (mixer_dpms) from [<c02b5118>] (exynos_drm_crtc_dpms+0x6c/0x17c)
+[   63.834296] [<c02b5118>] (exynos_drm_crtc_dpms) from [<c02b52c4>] (exynos_drm_crtc_commit+0x14/0x44)
+[   63.843400] [<c02b52c4>] (exynos_drm_crtc_commit) from [<c02901cc>] (drm_crtc_helper_set_mode+0x3d0/0x51c)
+[   63.853016] [<c02901cc>] (drm_crtc_helper_set_mode) from [<c0290d18>] (drm_crtc_helper_set_config+0x87c/0x9dc)
+[   63.862982] [<c0290d18>] (drm_crtc_helper_set_config) from [<c02a5f58>] (drm_mode_set_config_internal+0x58/0xd4)
+[   63.873119] [<c02a5f58>] (drm_mode_set_config_internal) from [<c02971b8>] (restore_fbdev_mode+0xcc/0xec)
+[   63.882562] [<c02971b8>] (restore_fbdev_mode) from [<c02971f4>] (drm_fb_helper_restore_fbdev_mode_unlocked+0x1c/0x30)
+[   63.893135] [<c02971f4>] (drm_fb_helper_restore_fbdev_mode_unlocked) from [<c029c3c0>] (drm_lastclose+0x34/0x118)
+[   63.903358] [<c029c3c0>] (drm_lastclose) from [<c029c7c4>] (drm_release+0x320/0x4c8)
+[   63.911071] [<c029c7c4>] (drm_release) from [<c00cbf78>] (__fput+0x80/0x1c8)
+[   63.918095] [<c00cbf78>] (__fput) from [<c003777c>] (task_work_run+0xac/0xe4)
+[   63.925204] [<c003777c>] (task_work_run) from [<c0022af8>] (do_exit+0x2cc/0x958)
+[   63.932563] [<c0022af8>] (do_exit) from [<c0023ee8>] (do_group_exit+0x4c/0xb8)
+[   63.939754] [<c0023ee8>] (do_group_exit) from [<c0023f64>] (__wake_up_parent+0x0/0x18)
+[   63.947636] Code: e1a00005 e5c43011 eb080e99 e5943044 (e5936000) 
+[   63.953701] ---[ end trace d3294b7b867ca713 ]---
+[   63.958290] Fixing recursive fault but reboot is needed!
