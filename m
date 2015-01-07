@@ -1,42 +1,61 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed,  7 Jan 2015 12:39:28 +0530
-Subject: [PATCH 0/2] Add SNVS clock gating and SNVS node for DT
-Message-ID: <cover.1420612799.git.maitysanchayan@gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 7 Jan 2015 12:39:46 +0530
+Subject: [RFC PATCH v3 4/4] arm64:numa: adding numa support for arm64
+ platforms.
+In-Reply-To: <2425557.4DHPZVafv4@wuerfel>
+References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <1849719.f6Z6RhZjTc@wuerfel>
+ <CAFpQJXVQnRY9wZRk-83bQLw0m=41ZxH2v-YZCHdF0fvC8LS_Tw@mail.gmail.com>
+ <2425557.4DHPZVafv4@wuerfel>
+Message-ID: <CAFpQJXVFbpgNUCSF9qPCR28FNXZQ46RpFezX9+QSB0nFRzaz5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch set adds support for clock gating
-of the SNVS peripheral required on the Vybrid platform.
-Also adds a device tree node for this peripheral.
-
-This patchset was send before along with the patch which
-had clock changes to the rtc-snvs driver. Since these could
-not be merged then, till the changes for rtc-snvs landed in
-the mainline, I am sending them anew as the changes are now
-in the for-next branch
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/log/?h=for-next
-
-The initial discussion can be found at the below links for the
-earlier set of patches:
-
-[RESEND] v2:
-https://lkml.org/lkml/2014/12/3/23
-
-v2:
-https://lkml.org/lkml/2014/11/7/295
-
-v1:
-https://lkml.org/lkml/2014/9/26/492
-
-Sanchayan Maity (2):
-  ARM: imx: clk-vf610: Add clock for SNVS
-  ARM: dts: vfxxx: Add SNVS node
-
- arch/arm/boot/dts/vf500.dtsi            |    4 ++++
- arch/arm/boot/dts/vfxxx.dtsi            |   14 ++++++++++++++
- arch/arm/mach-imx/clk-vf610.c           |    2 ++
- include/dt-bindings/clock/vf610-clock.h |    3 ++-
- 4 files changed, 22 insertions(+), 1 deletion(-)
-
--- 
-1.7.9.5
+On Wed, Jan 7, 2015 at 1:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 06 January 2015 14:55:53 Ganapatrao Kulkarni wrote:
+>> On Sat, Jan 3, 2015 at 2:40 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> +int dt_get_cpu_node_id(int cpu)
+>> >> +{
+>> >> +     struct device_node *dn = NULL;
+>> >> +
+>> >> +     while ((dn = of_find_node_by_type(dn, "cpu"))) {
+>> >> +             const u32 *cell;
+>> >> +             u64 hwid;
+>> >> +
+>> >> +             /*
+>> >> +              * A cpu node with missing "reg" property is
+>> >> +              * considered invalid to build a cpu_logical_map
+>> >> +              * entry.
+>> >> +              */
+>> >> +             cell = of_get_property(dn, "reg", NULL);
+>> >> +             if (!cell) {
+>> >> +                     pr_err("%s: missing reg property\n", dn->full_name);
+>> >> +                     return default_nid;
+>> >> +             }
+>> >> +             hwid = of_read_number(cell, of_n_addr_cells(dn));
+>> >> +
+>> >> +             if (cpu_logical_map(cpu) == hwid)
+>> >> +             return of_node_to_nid_single(dn);
+>> >> +     }
+>> >> +     return NUMA_NO_NODE;
+>> >> +}
+>> >> +EXPORT_SYMBOL(dt_get_cpu_node_id);
+>> >
+>> > Maybe just expose a function to the device node for a CPU ID here, and
+>> > expect callers to use of_node_to_nid?
+>> shall i make this wrapper function in dt_numa.c, which will use
+>> functions _of_node_to_nid and  _of_cpu_to_node(cpu)
+>
+> Yes, I guess that would work.
+>
+>> And,  this function can be a weak function in numa.c which returns 0.
+>
+> No, please don't use weak functions. You can either use IS_ENABLED()
+> tricks to remove function calls at compile-time, or in the header
+> file provide an inline function as an alternative to the extern
+> declaration, based on a configuration symbol.
+ok
+>
+>         Arnd
+thanks
+ganaapat
