@@ -1,83 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Jan 2015 18:53:22 +0000
-Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
-In-Reply-To: <vnkwh9w2bfr6.fsf@mitchelh-linux.qualcomm.com>
-References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
- <20150106141507.GB3484@arm.com>
- <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
- <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
- <vnkw61cjebbq.fsf@mitchelh-linux.qualcomm.com>
- <20150107101300.GC7485@arm.com>
- <vnkw4ms2cwb5.fsf@mitchelh-linux.qualcomm.com>
- <20150107180420.GR7485@arm.com>
- <vnkwh9w2bfr6.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20150107185322.GU7485@arm.com>
+Date: Wed, 7 Jan 2015 19:03:36 +0000
+Subject: [PATCH v2 1/2] arm64: don't make early_*map() calls post
+ paging_init()
+In-Reply-To: <20150107133109.GM3827@bivouac.eciton.net>
+References: <1420551673-31416-1-git-send-email-leif.lindholm@linaro.org>
+ <1420551673-31416-2-git-send-email-leif.lindholm@linaro.org>
+ <1420576522.16211.30.camel@t520.localdomain>
+ <20150107105841.GE7485@arm.com>
+ <CAKv+Gu9NRRFZG0S6oFJqPG1+1O2-SZah4wqoi0YPofL33X3nJw@mail.gmail.com>
+ <20150107133109.GM3827@bivouac.eciton.net>
+Message-ID: <20150107190335.GX7485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 06:35:41PM +0000, Mitchel Humpherys wrote:
-> On Wed, Jan 07 2015 at 10:04:20 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Jan 07, 2015 at 05:52:46PM +0000, Mitchel Humpherys wrote:
-> >> On Wed, Jan 07 2015 at 02:13:00 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > If would be better to check for the ARM_SMMU_OPT_SECURE_CFG_ACCESS feature
-> >> > and, if it's set then zero ARM_SMMU_GR0_STLBIALL at the correct address
-> >> > otherwise do the ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH.
-> >> 
-> >> I'm confused.  The problem I'm addressing here is that we're touching a
-> >> register that's marked as "secure only", which causes our system to
-> >> crash.  Why would we ever want to touch a secure only register, calxeda
-> >> workaround or not?
-> >
-> > Because I think the way the SMMU is wired for Calxeda is that the CPU can
-> > only see the secure side of the register interface, so the only way to nuke
-> > the whole TLB would be to use ARM_SMMU_GR0_STLBIALL.
+On Wed, Jan 07, 2015 at 01:31:09PM +0000, Leif Lindholm wrote:
+> On Wed, Jan 07, 2015 at 01:13:06PM +0000, Ard Biesheuvel wrote:
+> > >> > -void __init efi_idmap_init(void)
+> > >> > +void __init efi_memmap_init(void)
+> > >> >  {
+> > >> > +   u64 mapsize;
+> > >> > +
+> > >> >     if (!efi_enabled(EFI_BOOT))
+> > >> >             return;
+> > >> >
+> > >> > +   /* replace early memmap mapping with permanent mapping */
+> > >> > +   mapsize = memmap.map_end - memmap.map;
+> > >> > +   memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+> > >> > +                                              mapsize);
+> > >>
+> > >> ioremap_cache() could potententially fail here if the phys_map address
+> > >> doesn't have a valid pfn (not in the kernel linear ram mapping) because
+> > >> some of the underlying vm support hasn't been initialized yet.
+> > >
+> > > Can you be more specific about the case you have in mind, please? pfn_valid
+> > > uses the memblocks on arm64, and that should all have been sorted out in
+> > > paging_init(). What's the issue that you're anticipating?
+> > 
+> > I think Mark's concern is that it is too early to call
+> > __get_free_page(), which is what happens if ioremap_cache() finds that
+> > the requested address is not covered by the existing linear mapping.
+> > Currently, UEFI reserved RAM regions are covered by the linear
+> > mapping, but that is something we intend to change in the future.
 > 
-> Still not sure I understand what "the correct address" is for STLBIALL
-> on Calxeda (i.e. whether or not we need to use ARM_SMMU_GR0_NS), but
-> something like:
+> Which shouldn't be a problem, right? Since this function will be going
+> away with your "stable mappings" set, and the remap call bumped down
+> to an early initcall in arm64_enter_virtual_mode() (or potential
+> future name for that function).
 
-Hehe, I wasn't actually expecting a patch, but thanks!
+Sounds reasonable to me... Ard?
 
-> -- >8 --
-> Subject: [PATCH v2] iommu/arm-smmu: don't touch the secure STLBIALL register
-> 
-> Currently we do a STLBIALL when we initialize the SMMU.  However, on
-> systems with sane secure
-> configurations (i.e. !ARM_SMMU_OPT_SECURE_CFG_ACCESS) that register is
-> not supposed to be touched and is marked as "Secure only" in the spec.
-> Touching it results in a crash on those platforms.  However, on
-> platforms with ARM_SMMU_OPT_SECURE_CFG_ACCESS it's the only way to nuke
-> the whole TLB, so leave it in for them but rip it out for everyone else.
-> 
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 60558f794922..d4c149d83f3d 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1686,9 +1686,12 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  	}
->  
->  	/* Invalidate the TLB, just in case */
-> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
-> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
-> -	writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
-> +	if (smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS) {
-> +		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
-
-Right, so this is the bit where we'd need some Calxeda information about
-whether or not to subtract 0x400 from gr0_base or not.
-
-> +	} else {
-> +		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
-> +		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
-> +	}
-
-For now, I've applied your original patch pending any insight on the above.
-
-Cheers,
+However, I'd certainly like something in the commit log and/or a comment
+in the code with our reasoning.
 
 Will
