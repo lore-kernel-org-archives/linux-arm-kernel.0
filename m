@@ -1,42 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Jan 2015 17:42:46 +0000
-Subject: [PATCH v2 11/21] DT: arm,gic: kill arm,routable-irqs
+Date: Wed,  7 Jan 2015 17:42:55 +0000
+Subject: [PATCH v2 20/21] ARM: zynq: switch from gic_arch_extn to
+ gic_set_irqchip_flags
 In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
 References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420652576-22309-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420652576-22309-21-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody will regret it.
+Instead of directly touching gic_arch_extn, which is about to
+be removed, use gic_set_irqchip_flags instead.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/devicetree/bindings/arm/gic.txt | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm/mach-zynq/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index 8112d0c..631cb71 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -52,11 +52,6 @@ Optional
-   regions, used when the GIC doesn't have banked registers. The offset is
-   cpu-offset * cpu-nr.
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 26f92c2..82734d5 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -188,7 +188,7 @@ static void __init zynq_map_io(void)
  
--- arm,routable-irqs : Total number of gic irq inputs which are not directly
--		  connected from the peripherals, but are routed dynamically
--		  by a crossbar/multiplexer preceding the GIC. The GIC irq
--		  input line is assigned dynamically when the corresponding
--		  peripheral's crossbar line is mapped.
- Example:
+ static void __init zynq_irq_init(void)
+ {
+-	gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
++	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND);
+ 	irqchip_init();
+ }
  
- 	intc: interrupt-controller at fff11000 {
-@@ -64,7 +59,6 @@ Example:
- 		#interrupt-cells = <3>;
- 		#address-cells = <1>;
- 		interrupt-controller;
--		arm,routable-irqs = <160>;
- 		reg = <0xfff11000 0x1000>,
- 		      <0xfff10100 0x100>;
- 	};
 -- 
 2.1.4
