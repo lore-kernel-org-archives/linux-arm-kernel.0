@@ -1,57 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 7 Jan 2015 20:05:30 +0000
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 07 Jan 2015 15:05:14 -0500
 Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <1610983.9vqJdsL27R@wuerfel>
+In-Reply-To: <54AD8FF2.60407@redhat.com>
 References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <20150107172741.GY2634@sirena.org.uk> <54AD7098.5010700@redhat.com>
- <1610983.9vqJdsL27R@wuerfel>
-Message-ID: <20150107200530.GK2634@sirena.org.uk>
+ <2161376.07iV9ANMSk@wuerfel>
+ <20150107115039.GA2199@e104818-lin.cambridge.arm.com>
+ <1520439.Y1rXzXY1eS@wuerfel> <20150107172741.GY2634@sirena.org.uk>
+ <20150107184158.GO24989@titan.lakedaemon.net> <54AD8FF2.60407@redhat.com>
+Message-ID: <54AD917A.2040307@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 08:48:48PM +0100, Arnd Bergmann wrote:
-> On Wednesday 07 January 2015 12:44:56 Jon Masters wrote:
-> > On 01/07/2015 12:27 PM, Mark Brown wrote:
+On 01/07/2015 02:58 PM, Jon Masters wrote:
+> On 01/07/2015 01:41 PM, Jason Cooper wrote:
 
-> > > That level of hardware compatibility does partly come from the need to
-> > > run existing software.  I'd expect that similar effects will start to
-> > > come into play with ARMv8 ACPI systems if they become successful; people
-> > > will do things like ensure compatibility with common IPs that have
-> > > existing Linux drivers that distros tend to include as standard.
+>> One of the reasons I've really enjoyed working with ARM platforms and DT
+>> is the absence of this type of 'feature'.  I honestly don't care whether
+>> the kernel gets the board configuration info from DT or ACPI or FOO, as
+>> long as we can avoid the security mistakes of the past:
+>>
+>>   http://www.spiegel.de/international/world/catalog-reveals-nsa-has-back-doors-for-numerous-devices-a-940994.html
+> 
+> ACPI is not the great satan. I'm aware certain others in the community
+> have written missinformed blog posts and G+ rants equating ACPI with SMI
+> and even with various other system firmware. I can't force someone to
+> become informed on a topic, especially if it's politically useful to
+> them to hate on ACPI and use the security paranoia handwavy argument.
 
-> > Agreed.
+To clarify, and this is not directed at you Jason, it is politically
+useful to some who have written rants those business models are built
+upon being paid to enable platforms. For those folks, standardized
+platforms which allow a common OS approach are seen as threatening.
 
-> There are two problems I see in trying to do the same thing on ARM:
+In the previous rants (which were really instigated as a result of the
+above) ACPI was equated with SMM (System Management Mode), which is a
+bit like the Secure/Trusted world on AArch64 in which you might run
+another "Trusted" OS. These are the places where you want to watch out
+to malware of the kind cited in your link, not in ACPI tables.
 
-> * we don't have a single vendor that makes de-facto standards that
->   everyone else has to copy in the way that the few remaining x86
->   vendors copy everything that Intel does. In fact, we prefer to
->   have a large number of independent vendors.
-
-Right, I'd guess that (modulo any standards being defined and becoming
-successful) it'll more be a case of vendors keeping compatibility with
-their own stuff.  We *are* seeing greater reliance on off the shelf IPs
-for more boring things like DMA and basic bus controllers but there's
-plenty of other areas that still affect servers.
-
-> * There is a general mindset about deprecating unwanted features
->   early. ARMv8 aarch32 bit mode removes support for older instructions
->   or makes them optional. Even the virtualization mode doesn't allow
->   to trap on architecture version specific differences, so you can't
->   completely emulate an older architecture level.
->   This is nice for implementers but not so much for users that rely
->   on old (mis-)features. It's also not just the CPU core, other
->   components also get easily replaced, like a GICv3 that is not
->   a strict superset of GICv2.
-
-This is indeed worrying, though hopefully the fact that we're already
-seeing negative impacts in the app ecosystem for Android will have
-focused some minds - once you're talking about full system images it
-gets even more fun.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150107/f0e9f2b2/attachment.sig>
+Jon.
