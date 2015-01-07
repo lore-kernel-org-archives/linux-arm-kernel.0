@@ -1,41 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Jan 2015 12:54:43 +0000
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <54AA7DA6.3030707@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
- <54AA7DA6.3030707@free-electrons.com>
-Message-ID: <20150107125443.GA8013@red-moon>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 7 Jan 2015 12:56:39 +0000
+Subject: [PATCH v4 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <CAKv+Gu-aRkoRj5zVXrsBc0APCehZ9W926J6fxH380K9EURXe_Q@mail.gmail.com>
+References: <1419245944-2424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419245944-2424-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20150107120608.GJ3827@bivouac.eciton.net>
+ <CAKv+Gu_k0_anqvm24P8J4WaMrFLMxOhQETAfUb6xmzaJ+Z2vBQ@mail.gmail.com>
+ <20150107122515.GK3827@bivouac.eciton.net>
+ <CAKv+Gu-aRkoRj5zVXrsBc0APCehZ9W926J6fxH380K9EURXe_Q@mail.gmail.com>
+Message-ID: <20150107125639.GL3827@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Mon, Jan 05, 2015 at 12:03:50PM +0000, Gregory CLEMENT wrote:
-
-[...]
-
-> You didn't give your ack (or nack) about the license change for the files
-> you have contributed. I would like to have your answer on the followings
-> patches:
+On Wed, Jan 07, 2015 at 12:30:27PM +0000, Ard Biesheuvel wrote:
+> >> >> +     kernel_neon_begin();    /* disables preemption */               \
+> >> >
+> >> > Same nitpick.
+> >> >
+> >>
+> >> Is there anything wrong with that?
+> >
+> > I said nitpick.
+> >
+> > My (very minor) objection is that a (very reasonable) comment is added
+> > to existing functionality by a patch that adds new functionality. It
+> > makes the git blame/praise output less clear.
+> >
+> >> Would you prefer the comment to be on a separate line?
+> >
+> > I would _prefer_ the comments to be a separate patch.
+> > But again, a nitpick.
+> >
 > 
-> For Nobuhiro Iwamatsu:
-> ARM: mvebu: armada-xp-openblocks-ax3-4: Relicense the device tree under GPLv2+/X11
-> 
-> For Heikki Krogerus:
-> ARM: mvebu: armada-xp: Relicense the device tree under GPLv2+/X11
-> 
-> For Marcin Wojtas:
-> ARM: mvebu: armada-38x: Relicense the device tree under GPLv2+/X11
-> ARM: mvebu: armada-385-db: Relicense the device tree under GPLv2+/X11
-> ARM: mvebu: armada-375: Relicense the device tree under GPLv2+/X11
-> 
-> For Lorenzo Pieralisi:
-> ARM: mvebu: armada-370-xp: Relicense the device tree under GPLv2+/X11
+> Well, adding the comment is relevant to this patch, as we need to
+> disable preemption now before switching to the new address space. In
+> fact, it might be better even to drop the comment, and add an explicit
+> (if redundant) preempt_disable/preempt_enable pair.
 
-It is not something I can control. I asked the relevant people and I am
-trying to get back to you with a definite reply asap, it can take a
-while, you have been warned.
+That would be more clear, yes.
 
-Thanks,
-Lorenzo
+/
+    Leif
