@@ -1,118 +1,124 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Jan 2015 12:30:16 +0100
-Subject: [PATCH v12 1/9] ARM: OMAP2+: use common l2cache initialization code
+Date: Wed, 07 Jan 2015 12:30:21 +0100
+Subject: [PATCH v12 6/9] ARM: l2c: Add support for overriding prefetch settings
 In-Reply-To: <1420630224-8887-1-git-send-email-m.szyprowski@samsung.com>
 References: <1420630224-8887-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1420630224-8887-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1420630224-8887-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements generic DT L2C initialisation (the one from
-init_IRQ in arch/arm/kernel/irq.c) for Omap4 and AM43 platforms and
-kills the SoC specific stuff in arch/arm/mach-omap2/omap4-common.c.
+From: Tomasz Figa <t.figa@samsung.com>
 
+Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+settings configured in registers leading to crashes if L2C is enabled
+without overriding them. This patch introduces bindings to enable
+prefetch settings to be specified from DT and necessary support in the
+driver.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+[mszyprow: rebased onto v3.18-rc1, added error message when prefetch related
+ dt property has been provided without any value]
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Tested-by: Nishanth Menon <nm@ti.com>
 Acked-by: Nishanth Menon <nm@ti.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-generic.c |  6 ++++++
- arch/arm/mach-omap2/common.h        |  8 ++++++++
- arch/arm/mach-omap2/omap4-common.c  | 16 +---------------
- 3 files changed, 15 insertions(+), 15 deletions(-)
+ Documentation/devicetree/bindings/arm/l2cc.txt | 10 +++++
+ arch/arm/mm/cache-l2x0.c                       | 54 ++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 608079a1aba6..c5c480b76da5 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -171,6 +171,9 @@ static const char *const omap4_boards_compat[] __initconst = {
- };
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 292ef7ca3058..0dbabe9a6b0a 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -57,6 +57,16 @@ Optional properties:
+ - cache-id-part: cache id part number to be used if it is not present
+   on hardware
+ - wt-override: If present then L2 is forced to Write through mode
++- arm,double-linefill : Override double linefill enable setting. Enable if
++  non-zero, disable if zero.
++- arm,double-linefill-incr : Override double linefill on INCR read. Enable
++  if non-zero, disable if zero.
++- arm,double-linefill-wrap : Override double linefill on WRAP read. Enable
++  if non-zero, disable if zero.
++- arm,prefetch-drop : Override prefetch drop enable setting. Enable if non-zero,
++  disable if zero.
++- arm,prefetch-offset : Override prefetch offset value. Valid values are
++  0-7, 15, 23, and 31.
  
- DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
-+	.l2c_aux_val	= OMAP_L2C_AUX_CTRL,
-+	.l2c_aux_mask	= 0xcf9fffff,
-+	.l2c_write_sec	= omap4_l2c310_write_sec,
- 	.reserve	= omap_reserve,
- 	.smp		= smp_ops(omap4_smp_ops),
- 	.map_io		= omap4_map_io,
-@@ -214,6 +217,9 @@ static const char *const am43_boards_compat[] __initconst = {
- };
+ Example:
  
- DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
-+	.l2c_aux_val	= OMAP_L2C_AUX_CTRL,
-+	.l2c_aux_mask	= 0xcf9fffff,
-+	.l2c_write_sec	= omap4_l2c310_write_sec,
- 	.map_io		= am33xx_map_io,
- 	.init_early	= am43xx_init_early,
- 	.init_late	= am43xx_init_late,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 377eea849e7b..2610c9f8d29f 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -35,6 +35,7 @@
- #include <linux/irqchip/irq-omap-intc.h>
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 5288153f28b8..01de13809454 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1169,6 +1169,8 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 	u32 tag[3] = { 0, 0, 0 };
+ 	u32 filter[2] = { 0, 0 };
+ 	u32 assoc;
++	u32 prefetch;
++	u32 val;
+ 	int ret;
  
- #include <asm/proc-fns.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "i2c.h"
- #include "serial.h"
-@@ -94,11 +95,18 @@ extern void omap3_gptimer_timer_init(void);
- extern void omap4_local_timer_init(void);
- #ifdef CONFIG_CACHE_L2X0
- int omap_l2_cache_init(void);
-+#define OMAP_L2C_AUX_CTRL	(L2C_AUX_CTRL_SHARED_OVERRIDE | \
-+				 L310_AUX_CTRL_DATA_PREFETCH | \
-+				 L310_AUX_CTRL_INSTR_PREFETCH)
-+void omap4_l2c310_write_sec(unsigned long val, unsigned reg);
- #else
- static inline int omap_l2_cache_init(void)
- {
- 	return 0;
- }
+ 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+@@ -1214,6 +1216,58 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		       assoc);
+ 		break;
+ 	}
 +
-+#define OMAP_L2C_AUX_CTRL	0
-+#define omap4_l2c310_write_sec	NULL
- #endif
- extern void omap5_realtime_timer_init(void);
- 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index b7cb44abe49b..fe99ceff2e2d 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -166,7 +166,7 @@ void __iomem *omap4_get_l2cache_base(void)
- 	return l2cache_base;
++	prefetch = l2x0_saved_regs.prefetch_ctrl;
++
++	ret = of_property_read_u32(np, "arm,double-linefill", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,double-linefill property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "arm,double-linefill-incr", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,double-linefill-incr property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "arm,double-linefill-wrap", &val);
++	if (ret == 0) {
++		if (!val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,double-linefill-wrap property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "arm,prefetch-drop", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_PREFETCH_DROP;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_PREFETCH_DROP;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,prefetch-drop property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "arm,prefetch-offset", &val);
++	if (ret == 0) {
++		prefetch &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
++		prefetch |= val & L310_PREFETCH_CTRL_OFFSET_MASK;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
++	}
++
++	l2x0_saved_regs.prefetch_ctrl = prefetch;
  }
  
--static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
-+void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
- {
- 	unsigned smc_op;
- 
-@@ -201,24 +201,10 @@ static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
- 
- int __init omap_l2_cache_init(void)
- {
--	u32 aux_ctrl;
--
- 	/* Static mapping, never released */
- 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
- 	if (WARN_ON(!l2cache_base))
- 		return -ENOMEM;
--
--	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
--	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
--		   L310_AUX_CTRL_DATA_PREFETCH |
--		   L310_AUX_CTRL_INSTR_PREFETCH;
--
--	outer_cache.write_sec = omap4_l2c310_write_sec;
--	if (of_have_populated_dt())
--		l2x0_of_init(aux_ctrl, 0xcf9fffff);
--	else
--		l2x0_init(l2cache_base, aux_ctrl, 0xcf9fffff);
--
- 	return 0;
- }
- #endif
+ static const struct l2c_init_data of_l2c310_data __initconst = {
 -- 
 1.9.2
