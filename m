@@ -1,78 +1,142 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 07 Jan 2015 15:14:50 -0500
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150107200530.GK2634@sirena.org.uk>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <20150107172741.GY2634@sirena.org.uk> <54AD7098.5010700@redhat.com>
- <1610983.9vqJdsL27R@wuerfel> <20150107200530.GK2634@sirena.org.uk>
-Message-ID: <54AD93BA.3020904@redhat.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed,  7 Jan 2015 21:16:13 +0100
+Subject: [PATCH 1/3] ARM: dts: sun4i: Add dts file for Chuwi V7 CW0825 tablet
+Message-ID: <1420661775-20424-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2015 03:05 PM, Mark Brown wrote:
-> On Wed, Jan 07, 2015 at 08:48:48PM +0100, Arnd Bergmann wrote:
->> On Wednesday 07 January 2015 12:44:56 Jon Masters wrote:
->>> On 01/07/2015 12:27 PM, Mark Brown wrote:
-> 
->>>> That level of hardware compatibility does partly come from the need to
->>>> run existing software.  I'd expect that similar effects will start to
->>>> come into play with ARMv8 ACPI systems if they become successful; people
->>>> will do things like ensure compatibility with common IPs that have
->>>> existing Linux drivers that distros tend to include as standard.
-> 
->>> Agreed.
-> 
->> There are two problems I see in trying to do the same thing on ARM:
-> 
->> * we don't have a single vendor that makes de-facto standards that
->>   everyone else has to copy in the way that the few remaining x86
->>   vendors copy everything that Intel does. In fact, we prefer to
->>   have a large number of independent vendors.
-> 
-> Right, I'd guess that (modulo any standards being defined and becoming
-> successful) it'll more be a case of vendors keeping compatibility with
-> their own stuff.  We *are* seeing greater reliance on off the shelf IPs
-> for more boring things like DMA and basic bus controllers but there's
-> plenty of other areas that still affect servers.
+The Chuwi V7 is an A10 (sun4i) based tablet with 1G of RAM, 16G of nand flash,
+microsd slot, 7" 1024x768 lvds ips panel, mini hdmi out, headphones out,
+stereo speakers, front & back camera and usb wifi.
 
-I expect to see a greater level of standardization. SBBR is the
-beginning, but it is far from the end. There will be a lot more as the
-vendors come together and agree on common platform components. I've
-spent a lot of time over the past few years with a large number of
-vendors going over lots of these issues in lieu of more of a Windows
-Hardware Qualification style guide. I intend to have one this year that
-captures what Red Hat think an ARM server looks like, and to circulate
-that among the broader ecosystem of vendors to feed into SBBR++.
+It is clearly marked "CHUWI", "V7" and "Model: CW0825" on the back of the
+tablet.
 
->> * There is a general mindset about deprecating unwanted features
->>   early. ARMv8 aarch32 bit mode removes support for older instructions
->>   or makes them optional. Even the virtualization mode doesn't allow
->>   to trap on architecture version specific differences, so you can't
->>   completely emulate an older architecture level.
->>   This is nice for implementers but not so much for users that rely
->>   on old (mis-)features. It's also not just the CPU core, other
->>   components also get easily replaced, like a GICv3 that is not
->>   a strict superset of GICv2.
-> 
-> This is indeed worrying, though hopefully the fact that we're already
-> seeing negative impacts in the app ecosystem for Android will have
-> focused some minds - once you're talking about full system images it
-> gets even more fun.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 101 ++++++++++++++++++++++++
+ 2 files changed, 102 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
 
-GICv2/3 was something a bunch of us discussed years ago. At the time we
-debated whether there was a need to compel the superset option. It was
-deemed early enough not to be a critical issue. But there have already
-been other cases where we've pushed to ensure backward compatibility for
-all time. And there will be more of those as the ecosystem develops out
-into a world of existing Operating System images and apps that need to
-run on these emerging platforms. Deprecating instructions and
-formalizing other behaviors is an area where it's ephemeral - what made
-sense in the past might not make sense in the future, and ARM know that.
-Their architecture team features some of the smartest minds.
-
-(on architecture revisions, Red Hat has stated in the past that we only
-care about AArch64, not even running 32-bit code on 64-bit processors,
-which is one reason I have pushed for some silicon designs not to
-implement the 32-bit compatibility when it comes to servers)
-
-Jon.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a86f232..548520f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -445,6 +445,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
++	sun4i-a10-chuwi-v7-cw0825.dtb \
+ 	sun4i-a10-cubieboard.dtb \
+ 	sun4i-a10-mini-xplus.dtb \
+ 	sun4i-a10-hackberry.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+new file mode 100644
+index 0000000..1960985
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -0,0 +1,101 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "sun4i-a10.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Chuwi V7 CW0825";
++	compatible = "chuwi,v7-cw0825", "allwinner,sun4i-a10";
++
++	soc at 01c00000 {
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 1 0>; /* PH1 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupts = <0>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++		};
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		status = "okay";
++	};
++};
+-- 
+2.1.0
