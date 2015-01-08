@@ -1,113 +1,54 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 08 Jan 2015 15:01:03 +0100
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <20150108122958.GB32308@red-moon>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
- <54AE55CE.6040201@linaro.org> <54AE5C8F.9080600@arm.com>
- <54AE65EC.3050808@linaro.org> <20150108122958.GB32308@red-moon>
-Message-ID: <54AE8D9F.6090400@linaro.org>
+From: ezequiel.garcia@imgtec.com (Ezequiel Garcia)
+Date: Thu, 8 Jan 2015 10:59:33 -0300
+Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
+In-Reply-To: <6087001.lBonPVHV5K@wuerfel>
+References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+ <2223659.OW08fe0cS1@wuerfel>
+ <1003885907.22061.1415301932743.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <6087001.lBonPVHV5K@wuerfel>
+Message-ID: <54AE8D45.7050805@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 01:29 PM, Lorenzo Pieralisi wrote:
-> On Thu, Jan 08, 2015 at 11:11:40AM +0000, Daniel Lezcano wrote:
->
-> [...]
->
->>>> IMO, it would be better to be more strict with the mcpm
->>>> initialization and not let the system boot if something is wrong with
->>>> it which I believe is coming from the firmware and let the user to
->>>> figure out what is really happening by letting him to disable mcpm in
->>>> the kernel configuration (which in turn will disable cpuidle).
->>>
->>> Again I fully agree, but in this case I manually switched to legacy boot
->>> mode on TC2 and used same kernel with MCPM config enabled. Do you mean
->>> to say we should not support that even when developer understand the
->>> consequence of that ?
+Hi Stefan, Arnd,
+
+(I'm trimming the Cc list and adding Thierry and Maxime to the loop):
+
+On 11/06/2014 04:47 PM, Arnd Bergmann wrote:
+[..]
 >>
->> Well, I see there are the exynos5410/5420/5422. For the 5422 on
->> chromebook2 MCPM works well, IIUC. But for the 5422 on odroid-xu3, MCPM
->> does not work, hence cpuidle neither because of the firmware.
+>> i don't have a answer to this question, but how about changing fsl_ocotp driver
+>> to driver/soc/mxs/fuse with a similiar binary interface like the tegra ones.
 >>
->> Silently disabling cpuidle because mcpm did not initialize will hide the
->> issue.
->
-> No. MCPM *will* initialize, Sudeep's patch does not silently disable
-> CPUidle.
-> To put it differently MCPM will initialize if CCI is in the DT and it
-> is "available", so unless defined differently in the dts mcpm will be
-> available and CPUidle will be initialized (and break if there is an issue
-> with the platform FW/HW).
->
-> I agree the mechanism to define if MCPM is available can be improved
-> but that's what it is at the moment.
->
-> The problem here is to boot a platform with different boot methods
-> and still have a single kernel image.
->
->> I understand your point about switching to legacy without recompiling
->> the kernel.
->>
->> I suggest we add a big fat WARN_ON when the mcpm initialization fails
->> with your patch.
->
-> I think there are multiple facets we are tackling at once here and they
-> should not be mixed.
+>> Does it make sense to you?
+> 
+> I haven't looked at the drivers, so I don't know if the tegra interface
+> is any better or worse than the others. Changing everyone to have the same
+> interface is definitely a good idea, but of course only if the unified
+> interface is a good one ;-)
+> 
 
-Yes, I agree.
+I'm in the process of finding a suitable upstream path for a new eFuse driver
+for fuses used on Imagination Technologies SoCs.
 
-> 1) We left static idle states there to cope with legacy DTBs that were
->     published before we introduced idle states bindings. If we want to
->     boot eg vexpress in legacy mode but single kernel image with MCPM on,
->     we could remove the idle states in DT and the problem would be
->     solved; we can't do that since we were forced to leave the static
->     idle tables. Overall I think this is not the way to fix the issue.
-> 2) The idle driver should be initialized if there is an idle state entry
->     method, which in this case is MCPM. If I boot vexpress with MCPM
->     enabled but legacy boot method (ie spin table) with a single kernel image
->     I do not want to warn if the idle states entry method (MCPM) can't be
->     initialized (and I do not want to get a warning if the idle driver is
->     triggering a mcpm_cpu_suspend), so Sudeep's patch is valid and I am
->     against adding a:
->
->     if (WARN_ON(!mcpm_is_available())
->
-> 3) Sudeep's patch is not hiding anything. If CCI is in DT, CCI is
->     probed so mcpm_is_available() == true. If the firmware is borked
->     the idle states will be entered and we will notice there is something
->     wrong
->
-> So overall I think Sudeep's patch is sound.
+This was our last proposal, which follows Tegra's work:
 
-Ok, I will pick Sudeep's patch. Shall I add your acked-by ?
+http://www.spinics.net/lists/devicetree/msg59246.html
 
-> I also think we should
-> improve the way we detect if MCPM is available,
+However, Arnd was reluctant to take yet another efuse driver under drivers/soc
+and proposed instead to try to find a unified API. We've had numerous fuse
+drivers (tegra, sunxi, imx and img) appearing, so his concern certainly makes
+sense.
 
-Yes, I agree.
+I've talked to Arnd on IRC and we agreed to create a new directory
+drivers/efuse. As a first step we would just move the tegra driver,
+and add the new drivers (img on my side, and possibly mxs on Stefan's).
+Perhaps we would also pull the sunxi_sid driver as well.
 
-> and again, I think the
-> CPU operations on arm64 are a good example that we can and we should
-> replicate.
+Having the drivers together would allow us to come up with a unified API
+as follow up work.
 
-Ok, I think that will raise another thread soon :)
-
-Thanks for your feedbacks.
-
-   -- Daniel
-
-
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
+How does this sound? If you have no objections to this, I can go ahead and
+try to prepare some RFCs.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Ezequiel
