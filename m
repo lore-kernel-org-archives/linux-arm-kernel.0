@@ -1,36 +1,30 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 08 Jan 2015 14:46:15 +0530
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <54AE459B.8010703@linaro.org>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org>
-Message-ID: <54AE4ADF.3030307@arm.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Thu,  8 Jan 2015 10:16:44 +0100
+Subject: [PATCH 0/3] [MERGE REQUEST] DT support for Alphascale asm9260
+In-Reply-To: <1733388.SP14pjVoMj@wuerfel>
+References: <1733388.SP14pjVoMj@wuerfel>
+Message-ID: <1420708607-23052-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hello,
+this patches provide DT support for Alphascale asm9260 SoC.
+As was suggested..., I explicitly ask you to merge them :D
 
-On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
-> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
->> If big.LITTLE driver is initialized even when MCPM is unavailable,
->> we get the below warning the first time cpu tries to enter deeper
->> C-states.
->
-> Can you elaborate why MCPM could be unavailable when the tc2 pm code
-> registers the mcpm platform ops before the cpuidle driver ?
->
->
-I can think of 3 possible scenarios. Let me know if these make sense.
+Oleksij Rempel (3):
+  ARM: dts: add DT for Alphascale ASM9260 SoC
+  ARM: add alphascale,acc.txt bindings documentation
+  add Alphascale to vendor-prefixes.txt
 
-1. If the firmware settings in Vexpress configuration files are set to
-    boot in legacy mode, but MCPM is enabled in the kernel.
-2. If some failure occurs during MCPM initialization
-3. For example, if CCI is not accessible as in some Exynos boards [1],
-    we don't want to wait till mpcm_cpu_suspend ?
+ .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +-
+ arch/arm/boot/dts/alphascale-asm9260-devkit.dts    |  13 +++
+ arch/arm/boot/dts/alphascale-asm9260.dtsi          |  63 +++++++++++
+ 5 files changed, 193 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260-devkit.dts
+ create mode 100644 arch/arm/boot/dts/alphascale-asm9260.dtsi
 
-Regards,
-Sudeep
-
-[1] 
-https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg39624.html
+-- 
+1.9.1
