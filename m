@@ -1,34 +1,48 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed,  7 Jan 2015 17:33:31 -0700
-Subject: [PATCH V3 0/7] APM X-Gene SoC platform device tree cleanup
-Message-ID: <1420677218-30743-1-git-send-email-fkan@apm.com>
+Date: Wed,  7 Jan 2015 17:33:34 -0700
+Subject: [PATCH V3 3/7] arm64: dts: Add X-Gene reboot driver dts node
+In-Reply-To: <1420677218-30743-1-git-send-email-fkan@apm.com>
+References: <1420677218-30743-1-git-send-email-fkan@apm.com>
+Message-ID: <1420677218-30743-4-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This sums up the dts changes of the recent committed drivers into the kernel.
-This will grant PMU, reboot, USB and gpio functionalities to the platform.
-These patches are all based on existing and approved driver that is in the
-kernel tree today.
+Add X-Gene platform reboot driver dts node.
 
-V3 Changes:
-	- add comments regarding usb node
-	- change dwgpio node name to gpio
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm/apm-storm.dtsi |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-V2 Changes:
-        - add dma-coherent attribute for usb node.
-
-Feng Kan (7):
-  arm64: dts: Add APM X-Gene USB DTS node
-  Documentation: arm64: add SCU dts binding documentation to linux
-    kernel
-  arm64: dts: Add X-Gene reboot driver dts node
-  arm64: dts: Add Designware GPIO dts binding to APM X-Gene platform
-  arm64: dts: Add APM X-Gene SoC GFC GPIO controller DTS entries
-  Documentation: arm: pmu: Add Potenza PMU binding
-  arm64: dts: Add PMU node for APM X-Gene Storm SOC
-
- Documentation/devicetree/bindings/arm/apm/scu.txt |   17 ++++++
- Documentation/devicetree/bindings/arm/pmu.txt     |    1 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi            |   58 +++++++++++++++++++++
- 3 files changed, 76 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index 4b2ec83..f31e8df 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -103,6 +103,11 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		scu: system-clk-controller at 17000000 {
++			compatible = "apm,xgene-scu","syscon";
++			reg = <0x0 0x17000000 0x0 0x400>;
++		};
++
+ 		clocks {
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+@@ -354,6 +359,13 @@
+ 			};
+ 		};
+ 
++		reboot: reboot at 17000014 {
++			compatible = "syscon-reboot";
++			regmap = <&scu>;
++			offset = <0x14>;
++			mask = <0x1>;
++		};
++
+ 		pcie0: pcie at 1f2b0000 {
+ 			status = "disabled";
+ 			device_type = "pci";
+-- 
+1.7.1
