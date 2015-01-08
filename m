@@ -1,64 +1,120 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 08 Jan 2015 08:28:46 -0800
-Subject: [RESEND PATCH v15 07/11] KVM: arm: page logging 2nd stage fault
- handling
-In-Reply-To: <20150108104510.GI21092@cbox>
+Date: Thu, 08 Jan 2015 08:30:33 -0800
+Subject: [PATCH v15 10/11] KVM: arm/arm64: Enable Dirty Page logging for
+ ARMv8
+In-Reply-To: <20150108105612.GJ21092@cbox>
 References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418868449-23397-1-git-send-email-m.smarduch@samsung.com>
- <20150107123844.GA21092@cbox> <54ADE0B6.1060703@samsung.com>
- <20150108104510.GI21092@cbox>
-Message-ID: <54AEB03E.8080305@samsung.com>
+ <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
+ <20150107124744.GC21092@cbox> <54ADE293.1040901@samsung.com>
+ <20150108105612.GJ21092@cbox>
+Message-ID: <54AEB0A9.5060209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 02:45 AM, Christoffer Dall wrote:
-> On Wed, Jan 07, 2015 at 05:43:18PM -0800, Mario Smarduch wrote:
->> Hi Christoffer,
->>   before going through your comments, I discovered that
->> in 3.18.0-rc2 - a generic __get_user_pages_fast()
->> was implemented, now ARM picks this up. This causes
->> gfn_to_pfn_prot() to return meaningful 'writable'
->> value for a read fault, provided the region is writable.
->>
->> Prior to that the weak version returned 0 and 'writable'
->> had no optimization effect to set pte/pmd - RW on
->> a read fault.
->>
->> As a consequence dirty logging broke in 3.18, I was seeing
-Correction on this, proper __get_user_pages_fast()
-behavior exposed a bug in page logging code.
-
->> weird but very intermittent issues. I just put in the
->> additional few lines to fix it, prevent pte RW (only R) on
->> read faults  while  logging writable region.
->>
->> On 01/07/2015 04:38 AM, Christoffer Dall wrote:
->>> On Wed, Dec 17, 2014 at 06:07:29PM -0800, Mario Smarduch wrote:
->>>> This patch is a followup to v15 patch series, with following changes:
->>>> - When clearing/dissolving a huge, PMD mark huge page range dirty, since
->>>>   the state of whole range is unknown. After the huge page is dissolved 
->>>>   dirty page logging is at page granularity.
+On 01/08/2015 02:56 AM, Christoffer Dall wrote:
+> On Wed, Jan 07, 2015 at 05:51:15PM -0800, Mario Smarduch wrote:
+>> On 01/07/2015 04:47 AM, Christoffer Dall wrote:
+>>> On Sun, Dec 14, 2014 at 11:28:07PM -0800, Mario Smarduch wrote:
+>>>> This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
 >>>
->>> What is the sequence of events where you could have dirtied another page
->>> within the PMD range after the user initially requested dirty page
->>> logging?
+>>>                            dirty
+>> yeah.
+>>>
+>>>> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
+>>>> logging at architecture layer.
+>>>>
+>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_host.h | 12 ------------
+>>>>  arch/arm/kvm/arm.c              |  4 ----
+>>>>  arch/arm/kvm/mmu.c              | 19 +++++++++++--------
+>>>>  arch/arm64/kvm/Kconfig          |  2 ++
+>>>>  4 files changed, 13 insertions(+), 24 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>>> index b138431..088ea87 100644
+>>>> --- a/arch/arm/include/asm/kvm_host.h
+>>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>>> @@ -223,18 +223,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>>>>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>>>>  }
+>>>>  
+>>>> -/**
+>>>> - * kvm_flush_remote_tlbs() - flush all VM TLB entries
+>>>> - * @kvm:	pointer to kvm structure.
+>>>> - *
+>>>> - * Interface to HYP function to flush all VM TLB entries without address
+>>>> - * parameter.
+>>>> - */
+>>>> -static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+>>>> -{
+>>>> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+>>>> -}
+>>>> -
+>>>>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>>>>  {
+>>>>  	return 0;
+>>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>>>> index 6e4290c..1b6577c 100644
+>>>> --- a/arch/arm/kvm/arm.c
+>>>> +++ b/arch/arm/kvm/arm.c
+>>>> @@ -740,7 +740,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>>>>   */
+>>>>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>>>>  {
+>>>> -#ifdef CONFIG_ARM
+>>>>  	bool is_dirty = false;
+>>>>  	int r;
+>>>>  
+>>>> @@ -753,9 +752,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+>>>>  
+>>>>  	mutex_unlock(&kvm->slots_lock);
+>>>>  	return r;
+>>>> -#else /* arm64 */
+>>>> -	return -EINVAL;
+>>>> -#endif
+>>>>  }
+>>>>  
+>>>>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>>> index dc763bb..59003df 100644
+>>>> --- a/arch/arm/kvm/mmu.c
+>>>> +++ b/arch/arm/kvm/mmu.c
+>>>> @@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
+>>>>  
+>>>>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+>>>>  {
+>>>> -#ifdef CONFIG_ARM
+>>>>  	return !!memslot->dirty_bitmap;
+>>>> -#else
+>>>> -	return false;
+>>>> -#endif
+>>>> +}
+>>>> +
+>>>> +/**
+>>>> + * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
+>>>> + * @kvm:	pointer to kvm structure.
+>>>> + *
+>>>> + * Interface to HYP function to flush all VM TLB entries
+>>>> + */
+>>>> +inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+>>>
+>>> did you intend for a non-staic inline here?
 >>
->> No there is none. My issue was the start point for tracking dirty pages
->> and that would be second call to dirty log read. Not first
->> call after initial write protect where any page in range can
->> be assumed dirty. I'll remove this, not sure if there would be any
->> use case to call dirty log only once.
->>
+>> Yes it's used in arm.c and mmu.c
 > 
-> Calling dirty log once can not give you anything meaningful, right?  You
-> must assume all memory is 'dirty' at this point, no?
+> then why inline?
+> 
+> I'm not a compiler expert by any measure, but poking around I'm pretty
+> sure the inline keyword in this context is useless.  See for example:
+> http://www.cs.nyu.edu/~xiaojian/bookmark/c_programming/Inline_Functions.htm
+> 
+> So I suggest either make it a normal stand-alone function or keep it as
+> duplicate static inlines in the header files if you're adamant about
+> this being inlined.
 
-There is the interval between KVM_MEM_LOG_DIRTY_PAGES and first
-call to KVM_GET_DIRTY_LOG. Not sure of any use case, maybe enable
-logging, wait a while do a dirty log read, disable logging.
-Get an accumulated snapshot of dirty page activity.
-
-- Mario
+Sorry about that, should have given this a closer look, this
+shouldn't require a turnaround from you.
 
 > 
 > -Christoffer
