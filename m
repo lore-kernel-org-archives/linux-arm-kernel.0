@@ -1,189 +1,58 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 8 Jan 2015 10:44:20 -0600
-Subject: [PATCH v2 12/21] ARM: omap: convert wakeupgen to stacked domains
-In-Reply-To: <1420652576-22309-13-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-13-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150108164420.GB25986@kahuna>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 8 Jan 2015 16:51:30 +0000
+Subject: [PATCH] arm64: Relax licensing of arm64 Xen DMA operations
+In-Reply-To: <d7204be5-f199-456c-9587-c87e1d8d4dd5@CMEXHTCAS1.ad.emulex.com>
+References: <d7204be5-f199-456c-9587-c87e1d8d4dd5@CMEXHTCAS1.ad.emulex.com>
+Message-ID: <alpine.DEB.2.02.1501081650570.3058@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:42-20150107, Marc Zyngier wrote:
-> OMAP4/5 has been (ab)using the gic_arch_extn to provide
-> wakeup from suspend, and it makes a lot of sense to convert
-> this code to use stacked domains instead.
+On Sun, 21 Dec 2014, Chuck Tuffli wrote:
+> With Xen configured into the arm64 kernel, any driver allocating
+> DMA'able memory for PCI operations, must be GPL compatible, regardless
+> of its interaction with Xen. This patch relaxes the GPL requirement of
+> xen_dma_ops and its dependencies to allow open source drivers to be
+> compiled for the arm64 architecture.
 > 
-> This patch does just this, updating the DT files to actually
-> reflect what the HW provides.
-> 
-> BIG FAT WARNING: because the DTs were so far lying by not
-> exposing the WUGEN HW block, kernels with this patch applied
-> won't have any suspend-resume facility when booted with old DTs,
-> and old kernels with updated DTs won't even boot.
-> 
-> On a platform with this patch applied, the system looks like
-> this:
-> 
-> root at bacon-fat:~# cat /proc/interrupts
->             CPU0       CPU1
->  16:          0          0     WUGEN  37  gp_timer
->  19:     233799     155916       GIC  27  arch_timer
->  23:          0          0     WUGEN   9  l3-dbg-irq
->  24:          1          0     WUGEN  10  l3-app-irq
->  27:        282          0     WUGEN  13  omap-dma-engine
->  44:          0          0  4ae10000.gpio  13  DMA
-> 294:          0          0     WUGEN  20  gpmc
-> 297:        506          0     WUGEN  56  48070000.i2c
-> 298:          0          0     WUGEN  57  48072000.i2c
-> 299:          0          0     WUGEN  61  48060000.i2c
-> 300:          0          0     WUGEN  62  4807a000.i2c
-> 301:          8          0     WUGEN  60  4807c000.i2c
-> 308:       2439          0     WUGEN  74  OMAP UART2
-> 312:        362          0     WUGEN  83  mmc2
-> 313:        502          0     WUGEN  86  mmc0
-> 314:         13          0     WUGEN  94  mmc1
-> 350:          0          0      PRCM  pinctrl, pinctrl
-> 406:   35155709          0       GIC 109  ehci_hcd:usb1
-> 407:          0          0     WUGEN   7  palmas
-> 409:          0          0     WUGEN 119  twl6040
-> 410:          0          0   twl6040   5  twl6040_irq_ready
-> 411:          0          0   twl6040   0  twl6040_irq_th
-> IPI0:          0          1  CPU wakeup interrupts
-> IPI1:          0          0  Timer broadcast interrupts
-> IPI2:      95334     902334  Rescheduling interrupts
-> IPI3:          0          0  Function call interrupts
-> IPI4:        479        648  Single function call interrupts
-> IPI5:          0          0  CPU stop interrupts
-> IPI6:          0          0  IRQ work interrupts
-> IPI7:          0          0  completion interrupts
-> Err:          0
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/boot/dts/am4372.dtsi             |  11 ++-
->  arch/arm/boot/dts/dra7.dtsi               |  12 ++-
->  arch/arm/boot/dts/dra72x.dtsi             |   2 +-
->  arch/arm/boot/dts/dra74x.dtsi             |   2 +-
->  arch/arm/boot/dts/omap4-duovero.dtsi      |   2 -
->  arch/arm/boot/dts/omap4-panda-common.dtsi |   8 +-
->  arch/arm/boot/dts/omap4-sdp.dts           |   8 +-
->  arch/arm/boot/dts/omap4-var-som-om44.dtsi |   2 -
->  arch/arm/boot/dts/omap4.dtsi              |  18 ++++-
->  arch/arm/boot/dts/omap5-cm-t54.dts        |   1 -
->  arch/arm/boot/dts/omap5-uevm.dts          |   2 -
->  arch/arm/boot/dts/omap5.dtsi              |  24 ++++--
->  arch/arm/mach-omap2/omap-wakeupgen.c      | 125 +++++++++++++++++++++++-------
->  arch/arm/mach-omap2/omap-wakeupgen.h      |   1 -
->  arch/arm/mach-omap2/omap4-common.c        |   1 -
->  15 files changed, 154 insertions(+), 65 deletions(-)
+> Signed-off-by: Chuck Tuffli <chuck.tuffli@emulex.com>
 
-	we may need the following changes as well:
+I'll add it to my queue
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 7eaae4cf9f89..69f2313a49d1 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -280,7 +280,6 @@
- 		reg = <0x24>;
- 		compatible = "ti,tps65218";
- 		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
--		interrupt-parent = <&gic>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index 53bbfc90b26a..029badefad3d 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -334,7 +334,6 @@
- 	tps at 24 {
- 		compatible = "ti,tps65218";
- 		reg = <0x24>;
--		interrupt-parent = <&gic>;
- 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 662261d6b2ca..2d26bc11bad6 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -333,7 +333,6 @@
- 		reg = <0x24>;
- 		compatible = "ti,tps65218";
- 		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
--		interrupt-parent = <&gic>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 49edbda68cd5..c2241c2e5d9d 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -335,7 +335,6 @@
- 	mcp_rtc: rtc at 6f {
- 		compatible = "microchip,mcp7941x";
- 		reg = <0x6f>;
--		interrupt-parent = <&gic>;
- 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
- 
- 		pinctrl-names = "default";
-@@ -358,7 +357,7 @@
- 
- &uart3 {
- 	status = "okay";
--	interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
- 			      <&dra7_pmx_core 0x248>;
- 
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index f9c75c782c48..b056156e2a7a 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -893,14 +893,12 @@
- 			usbhsohci: ohci at 4a064800 {
- 				compatible = "ti,ohci-omap3";
- 				reg = <0x4a064800 0x400>;
--				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
- 			usbhsehci: ehci at 4a064c00 {
- 				compatible = "ti,ehci-omap";
- 				reg = <0x4a064c00 0x400>;
--				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 		};
 
-Also saw the following checkpatch warnings at this point - but, I
-suppose they were pre-existing.
-
-@@ -0,0 +1,26 @@
-+WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
-+#95: FILE: arch/arm/boot/dts/am4372.dtsi:55:
-++		compatible = "ti,omap4-wugen-mpu";
-+WARNING: DT compatible string "ti,omap5-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
-+#112: FILE: arch/arm/boot/dts/dra7.dtsi:68:
-++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
-+WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
-+#112: FILE: arch/arm/boot/dts/dra7.dtsi:68:
-++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
-+WARNING: line over 80 characters
-+#127: FILE: arch/arm/boot/dts/dra7.dtsi:103:
-++				      <&wakeupgen GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
-+#320: FILE: arch/arm/boot/dts/omap4.dtsi:78:
-++		compatible = "ti,omap4-wugen-mpu";
-+WARNING: DT compatible string "ti,omap5-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
-+#416: FILE: arch/arm/boot/dts/omap5.dtsi:103:
-++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
-+WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
-+#416: FILE: arch/arm/boot/dts/omap5.dtsi:103:
-++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
-+WARNING: line over 80 characters
-+#600: FILE: arch/arm/mach-omap2/omap-wakeupgen.c:441:
-++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
--- 
-Regards,
-Nishanth Menon
+>  arch/arm/xen/enlighten.c | 4 ++--
+>  arch/arm/xen/mm.c        | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index c7ca936..263a204 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -29,10 +29,10 @@
+>  
+>  struct start_info _xen_start_info;
+>  struct start_info *xen_start_info = &_xen_start_info;
+> -EXPORT_SYMBOL_GPL(xen_start_info);
+> +EXPORT_SYMBOL(xen_start_info);
+>  
+>  enum xen_domain_type xen_domain_type = XEN_NATIVE;
+> -EXPORT_SYMBOL_GPL(xen_domain_type);
+> +EXPORT_SYMBOL(xen_domain_type);
+>  
+>  struct shared_info xen_dummy_shared_info;
+>  struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
+> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> index 351b24a..793551d 100644
+> --- a/arch/arm/xen/mm.c
+> +++ b/arch/arm/xen/mm.c
+> @@ -149,7 +149,7 @@ void xen_destroy_contiguous_region(phys_addr_t pstart, unsigned int order)
+>  EXPORT_SYMBOL_GPL(xen_destroy_contiguous_region);
+>  
+>  struct dma_map_ops *xen_dma_ops;
+> -EXPORT_SYMBOL_GPL(xen_dma_ops);
+> +EXPORT_SYMBOL(xen_dma_ops);
+>  
+>  static struct dma_map_ops xen_swiotlb_dma_ops = {
+>  	.mapping_error = xen_swiotlb_dma_mapping_error,
+> -- 
+> 1.9.1
+> 
