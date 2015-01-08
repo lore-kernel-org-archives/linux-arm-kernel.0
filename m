@@ -1,31 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Jan 2015 10:30:44 +0100
-Subject: [PATCH] reset: sunxi: fix spinlock initialization
-In-Reply-To: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
-References: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <20150108093044.GL7853@lukather>
+Date: Thu, 8 Jan 2015 10:39:21 +0100
+Subject: [PATCH v2 03/11] clk: sunxi: Add driver for A80 MMC config
+ clocks/resets
+In-Reply-To: <CAGb2v64c9ZgyUhzneyK3Gqh8XS=qT682_eKZe3_BYm48JMqCNg@mail.gmail.com>
+References: <1418886058-8145-1-git-send-email-wens@csie.org>
+ <1418886058-8145-4-git-send-email-wens@csie.org>
+ <20141219180759.GP4820@lukather>
+ <CAGb2v64c9ZgyUhzneyK3Gqh8XS=qT682_eKZe3_BYm48JMqCNg@mail.gmail.com>
+Message-ID: <20150108093921.GQ7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-On Wed, Jan 07, 2015 at 04:54:39PM -0800, Tyler Baker wrote:
-> Call spin_lock_init() before the spinlocks are used, preventing a lockdep
-> splat.
+On Mon, Dec 22, 2014 at 10:15:19AM +0800, Chen-Yu Tsai wrote:
+> >> +     clk_data->clks = devm_kcalloc(&pdev->dev, count, sizeof(struct clk *),
+> >
+> > Hmmm, are you sure of that sizeof?
 > 
-> I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
-> when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
-> and has been tested on a few other sunxi platforms without issue.
+> Quite sure. Code in clk-sunxi.c for gates:
 > 
-> [1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
-> [2] http://kernelci.org/boot/?a80-optimus
+>     clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
 > 
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> Note I'm using kcalloc here.
+> 
+> Also definition for clk_data:
+> 
+>     struct clk_onecell_data {
+>             struct clk **clks;
+>             unsigned int clk_num;
+>     };
 
-Thanks for this patch.
+Ah, right, my bad :)
 
-Can you send this to stable too please?
-
+Thanks!
 Maxime
 
 -- 
@@ -38,4 +44,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/f5474105/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/2153110c/attachment.sig>
