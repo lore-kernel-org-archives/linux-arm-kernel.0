@@ -1,67 +1,91 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 08 Jan 2015 11:02:54 +0100
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <54AE4ADF.3030307@arm.com>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
-Message-ID: <54AE55CE.6040201@linaro.org>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Thu, 8 Jan 2015 18:06:32 +0800
+Subject: [RFC] mmc:change mmc_init workqueue into a freezable workqueue
+Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E192@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 10:16 AM, Sudeep Holla wrote:
-> Hi Daniel,
->
-> On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
->> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
->>> If big.LITTLE driver is initialized even when MCPM is unavailable,
->>> we get the below warning the first time cpu tries to enter deeper
->>> C-states.
->>
->> Can you elaborate why MCPM could be unavailable when the tc2 pm code
->> registers the mcpm platform ops before the cpuidle driver ?
->>
->>
-> I can think of 3 possible scenarios. Let me know if these make sense.
->
-> 1. If the firmware settings in Vexpress configuration files are set to
->     boot in legacy mode, but MCPM is enabled in the kernel.
+This patch fix the mmc driver suspend/resume conflict problems,
+mmc workqueue will queue mmc_rescan(), and it will call some
+pm_runtime_* functions, this will conflict with suspend path sometimes,
+and will result in some strange behavior:
 
-If I am not wrong, we have a BUG_ON in this path, right ?
+Suspend path:
+	-000 |context_switch(inline)
+	-000 |__schedule()
+	-001 |schedule_preempt_disabled()
+	-002 |spin_lock(inline)
+	-002 |__mutex_lock_common(inline)
+	-002 |__mutex_lock_slowpath(lock_count = 0xEDCD0F48)
+	-003 |__mutex_fastpath_lock(inline)
+	-003 |mutex_lock(lock = 0xEDCD0F48)
+	-004 |sdhci_do_set_ios(host = 0xEDCD0CC0, ios = 0xEDCD0A70)
+	-005 |sdhci_set_ios(?, ios = 0xEDCD0A70)
+	-006 |mmc_set_ios(host = 0xEDCD0800)
+	-007 |mmc_delay(inline)
+	-007 |mmc_power_off(host = 0xEDCD0800)
+	-008 |mmc_suspend_host(inline)
+	-008 |mmc_suspend_host(host = 0xEDCD0800)
+	-009 |mmc_host_suspend(dev = 0xEDCD0808)
+	-010 |dpm_run_callback(cb = 0xC0627A88, dev = 0xEDCD0808, state = (event = 2), info = 0xC0B6EF9B)
+	-011 |__device_suspend(dev = 0xEDCD0808, state = (event = 2), ?)
+	-012 |device_suspend(inline)
+	-012 |dpm_suspend(state = (event = 2))
+	-013 |suspend_devices_and_enter(state = 3)
+	-014 |enter_state(inline)
+	-014 |pm_suspend(state = 3)
+	-015 |try_to_suspend(?)
+	-016 |static_key_false(inline)
+	-016 |trace_workqueue_execute_end(inline)
+	-016 |process_one_work(worker = 0xD5E87040, work = 0xC0E3FF54)
+	-017 |worker_thread(__worker = 0xD5E87040)
+	-018 |kthread(_create = 0xE9FFBF10)
+	-019 |kernel_thread_exit(asm)
+	 --- |end of frame
 
-> 2. If some failure occurs during MCPM initialization
-> 3. For example, if CCI is not accessible as in some Exynos boards [1],
->     we don't want to wait till mpcm_cpu_suspend ?
+mmc_rescan() resume path:
+	 -000 |context_switch(inline)
+	 -000 |__schedule()
+	 -001 |do_undefinstr(regs = 0xD12242F0)
+	 -002 |__und_svc(asm)
+	  --> |exception
+	  -003 |sdhci_set_power(host = 0xEDCD0CC0, power = 0)
+	  -004 |sdhci_do_set_ios(host = 0xEDCD0CC0, ios = 0xEDCD0A70)
+	  -005 |sdhci_set_ios(?, ios = 0xEDCD0A70)
+	  -006 |mmc_set_ios(host = 0xEDCD0800)
+	  -007 |mmc_delay(inline)
+	  -007 |mmc_power_up(host = 0xEDCD0800)
+	  -008 |mmc_resume_bus(inline)
+	  -008 |mmc_resume_bus(host = 0xEDCD0800)
+	  -009 |mmc_rpm_hold(host = 0xEDCD0800, ?)
+	  -010 |mmc_rescan(work = 0xEDCD0AB0)
+	  -011 |static_key_false(inline)
+	  -011 |trace_workqueue_execute_end(inline)
+	  -011 |process_one_work(worker = 0xE5F0BBC0, work = 0xEDCD0AB0)
+	  -012 |worker_thread(__worker = 0xE5F0BBC0)
+	  -013 |kthread(_create = 0xD03A5F10)
+	  -014 |kernel_thread_exit(asm)
+	   --- |end of frame
 
-Well, I think if the firmware is preventing us to play with the CCI but 
-MCPM is enabled. We should add BUG_ON also in the same initialization 
-path. IIRC, Kevin spent some time to figure out what was happening to 
-its odroid-xu3 board before understanding mcpm wasn't able to deal with 
-the CCI due to the broken firmware.
+most mmc power callback function don't check this special case, and
+will cause problems, make sure the workqueue is stopped during suspend
+is more safe.
+---
+ drivers/mmc/core/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The patch you are proposing is valid. Nevertheless, I would really like 
-to have the firmwares to be fixed and your patch is hiding an 
-incompatible firmware with the kernel configuration and letting the 
-kernel continue to work in degraded mode.
-
-IMO, it would be better to be more strict with the mcpm initialization 
-and not let the system boot if something is wrong with it which I 
-believe is coming from the firmware and let the user to figure out what 
-is really happening by letting him to disable mcpm in the kernel 
-configuration (which in turn will disable cpuidle).
-
-Nico, Kevin, what is your opinion ?
-
-
-
-> [1]
-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg39624.html
-
-
-
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index a6c139d..ae8757f 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -3881,7 +3881,7 @@ static int __init mmc_init(void)
+ {
+ 	int ret;
+ 
+-	workqueue = alloc_ordered_workqueue("kmmcd", 0);
++	workqueue = alloc_ordered_workqueue("kmmcd", WQ_FREEZABLE);
+ 	if (!workqueue)
+ 		return -ENOMEM;
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.1.3
