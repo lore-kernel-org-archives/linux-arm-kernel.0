@@ -1,47 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Jan 2015 11:16:29 +0100
-Subject: [PATCH v2 03/21] ARM: tegra: skip gic_arch_extn setup if DT has
- a LIC node
-In-Reply-To: <1420652576-22309-4-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150108101628.GE1987@ulmo.nvidia.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Thu, 8 Jan 2015 03:18:46 -0700
+Subject: Tegra baseline test results for v3.19-rc1
+Message-ID: <54AE5986.6030806@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 05:42:38PM +0000, Marc Zyngier wrote:
-> If we detect that our DT has a LIC node, don't setup gic_arch_extn,
-> and skip tegra_legacy_irq_syscore_init as well.
-> 
-> This is only a temporary measure until that code is removed for good.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-tegra/irq.c   | 11 +++++++++++
->  arch/arm/mach-tegra/tegra.c |  1 -
->  2 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-> index 7f87a50..b37141d 100644
-> --- a/arch/arm/mach-tegra/irq.c
-> +++ b/arch/arm/mach-tegra/irq.c
-> @@ -255,11 +255,21 @@ static void tegra114_gic_cpu_pm_registration(void)
->  static void tegra114_gic_cpu_pm_registration(void) { }
->  #endif
->  
-> +static const struct of_device_id tegra_ictlr_match[] __initconst = {
-> +	{ .compatible = "nvidia,tegra-ictlr" },
+Here are some basic Tegra test results for Linux v3.19-rc1.
+Logs and other details at:
 
-Like I said elsewhere, I think this should be "nvidia,tegra20-ictlr" and
-there should be another entry for "nvidia,tegra30-ictlr".
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc1/20150108014100/
 
-Otherwise looks good, so with that fixed:
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/778ef8b2/attachment.sig>
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.18 (b2776bf7149bddd1f4161f14f79520f17fc1d71d)):
+    text     data      bss    total  kernel
++882219   +15760    -2432  +895547  multi_v7_defconfig
++149737    +2872   -12344  +140265  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.18 (b2776bf7149bddd1f4161f14f79520f17fc1d71d))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+     -872k     872k        .      40k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+     -140k     140k        .      16k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+     -876k     876k        .      40k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+     -144k     144k        .      16k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+     -868k     868k        .      40k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+     -136k     136k        .      16k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+
+The kernel boot-time memory report line changed.  Now it breaks CMA-reserved memory out into a separate quantity.  It's been lumped back in with reserved memory in this report.
