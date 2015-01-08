@@ -1,187 +1,113 @@
-From: nadavh@marvell.com (Nadav Haklai)
-Date: Thu, 8 Jan 2015 15:21:11 +0000
-Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point
- Development Board support
-In-Reply-To: <20150106173101.GB7853@lukather>
-References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
- <20150106155705.GB23784@lunn.ch> <20150106173101.GB7853@lukather>
-Message-ID: <29330f81b91442a1b36176f84530b86d@IL-EXCH01.marvell.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Thu, 8 Jan 2015 20:57:34 +0530
+Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
+In-Reply-To: <54AE278F.4020003@arm.com>
+References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>
+ <5487C897.9050405@arm.com>
+ <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
+ <5487D726.6000603@arm.com> <54AE278F.4020003@arm.com>
+Message-ID: <CAM4voamaqoje8Ccz3+UxvxaHN6GBd=QC5wRjVcz9Osfc=4aeiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sudeep,
 
+On Thu, Jan 8, 2015 at 12:15 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi Abhilash,
+>
+> On Wednesday 10 December 2014 10:46 AM, Sudeep Holla wrote:
+>>
+>>
+>>
+>> On Wednesday 10 December 2014 09:55 AM, Abhilash Kesavan wrote:
+>>>
+>>> Hi Sudeep,
+>>>
+>>> On Wed, Dec 10, 2014 at 9:44 AM, Sudeep Holla <sudeep.holla@arm.com>
+>>> wrote:
+>>>>
+>>>> Hi Abhilash,
+>>>>
+>>>> On Wednesday 10 December 2014 09:31 AM, Abhilash Kesavan wrote:
+>>>>>
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> On Fri, Nov 28, 2014 at 8:20 PM, Abhilash Kesavan
+>>>>> <a.kesavan@samsung.com>
+>>>>> wrote:
+>>>>>>
+>>>>>>
+>>>>>> The arm-cci driver completes the probe sequence even if the cci node
+>>>>>> is
+>>>>>> marked as disabled. Add a check in the driver to honour the cci status
+>>>>>> in the device tree.
+>>>>>>
+>>>>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>>>
+>>>>>
+>>>>>
+>>>>> This patch helps disable CCI on the Arndale Octa board thus resolving
+>>>>> some imprecise aborts seen on that board. Kindly review.
+>>>>>
+>>>>> Regards,
+>>>>> Abhilash
+>>>>>>
+>>>>>>
+>>>>>> ---
+>>>>>>     drivers/bus/arm-cci.c |    3 +++
+>>>>>>     1 file changed, 3 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>>>>>> index 860da40..0ce5e2d 100644
+>>>>>> --- a/drivers/bus/arm-cci.c
+>>>>>> +++ b/drivers/bus/arm-cci.c
+>>>>>> @@ -1312,6 +1312,9 @@ static int cci_probe(void)
+>>>>>>            if (!np)
+>>>>>>                    return -ENODEV;
+>>>>>>
+>>>>>> +       if (!of_device_is_available(np))
+>>>>>> +               return -ENODEV;
+>>>>>> +
+>>>>
+>>>>
+>>>>
+>>>> IIUC, by this change you are disabling the MCPM boot protocol here.
+>>>> Is there any alternative boot protocol that works on this platform
+>>>> to boot all 8 cores ? Sorry by quick grep couldn't find one, hence
+>>>> so I am asking.
+>>>
+>>>
+>>> Thanks for the reply.
+>>> On disabling MCPM, we will default to platsmp.c/firmware.c which boots
+>>> 4 cores as per Kevin's comment here[1]. This was the original behavior
+>>> before MCPM was enabled for all 5420 based SoCs.
+>>>
+>>
+>> Thanks for pointing that out. I assume the firmware can handle the
+>> alternate boot protocol and no more workarounds are needed especially
+>> when getting CPUIdle working in this mode.
+>>
+>> Anyways the patch makes sense irrespective how it works on exynos, so
+>> you can add,
+>>
+>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>
+> What's the status of this patch. It was useful for me on vexpress for some
+> testing. Please feel free to add
+>
+> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> if this is not yet queued.
 
------Original Message-----
-From: Maxime Ripard [mailto:maxime.ripard at free-electrons.com] 
-Sent: Tuesday, January 06, 2015 7:31 PM
-To: Andrew Lunn
-Cc: Gregory Clement; Jason Cooper; Sebastian Hesselbarth; Linus Walleij; Thomas Petazzoni; linux-arm-kernel at lists.infradead.org; Tawfik Bayouk; Nadav Haklai; Lior Amsalem
-Subject: Re: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point Development Board support
+Thanks for the tested-by. This patch has not been merged yet; I am not
+quite sure who is supposed to pick this up.
 
-Hi Andrew,
-
-On Tue, Jan 06, 2015 at 04:57:05PM +0100, Andrew Lunn wrote:
-> On Tue, Jan 06, 2015 at 04:28:20PM +0100, Maxime Ripard wrote:
-> 
-> Hi Maxime
-> 
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/armada-385-ap.dts
-> > @@ -0,0 +1,140 @@
-> > +/*
-> > + * Device Tree file for Marvell Armada 385 Access Point Development 
-> > +board
-> > + * (DB-88F6820-AP)
-> > + *
-> > + *  Copyright (C) 2014 Marvell
-> > + *
-> > + * Nadav Haklai <nadavh@marvell.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> 
-> Gregory is in the process of dual licensing some of the other mvebu DT 
-> files. This one is single license. Should it be dual?
-
-I'm not the original author though. Nadav, would you be ok to make a switch to a GPL/X11 dual-license?
-[Nadav Haklai] Yes, I agree.
-
-> > +
-> > +/dts-v1/;
-> > +#include "armada-385.dtsi"
-> > +
-> > +#include <dt-bindings/gpio/gpio.h>
-> > +
-> > +/ {
-> > +	model = "Marvell Armada 385 Access Point Development Board";
-> > +	compatible = "marvell,a385-db-ap", "marvell,armada385", 
-> > +"marvell,armada38x";
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,115200";
-> 
-> Humm, ttyS0? Then why add the LL_DEBUG via UART1?
-
-Yeah, my bad :)
-
-It's obviously ttyS1
-
-> Maybe add
-> 
-> stdout-path = &uart1;
-
-Does that even work with the 8250? Last time I tried with a 3.18, it didn't, and you still needed the console= bootargs.
-
-> > +	};
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x00000000 0x80000000>; /* 2GB */
-> > +	};
-> > +
-> > +	soc {
-> > +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-> > +			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-> > +
-> > +		internal-regs {
-> > +			spi1: spi at 10680 {
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&spi1_pins>;
-> > +				status = "okay";
-> > +
-> > +				spi-flash at 0 {
-> > +					#address-cells = <1>;
-> > +					#size-cells = <1>;
-> > +					compatible = "st,m25p128";
-> > +					reg = <0>; /* Chip select 0 */
-> > +					spi-max-frequency = <108000000>;
-> > +				};
-> > +			};
-> > +
-> > +			i2c0: i2c at 11000 {
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&i2c0_pins>;
-> > +				status = "okay";
-> > +				clock-frequency = <100000>;
-> > +			};
-> > +
-> > +			i2c1: i2c at 11100 {
-> > +				status = "okay";
-> > +				clock-frequency = <100000>;
-> > +			};
-> 
-> Is there anything on these two i2c busses?
-
-One goes to some pin of the mPCIe slot, the other is connected to the EEPROM.
-
-> If not, why enable them and increase the clock speed?
-
-The clock speed is not increased, it's actually the driver's default.
-
-> 
-> > +			mdio at 72004 {
-> > +				pinctrl-names = <&mdio_pins>;
-> > +
-> > +				phy0: ethernet-phy at 0 {
-> > +					reg = <1>;
-> > +				};
-> > +
-> > +				phy1: ethernet-phy at 1 {
-> > +					reg = <6>;
-> > +				};
-> > +
-> > +				phy2: ethernet-phy at 2 {
-> > +					reg = <4>;
-> > +				};
-> > +			};
-> > +
-> > +			uart0: serial at 12000 {
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&uart0_pins>;
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			uart1: serial at 12100 {
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&uart1_pins>;
-> > +				status = "okay";
-> > +			};
-> 
-> If it is not obvious from the silk screen, could you describe which 
-> connector this uart is on, what pins are what?
-
-There's two UART connectors documented in the user guide (JP8 and JP9). UART1 is also connected to a FTDI chip, that is exposed through a mini-USB connector.
-
-> > +
-> > +			ethernet at 30000 {
-> > +				status = "okay";
-> > +				phy = <&phy1>;
-> > +				phy-mode = "sgmii";
-> > +			};
-> > +
-> > +			ethernet at 34000 {
-> > +				status = "okay";
-> > +				phy = <&phy2>;
-> > +				phy-mode = "sgmii";
-> > +			};
-> > +
-> > +			ethernet at 70000 {
-> > +				pinctrl-names = "default";
-> > +
-> > +				/*
-> > +				 * The Reference Clock 0 is used to
-> > +				 * provide a clock to the PHY
-> > +				 */
-> 
-> Does this clock need enabling? Should it be listed in the clocks 
-> property?
-
->From what I understood, this clock is always running, it's just exposed to some external pin, and hence needs some muxing.
-
-Maxime
-
-Thanks,
-Nadav
+Regards,
+Abhilash
+>
+> Regards,
+> Sudeep
+>
