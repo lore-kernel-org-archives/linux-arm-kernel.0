@@ -1,99 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Jan 2015 22:34:35 +0000 (UTC)
-Subject: [PATCH] soc/tegra: pmc: Add Tegra132 support
-In-Reply-To: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
-References: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <alpine.DEB.2.02.1501082232280.28771@utopia.booyaka.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Thu, 8 Jan 2015 22:36:26 +0000
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+In-Reply-To: <1896224.oMI8M6J5T7@wuerfel>
+References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
+ <20150108131008.16c9a31c@lxorguk.ukuu.org.uk>
+ <54AEAC47.1040403@hurleysoftware.com> <1896224.oMI8M6J5T7@wuerfel>
+Message-ID: <20150108223626.43fd93d5@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Jan 2015, Thierry Reding wrote:
+> One idea that has come up in the past but never saw an implementation
+> is to make the ttyS namespace and minor numbers completely generic and
+> let any serial port driver use it. This would be a major rework, but
+> have the added advantage of cleaning up a number of other namespace
+> issues as well. There also lots of open question, in particular how
+> to maintain compatibility with existing drivers. One could imagine
+> that each uart always gets a ttyS device and optionally also gets
+> a device node for the same port with a driver specific chardev as
+> most of them do today. Or it could be an either/or decision that is
+> made at compile time or as a module parameter.
 
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> Tegra132 uses the same GPU as Tegra124 and the same special-case is
-> needed to remove clamps. However Tegra132 has a separate chip ID, so in
-> order to avoid having to extend the list of chip IDs for the special
-> case, add a feature flag to the SoC data.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+I'm not sure we should use ttyS for it. ttyS means 8250, a lot of
+existing code knows what ttyS is and what sort of ioctls and the like are
+assumed. A generic namespace needs not to be attached to a legacy naming 
 
-Reviewed-by: Paul Walmsley <pwalmsley@nvidia.com>
+(eg also put all serial ports in /dev/serial/0 /dev/serial/1 etc either
+via the tty layer or via systemd/udev)
 
-Nit: not sure I would call it a special-case; to me it's more of an 
-evolutionary change due to the radically different GPU in T124 & T132.
-
-
-- Paul
-
-> ---
->  drivers/soc/tegra/pmc.c | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-> index 4bdc654bd747..0f096e76574a 100644
-> --- a/drivers/soc/tegra/pmc.c
-> +++ b/drivers/soc/tegra/pmc.c
-> @@ -88,6 +88,8 @@ struct tegra_pmc_soc {
->  	const char *const *powergates;
->  	unsigned int num_cpu_powergates;
->  	const u8 *cpu_powergates;
-> +
-> +	bool has_gpu_clamps;
->  };
->  
->  /**
-> @@ -225,11 +227,11 @@ int tegra_powergate_remove_clamping(int id)
->  		return -EINVAL;
->  
->  	/*
-> -	 * The Tegra124 GPU has a separate register (with different semantics)
-> -	 * to remove clamps.
-> +	 * On Tegra124 and later, the clamps for the GPU are controlled by a
-> +	 * separate register (with different semantics).
->  	 */
-> -	if (tegra_get_chip_id() == TEGRA124) {
-> -		if (id == TEGRA_POWERGATE_3D) {
-> +	if (id == TEGRA_POWERGATE_3D) {
-> +		if (pmc->soc->has_gpu_clamps) {
->  			tegra_pmc_writel(0, GPU_RG_CNTRL);
->  			return 0;
->  		}
-> @@ -773,6 +775,7 @@ static const struct tegra_pmc_soc tegra20_pmc_soc = {
->  	.powergates = tegra20_powergates,
->  	.num_cpu_powergates = 0,
->  	.cpu_powergates = NULL,
-> +	.has_gpu_clamps = false,
->  };
->  
->  static const char * const tegra30_powergates[] = {
-> @@ -804,6 +807,7 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
->  	.powergates = tegra30_powergates,
->  	.num_cpu_powergates = ARRAY_SIZE(tegra30_cpu_powergates),
->  	.cpu_powergates = tegra30_cpu_powergates,
-> +	.has_gpu_clamps = false,
->  };
->  
->  static const char * const tegra114_powergates[] = {
-> @@ -839,6 +843,7 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
->  	.powergates = tegra114_powergates,
->  	.num_cpu_powergates = ARRAY_SIZE(tegra114_cpu_powergates),
->  	.cpu_powergates = tegra114_cpu_powergates,
-> +	.has_gpu_clamps = false,
->  };
->  
->  static const char * const tegra124_powergates[] = {
-> @@ -880,6 +885,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
->  	.powergates = tegra124_powergates,
->  	.num_cpu_powergates = ARRAY_SIZE(tegra124_cpu_powergates),
->  	.cpu_powergates = tegra124_cpu_powergates,
-> +	.has_gpu_clamps = true,
->  };
->  
->  static const struct of_device_id tegra_pmc_match[] = {
-> -- 
-> 2.1.3
-> 
-
-
-- Paul
+Alan
