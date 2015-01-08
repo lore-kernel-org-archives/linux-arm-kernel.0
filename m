@@ -1,97 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 08 Jan 2015 16:41:12 +0100
-Subject: [PATCH v2 7/8] ARM: mvebu: Add Device Tree description of the
- Armada 388 SoC
-In-Reply-To: <20150108155410.576bae03@free-electrons.com>
-References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>	<1420714305-7496-8-git-send-email-gregory.clement@free-electrons.com>
- <20150108155410.576bae03@free-electrons.com>
-Message-ID: <54AEA518.2080506@free-electrons.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Thu, 08 Jan 2015 10:49:44 -0500
+Subject: Query: ARM64: Behavior of el1_dbg exception while executing
+ el0_dbg
+In-Reply-To: <54AE830E.1090000@redhat.com>
+References: <54AE830E.1090000@redhat.com>
+Message-ID: <54AEA718.20502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 01/08/2015 08:15 AM, Pratyush Anand wrote:
+> Hi All,
+> 
+> I am trying to test following scenario, which seems valid to me. But I am very new to ARM64 as well as to debugging tools, so seeking expert's comment here.
+> 
+> -- I have inserted a kprobe to the function uprobe_breakpoint_handler which is called from elo_dbg (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
+> 
+> -- kprobe is enabled.
+> 
+> -- an uprobe is inserted into a test application and enabled.
+> 
+> So, when uprobe is enabled and test code execution reaches to probe instruction, it executes uprobe breakpoint instruction and el0_dbg exception is raised.
+> 
+> When control reaches to start of uprobe_breakpoint_handler and it executes first instruction (which has been replaced with a kprobe breakpoint instruction), el1_dbg exception is raised.
+> 
+> Further Call sequence goes like, el1_dbg->do_debug_exception->brk_handler->call_break_hook->kprobe_breakpoint_handler, and kprobe breakpoint handler does everything what it should have done.
+> 
+> After return from above (first) el1_dbg, second el1_dbg is raised for single steping of kprobe instruction, and instruction pointer does not matches with the kcb->ss_ctx.match_addr and so, kprobe_ss_hit fails, which is strange.
+> 
+> To debug it further, I examined ELR_EL1 value in el1_dbg after execution of first el1_dbg, and it was fffffdfffc000004.
+> 
+> So, my question is how can instruction pointer has a value fffffe0000092470(which is actually el1_inv + 0x4) when second el1_dbg is received?
+> 
+> Am I missing something or trying something which is not supported by ARM64?
+> 
+> 
+> I have put some printk in the code. You can have a detailed view of debug code and print log here:
+> 
+> https://github.com/pratyushanand/linux.git
+> 
+> branch: ml_arm64_uprobe_devel_debug_kprobe_insertion_at_uprobe_breakpoint_handler
+> 
+> 
+> ~Pratyush
 
-On 08/01/2015 15:54, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Thu,  8 Jan 2015 11:51:44 +0100, Gregory CLEMENT wrote:
->> This SoC belongs to the Armada 38x family. The main difference with
->> the Armada 385 is that the 388 can handle two more SATA
->> ports. Currently the only consequence is the use of a different
->> compatible string for the pinctrl node, in order to be able to use the
->> pins associated to this 2 new SATA ports.
-> 
-> I am not sure the pinmux is the only difference. Read on below.
-> 
->> +#include "armada-385.dtsi"
->> +
->> +/ {
->> +	model = "Marvell Armada 388 family SoC";
->> +	compatible = "marvell,armada388", "marvell,armada380";
->> +	soc {
-> 
-> Please, one empty new line between the last property (compatible) and
-> the "soc" node.
-> 
->> +		internal-regs {
->> +			pinctrl at 18000 {
->> +				compatible = "marvell,mv88f6828-pinctrl";
->> +			};
->> +		};
->> +	};
->> +};
-> 
-> So, the 380 and 385 have two SATA ports, presumably ports 0 and 1.
-> According to the Functional Specifications, section 3.1 (Internal
-> Address map), those two ports are located at 0xA8000. Ports 2 and 3,
-> which are only available on Armada 388, are located at 0xE0100 and
-> 0xE0180 according to the same datasheet. So I believe that the node:
-> 
-> 			sata at a8000 {
-> 				compatible = "marvell,armada-380-ahci";
-> 				reg = <0xa8000 0x2000>;
-> 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> 				clocks = <&gateclk 15>;
-> 				status = "disabled";
-> 			};
-> 
-> should stay where it is in armada-38x.dtsi.
-> 
-> However, the node:
-> 
-> 			sata at e0000 {
-> 				compatible = "marvell,armada-380-ahci";
-> 				reg = <0xe0000 0x2000>;
-> 				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-> 				clocks = <&gateclk 30>;
-> 				status = "disabled";
-> 			};
-> 
-> should probably move into armada-388.dtsi, since it covers ports 2 and
-> 3.
+Hi Pratyush,
 
-I will do this.
+Could the problem be that uprobe handling is already handling the breakpoint exception, so when the kprobe fires in the uprobes code it is like nested kprobes? When this happen some state information is getting clobbered and process never gets out of the nested kprobe/uprobe.  I wonder if similar failures can be trigger with kprobes in the kernel code that user-space gdb uses the handle breakpoints or hardware watchpoints/breakpoints.
 
-> 
-> In addition, I believe that the existing armada-385-db.dts and
-> armada-385-rd.dts should be renamed to armada-388-db.dts and
-> armada-388-rd.dts, and they should include armada-388.dtsi instead. At
-> least it's sure for the DB (which has both SATA controllers enabled).
-> For the RD, it remains to be confirmed, but in general most Marvell
-> development platforms use the superset SoC, which has all the
-> functionalities.
-
-The RD also uses 4 SATA ports and also the pin which are only associated
-to the Armada 388, so it seems also be this Soc. I will convert them.
-
-
-Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Will
