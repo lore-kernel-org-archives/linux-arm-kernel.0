@@ -1,71 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Jan 2015 16:43:50 -0800
-Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
-In-Reply-To: <20141226162618.GJ17430@saruman>
-References: <54991A25.2030804@compulab.co.il> <20141223161936.GA9147@saruman>
- <549AA94A.8030209@compulab.co.il> <20141224154948.GA423@saruman>
- <20141224190401.GN23854@atomide.com>
- <549BE333.9060709@compulab.co.il> <549D5CC0.2090408@linaro.org>
- <20141226152620.GF17430@saruman>
- <20141226161349.GC12409@atomide.com>
- <20141226162618.GJ17430@saruman>
-Message-ID: <20150108004349.GT13010@atomide.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed,  7 Jan 2015 16:54:39 -0800
+Subject: [PATCH] reset: sunxi: fix spinlock initialization
+Message-ID: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [141226 08:29]:
-> On Fri, Dec 26, 2014 at 08:13:49AM -0800, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [141226 07:29]:
-> > > On Fri, Dec 26, 2014 at 03:04:00PM +0200, Grygorii.Strashko at linaro.org wrote:
-> > > > >>>
-> > > > >>> Tony, your call
-> > > > 
-> > > > May be it will be good thing to split this patch. That way more
-> > > > information will be stored in commit log about which set of options
-> > > > gives us what benefits.  And also, It will allow to continue with
-> > > > agreed changes.  ?
-> > > 
-> > > can be done, but then again, it's just a defconfig change. Tony, your
-> > > call.
-> > > 
-> > > > >> I think we should move omap2plus_defconfig to be mostly modular and
-> > > > >> usable for distros as a base. Most distros prefer to build almost
-> > > > >> everything as loadable modules. And my preference is that we should
-> > > > >> only keep the minimum rootfs for devices and serial support as
-> > > > >> built-in and rely on initramfs for most drivers. And slowly move
-> > > > >> also the remaining built-in drivers to be loadable modules.
-> > > > >>
-> > > > >> The reasons for having drivers as loadable modules are many. It
-> > > > >> allows distros to use the same kernel for all the devices without
-> > > > >> bloating the kernel. It makes developing drivers easier as just the
-> > > > >> module needs to be reloaded. And loadable modules protect us from
-> > > > >> cross-framework spaghetti calls in the kernel as the interfaces are
-> > > > >> clearly defined.
-> > > > >>
-> > > > >> Are there people really using SATA as rootfs right now on omaps?
-> > > > > 
-> > > > > Yes. That is exactly my point.
-> > > > > 
-> > > > 
-> > > > From my side I'd like to note that I know about few ongoing projects
-> > > > on DRA7x EVM where SATA is used as rootfs - now It is the fast
-> > > > possible way to start Android.
-> > > 
-> > > now this is something different. This is evidence that there are people
-> > > relying on SATA on rootfs. I'll leave to Tony again.
-> > 
-> > OK sounds like people are really using SATA as rootfs, so we might as
-> > well keep it built in then. And it does not affect the PM on the devices
-> > that do have PM working, that has been a problem with having some
-> > drivers built-in.
-> > 
-> > We can still work towards making the current rootfs device drivers
-> > into loadable modules in the long term :)
-> 
-> Here's v3:
+Call spin_lock_init() before the spinlocks are used, preventing a lockdep
+splat.
 
-Thanks, applying this into omap-for-v3.20/defconfig.
+I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+and has been tested on a few other sunxi platforms without issue.
 
-Regards,
+[1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+[2] http://kernelci.org/boot/?a80-optimus
 
-Tony
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+---
+This patch was tested on 3.19.0-rc3 
+
+ drivers/reset/reset-sunxi.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+index eebc52c..e37250c 100644
+--- a/drivers/reset/reset-sunxi.c
++++ b/drivers/reset/reset-sunxi.c
+@@ -157,6 +157,8 @@ static int sunxi_reset_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->membase))
+ 		return PTR_ERR(data->membase);
+ 
++	spin_lock_init(&data->lock);
++
+ 	data->rcdev.owner = THIS_MODULE;
+ 	data->rcdev.nr_resets = resource_size(res) * 32;
+ 	data->rcdev.ops = &sunxi_reset_ops;
+-- 
+2.1.3
