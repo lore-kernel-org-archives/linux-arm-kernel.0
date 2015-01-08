@@ -1,49 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 16:08:08 +0100
-Subject: [PATCH] ARM: mvebu: Update the SoC ID and revision definitions
-Message-ID: <1420729688-31882-1-git-send-email-gregory.clement@free-electrons.com>
+From: mhocko@suse.cz (Michal Hocko)
+Date: Thu, 8 Jan 2015 16:08:50 +0100
+Subject: Linux 3.19-rc3
+In-Reply-To: <54AE7D53.2020305@redhat.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com>
+Message-ID: <20150108150850.GD5658@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing SoC and revision ID for the Armada 370 and 38x SoCs.
+[CCing linux-mm and CMA people]
+[Full message here:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/383669]
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/mvebu-soc-id.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+On Thu 08-01-15 06:51:31, Mark Langsdorf wrote:
+[...]
+> [ 1053.968815] active_anon:207417 inactive_anon:25722 isolated_anon:0
+> [ 1053.968815]  active_file:1300 inactive_file:21234 isolated_file:0
+> [ 1053.968815]  unevictable:0 dirty:0 writeback:0 unstable:0
+> [ 1053.968815]  free:1014 slab_reclaimable:1047 slab_unreclaimable:1758
+> [ 1053.968815]  mapped:733 shmem:58 pagetables:267 bounce:0
+> [ 1053.968815]  free_cma:1
 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.h b/arch/arm/mach-mvebu/mvebu-soc-id.h
-index c16bb68ca81f..e124a0b82a3e 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.h
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.h
-@@ -20,10 +20,28 @@
- #define MV78XX0_A0_REV	    0x1
- #define MV78XX0_B0_REV	    0x2
- 
-+/* Amada 370 ID */
-+#define ARMADA_370_DEV_ID   0x6710
-+
-+/* Amada 370 Revision */
-+#define ARMADA_370_A1_REV   0x1
-+
-+/* Armada 375 ID */
-+#define ARMADA_375_DEV_ID   0x6720
-+
- /* Armada 375 */
- #define ARMADA_375_Z1_REV   0x0
- #define ARMADA_375_A0_REV   0x3
- 
-+/* Armada 38x ID */
-+#define ARMADA_380_DEV_ID   0x6810
-+#define ARMADA_385_DEV_ID   0x6820
-+#define ARMADA_388_DEV_ID   0x6828
-+
-+/* Armada 38x Revision */
-+#define ARMADA_38x_Z1_REV   0x0
-+#define ARMADA_38x_A0_REV   0x4
-+
- #ifdef CONFIG_ARCH_MVEBU
- int mvebu_get_soc_id(u32 *dev, u32 *rev);
- #else
+Still a lot of pages (~80M) on the file LRU list which should be reclaimable
+because they are not dirty apparently.
+Anon pages can be reclaimed as well because the swap is basically
+unused.
+
+[...]
+> [ 1054.095277] DMA: 109*64kB (UR) 53*128kB (R) 8*256kB (R) 0*512kB 0*1024kB
+> 0*2048kB 1*4096kB (R) 0*8192kB 0*16384kB 1*32768kB (R) 0*65536kB = 52672kB
+> [ 1054.108621] Normal: 191*64kB (MR) 0*128kB 0*256kB 0*512kB 0*1024kB
+> 0*2048kB 0*4096kB 0*8192kB 0*16384kB 0*32768kB 0*65536kB = 12224kB
+[...]
+> [ 1054.142545] Free swap  = 6598400kB
+> [ 1054.145928] Total swap = 8388544kB
+> [ 1054.149317] 262112 pages RAM
+> [ 1054.152180] 0 pages HighMem/MovableOnly
+> [ 1054.155995] 18446744073709544361 pages reserved
+> [ 1054.160505] 8192 pages cma reserved
+
+Besides underflow in the reserved pages accounting mentioned in other
+email the free lists look strange as well. All free blocks with some memory
+are marked as reserved. I would suspect something CMA related.
+
 -- 
-1.9.1
+Michal Hocko
+SUSE Labs
