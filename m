@@ -1,75 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Jan 2015 09:54:58 +0000
-Subject: [PATCH] arm64/efi: add missing call to early_ioremap_reset()
-Message-ID: <1420710898-32298-1-git-send-email-ard.biesheuvel@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 08 Jan 2015 11:02:54 +0100
+Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
+ if MCPM is unavailable
+In-Reply-To: <54AE4ADF.3030307@arm.com>
+References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
+ <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
+Message-ID: <54AE55CE.6040201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early ioremap support introduced by patch bf4b558eba92
-("arm64: add early_ioremap support") failed to add a call to
-early_ioremap_reset() at an appropriate time. Without this call,
-invocations of early_ioremap etc. that are done too late will go
-unnoticed and may cause corruption.
+On 01/08/2015 10:16 AM, Sudeep Holla wrote:
+> Hi Daniel,
+>
+> On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
+>> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
+>>> If big.LITTLE driver is initialized even when MCPM is unavailable,
+>>> we get the below warning the first time cpu tries to enter deeper
+>>> C-states.
+>>
+>> Can you elaborate why MCPM could be unavailable when the tc2 pm code
+>> registers the mcpm platform ops before the cpuidle driver ?
+>>
+>>
+> I can think of 3 possible scenarios. Let me know if these make sense.
+>
+> 1. If the firmware settings in Vexpress configuration files are set to
+>     boot in legacy mode, but MCPM is enabled in the kernel.
 
-This is exactly what happened when the first user of this feature
-was added in patch f84d02755f5a ("arm64: add EFI runtime services").
-The early mapping of the EFI memory map is unmapped during an early
-initcall, at which time the early ioremap support is long gone.
+If I am not wrong, we have a BUG_ON in this path, right ?
 
-Fix by adding the missing call to early_ioremap_reset() to
-setup_arch(), and move the offending early_memunmap() to right after
-the point where the early mapping of the EFI memory map is last used.
+> 2. If some failure occurs during MCPM initialization
+> 3. For example, if CCI is not accessible as in some Exynos boards [1],
+>     we don't want to wait till mpcm_cpu_suspend ?
 
-Fixes: f84d02755f5a ("arm64: add EFI runtime services")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+Well, I think if the firmware is preventing us to play with the CCI but 
+MCPM is enabled. We should add BUG_ON also in the same initialization 
+path. IIRC, Kevin spent some time to figure out what was happening to 
+its odroid-xu3 board before understanding mcpm wasn't able to deal with 
+the CCI due to the broken firmware.
 
-After discussing off-list between Mark Salter, Leif and myself, this is the
-bare minimum to fix the early ioremap issue in kernels up to 3.19, combined
-into a single patch. Considering that the early_ioremap support was added in
-3.15 (eol), but not used until EFI runtime services support was added in 3.16,
-there is no reason to split this up. Also, we have work underway to drastically
-change the way runtime services etc are mapped during early boot [which we hope
-will make it into 3.20] so it makes sense to do the bare minimum here and handle
-any fallout in terms of style etc later.
+The patch you are proposing is valid. Nevertheless, I would really like 
+to have the firmwares to be fixed and your patch is hiding an 
+incompatible firmware with the kernel configuration and letting the 
+kernel continue to work in degraded mode.
 
- arch/arm64/kernel/efi.c   | 2 +-
- arch/arm64/kernel/setup.c | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+IMO, it would be better to be more strict with the mcpm initialization 
+and not let the system boot if something is wrong with it which I 
+believe is coming from the firmware and let the user to figure out what 
+is really happening by letting him to disable mcpm in the kernel 
+configuration (which in turn will disable cpuidle).
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 6fac253bc783..2bb4347d0edf 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -326,6 +326,7 @@ void __init efi_idmap_init(void)
- 
- 	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
- 	efi_setup_idmap();
-+	early_memunmap(memmap.map, memmap.map_end - memmap.map);
- }
- 
- static int __init remap_region(efi_memory_desc_t *md, void **new)
-@@ -380,7 +381,6 @@ static int __init arm64_enter_virtual_mode(void)
- 	}
- 
- 	mapsize = memmap.map_end - memmap.map;
--	early_memunmap(memmap.map, mapsize);
- 
- 	if (efi_runtime_disabled()) {
- 		pr_info("EFI runtime services will be disabled.\n");
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index b80991166754..20fe2932ad0c 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -402,6 +402,7 @@ void __init setup_arch(char **cmdline_p)
- 	request_standard_resources();
- 
- 	efi_idmap_init();
-+	early_ioremap_reset();
- 
- 	unflatten_device_tree();
- 
+Nico, Kevin, what is your opinion ?
+
+
+
+> [1]
+> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg39624.html
+
+
+
 -- 
-1.8.3.2
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
