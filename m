@@ -1,91 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Jan 2015 16:20:37 -0800
-Subject: [PATCH V4] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan
- node
-In-Reply-To: <20150105172718.GJ19336@saruman>
-References: <1420475549-28492-1-git-send-email-nm@ti.com>
- <20150105172718.GJ19336@saruman>
-Message-ID: <20150108002037.GS13010@atomide.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed,  7 Jan 2015 17:33:35 -0700
+Subject: [PATCH V3 4/7] arm64: dts: Add Designware GPIO dts binding to APM
+ X-Gene platform
+In-Reply-To: <1420677218-30743-1-git-send-email-fkan@apm.com>
+References: <1420677218-30743-1-git-send-email-fkan@apm.com>
+Message-ID: <1420677218-30743-5-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150105 09:30]:
-> On Mon, Jan 05, 2015 at 10:32:29AM -0600, Nishanth Menon wrote:
-> > TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
-> > a fan (such as AFB02505HHB) over J1 connector for various purposes.
-> > Provide device tree node to enable the same.
-> > 
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> 
-> have already reviewed this one previously:
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+Add Designware GPIO dts binding to APM X-Gene platform
 
-Applying this into omap-for-v3.20/dt instead of the
-earlier version thanks.
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+ arch/arm64/boot/dts/apm/apm-storm.dtsi |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-Tony
-
-> > ---
-> > V4: Change format of the speed-map used.
-> > V3: https://patchwork.kernel.org/patch/5562121/
-> > V2: https://patchwork.kernel.org/patch/5445111/
-> > V1: https://patchwork.kernel.org/patch/5444911/
-> > 
-> > Enable and disable can be controlled by (post the RPM, it finds
-> > closest match - even a 1 will do)
-> > 
-> > echo '13000' > /sys/class/hwmon/hwmon0/fan1_target
-> > and
-> > echo '0' > /sys/class/hwmon/hwmon0/fan1_target
-> > 
-> > Test log: http://slexy.org/view/s2T0ajh46z
-> > 
-> > requires CONFIG_GPIO_PALMAS and CONFIG_SENSORS_GPIO_FAN to be operational
-> > Applies on v3.19-rc1
-> > 
-> >  arch/arm/boot/dts/am57xx-beagle-x15.dts |   14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> > index 6c2e8e4..c5d4cea 100644
-> > --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> > +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> > @@ -80,6 +80,14 @@
-> >  			default-state = "off";
-> >  		};
-> >  	};
-> > +
-> > +	gpio_fan: gpio_fan {
-> > +		/* Based on 5v 500mA AFB02505HHB */
-> > +		compatible = "gpio-fan";
-> > +		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
-> > +		gpio-fan,speed-map = <0     0>,
-> > +				     <13000 1>;
-> > +	};
-> >  };
-> >  
-> >  &dra7_pmx_core {
-> > @@ -394,6 +402,12 @@
-> >  			wakeup-source;
-> >  			ti,palmas-long-press-seconds = <12>;
-> >  		};
-> > +
-> > +		tps659038_gpio: tps659038_gpio {
-> > +			compatible = "ti,palmas-gpio";
-> > +			gpio-controller;
-> > +			#gpio-cells = <2>;
-> > +		};
-> >  	};
-> >  
-> >  	tmp102: tmp102 at 48 {
-> > -- 
-> > 1.7.9.5
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> -- 
-> balbi
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index f31e8df..a58f9a2 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -525,6 +525,21 @@
+ 			interrupts = <0x0 0x4f 0x4>;
+ 		};
+ 
++		dwgpio: gpio at 1c024000 {
++			compatible = "snps,dw-apb-gpio";
++			reg = <0x0 0x1c024000 0x0 0x1000>;
++			reg-io-width = <4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			porta: gpio-controller at 0 {
++				compatible = "snps,dw-apb-gpio-port";
++				gpio-controller;
++				snps,nr-gpios = <32>;
++				reg = <0>;
++			};
++		};
++
+ 		phy1: phy at 1f21a000 {
+ 			compatible = "apm,xgene-phy";
+ 			reg = <0x0 0x1f21a000 0x0 0x100>;
+-- 
+1.7.1
