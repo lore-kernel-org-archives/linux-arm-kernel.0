@@ -1,82 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Jan 2015 16:06:26 +0000
-Subject: [PATCH v3 3/4] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <1420656594-8908-4-git-send-email-m-karicheri2@ti.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <1420656594-8908-4-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150108160626.GN11583@arm.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 08 Jan 2015 11:11:51 -0500
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+In-Reply-To: <20150108131008.16c9a31c@lxorguk.ukuu.org.uk>
+References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
+ <20150108131008.16c9a31c@lxorguk.ukuu.org.uk>
+Message-ID: <54AEAC47.1040403@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 06:49:53PM +0000, Murali Karicheri wrote:
-> Add of_pci_dma_configure() to allow updating the dma configuration
-> of the pci device using the configuration from DT of the parent of
-> the root bridge device.
+On 01/08/2015 08:10 AM, One Thousand Gnomes wrote:
+> On Mon,  5 Jan 2015 22:09:45 -0500
+> Peter Hurley <peter@hurleysoftware.com> wrote:
 > 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  drivers/of/of_pci.c    |   39 +++++++++++++++++++++++++++++++++++++++
->  include/linux/of_pci.h |   12 ++++++++++++
->  2 files changed, 51 insertions(+)
+>> Some arches have no need to create unprobed 8250 ports; these phantom
+>> ports are primarily required for ISA ports which have no probe
+>> mechanism or to provide non-operational ports for userspace to
+>> configure (via TIOCSSERIAL and TIOCSERCONFIG ioctls).
+>>
+>> Provide CONFIG_SERIAL_8250_PHANTOM_UARTS knob to disable phantom port
+>> registration; ie., CONFIG_SERIAL_8250_PHANTOM_UARTS=N only registers
+>> probed ports (ACPI/PNP, "serial8250" platform devices, PCI, etc).
 > 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 88471d3..34878c9 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -2,6 +2,7 @@
->  #include <linux/export.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_pci.h>
->  #include <linux/slab.h>
->  
-> @@ -229,6 +230,44 @@ parse_failed:
->  	return err;
->  }
->  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-> +
-> +/**
-> + * of_get_pci_root_bridge_parent - get the OF node of the root bridge's parent
-> + * @dev: ptr to pci_dev struct of the pci device
-> + *
-> + * This function will traverse the bus up to the root bus starting with
-> + * the child and return the OF node ptr to root bridge device's parent device.
-> + */
-> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
-> +{
-> +	struct pci_bus *bus = dev->bus;
-> +	struct device *bridge;
-> +
-> +	while (!pci_is_root_bus(bus))
-> +		bus = bus->parent;
-> +	bridge = bus->bridge;
-> +
-> +	return bridge->parent->of_node;
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
-> +
-> +/**
-> + * of_pci_dma_configure - Setup DMA configuration
-> + * @dev: ptr to pci_dev struct of the pci device
-> + *
-> + * Function to update PCI devices's DMA configuration using the same
-> + * info from the OF node of root host bridge's parent.
-> + */
-> +void of_pci_dma_configure(struct pci_dev *pci_dev)
-> +{
-> +	struct device *dev = &pci_dev->dev;
-> +	struct device_node *parent_np;
-> +
-> +	parent_np = of_get_pci_root_bridge_parent(pci_dev);
-> +	of_dma_configure(dev, parent_np);
-> +}
-> +EXPORT_SYMBOL_GPL(of_pci_dma_configure);
+> Just #define serial8250_isa_devs to 0 on such platforms. gcc should then
+> be bright enough to do the rest for you.
 
-Whilst I think this is the right overall structure, I think this function
-should determine the set of DMA aliases for the device and pass that through
-to the IOMMU (as mentioned in my reply to the cover letter). Then we just
-need to work out what we're doing for groups.
+Well, this patch has the "advantage" of allowing the user to override
+the config and create blank ports anyway.
 
-Will
+That said, I'm exploring a completely different approach: I've split the
+driver from the port operations. The idea being that the existing
+"universal" driver supports everything it does now, while allowing for
+a new driver(s) to only support a subset.
+
+At this point, I've only done the actual split. So the "universal" driver
+module has:
+ * ISA/"serial8250" platform driver
+ * PNP init
+ * uart driver and console definitions
+ * all the existing module parameters
+ * all the globals (except the const uart_config[] table)
+ * RSA port handling
+ * Chained interrupt handling
+ * port i/o by timer handling
+ * early_serial_setup()
+ * sun ttyS shared registration
+ * serial8250_ports[] table and how it re-uses existing ports
+
+The "universal" driver also has the sub-driver interface, which is:
+ * serial8250_register_8250_port
+ * serial8250_unregister_port
+ * serial8250_suspend/resume_port
+ * serial8250_find_port (hack for 8250_early)
+ * serial8250_get_port (hack for runtime pm)
+
+This interface is just storage and minor allocation, since the
+port-reuse behavior will be limited to the "universal" driver.
+>From a sub-driver perspective, the shared storage is actually
+a hindrance, so that reduces the requirement to minor allocation.
+
+And that's where I'm stuck at the moment -- how to share ttyS
+minor allocation. ttyS console is a related problem.
+
+Regards,
+Peter Hurley
