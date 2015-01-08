@@ -1,95 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  8 Jan 2015 17:06:10 +0000
-Subject: [PATCH v2 6/8] irqchip: GICv2m: Get rid of struct msi_controller
+Date: Thu,  8 Jan 2015 17:06:12 +0000
+Subject: [PATCH v2 8/8] PCI/MSI: Drop domain field from msi_controller
 In-Reply-To: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
 References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420736772-11088-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420736772-11088-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GICv2m only uses the msi_controller structure as a way to match
-the PHB with its MSI HW, and thus the msi_domain. But now that
-we can directly associate an msi_domain with a device, there is
-no use keeping this msi_controller around.
-
-Just remove all traces of msi_controller from the driver.
+The only two users of that field are not using the msi_controller
+structure anymore, so drop it altogether.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v2m.c | 26 +++++++++-----------------
- 1 file changed, 9 insertions(+), 17 deletions(-)
+ drivers/pci/msi.c   | 2 --
+ include/linux/msi.h | 3 ---
+ 2 files changed, 5 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index fdf7065..a76b802 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -45,7 +45,6 @@
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 003040b..a36894f 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -42,8 +42,6 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
+ 	struct irq_domain *domain = NULL;
  
- struct v2m_data {
- 	spinlock_t msi_cnt_lock;
--	struct msi_controller mchip;
- 	struct resource res;	/* GICv2m resource */
- 	void __iomem *base;	/* GICv2m virt address */
- 	u32 spi_start;		/* The SPI number that MSIs start */
-@@ -218,6 +217,7 @@ static int __init gicv2m_init_one(struct device_node *node,
- {
- 	int ret;
- 	struct v2m_data *v2m;
-+	struct irq_domain *inner_domain;
+ 	domain = dev_get_msi_domain(&dev->dev);
+-	if (!domain && dev->bus->msi)
+-		domain = dev->bus->msi->domain;
+ 	if (!domain)
+ 		domain = arch_get_pci_msi_domain(dev);
  
- 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
- 	if (!v2m) {
-@@ -261,19 +261,17 @@ static int __init gicv2m_init_one(struct device_node *node,
- 		goto err_iounmap;
- 	}
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 8ac4a68..692f217 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -108,9 +108,6 @@ struct msi_controller {
+ 	struct device *dev;
+ 	struct device_node *of_node;
+ 	struct list_head list;
+-#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+-	struct irq_domain *domain;
+-#endif
  
--	v2m->domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
--	if (!v2m->domain) {
-+	inner_domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
-+	if (!inner_domain) {
- 		pr_err("Failed to create GICv2m domain\n");
- 		ret = -ENOMEM;
- 		goto err_free_bm;
- 	}
- 
--	v2m->domain->parent = parent;
--	v2m->mchip.of_node = node;
--	v2m->mchip.domain = pci_msi_create_irq_domain(node,
--						      &gicv2m_msi_domain_info,
--						      v2m->domain);
--	if (!v2m->mchip.domain) {
-+	inner_domain->parent = parent;
-+	v2m->domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
-+						inner_domain);
-+	if (!v2m->domain) {
- 		pr_err("Failed to create MSI domain\n");
- 		ret = -ENOMEM;
- 		goto err_free_domains;
-@@ -281,12 +279,6 @@ static int __init gicv2m_init_one(struct device_node *node,
- 
- 	spin_lock_init(&v2m->msi_cnt_lock);
- 
--	ret = of_pci_msi_chip_add(&v2m->mchip);
--	if (ret) {
--		pr_err("Failed to add msi_chip.\n");
--		goto err_free_domains;
--	}
--
- 	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
- 		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
- 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-@@ -294,10 +286,10 @@ static int __init gicv2m_init_one(struct device_node *node,
- 	return 0;
- 
- err_free_domains:
--	if (v2m->mchip.domain)
--		irq_domain_remove(v2m->mchip.domain);
- 	if (v2m->domain)
- 		irq_domain_remove(v2m->domain);
-+	if (inner_domain)
-+		irq_domain_remove(inner_domain);
- err_free_bm:
- 	kfree(v2m->bm);
- err_iounmap:
+ 	int (*setup_irq)(struct msi_controller *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
 -- 
 2.1.4
