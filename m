@@ -1,50 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 8 Jan 2015 15:56:41 +0100
-Subject: [PATCH v2 6/8] ARM: mvebu: Document the Device Tree binding for
- the Armada 388 SoC
-In-Reply-To: <1420714305-7496-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
- <1420714305-7496-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150108155641.610488a1@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Jan 2015 09:06:09 -0600
+Subject: [PATCH v2 02/21] irqchip: tegra: add DT-based support for legacy
+ interrupt controller
+In-Reply-To: <1420652576-22309-3-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108150608.GA24654@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Thu,  8 Jan 2015 11:51:43 +0100, Gregory CLEMENT wrote:
-> Update the binding documentation of the Armada 38x Soc family with
-> the Armada 388.
+On 17:42-20150107, Marc Zyngier wrote:
+> Tegra's LIC (Legacy Interrupt Controller) has been so far only
+> supported as a weird extension of the GIC, which is not exactly
+> pretty.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> The stacked irq domain framework fits this pretty well, and allows
+> the LIC code to be turned into a standalone irqchip. In the process,
+> make the driver DT aware, something that was sorely missing from
+> the mach-tegra implementation.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  Documentation/devicetree/bindings/arm/armada-38x.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
-> index ad9f8ed4d9bd..202953f1887e 100644
-> --- a/Documentation/devicetree/bindings/arm/armada-38x.txt
-> +++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
-> @@ -15,6 +15,13 @@ Required root node property:
->  
->  compatible: must contain "marvell,armada385"
->  
-> +In addition, boards using the Marvell Armada 388 SoC shall have the
-> +following property before the previous one:
 
-So before "marvell,armada385" ? So we want to have:
+Saw a few checkpatch warnings as below: all of them seem minors.
 
- compatible = "<board>", "marvell,armada388", "marvell,armada385", "marvell,armada380";
-
- ?
-
-That's not what you do in the new armada-385-gp.dts. The 388 is a
-superset of the 385, which itself is a superset of the 380. Should this
-be reflected in this list of compatible strings?
-
-Thanks,
-
-Thomas
+@@ -0,0 +1,35 @@
++WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
++#36: 
++new file mode 100644
++WARNING: line over 80 characters
++#169: FILE: drivers/irqchip/irq-tegra.c:129:
+++		tegra_ictlr_info->cpu_ier[i] = readl_relaxed(ictlr + ICTLR_CPU_IER);
++WARNING: line over 80 characters
++#170: FILE: drivers/irqchip/irq-tegra.c:130:
+++		tegra_ictlr_info->cpu_iep[i] = readl_relaxed(ictlr + ICTLR_CPU_IEP_CLASS);
++WARNING: line over 80 characters
++#171: FILE: drivers/irqchip/irq-tegra.c:131:
+++		tegra_ictlr_info->cop_ier[i] = readl_relaxed(ictlr + ICTLR_COP_IER);
++WARNING: line over 80 characters
++#172: FILE: drivers/irqchip/irq-tegra.c:132:
+++		tegra_ictlr_info->cop_iep[i] = readl_relaxed(ictlr + ICTLR_COP_IEP_CLASS);
++WARNING: line over 80 characters
++#181: FILE: drivers/irqchip/irq-tegra.c:141:
+++		writel_relaxed(tegra_ictlr_info->ictlr_wake_mask[i], ictlr + ICTLR_CPU_IER_SET);
++WARNING: Missing a blank line after declarations
++#196: FILE: drivers/irqchip/irq-tegra.c:156:
+++		void __iomem *ictlr = tegra_ictlr_info->ictlr_reg_base[i];
+++		writel_relaxed(tegra_ictlr_info->cpu_iep[i],
++WARNING: line over 80 characters
++#284: FILE: drivers/irqchip/irq-tegra.c:244:
+++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
++CHECK: Please don't use multiple blank lines
++#287: FILE: drivers/irqchip/irq-tegra.c:247:
+++
+++
++WARNING: Missing a blank line after declarations
++#296: FILE: drivers/irqchip/irq-tegra.c:256:
+++		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
+++		irq_domain_reset_irq_data(d);
+`
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+Nishanth Menon
