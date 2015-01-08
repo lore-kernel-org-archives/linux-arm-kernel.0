@@ -1,32 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Jan 2015 17:36:00 +0000
-Subject: [RFC 2/8] ARM64: Refactor kprobes-arm64
-In-Reply-To: <54AEBF54.7000704@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <9a86c217f387f45568c18b724024b0d3e040d2c6.1420038188.git.panand@redhat.com>
- <20150108165557.GQ11583@arm.com> <54AEBF54.7000704@redhat.com>
-Message-ID: <20150108173600.GW11583@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 08 Jan 2015 18:47:45 +0100
+Subject: [PATCH v4 07/12] ARM: mvebu: Add Armada 385 Access Point
+ Development Board support
+In-Reply-To: <20150108184416.3feb0e02@free-electrons.com>
+References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>	<1420738694-6163-8-git-send-email-gregory.clement@free-electrons.com>
+ <20150108184416.3feb0e02@free-electrons.com>
+Message-ID: <54AEC2C1.2080408@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 05:33:08PM +0000, Pratyush Anand wrote:
-> On Thursday 08 January 2015 10:25 PM, Will Deacon wrote:
-> > On Wed, Dec 31, 2014 at 03:21:18PM +0000, Pratyush Anand wrote:
-> >> Most of the stuff of kprobes-arm64.c can also be used by uprobes.c. So
-> >> move all those part to common code area. In the process rename kprobe to
-> >> probe whereever possible.
-> >>
-> >> No functional change.
-> >
-> > In which case, can you merge this into the kprobes series (which we haven't
-> > merged yet)?
-> >
+Hi Thomas,
+
+On 08/01/2015 18:44, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
 > 
-> Yes, thats why these are just RFCs. I will send next version of uprobe 
-> only after kprobe patches are accepted into maintainer's tree.
+> On Thu,  8 Jan 2015 18:38:09 +0100, Gregory CLEMENT wrote:
+> 
+>> +#include "armada-385.dtsi"
+> 
+> Is it an Armada 385 or an Armada 388 ?
 
-Ok, but it also makes sense to make kprobes refactoring changes *before* the
-patches are merged, as that reduces churn in mainline whilst you don't have
-any other dependencies.
+I checked it and there is no SATA ports on the board and the SoC presented
+itself as an Armada 385: the revision ID is 0x6820.
 
-Will
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
