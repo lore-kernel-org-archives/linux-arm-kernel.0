@@ -1,21 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Jan 2015 16:55:57 +0000
-Subject: [RFC 2/8] ARM64: Refactor kprobes-arm64
-In-Reply-To: <9a86c217f387f45568c18b724024b0d3e040d2c6.1420038188.git.panand@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <9a86c217f387f45568c18b724024b0d3e040d2c6.1420038188.git.panand@redhat.com>
-Message-ID: <20150108165557.GQ11583@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Jan 2015 10:57:17 -0600
+Subject: [PATCH v2 14/21] ARM: imx6: convert GPC to stacked domains
+In-Reply-To: <1420652576-22309-15-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108165717.GA19124@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 31, 2014 at 03:21:18PM +0000, Pratyush Anand wrote:
-> Most of the stuff of kprobes-arm64.c can also be used by uprobes.c. So
-> move all those part to common code area. In the process rename kprobe to
-> probe whereever possible.
+On 17:42-20150107, Marc Zyngier wrote:
+> IMX6 has been (ab)using the gic_arch_extn to provide
+> wakeup from suspend, and it makes a lot of sense to convert
+> this code to use stacked domains instead.
 > 
-> No functional change.
+> This patch does just this, updating the DT files to actually
+> reflect what the HW provides.
+> 
+minor checkpatch warnings below:
 
-In which case, can you merge this into the kprobes series (which we haven't
-merged yet)?
-
-Will
+@@ -0,0 +1,14 @@
++CHECK: Alignment should match open parenthesis
++#249: FILE: arch/arm/mach-imx/gpc.c:158:
+++static int imx_gpc_domain_alloc(struct irq_domain *domain,
+++				  unsigned int virq,
++WARNING: line over 80 characters
++#272: FILE: arch/arm/mach-imx/gpc.c:181:
+++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
++ERROR: code indent should use tabs where possible
++#305: FILE: arch/arm/mach-imx/gpc.c:209:
+++^I        return -ENOMEM;$
++NOTE: whitespace errors detected, you may wish to use scripts/cleanpatch or
++      scripts/cleanfile
+-- 
+Regards,
+Nishanth Menon
