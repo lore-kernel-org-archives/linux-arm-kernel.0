@@ -1,89 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Jan 2015 15:39:37 +0100
-Subject: [PATCH v3 1/7] ARM: mvebu: Rename DEBUG_LL to indicate UART index
+Date: Thu,  8 Jan 2015 15:39:42 +0100
+Subject: [PATCH v3 6/7] ARM: mvebu: Add a number of pinctrl functions
 In-Reply-To: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420727983-23922-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1420727983-23922-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu SoCs actually have more UARTs than just the one exposed in DEBUG_LL
-yet.
-
-In order to differentiate them, Add the index in the configuration options and
-their help.
+Some pinctrl functions can be shared with all DTS out there, since they are
+generic, SoC-wide muxing options. Add a number of these to the DTSI to avoid
+duplication.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/Kconfig.debug | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/armada-38x.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5ddd4906f7a7..eb3991cf63ab 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -455,13 +455,13 @@ choice
- 		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE configuration
- 		  options based on your needs.
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 40200084c6c8..98885c58be29 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -195,6 +195,45 @@
  
--	config DEBUG_MVEBU_UART
--		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
-+	config DEBUG_MVEBU_UART0
-+		bool "Kernel low-level debugging messages via MVEBU UART0 (old bootloaders)"
- 		depends on ARCH_MVEBU
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  on MVEBU based platforms.
-+		  on MVEBU based platforms on UART0.
+ 			pinctrl at 18000 {
+ 				reg = <0x18000 0x20>;
++
++				ge0_rgmii_pins: ge-rgmii-pins-0 {
++					marvell,pins = "mpp6", "mpp7", "mpp8",
++						       "mpp9", "mpp10", "mpp11",
++						       "mpp12", "mpp13", "mpp14",
++						       "mpp15", "mpp16", "mpp17";
++					marvell,function = "ge0";
++				};
++
++				i2c0_pins: i2c-pins-0 {
++					marvell,pins = "mpp2", "mpp3";
++					marvell,function = "i2c0";
++				};
++
++				mdio_pins: mdio-pins {
++					marvell,pins = "mpp4", "mpp5";
++					marvell,function = "ge";
++				};
++
++				ref_clk0_pins: ref-clk-pins-0 {
++					marvell,pins = "mpp45";
++					marvell,function = "ref";
++				};
++
++				spi1_pins: spi-pins-1 {
++					marvell,pins = "mpp56", "mpp57", "mpp58",
++						       "mpp59";
++					marvell,function = "spi1";
++				};
++
++				uart0_pins: uart-pins-0 {
++					marvell,pins = "mpp0", "mpp1";
++					marvell,function = "ua0";
++				};
++
++				uart1_pins: uart-pins-1 {
++					marvell,pins = "mpp19", "mpp20";
++					marvell,function = "ua1";
++				};
+ 			};
  
- 		  This option should be used with the old bootloaders
- 		  that left the internal registers mapped at
-@@ -474,13 +474,13 @@ choice
- 		  when u-boot hands over to the kernel, the system
- 		  silently crashes, with no serial output at all.
- 
--	config DEBUG_MVEBU_UART_ALTERNATE
--		bool "Kernel low-level debugging messages via MVEBU UART (new bootloaders)"
-+	config DEBUG_MVEBU_UART0_ALTERNATE
-+		bool "Kernel low-level debugging messages via MVEBU UART0 (new bootloaders)"
- 		depends on ARCH_MVEBU
- 		select DEBUG_UART_8250
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  on MVEBU based platforms.
-+		  on MVEBU based platforms on UART0.
- 
- 		  This option should be used with the new bootloaders
- 		  that remap the internal registers at 0xf1000000.
-@@ -1282,7 +1282,7 @@ config DEBUG_UART_PHYS
- 	default 0xc8000000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
- 	default 0xc8000003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
- 	default 0xd0000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
--	default 0xd0012000 if DEBUG_MVEBU_UART
-+	default 0xd0012000 if DEBUG_MVEBU_UART0
- 	default 0xc81004c0 if DEBUG_MESON_UARTAO
- 	default 0xd4017000 if DEBUG_MMP_UART2
- 	default 0xd4018000 if DEBUG_MMP_UART3
-@@ -1296,7 +1296,7 @@ config DEBUG_UART_PHYS
- 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf040ab00 if DEBUG_BRCMSTB_UART
--	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
-+	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
- 	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
- 				ARCH_ORION5X
- 	default 0xf7fc9000 if DEBUG_BERLIN_UART
-@@ -1377,7 +1377,7 @@ config DEBUG_UART_VIRT
- 	default 0xfeb30c00 if DEBUG_KEYSTONE_UART0
- 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
- 	default 0xfec02000 if DEBUG_SOCFPGA_UART
--	default 0xfec12000 if DEBUG_MVEBU_UART || DEBUG_MVEBU_UART_ALTERNATE
-+	default 0xfec12000 if DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE
- 	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
- 	default 0xfec90000 if DEBUG_RK32_UART2
- 	default 0xfed0c000 if DEBUG_DAVINCI_DA8XX_UART1
+ 			gpio0: gpio at 18100 {
 -- 
 2.2.1
