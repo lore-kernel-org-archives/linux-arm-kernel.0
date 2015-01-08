@@ -1,173 +1,271 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 8 Jan 2015 09:29:06 +0800
-Subject: [PATCH 0/8] arm64: improved memory map handling for /dev/mem,
- ACPI etc
-In-Reply-To: <CAKv+Gu9DQLZnvNyF0qdk5jSH6=NvdsKYTX+E46U=kGRzCEfwHg@mail.gmail.com>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
- <20141226093528.GA26133@darkstar.redhat.com>
- <CAKv+Gu_1VCJK7y5U9H-mhjjN6AFW8+SGvbKUZfuzx6qGEpVg0A@mail.gmail.com>
- <20141230092514.GF2457@darkstar.redhat.com>
- <CAKv+Gu_Ou6Fv7-AUcpbUJAijwEJ8=PCB1mQU3mCfctLFAMhu_w@mail.gmail.com>
- <20150104081905.GA6231@darkstar.redhat.com>
- <CAKv+Gu-P7AeMNveZMe814FgrEr_z26vaYKWa=borKoPSc76Y6g@mail.gmail.com>
- <20150106081635.GE2113@darkstar.redhat.com>
- <CAKv+Gu9DQLZnvNyF0qdk5jSH6=NvdsKYTX+E46U=kGRzCEfwHg@mail.gmail.com>
-Message-ID: <20150108012906.GA2449@darkstar.redhat.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 08 Jan 2015 10:36:32 +0900
+Subject: [PATCH v3 1/4] mmc: dw_mmc: exynos: incorporate ciu_div into
+ timing property
+In-Reply-To: <1420008185-24758-2-git-send-email-alim.akhtar@samsung.com>
+References: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
+ <1420008185-24758-2-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <54ADDF20.8000807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/15 at 11:41am, Ard Biesheuvel wrote:
-> On 6 January 2015 at 08:16, Dave Young <dyoung@redhat.com> wrote:
-> > On 01/05/15 at 09:18am, Ard Biesheuvel wrote:
-> >> On 4 January 2015 at 08:19, Dave Young <dyoung@redhat.com> wrote:
-> >> > On 12/30/14 at 01:21pm, Ard Biesheuvel wrote:
-> >> >> On 30 December 2014 at 09:25, Dave Young <dyoung@redhat.com> wrote:
-> >> >> > On 12/29/14 at 09:22am, Ard Biesheuvel wrote:
-> >> >> >> On 26 December 2014 at 09:35, Dave Young <dyoung@redhat.com> wrote:
-> >> >> >> > On 12/22/14 at 07:08pm, Ard Biesheuvel wrote:
-> >> >> >> >> This series was split off from the UEFI virtmap for kexec series that I posted
-> >> >> >> >> earlier today. The main purpose is to deal with the need to classify memory
-> >> >> >> >> ranges as RAM or non-RAM in a consistent and comprehensive manner. This series
-> >> >> >> >> applies on top of the other series.
-> >> >> >> >>
-> >> >> >> >> Patch #1 avoids an early panic if the UEFI memory map is available but UEFI
-> >> >> >> >> support itself fails to initialize. In this case, there is no need to panic
-> >> >> >> >> early, and we have a better chance of being able to inform the user if we deal
-> >> >> >> >> with this error condition at a later time.
-> >> >> >> >>
-> >> >> >> >> Patch #2 adds iomem resource registration of UEFI memory regions. This is
-> >> >> >> >> necessary because otherwise, drivers could potentially claim regions that
-> >> >> >> >> are in active use by the firmware. This applies to both MMIO (NOR flash, RTC)
-> >> >> >> >> and RAM ranges (runtime services code and data).
-> >> >> >> >>
-> >> >> >> >> Patch #3-6 adds support to UEFI and non-UEFI code paths to record all memory
-> >> >> >> >> known to the system in the 'physmem' memblock table (if enabled). This fulfils
-> >> >> >> >> a need in the /dev/mem and (upcoming) ACPI layers to be able to classify ranges
-> >> >> >> >> as being backed by normal RAM even if they are not covered by the 'memory'
-> >> >> >> >> memblock table, and are hence not covered by the linear direct mapping.
-> >> >> >> >> The physmem code is pre-existing code that only needs minor tweaking to be made
-> >> >> >> >> suitable for this purpose.
-> >> >> >> >>
-> >> >> >> >> Patch #7 enables the 'physmem' memblock table for arm64, and wires it into the
-> >> >> >> >> handling of /dev/mem mappings, both to decide whether it should be mapped as
-> >> >> >> >> MT_NORMAL, and whether read-write access can be allowed. (Non-RAM regions can
-> >> >> >> >> be mapped read-write as long as they are not claimed by a driver in the iomem
-> >> >> >> >> resource table. RAM regions can only be mapped read-only, and only if they are
-> >> >> >> >> not covered by the 'memory' memblock table, and hence not covered by the linear
-> >> >> >> >> mapping)
-> >> >> >> >>
-> >> >> >> >> Finally, patch #8 changes the way the virtual memory map is handled by the
-> >> >> >> >> early UEFI code. Specifically, it memblock_remove()s rather than _reserves()
-> >> >> >> >> UEFI reserved RAM regions, so that they are removed entirely from the linear
-> >> >> >> >> mapping.
-> >> >> >> >>
-> >> >> >> >> Ard Biesheuvel (8):
-> >> >> >> >>   arm64/efi: use UEFI memory map unconditionally if available
-> >> >> >> >>   arm64/efi: register UEFI reserved regions as iomem resources
-> >> >> >> >>   memblock: add physmem to memblock_dump_all() output
-> >> >> >> >>   memblock: introduce memblock_add_phys() and memblock_is_physmem()
-> >> >> >> >>   of: fdt: register physmem in early_init_dt_scan_memory()
-> >> >> >> >>   arm64/efi: register physmem in reserve_regions()
-> >> >> >> >>   arm64: use 'physmem' memblock to improve CONFIG_STRICT_DEVMEM handling
-> >> >> >> >>   arm64/efi: memblock_remove rather than _reserve UEFI reserved RAM
-> >> >> >> >
-> >> >> >> > Ard, It is much cleaner for this splitting.
-> >> >> >> >
-> >> >> >>
-> >> >> >> Thanks for having a look.
-> >> >> >>
-> >> >> >> > I wonder if some of them can become general code such as register reserved
-> >> >> >> > regions as iomem resources?
-> >> >> >> >
-> >> >> >>
-> >> >> >> AFAICT, the x86 code adds reservations for such regions to the E820
-> >> >> >> memory map, which in turn is used to memblock_reserve() the actual
-> >> >> >> memory. Also, sharing of the RTC is handled with a dedicated mutex in
-> >> >> >> the runtime services wrapper code (and x86 does not even use the time
-> >> >> >> related runtime services as they are broken on many firmware
-> >> >> >> implementations) so blindly applying the same logic to x86 or ia64
-> >> >> >> would likely break stuff.
-> >> >> >
-> >> >> > Ok, I think bootloader will pass the E820 ranges though it can not tell
-> >> >> > which region is for what.
-> >> >> >
-> >> >> >>
-> >> >> >> Do you (or Mark) have any feedback on the utility of this series in
-> >> >> >> the ACPI context? I failed to mention in the cover letter that
-> >> >> >> memblock_is_physmem() now serves the purpose of page_is_ram(), i.e.,
-> >> >> >> whether a physical region is backed by a slice of RAM that was left
-> >> >> >> out of the kernel's linear mapping.
-> >> >> >
-> >> >> > I will do some test later along with the stable mapping stuff.
-> >> >
-> >> > The whole patchset works well without the last patch.
-> >> >
-> >> > I found that patch 8/8 caused system boot hangs very early.
-> >> > Just after stub print something about virtmap..
-> >> >
-> >>
-> >> Which platform is this?
-> >> Do you have earlycon enabled?
-> >
-> > It is apm mustang, earlycon was enabled.
-> >
+Hi, 
+
+On 12/31/2014 03:43 PM, Alim Akhtar wrote:
+> From: Seungwon Jeon <tgih.jun@samsung.com>
 > 
-> That's odd. reserve_regions() is called after uefi_init(), and the
-> latter prints the EFI: string, so I don't think the patch should
-> affect anything else before that either. Could you please double check
-> if you do see the console enabled/disabled messages?
-
-Will check, but I did not change the kernel params..
-
+> ciu_div may not be common value for all speed mode.
+> So, it needs to be attached to CLKSEL timing.
+> This also introduce a new compatibale 'dw-mshc-hs200-timing'
+> for selecting hs200 timing value
 > 
-> >>
-> >> > Any idea about it? I tested your patches upon 3.18.
-> >> >
-> >>
-> >> I suppose you tested both the virtmap series and this one, but did you
-> >> also take the 3.19 changes we did for UEFI? Not sure it would make a
-> >> difference, though.
-> >
-> > Yes, both virtmap series and this one, I did not take UEFI 3.19 changes,
-> > Which patchset do you have in mind? If no clue I will try rebase to test 3.19
-> >
+> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |   15 ++--
+>  drivers/mmc/host/dw_mmc-exynos.c                   |   81 ++++++++++++++------
+>  drivers/mmc/host/dw_mmc-exynos.h                   |    1 +
+>  3 files changed, 67 insertions(+), 30 deletions(-)
 > 
-> Well, there is patch 61139eb04056bba69aeef6c481802c4ea028bf4d that
-> changes the definition of is_reserve_region(), which may or may not be
-> relevant. Other than that, I don't think any of those patches could
-> make a difference here.
+> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> index ee4fc05..06455de 100644
+> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+> @@ -23,10 +23,6 @@ Required Properties:
+>  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
+>  	  specific extensions having an SMU.
+>  
+> -* samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
+> -  unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+> -  ignored for Exynos4 SoC's. The valid range of divider value is 0 to 7.
+> -
+>  * samsung,dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
+>    in transmit mode and CIU clock phase shift value in receive mode for single
+>    data rate mode operation. Refer notes below for the order of the cells and the
+> @@ -37,11 +33,16 @@ Required Properties:
+>    data rate mode operation. Refer notes below for the order of the cells and the
+>    valid values.
+>  
+> +* samsung,dw-mshc-hs200-timing: Similar with dw-mshc-sdr-timing.
 
-Ok, I have no machine on hand currently, will do some debugging once I have one.
+What does this comment mean? "Similar with dw-mshc-sdr-timing"
+how about adding the comment "optional"?
+
+And i think this timing doesn't need, we can reuse the sdr-timing or ddr-timing.
+Because it's re-configurated at tuning time, isn't?
+
+> +
+>    Notes for the sdr-timing and ddr-timing values:
+>  
+>      The order of the cells should be
+>        - First Cell: CIU clock phase shift value for tx mode.
+>        - Second Cell: CIU clock phase shift value for rx mode.
+> +      - Thrid Cell: Specifies the divider value for the card interface
+> +        unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+> +        ignored for Exynos4 SoC's. The valid range of divider value is 0 to 7.
+>  
+>      Valid values for SDR and DDR CIU clock timing for Exynos5250:
+>        - valid value for tx phase shift and rx phase shift is 0 to 7.
+> @@ -79,8 +80,8 @@ Example:
+>  		broken-cd;
+>  		fifo-depth = <0x80>;
+>  		card-detect-delay = <200>;
+> -		samsung,dw-mshc-ciu-div = <3>;
+> -		samsung,dw-mshc-sdr-timing = <2 3>;
+> -		samsung,dw-mshc-ddr-timing = <1 2>;
+> +		samsung,dw-mshc-sdr-timing = <2 3 3>;
+> +		samsung,dw-mshc-ddr-timing = <1 2 3>;
+> +		samsung,dw-mshc-hs200-timing = <0 2 3>;
+>  		bus-width = <8>;
+>  	};
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index 12a5eaa..be6530e 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -40,6 +40,7 @@ struct dw_mci_exynos_priv_data {
+>  	u8				ciu_div;
+>  	u32				sdr_timing;
+>  	u32				ddr_timing;
+> +	u32				hs200_timing;
+>  	u32				cur_speed;
+>  };
+>  
+> @@ -71,6 +72,21 @@ static struct dw_mci_exynos_compatible {
+>  	},
+>  };
+>  
+> +static inline u8 dw_mci_exynos_get_ciu_div(struct dw_mci *host)
+> +{
+> +	struct dw_mci_exynos_priv_data *priv = host->priv;
+> +
+> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS4412)
+> +		return EXYNOS4412_FIXED_CIU_CLK_DIV;
+> +	else if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS4210)
+> +		return EXYNOS4210_FIXED_CIU_CLK_DIV;
+> +	else if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+> +			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+> +		return SDMMC_CLKSEL_GET_DIV(mci_readl(host, CLKSEL64)) + 1;
+> +	else
+> +		return SDMMC_CLKSEL_GET_DIV(mci_readl(host, CLKSEL)) + 1;
+
+If need this, I think more readable that use the switch-case statement. how about?
+
+       switch (priv->ctrl_type) {
+       case DW_MCI_TYPE_EXYNOS4412:
+                return EXYNOS4412_FIXED_CIU_CLK_DIV;
+       case DW_MCI_TYPE_EXYNOS4210:
+                return EXYNOS4210_FIXED_CIU_CLK_DIV;
+       case DW_MCI_TYPE_EXYNOS7:
+       case DW_MCI_TYPE_EXYNOS7_SMU:
+                return SDMMC_CLKSEL_GET_DIV(mci_readl(host, CLKSEL64)) + 1;
+       default:
+                return SDMMC_CLKSEL_GET_DIV(mci_readl(host, CLKSEL)) + 1;
+       }
 
 
+> +}
+> +
+>  static int dw_mci_exynos_priv_init(struct dw_mci *host)
+>  {
+>  	struct dw_mci_exynos_priv_data *priv = host->priv;
+> @@ -85,6 +101,8 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
+>  			   SDMMC_MPSCTRL_NON_SECURE_WRITE_BIT);
+>  	}
+>  
+> +	priv->ciu_div = dw_mci_exynos_get_ciu_div(host);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -92,7 +110,7 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
+>  {
+>  	struct dw_mci_exynos_priv_data *priv = host->priv;
+>  
+> -	host->bus_hz /= (priv->ciu_div + 1);
+> +	host->bus_hz /= priv->ciu_div;
+>  
+>  	return 0;
+>  }
+> @@ -177,9 +195,14 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>  	struct dw_mci_exynos_priv_data *priv = host->priv;
+>  	unsigned int wanted = ios->clock;
+>  	unsigned long actual;
+> -	u8 div = priv->ciu_div + 1;
+>  
+> -	if (ios->timing == MMC_TIMING_MMC_DDR52) {
+> +	if (ios->timing == MMC_TIMING_MMC_HS200) {
+> +		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+> +			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+> +			mci_writel(host, CLKSEL64, priv->hs200_timing);
+> +		else
+> +			mci_writel(host, CLKSEL, priv->hs200_timing);
+> +	} else if (ios->timing == MMC_TIMING_MMC_DDR52) {
+>  		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
+>  			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
+>  			mci_writel(host, CLKSEL64, priv->ddr_timing);
+> @@ -208,6 +231,7 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>  		wanted = EXYNOS_CCLKIN_MIN;
+>  
+>  	if (wanted != priv->cur_speed) {
+> +		u8 div = dw_mci_exynos_get_ciu_div(host);
+>  		int ret = clk_set_rate(host->ciu_clk, wanted * div);
+>  		if (ret)
+>  			dev_warn(host->dev,
+> @@ -220,14 +244,34 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>  	}
+>  }
+>  
+> +static int dw_mci_exynos_dt_populate_timing(struct dw_mci *host,
+> +					    unsigned int ctrl_type,
+> +					    const char *propname,
+> +					    u32 *out_values)
+> +{
+> +	struct device_node *np = host->dev->of_node;
+> +	u32 timing[3];
+> +	int ret;
+> +
+> +	ret = of_property_read_u32_array(np, propname, timing, 3);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (ctrl_type == DW_MCI_TYPE_EXYNOS4412 ||
+> +	    ctrl_type == DW_MCI_TYPE_EXYNOS4210)
+> +		timing[2] = 0;
+
+Is it set to 0 into dt-file?
+
+> +
+> +	*out_values = SDMMC_CLKSEL_TIMING(timing[0], timing[1], timing[2]);
+> +
+> +	return 0;
+> +}
+> +
+> +
+>  static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+>  {
+>  	struct dw_mci_exynos_priv_data *priv;
+>  	struct device_node *np = host->dev->of_node;
+> -	u32 timing[2];
+> -	u32 div = 0;
+> -	int idx;
+> -	int ret;
+> +	int idx, ret;
+>  
+>  	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
+>  	if (!priv)
+> @@ -238,29 +282,20 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
+>  			priv->ctrl_type = exynos_compat[idx].ctrl_type;
+>  	}
+>  
+> -	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS4412)
+> -		priv->ciu_div = EXYNOS4412_FIXED_CIU_CLK_DIV - 1;
+> -	else if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS4210)
+> -		priv->ciu_div = EXYNOS4210_FIXED_CIU_CLK_DIV - 1;
+> -	else {
+> -		of_property_read_u32(np, "samsung,dw-mshc-ciu-div", &div);
+> -		priv->ciu_div = div;
+> -	}
+> -
+> -	ret = of_property_read_u32_array(np,
+> -			"samsung,dw-mshc-sdr-timing", timing, 2);
+> +	ret = dw_mci_exynos_dt_populate_timing(host, priv->ctrl_type,
+> +			"samsung,dw-mshc-sdr-timing", &priv->sdr_timing);
+>  	if (ret)
+>  		return ret;
+>  
+> -	priv->sdr_timing = SDMMC_CLKSEL_TIMING(timing[0], timing[1], div);
+> -
+> -	ret = of_property_read_u32_array(np,
+> -			"samsung,dw-mshc-ddr-timing", timing, 2);
+> +	ret = dw_mci_exynos_dt_populate_timing(host, priv->ctrl_type,
+> +			"samsung,dw-mshc-ddr-timing", &priv->ddr_timing);
+>  	if (ret)
+>  		return ret;
+>  
+> -	priv->ddr_timing = SDMMC_CLKSEL_TIMING(timing[0], timing[1], div);
+> +	dw_mci_exynos_dt_populate_timing(host, priv->ctrl_type,
+> +		"samsung,dw-mshc-hs200-timing", &priv->hs200_timing);
+
+hs200-timing is optional, so it needs not to check return value, right?
+
+Best Regards,
+Jaehoon Chung
+
+>  	host->priv = priv;
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.h b/drivers/mmc/host/dw_mmc-exynos.h
+> index 7872ce5..c04ecef 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.h
+> +++ b/drivers/mmc/host/dw_mmc-exynos.h
+> @@ -21,6 +21,7 @@
+>  #define SDMMC_CLKSEL_CCLK_DRIVE(x)	(((x) & 7) << 16)
+>  #define SDMMC_CLKSEL_CCLK_DIVIDER(x)	(((x) & 7) << 24)
+>  #define SDMMC_CLKSEL_GET_DRV_WD3(x)	(((x) >> 16) & 0x7)
+> +#define SDMMC_CLKSEL_GET_DIV(x)		(((x) >> 24) & 0x7)
+>  #define SDMMC_CLKSEL_TIMING(x, y, z)	(SDMMC_CLKSEL_CCLK_SAMPLE(x) |	\
+>  					 SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
+>  					 SDMMC_CLKSEL_CCLK_DIVIDER(z))
 > 
-> >>
-> >> >> > BTW, with previous stable mapping patches on modified 3.18 tree kexec kernel
-> >> >> > panics because of damaged efi mempry map arrays. It contains some
-> >> >> > random value instead of right addresses so that virt_to_phys return
-> >> >> > same value for vendor field. Will do more debugging maybe I missed something.
-> >> >> > Any clue for debugging above issue will be appreciated.
-> >> >> >
-> >> >>
-> >> >> No clues, unfortunately. The memory map is not used after early boot,
-> >> >> so it may be getting clobbered at any point between the first boot and
-> >> >> the second boot.
-> >> >
-> >> > It was caused by uefi sys table/mmap start addresses changes.
-> >> > I generate dtb from acpi=off boot /proc/device-tree, and use the dtb for kexec
-> >> > boot, but seems mmap addresses changes sometimes.
-> >> >
-> >> > Do you know have plan or status in Linaro for exporting dtb for acpi booting?
-> >> >
-> >>
-> >> We have this patch upstream now
-> >>
-> >> 08d53aa58cb1 of/fdt: export fdt blob as /sys/firmware/fdt
-> >>
-> >> which exports whatever FDT the kernel received from the bootloader or
-> >> the EFI stub, regardless of whether the kernel uses DT or not.
-> >
-> > Great, will try.
-> >
-> > Thanks
-> > Dave
