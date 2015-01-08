@@ -1,79 +1,104 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  8 Jan 2015 17:06:04 +0000
-Subject: [PATCH v2 0/8] Introducing per-device MSI domain
-Message-ID: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu,  8 Jan 2015 17:06:06 +0000
+Subject: [PATCH v2 2/8] PCI/MSI: Add hooks to populate the msi_domain field
+In-Reply-To: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420736772-11088-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSI-like interrupts are starting to creep out of the PCI world, and
-can now be seen into a number of "platform"-type busses. The MSI
-domain patches recognise that fact, and start providing a way to
-implement this.
+In order to be able to populate the device msi_domain field,
+add the necesary hooks to propagate the PHB msi_domain across
+secondary busses to devices.
 
-Another problem we have to solve is to identify which MSI domain a
-device is "connected" to. Currently, PCI gets away with a mixture of
-arch-specific callbacks, and a msi_controller structure that can
-optionally carry a pointer to an MSI domain. As we add new bus types
-and start dealing with topologies that do not map to what PCI does,
-this doesn't scale anymore.
+So far, nobody populates the initial msi_domain.
 
-This patch series tries to address some of it by providing a basic
-link between 'struct device' and an MSI domain. It also adds (yet
-another) way for PCI to propagate the domain pointer through the PCI
-device hierarchy, provides a method for OF to kick-start the
-propagation process, and finally allows the PCI/MSI layer to use that
-information. Hopefully this can serve as a model to implement support
-for different but types.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
+ include/linux/pci.h |  1 +
+ 2 files changed, 31 insertions(+)
 
-Additionally, the last three patches use all the above to remove any
-trace of the msi_controller structure from the two GIC interrupt
-controllers we use on arm64, so that they solely rely on the above
-infrastructure. We take this opportunity to also kill the domain
-pointer from the msi_controller structure.
-
-My hope is to eventually kill msi_controller entirely, and only rely
-on the msi_domain contained in the device structure (any help
-welcomed).
-
-This has been tested on arm64 with GICv2m (AMD Seattle) and GICv3 ITS
-(FVP model).
-
-Patches are on top of 3.19-rc3 and available at:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi_domain
-
-As always, comments most welcome.
-
-	M.
-
->From v1:
-
-- Allow arch code to set the MSI domain before we try to do so in core
-  code (which is used as a fallback).
-- Allow the MSI domain to be looked-up by using the PHB node.
-- Remove domain field from msi_controller
-
-[1] https://lkml.org/lkml/2014/12/8/581
-
-Marc Zyngier (8):
-  device core: Introduce per-device MSI domain pointer
-  PCI/MSI: Add hooks to populate the msi_domain field
-  PCI/MSI: of: Add support for OF-provided msi_domain
-  PCI/MSI: of: Allow msi_domain lookup using the PHB node
-  PCI/MSI: Let pci_msi_get_domain use struct device's msi_domain
-  irqchip: GICv2m: Get rid of struct msi_controller
-  irqchip: gicv3-its: Get rid of struct msi_controller
-  PCI/MSI: Drop domain field from msi_controller
-
- drivers/irqchip/irq-gic-v2m.c    | 26 +++++++++-----------------
- drivers/irqchip/irq-gic-v3-its.c | 33 ++++++++++++++-------------------
- drivers/pci/msi.c                |  3 +--
- drivers/pci/of.c                 | 20 ++++++++++++++++++++
- drivers/pci/probe.c              | 31 +++++++++++++++++++++++++++++++
- include/linux/device.h           | 20 ++++++++++++++++++++
- include/linux/msi.h              |  3 ---
- include/linux/pci.h              |  3 +++
- 8 files changed, 98 insertions(+), 41 deletions(-)
-
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 23212f8..977c079 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -660,6 +660,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+ 	}
+ }
+ 
++void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
++{
++}
++
++static void pci_set_bus_msi_domain(struct pci_bus *bus)
++{
++	struct pci_dev *bridge = bus->self;
++
++	if (!bridge)
++		pcibios_set_phb_msi_domain(bus);
++	else
++		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
++}
++
+ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 					   struct pci_dev *bridge, int busnr)
+ {
+@@ -713,6 +727,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	bridge->subordinate = child;
+ 
+ add_dev:
++	pci_set_bus_msi_domain(child);
+ 	ret = device_register(&child->dev);
+ 	WARN_ON(ret < 0);
+ 
+@@ -1507,6 +1522,17 @@ static void pci_init_capabilities(struct pci_dev *dev)
+ 	pci_enable_acs(dev);
+ }
+ 
++static void pci_set_msi_domain(struct pci_dev *dev)
++{
++	/*
++	 * If no domain has been set through the pcibios callback,
++	 * inherit the default from the bus device.
++	 */
++	if (!dev_get_msi_domain(&dev->dev))
++		dev_set_msi_domain(&dev->dev,
++				   dev_get_msi_domain(&dev->bus->dev));
++}
++
+ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ {
+ 	int ret;
+@@ -1547,6 +1573,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ 	ret = pcibios_add_device(dev);
+ 	WARN_ON(ret < 0);
+ 
++	/* Setup MSI irq domain */
++	pci_set_msi_domain(dev);
++
+ 	/* Notifier could use PCI capabilities */
+ 	dev->match_driver = false;
+ 	ret = device_add(&dev->dev);
+@@ -1937,6 +1966,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	b->bridge = get_device(&bridge->dev);
+ 	device_enable_async_suspend(b->bridge);
+ 	pci_set_bus_of_node(b);
++	pci_set_bus_msi_domain(b);
+ 
+ 	if (!parent)
+ 		set_dev_node(b->bridge, pcibus_to_node(b));
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 360a966..13c65ab 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1640,6 +1640,7 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+ int pcibios_add_device(struct pci_dev *dev);
+ void pcibios_release_device(struct pci_dev *dev);
+ void pcibios_penalize_isa_irq(int irq, int active);
++void pcibios_set_phb_msi_domain(struct pci_bus *bus);
+ 
+ #ifdef CONFIG_HIBERNATE_CALLBACKS
+ extern struct dev_pm_ops pcibios_pm_ops;
 -- 
 2.1.4
