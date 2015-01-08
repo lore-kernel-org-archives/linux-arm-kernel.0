@@ -1,51 +1,84 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Thu, 8 Jan 2015 15:42:14 +0800
-Subject: [PATCH 3/3] soc/tegra: fuse: Add Tegra132 support
-In-Reply-To: <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
-References: <1420701887-1465-1-git-send-email-thierry.reding@gmail.com>
- <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
-Message-ID: <54AE34D6.5090507@nvidia.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 8 Jan 2015 09:13:18 +0100
+Subject: [PATCH] net/at91_ether: prepare and unprepare clock
+In-Reply-To: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150108091318.45ca2760@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed,  7 Jan 2015 23:59:26 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-On 01/08/2015 03:24 PM, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> Tegra132 is very similar to Tegra124 from a peripheral point of view and
-> uses the same fuse controller.
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> The clock is enabled without being prepared, this leads to:
+> 
+> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
+> 
+> and a non working ethernet interface.
+> 
+> Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
->   drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
->   drivers/soc/tegra/fuse/fuse-tegra30.c | 2 ++
->   2 files changed, 3 insertions(+)
->
-> diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
-> index 011a3363c265..c0d660f1aaac 100644
-> --- a/drivers/soc/tegra/fuse/fuse-tegra.c
-> +++ b/drivers/soc/tegra/fuse/fuse-tegra.c
-> @@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
->   	{ .compatible = "nvidia,tegra30-car", },
->   	{ .compatible = "nvidia,tegra114-car", },
->   	{ .compatible = "nvidia,tegra124-car", },
-> +	{ .compatible = "nvidia,tegra132-car", },
->   	{},
->   };
->   
-> diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
-> index d1a4290cda5c..11fe22e0de73 100644
-> --- a/drivers/soc/tegra/fuse/fuse-tegra30.c
-> +++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
-> @@ -184,6 +184,8 @@ static void __init legacy_fuse_init(void)
->   	case TEGRA124:
->   		fuse_info = &tegra124_info;
->   		break;
-> +	case TEGRA132:
-> +		fuse_info = &tegra124_info;
-Fall through intentionally?
+>  drivers/net/ethernet/cadence/at91_ether.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+> index 55eb7f2af2b4..7ef55f5fa664 100644
+> --- a/drivers/net/ethernet/cadence/at91_ether.c
+> +++ b/drivers/net/ethernet/cadence/at91_ether.c
+> @@ -340,7 +340,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>  		res = PTR_ERR(lp->pclk);
+>  		goto err_free_dev;
+>  	}
+> -	clk_enable(lp->pclk);
+> +	clk_prepare_enable(lp->pclk);
+>  
+>  	lp->hclk = ERR_PTR(-ENOENT);
+>  	lp->tx_clk = ERR_PTR(-ENOENT);
+> @@ -406,7 +406,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>  err_out_unregister_netdev:
+>  	unregister_netdev(dev);
+>  err_disable_clock:
+> -	clk_disable(lp->pclk);
+> +	clk_disable_unprepare(lp->pclk);
+>  err_free_dev:
+>  	free_netdev(dev);
+>  	return res;
+> @@ -424,7 +424,7 @@ static int at91ether_remove(struct platform_device *pdev)
+>  	kfree(lp->mii_bus->irq);
+>  	mdiobus_free(lp->mii_bus);
+>  	unregister_netdev(dev);
+> -	clk_disable(lp->pclk);
+> +	clk_disable_unprepare(lp->pclk);
+>  	free_netdev(dev);
+>  
+>  	return 0;
+> @@ -440,7 +440,7 @@ static int at91ether_suspend(struct platform_device *pdev, pm_message_t mesg)
+>  		netif_stop_queue(net_dev);
+>  		netif_device_detach(net_dev);
+>  
+> -		clk_disable(lp->pclk);
+> +		clk_disable_unprepare(lp->pclk);
+>  	}
+>  	return 0;
+>  }
+> @@ -451,7 +451,7 @@ static int at91ether_resume(struct platform_device *pdev)
+>  	struct macb *lp = netdev_priv(net_dev);
+>  
+>  	if (netif_running(net_dev)) {
+> -		clk_enable(lp->pclk);
+> +		clk_prepare_enable(lp->pclk);
+>  
+>  		netif_device_attach(net_dev);
+>  		netif_start_queue(net_dev);
 
 
->   	default:
->   		return;
->   	}
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
