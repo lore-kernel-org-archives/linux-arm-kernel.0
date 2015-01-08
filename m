@@ -1,38 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Jan 2015 20:37:23 +0100
-Subject: [PATCH 3/9] ARM: versatile: add DT based PCI detection
-In-Reply-To: <1419967718-26909-4-git-send-email-robherring2@gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <1419967718-26909-4-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdYEHwXhw3nEPHp7+4rtzXyh9Qb2QCpsRMfopxNoaX3rLA@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu,  8 Jan 2015 21:39:56 +0200
+Subject: [PATCH v2 0/8] ARM: Conexant Digicolor CX92755 SoC support
+Message-ID: <cover.1420744368.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
+one of the Digicolor series of SoCs, all sharing many of the same peripherals.
+The code was tested on the CX92755 evaluation kit, AKA Equinox.
 
-> From: Rob Herring <robh@kernel.org>
->
-> Disable the Versatile PCI DT node when no PCI backplane is detected. This
-> will prevent the Versatile PCI driver from probing when PCI is not
-> populated.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+Uses attempting to try this code will most likely also want the UART/console
+driver available from https://patchwork.kernel.org/patch/5515861/.
 
-(...)
-> +       /* Check if PCI backplane is detected */
-> +       val = __raw_readl(base + VERSATILE_SYS_PCICTL_OFFSET);
+v2:
 
-I think this kind of random syscon register access should be handled
-using the mfd/syscon.c hub and looked up in some way to be used
-by the driver.
+   * Remove .map_io assignment, debug_ll is enabled by default (Arnd Bergmann)
 
-I'm thinking along the pattern of adding code in drivers/*
-by the pattern of e.g.
-drivers/video/fbdev/amba-clcd-versatile.c
-i.e. an add-on that gets compiled-in only for those platform
-but still married to the main driver.
+   * Migrate the irq driver to generic irq chip, simplifying the code somewhat
+     (Arnd Bergmann)
 
-Yours,
-Linus Walleij
+   * Change the timer dt binding, so that the 'reg' property points to the
+     first "Agent Communication" register. This should improve the chance of
+     reusing this binding for other SoCs in this series.
+
+   * Add the CONTROL() and COUNT() macros to the timer driver to make the code
+     clearer.
+
+   * Move arch/arm Kconfig changes from the clocksource driver patch to the
+     base arch support patch to reduce dependency between them
+
+v1:
+   http://thread.gmane.org/gmane.linux.kernel/1855027
+
+Baruch Siach (8):
+  ARM: initial support for Conexant Digicolor CX92755 SoC
+  ARM: digicolor: add low level debug support
+  ARM: digicolor: add minimal device tree description
+  irqchip: devicetree: document Conexant Digicolor irq binding
+  irqchip: Conexant CX92755 interrupts controller driver
+  clocksource: devicetree: document Conexant Digicolor timer binding
+  clocksource: driver for Conexant Digicolor SoC timer
+  ARM: devicetree: document supported Conexant Digicolor SoC
+
+ .../devicetree/bindings/arm/digicolor.txt          |   6 +
+ .../bindings/interrupt-controller/digicolor-ic.txt |  20 +++
+ .../devicetree/bindings/timer/digicolor-timer.txt  |  18 +++
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  12 +-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/conexant_equinox.dts             |  67 +++++++++
+ arch/arm/boot/dts/cx92755.dtsi                     | 103 +++++++++++++
+ arch/arm/include/debug/digicolor.S                 |  35 +++++
+ arch/arm/mach-digicolor/Kconfig                    |   5 +
+ arch/arm/mach-digicolor/Makefile                   |   1 +
+ arch/arm/mach-digicolor/digicolor.c                |  18 +++
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-digicolor.c              | 164 +++++++++++++++++++++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-digicolor.c                    | 112 ++++++++++++++
+ 16 files changed, 564 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/digicolor.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/digicolor-timer.txt
+ create mode 100644 arch/arm/boot/dts/conexant_equinox.dts
+ create mode 100644 arch/arm/boot/dts/cx92755.dtsi
+ create mode 100644 arch/arm/include/debug/digicolor.S
+ create mode 100644 arch/arm/mach-digicolor/Kconfig
+ create mode 100644 arch/arm/mach-digicolor/Makefile
+ create mode 100644 arch/arm/mach-digicolor/digicolor.c
+ create mode 100644 drivers/clocksource/timer-digicolor.c
+ create mode 100644 drivers/irqchip/irq-digicolor.c
+
+-- 
+2.1.4
