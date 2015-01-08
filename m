@@ -1,23 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Jan 2015 17:03:24 +0000
-Subject: [RFC 8/8] ARM64: Add uprobe support
-In-Reply-To: <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
-Message-ID: <20150108170324.GT11583@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  8 Jan 2015 17:06:05 +0000
+Subject: [PATCH v2 1/8] device core: Introduce per-device MSI domain pointer
+In-Reply-To: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420736772-11088-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 31, 2014 at 03:21:24PM +0000, Pratyush Anand wrote:
-> This patch adds support for uprobe on ARM64 architecture.
-> 
-> Unit test for following has been done so far and they have been found
-> working
-> 1. Normal instruction, which can be probed like sub, ldr, add etc.
-> 2. Instructions which can be simulated like ret.
-> 3. uretprobe
+As MSI-type features are creeping into non-PCI devices, it is
+starting to make sense to give our struct device some form of
+support for this, by allowing a pointer to an MSI irq domain to
+be set/retrieved.
 
-I'm assuming that means you don't support compat (AArch32) tasks with this?
-How do you enforce that?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/device.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Will
+diff --git a/include/linux/device.h b/include/linux/device.h
+index fb50673..ec4cee5 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -690,6 +690,7 @@ struct acpi_dev_node {
+  * 		along with subsystem-level and driver-level callbacks.
+  * @pins:	For device pin management.
+  *		See Documentation/pinctrl.txt for details.
++ * @msi_domain: The generic MSI domain this device is using.
+  * @numa_node:	NUMA node this device is close to.
+  * @dma_mask:	Dma mask (if dma'ble device).
+  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+@@ -750,6 +751,9 @@ struct device {
+ 	struct dev_pm_info	power;
+ 	struct dev_pm_domain	*pm_domain;
+ 
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain	*msi_domain; /* MSI domain device uses */
++#endif
+ #ifdef CONFIG_PINCTRL
+ 	struct dev_pin_info	*pins;
+ #endif
+@@ -837,6 +841,22 @@ static inline void set_dev_node(struct device *dev, int node)
+ }
+ #endif
+ 
++static inline struct irq_domain *dev_get_msi_domain(const struct device *dev)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	return dev->msi_domain;
++#else
++	return NULL;
++#endif
++}
++
++static inline void dev_set_msi_domain(struct device *dev, struct irq_domain *d)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	dev->msi_domain = d;
++#endif
++}
++
+ static inline void *dev_get_drvdata(const struct device *dev)
+ {
+ 	return dev->driver_data;
+-- 
+2.1.4
