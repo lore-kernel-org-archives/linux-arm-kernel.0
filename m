@@ -1,42 +1,89 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Jan 2015 16:11:18 -0800
-Subject: [PATCH] ARM: OMAP: DTS: N950/N9: add twl_power
-In-Reply-To: <1419624589-10432-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1419624589-10432-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20150108001117.GO13010@atomide.com>
+Date: Wed, 7 Jan 2015 16:12:31 -0800
+Subject: [PATCH v2] arm: boot: dts: am437x-idk: add gpio-based power key
+In-Reply-To: <1419627193-20838-1-git-send-email-balbi@ti.com>
+References: <1419626116-12833-1-git-send-email-balbi@ti.com>
+ <1419627193-20838-1-git-send-email-balbi@ti.com>
+Message-ID: <20150108001231.GP13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [141226 12:12]:
-> Add twl_power for N950/N9. Start with the simplest configuration to just
-> enable power off.
+* Felipe Balbi <balbi@ti.com> [141226 12:56]:
+> AM437x IDK board has a User Switch which we can
+> program to whatever we want. Because this board
+> doesn't have a PMIC which can give us power button
+> presses, let's use this user switch as a gpio-keys
+> power button.
 > 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
 Applying into omap-for-v3.20/dt thanks.
 
 Tony
 
 > ---
->  arch/arm/boot/dts/omap3-n950-n9.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/omap3-n950-n9.dtsi b/arch/arm/boot/dts/omap3-n950-n9.dtsi
-> index 1e49dfe..c41db94 100644
-> --- a/arch/arm/boot/dts/omap3-n950-n9.dtsi
-> +++ b/arch/arm/boot/dts/omap3-n950-n9.dtsi
-> @@ -60,6 +60,11 @@
->  
->  &twl {
->  	compatible = "ti,twl5031";
+> Changes since v1:
+> 	- Add explicit pinctrl data.
+> 	  (note that ball reset state is already MUX_MODE7, and even
+> 	   though it was already working before, as can be seen from
+> 	   v1's boot logs, it's best that we cope with possibly broken
+> 	   bootloaders)
+> 
+> depends on [1]. Boot logs at [2]. Note that this can rather easily
+> be folded into the original patch if so desired.
+> 
+> [1] http://marc.info/?l=linux-omap&m=141928747902983&w=2
+> [2] http://hastebin.com/qezicehunu
+> 
+>  arch/arm/boot/dts/am437x-idk-evm.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
+> index b52dd0a..f9a17e2 100644
+> --- a/arch/arm/boot/dts/am437x-idk-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-idk-evm.dts
+> @@ -96,9 +96,29 @@
+>  		regulator-boot-on;
+>  		vin-supply = <&v1_5dreg>;
+>  	};
 > +
-> +	twl_power: power {
-> +		compatible = "ti,twl4030-power";
-> +		ti,use_poweroff;
+> +	gpio_keys: gpio_keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&gpio_keys_pins_default>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		switch at 0 {
+> +			label = "power-button";
+> +			linux,code = <KEY_POWER>;
+> +			gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
+> +		};
 > +	};
 >  };
 >  
->  &twl_gpio {
+>  &am43xx_pinmux {
+> +	gpio_keys_pins_default: gpio_keys_pins_default {
+> +		pinctrl-single,pins = <
+> +			0x1b8 (PIN_INPUT | MUX_MODE7)	/* cam0_field.gpio4_2 */
+> +		>;
+> +	};
+> +
+>  	i2c0_pins_default: i2c0_pins_default {
+>  		pinctrl-single,pins = <
+>  			0x188 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0) /* i2c0_sda.i2c0_sda */
+> @@ -282,6 +302,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&gpio4 {
+> +	status = "okay";
+> +};
+> +
+>  &gpio5 {
+>  	status = "okay";
+>  };
 > -- 
 > 2.2.0
 > 
