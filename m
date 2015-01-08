@@ -1,35 +1,96 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Jan 2015 20:47:04 +0100
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-In-Reply-To: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkda8T8CwghVYtTw41h_y+GdCA5xCEaSL1Jy4VZBo3MAy-Q@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 8 Jan 2015 14:52:13 -0500
+Subject: [PATCH v3 3/4] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <20150108160626.GN11583@arm.com>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <1420656594-8908-4-git-send-email-m-karicheri2@ti.com>
+ <20150108160626.GN11583@arm.com>
+Message-ID: <54AEDFED.8060008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
-
-> From: Rob Herring <robh@kernel.org>
+On 01/08/2015 11:06 AM, Will Deacon wrote:
+> On Wed, Jan 07, 2015 at 06:49:53PM +0000, Murali Karicheri wrote:
+>> Add of_pci_dma_configure() to allow updating the dma configuration
+>> of the pci device using the configuration from DT of the parent of
+>> the root bridge device.
+>>
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>> ---
+>>   drivers/of/of_pci.c    |   39 +++++++++++++++++++++++++++++++++++++++
+>>   include/linux/of_pci.h |   12 ++++++++++++
+>>   2 files changed, 51 insertions(+)
+>>
+>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>> index 88471d3..34878c9 100644
+>> --- a/drivers/of/of_pci.c
+>> +++ b/drivers/of/of_pci.c
+>> @@ -2,6 +2,7 @@
+>>   #include<linux/export.h>
+>>   #include<linux/of.h>
+>>   #include<linux/of_address.h>
+>> +#include<linux/of_device.h>
+>>   #include<linux/of_pci.h>
+>>   #include<linux/slab.h>
+>>
+>> @@ -229,6 +230,44 @@ parse_failed:
+>>   	return err;
+>>   }
+>>   EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+>> +
+>> +/**
+>> + * of_get_pci_root_bridge_parent - get the OF node of the root bridge's parent
+>> + * @dev: ptr to pci_dev struct of the pci device
+>> + *
+>> + * This function will traverse the bus up to the root bus starting with
+>> + * the child and return the OF node ptr to root bridge device's parent device.
+>> + */
+>> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
+>> +{
+>> +	struct pci_bus *bus = dev->bus;
+>> +	struct device *bridge;
+>> +
+>> +	while (!pci_is_root_bus(bus))
+>> +		bus = bus->parent;
+>> +	bridge = bus->bridge;
+>> +
+>> +	return bridge->parent->of_node;
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
+>> +
+>> +/**
+>> + * of_pci_dma_configure - Setup DMA configuration
+>> + * @dev: ptr to pci_dev struct of the pci device
+>> + *
+>> + * Function to update PCI devices's DMA configuration using the same
+>> + * info from the OF node of root host bridge's parent.
+>> + */
+>> +void of_pci_dma_configure(struct pci_dev *pci_dev)
+>> +{
+>> +	struct device *dev =&pci_dev->dev;
+>> +	struct device_node *parent_np;
+>> +
+>> +	parent_np = of_get_pci_root_bridge_parent(pci_dev);
+>> +	of_dma_configure(dev, parent_np);
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_pci_dma_configure);
 >
-> This series converts ARM Versatile platform to multi-platform. I started
-> this some time ago and some pieces were already merged. The primary
-> piece remaining is converting the PCI host to DT which I was waiting for
-> the common PCI DT parsing to get settled. Now that that is in place as
-> well as a few other pieces are in place like multi-platform fixes for
-> CLCD, we can fully convert Versatile to DT and multi-platform.
+> Whilst I think this is the right overall structure, I think this function
+> should determine the set of DMA aliases for the device and pass that through
+> to the IOMMU (as mentioned in my reply to the cover letter). Then we just
+> need to work out what we're doing for groups.
 >
-> There's still a few things that need DT support which can be done
-> later:
-> - MMC card detect and write protect. Should be able to use VExpress
->   support
-> - Reboot support. Should be able to re-use Realview reboot code.
-> - flash phys-map support. Binding exists, but specifically Vpp control
->   is needed.
-> - CLCD support. Not sure where this is at.
+> Will
+Will,
 
-I like it overall but would like to see some use of the syscon
-pattern to access random registers in syscon, and specifically not
-to refer to these registers as some "gpio" because they aren't.
+Could you add this as as a follow up patch as I don't have a platformm 
+that support IOMMU and as such my understanding of the IOMMU is limited?
 
-Yours,
-Linus Walleij
+I can help test the change to make sure it has no side effect on 
+Keystone that doesn't support IOMMU.
+
+Thanks.
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
