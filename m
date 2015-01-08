@@ -1,123 +1,359 @@
-From: abhijit.ray.chaudhury@gmail.com (Abhijit Ray Chaudhury)
-Date: Thu, 8 Jan 2015 15:42:29 +0530
-Subject: Question regarding Linux Bringup in ARMA9 platform
-Message-ID: <CAACKNgW6S4fFvsczgMODb6NdH+r_H62VAHG+-3uWcK7RFHUUdw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Jan 2015 11:13:53 +0100
+Subject: [PATCH v2 02/21] irqchip: tegra: add DT-based support for legacy
+ interrupt controller
+In-Reply-To: <1420652576-22309-3-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108101351.GD1987@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ,
+On Wed, Jan 07, 2015 at 05:42:37PM +0000, Marc Zyngier wrote:
+> Tegra's LIC (Legacy Interrupt Controller) has been so far only
+> supported as a weird extension of the GIC, which is not exactly
+> pretty.
+> 
+> The stacked irq domain framework fits this pretty well, and allows
 
-I am trying to bringup linux in ARMA9 platform. I am getting following crash :
+Nit: s/irq/IRQ/
 
+> the LIC code to be turned into a standalone irqchip. In the process,
+> make the driver DT aware, something that was sorely missing from
+> the mach-tegra implementation.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/Makefile    |   1 +
+>  drivers/irqchip/irq-tegra.c | 335 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 336 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-tegra.c
 
-Unhandled fault: alignment exception (0x001) at 0x88042001:
+This matches largely what I have in a local patch (modulo the stacked
+domains vs. gic_arch_extn). A few comments below.
 
- (link_path_walk+0xa4/0x86c)
-(path_lookupat+0x54/0x780)
-(do_path_lookup+0x1c/0x58)
-(user_path_at_empty+0x54/0x88)
-(user_path_at+0x10/0x14)
-(sys_chdir+0x18/0x64)
-(devtmpfsd+0x60/0x2b4)
-(kthread+0x80/0x90)
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 9516a32..59f34be 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+>  obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+>  obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+>  obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
+> +obj-$(CONFIG_ARCH_TEGRA)		+= irq-tegra.o
+>  obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
 
-when kthread tries to mount tempfs and does sys_chdir kernel copies
-the path ("/..") at a kernel buffer starting at 0x88042000. It the
-skips the "/" character. In "
-load_unaligned_zeropad" function it tries to access the content of
-0x88042001 using "ldr" or 32bit access instruction. That causes
-alignment exception and kernel simply panics.
+Should these be sorted alphabetically?
 
-At this stage is it expected that ARM does not generate alignment
-fault ? I can see a fixup code is written inside
-load_unaligned_zeropad function, but fixup is not applicable, as this
-is not page fault exception.
+> diff --git a/drivers/irqchip/irq-tegra.c b/drivers/irqchip/irq-tegra.c
+[...]
+> +#define TEGRA_MAX_NUM_ICTLRS	5
+> +
+> +static int num_ictlrs;
 
-i am attaching the kernel log. Kindly advice what could be going wrong.
+This could be unsigned int.
 
-Thanks in advance,
--Abhijit
+> +struct tegra_ictlr_info {
+> +	void __iomem *ictlr_reg_base[TEGRA_MAX_NUM_ICTLRS];
+
+Maybe only "reg_base" or "base". The ictlr_ prefix is redundant.
+
+> +#ifdef CONFIG_PM_SLEEP
+> +	u32 cop_ier[TEGRA_MAX_NUM_ICTLRS];
+> +	u32 cop_iep[TEGRA_MAX_NUM_ICTLRS];
+> +	u32 cpu_ier[TEGRA_MAX_NUM_ICTLRS];
+> +	u32 cpu_iep[TEGRA_MAX_NUM_ICTLRS];
+> +
+> +	u32 ictlr_wake_mask[TEGRA_MAX_NUM_ICTLRS];
+
+Same here.
+
+> +#endif
+> +};
+> +
+> +static struct tegra_ictlr_info *tegra_ictlr_info;
+
+This variable name could be shorter, say "lic", to make some of the code
+below more terse.
+
+> +static int tegra_ictlr_suspend(void)
+> +{
+> +	unsigned long flags;
+> +	int i;
+
+This could be unsigned int, too.
+
+[...]
+> +static void tegra_ictlr_resume(void)
+> +{
+> +	unsigned long flags;
+> +	int i;
+
+And here.
+
+> +static struct syscore_ops tegra_ictlr_syscore_ops = {
+> +	.suspend	= tegra_ictlr_suspend,
+> +	.resume		= tegra_ictlr_resume,
+> +};
+> +
+> +static int tegra_ictlr_syscore_init(void)
+> +{
+> +	register_syscore_ops(&tegra_ictlr_syscore_ops);
+> +
+> +	return 0;
+> +}
+> +#else
+> +#define tegra_set_wake	NULL
+> +static inline void tegra_ictlr_syscore_init(void) {}
+> +#endif
+
+Both prototypes for tegra_ictlr_syscore_init() should match here. Since
+it never fails, returning void for both should be fine.
+
+> +static struct irq_chip tegra_ictlr_chip = {
+> +	.name		= "ICTLR",
+
+Maybe name it "LIC" since that's the more common name for it?
+
+> +static int tegra_ictlr_domain_xlate(struct irq_domain *domain,
+> +				    struct device_node *controller,
+> +				    const u32 *intspec,
+> +				    unsigned int intsize,
+> +				    unsigned long *out_hwirq,
+> +				    unsigned int *out_type)
+> +{
+> +	if (domain->of_node != controller)
+> +		return -EINVAL;	/* Shouldn't happen, really... */
+> +	if (intsize != 3)
+> +		return -EINVAL;	/* Not GIC compliant */
+> +	if (intspec[0] != 0)
+
+Maybe use GIC_SPI from dt-bindings/interrupt-controller/arm-gic.h here?
+To match the DTS content?
+
+> +static int tegra_ictlr_domain_alloc(struct irq_domain *domain,
+> +				    unsigned int virq,
+> +				    unsigned int nr_irqs, void *data)
+> +{
+> +	struct of_phandle_args *args = data;
+> +	struct of_phandle_args parent_args;
+> +	struct tegra_ictlr_info *info = domain->host_data;
+> +	irq_hw_number_t hwirq;
+> +	int i;
+
+unsigned int?
+
+> +
+> +	if (args->args_count != 3)
+> +		return -EINVAL;	/* Not GIC compliant */
+> +	if (args->args[0] != 0)
+
+GIC_SPI?
+
+> +	hwirq = args->args[1];
+> +	if (hwirq >= (num_ictlrs * 32))
+> +		return -EINVAL;	/* Can't deal with this */
+
+Not sure if that comment is necessary here. It's fairly obvious why this
+is an error. But it doesn't hurt, so if you prefer to leave it, that's
+fine with me.
+
+> +
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		int ictlr = (hwirq + i) / 32;
+
+irq_hw_number_t? Or unsigned int?
+
+> +
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +					      &tegra_ictlr_chip,
+> +					      &info->ictlr_reg_base[ictlr]);
+> +	}
+> +
+> +	parent_args = *args;
+> +	parent_args.np = domain->parent->of_node;
+> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
+> +}
+> +
+> +
+
+There's an extra blank line here.
+
+> +static void tegra_ictlr_domain_free(struct irq_domain *domain,
+> +				    unsigned int virq,
+> +				    unsigned int nr_irqs)
+> +{
+> +	int i;
+
+unsigned int?
+
+> +
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
+> +		irq_domain_reset_irq_data(d);
+> +	}
+> +}
+
+Aren't you missing a call to irq_domain_free_irqs_parent() here? If so,
+why not use irq_domain_free_irqs_common() instead?
+
+> +static struct irq_domain_ops tegra_ictlr_domain_ops = {
+
+static const?
+
+> +	.xlate	= tegra_ictlr_domain_xlate,
+> +	.alloc	= tegra_ictlr_domain_alloc,
+> +	.free	= tegra_ictlr_domain_free,
+> +};
+> +
+> +static int __init tegra_ictlr_init(struct device_node *node,
+> +				   struct device_node *parent)
+> +{
+> +	struct irq_domain *parent_domain, *domain;
+> +	int err;
+> +	int i;
+
+unsigned int?
+
+> +
+> +	if (!parent) {
+> +		pr_err("%s: no parent, giving up\n", node->full_name);
+> +		return -ENODEV;
+> +	}
+> +
+> +	parent_domain = irq_find_host(parent);
+> +	if (!parent_domain) {
+> +		pr_err("%s: unable to obtain parent domain\n", node->full_name);
+> +		return -ENXIO;
+> +	}
+> +
+> +	tegra_ictlr_info = kzalloc(sizeof(*tegra_ictlr_info), GFP_KERNEL);
+> +	if (!tegra_ictlr_info)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < TEGRA_MAX_NUM_ICTLRS; i++) {
+> +		void __iomem *base;
+> +
+> +		base = of_iomap(node, i);
+> +		if (!base)
+> +			break;
+> +
+> +		tegra_ictlr_info->ictlr_reg_base[i] = base;
+> +
+> +		/* Disable all interrupts */
+> +		writel_relaxed(~0, base + ICTLR_CPU_IER_CLR);
+
+I think you used ~0ul elsewhere, so maybe make this (or the other
+instances) consistent?
+
+> +		/* All interrupts target IRQ */
+> +		writel_relaxed(0, base + ICTLR_CPU_IEP_CLASS);
+> +
+> +		num_ictlrs++;
+> +	}
+> +
+> +	if (!num_ictlrs) {
+> +		pr_err("%s: no valid regions, giving up\n", node->full_name);
+> +		err = -ENOMEM;
+> +		goto out_free;
+> +	}
+
+The local patch that I have does this slightly differently. We have a
+tiny table of struct of_device_ids that contains the number of interrupt
+controllers to expect for a given compatible (see also below). The code
+then checks that the node indeed has valid reg entries for each of the
+controllers. So this could be something like:
+
+	struct tegra_ictlr_soc {
+		unsigned int num_ictlrs;
+	};
+
+	static const struct tegra_ictlr_soc tegra20_ictlr_soc = {
+		.num_ictlrs = 4,
+	};
+
+	static const struct tegra_ictlr_soc tegra30_ictlr_soc = {
+		.num_ictlrs = 5,
+	};
+
+	static const struct of_device_id ictlr_matches[] = {
+		{ .compatible = "nvidia,tegra30-ictlr", .data = &tegra30_ictlr_soc },
+		{ .compatible = "nvidia,tegra20-ictlr", .data = &tegra20_ictlr_soc },
+		{ }
+	};
+
+And in tegra_ictrl_init():
+
+	const struct of_device_id *match;
+
+	match = of_match_node(ictlr_matches, node);
+	if (!match)
+		return -ENODEV;
+
+	soc = match->data;
+
+	...
+
+	WARN(num_ictlrs != soc->num_ictlrs,
+	     "Found %u interrupt controllers in DT; expected %u.\n",
+	     num_ictlrs, soc->num_ictlrs);
+
+> +
+> +	domain = irq_domain_add_hierarchy(parent_domain, 0, num_ictlrs * 32,
+> +					  node, &tegra_ictlr_domain_ops,
+> +					  tegra_ictlr_info);
+
+Do we need to add a select IRQ_DOMAIN_HIERARCHY somewhere for this to
+compile? I guess it's already implied by the select ARM_GIC from
+ARCH_TEGRA, so maybe we don't have to be explicit.
+
+> +	if (!domain) {
+> +		pr_err("%s: failed to allocated domain\n", node->full_name);
+> +		err = -ENOMEM;
+> +		goto out_unmap;
+> +	}
+> +
+> +	tegra_ictlr_syscore_init();
+> +
+> +	pr_info("%s: %d interrupts forwarded to %s\n",
+> +		node->full_name, num_ictlrs * 32, parent->full_name);
+> +
+> +	return 0;
+> +
+> +out_unmap:
+> +	for (i = 0; i < num_ictlrs; i++)
+> +		iounmap(tegra_ictlr_info->ictlr_reg_base[i]);
+> +out_free:
+> +	kfree(tegra_ictlr_info);
+> +	return err;
+> +}
+> +
+> +IRQCHIP_DECLARE(tegra_ictlr, "nvidia,tegra-ictlr", tegra_ictlr_init);
+
+In general we name compatible values after the first generation of the
+SoC that introduced them. For the LIC this would be:
+
+	compatible = "nvidia,tegra20-ictlr";
+	
+With Tegra30 the number of interrupt controllers was increased to 5, so
+it needs a new compatible:
+
+	compatible = "nvidia,tegra30-ictlr";
+
+Subsequent generations remain compatible with this variant, but they
+traditionally get their own compatible, so for Tegra114 we'd get:
+
+	compatible = "nvidia,tegra114-ictlr", "nvidia,tegra30-ictlr";
+
+And similar for Tegra124. So I think the IRQCHIP_DECLARE should match on
+"nvidia,tegra20-ictlr" instead. For the same reason we should have a
+second entry for the "nvidia,tegra30-ictlr" compatible.
+
+Thierry
 -------------- next part --------------
-Uncompressing Linux... done, booting the kernel.
-Booting Linux on physical CPU 0
-Linux version 3.6.0-uc0  (gcc version 4.7.1 (crosstool-NG 1.16.0) ) #7 PREEMPT Tue Jan 6 12:29:13 IST 2015
-CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7f
-CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-Memory policy: ECC disabled, Data cache writeback
-On node 0 totalpages: 65536
-free_area_init_node: node 0, pgdat 8029bf98, node_mem_map 805be000
-  Normal zone: 512 pages used for memmap
-  Normal zone: 0 pages reserved
-  Normal zone: 65024 pages, LIFO batch:15
-pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
-pcpu-alloc: [0] 0
-Built 1 zonelists in Zone order, mobility grouping off.  Total pages: 65024
-Kernel command line: console=ttyS0 rootfstype=romfs
-PID hash table entries: 1024 (order: 0, 4096 bytes)
-Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-Memory: 256MB = 256MB total
-Memory: 253976k/253976k available, 8168k reserved, 0K highmem
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    vmalloc : 0x90800000 - 0xff000000   (1768 MB)
-    lowmem  : 0x80000000 - 0x90000000   ( 256 MB)
-    modules : 0x7f000000 - 0x80000000   (  16 MB)
-      .text : 0x80008000 - 0x8026c7fc   (2450 kB)
-      .init : 0x8026d000 - 0x80281fe8   (  84 kB)
-      .data : 0x80282000 - 0x8029c840   ( 107 kB)
-       .bss : 0x8029c880 - 0x802d8000   ( 238 kB)
-NR_IRQS:64
-sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 4294967286ms
-Console: colour dummy device 80x30
-console [ttyS0] enabled
-Calibrating delay loop... 1607.27 BogoMIPS (lpj=8036352)
-pid_max: default: 32768 minimum: 301
-Mount-cache hash table entries: 512
-CPU: Testing write buffer coherency: ok
-Setting up static identity map for 0x1d1d40 - 0x1d1dd4
-L310 cache controller enabled
-l2x0: 8 ways, CACHE_ID 0x410094c8, AUX_CTRL 0x7e460000, Cache size: 524288 B
-Unhandled fault: alignment exception (0x001) at 0x88042001
-Internal error: : 1 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0    Not tainted  (3.6.0-uc0 #7)
-PC is at link_path_walk+0xa4/0x86c
-LR is at link_path_walk+0x5c/0x86c
-pc : [<80087448>]    lr : [<80087400>]    psr: 60000153
-sp : 8804de10  ip : 8804ded0  fp : 00000000
-r10: 00000000  r9 : 00000000  r8 : 88042000
-r7 : 88042001  r6 : 8804c000  r5 : 00000000  r4 : 8804deb8
-r3 : 00000000  r2 : 88042001  r1 : 00000000  r0 : 00000000
-Flags: nZCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7f  Table: 00004059  DAC: 00000015
-Process kdevtmpfs (pid: 9, stack limit = 0x8804c2f0)
-Stack: (0x8804de10 to 0x8804e000)
-de00:                                     8800ab40 80078934 8803fca0 8803fca0
-de20: 00000000 8008f610 00000000 8003b960 0000002f 80087fbc ffffff9c 8804deb8
-de40: 00000000 00000043 ffffff9c 88042000 00000000 80088280 8804de60 8003c374
-de60: 00000000 8009e7ec 8804de68 8800d780 600001d3 8802bfa4 8800abc0 00000003
-de80: 8804deb8 88042000 ffffff9c ffffff9c 00000000 00000000 00000000 800889c8
-dea0: 88042000 8804df66 00000003 8804df38 ffffff9c 8008a838 8800d810 88012800
-dec0: 8800d810 00000000 00000020 8800d750 8800d810 88012800 88011d78 00001053
-dee0: 00000002 00000001 00000000 806be860 806be020 00000000 88001bc0 800795a0
-df00: 8028a2e4 00000000 88042000 00008000 8802bfa4 8804df66 801389e8 00000013
-df20: 00000000 8008a87c 00000000 8023b739 00000003 8007bea0 8023b739 00008001
-df40: 8802bfa4 80138a48 8804df66 00000003 8028f200 88028630 ffffffff 8802a000
-df60: 00000002 6f6dca2c 303d6564 00353537 00000000 00000002 8804df9c 8003c724
-df80: 8804c000 88028600 8028f200 8804c000 8804c000 88028600 8804dfcc 801d0ed0
-dfa0: 00000013 00000000 00000000 8802bf74 8802bfa4 801389e8 00000013 00000000
-dfc0: 00000000 00000000 00000000 80034798 00000000 00000000 8802bfa4 00000000
-dfe0: 8804dfe0 8804dfe0 8802bf74 80034718 8000ebc8 8000ebc8 00000000 00000000
-[<80087448>] (link_path_walk+0xa4/0x86c) from [<80088280>] (path_lookupat+0x54/0x780)
-[<80088280>] (path_lookupat+0x54/0x780) from [<800889c8>] (do_path_lookup+0x1c/0x58)
-[<800889c8>] (do_path_lookup+0x1c/0x58) from [<8008a838>] (user_path_at_empty+0x54/0x88)
-[<8008a838>] (user_path_at_empty+0x54/0x88) from [<8008a87c>] (user_path_at+0x10/0x14)
-[<8008a87c>] (user_path_at+0x10/0x14) from [<8007bea0>] (sys_chdir+0x18/0x64)
-[<8007bea0>] (sys_chdir+0x18/0x64) from [<80138a48>] (devtmpfsd+0x60/0x2b4)
-[<80138a48>] (devtmpfsd+0x60/0x2b4) from [<80034798>] (kthread+0x80/0x90)
-[<80034798>] (kthread+0x80/0x90) from [<8000ebc8>] (kernel_thread_exit+0x0/0x8)
-Code: e1a03000 e2811004 e0835005 e0872001 (e5923000)
----[ end trace 1b75b31a2719ed1c ]---
-Kernel panic - not syncing: Fatal exception
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/028f9853/attachment.sig>
