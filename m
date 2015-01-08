@@ -1,37 +1,110 @@
 From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Thu,  8 Jan 2015 15:22:18 +0200
-Subject: [PATCH v7 15/16] ARM: tegra: Add CPU regulator to the Jetson TK1
- device tree
+Date: Thu,  8 Jan 2015 15:22:08 +0200
+Subject: [PATCH v7 05/16] clk: tegra: Add DFLL DVCO reset control for Tegra124
 In-Reply-To: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
 References: <1420723339-30735-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1420723339-30735-16-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1420723339-30735-6-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify the CPU voltage regulator for the cpufreq driver.
+From: Paul Walmsley <pwalmsley@nvidia.com>
 
+The DVCO present in the DFLL IP block has a separate reset line,
+exposed via the CAR IP block.  This reset line is asserted upon SoC
+reset.  Unless something (such as the DFLL driver) deasserts this
+line, the DVCO will not oscillate, although reads and writes to the
+DFLL IP block will complete.
+
+Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+saving hours of debugging time.
+
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+[ttynkkynen: ported to tegra124 from tegra114]
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
 ---
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clk/tegra/clk-tegra124.c | 47 ++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/tegra/clk.h          |  3 +++
+ 2 files changed, 50 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-index f539990..1a3a88c 100644
---- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-+++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-@@ -1774,6 +1774,12 @@
- 		};
- 	};
+diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+index f5f9bac..623b77f 100644
+--- a/drivers/clk/tegra/clk-tegra124.c
++++ b/drivers/clk/tegra/clk-tegra124.c
+@@ -31,6 +31,9 @@
+ #define CLK_SOURCE_CSITE 0x1d4
+ #define CLK_SOURCE_EMC 0x19c
  
-+	cpus {
-+		cpu at 0 {
-+			vdd-cpu-supply = <&vdd_cpu>;
-+		};
-+	};
++#define RST_DFLL_DVCO			0x2f4
++#define DVFS_DFLL_RESET_SHIFT		0
 +
- 	gpio-keys {
- 		compatible = "gpio-keys";
+ #define PLLC_BASE 0x80
+ #define PLLC_OUT 0x84
+ #define PLLC_MISC2 0x88
+@@ -1399,6 +1402,50 @@ static void __init tegra124_clock_apply_init_table(void)
+ 	tegra_init_from_table(init_table, clks, TEGRA124_CLK_CLK_MAX);
+ }
+ 
++/**
++ * tegra124_car_barrier - wait for pending writes to the CAR to complete
++ *
++ * Wait for any outstanding writes to the CAR MMIO space from this CPU
++ * to complete before continuing execution.  No return value.
++ */
++static void tegra124_car_barrier(void)
++{
++	readl_relaxed(clk_base + RST_DFLL_DVCO);
++}
++
++/**
++ * tegra124_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
++ *
++ * Assert the reset line of the DFLL's DVCO.  No return value.
++ */
++void tegra124_clock_assert_dfll_dvco_reset(void)
++{
++	u32 v;
++
++	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
++	v |= (1 << DVFS_DFLL_RESET_SHIFT);
++	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
++	tegra124_car_barrier();
++}
++EXPORT_SYMBOL(tegra124_clock_assert_dfll_dvco_reset);
++
++/**
++ * tegra124_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
++ *
++ * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
++ * operate.  No return value.
++ */
++void tegra124_clock_deassert_dfll_dvco_reset(void)
++{
++	u32 v;
++
++	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
++	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
++	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
++	tegra124_car_barrier();
++}
++EXPORT_SYMBOL(tegra124_clock_deassert_dfll_dvco_reset);
++
+ static void __init tegra124_clock_init(struct device_node *np)
+ {
+ 	struct device_node *node;
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 4e458aa..def0ea4 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -629,6 +629,9 @@ void tegra114_clock_tune_cpu_trimmers_init(void);
+ void tegra114_clock_assert_dfll_dvco_reset(void);
+ void tegra114_clock_deassert_dfll_dvco_reset(void);
+ 
++void tegra124_clock_assert_dfll_dvco_reset(void);
++void tegra124_clock_deassert_dfll_dvco_reset(void);
++
+ typedef void (*tegra_clk_apply_init_table_func)(void);
+ extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
  
 -- 
 2.2.1
