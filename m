@@ -1,39 +1,40 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed,  7 Jan 2015 16:54:39 -0800
-Subject: [PATCH] reset: sunxi: fix spinlock initialization
-Message-ID: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Jan 2015 16:55:09 -0800
+Subject: [PATCH 5/5] arm: omap2plus_defconfig: enable TPS65218 power button
+In-Reply-To: <1419622104-25812-6-git-send-email-balbi@ti.com>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+ <1419622104-25812-6-git-send-email-balbi@ti.com>
+Message-ID: <20150108005508.GU13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call spin_lock_init() before the spinlocks are used, preventing a lockdep
-splat.
+* Felipe Balbi <balbi@ti.com> [141226 11:31]:
+> Enable tps65218 power button driver by default as
+> a dynamically linked module so AM437x SK can report
+> power button presses.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
-when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
-and has been tested on a few other sunxi platforms without issue.
+Applying this into omap-for-v3.20/defconfig thanks.
 
-[1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
-[2] http://kernelci.org/boot/?a80-optimus
+Tony
 
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
-This patch was tested on 3.19.0-rc3 
-
- drivers/reset/reset-sunxi.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-index eebc52c..e37250c 100644
---- a/drivers/reset/reset-sunxi.c
-+++ b/drivers/reset/reset-sunxi.c
-@@ -157,6 +157,8 @@ static int sunxi_reset_probe(struct platform_device *pdev)
- 	if (IS_ERR(data->membase))
- 		return PTR_ERR(data->membase);
- 
-+	spin_lock_init(&data->lock);
-+
- 	data->rcdev.owner = THIS_MODULE;
- 	data->rcdev.nr_resets = resource_size(res) * 32;
- 	data->rcdev.ops = &sunxi_reset_ops;
--- 
-2.1.3
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index c2c3a85..f4a4b2f 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -183,6 +183,7 @@ CONFIG_TOUCHSCREEN_EDT_FT5X06=m
+>  CONFIG_TOUCHSCREEN_TSC2005=m
+>  CONFIG_TOUCHSCREEN_TSC2007=m
+>  CONFIG_INPUT_MISC=y
+> +CONFIG_INPUT_TPS65218_PWRBUTTON=m
+>  CONFIG_INPUT_TWL4030_PWRBUTTON=y
+>  # CONFIG_LEGACY_PTYS is not set
+>  CONFIG_SERIAL_8250=y
+> -- 
+> 2.2.0
+> 
