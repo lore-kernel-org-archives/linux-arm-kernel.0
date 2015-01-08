@@ -1,107 +1,67 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 08 Jan 2015 12:11:40 +0100
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <54AE5C8F.9080600@arm.com>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
- <54AE55CE.6040201@linaro.org> <54AE5C8F.9080600@arm.com>
-Message-ID: <54AE65EC.3050808@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 8 Jan 2015 12:18:19 +0100
+Subject: [PATCH] ARM: mediatek: dts: Add UART dts for MT8127 and MT8135
+ boards
+In-Reply-To: <1420460918-24380-1-git-send-email-eddie.huang@mediatek.com>
+References: <1420460918-24380-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <CABuKBeLy5pg6GJNsE2ArszaG3k2DX1Ao3RA=1EjT3dHUQxui2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 11:31 AM, Sudeep Holla wrote:
-> Hi Daniel,
->
-> On Thursday 08 January 2015 03:32 PM, Daniel Lezcano wrote:
->> On 01/08/2015 10:16 AM, Sudeep Holla wrote:
->>> Hi Daniel,
->>>
->>> On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
->>>> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
->>>>> If big.LITTLE driver is initialized even when MCPM is
->>>>> unavailable, we get the below warning the first time cpu tries
->>>>>  to enter deeper C-states.
->>>>
->>>> Can you elaborate why MCPM could be unavailable when the tc2 pm
->>>> code registers the mcpm platform ops before the cpuidle driver ?
->>>>
->>>>
->>> I can think of 3 possible scenarios. Let me know if these make
->>> sense.
->>>
->>> 1. If the firmware settings in Vexpress configuration files are set
->>> to boot in legacy mode, but MCPM is enabled in the kernel.
->>
->> If I am not wrong, we have a BUG_ON in this path, right ?
->>
->
-> No we can't do that. E.g. on TC2 we should continue to boot in legacy
-> mode though none of the power management features work which is fine.
-> One scenario is I don't want to recompile the kernel, but try legacy
-> boot on TC2 flipping the firmware setting.
+Hi Eddie,
 
-What I meant is the BUG_ON is already there, no ?
+2015-01-05 13:28 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
+> This patch enable UART for MT8127 moose board and MT8135 evalution board.
+> Adding the dts, these two boards can show log and shell prompts.
+> This patch base on my previous MT8135/MT8127 SoC UART dtsi patch [1] and
+> Matthias's modification to disable SoC UART by default.
 
->>> 2. If some failure occurs during MCPM initialization 3. For
->>> example, if CCI is not accessible as in some Exynos boards [1], we
->>>  don't want to wait till mpcm_cpu_suspend ?
->>
->> Well, I think if the firmware is preventing us to play with the CCI
->> but MCPM is enabled. We should add BUG_ON also in the same
+I applied this patch deleting this two lines and the reference. From
+my understanding this is extra information about the patch depends on
+the actual development process and should normally be in the cover
+letter but not in the patch description itself.
+
+Thanks,
+Matthias
+
 >
-> Again why if alternate method of booting exists with limited/no PM
-> features.
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/312311.html
 >
->> initialization path. IIRC, Kevin spent some time to figure out what
->> was happening to its odroid-xu3 board before understanding mcpm
->> wasn't able to deal with the CCI due to the broken firmware.
->>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt8127-moose.dts | 4 ++++
+>  arch/arm/boot/dts/mt8135-evbp1.dts | 4 ++++
+>  2 files changed, 8 insertions(+)
 >
-> I agree, I did follow that thread, though I don't fully understand if
-> there exists alternate boot protocol on such boards. For sure TC2 or
-> Vexpress with any coretile in general have legacy boot support.
+> diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
+> index 13cba0e..073e295 100644
+> --- a/arch/arm/boot/dts/mt8127-moose.dts
+> +++ b/arch/arm/boot/dts/mt8127-moose.dts
+> @@ -23,3 +23,7 @@
+>                 reg = <0 0x80000000 0 0x40000000>;
+>         };
+>  };
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
+> index a5adf97..3667738 100644
+> --- a/arch/arm/boot/dts/mt8135-evbp1.dts
+> +++ b/arch/arm/boot/dts/mt8135-evbp1.dts
+> @@ -23,3 +23,7 @@
+>                 reg = <0 0x80000000 0 0x40000000>;
+>         };
+>  };
+> +
+> +&uart3 {
+> +       status = "okay";
+> +};
+> --
+> 1.8.1.1.dirty
 >
->> The patch you are proposing is valid. Nevertheless, I would really
->> like to have the firmwares to be fixed and your patch is hiding an
->> incompatible firmware with the kernel configuration and letting the
->> kernel continue to work in degraded mode.
->>
->
-> I fully agree, but most of the time this argument is suppressed by
-> saying the product is shipped and firmware can't be upgraded.
 
-This is an invalid argument. Shipped product have their own kernels, so 
-they can hack their kernel to remove the limitation.
-
->> IMO, it would be better to be more strict with the mcpm
->> initialization and not let the system boot if something is wrong with
->> it which I believe is coming from the firmware and let the user to
->> figure out what is really happening by letting him to disable mcpm in
->> the kernel configuration (which in turn will disable cpuidle).
->
-> Again I fully agree, but in this case I manually switched to legacy boot
-> mode on TC2 and used same kernel with MCPM config enabled. Do you mean
-> to say we should not support that even when developer understand the
-> consequence of that ?
-
-Well, I see there are the exynos5410/5420/5422. For the 5422 on 
-chromebook2 MCPM works well, IIUC. But for the 5422 on odroid-xu3, MCPM 
-does not work, hence cpuidle neither because of the firmware.
-
-Silently disabling cpuidle because mcpm did not initialize will hide the 
-issue.
-
-I understand your point about switching to legacy without recompiling 
-the kernel.
-
-I suggest we add a big fat WARN_ON when the mcpm initialization fails 
-with your patch.
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+motzblog.wordpress.com
