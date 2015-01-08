@@ -1,34 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Jan 2015 23:46:46 +0100
-Subject: [PATCH v2 0/8] ARM: Conexant Digicolor CX92755 SoC support
-In-Reply-To: <cover.1420744368.git.baruch@tkos.co.il>
-References: <cover.1420744368.git.baruch@tkos.co.il>
-Message-ID: <5966468.GiJYdzCvnt@wuerfel>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 8 Jan 2015 17:46:31 -0500
+Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
+In-Reply-To: <2785994.gTZ9chGdKf@wuerfel>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <54ADBB89.8070503@ti.com> <1934001.D0JfDRp1gF@wuerfel>
+ <2785994.gTZ9chGdKf@wuerfel>
+Message-ID: <54AF08C7.2010100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 January 2015 21:39:56 Baruch Siach wrote:
-> This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
-> one of the Digicolor series of SoCs, all sharing many of the same peripherals.
-> The code was tested on the CX92755 evaluation kit, AKA Equinox.
-> 
-> Uses attempting to try this code will most likely also want the UART/console
-> driver available from https://patchwork.kernel.org/patch/5515861/.
- 
-Looks great overall now.
+On 01/08/2015 05:27 PM, Arnd Bergmann wrote:
+> On Thursday 08 January 2015 09:56:39 Arnd Bergmann wrote:
+>> There is another interesting case, which is a USB host controller or
+>> something similar behind a PCI bus. These are quite common and also
+>> need to be handled in some form. Let's do just PCI first for now, but
+>> be aware that this will come next. Should we assume that the ID that
+>> is required for a device is either known from the device node, or
+>> that it comes from a PCI device? That means for the USB case, we will
+>> likely need to have some custom logic. There seems to be an implicit
+>> assumption all over the kernel that all devices have the same IOMMU
+>> instance, but we can't really rely on that here.
+>>
+>
+> Update: I've checked the USB implementation and we are lucky because
+> these interactions are all done by the USB host controller, and a
+> USB device is not itself DMA capable. We don't have to do anything
+> for USB.
 
-I have just two more comments in one patch, and one general request:
+Ok Thanks.
 
-Please add a patch description for every patch. The text above would
-be a good start for the first patch, but it would be lost in the git
-history if it's only in the cover letter.
+Murali
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-other than that, feel free to add my
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Once there are no more review comments, please submit the first three
-patches to arm at kernel.org, and send the other patches as separate
-series to the respective maintainers for irqchip and clocksource.
-
-	Arnd
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
