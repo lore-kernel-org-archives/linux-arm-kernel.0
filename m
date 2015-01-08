@@ -1,123 +1,113 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Jan 2015 14:59:53 +0100
-Subject: [PATCH 1/1] ARM: dts: pcduino: Enable user LED and button
- support for pcDuino
-In-Reply-To: <1420709664-12687-1-git-send-email-wigyori@uid0.hu>
-References: <1420709664-12687-1-git-send-email-wigyori@uid0.hu>
-Message-ID: <20150108135953.GU7853@lukather>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 08 Jan 2015 15:01:03 +0100
+Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
+ if MCPM is unavailable
+In-Reply-To: <20150108122958.GB32308@red-moon>
+References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
+ <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
+ <54AE55CE.6040201@linaro.org> <54AE5C8F.9080600@arm.com>
+ <54AE65EC.3050808@linaro.org> <20150108122958.GB32308@red-moon>
+Message-ID: <54AE8D9F.6090400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/08/2015 01:29 PM, Lorenzo Pieralisi wrote:
+> On Thu, Jan 08, 2015 at 11:11:40AM +0000, Daniel Lezcano wrote:
+>
+> [...]
+>
+>>>> IMO, it would be better to be more strict with the mcpm
+>>>> initialization and not let the system boot if something is wrong with
+>>>> it which I believe is coming from the firmware and let the user to
+>>>> figure out what is really happening by letting him to disable mcpm in
+>>>> the kernel configuration (which in turn will disable cpuidle).
+>>>
+>>> Again I fully agree, but in this case I manually switched to legacy boot
+>>> mode on TC2 and used same kernel with MCPM config enabled. Do you mean
+>>> to say we should not support that even when developer understand the
+>>> consequence of that ?
+>>
+>> Well, I see there are the exynos5410/5420/5422. For the 5422 on
+>> chromebook2 MCPM works well, IIUC. But for the 5422 on odroid-xu3, MCPM
+>> does not work, hence cpuidle neither because of the firmware.
+>>
+>> Silently disabling cpuidle because mcpm did not initialize will hide the
+>> issue.
+>
+> No. MCPM *will* initialize, Sudeep's patch does not silently disable
+> CPUidle.
+> To put it differently MCPM will initialize if CCI is in the DT and it
+> is "available", so unless defined differently in the dts mcpm will be
+> available and CPUidle will be initialized (and break if there is an issue
+> with the platform FW/HW).
+>
+> I agree the mechanism to define if MCPM is available can be improved
+> but that's what it is at the moment.
+>
+> The problem here is to boot a platform with different boot methods
+> and still have a single kernel image.
+>
+>> I understand your point about switching to legacy without recompiling
+>> the kernel.
+>>
+>> I suggest we add a big fat WARN_ON when the mcpm initialization fails
+>> with your patch.
+>
+> I think there are multiple facets we are tackling at once here and they
+> should not be mixed.
 
-On Thu, Jan 08, 2015 at 10:34:24AM +0100, Zoltan HERPAI wrote:
-> The pcDuino board has LEDs connected to PH15/PH16, and back/home/menu
-> buttons to PH17/18/19 respectively. Enable these via gpio-leds and
-> gpio-keys. This is shared across the v1 and v2 versions of the board.
-> 
-> Tested on a v2 and verified against the schematics of a v1.
-> 
-> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
-> Acked-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> ---
->  arch/arm/boot/dts/sun4i-a10-pcduino.dts |   57 +++++++++++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-> index 48161ad..c26a6bb 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-> @@ -51,6 +51,8 @@
->  #include "sunxi-common-regulators.dtsi"
->  
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->  
->  / {
->  	model = "LinkSprite pcDuino";
-> @@ -64,6 +66,22 @@
->  			status = "okay";
->  		};
->  
-> +		pinctrl at 01c20800 {
-> +			led_pins_pcduino: led_pins at 0 {
-> +				allwinner,pins = "PH15", "PH16";
-> +				allwinner,function = "gpio_out";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			key_pins_pcduino: key_pins at 0 {
-> +				allwinner,pins = "PH17", "PH18", "PH19";
-> +				allwinner,function = "gpio_in";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +		};
-> +
->  		mdio at 01c0b080 {
->  			status = "okay";
->  
-> @@ -126,6 +144,45 @@
->  		};
->  	};
->  
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pins_pcduino>;
-> +
-> +		tx {
-> +			label = "pcduino:green:tx";
-> +			gpios = <&pio 7 15 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		rx {
-> +			label = "pcduino:green:rx";
-> +			gpios = <&pio 7 16 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&key_pins_pcduino>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		button at 0 {
-> +			label = "Key Back";
-> +			linux,code = <KEY_BACK>;
-> +			gpios = <&pio 7 17 GPIO_ACTIVE_LOW>;
-> +		};
-> +		button at 1 {
-> +			label = "Key Home";
-> +			linux,code = <KEY_HOME>;
-> +			gpios = <&pio 7 18 GPIO_ACTIVE_LOW>;
-> +		};
-> +		button at 2 {
-> +			label = "Key Menu";
-> +			linux,code = <KEY_MENU>;
-> +			gpios = <&pio 7 19 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
+Yes, I agree.
 
-Some newlines here would have been nice between the button nodes. I
-added them and applied the patch.
+> 1) We left static idle states there to cope with legacy DTBs that were
+>     published before we introduced idle states bindings. If we want to
+>     boot eg vexpress in legacy mode but single kernel image with MCPM on,
+>     we could remove the idle states in DT and the problem would be
+>     solved; we can't do that since we were forced to leave the static
+>     idle tables. Overall I think this is not the way to fix the issue.
+> 2) The idle driver should be initialized if there is an idle state entry
+>     method, which in this case is MCPM. If I boot vexpress with MCPM
+>     enabled but legacy boot method (ie spin table) with a single kernel image
+>     I do not want to warn if the idle states entry method (MCPM) can't be
+>     initialized (and I do not want to get a warning if the idle driver is
+>     triggering a mcpm_cpu_suspend), so Sudeep's patch is valid and I am
+>     against adding a:
+>
+>     if (WARN_ON(!mcpm_is_available())
+>
+> 3) Sudeep's patch is not hiding anything. If CCI is in DT, CCI is
+>     probed so mcpm_is_available() == true. If the firmware is borked
+>     the idle states will be entered and we will notice there is something
+>     wrong
+>
+> So overall I think Sudeep's patch is sound.
 
-Thanks!
+Ok, I will pick Sudeep's patch. Shall I add your acked-by ?
 
-Maxime
+> I also think we should
+> improve the way we detect if MCPM is available,
+
+Yes, I agree.
+
+> and again, I think the
+> CPU operations on arm64 are a good example that we can and we should
+> replicate.
+
+Ok, I think that will raise another thread soon :)
+
+Thanks for your feedbacks.
+
+   -- Daniel
+
+
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/2711bcce/attachment.sig>
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
