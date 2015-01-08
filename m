@@ -1,46 +1,38 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 8 Jan 2015 14:26:36 -0500
-Subject: [PATCH v3 2/4] of: move of_dma_configure() to device,c to help
- re-use
-In-Reply-To: <3861625.CJ6m15sZMh@wuerfel>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <1420656594-8908-3-git-send-email-m-karicheri2@ti.com>
- <CAL_Jsq+pKeXuGnZV_NYHn6iZgeOs404OPhcUb0FJs=-7j2P1Ug@mail.gmail.com>
- <3861625.CJ6m15sZMh@wuerfel>
-Message-ID: <54AED9EC.1020703@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 Jan 2015 20:28:45 +0100
+Subject: [PATCH v2 0/8] Add Simple Power-Managed Bus Support
+In-Reply-To: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
+References: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdVeEmKiqGTOmevaBDbJ=nBTbSi6d6Xrm0eyvbMTtyU=sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 03:40 AM, Arnd Bergmann wrote:
-> On Wednesday 07 January 2015 17:37:56 Rob Herring wrote:
->> On Wed, Jan 7, 2015 at 12:49 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->>
->>> +       ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
->>> +       if (ret<  0) {
->>> +               dma_addr = offset = 0;
->>> +               size = dev->coherent_dma_mask + 1;
->>
->> If coherent_dma_mask is DMA_BIT_MASK(64), then you will overflow and
->> have a size of 0. There may also be a problem when the mask is only
->> 32-bit type.
->
-> The mask is always a 64-bit type, it's not optional. But you are right,
-> the 64-bit mask case is broken, so I guess we have to fix it differently
-> by always passing the smaller value into arch_setup_dma_ops and
-> adapting that function instead.
-Arnd,
+On Wed, Dec 17, 2014 at 7:49 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> The Renesas Bus State Controller (BSC) provides an external bus for
+> connecting multiple external devices to an SoC, driving several chip
+> select lines, for e.g. NOR FLASH, Ethernet and USB.
+> On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
+> controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
+> R-Mobile APE6 (r8a73a4) SoC.
 
-What is the smaller value you are referring to in the below code? 
-between *dev->dma_mask and size from DT? But overflow can still happen 
-when size is to be calculated in arch_setup_dma_ops() for Non DT case or 
-when DT size is configured to be equivalent of DMA_BIT_MASK(64) + 1. Can 
-we discuss the code change you have in mind when you get a chance?
+[...]
 
-Murali
->
-> 	Arnd
+> This was tested on sh73a0/kzm9g-multiplatform. Without this, Ethernet
+> doesn't work, as the ZB clock is disabled by clk_disable_unused().
+> Testing on r8a73a4/ape6evm-multiplatform would be appreciated.
 
+Has anyone tried this on r8a73a4/ape6evm-multiplatform?
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Thanks again!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
