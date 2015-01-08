@@ -1,38 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Jan 2015 20:28:45 +0100
-Subject: [PATCH v2 0/8] Add Simple Power-Managed Bus Support
-In-Reply-To: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
-References: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdVeEmKiqGTOmevaBDbJ=nBTbSi6d6Xrm0eyvbMTtyU=sA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Jan 2015 20:37:23 +0100
+Subject: [PATCH 3/9] ARM: versatile: add DT based PCI detection
+In-Reply-To: <1419967718-26909-4-git-send-email-robherring2@gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <1419967718-26909-4-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdYEHwXhw3nEPHp7+4rtzXyh9Qb2QCpsRMfopxNoaX3rLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 7:49 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> The Renesas Bus State Controller (BSC) provides an external bus for
-> connecting multiple external devices to an SoC, driving several chip
-> select lines, for e.g. NOR FLASH, Ethernet and USB.
-> On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
-> controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
-> R-Mobile APE6 (r8a73a4) SoC.
+On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-[...]
+> From: Rob Herring <robh@kernel.org>
+>
+> Disable the Versatile PCI DT node when no PCI backplane is detected. This
+> will prevent the Versatile PCI driver from probing when PCI is not
+> populated.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-> This was tested on sh73a0/kzm9g-multiplatform. Without this, Ethernet
-> doesn't work, as the ZB clock is disabled by clk_disable_unused().
-> Testing on r8a73a4/ape6evm-multiplatform would be appreciated.
+(...)
+> +       /* Check if PCI backplane is detected */
+> +       val = __raw_readl(base + VERSATILE_SYS_PCICTL_OFFSET);
 
-Has anyone tried this on r8a73a4/ape6evm-multiplatform?
+I think this kind of random syscon register access should be handled
+using the mfd/syscon.c hub and looked up in some way to be used
+by the driver.
 
-Thanks again!
+I'm thinking along the pattern of adding code in drivers/*
+by the pattern of e.g.
+drivers/video/fbdev/amba-clcd-versatile.c
+i.e. an add-on that gets compiled-in only for those platform
+but still married to the main driver.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
