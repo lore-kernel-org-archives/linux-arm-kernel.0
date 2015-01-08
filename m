@@ -1,50 +1,82 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 8 Jan 2015 12:30:23 +0200
-Subject: [PATCH v2] ARM: dts: cm-t3x: add NAND support
-In-Reply-To: <20150108001648.GQ13010@atomide.com>
-References: <54A00BD6.8010507@compulab.co.il>
- <1419777049-25271-1-git-send-email-lifshitz@compulab.co.il>
- <54A151F2.9010904@ti.com> <54A25696.80608@compulab.co.il>
- <20150108001648.GQ13010@atomide.com>
-Message-ID: <54AE5C3F.7010306@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 08 Jan 2015 16:01:43 +0530
+Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
+ if MCPM is unavailable
+In-Reply-To: <54AE55CE.6040201@linaro.org>
+References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
+ <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
+ <54AE55CE.6040201@linaro.org>
+Message-ID: <54AE5C8F.9080600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/15 02:16, Tony Lindgren wrote:
-> * Dmitry Lifshitz <lifshitz@compulab.co.il> [141229 23:42]:
->> On 12/29/2014 03:06 PM, Roger Quadros wrote:
->>> On 28/12/14 16:30, Dmitry Lifshitz wrote:
->>>> --- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
->>>> +++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
->>>> @@ -50,7 +50,8 @@
->>>>  #include "omap-gpmc-smsc911x.dtsi"
->>>>
->>>>  &gpmc {
->>>> -	ranges = <5 0 0x2c000000 0x01000000>;
->>>> +	ranges = <5 0 0x2c000000 0x01000000>, /* CM-T3x30 SMSC9x Eth */
->>>> +		 <0 0 0x00000000 0x01000000>; /* CM-T3x NAND */
+Hi Daniel,
+
+On Thursday 08 January 2015 03:32 PM, Daniel Lezcano wrote:
+> On 01/08/2015 10:16 AM, Sudeep Holla wrote:
+>> Hi Daniel,
+>>
+>> On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
+>>> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
+>>>> If big.LITTLE driver is initialized even when MCPM is
+>>>> unavailable, we get the below warning the first time cpu tries
+>>>>  to enter deeper C-states.
 >>>
->>> Isn't this ranges property redundant as it will anyways be overridden by the board specific dts?
+>>> Can you elaborate why MCPM could be unavailable when the tc2 pm
+>>> code registers the mcpm platform ops before the cpuidle driver ?
 >>>
+>>>
+>> I can think of 3 possible scenarios. Let me know if these make
+>> sense.
 >>
->> The ranges are specified here (and other files below) by design.
->>
->> We built a tree like structure to organize DT files -
->> d234e4239 "ARM: dts: sbc-t3x: refactor DT support"
->>
->> It allows to inherit/override properties common for different boards.
->>
->> Our customers do not have to deal with a correct GPMC ranges settings, once
->> they base on omap3-cm-t3x.dts core module DT file (in case they do not
->> connect additional device to the bus).
->>
->> This is the point of Igor's comment to the previous patch version.
-> 
-> Roger, do you still have pending issues with this patch?
+>> 1. If the firmware settings in Vexpress configuration files are set
+>> to boot in legacy mode, but MCPM is enabled in the kernel.
+>
+> If I am not wrong, we have a BUG_ON in this path, right ?
+>
 
-Sorry missed this one. Thanks for the explanations Dmitry.
+No we can't do that. E.g. on TC2 we should continue to boot in legacy
+mode though none of the power management features work which is fine.
+One scenario is I don't want to recompile the kernel, but try legacy
+boot on TC2 flipping the firmware setting.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+>> 2. If some failure occurs during MCPM initialization 3. For
+>> example, if CCI is not accessible as in some Exynos boards [1], we
+>>  don't want to wait till mpcm_cpu_suspend ?
+>
+> Well, I think if the firmware is preventing us to play with the CCI
+> but MCPM is enabled. We should add BUG_ON also in the same
 
-cheers,
--roger
+Again why if alternate method of booting exists with limited/no PM features.
+
+> initialization path. IIRC, Kevin spent some time to figure out what
+> was happening to its odroid-xu3 board before understanding mcpm
+> wasn't able to deal with the CCI due to the broken firmware.
+>
+
+I agree, I did follow that thread, though I don't fully understand if
+there exists alternate boot protocol on such boards. For sure TC2 or
+Vexpress with any coretile in general have legacy boot support.
+
+> The patch you are proposing is valid. Nevertheless, I would really
+> like to have the firmwares to be fixed and your patch is hiding an
+> incompatible firmware with the kernel configuration and letting the
+> kernel continue to work in degraded mode.
+>
+
+I fully agree, but most of the time this argument is suppressed by
+saying the product is shipped and firmware can't be upgraded.
+
+> IMO, it would be better to be more strict with the mcpm
+> initialization and not let the system boot if something is wrong with
+> it which I believe is coming from the firmware and let the user to
+> figure out what is really happening by letting him to disable mcpm in
+> the kernel configuration (which in turn will disable cpuidle).
+
+Again I fully agree, but in this case I manually switched to legacy boot
+mode on TC2 and used same kernel with MCPM config enabled. Do you mean
+to say we should not support that even when developer understand the
+consequence of that ?
+
+Regards,
+Sudeep
