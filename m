@@ -1,42 +1,29 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 8 Jan 2015 17:46:31 -0500
-Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
-In-Reply-To: <2785994.gTZ9chGdKf@wuerfel>
+Date: Thu, 8 Jan 2015 17:46:52 -0500
+Subject: [PATCH v3 3/4] of/pci: add of_pci_dma_configure() update dma
+ configuration
+In-Reply-To: <2057344.eJYxBNosJg@wuerfel>
 References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <54ADBB89.8070503@ti.com> <1934001.D0JfDRp1gF@wuerfel>
- <2785994.gTZ9chGdKf@wuerfel>
-Message-ID: <54AF08C7.2010100@ti.com>
+ <20150108160626.GN11583@arm.com> <54AEDFED.8060008@ti.com>
+ <2057344.eJYxBNosJg@wuerfel>
+Message-ID: <54AF08DC.3000302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 05:27 PM, Arnd Bergmann wrote:
-> On Thursday 08 January 2015 09:56:39 Arnd Bergmann wrote:
->> There is another interesting case, which is a USB host controller or
->> something similar behind a PCI bus. These are quite common and also
->> need to be handled in some form. Let's do just PCI first for now, but
->> be aware that this will come next. Should we assume that the ID that
->> is required for a device is either known from the device node, or
->> that it comes from a PCI device? That means for the USB case, we will
->> likely need to have some custom logic. There seems to be an implicit
->> assumption all over the kernel that all devices have the same IOMMU
->> instance, but we can't really rely on that here.
+On 01/08/2015 05:25 PM, Arnd Bergmann wrote:
+> On Thursday 08 January 2015 14:52:13 Murali Karicheri wrote:
 >>
+>> Could you add this as as a follow up patch as I don't have a platformm
+>> that support IOMMU and as such my understanding of the IOMMU is limited?
+>>
+>> I can help test the change to make sure it has no side effect on
+>> Keystone that doesn't support IOMMU.
 >
-> Update: I've checked the USB implementation and we are lucky because
-> these interactions are all done by the USB host controller, and a
-> USB device is not itself DMA capable. We don't have to do anything
-> for USB.
-
-Ok Thanks.
-
-Murali
+> I think that's fine. Let's get your series done first and add the
+> DMA aliases for iommus on top once we have worked out what to do.
 >
 > 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+Ok.
 
 -- 
 Murali Karicheri
