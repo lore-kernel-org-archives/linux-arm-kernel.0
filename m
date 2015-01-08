@@ -1,80 +1,73 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 8 Jan 2015 11:55:58 +0100
-Subject: [PATCH] net/at91_ether: prepare and unprepare clock
-In-Reply-To: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54AE623E.5020507@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Jan 2015 11:57:43 +0100
+Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for
+ tegra_resume() location store
+In-Reply-To: <54985C30.7020605@wwwdotorg.org>
+References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
+ <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
+ <54985C30.7020605@wwwdotorg.org>
+Message-ID: <20150108105742.GI1987@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/01/2015 23:59, Alexandre Belloni a ?crit :
-> The clock is enabled without being prepared, this leads to:
+On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
+> On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
+> >22.12.2014 19:17, Stephen Warren ?????:
+> >>On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
+> >>>Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
+> >>>tegra_resume()
+> >>>location storing from late to early and as result broke suspend on tegra20.
+> >>>PMC scratch register 41 was used by tegra lp1 suspend core code for storing
+> >>>physical memory address of common resume function and in the same time used by
+> >>>tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
+> >>>strict order of scratch register use. Fix it by using scratch 40 instead of 41
+> >>>for tegra_resume() location store.
+> >>
+> >>You likely can't simply change the PMC scratch register usage arbitrarily;
+> >>specific registers are designated for specific purposes, and code outside the
+> >>Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
+> >>those specific values being in those registers. Without significant research,
+> >>I'd suggest not changing the PMC scratch register usage.
+> >
+> >Sure, that's why I asked to verify if scratch register 40 is in use in the
+> >comment after commit message.
 > 
-> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
+> Sorry, I didn't notice that.
 > 
-> and a non working ethernet interface.
+> >I've checked that u-boot doesn't use it (since
+> >upstream kernel doesn't care about any other bootloader), but no idea about
+> >secure monitor. It's definitely safer to avoid changing scratch regs usage, I
+> >thought that proposed solution would be best from the pure code point of view.
+> >So, I'm considering your answer as a rejection of the patch (please, let me know
+> >if I'm wrong) and will prepare another one. Btw, it would be nice to have
+> >scratch registers usage publicly documented somewhere (on "Tegra Public
+> >Application Notes" webpage for example), if it's possible, of course.
 > 
-> Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> At this stage in Tegra20 development, I think it'd be best to avoid changing
+> any scratch register usage if at all possible.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Sorry, I had completely missed this discussion. When looking at the code
+it doesn't look like this particular "resettable" status needs to be
+stored in a PMC scratch register. It can't be stored in RAM because that
+goes into self-refresh as part of LP1, but how about just putting it
+into IRAM? That stays on in both LP1 and LP2, so should be suitable for
+this use-case. It would make the code slightly more complex but using a
+single scratch register for multiple purposes sounds brittle and easy to
+break (as evidenced by the offending commit).
 
-> ---
->  drivers/net/ethernet/cadence/at91_ether.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-> index 55eb7f2af2b4..7ef55f5fa664 100644
-> --- a/drivers/net/ethernet/cadence/at91_ether.c
-> +++ b/drivers/net/ethernet/cadence/at91_ether.c
-> @@ -340,7 +340,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
->  		res = PTR_ERR(lp->pclk);
->  		goto err_free_dev;
->  	}
-> -	clk_enable(lp->pclk);
-> +	clk_prepare_enable(lp->pclk);
->  
->  	lp->hclk = ERR_PTR(-ENOENT);
->  	lp->tx_clk = ERR_PTR(-ENOENT);
-> @@ -406,7 +406,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
->  err_out_unregister_netdev:
->  	unregister_netdev(dev);
->  err_disable_clock:
-> -	clk_disable(lp->pclk);
-> +	clk_disable_unprepare(lp->pclk);
->  err_free_dev:
->  	free_netdev(dev);
->  	return res;
-> @@ -424,7 +424,7 @@ static int at91ether_remove(struct platform_device *pdev)
->  	kfree(lp->mii_bus->irq);
->  	mdiobus_free(lp->mii_bus);
->  	unregister_netdev(dev);
-> -	clk_disable(lp->pclk);
-> +	clk_disable_unprepare(lp->pclk);
->  	free_netdev(dev);
->  
->  	return 0;
-> @@ -440,7 +440,7 @@ static int at91ether_suspend(struct platform_device *pdev, pm_message_t mesg)
->  		netif_stop_queue(net_dev);
->  		netif_device_detach(net_dev);
->  
-> -		clk_disable(lp->pclk);
-> +		clk_disable_unprepare(lp->pclk);
->  	}
->  	return 0;
->  }
-> @@ -451,7 +451,7 @@ static int at91ether_resume(struct platform_device *pdev)
->  	struct macb *lp = netdev_priv(net_dev);
->  
->  	if (netif_running(net_dev)) {
-> -		clk_enable(lp->pclk);
-> +		clk_prepare_enable(lp->pclk);
->  
->  		netif_device_attach(net_dev);
->  		netif_start_queue(net_dev);
-> 
+Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
+configuration data across LP0 suspend/resume, so I wouldn't think it'd
+cause problems if we used that instead of PMC_SCRATCH41 to store the
+"resettable" state.
 
+Changing the storage location for tegra_resume() isn't such a good idea
+since that's a documented use of PMC_SCRATCH41.
 
--- 
-Nicolas Ferre
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/30d5bef1/attachment.sig>
