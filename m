@@ -1,73 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 8 Jan 2015 14:43:30 -0800
-Subject: [GIT PULL] omap fixes against v3.19-rc1
-In-Reply-To: <20150106231814.GC4081@atomide.com>
-References: <20150106231814.GC4081@atomide.com>
-Message-ID: <20150108224330.GD13612@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Jan 2015 23:46:46 +0100
+Subject: [PATCH v2 0/8] ARM: Conexant Digicolor CX92755 SoC support
+In-Reply-To: <cover.1420744368.git.baruch@tkos.co.il>
+References: <cover.1420744368.git.baruch@tkos.co.il>
+Message-ID: <5966468.GiJYdzCvnt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 03:18:14PM -0800, Tony Lindgren wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On Thursday 08 January 2015 21:39:56 Baruch Siach wrote:
+> This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
+> one of the Digicolor series of SoCs, all sharing many of the same peripherals.
+> The code was tested on the CX92755 evaluation kit, AKA Equinox.
 > 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.19/fixes-rc1
-> 
-> for you to fetch changes up to 7ac72746aa9bb305fa74b44ec73eae99bbbe9b66:
-> 
->   ARM: dts: Revert disabling of smc91x for n900 (2015-01-06 08:49:57 -0800)
-> 
-> ----------------------------------------------------------------
-> Fixes for omaps mostly to deal with dra7 timer issues
-> and hypervisor mode. The other fixes are minor fixes for
-> various boards. The summary of the fixes is:
-> 
-> - Fix real-time counter rate typos for some frequencies
-> 
-> - Fix counter frequency drift for am572x
-> 
-> - Fix booting of secondary CPU in HYP mode
-> 
-> - Fix n900 board name for legacy user space
-> 
-> - Fix cpufreq in omap2plus_defconfig after Kconfig change
-> 
-> - Fix dra7 qspi partitions
-> 
-> And also, let's re-enable smc91x on some n900 boards that
-> we have sitting in a few test boot systems after the boot
-> loader dependencies got fixed.
-> 
-> ----------------------------------------------------------------
-> Lennart Sorensen (3):
->       ARM: omap5/dra7xx: Fix frequency typos
->       ARM: dra7xx: Fix counter frequency drift for AM572x errata i856
->       ARM: omap5/dra7xx: Enable booting secondary CPU in HYP mode
-> 
-> Mugunthan V N (1):
->       ARM: dts: dra7-evm: fix qspi device tree partition size
-> 
-> Nishanth Menon (1):
->       ARM: omap2plus_defconfig: use CONFIG_CPUFREQ_DT
-> 
-> Tony Lindgren (2):
->       ARM: OMAP2+: Fix n900 board name for legacy user space
->       ARM: dts: Revert disabling of smc91x for n900
-> 
->  arch/arm/boot/dts/dra7-evm.dts       | 10 ++++----
->  arch/arm/boot/dts/omap3-n900.dts     |  4 +---
->  arch/arm/configs/omap2plus_defconfig |  2 +-
->  arch/arm/mach-omap2/board-generic.c  | 18 +++++++++++++++
->  arch/arm/mach-omap2/common.h         |  1 +
->  arch/arm/mach-omap2/control.h        |  4 ++++
->  arch/arm/mach-omap2/omap-headsmp.S   | 21 +++++++++++++++++
->  arch/arm/mach-omap2/omap-smp.c       | 13 +++++++++--
->  arch/arm/mach-omap2/timer.c          | 44 +++++++++++++++++++++++++++++++-----
->  9 files changed, 100 insertions(+), 17 deletions(-)
+> Uses attempting to try this code will most likely also want the UART/console
+> driver available from https://patchwork.kernel.org/patch/5515861/.
+ 
+Looks great overall now.
 
-Merged, thanks.
+I have just two more comments in one patch, and one general request:
 
--Olof
+Please add a patch description for every patch. The text above would
+be a good start for the first patch, but it would be lost in the git
+history if it's only in the cover letter.
+
+other than that, feel free to add my
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Once there are no more review comments, please submit the first three
+patches to arm at kernel.org, and send the other patches as separate
+series to the respective maintainers for irqchip and clocksource.
+
+	Arnd
