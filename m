@@ -1,59 +1,70 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 8 Jan 2015 14:17:36 -0800
-Subject: [PATCH] PCI: keystone: fix incorrect annotations on probe and remove
-Message-ID: <20150108221736.GA39839@dtor-ws>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Jan 2015 23:24:11 +0100
+Subject: [PATCH v3 2/4] of: move of_dma_configure() to device,
+ c to help re-use
+In-Reply-To: <54AED9EC.1020703@ti.com>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <3861625.CJ6m15sZMh@wuerfel> <54AED9EC.1020703@ti.com>
+Message-ID: <2083932.v1GzgAfexK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though platform bus is not hot-pluggable, devices on it can be unbound
-from the driver and bound back to it via sysfs, so we should not be using
-__init annotations on probe() and __exit annotations on remove() methods.
+On Thursday 08 January 2015 14:26:36 Murali Karicheri wrote:
+> On 01/08/2015 03:40 AM, Arnd Bergmann wrote:
+> > On Wednesday 07 January 2015 17:37:56 Rob Herring wrote:
+> >> On Wed, Jan 7, 2015 at 12:49 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+> >>
+> >>> +       ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
+> >>> +       if (ret<  0) {
+> >>> +               dma_addr = offset = 0;
+> >>> +               size = dev->coherent_dma_mask + 1;
+> >>
+> >> If coherent_dma_mask is DMA_BIT_MASK(64), then you will overflow and
+> >> have a size of 0. There may also be a problem when the mask is only
+> >> 32-bit type.
+> >
+> > The mask is always a 64-bit type, it's not optional. But you are right,
+> > the 64-bit mask case is broken, so I guess we have to fix it differently
+> > by always passing the smaller value into arch_setup_dma_ops and
+> > adapting that function instead.
+> Arnd,
+> 
+> What is the smaller value you are referring to in the below code? 
+> between *dev->dma_mask and size from DT? But overflow can still happen 
+> when size is to be calculated in arch_setup_dma_ops() for Non DT case or 
+> when DT size is configured to be equivalent of DMA_BIT_MASK(64) + 1. Can 
+> we discuss the code change you have in mind when you get a chance?
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
+I meant changing every function that the size values gets passed into
+to take a mask like 0xffffffff instead of a size like 0x100000000, so
+we can represent a 64-bit capable bus correctly.
 
-Not tested, found by casual code inspection.
+This means we also need to adapt the value returned from of_dma_get_range.
+A minor complication here is that the DT properties sometimes already
+contain the mask value, in particular when we want to represent a
+full mapping like 
 
- drivers/pci/host/pci-keystone.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+	bus {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		dma-ranges = <0 0 0xffffffff>; /* all 4 GB, DMA_BIT_MASK(32) */
+	};
 
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index 1b893bc..7b84e1d 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -332,7 +332,7 @@ static const struct of_device_id ks_pcie_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, ks_pcie_of_match);
- 
--static int __exit ks_pcie_remove(struct platform_device *pdev)
-+static int ks_pcie_remove(struct platform_device *pdev)
- {
- 	struct keystone_pcie *ks_pcie = platform_get_drvdata(pdev);
- 
-@@ -341,7 +341,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __init ks_pcie_probe(struct platform_device *pdev)
-+static int ks_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct keystone_pcie *ks_pcie;
-@@ -398,9 +398,9 @@ fail_clk:
- 	return ret;
- }
- 
--static struct platform_driver ks_pcie_driver __refdata = {
-+static struct platform_driver ks_pcie_driver = {
- 	.probe  = ks_pcie_probe,
--	.remove = __exit_p(ks_pcie_remove),
-+	.remove = ks_pcie_remove,
- 	.driver = {
- 		.name	= "keystone-pcie",
- 		.owner	= THIS_MODULE,
--- 
-2.2.0.rc0.207.ga3a616c
+as opposed to
+
+	bus {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		dma-ranges = <0 0 0x80000000>; /* only lower 2GB, DMA_BIT_MASK(31) */
+	};
+
+or
+
+	bus {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		dma-ranges = <0 0 0x0000000100000000>; /* 4GB of 64-bit address space */
+	};
 
 
--- 
-Dmitry
+	Arnd
