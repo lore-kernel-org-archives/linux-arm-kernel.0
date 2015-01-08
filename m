@@ -1,167 +1,189 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 08 Jan 2015 17:42:44 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <54AD0293.70909@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
- <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
- <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
- <54AD0293.70909@samsung.com>
-Message-ID: <54AEB384.2040005@collabora.co.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Jan 2015 10:44:20 -0600
+Subject: [PATCH v2 12/21] ARM: omap: convert wakeupgen to stacked domains
+In-Reply-To: <1420652576-22309-13-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108164420.GB25986@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joonyoung,
-
-On 01/07/2015 10:55 AM, Joonyoung Shim wrote:
->>>
->>> I don't think iommu support and power domain issue are related. I also
->>> get displaying stripes via hdmi but it is just power domain issue
->>> regardless iommu support.
->>>
->>> I observed 8th bit from 0x1445000C register of mixer is set to 1 with
->>> displaying stripes. It means "The graphic layer0 line buffer underflow".
->>> There was same underflow issue on Exynos4 based boards. As Marek said,
->>> because LCD0 power domain was turned off.
->>>
->> 
->> Interesting, thanks a lot for sharing this information.
->>  
->>> I just tried to turn off DISP1 power domain at u-boot and DISP1 power
->>> domain is turned on from kernel hdmi and mixer driver on odroid xu3 
->>> board. As the result, i can see displaying penguin logo from hdmi.
->>>
->> 
->> Can you share the patches you are using to turn on the DISP1 power domain
->> since AFAIU the kernel does not know about the DISP1 power domain after
->> commit d51cad7df871 ("ARM: dts: remove display power domain for exynos5420").
->> 
->> I tried reverting that commit before so the kernel knows about the DISP1
->> power domain and booting with pd_ignore_unused but still had the stripes.
->>  
+On 17:42-20150107, Marc Zyngier wrote:
+> OMAP4/5 has been (ab)using the gic_arch_extn to provide
+> wakeup from suspend, and it makes a lot of sense to convert
+> this code to use stacked domains instead.
 > 
-> I add DISP1 power domain on dts and please refer below patch[0] with
-> some modification on hdmi phy(Actually, i think this is not related).
-> You also should disable DISP1 power domain from bootloader.
->
+> This patch does just this, updating the DT files to actually
+> reflect what the HW provides.
+> 
+> BIG FAT WARNING: because the DTs were so far lying by not
+> exposing the WUGEN HW block, kernels with this patch applied
+> won't have any suspend-resume facility when booted with old DTs,
+> and old kernels with updated DTs won't even boot.
+> 
+> On a platform with this patch applied, the system looks like
+> this:
+> 
+> root at bacon-fat:~# cat /proc/interrupts
+>             CPU0       CPU1
+>  16:          0          0     WUGEN  37  gp_timer
+>  19:     233799     155916       GIC  27  arch_timer
+>  23:          0          0     WUGEN   9  l3-dbg-irq
+>  24:          1          0     WUGEN  10  l3-app-irq
+>  27:        282          0     WUGEN  13  omap-dma-engine
+>  44:          0          0  4ae10000.gpio  13  DMA
+> 294:          0          0     WUGEN  20  gpmc
+> 297:        506          0     WUGEN  56  48070000.i2c
+> 298:          0          0     WUGEN  57  48072000.i2c
+> 299:          0          0     WUGEN  61  48060000.i2c
+> 300:          0          0     WUGEN  62  4807a000.i2c
+> 301:          8          0     WUGEN  60  4807c000.i2c
+> 308:       2439          0     WUGEN  74  OMAP UART2
+> 312:        362          0     WUGEN  83  mmc2
+> 313:        502          0     WUGEN  86  mmc0
+> 314:         13          0     WUGEN  94  mmc1
+> 350:          0          0      PRCM  pinctrl, pinctrl
+> 406:   35155709          0       GIC 109  ehci_hcd:usb1
+> 407:          0          0     WUGEN   7  palmas
+> 409:          0          0     WUGEN 119  twl6040
+> 410:          0          0   twl6040   5  twl6040_irq_ready
+> 411:          0          0   twl6040   0  twl6040_irq_th
+> IPI0:          0          1  CPU wakeup interrupts
+> IPI1:          0          0  Timer broadcast interrupts
+> IPI2:      95334     902334  Rescheduling interrupts
+> IPI3:          0          0  Function call interrupts
+> IPI4:        479        648  Single function call interrupts
+> IPI5:          0          0  CPU stop interrupts
+> IPI6:          0          0  IRQ work interrupts
+> IPI7:          0          0  completion interrupts
+> Err:          0
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/boot/dts/am4372.dtsi             |  11 ++-
+>  arch/arm/boot/dts/dra7.dtsi               |  12 ++-
+>  arch/arm/boot/dts/dra72x.dtsi             |   2 +-
+>  arch/arm/boot/dts/dra74x.dtsi             |   2 +-
+>  arch/arm/boot/dts/omap4-duovero.dtsi      |   2 -
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |   8 +-
+>  arch/arm/boot/dts/omap4-sdp.dts           |   8 +-
+>  arch/arm/boot/dts/omap4-var-som-om44.dtsi |   2 -
+>  arch/arm/boot/dts/omap4.dtsi              |  18 ++++-
+>  arch/arm/boot/dts/omap5-cm-t54.dts        |   1 -
+>  arch/arm/boot/dts/omap5-uevm.dts          |   2 -
+>  arch/arm/boot/dts/omap5.dtsi              |  24 ++++--
+>  arch/arm/mach-omap2/omap-wakeupgen.c      | 125 +++++++++++++++++++++++-------
+>  arch/arm/mach-omap2/omap-wakeupgen.h      |   1 -
+>  arch/arm/mach-omap2/omap4-common.c        |   1 -
+>  15 files changed, 154 insertions(+), 65 deletions(-)
 
-Thanks a lot for the patch. With your changes I have some HDMI output on
-my Peach Pi. But the HDMI output is broken since the resolution is very
-low and the video as a lot of visual artifacts.
+	we may need the following changes as well:
 
-In your change you are also adding clock phandles for the pd oscillator
-clock and the CLK_MOUT_SW_ACLK200, CLK_MOUT_USER_ACLK200_DISP1 pairs for
-the parent input and input clocks of the devices attached to the pd.
-
-And also making changes to the clocks in the clk-exynos5420 driver. Can
-you please explain the rationale for those changes? I'm asking because
-without your clock changes (only adding the DISP1 pd and making the
-devices as consumers), I've HDMI output too but video is even worse. This
-[0] is the minimal change I have on top of 3.19-rc3 to have some output.
-
-The docs I've access to, don't have information about the clock hierarchy.
-So each time there is a clock issue, I've a hard time to figure out what's
-happening.
-
-So there seems to be two issues here, one is the mixer and hdmi modules not
-being attached to the DISP1 power domain and another one is the clocks setup
-not being correct to have proper HDMI video output.
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index 7eaae4cf9f89..69f2313a49d1 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -280,7 +280,6 @@
+ 		reg = <0x24>;
+ 		compatible = "ti,tps65218";
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
+-		interrupt-parent = <&gic>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
  
->>> But the problem exists still because it is failed to control on/off of
->>> DISP1 power domain more than twice from kernel hdmi and mixer driver.[0]
->>>
-
-I didn't have this issue when testing your patch against 3.19-rc2. From your
-log I see that you are testing on a 3.18.1. So maybe makes sense to test with
-the latest kernel version since this HDMI issue qualifies as an 3.19-rc fix?
-
-Since commit 2ed127697eb1 ("PM / Domains: Power on the PM domain right after attach completes")
-that landed in 3.19-rc1, I see that the power domain is powered on when a
-device is attached. So maybe that is what makes a difference here?
-
->> 
->> Something that is not clear to me is how display panel is working on the
->> Peach boards if this is a power domain issue since according to the manual
->> both the modules used for display (LCD controller and DP) and the modules
->> used for HDMI (MIXER and HDMI) belong to the same power domain (DISP1).
->> 
->
-> I don't know about that because i just tested on odroid xu3 board
-> without display panel. Hmm, It can be any conditions to success on/off
-> power domain e.g. power state of clocks and of on/off order display
-> devices.
->
-
-My guess is that this is again clock related. Since if I add the DISP1 pd to
-the DTS and make the fimd node as a consumer of the pd, the display panel
-works correctly (same than current mainline that doesn't have the node).
-
-But, if I also make the mixer and hdmi nodes as consumer of the DISP1, then
-the exynos dp driver's probe function fails as shown in [1]. In this case,
-the HDMI output works and I see that the DISP1 power domain is not powered
-off so the only thing I can think is that is a clocks issue.
-
-> Is DISP1 power domain disabled on Peach boards to save power, not always
-> on?
->
-
-No AFAICT, currently as I mentioned before the DISP1 power domain was removed
-from the exynos5420.dtsi. So since the kernel does not know about it, should
-be always on. With your patch, it should not be disabled either since it has
-devices attached to and I confirmed that is not powered off anymore once all
-the attached devices' probe functions have been deferred and retried again.
-
-Thanks a lot for your help and best regards,
-Javier
-
-[0]:
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 517e50f6760b..9966fe7bb0ec 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -265,6 +265,11 @@
- 		clock-names = "oscclk", "pclk0", "clk0";
- 	};
+diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+index 53bbfc90b26a..029badefad3d 100644
+--- a/arch/arm/boot/dts/am437x-sk-evm.dts
++++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+@@ -334,7 +334,6 @@
+ 	tps at 24 {
+ 		compatible = "ti,tps65218";
+ 		reg = <0x24>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 662261d6b2ca..2d26bc11bad6 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -333,7 +333,6 @@
+ 		reg = <0x24>;
+ 		compatible = "ti,tps65218";
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
+-		interrupt-parent = <&gic>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
  
-+	disp_pd: power-domain at 100440C0 {
-+		compatible = "samsung,exynos4210-pd";
-+		reg = <0x100440C0 0x20>;
-+	};
-+
- 	msc_pd: power-domain at 10044120 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044120 0x20>;
-@@ -535,6 +540,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 49edbda68cd5..c2241c2e5d9d 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -335,7 +335,6 @@
+ 	mcp_rtc: rtc at 6f {
+ 		compatible = "microchip,mcp7941x";
+ 		reg = <0x6f>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
  
- 	fimd: fimd at 14400000 {
-+		samsung,power-domain = <&disp_pd>;
- 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
- 		clock-names = "sclk_fimd", "fimd";
- 	};
-@@ -710,6 +716,7 @@
- 		phy = <&hdmiphy>;
- 		samsung,syscon-phandle = <&pmu_system_controller>;
- 		status = "disabled";
-+		samsung,power-domain = <&disp_pd>;
- 	};
+ 		pinctrl-names = "default";
+@@ -358,7 +357,7 @@
  
- 	hdmiphy: hdmiphy at 145D0000 {
-@@ -722,6 +729,7 @@
- 		interrupts = <0 94 0>;
- 		clocks = <&clock CLK_MIXER>, <&clock CLK_SCLK_HDMI>;
- 		clock-names = "mixer", "sclk_hdmi";
-+		samsung,power-domain = <&disp_pd>;
- 	};
+ &uart3 {
+ 	status = "okay";
+-	interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
++	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&dra7_pmx_core 0x248>;
  
- 	gsc_0: video-scaler at 13e00000 {
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index f9c75c782c48..b056156e2a7a 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -893,14 +893,12 @@
+ 			usbhsohci: ohci at 4a064800 {
+ 				compatible = "ti,ohci-omap3";
+ 				reg = <0x4a064800 0x400>;
+-				interrupt-parent = <&gic>;
+ 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 
+ 			usbhsehci: ehci at 4a064c00 {
+ 				compatible = "ti,ehci-omap";
+ 				reg = <0x4a064c00 0x400>;
+-				interrupt-parent = <&gic>;
+ 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
 
+Also saw the following checkpatch warnings at this point - but, I
+suppose they were pre-existing.
 
-[1]:
-exynos-dp 145b0000.dp-controller: EDID data does not include any extensions.
-exynos-dp 145b0000.dp-controller: EDID Read success!
-exynos-dp 145b0000.dp-controller: Link Training Clock Recovery success
-exynos-dp 145b0000.dp-controller: Link Training success!
-exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-exynos-dp 145b0000.dp-controller: unable to config video
+@@ -0,0 +1,26 @@
++WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
++#95: FILE: arch/arm/boot/dts/am4372.dtsi:55:
+++		compatible = "ti,omap4-wugen-mpu";
++WARNING: DT compatible string "ti,omap5-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
++#112: FILE: arch/arm/boot/dts/dra7.dtsi:68:
+++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
++WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
++#112: FILE: arch/arm/boot/dts/dra7.dtsi:68:
+++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
++WARNING: line over 80 characters
++#127: FILE: arch/arm/boot/dts/dra7.dtsi:103:
+++				      <&wakeupgen GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
++#320: FILE: arch/arm/boot/dts/omap4.dtsi:78:
+++		compatible = "ti,omap4-wugen-mpu";
++WARNING: DT compatible string "ti,omap5-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
++#416: FILE: arch/arm/boot/dts/omap5.dtsi:103:
+++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
++WARNING: DT compatible string "ti,omap4-wugen-mpu" appears un-documented -- check ./Documentation/devicetree/bindings/
++#416: FILE: arch/arm/boot/dts/omap5.dtsi:103:
+++		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
++WARNING: line over 80 characters
++#600: FILE: arch/arm/mach-omap2/omap-wakeupgen.c:441:
+++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
+-- 
+Regards,
+Nishanth Menon
