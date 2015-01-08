@@ -1,32 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Jan 2015 15:34:25 +0100
-Subject: Use armv8 instructions to optimize ARM32 crypto
-In-Reply-To: <1420723794.21522.6.camel@mtksdaap41>
-References: <1420452722.4402.70.camel@mtksdaap41>
- <1420723794.21522.6.camel@mtksdaap41>
-Message-ID: <2161528.hd6uXvZTsx@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Jan 2015 08:39:38 -0600
+Subject: [PATCH v2 08/21] irqchip: crossbar: convert dra7 crossbar to
+ stacked domains
+In-Reply-To: <1420652576-22309-9-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108143938.GA30790@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 January 2015 21:29:54 hong-rong hsu wrote:
-> Excuse me, add more reviewers.
-> 
-> On Mon, 2015-01-05 at 18:12 +0800, hong-rong hsu wrote:
-> > Hi,
-> > 
-> > We are engineers from Mediatek. We have a patch to optimize ARM32 kernel
-> > crypto performance by armv8 instructions. Do you have interest in it?
-> > 
-> > It may be helpful for some projects which running 32-bit kernel at
-> > armv8. Do you suggest that we maintain it at the main-stream :-)? (ex.
-> > add aes-armv8.S in arch/arm/crypto/ folder)
+On 17:42-20150107, Marc Zyngier wrote:
+[..]
+> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+> index 10b725c..048cfeb 100644
+> --- a/arch/arm/boot/dts/dra7-evm.dts
+> +++ b/arch/arm/boot/dts/dra7-evm.dts
+> @@ -423,7 +423,7 @@
+>  	status = "okay";
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart1_pins>;
+> -	interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+> +	interrupts-extended = <&crossbar_mpu GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+>  			      <&dra7_pmx_core 0x3e0>;
+^^ interrrupt-extended for uart1 here
+[..]
 
-It sounds like this is just an additional driver, so that should not
-be a problem.
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+[...]
+> @@ -344,7 +344,7 @@
+>  		uart1: serial at 4806a000 {
+>  			compatible = "ti,omap4-uart";
+>  			reg = <0x4806a000 0x100>;
+> -			interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+^^ implies we will have both interrupts and interrupts-extended
+properties for uart1 in dra7-evm.dtb
 
-A slight concern that I have is that we don't really support ARMv8
-in 32-bit mode. There are a few differences between v7 and v8, and
-building the kernel with -march=armv8 will currently result in build
-warnings for deprecated assembler instructions, IIRC.
+Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+does not make it clear as to what the priority will be when both
+properties are present.
 
-	Arnd
+[...]
+Also, for 3.19-rc3, Missing the following causing x15 to fail boot.
+
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 49edbda68cd5..c2241c2e5d9d 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -335,7 +335,6 @@
+ 	mcp_rtc: rtc at 6f {
+ 		compatible = "microchip,mcp7941x";
+ 		reg = <0x6f>;
+-		interrupt-parent = <&gic>;
+ 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
+ 
+ 		pinctrl-names = "default";
+@@ -358,7 +357,7 @@
+ 
+ &uart3 {
+ 	status = "okay";
+-	interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
++	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&dra7_pmx_core 0x248>;
+ 
+ 	pinctrl-names = "default";
+-- 
+Regards,
+Nishanth Menon
