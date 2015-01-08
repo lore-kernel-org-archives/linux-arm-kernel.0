@@ -1,36 +1,50 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 08 Jan 2015 11:29:40 -0600
-Subject: Linux 3.19-rc3
-In-Reply-To: <20150108134520.GC14200@e104818-lin.cambridge.arm.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com>
- <20150108134520.GC14200@e104818-lin.cambridge.arm.com>
-Message-ID: <54AEBE84.6090307@redhat.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 08 Jan 2015 23:01:12 +0530
+Subject: [RFC 1/8] ARM64: Move BRK opcodes defines from kprobes.h to insn.h
+In-Reply-To: <20150108165506.GP11583@arm.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <5beb1ff58d4928a873be5e898b62d8cc2003ec7c.1420038188.git.panand@redhat.com>
+ <20150108165506.GP11583@arm.com>
+Message-ID: <54AEBEE0.8030100@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 07:45 AM, Catalin Marinas wrote:
-> On Thu, Jan 08, 2015 at 12:51:31PM +0000, Mark Langsdorf wrote:
->> On 01/05/2015 07:46 PM, Linus Torvalds wrote:
->>> It's a day delayed - not because of any particular development issues,
->>> but simply because I was tiling a bathroom yesterday. But rc3 is out
->>> there now, and things have stayed reasonably calm. I really hope that
->>> implies that 3.19 is looking good, but it's equally likely that it's
->>> just that people are still recovering from the holiday season.
+
+
+On Thursday 08 January 2015 10:25 PM, Will Deacon wrote:
+> On Wed, Dec 31, 2014 at 03:21:17PM +0000, Pratyush Anand wrote:
+>> Its better to keep all BRK opcodes used by kprobes and uprobes at one
+>> place. Therefore move these defines to asm/insn.h.
 >>
->> I'm consistently getting an out of memory killer triggered when
->> compiling the kernel (make -j 16 -s) on a 16 core ARM64 system
->> with 16 GB of memory. This doesn't happen when running a 3.18
->> kernel.
+>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>> ---
+>>   arch/arm64/include/asm/insn.h | 6 ++++++
+>>   arch/arm64/kernel/kprobes.h   | 7 +------
+>>   2 files changed, 7 insertions(+), 6 deletions(-)
 >>
->> I'm going to start bisecting the failure now, but here's the crash
->> log in case someone can see something obvious in it.
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index e2ff32a93b5c..87fa48746806 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -23,6 +23,12 @@
+>>   /* A64 instructions are always 32 bits. */
+>>   #define	AARCH64_INSN_SIZE		4
+>>
+>> +/* BRK opcodes with ESR encoding  */
+>> +#define BRK64_ESR_MASK		0xFFFF
+>> +#define BRK64_ESR_KPROBES	0x0004
+>> +#define BRK64_OPCODE_KPROBES	0xD4200080	/* "brk 0x4" */
+>
+> These might be better off in debug-monitors.h, but I guess that's for the
+> kprobes series to sort out.
+>
 
-> Can you disable (transparent) huge pages? I don't have any better at the
-> moment suggestion apart from bisecting.
+Agreed.
 
-I didn't have transparent huge pages on. Turning off hugetblfs didn't
-change anything. Turning off 64K pages isn't an option because of
-firmware constraints.
-
---Mark Langsdorf
+~Pratyush
+>> +#define ARCH64_NOP_OPCODE	0xD503201F
+>
+> We have aarch64_insn_gen_nop for this.
+>
+> Will
+>
