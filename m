@@ -1,86 +1,95 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  8 Jan 2015 17:06:07 +0000
-Subject: [PATCH v2 3/8] PCI/MSI: of: Add support for OF-provided msi_domain
+Date: Thu,  8 Jan 2015 17:06:10 +0000
+Subject: [PATCH v2 6/8] irqchip: GICv2m: Get rid of struct msi_controller
 In-Reply-To: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
 References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420736772-11088-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420736772-11088-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to populate the PHB msi_domain, use the "msi-parent"
-attribute to lookup a corresponding irq domain. If found,
-this is our MSI domain.
+GICv2m only uses the msi_controller structure as a way to match
+the PHB with its MSI HW, and thus the msi_domain. But now that
+we can directly associate an msi_domain with a device, there is
+no use keeping this msi_controller around.
 
-This gets plugged into the core PCI code.
+Just remove all traces of msi_controller from the driver.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/of.c    | 15 +++++++++++++++
- drivers/pci/probe.c |  1 +
- include/linux/pci.h |  2 ++
- 3 files changed, 18 insertions(+)
+ drivers/irqchip/irq-gic-v2m.c | 26 +++++++++-----------------
+ 1 file changed, 9 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index f092993..d8d1274 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -9,6 +9,7 @@
-  * 2 of the License, or (at your option) any later version.
-  */
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index fdf7065..a76b802 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -45,7 +45,6 @@
  
-+#include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/of.h>
-@@ -59,3 +60,17 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
- 		return of_node_get(bus->bridge->parent->of_node);
- 	return NULL;
- }
-+
-+void pci_set_phb_of_msi_domain(struct pci_bus *bus)
-+{
-+#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-+	struct device_node *np;
-+
-+	if (!bus->dev.of_node)
-+		return;
-+	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
-+	if (!np)
-+		return;
-+	dev_set_msi_domain(&bus->dev, irq_find_host(np));
-+#endif
-+}
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 977c079..82fbd12 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -662,6 +662,7 @@ static void pci_set_bus_speed(struct pci_bus *bus)
- 
- void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
+ struct v2m_data {
+ 	spinlock_t msi_cnt_lock;
+-	struct msi_controller mchip;
+ 	struct resource res;	/* GICv2m resource */
+ 	void __iomem *base;	/* GICv2m virt address */
+ 	u32 spi_start;		/* The SPI number that MSIs start */
+@@ -218,6 +217,7 @@ static int __init gicv2m_init_one(struct device_node *node,
  {
-+	pci_set_phb_of_msi_domain(bus);
- }
+ 	int ret;
+ 	struct v2m_data *v2m;
++	struct irq_domain *inner_domain;
  
- static void pci_set_bus_msi_domain(struct pci_bus *bus)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 13c65ab..66c493e 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1828,6 +1828,7 @@ void pci_set_of_node(struct pci_dev *dev);
- void pci_release_of_node(struct pci_dev *dev);
- void pci_set_bus_of_node(struct pci_bus *bus);
- void pci_release_bus_of_node(struct pci_bus *bus);
-+void pci_set_phb_of_msi_domain(struct pci_bus *bus);
+ 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
+ 	if (!v2m) {
+@@ -261,19 +261,17 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 		goto err_iounmap;
+ 	}
  
- /* Arch may override this (weak) */
- struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
-@@ -1848,6 +1849,7 @@ static inline void pci_set_of_node(struct pci_dev *dev) { }
- static inline void pci_release_of_node(struct pci_dev *dev) { }
- static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
- static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
-+static inline void pci_set_phb_of_msi_domain(struct pci_bus *bus) {}
- #endif  /* CONFIG_OF */
+-	v2m->domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
+-	if (!v2m->domain) {
++	inner_domain = irq_domain_add_tree(NULL, &gicv2m_domain_ops, v2m);
++	if (!inner_domain) {
+ 		pr_err("Failed to create GICv2m domain\n");
+ 		ret = -ENOMEM;
+ 		goto err_free_bm;
+ 	}
  
- #ifdef CONFIG_EEH
+-	v2m->domain->parent = parent;
+-	v2m->mchip.of_node = node;
+-	v2m->mchip.domain = pci_msi_create_irq_domain(node,
+-						      &gicv2m_msi_domain_info,
+-						      v2m->domain);
+-	if (!v2m->mchip.domain) {
++	inner_domain->parent = parent;
++	v2m->domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
++						inner_domain);
++	if (!v2m->domain) {
+ 		pr_err("Failed to create MSI domain\n");
+ 		ret = -ENOMEM;
+ 		goto err_free_domains;
+@@ -281,12 +279,6 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 
+ 	spin_lock_init(&v2m->msi_cnt_lock);
+ 
+-	ret = of_pci_msi_chip_add(&v2m->mchip);
+-	if (ret) {
+-		pr_err("Failed to add msi_chip.\n");
+-		goto err_free_domains;
+-	}
+-
+ 	pr_info("Node %s: range[%#lx:%#lx], SPI[%d:%d]\n", node->name,
+ 		(unsigned long)v2m->res.start, (unsigned long)v2m->res.end,
+ 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
+@@ -294,10 +286,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 	return 0;
+ 
+ err_free_domains:
+-	if (v2m->mchip.domain)
+-		irq_domain_remove(v2m->mchip.domain);
+ 	if (v2m->domain)
+ 		irq_domain_remove(v2m->domain);
++	if (inner_domain)
++		irq_domain_remove(inner_domain);
+ err_free_bm:
+ 	kfree(v2m->bm);
+ err_iounmap:
 -- 
 2.1.4
