@@ -1,45 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 8 Jan 2015 10:58:31 -0600
-Subject: [PATCH v2 15/21] ARM: exynos4/5: convert pmu wakeup to stacked
- domains
-In-Reply-To: <1420652576-22309-16-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150108165831.GB19124@kahuna>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 8 Jan 2015 10:58:34 -0600
+Subject: [PATCH v2 2/3] usb: phy: add lubbock phy driver
+In-Reply-To: <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
+References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
+ <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20150108165834.GH31926@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:42-20150107, Marc Zyngier wrote:
-> Exynos has been (ab)using the gic_arch_extn to provide
-> wakeup from suspend, and it makes a lot of sense to convert
-> this code to use stacked domains instead.
+On Sun, Nov 30, 2014 at 01:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
+> Extract lubbock-specific code from pxa25x_udc driver. As a bonus, phy
+> driver determines connector/VBUS status by reading CPLD register. Also
+> it uses a work to call into udc stack, instead of pinging vbus session
+> right from irq handler.
 > 
-> This patch does just this, updating the DT files to actually
-> reflect what the HW provides.
-> 
-> BIG FAT WARNING: because the DTs were so far lying by not
-> exposing the fact that the PMU block is actually the first
-> interrupt controller in the chain for RTC, kernels with this patch
-> applied wont have any suspend-resume facility when booted
-> with old DTs, and old kernels with updated DTs may not even boot.
-> 
-> Also, I stronly suspect that there is more than two wake-up
-> interrupts on these platforms, but I leave it to the maintainers
-> to fix their mess.
-> 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  drivers/usb/phy/Kconfig       |  10 ++
+>  drivers/usb/phy/Makefile      |   1 +
 
-minor checkpatch warnings:
+new phy drivers under drivers/phy only, sorry.
 
-+WARNING: line over 80 characters
-+#230: FILE: arch/arm/mach-exynos/suspend.c:208:
-++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &parent_args);
-+WARNING: line over 80 characters
-+#274: FILE: arch/arm/mach-exynos/suspend.c:252:
-++#define EXYNOS_PMU_IRQ(symbol,name)	OF_DECLARE_2(irqchip, symbol, name, exynos_pmu_irq_init)
-+ERROR: space required after that ',' (ctx:VxV)
-+#274: FILE: arch/arm/mach-exynos/suspend.c:252:
-++#define EXYNOS_PMU_IRQ(symbol,name)	OF_DECLARE_2(irqchip, symbol, name, exynos_pmu_irq_init)
-+                              ^
 -- 
-Regards,
-Nishanth Menon
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/1b0d65ee/attachment.sig>
