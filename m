@@ -1,53 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Jan 2015 09:33:05 +0100
-Subject: [RFC] ARM: Make CPU_DCACHE_DISABLE depend on !SMP
-In-Reply-To: <1420683088-1856-1-git-send-email-f.fainelli@gmail.com>
-References: <1420683088-1856-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <2868984.6iP3luxIAM@wuerfel>
+Date: Thu, 08 Jan 2015 09:40:10 +0100
+Subject: [PATCH v3 2/4] of: move of_dma_configure() to device,
+ c to help re-use
+In-Reply-To: <CAL_Jsq+pKeXuGnZV_NYHn6iZgeOs404OPhcUb0FJs=-7j2P1Ug@mail.gmail.com>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <1420656594-8908-3-git-send-email-m-karicheri2@ti.com>
+ <CAL_Jsq+pKeXuGnZV_NYHn6iZgeOs404OPhcUb0FJs=-7j2P1Ug@mail.gmail.com>
+Message-ID: <3861625.CJ6m15sZMh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 January 2015 18:11:28 Florian Fainelli wrote:
-> Enabling CPU_DCACHE_DISABLE on a SMP capable system will prevent the
-> kernel from booting because of the following ldrex instruction in
-> arch_spin_lock:
+On Wednesday 07 January 2015 17:37:56 Rob Herring wrote:
+> On Wed, Jan 7, 2015 at 12:49 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
 > 
-> (gdb) x/10i $pc
-> => 0xc053cfa8 <_raw_spin_lock+4>:       ldrex   r3, [r0]
->    0xc053cfac <_raw_spin_lock+8>:       add     r2, r3, #65536  ; 0x10000
+> > +       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+> > +       if (ret < 0) {
+> > +               dma_addr = offset = 0;
+> > +               size = dev->coherent_dma_mask + 1;
 > 
-> which is taken by the very first printk call:
-> 
->     at /home/fainelli/work/linux/arch/arm/include/asm/spinlock.h:65
->     fmt=0xc0637650 "\001\066Booting Linux on physical CPU 0x%x\n", args=<incomplete type>)
->     at kernel/printk/printk.c:1525
->     fmt=0xc05370f4 <printk+52> "\024\320\215\342\004\340\235\344\020\320\215\342\036\377/\341\017") at kernel/printk/printk.c:1688
-> 
-> ldrex requires exclusive monitor(s) (local or global) which are no longer
-> working when the Data cache is disabled in CP15 and will just hang the CPU
-> there.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> If coherent_dma_mask is DMA_BIT_MASK(64), then you will overflow and
+> have a size of 0. There may also be a problem when the mask is only
+> 32-bit type.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+The mask is always a 64-bit type, it's not optional. But you are right,
+the 64-bit mask case is broken, so I guess we have to fix it differently
+by always passing the smaller value into arch_setup_dma_ops and
+adapting that function instead.
 
-We stumbled on this a while back when Kaixu was trying to fix allmodconfig
-builds to run on real hardware, but never submitted it in the end when
-Russell didn't like some of the other parts required for that to work.
-
-This one clearly makes sense independently.
-
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 03823e784f63..09245fd1e900 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -738,7 +738,7 @@ config CPU_ICACHE_DISABLE
->  
->  config CPU_DCACHE_DISABLE
->  	bool "Disable D-Cache (C-bit)"
-> -	depends on CPU_CP15
-> +	depends on CPU_CP15 && !SMP
->  	help
->  	  Say Y here to disable the processor data cache. Unless
->  	  you have a reason not to or are unsure, say N.
-> 
+	Arnd
