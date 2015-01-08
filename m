@@ -1,100 +1,71 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 11:51:38 +0100
-Subject: [PATCH v2 1/8] ARM: mvebu: a38x: Fix node names
-In-Reply-To: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420714305-7496-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu,  8 Jan 2015 11:51:37 +0100
+Subject: [PATCH v2 0/8] Add Armada 385 General Purpose Development Board
+ support
+Message-ID: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Some nodes in the DTs have a reg property but no unit name in their node name.
+this patch set adds the support for the Armada 385 GP board, this
+board is pretty close to the Armada 385 RD one. It comes with a new
+revision of the Armada 38x SoC (A0). Actually the SoC used here is the
+Armada 388 one, which differed from the Armada 385 by allowing to use
+two more SATA ports.
 
-This contradicts the way the ePAPR defines the node names. Fix this.
+In this second version, I took into account the various comments from
+the 1st version but also some comments addressed to the Armada 385 AP
+series. The bigest changes are the removal of the regulator for the
+SATA which will be part of another series, the add of a dtsi file for
+the Armada 388 variant, and the add of pinctrl configuration. See the
+changelog for the details.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/armada-380.dtsi   | 2 +-
- arch/arm/boot/dts/armada-385-db.dts | 2 +-
- arch/arm/boot/dts/armada-385-rd.dts | 2 +-
- arch/arm/boot/dts/armada-385.dtsi   | 2 +-
- arch/arm/boot/dts/armada-38x.dtsi   | 4 ++--
- 5 files changed, 6 insertions(+), 6 deletions(-)
+The first 3 patches came from Maxime's series to support the AP
+board. I have done this in order to have a complete series and also
+because I don't expect big change in these patches.
 
-diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-index 4173a8ab34e7..13400ce88c54 100644
---- a/arch/arm/boot/dts/armada-380.dtsi
-+++ b/arch/arm/boot/dts/armada-380.dtsi
-@@ -32,7 +32,7 @@
- 
- 	soc {
- 		internal-regs {
--			pinctrl {
-+			pinctrl at 18000 {
- 				compatible = "marvell,mv88f6810-pinctrl";
- 				reg = <0x18000 0x20>;
- 			};
-diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-index 2aaa9d2ac284..212605ccc7b6 100644
---- a/arch/arm/boot/dts/armada-385-db.dts
-+++ b/arch/arm/boot/dts/armada-385-db.dts
-@@ -74,7 +74,7 @@
- 				phy-mode = "rgmii-id";
- 			};
- 
--			mdio {
-+			mdio at 72004 {
- 				phy0: ethernet-phy at 0 {
- 					reg = <0>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
-index aaca2861dc87..74a3bfe6efd7 100644
---- a/arch/arm/boot/dts/armada-385-rd.dts
-+++ b/arch/arm/boot/dts/armada-385-rd.dts
-@@ -67,7 +67,7 @@
- 			};
- 
- 
--			mdio {
-+			mdio at 72004 {
- 				phy0: ethernet-phy at 0 {
- 					reg = <0>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
-index 6283d7912f71..5249a4d3c207 100644
---- a/arch/arm/boot/dts/armada-385.dtsi
-+++ b/arch/arm/boot/dts/armada-385.dtsi
-@@ -37,7 +37,7 @@
- 
- 	soc {
- 		internal-regs {
--			pinctrl {
-+			pinctrl at 18000 {
- 				compatible = "marvell,mv88f6820-pinctrl";
- 				reg = <0x18000 0x20>;
- 			};
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 74391dace9e7..ada1f206028b 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -193,7 +193,7 @@
- 				status = "disabled";
- 			};
- 
--			pinctrl {
-+			pinctrl at 18000 {
- 				compatible = "marvell,mv88f6820-pinctrl";
- 				reg = <0x18000 0x20>;
- 			};
-@@ -373,7 +373,7 @@
- 				status = "disabled";
- 			};
- 
--			mdio {
-+			mdio at 72004 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				compatible = "marvell,orion-mdio";
+Changelog:
+
+v1 -> v2:
+- removed the earlyprintk in the command line
+- added the stdout-path for the bootloader
+- added the pinctrl configuration for all the node that need it
+- renamed pca9555_ into expander
+- added comment about the connector
+- switched the PHY address to match the hardware
+- removed the nr-ports property which is specific to the mv-sata and
+  not the ahci
+- removed the clock-frequency property of the sdhci node
+- formatted the speed-map of gpio-fan with a newline between the map
+  entries
+- removed the SATA regulators
+- added the dtsi for the Armada 388 variant
+
+Gregory CLEMENT (5):
+  ARM: mvebu: a38x: Add more pinctrl functions
+  ARM: mvebu: a38x: Add missing labels
+  ARM: mvebu: Document the Device Tree binding for the Armada 388 SoC
+  ARM: mvebu: Add Device Tree description of the Armada 388 SoC
+  ARM: mvebu: Add Armada 385 General Purpose Development Board support
+
+Maxime Ripard (3):
+  ARM: mvebu: a38x: Fix node names
+  ARM: mvebu: A38x: Remove redundant pinctrl informations
+  ARM: mvebu: Add a number of pinctrl functions
+
+ .../devicetree/bindings/arm/armada-38x.txt         |   7 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armada-380.dtsi                  |   3 +-
+ arch/arm/boot/dts/armada-385-db.dts                |   2 +-
+ arch/arm/boot/dts/armada-385-gp.dts                | 288 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-385-rd.dts                |   2 +-
+ arch/arm/boot/dts/armada-385.dtsi                  |   3 +-
+ arch/arm/boot/dts/armada-388.dtsi                  |  58 +++++
+ arch/arm/boot/dts/armada-38x.dtsi                  |  93 ++++++-
+ 9 files changed, 447 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-385-gp.dts
+ create mode 100644 arch/arm/boot/dts/armada-388.dtsi
+
 -- 
 1.9.1
