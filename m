@@ -1,87 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Jan 2015 08:22:05 +0100
-Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock node names
-In-Reply-To: <20150108003826.GF18943@verge.net.au>
-References: <1420418648-7815-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVX196P9u8zHyjWR_-6Pj7kqtOzR4pW2_qGigsSw-2BVQ@mail.gmail.com>
- <20150108003826.GF18943@verge.net.au>
-Message-ID: <CAMuHMdU_6rq0pP0pHD21GLdyPzSJDW1-LUrKDUdeThgsRdu3sQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu,  8 Jan 2015 08:24:45 +0100
+Subject: [PATCH 1/3] soc/tegra: Add Tegra132 support
+Message-ID: <1420701887-1465-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Thierry Reding <treding@nvidia.com>
 
-On Thu, Jan 8, 2015 at 1:38 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Jan 05, 2015 at 10:41:14AM +0100, Geert Uytterhoeven wrote:
->> On Mon, Jan 5, 2015 at 1:44 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
->> > diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
->> > index 8f78da5..9856e9c 100644
->> > --- a/arch/arm/boot/dts/r8a7794.dtsi
->> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
->> > @@ -294,14 +294,14 @@
->> >                                              "lb", "qspi", "sdh", "sd0", "z";
->> >                 };
->> >                 /* Variable factor clocks */
->> > -               sd1_clk: sd2_clk at e6150078 {
->> > +               sd1_clk: sd1_clk at e6150078 {
->> >                         compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->> >                         reg = <0 0xe6150078 0 4>;
->> >                         clocks = <&pll1_div2_clk>;
->> >                         #clock-cells = <0>;
->> >                         clock-output-names = "sd1";
->> >                 };
->> > -               sd2_clk: sd3_clk at e615007c {
->> > +               sd2_clk: sd2_clk at e615007c {
->> >                         compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
->> >                         reg = <0 0xe615007c 0 4>;
->> >                         clocks = <&pll1_div2_clk>;
->>
->> According to the documentation, SDCKCR is 0xe6150074, not ..78,
->> SD2CKCR is 0xe6150078, not ..7c.
->> For reference SD3CKCR is 0xe615026c.
->>
->> Note that r8a7791.dtsi also has the mismatches between the labels and node
->> names.
->>
->> The discrepancy is caused by the different number of SDHI modules in the
->> different SoCs of the R-Car Gen2 family.
->>
->>   - r8a7790 has hardware modules SDHI0, SDHI1, SDHI2, and SDHI3.
->>   - r8a7791 and r8a7794 have hardware modules SDHI0, SDHI2, and SDHI3,
->>     but call the last two instances SDHI1 and SDHI2, while the clock registers
->>     are not renumbered.
->>     So instance SDHI1 uses SD2CKCR, and instance SDHI2 uses SD3CKCR, right?
->
-> I had not noticed, but yes that does seem to be the case.
->
->> That means the node names are actually correct. But the register value and
->> unit address for the second clock are still wrong, they should be (0x)e615007c,
->
-> Ok, that makes sense. But in that the labels want updating, right?
+Add the chip ID for the NVIDIA Tegra132 SoC family.
 
-Yes, if the labels are supposed to refer to the clk instance (and not the
-SDHI instance).
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ include/soc/tegra/fuse.h | 1 +
+ 1 file changed, 1 insertion(+)
 
->> cfr. in r8a7791.dtsi.
->>
->> Note that IMHO the clock-output-names are wrong, for both r8a7791 and r8a7794,
->> as the hardware documentation calls these "sd2" and "sd3", not "sd1" and "sd2".
->
-> Excellent. I think we can easily change that for the r8a7794 as the
-> nodes aren't being consumed nor have been part of a release. But I'm
-> less sure about a path forward for the r8a7791. What are your thoughts?
-
-While the clock names are user-visible through /sysfs, I don't think anything
-relies on them. Their users (in DT) refer to the labels in DT.
-Or am I missing something?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/include/soc/tegra/fuse.h b/include/soc/tegra/fuse.h
+index 8e1249474e84..b5f7b5f8d008 100644
+--- a/include/soc/tegra/fuse.h
++++ b/include/soc/tegra/fuse.h
+@@ -21,6 +21,7 @@
+ #define TEGRA30		0x30
+ #define TEGRA114	0x35
+ #define TEGRA124	0x40
++#define TEGRA132	0x13
+ 
+ #define TEGRA_FUSE_SKU_CALIB_0	0xf0
+ #define TEGRA30_FUSE_SATA_CALIB	0x124
+-- 
+2.1.3
