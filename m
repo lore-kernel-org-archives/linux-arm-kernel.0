@@ -1,44 +1,34 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed,  7 Jan 2015 17:33:33 -0700
-Subject: [PATCH V3 2/7] Documentation: arm64: add SCU dts binding
- documentation to linux kernel
-In-Reply-To: <1420677218-30743-1-git-send-email-fkan@apm.com>
-References: <1420677218-30743-1-git-send-email-fkan@apm.com>
-Message-ID: <1420677218-30743-3-git-send-email-fkan@apm.com>
+Date: Wed,  7 Jan 2015 17:33:31 -0700
+Subject: [PATCH V3 0/7] APM X-Gene SoC platform device tree cleanup
+Message-ID: <1420677218-30743-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add documentation for the SCU system clock unit device tree binding
-to the kernel.
+This sums up the dts changes of the recent committed drivers into the kernel.
+This will grant PMU, reboot, USB and gpio functionalities to the platform.
+These patches are all based on existing and approved driver that is in the
+kernel tree today.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- Documentation/devicetree/bindings/arm/apm/scu.txt |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+V3 Changes:
+	- add comments regarding usb node
+	- change dwgpio node name to gpio
+
+V2 Changes:
+        - add dma-coherent attribute for usb node.
+
+Feng Kan (7):
+  arm64: dts: Add APM X-Gene USB DTS node
+  Documentation: arm64: add SCU dts binding documentation to linux
+    kernel
+  arm64: dts: Add X-Gene reboot driver dts node
+  arm64: dts: Add Designware GPIO dts binding to APM X-Gene platform
+  arm64: dts: Add APM X-Gene SoC GFC GPIO controller DTS entries
+  Documentation: arm: pmu: Add Potenza PMU binding
+  arm64: dts: Add PMU node for APM X-Gene Storm SOC
+
+ Documentation/devicetree/bindings/arm/apm/scu.txt |   17 ++++++
+ Documentation/devicetree/bindings/arm/pmu.txt     |    1 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi            |   58 +++++++++++++++++++++
+ 3 files changed, 76 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/apm/scu.txt b/Documentation/devicetree/bindings/arm/apm/scu.txt
-new file mode 100644
-index 0000000..b45be06
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/apm/scu.txt
-@@ -0,0 +1,17 @@
-+APM X-GENE SoC series SCU Registers
-+
-+This system clock unit contain various register that control block resets,
-+clock enable/disables, clock divisors and other deepsleep registers.
-+
-+Properties:
-+ - compatible : should contain two values. First value must be:
-+		   - "apm,xgene-scu"
-+		second value must be always "syscon".
-+
-+ - reg : offset and length of the register set.
-+
-+Example :
-+	scu: system-clk-controller at 17000000 {
-+		compatible = "apm,xgene-scu","syscon";
-+		reg = <0x0 0x17000000 0x0 0x400>;
-+	};
--- 
-1.7.1
