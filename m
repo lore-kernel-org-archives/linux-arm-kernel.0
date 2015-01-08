@@ -1,26 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 08 Jan 2015 13:22:42 -0800
-Subject: [PATCH 1/2] clk: Add clk_unregister_{divider,gate,mux} to close
- memory leak
-In-Reply-To: <1420451561-12360-1-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 08 Jan 2015 13:23:13 -0800
+Subject: [PATCH 2/2] clk: exynos-audss: Fix memory leak on driver unbind
+ or probe failure
+In-Reply-To: <1420451561-12360-2-git-send-email-k.kozlowski@samsung.com>
 References: <1420451561-12360-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <54AEF522.1060904@codeaurora.org>
+ <1420451561-12360-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54AEF541.1090700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/05/2015 01:52 AM, Krzysztof Kozlowski wrote:
-> The common clk_register_{divider,gate,mux} functions allocated memory
-> for internal data which wasn't freed anywhere. Drivers using these
-> helpers could only unregister clocks but the memory would still leak.
+> The memory allocated by basic clock divider/gate/mux (struct clk_gate,
+> clk_divider and clk_mux) was leaking. During driver unbind or probe
+> failure the driver only unregistered the clocks.
 >
-> Add corresponding unregister functions which will release all resources.
+> Use clk_unregister_{gate,divider,mux} to release all resources.
 >
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
-
-We're trying to move away from struct clk in provider APIs. It would be
-nice to have these functions take the clk_hw pointer instead, but I
-guess that can come later.
+>
 
 Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
