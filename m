@@ -1,73 +1,29 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Jan 2015 11:57:43 +0100
-Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for
- tegra_resume() location store
-In-Reply-To: <54985C30.7020605@wwwdotorg.org>
-References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
- <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
- <54985C30.7020605@wwwdotorg.org>
-Message-ID: <20150108105742.GI1987@ulmo.nvidia.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu,  8 Jan 2015 12:03:42 +0100
+Subject: [PATCH v2 0/2] ARM: mediatek: Enable uart for mt6589
+Message-ID: <1420715024-27738-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
-> On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
-> >22.12.2014 19:17, Stephen Warren ?????:
-> >>On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
-> >>>Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
-> >>>tegra_resume()
-> >>>location storing from late to early and as result broke suspend on tegra20.
-> >>>PMC scratch register 41 was used by tegra lp1 suspend core code for storing
-> >>>physical memory address of common resume function and in the same time used by
-> >>>tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
-> >>>strict order of scratch register use. Fix it by using scratch 40 instead of 41
-> >>>for tegra_resume() location store.
-> >>
-> >>You likely can't simply change the PMC scratch register usage arbitrarily;
-> >>specific registers are designated for specific purposes, and code outside the
-> >>Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
-> >>those specific values being in those registers. Without significant research,
-> >>I'd suggest not changing the PMC scratch register usage.
-> >
-> >Sure, that's why I asked to verify if scratch register 40 is in use in the
-> >comment after commit message.
-> 
-> Sorry, I didn't notice that.
-> 
-> >I've checked that u-boot doesn't use it (since
-> >upstream kernel doesn't care about any other bootloader), but no idea about
-> >secure monitor. It's definitely safer to avoid changing scratch regs usage, I
-> >thought that proposed solution would be best from the pure code point of view.
-> >So, I'm considering your answer as a rejection of the patch (please, let me know
-> >if I'm wrong) and will prepare another one. Btw, it would be nice to have
-> >scratch registers usage publicly documented somewhere (on "Tegra Public
-> >Application Notes" webpage for example), if it's possible, of course.
-> 
-> At this stage in Tegra20 development, I think it'd be best to avoid changing
-> any scratch register usage if at all possible.
+This patch series adds uart ports for the mt6589 SoC from Mediatek.
+It also enables the uart port for the mt6589 based Aquaris5 mobile phone.
 
-Sorry, I had completely missed this discussion. When looking at the code
-it doesn't look like this particular "resettable" status needs to be
-stored in a PMC scratch register. It can't be stored in RAM because that
-goes into self-refresh as part of LP1, but how about just putting it
-into IRAM? That stays on in both LP1 and LP2, so should be suitable for
-this use-case. It would make the code slightly more complex but using a
-single scratch register for multiple purposes sounds brittle and easy to
-break (as evidenced by the offending commit).
+This series is based on 3.19-rc1 and assumes that sysirq patch from Yingjoe Chen is added to the SoC [0].
 
-Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
-configuration data across LP0 suspend/resume, so I wouldn't think it'd
-cause problems if we used that instead of PMC_SCRATCH41 to store the
-"resettable" state.
+Changes for v2:
+- use uart0 reference
+- add stdout-path
+- enable uart3
 
-Changing the storage location for tegra_resume() isn't such a good idea
-since that's a documented use of PMC_SCRATCH41.
+[0] https://lkml.org/lkml/2014/11/25/132
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/30d5bef1/attachment.sig>
+Matthias Brugger (2):
+  ARM: mediatek: dts: Add uart to mt6589
+  ARM: mediatek: dts: Add uart to Aquaris5
+
+ arch/arm/boot/dts/mt6589-aquaris5.dts | 12 ++++++++++-
+ arch/arm/boot/dts/mt6589.dtsi         | 38 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
