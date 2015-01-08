@@ -1,67 +1,82 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 8 Jan 2015 12:18:19 +0100
-Subject: [PATCH] ARM: mediatek: dts: Add UART dts for MT8127 and MT8135
- boards
-In-Reply-To: <1420460918-24380-1-git-send-email-eddie.huang@mediatek.com>
-References: <1420460918-24380-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBeLy5pg6GJNsE2ArszaG3k2DX1Ao3RA=1EjT3dHUQxui2Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Jan 2015 12:26:55 +0100
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20150107225904.GQ24989@titan.lakedaemon.net>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <54AD917A.2040307@redhat.com> <20150107225904.GQ24989@titan.lakedaemon.net>
+Message-ID: <2034224.H5nZdW12se@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+On Wednesday 07 January 2015 17:59:04 Jason Cooper wrote:
+> On Wed, Jan 07, 2015 at 03:05:14PM -0500, Jon Masters wrote:
+> > On 01/07/2015 02:58 PM, Jon Masters wrote:
+> > > On 01/07/2015 01:41 PM, Jason Cooper wrote:
+> > 
+> > >> One of the reasons I've really enjoyed working with ARM platforms and DT
+> > >> is the absence of this type of 'feature'.  I honestly don't care whether
+> > >> the kernel gets the board configuration info from DT or ACPI or FOO, as
+> > >> long as we can avoid the security mistakes of the past:
+> > >>
+> > >>   http://www.spiegel.de/international/world/catalog-reveals-nsa-has-back-doors-for-numerous-devices-a-940994.html
+> > > 
+> > > ACPI is not the great satan. I'm aware certain others in the community
+> > > have written missinformed blog posts and G+ rants equating ACPI with SMI
+> > > and even with various other system firmware. I can't force someone to
+> > > become informed on a topic, especially if it's politically useful to
+> > > them to hate on ACPI and use the security paranoia handwavy argument.
+> > 
+> > To clarify, and this is not directed at you Jason, it is politically
+> > useful to some who have written rants those business models are built
+> > upon being paid to enable platforms. For those folks, standardized
+> > platforms which allow a common OS approach are seen as threatening.
+> 
+> Ahh, thanks for clarifying.
+> 
+> > In the previous rants (which were really instigated as a result of the
+> > above) ACPI was equated with SMM (System Management Mode), which is a
+> > bit like the Secure/Trusted world on AArch64 in which you might run
+> > another "Trusted" OS. These are the places where you want to watch out
+> > to malware of the kind cited in your link, not in ACPI tables.
+> 
+> fwiw, I *am* concerned about those spaces.  It seems we agree on their
+> vulnerability to attack (plus being meaty targets).
+> 
+> To more concisely state my other reply to you, wrt to AML, I'm primarily
+> concerned about a malicious update to the ACPI tables.  The ACPI tables
+> in the update would be otherwise normal, except for the AML blob that
+> contains some extra code.  The malicious payload.  Then, a routine call
+> into an AML (for pinctrl, say) executes the malicious code.
+> 
+> The plausibility and preventability of that style of attack is what I'm
+> hoping to nail down with this discussion.
 
-2015-01-05 13:28 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
-> This patch enable UART for MT8127 moose board and MT8135 evalution board.
-> Adding the dts, these two boards can show log and shell prompts.
-> This patch base on my previous MT8135/MT8127 SoC UART dtsi patch [1] and
-> Matthias's modification to disable SoC UART by default.
+If you want to run hidden code through the firmware, then doing an attack
+on Intel SMM or ARM TrustZone would be much harder to detect and as easy
+to get in, as long as you have the ability to flash arbitrary firmware.
+I think this has been shown to happen in the wild. That code could
+go and manipulate the running kernel image to do something else.
 
-I applied this patch deleting this two lines and the reference. From
-my understanding this is extra information about the patch depends on
-the actual development process and should normally be in the cover
-letter but not in the patch description itself.
+Running code inside of the AML interpreter is fairly limited for the
+purpose of an attack [*], but there might be bugs in the interpreter that
+allow arbitrary code execution from malicious firmware. I think this
+case would be similar to constructing a malicious DT blob that exploits
+a bug in the DT parser for arbitrary code execution. The AML interpreter
+is a relatively large chunk of code, but it's self-contained. In
+comparison, the DT parser is much smaller, but has the additional
+(theoretical) problem of potential buffer overflows in any drivers that
+use it incorrectly (e.g. format string attacks on string properties).
+Another difference is that the AML code is intended to not be
+user-upgradable without a full firmware upgrade, while a DT blob is
+meant to be easily replaced if necessary without flashing the firmware,
+using the same permissions you need for updating the OS.
 
-Thanks,
-Matthias
+I'm deliberately not trying to draw conclusions regarding whether AML
+is more or less secure than DT, but the above is my understanding of
+the fundamental differences.
 
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/312311.html
->
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt8127-moose.dts | 4 ++++
->  arch/arm/boot/dts/mt8135-evbp1.dts | 4 ++++
->  2 files changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
-> index 13cba0e..073e295 100644
-> --- a/arch/arm/boot/dts/mt8127-moose.dts
-> +++ b/arch/arm/boot/dts/mt8127-moose.dts
-> @@ -23,3 +23,7 @@
->                 reg = <0 0x80000000 0 0x40000000>;
->         };
->  };
-> +
-> +&uart0 {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
-> index a5adf97..3667738 100644
-> --- a/arch/arm/boot/dts/mt8135-evbp1.dts
-> +++ b/arch/arm/boot/dts/mt8135-evbp1.dts
-> @@ -23,3 +23,7 @@
->                 reg = <0 0x80000000 0 0x40000000>;
->         };
->  };
-> +
-> +&uart3 {
-> +       status = "okay";
-> +};
-> --
-> 1.8.1.1.dirty
->
+	Arnd
 
-
-
--- 
-motzblog.wordpress.com
+[*] I would assume you can get AML code to write to arbitrary physical
+memory locations without much effort, but it has rather limited arithmetical
+capabilities which makes it hard to know where to write to.
