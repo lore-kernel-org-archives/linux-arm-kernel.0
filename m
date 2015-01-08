@@ -1,72 +1,100 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 11:51:40 +0100
-Subject: [PATCH v2 3/8] ARM: mvebu: Add a number of pinctrl functions
+Date: Thu,  8 Jan 2015 11:51:38 +0100
+Subject: [PATCH v2 1/8] ARM: mvebu: a38x: Fix node names
 In-Reply-To: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420714305-7496-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420714305-7496-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Some pinctrl functions can be shared with all DTS out there, since they are
-generic, SoC-wide muxing options. Add a number of these to the DTSI to avoid
-duplication.
+Some nodes in the DTs have a reg property but no unit name in their node name.
+
+This contradicts the way the ePAPR defines the node names. Fix this.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/boot/dts/armada-380.dtsi   | 2 +-
+ arch/arm/boot/dts/armada-385-db.dts | 2 +-
+ arch/arm/boot/dts/armada-385-rd.dts | 2 +-
+ arch/arm/boot/dts/armada-385.dtsi   | 2 +-
+ arch/arm/boot/dts/armada-38x.dtsi   | 4 ++--
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 40200084c6c8..98885c58be29 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -195,6 +195,45 @@
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index 4173a8ab34e7..13400ce88c54 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -32,7 +32,7 @@
  
- 			pinctrl at 18000 {
+ 	soc {
+ 		internal-regs {
+-			pinctrl {
++			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6810-pinctrl";
  				reg = <0x18000 0x20>;
-+
-+				ge0_rgmii_pins: ge-rgmii-pins-0 {
-+					marvell,pins = "mpp6", "mpp7", "mpp8",
-+						       "mpp9", "mpp10", "mpp11",
-+						       "mpp12", "mpp13", "mpp14",
-+						       "mpp15", "mpp16", "mpp17";
-+					marvell,function = "ge0";
-+				};
-+
-+				i2c0_pins: i2c-pins-0 {
-+					marvell,pins = "mpp2", "mpp3";
-+					marvell,function = "i2c0";
-+				};
-+
-+				mdio_pins: mdio-pins {
-+					marvell,pins = "mpp4", "mpp5";
-+					marvell,function = "ge";
-+				};
-+
-+				ref_clk0_pins: ref-clk-pins-0 {
-+					marvell,pins = "mpp45";
-+					marvell,function = "ref";
-+				};
-+
-+				spi1_pins: spi-pins-1 {
-+					marvell,pins = "mpp56", "mpp57", "mpp58",
-+						       "mpp59";
-+					marvell,function = "spi1";
-+				};
-+
-+				uart0_pins: uart-pins-0 {
-+					marvell,pins = "mpp0", "mpp1";
-+					marvell,function = "ua0";
-+				};
-+
-+				uart1_pins: uart-pins-1 {
-+					marvell,pins = "mpp19", "mpp20";
-+					marvell,function = "ua1";
-+				};
+ 			};
+diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+index 2aaa9d2ac284..212605ccc7b6 100644
+--- a/arch/arm/boot/dts/armada-385-db.dts
++++ b/arch/arm/boot/dts/armada-385-db.dts
+@@ -74,7 +74,7 @@
+ 				phy-mode = "rgmii-id";
  			};
  
- 			gpio0: gpio at 18100 {
+-			mdio {
++			mdio at 72004 {
+ 				phy0: ethernet-phy at 0 {
+ 					reg = <0>;
+ 				};
+diff --git a/arch/arm/boot/dts/armada-385-rd.dts b/arch/arm/boot/dts/armada-385-rd.dts
+index aaca2861dc87..74a3bfe6efd7 100644
+--- a/arch/arm/boot/dts/armada-385-rd.dts
++++ b/arch/arm/boot/dts/armada-385-rd.dts
+@@ -67,7 +67,7 @@
+ 			};
+ 
+ 
+-			mdio {
++			mdio at 72004 {
+ 				phy0: ethernet-phy at 0 {
+ 					reg = <0>;
+ 				};
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index 6283d7912f71..5249a4d3c207 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -37,7 +37,7 @@
+ 
+ 	soc {
+ 		internal-regs {
+-			pinctrl {
++			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6820-pinctrl";
+ 				reg = <0x18000 0x20>;
+ 			};
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 74391dace9e7..ada1f206028b 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -193,7 +193,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pinctrl {
++			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6820-pinctrl";
+ 				reg = <0x18000 0x20>;
+ 			};
+@@ -373,7 +373,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			mdio {
++			mdio at 72004 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				compatible = "marvell,orion-mdio";
 -- 
 1.9.1
