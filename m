@@ -1,82 +1,87 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu,  8 Jan 2015 08:20:57 +0100
-Subject: [PATCH] soc/tegra: pmc: Add Tegra132 support
-Message-ID: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 Jan 2015 08:22:05 +0100
+Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock node names
+In-Reply-To: <20150108003826.GF18943@verge.net.au>
+References: <1420418648-7815-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVX196P9u8zHyjWR_-6Pj7kqtOzR4pW2_qGigsSw-2BVQ@mail.gmail.com>
+ <20150108003826.GF18943@verge.net.au>
+Message-ID: <CAMuHMdU_6rq0pP0pHD21GLdyPzSJDW1-LUrKDUdeThgsRdu3sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Hi Simon,
 
-Tegra132 uses the same GPU as Tegra124 and the same special-case is
-needed to remove clamps. However Tegra132 has a separate chip ID, so in
-order to avoid having to extend the list of chip IDs for the special
-case, add a feature flag to the SoC data.
+On Thu, Jan 8, 2015 at 1:38 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Jan 05, 2015 at 10:41:14AM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Jan 5, 2015 at 1:44 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+>> > diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+>> > index 8f78da5..9856e9c 100644
+>> > --- a/arch/arm/boot/dts/r8a7794.dtsi
+>> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
+>> > @@ -294,14 +294,14 @@
+>> >                                              "lb", "qspi", "sdh", "sd0", "z";
+>> >                 };
+>> >                 /* Variable factor clocks */
+>> > -               sd1_clk: sd2_clk at e6150078 {
+>> > +               sd1_clk: sd1_clk at e6150078 {
+>> >                         compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+>> >                         reg = <0 0xe6150078 0 4>;
+>> >                         clocks = <&pll1_div2_clk>;
+>> >                         #clock-cells = <0>;
+>> >                         clock-output-names = "sd1";
+>> >                 };
+>> > -               sd2_clk: sd3_clk at e615007c {
+>> > +               sd2_clk: sd2_clk at e615007c {
+>> >                         compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+>> >                         reg = <0 0xe615007c 0 4>;
+>> >                         clocks = <&pll1_div2_clk>;
+>>
+>> According to the documentation, SDCKCR is 0xe6150074, not ..78,
+>> SD2CKCR is 0xe6150078, not ..7c.
+>> For reference SD3CKCR is 0xe615026c.
+>>
+>> Note that r8a7791.dtsi also has the mismatches between the labels and node
+>> names.
+>>
+>> The discrepancy is caused by the different number of SDHI modules in the
+>> different SoCs of the R-Car Gen2 family.
+>>
+>>   - r8a7790 has hardware modules SDHI0, SDHI1, SDHI2, and SDHI3.
+>>   - r8a7791 and r8a7794 have hardware modules SDHI0, SDHI2, and SDHI3,
+>>     but call the last two instances SDHI1 and SDHI2, while the clock registers
+>>     are not renumbered.
+>>     So instance SDHI1 uses SD2CKCR, and instance SDHI2 uses SD3CKCR, right?
+>
+> I had not noticed, but yes that does seem to be the case.
+>
+>> That means the node names are actually correct. But the register value and
+>> unit address for the second clock are still wrong, they should be (0x)e615007c,
+>
+> Ok, that makes sense. But in that the labels want updating, right?
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/soc/tegra/pmc.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Yes, if the labels are supposed to refer to the clk instance (and not the
+SDHI instance).
 
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 4bdc654bd747..0f096e76574a 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -88,6 +88,8 @@ struct tegra_pmc_soc {
- 	const char *const *powergates;
- 	unsigned int num_cpu_powergates;
- 	const u8 *cpu_powergates;
-+
-+	bool has_gpu_clamps;
- };
- 
- /**
-@@ -225,11 +227,11 @@ int tegra_powergate_remove_clamping(int id)
- 		return -EINVAL;
- 
- 	/*
--	 * The Tegra124 GPU has a separate register (with different semantics)
--	 * to remove clamps.
-+	 * On Tegra124 and later, the clamps for the GPU are controlled by a
-+	 * separate register (with different semantics).
- 	 */
--	if (tegra_get_chip_id() == TEGRA124) {
--		if (id == TEGRA_POWERGATE_3D) {
-+	if (id == TEGRA_POWERGATE_3D) {
-+		if (pmc->soc->has_gpu_clamps) {
- 			tegra_pmc_writel(0, GPU_RG_CNTRL);
- 			return 0;
- 		}
-@@ -773,6 +775,7 @@ static const struct tegra_pmc_soc tegra20_pmc_soc = {
- 	.powergates = tegra20_powergates,
- 	.num_cpu_powergates = 0,
- 	.cpu_powergates = NULL,
-+	.has_gpu_clamps = false,
- };
- 
- static const char * const tegra30_powergates[] = {
-@@ -804,6 +807,7 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
- 	.powergates = tegra30_powergates,
- 	.num_cpu_powergates = ARRAY_SIZE(tegra30_cpu_powergates),
- 	.cpu_powergates = tegra30_cpu_powergates,
-+	.has_gpu_clamps = false,
- };
- 
- static const char * const tegra114_powergates[] = {
-@@ -839,6 +843,7 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
- 	.powergates = tegra114_powergates,
- 	.num_cpu_powergates = ARRAY_SIZE(tegra114_cpu_powergates),
- 	.cpu_powergates = tegra114_cpu_powergates,
-+	.has_gpu_clamps = false,
- };
- 
- static const char * const tegra124_powergates[] = {
-@@ -880,6 +885,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
- 	.powergates = tegra124_powergates,
- 	.num_cpu_powergates = ARRAY_SIZE(tegra124_cpu_powergates),
- 	.cpu_powergates = tegra124_cpu_powergates,
-+	.has_gpu_clamps = true,
- };
- 
- static const struct of_device_id tegra_pmc_match[] = {
--- 
-2.1.3
+>> cfr. in r8a7791.dtsi.
+>>
+>> Note that IMHO the clock-output-names are wrong, for both r8a7791 and r8a7794,
+>> as the hardware documentation calls these "sd2" and "sd3", not "sd1" and "sd2".
+>
+> Excellent. I think we can easily change that for the r8a7794 as the
+> nodes aren't being consumed nor have been part of a release. But I'm
+> less sure about a path forward for the r8a7791. What are your thoughts?
+
+While the clock names are user-visible through /sysfs, I don't think anything
+relies on them. Their users (in DT) refer to the labels in DT.
+Or am I missing something?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
