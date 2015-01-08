@@ -1,35 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 09 Jan 2015 00:51:23 +0200
-Subject: [PATCH v2 0/8] Add Simple Power-Managed Bus Support
-In-Reply-To: <CAMuHMdVeEmKiqGTOmevaBDbJ=nBTbSi6d6Xrm0eyvbMTtyU=sA@mail.gmail.com>
-References: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdVeEmKiqGTOmevaBDbJ=nBTbSi6d6Xrm0eyvbMTtyU=sA@mail.gmail.com>
-Message-ID: <10372546.9gL7hIlFWP@avalon>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu,  8 Jan 2015 16:52:55 -0600
+Subject: [PATCH 0/2] Add Qualcomm TCSR driver
+Message-ID: <1420757577-20425-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+This patch set adds a driver for the TCSR (Top Control and Status Register)
+block that is present in the IPQ8064, APQ8064, and some later processors.  The
+TCSR is responsible for accessing configuration and mux settings for a variety
+of peripherals.
 
-On Thursday 08 January 2015 20:28:45 Geert Uytterhoeven wrote:
-> On Wed, Dec 17, 2014 at 7:49 PM, Geert Uytterhoeven wrote:
-> > The Renesas Bus State Controller (BSC) provides an external bus for
-> > connecting multiple external devices to an SoC, driving several chip
-> > select lines, for e.g. NOR FLASH, Ethernet and USB.
-> > On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
-> > controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
-> > R-Mobile APE6 (r8a73a4) SoC.
-> 
-> [...]
-> 
-> > This was tested on sh73a0/kzm9g-multiplatform. Without this, Ethernet
-> > doesn't work, as the ZB clock is disabled by clk_disable_unused().
-> > Testing on r8a73a4/ape6evm-multiplatform would be appreciated.
-> 
-> Has anyone tried this on r8a73a4/ape6evm-multiplatform?
+The initial version of this driver exposes configuration settings for the USB
+PHY selection and ADM DMA CRCI muxing.
 
-I'm afraid I can't help there, as I have no APE6EVM board.
+Andy Gross (2):
+  soc: qcom: Add TCSR driver
+  soc: qcom: Add device tree binding for TCSR
+
+ .../devicetree/bindings/soc/qcom/qcom,tcsr.txt     |   33 ++++++++
+ drivers/soc/qcom/Kconfig                           |    7 ++
+ drivers/soc/qcom/Makefile                          |    1 +
+ drivers/soc/qcom/qcom_tcsr.c                       |   83 ++++++++++++++++++++
+ include/dt-bindings/soc/qcom,tcsr.h                |   34 ++++++++
+ include/soc/qcom/qcom_tcsr.h                       |   21 +++++
+ 6 files changed, 179 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,tcsr.txt
+ create mode 100644 drivers/soc/qcom/qcom_tcsr.c
+ create mode 100644 include/dt-bindings/soc/qcom,tcsr.h
+ create mode 100644 include/soc/qcom/qcom_tcsr.h
 
 -- 
-Regards,
-
-Laurent Pinchart
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
