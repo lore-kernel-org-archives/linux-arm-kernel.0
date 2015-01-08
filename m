@@ -1,91 +1,224 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 18:38:10 +0100
-Subject: [PATCH v4 08/12] ARM: mvebu: a38x: Add more pinctrl functions
+Date: Thu,  8 Jan 2015 18:38:09 +0100
+Subject: [PATCH v4 07/12] ARM: mvebu: Add Armada 385 Access Point Development
+ Board support
 In-Reply-To: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420738694-6163-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420738694-6163-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the Armada 385 GP board more pinctrl functions depending of the
-SoC are needed. Add them to the DTSI to avoid duplication.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+The A385-AP is a board produced by Marvell that holds 3 mPCIe slot, a 16MB
+SPI-NOR, 3 Gigabit Ethernet ports, USB3 and NAND flash storage.
+
+[gregory.clement at free-electrons.com: switch the license to the dual
+X11/GPL with the agreement of the author]
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 47 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/armada-385-db-ap.dts | 178 +++++++++++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-385-db-ap.dts
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 98885c58be29..63fe15174fee 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -204,6 +204,14 @@
- 					marvell,function = "ge0";
- 				};
- 
-+				ge1_rgmii_pins: ge-rgmii-pins-1 {
-+					marvell,pins = "mpp21", "mpp27", "mpp28",
-+						       "mpp29", "mpp30", "mpp31",
-+						       "mpp32", "mpp37", "mpp38",
-+						       "mpp39", "mpp40", "mpp41";
-+					marvell,function = "ge1";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 91bd5bd62857..ce7bc221fae7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -535,6 +535,7 @@ dtb-$(CONFIG_MACH_ARMADA_375) += \
+ 	armada-375-db.dtb
+ dtb-$(CONFIG_MACH_ARMADA_38X) += \
+ 	armada-385-db.dtb \
++	armada-385-db-ap.dtb \
+ 	armada-385-rd.dtb
+ dtb-$(CONFIG_MACH_ARMADA_XP) += \
+ 	armada-xp-axpwifiap.dtb \
+diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+new file mode 100644
+index 000000000000..57b9119fb3e0
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+@@ -0,0 +1,178 @@
++/*
++ * Device Tree file for Marvell Armada 385 Access Point Development board
++ * (DB-88F6820-AP)
++ *
++ *  Copyright (C) 2014 Marvell
++ *
++ * Nadav Haklai <nadavh@marvell.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is licensed under the terms of the GNU General Public
++ *     License version 2.  This program is licensed "as is" without
++ *     any warranty of any kind, whether express or implied.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "armada-385.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Marvell Armada 385 Access Point Development Board";
++	compatible = "marvell,a385-db-ap", "marvell,armada385", "marvell,armada38x";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++		stdout-path = &uart1;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000>; /* 2GB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
++
++		internal-regs {
++			spi1: spi at 10680 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&spi1_pins>;
++				status = "okay";
++
++				spi-flash at 0 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "st,m25p128";
++					reg = <0>; /* Chip select 0 */
++					spi-max-frequency = <54000000>;
++				};
++			};
++
++			i2c0: i2c at 11000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins>;
++				status = "okay";
++
++				/*
++				 * This bus is wired to two EEPROM
++				 * sockets, one of which holding the
++				 * board ID used by the	bootloader.
++				 * Erasing this EEPROM's content will
++				 * brick the board.
++				 * Use this bus with caution.
++				 */
++			};
++
++			mdio at 72004 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&mdio_pins>;
++
++				phy0: ethernet-phy at 1 {
++					reg = <1>;
 +				};
 +
- 				i2c0_pins: i2c-pins-0 {
- 					marvell,pins = "mpp2", "mpp3";
- 					marvell,function = "i2c0";
-@@ -219,6 +227,17 @@
- 					marvell,function = "ref";
- 				};
- 
-+				ref_clk1_pins: ref-clk-pins-1 {
-+					marvell,pins = "mpp46";
-+					marvell,function = "ref";
++				phy1: ethernet-phy at 4 {
++					reg = <4>;
 +				};
 +
-+				spi0_pins: spi-pins-0 {
-+					marvell,pins = "mpp22", "mpp23", "mpp24",
-+						       "mpp25";
-+					marvell,function = "spi0";
++				phy2: ethernet-phy at 6 {
++					reg = <6>;
 +				};
++			};
 +
- 				spi1_pins: spi-pins-1 {
- 					marvell,pins = "mpp56", "mpp57", "mpp58",
- 						       "mpp59";
-@@ -234,6 +253,34 @@
- 					marvell,pins = "mpp19", "mpp20";
- 					marvell,function = "ua1";
- 				};
++			/* UART0 is exposed through the JP8 connector */
++			uart0: serial at 12000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&uart0_pins>;
++				status = "okay";
++			};
 +
-+				sdhci_pins: sdhci-pins {
-+					marvell,pins = "mpp48", "mpp49", "mpp50",
-+						       "mpp52", "mpp53", "mpp54",
-+						       "mpp55", "mpp57", "mpp58",
-+						       "mpp59";
-+					marvell,function = "sd0";
-+				};
++			/*
++			 * UART1 is exposed through a FTDI chip
++			 * wired to the mini-USB connector
++			 */
++			uart1: serial at 12100 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&uart1_pins>;
++				status = "okay";
++			};
 +
-+				sata0_pins: sata-pins-0 {
-+					marvell,pins = "mpp20";
-+					marvell,function = "sata0";
-+				};
++			ethernet at 30000 {
++				status = "okay";
++				phy = <&phy2>;
++				phy-mode = "sgmii";
++			};
 +
-+				sata1_pins: sata-pins-1 {
-+					marvell,pins = "mpp19";
-+					marvell,function = "sata1";
-+				};
++			ethernet at 34000 {
++				status = "okay";
++				phy = <&phy1>;
++				phy-mode = "sgmii";
++			};
 +
-+				sata2_pins: sata-pins-2 {
-+					marvell,pins = "mpp47";
-+					marvell,function = "sata2";
-+				};
++			ethernet at 70000 {
++				pinctrl-names = "default";
 +
-+				sata3_pins: sata-pins-3 {
-+					marvell,pins = "mpp44";
-+					marvell,function = "sata3";
-+				};
- 			};
- 
- 			gpio0: gpio at 18100 {
++				/*
++				 * The Reference Clock 0 is used to
++				 * provide a clock to the PHY
++				 */
++				pinctrl-0 = <&ge0_rgmii_pins>, <&ref_clk0_pins>;
++				status = "okay";
++				phy = <&phy0>;
++				phy-mode = "rgmii-id";
++			};
++		};
++
++		pcie-controller {
++			status = "okay";
++
++			/*
++			 * The three PCIe units are accessible through
++			 * standard mini-PCIe slots on the board.
++			 */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++
++			pcie at 2,0 {
++				/* Port 1, Lane 0 */
++				status = "okay";
++			};
++
++			pcie at 3,0 {
++				/* Port 2, Lane 0 */
++				status = "okay";
++			};
++		};
++	};
++};
 -- 
 1.9.1
