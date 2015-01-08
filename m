@@ -1,59 +1,58 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 08 Jan 2015 09:49:51 +0100
-Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.19
-In-Reply-To: <544519A4.5090003@monstr.eu>
-References: <544519A4.5090003@monstr.eu>
-Message-ID: <54AE44AF.6010808@monstr.eu>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Jan 2015 09:50:20 +0100
+Subject: [PATCH 3/3] soc/tegra: fuse: Add Tegra132 support
+In-Reply-To: <54AE34D6.5090507@nvidia.com>
+References: <1420701887-1465-1-git-send-email-thierry.reding@gmail.com>
+ <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
+ <54AE34D6.5090507@nvidia.com>
+Message-ID: <20150108085019.GB1987@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 08, 2015 at 03:42:14PM +0800, Vince Hsu wrote:
+> 
+> On 01/08/2015 03:24 PM, Thierry Reding wrote:
+> >From: Thierry Reding <treding@nvidia.com>
+> >
+> >Tegra132 is very similar to Tegra124 from a peripheral point of view and
+> >uses the same fuse controller.
+> >
+> >Signed-off-by: Thierry Reding <treding@nvidia.com>
+> >---
+> >  drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
+> >  drivers/soc/tegra/fuse/fuse-tegra30.c | 2 ++
+> >  2 files changed, 3 insertions(+)
+> >
+> >diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
+> >index 011a3363c265..c0d660f1aaac 100644
+> >--- a/drivers/soc/tegra/fuse/fuse-tegra.c
+> >+++ b/drivers/soc/tegra/fuse/fuse-tegra.c
+> >@@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
+> >  	{ .compatible = "nvidia,tegra30-car", },
+> >  	{ .compatible = "nvidia,tegra114-car", },
+> >  	{ .compatible = "nvidia,tegra124-car", },
+> >+	{ .compatible = "nvidia,tegra132-car", },
+> >  	{},
+> >  };
+> >diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
+> >index d1a4290cda5c..11fe22e0de73 100644
+> >--- a/drivers/soc/tegra/fuse/fuse-tegra30.c
+> >+++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
+> >@@ -184,6 +184,8 @@ static void __init legacy_fuse_init(void)
+> >  	case TEGRA124:
+> >  		fuse_info = &tegra124_info;
+> >  		break;
+> >+	case TEGRA132:
+> >+		fuse_info = &tegra124_info;
+> Fall through intentionally?
 
-please consider to pull this one DT patch to your tree as fix for v3.19
-It is adding USD dt node. Driver has been added to v3.19.
+Nope, good catch.
 
-Thanks,
-Michal
-
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-fixes-for-3.19
-
-for you to fetch changes up to 1643b31658c44767a85469733c6bff4f6d0371c7:
-
-  ARM: zynq: DT: Add USB to device tree (2015-01-08 09:35:04 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq DT fixes for v3.19
-
-- Add USB chipidea driver to DT
-
-----------------------------------------------------------------
-Soren Brinkmann (1):
-      ARM: zynq: DT: Add USB to device tree
-
- arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
- arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
- arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
- 4 files changed, 51 insertions(+)
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/81bac99a/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/fb1c0a7e/attachment.sig>
