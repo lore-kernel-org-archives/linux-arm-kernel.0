@@ -1,212 +1,85 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Jan 2015 12:32:21 +0100
-Subject: [PATCH v15 11/11] KVM: arm/arm64: Add support to dissolve huge PUD
-In-Reply-To: <54ADF2F6.8060906@samsung.com>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418628488-3696-12-git-send-email-m.smarduch@samsung.com>
- <20150107130514.GD21092@cbox> <54ADF2F6.8060906@samsung.com>
-Message-ID: <20150108113221.GK21092@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Jan 2015 11:36:55 +0000
+Subject: [PATCH] arm64/efi: add missing call to early_ioremap_reset()
+In-Reply-To: <1420710898-32298-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1420710898-32298-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150108113655.GF11583@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 07:01:10PM -0800, Mario Smarduch wrote:
-> On 01/07/2015 05:05 AM, Christoffer Dall wrote:
-> > On Sun, Dec 14, 2014 at 11:28:08PM -0800, Mario Smarduch wrote:
-> >> This patch adds the same support for PUD huge page as for PMD. Huge PUD is 
-> >> write protected for initial memory region write protection. Code to dissolve 
-> >> huge PUD is supported in user_mem_abort(). At this time this code has not been 
-> >> tested, but similar approach to current ARMv8 page logging test is in work,
-> >> limiting kernel memory and mapping in 1 or 2GB into Guest address space on a 
-> >> 4k page/48 bit host, some host kernel test code needs to be added to detect
-> >> page fault to this region and side step general processing. Also similar to 
-> >> PMD case all pages in range are marked dirty when PUD entry is cleared.
-> > 
-> > the note about this code being untested shouldn't be part of the commit
-> > message but after the '---' separater or in the cover letter I think.
+On Thu, Jan 08, 2015 at 09:54:58AM +0000, Ard Biesheuvel wrote:
+> The early ioremap support introduced by patch bf4b558eba92
+> ("arm64: add early_ioremap support") failed to add a call to
+> early_ioremap_reset() at an appropriate time. Without this call,
+> invocations of early_ioremap etc. that are done too late will go
+> unnoticed and may cause corruption.
 > 
-> Ah ok.
-> > 
-> >>
-> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_mmu.h         |  8 +++++
-> >>  arch/arm/kvm/mmu.c                     | 64 ++++++++++++++++++++++++++++++++--
-> >>  arch/arm64/include/asm/kvm_mmu.h       |  9 +++++
-> >>  arch/arm64/include/asm/pgtable-hwdef.h |  3 ++
-> >>  4 files changed, 81 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> >> index dda0046..703d04d 100644
-> >> --- a/arch/arm/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm/include/asm/kvm_mmu.h
-> >> @@ -133,6 +133,14 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
-> >>  	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
-> >>  }
-> >>  
-> >> +static inline void kvm_set_s2pud_readonly(pud_t *pud)
-> >> +{
-> >> +}
-> >> +
-> >> +static inline bool kvm_s2pud_readonly(pud_t *pud)
-> >> +{
-> >> +	return false;
-> >> +}
-> >>  
-> >>  /* Open coded p*d_addr_end that can deal with 64bit addresses */
-> >>  #define kvm_pgd_addr_end(addr, end)					\
-> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >> index 59003df..35840fb 100644
-> >> --- a/arch/arm/kvm/mmu.c
-> >> +++ b/arch/arm/kvm/mmu.c
-> >> @@ -109,6 +109,55 @@ void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
-> >>  	}
-> >>  }
-> >>  
-> >> +/**
-> >> +  * stage2_find_pud() - find a PUD entry
-> >> +  * @kvm:	pointer to kvm structure.
-> >> +  * @addr:	IPA address
-> >> +  *
-> >> +  * Return address of PUD entry or NULL if not allocated.
-> >> +  */
-> >> +static pud_t *stage2_find_pud(struct kvm *kvm, phys_addr_t addr)
-> > 
-> > why can't you reuse stage2_get_pud here?
+> This is exactly what happened when the first user of this feature
+> was added in patch f84d02755f5a ("arm64: add EFI runtime services").
+> The early mapping of the EFI memory map is unmapped during an early
+> initcall, at which time the early ioremap support is long gone.
 > 
-> stage2_get_* allocate intermediate tables, when they're called
-> you know intermediate tables are needed to install a pmd or pte.
-> But currently there is no way to tell we faulted in a PUD
-> region, this code just checks if a PUD is set, and not
-> allocate intermediate tables along the way.
-
-hmmm, but if we get here it means that we are faulting on an address, so
-we need to map something at that address regardless, so I don't see the
-problem in using stage2_get_pud.
-
+> Fix by adding the missing call to early_ioremap_reset() to
+> setup_arch(), and move the offending early_memunmap() to right after
+> the point where the early mapping of the EFI memory map is last used.
 > 
-> Overall not sure if this is in preparation for a new huge page (PUD sized)?
-> Besides developing a custom test, not sure how to use this
-> and determine we fault in a PUD region? Generic 'gup'
-> code does handle PUDs but perhaps some arch. has PUD sized
-> huge pages.
+> Fixes: f84d02755f5a ("arm64: add EFI runtime services")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 > 
+> After discussing off-list between Mark Salter, Leif and myself, this is the
+> bare minimum to fix the early ioremap issue in kernels up to 3.19, combined
+> into a single patch. Considering that the early_ioremap support was added in
+> 3.15 (eol), but not used until EFI runtime services support was added in 3.16,
+> there is no reason to split this up. Also, we have work underway to drastically
+> change the way runtime services etc are mapped during early boot [which we hope
+> will make it into 3.20] so it makes sense to do the bare minimum here and handle
+> any fallout in terms of style etc later.
 
-When Marc and I discussed this we came to the conclusion that we wanted
-code to support this code path for when huge PUDs were suddently used,
-but now when I see the code, I am realizing that adding huge PUD support
-on the Stage-2 level requires a lot of changes to this file, so I really
-don't think we need to handle it at the point after all.
+Ok, so this replaces the two patch series sent earlier by Leif and should be
+appied for 3.19?
 
-> > 
-> >> +{
-> >> +	pgd_t *pgd;
-> >> +
-> >> +	pgd = kvm->arch.pgd + pgd_index(addr);
-> >> +	if (pgd_none(*pgd))
-> >> +		return NULL;
-> >> +
-> >> +	return pud_offset(pgd, addr);
-> >> +}
-> >> +
-> >> +/**
-> >> + * stage2_dissolve_pud() - clear and flush huge PUD entry
-> >> + * @kvm:	pointer to kvm structure.
-> >> + * @addr	IPA
-> >> + *
-> >> + * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-> >> + * pages in the range dirty.
-> >> + */
-> >> +void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr)
-> >> +{
-> >> +	pud_t *pud;
-> >> +	gfn_t gfn;
-> >> +	long i;
-> >> +
-> >> +	pud = stage2_find_pud(kvm, addr);
-> >> +	if (pud && !pud_none(*pud) && kvm_pud_huge(*pud)) {
-> > 
-> > I'm just thinking here, why do we need to check if we get a valid pud
-> > back here, but we don't need the equivalent check in dissolve_pmd from
-> > patch 7?
+Will
+
+>  arch/arm64/kernel/efi.c   | 2 +-
+>  arch/arm64/kernel/setup.c | 1 +
+>  2 files changed, 2 insertions(+), 1 deletion(-)
 > 
-> kvm_pud_huge() doesn't check bit 0 for invalid entry, but
-> pud_none() is not the right way to check either, maybe pud_bad()
-> first. Nothing is done in patch 7 since the pmd is retrieved from
-> stage2_get_pmd().
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 6fac253bc783..2bb4347d0edf 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -326,6 +326,7 @@ void __init efi_idmap_init(void)
+>  
+>  	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
+>  	efi_setup_idmap();
+> +	early_memunmap(memmap.map, memmap.map_end - memmap.map);
+>  }
+>  
+>  static int __init remap_region(efi_memory_desc_t *md, void **new)
+> @@ -380,7 +381,6 @@ static int __init arm64_enter_virtual_mode(void)
+>  	}
+>  
+>  	mapsize = memmap.map_end - memmap.map;
+> -	early_memunmap(memmap.map, mapsize);
+>  
+>  	if (efi_runtime_disabled()) {
+>  		pr_info("EFI runtime services will be disabled.\n");
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index b80991166754..20fe2932ad0c 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -402,6 +402,7 @@ void __init setup_arch(char **cmdline_p)
+>  	request_standard_resources();
+>  
+>  	efi_idmap_init();
+> +	early_ioremap_reset();
+>  
+>  	unflatten_device_tree();
+>  
+> -- 
+> 1.8.3.2
 > 
-
-hmmm, but stage2_get_pmd() can return a NULL pointer if you have the
-IOMAP flag set...
-
-> > 
-> > I think the rationale is that it should never happen because we never
-> > call these functions with the logging and iomap flags at the same
-> > time...
 > 
-> I'm little lost here, not sure how it's related to above.
-> But I think a VFIO device will have a memslot and
-> it would be possible to enable logging. But to what
-> end I'm not sure.
-> 
-
-As I said above, if you call the set_s2pte function with the IOMAP and
-LOGGING flags set, then you'll end up in a situation where you can get a
-NULL pointer back from stage2_get_pmd() but you're never checking
-against that.
-
-Now, this raises an interesting point, we have now added code that
-prevents faults from ever happening on device maps, but introducing a
-path here where the user can set logging on a memslot with device memory
-regions, which introduces write faults on such regions.  My gut feeling
-is that we should avoid that from ever happening, and not allow this
-function to be called with both flags set.
-
-> > 
-> >> +		pud_clear(pud);
-> >> +		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> >> +		put_page(virt_to_page(pud));
-> >> +#ifdef CONFIG_SMP
-> >> +		gfn = (addr & PUD_MASK) >> PAGE_SHIFT;
-> >> +		/*
-> >> +		 * Mark all pages in PUD range dirty, in case other
-> >> +		 * CPUs are  writing to it.
-> >> +		 */
-> >> +		for (i = 0; i < PTRS_PER_PUD * PTRS_PER_PMD; i++)
-> >> +			mark_page_dirty(kvm, gfn + i);
-> >> +#endif
-> >> +	}
-> >> +}
-> >> +
-> >>  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
-> >>  				  int min, int max)
-> >>  {
-> >> @@ -761,6 +810,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> >>  	unsigned long iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-> >>  	unsigned long logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
-> >>  
-> >> +	/*
-> >> +	 * While dirty page logging - dissolve huge PUD, then continue on to
-> >> +	 * allocate page.
-> >> +	 */
-> >> +	if (logging_active)
-> >> +		stage2_dissolve_pud(kvm, addr);
-> >> +
-> > 
-> > I know I asked for this, but what's the purpose really when we never set
-> > a huge stage-2 pud, shouldn't we just WARN/BUG if we encounter one?
-> > 
-> > Marc, you may have some thoughts here...
-> 
-> Not sure myself what's the vision for PUD support.
-> 
-
-with 4-level paging on aarch64, we use PUDs but we haven't added any
-code to insert huge PUDs (only regular ones) on the stage-2 page tables,
-even if the host kernel happens to suddenly support huge PUDs for the
-stage-1 page tables, which is what I think we were trying to address.
-
-
-So I really think we can drop this whole patch.  As I said, really sorry
-about this one!
-
--Christoffer
