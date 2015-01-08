@@ -1,455 +1,209 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Thu, 8 Jan 2015 19:47:15 +0530
-Subject: [PATCH v3 2/4] mmc: dw_mmc: exynos: support eMMC's HS400 mode
-In-Reply-To: <54ADE178.10100@samsung.com>
-References: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
- <1420008185-24758-3-git-send-email-alim.akhtar@samsung.com>
- <54ADE178.10100@samsung.com>
-Message-ID: <CAGOxZ510Mv4V3raed3MiShe-A+=4Zfu_LAv2a6H2c0M738OaVg@mail.gmail.com>
+From: moon.linux@yahoo.com (Anand Moon)
+Date: Thu, 8 Jan 2015 14:21:53 +0000 (UTC)
+Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <1420706948.6075.17.camel@collabora.co.uk>
+References: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <54AA48E6.3040404@samsung.com> <1420470469.15910.134.camel@collabora.co.uk>
+ <69242715.30115.1420655868687.JavaMail.yahoo@jws10659.mail.bf1.yahoo.com>
+ <1420670333.6075.2.camel@collabora.co.uk>
+ <6203C077F070A646AA0FCB4B5F1795D248114CA6@sisaex01sj>
+ <1420706948.6075.17.camel@collabora.co.uk>
+Message-ID: <1381088902.6390475.1420726913802.JavaMail.yahoo@jws10667.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+Hi Sjoerd,
 
-On Thu, Jan 8, 2015 at 7:16 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> On 12/31/2014 03:43 PM, Alim Akhtar wrote:
->> From: Seungwon Jeon <tgih.jun@samsung.com>
->>
->> Implements HS400 support for exynos host driver.
->> And this patch includes some updates as new mode is added.
->>
->> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    6 +
->>  drivers/mmc/host/dw_mmc-exynos.c                   |  177 +++++++++++++++-----
->>  drivers/mmc/host/dw_mmc-exynos.h                   |   17 +-
->>  drivers/mmc/host/dw_mmc.c                          |   16 +-
->>  drivers/mmc/host/dw_mmc.h                          |    2 +
->>  5 files changed, 178 insertions(+), 40 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> index 06455de..be30c94 100644
->> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->> @@ -34,6 +34,7 @@ Required Properties:
->>    valid values.
->>
->>  * samsung,dw-mshc-hs200-timing: Similar with dw-mshc-sdr-timing.
->> +* samsung,dw-mshc-hs400-timing: Similar with dw-mshc-ddr-timing.
->>
->>    Notes for the sdr-timing and ddr-timing values:
->>
->> @@ -51,6 +52,9 @@ Required Properties:
->>        - if CIU clock divider value is 0 (that is divide by 1), both tx and rx
->>          phase shift clocks should be 0.
->>
->> +* read-strobe-delay: RCLK (Data strobe) delay to control HS400 mode
->> +  (Latency value for delay line in Read path)
->> +
->>  Required properties for a slot (Deprecated - Recommend to use one slot per host):
->>
->>  * gpios: specifies a list of gpios used for command, clock and data bus. The
->> @@ -83,5 +87,7 @@ Example:
->>               samsung,dw-mshc-sdr-timing = <2 3 3>;
->>               samsung,dw-mshc-ddr-timing = <1 2 3>;
->>               samsung,dw-mshc-hs200-timing = <0 2 3>;
->> +             samsung,dw-mshc-hs400-timing = <0 2 1>;
->> +             read-strobe-delay = <90>;
->>               bus-width = <8>;
->>       };
->> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->> index be6530e..d37a631 100644
->> --- a/drivers/mmc/host/dw_mmc-exynos.c
->> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->> @@ -41,7 +41,12 @@ struct dw_mci_exynos_priv_data {
->>       u32                             sdr_timing;
->>       u32                             ddr_timing;
->>       u32                             hs200_timing;
->> +     u32                             hs400_timing;
->> +     u32                             tuned_sample;
->>       u32                             cur_speed;
->> +     u32                             dqs_delay;
->> +     u32                             saved_dqs_en;
->> +     u32                             saved_strobe_ctrl;
->>  };
->>
->>  static struct dw_mci_exynos_compatible {
->> @@ -101,6 +106,16 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
->>                          SDMMC_MPSCTRL_NON_SECURE_WRITE_BIT);
->>       }
->>
->> +     if (priv->ctrl_type >= DW_MCI_TYPE_EXYNOS5420) {
->> +             priv->saved_strobe_ctrl = mci_readl(host, HS400_DLINE_CTRL);
->> +             priv->saved_dqs_en = mci_readl(host, HS400_DQS_EN);
->> +             priv->saved_dqs_en |= AXI_NON_BLOCKING_WR;
->> +             mci_writel(host, HS400_DQS_EN, priv->saved_dqs_en);
->> +             if (!priv->dqs_delay)
->> +                     priv->dqs_delay =
->> +                             DQS_CTRL_GET_RD_DELAY(priv->saved_strobe_ctrl);
->> +     }
->> +
->>       priv->ciu_div = dw_mci_exynos_get_ciu_div(host);
->>
->>       return 0;
->> @@ -115,6 +130,25 @@ static int dw_mci_exynos_setup_clock(struct dw_mci *host)
->>       return 0;
->>  }
->>
->> +static void dw_mci_exynos_set_clksel_timing(struct dw_mci *host, u32 timing)
->> +{
->> +     struct dw_mci_exynos_priv_data *priv = host->priv;
->> +     u32 clksel;
->> +
->> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->> +             clksel = mci_readl(host, CLKSEL64);
->> +     else
->> +             clksel = mci_readl(host, CLKSEL);
->> +
->> +     clksel = (clksel & ~SDMMC_CLKSEL_TIMING_MASK) | timing;
->> +     if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->> +             priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->> +             mci_writel(host, CLKSEL64, clksel);
->> +     else
->> +             mci_writel(host, CLKSEL, clksel);
->> +}
->> +
->>  #ifdef CONFIG_PM_SLEEP
->>  static int dw_mci_exynos_suspend(struct device *dev)
->>  {
->> @@ -190,35 +224,37 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
->>       }
->>  }
->>
->> -static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->> +static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
->>  {
->>       struct dw_mci_exynos_priv_data *priv = host->priv;
->> -     unsigned int wanted = ios->clock;
->> -     unsigned long actual;
->> +     u32 dqs, strobe;
->>
->> -     if (ios->timing == MMC_TIMING_MMC_HS200) {
->> -             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->> -                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->> -                     mci_writel(host, CLKSEL64, priv->hs200_timing);
->> -             else
->> -                     mci_writel(host, CLKSEL, priv->hs200_timing);
->> -     } else if (ios->timing == MMC_TIMING_MMC_DDR52) {
->> -             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->> -                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->> -                     mci_writel(host, CLKSEL64, priv->ddr_timing);
->> -             else
->> -                     mci_writel(host, CLKSEL, priv->ddr_timing);
->> -             /* Should be double rate for DDR mode */
->> -             if (ios->bus_width == MMC_BUS_WIDTH_8)
->> -                     wanted <<= 1;
->> +     /*
->> +      * Exynos5420 and above controller supports HS400 mode
->> +      */
->> +     if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
->> +             return;
->> +
->> +     dqs = priv->saved_dqs_en;
->> +     strobe = priv->saved_strobe_ctrl;
->> +
->> +     if (timing == MMC_TIMING_MMC_HS400) {
->> +             dqs |= DATA_STROBE_EN;
->> +             strobe = DQS_CTRL_RD_DELAY(strobe, priv->dqs_delay);
->>       } else {
->> -             if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->> -                     priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->> -                     mci_writel(host, CLKSEL64, priv->sdr_timing);
->> -             else
->> -                     mci_writel(host, CLKSEL, priv->sdr_timing);
->> +             dqs &= ~DATA_STROBE_EN;
->>       }
->>
->> +     mci_writel(host, HS400_DQS_EN, dqs);
->> +     mci_writel(host, HS400_DLINE_CTRL, strobe);
->> +}
->> +
->> +static void dw_mci_exynos_adjust_clock(struct dw_mci *host, unsigned int wanted)
->> +{
->> +     struct dw_mci_exynos_priv_data *priv = host->priv;
->> +     unsigned long actual;
->> +     u8 div;
->> +     int ret;
->>       /*
->>        * Don't care if wanted clock is zero or
->>        * ciu clock is unavailable
->> @@ -230,18 +266,55 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>       if (wanted < EXYNOS_CCLKIN_MIN)
->>               wanted = EXYNOS_CCLKIN_MIN;
->>
->> -     if (wanted != priv->cur_speed) {
->> -             u8 div = dw_mci_exynos_get_ciu_div(host);
->> -             int ret = clk_set_rate(host->ciu_clk, wanted * div);
->> -             if (ret)
->> -                     dev_warn(host->dev,
->> -                             "failed to set clk-rate %u error: %d\n",
->> -                              wanted * div, ret);
->> -             actual = clk_get_rate(host->ciu_clk);
->> -             host->bus_hz = actual / div;
->> -             priv->cur_speed = wanted;
->> -             host->current_speed = 0;
->> +     if (wanted == priv->cur_speed)
->> +             return;
->> +
->> +     div = dw_mci_exynos_get_ciu_div(host);
->> +     ret = clk_set_rate(host->ciu_clk, wanted * div);
->> +     if (ret)
->> +             dev_warn(host->dev,
->> +                     "failed to set clk-rate %u error: %d\n",
->> +                     wanted * div, ret);
->> +     actual = clk_get_rate(host->ciu_clk);
->> +     host->bus_hz = actual / div;
->> +     priv->cur_speed = wanted;
->> +     host->current_speed = 0;
->> +}
->> +
->> +static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->> +{
->> +     struct dw_mci_exynos_priv_data *priv = host->priv;
->> +     unsigned int wanted = ios->clock;
->> +     u32 timing = ios->timing, clksel;
->> +
->> +     switch (timing) {
->> +     case MMC_TIMING_MMC_HS400:
->> +             /* Update tuned sample timing */
->> +             clksel = SDMMC_CLKSEL_UP_SAMPLE(
->> +                             priv->hs400_timing, priv->tuned_sample);
->> +             wanted <<= 1;
->> +             break;
->> +     case MMC_TIMING_MMC_HS200:
->> +             clksel = priv->hs200_timing;
->> +             break;
->> +     case MMC_TIMING_MMC_DDR52:
->> +             clksel = priv->ddr_timing;
->> +             /* Should be double rate for DDR mode */
->> +             if (ios->bus_width == MMC_BUS_WIDTH_8)
->> +                     wanted <<= 1;
->> +             break;
->> +     default:
->> +             clksel = priv->sdr_timing;
->>       }
->> +
->> +     /* Set clock timing for the requested speed mode*/
->> +     dw_mci_exynos_set_clksel_timing(host, clksel);
->> +
->> +     /* Configure setting for HS400 */
->> +     dw_mci_exynos_config_hs400(host, timing);
->> +
->> +     /* Configure clock rate */
->> +     dw_mci_exynos_adjust_clock(host, wanted);
->>  }
->>
->>  static int dw_mci_exynos_dt_populate_timing(struct dw_mci *host,
->> @@ -294,6 +367,14 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
->>
->>       dw_mci_exynos_dt_populate_timing(host, priv->ctrl_type,
->>               "samsung,dw-mshc-hs200-timing", &priv->hs200_timing);
->> +
->> +     ret = dw_mci_exynos_dt_populate_timing(host, priv->ctrl_type,
->> +                     "samsung,dw-mshc-hs400-timing", &priv->hs400_timing);
->> +     if (!ret && of_property_read_u32(np,
->> +                             "read-strobe-delay", &priv->dqs_delay))
->> +             dev_info(host->dev,
->> +                     "read-strobe-delay is not found, assuming usage of default value\n");
->> +
->>       host->priv = priv;
->>
->>       return 0;
->> @@ -320,7 +401,9 @@ static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
->>               clksel = mci_readl(host, CLKSEL64);
->>       else
->>               clksel = mci_readl(host, CLKSEL);
->> -     clksel = (clksel & ~0x7) | SDMMC_CLKSEL_CCLK_SAMPLE(sample);
->> +
->> +     clksel = SDMMC_CLKSEL_UP_SAMPLE(clksel, sample);
->> +
->>       if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->>               priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->>               mci_writel(host, CLKSEL64, clksel);
->> @@ -339,13 +422,16 @@ static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
->>               clksel = mci_readl(host, CLKSEL64);
->>       else
->>               clksel = mci_readl(host, CLKSEL);
->> +
->>       sample = (clksel + 1) & 0x7;
->> -     clksel = (clksel & ~0x7) | sample;
->> +     clksel = SDMMC_CLKSEL_UP_SAMPLE(clksel, sample);
->> +
->>       if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
->>               priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
->>               mci_writel(host, CLKSEL64, clksel);
->>       else
->>               mci_writel(host, CLKSEL, clksel);
->> +
->>       return sample;
->>  }
->>
->> @@ -378,6 +464,7 @@ out:
->>  static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
->>  {
->>       struct dw_mci *host = slot->host;
->> +     struct dw_mci_exynos_priv_data *priv = host->priv;
->>       struct mmc_host *mmc = slot->mmc;
->>       u8 start_smpl, smpl, candiates = 0;
->>       s8 found = -1;
->> @@ -395,14 +482,27 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
->>       } while (start_smpl != smpl);
->>
->>       found = dw_mci_exynos_get_best_clksmpl(candiates);
->> -     if (found >= 0)
->> +     if (found >= 0) {
->>               dw_mci_exynos_set_clksmpl(host, found);
->> -     else
->> +             priv->tuned_sample = found;
->> +     } else {
->>               ret = -EIO;
->> +     }
->>
->>       return ret;
->>  }
->>
->> +int dw_mci_exynos_prepare_hs400_tuning(struct dw_mci *host,
->> +                                     struct mmc_ios *ios)
->> +{
->> +     struct dw_mci_exynos_priv_data *priv = host->priv;
->> +
->> +     dw_mci_exynos_set_clksel_timing(host, priv->hs400_timing);
->> +     dw_mci_exynos_adjust_clock(host, (ios->clock) << 1);
->> +
->> +     return 0;
->> +}
->> +
->>  /* Common capabilities of Exynos4/Exynos5 SoC */
->>  static unsigned long exynos_dwmmc_caps[4] = {
->>       MMC_CAP_1_8V_DDR | MMC_CAP_8_BIT_DATA | MMC_CAP_CMD23,
->> @@ -419,6 +519,7 @@ static const struct dw_mci_drv_data exynos_drv_data = {
->>       .set_ios                = dw_mci_exynos_set_ios,
->>       .parse_dt               = dw_mci_exynos_parse_dt,
->>       .execute_tuning         = dw_mci_exynos_execute_tuning,
->> +     .prepare_hs400_tuning   = dw_mci_exynos_prepare_hs400_tuning,
->>  };
->>
->>  static const struct of_device_id dw_mci_exynos_match[] = {
->> diff --git a/drivers/mmc/host/dw_mmc-exynos.h b/drivers/mmc/host/dw_mmc-exynos.h
->> index c04ecef..e7faffe 100644
->> --- a/drivers/mmc/host/dw_mmc-exynos.h
->> +++ b/drivers/mmc/host/dw_mmc-exynos.h
->> @@ -12,21 +12,36 @@
->>  #ifndef _DW_MMC_EXYNOS_H_
->>  #define _DW_MMC_EXYNOS_H_
->>
->> -/* Extended Register's Offset */
->>  #define SDMMC_CLKSEL                 0x09C
->>  #define SDMMC_CLKSEL64                       0x0A8
->>
->> +/* Extended Register's Offset */
->> +#define SDMMC_HS400_DQS_EN           0x180
->> +#define SDMMC_HS400_ASYNC_FIFO_CTRL  0x184
->> +#define SDMMC_HS400_DLINE_CTRL               0x188
->> +
->>  /* CLKSEL register defines */
->>  #define SDMMC_CLKSEL_CCLK_SAMPLE(x)  (((x) & 7) << 0)
->>  #define SDMMC_CLKSEL_CCLK_DRIVE(x)   (((x) & 7) << 16)
->>  #define SDMMC_CLKSEL_CCLK_DIVIDER(x) (((x) & 7) << 24)
->>  #define SDMMC_CLKSEL_GET_DRV_WD3(x)  (((x) >> 16) & 0x7)
->>  #define SDMMC_CLKSEL_GET_DIV(x)              (((x) >> 24) & 0x7)
->> +#define SDMMC_CLKSEL_UP_SAMPLE(x, y) (((x) & ~SDMMC_CLKSEL_CCLK_SAMPLE(7)) |\
->> +                                      SDMMC_CLKSEL_CCLK_SAMPLE(y))
->>  #define SDMMC_CLKSEL_TIMING(x, y, z) (SDMMC_CLKSEL_CCLK_SAMPLE(x) |  \
->>                                        SDMMC_CLKSEL_CCLK_DRIVE(y) |   \
->>                                        SDMMC_CLKSEL_CCLK_DIVIDER(z))
->> +#define SDMMC_CLKSEL_TIMING_MASK     SDMMC_CLKSEL_TIMING(0x7, 0x7, 0x7)
->>  #define SDMMC_CLKSEL_WAKEUP_INT              BIT(11)
->>
->> +/* HS400 control defines */
->> +#define DATA_STROBE_EN                       BIT(0)
-> Add comment "xxx register defines."
->
-Ok, will add
->> +#define AXI_NON_BLOCKING_WR  BIT(7)
->
-> I can't find this bit and comment..where?
->
-This is Bit[7] of RCLK_EN register.
->> +
->> +/* Delay Line Control defines */
->> +#define DQS_CTRL_RD_DELAY(x, y)              (((x) & ~0x3FF) | ((y) & 0x3FF))
->
-> I'm not understanding this define... clear and set?
->
-yes, clear default and set the one pass from Device Tree.
-> Best Regards,
-> Jaehoon Chung
->
->> +#define DQS_CTRL_GET_RD_DELAY(x)     ((x) & 0x3FF)
->> +
->>  /* Protector Register */
->>  #define SDMMC_EMMCP_BASE     0x1000
->>  #define SDMMC_MPSECURITY     (SDMMC_EMMCP_BASE + 0x0010)
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 2e8abc8..43a3a5b 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -1084,7 +1084,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>       regs = mci_readl(slot->host, UHS_REG);
->>
->>       /* DDR mode set */
->> -     if (ios->timing == MMC_TIMING_MMC_DDR52)
->> +     if (ios->timing == MMC_TIMING_MMC_DDR52 ||
->> +         ios->timing == MMC_TIMING_MMC_HS400)
->>               regs |= ((0x1 << slot->id) << 16);
->>       else
->>               regs &= ~((0x1 << slot->id) << 16);
->> @@ -1321,6 +1322,18 @@ static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
->>       return err;
->>  }
->>
->> +int dw_mci_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
->> +{
->> +     struct dw_mci_slot *slot = mmc_priv(mmc);
->> +     struct dw_mci *host = slot->host;
->> +     const struct dw_mci_drv_data *drv_data = host->drv_data;
->> +
->> +     if (drv_data && drv_data->prepare_hs400_tuning)
->> +             return drv_data->prepare_hs400_tuning(host, ios);
->> +
->> +     return 0;
->> +}
->> +
->>  static const struct mmc_host_ops dw_mci_ops = {
->>       .request                = dw_mci_request,
->>       .pre_req                = dw_mci_pre_req,
->> @@ -1333,6 +1346,7 @@ static const struct mmc_host_ops dw_mci_ops = {
->>       .card_busy              = dw_mci_card_busy,
->>       .start_signal_voltage_switch = dw_mci_switch_voltage,
->>       .init_card              = dw_mci_init_card,
->> +     .prepare_hs400_tuning   = dw_mci_prepare_hs400_tuning,
->>  };
->>
->>  static void dw_mci_request_end(struct dw_mci *host, struct mmc_request *mrq)
->> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
->> index 18c4afe..d239867 100644
->> --- a/drivers/mmc/host/dw_mmc.h
->> +++ b/drivers/mmc/host/dw_mmc.h
->> @@ -271,5 +271,7 @@ struct dw_mci_drv_data {
->>       void            (*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
->>       int             (*parse_dt)(struct dw_mci *host);
->>       int             (*execute_tuning)(struct dw_mci_slot *slot);
->> +     int             (*prepare_hs400_tuning)(struct dw_mci *host,
->> +                                             struct mmc_ios *ios);
->>  };
->>  #endif /* _DW_MMC_H_ */
->>
->
+Thanks for all the inputs.
+I would like to point out another issue.
+
+I have pulled the changes from "git://git.collabora.co.uk/git/user/javier/linux.git" branch "wip/exynos/dp-integ"
+
+
+And now Hdmi output to monitor flickers and then black screen.
+
+odroid at odroid-xu3:~$ dmesg | grep hdmi
+[    2.442286] hdmi-en: no parameters
+[    2.443185] reg-fixed-voltage regulators:regulator at 1: hdmi-en supplying 0uV
+[   10.199757] samsung-pinctrl 13400000.pinctrl: request pin 39 (gpx3-7) for 14530000.hdmi
+[   10.208086] of_get_named_gpiod_flags: parsed 'hpd-gpio' property of node '/hdmi at 14530000[0]' - status (0)
+[   10.217849] exynos-hdmi 14530000.hdmi: Looking up vdd-supply from device tree
+[   10.224403] exynos-hdmi 14530000.hdmi: Failed to get supply 'vdd': -517
+[   10.230935] [drm:hdmi_resources_init] *ERROR* failed to get regulators
+[   10.237472] [drm:hdmi_probe] *ERROR* hdmi_resources_init failed
+[   10.243860] platform 14530000.hdmi: Driver exynos-hdmi requests probe deferral
+[   14.290745] samsung-pinctrl 13400000.pinctrl: request pin 39 (gpx3-7) for 14530000.hdmi
+[   14.299134] of_get_named_gpiod_flags: parsed 'hpd-gpio' property of node '/hdmi at 14530000[0]' - status (0)
+[   14.308644] exynos-hdmi 14530000.hdmi: Looking up vdd-supply from device tree
+[   14.316894] exynos-hdmi 14530000.hdmi: Looking up vdd_osc-supply from device tree
+[   14.324316] exynos-hdmi 14530000.hdmi: Looking up vdd_pll-supply from device tree
+[   14.331728] exynos-hdmi 14530000.hdmi: Looking up hdmi-en-supply from device tree
+[   14.337943] exynos-hdmi 14530000.hdmi: Looking up hdmi-en-supply property in node /hdmi at 14530000 failed
+[   14.399118] exynos-drm exynos-drm: bound 14530000.hdmi (ops hdmi_component_ops)
+
+
+I am now observing the kernel bug bellow.
+----------------------------------------------------------------------------
+
+[  164.155699] init: plymouth-stop pre-start process (3934) terminated with status 1
+[  654.961143] ------------[ cut here ]------------
+[  654.964305] kernel BUG at drivers/gpu/drm/drm_irq.c:1032!
+[  654.969673] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+[  654.975475] Modules linked in: cpufreq_ondemand cpufreq_conservative cpufreq_userspace cpufreq_powersave ipv6 rfcomm bnep bluetooth
+[  654.987267] CPU: 0 PID: 4075 Comm: Xorg Not tainted 3.18.0-armv71 #24
+[  654.993678] task: ddbfc300 ti: ddbd6000 task.ti: ddbd6000
+[  654.999055] PC is at drm_vblank_put+0xcc/0xe4
+[  655.003386] LR is at mixer_wait_for_vblank+0x11c/0x148
+[  655.008493] pc : [<c03eb608>]    lr : [<c040ee4c>]    psr: 60030013
+[  655.008493] sp : ddbd7ce8  ip : ddbd7d00  fp : ddbd7cfc
+[  655.019930] r10: c0710a78  r9 : ddbd7e50  r8 : dda5f680
+[  655.025129] r7 : 00000008  r6 : c0bd7aec  r5 : eb958724  r4 : eb958590
+[  655.031627] r3 : eb97d680  r2 : 00000000  r1 : 00000000  r0 : c23f9a40
+[  655.038127] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[  655.045233] Control: 10c5387d  Table: 5b87806a  DAC: 00000015
+[  655.050954] Process Xorg (pid: 4075, stack limit = 0xddbd6238)
+[  655.056759] Stack: (0xddbd7ce8 to 0xddbd8000)
+[  655.061096] 7ce0:                   eb958590 eb958724 ddbd7d34 ddbd7d00 c040ee4c c03eb548
+[  655.069242] 7d00: ddbd7e50 00000000 ddbfc300 c006fba0 ddbd7d10 ddbd7d10 eb955f00 c23f9ed0
+[  655.077389] 7d20: c23f9a40 dda5f6e4 ddbd7d4c ddbd7d38 c04045a4 c040ed3c dda5f684 c23f9e40
+[  655.085535] 7d40: ddbd7d7c ddbd7d50 c0404ddc c040456c c0404dbc dda5f684 c23f9e40 c23f9a40
+[  655.093679] 7d60: dda5f680 dda5f680 ddbd7e50 c0710a78 ddbd7d9c ddbd7d80 c03f2c30 c0404dc8
+[  655.101824] 7d80: dda5f680 dda5f680 c23f9a40 c23f9a40 ddbd7dbc ddbd7da0 c03f2c94 c03f2bdc
+[  655.109971] 7da0: ddbd6008 600f0013 ddbd7dc4 e9b92f5c ddbd7dfc ddbd7dc0 c03f304c c03f2c40
+[  655.118116] 7dc0: c06bc8dc c007ae2c e9b92f5c c23f9e40 dda5f6d8 c23f9a40 dda5f680 ddbd7e50
+[  655.126260] 7de0: e9b92f5c c23f9e40 dda5f6d8 c23f9a40 ddbd7e24 ddbd7e00 c03f77f0 c03f2fa0
+[  655.134407] 7e00: ddbd7e50 c23f9a40 c1450544 000000af e9b92ec0 ddbd7e50 ddbd7efc ddbd7e28
+[  655.142553] 7e20: c03e9bcc c03f7728 600f0013 ed401200 00070001 ddab10c0 ddbd7e5c ddbd7e48
+[  655.150697] 7e40: c03f771c 00000004 c00464af bed28bbc 0000001a 00000001 00000001 00000004
+[  655.158842] 7e60: 00000020 00000018 00000001 00000000 00000000 00000002 00000002 00000002
+[  655.166989] 7e80: 00000000 00001000 00000000 00001000 c007c7a4 c033daa8 00000000 ed4efcc0
+[  655.175132] 7ea0: c0160204 ddab53c0 ddab53c0 ddbd6018 00070000 c0160258 ddbd6000 2d068000
+[  655.183277] 7ec0: edbe6ce8 c0b85c40 ddbd7ef4 ed4efcc0 c0b7ece8 eb86de18 bed28bbc db83b200
+[  655.191422] 7ee0: c017d4f4 00000008 ddbd6000 00000000 ddbd7f7c ddbd7f00 c017d270 c03e99e4
+[  655.199568] 7f00: c0179b14 eea4d0c0 ddbd7f3c ddab53c0 db83b200 ddab53c0 eb86de18 db83b208
+[  655.207713] 7f20: 00000020 00000000 ddbd7f4c ddbd7f38 c0179b14 00000001 c000ee84 b6fc41a8
+[  655.215859] 7f40: ddbd7f6c ddbd7f50 c01896ac c00965f4 b6fc41a8 db83b200 00000008 db83b200
+[  655.224005] 7f60: c00464af bed28bbc ddbd6000 00000000 ddbd7fa4 ddbd7f80 c017d4f4 c017ce58
+[  655.232150] 7f80: b6fc41a8 bed28bbc c00464af 00000036 c000f0e4 ddbd6000 00000000 ddbd7fa8
+[  655.240295] 7fa0: c000ee60 c017d4bc b6fc41a8 bed28bbc 00000008 c00464af bed28bbc 0000001a
+[  655.248441] 7fc0: b6fc41a8 bed28bbc c00464af 00000036 bed28c24 00000020 b6fa18c4 00000003
+[  655.256586] 7fe0: b6d38044 bed28b9c b6d2b80f b6b7fa36 800f0030 00000008 aaaaaaaa aaaaaaaa
+[  655.264744] [<c03eb608>] (drm_vblank_put) from [<c040ee4c>] (mixer_wait_for_vblank+0x11c/0x148)
+[  655.273403] [<c040ee4c>] (mixer_wait_for_vblank) from [<c04045a4>] (exynos_drm_crtc_complete_scanout+0x44/0x58)
+[  655.283452] [<c04045a4>] (exynos_drm_crtc_complete_scanout) from [<c0404ddc>] (exynos_drm_fb_destroy+0x20/0xd4)
+[  655.293509] [<c0404ddc>] (exynos_drm_fb_destroy) from [<c03f2c30>] (drm_framebuffer_free+0x60/0x64)
+[  655.302518] [<c03f2c30>] (drm_framebuffer_free) from [<c03f2c94>] (drm_framebuffer_unreference+0x60/0x90)
+[  655.312050] [<c03f2c94>] (drm_framebuffer_unreference) from [<c03f304c>] (drm_framebuffer_remove+0xb8/0x124)
+[  655.321840] [<c03f304c>] (drm_framebuffer_remove) from [<c03f77f0>] (drm_mode_rmfb+0xd4/0xfc)
+[  655.330330] [<c03f77f0>] (drm_mode_rmfb) from [<c03e9bcc>] (drm_ioctl+0x1f4/0x51c)
+[  655.337872] [<c03e9bcc>] (drm_ioctl) from [<c017d270>] (do_vfs_ioctl+0x424/0x664)
+[  655.345322] [<c017d270>] (do_vfs_ioctl) from [<c017d4f4>] (SyS_ioctl+0x44/0x6c)
+[  655.352606] [<c017d4f4>] (SyS_ioctl) from [<c000ee60>] (ret_fast_syscall+0x0/0x48)
+[  655.360139] Code: e89da830 e1a00003 ebfffc03 e89da830 (e7f001f2)
+[  655.366212] ---[ end trace b3ff27e5920c0972 ]---
+[  655.370795] BUG: sleeping function called from invalid context at kernel/locking/rwsem.c:41
+[  655.379110] in_atomic(): 0, irqs_disabled(): 128, pid: 4075, name: Xorg
+[  655.385693] INFO: lockdep is turned off.
+[  655.389592] irq event stamp: 0
+[  655.392625] hardirqs last  enabled at (0): [<  (null)>]   (null)
+[  655.398604] hardirqs last disabled at (0): [<c0029e00>] copy_process.part.50+0x3a8/0x1778
+[  655.406750] softirqs last  enabled at (0): [<c0029e00>] copy_process.part.50+0x3a8/0x1778
+[  655.414895] softirqs last disabled at (0): [<  (null)>]   (null)
+[  655.420881] CPU: 0 PID: 4075 Comm: Xorg Tainted: G      D        3.18.0-armv71 #24
+[  655.428429] [<c0017610>] (unwind_backtrace) from [<c0013360>] (show_stack+0x20/0x24)
+[  655.436144] [<c0013360>] (show_stack) from [<c06b8240>] (dump_stack+0x8c/0xcc)
+[  655.443338] [<c06b8240>] (dump_stack) from [<c0056bd4>] (__might_sleep+0x180/0x248)
+[  655.450957] [<c0056bd4>] (__might_sleep) from [<c06bdf2c>] (down_read+0x38/0xe8)
+[  655.458323] [<c06bdf2c>] (down_read) from [<c003e28c>] (exit_signals+0x28/0x158)
+[  655.465688] [<c003e28c>] (exit_signals) from [<c002e780>] (do_exit+0xb0/0xc2c)
+[  655.472877] [<c002e780>] (do_exit) from [<c00135a4>] (die+0x240/0x2fc)
+[  655.479374] [<c00135a4>] (die) from [<c0013688>] (arm_notify_die+0x28/0x60)
+[  655.486307] [<c0013688>] (arm_notify_die) from [<c0008338>] (do_undefinstr+0xb8/0x214)
+[  655.494194] [<c0008338>] (do_undefinstr) from [<c0013fd0>] (__und_svc_finish+0x0/0x30)
+[  655.502071] Exception stack(0xddbd7ca0 to 0xddbd7ce8)
+[  655.507103] 7ca0: c23f9a40 00000000 00000000 eb97d680 eb958590 eb958724 c0bd7aec 00000008
+[  655.515249] 7cc0: dda5f680 ddbd7e50 c0710a78 ddbd7cfc ddbd7d00 ddbd7ce8 c040ee4c c03eb608
+[  655.523388] 7ce0: 60030013 ffffffff
+[  655.526863] [<c0013fd0>] (__und_svc_finish) from [<c03eb608>] (drm_vblank_put+0xcc/0xe4)
+[  655.534923] [<c03eb608>] (drm_vblank_put) from [<c040ee4c>] (mixer_wait_for_vblank+0x11c/0x148)
+[  655.543587] [<c040ee4c>] (mixer_wait_for_vblank) from [<c04045a4>] (exynos_drm_crtc_complete_scanout+0x44/0x58)
+[  655.553638] [<c04045a4>] (exynos_drm_crtc_complete_scanout) from [<c0404ddc>] (exynos_drm_fb_destroy+0x20/0xd4)
+[  655.563693] [<c0404ddc>] (exynos_drm_fb_destroy) from [<c03f2c30>] (drm_framebuffer_free+0x60/0x64)
+[  655.572705] [<c03f2c30>] (drm_framebuffer_free) from [<c03f2c94>] (drm_framebuffer_unreference+0x60/0x90)
+[  655.582237] [<c03f2c94>] (drm_framebuffer_unreference) from [<c03f304c>] (drm_framebuffer_remove+0xb8/0x124)
+[  655.592027] [<c03f304c>] (drm_framebuffer_remove) from [<c03f77f0>] (drm_mode_rmfb+0xd4/0xfc)
+[  655.600517] [<c03f77f0>] (drm_mode_rmfb) from [<c03e9bcc>] (drm_ioctl+0x1f4/0x51c)
+[  655.608056] [<c03e9bcc>] (drm_ioctl) from [<c017d270>] (do_vfs_ioctl+0x424/0x664)
+[  655.615509] [<c017d270>] (do_vfs_ioctl) from [<c017d4f4>] (SyS_ioctl+0x44/0x6c)
+[  655.622789] [<c017d4f4>] (SyS_ioctl) from [<c000ee60>] (ret_fast_syscall+0x0/0x48)
+
+
+----------------------------------------------------------------------------
+Also the regulators seems not getting populated in the device tree.
+
+odroid at odroid-xu3:~$ ls /proc/device-tree/ | grep regulators
+regulators
+odroid at odroid-xu3:~$ ksrc8
+
+-Anand Moon
 
 
 
--- 
-Regards,
-Alim
+
+On Thursday, January 8, 2015 6:14 PM, Sjoerd Simons <sjoerd.simons@collabora.co.uk> wrote:
+On Wed, 2015-01-07 at 23:49 +0000, Jonathan Stone -SISA wrote:
+> 
+> On On Wed, 2015-01-07 at 18:37 +0000, Sjoerd Simons writes wrote:
+> >On Wed, 2015-01-07 at 18:37 +0000, Anand Moon wrote:>
+> [...]
+> 
+> >> Only 4 core cpu's are on my board. Also CpuFreq is not working.
+> > 
+> > Can you share some point on this.
+> 
+> >The defconfig is using the bL switcher, which pairs up big and little cores to make them appear as one core.. So for 8 real cores, you'll get
+> >4 "virtual cores".
+> 
+> That configuration is appropriate for the 5420, which allegedly has a hardware bug in the cache-coherence between the Cortex-A7 block and the Cortex-A15 block.
+> Newer Exynos 5 SoCs -- 5422/5800, 5620, etc -- don't have that bug. The scheduler should configured to  do HMP on all 8 (or 6) cores.
+> I don't have a 5410, but I assume it has the same bug as the 5420.
+
+Yes the kernel/scheduler could be configured like that, but
+exynos_defconfig turns on bL rather then HMP. 
+
+Now it's not unthinkable to add code/dts properties to select the
+right/preferred scheduling strategy depending on the board (HMP vs. bL).
+But proper HMP scheduling is still a work in progress in mainline and
+iirc specifically on the XU3 there are open issue wrt. MCPM and its
+secure firmware. I've added Kevin to the CC as he's been working on this
+topic so should know the status a lot better then i do.
+
+> The XU3 kernel supplied by HardKernel shows all 8 cores, and does HMP scheduling across all 8.
+
+Yes, that's independant of the dts though as mentioned above. Also there
+are still opne issues to booting up all cores on an XU3 afaik. See 
+  http://www.spinics.net/lists/linux-samsung-soc/msg39523.html
+
+> I tried v1.0 of the Odroid-XU3 DTB patch, applied to linux-next
+> 20150107.  I'm only seeing 1 core running on my Odroid-XU3.  The USB
+> 3.0 port works (great!) but I'm not getting any HDMI output. I didn't
+> try DisplayPort.   I'll gladly try v2 of the patch on an XU3; is there
+> a better base to apply the patch to?
+
+HDMI output is broken on all exynos boards in mainline atm. For exynos
+5, see the thread here:
+http://www.spinics.net/lists/linux-samsung-soc/msg40708.html
+
+As far as a i know with the DTS as posted (just posted v3 with a small
+improvement), all base functionality that can work on mainline (MMC/SD,
+network, USB2, USB3) works. Some less important bits (fan control &
+power sensors) are outstanding, but that really shouldn't block the
+merge of the DTS.
+
+--
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
