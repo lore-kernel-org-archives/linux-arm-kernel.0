@@ -1,44 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Jan 2015 16:16:48 -0800
-Subject: [PATCH v2] ARM: dts: cm-t3x: add NAND support
-In-Reply-To: <54A25696.80608@compulab.co.il>
-References: <54A00BD6.8010507@compulab.co.il>
- <1419777049-25271-1-git-send-email-lifshitz@compulab.co.il>
- <54A151F2.9010904@ti.com> <54A25696.80608@compulab.co.il>
-Message-ID: <20150108001648.GQ13010@atomide.com>
+Date: Wed, 7 Jan 2015 16:19:22 -0800
+Subject: [PATCH V2] ARM: dts: am57xx-beagle-x15: Add GPIO controlled fan
+ node
+In-Reply-To: <20150107235815.GA17239@kahuna>
+References: <1417800739-13146-1-git-send-email-nm@ti.com>
+ <1417801732-24620-1-git-send-email-nm@ti.com>
+ <20150107234442.GI13010@atomide.com>
+ <20150107235815.GA17239@kahuna>
+Message-ID: <20150108001921.GR13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dmitry Lifshitz <lifshitz@compulab.co.il> [141229 23:42]:
-> On 12/29/2014 03:06 PM, Roger Quadros wrote:
-> >On 28/12/14 16:30, Dmitry Lifshitz wrote:
-> >>--- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-> >>+++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-> >>@@ -50,7 +50,8 @@
-> >>  #include "omap-gpmc-smsc911x.dtsi"
-> >>
-> >>  &gpmc {
-> >>-	ranges = <5 0 0x2c000000 0x01000000>;
-> >>+	ranges = <5 0 0x2c000000 0x01000000>, /* CM-T3x30 SMSC9x Eth */
-> >>+		 <0 0 0x00000000 0x01000000>; /* CM-T3x NAND */
-> >
-> >Isn't this ranges property redundant as it will anyways be overridden by the board specific dts?
-> >
-> 
-> The ranges are specified here (and other files below) by design.
-> 
-> We built a tree like structure to organize DT files -
-> d234e4239 "ARM: dts: sbc-t3x: refactor DT support"
-> 
-> It allows to inherit/override properties common for different boards.
-> 
-> Our customers do not have to deal with a correct GPMC ranges settings, once
-> they base on omap3-cm-t3x.dts core module DT file (in case they do not
-> connect additional device to the bus).
-> 
-> This is the point of Igor's comment to the previous patch version.
+* Nishanth Menon <nm@ti.com> [150107 16:01]:
+> On 15:44-20150107, Tony Lindgren wrote:
+> > * Nishanth Menon <nm@ti.com> [141205 09:51]:
+> > > TPS gpio now controls a 5v 500mA TL5209 regulator which may be supply
+> > > a fan (such as AFB02505HHB) over J1 connector for various purposes.
+> > > Provide device tree node to enable the same.
+> > > 
+> > > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > 
+> > Applying into omap-for-v3.20/dt thanks.
+> > 
+> > Tony
+> Could you pick up the very latest rev:
+> https://patchwork.kernel.org/patch/5569521/ ?
 
-Roger, do you still have pending issues with this patch?
+Yeah sorry just noticed I had tagged two versions,
+will use the v4 instead.
 
 Regards,
 
