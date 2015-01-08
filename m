@@ -1,28 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Jan 2015 23:27:14 +0100
-Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
-In-Reply-To: <1934001.D0JfDRp1gF@wuerfel>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <54ADBB89.8070503@ti.com> <1934001.D0JfDRp1gF@wuerfel>
-Message-ID: <2785994.gTZ9chGdKf@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 08 Jan 2015 23:30:01 +0100
+Subject: [RFC PATCH 0/2] clk: rockchip: leave npll for DCLK_VOP0(HDMI) only
+In-Reply-To: <1416236138-11010-1-git-send-email-kever.yang@rock-chips.com>
+References: <1416236138-11010-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <3353483.Eif0pChkY5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 January 2015 09:56:39 Arnd Bergmann wrote:
-> There is another interesting case, which is a USB host controller or
-> something similar behind a PCI bus. These are quite common and also
-> need to be handled in some form. Let's do just PCI first for now, but
-> be aware that this will come next. Should we assume that the ID that
-> is required for a device is either known from the device node, or
-> that it comes from a PCI device? That means for the USB case, we will
-> likely need to have some custom logic. There seems to be an implicit
-> assumption all over the kernel that all devices have the same IOMMU
-> instance, but we can't really rely on that here.
+Hi Kever,
+
+Am Montag, 17. November 2014, 22:55:36 schrieb Kever Yang:
+> To support all kinds of frequency requirement for HDMI on rk3288,
+> we need a PLL that can change rate at run time.
 > 
+> There are some discussion before at [0], I think we can just leave
+> the npll for HDMI(DCLK_VOP0) used to make it simple.
+> 
+> Comments are welcome.
 
-Update: I've checked the USB implementation and we are lucky because
-these interactions are all done by the USB host controller, and a
-USB device is not itself DMA capable. We don't have to do anything
-for USB.
+I think I said it in private somewhere already, but just so it's also 
+available publically:
 
-	Arnd
+I don't think customizing/limiting the clock usage like this will fly, 
+especially as this would require each and every rk3288 board to use vop0 for 
+hdmi and vop1 for other stuff.
+
+With the new rk3288 Firefly devboard this concern already becomes reality. 
+There a vga converter is connected to VOP0, which leaves only vop1 for hdmi if 
+one wants to support the vga connection.
+
+
+>From our discussion about this problem I remember that the missing clock 
+frequencies only affected more esotheric screen resolutions, so personally I'm 
+not this much concerned an would like to wait till we find a better solution to 
+the problem.
+
+
+Heiko
