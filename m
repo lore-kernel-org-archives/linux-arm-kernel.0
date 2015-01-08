@@ -1,33 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Jan 2015 13:39:27 +0100
-Subject: [PATCH] ARM: dts: sunxi: Add simplefb nodes for de_be0-lcd0,
- de_be0-lcd0-tve0 pipelines
-In-Reply-To: <1419696540-15680-2-git-send-email-hdegoede@redhat.com>
-References: <1419696540-15680-1-git-send-email-hdegoede@redhat.com>
- <1419696540-15680-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150108123927.GS7853@lukather>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 8 Jan 2015 13:47:44 +0100
+Subject: [PATCH v2 8/8] ARM: mvebu: Add Armada 385 General Purpose
+ Development Board support
+In-Reply-To: <1420714305-7496-9-git-send-email-gregory.clement@free-electrons.com>
+References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
+ <1420714305-7496-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150108124744.GA24268@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 27, 2014 at 05:09:00PM +0100, Hans de Goede wrote:
-> Add simplefb nodes for "de_be0-lcd0" and "de_be0-lcd0-tve0" display pipeline
-> for when u-boot has set up a pipeline to drive a LCD panel / VGA output rather
-> then the HDMI output.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Thu, Jan 08, 2015 at 11:51:45AM +0100, Gregory CLEMENT wrote:
 
-Applied, thanks!
+> +		gpio-fan {
+> +			compatible = "gpio-fan";
+> +			gpios = <&expander1 3 GPIO_ACTIVE_HIGH>;
+> +			gpio-fan,speed-map = <	 0 0
+> +								  3000 1>;
+> +		};
+> +	};
 
-Maxime
+Hi Gregory
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/f5304e49/attachment-0001.sig>
+The indentation is a bit off here. If there are no other comments, i
+can fix it as i add it to mvebu/dt.
+
+    Andrew
