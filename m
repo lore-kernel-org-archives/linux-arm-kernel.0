@@ -1,84 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 8 Jan 2015 20:16:03 +0100
-Subject: [PATCH v3] ARM: at91/dt: sam9263: Add ac97 device node
-In-Reply-To: <2066438.if5qXaBWRu@kongar>
-References: <1419854922-29338-1-git-send-email-alexanders83@web.de>
- <1419854922-29338-3-git-send-email-alexanders83@web.de>
- <2066438.if5qXaBWRu@kongar>
-Message-ID: <20150108191603.GF2447@piout.net>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 8 Jan 2015 11:21:02 -0800
+Subject: Linux 3.19-rc3
+In-Reply-To: <54AED10C.7090305@redhat.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com>
+ <20150108134520.GC14200@e104818-lin.cambridge.arm.com>
+ <54AEBE84.6090307@redhat.com>
+ <20150108173408.GF17290@e104818-lin.cambridge.arm.com>
+ <54AED10C.7090305@redhat.com>
+Message-ID: <CA+55aFwpwkjRnTzBe2K0y+2DOH1F=5SpJkYe=P5z8ps5_1PQHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 8, 2015 at 10:48 AM, Mark Langsdorf <mlangsdo@redhat.com> wrote:
+>
+> With 4K pages, the oom killer doesn't trigger during `make -j 16 -s`
+> on a fresh kernel. Thanks for the suggestion. I'm not sure what to do
+> about that, though.
 
+I suspect that bisecting remains the best option.
 
-On 08/01/2015 at 20:12:04 +0100, Alexander Stein wrote :
-> Now that the implementation has been applied to sound/for-next (https://git.kernel.org/cgit/linux/kernel/git/tiwai/sound.git/log/?h=for-next
-> ), who is going to pick the related patches (this one and the other two adding documentation and default config)?
-> 
+A 64kB allocation will make various memory pressure issues *much*
+worse, and quite frankly, I consider 64kB pages completely
+unacceptable for any real life situation for that and other reasons,
+but if it used to work, we do want to figure out what actually broke.
 
-Nicolas will do it but he has not yet started to create a branch for
-3.20.
+The only excuse for 64kB pages is "my hardware TLB is complete crap,
+and I have very specialized server-only loads".
 
-> Best regards,
-> Alexander
-> 
-> On Monday 29 December 2014, 13:08:41 wrote Alexander Stein:
-> > This adds the device node for the ac97 controller.
-> > 
-> > Signed-off-by: Alexander Stein <alexanders83@web.de>
-> > Acked-By Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > Changes in v3:
-> > * Renamed the compatible string to atmel,at91sam9263-ac97c
-> > * Added 'Acked-By Alexandre Belloni <alexandre.belloni@free-electrons.com>'
-> > 
-> >  arch/arm/boot/dts/at91sam9263.dtsi | 21 +++++++++++++++++++++
-> >  1 file changed, 21 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> > index 6283785..2e67e38 100644
-> > --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> > @@ -700,6 +700,16 @@
-> >  					};
-> >  				};
-> >  
-> > +				ac97 {
-> > +					pinctrl_ac97: ac97-0 {
-> > +						atmel,pins =
-> > +							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A AC97FS pin */
-> > +							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A AC97CK pin */
-> > +							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A AC97TX pin */
-> > +							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB14 periph A AC97RX pin */
-> > +					};
-> > +				};
-> > +
-> >  				pioA: gpio at fffff200 {
-> >  					compatible = "atmel,at91rm9200-gpio";
-> >  					reg = <0xfffff200 0x200>;
-> > @@ -828,6 +838,17 @@
-> >  				status = "disabled";
-> >  			};
-> >  
-> > +			ac97: sound at fffa0000 {
-> > +				compatible = "atmel,at91sam9263-ac97c";
-> > +				reg = <0xfffa0000 0x4000>;
-> > +				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&pinctrl_ac97>;
-> > +				clocks = <&ac97_clk>;
-> > +				clock-names = "ac97_clk";
-> > +				status = "disabled";
-> > +			};
-> > +
-> >  			macb0: ethernet at fffbc000 {
-> >  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
-> >  				reg = <0xfffbc000 0x100>;
-> > 
-> 
+People who think 64kB pages are a good idea are wrong. It's that
+simple. You seem to be trying to compile stuff, which is not a good
+load for 64kB pages (notably the page cache becomes 90% unused due to
+wasted space at the end of pages).
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+But while 64kB pages are a completely braindead idea, the actual *bug*
+is likely not the fact that 64kB page thing in itself, but some other
+issue that gets triggered by it. Maybe we have some piece of code that
+"knows" that a page is 4kB and mis-accounts things due to that, or
+similar.
+
+                       Linus
