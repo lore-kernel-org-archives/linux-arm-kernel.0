@@ -1,28 +1,98 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Jan 2015 09:56:06 +0100
-Subject: [PATCH v2 01/21] ARM: tegra: irq: nuke leftovers from non-DT
- support
-In-Reply-To: <1420652576-22309-2-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150108085605.GC1987@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Jan 2015 09:56:39 +0100
+Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
+In-Reply-To: <54ADBB89.8070503@ti.com>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <4057859.4ynbgz66iN@wuerfel> <54ADBB89.8070503@ti.com>
+Message-ID: <1934001.D0JfDRp1gF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 05:42:36PM +0000, Marc Zyngier wrote:
-> The GIC is now always initialized from DT on tegra, and there is
-> no point in keeping non-DT init code.
+On Wednesday 07 January 2015 18:04:41 Murali Karicheri wrote:
+> On 01/07/2015 04:18 PM, Arnd Bergmann wrote:
+> > On Wednesday 07 January 2015 13:49:50 Murali Karicheri wrote:
+> >> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This patch
+> >> add capability to set the dma configuration such as dma-mask, dma_pfn_offset,
+> >> and dma ops etc using the information from DT. The prior RFCs and discussions
+> >> are available at [1] and [2] below.
+> >>
+> >> [2] : https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
+> >> [1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
+> >
+> > Looks all good to me in this version, I'm just unsure about one thing:
+> >
+> >>                 - Limit the of_iommu_configure to non pci devices
+> >
+> > My last recommendation was to pass the b/d/f number into
+> > of_pci_dma_configure to handle this correctly. What was your
+> > reason for not doing it in the end?
+> Arnd,
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-tegra/irq.c | 8 --------
->  1 file changed, 8 deletions(-)
+> I had responded to this already on the list and reproduced below your 
+> remark and my response below from that thread.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/127112d7/attachment.sig>
+Ah right, sorry for missing a reply on that.
+
+> ---------------cut-------------------------------------------------------
+>  > Actually regarding the bit I wrote above, it might be helpful to pass
+>  > the PCI_DEVID() into both of_iommu_configure and of_dma_configure.
+>  >
+>  > While this may or may not be sufficient, I think there is no question
+>  > about it being needed for the ARM SMMU with PCI, so we may as well add
+>  > it at the point when you touch the same lines already. In the platform
+>  > bus case, just pass zero here.
+> 
+> PCI_DEVID() is defined as
+> 
+> #define PCI_DEVID(bus, devfn)  ((((u16)(bus)) << 8) | (devfn))
+> 
+> So PCI_DEVID of 0 is a valid PCI DEVID.
+
+I think that is ok: the idea would be that we always just list the
+first ID of the range and then let the iommu driver add the offset
+in the appropriate way.
+
+> How about checking if the device is PCI in of_iommu_configure() using 
+> dev_is_pci(dev) macro and return immediately for PCI? Need to include 
+> pci.h in this file though.
+> 
+> Some of the iommu drivers already include this.
+
+I guess you are right, but the driver can even handle the PCI
+device correctly without the extra parameter:
+
+	devid = 0;
+	if (dev_is_pci(dev)) {
+		struct pci_dev *pdev = to_pci_dev(dev);
+		devid = PCI_DEVID(pdev->bus->number, pdev->devfn);
+	}
+
+	streamid += devid;
+
+Other IOMMUs won't even care about the devid, so they will just work.
+
+> This will allow us to re-visit this later for IOMMU support for PCI 
+> without polluting the API.
+>
+> -----------------------cut-end---------------------------------------
+> 
+> I assumed you want to use value of zero for b/d/f to indicate it is for
+> platform. Also use the non zero value to skip the DT attribute parsing 
+> for IOMMU DT attribute in of_iommu_configure() for PCI.
+> I did dev_is_pci() for skipping the processing for PCI. I thought it is 
+> better to add the b/d/f argument later when this is re-visited later.
+
+I'd say just keep the iommu setup for PCI now and let drivers handle
+this under the covers.
+
+There is another interesting case, which is a USB host controller or
+something similar behind a PCI bus. These are quite common and also
+need to be handled in some form. Let's do just PCI first for now, but
+be aware that this will come next. Should we assume that the ID that
+is required for a device is either known from the device node, or
+that it comes from a PCI device? That means for the USB case, we will
+likely need to have some custom logic. There seems to be an implicit
+assumption all over the kernel that all devices have the same IOMMU
+instance, but we can't really rely on that here.
+
+	Arnd
