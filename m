@@ -1,30 +1,36 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 08 Jan 2015 10:09:06 +0100
-Subject: [PATCH] reset: sunxi: fix spinlock initialization
-In-Reply-To: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
-References: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <1420708146.3190.1.camel@pengutronix.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 08 Jan 2015 14:46:15 +0530
+Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
+ if MCPM is unavailable
+In-Reply-To: <54AE459B.8010703@linaro.org>
+References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
+ <54AE459B.8010703@linaro.org>
+Message-ID: <54AE4ADF.3030307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hi Daniel,
 
-Am Mittwoch, den 07.01.2015, 16:54 -0800 schrieb Tyler Baker:
-> Call spin_lock_init() before the spinlocks are used, preventing a lockdep
-> splat.
+On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
+> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
+>> If big.LITTLE driver is initialized even when MCPM is unavailable,
+>> we get the below warning the first time cpu tries to enter deeper
+>> C-states.
 >
-> I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
-> when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
-> and has been tested on a few other sunxi platforms without issue.
-> 
-> [1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
-> [2] http://kernelci.org/boot/?a80-optimus
-> 
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-> ---
-> This patch was tested on 3.19.0-rc3 
+> Can you elaborate why MCPM could be unavailable when the tc2 pm code
+> registers the mcpm platform ops before the cpuidle driver ?
+>
+>
+I can think of 3 possible scenarios. Let me know if these make sense.
 
-Applied, thanks!
+1. If the firmware settings in Vexpress configuration files are set to
+    boot in legacy mode, but MCPM is enabled in the kernel.
+2. If some failure occurs during MCPM initialization
+3. For example, if CCI is not accessible as in some Exynos boards [1],
+    we don't want to wait till mpcm_cpu_suspend ?
 
-regards
-Philipp
+Regards,
+Sudeep
+
+[1] 
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg39624.html
