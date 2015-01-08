@@ -1,38 +1,64 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 18:38:12 +0100
-Subject: [PATCH v4 10/12] ARM: mvebu: Document the Device Tree binding for the
- Armada 388 SoC
+Date: Thu,  8 Jan 2015 18:38:07 +0100
+Subject: [PATCH v4 05/12] ARM: mvebu: A38x: Remove redundant pinctrl
+ informations
 In-Reply-To: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420738694-6163-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420738694-6163-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the binding documentation of the Armada 38x Soc family with
-the Armada 388.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+The compatible set in the armada-38x DTSI is always overridden, and the reg
+defined in there is duplicated in the armada-380 and armada-385 DTSIs.
+
+Remove these useless items.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/armada-38x.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/armada-380.dtsi | 1 -
+ arch/arm/boot/dts/armada-385.dtsi | 1 -
+ arch/arm/boot/dts/armada-38x.dtsi | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
-index ad9f8ed4d9bd..202953f1887e 100644
---- a/Documentation/devicetree/bindings/arm/armada-38x.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
-@@ -15,6 +15,13 @@ Required root node property:
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index 13400ce88c54..7e509d2d74d0 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -34,7 +34,6 @@
+ 		internal-regs {
+ 			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6810-pinctrl";
+-				reg = <0x18000 0x20>;
+ 			};
+ 		};
  
- compatible: must contain "marvell,armada385"
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index 5249a4d3c207..a54a252ddb4c 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -39,7 +39,6 @@
+ 		internal-regs {
+ 			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6820-pinctrl";
+-				reg = <0x18000 0x20>;
+ 			};
+ 		};
  
-+In addition, boards using the Marvell Armada 388 SoC shall have the
-+following property before the previous one:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada388"
-+
- Example:
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index ada1f206028b..40200084c6c8 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -194,7 +194,6 @@
+ 			};
  
- compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada380";
+ 			pinctrl at 18000 {
+-				compatible = "marvell,mv88f6820-pinctrl";
+ 				reg = <0x18000 0x20>;
+ 			};
+ 
 -- 
 1.9.1
