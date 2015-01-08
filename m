@@ -1,84 +1,23 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 08 Jan 2015 18:25:03 -0500
-Subject: [PATCH] serial: 8250: Make ISA ports optional
-In-Reply-To: <20150108223626.43fd93d5@lxorguk.ukuu.org.uk>
-References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>	<20150108131008.16c9a31c@lxorguk.ukuu.org.uk>	<54AEAC47.1040403@hurleysoftware.com>	<1896224.oMI8M6J5T7@wuerfel>
- <20150108223626.43fd93d5@lxorguk.ukuu.org.uk>
-Message-ID: <54AF11CF.9080600@hurleysoftware.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 08 Jan 2015 15:39:44 -0800
+Subject: [PATCH 1/2] soc: qcom: Add TCSR driver
+In-Reply-To: <1420757577-20425-2-git-send-email-agross@codeaurora.org>
+References: <1420757577-20425-1-git-send-email-agross@codeaurora.org>
+ <1420757577-20425-2-git-send-email-agross@codeaurora.org>
+Message-ID: <54AF1540.6090800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 05:36 PM, One Thousand Gnomes wrote:
->> One idea that has come up in the past but never saw an implementation
->> is to make the ttyS namespace and minor numbers completely generic and
->> let any serial port driver use it. This would be a major rework, but
->> have the added advantage of cleaning up a number of other namespace
->> issues as well. There also lots of open question, in particular how
->> to maintain compatibility with existing drivers. One could imagine
->> that each uart always gets a ttyS device and optionally also gets
->> a device node for the same port with a driver specific chardev as
->> most of them do today. Or it could be an either/or decision that is
->> made at compile time or as a module parameter.
-> 
-> I'm not sure we should use ttyS for it. ttyS means 8250, a lot of
-> existing code knows what ttyS is and what sort of ioctls and the like are
-> assumed.
+On 01/08/2015 02:52 PM, Andy Gross wrote:
+> +
+> +static struct platform_driver qcom_tcsr_driver = {
+> +	.driver = {
+> +		.name		= "tcsr",
+> +		.owner		= THIS_MODULE,
 
-That genie has already escaped the bottle.
+This is done by the module_platform_driver() macro now so it's largely
+unnecessary. Best to remove it so that the janitors don't find you!
 
-./arch/powerpc/platforms/powermac/setup.c:	char *devname = "ttyS";
-./arch/powerpc/platforms/chrp/setup.c:		add_preferred_console("ttyS", 0, NULL);
-./arch/powerpc/kernel/legacy_serial.c:		return add_preferred_console("ttyS", offset, opt);
-./arch/xtensa/platforms/iss/console.c:	serial_driver->name = "ttyS";
-./arch/mips/sni/setup.c:			add_preferred_console("ttyS", port,
-./arch/mips/sgi-ip32/ip32-setup.c:			add_preferred_console("ttyS", *(con + 1) == '2' ? 1 : 0,
-./arch/mips/jazz/setup.c:	add_preferred_console("ttyS", 0, "9600");
-./arch/mips/sgi-ip22/ip22-setup.c:		add_preferred_console("ttyS", *(ctype + 1) == '2' ? 1 : 0,
-./arch/arm/mach-davinci/board-da830-evm.c:	return add_preferred_console("ttyS", 2, "115200");
-./arch/arm/mach-davinci/board-mityomapl138.c:	return add_preferred_console("ttyS", 1, "115200");
-./arch/arm/mach-davinci/board-da850-evm.c:	return add_preferred_console("ttyS", 2, "115200");
-./arch/arm/mach-davinci/board-omapl138-hawk.c:	return add_preferred_console("ttyS", 2, "115200");
-./arch/cris/arch-v10/kernel/debugport.c:	name : "ttyS",
-./arch/ia64/hp/sim/simserial.c:	hp_simserial_driver->name = "ttyS";
-./arch/um/drivers/ssl.c:	.device_name 		= "ttyS",
-./arch/s390/kernel/setup.c:			add_preferred_console("ttyS", 1, NULL);
-./drivers/tty/amiserial.c:	.name =		"ttyS",
-./drivers/tty/serial/serial_txx9.c:#define TXX9_TTY_NAME "ttyS"
-./drivers/tty/serial/sunsab.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/mcf.c:	.dev_name	= "ttyS",
-./drivers/tty/serial/atmel_serial.c:#define ATMEL_DEVICENAME	"ttyS"
-./drivers/tty/serial/bcm63xx_uart.c:	.dev_name	= "ttyS",
-./drivers/tty/serial/sunsu.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/mrst_max3110.c:	.dev_name	= "ttyS",
-./drivers/tty/serial/apbuart.c:	.name = "ttyS",
-./drivers/tty/serial/apbuart.c:	.dev_name = "ttyS",
-./drivers/tty/serial/tilegx.c:#define TILEGX_UART_NAME	"ttyS"
-./drivers/tty/serial/pmac_zilog.c:#define PMACZILOG_NAME		"ttyS"
-./drivers/tty/serial/pnx8xxx_uart.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/m32r_sio.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/ip22zilog.c:	.dev_name	= "ttyS",
-./drivers/tty/serial/zs.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/68328serial.c:	serial_driver->name = "ttyS";
-./drivers/tty/serial/crisv10.c:	driver->name = "ttyS";
-/drivers/tty/serial/8250/8250_core.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/sunzilog.c:	.dev_name	=	"ttyS",
-./drivers/tty/serial/pxa.c:	.dev_name	= "ttyS",
-./drivers/tty/serial/dz.c:	.dev_name		= "ttyS",
-./drivers/tty/serial/sunhv.c:	.dev_name		= "ttyS",
-./drivers/s390/char/sclp_vt220.c:#define SCLP_VT220_CONSOLE_NAME		"ttyS"
-./drivers/s390/char/sclp_con.c:#define sclp_console_name  "ttyS"
-./drivers/s390/char/con3215.c:	driver->name = "ttyS";
-
-
-Besides, despite its pedigree, omap is no closer to 8250 than anything
-else in drivers/tty/serial/
-
-> A generic namespace needs not to be attached to a legacy naming 
-> 
-> (eg also put all serial ports in /dev/serial/0 /dev/serial/1 etc either
-> via the tty layer or via systemd/udev)
-
-This doesn't address pre-init.
-
-Regards,
-Peter Hurley
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
