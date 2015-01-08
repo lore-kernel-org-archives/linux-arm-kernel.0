@@ -1,32 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 8 Jan 2015 10:58:34 -0600
-Subject: [PATCH v2 2/3] usb: phy: add lubbock phy driver
-In-Reply-To: <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
-References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
- <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20150108165834.GH31926@saruman>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Jan 2015 16:59:09 +0000
+Subject: [RFC 4/8] ARM64: Add instruction_pointer_set function
+In-Reply-To: <028aab951a24c56075b1060afa1c2b2d88c09083.1420038188.git.panand@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <028aab951a24c56075b1060afa1c2b2d88c09083.1420038188.git.panand@redhat.com>
+Message-ID: <20150108165909.GR11583@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 30, 2014 at 01:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
-> Extract lubbock-specific code from pxa25x_udc driver. As a bonus, phy
-> driver determines connector/VBUS status by reading CPLD register. Also
-> it uses a work to call into udc stack, instead of pinging vbus session
-> right from irq handler.
+On Wed, Dec 31, 2014 at 03:21:20PM +0000, Pratyush Anand wrote:
+> instruction_pointer_set is needed for uprobe implementation. Hence
+> define it for ARM64.
 > 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
 > ---
->  drivers/usb/phy/Kconfig       |  10 ++
->  drivers/usb/phy/Makefile      |   1 +
+>  arch/arm64/include/asm/ptrace.h | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index 24cc048ac3e7..29d9bf5e3635 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -206,6 +206,12 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
+>  #define instruction_pointer(regs)	((regs)->pc)
+>  #define stack_pointer(regs)		((regs)->sp)
+>  
+> +static inline void instruction_pointer_set(struct pt_regs *regs,
+> +					   unsigned long val)
+> +{
+> +	instruction_pointer(regs) = val;
+> +}
 
-new phy drivers under drivers/phy only, sorry.
+Do you think we could make use of the asm-generic ptrace header to get
+this for free? afaict, we just need to implement GET_USP and possibly
+GET_FP for the compat case (although it may well be that we still handle
+the compat case entirely separately).
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/1b0d65ee/attachment.sig>
+Will
