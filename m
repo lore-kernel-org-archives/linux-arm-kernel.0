@@ -1,120 +1,31 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 8 Jan 2015 13:29:26 -0500
-Subject: [PATCH v3 1/4] of: iommu: add ptr to OF node arg to
- of_iommu_configure()
-In-Reply-To: <CAL_JsqJ5tDQb+SzzhGQTs48tSG=T_QZu3LW5TDyugxFw1V7LoA@mail.gmail.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <1420656594-8908-2-git-send-email-m-karicheri2@ti.com>
- <CAL_JsqJ5tDQb+SzzhGQTs48tSG=T_QZu3LW5TDyugxFw1V7LoA@mail.gmail.com>
-Message-ID: <54AECC86.7080201@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 8 Jan 2015 19:37:42 +0100
+Subject: [PATCH v4 07/12] ARM: mvebu: Add Armada 385 Access Point
+ Development Board support
+In-Reply-To: <54AEC2C1.2080408@free-electrons.com>
+References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
+ <1420738694-6163-8-git-send-email-gregory.clement@free-electrons.com>
+ <20150108184416.3feb0e02@free-electrons.com>
+ <54AEC2C1.2080408@free-electrons.com>
+Message-ID: <20150108193742.305727a3@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2015 06:30 PM, Rob Herring wrote:
-> On Wed, Jan 7, 2015 at 12:49 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> Function of_iommu_configure() is called from of_dma_configure() to
->> setup iommu ops using DT property. This API is currently used for
->> platform devices for which DMA configuration (including iommu ops)
->> may come from device's parent. To extend this functionality for PCI
->> devices, this API need to take a parent node ptr as an argument
->> instead of assuming device's parent. This is needed since for PCI, the
->> dma configuration may be defined in the DT node of the root bus bridge's
->> parent device. Currently only dma-range is used for PCI and iommu is not
->> supported. So return error if the device is PCI.
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> ---
->>   drivers/iommu/of_iommu.c |   10 ++++++++--
->>   drivers/of/platform.c    |    2 +-
->>   include/linux/of_iommu.h |    6 ++++--
->>   3 files changed, 13 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->> index af1dc6a..396bc77 100644
->> --- a/drivers/iommu/of_iommu.c
->> +++ b/drivers/iommu/of_iommu.c
->> @@ -133,19 +133,25 @@ struct iommu_ops *of_iommu_get_ops(struct device_node *np)
->>          return ops;
->>   }
->>
->> -struct iommu_ops *of_iommu_configure(struct device *dev)
->> +struct iommu_ops *of_iommu_configure(struct device *dev,
->> +                                    struct device_node *node)
->
-> You use node here, but np in the declaration. However...
->
->>   {
->>          struct of_phandle_args iommu_spec;
->>          struct device_node *np;
->
-> We also have np here. I would suggest we rename this to iommu_node or
-> iommu_np to be clear which one this is for.
->
-Rob,
+Dear Gregory CLEMENT,
 
-Thanks for the comment. Will pick and use iommu_np consistently everywhere.
+On Thu, 08 Jan 2015 18:47:45 +0100, Gregory CLEMENT wrote:
 
-Murali
->>          struct iommu_ops *ops = NULL;
->>          int idx = 0;
->>
->> +       if (dev_is_pci(dev)) {
->> +               dev_err(dev, "iommu is currently not supported for PCI\n");
->> +               return NULL;
->> +       }
->> +
->>          /*
->>           * We don't currently walk up the tree looking for a parent IOMMU.
->>           * See the `Notes:' section of
->>           * Documentation/devicetree/bindings/iommu/iommu.txt
->>           */
->> -       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
->> +       while (!of_parse_phandle_with_args(node, "iommus",
->>                                             "#iommu-cells", idx,
->>                                             &iommu_spec)) {
->>                  np = iommu_spec.np;
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index a54ec10..7675b79 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -196,7 +196,7 @@ static void of_dma_configure(struct device *dev)
->>          dev_dbg(dev, "device is%sdma coherent\n",
->>                  coherent ? " " : " not ");
->>
->> -       iommu = of_iommu_configure(dev);
->> +       iommu = of_iommu_configure(dev, dev->of_node);
->>          dev_dbg(dev, "device is%sbehind an iommu\n",
->>                  iommu ? " " : " not ");
->>
->> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
->> index 16c7554..3258cbb 100644
->> --- a/include/linux/of_iommu.h
->> +++ b/include/linux/of_iommu.h
->> @@ -12,7 +12,8 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
->>                               size_t *size);
->>
->>   extern void of_iommu_init(void);
->> -extern struct iommu_ops *of_iommu_configure(struct device *dev);
->> +extern struct iommu_ops *of_iommu_configure(struct device *dev,
->> +                                       struct device_node *np);
->>
->>   #else
->>
->> @@ -24,7 +25,8 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
->>   }
->>
->>   static inline void of_iommu_init(void) { }
->> -static inline struct iommu_ops *of_iommu_configure(struct device *dev)
->> +static inline struct iommu_ops *of_iommu_configure(struct device *dev,
->> +                                        struct device_node *np)
->>   {
->>          return NULL;
->>   }
->> --
->> 1.7.9.5
->>
+> > Is it an Armada 385 or an Armada 388 ?
+> 
+> I checked it and there is no SATA ports on the board and the SoC presented
+> itself as an Armada 385: the revision ID is 0x6820.
 
+Great, thanks for the double check!
 
+Best regards,
+
+Thomas
 -- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
