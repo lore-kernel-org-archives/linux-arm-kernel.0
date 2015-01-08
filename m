@@ -1,75 +1,53 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 8 Jan 2015 10:52:36 -0500
-Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
-In-Reply-To: <CAErSpo46UAn9ckbzrgzAoQbu2D=oyOOL_rO24NWEg_iDLSuCLA@mail.gmail.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <54ADBBCF.8020206@ti.com>
- <CAErSpo46UAn9ckbzrgzAoQbu2D=oyOOL_rO24NWEg_iDLSuCLA@mail.gmail.com>
-Message-ID: <54AEA7C4.9000005@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 08 Jan 2015 07:53:04 -0800
+Subject: [RFC] ARM: Make CPU_DCACHE_DISABLE depend on !SMP
+In-Reply-To: <20150108115219.GS12302@n2100.arm.linux.org.uk>
+References: <1420683088-1856-1-git-send-email-f.fainelli@gmail.com>
+ <2868984.6iP3luxIAM@wuerfel> <20150108115219.GS12302@n2100.arm.linux.org.uk>
+Message-ID: <54AEA7E0.5070101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2015 06:08 PM, Bjorn Helgaas wrote:
-> On Wed, Jan 7, 2015 at 5:05 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> On 01/07/2015 01:49 PM, Murali Karicheri wrote:
+Le 08/01/2015 03:52, Russell King - ARM Linux a ?crit :
+> On Thu, Jan 08, 2015 at 09:33:05AM +0100, Arnd Bergmann wrote:
+>> On Wednesday 07 January 2015 18:11:28 Florian Fainelli wrote:
+>>> Enabling CPU_DCACHE_DISABLE on a SMP capable system will prevent the
+>>> kernel from booting because of the following ldrex instruction in
+>>> arch_spin_lock:
 >>>
->>> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This
->>> patch
->>> add capability to set the dma configuration such as dma-mask,
->>> dma_pfn_offset,
->>> and dma ops etc using the information from DT. The prior RFCs and
->>> discussions
->>> are available at [1] and [2] below.
+>>> (gdb) x/10i $pc
+>>> => 0xc053cfa8 <_raw_spin_lock+4>:       ldrex   r3, [r0]
+>>>    0xc053cfac <_raw_spin_lock+8>:       add     r2, r3, #65536  ; 0x10000
 >>>
->>> [2] :
->>> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
->>> [1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
+>>> which is taken by the very first printk call:
 >>>
->>> Change history:
->>>          v3 - addressed comments to re-use of_dma_configure() for PCI
->>>             - To help re-use, change of_iommu_configure() function argument
->>>                  - Move of_dma_configure to of/device.c
->>>                  - Limit the of_iommu_configure to non pci devices
->>>          v2 - update size to coherent_dma_mask + 1 if dma-range info is
->>> missing
->>>             - also check the np for null.
->>>          v1 - updates based on the comments against initial RFC.
->>>             - Added a helper function to get the OF node of the parent
->>>             - Added an API in of_pci.c to update DMA configuration of the
->>> pci
->>>               device.
+>>>     at /home/fainelli/work/linux/arch/arm/include/asm/spinlock.h:65
+>>>     fmt=0xc0637650 "\001\066Booting Linux on physical CPU 0x%x\n", args=<incomplete type>)
+>>>     at kernel/printk/printk.c:1525
+>>>     fmt=0xc05370f4 <printk+52> "\024\320\215\342\004\340\235\344\020\320\215\342\036\377/\341\017") at kernel/printk/printk.c:1688
 >>>
->>> Murali Karicheri (4):
->>>     of: iommu: add ptr to OF node arg to of_iommu_configure()
->>>     of: move of_dma_configure() to device,c to help re-use
->>>     of/pci: add of_pci_dma_configure() update dma configuration
->>>     PCI: update dma configuration from DT
+>>> ldrex requires exclusive monitor(s) (local or global) which are no longer
+>>> working when the Data cache is disabled in CP15 and will just hang the CPU
+>>> there.
 >>>
->>>    drivers/iommu/of_iommu.c  |   10 ++++++--
->>>    drivers/of/device.c       |   58
->>> +++++++++++++++++++++++++++++++++++++++++++++
->>>    drivers/of/of_pci.c       |   39 ++++++++++++++++++++++++++++++
->>>    drivers/of/platform.c     |   58
->>> ++-------------------------------------------
->>>    drivers/pci/probe.c       |    2 ++
->>>    include/linux/of_device.h |    2 ++
->>>    include/linux/of_iommu.h  |    6 +++--
->>>    include/linux/of_pci.h    |   12 ++++++++++
->>>    8 files changed, 127 insertions(+), 60 deletions(-)
->>>
->> Bjorn,
+>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 >>
->> Could you review this series from the PCI subsystem point of view?
->
-> Will do, it's in my patchwork queue.  I'm just returning after a
-> couple weeks of vacation, during which I moved across the country, so
-> it will take me a bit to catch up.
->
-> Bjorn
-Bjorn,
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> We stumbled on this a while back when Kaixu was trying to fix allmodconfig
+>> builds to run on real hardware, but never submitted it in the end when
+>> Russell didn't like some of the other parts required for that to work.
+>>
+>> This one clearly makes sense independently.
+> 
+> What about platforms where exclusives to strongly ordered memory do work?
 
-Thanks and Happy New year!
+Do we have a comprehensive list of these platforms?
 
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+> 
+> I seem to remember patches from Tony for the pstore/ram_core driver to
+> allow it to map stuff strongly ordered, and use exclusives on it.
+
+Would you have links to these patches handy?
+--
+Florian
