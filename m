@@ -1,52 +1,35 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Thu, 08 Jan 2015 18:32:27 +0200
-Subject: [PATCH 1/4] usb: phy: Fix deferred probing
-In-Reply-To: <CAOesGMhWgUu8wDyZyL63gq5JEDu=ecv=r0y7Aa+6SMt24N-Z+A@mail.gmail.com>
-References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420559110-8043-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAOesGMhWgUu8wDyZyL63gq5JEDu=ecv=r0y7Aa+6SMt24N-Z+A@mail.gmail.com>
-Message-ID: <54AEB11B.6060403@linaro.org>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Thu, 08 Jan 2015 10:37:50 -0600
+Subject: Linux 3.19-rc3
+In-Reply-To: <20150108150850.GD5658@dhcp22.suse.cz>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com> <20150108150850.GD5658@dhcp22.suse.cz>
+Message-ID: <54AEB25E.9050205@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/08/2015 09:08 AM, Michal Hocko wrote:
+> [CCing linux-mm and CMA people]
+> [Full message here:
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/383669]
 
-On 01/07/2015 06:41 AM, Olof Johansson wrote:
-> On Tue, Jan 6, 2015 at 7:45 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Commit 1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error on
->> failure") actually broke the deferred probing mechanism, since it now returns
->> EPROBE_DEFER only when the try_module_get call fails, but not when the phy
->> lookup does.
->>
->> All the other similar functions seem to return ENODEV when try_module_get
->> fails, and the error code of either __usb_find_phy or __of_usb_find_phy
->> otherwise.
->>
->> In order to have a consistent behaviour, and a meaningful EPROBE_DEFER, always
->> return EPROBE_DEFER when __(of_)usb_find_phy fails to look up the requested
->> phy, that will be propagated by the caller, and ENODEV if try_module_get fails.
->>
-> 
-> Fixes:  1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error
-> on failure")
-> 
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> This also fixes USB on tegra/trimslice here.
-> 
-> Tested-by: Olof Johansson <olof@lixom.net>
-> 
-> Given that the regression went in during 3.19 merge window, this
-> should go in as a fix during -rc, please.
+>> [ 1054.095277] DMA: 109*64kB (UR) 53*128kB (R) 8*256kB (R) 0*512kB 0*1024kB
+>> 0*2048kB 1*4096kB (R) 0*8192kB 0*16384kB 1*32768kB (R) 0*65536kB = 52672kB
+>> [ 1054.108621] Normal: 191*64kB (MR) 0*128kB 0*256kB 0*512kB 0*1024kB
+>> 0*2048kB 0*4096kB 0*8192kB 0*16384kB 0*32768kB 0*65536kB = 12224kB
+> [...]
+>> [ 1054.142545] Free swap  = 6598400kB
+>> [ 1054.145928] Total swap = 8388544kB
+>> [ 1054.149317] 262112 pages RAM
+>> [ 1054.152180] 0 pages HighMem/MovableOnly
+>> [ 1054.155995] 18446744073709544361 pages reserved
+>> [ 1054.160505] 8192 pages cma reserved
+>
+> Besides underflow in the reserved pages accounting mentioned in other
+> email the free lists look strange as well. All free blocks with some memory
+> are marked as reserved. I would suspect something CMA related.
 
-1) Pls note, there is a duplication patch https://www.mail-archive.com/linux-usb at vger.kernel.org/msg53893.html
-but this one is more correct as for me. 
+I get the same failure with CMA turned off entirely. I assume that means
+CMA is not the culprit.
 
-2) This patch fixes USB regression on Keystone 2, so
-
- Tested-by: Grygorii Strashko <grygorii.strashko@linaro.org>
-
--- 
-regards,
--grygorii
+--Mark Langsdorf
