@@ -1,42 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Jan 2015 17:34:08 +0000
-Subject: Linux 3.19-rc3
-In-Reply-To: <54AEBE84.6090307@redhat.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com>
- <20150108134520.GC14200@e104818-lin.cambridge.arm.com>
- <54AEBE84.6090307@redhat.com>
-Message-ID: <20150108173408.GF17290@e104818-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  8 Jan 2015 18:38:06 +0100
+Subject: [PATCH v4 04/12] pinctrl: mvebu: a38x: Add UART1 muxing options
+In-Reply-To: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420738694-6163-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 05:29:40PM +0000, Mark Langsdorf wrote:
-> On 01/08/2015 07:45 AM, Catalin Marinas wrote:
-> > On Thu, Jan 08, 2015 at 12:51:31PM +0000, Mark Langsdorf wrote:
-> >> On 01/05/2015 07:46 PM, Linus Torvalds wrote:
-> >>> It's a day delayed - not because of any particular development issues,
-> >>> but simply because I was tiling a bathroom yesterday. But rc3 is out
-> >>> there now, and things have stayed reasonably calm. I really hope that
-> >>> implies that 3.19 is looking good, but it's equally likely that it's
-> >>> just that people are still recovering from the holiday season.
-> >>
-> >> I'm consistently getting an out of memory killer triggered when
-> >> compiling the kernel (make -j 16 -s) on a 16 core ARM64 system
-> >> with 16 GB of memory. This doesn't happen when running a 3.18
-> >> kernel.
-> >>
-> >> I'm going to start bisecting the failure now, but here's the crash
-> >> log in case someone can see something obvious in it.
-> 
-> > Can you disable (transparent) huge pages? I don't have any better at the
-> > moment suggestion apart from bisecting.
-> 
-> I didn't have transparent huge pages on. Turning off hugetblfs didn't
-> change anything. Turning off 64K pages isn't an option because of
-> firmware constraints.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-What constraints are these? I thought they could only happen the other
-way around (4K to 64K).
+The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
+function.
 
+Add this case to the pinctrl driver.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+index 224c6cff6aa2..7302f66f4f19 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+@@ -145,14 +145,16 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
+ 	MPP_MODE(20,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
+ 	MPP_MODE(21,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "spi0",  "cs1",        V_88F6810_PLUS),
 -- 
-Catalin
+1.9.1
