@@ -1,49 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Jan 2015 11:52:19 +0000
-Subject: [RFC] ARM: Make CPU_DCACHE_DISABLE depend on !SMP
-In-Reply-To: <2868984.6iP3luxIAM@wuerfel>
-References: <1420683088-1856-1-git-send-email-f.fainelli@gmail.com>
- <2868984.6iP3luxIAM@wuerfel>
-Message-ID: <20150108115219.GS12302@n2100.arm.linux.org.uk>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 8 Jan 2015 17:22:04 +0530
+Subject: [PATCH v2] ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on
+ UART3
+Message-ID: <1420717924-3721-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 09:33:05AM +0100, Arnd Bergmann wrote:
-> On Wednesday 07 January 2015 18:11:28 Florian Fainelli wrote:
-> > Enabling CPU_DCACHE_DISABLE on a SMP capable system will prevent the
-> > kernel from booting because of the following ldrex instruction in
-> > arch_spin_lock:
-> > 
-> > (gdb) x/10i $pc
-> > => 0xc053cfa8 <_raw_spin_lock+4>:       ldrex   r3, [r0]
-> >    0xc053cfac <_raw_spin_lock+8>:       add     r2, r3, #65536  ; 0x10000
-> > 
-> > which is taken by the very first printk call:
-> > 
-> >     at /home/fainelli/work/linux/arch/arm/include/asm/spinlock.h:65
-> >     fmt=0xc0637650 "\001\066Booting Linux on physical CPU 0x%x\n", args=<incomplete type>)
-> >     at kernel/printk/printk.c:1525
-> >     fmt=0xc05370f4 <printk+52> "\024\320\215\342\004\340\235\344\020\320\215\342\036\377/\341\017") at kernel/printk/printk.c:1688
-> > 
-> > ldrex requires exclusive monitor(s) (local or global) which are no longer
-> > working when the Data cache is disabled in CP15 and will just hang the CPU
-> > there.
-> > 
-> > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> We stumbled on this a while back when Kaixu was trying to fix allmodconfig
-> builds to run on real hardware, but never submitted it in the end when
-> Russell didn't like some of the other parts required for that to work.
-> 
-> This one clearly makes sense independently.
+With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset()
+with DEBUG_LL' we moved from parsing cmdline to identify uart used
+for earlycon to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
 
-What about platforms where exclusives to strongly ordered memory do work?
+On DRA7 UART3 hwmod doesn't have this flag enabled, and atleast on
+BeagleBoard-X15, where we use UART3 for console, boot fails with
+DEBUG_LL enabled. Enable DEBUG_OMAP4UART3_FLAGS for UART3 hwmod.
 
-I seem to remember patches from Tony for the pstore/ram_core driver to
-allow it to map stuff strongly ordered, and use exclusives on it.
+For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
 
+Fixes: 90020c7b2c5e ("ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data")
+Cc: <stable@vger.kernel.org> # v3.12+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Changes since v1:
+	- Updated $subject and patch description.	
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index ffd6604..b6ea88f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -2017,7 +2017,7 @@ static struct omap_hwmod dra7xx_uart3_hwmod = {
+ 	.class		= &dra7xx_uart_hwmod_class,
+ 	.clkdm_name	= "l4per_clkdm",
+ 	.main_clk	= "uart3_gfclk_mux",
+-	.flags		= HWMOD_SWSUP_SIDLE_ACT,
++	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP4UART3_FLAGS,
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_offs = DRA7XX_CM_L4PER_UART3_CLKCTRL_OFFSET,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
