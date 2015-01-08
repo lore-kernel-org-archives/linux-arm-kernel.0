@@ -1,45 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Jan 2015 15:39:40 +0100
-Subject: [PATCH v3 4/7] pinctrl: mvebu: a38x: Add UART1 muxing options
+Date: Thu,  8 Jan 2015 15:39:41 +0100
+Subject: [PATCH v3 5/7] ARM: mvebu: A38x: Remove redundant pinctrl informations
 In-Reply-To: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420727983-23922-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1420727983-23922-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
-function.
+The compatible set in the armada-38x DTSI is always overridden, and the reg
+defined in there is duplicated in the armada-380 and armada-385 DTSIs.
 
-Add this case to the pinctrl driver.
+Remove these useless items.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/armada-380.dtsi | 1 -
+ arch/arm/boot/dts/armada-385.dtsi | 1 -
+ arch/arm/boot/dts/armada-38x.dtsi | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-index 224c6cff6aa2..7302f66f4f19 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-@@ -145,14 +145,16 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
- 	MPP_MODE(20,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
- 		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
- 	MPP_MODE(21,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "spi0",  "cs1",        V_88F6810_PLUS),
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index 13400ce88c54..7e509d2d74d0 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -34,7 +34,6 @@
+ 		internal-regs {
+ 			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6810-pinctrl";
+-				reg = <0x18000 0x20>;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index 5249a4d3c207..a54a252ddb4c 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -39,7 +39,6 @@
+ 		internal-regs {
+ 			pinctrl at 18000 {
+ 				compatible = "marvell,mv88f6820-pinctrl";
+-				reg = <0x18000 0x20>;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index ada1f206028b..40200084c6c8 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -194,7 +194,6 @@
+ 			};
+ 
+ 			pinctrl at 18000 {
+-				compatible = "marvell,mv88f6820-pinctrl";
+ 				reg = <0x18000 0x20>;
+ 			};
+ 
 -- 
 2.2.1
