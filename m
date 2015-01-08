@@ -1,29 +1,28 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 08 Jan 2015 14:25:57 -0800
-Subject: [RFC] ARM: Make CPU_DCACHE_DISABLE depend on !SMP
-In-Reply-To: <20150108221356.GD12302@n2100.arm.linux.org.uk>
-References: <1420683088-1856-1-git-send-email-f.fainelli@gmail.com>
- <54AEA7E0.5070101@gmail.com>
- <CADtm3G5Ebf6WkHG3fyiY3pm7fEBBNoW3DDEEwpvBXGj0fVE6jQ@mail.gmail.com>
- <3495606.iOQOj3bxPc@wuerfel> <20150108221356.GD12302@n2100.arm.linux.org.uk>
-Message-ID: <54AF03F5.9030907@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Jan 2015 23:27:14 +0100
+Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
+In-Reply-To: <1934001.D0JfDRp1gF@wuerfel>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <54ADBB89.8070503@ti.com> <1934001.D0JfDRp1gF@wuerfel>
+Message-ID: <2785994.gTZ9chGdKf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/15 14:13, Russell King - ARM Linux wrote:
-> On Thu, Jan 08, 2015 at 11:10:47PM +0100, Arnd Bergmann wrote:
->> My guess is that any implementation that has working LDREX/STREX
->> on uncached memory does not support SMP, because these instructions
->> tend to be implemented through the cache coherency logic on SMP
->> systems but could be implemented more easily without a dcache
->> on uniprocessor cores.
+On Thursday 08 January 2015 09:56:39 Arnd Bergmann wrote:
+> There is another interesting case, which is a USB host controller or
+> something similar behind a PCI bus. These are quite common and also
+> need to be handled in some form. Let's do just PCI first for now, but
+> be aware that this will come next. Should we assume that the ID that
+> is required for a device is either known from the device node, or
+> that it comes from a PCI device? That means for the USB case, we will
+> likely need to have some custom logic. There seems to be an implicit
+> assumption all over the kernel that all devices have the same IOMMU
+> instance, but we can't really rely on that here.
 > 
-> Yes, I negated Tony's patches... Tony was fixing pstore to use
-> writecombine memory.
-> 
-> So this change is fine.
 
-Do you want me to submit the patch as-is to your patch tracking, or
-would you want to include Gregory's quotes for completeness?
---
-Florian
+Update: I've checked the USB implementation and we are lucky because
+these interactions are all done by the USB host controller, and a
+USB device is not itself DMA capable. We don't have to do anything
+for USB.
+
+	Arnd
