@@ -1,85 +1,65 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 08 Jan 2015 11:26:30 -0500
-Subject: [Patch v2 2/2] dt/bindings: qcom_adm: Fix channel specificers
-In-Reply-To: <1420687572-7116-3-git-send-email-agross@codeaurora.org>
-References: <1420687572-7116-1-git-send-email-agross@codeaurora.org>
- <1420687572-7116-3-git-send-email-agross@codeaurora.org>
-Message-ID: <54AEAFB6.9050609@codeaurora.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 08 Jan 2015 08:28:46 -0800
+Subject: [RESEND PATCH v15 07/11] KVM: arm: page logging 2nd stage fault
+ handling
+In-Reply-To: <20150108104510.GI21092@cbox>
+References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
+ <1418868449-23397-1-git-send-email-m.smarduch@samsung.com>
+ <20150107123844.GA21092@cbox> <54ADE0B6.1060703@samsung.com>
+ <20150108104510.GI21092@cbox>
+Message-ID: <54AEB03E.8080305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On 01/08/2015 02:45 AM, Christoffer Dall wrote:
+> On Wed, Jan 07, 2015 at 05:43:18PM -0800, Mario Smarduch wrote:
+>> Hi Christoffer,
+>>   before going through your comments, I discovered that
+>> in 3.18.0-rc2 - a generic __get_user_pages_fast()
+>> was implemented, now ARM picks this up. This causes
+>> gfn_to_pfn_prot() to return meaningful 'writable'
+>> value for a read fault, provided the region is writable.
+>>
+>> Prior to that the weak version returned 0 and 'writable'
+>> had no optimization effect to set pte/pmd - RW on
+>> a read fault.
+>>
+>> As a consequence dirty logging broke in 3.18, I was seeing
+Correction on this, proper __get_user_pages_fast()
+behavior exposed a bug in page logging code.
 
-On 01/07/2015 10:26 PM, Andy Gross wrote:
-> This patch removes the crci information from the dma channel property.  At least
-> one client device requires using more than one CRCI value for a channel.  This
-> does not match the current binding and the crci information needs to be removed.
+>> weird but very intermittent issues. I just put in the
+>> additional few lines to fix it, prevent pte RW (only R) on
+>> read faults  while  logging writable region.
+>>
+>> On 01/07/2015 04:38 AM, Christoffer Dall wrote:
+>>> On Wed, Dec 17, 2014 at 06:07:29PM -0800, Mario Smarduch wrote:
+>>>> This patch is a followup to v15 patch series, with following changes:
+>>>> - When clearing/dissolving a huge, PMD mark huge page range dirty, since
+>>>>   the state of whole range is unknown. After the huge page is dissolved 
+>>>>   dirty page logging is at page granularity.
+>>>
+>>> What is the sequence of events where you could have dirtied another page
+>>> within the PMD range after the user initially requested dirty page
+>>> logging?
+>>
+>> No there is none. My issue was the start point for tracking dirty pages
+>> and that would be second call to dirty log read. Not first
+>> call after initial write protect where any page in range can
+>> be assumed dirty. I'll remove this, not sure if there would be any
+>> use case to call dirty log only once.
+>>
 > 
-> Instead, the client device will provide this information via other means.
+> Calling dirty log once can not give you anything meaningful, right?  You
+> must assume all memory is 'dirty' at this point, no?
+
+There is the interval between KVM_MEM_LOG_DIRTY_PAGES and first
+call to KVM_GET_DIRTY_LOG. Not sure of any use case, maybe enable
+logging, wait a while do a dirty log read, disable logging.
+Get an accumulated snapshot of dirty page activity.
+
+- Mario
+
 > 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/dma/qcom_adm.txt |   14 +++++---------
->  1 file changed, 5 insertions(+), 9 deletions(-)
+> -Christoffer
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/qcom_adm.txt b/Documentation/devicetree/bindings/dma/qcom_adm.txt
-> index 9bcab91..fba67c6 100644
-> --- a/Documentation/devicetree/bindings/dma/qcom_adm.txt
-> +++ b/Documentation/devicetree/bindings/dma/qcom_adm.txt
-> @@ -4,8 +4,7 @@ Required properties:
->  - compatible: must contain "qcom,adm" for IPQ/APQ8064 and MSM8960
->  - reg: Address range for DMA registers
->  - interrupts: Should contain one interrupt shared by all channels
-> -- #dma-cells: must be <2>.  First cell denotes the channel number.  Second cell
-> -  denotes CRCI (client rate control interface) flow control assignment.
-> +- #dma-cells: must be <1>.  First cell denotes the channel number.
->  - clocks: Should contain the core clock and interface clock.
->  - clock-names: Must contain "core" for the core clock and "iface" for the
->    interface clock.
-> @@ -22,7 +21,7 @@ Example:
->  			compatible = "qcom,adm";
->  			reg = <0x18300000 0x100000>;
->  			interrupts = <0 170 0>;
-> -			#dma-cells = <2>;
-> +			#dma-cells = <1>;
->  
->  			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
->  			clock-names = "core", "iface";
-> @@ -35,15 +34,12 @@ Example:
->  			qcom,ee = <0>;
->  		};
->  
-> -DMA clients must use the format descripted in the dma.txt file, using a three
-> +DMA clients must use the format descripted in the dma.txt file, using a two
->  cell specifier for each channel.
->  
->  Each dmas request consists of 3 cells:
-
-Now 2 cells?
-
->   1. phandle pointing to the DMA controller
->   2. channel number
-> - 3. CRCI assignment, if applicable.  If no CRCI flow control is required, use 0.
-> -    The CRCI is used for flow control.  It identifies the peripheral device that
-> -    is the source/destination for the transferred data.
->  
->  Example:
->  
-> @@ -56,7 +52,7 @@ Example:
->  
->  		cs-gpios = <&qcom_pinmux 20 0>;
->  
-> -		dmas = <&adm_dma 6 9>,
-> -			<&adm_dma 5 10>;
-> +		dmas = <&adm_dma 6>,
-> +			<&adm_dma 5>;
->  		dma-names = "rx", "tx";
->  	};
-> 
-
-Chris
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
