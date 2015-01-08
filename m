@@ -1,82 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Jan 2015 12:26:55 +0100
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150107225904.GQ24989@titan.lakedaemon.net>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <54AD917A.2040307@redhat.com> <20150107225904.GQ24989@titan.lakedaemon.net>
-Message-ID: <2034224.H5nZdW12se@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 8 Jan 2015 12:29:55 +0100
+Subject: [PATCH v2 06/21] ARM: tegra: remove old LIC support
+In-Reply-To: <1420652576-22309-7-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108112954.GK1987@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 January 2015 17:59:04 Jason Cooper wrote:
-> On Wed, Jan 07, 2015 at 03:05:14PM -0500, Jon Masters wrote:
-> > On 01/07/2015 02:58 PM, Jon Masters wrote:
-> > > On 01/07/2015 01:41 PM, Jason Cooper wrote:
-> > 
-> > >> One of the reasons I've really enjoyed working with ARM platforms and DT
-> > >> is the absence of this type of 'feature'.  I honestly don't care whether
-> > >> the kernel gets the board configuration info from DT or ACPI or FOO, as
-> > >> long as we can avoid the security mistakes of the past:
-> > >>
-> > >>   http://www.spiegel.de/international/world/catalog-reveals-nsa-has-back-doors-for-numerous-devices-a-940994.html
-> > > 
-> > > ACPI is not the great satan. I'm aware certain others in the community
-> > > have written missinformed blog posts and G+ rants equating ACPI with SMI
-> > > and even with various other system firmware. I can't force someone to
-> > > become informed on a topic, especially if it's politically useful to
-> > > them to hate on ACPI and use the security paranoia handwavy argument.
-> > 
-> > To clarify, and this is not directed at you Jason, it is politically
-> > useful to some who have written rants those business models are built
-> > upon being paid to enable platforms. For those folks, standardized
-> > platforms which allow a common OS approach are seen as threatening.
-> 
-> Ahh, thanks for clarifying.
-> 
-> > In the previous rants (which were really instigated as a result of the
-> > above) ACPI was equated with SMM (System Management Mode), which is a
-> > bit like the Secure/Trusted world on AArch64 in which you might run
-> > another "Trusted" OS. These are the places where you want to watch out
-> > to malware of the kind cited in your link, not in ACPI tables.
-> 
-> fwiw, I *am* concerned about those spaces.  It seems we agree on their
-> vulnerability to attack (plus being meaty targets).
-> 
-> To more concisely state my other reply to you, wrt to AML, I'm primarily
-> concerned about a malicious update to the ACPI tables.  The ACPI tables
-> in the update would be otherwise normal, except for the AML blob that
-> contains some extra code.  The malicious payload.  Then, a routine call
-> into an AML (for pinctrl, say) executes the malicious code.
-> 
-> The plausibility and preventability of that style of attack is what I'm
-> hoping to nail down with this discussion.
+On Wed, Jan 07, 2015 at 05:42:41PM +0000, Marc Zyngier wrote:
+[...]
+> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+[...]
+>  void __init tegra_init_irq(void)
+>  {
+> -	int i;
+> -	void __iomem *distbase;
+> -
+> -	if (of_find_matching_node(NULL, tegra_ictlr_match))
+> -		goto skip_extn_setup;
+> -
+> -	tegra_legacy_irq_syscore_init();
+> -
+> -	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+> -	num_ictlrs = readl_relaxed(distbase + GIC_DIST_CTR) & 0x1f;
+> -
+> -	if (num_ictlrs > ARRAY_SIZE(ictlr_reg_base)) {
+> -		WARN(1, "Too many (%d) interrupt controllers found. Maximum is %d.",
+> -			num_ictlrs, ARRAY_SIZE(ictlr_reg_base));
+> -		num_ictlrs = ARRAY_SIZE(ictlr_reg_base);
+> -	}
+> -
+> -	for (i = 0; i < num_ictlrs; i++) {
+> -		void __iomem *ictlr = ictlr_reg_base[i];
+> -		writel(~0, ictlr + ICTLR_CPU_IER_CLR);
+> -		writel(0, ictlr + ICTLR_CPU_IEP_CLASS);
+> -	}
+> -
+> -	gic_arch_extn.irq_ack = tegra_ack;
+> -	gic_arch_extn.irq_eoi = tegra_eoi;
+> -	gic_arch_extn.irq_mask = tegra_mask;
+> -	gic_arch_extn.irq_unmask = tegra_unmask;
+> -	gic_arch_extn.irq_retrigger = tegra_retrigger;
+> -	gic_arch_extn.irq_set_wake = tegra_set_wake;
+> -	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+> +	if (!of_find_matching_node(NULL, tegra_ictlr_match))
+> +		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
 
-If you want to run hidden code through the firmware, then doing an attack
-on Intel SMM or ARM TrustZone would be much harder to detect and as easy
-to get in, as long as you have the ability to flash arbitrary firmware.
-I think this has been shown to happen in the wild. That code could
-go and manipulate the running kernel image to do something else.
+I'm not very happy about the ABI breakage here, but I also realize that
+we need this change to properly describe the hardware. To make it more
+obvious that people really should update their DTBs, maybe turn this
+into a WARN()?
 
-Running code inside of the AML interpreter is fairly limited for the
-purpose of an attack [*], but there might be bugs in the interpreter that
-allow arbitrary code execution from malicious firmware. I think this
-case would be similar to constructing a malicious DT blob that exploits
-a bug in the DT parser for arbitrary code execution. The AML interpreter
-is a relatively large chunk of code, but it's self-contained. In
-comparison, the DT parser is much smaller, but has the additional
-(theoretical) problem of potential buffer overflows in any drivers that
-use it incorrectly (e.g. format string attacks on string properties).
-Another difference is that the AML code is intended to not be
-user-upgradable without a full firmware upgrade, while a DT blob is
-meant to be easily replaced if necessary without flashing the firmware,
-using the same permissions you need for updating the OS.
+> -skip_extn_setup:
+>  	tegra114_gic_cpu_pm_registration();
 
-I'm deliberately not trying to draw conclusions regarding whether AML
-is more or less secure than DT, but the above is my understanding of
-the fundamental differences.
+I'm not intimately familiar with the GIC, but is this really SoC
+specific? Doesn't anybody else need this? Comparing to the GIC spec the
+write of 0x1e0 to the GIC_CPU_CTRL register (which I assume corresponds
+to GICC_CTLR in the spec), this simply disables the IRQ and FIQ bypass
+signals for both group 0 and group 1.
 
-	Arnd
-
-[*] I would assume you can get AML code to write to arbitrary physical
-memory locations without much effort, but it has rather limited arithmetical
-capabilities which makes it hard to know where to write to.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/d70c076b/attachment.sig>
