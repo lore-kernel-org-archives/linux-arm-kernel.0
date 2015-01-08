@@ -1,26 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 8 Jan 2015 18:44:16 +0100
-Subject: [PATCH v4 07/12] ARM: mvebu: Add Armada 385 Access Point
- Development Board support
-In-Reply-To: <1420738694-6163-8-git-send-email-gregory.clement@free-electrons.com>
-References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
- <1420738694-6163-8-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150108184416.3feb0e02@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Jan 2015 17:36:00 +0000
+Subject: [RFC 2/8] ARM64: Refactor kprobes-arm64
+In-Reply-To: <54AEBF54.7000704@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <9a86c217f387f45568c18b724024b0d3e040d2c6.1420038188.git.panand@redhat.com>
+ <20150108165557.GQ11583@arm.com> <54AEBF54.7000704@redhat.com>
+Message-ID: <20150108173600.GW11583@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Thu, Jan 08, 2015 at 05:33:08PM +0000, Pratyush Anand wrote:
+> On Thursday 08 January 2015 10:25 PM, Will Deacon wrote:
+> > On Wed, Dec 31, 2014 at 03:21:18PM +0000, Pratyush Anand wrote:
+> >> Most of the stuff of kprobes-arm64.c can also be used by uprobes.c. So
+> >> move all those part to common code area. In the process rename kprobe to
+> >> probe whereever possible.
+> >>
+> >> No functional change.
+> >
+> > In which case, can you merge this into the kprobes series (which we haven't
+> > merged yet)?
+> >
+> 
+> Yes, thats why these are just RFCs. I will send next version of uprobe 
+> only after kprobe patches are accepted into maintainer's tree.
 
-On Thu,  8 Jan 2015 18:38:09 +0100, Gregory CLEMENT wrote:
+Ok, but it also makes sense to make kprobes refactoring changes *before* the
+patches are merged, as that reduces churn in mainline whilst you don't have
+any other dependencies.
 
-> +#include "armada-385.dtsi"
-
-Is it an Armada 385 or an Armada 388 ?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
