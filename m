@@ -1,37 +1,62 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 8 Jan 2015 11:19:46 -0600
-Subject: [Patch v2 2/2] dt/bindings: qcom_adm: Fix channel specificers
-In-Reply-To: <54AEAFB6.9050609@codeaurora.org>
-References: <1420687572-7116-1-git-send-email-agross@codeaurora.org>
- <1420687572-7116-3-git-send-email-agross@codeaurora.org>
- <54AEAFB6.9050609@codeaurora.org>
-Message-ID: <20150108171946.GA15842@qualcomm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 8 Jan 2015 11:24:11 -0600
+Subject: [PATCH 1/4] usb: phy: Fix deferred probing
+In-Reply-To: <54AEB11B.6060403@linaro.org>
+References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420559110-8043-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAOesGMhWgUu8wDyZyL63gq5JEDu=ecv=r0y7Aa+6SMt24N-Z+A@mail.gmail.com>
+ <54AEB11B.6060403@linaro.org>
+Message-ID: <20150108172411.GN31926@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 11:26:30AM -0500, Christopher Covington wrote:
-
-<snip>
-
-> > +DMA clients must use the format descripted in the dma.txt file, using a two
-> >  cell specifier for each channel.
-> >  
-> >  Each dmas request consists of 3 cells:
+On Thu, Jan 08, 2015 at 06:32:27PM +0200, Grygorii.Strashko at linaro.org wrote:
+> Hi,
 > 
-> Now 2 cells?
+> On 01/07/2015 06:41 AM, Olof Johansson wrote:
+> > On Tue, Jan 6, 2015 at 7:45 AM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> >> Commit 1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error on
+> >> failure") actually broke the deferred probing mechanism, since it now returns
+> >> EPROBE_DEFER only when the try_module_get call fails, but not when the phy
+> >> lookup does.
+> >>
+> >> All the other similar functions seem to return ENODEV when try_module_get
+> >> fails, and the error code of either __usb_find_phy or __of_usb_find_phy
+> >> otherwise.
+> >>
+> >> In order to have a consistent behaviour, and a meaningful EPROBE_DEFER, always
+> >> return EPROBE_DEFER when __(of_)usb_find_phy fails to look up the requested
+> >> phy, that will be propagated by the caller, and ENODEV if try_module_get fails.
+> >>
+> > 
+> > Fixes:  1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error
+> > on failure")
+> > 
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > 
+> > This also fixes USB on tegra/trimslice here.
+> > 
+> > Tested-by: Olof Johansson <olof@lixom.net>
+> > 
+> > Given that the regression went in during 3.19 merge window, this
+> > should go in as a fix during -rc, please.
+> 
+> 1) Pls note, there is a duplication patch https://www.mail-archive.com/linux-usb at vger.kernel.org/msg53893.html
+> but this one is more correct as for me. 
+> 
+> 2) This patch fixes USB regression on Keystone 2, so
+> 
+>  Tested-by: Grygorii Strashko <grygorii.strashko@linaro.org>
 
-Good catch.  I'll fix in next rev.  Thanks!
-
-> >   1. phandle pointing to the DMA controller
-> >   2. channel number
-> > - 3. CRCI assignment, if applicable.  If no CRCI flow control is required, use 0.
-> > -    The CRCI is used for flow control.  It identifies the peripheral device that
-> > -    is the source/destination for the transferred data.
-> >  
-
-<snip>
+Are we asking that I drop Thierry's Patch or just apply the other hunks?
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/fc39e5b5/attachment.sig>
