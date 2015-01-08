@@ -1,64 +1,42 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 18:38:07 +0100
-Subject: [PATCH v4 05/12] ARM: mvebu: A38x: Remove redundant pinctrl
- informations
+Date: Thu,  8 Jan 2015 18:38:11 +0100
+Subject: [PATCH v4 09/12] ARM: mvebu: a38x: Add missing labels
 In-Reply-To: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420738694-6163-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420738694-6163-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+The pintcrl label was missing. Adding it allowed referring it from the
+root of the device tree. Also add the uart0 label used by the
+bootloader.
 
-The compatible set in the armada-38x DTSI is always overridden, and the reg
-defined in there is duplicated in the armada-380 and armada-385 DTSIs.
-
-Remove these useless items.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-380.dtsi | 1 -
- arch/arm/boot/dts/armada-385.dtsi | 1 -
- arch/arm/boot/dts/armada-38x.dtsi | 1 -
- 3 files changed, 3 deletions(-)
+ arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-index 13400ce88c54..7e509d2d74d0 100644
---- a/arch/arm/boot/dts/armada-380.dtsi
-+++ b/arch/arm/boot/dts/armada-380.dtsi
-@@ -34,7 +34,6 @@
- 		internal-regs {
- 			pinctrl at 18000 {
- 				compatible = "marvell,mv88f6810-pinctrl";
--				reg = <0x18000 0x20>;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
-index 5249a4d3c207..a54a252ddb4c 100644
---- a/arch/arm/boot/dts/armada-385.dtsi
-+++ b/arch/arm/boot/dts/armada-385.dtsi
-@@ -39,7 +39,6 @@
- 		internal-regs {
- 			pinctrl at 18000 {
- 				compatible = "marvell,mv88f6820-pinctrl";
--				reg = <0x18000 0x20>;
- 			};
- 		};
- 
 diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index ada1f206028b..40200084c6c8 100644
+index 63fe15174fee..04fe80d101f8 100644
 --- a/arch/arm/boot/dts/armada-38x.dtsi
 +++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -194,7 +194,6 @@
+@@ -173,7 +173,7 @@
+ 				status = "disabled";
  			};
  
- 			pinctrl at 18000 {
--				compatible = "marvell,mv88f6820-pinctrl";
+-			serial at 12000 {
++			uart0: serial at 12000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0x12000 0x100>;
+ 				reg-shift = <2>;
+@@ -193,7 +193,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			pinctrl at 18000 {
++			pinctrl: pinctrl at 18000 {
  				reg = <0x18000 0x20>;
- 			};
  
+ 				ge0_rgmii_pins: ge-rgmii-pins-0 {
 -- 
 1.9.1
