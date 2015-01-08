@@ -1,65 +1,71 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Jan 2015 09:38:27 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI clock node names
-In-Reply-To: <CAMuHMdVX196P9u8zHyjWR_-6Pj7kqtOzR4pW2_qGigsSw-2BVQ@mail.gmail.com>
-References: <1420418648-7815-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVX196P9u8zHyjWR_-6Pj7kqtOzR4pW2_qGigsSw-2BVQ@mail.gmail.com>
-Message-ID: <20150108003826.GF18943@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Jan 2015 16:43:50 -0800
+Subject: [PATCH] arm: omap: reduce zImage size on omap2plus_defconfig
+In-Reply-To: <20141226162618.GJ17430@saruman>
+References: <54991A25.2030804@compulab.co.il> <20141223161936.GA9147@saruman>
+ <549AA94A.8030209@compulab.co.il> <20141224154948.GA423@saruman>
+ <20141224190401.GN23854@atomide.com>
+ <549BE333.9060709@compulab.co.il> <549D5CC0.2090408@linaro.org>
+ <20141226152620.GF17430@saruman>
+ <20141226161349.GC12409@atomide.com>
+ <20141226162618.GJ17430@saruman>
+Message-ID: <20150108004349.GT13010@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 10:41:14AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Jan 5, 2015 at 1:44 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> > index 8f78da5..9856e9c 100644
-> > --- a/arch/arm/boot/dts/r8a7794.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> > @@ -294,14 +294,14 @@
-> >                                              "lb", "qspi", "sdh", "sd0", "z";
-> >                 };
-> >                 /* Variable factor clocks */
-> > -               sd1_clk: sd2_clk at e6150078 {
-> > +               sd1_clk: sd1_clk at e6150078 {
-> >                         compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-> >                         reg = <0 0xe6150078 0 4>;
-> >                         clocks = <&pll1_div2_clk>;
-> >                         #clock-cells = <0>;
-> >                         clock-output-names = "sd1";
-> >                 };
-> > -               sd2_clk: sd3_clk at e615007c {
-> > +               sd2_clk: sd2_clk at e615007c {
-> >                         compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
-> >                         reg = <0 0xe615007c 0 4>;
-> >                         clocks = <&pll1_div2_clk>;
+* Felipe Balbi <balbi@ti.com> [141226 08:29]:
+> On Fri, Dec 26, 2014 at 08:13:49AM -0800, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [141226 07:29]:
+> > > On Fri, Dec 26, 2014 at 03:04:00PM +0200, Grygorii.Strashko at linaro.org wrote:
+> > > > >>>
+> > > > >>> Tony, your call
+> > > > 
+> > > > May be it will be good thing to split this patch. That way more
+> > > > information will be stored in commit log about which set of options
+> > > > gives us what benefits.  And also, It will allow to continue with
+> > > > agreed changes.  ?
+> > > 
+> > > can be done, but then again, it's just a defconfig change. Tony, your
+> > > call.
+> > > 
+> > > > >> I think we should move omap2plus_defconfig to be mostly modular and
+> > > > >> usable for distros as a base. Most distros prefer to build almost
+> > > > >> everything as loadable modules. And my preference is that we should
+> > > > >> only keep the minimum rootfs for devices and serial support as
+> > > > >> built-in and rely on initramfs for most drivers. And slowly move
+> > > > >> also the remaining built-in drivers to be loadable modules.
+> > > > >>
+> > > > >> The reasons for having drivers as loadable modules are many. It
+> > > > >> allows distros to use the same kernel for all the devices without
+> > > > >> bloating the kernel. It makes developing drivers easier as just the
+> > > > >> module needs to be reloaded. And loadable modules protect us from
+> > > > >> cross-framework spaghetti calls in the kernel as the interfaces are
+> > > > >> clearly defined.
+> > > > >>
+> > > > >> Are there people really using SATA as rootfs right now on omaps?
+> > > > > 
+> > > > > Yes. That is exactly my point.
+> > > > > 
+> > > > 
+> > > > From my side I'd like to note that I know about few ongoing projects
+> > > > on DRA7x EVM where SATA is used as rootfs - now It is the fast
+> > > > possible way to start Android.
+> > > 
+> > > now this is something different. This is evidence that there are people
+> > > relying on SATA on rootfs. I'll leave to Tony again.
+> > 
+> > OK sounds like people are really using SATA as rootfs, so we might as
+> > well keep it built in then. And it does not affect the PM on the devices
+> > that do have PM working, that has been a problem with having some
+> > drivers built-in.
+> > 
+> > We can still work towards making the current rootfs device drivers
+> > into loadable modules in the long term :)
 > 
-> According to the documentation, SDCKCR is 0xe6150074, not ..78,
-> SD2CKCR is 0xe6150078, not ..7c.
-> For reference SD3CKCR is 0xe615026c.
->
-> Note that r8a7791.dtsi also has the mismatches between the labels and node
-> names.
->
-> The discrepancy is caused by the different number of SDHI modules in the
-> different SoCs of the R-Car Gen2 family.
-> 
->   - r8a7790 has hardware modules SDHI0, SDHI1, SDHI2, and SDHI3.
->   - r8a7791 and r8a7794 have hardware modules SDHI0, SDHI2, and SDHI3,
->     but call the last two instances SDHI1 and SDHI2, while the clock registers
->     are not renumbered.
->     So instance SDHI1 uses SD2CKCR, and instance SDHI2 uses SD3CKCR, right?
+> Here's v3:
 
-I had not noticed, but yes that does seem to be the case.
+Thanks, applying this into omap-for-v3.20/defconfig.
 
-> That means the node names are actually correct. But the register value and
-> unit address for the second clock are still wrong, they should be (0x)e615007c,
+Regards,
 
-Ok, that makes sense. But in that the labels want updating, right?
-
-> cfr. in r8a7791.dtsi.
-> 
-> Note that IMHO the clock-output-names are wrong, for both r8a7791 and r8a7794,
-> as the hardware documentation calls these "sd2" and "sd3", not "sd1" and "sd2".
-
-Excellent. I think we can easily change that for the r8a7794 as the
-nodes aren't being consumed nor have been part of a release. But I'm
-less sure about a path forward for the r8a7791. What are your thoughts?
+Tony
