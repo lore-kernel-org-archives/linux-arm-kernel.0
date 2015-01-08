@@ -1,55 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 8 Jan 2015 15:48:35 +0100
-Subject: [PATCH v3 4/7] pinctrl: mvebu: a38x: Add UART1 muxing options
-In-Reply-To: <1420727983-23922-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420727983-23922-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150108144835.GB16907@lunn.ch>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 08 Jan 2015 15:53:15 +0100
+Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
+In-Reply-To: <54AE8D45.7050805@imgtec.com>
+References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
+ <2223659.OW08fe0cS1@wuerfel>
+ <1003885907.22061.1415301932743.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <6087001.lBonPVHV5K@wuerfel> <54AE8D45.7050805@imgtec.com>
+Message-ID: <54AE99DB.1070300@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 03:39:40PM +0100, Maxime Ripard wrote:
-> The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
-> function.
-> 
-> Add this case to the pinctrl driver.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-> index 224c6cff6aa2..7302f66f4f19 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-> @@ -145,14 +145,16 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
->  		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
->  		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
->  		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
-> -		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS)),
-> +		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS),
-> +		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
->  	MPP_MODE(20,
->  		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
->  		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
->  		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
->  		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
->  		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
-> -		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS)),
-> +		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS),
-> +		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
->  	MPP_MODE(21,
->  		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
->  		 MPP_VAR_FUNCTION(1, "spi0",  "cs1",        V_88F6810_PLUS),
-> -- 
-> 2.2.1
-> 
+Hi Ezequiel,
 
-Hi Linus
+Am 08.01.2015 um 14:59 schrieb Ezequiel Garcia:
+> Hi Stefan, Arnd,
+>
+> (I'm trimming the Cc list and adding Thierry and Maxime to the loop):
+>
+> I'm in the process of finding a suitable upstream path for a new eFuse driver
+> for fuses used on Imagination Technologies SoCs.
+>
+> This was our last proposal, which follows Tegra's work:
+>
+> http://www.spinics.net/lists/devicetree/msg59246.html
+>
+> However, Arnd was reluctant to take yet another efuse driver under drivers/soc
+> and proposed instead to try to find a unified API. We've had numerous fuse
+> drivers (tegra, sunxi, imx and img) appearing, so his concern certainly makes
+> sense.
+>
+> I've talked to Arnd on IRC and we agreed to create a new directory
+> drivers/efuse. As a first step we would just move the tegra driver,
+> and add the new drivers (img on my side, and possibly mxs on Stefan's).
+> Perhaps we would also pull the sunxi_sid driver as well.
+>
+> Having the drivers together would allow us to come up with a unified API
+> as follow up work.
 
-I can take this though mvebu->arm-soc if you want? Or you can take
-it. Please let me know your preference.
+does this unified API affects userspace interface, internal kernel
+interface or both?
 
-    Andrew
+> How does this sound? If you have no objections to this, I can go ahead and
+> try to prepare some RFCs.
+
+I'm happy about any progress on this. It's not really urgent for me to
+get the driver into mainline. A helpful and useable userspace interface
+is more important to me. So i want to send my comments/requirements
+about the API and post the mxs driver after the definition of the
+unified API.
+
+Does this answer your question?
+
+Stefan
