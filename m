@@ -1,124 +1,89 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 08 Jan 2015 14:36:38 +0800
-Subject: [Bugfix] x86/apic: Fix xen IRQ allocation failure caused by commit
- b81975eade8c
-In-Reply-To: <20150107154416.GB30955@l.oracle.com>
-References: <1420611244-25624-1-git-send-email-jiang.liu@linux.intel.com>
- <20150107145050.GC30457@l.oracle.com> <54AD52D0.5050303@linux.intel.com>
- <20150107154416.GB30955@l.oracle.com>
-Message-ID: <54AE2576.5020209@linux.intel.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 08 Jan 2015 12:15:35 +0530
+Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
+In-Reply-To: <5487D726.6000603@arm.com>
+References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>	<CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>	<5487C897.9050405@arm.com>
+ <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
+ <5487D726.6000603@arm.com>
+Message-ID: <54AE278F.4020003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/7 23:44, Konrad Rzeszutek Wilk wrote:
-> On Wed, Jan 07, 2015 at 11:37:52PM +0800, Jiang Liu wrote:
->> On 2015/1/7 22:50, Konrad Rzeszutek Wilk wrote:
->>> On Wed, Jan 07, 2015 at 02:13:49PM +0800, Jiang Liu wrote:
->>>> Commit b81975eade8c ("x86, irq: Clean up irqdomain transition code")
->>>> breaks xen IRQ allocation because xen_smp_prepare_cpus() doesn't invoke
->>>> setup_IO_APIC(), so no irqdomains created for IOAPICs and
->>>> mp_map_pin_to_irq() fails at the very beginning.
->>>> --- a/arch/x86/kernel/apic/io_apic.c
->>>> +++ b/arch/x86/kernel/apic/io_apic.c
->>>> @@ -2369,31 +2369,29 @@ static void ioapic_destroy_irqdomain(int idx)
->>>>  	ioapics[idx].pin_info = NULL;
->>>>  }
->>>>  
->>>> -void __init setup_IO_APIC(void)
->>>> +void __init setup_IO_APIC(bool xen_smp)
->>>>  {
->>>>  	int ioapic;
->>>>  
->>>> -	/*
->>>> -	 * calling enable_IO_APIC() is moved to setup_local_APIC for BP
->>>> -	 */
->>>> -	io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
->>>> +	if (!xen_smp) {
->>>> +		apic_printk(APIC_VERBOSE, "ENABLING IO-APIC IRQs\n");
->>>> +		io_apic_irqs = nr_legacy_irqs() ? ~PIC_IRQS : ~0UL;
->>>> +
->>>> +		/* Set up IO-APIC IRQ routing. */
->>>> +		x86_init.mpparse.setup_ioapic_ids();
->>>> +		sync_Arb_IDs();
->>>> +	}
-Hi Konrad,
-	Enabling above code for Xen dom0 will cause following warning
-because it writes a special value to ICR register.
-[    3.394981] ------------[ cut here ]------------
-[    3.394985] WARNING: CPU: 0 PID: 1 at arch/x86/xen/enlighten.c:968
-xen_apic_write+0x15/0x20()
-[    3.394988] Modules linked in:
-[    3.394991] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.19.0-rc3+ #5
-[    3.394993] Hardware name: Dell Inc. OptiPlex 9020/0DNKMN, BIOS A03
-09/17/2013
-[    3.394996]  00000000000003c8 ffff88003056bdd8 ffffffff817611bb
-00000000000003c8
-[    3.395000]  0000000000000000 ffff88003056be18 ffffffff8106f4ea
-0000000000000008
-[    3.395004]  ffffffff81fc1120 ffff880030561348 000000000000a108
-000000000000a101
-[    3.395008] Call Trace:
-[    3.395012]  [<ffffffff817611bb>] dump_stack+0x4f/0x6c
-[    3.395015]  [<ffffffff8106f4ea>] warn_slowpath_common+0xaa/0xd0
-[    3.395018]  [<ffffffff8106f525>] warn_slowpath_null+0x15/0x20
-[    3.395021]  [<ffffffff81003e25>] xen_apic_write+0x15/0x20
-[    3.395026]  [<ffffffff81ef606b>] sync_Arb_IDs+0x84/0x86
-[    3.395029]  [<ffffffff81ef7f7a>] setup_IO_APIC+0x7f/0x8e3
-[    3.395033]  [<ffffffff810b275d>] ? trace_hardirqs_on+0xd/0x10
-[    3.395036]  [<ffffffff8176858a>] ? _raw_spin_unlock_irqrestore+0x8a/0xa0
-[    3.395040]  [<ffffffff81ee841b>] xen_smp_prepare_cpus+0x5d/0x184
-[    3.395044]  [<ffffffff81ee1ba3>] kernel_init_freeable+0x149/0x293
-[    3.395047]  [<ffffffff81758d49>] ? kernel_init+0x9/0xf0
-[    3.395049]  [<ffffffff81758d40>] ? rest_init+0xd0/0xd0
-[    3.395052]  [<ffffffff81758d49>] kernel_init+0x9/0xf0
-[    3.395054]  [<ffffffff8176887c>] ret_from_fork+0x7c/0xb0
-[    3.395057]  [<ffffffff81758d40>] ? rest_init+0xd0/0xd0
-[    3.395066] ---[ end trace 7c4371c8ba33d5d0 ]---
+Hi Abhilash,
 
-<snit>
->>>>  	ioapic_initialized = 1;
->>>> +
->>>> +	if (!xen_smp) {
->>>> +		init_IO_APIC_traps();
->>>> +		if (nr_legacy_irqs())
->>>> +			check_timer();
->>>> +	}
->>>>  }
-And enabling above code causes Xen dom0 reboots.
-Haven't test HVM and PV kernel yet.
-So seems we still need special treatment for xen here.
-Regards!
-Gerry
-
->>>>  
->>>>  /*
->>>> diff --git a/arch/x86/xen/smp.c b/arch/x86/xen/smp.c
->>>> index 4c071aeb8417..7eb0283901fa 100644
->>>> --- a/arch/x86/xen/smp.c
->>>> +++ b/arch/x86/xen/smp.c
->>>> @@ -326,7 +326,10 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
->>>>  
->>>>  		xen_raw_printk(m);
->>>>  		panic(m);
->>>> +	} else {
->>>> +		setup_IO_APIC(true);
->>>>  	}
->>>> +
->>>>  	xen_init_lock_cpu(0);
->>>>  
->>>>  	smp_store_boot_cpu_info();
->>>> -- 
->>>> 1.7.10.4
->>>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
+On Wednesday 10 December 2014 10:46 AM, Sudeep Holla wrote:
+>
+>
+> On Wednesday 10 December 2014 09:55 AM, Abhilash Kesavan wrote:
+>> Hi Sudeep,
+>>
+>> On Wed, Dec 10, 2014 at 9:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> Hi Abhilash,
 >>>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+>>> On Wednesday 10 December 2014 09:31 AM, Abhilash Kesavan wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On Fri, Nov 28, 2014 at 8:20 PM, Abhilash Kesavan <a.kesavan@samsung.com>
+>>>> wrote:
+>>>>>
+>>>>> The arm-cci driver completes the probe sequence even if the cci node is
+>>>>> marked as disabled. Add a check in the driver to honour the cci status
+>>>>> in the device tree.
+>>>>>
+>>>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>>
+>>>>
+>>>> This patch helps disable CCI on the Arndale Octa board thus resolving
+>>>> some imprecise aborts seen on that board. Kindly review.
+>>>>
+>>>> Regards,
+>>>> Abhilash
+>>>>>
+>>>>> ---
+>>>>>     drivers/bus/arm-cci.c |    3 +++
+>>>>>     1 file changed, 3 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>>>>> index 860da40..0ce5e2d 100644
+>>>>> --- a/drivers/bus/arm-cci.c
+>>>>> +++ b/drivers/bus/arm-cci.c
+>>>>> @@ -1312,6 +1312,9 @@ static int cci_probe(void)
+>>>>>            if (!np)
+>>>>>                    return -ENODEV;
+>>>>>
+>>>>> +       if (!of_device_is_available(np))
+>>>>> +               return -ENODEV;
+>>>>> +
+>>>
+>>>
+>>> IIUC, by this change you are disabling the MCPM boot protocol here.
+>>> Is there any alternative boot protocol that works on this platform
+>>> to boot all 8 cores ? Sorry by quick grep couldn't find one, hence
+>>> so I am asking.
+>>
+>> Thanks for the reply.
+>> On disabling MCPM, we will default to platsmp.c/firmware.c which boots
+>> 4 cores as per Kevin's comment here[1]. This was the original behavior
+>> before MCPM was enabled for all 5420 based SoCs.
+>>
+>
+> Thanks for pointing that out. I assume the firmware can handle the
+> alternate boot protocol and no more workarounds are needed especially
+> when getting CPUIdle working in this mode.
+>
+> Anyways the patch makes sense irrespective how it works on exynos, so
+> you can add,
+>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+
+What's the status of this patch. It was useful for me on vexpress for 
+some testing. Please feel free to add
+
+Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+
+if this is not yet queued.
+
+Regards,
+Sudeep
