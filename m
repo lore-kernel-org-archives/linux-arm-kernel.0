@@ -1,48 +1,106 @@
-From: mhocko@suse.cz (Michal Hocko)
-Date: Thu, 8 Jan 2015 16:08:50 +0100
-Subject: Linux 3.19-rc3
-In-Reply-To: <54AE7D53.2020305@redhat.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com>
-Message-ID: <20150108150850.GD5658@dhcp22.suse.cz>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Jan 2015 09:12:08 -0600
+Subject: [PATCH v2 05/21] DT: tegra: add binding for the legacy interrupt
+ controller
+In-Reply-To: <1420652576-22309-6-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+ <1420652576-22309-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150108151208.GC24654@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CCing linux-mm and CMA people]
-[Full message here:
-http://article.gmane.org/gmane.linux.ports.arm.kernel/383669]
+On 17:42-20150107, Marc Zyngier wrote:
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  .../interrupt-controller/nvidia,tegra-ictlr.txt    | 39 ++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+> new file mode 100644
+> index 0000000..44fd873
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+> @@ -0,0 +1,39 @@
+> +NVIDIA Legacy Interrupt Controller
+> +
+> +All Tegra SoCs contain a legacy interrupt controller that routes
+> +interrupts to the GIC, and also serves as a wakeup source. It is also
+> +refered to as "ictlr", hence the name of the binding.
+> +
+> +The HW block exposes a number of frames, each implementing a set of 32
+> +interrupts.
+> +
+> +Reguired properties:
+> +
+> +- compatible : should contain at least "nvidia,tegra-ictlr".
 
-On Thu 08-01-15 06:51:31, Mark Langsdorf wrote:
-[...]
-> [ 1053.968815] active_anon:207417 inactive_anon:25722 isolated_anon:0
-> [ 1053.968815]  active_file:1300 inactive_file:21234 isolated_file:0
-> [ 1053.968815]  unevictable:0 dirty:0 writeback:0 unstable:0
-> [ 1053.968815]  free:1014 slab_reclaimable:1047 slab_unreclaimable:1758
-> [ 1053.968815]  mapped:733 shmem:58 pagetables:267 bounce:0
-> [ 1053.968815]  free_cma:1
+perhaps list the specific versions here..?
 
-Still a lot of pages (~80M) on the file LRU list which should be reclaimable
-because they are not dirty apparently.
-Anon pages can be reclaimed as well because the swap is basically
-unused.
++WARNING: DT compatible string "nvidia,tegra114-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#39: FILE: arch/arm/boot/dts/tegra114.dtsi:141:
+++		compatible = "nvidia,tegra114-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#39: FILE: arch/arm/boot/dts/tegra114.dtsi:141:
+++		compatible = "nvidia,tegra114-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra124-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#84: FILE: arch/arm/boot/dts/tegra124.dtsi:195:
+++		compatible = "nvidia,tegra124-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#84: FILE: arch/arm/boot/dts/tegra124.dtsi:195:
+++		compatible = "nvidia,tegra124-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra20-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#139: FILE: arch/arm/boot/dts/tegra20.dtsi:171:
+++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#139: FILE: arch/arm/boot/dts/tegra20.dtsi:171:
+++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra30-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#186: FILE: arch/arm/boot/dts/tegra30.dtsi:256:
+++		compatible = "nvidia,tegra30-ictlr", "nvidia,tegra-ictlr";
++WARNING: DT compatible string "nvidia,tegra-ictlr" appears un-documented -- check ./Documentation/devicetree/bindings/
++#186: FILE: arch/arm/boot/dts/tegra30.dtsi:256:
+++		compatible = "nvidia,tegra30-ictlr", "nvidia,tegra-ictlr";
+> +- reg : Specifies base physical address and size of the registers.
+> +  Each frame must be described separately.
+> +- interrupt-controller : Identifies the node as an interrupt controller.
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value must be 3.
+> +- interrupt-parent : a phandle to the GIC these interrupts are routed
+> +  to.
+> +
+> +Notes:
+> +
+> +- Because this HW ultimately routes interrupts to the GIC, the
+> +  interrupt specifier must be that of the GIC.
+> +- Only SPIs can use the ictlr as an interrupt parent. SGIs and PPIs
+> +  are explicitely forbiden.
+> +
+> +Example:
+> +
+> +	ictlr: interrupt-controller at 60004000 {
+> +		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
 
-[...]
-> [ 1054.095277] DMA: 109*64kB (UR) 53*128kB (R) 8*256kB (R) 0*512kB 0*1024kB
-> 0*2048kB 1*4096kB (R) 0*8192kB 0*16384kB 1*32768kB (R) 0*65536kB = 52672kB
-> [ 1054.108621] Normal: 191*64kB (MR) 0*128kB 0*256kB 0*512kB 0*1024kB
-> 0*2048kB 0*4096kB 0*8192kB 0*16384kB 0*32768kB 0*65536kB = 12224kB
-[...]
-> [ 1054.142545] Free swap  = 6598400kB
-> [ 1054.145928] Total swap = 8388544kB
-> [ 1054.149317] 262112 pages RAM
-> [ 1054.152180] 0 pages HighMem/MovableOnly
-> [ 1054.155995] 18446744073709544361 pages reserved
-> [ 1054.160505] 8192 pages cma reserved
+> +		reg = <0x60004000 64>,
+> +		      <0x60004100 64>,
+> +		      <0x60004200 64>,
+> +		      <0x60004300 64>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&intc>;
+> +	};
+> -- 
+> 2.1.4
 
-Besides underflow in the reserved pages accounting mentioned in other
-email the free lists look strange as well. All free blocks with some memory
-are marked as reserved. I would suspect something CMA related.
+Might be good to have this patch before patch #3, since the binding
+defined here is implemented in #3 and used in #4. also:
 
++WARNING: 'refered' may be misspelled - perhaps 'referred'?
++#23: FILE: Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt:5:
+++refered to as "ictlr", hence the name of the binding.
++WARNING: 'explicitely' may be misspelled - perhaps 'explicitly'?
++#44: FILE: Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt:26:
+++  are explicitely forbiden.
 -- 
-Michal Hocko
-SUSE Labs
+Regards,
+Nishanth Menon
