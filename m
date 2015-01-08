@@ -1,23 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Jan 2015 23:25:15 +0100
-Subject: [PATCH v3 3/4] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <54AEDFED.8060008@ti.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <20150108160626.GN11583@arm.com> <54AEDFED.8060008@ti.com>
-Message-ID: <2057344.eJYxBNosJg@wuerfel>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 08 Jan 2015 14:25:57 -0800
+Subject: [RFC] ARM: Make CPU_DCACHE_DISABLE depend on !SMP
+In-Reply-To: <20150108221356.GD12302@n2100.arm.linux.org.uk>
+References: <1420683088-1856-1-git-send-email-f.fainelli@gmail.com>
+ <54AEA7E0.5070101@gmail.com>
+ <CADtm3G5Ebf6WkHG3fyiY3pm7fEBBNoW3DDEEwpvBXGj0fVE6jQ@mail.gmail.com>
+ <3495606.iOQOj3bxPc@wuerfel> <20150108221356.GD12302@n2100.arm.linux.org.uk>
+Message-ID: <54AF03F5.9030907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 January 2015 14:52:13 Murali Karicheri wrote:
+On 08/01/15 14:13, Russell King - ARM Linux wrote:
+> On Thu, Jan 08, 2015 at 11:10:47PM +0100, Arnd Bergmann wrote:
+>> My guess is that any implementation that has working LDREX/STREX
+>> on uncached memory does not support SMP, because these instructions
+>> tend to be implemented through the cache coherency logic on SMP
+>> systems but could be implemented more easily without a dcache
+>> on uniprocessor cores.
 > 
-> Could you add this as as a follow up patch as I don't have a platformm 
-> that support IOMMU and as such my understanding of the IOMMU is limited?
+> Yes, I negated Tony's patches... Tony was fixing pstore to use
+> writecombine memory.
 > 
-> I can help test the change to make sure it has no side effect on 
-> Keystone that doesn't support IOMMU.
+> So this change is fine.
 
-I think that's fine. Let's get your series done first and add the
-DMA aliases for iommus on top once we have worked out what to do.
-
-	Arnd
+Do you want me to submit the patch as-is to your patch tracking, or
+would you want to include Gregory's quotes for completeness?
+--
+Florian
