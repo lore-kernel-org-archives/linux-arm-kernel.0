@@ -1,35 +1,44 @@
 From: fkan@apm.com (Feng Kan)
-Date: Wed,  7 Jan 2015 17:33:38 -0700
-Subject: [PATCH V3 7/7] arm64: dts: Add PMU node for APM X-Gene Storm SOC
+Date: Wed,  7 Jan 2015 17:33:33 -0700
+Subject: [PATCH V3 2/7] Documentation: arm64: add SCU dts binding
+ documentation to linux kernel
 In-Reply-To: <1420677218-30743-1-git-send-email-fkan@apm.com>
 References: <1420677218-30743-1-git-send-email-fkan@apm.com>
-Message-ID: <1420677218-30743-8-git-send-email-fkan@apm.com>
+Message-ID: <1420677218-30743-3-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PMU device tree node for APM X-Gene Storm SOC.
+This add documentation for the SCU system clock unit device tree binding
+to the kernel.
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/boot/dts/apm/apm-storm.dtsi |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/arm/apm/scu.txt |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index adea254..9d00dd4 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -97,6 +97,11 @@
- 		clock-frequency = <50000000>;
- 	};
- 
-+	pmu {
-+		compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
-+		interrupts = <1 12 0xff04>;
-+	};
+diff --git a/Documentation/devicetree/bindings/arm/apm/scu.txt b/Documentation/devicetree/bindings/arm/apm/scu.txt
+new file mode 100644
+index 0000000..b45be06
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/apm/scu.txt
+@@ -0,0 +1,17 @@
++APM X-GENE SoC series SCU Registers
 +
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
++This system clock unit contain various register that control block resets,
++clock enable/disables, clock divisors and other deepsleep registers.
++
++Properties:
++ - compatible : should contain two values. First value must be:
++		   - "apm,xgene-scu"
++		second value must be always "syscon".
++
++ - reg : offset and length of the register set.
++
++Example :
++	scu: system-clk-controller at 17000000 {
++		compatible = "apm,xgene-scu","syscon";
++		reg = <0x0 0x17000000 0x0 0x400>;
++	};
 -- 
 1.7.1
