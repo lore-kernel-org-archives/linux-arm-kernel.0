@@ -1,141 +1,105 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Thu,  8 Jan 2015 10:16:46 +0100
-Subject: [PATCH 2/3] ARM: add alphascale,acc.txt bindings documentation
-In-Reply-To: <1420708607-23052-1-git-send-email-linux@rempel-privat.de>
-References: <1733388.SP14pjVoMj@wuerfel>
- <1420708607-23052-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1420708607-23052-3-git-send-email-linux@rempel-privat.de>
+From: wigyori@uid0.hu (Zoltan HERPAI)
+Date: Thu,  8 Jan 2015 10:34:24 +0100
+Subject: [PATCH 1/1] ARM: dts: pcduino: Enable user LED and button support for
+ pcDuino
+Message-ID: <1420709664-12687-1-git-send-email-wigyori@uid0.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACC is for AlphaScale Clock Controller.
+The pcDuino board has LEDs connected to PH15/PH16, and back/home/menu
+buttons to PH17/18/19 respectively. Enable these via gpio-leds and
+gpio-keys. This is shared across the v1 and v2 versions of the board.
 
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+Tested on a v2 and verified against the schematics of a v1.
+
+Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
+Acked-by: Hans de Goede <hdegoede@redhat.com>
+
 ---
- .../devicetree/bindings/clock/alphascale,acc.txt   | 115 +++++++++++++++++++++
- 1 file changed, 115 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/alphascale,acc.txt
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts |   57 +++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/alphascale,acc.txt b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
-new file mode 100644
-index 0000000..62e67e8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/alphascale,acc.txt
-@@ -0,0 +1,115 @@
-+Alphascale Clock Controller
+diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+index 48161ad..c26a6bb 100644
+--- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
++++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+@@ -51,6 +51,8 @@
+ #include "sunxi-common-regulators.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+ 	model = "LinkSprite pcDuino";
+@@ -64,6 +66,22 @@
+ 			status = "okay";
+ 		};
+ 
++		pinctrl at 01c20800 {
++			led_pins_pcduino: led_pins at 0 {
++				allwinner,pins = "PH15", "PH16";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+The ACC (Alphascale Clock Controller) is responsible of choising proper
-+clock source, setting deviders and clock gates.
++			key_pins_pcduino: key_pins at 0 {
++				allwinner,pins = "PH17", "PH18", "PH19";
++				allwinner,function = "gpio_in";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++		};
 +
-+Required properties for the ACC node:
-+ - compatible: must be "alphascale,asm9260-clock-controller"
-+ - reg: must contain the ACC register base and size
-+ - #clock-cells : shall be set to 1.
+ 		mdio at 01c0b080 {
+ 			status = "okay";
+ 
+@@ -126,6 +144,45 @@
+ 		};
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_pcduino>;
 +
-+Simple one-cell clock specifier format is used, where the only cell is used
-+as an index of the clock inside the provider.
-+It is encouraged to use dt-binding for clock index definitions. SoC specific
-+dt-binding should be included to the device tree descriptor. For example
-+Alphascale ASM9260:
-+#include <dt-bindings/clock/alphascale,asm9260.h>
++		tx {
++			label = "pcduino:green:tx";
++			gpios = <&pio 7 15 GPIO_ACTIVE_LOW>;
++		};
 +
-+This binding contains two types of clock providers:
-+ _AHB_ - AHB gate;
-+ _SYS_ - adjustable clock source. Not all peripheral have _SYS_ clock provider.
-+All clock specific details can be found in the SoC documentation.
-+CLKID_AHB_ROM		0
-+CLKID_AHB_RAM		1
-+CLKID_AHB_GPIO		2
-+CLKID_AHB_MAC		3
-+CLKID_AHB_EMI		4
-+CLKID_AHB_USB0		5
-+CLKID_AHB_USB1		6
-+CLKID_AHB_DMA0		7
-+CLKID_AHB_DMA1		8
-+CLKID_AHB_UART0		9
-+CLKID_AHB_UART1		10
-+CLKID_AHB_UART2		11
-+CLKID_AHB_UART3		12
-+CLKID_AHB_UART4		13
-+CLKID_AHB_UART5		14
-+CLKID_AHB_UART6		15
-+CLKID_AHB_UART7		16
-+CLKID_AHB_UART8		17
-+CLKID_AHB_UART9		18
-+CLKID_AHB_I2S0		19
-+CLKID_AHB_I2C0		20
-+CLKID_AHB_I2C1		21
-+CLKID_AHB_SSP0		22
-+CLKID_AHB_IOCONFIG	23
-+CLKID_AHB_WDT		24
-+CLKID_AHB_CAN0		25
-+CLKID_AHB_CAN1		26
-+CLKID_AHB_MPWM		27
-+CLKID_AHB_SPI0		28
-+CLKID_AHB_SPI1		29
-+CLKID_AHB_QEI		30
-+CLKID_AHB_QUADSPI0	31
-+CLKID_AHB_CAMIF		32
-+CLKID_AHB_LCDIF		33
-+CLKID_AHB_TIMER0	34
-+CLKID_AHB_TIMER1	35
-+CLKID_AHB_TIMER2	36
-+CLKID_AHB_TIMER3	37
-+CLKID_AHB_IRQ		38
-+CLKID_AHB_RTC		39
-+CLKID_AHB_NAND		40
-+CLKID_AHB_ADC0		41
-+CLKID_AHB_LED		42
-+CLKID_AHB_DAC0		43
-+CLKID_AHB_LCD		44
-+CLKID_AHB_I2S1		45
-+CLKID_AHB_MAC1		46
++		rx {
++			label = "pcduino:green:rx";
++			gpios = <&pio 7 16 GPIO_ACTIVE_LOW>;
++		};
++	};
 +
-+CLKID_SYS_CPU		47
-+CLKID_SYS_AHB		48
-+CLKID_SYS_I2S0M		49
-+CLKID_SYS_I2S0S		50
-+CLKID_SYS_I2S1M		51
-+CLKID_SYS_I2S1S		52
-+CLKID_SYS_UART0		53
-+CLKID_SYS_UART1		54
-+CLKID_SYS_UART2		55
-+CLKID_SYS_UART3		56
-+CLKID_SYS_UART4		56
-+CLKID_SYS_UART5		57
-+CLKID_SYS_UART6		58
-+CLKID_SYS_UART7		59
-+CLKID_SYS_UART8		60
-+CLKID_SYS_UART9		61
-+CLKID_SYS_SPI0		62
-+CLKID_SYS_SPI1		63
-+CLKID_SYS_QUADSPI	64
-+CLKID_SYS_SSP0		65
-+CLKID_SYS_NAND		66
-+CLKID_SYS_TRACE		67
-+CLKID_SYS_CAMM		68
-+CLKID_SYS_WDT		69
-+CLKID_SYS_CLKOUT	70
-+CLKID_SYS_MAC		71
-+CLKID_SYS_LCD		72
-+CLKID_SYS_ADCANA	73
++	gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&key_pins_pcduino>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button at 0 {
++			label = "Key Back";
++			linux,code = <KEY_BACK>;
++			gpios = <&pio 7 17 GPIO_ACTIVE_LOW>;
++		};
++		button at 1 {
++			label = "Key Home";
++			linux,code = <KEY_HOME>;
++			gpios = <&pio 7 18 GPIO_ACTIVE_LOW>;
++		};
++		button at 2 {
++			label = "Key Menu";
++			linux,code = <KEY_MENU>;
++			gpios = <&pio 7 19 GPIO_ACTIVE_LOW>;
++		};
++	};
 +
-+Example of clock consumer with _SYS_ and _AHB_ sinks.
-+uart4: serial at 80010000 {
-+	compatible = "alphascale,asm9260-uart";
-+	reg = <0x80010000 0x4000>;
-+	clocks = <&acc CLKID_SYS_UART4>, <&acc CLKID_AHB_UART4>;
-+	interrupts = <19>;
-+	status = "disabled";
-+};
-+
-+Clock consumer with only one, _AHB_ sink.
-+timer0: timer at 80088000 {
-+	compatible = "alphascale,asm9260-timer";
-+	reg = <0x80088000 0x4000>;
-+	clocks = <&acc CLKID_AHB_TIMER0>;
-+	interrupts = <29>;
-+};
-+
+ 	reg_usb1_vbus: usb1-vbus {
+ 		status = "okay";
+ 	};
 -- 
-1.9.1
+1.7.10.4
