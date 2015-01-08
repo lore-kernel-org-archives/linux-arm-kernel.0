@@ -1,71 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Jan 2015 15:39:42 +0100
-Subject: [PATCH v3 6/7] ARM: mvebu: Add a number of pinctrl functions
-In-Reply-To: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420727983-23922-7-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu,  8 Jan 2015 15:39:36 +0100
+Subject: [PATCH v3 0/7] 
+Message-ID: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some pinctrl functions can be shared with all DTS out there, since they are
-generic, SoC-wide muxing options. Add a number of these to the DTSI to avoid
-duplication.
+Hi everyone,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-38x.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+This set of patches add the support for the Armada 385 AP board.
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 40200084c6c8..98885c58be29 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -195,6 +195,45 @@
- 
- 			pinctrl at 18000 {
- 				reg = <0x18000 0x20>;
-+
-+				ge0_rgmii_pins: ge-rgmii-pins-0 {
-+					marvell,pins = "mpp6", "mpp7", "mpp8",
-+						       "mpp9", "mpp10", "mpp11",
-+						       "mpp12", "mpp13", "mpp14",
-+						       "mpp15", "mpp16", "mpp17";
-+					marvell,function = "ge0";
-+				};
-+
-+				i2c0_pins: i2c-pins-0 {
-+					marvell,pins = "mpp2", "mpp3";
-+					marvell,function = "i2c0";
-+				};
-+
-+				mdio_pins: mdio-pins {
-+					marvell,pins = "mpp4", "mpp5";
-+					marvell,function = "ge";
-+				};
-+
-+				ref_clk0_pins: ref-clk-pins-0 {
-+					marvell,pins = "mpp45";
-+					marvell,function = "ref";
-+				};
-+
-+				spi1_pins: spi-pins-1 {
-+					marvell,pins = "mpp56", "mpp57", "mpp58",
-+						       "mpp59";
-+					marvell,function = "spi1";
-+				};
-+
-+				uart0_pins: uart-pins-0 {
-+					marvell,pins = "mpp0", "mpp1";
-+					marvell,function = "ua0";
-+				};
-+
-+				uart1_pins: uart-pins-1 {
-+					marvell,pins = "mpp19", "mpp20";
-+					marvell,function = "ua1";
-+				};
- 			};
- 
- 			gpio0: gpio at 18100 {
+It also adds a few clean ups here and there, a few missing pin
+functions needed for the board, etc.
+
+Maxime
+
+Changes from v2:
+  - Removed the i2c1 bus that is not used
+  - Added comments for the i2c0 and the UARTs
+  - Removed the i2c clk-frequency property
+  - Fixed the SPI-NOR maximum frequency
+  - Fixed the phy nodes unit addresses
+  - Add the /chosen/stdout-path property
+  - Changed the filename to match the board compatible
+
+Changes from v1:
+  - Removed USB3 support. This required some additional patches for
+    the phy and USB drivers that are not really related to this
+    serie. This will be submitted as a separate one.
+  - Removed earlyprintk from the default bootargs
+  - Removed two unneeded ranges
+  - Changed the phy pins node name to mdio
+  - Moved most of the pinctrl nodes to the DTSI
+  - Added a comment to mention why the phy reference clock is needed.
+  - Rebased on top of 3.19-rc1
+
+Maxime Ripard (7):
+  ARM: mvebu: Rename DEBUG_LL to indicate UART index
+  ARM: mvebu: Add UART1 as DEBUG_LL possible target
+  ARM: mvebu: a38x: Fix node names
+  pinctrl: mvebu: a38x: Add UART1 muxing options
+  ARM: mvebu: A38x: Remove redundant pinctrl informations
+  ARM: mvebu: Add a number of pinctrl functions
+  ARM: mvebu: Add Armada 385 Access Point Development Board support
+
+ arch/arm/Kconfig.debug                     |  35 +++++--
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/armada-380.dtsi          |   3 +-
+ arch/arm/boot/dts/armada-385-db-ap.dts     | 150 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-385-db.dts        |   2 +-
+ arch/arm/boot/dts/armada-385-rd.dts        |   2 +-
+ arch/arm/boot/dts/armada-385.dtsi          |   3 +-
+ arch/arm/boot/dts/armada-38x.dtsi          |  44 ++++++++-
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c |   6 +-
+ 9 files changed, 226 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-385-db-ap.dts
+
 -- 
 2.2.1
