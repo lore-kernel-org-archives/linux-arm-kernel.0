@@ -1,114 +1,80 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Jan 2015 11:56:12 +0100
-Subject: [PATCH v15 10/11] KVM: arm/arm64: Enable Dirty Page logging for
- ARMv8
-In-Reply-To: <54ADE293.1040901@samsung.com>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
- <20150107124744.GC21092@cbox> <54ADE293.1040901@samsung.com>
-Message-ID: <20150108105612.GJ21092@cbox>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 8 Jan 2015 11:55:58 +0100
+Subject: [PATCH] net/at91_ether: prepare and unprepare clock
+In-Reply-To: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54AE623E.5020507@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 05:51:15PM -0800, Mario Smarduch wrote:
-> On 01/07/2015 04:47 AM, Christoffer Dall wrote:
-> > On Sun, Dec 14, 2014 at 11:28:07PM -0800, Mario Smarduch wrote:
-> >> This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
-> > 
-> >                            dirty
-> yeah.
-> > 
-> >> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
-> >> logging at architecture layer.
-> >>
-> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> ---
-> >>  arch/arm/include/asm/kvm_host.h | 12 ------------
-> >>  arch/arm/kvm/arm.c              |  4 ----
-> >>  arch/arm/kvm/mmu.c              | 19 +++++++++++--------
-> >>  arch/arm64/kvm/Kconfig          |  2 ++
-> >>  4 files changed, 13 insertions(+), 24 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index b138431..088ea87 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -223,18 +223,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
-> >>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
-> >>  }
-> >>  
-> >> -/**
-> >> - * kvm_flush_remote_tlbs() - flush all VM TLB entries
-> >> - * @kvm:	pointer to kvm structure.
-> >> - *
-> >> - * Interface to HYP function to flush all VM TLB entries without address
-> >> - * parameter.
-> >> - */
-> >> -static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
-> >> -{
-> >> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
-> >> -}
-> >> -
-> >>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
-> >>  {
-> >>  	return 0;
-> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >> index 6e4290c..1b6577c 100644
-> >> --- a/arch/arm/kvm/arm.c
-> >> +++ b/arch/arm/kvm/arm.c
-> >> @@ -740,7 +740,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-> >>   */
-> >>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
-> >>  {
-> >> -#ifdef CONFIG_ARM
-> >>  	bool is_dirty = false;
-> >>  	int r;
-> >>  
-> >> @@ -753,9 +752,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
-> >>  
-> >>  	mutex_unlock(&kvm->slots_lock);
-> >>  	return r;
-> >> -#else /* arm64 */
-> >> -	return -EINVAL;
-> >> -#endif
-> >>  }
-> >>  
-> >>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
-> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >> index dc763bb..59003df 100644
-> >> --- a/arch/arm/kvm/mmu.c
-> >> +++ b/arch/arm/kvm/mmu.c
-> >> @@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
-> >>  
-> >>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
-> >>  {
-> >> -#ifdef CONFIG_ARM
-> >>  	return !!memslot->dirty_bitmap;
-> >> -#else
-> >> -	return false;
-> >> -#endif
-> >> +}
-> >> +
-> >> +/**
-> >> + * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
-> >> + * @kvm:	pointer to kvm structure.
-> >> + *
-> >> + * Interface to HYP function to flush all VM TLB entries
-> >> + */
-> >> +inline void kvm_flush_remote_tlbs(struct kvm *kvm)
-> > 
-> > did you intend for a non-staic inline here?
+Le 07/01/2015 23:59, Alexandre Belloni a ?crit :
+> The clock is enabled without being prepared, this leads to:
 > 
-> Yes it's used in arm.c and mmu.c
+> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
+> 
+> and a non working ethernet interface.
+> 
+> Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-then why inline?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I'm not a compiler expert by any measure, but poking around I'm pretty
-sure the inline keyword in this context is useless.  See for example:
-http://www.cs.nyu.edu/~xiaojian/bookmark/c_programming/Inline_Functions.htm
+> ---
+>  drivers/net/ethernet/cadence/at91_ether.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+> index 55eb7f2af2b4..7ef55f5fa664 100644
+> --- a/drivers/net/ethernet/cadence/at91_ether.c
+> +++ b/drivers/net/ethernet/cadence/at91_ether.c
+> @@ -340,7 +340,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>  		res = PTR_ERR(lp->pclk);
+>  		goto err_free_dev;
+>  	}
+> -	clk_enable(lp->pclk);
+> +	clk_prepare_enable(lp->pclk);
+>  
+>  	lp->hclk = ERR_PTR(-ENOENT);
+>  	lp->tx_clk = ERR_PTR(-ENOENT);
+> @@ -406,7 +406,7 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>  err_out_unregister_netdev:
+>  	unregister_netdev(dev);
+>  err_disable_clock:
+> -	clk_disable(lp->pclk);
+> +	clk_disable_unprepare(lp->pclk);
+>  err_free_dev:
+>  	free_netdev(dev);
+>  	return res;
+> @@ -424,7 +424,7 @@ static int at91ether_remove(struct platform_device *pdev)
+>  	kfree(lp->mii_bus->irq);
+>  	mdiobus_free(lp->mii_bus);
+>  	unregister_netdev(dev);
+> -	clk_disable(lp->pclk);
+> +	clk_disable_unprepare(lp->pclk);
+>  	free_netdev(dev);
+>  
+>  	return 0;
+> @@ -440,7 +440,7 @@ static int at91ether_suspend(struct platform_device *pdev, pm_message_t mesg)
+>  		netif_stop_queue(net_dev);
+>  		netif_device_detach(net_dev);
+>  
+> -		clk_disable(lp->pclk);
+> +		clk_disable_unprepare(lp->pclk);
+>  	}
+>  	return 0;
+>  }
+> @@ -451,7 +451,7 @@ static int at91ether_resume(struct platform_device *pdev)
+>  	struct macb *lp = netdev_priv(net_dev);
+>  
+>  	if (netif_running(net_dev)) {
+> -		clk_enable(lp->pclk);
+> +		clk_prepare_enable(lp->pclk);
+>  
+>  		netif_device_attach(net_dev);
+>  		netif_start_queue(net_dev);
+> 
 
-So I suggest either make it a normal stand-alone function or keep it as
-duplicate static inlines in the header files if you're adamant about
-this being inlined.
 
--Christoffer
+-- 
+Nicolas Ferre
