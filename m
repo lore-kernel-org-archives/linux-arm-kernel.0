@@ -1,56 +1,36 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu,  8 Jan 2015 08:24:46 +0100
-Subject: [PATCH 2/3] soc/tegra: fuse: Constify tegra_fuse_info structures
-In-Reply-To: <1420701887-1465-1-git-send-email-thierry.reding@gmail.com>
-References: <1420701887-1465-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1420701887-1465-2-git-send-email-thierry.reding@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 8 Jan 2015 07:39:20 +0000 (UTC)
+Subject: [PATCH 0/2] arm64: first set of Kconfig patches for Tegra132
+ support
+In-Reply-To: <20150107110738.GF7485@arm.com>
+References: <20150107081638.14381.42444.stgit@dusk.lan>
+ <20150107110738.GF7485@arm.com>
+Message-ID: <alpine.DEB.2.02.1501072151470.28771@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Hi Will,
 
-These structures contain read-only data and are never modified, so they
-can be const.
+On Wed, 7 Jan 2015, Will Deacon wrote:
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/soc/tegra/fuse/fuse-tegra30.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> Whilst I'm happy to take the second patch for 3.20 (getting those
+> dependencies building and keeping them building is a Good Thing), can we
+> hold off on the first patch until it's not broken? Having an unconditional
+> depends on BROKEN isn't really that useful.
 
-diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
-index 8646fa920d8d..d1a4290cda5c 100644
---- a/drivers/soc/tegra/fuse/fuse-tegra30.c
-+++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
-@@ -56,7 +56,7 @@ struct tegra_fuse_info {
- 
- static void __iomem *fuse_base;
- static struct clk *fuse_clk;
--static struct tegra_fuse_info *fuse_info;
-+static const struct tegra_fuse_info *fuse_info;
- 
- u32 tegra30_fuse_readl(const unsigned int offset)
- {
-@@ -78,18 +78,18 @@ u32 tegra30_fuse_readl(const unsigned int offset)
- 	return val;
- }
- 
--static struct tegra_fuse_info tegra30_info = {
-+static const struct tegra_fuse_info tegra30_info = {
- 	.size			= 0x2a4,
- 	.spare_bit		= 0x144,
- 	.speedo_idx		= SPEEDO_TEGRA30,
- };
- 
--static struct tegra_fuse_info tegra114_info = {
-+static const struct tegra_fuse_info tegra114_info = {
- 	.size			= 0x2a0,
- 	.speedo_idx		= SPEEDO_TEGRA114,
- };
- 
--static struct tegra_fuse_info tegra124_info = {
-+static const struct tegra_fuse_info tegra124_info = {
- 	.size			= 0x300,
- 	.speedo_idx		= SPEEDO_TEGRA124,
- };
--- 
-2.1.3
+I reflected on this when preparing the patches.  It seemed to me that the 
+CONFIG_BROKEN approach was slightly preferable.  If initial support for 
+CONFIG_ARCH_TEGRA is merged, there will be a base set of mainline Kconfig 
+directives in mainline for others to use when working on support for 
+future Tegra chips, such as the X1.  It also moves mainline slightly 
+closer to Tegra132 support than it would be without the patch.  At this 
+point in time in my life, I've come to appreciate the incremental "baby 
+step" approach ;-)
+
+That written, the difference between the two approaches is rather minimal.  
+So ultimately I'm fine with whatever you and Catalin want to do.
+
+
+regards,
+
+- Paul
