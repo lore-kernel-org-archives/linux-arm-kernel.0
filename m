@@ -1,96 +1,83 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 8 Jan 2015 14:52:13 -0500
-Subject: [PATCH v3 3/4] of/pci: add of_pci_dma_configure() update dma
- configuration
-In-Reply-To: <20150108160626.GN11583@arm.com>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <1420656594-8908-4-git-send-email-m-karicheri2@ti.com>
- <20150108160626.GN11583@arm.com>
-Message-ID: <54AEDFED.8060008@ti.com>
+From: Kangkang.Shen@huawei.com (Kangkang Shen)
+Date: Thu, 8 Jan 2015 19:59:23 +0000
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <2034224.H5nZdW12se@wuerfel>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <54AD917A.2040307@redhat.com> <20150107225904.GQ24989@titan.lakedaemon.net>
+ <2034224.H5nZdW12se@wuerfel>
+Message-ID: <9A6BBCC9BB211F40A86BE42635C3C534712FA4C6@szxeml555-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 11:06 AM, Will Deacon wrote:
-> On Wed, Jan 07, 2015 at 06:49:53PM +0000, Murali Karicheri wrote:
->> Add of_pci_dma_configure() to allow updating the dma configuration
->> of the pci device using the configuration from DT of the parent of
->> the root bridge device.
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> ---
->>   drivers/of/of_pci.c    |   39 +++++++++++++++++++++++++++++++++++++++
->>   include/linux/of_pci.h |   12 ++++++++++++
->>   2 files changed, 51 insertions(+)
->>
->> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
->> index 88471d3..34878c9 100644
->> --- a/drivers/of/of_pci.c
->> +++ b/drivers/of/of_pci.c
->> @@ -2,6 +2,7 @@
->>   #include<linux/export.h>
->>   #include<linux/of.h>
->>   #include<linux/of_address.h>
->> +#include<linux/of_device.h>
->>   #include<linux/of_pci.h>
->>   #include<linux/slab.h>
->>
->> @@ -229,6 +230,44 @@ parse_failed:
->>   	return err;
->>   }
->>   EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
->> +
->> +/**
->> + * of_get_pci_root_bridge_parent - get the OF node of the root bridge's parent
->> + * @dev: ptr to pci_dev struct of the pci device
->> + *
->> + * This function will traverse the bus up to the root bus starting with
->> + * the child and return the OF node ptr to root bridge device's parent device.
->> + */
->> +struct device_node *of_get_pci_root_bridge_parent(struct pci_dev *dev)
->> +{
->> +	struct pci_bus *bus = dev->bus;
->> +	struct device *bridge;
->> +
->> +	while (!pci_is_root_bus(bus))
->> +		bus = bus->parent;
->> +	bridge = bus->bridge;
->> +
->> +	return bridge->parent->of_node;
->> +}
->> +EXPORT_SYMBOL_GPL(of_get_pci_root_bridge_parent);
->> +
->> +/**
->> + * of_pci_dma_configure - Setup DMA configuration
->> + * @dev: ptr to pci_dev struct of the pci device
->> + *
->> + * Function to update PCI devices's DMA configuration using the same
->> + * info from the OF node of root host bridge's parent.
->> + */
->> +void of_pci_dma_configure(struct pci_dev *pci_dev)
->> +{
->> +	struct device *dev =&pci_dev->dev;
->> +	struct device_node *parent_np;
->> +
->> +	parent_np = of_get_pci_root_bridge_parent(pci_dev);
->> +	of_dma_configure(dev, parent_np);
->> +}
->> +EXPORT_SYMBOL_GPL(of_pci_dma_configure);
->
-> Whilst I think this is the right overall structure, I think this function
-> should determine the set of DMA aliases for the device and pass that through
-> to the IOMMU (as mentioned in my reply to the cover letter). Then we just
-> need to work out what we're doing for groups.
->
-> Will
-Will,
+Security is a much big scale issue. The industry has all kind of solutions to deal with firmware security. In ARM system, the Firmware has been designed with higher privilege/security than OS. I will suggest we trust firmware security and focus on Linux itself.  
 
-Could you add this as as a follow up patch as I don't have a platformm 
-that support IOMMU and as such my understanding of the IOMMU is limited?
+-----Original Message-----
+From: linaro-acpi-bounces@lists.linaro.org [mailto:linaro-acpi-bounces at lists.linaro.org] On Behalf Of Arnd Bergmann
+Sent: Thursday, January 08, 2015 3:27 AM
+To: Jason Cooper
+Cc: Rob Herring; Daniel Lezcano; Robert Richter; linaro-acpi at lists.linaro.org; Marc Zyngier; Jon Masters; Randy Dunlap; Liviu Dudau; Robert Moore; Will Deacon; linux-kernel at vger.kernel.org; linux-acpi at vger.kernel.org; Mark Brown; Rafael J. Wysocki; Lv Zheng; Catalin Marinas; Bjorn Helgaas; linux-arm-kernel at lists.infradead.org; Olof Johansson
+Subject: Re: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
 
-I can help test the change to make sure it has no side effect on 
-Keystone that doesn't support IOMMU.
+On Wednesday 07 January 2015 17:59:04 Jason Cooper wrote:
+> On Wed, Jan 07, 2015 at 03:05:14PM -0500, Jon Masters wrote:
+> > On 01/07/2015 02:58 PM, Jon Masters wrote:
+> > > On 01/07/2015 01:41 PM, Jason Cooper wrote:
+> > 
+> > >> One of the reasons I've really enjoyed working with ARM platforms 
+> > >> and DT is the absence of this type of 'feature'.  I honestly 
+> > >> don't care whether the kernel gets the board configuration info 
+> > >> from DT or ACPI or FOO, as long as we can avoid the security mistakes of the past:
+> > >>
+> > >>   
+> > >> http://www.spiegel.de/international/world/catalog-reveals-nsa-has
+> > >> -back-doors-for-numerous-devices-a-940994.html
+> > > 
+> > > ACPI is not the great satan. I'm aware certain others in the 
+> > > community have written missinformed blog posts and G+ rants 
+> > > equating ACPI with SMI and even with various other system 
+> > > firmware. I can't force someone to become informed on a topic, 
+> > > especially if it's politically useful to them to hate on ACPI and use the security paranoia handwavy argument.
+> > 
+> > To clarify, and this is not directed at you Jason, it is politically 
+> > useful to some who have written rants those business models are 
+> > built upon being paid to enable platforms. For those folks, 
+> > standardized platforms which allow a common OS approach are seen as threatening.
+> 
+> Ahh, thanks for clarifying.
+> 
+> > In the previous rants (which were really instigated as a result of 
+> > the
+> > above) ACPI was equated with SMM (System Management Mode), which is 
+> > a bit like the Secure/Trusted world on AArch64 in which you might 
+> > run another "Trusted" OS. These are the places where you want to 
+> > watch out to malware of the kind cited in your link, not in ACPI tables.
+> 
+> fwiw, I *am* concerned about those spaces.  It seems we agree on their 
+> vulnerability to attack (plus being meaty targets).
+> 
+> To more concisely state my other reply to you, wrt to AML, I'm 
+> primarily concerned about a malicious update to the ACPI tables.  The 
+> ACPI tables in the update would be otherwise normal, except for the 
+> AML blob that contains some extra code.  The malicious payload.  Then, 
+> a routine call into an AML (for pinctrl, say) executes the malicious code.
+> 
+> The plausibility and preventability of that style of attack is what 
+> I'm hoping to nail down with this discussion.
 
-Thanks.
--- 
-Murali Karicheri
-Linux Kernel, Texas Instruments
+If you want to run hidden code through the firmware, then doing an attack on Intel SMM or ARM TrustZone would be much harder to detect and as easy to get in, as long as you have the ability to flash arbitrary firmware.
+I think this has been shown to happen in the wild. That code could go and manipulate the running kernel image to do something else.
+
+Running code inside of the AML interpreter is fairly limited for the purpose of an attack [*], but there might be bugs in the interpreter that allow arbitrary code execution from malicious firmware. I think this case would be similar to constructing a malicious DT blob that exploits a bug in the DT parser for arbitrary code execution. The AML interpreter is a relatively large chunk of code, but it's self-contained. In comparison, the DT parser is much smaller, but has the additional
+(theoretical) problem of potential buffer overflows in any drivers that use it incorrectly (e.g. format string attacks on string properties).
+Another difference is that the AML code is intended to not be user-upgradable without a full firmware upgrade, while a DT blob is meant to be easily replaced if necessary without flashing the firmware, using the same permissions you need for updating the OS.
+
+I'm deliberately not trying to draw conclusions regarding whether AML is more or less secure than DT, but the above is my understanding of the fundamental differences.
+
+	Arnd
+
+[*] I would assume you can get AML code to write to arbitrary physical memory locations without much effort, but it has rather limited arithmetical capabilities which makes it hard to know where to write to.
+
+_______________________________________________
+Linaro-acpi mailing list
+Linaro-acpi at lists.linaro.org
+http://lists.linaro.org/mailman/listinfo/linaro-acpi
