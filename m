@@ -1,37 +1,74 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 8 Jan 2015 15:58:39 -0600
+Date: Thu, 8 Jan 2015 15:59:43 -0600
 Subject: [PATCH] ARM: omap2plus_defconfig: Enable misc options for
  BeagleBoard-X15 platform
-In-Reply-To: <CAGo_u6p-6EuZR8JC2Z=o1t9EgXKQnH6R9mYrfLxrsD7sYXdAxg@mail.gmail.com>
+In-Reply-To: <1420751680-21230-1-git-send-email-nm@ti.com>
 References: <1420751680-21230-1-git-send-email-nm@ti.com>
- <20150108212538.GU31926@saruman>
- <CAGo_u6p-6EuZR8JC2Z=o1t9EgXKQnH6R9mYrfLxrsD7sYXdAxg@mail.gmail.com>
-Message-ID: <20150108215839.GV31926@saruman>
+Message-ID: <20150108215943.GW31926@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Thu, Jan 08, 2015 at 03:14:40PM -0600, Nishanth Menon wrote:
+> BeagleBoard-X15 has options such as rtc, fan that need to be functional
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-On Thu, Jan 08, 2015 at 03:49:11PM -0600, Nishanth Menon wrote:
-> On Thu, Jan 8, 2015 at 3:25 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Thu, Jan 08, 2015 at 03:14:40PM -0600, Nishanth Menon wrote:
-> >> @@ -205,6 +206,7 @@ CONFIG_PINCTRL_SINGLE=y
-> >>  CONFIG_DEBUG_GPIO=y
-> >>  CONFIG_GPIO_SYSFS=y
-> >>  CONFIG_GPIO_TWL4030=y
-> >> +CONFIG_GPIO_PALMAS=y
-> >
-> > other than the power button, do you have anything else attached to a
-> > palmas GPIO ? We might not need this for boot.
-> we dont, but setting it to 'm'
-> "warning: symbol value 'm' invalid for GPIO_PALMAS"
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-alright, should've checked. Guess we will need to patch that up at some
-point.
-
-cheers
+> ---
+> 
+> Applies on
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+> branch:
+> omap-for-v3.20/defconfig  4af41284e83c ARM: omap2plus_defconfig: enable TPS65218 power button
+> 
+>  erch/arm/configs/omap2plus_defconfig |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index b5ccb36c599b..3435e6043710 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -184,6 +184,7 @@ CONFIG_TOUCHSCREEN_TSC2007=m
+>  CONFIG_INPUT_MISC=y
+>  CONFIG_INPUT_TPS65218_PWRBUTTON=m
+>  CONFIG_INPUT_TWL4030_PWRBUTTON=m
+> +CONFIG_INPUT_PALMAS_PWRBUTTON=m
+>  CONFIG_SERIO=m
+>  # CONFIG_LEGACY_PTYS is not set
+>  CONFIG_SERIAL_8250=y
+> @@ -205,6 +206,7 @@ CONFIG_PINCTRL_SINGLE=y
+>  CONFIG_DEBUG_GPIO=y
+>  CONFIG_GPIO_SYSFS=y
+>  CONFIG_GPIO_TWL4030=y
+> +CONFIG_GPIO_PALMAS=y
+>  CONFIG_W1=m
+>  CONFIG_HDQ_MASTER_OMAP=m
+>  CONFIG_BATTERY_BQ27x00=m
+> @@ -216,6 +218,7 @@ CONFIG_CHARGER_BQ24735=m
+>  CONFIG_POWER_RESET=y
+>  CONFIG_POWER_AVS=y
+>  CONFIG_HWMON=m
+> +CONFIG_SENSORS_GPIO_FAN=m
+>  CONFIG_SENSORS_LM75=m
+>  CONFIG_SENSORS_TMP102=m
+>  CONFIG_THERMAL=m
+> @@ -346,6 +349,8 @@ CONFIG_LEDS_TRIGGER_CPU=y
+>  CONFIG_LEDS_TRIGGER_GPIO=m
+>  CONFIG_LEDS_TRIGGER_DEFAULT_ON=m
+>  CONFIG_RTC_CLASS=y
+> +CONFIG_RTC_DRV_DS1307=m
+> +CONFIG_RTC_DRV_PALMAS=m
+>  CONFIG_RTC_DRV_TWL92330=y
+>  CONFIG_RTC_DRV_TWL4030=m
+>  CONFIG_RTC_DRV_OMAP=m
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 balbi
@@ -41,4 +78,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/fe9feaa1/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/e594461f/attachment.sig>
