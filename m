@@ -1,25 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Jan 2015 14:46:59 +0000
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver if
- MCPM is unavailable
-In-Reply-To: <54AE8D9F.6090400@linaro.org>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
- <54AE55CE.6040201@linaro.org> <54AE5C8F.9080600@arm.com>
- <54AE65EC.3050808@linaro.org> <20150108122958.GB32308@red-moon>
- <54AE8D9F.6090400@linaro.org>
-Message-ID: <20150108144659.GA5756@red-moon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 8 Jan 2015 15:48:35 +0100
+Subject: [PATCH v3 4/7] pinctrl: mvebu: a38x: Add UART1 muxing options
+In-Reply-To: <1420727983-23922-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1420727983-23922-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420727983-23922-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150108144835.GB16907@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 02:01:03PM +0000, Daniel Lezcano wrote:
-
-[...]
-
-> > So overall I think Sudeep's patch is sound.
+On Thu, Jan 08, 2015 at 03:39:40PM +0100, Maxime Ripard wrote:
+> The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
+> function.
 > 
-> Ok, I will pick Sudeep's patch. Shall I add your acked-by ?
+> Add this case to the pinctrl driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+> index 224c6cff6aa2..7302f66f4f19 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+> @@ -145,14 +145,16 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+>  		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
+>  		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
+>  		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
+> -		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS)),
+> +		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS),
+> +		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
+>  	MPP_MODE(20,
+>  		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+>  		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
+>  		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
+>  		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+>  		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
+> -		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS)),
+> +		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS),
+> +		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
+>  	MPP_MODE(21,
+>  		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+>  		 MPP_VAR_FUNCTION(1, "spi0",  "cs1",        V_88F6810_PLUS),
+> -- 
+> 2.2.1
+> 
 
-Yes please, thanks a lot.
+Hi Linus
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+I can take this though mvebu->arm-soc if you want? Or you can take
+it. Please let me know your preference.
+
+    Andrew
