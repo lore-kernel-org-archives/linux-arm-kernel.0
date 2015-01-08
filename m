@@ -1,46 +1,123 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 8 Jan 2015 21:55:08 +0800
-Subject: [RFC] how to implement suspend to ram for arm64?
-In-Reply-To: <20150108125921.GB1823@red-moon>
-References: <20150108195408.01a8dfdb@xhacker> <20150108125921.GB1823@red-moon>
-Message-ID: <20150108215508.71e95b7b@xhacker>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 Jan 2015 14:59:53 +0100
+Subject: [PATCH 1/1] ARM: dts: pcduino: Enable user LED and button
+ support for pcDuino
+In-Reply-To: <1420709664-12687-1-git-send-email-wigyori@uid0.hu>
+References: <1420709664-12687-1-git-send-email-wigyori@uid0.hu>
+Message-ID: <20150108135953.GU7853@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lorenzo,
+Hi,
 
-On Thu, 8 Jan 2015 05:49:26 -0800
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-
-> Hi Jisheng,
+On Thu, Jan 08, 2015 at 10:34:24AM +0100, Zoltan HERPAI wrote:
+> The pcDuino board has LEDs connected to PH15/PH16, and back/home/menu
+> buttons to PH17/18/19 respectively. Enable these via gpio-leds and
+> gpio-keys. This is shared across the v1 and v2 versions of the board.
 > 
-> On Thu, Jan 08, 2015 at 11:54:08AM +0000, Jisheng Zhang wrote:
-> > Hi list,
-> > 
-> > we need the suspend to ram feature on arm64. And I think the fundamental
-> > code is ready, for example  __cpu_suspend() etc.
-> > 
-> > However, there are several issues need to be resolved...
-> > 
-> > 1. where to put platform_suspend_ops implementation? drivers/power?
-> > 
-> > 2. If the "put ddr to self refresh" code must be in EL3 or secure EL1, how
-> > linux tell the firmware to trigger it? extend PSCI or use the context_id
-> > of PSCI CPU_SUSPEND function?
-> > 
-> > 3. where to put the cod of invoke suspend_to_ram psci call?
+> Tested on a v2 and verified against the schematics of a v1.
 > 
-> We are working on all the items you mentioned above, inclusive of a PSCI
-> spec update.
+> Signed-off-by: Zoltan HERPAI <wigyori@uid0.hu>
+> Acked-by: Hans de Goede <hdegoede@redhat.com>
 > 
-> I will make sure we post the required code on the lists shortly, and keep
-> you in the loop.
+> ---
+>  arch/arm/boot/dts/sun4i-a10-pcduino.dts |   57 +++++++++++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+> index 48161ad..c26a6bb 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
+> @@ -51,6 +51,8 @@
+>  #include "sunxi-common-regulators.dtsi"
+>  
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>  
+>  / {
+>  	model = "LinkSprite pcDuino";
+> @@ -64,6 +66,22 @@
+>  			status = "okay";
+>  		};
+>  
+> +		pinctrl at 01c20800 {
+> +			led_pins_pcduino: led_pins at 0 {
+> +				allwinner,pins = "PH15", "PH16";
+> +				allwinner,function = "gpio_out";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			key_pins_pcduino: key_pins at 0 {
+> +				allwinner,pins = "PH17", "PH18", "PH19";
+> +				allwinner,function = "gpio_in";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +		};
+> +
+>  		mdio at 01c0b080 {
+>  			status = "okay";
+>  
+> @@ -126,6 +144,45 @@
+>  		};
+>  	};
+>  
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_pcduino>;
+> +
+> +		tx {
+> +			label = "pcduino:green:tx";
+> +			gpios = <&pio 7 15 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		rx {
+> +			label = "pcduino:green:rx";
+> +			gpios = <&pio 7 16 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&key_pins_pcduino>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		button at 0 {
+> +			label = "Key Back";
+> +			linux,code = <KEY_BACK>;
+> +			gpios = <&pio 7 17 GPIO_ACTIVE_LOW>;
+> +		};
+> +		button at 1 {
+> +			label = "Key Home";
+> +			linux,code = <KEY_HOME>;
+> +			gpios = <&pio 7 18 GPIO_ACTIVE_LOW>;
+> +		};
+> +		button at 2 {
+> +			label = "Key Menu";
+> +			linux,code = <KEY_MENU>;
+> +			gpios = <&pio 7 19 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
 
-Wow, great! Thank you very much. I have an ugly hack in private repo to support
-this feature. I'm sure the hack will be definitely rejected :D 
+Some newlines here would have been nice between the button nodes. I
+added them and applied the patch.
 
-Looking forward to the beautiful standard solution!
+Thanks!
 
-Thanks,
-Jisheng
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/2711bcce/attachment.sig>
