@@ -1,172 +1,75 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 08 Jan 2015 10:40:52 +0900
-Subject: [PATCHv3 3/8] ARM: dts: Add memory bus node for Exynos3250
-In-Reply-To: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1420681257-3078-4-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 08 Jan 2015 10:40:49 +0900
+Subject: [PATCHv3 0/8] devfreq: Add generic exynos memory-bus frequency driver
+Message-ID: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the memory bus node for Exynos3250 SoC. Exynos3250 has
-following memory buses to translate data between DRAM and eMMC/sub-IPs.
+This patch-set adds the generic exynos bus frequency driver for memory bus
+with DEVFREQ framework. The Samsung Exynos SoCs have the common architecture
+for memory bus between DRAM memory and MMC/sub IP in SoC. This driver can
+support the memory bus frequency driver for Exynos SoCs.
 
-Following list specifies the detailed relation between memory bus clock and DMC
-IP in MIF (Memory Interface) block:
-- DMC clock : DMC (Dynamic Memory Controller)
+Each memory bus block has a clock for memory bus speed and frequency
+table which is changed according to the utilization of memory bus on runtime.
+And then each memory bus group has the one more memory bus blocks and
+OPP table (including frequency and voltage), regulator, devfreq-event
+devices.
 
-Following list specifies the detailed relation between memory bus clock and
-sub-IPs in INT (Internal) block:
-- ACLK100 clock : PERIL
-- ACLK160 clock : LCD0
-- ACLK200 clock : FSYS
-- ACLK266 clock : ISP
-- GDL/GDR clock : leftbus/rightbus
-- SCLK_MFC clock : MFC
+There are a little difference about the number of memory bus because each Exynos
+SoC have the different sub-IP and different memory bus speed. In spite of this
+difference among Exynos SoCs, we can support almost Exynos SoC by adding
+unique data of memory bus to devicetree file.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi | 125 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 125 insertions(+)
+Depend on:
+- v3.19-rc3
+- [PATCHv7 00/10] devfreq: Add devfreq-event class to provide raw data for devfreq device
+  : https://lkml.org/lkml/2015/1/7/795
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 9ed1260..3eaed53 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -99,6 +99,131 @@
- 			};
- 		};
- 
-+		memory_bus_mif: memory_bus at 0 {
-+			compatible = "samsung,exynos-memory-bus";
-+
-+			operating-points = <
-+				400000 875000
-+				200000 800000
-+				133000 800000
-+				100000 800000
-+				50000  800000>;
-+			status = "disabled";
-+
-+			blocks {
-+				dmc_block: memory_bus_block1 {
-+					clocks = <&cmu_dmc CLK_DIV_DMC>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						400000
-+						200000
-+						133000
-+						100000
-+						50000>;
-+				};
-+			};
-+		};
-+
-+		memory_bus_int: memory_bus at 1 {
-+			compatible = "samsung,exynos-memory-bus";
-+
-+			operating-points = <
-+				400000 950000
-+				200000 950000
-+				133000 925000
-+				100000 850000
-+				80000  850000
-+				50000  850000>;
-+
-+			status = "disabled";
-+
-+			blocks {
-+				peril_block: memory_bus_block1 {
-+					clocks = <&cmu CLK_DIV_ACLK_100>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						100000
-+						100000
-+						100000
-+						100000
-+						50000
-+						50000>;
-+				};
-+
-+				lcd0_block: memory_bus_block2 {
-+					clocks = <&cmu CLK_DIV_ACLK_160>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						200000
-+						160000
-+						100000
-+						80000
-+						80000
-+						50000>;
-+				};
-+
-+				fsys_block: memory_bus_block3 {
-+					clocks = <&cmu CLK_DIV_ACLK_200>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						200000
-+						200000
-+						100000
-+						80000
-+						50000
-+						50000>;
-+				};
-+
-+				isp_block: memory_bus_block4 {
-+					clocks = <&cmu CLK_DIV_ACLK_266>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						300000
-+						200000
-+						133000
-+						100000
-+						50000
-+						50000>;
-+				};
-+
-+				leftbus_block: memory_bus_block5 {
-+					clocks = <&cmu CLK_DIV_GDL>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						200000
-+						200000
-+						133000
-+						100000
-+						100000
-+						100000>;
-+				};
-+
-+				rightbus_block: memory_bus_block6 {
-+					clocks = <&cmu CLK_DIV_GDR>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						200000
-+						200000
-+						133000
-+						100000
-+						100000
-+						100000>;
-+				};
-+
-+				mfc_block: memory_bus_block7 {
-+					clocks = <&cmu CLK_SCLK_MFC>;
-+					clock-names = "memory-bus";
-+					frequency = <
-+						200000
-+						200000
-+						200000
-+						133000
-+						100000
-+						80000>;
-+				};
-+			};
-+		};
-+
- 		sysram at 02020000 {
- 			compatible = "mmio-sram";
- 			reg = <0x02020000 0x40000>;
+Changelog:
+
+Changes from v2:
+(https://lkml.org/lkml/2014/12/31/2)
+- Support the memory bus frequency feature for Exynos3250-based Monk board
+- Fix build warning about variable uninitialized
+
+Changes from v1:
+(https://lkml.org/lkml/2014/12/23/178)
+- This patchset is rebased on v3.19-rc2.
+- Fix bug after wake-up from suspend state. If devfreq device fail to get event,
+  exynos-busfreq retry to set the event for starting.
+- Add memory bus group of Exynos4x12/Exynos4210
+- Add divider clock id for Exynos4 memory bus frequency
+- Support memory bus frequency driver on Exynos4412-based TRATS2 board
+- This patch-set has the dependency on following patch-set[1]:
+  [1] [PATCHv6 0/9] devfreq: Add devfreq-event class to provide raw data for devfreq device
+  : https://lkml.org/lkml/2014/12/28/139
+
+Chanwoo Choi (8):
+  devfreq: exynos: Add generic exynos memory bus frequency driver
+  devfreq: exynos: Add documentation for generic exynos memory bus frequency driver
+  ARM: dts: Add memory bus node for Exynos3250
+  clk: samsung: exynos4: Add divider clock id for memory bus frequency
+  ARM: dts: Add memory bus node for Exynos4x12
+  ARM: dts: Add memory bus node for Exynos4210
+  ARM: dts: Add memory bus node for Exynos3250-based Rinato/Monk board
+  ARM: dts: Add memory bus node for Exynos4412-based TRATS2 board
+
+ .../devicetree/bindings/devfreq/exynos-busfreq.txt | 184 +++++++
+ arch/arm/boot/dts/exynos3250-monk.dts              |  12 +
+ arch/arm/boot/dts/exynos3250-rinato.dts            |  12 +
+ arch/arm/boot/dts/exynos3250.dtsi                  | 125 +++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  93 ++++
+ arch/arm/boot/dts/exynos4412-trats2.dts            |  12 +
+ arch/arm/boot/dts/exynos4x12.dtsi                  | 121 +++++
+ drivers/clk/samsung/clk-exynos4.c                  |  10 +-
+ drivers/devfreq/Kconfig                            |  15 +
+ drivers/devfreq/Makefile                           |   1 +
+ drivers/devfreq/exynos-busfreq.c                   | 589 +++++++++++++++++++++
+ include/dt-bindings/clock/exynos4.h                |   7 +-
+ 12 files changed, 1175 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-busfreq.txt
+ create mode 100644 drivers/devfreq/exynos-busfreq.c
+
 -- 
 1.8.5.5
