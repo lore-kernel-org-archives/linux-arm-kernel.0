@@ -1,230 +1,250 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Jan 2015 11:41:42 +0100
-Subject: [PATCH v2 04/21] ARM: tegra: update DTs to expose legacy
- interrupt controller
-In-Reply-To: <1420652576-22309-5-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150108104141.GF1987@ulmo.nvidia.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu,  8 Jan 2015 10:42:34 +0000
+Subject: [PATCH] ARM64: kernel: add support for cpu cache information
+Message-ID: <1420713754-13734-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 05:42:39PM +0000, Marc Zyngier wrote:
-> Describe the legacy interrupt controller in every tegra DTSI files,
-> and make it the parent of most interrupts.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/boot/dts/tegra114.dtsi | 16 +++++++++++++++-
->  arch/arm/boot/dts/tegra124.dtsi | 16 +++++++++++++++-
->  arch/arm/boot/dts/tegra20.dtsi  | 15 ++++++++++++++-
->  arch/arm/boot/dts/tegra30.dtsi  | 16 +++++++++++++++-
->  4 files changed, 59 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-> index 4296b53..f70bed0 100644
-> --- a/arch/arm/boot/dts/tegra114.dtsi
-> +++ b/arch/arm/boot/dts/tegra114.dtsi
-> @@ -8,7 +8,7 @@
->  
->  / {
->  	compatible = "nvidia,tegra114";
-> -	interrupt-parent = <&gic>;
-> +	interrupt-parent = <&ictlr>;
+This patch adds support for cacheinfo on ARM64.
 
-Maybe name the label "lic" because that's the more common name for this
-controller? Same for the other DTSI files.
+On ARMv8, the cache hierarchy can be identified through Cache Level ID
+(CLIDR) register while the cache geometry is provided by Cache Size ID
+(CCSIDR) register.
 
-> @@ -134,6 +134,19 @@
->  		      <0x50046000 0x2000>;
->  		interrupts = <GIC_PPI 9
->  			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		interrupt-parent = <&gic>;
+Since the architecture doesn't provide any way of detecting the cpus
+sharing particular cache, device tree is used for the same purpose.
 
-Is this allowed? It makes the GIC its own parent. I guess we need it to
-stop a loop from GIC -> LIC -> GIC, but it doesn't look quite right.
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm64/include/asm/cachetype.h |  29 +++++++--
+ arch/arm64/kernel/Makefile         |   2 +-
+ arch/arm64/kernel/cacheinfo.c      | 128 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpuinfo.c        |  12 ----
+ 4 files changed, 152 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm64/kernel/cacheinfo.c
 
-> +	};
-> +
-> +	ictlr: interrupt-controller at 60004000 {
-> +		compatible = "nvidia,tegra114-ictlr", "nvidia,tegra-ictlr";
-
-As previously discussed, I think the second string should be
-"nvidia,tegra30-ictlr".
-
-> +		reg = <0x60004000 64>,
-
-I think the first entry should be 256 bytes long since there's another
-block of 192 bytes of registers that's part of the interrupt controller,
-albeit maybe not related to the functionality of the interrupt chip. But
-they're still part of the same hardware block.
-
-> +		      <0x60004100 64>,
-
-According to the TRM there are 4 more registers in this block, so this
-should be 80 in size.
-
-> +		      <0x60004200 64>,
-> +		      <0x60004300 64>,
-> +		      <0x60004400 64>;
-
-I'd prefer all of these to be hexadecimal.
-
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&gic>;
->  	};
->  
->  	timer at 60005000 {
-> @@ -766,5 +779,6 @@
->  				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->  			<GIC_PPI 10
->  				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +		interrupt-parent = <&gic>;
-
-Why does this get to have a non-default parent?
-
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-[...]
-> @@ -190,6 +191,18 @@
->  		status = "disabled";
->  	};
->  
-> +	ictlr: interrupt-controller at 60004000 {
-> +		compatible = "nvidia,tegra124-ictlr", "nvidia,tegra-ictlr";
-
-Same as for Tegra114.
-
-> +		reg = <0x0 0x60004000 0x0 0x40>,
-> +		      <0x0 0x60004100 0x0 0x40>,
-> +		      <0x0 0x60004200 0x0 0x40>,
-> +		      <0x0 0x60004300 0x0 0x40>,
-> +		      <0x0 0x60004400 0x0 0x40>;
-
-According to the TRM, entries 1-4 should be 0x100 bytes. Even the first
-entry could be 0x100 bytes long since there are additional registers in
-there. While they may not be directly relevant to the interrupt chip, I
-think it would make sense to include them here because they are part of
-the same hardware block.
-
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index 8acf5d8..ab2f004 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -7,7 +7,7 @@
->  
->  / {
->  	compatible = "nvidia,tegra20";
-> -	interrupt-parent = <&intc>;
-> +	interrupt-parent = <&ictlr>;
-
-I wonder if we shouldn't rename the intc label to gic for consistency.
-Could be in a follow-up patch though, and something that I can easily do
-after this patch set.
-
->  
->  	host1x at 50000000 {
->  		compatible = "nvidia,tegra20-host1x", "simple-bus";
-> @@ -142,6 +142,7 @@
->  
->  	timer at 50004600 {
->  		compatible = "arm,cortex-a9-twd-timer";
-> +		interrupt-parent = <&intc>;
->  		reg = <0x50040600 0x20>;
->  		interrupts = <GIC_PPI 13
->  			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-> @@ -154,6 +155,7 @@
->  		       0x50040100 0x0100>;
->  		interrupt-controller;
->  		#interrupt-cells = <3>;
-> +		interrupt-parent = <&intc>;
->  	};
->  
->  	cache-controller at 50043000 {
-> @@ -165,6 +167,17 @@
->  		cache-level = <2>;
->  	};
->  
-> +	ictlr: interrupt-controller at 60004000 {
-> +		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
-
-As discussed previously, I think the second compatible should be
-dropped.
-
-> +		reg = <0x60004000 64>,
-> +		      <0x60004100 64>,
-> +		      <0x60004200 64>,
-> +		      <0x60004300 64>;
-
-Same comments as for Tegra114, except the quinary controller which
-doesn't exist on Tegra20.
-
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&intc>;
-> +	};
-> +
->  	timer at 60005000 {
->  		compatible = "nvidia,tegra20-timer";
->  		reg = <0x60005000 0x60>;
-
-Why doesn't the Tegra timer get to keep the GIC as parent like for
-Tegra114 and Tegra124? Instead I see that the Cortex-A9 TWD timer gets
-to keep the parent instead.
-
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-[...]
-> @@ -228,6 +228,7 @@
->  	timer at 50004600 {
->  		compatible = "arm,cortex-a9-twd-timer";
->  		reg = <0x50040600 0x20>;
-> +		interrupt-parent = <&intc>;
->  		interrupts = <GIC_PPI 13
->  			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->  		clocks = <&tegra_car TEGRA30_CLK_TWD>;
-> @@ -239,6 +240,7 @@
->  		       0x50040100 0x0100>;
->  		interrupt-controller;
->  		#interrupt-cells = <3>;
-> +		interrupt-parent = <&intc>;
->  	};
->  
->  	cache-controller at 50043000 {
-> @@ -250,6 +252,18 @@
->  		cache-level = <2>;
->  	};
->  
-> +	ictlr: interrupt-controller at 60004000 {
-> +		compatible = "nvidia,tegra30-ictlr", "nvidia,tegra-ictlr";
-
-Should be "nvidia,tegra30-ictlr" only.
-
-> +		reg = <0x60004000 64>,
-> +		      <0x60004100 64>,
-> +		      <0x60004200 64>,
-> +		      <0x60004300 64>,
-> +		      <0x60004400 64>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		interrupt-parent = <&intc>;
-> +	};
-
-This should be the same as for Tegra114.
-
-> +
->  	timer at 60005000 {
->  		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
->  		reg = <0x60005000 0x400>;
-
-Like for Tegra20, the Tegra timer is now switched to the LIC as parent.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/6da51cd8/attachment-0001.sig>
+diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
+index 4c631a0a3609..da2fc9e3cedd 100644
+--- a/arch/arm64/include/asm/cachetype.h
++++ b/arch/arm64/include/asm/cachetype.h
+@@ -39,24 +39,41 @@
+ 
+ extern unsigned long __icache_flags;
+ 
++/*
++ * NumSets, bits[27:13] - (Number of sets in cache) - 1
++ * Associativity, bits[12:3] - (Associativity of cache) - 1
++ * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
++ */
++#define CCSIDR_EL1_WRITE_THROUGH	BIT(31)
++#define CCSIDR_EL1_WRITE_BACK		BIT(30)
++#define CCSIDR_EL1_READ_ALLOCATE	BIT(29)
++#define CCSIDR_EL1_WRITE_ALLOCATE	BIT(28)
+ #define CCSIDR_EL1_LINESIZE_MASK	0x7
+ #define CCSIDR_EL1_LINESIZE(x)		((x) & CCSIDR_EL1_LINESIZE_MASK)
+-
++#define CCSIDR_EL1_ASSOCIATIVITY_SHIFT	3
++#define CCSIDR_EL1_ASSOCIATIVITY_MASK	0x3ff
++#define CCSIDR_EL1_ASSOCIATIVITY(x)	\
++	(((x) >> CCSIDR_EL1_ASSOCIATIVITY_SHIFT) & CCSIDR_EL1_ASSOCIATIVITY_MASK)
+ #define CCSIDR_EL1_NUMSETS_SHIFT	13
+-#define CCSIDR_EL1_NUMSETS_MASK		(0x7fff << CCSIDR_EL1_NUMSETS_SHIFT)
++#define CCSIDR_EL1_NUMSETS_MASK		0x7fff
+ #define CCSIDR_EL1_NUMSETS(x) \
+-	(((x) & CCSIDR_EL1_NUMSETS_MASK) >> CCSIDR_EL1_NUMSETS_SHIFT)
++	(((x) >> CCSIDR_EL1_NUMSETS_SHIFT) & CCSIDR_EL1_NUMSETS_MASK)
++
++#define CACHE_LINESIZE(x)	(16 << CCSIDR_EL1_LINESIZE(x))
++#define CACHE_NUMSETS(x)	(CCSIDR_EL1_NUMSETS(x) + 1)
++#define CACHE_ASSOCIATIVITY(x)	(CCSIDR_EL1_ASSOCIATIVITY(x) + 1)
+ 
+-extern u64 __attribute_const__ icache_get_ccsidr(void);
++extern u64 __attribute_const__ cache_get_ccsidr(u64 csselr);
+ 
++/* Helpers for Level 1 Instruction cache csselr = 1L */
+ static inline int icache_get_linesize(void)
+ {
+-	return 16 << CCSIDR_EL1_LINESIZE(icache_get_ccsidr());
++	return CACHE_LINESIZE(cache_get_ccsidr(1L));
+ }
+ 
+ static inline int icache_get_numsets(void)
+ {
+-	return 1 + CCSIDR_EL1_NUMSETS(icache_get_ccsidr());
++	return CACHE_NUMSETS(cache_get_ccsidr(1L));
+ }
+ 
+ /*
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index eaa77ed7766a..77d3d9568333 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -16,7 +16,7 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+ 			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o	\
+-			   cpuinfo.o cpu_errata.o alternative.o
++			   cpuinfo.o cpu_errata.o alternative.o cacheinfo.o
+ 
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o 			\
+diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+new file mode 100644
+index 000000000000..497b0e557bd5
+--- /dev/null
++++ b/arch/arm64/kernel/cacheinfo.c
+@@ -0,0 +1,128 @@
++/*
++ *  ARM64 cacheinfo support
++ *
++ *  Copyright (C) 2015 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/bitops.h>
++#include <linux/cacheinfo.h>
++#include <linux/cpu.h>
++#include <linux/compiler.h>
++#include <linux/of.h>
++
++#include <asm/cachetype.h>
++#include <asm/processor.h>
++
++#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
++/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
++#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
++#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
++#define CLIDR_CTYPE(clidr, level)	\
++	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
++
++static inline enum cache_type get_cache_type(int level)
++{
++	u64 clidr;
++
++	if (level > MAX_CACHE_LEVEL)
++		return CACHE_TYPE_NOCACHE;
++	asm volatile ("mrs     %x0, clidr_el1" : "=r" (clidr));
++	return CLIDR_CTYPE(clidr, level);
++}
++
++/*
++ * Cache Size Selection Register(CSSELR) selects which Cache Size ID
++ * Register(CCSIDR) is accessible by specifying the required cache
++ * level and the cache type. We need to ensure that no one else changes
++ * CSSELR by calling this in non-preemtible context
++ */
++u64 __attribute_const__ cache_get_ccsidr(u64 csselr)
++{
++	u64 ccsidr;
++
++	WARN_ON(preemptible());
++
++	/* Put value into CSSELR */
++	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
++	isb();
++	/* Read result out of CCSIDR */
++	asm volatile("mrs %x0, ccsidr_el1" : "=r" (ccsidr));
++
++	return ccsidr;
++}
++
++static void ci_leaf_init(struct cacheinfo *this_leaf,
++			 enum cache_type type, unsigned int level)
++{
++	bool is_icache = type & CACHE_TYPE_INST;
++	u64 tmp = cache_get_ccsidr((level - 1) << 1 | is_icache);
++
++	this_leaf->level = level;
++	this_leaf->type = type;
++	this_leaf->coherency_line_size = CACHE_LINESIZE(tmp);
++	this_leaf->number_of_sets = CACHE_NUMSETS(tmp);
++	this_leaf->ways_of_associativity = CACHE_ASSOCIATIVITY(tmp);
++	this_leaf->size = this_leaf->number_of_sets *
++	    this_leaf->coherency_line_size * this_leaf->ways_of_associativity;
++	this_leaf->attributes =
++		((tmp & CCSIDR_EL1_WRITE_THROUGH) ? CACHE_WRITE_THROUGH : 0) |
++		((tmp & CCSIDR_EL1_WRITE_BACK) ? CACHE_WRITE_BACK : 0) |
++		((tmp & CCSIDR_EL1_READ_ALLOCATE) ? CACHE_READ_ALLOCATE : 0) |
++		((tmp & CCSIDR_EL1_WRITE_ALLOCATE) ? CACHE_WRITE_ALLOCATE : 0);
++}
++
++static int __init_cache_level(unsigned int cpu)
++{
++	unsigned int ctype, level, leaves;
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++
++	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
++		ctype = get_cache_type(level);
++		if (ctype == CACHE_TYPE_NOCACHE) {
++			level--;
++			break;
++		}
++		/* Separate instruction and data caches */
++		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
++	}
++
++	this_cpu_ci->num_levels = level;
++	this_cpu_ci->num_leaves = leaves;
++	return 0;
++}
++
++static int __populate_cache_leaves(unsigned int cpu)
++{
++	unsigned int level, idx;
++	enum cache_type type;
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++	struct cacheinfo *this_leaf = this_cpu_ci->info_list;
++
++	for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
++	     idx < this_cpu_ci->num_leaves; idx++, level++) {
++		type = get_cache_type(level);
++		if (type == CACHE_TYPE_SEPARATE) {
++			ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
++			ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
++		} else {
++			ci_leaf_init(this_leaf++, type, level);
++		}
++	}
++	return 0;
++}
++
++DEFINE_SMP_CALL_CACHE_FUNCTION(init_cache_level)
++DEFINE_SMP_CALL_CACHE_FUNCTION(populate_cache_leaves)
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 57b641747534..a047d6cf8a0c 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -221,15 +221,3 @@ void __init cpuinfo_store_boot_cpu(void)
+ 
+ 	boot_cpu_data = *info;
+ }
+-
+-u64 __attribute_const__ icache_get_ccsidr(void)
+-{
+-	u64 ccsidr;
+-
+-	WARN_ON(preemptible());
+-
+-	/* Select L1 I-cache and read its size ID register */
+-	asm("msr csselr_el1, %1; isb; mrs %0, ccsidr_el1"
+-	    : "=r"(ccsidr) : "r"(1L));
+-	return ccsidr;
+-}
+-- 
+1.9.1
