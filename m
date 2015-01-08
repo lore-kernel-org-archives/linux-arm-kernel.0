@@ -1,54 +1,39 @@
-From: js07.lee@gmail.com (Jungseung Lee)
-Date: Thu, 8 Jan 2015 12:03:47 +0900
-Subject: [PATCH] kernel/module.c: Mark module state before set RO and NX
- regions
-In-Reply-To: <54AD731F.3080408@codeaurora.org>
-References: <1420535256-6091-1-git-send-email-js07.lee@gmail.com>
- <878uhf4457.fsf@rustcorp.com.au> <54AD731F.3080408@codeaurora.org>
-Message-ID: <CAPP0e=PF0Dne8i=uR4OvLA6ujCwJDv7T6q2m-Jy_6TGYihJeEw@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed,  7 Jan 2015 21:26:10 -0600
+Subject: [Patch v2 0/2] Add Qualcomm ADM dmaengine driver
+Message-ID: <1420687572-7116-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-08 2:55 GMT+09:00 Laura Abbott <lauraa@codeaurora.org>:
-> On 1/6/2015 8:16 PM, Rusty Russell wrote:
->>
->> Jungseung Lee <js07.lee@gmail.com> writes:
->>>
->>> In some architectures like arm/arm64, set_memory_*() check module address
->>> and state as well. Mark module state before set RO and NX regions for
->>> the routine is passed.
->>>
->>> It will fix wrong RO/NX protection for loadable kernel modules on
->>> arm/arm64.
->>
->>
->> This partially reverts commit 4982223e51e8ea9d09bb33c8323b5ec1877b2b51
->> Author: Rusty Russell <rusty@rustcorp.com.au>
->> Date:   Wed May 14 10:54:19 2014 +0930
->>
->>      module: set nx before marking module MODULE_STATE_COMING.
->>
->> Laura Abbott (CC'd) was looking at an alternative fix for this.  Laura?
->>
->> Thanks,
->> Rusty.
->>
->
-> Yes, my proposal was to stop using is_module_address and just bounds
-> check against the module ranges[1]. I got bogged down with other
-> tasks and hadn't submitted a patch for review yet.
->
-I got it. I'll prepare bounds check patch for aarch32.
-Thanks,
+This patch set introduces the dmaengine driver for the Qualcomm Application
+Data Mover (ADM) DMA controller present on MSM8960, APQ8064, and IPQ8064
+devices.
 
-> Thanks,
-> Laura
->
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311574.html
->
->
-> --
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+The initial version of this driver will only support slave DMA operations
+between system memory and peripherals.  Flow control via the CRCI (client rate
+control interface) is supported and can be configured via device tree
+configuration.  Flow control usage is required for some peripheral devices.
+
+Changes since v1:
+  - Fixed various review comments
+  - Fixed some descriptor programming issues.
+  - Added single descriptors to support sub burst length transactions.
+    Selection of single or box descriptors depends on the sg length and burst
+    size.
+  - Removed use of crci in the dmas property.  CRCI is now designated via the
+    slave_config structure and will be stored in slave_id.
+
+Andy Gross (2):
+  dmaengine: Add ADM driveri
+  dt/bindings: qcom_adm: Fix channel specificers
+
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   14 +-
+ drivers/dma/Kconfig                                |   10 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/qcom_adm.c                             |  899 ++++++++++++++++++++
+ 4 files changed, 915 insertions(+), 9 deletions(-)
+ create mode 100644 drivers/dma/qcom_adm.c
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
