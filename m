@@ -1,37 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Jan 2015 16:23:13 +0000
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <54AE830E.1090000@redhat.com>
-References: <54AE830E.1090000@redhat.com>
-Message-ID: <20150108162312.GO11583@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 8 Jan 2015 10:25:12 -0600
+Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
+ volatile
+In-Reply-To: <20150106173734.GL6502@saruman>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+ <1419622104-25812-2-git-send-email-balbi@ti.com>
+ <20150106173734.GL6502@saruman>
+Message-ID: <20150108162512.GC31926@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
-> Hi All,
+On Tue, Jan 06, 2015 at 11:37:34AM -0600, Felipe Balbi wrote:
+> On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
+> > STATUS register can be modified by the HW, so we
+> > should bypass cache because of that.
+> > 
+> > In the case of INT[12] registers, they are the ones
+> > that actually clear the IRQ source at the time they
+> > are read. If we rely on the cache for them, we will
+> > never be able to clear the interrupt, which will cause
+> > our IRQ line to be disabled due to IRQ throttling.
+> > 
+> > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
+> > Cc: <stable@vger.kernel.org> # v3.15+
+> > Cc: Keerthy <j-keerthy@ti.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
 > 
-> I am trying to test following scenario, which seems valid to me. But I 
-> am very new to ARM64 as well as to debugging tools, so seeking expert's 
-> comment here.
-> 
-> -- I have inserted a kprobe to the function uprobe_breakpoint_handler 
-> which is called from elo_dbg 
-> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
-> 
-> -- kprobe is enabled.
-> 
-> -- an uprobe is inserted into a test application and enabled.
-> 
-> So, when uprobe is enabled and test code execution reaches to probe 
-> instruction, it executes uprobe breakpoint instruction and el0_dbg 
-> exception is raised.
-> 
-> When control reaches to start of uprobe_breakpoint_handler and it 
-> executes first instruction (which has been replaced with a kprobe 
-> breakpoint instruction), el1_dbg exception is raised.
+> ping
 
-Hmm, debug exceptions should be masked at this point so I don't see why
-you're taking the second debug exception.
+another ping. Without this and the following patch TPS65218 power button
+driver which was already applied by Dmitry, won't work.
 
-Will
+> > ---
+> >  drivers/mfd/tps65218.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> > index 0d256cb..2243f75 100644
+> > --- a/drivers/mfd/tps65218.c
+> > +++ b/drivers/mfd/tps65218.c
+> > @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
+> >  }
+> >  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
+> >  
+> > +static const struct regmap_range tps65218_yes_ranges[] = {
+> > +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
+> > +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
+> > +};
+> > +
+> > +static const struct regmap_access_table tps65218_volatile_table = {
+> > +	.yes_ranges = tps65218_yes_ranges,
+> > +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
+> > +};
+> > +
+> >  static struct regmap_config tps65218_regmap_config = {
+> >  	.reg_bits = 8,
+> >  	.val_bits = 8,
+> >  	.cache_type = REGCACHE_RBTREE,
+> > +	.volatile_table = &tps65218_volatile_table,
+> >  };
+> >  
+> >  static const struct regmap_irq tps65218_irqs[] = {
+> > -- 
+> > 2.2.0
+> > 
+> 
+> -- 
+> balbi
+
+
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/b6f478c2/attachment.sig>
