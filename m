@@ -1,165 +1,84 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu,  8 Jan 2015 16:52:56 -0600
-Subject: [PATCH 1/2] soc: qcom: Add TCSR driver
-In-Reply-To: <1420757577-20425-1-git-send-email-agross@codeaurora.org>
-References: <1420757577-20425-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1420757577-20425-2-git-send-email-agross@codeaurora.org>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 08 Jan 2015 18:25:03 -0500
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+In-Reply-To: <20150108223626.43fd93d5@lxorguk.ukuu.org.uk>
+References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>	<20150108131008.16c9a31c@lxorguk.ukuu.org.uk>	<54AEAC47.1040403@hurleysoftware.com>	<1896224.oMI8M6J5T7@wuerfel>
+ <20150108223626.43fd93d5@lxorguk.ukuu.org.uk>
+Message-ID: <54AF11CF.9080600@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the TCSR (Top Control and Status Register) IP block
-that is present in the Qualcomm IPQ8064, APQ8064, and some later processors.
-This block contains additional configuration and mux settings for various
-peripherals in the system, including the ADM DMA block and USB controller.
+On 01/08/2015 05:36 PM, One Thousand Gnomes wrote:
+>> One idea that has come up in the past but never saw an implementation
+>> is to make the ttyS namespace and minor numbers completely generic and
+>> let any serial port driver use it. This would be a major rework, but
+>> have the added advantage of cleaning up a number of other namespace
+>> issues as well. There also lots of open question, in particular how
+>> to maintain compatibility with existing drivers. One could imagine
+>> that each uart always gets a ttyS device and optionally also gets
+>> a device node for the same port with a driver specific chardev as
+>> most of them do today. Or it could be an either/or decision that is
+>> made at compile time or as a module parameter.
+> 
+> I'm not sure we should use ttyS for it. ttyS means 8250, a lot of
+> existing code knows what ttyS is and what sort of ioctls and the like are
+> assumed.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/soc/qcom/Kconfig     |    7 ++++
- drivers/soc/qcom/Makefile    |    1 +
- drivers/soc/qcom/qcom_tcsr.c |   83 ++++++++++++++++++++++++++++++++++++++++++
- include/soc/qcom/qcom_tcsr.h |   21 +++++++++++
- 4 files changed, 112 insertions(+)
- create mode 100644 drivers/soc/qcom/qcom_tcsr.c
- create mode 100644 include/soc/qcom/qcom_tcsr.h
+That genie has already escaped the bottle.
 
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index 7bd2c94..950c218 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -9,3 +9,10 @@ config QCOM_GSBI
-           functions for connecting the underlying serial UART, SPI, and I2C
-           devices to the output pins.
- 
-+config QCOM_TCSR
-+	tristate "QCOM Top Control and Status Registers"
-+	depends on ARCH_QCOM
-+	help
-+	  Say y here to enable TCSR support.  The TCSR provides control
-+	  functions for various peripherals, like selection of USB port type and
-+	  GSBI CRCI muxing.
-diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-index 4389012..f0c287c 100644
---- a/drivers/soc/qcom/Makefile
-+++ b/drivers/soc/qcom/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
-+obj-$(CONFIG_QCOM_TCSR) +=	qcom_tcsr.o
-diff --git a/drivers/soc/qcom/qcom_tcsr.c b/drivers/soc/qcom/qcom_tcsr.c
-new file mode 100644
-index 0000000..f8d5ef8
---- /dev/null
-+++ b/drivers/soc/qcom/qcom_tcsr.c
-@@ -0,0 +1,83 @@
-+/*
-+ * Copyright (c) 2014-2015, The Linux foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License rev 2 and
-+ * only rev 2 as published by the free Software foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or fITNESS fOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <soc/qcom/qcom_tcsr.h>
-+
-+#define TCSR_ADM_A_CRCI_MUX_SEL	0x70
-+#define TCSR_ADM_B_CRCI_MUX_SEL	0x74
-+#define TCSR_USB_PORT_SEL	0xb0
-+
-+static int initialized;
-+
-+int qcom_tcsr_is_initialized(void)
-+{
-+	return !initialized;
-+}
-+EXPORT_SYMBOL(qcom_tcsr_is_initialized);
-+
-+static int qcom_tcsr_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	const struct device_node *node = pdev->dev.of_node;
-+	void __iomem *base;
-+	u32 val;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	if (!of_property_read_u32(node, "qcom,usb-ctrl-select", &val)) {
-+		dev_info(&pdev->dev, "setting usb port select = %d\n", val);
-+		writel(val, base + TCSR_USB_PORT_SEL);
-+	}
-+
-+	if (!of_property_read_u32(node, "qcom,adm-a-crci-mux-sel", &val))
-+		writel(val, base + TCSR_ADM_A_CRCI_MUX_SEL);
-+
-+	if (!of_property_read_u32(node, "qcom,adm-b-crci-mux-sel", &val))
-+		writel(val, base + TCSR_ADM_B_CRCI_MUX_SEL);
-+
-+	initialized = 1;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id qcom_tcsr_dt_match[] = {
-+	{ .compatible = "qcom,tcsr", },
-+	{ },
-+};
-+
-+MODULE_DEVICE_TABLE(of, qcom_tcsr_dt_match);
-+
-+static struct platform_driver qcom_tcsr_driver = {
-+	.driver = {
-+		.name		= "tcsr",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= qcom_tcsr_dt_match,
-+	},
-+	.probe = qcom_tcsr_probe,
-+};
-+
-+module_platform_driver(qcom_tcsr_driver);
-+
-+MODULE_AUTHOR("Andy Gross <agross@codeaurora.org>");
-+MODULE_DESCRIPTION("QCOM TCSR driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/soc/qcom/qcom_tcsr.h b/include/soc/qcom/qcom_tcsr.h
-new file mode 100644
-index 0000000..cbdd3c8
---- /dev/null
-+++ b/include/soc/qcom/qcom_tcsr.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (c) 2015, The Linux foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License rev 2 and
-+ * only rev 2 as published by the free Software foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or fITNESS fOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef _QCOM_TCSR_H
-+
-+#ifdef CONFIG_QCOM_TCSR
-+int qcom_tcsr_is_initialized(void);
-+#else
-+static inline int qcom_tcsr_is_initialized(void) {return -ENODEV; }
-+#endif
-+
-+#endif
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+./arch/powerpc/platforms/powermac/setup.c:	char *devname = "ttyS";
+./arch/powerpc/platforms/chrp/setup.c:		add_preferred_console("ttyS", 0, NULL);
+./arch/powerpc/kernel/legacy_serial.c:		return add_preferred_console("ttyS", offset, opt);
+./arch/xtensa/platforms/iss/console.c:	serial_driver->name = "ttyS";
+./arch/mips/sni/setup.c:			add_preferred_console("ttyS", port,
+./arch/mips/sgi-ip32/ip32-setup.c:			add_preferred_console("ttyS", *(con + 1) == '2' ? 1 : 0,
+./arch/mips/jazz/setup.c:	add_preferred_console("ttyS", 0, "9600");
+./arch/mips/sgi-ip22/ip22-setup.c:		add_preferred_console("ttyS", *(ctype + 1) == '2' ? 1 : 0,
+./arch/arm/mach-davinci/board-da830-evm.c:	return add_preferred_console("ttyS", 2, "115200");
+./arch/arm/mach-davinci/board-mityomapl138.c:	return add_preferred_console("ttyS", 1, "115200");
+./arch/arm/mach-davinci/board-da850-evm.c:	return add_preferred_console("ttyS", 2, "115200");
+./arch/arm/mach-davinci/board-omapl138-hawk.c:	return add_preferred_console("ttyS", 2, "115200");
+./arch/cris/arch-v10/kernel/debugport.c:	name : "ttyS",
+./arch/ia64/hp/sim/simserial.c:	hp_simserial_driver->name = "ttyS";
+./arch/um/drivers/ssl.c:	.device_name 		= "ttyS",
+./arch/s390/kernel/setup.c:			add_preferred_console("ttyS", 1, NULL);
+./drivers/tty/amiserial.c:	.name =		"ttyS",
+./drivers/tty/serial/serial_txx9.c:#define TXX9_TTY_NAME "ttyS"
+./drivers/tty/serial/sunsab.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/mcf.c:	.dev_name	= "ttyS",
+./drivers/tty/serial/atmel_serial.c:#define ATMEL_DEVICENAME	"ttyS"
+./drivers/tty/serial/bcm63xx_uart.c:	.dev_name	= "ttyS",
+./drivers/tty/serial/sunsu.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/mrst_max3110.c:	.dev_name	= "ttyS",
+./drivers/tty/serial/apbuart.c:	.name = "ttyS",
+./drivers/tty/serial/apbuart.c:	.dev_name = "ttyS",
+./drivers/tty/serial/tilegx.c:#define TILEGX_UART_NAME	"ttyS"
+./drivers/tty/serial/pmac_zilog.c:#define PMACZILOG_NAME		"ttyS"
+./drivers/tty/serial/pnx8xxx_uart.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/m32r_sio.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/ip22zilog.c:	.dev_name	= "ttyS",
+./drivers/tty/serial/zs.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/68328serial.c:	serial_driver->name = "ttyS";
+./drivers/tty/serial/crisv10.c:	driver->name = "ttyS";
+/drivers/tty/serial/8250/8250_core.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/sunzilog.c:	.dev_name	=	"ttyS",
+./drivers/tty/serial/pxa.c:	.dev_name	= "ttyS",
+./drivers/tty/serial/dz.c:	.dev_name		= "ttyS",
+./drivers/tty/serial/sunhv.c:	.dev_name		= "ttyS",
+./drivers/s390/char/sclp_vt220.c:#define SCLP_VT220_CONSOLE_NAME		"ttyS"
+./drivers/s390/char/sclp_con.c:#define sclp_console_name  "ttyS"
+./drivers/s390/char/con3215.c:	driver->name = "ttyS";
+
+
+Besides, despite its pedigree, omap is no closer to 8250 than anything
+else in drivers/tty/serial/
+
+> A generic namespace needs not to be attached to a legacy naming 
+> 
+> (eg also put all serial ports in /dev/serial/0 /dev/serial/1 etc either
+> via the tty layer or via systemd/udev)
+
+This doesn't address pre-init.
+
+Regards,
+Peter Hurley
