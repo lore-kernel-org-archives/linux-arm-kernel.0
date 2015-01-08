@@ -1,82 +1,85 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 8 Jan 2015 10:25:12 -0600
-Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
- volatile
-In-Reply-To: <20150106173734.GL6502@saruman>
-References: <1419622104-25812-1-git-send-email-balbi@ti.com>
- <1419622104-25812-2-git-send-email-balbi@ti.com>
- <20150106173734.GL6502@saruman>
-Message-ID: <20150108162512.GC31926@saruman>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 08 Jan 2015 11:26:30 -0500
+Subject: [Patch v2 2/2] dt/bindings: qcom_adm: Fix channel specificers
+In-Reply-To: <1420687572-7116-3-git-send-email-agross@codeaurora.org>
+References: <1420687572-7116-1-git-send-email-agross@codeaurora.org>
+ <1420687572-7116-3-git-send-email-agross@codeaurora.org>
+Message-ID: <54AEAFB6.9050609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 11:37:34AM -0600, Felipe Balbi wrote:
-> On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
-> > STATUS register can be modified by the HW, so we
-> > should bypass cache because of that.
-> > 
-> > In the case of INT[12] registers, they are the ones
-> > that actually clear the IRQ source at the time they
-> > are read. If we rely on the cache for them, we will
-> > never be able to clear the interrupt, which will cause
-> > our IRQ line to be disabled due to IRQ throttling.
-> > 
-> > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
-> > Cc: <stable@vger.kernel.org> # v3.15+
-> > Cc: Keerthy <j-keerthy@ti.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+Hi Andy,
+
+On 01/07/2015 10:26 PM, Andy Gross wrote:
+> This patch removes the crci information from the dma channel property.  At least
+> one client device requires using more than one CRCI value for a channel.  This
+> does not match the current binding and the crci information needs to be removed.
 > 
-> ping
-
-another ping. Without this and the following patch TPS65218 power button
-driver which was already applied by Dmitry, won't work.
-
-> > ---
-> >  drivers/mfd/tps65218.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-> > index 0d256cb..2243f75 100644
-> > --- a/drivers/mfd/tps65218.c
-> > +++ b/drivers/mfd/tps65218.c
-> > @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
-> >  }
-> >  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
-> >  
-> > +static const struct regmap_range tps65218_yes_ranges[] = {
-> > +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
-> > +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
-> > +};
-> > +
-> > +static const struct regmap_access_table tps65218_volatile_table = {
-> > +	.yes_ranges = tps65218_yes_ranges,
-> > +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
-> > +};
-> > +
-> >  static struct regmap_config tps65218_regmap_config = {
-> >  	.reg_bits = 8,
-> >  	.val_bits = 8,
-> >  	.cache_type = REGCACHE_RBTREE,
-> > +	.volatile_table = &tps65218_volatile_table,
-> >  };
-> >  
-> >  static const struct regmap_irq tps65218_irqs[] = {
-> > -- 
-> > 2.2.0
-> > 
+> Instead, the client device will provide this information via other means.
 > 
-> -- 
-> balbi
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/dma/qcom_adm.txt |   14 +++++---------
+>  1 file changed, 5 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/qcom_adm.txt b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+> index 9bcab91..fba67c6 100644
+> --- a/Documentation/devicetree/bindings/dma/qcom_adm.txt
+> +++ b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+> @@ -4,8 +4,7 @@ Required properties:
+>  - compatible: must contain "qcom,adm" for IPQ/APQ8064 and MSM8960
+>  - reg: Address range for DMA registers
+>  - interrupts: Should contain one interrupt shared by all channels
+> -- #dma-cells: must be <2>.  First cell denotes the channel number.  Second cell
+> -  denotes CRCI (client rate control interface) flow control assignment.
+> +- #dma-cells: must be <1>.  First cell denotes the channel number.
+>  - clocks: Should contain the core clock and interface clock.
+>  - clock-names: Must contain "core" for the core clock and "iface" for the
+>    interface clock.
+> @@ -22,7 +21,7 @@ Example:
+>  			compatible = "qcom,adm";
+>  			reg = <0x18300000 0x100000>;
+>  			interrupts = <0 170 0>;
+> -			#dma-cells = <2>;
+> +			#dma-cells = <1>;
+>  
+>  			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
+>  			clock-names = "core", "iface";
+> @@ -35,15 +34,12 @@ Example:
+>  			qcom,ee = <0>;
+>  		};
+>  
+> -DMA clients must use the format descripted in the dma.txt file, using a three
+> +DMA clients must use the format descripted in the dma.txt file, using a two
+>  cell specifier for each channel.
+>  
+>  Each dmas request consists of 3 cells:
 
+Now 2 cells?
 
+>   1. phandle pointing to the DMA controller
+>   2. channel number
+> - 3. CRCI assignment, if applicable.  If no CRCI flow control is required, use 0.
+> -    The CRCI is used for flow control.  It identifies the peripheral device that
+> -    is the source/destination for the transferred data.
+>  
+>  Example:
+>  
+> @@ -56,7 +52,7 @@ Example:
+>  
+>  		cs-gpios = <&qcom_pinmux 20 0>;
+>  
+> -		dmas = <&adm_dma 6 9>,
+> -			<&adm_dma 5 10>;
+> +		dmas = <&adm_dma 6>,
+> +			<&adm_dma 5>;
+>  		dma-names = "rx", "tx";
+>  	};
+> 
+
+Chris
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/b6f478c2/attachment.sig>
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
