@@ -1,102 +1,77 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 08 Jan 2015 21:51:40 +0100
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <7hh9w1vwzr.fsf@deeprootsystems.com>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>	<54AE459B.8010703@linaro.org>
- <54AE4ADF.3030307@arm.com>	<54AE55CE.6040201@linaro.org>
- <54AE5C8F.9080600@arm.com>	<54AE65EC.3050808@linaro.org>
- <20150108122958.GB32308@red-moon> <7hh9w1vwzr.fsf@deeprootsystems.com>
-Message-ID: <54AEEDDC.3070609@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 8 Jan 2015 14:58:33 -0600
+Subject: [PATCH] iommu/arm-smmu: don't touch the secure STLBIALL register
+In-Reply-To: <20150107185322.GU7485@arm.com>
+References: <1419356362-27343-1-git-send-email-mitchelh@codeaurora.org>
+ <20150106141507.GB3484@arm.com> <vnkwiogjhdgm.fsf@mitchelh-linux.qualcomm.com>
+ <CAL_JsqJYZ+-qt8UXPP7=pCsZFXeOkB8ogOzbuusdv1Cb+o1d2A@mail.gmail.com>
+ <vnkw61cjebbq.fsf@mitchelh-linux.qualcomm.com> <20150107101300.GC7485@arm.com>
+ <vnkw4ms2cwb5.fsf@mitchelh-linux.qualcomm.com> <20150107180420.GR7485@arm.com>
+ <vnkwh9w2bfr6.fsf@mitchelh-linux.qualcomm.com> <20150107185322.GU7485@arm.com>
+Message-ID: <CAL_JsqLqgZ4tYVpd7pFOE9w8Ca441ahOa1OZ_+=XRPk2-WOQrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 09:27 PM, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
++Andreas
+
+On Wed, Jan 7, 2015 at 12:53 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jan 07, 2015 at 06:35:41PM +0000, Mitchel Humpherys wrote:
+>> On Wed, Jan 07 2015 at 10:04:20 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Wed, Jan 07, 2015 at 05:52:46PM +0000, Mitchel Humpherys wrote:
+>> >> On Wed, Jan 07 2015 at 02:13:00 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > If would be better to check for the ARM_SMMU_OPT_SECURE_CFG_ACCESS feature
+>> >> > and, if it's set then zero ARM_SMMU_GR0_STLBIALL at the correct address
+>> >> > otherwise do the ARM_SMMU_GR0_TLBIALLH and ARM_SMMU_GR0_TLBIALLNSNH.
+>> >>
+>> >> I'm confused.  The problem I'm addressing here is that we're touching a
+>> >> register that's marked as "secure only", which causes our system to
+>> >> crash.  Why would we ever want to touch a secure only register, calxeda
+>> >> workaround or not?
+>> >
+>> > Because I think the way the SMMU is wired for Calxeda is that the CPU can
+>> > only see the secure side of the register interface, so the only way to nuke
+>> > the whole TLB would be to use ARM_SMMU_GR0_STLBIALL.
+>>
+>> Still not sure I understand what "the correct address" is for STLBIALL
+>> on Calxeda (i.e. whether or not we need to use ARM_SMMU_GR0_NS), but
+>> something like:
 >
->> On Thu, Jan 08, 2015 at 11:11:40AM +0000, Daniel Lezcano wrote:
->>
->> [...]
->>
->>>>> IMO, it would be better to be more strict with the mcpm
->>>>> initialization and not let the system boot if something is wrong with
->>>>> it which I believe is coming from the firmware and let the user to
->>>>> figure out what is really happening by letting him to disable mcpm in
->>>>> the kernel configuration (which in turn will disable cpuidle).
->>>>
->>>> Again I fully agree, but in this case I manually switched to legacy boot
->>>> mode on TC2 and used same kernel with MCPM config enabled. Do you mean
->>>> to say we should not support that even when developer understand the
->>>> consequence of that ?
->>>
->>> Well, I see there are the exynos5410/5420/5422. For the 5422 on
->>> chromebook2 MCPM works well, IIUC. But for the 5422 on odroid-xu3, MCPM
->>> does not work, hence cpuidle neither because of the firmware.
->>>
->>> Silently disabling cpuidle because mcpm did not initialize will hide the
->>> issue.
->>
->> No. MCPM *will* initialize, Sudeep's patch does not silently disable
->> CPUidle.
->> To put it differently MCPM will initialize if CCI is in the DT and it
->> is "available", so unless defined differently in the dts mcpm will be
->> available and CPUidle will be initialized (and break if there is an issue
->> with the platform FW/HW).
->>
->> I agree the mechanism to define if MCPM is available can be improved
->> but that's what it is at the moment.
->>
->> The problem here is to boot a platform with different boot methods
->> and still have a single kernel image.
->>
->>> I understand your point about switching to legacy without recompiling
->>> the kernel.
->>>
->>> I suggest we add a big fat WARN_ON when the mcpm initialization fails
->>> with your patch.
->>
->> I think there are multiple facets we are tackling at once here and they
->> should not be mixed.
->>
->> 1) We left static idle states there to cope with legacy DTBs that were
->>     published before we introduced idle states bindings. If we want to
->>     boot eg vexpress in legacy mode but single kernel image with MCPM on,
->>     we could remove the idle states in DT and the problem would be
->>     solved; we can't do that since we were forced to leave the static
->>     idle tables. Overall I think this is not the way to fix the issue.
->> 2) The idle driver should be initialized if there is an idle state entry
->>     method, which in this case is MCPM. If I boot vexpress with MCPM
->>     enabled but legacy boot method (ie spin table) with a single kernel image
->>     I do not want to warn if the idle states entry method (MCPM) can't be
->>     initialized (and I do not want to get a warning if the idle driver is
->>     triggering a mcpm_cpu_suspend), so Sudeep's patch is valid and I am
->>     against adding a:
->>
->>     if (WARN_ON(!mcpm_is_available())
->>
->> 3) Sudeep's patch is not hiding anything. If CCI is in DT, CCI is
->>     probed so mcpm_is_available() == true. If the firmware is borked
->>     the idle states will be entered and we will notice there is something
->>     wrong
->>
->> So overall I think Sudeep's patch is sound. I also think we should
->> improve the way we detect if MCPM is available, and again, I think the
->> CPU operations on arm64 are a good example that we can and we should
->> replicate.
+> Hehe, I wasn't actually expecting a patch, but thanks!
 >
-> This patch disables CPUidle all together, but shouldn't it just disable
-> the states that rely on MCPM?  IOW, C1 should still work just fine since
-> it doesn't use MCPM, right?  So, rather than fail the init, it should
-> just drop any MCPM states (e.g. set ->state_count = 1)
+>> -- >8 --
+>> Subject: [PATCH v2] iommu/arm-smmu: don't touch the secure STLBIALL register
+>>
+>> Currently we do a STLBIALL when we initialize the SMMU.  However, on
+>> systems with sane secure
+>> configurations (i.e. !ARM_SMMU_OPT_SECURE_CFG_ACCESS) that register is
+>> not supposed to be touched and is marked as "Secure only" in the spec.
+>> Touching it results in a crash on those platforms.  However, on
+>> platforms with ARM_SMMU_OPT_SECURE_CFG_ACCESS it's the only way to nuke
+>> the whole TLB, so leave it in for them but rip it out for everyone else.
+>>
+>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 60558f794922..d4c149d83f3d 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1686,9 +1686,12 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>>       }
+>>
+>>       /* Invalidate the TLB, just in case */
+>> -     writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+>> -     writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLH);
+>> -     writel_relaxed(0, gr0_base + ARM_SMMU_GR0_TLBIALLNSNH);
+>> +     if (smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS) {
+>> +             writel_relaxed(0, gr0_base + ARM_SMMU_GR0_STLBIALL);
+>
+> Right, so this is the bit where we'd need some Calxeda information about
+> whether or not to subtract 0x400 from gr0_base or not.
 
-Well, that means we will have a cpuidle driver with the WFI state only 
-which is the default idle function when there is no cpuidle driver (+ 
-without the governor math).
+Beats me. I don't recall any configuration option here. The binding
+only has a single address. Maybe Andreas remembers.
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rob
