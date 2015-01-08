@@ -1,86 +1,350 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 8 Jan 2015 12:09:08 -0600
-Subject: [PATCH 1/4] usb: phy: Fix deferred probing
-In-Reply-To: <20150108180417.GB17281@ulmo.nvidia.com>
-References: <1420559110-8043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1420559110-8043-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAOesGMhWgUu8wDyZyL63gq5JEDu=ecv=r0y7Aa+6SMt24N-Z+A@mail.gmail.com>
- <54AEB11B.6060403@linaro.org> <20150108172411.GN31926@saruman>
- <20150108180417.GB17281@ulmo.nvidia.com>
-Message-ID: <20150108180908.GO31926@saruman>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  8 Jan 2015 19:11:33 +0100
+Subject: [PATCH v4 12/12] ARM: mvebu: Add Armada 388 General Purpose
+ Development Board support
+In-Reply-To: <420738694-6163-13-git-send-email-gregory.clement@free-electrons.com>
+References: <420738694-6163-13-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420740693-7785-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 07:04:18PM +0100, Thierry Reding wrote:
-> On Thu, Jan 08, 2015 at 11:24:11AM -0600, Felipe Balbi wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Thu, Jan 08, 2015 at 06:32:27PM +0200, Grygorii.Strashko at linaro.org wrote:
-> > > Hi,
-> > > 
-> > > On 01/07/2015 06:41 AM, Olof Johansson wrote:
-> > > > On Tue, Jan 6, 2015 at 7:45 AM, Maxime Ripard
-> > > > <maxime.ripard@free-electrons.com> wrote:
-> > > >> Commit 1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error on
-> > > >> failure") actually broke the deferred probing mechanism, since it now returns
-> > > >> EPROBE_DEFER only when the try_module_get call fails, but not when the phy
-> > > >> lookup does.
-> > > >>
-> > > >> All the other similar functions seem to return ENODEV when try_module_get
-> > > >> fails, and the error code of either __usb_find_phy or __of_usb_find_phy
-> > > >> otherwise.
-> > > >>
-> > > >> In order to have a consistent behaviour, and a meaningful EPROBE_DEFER, always
-> > > >> return EPROBE_DEFER when __(of_)usb_find_phy fails to look up the requested
-> > > >> phy, that will be propagated by the caller, and ENODEV if try_module_get fails.
-> > > >>
-> > > > 
-> > > > Fixes:  1290a958d48e ("usb: phy: propagate __of_usb_find_phy()'s error
-> > > > on failure")
-> > > > 
-> > > >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > 
-> > > > This also fixes USB on tegra/trimslice here.
-> > > > 
-> > > > Tested-by: Olof Johansson <olof@lixom.net>
-> > > > 
-> > > > Given that the regression went in during 3.19 merge window, this
-> > > > should go in as a fix during -rc, please.
-> > > 
-> > > 1) Pls note, there is a duplication patch https://www.mail-archive.com/linux-usb at vger.kernel.org/msg53893.html
-> > > but this one is more correct as for me. 
-> > > 
-> > > 2) This patch fixes USB regression on Keystone 2, so
-> > > 
-> > >  Tested-by: Grygorii Strashko <grygorii.strashko@linaro.org>
-> > 
-> > Are we asking that I drop Thierry's Patch or just apply the other hunks?
-> 
-> The above doesn't like to my patch. The original is here:
-> 
-> 	http://www.spinics.net/lists/linux-usb/msg118358.html
-> 
-> That has the advantage of also handling the case where the PHY provider
-> is disabled and will therefore never become available, thus preventing
-> infinite deferred probe.
-> 
-> My patch doesn't handle the non-OF case, though I'm not sure that
-> it's safe to defer probe for those, since we don't have any indication
-> that the probe will ever succeed. In that case it might actually be
-> better to keep returning -ENODEV. Also the change to __usb_find_phy() is
-> unrelated to the commit that causes the regression, so if we want to
-> defer probe in that case, too it might be better to do so in a separate
-> patch.
+The A388-GP is a board produced by Marvell that holds
 
-my thoughts exactly. I'll send your patch and expect another patch for
-3.20 for the other case. Thanks
+- 1 PCIe slot
+- 2 mini PCIe slot (one of them is multiplexed with the PCIe slot,
+  muxing is selected through the GPIO expander)
+- 1 16MB SPI-NOR
+- 2 Gigabit Ethernet ports
+- 4 SATA ports (2 of them are multiplexed with the mini PCIe slots,
+  muxing is selected through the GPIO expander)
+- 1 SDIO slot
+- 1 USB3 port
+- 2 USB2 port
+- 2 GPIO/interrupts expander on I2C
 
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+
+Hi Andrew,
+
+I made a mistake and the file was improperly named
+armada-385-gp.dts. This patch is the correct version.
+
+Sorry for this.
+
+Gregory
+
+
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/armada-388-gp.dts | 288 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 289 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-388-gp.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4613c1603692..d5178d103766 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -536,6 +536,7 @@ dtb-$(CONFIG_MACH_ARMADA_375) += \
+ dtb-$(CONFIG_MACH_ARMADA_38X) += \
+ 	armada-385-db-ap.dtb \
+ 	armada-388-db.dtb \
++	armada-388-gp.dtb \
+ 	armada-388-rd.dtb
+ dtb-$(CONFIG_MACH_ARMADA_XP) += \
+ 	armada-xp-axpwifiap.dtb \
+diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+new file mode 100644
+index 000000000000..4df22bf91683
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-388-gp.dts
+@@ -0,0 +1,288 @@
++/*
++ * Device Tree file for Marvell Armada 385 development board
++ * (RD-88F6820-GP)
++ *
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is licensed under the terms of the GNU General Public
++ *     License version 2.  This program is licensed "as is" without
++ *     any warranty of any kind, whether express or implied.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "armada-388.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Marvell Armada 385 GP";
++	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++		stdout-path = &uart0;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000>; /* 2 GB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
++
++		internal-regs {
++			spi at 10600 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&spi0_pins>;
++				status = "okay";
++
++				spi-flash at 0 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "st,m25p128";
++					reg = <0>; /* Chip select 0 */
++					spi-max-frequency = <50000000>;
++					m25p,fast-read;
++				};
++			};
++
++			i2c at 11000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins>;
++				status = "okay";
++				clock-frequency = <100000>;
++				/*
++				 * The EEPROM located at adresse 54 is needed
++				 * for the boot - DO NOT ERASE IT -
++				 */
++
++				expander0: pca9555 at 20 {
++					compatible = "nxp,pca9555";
++					pinctrl-names = "default";
++					pinctrl-0 = <&pca0_pins>;
++					interrupt-parent = <&gpio0>;
++					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					reg = <0x20>;
++				};
++
++				expander1: pca9555 at 21 {
++					compatible = "nxp,pca9555";
++					pinctrl-names = "default";
++					interrupt-parent = <&gpio0>;
++					interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					reg = <0x21>;
++				};
++
++			};
++
++			serial at 12000 {
++				/*
++				 * Exported on the micro USB connector CON16
++				 * through an FTDI
++				 */
++
++				pinctrl-names = "default";
++				pinctrl-0 = <&uart0_pins>;
++				status = "okay";
++			};
++
++			/* GE1 CON15 */
++			ethernet at 30000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&ge1_rgmii_pins>;
++				status = "okay";
++				phy = <&phy1>;
++				phy-mode = "rgmii-id";
++			};
++
++			/* CON4 */
++			usb at 50000 {
++				vcc-supply = <&reg_usb2_0_vbus>;
++				status = "okay";
++			};
++
++			/* GE0 CON1 */
++			ethernet at 70000 {
++				pinctrl-names = "default";
++				/*
++				 * The Reference Clock 0 is used to provide a
++				 * clock to the PHY
++				 */
++				pinctrl-0 = <&ge0_rgmii_pins>, <&ref_clk0_pins>;
++				status = "okay";
++				phy = <&phy0>;
++				phy-mode = "rgmii-id";
++			};
++
++
++			mdio at 72004 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&mdio_pins>;
++
++				phy0: ethernet-phy at 1 {
++					reg = <1>;
++				};
++
++				phy1: ethernet-phy at 0 {
++					reg = <0>;
++				};
++			};
++
++			sata at a8000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&sata0_pins>, <&sata1_pins>;
++				status = "okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++
++			sata at e0000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&sata2_pins>, <&sata3_pins>;
++				status = "okay";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++
++			sdhci at d8000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&sdhci_pins>;
++				cd-gpios = <&expander0 5 GPIO_ACTIVE_LOW>;
++				no-1-8-v;
++				wp-inverted;
++				bus-width = <8>;
++				status = "okay";
++			};
++
++			/* CON5 */
++			usb3 at f0000 {
++				vcc-supply = <&reg_usb2_1_vbus>;
++				status = "okay";
++			};
++
++			/* CON7 */
++			usb3 at f8000 {
++				vcc-supply = <&reg_usb3_vbus>;
++				status = "okay";
++			};
++		};
++
++		pcie-controller {
++			status = "okay";
++			/*
++			 * One PCIe units is accessible through
++			 * standard PCIe slot on the board.
++			 */
++			pcie at 1,0 {
++				/* Port 0, Lane 0 */
++				status = "okay";
++			};
++
++			/*
++			 * The two other PCIe units are accessible
++			 * through mini PCIe slot on the board.
++			 */
++			pcie at 2,0 {
++				/* Port 1, Lane 0 */
++				status = "okay";
++			};
++			pcie at 3,0 {
++				/* Port 2, Lane 0 */
++				status = "okay";
++			};
++		};
++
++		gpio-fan {
++			compatible = "gpio-fan";
++			gpios = <&expander1 3 GPIO_ACTIVE_HIGH>;
++			gpio-fan,speed-map = <	 0 0
++					      3000 1>;
++		};
++	};
++
++	reg_usb3_vbus: usb3-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb3-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_usb2_0_vbus: v5-vbus0 {
++		compatible = "regulator-fixed";
++		regulator-name = "v5.0-vbus0";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		gpio = <&expander1 14 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_usb2_1_vbus: v5-vbus1 {
++		compatible = "regulator-fixed";
++		regulator-name = "v5.0-vbus1";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_usb2_1_vbus: v5-vbus1 {
++		compatible = "regulator-fixed";
++		regulator-name = "v5.0-vbus1";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&pinctrl {
++	pca0_pins: pca0_pins {
++		marvell,pins = "mpp18";
++		marvell,function = "gpio";
++	};
++};
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/daf33c2e/attachment-0001.sig>
+1.9.1
