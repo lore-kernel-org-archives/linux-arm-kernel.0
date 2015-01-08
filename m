@@ -1,96 +1,187 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 8 Jan 2015 09:20:59 -0600
-Subject: [PATCH v2 08/21] irqchip: crossbar: convert dra7 crossbar to
- stacked domains
-In-Reply-To: <1420652576-22309-9-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-9-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150108152059.GB24705@kahuna>
+From: nadavh@marvell.com (Nadav Haklai)
+Date: Thu, 8 Jan 2015 15:21:11 +0000
+Subject: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point
+ Development Board support
+In-Reply-To: <20150106173101.GB7853@lukather>
+References: <1420558100-4700-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1420558100-4700-8-git-send-email-maxime.ripard@free-electrons.com>
+ <20150106155705.GB23784@lunn.ch> <20150106173101.GB7853@lukather>
+Message-ID: <29330f81b91442a1b36176f84530b86d@IL-EXCH01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:42-20150107, Marc Zyngier wrote:
-a few more minor comments follow:
 
-[..]
-> --- a/drivers/irqchip/irq-crossbar.c
-> +++ b/drivers/irqchip/irq-crossbar.c
-[..]
-> @@ -33,6 +34,7 @@
->   * @write: register write function pointer
->   */
->  struct crossbar_device {
-> +	raw_spinlock_t lock;
 
-^^ kernel doc missing.
+-----Original Message-----
+From: Maxime Ripard [mailto:maxime.ripard at free-electrons.com] 
+Sent: Tuesday, January 06, 2015 7:31 PM
+To: Andrew Lunn
+Cc: Gregory Clement; Jason Cooper; Sebastian Hesselbarth; Linus Walleij; Thomas Petazzoni; linux-arm-kernel at lists.infradead.org; Tawfik Bayouk; Nadav Haklai; Lior Amsalem
+Subject: Re: [PATCH v2 7/7] ARM: mvebu: Add Armada 385 Access Point Development Board support
 
-[...]
-> +static int crossbar_domain_alloc(struct irq_domain *d, unsigned int virq,
-> +				 unsigned int nr_irqs, void *data)
->  {
-> -	if (needs_crossbar_write(hw))
-> -		cb->write(hw - GIC_IRQ_START, cb->irq_map[hw - GIC_IRQ_START]);
-> +	struct of_phandle_args *args = data;
-> +	irq_hw_number_t hwirq;
-> +	int i;
-> +
-> +	if (args->args_count != 3)
-> +		return -EINVAL;	/* Not GIC compliant */
-> +	if (args->args[0] != 0)
-> +		return -EINVAL;	/* No PPI should point to this domain */
-> +
-> +	hwirq = args->args[1];
-> +	if ((hwirq + nr_irqs) > cb->max_crossbar_sources)
-> +		return -EINVAL;	/* Can't deal with this */
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		int err = allocate_gic_irq(d, virq + i, hwirq + i);
+Hi Andrew,
 
-^^ add a blank line here?
+On Tue, Jan 06, 2015 at 04:57:05PM +0100, Andrew Lunn wrote:
+> On Tue, Jan 06, 2015 at 04:28:20PM +0100, Maxime Ripard wrote:
+> 
+> Hi Maxime
+> 
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/armada-385-ap.dts
+> > @@ -0,0 +1,140 @@
+> > +/*
+> > + * Device Tree file for Marvell Armada 385 Access Point Development 
+> > +board
+> > + * (DB-88F6820-AP)
+> > + *
+> > + *  Copyright (C) 2014 Marvell
+> > + *
+> > + * Nadav Haklai <nadavh@marvell.com>
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2.  This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + */
+> 
+> Gregory is in the process of dual licensing some of the other mvebu DT 
+> files. This one is single license. Should it be dual?
 
-> +		if (err)
-> +			return err;
-> +
-> +		irq_domain_set_hwirq_and_chip(d, virq + i, hwirq + i,
-> +					      &crossbar_chip, NULL);
-> +	}
->  
->  	return 0;
->  }
->  
->  /**
-> - * crossbar_domain_unmap - unmap a crossbar<->irq connection
-> + * crossbar_domain_free - unmap/free a crossbar<->irq connection
->   * @d: domain of irq to unmap
+I'm not the original author though. Nadav, would you be ok to make a switch to a GPL/X11 dual-license?
+[Nadav Haklai] Yes, I agree.
 
-      ^^ should be @domain?
+> > +
+> > +/dts-v1/;
+> > +#include "armada-385.dtsi"
+> > +
+> > +#include <dt-bindings/gpio/gpio.h>
+> > +
+> > +/ {
+> > +	model = "Marvell Armada 385 Access Point Development Board";
+> > +	compatible = "marvell,a385-db-ap", "marvell,armada385", 
+> > +"marvell,armada38x";
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,115200";
+> 
+> Humm, ttyS0? Then why add the LL_DEBUG via UART1?
 
-> - * @irq: virq number
-> + * @virq: virq number
-> + * @nr_irqs: number of irqs to free
->   *
->   * We do not maintain a use count of total number of map/unmap
->   * calls for a particular irq to find out if a irq can be really
-> @@ -117,14 +144,19 @@ static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
->   * after which irq is anyways unusable. So an explicit map has to be called
->   * after that.
->   */
-> -static void crossbar_domain_unmap(struct irq_domain *d, unsigned int irq)
-> +static void crossbar_domain_free(struct irq_domain *domain, unsigned int virq,
-> +				 unsigned int nr_irqs)
->  {
-> -	irq_hw_number_t hw = irq_get_irq_data(irq)->hwirq;
-> +	int i;
->  
-> -	if (needs_crossbar_write(hw)) {
-> -		cb->irq_map[hw - GIC_IRQ_START] = IRQ_FREE;
-> -		cb->write(hw - GIC_IRQ_START, cb->safe_map);
-> +	raw_spin_lock(&cb->lock);
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
+Yeah, my bad :)
 
-^^ Add a blank line here.
+It's obviously ttyS1
 
--- 
-Regards,
-Nishanth Menon
+> Maybe add
+> 
+> stdout-path = &uart1;
+
+Does that even work with the 8250? Last time I tried with a 3.18, it didn't, and you still needed the console= bootargs.
+
+> > +	};
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> > +		reg = <0x00000000 0x80000000>; /* 2GB */
+> > +	};
+> > +
+> > +	soc {
+> > +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+> > +			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
+> > +
+> > +		internal-regs {
+> > +			spi1: spi at 10680 {
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&spi1_pins>;
+> > +				status = "okay";
+> > +
+> > +				spi-flash at 0 {
+> > +					#address-cells = <1>;
+> > +					#size-cells = <1>;
+> > +					compatible = "st,m25p128";
+> > +					reg = <0>; /* Chip select 0 */
+> > +					spi-max-frequency = <108000000>;
+> > +				};
+> > +			};
+> > +
+> > +			i2c0: i2c at 11000 {
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&i2c0_pins>;
+> > +				status = "okay";
+> > +				clock-frequency = <100000>;
+> > +			};
+> > +
+> > +			i2c1: i2c at 11100 {
+> > +				status = "okay";
+> > +				clock-frequency = <100000>;
+> > +			};
+> 
+> Is there anything on these two i2c busses?
+
+One goes to some pin of the mPCIe slot, the other is connected to the EEPROM.
+
+> If not, why enable them and increase the clock speed?
+
+The clock speed is not increased, it's actually the driver's default.
+
+> 
+> > +			mdio at 72004 {
+> > +				pinctrl-names = <&mdio_pins>;
+> > +
+> > +				phy0: ethernet-phy at 0 {
+> > +					reg = <1>;
+> > +				};
+> > +
+> > +				phy1: ethernet-phy at 1 {
+> > +					reg = <6>;
+> > +				};
+> > +
+> > +				phy2: ethernet-phy at 2 {
+> > +					reg = <4>;
+> > +				};
+> > +			};
+> > +
+> > +			uart0: serial at 12000 {
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&uart0_pins>;
+> > +				status = "okay";
+> > +			};
+> > +
+> > +			uart1: serial at 12100 {
+> > +				pinctrl-names = "default";
+> > +				pinctrl-0 = <&uart1_pins>;
+> > +				status = "okay";
+> > +			};
+> 
+> If it is not obvious from the silk screen, could you describe which 
+> connector this uart is on, what pins are what?
+
+There's two UART connectors documented in the user guide (JP8 and JP9). UART1 is also connected to a FTDI chip, that is exposed through a mini-USB connector.
+
+> > +
+> > +			ethernet at 30000 {
+> > +				status = "okay";
+> > +				phy = <&phy1>;
+> > +				phy-mode = "sgmii";
+> > +			};
+> > +
+> > +			ethernet at 34000 {
+> > +				status = "okay";
+> > +				phy = <&phy2>;
+> > +				phy-mode = "sgmii";
+> > +			};
+> > +
+> > +			ethernet at 70000 {
+> > +				pinctrl-names = "default";
+> > +
+> > +				/*
+> > +				 * The Reference Clock 0 is used to
+> > +				 * provide a clock to the PHY
+> > +				 */
+> 
+> Does this clock need enabling? Should it be listed in the clocks 
+> property?
+
+>From what I understood, this clock is always running, it's just exposed to some external pin, and hence needs some muxing.
+
+Maxime
+
+Thanks,
+Nadav
