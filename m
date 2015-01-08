@@ -1,69 +1,114 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 8 Jan 2015 11:55:31 +0100
-Subject: [PATCH 1/2] arm64: Kconfig: add basic support for the Tegra SoC
- family and the Tegra132 SoC
-In-Reply-To: <54AE5DD0.6020409@nvidia.com>
-References: <20150107081638.14381.42444.stgit@dusk.lan>
- <20150107081729.14381.47835.stgit@dusk.lan>
- <20150107142005.GA1621@ulmo> <54AE5DD0.6020409@nvidia.com>
-Message-ID: <20150108105529.GH1987@ulmo.nvidia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Jan 2015 11:56:12 +0100
+Subject: [PATCH v15 10/11] KVM: arm/arm64: Enable Dirty Page logging for
+ ARMv8
+In-Reply-To: <54ADE293.1040901@samsung.com>
+References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
+ <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
+ <20150107124744.GC21092@cbox> <54ADE293.1040901@samsung.com>
+Message-ID: <20150108105612.GJ21092@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 03:37:04AM -0700, Paul Walmsley wrote:
-> Hi Thierry,
-> 
-> On 01/07/2015 07:20 AM, Thierry Reding wrote:
-> >* PGP Signed by an unknown key
-> >
-> >On Wed, Jan 07, 2015 at 01:17:33AM -0700, Paul Walmsley wrote:
-> >>Add basic Kbuild support for the Tegra SoC family, and specifically,
-> >>the Tegra132 SoC.  Tegra132 pairs the NVIDIA Denver CPU complex with
-> >>the SoC integration of Tegra124 - hence the use of ARCH_TEGRA and the
-> >>Tegra124 pinctrl option.
+On Wed, Jan 07, 2015 at 05:51:15PM -0800, Mario Smarduch wrote:
+> On 01/07/2015 04:47 AM, Christoffer Dall wrote:
+> > On Sun, Dec 14, 2014 at 11:28:07PM -0800, Mario Smarduch wrote:
+> >> This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
+> > 
+> >                            dirty
+> yeah.
+> > 
+> >> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
+> >> logging at architecture layer.
 > >>
-> >>For the time being, Tegra ARM64 support is added with a dependency on
-> >>CONFIG_BROKEN.  This is temporary and can be removed when the
-> >>following two patches for compilation failures have been merged:
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_host.h | 12 ------------
+> >>  arch/arm/kvm/arm.c              |  4 ----
+> >>  arch/arm/kvm/mmu.c              | 19 +++++++++++--------
+> >>  arch/arm64/kvm/Kconfig          |  2 ++
+> >>  4 files changed, 13 insertions(+), 24 deletions(-)
 > >>
-> >>"soc: tegra: pmc: restrict compilation of suspend-related support to ARM"
-> >>https://git.kernel.org/cgit/linux/kernel/git/pjw/tegra-dev.git/commit/?id=053decbf3900d4e8fee799f9a29cf8d905b2fcb1
-> >I think you said you were going to respin this on top of v3.19-rc1, but
-> >the above doesn't seem to be rebased yet. Given that the only comments
-> >were bikeshed from my part, do you have any objections to me taking the
-> >patch and apply the bikeshed myself?
+> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> >> index b138431..088ea87 100644
+> >> --- a/arch/arm/include/asm/kvm_host.h
+> >> +++ b/arch/arm/include/asm/kvm_host.h
+> >> @@ -223,18 +223,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+> >>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+> >>  }
+> >>  
+> >> -/**
+> >> - * kvm_flush_remote_tlbs() - flush all VM TLB entries
+> >> - * @kvm:	pointer to kvm structure.
+> >> - *
+> >> - * Interface to HYP function to flush all VM TLB entries without address
+> >> - * parameter.
+> >> - */
+> >> -static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+> >> -{
+> >> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+> >> -}
+> >> -
+> >>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+> >>  {
+> >>  	return 0;
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index 6e4290c..1b6577c 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -740,7 +740,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+> >>   */
+> >>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+> >>  {
+> >> -#ifdef CONFIG_ARM
+> >>  	bool is_dirty = false;
+> >>  	int r;
+> >>  
+> >> @@ -753,9 +752,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+> >>  
+> >>  	mutex_unlock(&kvm->slots_lock);
+> >>  	return r;
+> >> -#else /* arm64 */
+> >> -	return -EINVAL;
+> >> -#endif
+> >>  }
+> >>  
+> >>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index dc763bb..59003df 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
+> >>  
+> >>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
+> >>  {
+> >> -#ifdef CONFIG_ARM
+> >>  	return !!memslot->dirty_bitmap;
+> >> -#else
+> >> -	return false;
+> >> -#endif
+> >> +}
+> >> +
+> >> +/**
+> >> + * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
+> >> + * @kvm:	pointer to kvm structure.
+> >> + *
+> >> + * Interface to HYP function to flush all VM TLB entries
+> >> + */
+> >> +inline void kvm_flush_remote_tlbs(struct kvm *kvm)
+> > 
+> > did you intend for a non-staic inline here?
 > 
-> Sorry about that.  I am indeed on the hook for that.   I got distracted with
-> some other patches and haven't yet reposted that one :-(
-> I will do that later today.  If you would prefer to do it yourself, that's
-> fine too.
+> Yes it's used in arm.c and mmu.c
 
-I ended up applying your patch as is. Retrospectively my comments had
-been a little too much on the pedantic side.
+then why inline?
 
-> >>"clocksource: tegra: wrap arch/arm-specific sections in CONFIG_ARM"
-> >>https://git.kernel.org/cgit/linux/kernel/git/pjw/tegra-dev.git/commit/?id=220aa7fcc74a1a089916be6cb34b0e326f31841f
-> >I don't think I've seen any comments other than mine on this patch.
-> >Given that this patch depends on the above to get rid of the BROKEN
-> >dependency, it might still be preferable to take both via the Tegra
-> >tree. Otherwise we probably have to wait until v3.21 before we can
-> >apply this.
-> 
-> I'm fine with them going in through you if you have a strong preference for
-> that approach.   Generally my preference is for patches to go in through the
-> direct maintainer's tree to minimize the risk and hassle of merge conflicts.
-> But if you'll take care of that side of it, it doesn't matter too much to me
-> :-)   We just need to pick up acks from the direct maintainers, I guess?
+I'm not a compiler expert by any measure, but poking around I'm pretty
+sure the inline keyword in this context is useless.  See for example:
+http://www.cs.nyu.edu/~xiaojian/bookmark/c_programming/Inline_Functions.htm
 
-Yes, we really just need an ack from either Daniel or Thomas on the
-clocksource patch. I don't think that driver has a lot of potential for
-merge conflicts.
+So I suggest either make it a normal stand-alone function or keep it as
+duplicate static inlines in the header files if you're adamant about
+this being inlined.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/211b5a39/attachment.sig>
+-Christoffer
