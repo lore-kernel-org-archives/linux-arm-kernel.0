@@ -1,50 +1,75 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Thu, 08 Jan 2015 10:49:44 -0500
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <54AE830E.1090000@redhat.com>
-References: <54AE830E.1090000@redhat.com>
-Message-ID: <54AEA718.20502@redhat.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 8 Jan 2015 10:52:36 -0500
+Subject: [PATCH v3 0/4] PCI: get DMA configuration from parent device
+In-Reply-To: <CAErSpo46UAn9ckbzrgzAoQbu2D=oyOOL_rO24NWEg_iDLSuCLA@mail.gmail.com>
+References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
+ <54ADBBCF.8020206@ti.com>
+ <CAErSpo46UAn9ckbzrgzAoQbu2D=oyOOL_rO24NWEg_iDLSuCLA@mail.gmail.com>
+Message-ID: <54AEA7C4.9000005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 08:15 AM, Pratyush Anand wrote:
-> Hi All,
-> 
-> I am trying to test following scenario, which seems valid to me. But I am very new to ARM64 as well as to debugging tools, so seeking expert's comment here.
-> 
-> -- I have inserted a kprobe to the function uprobe_breakpoint_handler which is called from elo_dbg (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
-> 
-> -- kprobe is enabled.
-> 
-> -- an uprobe is inserted into a test application and enabled.
-> 
-> So, when uprobe is enabled and test code execution reaches to probe instruction, it executes uprobe breakpoint instruction and el0_dbg exception is raised.
-> 
-> When control reaches to start of uprobe_breakpoint_handler and it executes first instruction (which has been replaced with a kprobe breakpoint instruction), el1_dbg exception is raised.
-> 
-> Further Call sequence goes like, el1_dbg->do_debug_exception->brk_handler->call_break_hook->kprobe_breakpoint_handler, and kprobe breakpoint handler does everything what it should have done.
-> 
-> After return from above (first) el1_dbg, second el1_dbg is raised for single steping of kprobe instruction, and instruction pointer does not matches with the kcb->ss_ctx.match_addr and so, kprobe_ss_hit fails, which is strange.
-> 
-> To debug it further, I examined ELR_EL1 value in el1_dbg after execution of first el1_dbg, and it was fffffdfffc000004.
-> 
-> So, my question is how can instruction pointer has a value fffffe0000092470(which is actually el1_inv + 0x4) when second el1_dbg is received?
-> 
-> Am I missing something or trying something which is not supported by ARM64?
-> 
-> 
-> I have put some printk in the code. You can have a detailed view of debug code and print log here:
-> 
-> https://github.com/pratyushanand/linux.git
-> 
-> branch: ml_arm64_uprobe_devel_debug_kprobe_insertion_at_uprobe_breakpoint_handler
-> 
-> 
-> ~Pratyush
+On 01/07/2015 06:08 PM, Bjorn Helgaas wrote:
+> On Wed, Jan 7, 2015 at 5:05 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
+>> On 01/07/2015 01:49 PM, Murali Karicheri wrote:
+>>>
+>>> PCI devices on Keystone doesn't have correct dma_pfn_offset set. This
+>>> patch
+>>> add capability to set the dma configuration such as dma-mask,
+>>> dma_pfn_offset,
+>>> and dma ops etc using the information from DT. The prior RFCs and
+>>> discussions
+>>> are available at [1] and [2] below.
+>>>
+>>> [2] :
+>>> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg790244.html
+>>> [1] : http://www.gossamer-threads.com/lists/linux/kernel/2024591
+>>>
+>>> Change history:
+>>>          v3 - addressed comments to re-use of_dma_configure() for PCI
+>>>             - To help re-use, change of_iommu_configure() function argument
+>>>                  - Move of_dma_configure to of/device.c
+>>>                  - Limit the of_iommu_configure to non pci devices
+>>>          v2 - update size to coherent_dma_mask + 1 if dma-range info is
+>>> missing
+>>>             - also check the np for null.
+>>>          v1 - updates based on the comments against initial RFC.
+>>>             - Added a helper function to get the OF node of the parent
+>>>             - Added an API in of_pci.c to update DMA configuration of the
+>>> pci
+>>>               device.
+>>>
+>>> Murali Karicheri (4):
+>>>     of: iommu: add ptr to OF node arg to of_iommu_configure()
+>>>     of: move of_dma_configure() to device,c to help re-use
+>>>     of/pci: add of_pci_dma_configure() update dma configuration
+>>>     PCI: update dma configuration from DT
+>>>
+>>>    drivers/iommu/of_iommu.c  |   10 ++++++--
+>>>    drivers/of/device.c       |   58
+>>> +++++++++++++++++++++++++++++++++++++++++++++
+>>>    drivers/of/of_pci.c       |   39 ++++++++++++++++++++++++++++++
+>>>    drivers/of/platform.c     |   58
+>>> ++-------------------------------------------
+>>>    drivers/pci/probe.c       |    2 ++
+>>>    include/linux/of_device.h |    2 ++
+>>>    include/linux/of_iommu.h  |    6 +++--
+>>>    include/linux/of_pci.h    |   12 ++++++++++
+>>>    8 files changed, 127 insertions(+), 60 deletions(-)
+>>>
+>> Bjorn,
+>>
+>> Could you review this series from the PCI subsystem point of view?
+>
+> Will do, it's in my patchwork queue.  I'm just returning after a
+> couple weeks of vacation, during which I moved across the country, so
+> it will take me a bit to catch up.
+>
+> Bjorn
+Bjorn,
 
-Hi Pratyush,
+Thanks and Happy New year!
 
-Could the problem be that uprobe handling is already handling the breakpoint exception, so when the kprobe fires in the uprobes code it is like nested kprobes? When this happen some state information is getting clobbered and process never gets out of the nested kprobe/uprobe.  I wonder if similar failures can be trigger with kprobes in the kernel code that user-space gdb uses the handle breakpoints or hardware watchpoints/breakpoints.
-
--Will
+-- 
+Murali Karicheri
+Linux Kernel, Texas Instruments
