@@ -1,72 +1,59 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu, 08 Jan 2015 09:49:08 +0100
-Subject: [PATCH v2] ARM: dts: Add dts file for odroid XU3 board
-In-Reply-To: <6203C077F070A646AA0FCB4B5F1795D248114CA6@sisaex01sj>
-References: <1417721269-19342-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <54AA48E6.3040404@samsung.com> <1420470469.15910.134.camel@collabora.co.uk>
- <69242715.30115.1420655868687.JavaMail.yahoo@jws10659.mail.bf1.yahoo.com>
- <1420670333.6075.2.camel@collabora.co.uk>
- <6203C077F070A646AA0FCB4B5F1795D248114CA6@sisaex01sj>
-Message-ID: <1420706948.6075.17.camel@collabora.co.uk>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 08 Jan 2015 09:49:51 +0100
+Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.19
+In-Reply-To: <544519A4.5090003@monstr.eu>
+References: <544519A4.5090003@monstr.eu>
+Message-ID: <54AE44AF.6010808@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-01-07 at 23:49 +0000, Jonathan Stone -SISA wrote:
-> 
-> On On Wed, 2015-01-07 at 18:37 +0000, Sjoerd Simons writes wrote:
-> >On Wed, 2015-01-07 at 18:37 +0000, Anand Moon wrote:>
-> [...]
-> 
-> >> Only 4 core cpu's are on my board. Also CpuFreq is not working.
-> > 
-> > Can you share some point on this.
-> 
-> >The defconfig is using the bL switcher, which pairs up big and little cores to make them appear as one core.. So for 8 real cores, you'll get
-> >4 "virtual cores".
-> 
-> That configuration is appropriate for the 5420, which allegedly has a hardware bug in the cache-coherence between the Cortex-A7 block and the Cortex-A15 block.
-> Newer Exynos 5 SoCs -- 5422/5800, 5620, etc -- don't have that bug. The scheduler should configured to  do HMP on all 8 (or 6) cores.
-> I don't have a 5410, but I assume it has the same bug as the 5420.
+Hi,
 
-Yes the kernel/scheduler could be configured like that, but
-exynos_defconfig turns on bL rather then HMP. 
+please consider to pull this one DT patch to your tree as fix for v3.19
+It is adding USD dt node. Driver has been added to v3.19.
 
-Now it's not unthinkable to add code/dts properties to select the
-right/preferred scheduling strategy depending on the board (HMP vs. bL).
-But proper HMP scheduling is still a work in progress in mainline and
-iirc specifically on the XU3 there are open issue wrt. MCPM and its
-secure firmware. I've added Kevin to the CC as he's been working on this
-topic so should know the status a lot better then i do.
+Thanks,
+Michal
 
-> The XU3 kernel supplied by HardKernel shows all 8 cores, and does HMP scheduling across all 8.
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-Yes, that's independant of the dts though as mentioned above. Also there
-are still opne issues to booting up all cores on an XU3 afaik. See 
-   http://www.spinics.net/lists/linux-samsung-soc/msg39523.html
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-> I tried v1.0 of the Odroid-XU3 DTB patch, applied to linux-next
-> 20150107.  I'm only seeing 1 core running on my Odroid-XU3.  The USB
-> 3.0 port works (great!) but I'm not getting any HDMI output. I didn't
-> try DisplayPort.   I'll gladly try v2 of the patch on an XU3; is there
-> a better base to apply the patch to?
+are available in the git repository at:
 
-HDMI output is broken on all exynos boards in mainline atm. For exynos
-5, see the thread here:
- http://www.spinics.net/lists/linux-samsung-soc/msg40708.html
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-fixes-for-3.19
 
-As far as a i know with the DTS as posted (just posted v3 with a small
-improvement), all base functionality that can work on mainline (MMC/SD,
-network, USB2, USB3) works. Some less important bits (fan control &
-power sensors) are outstanding, but that really shouldn't block the
-merge of the DTS.
+for you to fetch changes up to 1643b31658c44767a85469733c6bff4f6d0371c7:
 
---
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
+  ARM: zynq: DT: Add USB to device tree (2015-01-08 09:35:04 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq DT fixes for v3.19
+
+- Add USB chipidea driver to DT
+
+----------------------------------------------------------------
+Soren Brinkmann (1):
+      ARM: zynq: DT: Add USB to device tree
+
+ arch/arm/boot/dts/zynq-7000.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zc702.dts | 11 +++++++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 10 ++++++++++
+ arch/arm/boot/dts/zynq-zed.dts   | 10 ++++++++++
+ 4 files changed, 51 insertions(+)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/472a71b3/attachment.bin>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/81bac99a/attachment.sig>
