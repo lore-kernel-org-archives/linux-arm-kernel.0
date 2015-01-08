@@ -1,54 +1,84 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 08 Jan 2015 15:53:15 +0100
-Subject: [PATCH RFC V3 2/3] mxs: add driver for ocotp in i.MX23 and i.MX28
-In-Reply-To: <54AE8D45.7050805@imgtec.com>
-References: <1413628372-2809-1-git-send-email-stefan.wahren@i2se.com>
- <2223659.OW08fe0cS1@wuerfel>
- <1003885907.22061.1415301932743.JavaMail.open-xchange@oxbsltgw00.schlund.de>
- <6087001.lBonPVHV5K@wuerfel> <54AE8D45.7050805@imgtec.com>
-Message-ID: <54AE99DB.1070300@i2se.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 8 Jan 2015 15:54:10 +0100
+Subject: [PATCH v2 7/8] ARM: mvebu: Add Device Tree description of the
+ Armada 388 SoC
+In-Reply-To: <1420714305-7496-8-git-send-email-gregory.clement@free-electrons.com>
+References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
+ <1420714305-7496-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150108155410.576bae03@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Dear Gregory CLEMENT,
 
-Am 08.01.2015 um 14:59 schrieb Ezequiel Garcia:
-> Hi Stefan, Arnd,
->
-> (I'm trimming the Cc list and adding Thierry and Maxime to the loop):
->
-> I'm in the process of finding a suitable upstream path for a new eFuse driver
-> for fuses used on Imagination Technologies SoCs.
->
-> This was our last proposal, which follows Tegra's work:
->
-> http://www.spinics.net/lists/devicetree/msg59246.html
->
-> However, Arnd was reluctant to take yet another efuse driver under drivers/soc
-> and proposed instead to try to find a unified API. We've had numerous fuse
-> drivers (tegra, sunxi, imx and img) appearing, so his concern certainly makes
-> sense.
->
-> I've talked to Arnd on IRC and we agreed to create a new directory
-> drivers/efuse. As a first step we would just move the tegra driver,
-> and add the new drivers (img on my side, and possibly mxs on Stefan's).
-> Perhaps we would also pull the sunxi_sid driver as well.
->
-> Having the drivers together would allow us to come up with a unified API
-> as follow up work.
+On Thu,  8 Jan 2015 11:51:44 +0100, Gregory CLEMENT wrote:
+> This SoC belongs to the Armada 38x family. The main difference with
+> the Armada 385 is that the 388 can handle two more SATA
+> ports. Currently the only consequence is the use of a different
+> compatible string for the pinctrl node, in order to be able to use the
+> pins associated to this 2 new SATA ports.
 
-does this unified API affects userspace interface, internal kernel
-interface or both?
+I am not sure the pinmux is the only difference. Read on below.
 
-> How does this sound? If you have no objections to this, I can go ahead and
-> try to prepare some RFCs.
+> +#include "armada-385.dtsi"
+> +
+> +/ {
+> +	model = "Marvell Armada 388 family SoC";
+> +	compatible = "marvell,armada388", "marvell,armada380";
+> +	soc {
 
-I'm happy about any progress on this. It's not really urgent for me to
-get the driver into mainline. A helpful and useable userspace interface
-is more important to me. So i want to send my comments/requirements
-about the API and post the mxs driver after the definition of the
-unified API.
+Please, one empty new line between the last property (compatible) and
+the "soc" node.
 
-Does this answer your question?
+> +		internal-regs {
+> +			pinctrl at 18000 {
+> +				compatible = "marvell,mv88f6828-pinctrl";
+> +			};
+> +		};
+> +	};
+> +};
 
-Stefan
+So, the 380 and 385 have two SATA ports, presumably ports 0 and 1.
+According to the Functional Specifications, section 3.1 (Internal
+Address map), those two ports are located at 0xA8000. Ports 2 and 3,
+which are only available on Armada 388, are located at 0xE0100 and
+0xE0180 according to the same datasheet. So I believe that the node:
+
+			sata at a8000 {
+				compatible = "marvell,armada-380-ahci";
+				reg = <0xa8000 0x2000>;
+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&gateclk 15>;
+				status = "disabled";
+			};
+
+should stay where it is in armada-38x.dtsi.
+
+However, the node:
+
+			sata at e0000 {
+				compatible = "marvell,armada-380-ahci";
+				reg = <0xe0000 0x2000>;
+				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&gateclk 30>;
+				status = "disabled";
+			};
+
+should probably move into armada-388.dtsi, since it covers ports 2 and
+3.
+
+In addition, I believe that the existing armada-385-db.dts and
+armada-385-rd.dts should be renamed to armada-388-db.dts and
+armada-388-rd.dts, and they should include armada-388.dtsi instead. At
+least it's sure for the DB (which has both SATA controllers enabled).
+For the RD, it remains to be confirmed, but in general most Marvell
+development platforms use the superset SoC, which has all the
+functionalities.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
