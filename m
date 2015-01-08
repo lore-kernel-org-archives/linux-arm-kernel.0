@@ -1,70 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 08 Jan 2015 09:53:47 +0100
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <54AE459B.8010703@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu,  8 Jan 2015 09:55:08 +0100
+Subject: [PATCH v2 3/3] soc/tegra: fuse: Add Tegra132 support
+In-Reply-To: <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
+References: <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2015 07:29 AM, Sudeep Holla wrote:
-> If big.LITTLE driver is initialized even when MCPM is unavailable,
-> we get the below warning the first time cpu tries to enter deeper
-> C-states.
+From: Thierry Reding <treding@nvidia.com>
 
-Can you elaborate why MCPM could be unavailable when the tc2 pm code 
-registers the mcpm platform ops before the cpuidle driver ?
+Tegra132 is very similar to Tegra124 from a peripheral point of view and
+uses the same fuse controller.
 
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v2:
+- add missing break in Tegra132 case for legacy fuse init (Vince Hsu)
 
+ drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
+ drivers/soc/tegra/fuse/fuse-tegra30.c | 3 +++
+ 2 files changed, 4 insertions(+)
 
-> ------------[ cut here ]------------
-> WARNING: CPU: 4 PID: 0 at kernel/arch/arm/common/mcpm_entry.c:130 mcpm_cpu_suspend+0x6d/0x74()
-> Modules linked in:
-> CPU: 4 PID: 0 Comm: swapper/4 Not tainted 3.19.0-rc3-00007-gaf5a2cb1ad5c-dirty #11
-> Hardware name: ARM-Versatile Express
-> [<c0013fa5>] (unwind_backtrace) from [<c001084d>] (show_stack+0x11/0x14)
-> [<c001084d>] (show_stack) from [<c04fe7f1>] (dump_stack+0x6d/0x78)
-> [<c04fe7f1>] (dump_stack) from [<c0020645>] (warn_slowpath_common+0x69/0x90)
-> [<c0020645>] (warn_slowpath_common) from [<c00206db>] (warn_slowpath_null+0x17/0x1c)
-> [<c00206db>] (warn_slowpath_null) from [<c001cbdd>] (mcpm_cpu_suspend+0x6d/0x74)
-> [<c001cbdd>] (mcpm_cpu_suspend) from [<c03c6919>] (bl_powerdown_finisher+0x21/0x24)
-> [<c03c6919>] (bl_powerdown_finisher) from [<c001218d>] (cpu_suspend_abort+0x1/0x14)
-> [<c001218d>] (cpu_suspend_abort) from [<00000000>] (  (null))
-> ---[ end trace d098e3fd00000008 ]---
->
-> This patch fixes the issue by checking for the availability of MCPM
-> before initializing the big.LITTLE cpuidle driver
->
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->   drivers/cpuidle/cpuidle-big_little.c | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-> index e3e225fe6b45..40c34faffe59 100644
-> --- a/drivers/cpuidle/cpuidle-big_little.c
-> +++ b/drivers/cpuidle/cpuidle-big_little.c
-> @@ -182,6 +182,10 @@ static int __init bl_idle_init(void)
->   	 */
->   	if (!of_match_node(compatible_machine_match, root))
->   		return -ENODEV;
-> +
-> +	if (!mcpm_is_available())
-> +		return -EUNATCH;
-> +
->   	/*
->   	 * For now the differentiation between little and big cores
->   	 * is based on the part number. A7 cores are considered little
->
-
-
+diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
+index 011a3363c265..c0d660f1aaac 100644
+--- a/drivers/soc/tegra/fuse/fuse-tegra.c
++++ b/drivers/soc/tegra/fuse/fuse-tegra.c
+@@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
+ 	{ .compatible = "nvidia,tegra30-car", },
+ 	{ .compatible = "nvidia,tegra114-car", },
+ 	{ .compatible = "nvidia,tegra124-car", },
++	{ .compatible = "nvidia,tegra132-car", },
+ 	{},
+ };
+ 
+diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
+index d1a4290cda5c..9e3679594259 100644
+--- a/drivers/soc/tegra/fuse/fuse-tegra30.c
++++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
+@@ -184,6 +184,9 @@ static void __init legacy_fuse_init(void)
+ 	case TEGRA124:
+ 		fuse_info = &tegra124_info;
+ 		break;
++	case TEGRA132:
++		fuse_info = &tegra124_info;
++		break;
+ 	default:
+ 		return;
+ 	}
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.1.3
