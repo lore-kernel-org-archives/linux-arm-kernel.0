@@ -1,47 +1,20 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Thu, 8 Jan 2015 03:18:46 -0700
-Subject: Tegra baseline test results for v3.19-rc1
-Message-ID: <54AE5986.6030806@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 8 Jan 2015 10:23:35 +0000
+Subject: [PATCH] ASoC: rockchip: i2s:  applys rate symmetry for CPU DAI
+In-Reply-To: <1420685399-24142-1-git-send-email-jay.xu@rock-chips.com>
+References: <1420685399-24142-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <20150108102335.GM2634@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.19-rc1.
-Logs and other details at:
+On Thu, Jan 08, 2015 at 10:49:59AM +0800, Jianqun Xu wrote:
+> This patch applys rate symmetry for rockchip i2s DAI.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc1/20150108014100/
-
-
-Test summary
-------------
-
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.18 (b2776bf7149bddd1f4161f14f79520f17fc1d71d)):
-    text     data      bss    total  kernel
-+882219   +15760    -2432  +895547  multi_v7_defconfig
-+149737    +2872   -12344  +140265  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.18 (b2776bf7149bddd1f4161f14f79520f17fc1d71d))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-     -872k     872k        .      40k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-     -140k     140k        .      16k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-     -876k     876k        .      40k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-     -144k     144k        .      16k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-     -868k     868k        .      40k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-     -136k     136k        .      16k       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
-
-The kernel boot-time memory report line changed.  Now it breaks CMA-reserved memory out into a separate quantity.  It's been lumped back in with reserved memory in this report.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150108/0310982c/attachment.sig>
