@@ -1,82 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 08 Jan 2015 16:01:43 +0530
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver
- if MCPM is unavailable
-In-Reply-To: <54AE55CE.6040201@linaro.org>
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
- <54AE55CE.6040201@linaro.org>
-Message-ID: <54AE5C8F.9080600@arm.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Thu, 8 Jan 2015 03:37:04 -0700
+Subject: [PATCH 1/2] arm64: Kconfig: add basic support for the Tegra SoC
+ family and the Tegra132 SoC
+In-Reply-To: <20150107142005.GA1621@ulmo>
+References: <20150107081638.14381.42444.stgit@dusk.lan>
+ <20150107081729.14381.47835.stgit@dusk.lan> <20150107142005.GA1621@ulmo>
+Message-ID: <54AE5DD0.6020409@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Thierry,
 
-On Thursday 08 January 2015 03:32 PM, Daniel Lezcano wrote:
-> On 01/08/2015 10:16 AM, Sudeep Holla wrote:
->> Hi Daniel,
+On 01/07/2015 07:20 AM, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Wed, Jan 07, 2015 at 01:17:33AM -0700, Paul Walmsley wrote:
+>> Add basic Kbuild support for the Tegra SoC family, and specifically,
+>> the Tegra132 SoC.  Tegra132 pairs the NVIDIA Denver CPU complex with
+>> the SoC integration of Tegra124 - hence the use of ARCH_TEGRA and the
+>> Tegra124 pinctrl option.
 >>
->> On Thursday 08 January 2015 02:23 PM, Daniel Lezcano wrote:
->>> On 01/08/2015 07:29 AM, Sudeep Holla wrote:
->>>> If big.LITTLE driver is initialized even when MCPM is
->>>> unavailable, we get the below warning the first time cpu tries
->>>>  to enter deeper C-states.
->>>
->>> Can you elaborate why MCPM could be unavailable when the tc2 pm
->>> code registers the mcpm platform ops before the cpuidle driver ?
->>>
->>>
->> I can think of 3 possible scenarios. Let me know if these make
->> sense.
+>> For the time being, Tegra ARM64 support is added with a dependency on
+>> CONFIG_BROKEN.  This is temporary and can be removed when the
+>> following two patches for compilation failures have been merged:
 >>
->> 1. If the firmware settings in Vexpress configuration files are set
->> to boot in legacy mode, but MCPM is enabled in the kernel.
->
-> If I am not wrong, we have a BUG_ON in this path, right ?
->
+>> "soc: tegra: pmc: restrict compilation of suspend-related support to ARM"
+>> https://git.kernel.org/cgit/linux/kernel/git/pjw/tegra-dev.git/commit/?id=053decbf3900d4e8fee799f9a29cf8d905b2fcb1
+> I think you said you were going to respin this on top of v3.19-rc1, but
+> the above doesn't seem to be rebased yet. Given that the only comments
+> were bikeshed from my part, do you have any objections to me taking the
+> patch and apply the bikeshed myself?
 
-No we can't do that. E.g. on TC2 we should continue to boot in legacy
-mode though none of the power management features work which is fine.
-One scenario is I don't want to recompile the kernel, but try legacy
-boot on TC2 flipping the firmware setting.
+Sorry about that.  I am indeed on the hook for that.   I got distracted 
+with some other patches and haven't yet reposted that one :-(
+I will do that later today.  If you would prefer to do it yourself, 
+that's fine too.
 
->> 2. If some failure occurs during MCPM initialization 3. For
->> example, if CCI is not accessible as in some Exynos boards [1], we
->>  don't want to wait till mpcm_cpu_suspend ?
->
-> Well, I think if the firmware is preventing us to play with the CCI
-> but MCPM is enabled. We should add BUG_ON also in the same
+>> "clocksource: tegra: wrap arch/arm-specific sections in CONFIG_ARM"
+>> https://git.kernel.org/cgit/linux/kernel/git/pjw/tegra-dev.git/commit/?id=220aa7fcc74a1a089916be6cb34b0e326f31841f
+> I don't think I've seen any comments other than mine on this patch.
+> Given that this patch depends on the above to get rid of the BROKEN
+> dependency, it might still be preferable to take both via the Tegra
+> tree. Otherwise we probably have to wait until v3.21 before we can
+> apply this.
 
-Again why if alternate method of booting exists with limited/no PM features.
+I'm fine with them going in through you if you have a strong preference 
+for that approach.   Generally my preference is for patches to go in 
+through the direct maintainer's tree to minimize the risk and hassle of 
+merge conflicts.  But if you'll take care of that side of it, it doesn't 
+matter too much to me :-)   We just need to pick up acks from the direct 
+maintainers, I guess?
 
-> initialization path. IIRC, Kevin spent some time to figure out what
-> was happening to its odroid-xu3 board before understanding mcpm
-> wasn't able to deal with the CCI due to the broken firmware.
->
 
-I agree, I did follow that thread, though I don't fully understand if
-there exists alternate boot protocol on such boards. For sure TC2 or
-Vexpress with any coretile in general have legacy boot support.
-
-> The patch you are proposing is valid. Nevertheless, I would really
-> like to have the firmwares to be fixed and your patch is hiding an
-> incompatible firmware with the kernel configuration and letting the
-> kernel continue to work in degraded mode.
->
-
-I fully agree, but most of the time this argument is suppressed by
-saying the product is shipped and firmware can't be upgraded.
-
-> IMO, it would be better to be more strict with the mcpm
-> initialization and not let the system boot if something is wrong with
-> it which I believe is coming from the firmware and let the user to
-> figure out what is really happening by letting him to disable mcpm in
-> the kernel configuration (which in turn will disable cpuidle).
-
-Again I fully agree, but in this case I manually switched to legacy boot
-mode on TC2 and used same kernel with MCPM config enabled. Do you mean
-to say we should not support that even when developer understand the
-consequence of that ?
-
-Regards,
-Sudeep
+- Paul
