@@ -1,22 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 8 Jan 2015 14:39:34 -0800
-Subject: [GIT PULL] ARM: rockchip: dts fix for 3.19
-In-Reply-To: <2451485.a1EjNQjEOm@phil>
-References: <2451485.a1EjNQjEOm@phil>
-Message-ID: <20150108223934.GA13612@quad.lixom.net>
+Date: Thu, 8 Jan 2015 14:41:50 -0800
+Subject: [GIT PULL] at91: fixes for 3.19 #1 (bis)
+In-Reply-To: <1420456477-18204-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1420456477-18204-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150108224150.GB13612@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 31, 2014 at 11:53:08AM +0100, Heiko St?bner wrote:
-> Hi Arnd, Olof,
+On Mon, Jan 05, 2015 at 12:14:37PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> as the tag explains, a small fix increasing the drive-strength of sdmmc pins
-> to fix card communication issues introduced by a dw_mmc fix.
+> This is the rebase of my previous pull-request on top of 3.19-rc1. As said at
+> the time of my early messages, I was waiting for the arm-soc *and* pinctrl
+> material to reach Linus T.'s tree before sending this pull-request. In fact
+> this sequence was needed for the gpio header removal. The little patch about
+> #include deletion just follows an earlier merge conflict in arm-soc tree: I was
+> also waiting for this moment before sending the definitive fix, just to be
+> sure.
 > 
+> In comparison with the previous pull-request, I also added a tiny correction of
+> the sama5d4.dtsi timer entry. All the rest is pretty straightforward.
 > 
-> Thanks and happy new year
-> Heiko
-> 
+> Thanks, best regards,
 > 
 > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
@@ -24,21 +29,26 @@ On Wed, Dec 31, 2014 at 11:53:08AM +0100, Heiko St?bner wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.19-rockchip-dtsfixes1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
 > 
-> for you to fetch changes up to 6618e478954d2866754798c3b07805dc9dbb2fc4:
+> for you to fetch changes up to 0e049c66ebf56a415cadd6c593b7ee0a2cb9d19d:
 > 
->   ARM: dts: rockchip: bump sd card pin drive strength up on rk3288-evb (2014-12-21 15:02:10 +0100)
-> 
-> ----------------------------------------------------------------
-> Increase drive-strength to sdmmc pins on rk3288-evb to fix
-> an issue with the fixed highspeed card detection.
+>   ARM: at91/dt: sama5d4: fix the timer reg length (2015-01-05 11:07:14 +0100)
 > 
 > ----------------------------------------------------------------
-> Doug Anderson (1):
->       ARM: dts: rockchip: bump sd card pin drive strength up on rk3288-evb
+> First fixes batch for AT91 on 3.19 folowing The big cleanup:
+> - removal of unused Kconfig RTC options
+> - GPIO header file is now in same directory as the pinctrl driver
+> - little fix on #includes
+> - removal of DEBUG_LL from the sama5 common defconfig
+> - little fix of reg size in sama5d4.dtsi
+> 
+> ----------------------------------------------------------------
+> Bo Shen (1):
+>       ARM: at91/dt: sama5d4: fix the timer reg length
 
-Merged, thanks.
+This is the only fix among these patches, isn't it? The others seem to
+be code removals/cleanups better targeted for 3.20, as far as I can tell.
 
 
 -Olof
