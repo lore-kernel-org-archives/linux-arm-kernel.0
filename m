@@ -1,55 +1,80 @@
-From: wens213@gmail.com (wens Tsai)
-Date: Thu, 8 Jan 2015 11:54:21 +0800
-Subject: ARM: dts: sunxi: A20-OlinuXino-Lime2 raise dcdc2 lower voltage
- limit
-In-Reply-To: <54ADB179.9000209@gmail.com>
-References: <54ADB179.9000209@gmail.com>
-Message-ID: <CAGb2v64xsLpQ63GuxDRj+X454f-FaHHqS+2QpEWEnvgVO2NFQA@mail.gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Thu, 8 Jan 2015 09:32:44 +0530
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+In-Reply-To: <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
+References: <CAMJs5B8VqS2-3dhSX+PBaQruzyXiYwaYRQ7vvWEMrHbvbjn+9A@mail.gmail.com>
+ <CAAhSdy3iyMpXLh1Qq-TqZ-1W368kG0Oz9iE2McnJkYbA9ZaNPg@mail.gmail.com>
+ <20141119152952.GB9776@lvm>
+ <CAAhSdy2rQf-26SjeEspcc+LgwmhDr+QeYOOSyOUApF+0-8WdeA@mail.gmail.com>
+ <20141121095922.GR19598@cbox>
+ <CAAhSdy37W-iK2QznzVtwvZx427xDmm3kGEzN7KdOhvXvBuwwQQ@mail.gmail.com>
+ <20141121114950.GB3401@cbox>
+ <CAAhSdy3-+5T0sOEGHLtHbPQJ+3hXdZxL=695dq7PJ2J0qmVbTg@mail.gmail.com>
+ <20141124143753.GO3401@cbox>
+ <CAAhSdy0+Z8o6dx=Bq+Ep7ybQpTpj+QNJm4oJbKa8yCM7WS8oxg@mail.gmail.com>
+ <20141125134239.GI31297@cbox>
+ <CAAhSdy32G+-BVQk-=dWjfM1S-cytGavp4qq942m=3y7HUudguw@mail.gmail.com>
+ <5476FFAF.2010601@arm.com>
+ <CAAhSdy3US4H9DZLDmwawR6D22GUpQ8H5NqrZ8XvYJjhsnPzzRQ@mail.gmail.com>
+ <547705BF.5040609@arm.com>
+ <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
+Message-ID: <CAAhSdy1V4qwMsiXK6HHw-HMd6kXMNnRvY4oL5jK-qsPB4MK3pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 8, 2015 at 6:21 AM, Iain Paton <ipaton0@gmail.com> wrote:
-> The Lime2 is not stable if the cpu core voltage is reduced below 1v. To
-> prevent any problems when operating points are enabled, raise the pmic dcdc2
-> lower voltage limit to 1v.
+On Tue, Dec 30, 2014 at 11:19 AM, Anup Patel <anup@brainfault.org> wrote:
+> (dropping previous conversation for easy reading)
 >
-> Signed-off-by: Iain Paton <ipaton0@gmail.com>
-> ---
+> Hi Marc/Christoffer,
 >
-> Maxime, I realise the axp209 nodes will probably end up abstracted somewhat
-> differently once all of the patches Chen-Yu posted are reviewed and picked
-> up and I can redo the lime2 dts to fit once that's done.
-> For now, the lime2 dts defines the full axp209 node itself including all of
-> the regulators, so if the lowest opp with the 0.9v setting is enabled this
-> will cause problems.
+> I tried implementing PMU context-switch via C code
+> in EL1 mode and in atomic context with irqs disabled.
+> The context switch itself works perfectly fine but
+> irq forwarding is not clean for PMU irq.
 >
-> Up to you if you want to take this patch now or we wait until the axp209.dtsi
-> lands and refactor the lime2 dts appropriately then.
+> I found another issue that is GIC only samples irq
+> lines if they are enabled. This means for using
+> irq forwarding we will need to ensure that host PMU
+> irq is enabled.  The arch_timer code does this by
+> doing request_irq() for host virtual timer interrupt.
+> For PMU, we can either enable/disable host PMU
+> irq in context switch or we need to do have shared
+> irq handler between kvm pmu and host kernel pmu.
 >
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I have rethinked about our discussion so far. I
+> understand that we need KVM PMU virtualization
+> to meet following criteria:
+> 1. No modification in host PMU driver
+> 2. No modification in guest PMU driver
+> 3. No mask/unmask dance for sharing host PMU irq
+> 4. Clean way to avoid infinite VM exits due to
+> PMU interrupt
 >
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> index ed364d5..910318a 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> @@ -159,7 +159,7 @@
->                                         };
+> I have discovered new approach which is as follows:
+> 1. Context switch PMU in atomic context (i.e. local_irq_disable())
+> 2. Ensure that host PMU irq is disabled when entering guest
+> mode and re-enable host PMU irq when exiting guest mode if
+> it was enabled previously. This is to avoid infinite VM exits
+> due to PMU interrupt because as-per new approach we
+> don't mask the PMU irq via PMINTENSET_EL1 register.
+> 3. Inject virtual PMU irq at time of entering guest mode if PMU
+> overflow register is non-zero (i.e. PMOVSSET_EL0) in atomic
+> context (i.e. local_irq_disable()).
 >
->                                         vdd_cpu: dcdc2 {
-> -                                               regulator-min-microvolt = <700000>;
-> +                                               regulator-min-microvolt = <1000000>;
->                                                 regulator-max-microvolt = <2275000>;
+> The only limitation of this new approach is that virtual PMU irq
+> is injected at time of entering guest mode. This means guest
+> will receive virtual PMU  interrupt with little delay after actual
+> interrupt occurred. The PMU interrupts are only overflow events
+> and generally not used in any timing critical applications. If we
+> can live with this limitation then this can be a good approach
+> for KVM PMU virtualization.
+>
+> Regards,
+> Anup
 
-You should lower the maximum voltage as well, either in this patch
-or when you redo all the regulators. AFAIK the SoC certainly cannot
-take up to 2.275V. The regulator nodes are supposed to say what
-the board can handle.
+Hi Marc/Christoffer,
 
-ChenYu
+Ping??
 
->                                                 regulator-always-on;
->                                         };
-> --
-> 2.1.3
->
+Regards,
+Anup
