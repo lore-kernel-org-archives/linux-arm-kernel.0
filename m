@@ -1,159 +1,263 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 07 Jan 2015 17:51:15 -0800
-Subject: [PATCH v15 10/11] KVM: arm/arm64: Enable Dirty Page logging for
- ARMv8
-In-Reply-To: <20150107124744.GC21092@cbox>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418628488-3696-11-git-send-email-m.smarduch@samsung.com>
- <20150107124744.GC21092@cbox>
-Message-ID: <54ADE293.1040901@samsung.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 08 Jan 2015 10:58:07 +0900
+Subject: [PATCH v5] mmc: dw_mmc: add quirk for broken data transfer over
+ scheme
+In-Reply-To: <1420446088-15710-1-git-send-email-addy.ke@rock-chips.com>
+References: <1419585223-8214-1-git-send-email-addy.ke@rock-chips.com>
+ <1420446088-15710-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <54ADE42F.9070200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/2015 04:47 AM, Christoffer Dall wrote:
-> On Sun, Dec 14, 2014 at 11:28:07PM -0800, Mario Smarduch wrote:
->> This patch enables ARMv8 ditry page logging support. Plugs ARMv8 into generic
-> 
->                            dirty
-yeah.
-> 
->> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
->> logging at architecture layer.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h | 12 ------------
->>  arch/arm/kvm/arm.c              |  4 ----
->>  arch/arm/kvm/mmu.c              | 19 +++++++++++--------
->>  arch/arm64/kvm/Kconfig          |  2 ++
->>  4 files changed, 13 insertions(+), 24 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index b138431..088ea87 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -223,18 +223,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->>  	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
->>  }
->>  
->> -/**
->> - * kvm_flush_remote_tlbs() - flush all VM TLB entries
->> - * @kvm:	pointer to kvm structure.
->> - *
->> - * Interface to HYP function to flush all VM TLB entries without address
->> - * parameter.
->> - */
->> -static inline void kvm_flush_remote_tlbs(struct kvm *kvm)
->> -{
->> -	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
->> -}
->> -
->>  static inline int kvm_arch_dev_ioctl_check_extension(long ext)
->>  {
->>  	return 0;
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 6e4290c..1b6577c 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -740,7 +740,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->>   */
->>  int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->>  {
->> -#ifdef CONFIG_ARM
->>  	bool is_dirty = false;
->>  	int r;
->>  
->> @@ -753,9 +752,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->>  
->>  	mutex_unlock(&kvm->slots_lock);
->>  	return r;
->> -#else /* arm64 */
->> -	return -EINVAL;
->> -#endif
->>  }
->>  
->>  static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index dc763bb..59003df 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -52,11 +52,18 @@ static phys_addr_t hyp_idmap_vector;
->>  
->>  static bool kvm_get_logging_state(struct kvm_memory_slot *memslot)
->>  {
->> -#ifdef CONFIG_ARM
->>  	return !!memslot->dirty_bitmap;
->> -#else
->> -	return false;
->> -#endif
->> +}
->> +
->> +/**
->> + * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
->> + * @kvm:	pointer to kvm structure.
->> + *
->> + * Interface to HYP function to flush all VM TLB entries
->> + */
->> +inline void kvm_flush_remote_tlbs(struct kvm *kvm)
-> 
-> did you intend for a non-staic inline here?
+Hi, Addy.
 
-Yes it's used in arm.c and mmu.c
+On 01/05/2015 05:21 PM, Addy Ke wrote:
+> This patch add a new quirk to add a s/w timer to notify the driver
+> to terminate current transfer and report a data timeout to the core,
+> if DTO interrupt does NOT come within the given time.
 > 
->> +{
->> +	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
->>  }
->>  
->>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->> @@ -895,7 +902,6 @@ static bool kvm_is_device_pfn(unsigned long pfn)
->>  	return !pfn_valid(pfn);
->>  }
->>  
->> -#ifdef CONFIG_ARM
->>  /**
->>   * stage2_wp_ptes - write protect PMD range
->>   * @pmd:	pointer to pmd entry
->> @@ -1040,7 +1046,6 @@ void kvm_arch_mmu_write_protect_pt_masked(struct kvm *kvm,
->>  
->>  	stage2_wp_range(kvm, start, end);
->>  }
->> -#endif
->>  
->>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  			  struct kvm_memory_slot *memslot, unsigned long hva,
->> @@ -1445,7 +1450,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
->>  				   const struct kvm_memory_slot *old,
->>  				   enum kvm_mr_change change)
->>  {
->> -#ifdef CONFIG_ARM
->>  	/*
->>  	 * At this point memslot has been committed and there is an
->>  	 * allocated dirty_bitmap[], dirty pages will be be tracked while the
->> @@ -1453,7 +1457,6 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
->>  	 */
->>  	if (change != KVM_MR_DELETE && mem->flags & KVM_MEM_LOG_DIRTY_PAGES)
->>  		kvm_mmu_wp_memory_region(kvm, mem->slot);
->> -#endif
->>  }
->>  
->>  int kvm_arch_prepare_memory_region(struct kvm *kvm,
->> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
->> index 8ba85e9..3ce389b 100644
->> --- a/arch/arm64/kvm/Kconfig
->> +++ b/arch/arm64/kvm/Kconfig
->> @@ -22,10 +22,12 @@ config KVM
->>  	select PREEMPT_NOTIFIERS
->>  	select ANON_INODES
->>  	select HAVE_KVM_CPU_RELAX_INTERCEPT
->> +	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
->>  	select KVM_MMIO
->>  	select KVM_ARM_HOST
->>  	select KVM_ARM_VGIC
->>  	select KVM_ARM_TIMER
->> +	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
->>  	---help---
->>  	  Support hosting virtualized guest machines.
->>  
->> -- 
->> 1.9.1
->>
+> dw_mmc call mmc_request_done func to finish transfer depends on
+> DTO interrupt. If DTO interrupt does not come in sending data state,
+> the current transfer will be blocked.
+> 
+> We got the reply from synopsys:
+> There are two counters but both use the same value of [31:8] bits.
+> Data timeout counter doesn't wait for stop clock and you should get
+> DRTO even when the clock is not stopped.
+> Host Starvation timeout counter is triggered with stop clock condition.
+> 
+> This means that host should get DRTO and DTO interrupt.
+> 
+> But this case really exists, when driver reads tuning data from
+> card on RK3288-pink2 board. I measured waveforms by oscilloscope
+> and found that card clock was always on and data lines were always
+> holded high level in sending data state.
+> 
+> There are two possibility that data over interrupt doesn't come in
+> reading data state on RK3X SoCs:
+> - get command done interrupt, but doesn't get any data-related interrupt.
+> - get data error interrupt, but doesn't get data over interrupt.
+> 
+> We don't know why we have this problem, but we need it to fix this problem now.
+> And I will post a follow up change when we find the root cause.
+> 
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - fix some typo.
+> - remove extra timeout value (250ms).
+> - remove dw_mci_dto_start_monitor func.
+> - use "broken-dto" for new quirk and change Subject for it.
+> 
+> Changes in v3:
+> - Remove dts for broken-dto, just add this quirk in dw_mci_rockchip_init
+> 
+> Changes in v4:
+> - fix bug that may cause 32 bit overflow by (drto_clks * 1000).
+> - doesn't call mod_timer in writing data state, becase TMOUT register only
+>   for reading data.
+> 
+> Changes in v5:
+> - fix some typo.
+> - add a buffer for drto_ms.
+> - move drto_ms related code to a helper function.
+> 
+>  drivers/mmc/host/dw_mmc-rockchip.c |  3 ++
+>  drivers/mmc/host/dw_mmc.c          | 71 ++++++++++++++++++++++++++++++++++++--
+>  include/linux/mmc/dw_mmc.h         |  5 +++
+>  3 files changed, 77 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+> index 5650ac4..ba92ebd 100644
+> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> @@ -73,6 +73,9 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
+>  	/* It is slot 8 on Rockchip SoCs */
+>  	host->sdio_id0 = 8;
+>  
+> +	/* It needs this quirk on all Rockchip SoCs */
+> +	host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO;
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 6e4d864..ace4b40 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1468,6 +1468,20 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
+>  	return data->error;
+>  }
+>  
+> +static unsigned int dw_mci_get_drto_ms(struct dw_mci *host)
+> +{
+> +	unsigned int drto_clks;
+> +	unsigned int drto_ms;
+> +
+> +	drto_clks = mci_readl(host, TMOUT) >> 8;
+> +	drto_ms = DIV_ROUND_UP(drto_clks, host->bus_hz / 1000);
+> +
+> +	/* add a buffer */
+> +	drto_ms += 10;
+
+Add a buffer? What means?
+
+> +
+> +	return drto_ms;
+> +}
+
+dw_mci_set_drto() instead of dw_mci_get_drto_ms().
+
+Then you can include the codes relevant to broken-dto.
+
+static unsigned int (or void) dw_mci_set_drto(struct dw_mci *host) {
+
+	if (!(host->quirks & DW_MCI_QUIRK_BROKEN_DTO))
+		return;
+
+	... 
+	add codes relevant to broken-dtop (mod_timer) at here.
+}
+
+If you need to start timer, you have only to call dw_mci_set_drto().
+how about?
+
+Best Regards,
+Jaehoon Chung
+
+> +
+>  static void dw_mci_tasklet_func(unsigned long priv)
+>  {
+>  	struct dw_mci *host = (struct dw_mci *)priv;
+> @@ -1477,6 +1491,7 @@ static void dw_mci_tasklet_func(unsigned long priv)
+>  	enum dw_mci_state state;
+>  	enum dw_mci_state prev_state;
+>  	unsigned int err;
+> +	unsigned int drto_ms;
+>  
+>  	spin_lock(&host->lock);
+>  
+> @@ -1542,8 +1557,19 @@ static void dw_mci_tasklet_func(unsigned long priv)
+>  			}
+>  
+>  			if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
+> -						&host->pending_events))
+> +						&host->pending_events)) {
+> +				/*
+> +				 * If all data-related interrupts don't come
+> +				 * within the given time in reading data state.
+> +				 */
+> +				if ((host->quirks & DW_MCI_QUIRK_BROKEN_DTO) &&
+> +				    (host->dir_status == DW_MCI_RECV_STATUS)) {
+> +					drto_ms = dw_mci_get_drto_ms(host);
+> +					mod_timer(&host->dto_timer, jiffies +
+> +						  msecs_to_jiffies(drto_ms));
+> +				}
+>  				break;
+> +			}
+>  
+>  			set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
+>  
+> @@ -1573,8 +1599,20 @@ static void dw_mci_tasklet_func(unsigned long priv)
+>  
+>  		case STATE_DATA_BUSY:
+>  			if (!test_and_clear_bit(EVENT_DATA_COMPLETE,
+> -						&host->pending_events))
+> +						&host->pending_events)) {
+> +				/*
+> +				 * If data error interrupt comes but data over
+> +				 * interrupt doesn't come within the given time.
+> +				 * in reading data state.
+> +				 */
+> +				if ((host->quirks & DW_MCI_QUIRK_BROKEN_DTO) &&
+> +				    (host->dir_status == DW_MCI_RECV_STATUS)) {
+> +					drto_ms = dw_mci_get_drto_ms(host);
+> +					mod_timer(&host->dto_timer, jiffies +
+> +						  msecs_to_jiffies(drto_ms));
+> +				}
+>  				break;
+> +			}
+>  
+>  			host->data = NULL;
+>  			set_bit(EVENT_DATA_COMPLETE, &host->completed_events);
+> @@ -2135,6 +2173,9 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>  		}
+>  
+>  		if (pending & SDMMC_INT_DATA_OVER) {
+> +			if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO)
+> +				del_timer(&host->dto_timer);
+> +
+>  			mci_writel(host, RINTSTS, SDMMC_INT_DATA_OVER);
+>  			if (!host->data_status)
+>  				host->data_status = pending;
+> @@ -2522,6 +2563,28 @@ ciu_out:
+>  	return ret;
+>  }
+>  
+> +static void dw_mci_dto_timer(unsigned long arg)
+> +{
+> +	struct dw_mci *host = (struct dw_mci *)arg;
+> +
+> +	switch (host->state) {
+> +	case STATE_SENDING_DATA:
+> +	case STATE_DATA_BUSY:
+> +		/*
+> +		 * If DTO interrupt does NOT come in sending data state,
+> +		 * we should notify the driver to terminate current transfer
+> +		 * and report a data timeout to the core.
+> +		 */
+> +		host->data_status = SDMMC_INT_DRTO;
+> +		set_bit(EVENT_DATA_ERROR, &host->pending_events);
+> +		set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
+> +		tasklet_schedule(&host->tasklet);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+>  #ifdef CONFIG_OF
+>  static struct dw_mci_of_quirks {
+>  	char *quirk;
+> @@ -2670,6 +2733,10 @@ int dw_mci_probe(struct dw_mci *host)
+>  
+>  	host->quirks = host->pdata->quirks;
+>  
+> +	if (host->quirks & DW_MCI_QUIRK_BROKEN_DTO)
+> +		setup_timer(&host->dto_timer,
+> +			    dw_mci_dto_timer, (unsigned long)host);
+> +
+>  	spin_lock_init(&host->lock);
+>  	spin_lock_init(&host->irq_lock);
+>  	INIT_LIST_HEAD(&host->queue);
+> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> index 471fb31..2ece0dd 100644
+> --- a/include/linux/mmc/dw_mmc.h
+> +++ b/include/linux/mmc/dw_mmc.h
+> @@ -98,6 +98,7 @@ struct mmc_data;
+>   * @irq_flags: The flags to be passed to request_irq.
+>   * @irq: The irq value to be passed to request_irq.
+>   * @sdio_id0: Number of slot0 in the SDIO interrupt registers.
+> + * @dto_timer: Timer for broken data transfer over scheme.
+>   *
+>   * Locking
+>   * =======
+> @@ -202,6 +203,8 @@ struct dw_mci {
+>  	int			irq;
+>  
+>  	int			sdio_id0;
+> +
+> +	struct timer_list       dto_timer;
+>  };
+>  
+>  /* DMA ops for Internal/External DMAC interface */
+> @@ -226,6 +229,8 @@ struct dw_mci_dma_ops {
+>  #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
+>  /* No write protect */
+>  #define DW_MCI_QUIRK_NO_WRITE_PROTECT		BIT(4)
+> +/* Timer for broken data transfer over scheme */
+> +#define DW_MCI_QUIRK_BROKEN_DTO			BIT(5)
+>  
+>  /* Slot level quirks */
+>  /* This slot has no write protect */
+> 
