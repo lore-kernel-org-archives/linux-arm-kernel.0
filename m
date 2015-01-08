@@ -1,44 +1,24 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 8 Jan 2015 17:22:04 +0530
-Subject: [PATCH v2] ARM: DRA7: hwmod: Fix boot crash with DEBUG_LL enabled on
- UART3
-Message-ID: <1420717924-3721-1-git-send-email-lokeshvutla@ti.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 8 Jan 2015 19:54:08 +0800
+Subject: [RFC] how to implement suspend to ram for arm64?
+Message-ID: <20150108195408.01a8dfdb@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit '7dedd34: ARM: OMAP2+: hwmod: Fix a crash in _setup_reset()
-with DEBUG_LL' we moved from parsing cmdline to identify uart used
-for earlycon to using the requsite hwmod CONFIG_DEBUG_OMAPxUARTy FLAGS.
+Hi list,
 
-On DRA7 UART3 hwmod doesn't have this flag enabled, and atleast on
-BeagleBoard-X15, where we use UART3 for console, boot fails with
-DEBUG_LL enabled. Enable DEBUG_OMAP4UART3_FLAGS for UART3 hwmod.
+we need the suspend to ram feature on arm64. And I think the fundamental code
+is ready, for example  __cpu_suspend() etc.
 
-For using DEBUG_LL, enable CONFIG_DEBUG_OMAP4UART3 in menuconfig.
+However, there are several issues need to be resolved...
 
-Fixes: 90020c7b2c5e ("ARM: OMAP: DRA7: hwmod: Create initial DRA7XX SoC data")
-Cc: <stable@vger.kernel.org> # v3.12+
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Changes since v1:
-	- Updated $subject and patch description.	
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+1. where to put platform_suspend_ops implementation? drivers/power?
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index ffd6604..b6ea88f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -2017,7 +2017,7 @@ static struct omap_hwmod dra7xx_uart3_hwmod = {
- 	.class		= &dra7xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
- 	.main_clk	= "uart3_gfclk_mux",
--	.flags		= HWMOD_SWSUP_SIDLE_ACT,
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT | DEBUG_OMAP4UART3_FLAGS,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DRA7XX_CM_L4PER_UART3_CLKCTRL_OFFSET,
--- 
-1.9.1
+2. If the "put ddr to self refresh" code must be in EL3 or secure EL1, how
+linux tell the firmware to trigger it? extend PSCI or use the context_id
+of PSCI CPU_SUSPEND function?
+
+3. where to put the cod of invoke suspend_to_ram psci call?
+
+Thanks in advance,
+Jisheng
