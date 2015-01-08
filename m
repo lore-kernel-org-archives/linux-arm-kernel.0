@@ -1,144 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Jan 2015 18:48:34 +0000
-Subject: [PATCH v5 8/8] arm64/efi: remove idmap manipulations from UEFI code
-In-Reply-To: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1420742914-2404-9-git-send-email-ard.biesheuvel@linaro.org>
+From: alexanders83@web.de (Alexander Stein)
+Date: Thu, 08 Jan 2015 20:12:04 +0100
+Subject: [PATCH v3] ARM: at91/dt: sam9263: Add ac97 device node
+In-Reply-To: <1419854922-29338-3-git-send-email-alexanders83@web.de>
+References: <1419854922-29338-1-git-send-email-alexanders83@web.de>
+ <1419854922-29338-3-git-send-email-alexanders83@web.de>
+Message-ID: <2066438.if5qXaBWRu@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have moved the call to SetVirtualAddressMap() to the stub,
-UEFI has no use for the ID map, so we can drop the code that installs
-ID mappings for UEFI memory regions.
+Now that the implementation has been applied to sound/for-next (https://git.kernel.org/cgit/linux/kernel/git/tiwai/sound.git/log/?h=for-next
+), who is going to pick the related patches (this one and the other two adding documentation and default config)?
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/efi.h |  2 --
- arch/arm64/include/asm/mmu.h |  2 --
- arch/arm64/kernel/efi.c      | 32 +-------------------------------
- arch/arm64/kernel/setup.c    |  1 -
- arch/arm64/mm/mmu.c          | 12 ------------
- 5 files changed, 1 insertion(+), 48 deletions(-)
+Best regards,
+Alexander
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index effef3713c5a..7baf2cc04e1e 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -6,11 +6,9 @@
- 
- #ifdef CONFIG_EFI
- extern void efi_init(void);
--extern void efi_idmap_init(void);
- extern void efi_virtmap_init(void);
- #else
- #define efi_init()
--#define efi_idmap_init()
- #define efi_virtmap_init()
- #endif
- 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 5fd40c43be80..3d311761e3c2 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -31,8 +31,6 @@ extern void paging_init(void);
- extern void setup_mm_for_reboot(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
--/* create an identity mapping for memory (or io if map_io is true) */
--extern void create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot);
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 4a5d7343dddd..a98415b5979c 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -54,27 +54,6 @@ static int __init is_normal_ram(efi_memory_desc_t *md)
- 	return 0;
- }
- 
--static void __init efi_setup_idmap(void)
--{
--	struct memblock_region *r;
--	efi_memory_desc_t *md;
--	u64 paddr, npages, size;
--
--	for_each_memblock(memory, r)
--		create_id_mapping(r->base, r->size, 0);
--
--	/* map runtime io spaces */
--	for_each_efi_memory_desc(&memmap, md) {
--		if (!(md->attribute & EFI_MEMORY_RUNTIME) || is_normal_ram(md))
--			continue;
--		paddr = md->phys_addr;
--		npages = md->num_pages;
--		memrange_efi_to_native(&paddr, &npages);
--		size = npages << PAGE_SHIFT;
--		create_id_mapping(paddr, size, 1);
--	}
--}
--
- /*
-  * Translate a EFI virtual address into a physical address: this is necessary,
-  * as some data members of the EFI system table are virtually remapped after
-@@ -236,16 +215,6 @@ void __init efi_init(void)
- 	reserve_regions();
- }
- 
--void __init efi_idmap_init(void)
--{
--	if (!efi_enabled(EFI_BOOT))
--		return;
--
--	/* boot time idmap_pg_dir is incomplete, so fill in missing parts */
--	efi_setup_idmap();
--	early_memunmap(memmap.map, memmap.map_end - memmap.map);
--}
--
- /*
-  * Enable the UEFI Runtime Services if all prerequisites are in place, i.e.,
-  * non-early mapping of the UEFI system table and virtual mappings for all
-@@ -386,4 +355,5 @@ void __init efi_virtmap_init(void)
- 		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
- 	}
- 	set_bit(EFI_VIRTMAP, &efi.flags);
-+	early_memunmap(memmap.map, memmap.map_end - memmap.map);
- }
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index beac8188fdbd..199d1b7809d7 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -402,7 +402,6 @@ void __init setup_arch(char **cmdline_p)
- 	request_standard_resources();
- 
- 	efi_virtmap_init();
--	efi_idmap_init();
- 	early_ioremap_reset();
- 
- 	unflatten_device_tree();
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 3f3d5aa4a8b1..328638548871 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -271,18 +271,6 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 			 size, PAGE_KERNEL_EXEC);
- }
- 
--void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
--{
--	if ((addr >> PGDIR_SHIFT) >= ARRAY_SIZE(idmap_pg_dir)) {
--		pr_warn("BUG: not creating id mapping for %pa\n", &addr);
--		return;
--	}
--	__create_mapping(&init_mm, &idmap_pg_dir[pgd_index(addr)],
--			 addr, addr, size,
--			 map_io ? __pgprot(PROT_DEVICE_nGnRE)
--				: PAGE_KERNEL_EXEC);
--}
--
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot)
--- 
-1.8.3.2
+On Monday 29 December 2014, 13:08:41 wrote Alexander Stein:
+> This adds the device node for the ac97 controller.
+> 
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> Acked-By Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Changes in v3:
+> * Renamed the compatible string to atmel,at91sam9263-ac97c
+> * Added 'Acked-By Alexandre Belloni <alexandre.belloni@free-electrons.com>'
+> 
+>  arch/arm/boot/dts/at91sam9263.dtsi | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 6283785..2e67e38 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -700,6 +700,16 @@
+>  					};
+>  				};
+>  
+> +				ac97 {
+> +					pinctrl_ac97: ac97-0 {
+> +						atmel,pins =
+> +							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A AC97FS pin */
+> +							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A AC97CK pin */
+> +							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A AC97TX pin */
+> +							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB14 periph A AC97RX pin */
+> +					};
+> +				};
+> +
+>  				pioA: gpio at fffff200 {
+>  					compatible = "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff200 0x200>;
+> @@ -828,6 +838,17 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			ac97: sound at fffa0000 {
+> +				compatible = "atmel,at91sam9263-ac97c";
+> +				reg = <0xfffa0000 0x4000>;
+> +				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_ac97>;
+> +				clocks = <&ac97_clk>;
+> +				clock-names = "ac97_clk";
+> +				status = "disabled";
+> +			};
+> +
+>  			macb0: ethernet at fffbc000 {
+>  				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+>  				reg = <0xfffbc000 0x100>;
+> 
