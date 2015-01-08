@@ -1,42 +1,38 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  8 Jan 2015 11:51:42 +0100
-Subject: [PATCH v2 5/8] ARM: mvebu: a38x: Add missing labels
+Date: Thu,  8 Jan 2015 11:51:43 +0100
+Subject: [PATCH v2 6/8] ARM: mvebu: Document the Device Tree binding for the
+ Armada 388 SoC
 In-Reply-To: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1420714305-7496-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420714305-7496-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1420714305-7496-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pintcrl label was missing. Adding it allowed referring it from the
-root of the device tree. Also add the uart0 label used by the
-bootloader.
+Update the binding documentation of the Armada 38x Soc family with
+the Armada 388.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/armada-38x.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 63fe15174fee..04fe80d101f8 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -173,7 +173,7 @@
- 				status = "disabled";
- 			};
+diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
+index ad9f8ed4d9bd..202953f1887e 100644
+--- a/Documentation/devicetree/bindings/arm/armada-38x.txt
++++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+@@ -15,6 +15,13 @@ Required root node property:
  
--			serial at 12000 {
-+			uart0: serial at 12000 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x12000 0x100>;
- 				reg-shift = <2>;
-@@ -193,7 +193,7 @@
- 				status = "disabled";
- 			};
+ compatible: must contain "marvell,armada385"
  
--			pinctrl at 18000 {
-+			pinctrl: pinctrl at 18000 {
- 				reg = <0x18000 0x20>;
++In addition, boards using the Marvell Armada 388 SoC shall have the
++following property before the previous one:
++
++Required root node property:
++
++compatible: must contain "marvell,armada388"
++
+ Example:
  
- 				ge0_rgmii_pins: ge-rgmii-pins-0 {
+ compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada380";
 -- 
 1.9.1
