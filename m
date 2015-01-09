@@ -1,109 +1,168 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  9 Jan 2015 18:17:54 +0800
-Subject: [PATCH v2 7/9] ARM: dts: sun5i: hsg-h702: add axp209 regulator nodes
-In-Reply-To: <1420798676-22856-1-git-send-email-wens@csie.org>
-References: <1420798676-22856-1-git-send-email-wens@csie.org>
-Message-ID: <1420798676-22856-8-git-send-email-wens@csie.org>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 09 Jan 2015 10:21:00 +0000
+Subject: [PATCH 2/2] arm64: Emulate SETEND for AArch32 tasks
+In-Reply-To: <20150108184258.GB31280@leverpostej>
+References: <1420647405-3907-1-git-send-email-suzuki.poulose@arm.com>
+ <1420647405-3907-3-git-send-email-suzuki.poulose@arm.com>
+ <20150108184258.GB31280@leverpostej>
+Message-ID: <54AFAB8C.5040803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the regulator nodes for the axp209 by including
-the axp209 dtsi. As the inputs of these regulators are from the
-axp209's PS output, which is basically just a mux over the 2
-inputs, it is considered to be unregulated. Thus we do not provide
-input supply properties for them.
+On 08/01/15 18:43, Mark Rutland wrote:
+> Hi Suzuki,
+>
+> On Wed, Jan 07, 2015 at 04:16:45PM +0000, Suzuki K. Poulose wrote:
+>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>
+>> Emulate deprecated 'setend' instruction for AArch32 bit tasks.
+>>
+>> 	setend [le/be] - Sets the endianness of EL0
+>>
+>> The hardware support for the instruction can be enabled by setting the
+>> SCTLR_EL1.SED bit. Like the other emulated instructions it is controlled by
+>> an entry in /proc/sys/abi/. For more information see :
+>> 	Documentation/arm64/legacy_instructions.txt
+>>
+>> The instruction is emulated by setting/clearing the SPSR_EL1.E bit, which
+>> will be reflected in the PSTATE.E in AArch32 context.
+>
+> A "fun" problem with emulating setend is that it will not always work
+> unless we emulate the entire instruction set when userspace wants to be
+> in an unsupported endianness.
+>
+> For implementations which are not bi-endian at EL0 (i.e. where
+> ID_AA64MMFR0_EL1.BigEndEL0 == 0), SCTLR_EL1.E0E has a fixed value which
+> we cannot change. The field names are misleading: in a BE-only system
+> ID_AA64MMFR0_EL1.{BigEnd,BigEndEL0} == {0,0} and SCTLR_EL1.{EE,E0E} are
+> fixed to {1,1}.
+>
+> I think we need to detect when EL0 has a fixed endianness such that we
+> can treat the setend instruction as undefined. Otherwise we will
+> silently fail to change EL0 endianness, advance the PC, and return to
+> userspace in the wrong endianness, which will be very painful to debug.
+> Userspace has the option of handling the resulting SIGILL in such cases.
 
-The regulator names and constraints are based on the board
-schematics and the SoC datasheet.
+You are right. I missed this scenario. To add to that things get 
+complicated when there are heterogeneous CPUs on the system that might 
+have differing bits for BigEndEL0. I will take a look at this one. 
+Thanks for pointing this out.
+>
+> That means we need to be able to fail to transition into INSN_EMULATE
+> mode as we currently can when transitioning to INSN_HW.
+>
+>> This patch also restores the native endianness for the execution of signal
+>> handlers, since the process could have changed the endianness.
+>>
+>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   Documentation/arm64/legacy_instructions.txt |    5 ++
+>>   arch/arm64/Kconfig                          |   10 ++++
+>>   arch/arm64/include/asm/ptrace.h             |    7 +++
+>>   arch/arm64/kernel/armv8_deprecated.c        |   75 +++++++++++++++++++++++++++
+>>   arch/arm64/kernel/signal32.c                |    5 +-
+>>   5 files changed, 101 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+>> index a3b3da2..20e5621 100644
+>> --- a/Documentation/arm64/legacy_instructions.txt
+>> +++ b/Documentation/arm64/legacy_instructions.txt
+>> @@ -43,3 +43,8 @@ Default: Undef (0)
+>>   Node: /proc/sys/abi/cp15_barrier
+>>   Status: Deprecated
+>>   Default: Emulate (1)
+>> +
+>> +* SETEND
+>> +Node: /proc/sys/abi/setend
+>> +Status: Deprecated
+>> +Default: Emulate (1)
+>
+> Given we can't always emulate SETEND, should we document "Emulate where
+> possible" or something to that effect?
+>
+Will fix it in the next revision.
 
-DCDC2 is used as the cpu power supply. This patch also references
-it from the cpu node.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index b1f9a20..c6d1fd9 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -540,6 +540,16 @@ config CP15_BARRIER_EMULATION
+>>
+>>   	  If unsure, say Y
+>>
+>> +config SETEND_EMULATION
+>> +	bool "Emulate SETEND instruction"
+>> +	help
+>> +	  The SETEND instruction alters the data-endianness of the
+>> +	  AArch32 EL0, and is deprecated in ARMv8.
+>> +
+>> +	  Say Y here to enable software emulation of the instruction
+>> +	  for AArch32 userspace code.
+>> +
+>> +	  If unsure, say Y
+>>   endif
+>>
+>>   endmenu
+>> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+>> index 41ed9e1..d6dd9fd 100644
+>> --- a/arch/arm64/include/asm/ptrace.h
+>> +++ b/arch/arm64/include/asm/ptrace.h
+>> @@ -58,6 +58,13 @@
+>>   #define COMPAT_PSR_Z_BIT	0x40000000
+>>   #define COMPAT_PSR_N_BIT	0x80000000
+>>   #define COMPAT_PSR_IT_MASK	0x0600fc00	/* If-Then execution state mask */
+>> +
+>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+>> +#define COMPAT_PSR_ENDSTATE	COMPAT_PSR_E_BIT
+>> +#else
+>> +#define COMPAT_PSR_ENDSTATE	0
+>> +#endif
+>> +
+>>   /*
+>>    * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
+>>    * process is located in memory.
+>> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+>> index 9054447..dc91bac 100644
+>> --- a/arch/arm64/kernel/armv8_deprecated.c
+>> +++ b/arch/arm64/kernel/armv8_deprecated.c
+>> @@ -477,6 +477,7 @@ ret:
+>>   }
+>>
+>>   #define SCTLR_EL1_CP15BEN 	(1 << 5)
+>> +#define SCTLR_EL1_SED		(1 << 8)
+>>
+>>   static inline void config_sctlr_el1(u32 clear, u32 set)
+>>   {
+>> @@ -521,6 +522,77 @@ static struct insn_emulation_ops cp15_barrier_ops = {
+>>   	.set_hw_mode = cp15_barrier_set_hw_mode,
+>>   };
+>>
+>> +static void setend_set_hw_mode(void *enable)
+>> +{
+>> +	if (enable)
+>> +		config_sctlr_el1(SCTLR_EL1_SED, 0);
+>> +	else
+>> +		config_sctlr_el1(0, SCTLR_EL1_SED);
+>> +}
+>> +
+>> +static int compat_setend_handler(struct pt_regs *regs, u32 endian)
+>
+> If we s/endian/big_endian/ here we can drop the comments within the
+> function as the test will be easier to read. We could also s/u32/bool/.
+>
+OK
+>> +{
+>> +	char insn[16] = "setend _e";
+>
+> Elsewhere (e.g. in cp15barrier_handler) we write these out in full
+> rather than modifying a string on the stack. I think we should do the
+> same here (we can change insn to a char * and assign the full relevant
+> string in either branch).
+>
+> Doing so will mean grepping for '"setend be"' finds this function, which
+> is handy.
+>
+Makes sense. Thanks for the review.
 
-LDO3 powers the USB WiFi module. This patch also references it
-from the usb-phy node.
-
-Also get rid of axp209 properties already set in axp209.dtsi.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-changes since v1:
-
-    - Use preprocessor include for axp209.dtsi
-
----
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 46 ++++++++++++++++++++++++++------
- 1 file changed, 38 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-index 99a5968720b4..82637db1c55a 100644
---- a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -68,11 +68,7 @@
- 		};
- 
- 		usbphy: phy at 01c13400 {
--			/*
--			 * There doesn't seem to be a GPIO for controlling
--			 * usb1 vbus, despite the fex file saying otherwise.
--			 */
--			usb1_vbus-supply = <&reg_vcc5v0>;
-+			usb1_vbus-supply = <&reg_ldo3>;
- 			status = "okay";
- 		};
- 
-@@ -105,11 +101,8 @@
- 			status = "okay";
- 
- 			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
- 				reg = <0x34>;
- 				interrupts = <0>;
--				interrupt-controller;
--				#interrupt-cells = <1>;
- 			};
- 		};
- 
-@@ -131,3 +124,40 @@
- 		};
- 	};
- };
-+
-+#include "axp209.dtsi"
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_ldo3 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
--- 
-2.1.4
+Thanks
+Suzuki
