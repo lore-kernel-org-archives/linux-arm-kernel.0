@@ -1,114 +1,64 @@
-From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
-Date: Fri,  9 Jan 2015 19:19:29 +0800
-Subject: [PATCH v3 0/8] Support for Fujitsu MB86S7X SoCs
-Message-ID: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Jan 2015 12:19:55 +0100
+Subject: [PATCH 4/4] clk: tegra: Add support for the Tegra132 CAR IP block
+In-Reply-To: <20141216203829.22980.64446.stgit@chromeos-P9X79>
+References: <20141216203813.22980.2301.stgit@chromeos-P9X79>
+ <20141216203829.22980.64446.stgit@chromeos-P9X79>
+Message-ID: <20150109111954.GB16465@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Dec 16, 2014 at 12:38:29PM -0800, Paul Walmsley wrote:
+> From: Paul Walmsley <pwalmsley@nvidia.com>
+> 
+> Tegra132 CAR supports almost the same clocks as Tegra124 CAR. This
+> patch mostly deals with the small differences.
+> 
+> Since Tegra132 contains many of the same PLL clock sources used on
+> Tegra114 and Tegra124, enable them in drivers/clk/tegra/clk-pll.c when
+> the kernel is configured to include Tegra132 support.
+> 
+> This patch is based on several patches from others:
+> 
+> 1. a  patch from Peter De Schrijver:
+> 
+> http://lkml.iu.edu/hypermail/linux/kernel/1407.1/06094.html
+> 
+> 2. a patch from Bill Huang ("clk: tegra: enable cclk_g at boot on
+> Tegra132"), and
+> 
+> 3. a patch from Allen Martin ("clk: Enable tegra clock driver for
+> tegra132").
 
-  Fujitsu have a series of SoC already shipping based around
-variations of 2xCA7+2xCA15 big.LITTLE architecture, and we would like
-to upstream the basic support in this series.
+Doesn't this technically require Signed-off-bys from each of the above,
+then?
 
-  MB86S70 is a big.LITTLE platform with 2xCA7+2xCA15 and an additional
-CM3 as the master. MB86S73 is a simple 2xCA7 and an additional CM3
-master.
+> diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+[...]
+> +/**
+> + * tegra124_132_clock_init_pre - clock initialization preamble for T124/T132
+> + * @np: struct device_node * of the DT node for the SoC CAR IP block
+> + *
+> + * Register most of the clocks controlled by the CAR IP block, along
+> + * with a few clocks controlled by the PMC IP block.  Everything in
+> + * this function should be common to Tegra124 and Tegra132.  XXX The
+> + * PMC clock initialization should probably be moved to PMC-specific
+> + * driver code.  No return value.
+> + */
+> +static void __init tegra124_132_clock_init_pre(struct device_node *np)
 
-  The DT includes references to sdhci patches which are being sent to
-the mmc list at the same time.
+I would've personally named this tegra124_clock_init_pre(). In the past
+we've named these functions after the first chip that needed them and if
+later chips remained compatible they would simply use the one from an
+earlier chip. That's consistent with the naming of compatible strings
+and doesn't require changes to the function names if yet another SoC
+generation were to need the same functionality.
 
-  We welcome any comments or questions.
-
-Changes since v2:
-* Minor cleanup of MCPM as suggested by Nicolas Pitre.
-
-Changes since v1:
-* Thanks to Arnd, modified clock driver to populate clocks only when
-some user need them. Node name changed from "fujitsu,mb86s70-clk" to
-"fujitsu,mb86s70-crg11" . Controller+Domain+Port of a clock are now
-three cells specified by the user node.
-* aliases moved into board DTS files
-* Voltage supply moved as per-board DT node.
-* Removed default overly verbose loglevel=8
-* Specify -march=armv7-a flag for mcpm.c and smc.S that contain ARMv7
-specific code.
-* Removed wrongly put outer_flush_all(), now using standard
-v7_exit_coherency_flush() instead of platform specific macro.
-* Simplified GPIO offset calculations in gpio-mb86s70.c driver. And
-added .remove() for the driver
-* ARM MHU driver provided a .remove() to enable module unloading.
-* A few other misc cleanups suggested in v1 submission.
-
-Thanks.
-
-Jassi Brar (8):
-  ARM: Add platform support for Fujitsu MB86S7X SoCs
-  mailbox: arm_mhu: add driver for ARM MHU controller
-  ARM: MB86S7X: Add MCPM support
-  clk: Add clock driver for mb86s7x
-  gpio: Add Fujitsu MB86S7x GPIO driver
-  dt: mb86s7x: add dt files for MB86S7x evbs
-  of: add Fujitsu vendor prefix
-  ARM: MB86S7x: Add configs
-
- Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
- .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
- .../bindings/gpio/fujitsu,mb86s70-gpio.txt         |  20 +
- .../devicetree/bindings/mailbox/arm-mhu.txt        |  33 ++
- .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   7 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
- arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
- arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
- arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
- arch/arm/boot/dts/mb86s7x.dtsi                     | 140 ++++++
- arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
- arch/arm/configs/multi_v7_defconfig                |   5 +
- arch/arm/mach-mb86s7x/Kconfig                      |  19 +
- arch/arm/mach-mb86s7x/Makefile                     |   3 +
- arch/arm/mach-mb86s7x/board.c                      |  23 +
- arch/arm/mach-mb86s7x/mcpm.c                       | 315 ++++++++++++
- arch/arm/mach-mb86s7x/smc.S                        |  27 ++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-mb86s7x.c                          | 379 +++++++++++++++
- drivers/gpio/Kconfig                               |   6 +
- drivers/gpio/Makefile                              |   1 +
- drivers/gpio/gpio-mb86s7x.c                        | 231 +++++++++
- drivers/mailbox/Kconfig                            |   7 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/arm_mhu.c                          | 212 +++++++++
- drivers/soc/Makefile                               |   1 +
- drivers/soc/mb86s7x/Makefile                       |   4 +
- drivers/soc/mb86s7x/scb_mhu.c                      | 528 +++++++++++++++++++++
- include/soc/mb86s7x/scb_mhu.h                      | 105 ++++
- 34 files changed, 2630 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
- create mode 100644 Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/fujitsu,mb86s70-gpio.txt
- create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
- create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
- create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
- create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
- create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
- create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
- create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
- create mode 100644 arch/arm/configs/fujitsu_defconfig
- create mode 100644 arch/arm/mach-mb86s7x/Kconfig
- create mode 100644 arch/arm/mach-mb86s7x/Makefile
- create mode 100644 arch/arm/mach-mb86s7x/board.c
- create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
- create mode 100644 arch/arm/mach-mb86s7x/smc.S
- create mode 100644 drivers/clk/clk-mb86s7x.c
- create mode 100644 drivers/gpio/gpio-mb86s7x.c
- create mode 100644 drivers/mailbox/arm_mhu.c
- create mode 100644 drivers/soc/mb86s7x/Makefile
- create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
- create mode 100644 include/soc/mb86s7x/scb_mhu.h
-
--- 
-1.9.0
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/168d5ed2/attachment.sig>
