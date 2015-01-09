@@ -1,89 +1,77 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  9 Jan 2015 18:17:52 +0800
-Subject: [PATCH v2 5/9] ARM: dts: sun7i: cubietruck: add axp209 regulator nodes
+Date: Fri,  9 Jan 2015 18:17:55 +0800
+Subject: [PATCH v2 8/9] ARM: dts: sun4i: Add cpu thermal zones to dtsi
 In-Reply-To: <1420798676-22856-1-git-send-email-wens@csie.org>
 References: <1420798676-22856-1-git-send-email-wens@csie.org>
-Message-ID: <1420798676-22856-6-git-send-email-wens@csie.org>
+Message-ID: <1420798676-22856-9-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the regulator nodes for the axp209 by including
-the axp209 dtsi. As the inputs of these regulators are from the
-axp209's PS output, which is basically just a mux over the 2
-inputs, it is considered to be unregulated. Thus we do not provide
-input supply properties for them.
-
-The regulator names and constraints are based on the board
-schematics and the SoC datasheet.
-
-DCDC2 is used as the cpu power supply. This patch also references
-it from the cpu node.
-
-Also get rid of axp209 properties already set in axp209.dtsi.
+The core temperature sensor now supports thermal zones. Add a thermal
+zone mapping for the cpus with passive cooling (cpufreq throttling).
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
 
 changes since v1:
 
-    - Use preprocessor include for axp209.dtsi
+    - Use thermal dt bindings macros in cooling-device
 
 ---
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 35 ++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 77bc7e79cab9..5f817b65ceea 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -130,13 +130,9 @@
- 			status = "okay";
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 7fb4e912f510..f0dc246dc69e 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -12,6 +12,8 @@
  
- 			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
- 				reg = <0x34>;
- 				interrupt-parent = <&nmi_intc>;
- 				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--				interrupt-controller;
--				#interrupt-cells = <1>;
- 			};
+ #include "skeleton.dtsi"
+ 
++#include <dt-bindings/thermal/thermal.h>
++
+ #include <dt-bindings/dma/sun4i-a10.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+@@ -67,6 +69,38 @@
  		};
- 
-@@ -222,3 +218,34 @@
- 		gpio = <&pio 7 9 GPIO_ACTIVE_HIGH>;
  	};
- };
+ 
++	thermal-zones {
++		cpu_thermal {
++			/* milliseconds */
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++			thermal-sensors = <&rtp>;
 +
-+#include "axp209.dtsi"
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
 +
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
++			trips {
++				cpu_alert0: cpu_alert0 {
++					/* milliCelsius */
++					temperature = <850000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
 +
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1450000>;
-+	regulator-name = "vdd-cpu";
-+};
++				cpu_crit: cpu_crit {
++					/* milliCelsius */
++					temperature = <100000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
 +
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 	};
 -- 
 2.1.4
