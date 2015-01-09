@@ -1,67 +1,84 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 9 Jan 2015 11:24:58 +0100
-Subject: [RESEND PATCH v15 07/11] KVM: arm: page logging 2nd stage fault
- handling
-In-Reply-To: <54AEB03E.8080305@samsung.com>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418868449-23397-1-git-send-email-m.smarduch@samsung.com>
- <20150107123844.GA21092@cbox> <54ADE0B6.1060703@samsung.com>
- <20150108104510.GI21092@cbox> <54AEB03E.8080305@samsung.com>
-Message-ID: <20150109102458.GN21092@cbox>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 09 Jan 2015 10:25:54 +0000
+Subject: [PATCH v20 08/11] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
+References: <1420457376-77366-1-git-send-email-wangnan0@huawei.com>
+ <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <1420799154.4160.19.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 08:28:46AM -0800, Mario Smarduch wrote:
-> On 01/08/2015 02:45 AM, Christoffer Dall wrote:
-> > On Wed, Jan 07, 2015 at 05:43:18PM -0800, Mario Smarduch wrote:
-> >> Hi Christoffer,
-> >>   before going through your comments, I discovered that
-> >> in 3.18.0-rc2 - a generic __get_user_pages_fast()
-> >> was implemented, now ARM picks this up. This causes
-> >> gfn_to_pfn_prot() to return meaningful 'writable'
-> >> value for a read fault, provided the region is writable.
-> >>
-> >> Prior to that the weak version returned 0 and 'writable'
-> >> had no optimization effect to set pte/pmd - RW on
-> >> a read fault.
-> >>
-> >> As a consequence dirty logging broke in 3.18, I was seeing
-> Correction on this, proper __get_user_pages_fast()
-> behavior exposed a bug in page logging code.
+On Fri, 2015-01-09 at 14:37 +0800, Wang Nan wrote:
+> This patch introduce kprobeopt for ARM 32.
 > 
-> >> weird but very intermittent issues. I just put in the
-> >> additional few lines to fix it, prevent pte RW (only R) on
-> >> read faults  while  logging writable region.
-> >>
-> >> On 01/07/2015 04:38 AM, Christoffer Dall wrote:
-> >>> On Wed, Dec 17, 2014 at 06:07:29PM -0800, Mario Smarduch wrote:
-> >>>> This patch is a followup to v15 patch series, with following changes:
-> >>>> - When clearing/dissolving a huge, PMD mark huge page range dirty, since
-> >>>>   the state of whole range is unknown. After the huge page is dissolved 
-> >>>>   dirty page logging is at page granularity.
-> >>>
-> >>> What is the sequence of events where you could have dirtied another page
-> >>> within the PMD range after the user initially requested dirty page
-> >>> logging?
-> >>
-> >> No there is none. My issue was the start point for tracking dirty pages
-> >> and that would be second call to dirty log read. Not first
-> >> call after initial write protect where any page in range can
-> >> be assumed dirty. I'll remove this, not sure if there would be any
-> >> use case to call dirty log only once.
-> >>
-> > 
-> > Calling dirty log once can not give you anything meaningful, right?  You
-> > must assume all memory is 'dirty' at this point, no?
+> Limitations:
+>  - Currently only kernel compiled with ARM ISA is supported.
 > 
-> There is the interval between KVM_MEM_LOG_DIRTY_PAGES and first
-> call to KVM_GET_DIRTY_LOG. Not sure of any use case, maybe enable
-> logging, wait a while do a dirty log read, disable logging.
-> Get an accumulated snapshot of dirty page activity.
+>  - Offset between probe point and optinsn slot must not larger than
+>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
+>    things complex. Futher patch can make such optimization.
 > 
-ok, so from the time the user calls KVM_MEM_LOG_DIRTY_PAGES, then any
-fault on any huge page will dissolve that huge page into pages, and each
-dirty page will be logged accordingly for the first call to
-KVM_GET_DIRTY_LOG, right?  What am I missing here?
+> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
+> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
+> replace probed instruction by a 'b', branch to trampoline code and then
+> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
+> to execute kprobe handler. It also emulate/simulate replaced instruction.
+> 
+> When unregistering kprobe, the deferred manner of unoptimizer may leave
+> branch instruction before optimizer is called. Different from x86_64,
+> which only copy the probed insn after optprobe_template_end and
+> reexecute them, this patch call singlestep to emulate/simulate the insn
+> directly. Futher patch can optimize this behavior.
+> 
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+> Reviewed-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
 
--Christoffer
+[...]
+
+> +asm (
+> +			".global optprobe_template_entry\n"
+> +			"optprobe_template_entry:\n"
+> +			".global optprobe_template_sub_sp\n"
+> +			"optprobe_template_sub_sp:"
+> +			"	sub	sp, sp, #0xff\n"
+> +			"	stmia	sp, {r0 - r14} \n"
+> +			".global optprobe_template_add_sp\n"
+> +			"optprobe_template_add_sp:"
+> +			"	add	r3, sp, #0xff\n"
+> +			"	str	r3, [sp, #52]\n"
+> +			"	mrs	r4, cpsr\n"
+> +			"	str	r4, [sp, #64]\n"
+> +			"	mov	r1, sp\n"
+> +			"	ldr	r0, 1f\n"
+> +			"	ldr	r2, 2f\n"
+> +			/*
+> +			 * AEABI requires an 8-bytes alignment stack. If
+> +			 * SP % 8 != 0 (SP % 4 == 0 should be ensured),
+> +			 * alloc more bytes here.
+> +			 */
+> +			"	and	r4, sp, #4\n"
+> +			"	sub	sp, sp, r4\n"
+> +#if __LINUX_ARM_ARCH__ >= 5
+> +			"	blx	r2\n"
+> +#else
+> +			"	mov     lr, pc\n"
+> +			"	bx	r2\n"
+
+I think the BX instruction is not supported for ARMv4 chips that don't
+have Thumb support (e.g. SA110), at least an old ARM ARM I have says BX
+is supported on "Version 5 and above, and T variants of version 4".
+Though building assabet_defconfig with kprobes enabled doesn't produce
+an error for the BX instruction (!?)
+
+To be safe I would be tempted to use "mov pc, r2" instead. Again, if you
+agree, I'll change this in the patch in the branch I'm putting together.
+
+[...]
+
+-- 
+Tixy
