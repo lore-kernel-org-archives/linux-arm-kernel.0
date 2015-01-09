@@ -1,41 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Jan 2015 14:00:43 -0700
-Subject: [PATCH 4/4] clk: tegra: Add support for the Tegra132 CAR IP block
-In-Reply-To: <alpine.DEB.2.02.1501092030180.28771@utopia.booyaka.com>
-References: <20141216203813.22980.2301.stgit@chromeos-P9X79>
- <20141216203829.22980.64446.stgit@chromeos-P9X79>
- <20150109111954.GB16465@ulmo>
- <alpine.DEB.2.02.1501092030180.28771@utopia.booyaka.com>
-Message-ID: <54B0417B.6030409@wwwdotorg.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 10 Jan 2015 00:05:07 +0300
+Subject: [RFC 02/11] i2c: add quirk checks to core
+In-Reply-To: <20150109204522.GB1904@katana>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+ <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+ <54B02D7F.7040501@cogentembedded.com> <20150109204522.GB1904@katana>
+Message-ID: <54B04283.5070705@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2015 01:52 PM, Paul Walmsley wrote:
-> Hi Thierry
->
-> On Fri, 9 Jan 2015, Thierry Reding wrote:
->
->> On Tue, Dec 16, 2014 at 12:38:29PM -0800, Paul Walmsley wrote:
->>>
->>> This patch is based on several patches from others:
->>>
->>> 1. a  patch from Peter De Schrijver:
->>>
->>> http://lkml.iu.edu/hypermail/linux/kernel/1407.1/06094.html
->>>
->>> 2. a patch from Bill Huang ("clk: tegra: enable cclk_g at boot on
->>> Tegra132"), and
->>>
->>> 3. a patch from Allen Martin ("clk: Enable tegra clock driver for
->>> tegra132").
->>
->> Doesn't this technically require Signed-off-bys from each of the above,
->> then?
->
-> I don't think so.  Documentation/SubmittingPatches states:
+Hello.
 
-It's certainly been deemed acceptable in the past, if admittedly not 
-optimal, for the person who is the "exit point" of an 
-organization/company for the patch to be the only person to sign it off. 
-The reason being they're vouching that the Certificate of Origin applies 
-to all the company-sponsored work internal to the organization.
+On 01/09/2015 11:45 PM, Wolfram Sang wrote:
+
+>>> Let the core do the checks if HW quirks prevent a transfer. Saves code
+>> >from drivers and adds consistency.
+
+>>> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+>>> ---
+>>>   drivers/i2c/i2c-core.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 53 insertions(+)
+>>>
+>>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>>> index 39d25a8cb1ad..7b10a19abf5b 100644
+>>> --- a/drivers/i2c/i2c-core.c
+>>> +++ b/drivers/i2c/i2c-core.c
+>>> @@ -2063,6 +2063,56 @@ module_exit(i2c_exit);
+>>>    * ----------------------------------------------------
+>>>    */
+>>>
+>>> +/* Check if val is exceeding the quirk IFF quirk is non 0 */
+>>> +#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
+>>> +
+>>> +static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
+>>> +{
+>>> +	dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
+>>> +	return -EOPNOTSUPP;
+>>> +}
+
+>>     Always returning the same value doesn't make much sense. Are you trying
+>> to save space on the call sites?
+
+> Please elaborate. I think it does. If a quirk matches, we report that we
+> don't support this transfer.
+
+    OK, but what's the point of having this function return *int* if it always 
+returns the same value? AFAIU, you're trying to save the code space on the 
+call sites of this function by not having *return* -EOPNOTSUPP there each time?
+
+>> [...]
+>>> @@ -2080,6 +2130,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+>>>   	unsigned long orig_jiffies;
+>>>   	int ret, try;
+>>>
+>>> +	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
+
+>>     So, you only check for non-zero result of this function? Perhaps it makes
+>> sense to return true/false instead?
+
+> Could be done, but what would be the advantage? A lot of functions
+> return errno or 0.
+
+    It would have been OK if you were actually caring about the result, e.g. 
+returning it from __i2c_transfer(). Since you don't, IMO it would make more 
+sense to return true from i2c_check_for_quirks() (making it *bool*) iff it did 
+find/apply a quirk.
+
+WBR, Sergei
