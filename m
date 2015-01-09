@@ -1,57 +1,113 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 9 Jan 2015 21:58:42 +0530
-Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
-In-Reply-To: <54AF62D2.7000400@arm.com>
-References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
- <CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>
- <5487C897.9050405@arm.com>
- <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
- <5487D726.6000603@arm.com> <54AE278F.4020003@arm.com>
- <CAM4voamaqoje8Ccz3+UxvxaHN6GBd=QC5wRjVcz9Osfc=4aeiw@mail.gmail.com>
- <54AF62D2.7000400@arm.com>
-Message-ID: <CAM4voamN1A-sqCDR2bT5rHRBARH2SmfA1wYkXZRn9oi-4-Gj8g@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Jan 2015 00:29:32 +0800
+Subject: [PATCH v2 2/4] Documentation: bindings: Add the regulator
+ property to the sub-nodes AHCI bindings
+In-Reply-To: <54AFFFDC.7020307@free-electrons.com>
+References: <1420799989-10645-1-git-send-email-gregory.clement@free-electrons.com>
+ <1420799989-10645-3-git-send-email-gregory.clement@free-electrons.com>
+ <54AFF7E3.4070506@redhat.com> <54AFFFDC.7020307@free-electrons.com>
+Message-ID: <CAGb2v674q4Cjp9qy9CbUXe2j5pT_ez98CKxXHC8u4Diap2TT1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+Hi,
 
-On Fri, Jan 9, 2015 at 10:40 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Sat, Jan 10, 2015 at 12:20 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Hans,
 >
->
-> On Thursday 08 January 2015 08:57 PM, Abhilash Kesavan wrote:
+> On 09/01/2015 16:46, Hans de Goede wrote:
+>> Hi,
 >>
->> Hi Sudeep,
->>
->> On Thu, Jan 8, 2015 at 12:15 PM, Sudeep Holla <sudeep.holla@arm.com>
->> wrote:
+>> On 09-01-15 11:39, Gregory CLEMENT wrote:
+>>> It is now possible to use a regulator property for each port of the
+>>> AHCI controller.
 >>>
->>> Hi Abhilash,
->
->
-> [...]
->
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/ata/ahci-platform.txt | 9 ++++++---
+>>>   1 file changed, 6 insertions(+), 3 deletions(-)
 >>>
->>> What's the status of this patch. It was useful for me on vexpress for
->>> some
->>> testing. Please feel free to add
+>>> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+>>> index 4ab09f2202d4..87416d71c758 100644
+>>> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+>>> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+>>> @@ -37,9 +37,10 @@ Required properties when using sub-nodes:
 >>>
->>> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
 >>>
->>> if this is not yet queued.
+>>>   Sub-nodes required properties:
+>>> -- reg               : the port number
+>>> -- phys              : reference to the SATA PHY node
+>>> -
+>>> +- reg                                       : the port number
+>>> +And at least one of the following properties:
+>>> +- phys                      : reference to the SATA PHY node
+>>> +- target-port<n>-supply     : regulator for SATA target power for port <n>
+>>>
+>>>   Examples:
+>>>           sata at ffe08000 {
+>>> @@ -68,10 +69,12 @@ With sub-nodes:
+>>>              sata0: sata-port at 0 {
+>>>                      reg = <0>;
+>>>                      phys = <&sata_phy 0>;
+>>> +                    target-port0-supply = <&reg_sata0>;
+>>>              };
+>>>
 >>
+>> I'm sorry, but I've to NAK this, I did not follow the regulator discussion.,
+>> thinking that it was just about the use of some utility function vs diy or
+>> some such, I had no idea this would impact the dt-binding.
 >>
->> Thanks for the tested-by. This patch has not been merged yet; I am not
->> quite sure who is supposed to pick this up.
+>> The -port%d- bit is completely unnecessary from a dt pov. Devicetree is
+>> supposed to be OS agnostic, we cannot make the dt-binding ugly just because
+>> the regulator subsys in Linux does not provide the necessary functionality.
 >>
+>> I'm afraid you will have to get back to the regulator subsys people and tell
+>> them that we really need an of_regulator_get, so that we can tell the
+>> regulator subsys we want a regulator from a specific of_node.
 >
-> So far, most of the CCI patches are merged through arm-soc.
+> I didn't cc you especially, but I cc the linux-ide mailing list. The
+> email was "[PATCH 2/2] regulator: core: Add the device tree version to
+> the regulator_get family" (see
+> http://thread.gmane.org/gmane.linux.kernel/1856154).
+>
+> Mark Brown didn't want a firmware specific interface. The regulator
+> framework allows associating only a regulator to a device and
+> currently, at least from the point of view of the device tree, the
+> port subnodes are not devices. He suggested making the child node
+> device. However, when I had a look on it, it didn't seem an easy
+> task. As you know better this code, what do you think of it?
+>
+> (I added Mark Bronw in CC of this email so he can add more explanation
+> if needed)
 
-Would you be OK picking this up as is or do you want me to re-send
-this with the RFT tag dropped ?
+Since the AHCI library code already supports the generic phy subsystem,
+with one phy possible for each port node, you could possibly add a
+generic phy that just takes a regulator, and hook it up that way.
+
+I don't know if the extra layer of indirection is good or not.
+Just offering an alternative.
+
 
 Regards,
-Abhilash
+ChenYu
+
+>>
+>> Please CC me when you re-open the discussion with the regulator people.
+>>
+>> Regards,
+>>
+>> Hans
+>>
 >
-> Regards,
-> Sudeep
 >
+> --
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
