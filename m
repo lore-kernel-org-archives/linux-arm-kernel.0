@@ -1,74 +1,119 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jan 2015 09:34:46 +0100
-Subject: [PATCH 0/9] ARM Versatile multi-platform support
-In-Reply-To: <CAL_JsqKLNPVDCUELaZU8JW0roT3RcyqcxtJbvbYQrjzxjt3FeQ@mail.gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <CACRpkda8T8CwghVYtTw41h_y+GdCA5xCEaSL1Jy4VZBo3MAy-Q@mail.gmail.com>
- <CAL_JsqKLNPVDCUELaZU8JW0roT3RcyqcxtJbvbYQrjzxjt3FeQ@mail.gmail.com>
-Message-ID: <CACRpkdZpwoY4-9K9_Eh-UikmP5hqQhfu2eZRb-wkVntVn1g5wA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 09 Jan 2015 09:39:11 +0100
+Subject: [PATCH v5 5/5] ARM: dts: exynos4412-trats: Switch max77686
+ regulators to GPIO control
+In-Reply-To: <1420458525-22576-6-git-send-email-k.kozlowski@samsung.com>
+References: <1420458525-22576-1-git-send-email-k.kozlowski@samsung.com>
+ <1420458525-22576-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1420792751.553.1.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 8, 2015 at 10:38 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Thu, Jan 8, 2015 at 1:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
->>
->>> From: Rob Herring <robh@kernel.org>
->>>
->>> This series converts ARM Versatile platform to multi-platform. I started
->>> this some time ago and some pieces were already merged. The primary
->>> piece remaining is converting the PCI host to DT which I was waiting for
->>> the common PCI DT parsing to get settled. Now that that is in place as
->>> well as a few other pieces are in place like multi-platform fixes for
->>> CLCD, we can fully convert Versatile to DT and multi-platform.
->>>
->>> There's still a few things that need DT support which can be done
->>> later:
->>> - MMC card detect and write protect. Should be able to use VExpress
->>>   support
->>> - Reboot support. Should be able to re-use Realview reboot code.
->>> - flash phys-map support. Binding exists, but specifically Vpp control
->>>   is needed.
->>> - CLCD support. Not sure where this is at.
->>
->> I like it overall but would like to see some use of the syscon
->> pattern to access random registers in syscon, and specifically not
->> to refer to these registers as some "gpio" because they aren't.
->
-> I'm not sure I follow. Creating GPIO lines for SD card detect and
-> write protect is exactly how VExpress syscon was implemented.
+Hi Kukjin,
 
-Hm it all boils down to this mfd/vexpress-sysreg.c driver that
-spawns some MFD devices.
+Mark Brown pulled regulator changes and documentation for bindings [1].
+Could you pick up this patch?
 
->From there a LED, card detect and flash protection are modeled as
-"basic-mmio-gpio" instantiating the drivers/gpio/gpio-generic.c
-driver to drive/read various bits.
+[1] http://www.spinics.net/lists/linux-samsung-soc/msg40834.html
 
-Specifically commit 974cc7b93441a0e78f030495436d1be7eb7c208d
-that makes a layered MFD->gpio->gpio LED cake.
-Needless to say neither the GPIO maintainers or the GPIO
-mailing list was included in review of this patch and it was
-merged on its MFD merits :(
+Best regards,
+Krzysztof
 
-It is sort of elegant in a way, but I don't like it when we describe
-registers that are not general purpose as "general purpose input
-output" it is simply ontologically wrong and a misleading hardware
-description. These bits are not general purpose *at* *all* they are
-special purpose.
 
-It is Linux GPIO implementation details leaking into the hardware
-description basically: it just happened to be very convenient to
-describe these register bits as "gpios" as the drivers etc were
-already in place.
-
-I prefer syscon->syscon LED as a two layer cake
-instead of a three layer cake involving GPIO and it's more to the point,
-describing the hardware properly, so I say let's go for that instead.
-
-For card detect and flash protection I suspect we can use
-syscon as well, avoiding shoehorning a GPIO abstraction between
-it.
-
-Yours,
-Linus Walleij
+On pon, 2015-01-05 at 12:48 +0100, Krzysztof Kozlowski wrote:
+> Remove fixed regulators (duplicating what max77686 provides) and
+> add GPIO enable control to max77686 regulators.
+> 
+> This gives the system full control over those regulators. Previously
+> the state of such regulators was a mixture of what max77686 driver set
+> over I2C and what regulator-fixed set through GPIO.
+> 
+> Removal of 'regulator-always-on' from CAM_ISP_CORE_1.2V (buck9) allows
+> disabling it when it is not used. Previously this regulator was always
+> enabled because its enable state is a OR of:
+>  - ENB9 GPIO (turned always on by regulator-fixed),
+>  - BUCK9EN field in BUCK9CTRL register (off by max77686 through I2C).
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 25 +++++--------------------
+>  1 file changed, 5 insertions(+), 20 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 405d4f337e89..186c210680c1 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -58,15 +58,6 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		vemmc_reg: regulator-0 {
+> -			compatible = "regulator-fixed";
+> -			regulator-name = "VMEM_VDD_2.8V";
+> -			regulator-min-microvolt = <2800000>;
+> -			regulator-max-microvolt = <2800000>;
+> -			gpio = <&gpk0 2 0>;
+> -			enable-active-high;
+> -		};
+> -
+>  		cam_io_reg: voltage-regulator-1 {
+>  			compatible = "regulator-fixed";
+>  			regulator-name = "CAM_SENSOR_A";
+> @@ -94,16 +85,6 @@
+>  			enable-active-high;
+>  		};
+>  
+> -		cam_isp_core_reg: voltage-regulator-4 {
+> -			compatible = "regulator-fixed";
+> -			regulator-name = "CAM_ISP_CORE_1.2V_EN";
+> -			regulator-min-microvolt = <1200000>;
+> -			regulator-max-microvolt = <1200000>;
+> -			gpio = <&gpm0 3 0>;
+> -			enable-active-high;
+> -			regulator-always-on;
+> -		};
+> -
+>  		ps_als_reg: voltage-regulator-5 {
+>  			compatible = "regulator-fixed";
+>  			regulator-name = "LED_A_3.0V";
+> @@ -405,6 +386,7 @@
+>  					regulator-name = "VTF_2.8V";
+>  					regulator-min-microvolt = <2800000>;
+>  					regulator-max-microvolt = <2800000>;
+> +					maxim,ena-gpios = <&gpy2 0 GPIO_ACTIVE_HIGH>;
+>  				};
+>  
+>  				ldo22_reg: ldo22 {
+> @@ -412,6 +394,7 @@
+>  					regulator-name = "VMEM_VDD_2.8V";
+>  					regulator-min-microvolt = <2800000>;
+>  					regulator-max-microvolt = <2800000>;
+> +					maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
+>  				};
+>  
+>  				ldo23_reg: ldo23 {
+> @@ -518,6 +501,7 @@
+>  					regulator-name = "VMEM_VDDF_3.0V";
+>  					regulator-min-microvolt = <2850000>;
+>  					regulator-max-microvolt = <2850000>;
+> +					maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
+>  				};
+>  
+>  				buck9_reg: buck9 {
+> @@ -525,6 +509,7 @@
+>  					regulator-name = "CAM_ISP_CORE_1.2V";
+>  					regulator-min-microvolt = <1000000>;
+>  					regulator-max-microvolt = <1200000>;
+> +					maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
+>  				};
+>  			};
+>  		};
+> @@ -587,7 +572,7 @@
+>  		broken-cd;
+>  		non-removable;
+>  		card-detect-delay = <200>;
+> -		vmmc-supply = <&vemmc_reg>;
+> +		vmmc-supply = <&ldo22_reg>;
+>  		clock-frequency = <400000000>;
+>  		samsung,dw-mshc-ciu-div = <0>;
+>  		samsung,dw-mshc-sdr-timing = <2 3>;
