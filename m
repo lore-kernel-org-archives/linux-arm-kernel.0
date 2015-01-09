@@ -1,44 +1,54 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 9 Jan 2015 14:24:44 +0800
-Subject: [RFC] usb: dwc3: add DWC3_SKIP_USB3PHY and DWC3_SKIP_USB2_PHY
- quirks
-In-Reply-To: <20150108170815.GJ31926@saruman>
-References: <20141208213551.38860f81@xhacker> <20150108170815.GJ31926@saruman>
-Message-ID: <20150109142444.49e0ff2f@xhacker>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 8 Jan 2015 22:38:57 -0800
+Subject: [PATCH] reset: sunxi: fix spinlock initialization
+In-Reply-To: <20150108093044.GL7853@lukather>
+References: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
+ <20150108093044.GL7853@lukather>
+Message-ID: <CANMBJr6MLTqvC5OJbq=+viodU=TR0WxuDc8iUrRyh4nV=6PeZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Hi Maxime,
 
-On Thu, 8 Jan 2015 09:08:15 -0800
-Felipe Balbi <balbi@ti.com> wrote:
+On 8 January 2015 at 01:30, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Tyler,
+>
+> On Wed, Jan 07, 2015 at 04:54:39PM -0800, Tyler Baker wrote:
+>> Call spin_lock_init() before the spinlocks are used, preventing a lockdep
+>> splat.
+>>
+>> I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+>> when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+>> and has been tested on a few other sunxi platforms without issue.
+>>
+>> [1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+>> [2] http://kernelci.org/boot/?a80-optimus
+>>
+>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>
+> Thanks for this patch.
 
-> Hi,
-> 
-> On Mon, Dec 08, 2014 at 09:35:51PM +0800, Jisheng Zhang wrote:
-> > On platforms which has native usb hosts/phys and pci-dwc3 controller,
-> > the dwc3 core may get the wrong usb2_phy and usb3_phy by
-> > devm_usb_get_phy(). It depends on which usb phy driver is initialized
-> > firstly, the usb_phy_generic or the native/real usb phy driver.
-> 
-> why are you initializing generic PHY if you have a real PHY ?
+You're welcome.
 
-we have two kind of usb hosts: the native usb hosts which can be probed via. DT
-and the usb hosts from pci-dwc3. The former has real phy and the latter doesn't.
+>
+> Can you send this to stable too please?
 
-> 
-> > Before all old USB phy library usage removed, the solution I can have
-> > is to add DWC3_SKIP_USB3PHY and DWC3_SKIP_USB2_PHY quirks and set them
-> > in dwc3-pci.
-> > Could such modification can be accepted? If not, could you please give
-> > alternative suggestions?
-> 
-> we will not accept a quirk to skip PHYs, sorry. A better way of handling
-> this needs to be found.
-> 
+Sure. Once it has been merged in Linus' tree I'll send it for -stable review.
 
-OK, Got your points. It seems we need to deprecate old usb phy library usage
-early.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-Thanks,
-Jisheng
+Cheers,
+
+-- 
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
