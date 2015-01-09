@@ -1,131 +1,208 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  9 Jan 2015 11:54:27 +0000
-Subject: [PATCH v6 09/20] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
+Date: Fri,  9 Jan 2015 11:54:26 +0000
+Subject: [PATCH v6 08/20] arm/arm64: KVM: make the maximum number of vCPUs a
+ per-VM value
 In-Reply-To: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
 References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1420804478-17354-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <1420804478-17354-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-for proper GICv3 support we have to allow guests to use it (depending
-on their selected virtual GIC model).
-So add ICC_SRE_EL1 to the list of saved/restored registers on a
-world switch, but actually disallow a guest to change it by only
-restoring a fixed, once-initialized value.
-This value depends on the GIC model userland has chosen for a guest.
+Currently the maximum number of vCPUs supported is a global value
+limited by the used GIC model. GICv3 will lift this limit, but we
+still need to observe it for guests using GICv2.
+So the maximum number of vCPUs is per-VM value, depending on the
+GIC model the guest uses.
+Store and check the value in struct kvm_arch, but keep it down to
+8 for now.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
 Changelog v5...v6:
- (add Acked-by)
+- adapt to 3.19-rc changes and to changes due to new 05/20
 
 Changelog v4...v5:
- (none)
+- add define for GIC_V2_MAX_CPUS
+- rename max_hw_vcpus
+- add prototype for ARM non-VGIC configs
 
 Changelog v3...v4:
-- initialize variable on declaration
+- initialize max_vcpus with limit based on host GIC
+- remove *_init_emul_* from VGIC backend
+- refine VCPU limit on VGIC creation
+- print warning when userland tries to create more VCPUs than supported
 
- arch/arm64/kernel/asm-offsets.c |    1 +
- arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
- include/kvm/arm_vgic.h          |    1 +
- virt/kvm/arm/vgic-v3.c          |    8 ++++++--
- 4 files changed, 17 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |    1 +
+ arch/arm/kvm/arm.c                |    8 ++++++++
+ arch/arm64/include/asm/kvm_host.h |    3 +++
+ include/kvm/arm_vgic.h            |    8 ++++++++
+ virt/kvm/arm/vgic-v2.c            |    1 +
+ virt/kvm/arm/vgic-v3.c            |    1 +
+ virt/kvm/arm/vgic.c               |   22 ++++++++++++++++++++++
+ 7 files changed, 44 insertions(+)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 9a9fce0..9d34486 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -140,6 +140,7 @@ int main(void)
-   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-+  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
-   DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-   DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-   DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-index d160469..617a012 100644
---- a/arch/arm64/kvm/vgic-v3-switch.S
-+++ b/arch/arm64/kvm/vgic-v3-switch.S
-@@ -148,17 +148,18 @@
-  * x0: Register pointing to VCPU struct
-  */
- .macro	restore_vgic_v3_state
--	// Disable SRE_EL1 access. Necessary, otherwise
--	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
--	msr_s	ICC_SRE_EL1, xzr
--	isb
--
- 	// Compute the address of struct vgic_cpu
- 	add	x3, x0, #VCPU_VGIC_CPU
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index a4e1155..60c52ad 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -68,6 +68,7 @@ struct kvm_arch {
  
- 	// Restore all interesting registers
- 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
- 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-+	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
++	int max_vcpus;
+ };
+ 
+ #define KVM_NR_MEM_OBJS     40
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dd1a689..c33e4ab 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -132,6 +132,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 	/* Mark the initial VMID generation invalid */
+ 	kvm->arch.vmid_gen = 0;
+ 
++	/* The maximum number of VCPUs is limited by the host's GIC model */
++	kvm->arch.max_vcpus = kvm_vgic_get_max_vcpus();
 +
-+	msr_s	ICC_SRE_EL1, x25
+ 	return ret;
+ out_free_stage2_pgd:
+ 	kvm_free_stage2_pgd(kvm);
+@@ -218,6 +221,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ 		goto out;
+ 	}
+ 
++	if (id >= kvm->arch.max_vcpus) {
++		err = -EINVAL;
++		goto out;
++	}
 +
-+	// make sure SRE is valid before writing the other registers
-+	isb
+ 	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+ 	if (!vcpu) {
+ 		err = -ENOMEM;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 37c4ff1..544de35 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -59,6 +59,9 @@ struct kvm_arch {
+ 	/* VTTBR value associated with above pgd and vmid */
+ 	u64    vttbr;
  
- 	msr_s	ICH_HCR_EL2, x4
- 	msr_s	ICH_VMCR_EL2, x5
-@@ -244,9 +245,12 @@
- 	dsb	sy
++	/* The maximum number of vCPUs depends on the used GIC model */
++	int max_vcpus;
++
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
  
- 	// Prevent the guest from touching the GIC system registers
-+	// if SRE isn't enabled for GICv3 emulation
-+	cbnz	x25, 1f
- 	mrs_s	x5, ICC_SRE_EL2
- 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
- 	msr_s	ICC_SRE_EL2, x5
-+1:
- .endm
- 
- ENTRY(__save_vgic_v3_state)
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 1c0e9db..ff04afd 100644
+index dd24396..1c0e9db 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -245,6 +245,7 @@ struct vgic_v3_cpu_if {
- #ifdef CONFIG_ARM_GIC_V3
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
-+	u32		vgic_sre;	/* Restored only, change ignored */
- 	u32		vgic_misr;	/* Saved only */
- 	u32		vgic_eisr;	/* Saved only */
- 	u32		vgic_elrsr;	/* Saved only */
+@@ -33,6 +33,7 @@
+ #define VGIC_V2_MAX_LRS		(1 << 6)
+ #define VGIC_V3_MAX_LRS		16
+ #define VGIC_MAX_IRQS		1024
++#define VGIC_V2_MAX_CPUS	8
+ 
+ /* Sanity checks... */
+ #if (KVM_MAX_VCPUS > 8)
+@@ -132,6 +133,7 @@ struct vgic_params {
+ 	unsigned int	maint_irq;
+ 	/* Virtual control interface base address */
+ 	void __iomem	*vctrl_base;
++	int		max_gic_vcpus;
+ };
+ 
+ struct vgic_vm_ops {
+@@ -289,6 +291,7 @@ struct kvm_exit_mmio;
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+ int kvm_vgic_hyp_init(void);
+ int kvm_vgic_map_resources(struct kvm *kvm);
++int kvm_vgic_get_max_vcpus(void);
+ int kvm_vgic_create(struct kvm *kvm, u32 type);
+ void kvm_vgic_destroy(struct kvm *kvm);
+ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+@@ -393,6 +396,11 @@ static inline bool vgic_ready(struct kvm *kvm)
+ {
+ 	return true;
+ }
++
++static inline int kvm_vgic_get_max_vcpus(void)
++{
++	return KVM_MAX_VCPUS;
++}
+ #endif
+ 
+ #endif
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index e1cd3cb..e8b82b2 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -237,6 +237,7 @@ int vgic_v2_probe(struct device_node *vgic_node,
+ 		 vctrl_res.start, vgic->maint_irq);
+ 
+ 	vgic->type = VGIC_V2;
++	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
+ 	*ops = &vgic_v2_ops;
+ 	*params = vgic;
+ 	goto out;
 diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index ea39bad..5249048 100644
+index d14c75f..ea39bad 100644
 --- a/virt/kvm/arm/vgic-v3.c
 +++ b/virt/kvm/arm/vgic-v3.c
-@@ -145,15 +145,19 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+@@ -235,6 +235,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 	vgic->vcpu_base = vcpu_res.start;
+ 	vgic->vctrl_base = NULL;
+ 	vgic->type = VGIC_V3;
++	vgic->max_gic_vcpus = KVM_MAX_VCPUS;
  
- static void vgic_v3_enable(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-+
- 	/*
- 	 * By forcing VMCR to zero, the GIC will restore the binary
- 	 * points to their reset values. Anything else resets to zero
- 	 * anyway.
- 	 */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
-+	vgic_v3->vgic_vmcr = 0;
-+
-+	vgic_v3->vgic_sre = 0;
- 
- 	/* Get the show on the road... */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
+ 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+ 		 vcpu_res.start, vgic->maint_irq);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 73cc18e..2bfaf53 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1868,6 +1868,17 @@ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+ 	return 0;
  }
  
- static const struct vgic_ops vgic_v3_ops = {
++/**
++ * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
++ *
++ * The host's GIC naturally limits the maximum amount of VCPUs a guest
++ * can use.
++ */
++int kvm_vgic_get_max_vcpus(void)
++{
++	return vgic->max_gic_vcpus;
++}
++
+ void kvm_vgic_destroy(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -2063,6 +2074,8 @@ static int vgic_v2_init_emulation(struct kvm *kvm)
+ 	dist->vm_ops.init_model = vgic_v2_init_model;
+ 	dist->vm_ops.map_resources = vgic_v2_map_resources;
+ 
++	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
++
+ 	return 0;
+ }
+ 
+@@ -2079,6 +2092,15 @@ static int init_vgic_model(struct kvm *kvm, int type)
+ 		break;
+ 	}
+ 
++	if (ret)
++		return ret;
++
++	if (atomic_read(&kvm->online_vcpus) > kvm->arch.max_vcpus) {
++		pr_warn_ratelimited("VGIC model only supports up to %d vCPUs\n",
++			kvm->arch.max_vcpus);
++		ret = -EINVAL;
++	}
++
+ 	return ret;
+ }
+ 
 -- 
 1.7.9.5
