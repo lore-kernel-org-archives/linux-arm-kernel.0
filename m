@@ -1,56 +1,56 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 09 Jan 2015 19:18:49 +0000
-Subject: [PATCH v20 08/11] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <20150109175711.GA12302@n2100.arm.linux.org.uk>
-References: <1420457376-77366-1-git-send-email-wangnan0@huawei.com>
- <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
- <1420799154.4160.19.camel@linaro.org>
- <20150109163505.GS12302@n2100.arm.linux.org.uk>
- <1420824502.4160.62.camel@linaro.org>
- <20150109175711.GA12302@n2100.arm.linux.org.uk>
-Message-ID: <1420831129.4160.78.camel@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 09 Jan 2015 22:35:27 +0300
+Subject: [RFC 02/11] i2c: add quirk checks to core
+In-Reply-To: <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+ <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <54B02D7F.7040501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-01-09 at 17:57 +0000, Russell King - ARM Linux wrote:
+Hello.
+
+On 01/09/2015 08:21 PM, Wolfram Sang wrote:
+
+> Let the core do the checks if HW quirks prevent a transfer. Saves code
+> from drivers and adds consistency.
+
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>   drivers/i2c/i2c-core.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 53 insertions(+)
+>
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 39d25a8cb1ad..7b10a19abf5b 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -2063,6 +2063,56 @@ module_exit(i2c_exit);
+>    * ----------------------------------------------------
+>    */
+>
+> +/* Check if val is exceeding the quirk IFF quirk is non 0 */
+> +#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
+> +
+> +static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
+> +{
+> +	dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
+> +	return -EOPNOTSUPP;
+> +}
+
+    Always returning the same value doesn't make much sense. Are you trying to 
+save space on the call sites?
+
 [...]
-> For me:
-> 
-> $ echo 'asm ("bx r2\n");' | arm-linux-gcc -x c -c -marm -march=armv4 -v - -o o.o
-> 
-> calls the assembler thusly:
-> 
-> /usr/local/lib/gcc/arm-linux-gnueabi/4.7.4/../../../../arm-linux-gnueabi/bin/as \
-> -v -march=armv4 -meabi=5 --fix-v4bx -o o.o /tmp/ccB0cZgO.s
-> 
-> Sure enough, the object file contains:
-> 
-> 00000000 <.text>:
->    0:   e12fff12        bx      r2
->                         0: R_ARM_V4BX   *ABS*
-> 
-> so it looks like it's been told...  Then if you do:
-> 
-> $ arm-linux-ld --fix-v4bx -o o1.o o.o
-> $ arm-linux-objdump -dr o1.o
-> 
-> you get:
-> 
->     8074:       e1a0f002        mov     pc, r2
+> @@ -2080,6 +2130,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+>   	unsigned long orig_jiffies;
+>   	int ret, try;
+>
+> +	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
 
-I get results consistent with what you get above. A bit of googling
-seems to indicate the generate-BX-and-fix-it-in-the-linker came in many
-years ago with AEABI support.
+    So, you only check for non-zero result of this function? Perhaps it makes 
+sense to return true/false instead?
 
-> Hmm, I wonder if this means we should have the kernel linker deal with
-> V4BX relocations on ARMv4, converting them to their mov pc, X variant.
-> 
-> Also, do we need --fix-v4bx for the link of vmlinux?
+> +		return -EOPNOTSUPP;
+> +
 
-I guess the answer is yes if we want to catch uses of BX in inline
-assembly. A quick and not very thorough grep of arch/arm for 'bx'
-doesn't seem to turn up any existing dodgy uses, except in the kprobes
-test code I wrote :-(
-
--- 
-Tixy
+WBR, Sergei
