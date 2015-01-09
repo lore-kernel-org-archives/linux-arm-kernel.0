@@ -1,51 +1,63 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  9 Jan 2015 14:12:33 +0100
-Subject: [PATCH v3 2/4] drivers: bus: Sort Makefile entries alphabetically
-In-Reply-To: <1420809155-4015-1-git-send-email-geert+renesas@glider.be>
-References: <1420809155-4015-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1420809155-4015-3-git-send-email-geert+renesas@glider.be>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jan 2015 13:13:22 +0000
+Subject: ioremap vs remap_pfn_range, VMSPLIT, etc
+In-Reply-To: <54AFD09E.1010806@free.fr>
+References: <54AFD09E.1010806@free.fr>
+Message-ID: <20150109131322.GO12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
----
-v3:
-  - Add Tested-by,
+On Fri, Jan 09, 2015 at 01:59:10PM +0100, Mason wrote:
+> Hello everyone,
+> 
+> Yesterday, I used /dev/mem to mmap 2 GB and (to my surprise) it worked.
+> Specifically, I opened /dev/mem O_RDWR | O_SYNC
+> then called
+>   mmap(NULL, 1U<<31, PROT_WRITE, MAP_SHARED, fd, 0x80000000);
 
-v2:
-  - New.
----
- drivers/bus/Makefile | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+So you asked to map 2GB starting@2GB physical.
 
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 2973c18cbcc27816..3cfaf2c7f25ac4f0 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -2,16 +2,16 @@
- # Makefile for the bus drivers.
- #
- 
-+# Interconnect bus drivers for ARM platforms
-+obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
-+obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
-+
- obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
--obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
--obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
--obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
-+obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
-+obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
- 
- # Interconnect bus driver for OMAP SoCs.
- obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
- 
--# Interconnect bus drivers for ARM platforms
--obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
--obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
--
-+obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+> And mmap returned a valid pointer.
+
+And that mapping would have been created to map physical addresses
+0x80000000-0xffffffff inclusive.
+
+> I was expecting it to fail.
+> 
+> - the kernel is configured with VMSPLIT_3G (3G/1G user/kernel)
+
+This has no bearing on the above.
+
+> - the kernel manages 256 MB RAM
+> - there is roughly 750 MB of VMALLOC space, no highmem
+
+vmalloc has no bearing on the above, mmap() doesn't allocate anything
+into vmalloc space.
+
+> If I requested the same mapping *within the kernel* using ioremap,
+> would that fail because of limited VMALLOC space?
+
+Correct.
+
+> Moving to arch-specific questions (namely ARM Cortex-A9).
+> If I understand correctly (which is very possibly NOT the case)
+> the CPU has two registers pointing to page tables, one for
+> the current process, one for the kernel. And the CPU automatically
+> picks the correct one, based on the active context?
+> It would seem possible to have a full 4G for process, and a full 4G
+> for the kernel, using that method, no? (Like Ingo's old 4G/4G split).
+> Without the performance overhead of fiddling with the page tables.
+> What am I missing?
+
+It's possible to use both, but the CPU selects the page table register
+according to the virtual address.  So it's not possible to have 4G for
+both.  There's only a restricted set of options:  2G / 2G, where the
+bottom 2G of virtual space uses TTBR0 and the upper 2G uses TTBR1.
+1G / 3G (1G for TTBR0, 3G for TTBR1).
+
+We don't use it because most people run with 3G for userspace, which
+isn't supported in hardware.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
