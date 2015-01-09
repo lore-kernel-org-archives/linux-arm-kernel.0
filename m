@@ -1,72 +1,91 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  9 Jan 2015 18:17:47 +0800
-Subject: [PATCH v2 0/9] ARM: sunxi: Support cpufreq on sun[457]i
-Message-ID: <1420798676-22856-1-git-send-email-wens@csie.org>
+Date: Fri,  9 Jan 2015 18:17:51 +0800
+Subject: [PATCH v2 4/9] ARM: dts: sun7i: cubieboard2: add axp209 regulator
+ nodes
+In-Reply-To: <1420798676-22856-1-git-send-email-wens@csie.org>
+References: <1420798676-22856-1-git-send-email-wens@csie.org>
+Message-ID: <1420798676-22856-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds the regulator nodes for the axp209 by including
+the axp209 dtsi. As the inputs of these regulators are from the
+axp209's PS output, which is basically just a mux over the 2
+inputs, it is considered to be unregulated. Thus we do not provide
+input supply properties for them.
 
-This is v2 of the cpufreq support series for sunxi. The series has been
-rebased onto the latest sunxi-next. I've dropped all the patches Maxime
-merged. This includes "ARM: sunxi: Register cpufreq-dt for sun[45678]i"
-which was merged but not published yet.
+The regulator names and constraints are based on the board
+schematics and the SoC datasheet.
 
-Individual changes since v1 are listed within each patch.
+DCDC2 is used as the cpu power supply. This patch also references
+it from the cpu node.
 
+Also get rid of axp209 properties already set in axp209.dtsi.
 
-Original cover letter follows:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-This series adds support cpufreq support for sun[457]i using cpufreq-dt.
-This also supports passive cpu cooling (thermal throttling) using thermal
-zones with the temperature sensor in the SoC.
+changes since v1:
 
-The operating points for the supported platforms were taken from the
-linux-sunxi FEX files repository. The majority of boards use the same
-settings. Only with sun7i do we see slight variations, either disabling
-some frequencies, or bumping up the voltage a bit. In either case this
-can be done by limiting the constraints for the supply regulator, or 
-overriding the OPP table in the board dts file.
+    - Use preprocessor include for axp209.dtsi
+    - Remove incorrectly squashed axp209.dtsi patch
 
-On sun7i, there is an additional operating point not found in the FEX
-files, 960 MHz @ 1.4V, which is the full speed setting in both u-boot-sunxi
-and mainline u-boot.
+---
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 35 +++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
-The series has been tested on the 4 boards I have. With cpufreq active,
-the effects are visible as a decrease in SoC internal temperature.
-Stability for the operating points has been tested using:
-
-  http://linux-sunxi.org/Hardware_Reliability_Tests#Reliability_of_cpufreq_voltage.2Ffrequency_settings
-
-More real world usage feedback is appreciated. Thermal throttling hasn't
-been tested much, due to not being able to generate enough load without
-the GPU for the SoC to heat up. Also on sun4i, the temperature sensor
-still hasn't been calibrated, so the readings are highly inaccurate.
-
-
-Chen-Yu Tsai (9):
-  Input: sun4i-ts: Add thermal zone sensor support
-  ARM: dts: sunxi: Add dtsi for AXP209 PMIC
-  ARM: dts: sun7i: Add cpu thermal zones to dtsi
-  ARM: dts: sun7i: cubieboard2: add axp209 regulator nodes
-  ARM: dts: sun7i: cubietruck: add axp209 regulator nodes
-  ARM: dts: sun5i: Add cpu thermal zones to dtsi
-  ARM: dts: sun5i: hsg-h702: add axp209 regulator nodes
-  ARM: dts: sun4i: Add cpu thermal zones to dtsi
-  ARM: dts: sun4i: cubieboard: add axp209 regulator nodes
-
- .../bindings/input/touchscreen/sun4i.txt           |  2 +
- arch/arm/boot/dts/axp209.dtsi                      | 97 ++++++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts         | 35 +++++++-
- arch/arm/boot/dts/sun4i-a10.dtsi                   | 34 ++++++++
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts           | 46 ++++++++--
- arch/arm/boot/dts/sun5i-a13.dtsi                   | 34 ++++++++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        | 35 +++++++-
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts         | 35 +++++++-
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 33 ++++++++
- drivers/input/touchscreen/sun4i-ts.c               | 47 +++++++++++
- 10 files changed, 378 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm/boot/dts/axp209.dtsi
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 18fc5db9c976..ec1fc2c8b3e3 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -88,13 +88,9 @@
+ 			status = "okay";
+ 
+ 			axp209: pmic at 34 {
+-				compatible = "x-powers,axp209";
+ 				reg = <0x34>;
+ 				interrupt-parent = <&nmi_intc>;
+ 				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-
+-				interrupt-controller;
+-				#interrupt-cells = <1>;
+ 			};
+ 		};
+ 
+@@ -145,3 +141,34 @@
+ 		status = "okay";
+ 	};
+ };
++
++#include "axp209.dtsi"
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
 -- 
 2.1.4
