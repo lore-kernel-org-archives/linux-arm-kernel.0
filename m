@@ -1,52 +1,86 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  9 Jan 2015 11:49:33 +0100
-Subject: [PATCH v3 3/3] soc/tegra: fuse: Add Tegra132 support
-In-Reply-To: <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
-References: <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1420800573-16385-1-git-send-email-thierry.reding@gmail.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Fri, 9 Jan 2015 18:55:05 +0800
+Subject: [PATCH v20 08/11] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1420799154.4160.19.camel@linaro.org>
+References: <1420457376-77366-1-git-send-email-wangnan0@huawei.com>	
+ <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
+ <1420799154.4160.19.camel@linaro.org>
+Message-ID: <54AFB389.4030807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
-
-Tegra132 is very similar to Tegra124 from a peripheral point of view and
-uses the same fuse controller.
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes in v3:
-- collapse TEGRA124 and TEGRA132 cases into a single one (Alex Courbot)
-
-Changes in v2:
-- add missing break in Tegra132 case for legacy fuse init (Vince Hsu)
----
- drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
- drivers/soc/tegra/fuse/fuse-tegra30.c | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
-index 011a3363c265..c0d660f1aaac 100644
---- a/drivers/soc/tegra/fuse/fuse-tegra.c
-+++ b/drivers/soc/tegra/fuse/fuse-tegra.c
-@@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
- 	{ .compatible = "nvidia,tegra30-car", },
- 	{ .compatible = "nvidia,tegra114-car", },
- 	{ .compatible = "nvidia,tegra124-car", },
-+	{ .compatible = "nvidia,tegra132-car", },
- 	{},
- };
- 
-diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
-index d1a4290cda5c..4d2f71bf65c5 100644
---- a/drivers/soc/tegra/fuse/fuse-tegra30.c
-+++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
-@@ -182,6 +182,7 @@ static void __init legacy_fuse_init(void)
- 		fuse_info = &tegra114_info;
- 		break;
- 	case TEGRA124:
-+	case TEGRA132:
- 		fuse_info = &tegra124_info;
- 		break;
- 	default:
--- 
-2.1.3
+On 2015/1/9 18:25, Jon Medhurst (Tixy) wrote:
+> On Fri, 2015-01-09 at 14:37 +0800, Wang Nan wrote:
+>> This patch introduce kprobeopt for ARM 32.
+>>
+>> Limitations:
+>>  - Currently only kernel compiled with ARM ISA is supported.
+>>
+>>  - Offset between probe point and optinsn slot must not larger than
+>>    32MiB. Masami Hiramatsu suggests replacing 2 words, it will make
+>>    things complex. Futher patch can make such optimization.
+>>
+>> Kprobe opt on ARM is relatively simpler than kprobe opt on x86 because
+>> ARM instruction is always 4 bytes aligned and 4 bytes long. This patch
+>> replace probed instruction by a 'b', branch to trampoline code and then
+>> calls optimized_callback(). optimized_callback() calls opt_pre_handler()
+>> to execute kprobe handler. It also emulate/simulate replaced instruction.
+>>
+>> When unregistering kprobe, the deferred manner of unoptimizer may leave
+>> branch instruction before optimizer is called. Different from x86_64,
+>> which only copy the probed insn after optprobe_template_end and
+>> reexecute them, this patch call singlestep to emulate/simulate the insn
+>> directly. Futher patch can optimize this behavior.
+>>
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>> Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+>> Reviewed-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+>> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+> 
+> [...]
+> 
+>> +asm (
+>> +			".global optprobe_template_entry\n"
+>> +			"optprobe_template_entry:\n"
+>> +			".global optprobe_template_sub_sp\n"
+>> +			"optprobe_template_sub_sp:"
+>> +			"	sub	sp, sp, #0xff\n"
+>> +			"	stmia	sp, {r0 - r14} \n"
+>> +			".global optprobe_template_add_sp\n"
+>> +			"optprobe_template_add_sp:"
+>> +			"	add	r3, sp, #0xff\n"
+>> +			"	str	r3, [sp, #52]\n"
+>> +			"	mrs	r4, cpsr\n"
+>> +			"	str	r4, [sp, #64]\n"
+>> +			"	mov	r1, sp\n"
+>> +			"	ldr	r0, 1f\n"
+>> +			"	ldr	r2, 2f\n"
+>> +			/*
+>> +			 * AEABI requires an 8-bytes alignment stack. If
+>> +			 * SP % 8 != 0 (SP % 4 == 0 should be ensured),
+>> +			 * alloc more bytes here.
+>> +			 */
+>> +			"	and	r4, sp, #4\n"
+>> +			"	sub	sp, sp, r4\n"
+>> +#if __LINUX_ARM_ARCH__ >= 5
+>> +			"	blx	r2\n"
+>> +#else
+>> +			"	mov     lr, pc\n"
+>> +			"	bx	r2\n"
+> 
+> I think the BX instruction is not supported for ARMv4 chips that don't
+> have Thumb support (e.g. SA110), at least an old ARM ARM I have says BX
+> is supported on "Version 5 and above, and T variants of version 4".
+> Though building assabet_defconfig with kprobes enabled doesn't produce
+> an error for the BX instruction (!?)
+> 
+> To be safe I would be tempted to use "mov pc, r2" instead. Again, if you
+> agree, I'll change this in the patch in the branch I'm putting together.
+> 
+> [...]
+> 
+Sure. I tested a function pointer calling and found that gcc generates
+'mov pc, r2', and there is no need for ISA switching.
