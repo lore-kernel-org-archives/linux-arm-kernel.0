@@ -1,76 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jan 2015 11:12:16 +0100
-Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
-In-Reply-To: <1417131990-17954-2-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1417131990-17954-1-git-send-email-rjui@broadcom.com>
- <1417131990-17954-2-git-send-email-rjui@broadcom.com>
-Message-ID: <CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Jan 2015 11:12:53 +0100
+Subject: [PATCH] soc/tegra: pmc: Add Tegra132 support
+In-Reply-To: <alpine.DEB.2.02.1501082232280.28771@utopia.booyaka.com>
+References: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
+ <alpine.DEB.2.02.1501082232280.28771@utopia.booyaka.com>
+Message-ID: <20150109101252.GG27845@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 28, 2014 at 12:46 AM, Ray Jui <rjui@broadcom.com> wrote:
+On Thu, Jan 08, 2015 at 10:34:35PM +0000, Paul Walmsley wrote:
+> On Thu, 8 Jan 2015, Thierry Reding wrote:
+> 
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Tegra132 uses the same GPU as Tegra124 and the same special-case is
+> > needed to remove clamps. However Tegra132 has a separate chip ID, so in
+> > order to avoid having to extend the list of chip IDs for the special
+> > case, add a feature flag to the SoC data.
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 
+> Reviewed-by: Paul Walmsley <pwalmsley@nvidia.com>
+> 
+> Nit: not sure I would call it a special-case; to me it's more of an 
+> evolutionary change due to the radically different GPU in T124 & T132.
 
-> Device tree binding documentation for Broadcom Cygnus pinctrl driver
->
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  .../bindings/pinctrl/brcm,cygnus-pinctrl.txt       |   92 ++++++++++++++++++++
->  1 file changed, 92 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
-> new file mode 100644
-> index 0000000..86e4579
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
-> @@ -0,0 +1,92 @@
-> +Broadcom Cygnus Pin Controller
-> +
-> +The Cygnus pin controller supports setting the alternate functions of groups
-> +of pins. Pinmux configuration on individual pins is not supported by the
-> +Cygnus A0 SoC.
-> +
-> +Required properties:
-> +
-> +- compatible:
-> +    Must be "brcm,cygnus-pinctrl"
-> +
-> +- reg:
-> +    Define the base and range of the I/O address space that contain the Cygnus
-> +pin control registers
+I reworded the commit message slightly, so it says:
 
-The following is subnodes. Indicate clearly in the binding that these are
-*not* properties of the main node, but individual subnodes.
+	Tegra132 uses the same GPU as Tegra124 and therefore requires the same
+	method to remove clamps. ...
 
-> +- brcm,groups:
-> +    This can be strings of one or more group names. This defines the group(s)
-> +that one wants to configure
-> +
-> +- brcm,function:
-> +    This is the alternate function that one wants to configure to. Valid
-> +alternate functions are "alt1", "alt2", "alt3", "alt4"
+I hope that's less misleading.
 
-NAK. We have standardized bindings for groups and functions,
-and there are pending patches from S?ren Brinkmann adding
-this to the pinctrl DT parsing core.
-
-Just use "groups" and "function" and refer to
-Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-
-Then "alt1", "alt2" etc are non-functional names of functions.
-Use the real function names, like "spi0" or so. This
-alt-business seems to be just a shortcut to make it
-simple, don't do that.
-
-Then you use e.g. "spi0" as a group name. I prefer you
-call that "spi0_grp" or something to say it is a group of
-pins associated with spi0, as spi0 is actually the
-function.
-
-If unsure of the definitions of group and function, refer
-to Documentation/pinctrl.txt
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/493b4c66/attachment.sig>
