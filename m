@@ -1,65 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jan 2015 17:20:35 +0000
-Subject: [PATCH] arm: Remove early stack deallocation from
- restore_user_regs
-In-Reply-To: <54B00AAE.1050504@linaro.org>
-References: <1418382718-16323-1-git-send-email-daniel.thompson@linaro.org>
- <1420470758-5874-1-git-send-email-daniel.thompson@linaro.org>
- <20150109164608.GV12302@n2100.arm.linux.org.uk>
- <54B00AAE.1050504@linaro.org>
-Message-ID: <20150109172035.GZ12302@n2100.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri,  9 Jan 2015 18:21:36 +0100
+Subject: [RFC 06/11] i2c: cpm: make use of the new infrastructure for quirks
+In-Reply-To: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1420824103-24169-7-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 05:06:54PM +0000, Daniel Thompson wrote:
-> On 09/01/15 16:46, Russell King - ARM Linux wrote:
-> > On Mon, Jan 05, 2015 at 03:12:38PM +0000, Daniel Thompson wrote:
-> >> Currently restore_user_regs deallocates the SVC stack early in
-> >> its execution and relies on no exception being taken between
-> >> the deallocation and the registers being restored. The introduction
-> >> of a default FIQ handler that also uses the SVC stack breaks this
-> >> assumption and can result in corrupted register state.
-> >>
-> >> This patch works around the problem by removing the early
-> >> stack deallocation and using r2 as a temporary instead. I have
-> >> not found a way to do this without introducing an extra mov
-> >> instruction to the macro.
-> >>
-> >> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> >> ---
-> > 
-> > Please put it in the patch system, thanks.
-> 
-> Will do.
-> 
-> 
-> > I think we should queue
-> > this one for stable too, as I think we need this for v3.18
-> > (as a result of c0e7f7ee717e2b4c5791e7422424c96b5008c39e,
-> > ARM: 8150/3: fiq: Replace default FIQ handler)?
-> 
-> It's a close call.
+Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+---
+ drivers/i2c/busses/i2c-cpm.c | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
-I agree.
-
-> Before 8150/3 the system would probably crash if the default FIQ handler
-> ran. After 8150/3 the system is also likely to crash since there's no
-> code hooked into the handler in v3.18 that can clear the source of FIQ
-> leaving us stuck re-entering the FIQ handler.
-> 
-> Nevertheless, this is a nasty gremlin to leave for backporters (it
-> wasn't easy to find) so I'd be very happy to Cc: stable and see what
-> they think.
-
-Well, we could ask Greg now.  It's not a regression (as nothing makes
-use of the previously merged changes yet), but it is a nasty latent bug
-which we could easily solve.
-
-Having thought about it some more, I'm tempted to say... leave the
-stable tag off it, and we can make the decision later - after it's had
-a chance to really prove itself to a much wider audience.  That'd be
-the lowest risk for the 3.18 stable tree.
-
+diff --git a/drivers/i2c/busses/i2c-cpm.c b/drivers/i2c/busses/i2c-cpm.c
+index 2d466538b2e2..714bdc837769 100644
+--- a/drivers/i2c/busses/i2c-cpm.c
++++ b/drivers/i2c/busses/i2c-cpm.c
+@@ -308,22 +308,12 @@ static int cpm_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+ 	struct i2c_reg __iomem *i2c_reg = cpm->i2c_reg;
+ 	struct i2c_ram __iomem *i2c_ram = cpm->i2c_ram;
+ 	struct i2c_msg *pmsg;
+-	int ret, i;
++	int ret;
+ 	int tptr;
+ 	int rptr;
+ 	cbd_t __iomem *tbdf;
+ 	cbd_t __iomem *rbdf;
+ 
+-	if (num > CPM_MAXBD)
+-		return -EINVAL;
+-
+-	/* Check if we have any oversized READ requests */
+-	for (i = 0; i < num; i++) {
+-		pmsg = &msgs[i];
+-		if (pmsg->len >= CPM_MAX_READ)
+-			return -EINVAL;
+-	}
+-
+ 	/* Reset to use first buffer */
+ 	out_be16(&i2c_ram->rbptr, in_be16(&i2c_ram->rbase));
+ 	out_be16(&i2c_ram->tbptr, in_be16(&i2c_ram->tbase));
+@@ -424,10 +414,18 @@ static const struct i2c_algorithm cpm_i2c_algo = {
+ 	.functionality = cpm_i2c_func,
+ };
+ 
++/* CPM_MAX_READ is also limiting writes according to the code! */
++static struct i2c_adapter_quirks cpm_i2c_quirks = {
++	.max_num_msgs = CPM_MAXBD,
++	.max_read_len = CPM_MAX_READ,
++	.max_write_len = CPM_MAX_READ,
++};
++
+ static const struct i2c_adapter cpm_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.name		= "i2c-cpm",
+ 	.algo		= &cpm_i2c_algo,
++	.quirks		= &cpm_i2c_quirks,
+ };
+ 
+ static int cpm_i2c_setup(struct cpm_i2c *cpm)
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
