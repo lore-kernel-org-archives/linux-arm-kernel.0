@@ -1,46 +1,35 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri,  9 Jan 2015 16:57:16 -0700
-Subject: [PATCH 05/11] coresight-tpiu: use module_amba_driver to simplify the
- code
+Date: Fri,  9 Jan 2015 16:57:19 -0700
+Subject: [PATCH 08/11] coresight: fix typo in comment in of_coresight.c
 In-Reply-To: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1420847842-31769-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1420847842-31769-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+From: Kaixu Xia <xiakaixu@huawei.com>
 
-module_amba_driver() makes the code simpler by eliminating
-boilerplate code.
+Debugfs isn't used for coresight configuration, so the corresponding
+comments should be changed.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/coresight-tpiu.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/coresight/of_coresight.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/coresight/coresight-tpiu.c
-index ae101082791a..3b33af2416bb 100644
---- a/drivers/coresight/coresight-tpiu.c
-+++ b/drivers/coresight/coresight-tpiu.c
-@@ -201,17 +201,7 @@ static struct amba_driver tpiu_driver = {
- 	.id_table	= tpiu_ids,
- };
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index 5030c0734508..8bd524e49518 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -126,7 +126,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	if (!pdata)
+ 		return ERR_PTR(-ENOMEM);
  
--static int __init tpiu_init(void)
--{
--	return amba_driver_register(&tpiu_driver);
--}
--module_init(tpiu_init);
--
--static void __exit tpiu_exit(void)
--{
--	amba_driver_unregister(&tpiu_driver);
--}
--module_exit(tpiu_exit);
-+module_amba_driver(tpiu_driver);
+-	/* Use device name as debugfs handle */
++	/* Use device name as sysfs handle */
+ 	pdata->name = dev_name(dev);
  
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("CoreSight Trace Port Interface Unit driver");
+ 	/* Get the number of input and output port for this component */
 -- 
 1.9.1
