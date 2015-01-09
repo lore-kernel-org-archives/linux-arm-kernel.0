@@ -1,122 +1,592 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  9 Jan 2015 14:13:55 +0100
-Subject: [PATCH 3/4] ARM: shmobile: Enable kzm9g board in multiplatform
- defconfig
+Date: Fri,  9 Jan 2015 14:13:56 +0100
+Subject: [PATCH 4/4] ARM: shmobile: kzm9g-reference: Remove board C code and
+ DT file
 In-Reply-To: <1420809236-4105-1-git-send-email-geert+renesas@glider.be>
 References: <1420809236-4105-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1420809236-4105-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1420809236-4105-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that the sh73a0 generic multiplatform case has the same feature set
+as the kzm9g DT reference board code, we get rid of the latter.
+DT reference code in the future shall make use of the sh73a0
+multiplatform support code with the generic SoC machine vector.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/configs/shmobile_defconfig | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt |   2 -
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       | 398 ---------------------
+ arch/arm/mach-shmobile/Kconfig                     |  14 -
+ arch/arm/mach-shmobile/Makefile                    |   1 -
+ arch/arm/mach-shmobile/Makefile.boot               |   1 -
+ arch/arm/mach-shmobile/board-kzm9g-reference.c     |  62 ----
+ arch/arm/mach-shmobile/include/mach/zboot.h        |   2 +-
+ 8 files changed, 2 insertions(+), 481 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+ delete mode 100644 arch/arm/mach-shmobile/board-kzm9g-reference.c
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index adaa7aaf9178c4dc..e365c31e9dd513f3 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -17,6 +17,7 @@ CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
- CONFIG_ARCH_R8A7791=y
- CONFIG_ARCH_R8A7794=y
-+CONFIG_ARCH_SH73A0=y
- CONFIG_MACH_MARZEN=y
- CONFIG_CPU_BPREDICT_DISABLE=y
- CONFIG_PL310_ERRATA_588369=y
-@@ -44,7 +45,6 @@ CONFIG_CPUFREQ_DT=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -54,6 +54,7 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_SIMPLE_PM_BUS=y
- CONFIG_MTD=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-@@ -81,10 +82,13 @@ CONFIG_SMSC911X=y
- CONFIG_SMSC_PHY=y
- CONFIG_MICREL_PHY=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ST1232=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_ADXL34X=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -93,6 +97,7 @@ CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=20
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_SH_MOBILE=y
-@@ -103,14 +108,16 @@ CONFIG_SPI_SH_MSIOF=y
- CONFIG_SPI_SH_HSPI=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
-+CONFIG_GPIO_PCF857X=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
-+CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
--CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_MEDIA_SUPPORT=y
-@@ -127,10 +134,12 @@ CONFIG_VIDEO_RENESAS_VSP1=y
- CONFIG_VIDEO_ADV7180=y
- CONFIG_DRM=y
- CONFIG_DRM_RCAR_DU=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_FB_SH_MOBILE_LCDC=y
-+CONFIG_FB_SH_MOBILE_MERAM=y
- # CONFIG_LCD_CLASS_DEVICE is not set
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
-+CONFIG_BACKLIGHT_AS3711=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-@@ -141,6 +150,7 @@ CONFIG_SND_SOC_WM8978=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_R8A66597_HCD=y
- CONFIG_USB_RENESAS_USBHS=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_USB_RCAR_GEN2_PHY=y
-@@ -154,11 +164,14 @@ CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_RS5C372=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- CONFIG_RCAR_DMAC=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_IIO=y
-+CONFIG_AK8975=y
- CONFIG_PWM=y
- CONFIG_PWM_RENESAS_TPU=y
- # CONFIG_DNOTIFY is not set
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 51147cb5c036599a..c69f127d27c3b974 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -57,8 +57,6 @@ Boards:
+     compatible = "renesas,kzm9d", "renesas,emev2"
+   - Kyoto Microcomputer Co. KZM-A9-GT
+     compatible = "renesas,kzm9g", "renesas,sh73a0"
+-  - Kyoto Microcomputer Co. KZM-A9-GT - Reference Device Tree Implementation
+-    compatible = "renesas,kzm9g-reference", "renesas,sh73a0"
+   - Lager (RTP0RC7790SEB00010S)
+     compatible = "renesas,lager", "renesas,r8a7790"
+   - Mackerel (R0P7372LC0016RL, AP4 EVM 2nd)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52844bf64d22cc8c..be6e2607da889bf6 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -411,8 +411,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += \
+ 	r8a7778-bockw-reference.dtb \
+ 	r8a7779-marzen.dtb \
+ 	sh7372-mackerel.dtb \
+-	sh73a0-kzm9g.dtb \
+-	sh73a0-kzm9g-reference.dtb
++	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai.dtb \
+ 	r8a73a4-ape6evm.dtb \
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+deleted file mode 100644
+index bf365f7fef47213a..0000000000000000
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ /dev/null
+@@ -1,398 +0,0 @@
+-/*
+- * Device Tree Source for the KZM-A9-GT board
+- *
+- * Copyright (C) 2012 Horms Solutions Ltd.
+- *
+- * Based on sh73a0-kzm9g.dts
+- * Copyright (C) 2012 Renesas Solutions Corp.
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-
+-/dts-v1/;
+-#include "sh73a0.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
+-#include <dt-bindings/interrupt-controller/irq.h>
+-
+-/ {
+-	model = "KZM-A9-GT";
+-	compatible = "renesas,kzm9g-reference", "renesas,sh73a0";
+-
+-	aliases {
+-		serial4 = &scifa4;
+-	};
+-
+-	cpus {
+-		cpu at 0 {
+-			cpu0-supply = <&vdd_dvfs>;
+-			operating-points = <
+-				/* kHz  uV */
+-				1196000 1315000
+-				 598000 1175000
+-				 398667 1065000
+-			>;
+-			voltage-tolerance = <1>; /* 1% */
+-		};
+-	};
+-
+-	chosen {
+-		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel rw";
+-		stdout-path = &scifa4;
+-	};
+-
+-	memory {
+-		device_type = "memory";
+-		reg = <0x40000000 0x20000000>;
+-	};
+-
+-	reg_1p8v: regulator at 0 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-1.8V";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		regulator-always-on;
+-		regulator-boot-on;
+-	};
+-
+-	reg_3p3v: regulator at 1 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "fixed-3.3V";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-always-on;
+-		regulator-boot-on;
+-	};
+-
+-	vmmc_sdhi0: regulator at 2 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "SDHI0 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&pfc 15 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-	};
+-
+-	vmmc_sdhi2: regulator at 3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "SDHI2 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&pfc 14 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-	};
+-
+-	lan9220 at 10000000 {
+-		compatible = "smsc,lan9220", "smsc,lan9115";
+-		reg = <0x10000000 0x100>;
+-		phy-mode = "mii";
+-		interrupt-parent = <&irqpin0>;
+-		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+-		reg-io-width = <4>;
+-		smsc,irq-push-pull;
+-		smsc,save-mac-address;
+-		vddvario-supply = <&reg_1p8v>;
+-		vdd33a-supply = <&reg_3p3v>;
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		led1 {
+-			gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
+-			label = "LED1";
+-		};
+-		led2 {
+-			gpios = <&pfc 21 GPIO_ACTIVE_LOW>;
+-			label = "LED2";
+-		};
+-		led3 {
+-			gpios = <&pfc 22 GPIO_ACTIVE_LOW>;
+-			label = "LED3";
+-		};
+-		led4 {
+-			gpios = <&pfc 23 GPIO_ACTIVE_LOW>;
+-			label = "LED4";
+-		};
+-	};
+-
+-	keyboard {
+-		compatible = "gpio-keys";
+-
+-		back-key {
+-			gpios = <&pcf8575 8 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_BACK>;
+-			label = "SW3";
+-		};
+-
+-		right-key {
+-			gpios = <&pcf8575 9 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_RIGHT>;
+-			label = "SW2-R";
+-		};
+-
+-		left-key {
+-			gpios = <&pcf8575 10 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_LEFT>;
+-			label = "SW2-L";
+-		};
+-
+-		enter-key {
+-			gpios = <&pcf8575 11 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_ENTER>;
+-			label = "SW2-P";
+-		};
+-
+-		up-key {
+-			gpios = <&pcf8575 12 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_UP>;
+-			label = "SW2-U";
+-		};
+-
+-		down-key {
+-			gpios = <&pcf8575 13 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_DOWN>;
+-			label = "SW2-D";
+-		};
+-
+-		home-key {
+-			gpios = <&pcf8575 14 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_HOME>;
+-			label = "SW1";
+-		};
+-	};
+-
+-	sound {
+-		compatible = "simple-audio-card";
+-		simple-audio-card,format = "left_j";
+-		simple-audio-card,cpu {
+-			sound-dai = <&sh_fsi2 0>;
+-		};
+-		simple-audio-card,codec {
+-			sound-dai = <&ak4648>;
+-			bitclock-master;
+-			frame-master;
+-			system-clock-frequency = <11289600>;
+-		};
+-	};
+-};
+-
+-&cmt1 {
+-	status = "okay";
+-};
+-
+-&extal2_clk {
+-	clock-frequency = <48000000>;
+-};
+-
+-&i2c0 {
+-	status = "okay";
+-
+-	compass at c {
+-		compatible = "asahi-kasei,ak8975";
+-		reg = <0x0c>;
+-		interrupt-parent = <&irqpin3>;
+-		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+-	};
+-
+-	ak4648: codec at 12 {
+-		compatible = "asahi-kasei,ak4648";
+-		reg = <0x12>;
+-		#sound-dai-cells = <0>;
+-	};
+-
+-	accelerometer at 1d {
+-		compatible = "adi,adxl34x";
+-		reg = <0x1d>;
+-		interrupt-parent = <&irqpin3>;
+-		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
+-			     <3 IRQ_TYPE_LEVEL_HIGH>;
+-	};
+-
+-	rtc at 32 {
+-		compatible = "ricoh,r2025sd";
+-		reg = <0x32>;
+-	};
+-
+-	as3711 at 40 {
+-		compatible = "ams,as3711";
+-		reg = <0x40>;
+-
+-		regulators {
+-			vdd_dvfs: sd1 {
+-				regulator-name = "1.315V CPU";
+-				regulator-min-microvolt = <1050000>;
+-				regulator-max-microvolt = <1350000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			sd2 {
+-				regulator-name = "1.8V";
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			sd4 {
+-				regulator-name = "1.215V";
+-				regulator-min-microvolt = <1215000>;
+-				regulator-max-microvolt = <1235000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			ldo2 {
+-				regulator-name = "2.8V CPU";
+-				regulator-min-microvolt = <2800000>;
+-				regulator-max-microvolt = <2800000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			ldo3 {
+-				regulator-name = "3.0V CPU";
+-				regulator-min-microvolt = <3000000>;
+-				regulator-max-microvolt = <3000000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			ldo4 {
+-				regulator-name = "2.8V";
+-				regulator-min-microvolt = <2800000>;
+-				regulator-max-microvolt = <2800000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			ldo5 {
+-				regulator-name = "2.8V #2";
+-				regulator-min-microvolt = <2800000>;
+-				regulator-max-microvolt = <2800000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			ldo7 {
+-				regulator-name = "1.15V CPU";
+-				regulator-min-microvolt = <1150000>;
+-				regulator-max-microvolt = <1150000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-			ldo8 {
+-				regulator-name = "1.15V CPU #2";
+-				regulator-min-microvolt = <1150000>;
+-				regulator-max-microvolt = <1150000>;
+-				regulator-always-on;
+-				regulator-boot-on;
+-			};
+-		};
+-	};
+-};
+-
+-&i2c1 {
+-	status = "okay";
+-
+-	touchscreen at 55 {
+-		compatible = "sitronix,st1232";
+-		reg = <0x55>;
+-		interrupt-parent = <&irqpin1>;
+-		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
+-	};
+-};
+-
+-&i2c3 {
+-	pinctrl-0 = <&i2c3_pins>;
+-	pinctrl-names = "default";
+-	status = "okay";
+-
+-	pcf8575: gpio at 20 {
+-		compatible = "nxp,pcf8575";
+-		reg = <0x20>;
+-		interrupt-parent = <&irqpin2>;
+-		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		interrupt-controller;
+-		#interrupt-cells = <2>;
+-	};
+-};
+-
+-&mmcif {
+-	pinctrl-0 = <&mmcif_pins>;
+-	pinctrl-names = "default";
+-
+-	bus-width = <8>;
+-	vmmc-supply = <&reg_1p8v>;
+-	status = "okay";
+-};
+-
+-&pfc {
+-	i2c3_pins: i2c3 {
+-		renesas,groups = "i2c3_1";
+-		renesas,function = "i2c3";
+-	};
+-
+-	mmcif_pins: mmc {
+-		mux {
+-			renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
+-			renesas,function = "mmc0";
+-		};
+-		cfg {
+-			renesas,groups = "mmc0_data8_0";
+-			renesas,pins = "PORT279";
+-			bias-pull-up;
+-		};
+-	};
+-
+-	scifa4_pins: serial4 {
+-		renesas,groups = "scifa4_data", "scifa4_ctrl";
+-		renesas,function = "scifa4";
+-	};
+-
+-	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd", "sdhi0_wp";
+-		renesas,function = "sdhi0";
+-	};
+-
+-	sdhi2_pins: sd2 {
+-		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
+-		renesas,function = "sdhi2";
+-	};
+-
+-	fsia_pins: sounda {
+-		renesas,groups = "fsia_mclk_in", "fsia_sclk_in",
+-				 "fsia_data_in", "fsia_data_out";
+-		renesas,function = "fsia";
+-	};
+-};
+-
+-&scifa4 {
+-	pinctrl-0 = <&scifa4_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&vmmc_sdhi0>;
+-	bus-width = <4>;
+-	status = "okay";
+-};
+-
+-&sdhi2 {
+-	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&vmmc_sdhi2>;
+-	bus-width = <4>;
+-	broken-cd;
+-	status = "okay";
+-};
+-
+-&sh_fsi2 {
+-	pinctrl-0 = <&fsia_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 8ee2f281f2a3dd6a..f4108d85c03c6a0e 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -214,20 +214,6 @@ config MACH_KZM9G
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+ 	select USE_OF
+ 
+-config MACH_KZM9G_REFERENCE
+-	bool "KZM-A9-GT board - Reference Device Tree Implementation"
+-	depends on ARCH_SH73A0
+-	select ARCH_REQUIRE_GPIOLIB
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+-	select USE_OF
+-	---help---
+-	   Use reference implementation of KZM-A9-GT board support
+-	   which makes as greater use of device tree at the expense
+-	   of not supporting a number of devices.
+-
+-	   This is intended to aid developers
+-
+ comment "Renesas ARM SoCs System Configuration"
+ 
+ config CPU_HAS_INTEVT
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index b400f5fe72c269af..7b9ed9e25e9bc954 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -66,7 +66,6 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o intc-sh73a0.o
+-obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
+ endif
+ 
+ # Framework support
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 02532bea530000cb..6ef0e2b29a02440d 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -6,7 +6,6 @@ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
+ loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
+ loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+ loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
+-loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
+ loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
+ loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
+ 
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+deleted file mode 100644
+index 2e82e44ab85258b7..0000000000000000
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ /dev/null
+@@ -1,62 +0,0 @@
+-/*
+- * KZM-A9-GT board support - Reference Device Tree Implementation
+- *
+- * Copyright (C) 2012	Horms Solutions Ltd.
+- *
+- * Based on board-kzm9g.c
+- * Copyright (C) 2012	Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/io.h>
+-#include <linux/irq.h>
+-#include <linux/input.h>
+-#include <linux/of_platform.h>
+-
+-#include <asm/hardware/cache-l2x0.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-#include "sh73a0.h"
+-
+-static void __init kzm_init(void)
+-{
+-	sh73a0_add_standard_devices_dt();
+-
+-#ifdef CONFIG_CACHE_L2X0
+-	/* Shared attribute override enable, 64K*8way */
+-	l2x0_init(IOMEM(0xf0100000), 0x00400000, 0xc20f0fff);
+-#endif
+-}
+-
+-#define RESCNT2 IOMEM(0xe6188020)
+-static void kzm9g_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	/* Do soft power on reset */
+-	writel((1 << 31), RESCNT2);
+-}
+-
+-static const char *kzm9g_boards_compat_dt[] __initdata = {
+-	"renesas,kzm9g-reference",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
+-	.smp		= smp_ops(sh73a0_smp_ops),
+-	.map_io		= sh73a0_map_io,
+-	.init_early	= shmobile_init_delay,
+-	.init_machine	= kzm_init,
+-	.init_late	= shmobile_init_late,
+-	.restart	= kzm9g_restart,
+-	.dt_compat	= kzm9g_boards_compat_dt,
+-MACHINE_END
+diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
+index 727cc78ac8ece937..219bbcf029cc34b0 100644
+--- a/arch/arm/mach-shmobile/include/mach/zboot.h
++++ b/arch/arm/mach-shmobile/include/mach/zboot.h
+@@ -12,7 +12,7 @@
+ #ifdef CONFIG_MACH_MACKEREL
+ #define MEMORY_START	0x40000000
+ #include "mach/head-mackerel.txt"
+-#elif defined(CONFIG_MACH_KZM9G) || defined(CONFIG_MACH_KZM9G_REFERENCE)
++#elif defined(CONFIG_MACH_KZM9G)
+ #define MEMORY_START	0x43000000
+ #include "mach/head-kzm9g.txt"
+ #else
 -- 
 1.9.1
