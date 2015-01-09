@@ -1,97 +1,207 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Jan 2015 15:38:17 +0000
-Subject: [PATCH 7/8] arm64: use 'physmem' memblock to improve
- CONFIG_STRICT_DEVMEM handling
-In-Reply-To: <1419275322-29811-8-git-send-email-ard.biesheuvel@linaro.org>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419275322-29811-8-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150109153817.GE11258@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 9 Jan 2015 16:40:51 +0100
+Subject: [PATCH 4/5] tty/serial: at91: fix RTS line management when
+ hardware handshake is enabled
+In-Reply-To: <242df21d70a04c1da8630a356341cbdf00781fda.1418131298.git.cyrille.pitchen@atmel.com>
+References: <cover.1418131298.git.cyrille.pitchen@atmel.com>
+ <242df21d70a04c1da8630a356341cbdf00781fda.1418131298.git.cyrille.pitchen@atmel.com>
+Message-ID: <54AFF683.2000808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 22, 2014 at 07:08:41PM +0000, Ard Biesheuvel wrote:
-> The 'physmem' memblock table allows us to classify memory as RAM even
-> if it is not covered by the ordinary 'memory' memblock table.
+Le 09/12/2014 14:31, Cyrille Pitchen a ?crit :
+> This patch fixes many bugs in the code dealing with the hardware handshake.
 > 
-> Under CONFIG_STRICT_DEVMEM, we can use this to:
-> - allow read-only access to parts of RAM that are not considered memory
->   by the kernel, this is mainly intended for exposing UEFI configuration
->   tables such as SMBIOS to userland;
-> - avoid using non-cached mappings for those parts of RAM, as it may
->   result in mismatched attributes.
+> As an example, in atmel_set_termios(), we used to test whether the CRTSCTS
+> c_cflag was set. If so, we selected the "Hardware Handshake" mode through the
+> Mode Register. However, few lines below the mode was reset to "Normal" (0).
+> So there was no way to select the "Hardware Handshake" mode. To fix this issue,
+> we moved the CRTSCRTS c_cflag test AFTER the mode has been reset to "Normal".
+> 
+> Also setting the RTSEN and RTSDIS bits in the Control Register has different
+> results whether the USART is set in "Normal" or "Hardware Handshake" mode:
+> 
+> 1) "Normal" mode
+> - the RTSEN bit forces the RTS line to low level, which tells the remote peer
+>   that we are ready to received new data.
+> - the RTSDIS bit forces the RTS line to high level, which tells the remote peer
+>   to stop sending new data.
+> 
+> 2) "Hardware Handshake" mode
+> - the RTSEN bit forces the RTS line to high level.
+> - the RTSDIS bit lets the hardware control the RTS line.
+> 
+> WARNING:
+> when FIFOs are not available or not enabled, the RTS line is controlled by the
+> PDC. This is why using the Hardware Handshake mode requires using the PDC
+> channel for reception. However the Hardware Handshake mode DOES NOT work with
+> DMA controller since it cannot control the RTS line.
+> Future designs with FIFOs will introduce a new feature: the RTS line will be
+> controlled by the RX FIFO using thresholds. This patch was tested with this new
+> design.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Looks fine to me assuming that the rest of the series is ok:
+Indeed. It fixes a pretty important misbehavior.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Will
+Thanks.
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm64/Kconfig   |  1 +
->  arch/arm64/mm/mmap.c |  2 +-
->  arch/arm64/mm/mmu.c  | 15 ++++++++++++++-
->  3 files changed, 16 insertions(+), 2 deletions(-)
+>  drivers/tty/serial/atmel_serial.c | 91 ++++++++++++++++++++++++++-------------
+>  1 file changed, 61 insertions(+), 30 deletions(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index b1f9a20a3677..86902f8d8e36 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -60,6 +60,7 @@ config ARM64
->  	select HAVE_GENERIC_DMA_COHERENT
->  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
->  	select HAVE_MEMBLOCK
-> +	select HAVE_MEMBLOCK_PHYS_MAP
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_PERF_EVENTS
->  	select HAVE_PERF_REGS
-> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-> index 54922d1275b8..9f558ab41f39 100644
-> --- a/arch/arm64/mm/mmap.c
-> +++ b/arch/arm64/mm/mmap.c
-> @@ -126,7 +126,7 @@ int devmem_is_allowed(unsigned long pfn)
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 92a8b26..9e0c636 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -341,13 +341,37 @@ static u_int atmel_tx_empty(struct uart_port *port)
+>  static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
 >  {
->  	if (iomem_is_exclusive(pfn << PAGE_SHIFT))
->  		return 0;
-> -	if (!page_is_ram(pfn))
-> +	if (!pfn_valid(pfn))
->  		return 1;
->  	return 0;
->  }
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 328638548871..083be3de1a87 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -122,7 +122,7 @@ early_param("cachepolicy", early_cachepolicy);
->  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  			      unsigned long size, pgprot_t vma_prot)
->  {
-> -	if (!pfn_valid(pfn))
-> +	if (!memblock_is_physmem(PFN_PHYS(pfn)))
->  		return pgprot_noncached(vma_prot);
->  	else if (file->f_flags & O_SYNC)
->  		return pgprot_writecombine(vma_prot);
-> @@ -130,6 +130,19 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  }
->  EXPORT_SYMBOL(phys_mem_access_prot);
+>  	unsigned int control = 0;
+> -	unsigned int mode;
+> +	unsigned int mode = UART_GET_MR(port);
+> +	unsigned int rts_paused, rts_ready;
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
 >  
-> +/*
-> + * This definition of phys_mem_access_prot_allowed() overrides
-> + * the __weak definition in drivers/char/mem.c
-> + */
-> +int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
-> +				 unsigned long size, pgprot_t *prot)
-> +{
-> +	/* Disallow read-write access to system RAM */
-> +	if (memblock_is_physmem(PFN_PHYS(pfn)) && pgprot_val(*prot) & PTE_WRITE)
-> +		return 0;
-> +	return 1;
-> +}
+> +	/* override mode to RS485 if needed, otherwise keep the current mode */
+> +	if (port->rs485.flags & SER_RS485_ENABLED) {
+> +		if ((port->rs485.delay_rts_after_send) > 0)
+> +			UART_PUT_TTGR(port, port->rs485.delay_rts_after_send);
+> +		mode &= ~ATMEL_US_USMODE;
+> +		mode |= ATMEL_US_USMODE_RS485;
+> +	}
 > +
->  static void __init *early_alloc(unsigned long sz)
+> +	/* set the RTS line state according to the mode */
+> +	if ((mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_HWHS) {
+> +		/* force RTS line to high level */
+> +		rts_paused = ATMEL_US_RTSEN;
+> +
+> +		/* give the control of the RTS line back to the hardware */
+> +		rts_ready = ATMEL_US_RTSDIS;
+> +	} else {
+> +		/* force RTS line to high level */
+> +		rts_paused = ATMEL_US_RTSDIS;
+> +
+> +		/* force RTS line to low level */
+> +		rts_ready = ATMEL_US_RTSEN;
+> +	}
+> +
+>  	if (mctrl & TIOCM_RTS)
+> -		control |= ATMEL_US_RTSEN;
+> +		control |= rts_ready;
+>  	else
+> -		control |= ATMEL_US_RTSDIS;
+> +		control |= rts_paused;
+>  
+>  	if (mctrl & TIOCM_DTR)
+>  		control |= ATMEL_US_DTREN;
+> @@ -359,23 +383,12 @@ static void atmel_set_mctrl(struct uart_port *port, u_int mctrl)
+>  	mctrl_gpio_set(atmel_port->gpios, mctrl);
+>  
+>  	/* Local loopback mode? */
+> -	mode = UART_GET_MR(port) & ~ATMEL_US_CHMODE;
+> +	mode &= ~ATMEL_US_CHMODE;
+>  	if (mctrl & TIOCM_LOOP)
+>  		mode |= ATMEL_US_CHMODE_LOC_LOOP;
+>  	else
+>  		mode |= ATMEL_US_CHMODE_NORMAL;
+>  
+> -	/* Resetting serial mode to RS232 (0x0) */
+> -	mode &= ~ATMEL_US_USMODE;
+> -
+> -	if (port->rs485.flags & SER_RS485_ENABLED) {
+> -		dev_dbg(port->dev, "Setting UART to RS485\n");
+> -		if ((port->rs485.delay_rts_after_send) > 0)
+> -			UART_PUT_TTGR(port, port->rs485.delay_rts_after_send);
+> -		mode |= ATMEL_US_USMODE_RS485;
+> -	} else {
+> -		dev_dbg(port->dev, "Setting UART to RS232\n");
+> -	}
+>  	UART_PUT_MR(port, mode);
+>  }
+>  
+> @@ -1921,12 +1934,14 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  			      struct ktermios *old)
 >  {
->  	void *ptr = __va(memblock_alloc(sz, sz));
-> -- 
-> 1.8.3.2
+>  	unsigned long flags;
+> -	unsigned int mode, imr, quot, baud;
+> +	unsigned int old_mode, mode, imr, quot, baud;
+> +
+> +	/* save the current mode register */
+> +	mode = old_mode = UART_GET_MR(port);
+>  
+> -	/* Get current mode register */
+> -	mode = UART_GET_MR(port) & ~(ATMEL_US_USCLKS | ATMEL_US_CHRL
+> -					| ATMEL_US_NBSTOP | ATMEL_US_PAR
+> -					| ATMEL_US_USMODE);
+> +	/* reset the mode, clock divisor, parity, stop bits and data size */
+> +	mode &= ~(ATMEL_US_USCLKS | ATMEL_US_CHRL | ATMEL_US_NBSTOP |
+> +		  ATMEL_US_PAR | ATMEL_US_USMODE);
+>  
+>  	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
+>  	quot = uart_get_divisor(port, baud);
+> @@ -1971,12 +1986,6 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	} else
+>  		mode |= ATMEL_US_PAR_NONE;
+>  
+> -	/* hardware handshake (RTS/CTS) */
+> -	if (termios->c_cflag & CRTSCTS)
+> -		mode |= ATMEL_US_USMODE_HWHS;
+> -	else
+> -		mode |= ATMEL_US_USMODE_NORMAL;
+> -
+>  	spin_lock_irqsave(&port->lock, flags);
+>  
+>  	port->read_status_mask = ATMEL_US_OVRE;
+> @@ -2020,18 +2029,40 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	/* disable receiver and transmitter */
+>  	UART_PUT_CR(port, ATMEL_US_TXDIS | ATMEL_US_RXDIS);
+>  
+> -	/* Resetting serial mode to RS232 (0x0) */
+> -	mode &= ~ATMEL_US_USMODE;
+> -
+> +	/* mode */
+>  	if (port->rs485.flags & SER_RS485_ENABLED) {
+>  		if ((port->rs485.delay_rts_after_send) > 0)
+>  			UART_PUT_TTGR(port, port->rs485.delay_rts_after_send);
+>  		mode |= ATMEL_US_USMODE_RS485;
+> +	} else if (termios->c_cflag & CRTSCTS) {
+> +		/* RS232 with hardware handshake (RTS/CTS) */
+> +		mode |= ATMEL_US_USMODE_HWHS;
+> +	} else {
+> +		/* RS232 without hadware handshake */
+> +		mode |= ATMEL_US_USMODE_NORMAL;
+>  	}
+>  
+> -	/* set the parity, stop bits and data size */
+> +	/* set the mode, clock divisor, parity, stop bits and data size */
+>  	UART_PUT_MR(port, mode);
+>  
+> +	/*
+> +	 * when switching the mode, set the RTS line state according to the
+> +	 * new mode, otherwise keep the former state
+> +	 */
+> +	if ((old_mode & ATMEL_US_USMODE) != (mode & ATMEL_US_USMODE)) {
+> +		unsigned int rts_state;
+> +
+> +		if ((mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_HWHS) {
+> +			/* let the hardware control the RTS line */
+> +			rts_state = ATMEL_US_RTSDIS;
+> +		} else {
+> +			/* force RTS line to low level */
+> +			rts_state = ATMEL_US_RTSEN;
+> +		}
+> +
+> +		UART_PUT_CR(port, rts_state);
+> +	}
+> +
+>  	/* set the baud rate */
+>  	UART_PUT_BRGR(port, quot);
+>  	UART_PUT_CR(port, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
 > 
-> 
+
+
+-- 
+Nicolas Ferre
