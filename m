@@ -1,287 +1,352 @@
-From: fkan@apm.com (Feng Kan)
-Date: Fri, 9 Jan 2015 10:52:15 -0800
-Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
- X-Gene platform
-In-Reply-To: <20141111203237.GB6443@katana>
-References: <1412726809-7525-1-git-send-email-fkan@apm.com>
- <1412726809-7525-5-git-send-email-fkan@apm.com>
- <20141111203237.GB6443@katana>
-Message-ID: <CAL85gmB172hgTCHUQ=sshAAYjOwpNKc=YdovjfTFXfnW7LJTLQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 9 Jan 2015 19:04:00 +0000
+Subject: [PATCH v6 08/17] ARM64 / ACPI: Parse FADT table to get PSCI
+ flags for PSCI init
+In-Reply-To: <1420368918-5086-9-git-send-email-hanjun.guo@linaro.org>
+References: <1420368918-5086-1-git-send-email-hanjun.guo@linaro.org>
+ <1420368918-5086-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150109190400.GD13478@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 11, 2014 at 12:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Tue, Oct 07, 2014 at 05:06:47PM -0700, Feng Kan wrote:
->> Add SLIMpro I2C device driver on APM X-Gene platform. This I2C
->> device driver use the SLIMpro Mailbox driver to tunnel message to
->> the SLIMpro coprocessor to do the work of accessing I2C components.
->>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> Signed-off-by: Hieu Le <hnle@apm.com>
->
-> Thank you for this submission!
->
->> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
->> index 2e45ae3..a03042c 100644
->> --- a/drivers/i2c/busses/Kconfig
->> +++ b/drivers/i2c/busses/Kconfig
->> @@ -1009,6 +1009,15 @@ config I2C_CROS_EC_TUNNEL
->>         connected there. This will work whatever the interface used to
->>         talk to the EC (SPI, I2C or LPC).
->>
->> +config I2C_XGENE_SLIMPRO
->> +     tristate "APM X-Gene SoC I2C SLIMpro devices support"
->> +     depends on ARCH_XGENE && XGENE_SLIMPRO_MBOX
->> +     help
->> +       Enable I2C bus access using the APM X-Gene SoC SLIMpro
->> +       co-processor. The I2C device access the I2C bus via the X-Gene
->> +       to SLIMpro (On chip coprocessor) mailbox mechanism.
->> +       If unsure, say N.
->> +
->
-> I guess this is a driver for embedded? If so, please sort it properly.
-Sorry, having let this dangle for  a while.  I will fix up comments and submit
-another version. I can move this to embedded, however Xgene is
-suppose to be a server class chip.
->
->>  config SCx200_ACB
->>       tristate "Geode ACCESS.bus support"
->>       depends on X86_32 && PCI
->> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
->> index 49bf07e..22b5f0c 100644
->> --- a/drivers/i2c/busses/Makefile
->> +++ b/drivers/i2c/busses/Makefile
->> @@ -99,6 +99,7 @@ obj-$(CONFIG_I2C_CROS_EC_TUNNEL)    += i2c-cros-ec-tunnel.o
->>  obj-$(CONFIG_I2C_ELEKTOR)    += i2c-elektor.o
->>  obj-$(CONFIG_I2C_PCA_ISA)    += i2c-pca-isa.o
->>  obj-$(CONFIG_I2C_SIBYTE)     += i2c-sibyte.o
->> +obj-$(CONFIG_I2C_XGENE_SLIMPRO) += i2c-xgene-slimpro.o
->
-> Ditto.
->
->>  obj-$(CONFIG_SCx200_ACB)     += scx200_acb.o
->>
->>  ccflags-$(CONFIG_I2C_DEBUG_BUS) := -DDEBUG
->> diff --git a/drivers/i2c/busses/i2c-xgene-slimpro.c b/drivers/i2c/busses/i2c-xgene-slimpro.c
->> new file mode 100644
->> index 0000000..2cf6c33
->> --- /dev/null
->> +++ b/drivers/i2c/busses/i2c-xgene-slimpro.c
->> @@ -0,0 +1,531 @@
->> +/*
->> + * X-Gene SLIMpro I2C Driver
->> + *
->> + * Copyright (c) 2014, Applied Micro Circuits Corporation
->> + * Author: Feng Kan <fkan@apm.com>
->> + * Author: Hieu Le <hnle@apm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->
-> The license preamble and MODULE_LICENSE do not match!
->
->> +#include <linux/module.h>
->> +#include <linux/version.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/of.h>
->> +#include <linux/i2c.h>
->> +#include <linux/mailbox_client.h>
->> +#include <linux/delay.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/dma-mapping.h>
->
-> Please sort the includes.
->
->> +
->> +#define XGENE_SLIMPRO_I2C            "xgene-slimpro-i2c"
->
-> Only used once, not really needed
->
->> +
->> +#define SLIMPRO_I2C_WAIT_COUNT               10000
->> +
->> +#define SLIMPRO_OP_TO_MS             1000    /* Operation time out in ms */
->
-> *_TOUT_* or *_TIMEOUT_*. TO sounds like a conversion, from op to ms :)
->
->> +#define SLIMPRO_IIC_BUS                      1
->
-> What does this '1' mean?
->
->> +static int start_i2c_msg_xfer(struct slimpro_i2c_dev *ctx)
->> +{
->> +     int count;
->> +     unsigned long flags;
->> +
->> +     if (ctx->mbox_client.tx_block) {
->> +             if (!wait_for_completion_timeout(&ctx->rd_complete,
->> +                                              msecs_to_jiffies
->> +                                              (SLIMPRO_OP_TO_MS)))
->> +                     return -EIO;
->
-> That should be -ETIMEDOUT, no?
->
->> +     } else {
->> +             spin_lock_irqsave(&ctx->lock, flags);
->> +             ctx->i2c_rx_poll = 1;
->> +             for (count = SLIMPRO_I2C_WAIT_COUNT; count > 0; count--) {
->> +                     if (ctx->i2c_rx_poll == 0)
->> +                             break;
->> +                     udelay(100);
->> +             }
->> +
->> +             if (count == 0) {
->> +                     ctx->i2c_rx_poll = 0;
->> +                     ctx->mbox_client.tx_block = true;
->> +                     spin_unlock_irqrestore(&ctx->lock, flags);
->> +                     return -EIO;
->
-> ditto.
->
->> +             }
->> +             ctx->mbox_client.tx_block = true;
->> +             spin_unlock_irqrestore(&ctx->lock, flags);
->> +     }
->> +
->> +     /* Check of invalid data or no device */
->> +     if (*ctx->resp_msg == 0xffffffff)
->> +             return -ENODEV;
->> +
->> +     return 0;
->> +}
->> +
->> +static int slimpro_i2c_blkrd(struct slimpro_i2c_dev *ctx, u32 chip, u32 addr,
->> +                             u32 addrlen, u32 protocol, u32 readlen,
->> +                             u32 with_data_len, void *data)
->> +{
->> +     dma_addr_t paddr;
->> +     u32 msg[3];
->> +     int rc;
->> +
->> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
->> +                            DMA_FROM_DEVICE);
->> +     if (dma_mapping_error(ctx->dev, paddr)) {
->> +             dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
->> +                     ctx->dma_buffer);
->> +             rc = -EIO;
->
-> Return the err value from dma_mapping_error?
->
->> +             goto err;
->> +     }
->> +
->> +     if (irqs_disabled())
->> +             ctx->mbox_client.tx_block = false;
->> +
->> +     msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
->> +                                     SLIMPRO_IIC_READ, protocol, addrlen,
->> +                                     readlen);
->> +     msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
->> +              SLIMPRO_IIC_ENCODE_FLAG_WITH_DATA_LEN(with_data_len) |
->> +              SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
->> +              SLIMPRO_IIC_ENCODE_ADDR(addr);
->> +     msg[2] = (u32) paddr;
->> +     ctx->resp_msg = msg;
->> +
->> +     if (ctx->mbox_client.tx_block)
->> +             init_completion(&ctx->rd_complete);
->
-> reinit_completion? and init_completion in probe?
->
->> +
->> +     rc = mbox_send_message(ctx->mbox_chan, &msg);
->> +     if (rc < 0)
->> +             goto err_unmap;
->> +
->> +     rc = start_i2c_msg_xfer(ctx);
->> +
->> +     /* Copy to destination */
->> +     memcpy(data, ctx->dma_buffer, readlen);
->> +
->> +err_unmap:
->> +     dma_unmap_single(ctx->dev, paddr, readlen, DMA_FROM_DEVICE);
->> +err:
->> +     ctx->resp_msg = NULL;
->> +     return rc;
->> +}
->> +
->> +static int slimpro_i2c_blkwr(struct slimpro_i2c_dev *ctx, u32 chip,
->> +                          u32 addr, u32 addrlen, u32 protocol, u32 writelen,
->> +                          void *data)
->> +{
->> +     dma_addr_t paddr;
->> +     u32 msg[3];
->> +     int rc;
->> +
->> +     memcpy(ctx->dma_buffer, data, writelen);
->> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, writelen,
->> +                            DMA_TO_DEVICE);
->> +     if (dma_mapping_error(ctx->dev, paddr)) {
->> +             dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
->> +                     ctx->dma_buffer);
->> +             rc = -EIO;
->
-> same as above
->
->> +             goto err;
->> +     }
->> +
->> +     if (irqs_disabled())
->> +             ctx->mbox_client.tx_block = false;
->> +
->> +     msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
->> +                                     SLIMPRO_IIC_WRITE, protocol, addrlen,
->> +                                     writelen);
->> +     msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
->> +              SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
->> +              SLIMPRO_IIC_ENCODE_ADDR(addr);
->> +     msg[2] = (u32) paddr;
->> +     ctx->resp_msg = msg;
->> +
->> +     if (ctx->mbox_client.tx_block)
->> +             init_completion(&ctx->rd_complete);
->
-> ditto
->
->> +
->> +     rc = mbox_send_message(ctx->mbox_chan, &msg);
->> +     if (rc < 0)
->> +             goto err_unmap;
->> +
->> +     rc = start_i2c_msg_xfer(ctx);
->> +
->> +err_unmap:
->> +     dma_unmap_single(ctx->dev, paddr, writelen, DMA_TO_DEVICE);
->> +err:
->> +     ctx->resp_msg = NULL;
->> +     return rc;
->> +}
->> +
->> +static struct platform_driver xgene_slimpro_i2c_driver = {
->> +     .probe  = xgene_slimpro_i2c_probe,
->> +     .remove = xgene_slimpro_i2c_remove,
->> +     .driver = {
->> +             .name   = XGENE_SLIMPRO_I2C,
->> +             .owner  = THIS_MODULE,
->
-> Not needed.
->
->> +             .of_match_table = of_match_ptr(xgene_slimpro_i2c_id)
->> +     },
->> +};
->> +
->> +module_platform_driver(xgene_slimpro_i2c_driver);
->> +
->> +MODULE_DESCRIPTION("APM X-Gene SLIMpro I2C driver");
->> +MODULE_LICENSE("GPL v2");
->
-> So, only minor stuff. Looking good already to me.
-Will fix the rest of the comments, thanks
->
-> Thanks,
->
->    Wolfram
->
+On Sun, Jan 04, 2015 at 10:55:09AM +0000, Hanjun Guo wrote:
+> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+> the former signals to the OS that the firmware is PSCI compliant.
+> The latter selects the appropriate conduit for PSCI calls by
+> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+> (SMC).
+> 
+> FADT table contains such information, parse FADT to get the flags
+> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
+> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
+> 
+> At the same time, only ACPI 5.1 or higher verison supports PSCI,
+> and FADT Major.Minor version was introduced in ACPI 5.1, so we
+> will check the version and only parse FADT table with version >= 5.1.
+> 
+> If firmware provides ACPI tables with ACPI version less than 5.1,
+> OS will be messed up with those information and have no way to init
+> smp and GIC, so disable ACPI if we get an FADT table with version
+> less that 5.1.
+
+I am a bit confused by this log. I understand the problem is that,
+for versions predating 5.1, PSCI information is missing. So, I would
+say:
+
+"OS will not be able to boot properly owing to missing PSCI bindings
+data in the ACPI tables".
+
+Is that the message you want to get across ?
+
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h | 14 ++++++++
+>  arch/arm64/include/asm/psci.h |  3 +-
+>  arch/arm64/kernel/acpi.c      | 31 ++++++++++++++++-
+>  arch/arm64/kernel/psci.c      | 78 ++++++++++++++++++++++++++++++-------------
+>  arch/arm64/kernel/setup.c     |  8 +++--
+>  5 files changed, 105 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 496c33b..221ff15 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -19,6 +19,18 @@ extern int acpi_disabled;
+>  extern int acpi_noirq;
+>  extern int acpi_pci_disabled;
+>  
+> +/* 1 to indicate PSCI 0.2+ is implemented */
+> +static inline bool acpi_psci_present(void)
+> +{
+> +	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
+> +}
+> +
+> +/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+> +static inline bool acpi_psci_use_hvc(void)
+> +{
+> +	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
+> +}
+> +
+>  static inline void disable_acpi(void)
+>  {
+>  	acpi_disabled = 1;
+> @@ -49,6 +61,8 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>  
+>  #else
+>  static inline void disable_acpi(void) { }
+> +static inline bool acpi_psci_present(void) { return false; }
+> +static inline bool acpi_psci_use_hvc(void) { return false; }
+>  #endif /* CONFIG_ACPI */
+>  
+>  #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+> index e5312ea..2454bc5 100644
+> --- a/arch/arm64/include/asm/psci.h
+> +++ b/arch/arm64/include/asm/psci.h
+> @@ -14,6 +14,7 @@
+>  #ifndef __ASM_PSCI_H
+>  #define __ASM_PSCI_H
+>  
+> -int psci_init(void);
+> +int psci_dt_init(void);
+> +int psci_acpi_init(void);
+
+Is not there a better way to avoid this function dt/acpi duplication ?
+
+>  
+>  #endif /* __ASM_PSCI_H */
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 39a1655..e713236 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -13,6 +13,8 @@
+>   *  published by the Free Software Foundation.
+>   */
+>  
+> +#define pr_fmt(fmt) "ACPI: " fmt
+> +
+>  #include <linux/init.h>
+>  #include <linux/acpi.h>
+>  #include <linux/cpumask.h>
+> @@ -49,10 +51,32 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>  	early_memunmap(map, size);
+>  }
+>  
+> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
+> +{
+> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> +
+> +	/*
+> +	 * Revision in table header is the FADT Major revision,
+> +	 * and there is a minor revision of FADT which was introduced
+> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or newer revision
+> +	 * to get arm boot flags, or we will disable ACPI.
+> +	 */
+> +	if (table->revision > 5 ||
+> +	    (table->revision == 5 && fadt->minor_revision >= 1))
+> +		return 0;
+> +
+> +	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
+> +		table->revision, fadt->minor_revision);
+> +	disable_acpi();
+
+I would rename this function, function is checking the FADT
+revision, make that clear. I think that disable_acpi() should be
+called on function return, if it fails.
+
+To make the "acpi disabling" clearer, why not call this function in
+
+psci_acpi_init()
+
+something like:
+
+int __init psci_acpi_init(void)
+{
+
+	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
+		pr_err("Can't find FADT or error happened during parsing FADT\n");
+		disable_acpi();
+	}
+	...
+}
+
+After all you disable ACPI because you can't retrieve PSCI information,
+am I right ?
+
+> +
+> +	return -EINVAL;
+> +}
+> +
+>  /*
+>   * acpi_boot_table_init() called from setup_arch(), always.
+>   *	1. find RSDP and get its address, and then find XSDT
+>   *	2. extract all tables and checksums them all
+> + *	3. check ACPI FADT revisoin
+
+s/revisoin/revision
+
+>   *
+>   * We can parse ACPI boot-time tables such as MADT after
+>   * this function is called.
+> @@ -64,8 +88,13 @@ void __init acpi_boot_table_init(void)
+>  		return;
+>  
+>  	/* Initialize the ACPI boot-time table parser. */
+> -	if (acpi_table_init())
+> +	if (acpi_table_init()) {
+>  		disable_acpi();
+> +		return;
+> +	}
+> +
+> +	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
+> +		pr_err("Can't find FADT or error happened during parsing FADT\n");
+
+As I said above this is a bit sneaky. It is not clear you are disabling
+ACPI when the acpi_table_parse() call fails. Is it not better to move
+the revision check in the PSCI ACPI init call ?
+
+>  }
+>  
+>  static int __init parse_acpi(char *arg)
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index f1dbca7..dbb3945 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -15,6 +15,7 @@
+>  
+>  #define pr_fmt(fmt) "psci: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  #include <linux/smp.h>
+> @@ -24,6 +25,7 @@
+>  #include <linux/slab.h>
+>  #include <uapi/linux/psci.h>
+>  
+> +#include <asm/acpi.h>
+>  #include <asm/compiler.h>
+>  #include <asm/cpu_ops.h>
+>  #include <asm/errno.h>
+> @@ -304,6 +306,33 @@ static void psci_sys_poweroff(void)
+>  	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+>  }
+>  
+> +static void psci_0_2_set_functions(void)
+
+__init ?
+
+> +{
+> +	pr_info("Using standard PSCI v0.2 function IDs\n");
+> +	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> +	psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +	psci_ops.cpu_off = psci_cpu_off;
+> +
+> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> +	psci_ops.cpu_on = psci_cpu_on;
+> +
+> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> +	psci_ops.migrate = psci_migrate;
+> +
+> +	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> +	psci_ops.affinity_info = psci_affinity_info;
+> +
+> +	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +	psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +	arm_pm_restart = psci_sys_reset;
+> +
+> +	pm_power_off = psci_sys_poweroff;
+> +}
+> +
+>  /*
+>   * PSCI Function IDs for v0.2+ are well defined so use
+>   * standard values.
+> @@ -337,29 +366,7 @@ static int __init psci_0_2_init(struct device_node *np)
+>  		}
+>  	}
+>  
+> -	pr_info("Using standard PSCI v0.2 function IDs\n");
+> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> -	psci_ops.cpu_suspend = psci_cpu_suspend;
+> -
+> -	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> -	psci_ops.cpu_off = psci_cpu_off;
+> -
+> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> -	psci_ops.cpu_on = psci_cpu_on;
+> -
+> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> -	psci_ops.migrate = psci_migrate;
+> -
+> -	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> -	psci_ops.affinity_info = psci_affinity_info;
+> -
+> -	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> -		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> -	psci_ops.migrate_info_type = psci_migrate_info_type;
+> -
+> -	arm_pm_restart = psci_sys_reset;
+> -
+> -	pm_power_off = psci_sys_poweroff;
+> +	psci_0_2_set_functions();
+>  
+>  out_put_node:
+>  	of_node_put(np);
+> @@ -412,7 +419,7 @@ static const struct of_device_id psci_of_match[] __initconst = {
+>  	{},
+>  };
+>  
+> -int __init psci_init(void)
+> +int __init psci_dt_init(void)
+>  {
+>  	struct device_node *np;
+>  	const struct of_device_id *matched_np;
+> @@ -427,6 +434,29 @@ int __init psci_init(void)
+>  	return init_fn(np);
+>  }
+>  
+> +/*
+> + * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
+> + * explicitly clarified in SBBR
+> + */
+> +int __init psci_acpi_init(void)
+> +{
+> +	if (!acpi_psci_present()) {
+> +		pr_info("is not implemented in ACPI.\n");
+> +		return -EOPNOTSUPP;
+> +	}
+> +
+> +	pr_info("probing for conduit method from ACPI.\n");
+> +
+> +	if (acpi_psci_use_hvc())
+> +		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +	else
+> +		invoke_psci_fn = __invoke_psci_fn_smc;
+> +
+> +	psci_0_2_set_functions();
+> +
+> +	return 0;
+
+As I asked above, is not there a better way to have a common init
+function and factor out the acpi/dt paths in it instead of adding
+multiple calls in setup_arch() ?
+
+Thanks,
+Lorenzo
+
+> +}
+> +
+>  #ifdef CONFIG_SMP
+>  
+>  static int __init cpu_psci_cpu_init(struct device_node *dn, unsigned int cpu)
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 2534de3..4322be2 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -410,10 +410,12 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	efi_idmap_init();
+>  
+> -	if (acpi_disabled)
+> +	if (acpi_disabled) {
+>  		unflatten_device_tree();
+> -
+> -	psci_init();
+> +		psci_dt_init();
+> +	} else {
+> +		psci_acpi_init();
+> +	}
+>  
+>  	cpu_read_bootcpu_ops();
+>  #ifdef CONFIG_SMP
+> -- 
+> 1.9.1
+> 
+> 
