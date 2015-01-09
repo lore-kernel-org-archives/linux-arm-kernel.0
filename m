@@ -1,61 +1,31 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 9 Jan 2015 14:34:01 -0800
-Subject: [PATCH 0/4] serial: fsl_lpuart: fix various DMA related issues
-In-Reply-To: <742637f13bc97ecaadd1d264cd0ad4cc@agner.ch>
-References: <1417134205-4400-1-git-send-email-stefan@agner.ch>
- <677f2c62b6b6c1fe8e16cd38d5f20d47@agner.ch>
- <20141212143244.GA2219@kroah.com>
- <f6255321feb06d32f257b7b41d5d58a3@agner.ch>
- <20150109221432.GA4056@kroah.com>
- <742637f13bc97ecaadd1d264cd0ad4cc@agner.ch>
-Message-ID: <20150109223401.GA15118@kroah.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri,  9 Jan 2015 14:45:40 -0800
+Subject: [PATCH 3/4] MAINTAINERS: add a git entry for BCM7xxx ARM-based SoCs
+In-Reply-To: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
+References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1420843541-5166-4-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 11:19:50PM +0100, Stefan Agner wrote:
-> On 2015-01-09 23:14, Greg KH wrote:
-> > On Fri, Dec 12, 2014 at 05:19:02PM +0100, Stefan Agner wrote:
-> >> On 2014-12-12 15:32, Greg KH wrote:
-> >> > On Fri, Dec 12, 2014 at 02:44:06PM +0100, Stefan Agner wrote:
-> >> >> Any thoughts on this patchset? Would have hopped that it makes it into
-> >> >> 3.19 as those are mostly fixes.
-> >> >
-> >> > "mostly"?
-> >> >
-> >>
-> >> Well, all of them fix a bug, but PATCH 2/4 does this by also moving DMA
-> >> allocation to probe. I would really have to split up that patch and make
-> >> two incremental steps (split-up of RX/TX DMA allocation to make each
-> >> single action revert-able and move to probe). But this would lead to
-> >> more changed lines in total. The patchset as is already somewhat tested
-> >> since we use it in our 3.18 BSP, whereas a new set would not be tested.
-> >>
-> >> One could also argument, it only affects fsl_lpuart (UART in rather not
-> >> very widespread SoC's Freescale Vybrid and LS1021a).
-> >>
-> >>
-> >> > I'll get to these after 3.19-rc1 is out, but it really looks like these
-> >> > will be for 3.20-rc1, unless you break them up into "bugfix only" type
-> >> > patches.
-> >>
-> >>
-> >> PATCH 1/4 fixes a bug which happens on a normal console rather often on
-> >> my setup. So if you decide that patchset is for 3.20-rc1, that one would
-> >> be nice to have in 3.19 as well...
-> > 
-> > Please redo this patchset then, makeing it obvious that some are fixes,
-> > and need to go for 3.19 and others are ok for 3.20.  As it is, the
-> > changelog entries do not look like anything here is for 3.19, sorry.
-> > 
-> 
-> Ok, will create a patchset with 1 and 3 for 3.19 (since this two really
-> lead to reproducible kernel traces), and the rest for 3.20. Do you
-> prefer to have the patches in a single patchset (with 3 moved to 2) or
-> should I create two patchsets?
+Use github.com/Broadcom/stblinux.git as our default development tree for
+Broadcom BCM7xxx ARM-based SoCs.
 
-What would you want if you were in my shoes and had to maintain two
-different branches?
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-(hint, two different patchsets...)
-
-greg k-h
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4a8f3459f9c2..18a199638105 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2141,6 +2141,7 @@ M:	Brian Norris <computersforpeace@gmail.com>
+ M:	Gregory Fong <gregory.0xf0@gmail.com>
+ M:	Florian Fainelli <f.fainelli@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++T:	git git://git.github.com/broadcom/stblinux.git
+ S:	Maintained
+ F:	arch/arm/mach-bcm/*brcmstb*
+ F:	arch/arm/boot/dts/bcm7*.dts*
+-- 
+2.1.0
