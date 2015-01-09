@@ -1,31 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  9 Jan 2015 14:45:40 -0800
-Subject: [PATCH 3/4] MAINTAINERS: add a git entry for BCM7xxx ARM-based SoCs
-In-Reply-To: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
-References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1420843541-5166-4-git-send-email-f.fainelli@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri,  9 Jan 2015 23:45:43 +0100
+Subject: [PATCHv2 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
+Message-ID: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use github.com/Broadcom/stblinux.git as our default development tree for
-Broadcom BCM7xxx ARM-based SoCs.
+This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+driver. This driver is used on the Belkin WRT1900AC access point and
+the C code is derived from code Belkin contributed to OpenWRT.
+However it has been extensively re-written, and a device tree binding
+added to replace platform data.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+Cc: Matthew.Fatheree at belkin.com
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4a8f3459f9c2..18a199638105 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2141,6 +2141,7 @@ M:	Brian Norris <computersforpeace@gmail.com>
- M:	Gregory Fong <gregory.0xf0@gmail.com>
- M:	Florian Fainelli <f.fainelli@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+T:	git git://git.github.com/broadcom/stblinux.git
- S:	Maintained
- F:	arch/arm/mach-bcm/*brcmstb*
- F:	arch/arm/boot/dts/bcm7*.dts*
+Since v1:
+      s/uint8_t/u8/g
+      Remove empty line
+      Removed #gpio-cells
+      Added select REGMAP_I2C
+      Sorted #includes into alphabetic order
+      Added missing MODULE_DEVICE_TABLE(of, ...)
+      Check return value of regmap_write()
+      Simplified tlc59116_set_mode()
+
+Andrew Lunn (2):
+  leds: tlc59116: Document binding for the TI 16 Channel i2c LED driver
+  leds: tlc59116: Driver for the TI 16 Channel i2c LED driver
+
+ .../devicetree/bindings/leds/leds-tlc59116.txt     |  41 ++++
+ drivers/leds/Kconfig                               |   7 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-tlc59116.c                       | 253 +++++++++++++++++++++
+ 4 files changed, 302 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+ create mode 100644 drivers/leds/leds-tlc59116.c
+
 -- 
-2.1.0
+2.1.3
