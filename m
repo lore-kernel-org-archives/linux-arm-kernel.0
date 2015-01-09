@@ -1,98 +1,57 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 9 Jan 2015 03:42:24 +0000
-Subject: [PATCH v5][resend v5] of: replace Asahi Kasei Corp vendor prefix
-In-Reply-To: <87egr4vcxu.wl%kuninori.morimoto.gx@renesas.com>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>
- <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
- <20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
- <5469CD47.3040409@cogentembedded.com>
- <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
- <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
- <5478603D.1080404@cogentembedded.com>
- <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
- <87lhm7t37l.wl%kuninori.morimoto.gx@renesas.com>
- <87egr4vcxu.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87bnm8vcu1.wl%kuninori.morimoto.gx@renesas.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 9 Jan 2015 12:49:25 +0900
+Subject: [PATCH v2 3/3] soc/tegra: fuse: Add Tegra132 support
+In-Reply-To: <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
+References: <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
+ <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <CAAVeFuKbnquF0iBp4L8Sv4tp-F3YevKjaSkVtyT2LJnDDvXCbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, Jan 8, 2015 at 5:55 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> Tegra132 is very similar to Tegra124 from a peripheral point of view and
+> uses the same fuse controller.
+>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Changes in v2:
+> - add missing break in Tegra132 case for legacy fuse init (Vince Hsu)
+>
+>  drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
+>  drivers/soc/tegra/fuse/fuse-tegra30.c | 3 +++
+>  2 files changed, 4 insertions(+)
+>
+> diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
+> index 011a3363c265..c0d660f1aaac 100644
+> --- a/drivers/soc/tegra/fuse/fuse-tegra.c
+> +++ b/drivers/soc/tegra/fuse/fuse-tegra.c
+> @@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
+>         { .compatible = "nvidia,tegra30-car", },
+>         { .compatible = "nvidia,tegra114-car", },
+>         { .compatible = "nvidia,tegra124-car", },
+> +       { .compatible = "nvidia,tegra132-car", },
+>         {},
+>  };
+>
+> diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
+> index d1a4290cda5c..9e3679594259 100644
+> --- a/drivers/soc/tegra/fuse/fuse-tegra30.c
+> +++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
+> @@ -184,6 +184,9 @@ static void __init legacy_fuse_init(void)
+>         case TEGRA124:
+>                 fuse_info = &tegra124_info;
+>                 break;
+> +       case TEGRA132:
+> +               fuse_info = &tegra124_info;
+> +               break;
 
-Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
-by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
+Nit, but why not
 
-It went through the appropriate review process. But, almost all
-Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
-(arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
- but there are instances of "asahi-kasei,ak8975" in other dts files.
- And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
-So, we made a mistake there.
+        case TEGRA124:
++       case TEGRA132:
+                fuse_info = &tegra124_info;
+                break;
 
-In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
-prerfix in DT file.
-(DT compatible string vendor "asahi-kasei" appears un-documented)
-
-Marking it deprecated and warning with checkpatch is certainly
-preferable. So, this patch replace "ak" to "asahi-kasei" in
-vendor-prefixes.txt. (and fixup tegra20-seaboard)
-
-OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
-doesn't care about it. Because no DT is using that today.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
----
-v4 -> v5
-
- - venter -> vendor on Subject
- - fixup Acked-by ordering
-
- .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 723999d..ddcb4cd 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -9,7 +9,6 @@ ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
- adi	Analog Devices, Inc.
- aeroflexgaisler	Aeroflex Gaisler AB
--ak	Asahi Kasei Corp.
- allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
-@@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
- apm	Applied Micro Circuits Corporation (APM)
- arm	ARM Ltd.
- armadeus	ARMadeus Systems SARL
-+asahi-kasei	Asahi Kasei Corp.
- atmel	Atmel Corporation
- auo	AU Optronics Corporation
- avago	Avago Technologies
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index a1d4bf9..7f5cf80 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -405,7 +405,7 @@
- 		clock-frequency = <400000>;
- 
- 		magnetometer at c {
--			compatible = "ak,ak8975";
-+			compatible = "asahi-kasei,ak8975";
- 			reg = <0xc>;
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.7.9.5
+?
