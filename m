@@ -1,265 +1,276 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  9 Jan 2015 13:54:15 +0000
-Subject: [PATCH v2 3/5] iommu: add self-consistency tests to ARM LPAE IO page
- table allocator
+Date: Fri,  9 Jan 2015 13:54:13 +0000
+Subject: [PATCH v2 1/5] iommu: introduce generic page table allocation
+ framework
 In-Reply-To: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
 References: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1420811657-21321-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1420811657-21321-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a series of basic self-consistency tests to the ARM LPAE
-IO page table allocator that exercise corner cases in map/unmap, as well
-as testing all valid configurations of pagesize, ias and stage.
+This patch introduces a generic framework for allocating page tables for
+an IOMMU. There are a number of reasons we want to do this:
 
+  - It avoids duplication of complex table management code in IOMMU
+    drivers that use the same page table format
+
+  - It removes any coupling with the CPU table format (and even the
+    architecture!)
+
+  - It defines an API for IOMMU TLB maintenance
+
+Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/Kconfig          |   9 ++
- drivers/iommu/io-pgtable-arm.c | 200 ++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 208 insertions(+), 1 deletion(-)
+ drivers/iommu/Kconfig      |   8 +++
+ drivers/iommu/Makefile     |   1 +
+ drivers/iommu/io-pgtable.c |  71 +++++++++++++++++++++++++
+ drivers/iommu/io-pgtable.h | 128 +++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 208 insertions(+)
+ create mode 100644 drivers/iommu/io-pgtable.c
+ create mode 100644 drivers/iommu/io-pgtable.h
 
 diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 306454fbc52d..9fd9909867cd 100644
+index 325188eef1c1..3faaa41db8ff 100644
 --- a/drivers/iommu/Kconfig
 +++ b/drivers/iommu/Kconfig
-@@ -28,6 +28,15 @@ config IOMMU_IO_PGTABLE_LPAE
- 	  sizes at both stage-1 and stage-2, as well as address spaces
- 	  up to 48-bits in size.
+@@ -13,6 +13,14 @@ menuconfig IOMMU_SUPPORT
  
-+config IOMMU_IO_PGTABLE_LPAE_SELFTEST
-+	bool "LPAE selftests"
-+	depends on IOMMU_IO_PGTABLE_LPAE
-+	help
-+	  Enable self-tests for LPAE page table allocator. This performs
-+	  a series of page-table consistency checks during boot.
-+
-+	  If unsure, say N here.
-+
- endmenu
+ if IOMMU_SUPPORT
  
++menu "Generic IOMMU Pagetable Support"
++
++# Selected by the actual pagetable implementations
++config IOMMU_IO_PGTABLE
++	bool
++
++endmenu
++
  config OF_IOMMU
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index dbe6178a53e9..52fb21487f02 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -193,6 +193,8 @@ struct arm_lpae_io_pgtable {
- 
- typedef u64 arm_lpae_iopte;
- 
-+static bool selftest_running = false;
+        def_bool y
+        depends on OF && IOMMU_API
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index 7b976f294a69..701c9516e2ae 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -1,6 +1,7 @@
+ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+ obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
++obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+ obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
+ obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
+ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
+diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+new file mode 100644
+index 000000000000..f664a1ca49cf
+--- /dev/null
++++ b/drivers/iommu/io-pgtable.c
+@@ -0,0 +1,71 @@
++/*
++ * Generic page table allocator for IOMMUs.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2014 ARM Limited
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ */
 +
- static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 			     unsigned long iova, phys_addr_t paddr,
- 			     arm_lpae_iopte prot, int lvl,
-@@ -201,8 +203,10 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 	arm_lpae_iopte pte = prot;
- 
- 	/* We require an unmap first */
--	if (WARN_ON(iopte_leaf(*ptep, lvl)))
-+	if (iopte_leaf(*ptep, lvl)) {
-+		WARN_ON(!selftest_running);
- 		return -EEXIST;
-+	}
- 
- 	if (lvl == ARM_LPAE_MAX_LEVELS - 1)
- 		pte |= ARM_LPAE_PTE_TYPE_PAGE;
-@@ -779,3 +783,197 @@ struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
- 	.alloc	= arm_32_lpae_alloc_pgtable_s2,
- 	.free	= arm_lpae_free_pgtable,
- };
++#include <linux/bug.h>
++#include <linux/kernel.h>
++#include <linux/types.h>
 +
-+#ifdef CONFIG_IOMMU_IO_PGTABLE_LPAE_SELFTEST
++#include "io-pgtable.h"
 +
-+static struct io_pgtable_cfg *cfg_cookie;
-+
-+static void dummy_tlb_flush_all(void *cookie)
++static const struct io_pgtable_init_fns *
++io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] =
 +{
-+	WARN_ON(cookie != cfg_cookie);
-+}
-+
-+static void dummy_tlb_add_flush(unsigned long iova, size_t size, bool leaf,
-+				void *cookie)
-+{
-+	WARN_ON(cookie != cfg_cookie);
-+	WARN_ON(!(size & cfg_cookie->pgsize_bitmap));
-+}
-+
-+static void dummy_tlb_sync(void *cookie)
-+{
-+	WARN_ON(cookie != cfg_cookie);
-+}
-+
-+static void dummy_flush_pgtable(void *ptr, size_t size, void *cookie)
-+{
-+	WARN_ON(cookie != cfg_cookie);
-+}
-+
-+static struct iommu_gather_ops dummy_tlb_ops __initdata = {
-+	.tlb_flush_all	= dummy_tlb_flush_all,
-+	.tlb_add_flush	= dummy_tlb_add_flush,
-+	.tlb_sync	= dummy_tlb_sync,
-+	.flush_pgtable	= dummy_flush_pgtable,
 +};
 +
-+static void __init arm_lpae_dump_ops(struct io_pgtable_ops *ops)
++struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
++					    struct io_pgtable_cfg *cfg,
++					    void *cookie)
 +{
-+	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-+	struct io_pgtable_cfg *cfg = &data->iop.cfg;
++	struct io_pgtable *iop;
++	const struct io_pgtable_init_fns *fns;
 +
-+	pr_err("cfg: pgsize_bitmap 0x%lx, ias %u-bit\n",
-+		cfg->pgsize_bitmap, cfg->ias);
-+	pr_err("data: %d levels, 0x%zx pgd_size, %lu pg_shift, %lu bits_per_level, pgd @ %p\n",
-+		data->levels, data->pgd_size, data->pg_shift,
-+		data->bits_per_level, data->pgd);
++	if (fmt >= IO_PGTABLE_NUM_FMTS)
++		return NULL;
++
++	fns = io_pgtable_init_table[fmt];
++	if (!fns)
++		return NULL;
++
++	iop = fns->alloc(cfg, cookie);
++	if (!iop)
++		return NULL;
++
++	iop->fmt	= fmt;
++	iop->cookie	= cookie;
++	iop->cfg	= *cfg;
++
++	return &iop->ops;
 +}
 +
-+#define __FAIL(ops, i)	({						\
-+		WARN(1, "selftest: test failed for fmt idx %d\n", (i));	\
-+		arm_lpae_dump_ops(ops);					\
-+		selftest_running = false;				\
-+		-EFAULT;						\
-+})
-+
-+static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
++/*
++ * It is the IOMMU driver's responsibility to ensure that the page table
++ * is no longer accessible to the walker by this point.
++ */
++void free_io_pgtable_ops(struct io_pgtable_ops *ops)
 +{
-+	static const enum io_pgtable_fmt fmts[] = {
-+		ARM_64_LPAE_S1,
-+		ARM_64_LPAE_S2,
-+	};
++	struct io_pgtable *iop;
 +
-+	int i, j;
-+	unsigned long iova;
-+	size_t size;
-+	struct io_pgtable_ops *ops;
++	if (!ops)
++		return;
 +
-+	selftest_running = true;
-+
-+	for (i = 0; i < ARRAY_SIZE(fmts); ++i) {
-+		cfg_cookie = cfg;
-+		ops = alloc_io_pgtable_ops(fmts[i], cfg, cfg);
-+		if (!ops) {
-+			pr_err("selftest: failed to allocate io pgtable ops\n");
-+			return -ENOMEM;
-+		}
-+
-+		/*
-+		 * Initial sanity checks.
-+		 * Empty page tables shouldn't provide any translations.
-+		 */
-+		if (ops->iova_to_phys(ops, 42))
-+			return __FAIL(ops, i);
-+
-+		if (ops->iova_to_phys(ops, SZ_1G + 42))
-+			return __FAIL(ops, i);
-+
-+		if (ops->iova_to_phys(ops, SZ_2G + 42))
-+			return __FAIL(ops, i);
-+
-+		/*
-+		 * Distinct mappings of different granule sizes.
-+		 */
-+		iova = 0;
-+		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
-+		while (j != BITS_PER_LONG) {
-+			size = 1UL << j;
-+
-+			if (ops->map(ops, iova, iova, size, IOMMU_READ |
-+							    IOMMU_WRITE |
-+							    IOMMU_NOEXEC |
-+							    IOMMU_CACHE))
-+				return __FAIL(ops, i);
-+
-+			/* Overlapping mappings */
-+			if (!ops->map(ops, iova, iova + size, size,
-+				      IOMMU_READ | IOMMU_NOEXEC))
-+				return __FAIL(ops, i);
-+
-+			if (ops->iova_to_phys(ops, iova + 42) != (iova + 42))
-+				return __FAIL(ops, i);
-+
-+			iova += SZ_1G;
-+			j++;
-+			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
-+		}
-+
-+		/* Partial unmap */
-+		size = 1UL << __ffs(cfg->pgsize_bitmap);
-+		if (ops->unmap(ops, SZ_1G + size, size) != size)
-+			return __FAIL(ops, i);
-+
-+		/* Remap of partial unmap */
-+		if (ops->map(ops, SZ_1G + size, size, size, IOMMU_READ))
-+			return __FAIL(ops, i);
-+
-+		if (ops->iova_to_phys(ops, SZ_1G + size + 42) != (size + 42))
-+			return __FAIL(ops, i);
-+
-+		/* Full unmap */
-+		iova = 0;
-+		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
-+		while (j != BITS_PER_LONG) {
-+			size = 1UL << j;
-+
-+			if (ops->unmap(ops, iova, size) != size)
-+				return __FAIL(ops, i);
-+
-+			if (ops->iova_to_phys(ops, iova + 42))
-+				return __FAIL(ops, i);
-+
-+			/* Remap full block */
-+			if (ops->map(ops, iova, iova, size, IOMMU_WRITE))
-+				return __FAIL(ops, i);
-+
-+			if (ops->iova_to_phys(ops, iova + 42) != (iova + 42))
-+				return __FAIL(ops, i);
-+
-+			iova += SZ_1G;
-+			j++;
-+			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
-+		}
-+
-+		free_io_pgtable_ops(ops);
-+	}
-+
-+	selftest_running = false;
-+	return 0;
++	iop = container_of(ops, struct io_pgtable, ops);
++	iop->cfg.tlb->tlb_flush_all(iop->cookie);
++	io_pgtable_init_table[iop->fmt]->free(iop);
 +}
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+new file mode 100644
+index 000000000000..fdd792c37698
+--- /dev/null
++++ b/drivers/iommu/io-pgtable.h
+@@ -0,0 +1,128 @@
++#ifndef __IO_PGTABLE_H
++#define __IO_PGTABLE_H
 +
-+static int __init arm_lpae_do_selftests(void)
-+{
-+	static const unsigned long pgsize[] = {
-+		SZ_4K | SZ_2M | SZ_1G,
-+		SZ_16K | SZ_32M,
-+		SZ_64K | SZ_512M,
++/*
++ * Public API for use by IOMMU drivers
++ */
++enum io_pgtable_fmt {
++	IO_PGTABLE_NUM_FMTS,
++};
++
++/**
++ * struct iommu_gather_ops - IOMMU callbacks for TLB and page table management.
++ *
++ * @tlb_flush_all: Synchronously invalidate the entire TLB context.
++ * @tlb_add_flush: Queue up a TLB invalidation for a virtual address range.
++ * @tlb_sync:      Ensure any queue TLB invalidation has taken effect.
++ * @flush_pgtable: Ensure page table updates are visible to the IOMMU.
++ *
++ * Note that these can all be called in atomic context and must therefore
++ * not block.
++ */
++struct iommu_gather_ops {
++	void (*tlb_flush_all)(void *cookie);
++	void (*tlb_add_flush)(unsigned long iova, size_t size, bool leaf,
++			      void *cookie);
++	void (*tlb_sync)(void *cookie);
++	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
++};
++
++/**
++ * struct io_pgtable_cfg - Configuration data for a set of page tables.
++ *
++ * @quirks:        A bitmap of hardware quirks that require some special
++ *                 action by the low-level page table allocator.
++ * @pgsize_bitmap: A bitmap of page sizes supported by this set of page
++ *                 tables.
++ * @ias:           Input address (iova) size, in bits.
++ * @oas:           Output address (paddr) size, in bits.
++ * @tlb:           TLB management callbacks for this set of tables.
++ */
++struct io_pgtable_cfg {
++	int				quirks; /* IO_PGTABLE_QUIRK_* */
++	unsigned long			pgsize_bitmap;
++	unsigned int			ias;
++	unsigned int			oas;
++	const struct iommu_gather_ops	*tlb;
++
++	/* Low-level data specific to the table format */
++	union {
 +	};
++};
 +
-+	static const unsigned int ias[] = {
-+		32, 36, 40, 42, 44, 48,
-+	};
++/**
++ * struct io_pgtable_ops - Page table manipulation API for IOMMU drivers.
++ *
++ * @map:          Map a physically contiguous memory region.
++ * @unmap:        Unmap a physically contiguous memory region.
++ * @iova_to_phys: Translate iova to physical address.
++ *
++ * These functions map directly onto the iommu_ops member functions with
++ * the same names.
++ */
++struct io_pgtable_ops {
++	int (*map)(struct io_pgtable_ops *ops, unsigned long iova,
++		   phys_addr_t paddr, size_t size, int prot);
++	int (*unmap)(struct io_pgtable_ops *ops, unsigned long iova,
++		     size_t size);
++	phys_addr_t (*iova_to_phys)(struct io_pgtable_ops *ops,
++				    unsigned long iova);
++};
 +
-+	int i, j, pass = 0, fail = 0;
-+	struct io_pgtable_cfg cfg = {
-+		.tlb = &dummy_tlb_ops,
-+		.oas = 48,
-+	};
++/**
++ * alloc_io_pgtable_ops() - Allocate a page table allocator for use by an IOMMU.
++ *
++ * @fmt:    The page table format.
++ * @cfg:    The page table configuration. This will be modified to represent
++ *          the configuration actually provided by the allocator (e.g. the
++ *          pgsize_bitmap may be restricted).
++ * @cookie: An opaque token provided by the IOMMU driver and passed back to
++ *          the callback routines in cfg->tlb.
++ */
++struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
++					    struct io_pgtable_cfg *cfg,
++					    void *cookie);
 +
-+	for (i = 0; i < ARRAY_SIZE(pgsize); ++i) {
-+		for (j = 0; j < ARRAY_SIZE(ias); ++j) {
-+			cfg.pgsize_bitmap = pgsize[i];
-+			cfg.ias = ias[j];
-+			pr_info("selftest: pgsize_bitmap 0x%08lx, IAS %u\n",
-+				pgsize[i], ias[j]);
-+			if (arm_lpae_run_tests(&cfg))
-+				fail++;
-+			else
-+				pass++;
-+		}
-+	}
++/**
++ * free_io_pgtable_ops() - Free an io_pgtable_ops structure. The caller
++ *                         *must* ensure that the page table is no longer
++ *                         live, but the TLB can be dirty.
++ *
++ * @ops: The ops returned from alloc_io_pgtable_ops.
++ */
++void free_io_pgtable_ops(struct io_pgtable_ops *ops);
 +
-+	pr_info("selftest: completed with %d PASS %d FAIL\n", pass, fail);
-+	return fail ? -EFAULT : 0;
-+}
-+subsys_initcall(arm_lpae_do_selftests);
-+#endif
++
++/*
++ * Internal structures for page table allocator implementations.
++ */
++
++/**
++ * struct io_pgtable - Internal structure describing a set of page tables.
++ *
++ * @fmt:    The page table format.
++ * @cookie: An opaque token provided by the IOMMU driver and passed back to
++ *          any callback routines.
++ * @cfg:    A copy of the page table configuration.
++ * @ops:    The page table operations in use for this set of page tables.
++ */
++struct io_pgtable {
++	enum io_pgtable_fmt	fmt;
++	void			*cookie;
++	struct io_pgtable_cfg	cfg;
++	struct io_pgtable_ops	ops;
++};
++
++/**
++ * struct io_pgtable_init_fns - Alloc/free a set of page tables for a
++ *                              particular format.
++ *
++ * @alloc: Allocate a set of page tables described by cfg.
++ * @free:  Free the page tables associated with iop.
++ */
++struct io_pgtable_init_fns {
++	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
++	void (*free)(struct io_pgtable *iop);
++};
++
++#endif /* __IO_PGTABLE_H */
 -- 
 2.1.4
