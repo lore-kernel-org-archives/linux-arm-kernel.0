@@ -1,65 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 9 Jan 2015 16:13:59 +0100
-Subject: [PATCH 1/5] tty/serial: at91: use correct type for
- dma_sync_*_for_cpu() and dma_sync_*_for_device()
-In-Reply-To: <830a2b33ab0226405dc310c8a6d43731bf4ca8f9.1418131298.git.cyrille.pitchen@atmel.com>
-References: <cover.1418131298.git.cyrille.pitchen@atmel.com>
- <830a2b33ab0226405dc310c8a6d43731bf4ca8f9.1418131298.git.cyrille.pitchen@atmel.com>
-Message-ID: <54AFF037.1000004@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Jan 2015 16:20:17 +0100
+Subject: [PATCH v4 00/12]  Add Armada 38x GP and AP boards support
+In-Reply-To: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1420738694-6163-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150109152017.GB18832@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/12/2014 14:31, Cyrille Pitchen a ?crit :
-> dma_sync_*_for_cpu() and dma_sync_*_for_device() use 'enum dma_data_direction',
-> not 'enum dma_transfer_direction'
+> Gregory CLEMENT (5):
+>   ARM: mvebu: a38x: Add more pinctrl functions
+>   ARM: mvebu: a38x: Add missing labels
+>   ARM: mvebu: Document the Device Tree binding for the Armada 388 SoC
+>   ARM: mvebu: Add Device Tree description of the Armada 388 SoC
+>   ARM: mvebu: Add Armada 388 General Purpose Development Board support
+
+All added to mvebu/dt
+
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Maxime Ripard (7):
+>   ARM: mvebu: Rename DEBUG_LL to indicate UART index
+>   ARM: mvebu: Add UART1 as DEBUG_LL possible target
 
-Sure:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Added to mvebu/soc
 
-Here it's difficult to add a "stable" tag as the error was introduced by
-several different patches.
+>   ARM: mvebu: a38x: Fix node names
 
-Thanks.
+All added to mvebu/dt
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 4d848a2..756f567 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -794,7 +794,7 @@ static void atmel_tx_dma(struct uart_port *port)
->  			return;
->  		}
->  
-> -		dma_sync_sg_for_device(port->dev, sg, 1, DMA_MEM_TO_DEV);
-> +		dma_sync_sg_for_device(port->dev, sg, 1, DMA_TO_DEVICE);
->  
->  		atmel_port->desc_tx = desc;
->  		desc->callback = atmel_complete_tx_dma;
-> @@ -927,7 +927,7 @@ static void atmel_rx_from_dma(struct uart_port *port)
->  	dma_sync_sg_for_cpu(port->dev,
->  			    &atmel_port->sg_rx,
->  			    1,
-> -			    DMA_DEV_TO_MEM);
-> +			    DMA_FROM_DEVICE);
->  
->  	/*
->  	 * ring->head points to the end of data already written by the DMA.
-> @@ -974,7 +974,7 @@ static void atmel_rx_from_dma(struct uart_port *port)
->  	dma_sync_sg_for_device(port->dev,
->  			       &atmel_port->sg_rx,
->  			       1,
-> -			       DMA_DEV_TO_MEM);
-> +			       DMA_FROM_DEVICE);
->  
->  	/*
->  	 * Drop the lock here since it might end up calling
-> 
+>   pinctrl: mvebu: a38x: Add UART1 muxing options
 
+Linus took this one already
 
--- 
-Nicolas Ferre
+>   ARM: mvebu: A38x: Remove redundant pinctrl informations
+>   ARM: mvebu: Add a number of pinctrl functions
+>   ARM: mvebu: Add Armada 385 Access Point Development Board support
+
+All added to mvebu/dt
+
+Thanks
+	Andrew
