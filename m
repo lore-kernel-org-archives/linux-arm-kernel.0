@@ -1,14 +1,14 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 9 Jan 2015 14:10:18 -0400
-Subject: [PATCH v2 3/9] ARM: dts: sun7i: Add cpu thermal zones to dtsi
-In-Reply-To: <1420798676-22856-4-git-send-email-wens@csie.org>
+Date: Fri, 9 Jan 2015 14:10:58 -0400
+Subject: [PATCH v2 6/9] ARM: dts: sun5i: Add cpu thermal zones to dtsi
+In-Reply-To: <1420798676-22856-7-git-send-email-wens@csie.org>
 References: <1420798676-22856-1-git-send-email-wens@csie.org>
- <1420798676-22856-4-git-send-email-wens@csie.org>
-Message-ID: <20150109181016.GC9510@developer>
+ <1420798676-22856-7-git-send-email-wens@csie.org>
+Message-ID: <20150109181056.GD9510@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 06:17:50PM +0800, Chen-Yu Tsai wrote:
+On Fri, Jan 09, 2015 at 06:17:53PM +0800, Chen-Yu Tsai wrote:
 > The core temperature sensor now supports thermal zones. Add a thermal
 > zone mapping for the cpus with passive cooling (cpufreq throttling).
 > 
@@ -25,22 +25,23 @@ Acked-by: Eduardo Valentin <edubezval@gmail.com>
 >     - Use thermal dt bindings macros in cooling-device
 > 
 > ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
+>  arch/arm/boot/dts/sun5i-a13.dtsi | 34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index c2e964939991..61780b144745 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -50,6 +50,7 @@
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index dee2aa5bc9ed..c26f58ea0850 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -13,6 +13,8 @@
+>  
 >  #include "skeleton.dtsi"
 >  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
 > +#include <dt-bindings/thermal/thermal.h>
->  
+> +
 >  #include <dt-bindings/dma/sun4i-a10.h>
 >  #include <dt-bindings/pinctrl/sun4i-a10.h>
-> @@ -116,6 +117,38 @@
+>  
+> @@ -50,6 +52,38 @@
 >  		};
 >  	};
 >  
@@ -61,7 +62,7 @@ Acked-by: Eduardo Valentin <edubezval@gmail.com>
 > +			trips {
 > +				cpu_alert0: cpu_alert0 {
 > +					/* milliCelsius */
-> +					temperature = <75000>;
+> +					temperature = <850000>;
 > +					hysteresis = <2000>;
 > +					type = "passive";
 > +				};
@@ -77,7 +78,7 @@ Acked-by: Eduardo Valentin <edubezval@gmail.com>
 > +	};
 > +
 >  	memory {
->  		reg = <0x40000000 0x80000000>;
+>  		reg = <0x40000000 0x20000000>;
 >  	};
 > -- 
 > 2.1.4
@@ -88,4 +89,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/c497d679/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/0b6ad1ff/attachment.sig>
