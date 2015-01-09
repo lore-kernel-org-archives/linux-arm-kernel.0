@@ -1,51 +1,38 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Fri, 9 Jan 2015 16:34:17 +0530
-Subject: [PATCH] arm64: dts: exynos7: Fix wrong base address of i2c7 bus
-In-Reply-To: <1418996000-15735-1-git-send-email-padma.v@samsung.com>
-References: <1418996000-15735-1-git-send-email-padma.v@samsung.com>
-Message-ID: <CAFp+6iHKdZ6uGKRcVYs1kAEQs5R4bWVuHKy8KdmUHJDo9Gd8nA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Jan 2015 12:06:36 +0100
+Subject: [PATCHv2 8/8] arm: dts: tegra: update isl29028 compatible string
+ to use isil vendor prefix
+In-Reply-To: <8cfd0ac11713262036dca415e59e56508fb07c3c.1418763328.git.arno@natisbad.org>
+References: <cover.1418763328.git.arno@natisbad.org>
+ <8cfd0ac11713262036dca415e59e56508fb07c3c.1418763328.git.arno@natisbad.org>
+Message-ID: <20150109110635.GA16465@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padma,
-
-
-On Fri, Dec 19, 2014 at 7:03 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> I2C7 base address corrected.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+On Tue, Dec 16, 2014 at 10:21:16PM +0100, Arnaud Ebalard wrote:
+> 
+> "isil" and "isl" prefixes are used at various locations inside the kernel
+> to reference Intersil corporation. This patch is part of a series fixing
+> those locations were "isl" is used in compatible strings to use the now
+> expected "isil" prefix instead (NASDAQ symbol for Intersil and most used
+> version).
+> 
+> Note: isl29028 is an I2C device so the patch does not in fact currently
+> depend on the introduction of "isil"-based compatible string in isl29028
+> driver because I2C core does not check the prefix yet.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
+>  arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Verified from Exynos7 datasheet. LGTM.
+Applied to the for-3.20/dt branch, thanks.
 
-Reviewed-by: Vivek Gautam <gautam.vivek@samsung.com>
-
->  arch/arm64/boot/dts/exynos/exynos7.dtsi |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index db7058a..84a57c8 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -386,9 +386,9 @@
->                         status = "disabled";
->                 };
->
-> -               hsi2c_7: hsi2c at 13e10000 {
-> +               hsi2c_7: hsi2c at 14e10000 {
->                         compatible = "samsung,exynos7-hsi2c";
-> -                       reg = <0x13e10000 0x1000>;
-> +                       reg = <0x14e10000 0x1000>;
->                         interrupts = <0 462 0>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
-> --
-> 1.7.4.4
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/78b6189e/attachment.sig>
