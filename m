@@ -1,24 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Jan 2015 20:45:49 +0100
-Subject: [PATCH RESEND] dma-mapping: tidy up dma_parms default handling
-In-Reply-To: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
-References: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
-Message-ID: <2031542.TLqIP3YVGc@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 9 Jan 2015 20:02:57 +0000 (UTC)
+Subject: [PATCH] soc/tegra: pmc: Add Tegra132 support
+In-Reply-To: <20150109101252.GG27845@ulmo>
+References: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
+ <alpine.DEB.2.02.1501082232280.28771@utopia.booyaka.com>
+ <20150109101252.GG27845@ulmo>
+Message-ID: <alpine.DEB.2.02.1501092002430.28771@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 January 2015 16:56:03 Robin Murphy wrote:
+On Fri, 9 Jan 2015, Thierry Reding wrote:
+
+> On Thu, Jan 08, 2015 at 10:34:35PM +0000, Paul Walmsley wrote:
+> > On Thu, 8 Jan 2015, Thierry Reding wrote:
+> > 
+> > > From: Thierry Reding <treding@nvidia.com>
+> > > 
+> > > Tegra132 uses the same GPU as Tegra124 and the same special-case is
+> > > needed to remove clamps. However Tegra132 has a separate chip ID, so in
+> > > order to avoid having to extend the list of chip IDs for the special
+> > > case, add a feature flag to the SoC data.
+> > > 
+> > > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > 
+> > Reviewed-by: Paul Walmsley <pwalmsley@nvidia.com>
+> > 
+> > Nit: not sure I would call it a special-case; to me it's more of an 
+> > evolutionary change due to the radically different GPU in T124 & T132.
 > 
-> This one's a bit tricky to find a home for - I think technically it's 
-> probably an IOMMU patch, but then the long-underlying problem doesn't
-> seem to have blown up anything until arm64, and my motivation is to
-> make bits of Juno work, which seems to nudge it towards arm64/arm-soc
-> territory. Could anyone suggest which tree is most appropriate?
+> I reworded the commit message slightly, so it says:
+> 
+> 	Tegra132 uses the same GPU as Tegra124 and therefore requires the same
+> 	method to remove clamps. ...
+> 
+> I hope that's less misleading.
 
-I have a set of patches touching various dma-mapping.h related bits
-across architectures and in ARM in particular. Your patch fits into
-that series, and I guess we could either have it in my asm-generic
-tree or in Andrew Morton's mm tree. Possibly also arm-soc for practical
-reasons, although it really doesn't belong in there.
+Looks good to me,
 
-	Arnd
+
+- Paul
