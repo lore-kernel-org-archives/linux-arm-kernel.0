@@ -1,91 +1,153 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  9 Jan 2015 18:17:51 +0800
-Subject: [PATCH v2 4/9] ARM: dts: sun7i: cubieboard2: add axp209 regulator
- nodes
+Date: Fri,  9 Jan 2015 18:17:48 +0800
+Subject: [PATCH v2 1/9] Input: sun4i-ts: Add thermal zone sensor support
 In-Reply-To: <1420798676-22856-1-git-send-email-wens@csie.org>
 References: <1420798676-22856-1-git-send-email-wens@csie.org>
-Message-ID: <1420798676-22856-5-git-send-email-wens@csie.org>
+Message-ID: <1420798676-22856-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the regulator nodes for the axp209 by including
-the axp209 dtsi. As the inputs of these regulators are from the
-axp209's PS output, which is basically just a mux over the 2
-inputs, it is considered to be unregulated. Thus we do not provide
-input supply properties for them.
+The touchscreen controller has a temperature sensor embedded in the SoC,
+which already has hwmon support in the driver.
 
-The regulator names and constraints are based on the board
-schematics and the SoC datasheet.
+Add DT thermal zone support so we can use it with cpufreq for thermal
+throttling.
 
-DCDC2 is used as the cpu power supply. This patch also references
-it from the cpu node.
-
-Also get rid of axp209 properties already set in axp209.dtsi.
+This also adds a comment stating that we do not know the actual formula
+for calculating the temperature.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
 
 changes since v1:
 
-    - Use preprocessor include for axp209.dtsi
-    - Remove incorrectly squashed axp209.dtsi patch
+    - clean up thermal zone sensor when input device register fails
+    - unconditionally unregister thermal zone sensor on removal.
+      the unregister function checks the pointers passed in.
+    - add comment explaining the lack of documents for the temperature
+      calculation formula
 
 ---
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 35 +++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+ .../bindings/input/touchscreen/sun4i.txt           |  2 +
+ drivers/input/touchscreen/sun4i-ts.c               | 47 ++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 18fc5db9c976..ec1fc2c8b3e3 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -88,13 +88,9 @@
- 			status = "okay";
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+index aef57791f40b..a8405bab6c00 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+@@ -5,6 +5,7 @@ Required properties:
+  - compatible: "allwinner,sun4i-a10-ts"
+  - reg: mmio address range of the chip
+  - interrupts: interrupt to which the chip is connected
++ - #thermal-sensor-cells: shall be 0
  
- 			axp209: pmic at 34 {
--				compatible = "x-powers,axp209";
- 				reg = <0x34>;
- 				interrupt-parent = <&nmi_intc>;
- 				interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--				interrupt-controller;
--				#interrupt-cells = <1>;
- 			};
- 		};
- 
-@@ -145,3 +141,34 @@
- 		status = "okay";
+ Optional properties:
+  - allwinner,ts-attached: boolean indicating that an actual touchscreen is
+@@ -17,4 +18,5 @@ Example:
+ 		reg = <0x01c25000 0x100>;
+ 		interrupts = <29>;
+ 		allwinner,ts-attached;
++		#thermal-sensor-cells = <0>;
  	};
- };
+diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+index 28a06749ae42..aac49db0b09d 100644
+--- a/drivers/input/touchscreen/sun4i-ts.c
++++ b/drivers/input/touchscreen/sun4i-ts.c
+@@ -34,6 +34,7 @@
+ 
+ #include <linux/err.h>
+ #include <linux/hwmon.h>
++#include <linux/thermal.h>
+ #include <linux/init.h>
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+@@ -107,6 +108,7 @@
+ struct sun4i_ts_data {
+ 	struct device *dev;
+ 	struct input_dev *input;
++	struct thermal_zone_device *tz;
+ 	void __iomem *base;
+ 	unsigned int irq;
+ 	bool ignore_fifo_data;
+@@ -180,6 +182,33 @@ static void sun4i_ts_close(struct input_dev *dev)
+ 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+ }
+ 
++static int get_temp(void *data, long *temp)
++{
++	struct sun4i_ts_data *ts = data;
 +
-+#include "axp209.dtsi"
++	/* No temp_data until the first irq */
++	if (ts->temp_data == -1)
++		return -EAGAIN;
 +
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
++	/*
++	 * The user manuals do not contain the formula for calculating
++	 * the temperature. The formula used here is from the AXP209,
++	 * which is designed by X-Powers, an affiliate of Allwinner:
++	 *
++	 *     temperature = -144.7 + (value * 0.1)
++	 *
++	 * This should be replaced with the correct one if such information
++	 * becomes available.
++	 */
++	*temp = (ts->temp_data - 1447) * 100;
++
++	return 0;
++}
++
++static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
++	.get_temp = get_temp,
 +};
 +
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1450000>;
-+	regulator-name = "vdd-cpu";
-+};
+ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+ 			 char *buf)
+ {
+@@ -189,6 +218,16 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+ 	if (ts->temp_data == -1)
+ 		return -EAGAIN;
+ 
++	/*
++	 * The user manuals do not contain the formula for calculating
++	 * the temperature. The formula used here is from the AXP209,
++	 * which is designed by X-Powers, an affiliate of Allwinner:
++	 *
++	 *     temperature = -144.7 + (value * 0.1)
++	 *
++	 * This should be replaced with the correct one if such information
++	 * becomes available.
++	 */
+ 	return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
+ }
+ 
+@@ -288,12 +327,18 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+ 	if (IS_ERR(hwmon))
+ 		return PTR_ERR(hwmon);
+ 
++	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
++						 &sun4i_ts_tz_ops);
++	if (IS_ERR(ts->tz))
++		ts->tz = NULL;
 +
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
+ 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+ 
+ 	if (ts_attached) {
+ 		error = input_register_device(ts->input);
+ 		if (error) {
+ 			writel(0, ts->base + TP_INT_FIFOC);
++			thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+ 			return error;
+ 		}
+ 	}
+@@ -310,6 +355,8 @@ static int sun4i_ts_remove(struct platform_device *pdev)
+ 	if (ts->input)
+ 		input_unregister_device(ts->input);
+ 
++	thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
 +
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
+ 	/* Deactivate all IRQs */
+ 	writel(0, ts->base + TP_INT_FIFOC);
+ 
 -- 
 2.1.4
