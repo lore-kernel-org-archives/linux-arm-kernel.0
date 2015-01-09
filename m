@@ -1,63 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 9 Jan 2015 16:28:58 +0100
-Subject: [PATCH 3/5] tty/serial: at91: fix error handling in
- atmel_serial_probe()
-In-Reply-To: <95ff85410e2f93993a4f7c5d255c4a88993fd462.1418131298.git.cyrille.pitchen@atmel.com>
-References: <cover.1418131298.git.cyrille.pitchen@atmel.com>
- <95ff85410e2f93993a4f7c5d255c4a88993fd462.1418131298.git.cyrille.pitchen@atmel.com>
-Message-ID: <54AFF3BA.7090704@atmel.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 9 Jan 2015 20:59:20 +0530
+Subject: [PATCH v3 2/8] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <20150109152402.GQ12302@n2100.arm.linux.org.uk>
+References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1420802889-4041-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <20150109125102.GL12302@n2100.arm.linux.org.uk>
+ <CAJe_ZhdkF5o91HE8woAw0-DN5TuS_j6LM15NF0z6oHcQwPvnsQ@mail.gmail.com>
+ <20150109152402.GQ12302@n2100.arm.linux.org.uk>
+Message-ID: <CAJe_ZheihwiEUXaRQfCFSfr9s1k59E_-0Ca8U_kNLVtRtNOnPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/12/2014 14:31, Cyrille Pitchen a ?crit :
-> -EDEFER error wasn't handle properly by atmel_serial_probe().
-> As an example, when atmel_serial_probe() is called for the first time, we pass
-> the test_and_set_bit() test to check whether the port has already been
-> initalized. Then we call atmel_init_port(), which may return -EDEFER, possibly
-> returned before by clk_get(). Consequently atmel_serial_probe() used to return
-> this error code WITHOUT clearing the port bit in the "atmel_ports_in_use" mask.
-> When atmel_serial_probe() was called for the second time, it used to fail on
-> the test_and_set_bit() function then returning -EBUSY.
-> 
-> When atmel_serial_probe() fails, this patch make it clear the port bit in the
-> "atmel_ports_in_use" mask, if needed, before returning the error code.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+On 9 January 2015 at 20:54, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 09, 2015 at 06:49:12PM +0530, Jassi Brar wrote:
+>> On 9 January 2015 at 18:21, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Jan 09, 2015 at 07:28:09PM +0800, Vincent Yang wrote:
+>> >> +static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+>> >> +{
+>> >> +     struct mbox_chan *chan = p;
+>> >> +     struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+>> >> +     u32 val;
+>> >> +
+>> >> +     pr_debug("%s:%d\n", __func__, __LINE__);
+>> >> +     val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
+>> >> +     mbox_chan_received_data(chan, (void *)val);
+>> >> +
+>> >> +     writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
+>> >> +
+>> >> +     return IRQ_HANDLED;
+>> >
+>> > What if 'val' was zero - is the interrupt still "handled" ?
+>> >
+>> This irq shouldn't fire unless RX_STAT register has some non-zero value.
+>
+> You claim this interrupt handler using IRQF_SHARED - what if another user
+> of this interrupt gets stuck?  Your handler above will prevent the kernel
+> recovering as it will think that you are validly processing the stuck
+> interrupt each time.
+>
+> If it isn't shared, then don't use IRQF_SHARED.
+>
+> Either way, it is good practice to return IRQ_NONE if there's no work to
+> be done.
+>
+OK, will do.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-and you can also add:
-Cc: <stable@vger.kernel.org> # 3.12+
-
-Thanks.
-
-> ---
->  drivers/tty/serial/atmel_serial.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index c6621dc..92a8b26 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2565,7 +2565,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
->  
->  	ret = atmel_init_port(port, pdev);
->  	if (ret)
-> -		goto err;
-> +		goto err_clear_bit;
->  
->  	if (!atmel_use_pdc_rx(&port->uart)) {
->  		ret = -ENOMEM;
-> @@ -2628,6 +2628,8 @@ err_alloc_ring:
->  		clk_put(port->clk);
->  		port->clk = NULL;
->  	}
-> +err_clear_bit:
-> +	clear_bit(port->uart.line, atmel_ports_in_use);
->  err:
->  	return ret;
->  }
-> 
-
-
--- 
-Nicolas Ferre
+thanks.
