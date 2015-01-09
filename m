@@ -1,153 +1,132 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  9 Jan 2015 18:17:48 +0800
-Subject: [PATCH v2 1/9] Input: sun4i-ts: Add thermal zone sensor support
+Date: Fri,  9 Jan 2015 18:17:49 +0800
+Subject: [PATCH v2 2/9] ARM: dts: sunxi: Add dtsi for AXP209 PMIC
 In-Reply-To: <1420798676-22856-1-git-send-email-wens@csie.org>
 References: <1420798676-22856-1-git-send-email-wens@csie.org>
-Message-ID: <1420798676-22856-2-git-send-email-wens@csie.org>
+Message-ID: <1420798676-22856-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The touchscreen controller has a temperature sensor embedded in the SoC,
-which already has hwmon support in the driver.
-
-Add DT thermal zone support so we can use it with cpufreq for thermal
-throttling.
-
-This also adds a comment stating that we do not know the actual formula
-for calculating the temperature.
+The AXP209 PMIC is used with some Allwinner SoCs. This patch adds
+a dtsi file listing all the regulator nodes. The regulators are
+initialized based on their device node names.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
 
 changes since v1:
 
-    - clean up thermal zone sensor when input device register fails
-    - unconditionally unregister thermal zone sensor on removal.
-      the unregister function checks the pointers passed in.
-    - add comment explaining the lack of documents for the temperature
-      calculation formula
+    - Moved interrupt controller properties to this patch
+    - Added default names for all the regulators
+    - Removed needless comment above regulators section
 
 ---
- .../bindings/input/touchscreen/sun4i.txt           |  2 +
- drivers/input/touchscreen/sun4i-ts.c               | 47 ++++++++++++++++++++++
- 2 files changed, 49 insertions(+)
+ arch/arm/boot/dts/axp209.dtsi | 97 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axp209.dtsi
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-index aef57791f40b..a8405bab6c00 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-@@ -5,6 +5,7 @@ Required properties:
-  - compatible: "allwinner,sun4i-a10-ts"
-  - reg: mmio address range of the chip
-  - interrupts: interrupt to which the chip is connected
-+ - #thermal-sensor-cells: shall be 0
- 
- Optional properties:
-  - allwinner,ts-attached: boolean indicating that an actual touchscreen is
-@@ -17,4 +18,5 @@ Example:
- 		reg = <0x01c25000 0x100>;
- 		interrupts = <29>;
- 		allwinner,ts-attached;
-+		#thermal-sensor-cells = <0>;
- 	};
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-index 28a06749ae42..aac49db0b09d 100644
---- a/drivers/input/touchscreen/sun4i-ts.c
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -34,6 +34,7 @@
- 
- #include <linux/err.h>
- #include <linux/hwmon.h>
-+#include <linux/thermal.h>
- #include <linux/init.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
-@@ -107,6 +108,7 @@
- struct sun4i_ts_data {
- 	struct device *dev;
- 	struct input_dev *input;
-+	struct thermal_zone_device *tz;
- 	void __iomem *base;
- 	unsigned int irq;
- 	bool ignore_fifo_data;
-@@ -180,6 +182,33 @@ static void sun4i_ts_close(struct input_dev *dev)
- 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
- }
- 
-+static int get_temp(void *data, long *temp)
-+{
-+	struct sun4i_ts_data *ts = data;
+diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+new file mode 100644
+index 000000000000..c20cf537f5a5
+--- /dev/null
++++ b/arch/arm/boot/dts/axp209.dtsi
+@@ -0,0 +1,97 @@
++/*
++ * Copyright 2015 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	/* No temp_data until the first irq */
-+	if (ts->temp_data == -1)
-+		return -EAGAIN;
++/*
++ * AXP202/209 Integrated Power Management Chip
++ * http://www.x-powers.com/product/AXP20X.php
++ * http://dl.linux-sunxi.org/AXP/AXP209%20Datasheet%20v1.0_cn.pdf
++ */
 +
-+	/*
-+	 * The user manuals do not contain the formula for calculating
-+	 * the temperature. The formula used here is from the AXP209,
-+	 * which is designed by X-Powers, an affiliate of Allwinner:
-+	 *
-+	 *     temperature = -144.7 + (value * 0.1)
-+	 *
-+	 * This should be replaced with the correct one if such information
-+	 * becomes available.
-+	 */
-+	*temp = (ts->temp_data - 1447) * 100;
++&axp209 {
++	compatible = "x-powers,axp209";
++	interrupt-controller;
++	#interrupt-cells = <1>;
 +
-+	return 0;
-+}
++	regulators {
++		/* Default work frequency for buck regulators */
++		x-powers,dcdc-freq = <1500>;
 +
-+static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
-+	.get_temp = get_temp,
++		reg_dcdc2: dcdc2 {
++			regulator-name = "dcdc2";
++		};
++
++		reg_dcdc3: dcdc3 {
++			regulator-name = "dcdc3";
++		};
++
++		reg_ldo1: ldo1 {
++			/* LDO1 is a fixed output regulator */
++			regulator-always-on;
++			regulator-min-microvolt = <1300000>;
++			regulator-max-microvolt = <1300000>;
++			regulator-name = "ldo1";
++		};
++
++		reg_ldo2: ldo2 {
++			regulator-name = "ldo2";
++		};
++
++		reg_ldo3: ldo3 {
++			regulator-name = "ldo3";
++		};
++
++		reg_ldo4: ldo4 {
++			regulator-name = "ldo4";
++		};
++
++		reg_ldo5: ldo5 {
++			regulator-name = "ldo5";
++		};
++	};
 +};
-+
- static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
- 			 char *buf)
- {
-@@ -189,6 +218,16 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
- 	if (ts->temp_data == -1)
- 		return -EAGAIN;
- 
-+	/*
-+	 * The user manuals do not contain the formula for calculating
-+	 * the temperature. The formula used here is from the AXP209,
-+	 * which is designed by X-Powers, an affiliate of Allwinner:
-+	 *
-+	 *     temperature = -144.7 + (value * 0.1)
-+	 *
-+	 * This should be replaced with the correct one if such information
-+	 * becomes available.
-+	 */
- 	return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
- }
- 
-@@ -288,12 +327,18 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 	if (IS_ERR(hwmon))
- 		return PTR_ERR(hwmon);
- 
-+	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
-+						 &sun4i_ts_tz_ops);
-+	if (IS_ERR(ts->tz))
-+		ts->tz = NULL;
-+
- 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
- 
- 	if (ts_attached) {
- 		error = input_register_device(ts->input);
- 		if (error) {
- 			writel(0, ts->base + TP_INT_FIFOC);
-+			thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
- 			return error;
- 		}
- 	}
-@@ -310,6 +355,8 @@ static int sun4i_ts_remove(struct platform_device *pdev)
- 	if (ts->input)
- 		input_unregister_device(ts->input);
- 
-+	thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
-+
- 	/* Deactivate all IRQs */
- 	writel(0, ts->base + TP_INT_FIFOC);
- 
 -- 
 2.1.4
