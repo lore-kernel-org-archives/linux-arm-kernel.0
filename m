@@ -1,36 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 Jan 2015 17:11:31 +0000
-Subject: [PATCH v2 2/4] Documentation: bindings: Add the regulator
- property to the sub-nodes AHCI bindings
-In-Reply-To: <CAGb2v674q4Cjp9qy9CbUXe2j5pT_ez98CKxXHC8u4Diap2TT1A@mail.gmail.com>
-References: <1420799989-10645-1-git-send-email-gregory.clement@free-electrons.com>
- <1420799989-10645-3-git-send-email-gregory.clement@free-electrons.com>
- <54AFF7E3.4070506@redhat.com> <54AFFFDC.7020307@free-electrons.com>
- <CAGb2v674q4Cjp9qy9CbUXe2j5pT_ez98CKxXHC8u4Diap2TT1A@mail.gmail.com>
-Message-ID: <20150109171131.GH2634@sirena.org.uk>
+From: ggdavisiv@gmail.com (George G. Davis)
+Date: Fri,  9 Jan 2015 12:12:28 -0500
+Subject: [PATCH] ARM: mm: Fix dma_contiguous_reserve comment
+Message-ID: <1420823548-37979-1-git-send-email-george_davis@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 12:29:32AM +0800, Chen-Yu Tsai wrote:
+DMA contiguous allocations have been able to use highmem since commit
+"95b0e65 ARM: mm: don't limit default CMA region only to low memory"
+but a comment still notes the earlier "low memory" limitation.  Update
+the comment to remove the low memory limitation and fix the
+s/contigouos/contiguous/ typo while we're at it.
 
-> Since the AHCI library code already supports the generic phy subsystem,
-> with one phy possible for each port node, you could possibly add a
-> generic phy that just takes a regulator, and hook it up that way.
+Signed-off-by: George G. Davis <george_davis@mentor.com>
+---
+ arch/arm/mm/init.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-> I don't know if the extra layer of indirection is good or not.
-> Just offering an alternative.
-
-Or if the supply is for the device at the other end of the link (which
-is what it sounded like) then use that.  This just sounds like the same
-problem we have for all the enumerable buses in embedded systems where
-we need to be able to understand that the device exists prior to it
-being fully ready to appear in the system.  Having the link/slot be a
-device in Linux does indeed seem to be a common way people think about
-doing this, it sounds like for this one it might be the most direct.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/e840d768/attachment.sig>
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 98ad9c7..d538dc7 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -319,10 +319,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
+ 
+ 	early_init_fdt_scan_reserved_mem();
+ 
+-	/*
+-	 * reserve memory for DMA contigouos allocations,
+-	 * must come from DMA area inside low memory
+-	 */
++	/* reserve memory for DMA contiguous allocations */
+ 	dma_contiguous_reserve(arm_dma_limit);
+ 
+ 	arm_memblock_steal_permitted = false;
+-- 
+1.9.3
