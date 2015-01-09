@@ -1,52 +1,62 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  9 Jan 2015 18:21:37 +0100
-Subject: [RFC 07/11] i2c: axxia: make use of the new infrastructure for quirks
+Date: Fri,  9 Jan 2015 18:21:35 +0100
+Subject: [RFC 05/11] i2c: qup: make use of the new infrastructure for quirks
 In-Reply-To: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
 References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1420824103-24169-8-git-send-email-wsa@the-dreams.de>
+Message-ID: <1420824103-24169-6-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/i2c/busses/i2c-axxia.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/i2c/busses/i2c-qup.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-axxia.c b/drivers/i2c/busses/i2c-axxia.c
-index 768a598d8d03..488c5d3bf9db 100644
---- a/drivers/i2c/busses/i2c-axxia.c
-+++ b/drivers/i2c/busses/i2c-axxia.c
-@@ -336,11 +336,6 @@ static int axxia_i2c_xfer_msg(struct axxia_i2c_dev *idev, struct i2c_msg *msg)
- 	u32 addr_1, addr_2;
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 4dad23bdffbe..fdcbdab808e9 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -412,17 +412,6 @@ static int qup_i2c_read_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 	unsigned long left;
  	int ret;
  
--	if (msg->len > 255) {
--		dev_warn(idev->dev, "unsupported length %u\n", msg->len);
+-	/*
+-	 * The QUP block will issue a NACK and STOP on the bus when reaching
+-	 * the end of the read, the length of the read is specified as one byte
+-	 * which limits the possible read to 256 (QUP_READ_LIMIT) bytes.
+-	 */
+-	if (msg->len > QUP_READ_LIMIT) {
+-		dev_err(qup->dev, "HW not capable of reads over %d bytes\n",
+-			QUP_READ_LIMIT);
 -		return -EINVAL;
 -	}
 -
- 	idev->msg = msg;
- 	idev->msg_xfrd = 0;
- 	idev->msg_err = 0;
-@@ -454,6 +449,11 @@ static const struct i2c_algorithm axxia_i2c_algo = {
- 	.functionality = axxia_i2c_func,
+ 	qup->msg = msg;
+ 	qup->pos  = 0;
+ 
+@@ -534,6 +523,15 @@ static const struct i2c_algorithm qup_i2c_algo = {
+ 	.functionality	= qup_i2c_func,
  };
  
-+static struct i2c_adapter_quirks axxia_i2c_quirks = {
-+	.max_read_len = 255,
-+	.max_write_len = 255,
++/*
++ * The QUP block will issue a NACK and STOP on the bus when reaching
++ * the end of the read, the length of the read is specified as one byte
++ * which limits the possible read to 256 (QUP_READ_LIMIT) bytes.
++ */
++static struct i2c_adapter_quirks qup_i2c_quirks = {
++	.max_read_len = QUP_READ_LIMIT,
 +};
 +
- static int axxia_i2c_probe(struct platform_device *pdev)
+ static void qup_i2c_enable_clocks(struct qup_i2c_dev *qup)
  {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -511,6 +511,7 @@ static int axxia_i2c_probe(struct platform_device *pdev)
- 	strlcpy(idev->adapter.name, pdev->name, sizeof(idev->adapter.name));
- 	idev->adapter.owner = THIS_MODULE;
- 	idev->adapter.algo = &axxia_i2c_algo;
-+	idev->adapter.quirks = &axxia_i2c_quirks;
- 	idev->adapter.dev.parent = &pdev->dev;
- 	idev->adapter.dev.of_node = pdev->dev.of_node;
+ 	clk_prepare_enable(qup->clk);
+@@ -670,6 +668,7 @@ static int qup_i2c_probe(struct platform_device *pdev)
  
+ 	i2c_set_adapdata(&qup->adap, qup);
+ 	qup->adap.algo = &qup_i2c_algo;
++	qup->adap.quirks = &qup_i2c_quirks;
+ 	qup->adap.dev.parent = qup->dev;
+ 	qup->adap.dev.of_node = pdev->dev.of_node;
+ 	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
 -- 
 2.1.3
