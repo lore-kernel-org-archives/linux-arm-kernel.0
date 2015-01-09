@@ -1,89 +1,44 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 9 Jan 2015 13:38:04 +0800
-Subject: [RFC] mmc:change mmc_init workqueue into a freezable workqueue
-In-Reply-To: <20150108114225.GR12302@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103EDAF89E192@CNBJMBX05.corpusers.net>
- <20150108114225.GR12302@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E197@CNBJMBX05.corpusers.net>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 9 Jan 2015 14:24:44 +0800
+Subject: [RFC] usb: dwc3: add DWC3_SKIP_USB3PHY and DWC3_SKIP_USB2_PHY
+ quirks
+In-Reply-To: <20150108170815.GJ31926@saruman>
+References: <20141208213551.38860f81@xhacker> <20150108170815.GJ31926@saruman>
+Message-ID: <20150109142444.49e0ff2f@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, January 08, 2015 7:42 PM
-> To: Wang, Yalin
-> Cc: 'chris at printf.net'; 'ulf.hansson at linaro.org'; 'tim.kryger at gmail.com';
-> 'tgih.jun at samsung.com'; 'johan.rudholm at axis.com'; 'linux-
-> mmc at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: Re: [RFC] mmc:change mmc_init workqueue into a freezable workqueue
-> 
-> On Thu, Jan 08, 2015 at 06:06:32PM +0800, Wang, Yalin wrote:
-> > This patch fix the mmc driver suspend/resume conflict problems, mmc
-> > workqueue will queue mmc_rescan(), and it will call some
-> > pm_runtime_* functions, this will conflict with suspend path
-> > sometimes, and will result in some strange behavior:
-> >
-> > Suspend path:
-> > 	-000 |context_switch(inline)
-> > 	-000 |__schedule()
-> > 	-001 |schedule_preempt_disabled()
-> > 	-002 |spin_lock(inline)
-> > 	-002 |__mutex_lock_common(inline)
-> > 	-002 |__mutex_lock_slowpath(lock_count = 0xEDCD0F48)
-> > 	-003 |__mutex_fastpath_lock(inline)
-> > 	-003 |mutex_lock(lock = 0xEDCD0F48)
-> > 	-004 |sdhci_do_set_ios(host = 0xEDCD0CC0, ios = 0xEDCD0A70)
-> > 	-005 |sdhci_set_ios(?, ios = 0xEDCD0A70)
-> > 	-006 |mmc_set_ios(host = 0xEDCD0800)
-> > 	-007 |mmc_delay(inline)
-> > 	-007 |mmc_power_off(host = 0xEDCD0800)
-> > 	-008 |mmc_suspend_host(inline)
-> > 	-008 |mmc_suspend_host(host = 0xEDCD0800)
-> > 	-009 |mmc_host_suspend(dev = 0xEDCD0808)
-> > 	-010 |dpm_run_callback(cb = 0xC0627A88, dev = 0xEDCD0808, state =
-> (event = 2), info = 0xC0B6EF9B)
-> > 	-011 |__device_suspend(dev = 0xEDCD0808, state = (event = 2), ?)
-> > 	-012 |device_suspend(inline)
-> 
-> Suspend can't complete until device_suspend() returns.  Hence,
-> mmc_power_off() must finish.
-> 
-> > mmc_rescan() resume path:
-> > 	 -000 |context_switch(inline)
-> > 	 -000 |__schedule()
-> > 	 -001 |do_undefinstr(regs = 0xD12242F0)
-> > 	 -002 |__und_svc(asm)
-> > 	  --> |exception
-> 
-> I assume this is what you mean by "strange behaviour" ?  If so, please give
-> the full oops.  Have you fully diagnosed the failure?
-> 
-> > most mmc power callback function don't check this special case, and
-> > will cause problems, make sure the workqueue is stopped during suspend
-> > is more safe.
-> 
-> I think there's a bad side effect of this: if you have swap on a SD card,
-> and you ask the system to hibernate, you don't want this thread to freeze.
-> 
-> What you do need to do is to ensure that new requests can't be processed
-> while the host is suspended.
-> 
-> A hibernate works (approximately) as:
-> 
-> - freeze all tasks
-> - push as much out to swap as possible
-> - suspend devices
-> - create system snapshot
-> - resume devices
-> - write system snapshot to swap
-> - power down
-> 
-> If the MMC thread is frozen, and you have swap on SD, then it can't write
-> the image to swap.
-> 
-I see your concerns, thanks for your comment.
-I will think about some other solutions for this problems.
+Hi Felipe,
 
+On Thu, 8 Jan 2015 09:08:15 -0800
+Felipe Balbi <balbi@ti.com> wrote:
 
-Thank you
+> Hi,
+> 
+> On Mon, Dec 08, 2014 at 09:35:51PM +0800, Jisheng Zhang wrote:
+> > On platforms which has native usb hosts/phys and pci-dwc3 controller,
+> > the dwc3 core may get the wrong usb2_phy and usb3_phy by
+> > devm_usb_get_phy(). It depends on which usb phy driver is initialized
+> > firstly, the usb_phy_generic or the native/real usb phy driver.
+> 
+> why are you initializing generic PHY if you have a real PHY ?
+
+we have two kind of usb hosts: the native usb hosts which can be probed via. DT
+and the usb hosts from pci-dwc3. The former has real phy and the latter doesn't.
+
+> 
+> > Before all old USB phy library usage removed, the solution I can have
+> > is to add DWC3_SKIP_USB3PHY and DWC3_SKIP_USB2_PHY quirks and set them
+> > in dwc3-pci.
+> > Could such modification can be accepted? If not, could you please give
+> > alternative suggestions?
+> 
+> we will not accept a quirk to skip PHYs, sorry. A better way of handling
+> this needs to be found.
+> 
+
+OK, Got your points. It seems we need to deprecate old usb phy library usage
+early.
+
+Thanks,
+Jisheng
