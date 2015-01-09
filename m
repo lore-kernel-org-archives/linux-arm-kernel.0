@@ -1,38 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 9 Jan 2015 12:06:36 +0100
-Subject: [PATCHv2 8/8] arm: dts: tegra: update isl29028 compatible string
- to use isil vendor prefix
-In-Reply-To: <8cfd0ac11713262036dca415e59e56508fb07c3c.1418763328.git.arno@natisbad.org>
-References: <cover.1418763328.git.arno@natisbad.org>
- <8cfd0ac11713262036dca415e59e56508fb07c3c.1418763328.git.arno@natisbad.org>
-Message-ID: <20150109110635.GA16465@ulmo>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jan 2015 11:10:48 +0000
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
+References: <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+ <20141114095812.GG4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
+ <20150108184059.GZ12302@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
+Message-ID: <20150109111048.GE12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 10:21:16PM +0100, Arnaud Ebalard wrote:
+On Fri, Jan 09, 2015 at 10:16:32AM +0800, Wang, Yalin wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Friday, January 09, 2015 2:41 AM
+> > To: Wang, Yalin
+> > Cc: 'Will Deacon'; 'Ard Biesheuvel'; 'linux-kernel at vger.kernel.org';
+> > 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
+> > kernel at lists.infradead.org'
+> > Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+> > 
+> > The root cause is that the kernel being built is supposed to support both
+> > ARMv7 and ARMv6K CPUs.  However, "rbit" is only available on
+> > ARMv6T2 (thumb2) and ARMv7, and not plain ARMv6 or ARMv6K CPUs.
+> > 
+> In the patch that you applied:
+> 8205/1 	add bitrev.h file to support rbit instruction
 > 
-> "isil" and "isl" prefixes are used at various locations inside the kernel
-> to reference Intersil corporation. This patch is part of a series fixing
-> those locations were "isl" is used in compatible strings to use the now
-> expected "isil" prefix instead (NASDAQ symbol for Intersil and most used
-> version).
+> I have add :
+> +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
 > 
-> Note: isl29028 is an I2C device so the patch does not in fact currently
-> depend on the introduction of "isil"-based compatible string in isl29028
-> driver because I2C core does not check the prefix yet.
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  arch/arm/boot/dts/tegra30-cardhu.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> If you build kernel support ARMv6K, should CONFIG_CPU_V6=y, isn't it ?
+> Then will not build hardware rbit instruction, isn't it ?
 
-Applied to the for-3.20/dt branch, thanks.
+The config has:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/78b6189e/attachment.sig>
+CONFIG_CPU_PJ4=y
+# CONFIG_CPU_V6 is not set
+CONFIG_CPU_V6K=y
+CONFIG_CPU_V7=y
+CONFIG_CPU_32v6=y
+CONFIG_CPU_32v6K=y
+CONFIG_CPU_32v7=y
+
+And no, the CONFIG_CPU_V* flags refer to the CPUs.  The
+CONFIG_CPU_32v* symbols refer to the CPU architectures.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
