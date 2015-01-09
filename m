@@ -1,189 +1,233 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  9 Jan 2015 10:51:28 +0100
-Subject: [PATCH v2 2/8] mfd: Add atmel-st driver
+Date: Fri,  9 Jan 2015 10:51:33 +0100
+Subject: [PATCH v2 7/8] clocksource: atmel-st: use syscon/regmap
 In-Reply-To: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1420797094-9444-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1420797094-9444-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Atmel System Timer IP available on the at91rm9200 exposes both a timer and a
-watchdog.
+The register range from the system timer is also used by the watchdog driver.
+Use a regmap to handle concurrent accesses.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/mfd/Kconfig          |  7 ++++
- drivers/mfd/Makefile         |  1 +
- drivers/mfd/atmel-st.c       | 76 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/atmel-st.h | 47 +++++++++++++++++++++++++++
- 4 files changed, 131 insertions(+)
- create mode 100644 drivers/mfd/atmel-st.c
- create mode 100644 include/linux/mfd/atmel-st.h
+ drivers/clocksource/timer-atmel-st.c | 103 +++++++++++++----------------------
+ 1 file changed, 39 insertions(+), 64 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 2e6b7311fabc..3c5185c0cf06 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -78,6 +78,13 @@ config MFD_BCM590XX
- 	help
- 	  Support for the BCM590xx PMUs from Broadcom
- 
-+config MFD_ATMEL_ST
-+	bool "Atmel System Timer"
-+	select MFD_CORE
-+	default SOC_AT91RM9200
-+	help
-+	  If you say Y here you get support for the Atmel System Timer.
-+
- config MFD_AXP20X
- 	bool "X-Powers AXP20X"
- 	select MFD_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 53467e211381..1ecd416f25c5 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -104,6 +104,7 @@ obj-$(CONFIG_PMIC_DA9052)	+= da9052-core.o
- obj-$(CONFIG_MFD_DA9052_SPI)	+= da9052-spi.o
- obj-$(CONFIG_MFD_DA9052_I2C)	+= da9052-i2c.o
- obj-$(CONFIG_MFD_AXP20X)	+= axp20x.o
-+obj-$(CONFIG_MFD_ATMEL_ST)	+= atmel-st.o
- 
- obj-$(CONFIG_MFD_LP3943)	+= lp3943.o
- obj-$(CONFIG_MFD_LP8788)	+= lp8788.o lp8788-irq.o
-diff --git a/drivers/mfd/atmel-st.c b/drivers/mfd/atmel-st.c
-new file mode 100644
-index 000000000000..5af83cbfe404
---- /dev/null
-+++ b/drivers/mfd/atmel-st.c
-@@ -0,0 +1,76 @@
-+/*
-+ * Copyright (C) 2014 Free Electrons
-+ * Copyright (C) 2014 Atmel
-+ *
-+ * Author: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
+diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
+index ed0267f1c892..557389306be5 100644
+--- a/drivers/clocksource/timer-atmel-st.c
++++ b/drivers/clocksource/timer-atmel-st.c
+@@ -24,20 +24,20 @@
+ #include <linux/irq.h>
+ #include <linux/clockchips.h>
+ #include <linux/export.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
 +#include <linux/mfd/atmel-st.h>
-+#include <linux/mfd/core.h>
 +#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
+ #include <linux/of_irq.h>
 +#include <linux/regmap.h>
+ 
+ #include <asm/mach/time.h>
+ #include <asm/system_misc.h>
+ 
+-#include <mach/at91_st.h>
+-#include <mach/hardware.h>
+-
+ static unsigned long last_crtr;
+ static u32 irqmask;
+ static struct clock_event_device clkevt;
++static struct regmap *regmap_st;
+ 
++#define AT91_SLOW_CLOCK		32768 /* DT compatibility */
+ #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
+ 
+ /*
+@@ -47,11 +47,11 @@ static struct clock_event_device clkevt;
+  */
+ static inline unsigned long read_CRTR(void)
+ {
+-	unsigned long x1, x2;
++	unsigned int x1, x2;
+ 
+-	x1 = at91_st_read(AT91_ST_CRTR);
++	regmap_read(regmap_st, AT91_ST_CRTR, &x1);
+ 	do {
+-		x2 = at91_st_read(AT91_ST_CRTR);
++		regmap_read(regmap_st, AT91_ST_CRTR, &x2);
+ 		if (x1 == x2)
+ 			break;
+ 		x1 = x2;
+@@ -64,7 +64,10 @@ static inline unsigned long read_CRTR(void)
+  */
+ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+ {
+-	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
++	u32 sr;
 +
-+static const struct mfd_cell atmel_st_cells[] = {
-+	{
-+		.name = "atmel_st_timer",
-+	},
-+	{
-+		.name = "atmel_st_watchdog",
-+	},
-+};
++	regmap_read(regmap_st, AT91_ST_SR, &sr);
++	sr &= irqmask;
+ 
+ 	/*
+ 	 * irqs should be disabled here, but as the irq is shared they are only
+@@ -97,7 +100,7 @@ static struct irqaction at91rm9200_timer_irq = {
+ 	.name		= "at91_tick",
+ 	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= at91rm9200_timer_interrupt,
+-	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
++	.irq		= 0,
+ };
+ 
+ static cycle_t read_clk32k(struct clocksource *cs)
+@@ -116,23 +119,25 @@ static struct clocksource clk32k = {
+ static void
+ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ {
++	unsigned int val;
 +
-+static int atmel_st_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct regmap *regmap_st;
+ 	/* Disable and flush pending timer interrupts */
+-	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
+-	at91_st_read(AT91_ST_SR);
++	regmap_write(regmap_st, AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
++	regmap_read(regmap_st, AT91_ST_SR, &val);
+ 
+ 	last_crtr = read_CRTR();
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		/* PIT for periodic irqs; fixed rate of 1/HZ */
+ 		irqmask = AT91_ST_PITS;
+-		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
++		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		/* ALM for oneshot irqs, set by next_event()
+ 		 * before 32 seconds have passed
+ 		 */
+ 		irqmask = AT91_ST_ALMS;
+-		at91_st_write(AT91_ST_RTAR, last_crtr);
++		regmap_write(regmap_st, AT91_ST_RTAR, last_crtr);
+ 		break;
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	case CLOCK_EVT_MODE_UNUSED:
+@@ -140,7 +145,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ 		irqmask = 0;
+ 		break;
+ 	}
+-	at91_st_write(AT91_ST_IER, irqmask);
++	regmap_write(regmap_st, AT91_ST_IER, irqmask);
+ }
+ 
+ static int
+@@ -148,6 +153,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+ {
+ 	u32		alm;
+ 	int		status = 0;
++	unsigned int	val;
+ 
+ 	BUG_ON(delta < 2);
+ 
+@@ -163,12 +169,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+ 	alm = read_CRTR();
+ 
+ 	/* Cancel any pending alarm; flush any pending IRQ */
+-	at91_st_write(AT91_ST_RTAR, alm);
+-	at91_st_read(AT91_ST_SR);
++	regmap_write(regmap_st, AT91_ST_RTAR, alm);
++	regmap_read(regmap_st, AT91_ST_SR, &val);
+ 
+ 	/* Schedule alarm by writing RTAR. */
+ 	alm += delta;
+-	at91_st_write(AT91_ST_RTAR, alm);
++	regmap_write(regmap_st, AT91_ST_RTAR, alm);
+ 
+ 	return status;
+ }
+@@ -186,47 +192,8 @@ static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
+ 	/*
+ 	 * Perform a hardware reset with the use of the Watchdog timer.
+ 	 */
+-	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
+-	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
+-}
+-
+-void __iomem *at91_st_base;
+-EXPORT_SYMBOL_GPL(at91_st_base);
+-
+-static struct of_device_id at91rm9200_st_timer_ids[] = {
+-	{ .compatible = "atmel,at91rm9200-st" },
+-	{ /* sentinel */ }
+-};
+-
+-static int __init of_at91rm9200_st_init(void)
+-{
+-	struct device_node *np;
+-	int ret;
+-
+-	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
+-	if (!np)
+-		goto err;
+-
+-	at91_st_base = of_iomap(np, 0);
+-	if (!at91_st_base)
+-		goto node_err;
+-
+-	/* Get the interrupts property */
+-	ret = irq_of_parse_and_map(np, 0);
+-	if (!ret)
+-		goto ioremap_err;
+-	at91rm9200_timer_irq.irq = ret;
+-
+-	of_node_put(np);
+-
+-	return 0;
+-
+-ioremap_err:
+-	iounmap(at91_st_base);
+-node_err:
+-	of_node_put(np);
+-err:
+-	return -EINVAL;
++	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
++	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+ }
+ 
+ /*
+@@ -234,13 +201,21 @@ err:
+  */
+ static void __init atmel_st_timer_init(struct device_node *node)
+ {
+-	/* For device tree enabled device: initialize here */
+-	of_at91rm9200_st_init();
++	unsigned int val;
 +
-+	regmap_st = syscon_node_to_regmap(dev->of_node);
++	regmap_st = syscon_node_to_regmap(node);
 +	if (IS_ERR(regmap_st))
-+		return PTR_ERR(regmap_st);
-+	dev_set_drvdata(dev, regmap_st);
++		panic(pr_fmt("Unable to get regmap\n"));
+ 
+ 	/* Disable all timer interrupts, and clear any pending ones */
+-	at91_st_write(AT91_ST_IDR,
++	regmap_write(regmap_st, AT91_ST_IDR,
+ 		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
+-	at91_st_read(AT91_ST_SR);
++	regmap_read(regmap_st, AT91_ST_SR, &val);
 +
-+	return mfd_add_devices(dev, -1, atmel_st_cells,
-+			       ARRAY_SIZE(atmel_st_cells),
-+			       NULL, 0, NULL);
-+}
-+
-+static int atmel_st_remove(struct platform_device *pdev)
-+{
-+	mfd_remove_devices(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id atmel_st_match[] = {
-+	{ .compatible = "atmel,at91rm9200-st" },
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver atmel_st_driver = {
-+	.probe = atmel_st_probe,
-+	.remove = atmel_st_remove,
-+	.driver = {
-+		.name = "atmel-system-timer",
-+		.of_match_table = atmel_st_match,
-+	},
-+};
-+module_platform_driver(atmel_st_driver);
-+
-+MODULE_ALIAS("platform:atmel-st");
-+MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
-+MODULE_DESCRIPTION("Atmel ST (System Timer) driver");
-+MODULE_LICENSE("GPL");
-diff --git a/include/linux/mfd/atmel-st.h b/include/linux/mfd/atmel-st.h
-new file mode 100644
-index 000000000000..88c6cf8eeb2b
---- /dev/null
-+++ b/include/linux/mfd/atmel-st.h
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2005 Ivan Kokshaysky
-+ * Copyright (C) SAN People
-+ *
-+ * System Timer (ST) - System peripherals registers.
-+ * Based on AT91RM9200 datasheet revision E.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __LINUX_MFD_ATMEL_ST_H
-+#define __LINUX_MFD_ATMEL_ST_H
-+
-+#define	AT91_ST_CR		0x00			/* Control Register */
-+#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
-+
-+#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
-+#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
-+
-+#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
-+#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
-+#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
-+#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
-+
-+#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
-+#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
-+
-+#define	AT91_ST_SR		0x10			/* Status Register */
-+#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
-+#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
-+#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
-+#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
-+
-+#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
-+#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
-+#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
-+
-+#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
-+#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
-+
-+#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
-+#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
-+
-+#endif /* __LINUX_MFD_ATMEL_ST_H */
++	/* Get the interrupts property */
++	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
++	if (!at91rm9200_timer_irq.irq)
++		panic(pr_fmt("Unable to get IRQ from DT\n"));
+ 
+ 	/* Make IRQs happen for the system timer */
+ 	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
+@@ -249,7 +224,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
+ 	 * directly for the clocksource and all clockevents, after adjusting
+ 	 * its prescaler from the 1 Hz default.
+ 	 */
+-	at91_st_write(AT91_ST_RTMR, 1);
++	regmap_write(regmap_st, AT91_ST_RTMR, 1);
+ 
+ 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
+ 	clkevt.cpumask = cpumask_of(0);
 -- 
 2.1.0
