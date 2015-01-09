@@ -1,38 +1,69 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 9 Jan 2015 16:42:21 +0100
-Subject: at91: dt: dma usage
-In-Reply-To: <2831487.RTCyiHWGfY@wuerfel>
-References: <e2dd545ccf0051e1089b1a313205547c44df5c12.1413190828.git.jiri.prchal@aksignal.cz>
- <54477097.1050909@aksignal.cz> <20141217201622.GE4885@piout.net>
- <2831487.RTCyiHWGfY@wuerfel>
-Message-ID: <20150109154220.GC3625@ldesroches-Latitude-E6320>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Jan 2015 15:41:40 +0000
+Subject: [PATCH 1/8] arm64/efi: use UEFI memory map unconditionally if
+ available
+In-Reply-To: <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150109154140.GF11258@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 10:49:55PM +0100, Arnd Bergmann wrote:
-> On Wednesday 17 December 2014 21:16:22 Alexandre Belloni wrote:
-> > On 22/10/2014 at 10:53:43 +0200, Ji?? Prchal wrote :
-> > > in fact that in at91sam chips has a lot of peripherals but only 2*8 dma channels
-> > > and as my patch in last week "at91: sam9x5 dt: add usart dma definitions to dt"
-> > > adds only dma definitions, not make to use them, leave it on board definition,
-> > > shouldn't do the same all other peripherals definitions?
-> > > I think that I2C, SPI are not as necessary as USART, but thous are always "on".
-> > 
-> > Not much discussion happened on that and I have the feeling this is
-> > something we have to sort out. Until the dma driver are able to allocate
-> > channels dynamically, it is true that this may be something we shouldn't
-> > enable in the dtsi and let people activate dma in the board dts.
-
-People can override dma-names to disable dma use for a device.
-
+On Mon, Dec 22, 2014 at 07:08:35PM +0000, Ard Biesheuvel wrote:
+> On systems that boot via UEFI, all memory nodes are deleted from the
+> device tree, and instead, the size and location of system RAM is derived
+> from the UEFI memory map. This is handled by reserve_regions, which not only
+> reserves parts of memory that UEFI declares as reserved, but also installs
+> the memblocks that cover the remaining usable memory.
 > 
-> Could you use the drivers/dma/virt-dma.c infrastructure in the driver
-> to do this? Are you already planning to use it?
+> Currently, reserve_regions() is only called if uefi_init() succeeds.
+> However, it does not actually depend on anything that uefi_init() does,
+> and not calling reserve_regions() results in a broken boot, so it is
+> better to just call it unconditionally.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
 
-Yes we could use virtual channels. We planned to use it for xdmac but
-there is more channels so it's not a high priority. Concerning hdmac, it
-will be useful due to the low number of channels but, at the moment,
-it's not planned to switch to virtual channels.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
+Will
 
-Ludovic
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index d7d2e818c856..d2f483a7cffe 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -208,8 +208,7 @@ void __init efi_init(void)
+>  	memmap.desc_size = params.desc_size;
+>  	memmap.desc_version = params.desc_ver;
+>  
+> -	if (uefi_init() < 0)
+> -		return;
+> +	WARN_ON(uefi_init() < 0);
+>  
+>  	reserve_regions();
+>  }
+> @@ -218,15 +217,13 @@ static int __init arm64_enter_virtual_mode(void)
+>  {
+>  	u64 mapsize;
+>  
+> -	if (!efi_enabled(EFI_BOOT)) {
+> -		pr_info("EFI services will not be available.\n");
+> -		return -1;
+> -	}
+> +	if (!efi_enabled(EFI_MEMMAP))
+> +		return 0;
+>  
+>  	mapsize = memmap.map_end - memmap.map;
+>  	early_memunmap(memmap.map, mapsize);
+>  
+> -	if (efi_runtime_disabled()) {
+> +	if (!efi_enabled(EFI_BOOT) || efi_runtime_disabled()) {
+>  		pr_info("EFI runtime services will be disabled.\n");
+>  		return -1;
+>  	}
+> -- 
+> 1.8.3.2
+> 
+> 
