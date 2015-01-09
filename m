@@ -1,30 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jan 2015 10:53:49 +0100
-Subject: [PATCH 1/3] gpio: sx150x: move to irqdomain framework for sx150x
- driver
-In-Reply-To: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
-References: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdaYb3Fnbm5To0Y0tJe1xO-Jb0MdkmR9rsqVEWFEOXviFw@mail.gmail.com>
+From: pi-cheng.chen@linaro.org (pi-cheng.chen)
+Date: Fri,  9 Jan 2015 17:54:50 +0800
+Subject: [PATCH 1/2] cpufreq-dt: check CPU clock/power domain during
+ initializing
+In-Reply-To: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <1420797291-15972-2-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 4, 2014 at 1:12 PM, Barry Song <21cnbao@gmail.com> wrote:
+Currently the DT based cpufreq driver is missing some way to check which
+CPUs share clocks. In the 1st patch, CPU clock/power domain information is
+added to the platform_data of cpufreq-dt so that cpufreq-dt driver could
+check which CPUs share clock/power.
 
-> From: Wei Chen <Wei.Chen@csr.com>
->
-> The sx150x gpio driver used a loop to set liner irq map for gpio pins.
-> Now we use the irq domain to rebuild this irq mappig and make sure the
-> codes are still compatible to old users.
->
-> this patch also adds IRQF_ONESHOT flag to fix the IRQ flooding issues.
->
-> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+---
+ drivers/cpufreq/cpufreq-dt.c | 15 +++++++++++++++
+ include/linux/cpufreq-dt.h   |  6 ++++++
+ 2 files changed, 21 insertions(+)
 
-Excellent, patch applied.
-
-I added select GPIOLIB_IRQCHIP to the Kconfig though, to
-make sure we have the proper library functions.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index fde97d6..ff8c266 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -296,6 +296,21 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	pd = cpufreq_get_driver_data();
+ 	if (!pd || !pd->independent_clocks)
+ 		cpumask_setall(policy->cpus);
++	else if (pd && !list_empty(&pd->domain_list)) {
++		struct list_head *domain_node;
++
++		list_for_each(domain_node, &pd->domain_list) {
++			struct cpufreq_cpu_domain *domain;
++
++			domain = container_of(domain_node,
++					      struct cpufreq_cpu_domain, node);
++			if (!cpumask_test_cpu(policy->cpu, &domain->cpus))
++				continue;
++
++			cpumask_copy(policy->cpus, &domain->cpus);
++			break;
++		}
++	}
+ 
+ 	of_node_put(np);
+ 
+diff --git a/include/linux/cpufreq-dt.h b/include/linux/cpufreq-dt.h
+index 0414009..92bffd3 100644
+--- a/include/linux/cpufreq-dt.h
++++ b/include/linux/cpufreq-dt.h
+@@ -10,6 +10,11 @@
+ #ifndef __CPUFREQ_DT_H__
+ #define __CPUFREQ_DT_H__
+ 
++struct cpufreq_cpu_domain {
++	struct list_head node;
++	cpumask_t cpus;
++};
++
+ struct cpufreq_dt_platform_data {
+ 	/*
+ 	 * True when each CPU has its own clock to control its
+@@ -17,6 +22,7 @@ struct cpufreq_dt_platform_data {
+ 	 * clock.
+ 	 */
+ 	bool independent_clocks;
++	struct list_head domain_list;
+ };
+ 
+ #endif /* __CPUFREQ_DT_H__ */
+-- 
+1.9.1
