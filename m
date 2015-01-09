@@ -1,57 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jan 2015 11:10:48 +0000
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
-References: <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
- <20141114095812.GG4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
- <20150108184059.GZ12302@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
-Message-ID: <20150109111048.GE12302@n2100.arm.linux.org.uk>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Fri, 9 Jan 2015 11:16:42 +0000
+Subject: [alsa-devel] [PATCH] ASoC: wm8904: fix runtime warning
+In-Reply-To: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
+References: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20150109111642.GU14516@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 10:16:32AM +0800, Wang, Yalin wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Friday, January 09, 2015 2:41 AM
-> > To: Wang, Yalin
-> > Cc: 'Will Deacon'; 'Ard Biesheuvel'; 'linux-kernel at vger.kernel.org';
-> > 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
-> > kernel at lists.infradead.org'
-> > Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-> > 
-> > The root cause is that the kernel being built is supposed to support both
-> > ARMv7 and ARMv6K CPUs.  However, "rbit" is only available on
-> > ARMv6T2 (thumb2) and ARMv7, and not plain ARMv6 or ARMv6K CPUs.
-> > 
-> In the patch that you applied:
-> 8205/1 	add bitrev.h file to support rbit instruction
+On Fri, Jan 09, 2015 at 04:53:40PM +0800, Bo Shen wrote:
+> As the commit 5fe5b76 (ASoC: dapm: Do not pretend to support
+> controls for non mixer/mux widgets) remove the fake control.
 > 
-> I have add :
-> +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
+> Then, the wm8904 throw out the following warning at runtime.
+> --->8---
+> wm8904 1-001a: Control not supported for path ADCL -> [Left] -> AIFOUTL
+> wm8904 1-001a: ASoC: no dapm match for ADCL --> Left --> AIFOUTL
+> wm8904 1-001a: ASoC: Failed to add route ADCL -> Left -> AIFOUTL
+> wm8904 1-001a: Control not supported for path ADCR -> [Right] -> AIFOUTL
+> wm8904 1-001a: ASoC: no dapm match for ADCR --> Right --> AIFOUTL
+> wm8904 1-001a: ASoC: Failed to add route ADCR -> Right -> AIFOUTL
+> wm8904 1-001a: Control not supported for path ADCL -> [Left] -> AIFOUTR
+> wm8904 1-001a: ASoC: no dapm match for ADCL --> Left --> AIFOUTR
+> wm8904 1-001a: ASoC: Failed to add route ADCL -> Left -> AIFOUTR
+> wm8904 1-001a: Control not supported for path ADCR -> [Right] -> AIFOUTR
+> wm8904 1-001a: ASoC: no dapm match for ADCR --> Right --> AIFOUTR
+> wm8904 1-001a: ASoC: Failed to add route ADCR -> Right -> AIFOUTR
+> wm8904 1-001a: Control not supported for path AIFINR -> [Right] -> DACL
+> wm8904 1-001a: ASoC: no dapm match for AIFINR --> Right --> DACL
+> wm8904 1-001a: ASoC: Failed to add route AIFINR -> Right -> DACL
+> wm8904 1-001a: Control not supported for path AIFINL -> [Left] -> DACL
+> wm8904 1-001a: ASoC: no dapm match for AIFINL --> Left --> DACL
+> wm8904 1-001a: ASoC: Failed to add route AIFINL -> Left -> DACL
+> wm8904 1-001a: Control not supported for path AIFINR -> [Right] -> DACR
+> wm8904 1-001a: ASoC: no dapm match for AIFINR --> Right --> DACR
+> wm8904 1-001a: ASoC: Failed to add route AIFINR -> Right -> DACR
+> wm8904 1-001a: Control not supported for path AIFINL -> [Left] -> DACR
+> wm8904 1-001a: ASoC: no dapm match for AIFINL --> Left --> DACR
+> wm8904 1-001a: ASoC: Failed to add route AIFINL -> Left -> DACR
+> ---8<---
 > 
-> If you build kernel support ARMv6K, should CONFIG_CPU_V6=y, isn't it ?
-> Then will not build hardware rbit instruction, isn't it ?
+> This patch is used to remove these warning.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+> 
+>  sound/soc/codecs/wm8904.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
+> index 4d2d2b1..38582d7 100644
+> --- a/sound/soc/codecs/wm8904.c
+> +++ b/sound/soc/codecs/wm8904.c
+> @@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route adc_intercon[] = {
+>  	{ "Right Capture PGA", NULL, "Right Capture Mux" },
+>  	{ "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
+>  
+> -	{ "AIFOUTL", "Left",  "ADCL" },
+> -	{ "AIFOUTL", "Right", "ADCR" },
+> -	{ "AIFOUTR", "Left",  "ADCL" },
+> -	{ "AIFOUTR", "Right", "ADCR" },
+> +	{ "AIFOUTL", NULL, "ADCL" },
+> +	{ "AIFOUTL", NULL, "ADCR" },
+> +	{ "AIFOUTR", NULL, "ADCL" },
+> +	{ "AIFOUTR", NULL, "ADCR" },
 
-The config has:
+Is this the right fix here? I am not super familiar with the
+driver but it appears to contain an "AIFOUTL Mux" control which
+is not connected to anything. Looks like maybe this is a mistake
+the mux is indeded to be included in the path? Feels like we
+should either remove the control as well or hook it into the
+path.
 
-CONFIG_CPU_PJ4=y
-# CONFIG_CPU_V6 is not set
-CONFIG_CPU_V6K=y
-CONFIG_CPU_V7=y
-CONFIG_CPU_32v6=y
-CONFIG_CPU_32v6K=y
-CONFIG_CPU_32v7=y
-
-And no, the CONFIG_CPU_V* flags refer to the CPUs.  The
-CONFIG_CPU_32v* symbols refer to the CPU architectures.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Charles
