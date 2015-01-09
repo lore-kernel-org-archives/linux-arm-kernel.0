@@ -1,108 +1,23 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 09 Jan 2015 09:34:46 -0800
-Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver if
- MCPM is unavailable
-In-Reply-To: <54AEEDDC.3070609@linaro.org> (Daniel Lezcano's message of "Thu,
- 08 Jan 2015 21:51:40 +0100")
-References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
- <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
- <54AE55CE.6040201@linaro.org> <54AE5C8F.9080600@arm.com>
- <54AE65EC.3050808@linaro.org> <20150108122958.GB32308@red-moon>
- <7hh9w1vwzr.fsf@deeprootsystems.com> <54AEEDDC.3070609@linaro.org>
-Message-ID: <7hoaq7vow9.fsf@deeprootsystems.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 09 Jan 2015 17:36:48 +0000
+Subject: [PATCH v2 1/3] dtb: xgene: fix: Backward compatibility with
+ older firmware
+In-Reply-To: <1420819166.21186.38.camel@citrix.com>
+References: <1415044796-5081-1-git-send-email-isubramanian@apm.com>
+ <1415044796-5081-2-git-send-email-isubramanian@apm.com>
+ <1420819166.21186.38.camel@citrix.com>
+Message-ID: <1420825008.21186.50.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+On Fri, 2015-01-09 at 15:59 +0000, Ian Campbell wrote:
+> I'm running mustang_sw_1.13.29-beta, using the mustang_tianocore_ubt.fd
+> method to launch from u-boot.
 
-> On 01/08/2015 09:27 PM, Kevin Hilman wrote:
->> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
->>
->>> On Thu, Jan 08, 2015 at 11:11:40AM +0000, Daniel Lezcano wrote:
->>>
->>> [...]
->>>
->>>>>> IMO, it would be better to be more strict with the mcpm
->>>>>> initialization and not let the system boot if something is wrong with
->>>>>> it which I believe is coming from the firmware and let the user to
->>>>>> figure out what is really happening by letting him to disable mcpm in
->>>>>> the kernel configuration (which in turn will disable cpuidle).
->>>>>
->>>>> Again I fully agree, but in this case I manually switched to legacy boot
->>>>> mode on TC2 and used same kernel with MCPM config enabled. Do you mean
->>>>> to say we should not support that even when developer understand the
->>>>> consequence of that ?
->>>>
->>>> Well, I see there are the exynos5410/5420/5422. For the 5422 on
->>>> chromebook2 MCPM works well, IIUC. But for the 5422 on odroid-xu3, MCPM
->>>> does not work, hence cpuidle neither because of the firmware.
->>>>
->>>> Silently disabling cpuidle because mcpm did not initialize will hide the
->>>> issue.
->>>
->>> No. MCPM *will* initialize, Sudeep's patch does not silently disable
->>> CPUidle.
->>> To put it differently MCPM will initialize if CCI is in the DT and it
->>> is "available", so unless defined differently in the dts mcpm will be
->>> available and CPUidle will be initialized (and break if there is an issue
->>> with the platform FW/HW).
->>>
->>> I agree the mechanism to define if MCPM is available can be improved
->>> but that's what it is at the moment.
->>>
->>> The problem here is to boot a platform with different boot methods
->>> and still have a single kernel image.
->>>
->>>> I understand your point about switching to legacy without recompiling
->>>> the kernel.
->>>>
->>>> I suggest we add a big fat WARN_ON when the mcpm initialization fails
->>>> with your patch.
->>>
->>> I think there are multiple facets we are tackling at once here and they
->>> should not be mixed.
->>>
->>> 1) We left static idle states there to cope with legacy DTBs that were
->>>     published before we introduced idle states bindings. If we want to
->>>     boot eg vexpress in legacy mode but single kernel image with MCPM on,
->>>     we could remove the idle states in DT and the problem would be
->>>     solved; we can't do that since we were forced to leave the static
->>>     idle tables. Overall I think this is not the way to fix the issue.
->>> 2) The idle driver should be initialized if there is an idle state entry
->>>     method, which in this case is MCPM. If I boot vexpress with MCPM
->>>     enabled but legacy boot method (ie spin table) with a single kernel image
->>>     I do not want to warn if the idle states entry method (MCPM) can't be
->>>     initialized (and I do not want to get a warning if the idle driver is
->>>     triggering a mcpm_cpu_suspend), so Sudeep's patch is valid and I am
->>>     against adding a:
->>>
->>>     if (WARN_ON(!mcpm_is_available())
->>>
->>> 3) Sudeep's patch is not hiding anything. If CCI is in DT, CCI is
->>>     probed so mcpm_is_available() == true. If the firmware is borked
->>>     the idle states will be entered and we will notice there is something
->>>     wrong
->>>
->>> So overall I think Sudeep's patch is sound. I also think we should
->>> improve the way we detect if MCPM is available, and again, I think the
->>> CPU operations on arm64 are a good example that we can and we should
->>> replicate.
->>
->> This patch disables CPUidle all together, but shouldn't it just disable
->> the states that rely on MCPM?  IOW, C1 should still work just fine since
->> it doesn't use MCPM, right?  So, rather than fail the init, it should
->> just drop any MCPM states (e.g. set ->state_count = 1)
->
-> Well, that means we will have a cpuidle driver with the WFI state only
-> which is the default idle function when there is no cpuidle driver (+
-> without the governor math).
+I realised shortly after that I had downloaded 1.14.14 too, but it
+behaves the same.
 
-Ah, OK.  Then it makes more sense to disable the driver all together.
+I rebuilt mustang_tianocore_ubt.fd with the first hunk of this patch and
+things now work.
 
-Feel free to add
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
-
-Thanks,
-
-Kevin
+Ian.
