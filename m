@@ -1,76 +1,427 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  9 Jan 2015 14:08:50 +0100
-Subject: [PATCH 2/4] ARM: shmobile: sh73a0: Add Multiplatform support
+Date: Fri,  9 Jan 2015 14:08:51 +0100
+Subject: [PATCH 3/4] ARM: shmobile: kzm9g dts: Sync with kzm9g-reference dts
 In-Reply-To: <1420808932-3899-1-git-send-email-geert+renesas@glider.be>
 References: <1420808932-3899-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1420808932-3899-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1420808932-3899-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Enable sh73a0 Multiplatform support for the generic sh73a0
-machine vector. No board support is enabled, and the board
-code for KZM9G DT Reference is left by itself.
+Sync the two DTS for the KZM9G board. The target is the file
+"sh73a0-kzm9g.dts" and it is made identical to the DT reference
+case with the exception of the compatbile string. In the future
+the DT reference file will go away.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+[geert: Update for recent changes to sh73a0-kzm9g-reference.dts]
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/Kconfig      | 5 +++++
- arch/arm/mach-shmobile/Makefile     | 4 ++--
- arch/arm/mach-shmobile/smp-sh73a0.c | 2 +-
- 3 files changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g.dts | 374 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 373 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 2f36c85eec4b201e..8ee2f281f2a3dd6a 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -78,6 +78,11 @@ config ARCH_R8A7794
- 	bool "R-Car E2 (R8A77940)"
- 	select ARCH_RCAR_GEN2
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index e7dae01933a575f1..6f00e6b680e8e0fa 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -1,6 +1,9 @@
+ /*
+  * Device Tree Source for the KZM-A9-GT board
+  *
++ * Copyright (C) 2012 Horms Solutions Ltd.
++ *
++ * Based on sh73a0-kzm9g.dts
+  * Copyright (C) 2012 Renesas Solutions Corp.
+  *
+  * This file is licensed under the terms of the GNU General Public License
+@@ -10,17 +13,386 @@
  
-+config ARCH_SH73A0
-+	bool "SH-Mobile AG5 (R8A73A00)"
-+	select ARCH_RMOBILE
-+	select RENESAS_INTC_IRQPIN
+ /dts-v1/;
+ #include "sh73a0.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+ 	model = "KZM-A9-GT";
+ 	compatible = "renesas,kzm9g", "renesas,sh73a0";
+ 
++	aliases {
++		serial4 = &scifa4;
++	};
 +
- comment "Renesas ARM SoCs Board Type"
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vdd_dvfs>;
++			operating-points = <
++				/* kHz  uV */
++				1196000 1315000
++				 598000 1175000
++				 398667 1065000
++			>;
++			voltage-tolerance = <1>; /* 1% */
++		};
++	};
++
+ 	chosen {
+-		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200 rw";
++		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel rw";
++		stdout-path = &scifa4;
+ 	};
  
- config MACH_MARZEN
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index d53996e6da970d8d..b400f5fe72c269af 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -7,7 +7,7 @@ obj-y				:= timer.o console.o
- 
- # CPU objects
- obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o intc-sh7372.o pm-sh7372.o
--obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o intc-sh73a0.o pm-sh73a0.o
-+obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o pm-sh73a0.o
- obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o pm-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
-@@ -65,7 +65,7 @@ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
--obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
-+obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o intc-sh73a0.o
- obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
- endif
- 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index c16dbfe9836c527d..2106d6b76a069392 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -33,7 +33,7 @@
- 
- #define SH73A0_SCU_BASE 0xf0000000
- 
--#ifdef CONFIG_HAVE_ARM_TWD
-+#if defined(CONFIG_HAVE_ARM_TWD) && !defined(CONFIG_ARCH_MULTIPLATFORM)
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, SH73A0_SCU_BASE + 0x600, 29);
- void __init sh73a0_register_twd(void)
- {
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x40000000 0x20000000>;
+ 	};
++
++	reg_1p8v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	reg_3p3v: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	vmmc_sdhi0: regulator at 2 {
++		compatible = "regulator-fixed";
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pfc 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vmmc_sdhi2: regulator at 3 {
++		compatible = "regulator-fixed";
++		regulator-name = "SDHI2 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pfc 14 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	lan9220 at 10000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x10000000 0x100>;
++		phy-mode = "mii";
++		interrupt-parent = <&irqpin0>;
++		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++		reg-io-width = <4>;
++		smsc,irq-push-pull;
++		smsc,save-mac-address;
++		vddvario-supply = <&reg_1p8v>;
++		vdd33a-supply = <&reg_3p3v>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		led1 {
++			gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
++			label = "LED1";
++		};
++		led2 {
++			gpios = <&pfc 21 GPIO_ACTIVE_LOW>;
++			label = "LED2";
++		};
++		led3 {
++			gpios = <&pfc 22 GPIO_ACTIVE_LOW>;
++			label = "LED3";
++		};
++		led4 {
++			gpios = <&pfc 23 GPIO_ACTIVE_LOW>;
++			label = "LED4";
++		};
++	};
++
++	keyboard {
++		compatible = "gpio-keys";
++
++		back-key {
++			gpios = <&pcf8575 8 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_BACK>;
++			label = "SW3";
++		};
++
++		right-key {
++			gpios = <&pcf8575 9 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RIGHT>;
++			label = "SW2-R";
++		};
++
++		left-key {
++			gpios = <&pcf8575 10 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_LEFT>;
++			label = "SW2-L";
++		};
++
++		enter-key {
++			gpios = <&pcf8575 11 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_ENTER>;
++			label = "SW2-P";
++		};
++
++		up-key {
++			gpios = <&pcf8575 12 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_UP>;
++			label = "SW2-U";
++		};
++
++		down-key {
++			gpios = <&pcf8575 13 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_DOWN>;
++			label = "SW2-D";
++		};
++
++		home-key {
++			gpios = <&pcf8575 14 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_HOME>;
++			label = "SW1";
++		};
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "left_j";
++		simple-audio-card,cpu {
++			sound-dai = <&sh_fsi2 0>;
++		};
++		simple-audio-card,codec {
++			sound-dai = <&ak4648>;
++			bitclock-master;
++			frame-master;
++			system-clock-frequency = <11289600>;
++		};
++	};
++};
++
++&cmt1 {
++	status = "okay";
++};
++
++&extal2_clk {
++	clock-frequency = <48000000>;
++};
++
++&i2c0 {
++	status = "okay";
++
++	compass at c {
++		compatible = "asahi-kasei,ak8975";
++		reg = <0x0c>;
++		interrupt-parent = <&irqpin3>;
++		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++	};
++
++	ak4648: codec at 12 {
++		compatible = "asahi-kasei,ak4648";
++		reg = <0x12>;
++		#sound-dai-cells = <0>;
++	};
++
++	accelerometer at 1d {
++		compatible = "adi,adxl34x";
++		reg = <0x1d>;
++		interrupt-parent = <&irqpin3>;
++		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
++			     <3 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	rtc at 32 {
++		compatible = "ricoh,r2025sd";
++		reg = <0x32>;
++	};
++
++	as3711 at 40 {
++		compatible = "ams,as3711";
++		reg = <0x40>;
++
++		regulators {
++			vdd_dvfs: sd1 {
++				regulator-name = "1.315V CPU";
++				regulator-min-microvolt = <1050000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			sd2 {
++				regulator-name = "1.8V";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			sd4 {
++				regulator-name = "1.215V";
++				regulator-min-microvolt = <1215000>;
++				regulator-max-microvolt = <1235000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo2 {
++				regulator-name = "2.8V CPU";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo3 {
++				regulator-name = "3.0V CPU";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo4 {
++				regulator-name = "2.8V";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo5 {
++				regulator-name = "2.8V #2";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo7 {
++				regulator-name = "1.15V CPU";
++				regulator-min-microvolt = <1150000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo8 {
++				regulator-name = "1.15V CPU #2";
++				regulator-min-microvolt = <1150000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++		};
++	};
++};
++
++&i2c1 {
++	status = "okay";
++
++	touchscreen at 55 {
++		compatible = "sitronix,st1232";
++		reg = <0x55>;
++		interrupt-parent = <&irqpin1>;
++		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++	};
++};
++
++&i2c3 {
++	pinctrl-0 = <&i2c3_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	pcf8575: gpio at 20 {
++		compatible = "nxp,pcf8575";
++		reg = <0x20>;
++		interrupt-parent = <&irqpin2>;
++		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++};
++
++&mmcif {
++	pinctrl-0 = <&mmcif_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <8>;
++	vmmc-supply = <&reg_1p8v>;
++	status = "okay";
++};
++
++&pfc {
++	i2c3_pins: i2c3 {
++		renesas,groups = "i2c3_1";
++		renesas,function = "i2c3";
++	};
++
++	mmcif_pins: mmc {
++		mux {
++			renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
++			renesas,function = "mmc0";
++		};
++		cfg {
++			renesas,groups = "mmc0_data8_0";
++			renesas,pins = "PORT279";
++			bias-pull-up;
++		};
++	};
++
++	scifa4_pins: serial4 {
++		renesas,groups = "scifa4_data", "scifa4_ctrl";
++		renesas,function = "scifa4";
++	};
++
++	sdhi0_pins: sd0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd", "sdhi0_wp";
++		renesas,function = "sdhi0";
++	};
++
++	sdhi2_pins: sd2 {
++		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
++		renesas,function = "sdhi2";
++	};
++
++	fsia_pins: sounda {
++		renesas,groups = "fsia_mclk_in", "fsia_sclk_in",
++				 "fsia_data_in", "fsia_data_out";
++		renesas,function = "fsia";
++	};
++};
++
++&scifa4 {
++	pinctrl-0 = <&scifa4_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vmmc_sdhi0>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&sdhi2 {
++	pinctrl-0 = <&sdhi2_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vmmc_sdhi2>;
++	bus-width = <4>;
++	broken-cd;
++	status = "okay";
++};
++
++&sh_fsi2 {
++	pinctrl-0 = <&fsia_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
+ };
 -- 
 1.9.1
