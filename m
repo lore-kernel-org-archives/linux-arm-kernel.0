@@ -1,73 +1,84 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  9 Jan 2015 11:54:32 +0000
-Subject: [PATCH v6 14/20] arm/arm64: KVM: add opaque private pointer to MMIO
- data
+Date: Fri,  9 Jan 2015 11:54:34 +0000
+Subject: [PATCH v6 16/20] arm64: GICv3: introduce symbolic names for GICv3
+ ICC_SGI1R_EL1 fields
 In-Reply-To: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
 References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1420804478-17354-15-git-send-email-andre.przywara@arm.com>
+Message-ID: <1420804478-17354-17-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a GICv2 there is always only one (v)CPU involved: the one that
-does the access. On a GICv3 the access to a CPU redistributor is
-memory-mapped, but not banked, so the (v)CPU affected is determined by
-looking at the MMIO address region being accessed.
-To allow passing the affected CPU into the accessors later, extend
-struct kvm_exit_mmio to add an opaque private pointer parameter.
-The current GICv2 emulation just does not use it.
+The gic_send_sgi() function used hardcoded bit shift values to
+generate the ICC_SGI1R_EL1 register value.
+Replace this with symbolic names to allow reusing them later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v5...v6:
  (none)
 
 Changelog v4...v5:
- (add Acked-by:)
+ (add Reviewed-by:)
 
 Changelog v3...v4:
-- moving private parameter from each accessor into struct kvm_exit_mmio
+- (new patch)
 
- arch/arm/include/asm/kvm_mmio.h   |    1 +
- arch/arm64/include/asm/kvm_mmio.h |    1 +
- virt/kvm/arm/vgic.c               |    1 +
- 3 files changed, 3 insertions(+)
+ drivers/irqchip/irq-gic-v3.c       |   14 +++++++++-----
+ include/linux/irqchip/arm-gic-v3.h |   12 ++++++++++++
+ 2 files changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
-index adcc0d7..3f83db2 100644
---- a/arch/arm/include/asm/kvm_mmio.h
-+++ b/arch/arm/include/asm/kvm_mmio.h
-@@ -37,6 +37,7 @@ struct kvm_exit_mmio {
- 	u8		data[8];
- 	u32		len;
- 	bool		is_write;
-+	void		*private;
- };
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 1a146cc..2ab290b 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -481,15 +481,19 @@ out:
+ 	return tlist;
+ }
  
- static inline void kvm_prepare_mmio(struct kvm_run *run,
-diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
-index fc2f689..9f52beb 100644
---- a/arch/arm64/include/asm/kvm_mmio.h
-+++ b/arch/arm64/include/asm/kvm_mmio.h
-@@ -40,6 +40,7 @@ struct kvm_exit_mmio {
- 	u8		data[8];
- 	u32		len;
- 	bool		is_write;
-+	void		*private;
- };
++#define MPIDR_TO_SGI_AFFINITY(cluster_id, level) \
++	(MPIDR_AFFINITY_LEVEL(cluster_id, level) \
++		<< ICC_SGI1R_AFFINITY_## level ##_SHIFT)
++
+ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
+ {
+ 	u64 val;
  
- static inline void kvm_prepare_mmio(struct kvm_run *run,
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 750d956..53160f1 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -711,6 +711,7 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
+-	val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48	|
+-	       MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32	|
+-	       irq << 24			    		|
+-	       MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16	|
+-	       tlist);
++	val = (MPIDR_TO_SGI_AFFINITY(cluster_id, 3)	|
++	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
++	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
++	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
++	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
  
- 	mmio32.len = 4;
- 	mmio32.is_write = mmio->is_write;
-+	mmio32.private = mmio->private;
+ 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+ 	gic_write_sgi1r(val);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 3fb4d85..800544b 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -280,6 +280,18 @@
+ #define ICC_SRE_EL2_SRE			(1 << 0)
+ #define ICC_SRE_EL2_ENABLE		(1 << 3)
  
- 	mmio32.phys_addr = mmio->phys_addr + 4;
- 	if (mmio->is_write)
++#define ICC_SGI1R_TARGET_LIST_SHIFT	0
++#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
++#define ICC_SGI1R_AFFINITY_1_SHIFT	16
++#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_SGI_ID_SHIFT		24
++#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
++#define ICC_SGI1R_AFFINITY_2_SHIFT	32
++#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
++#define ICC_SGI1R_AFFINITY_3_SHIFT	48
++#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++
+ /*
+  * System register definitions
+  */
 -- 
 1.7.9.5
