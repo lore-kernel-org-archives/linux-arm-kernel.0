@@ -1,235 +1,97 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 09 Jan 2015 14:23:24 +0000
-Subject: [PATCH v3] arm: perf: Directly handle SMP platforms with one SPI
-In-Reply-To: <20150108173019.GV11583@arm.com>
-References: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
- <1420633698-11742-1-git-send-email-daniel.thompson@linaro.org>
- <20150108173019.GV11583@arm.com>
-Message-ID: <54AFE45C.2050607@linaro.org>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Fri, 09 Jan 2015 17:36:37 +0300
+Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for tegra_resume()
+ location store
+In-Reply-To: <20150109102922.GC10073@tbergstrom-lnx.Nvidia.com>
+References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
+ <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
+ <54985C30.7020605@wwwdotorg.org> <20150108105742.GI1987@ulmo.nvidia.com>
+ <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
+ <20150109095134.GC27845@ulmo>
+ <20150109102922.GC10073@tbergstrom-lnx.Nvidia.com>
+Message-ID: <54AFE775.3090209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/15 17:30, Will Deacon wrote:
-> Hi Daniel,
-> 
-> Some minor comments below...
-> 
-> On Wed, Jan 07, 2015 at 12:28:18PM +0000, Daniel Thompson wrote:
->> Some ARM platforms mux the PMU interrupt of every core into a single
->> SPI. On such platforms if the PMU of any core except 0 raises an interrupt
->> then it cannot be serviced and eventually, if you are lucky, the spurious
->> irq detection might forcefully disable the interrupt.
+09.01.2015 13:29, Peter De Schrijver ?????:
+> On Fri, Jan 09, 2015 at 10:51:35AM +0100, Thierry Reding wrote:
+>> * PGP Signed by an unknown key
 >>
->> On these SoCs it is not possible to determine which core raised the
->> interrupt so workaround this issue by queuing irqwork on the other
->> cores whenever the primary interrupt handler is unable to service the
->> interrupt.
+>> On Thu, Jan 08, 2015 at 02:37:09PM +0200, Peter De Schrijver wrote:
+>>> On Thu, Jan 08, 2015 at 11:57:43AM +0100, Thierry Reding wrote:
+>>>>> Old Signed by an unknown key
+>>>>
+>>>> On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
+>>>>> On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
+>>>>>> 22.12.2014 19:17, Stephen Warren ?????:
+>>>>>>> On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
+>>>>>>>> Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
+>>>>>>>> tegra_resume()
+>>>>>>>> location storing from late to early and as result broke suspend on tegra20.
+>>>>>>>> PMC scratch register 41 was used by tegra lp1 suspend core code for storing
+>>>>>>>> physical memory address of common resume function and in the same time used by
+>>>>>>>> tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
+>>>>>>>> strict order of scratch register use. Fix it by using scratch 40 instead of 41
+>>>>>>>> for tegra_resume() location store.
+>>>>>>>
+>>>>>>> You likely can't simply change the PMC scratch register usage arbitrarily;
+>>>>>>> specific registers are designated for specific purposes, and code outside the
+>>>>>>> Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
+>>>>>>> those specific values being in those registers. Without significant research,
+>>>>>>> I'd suggest not changing the PMC scratch register usage.
+>>>>>>
+>>>>>> Sure, that's why I asked to verify if scratch register 40 is in use in the
+>>>>>> comment after commit message.
+>>>>>
+>>>>> Sorry, I didn't notice that.
+>>>>>
+>>>>>> I've checked that u-boot doesn't use it (since
+>>>>>> upstream kernel doesn't care about any other bootloader), but no idea about
+>>>>>> secure monitor. It's definitely safer to avoid changing scratch regs usage, I
+>>>>>> thought that proposed solution would be best from the pure code point of view.
+>>>>>> So, I'm considering your answer as a rejection of the patch (please, let me know
+>>>>>> if I'm wrong) and will prepare another one. Btw, it would be nice to have
+>>>>>> scratch registers usage publicly documented somewhere (on "Tegra Public
+>>>>>> Application Notes" webpage for example), if it's possible, of course.
+>>>>>
+>>>>> At this stage in Tegra20 development, I think it'd be best to avoid changing
+>>>>> any scratch register usage if at all possible.
+>>>>
+>>>> Sorry, I had completely missed this discussion. When looking at the code
+>>>> it doesn't look like this particular "resettable" status needs to be
+>>>> stored in a PMC scratch register. It can't be stored in RAM because that
+>>>> goes into self-refresh as part of LP1, but how about just putting it
+>>>> into IRAM? That stays on in both LP1 and LP2, so should be suitable for
+>>>> this use-case. It would make the code slightly more complex but using a
+>>>> single scratch register for multiple purposes sounds brittle and easy to
+>>>> break (as evidenced by the offending commit).
+>>>>
+>>>> Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
+>>>> configuration data across LP0 suspend/resume, so I wouldn't think it'd
+>>>> cause problems if we used that instead of PMC_SCRATCH41 to store the
+>>>> "resettable" state.
+>>>>
+>>>
+>>> No. Usually the scratch registers for EMC config data are setup once by the
+>>> bootloader and never touched by the kernel after that. So I would not
+>>> recommend reusing those registers for different purposes.
 >>
->> The u8500 platform has an alternative workaround that dynamically alters
->> the affinity of the PMU interrupt. This workaround logic is no longer
->> required so the original code is removed as is the hook it relied upon.
+>> Right, I misread the code in the downstream kernel. Though it's not the
+>> bootloader that does it (at least on Tegra20), but some early code in
+>> the kernel.
 >>
->> Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI).
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> IRAM sounds like a good candidate still. Or do you know of anything that
+>> would exclude IRAM as storage location for this data?
 > 
-> [...]
+> No. I can't think of a reason this flag could not be in IRAM.
 > 
->> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
->> index dd9acc95ebc0..3d51c5f442eb 100644
->> --- a/arch/arm/kernel/perf_event_cpu.c
->> +++ b/arch/arm/kernel/perf_event_cpu.c
->> @@ -59,6 +59,116 @@ int perf_num_counters(void)
->>  }
->>  EXPORT_SYMBOL_GPL(perf_num_counters);
->>
->> +#ifdef CONFIG_SMP
->> +/*
->> + * Workaround logic that is distributed to all cores if the PMU has only
->> + * a single IRQ and the CPU receiving that IRQ cannot handle it. Its
->> + * job is to try to service the interrupt on the current CPU. It will
->> + * also enable the IRQ again if all the other CPUs have already tried to
->> + * service it.
->> + */
->> +static void cpu_pmu_do_percpu_work(struct irq_work *w)
->> +{
->> +       struct pmu_hw_events *hw_events =
->> +           container_of(w, struct pmu_hw_events, work);
->> +       struct arm_pmu *cpu_pmu = hw_events->percpu_pmu;
->> +
->> +       atomic_set(&hw_events->work_ret,
->> +                  cpu_pmu->handle_irq(0, cpu_pmu));
+> Cheers,
 > 
-> Do you need a memory barrier here, or is that implued by enable_irq?
-
-We are more getting away without a memory barrier... the spurious
-interrupt detector won't really mind if we see an out of date value
-(since it can tolerate getting the value wrong sometimes).
-
-I think we can moot this issue though by removing the code. See below...
-
-
->> +       if (atomic_dec_and_test(&cpu_pmu->remaining_work))
->> +               enable_irq(cpu_pmu->muxed_spi_workaround_irq);
->> +}
->> +
->> +/*
->> + * Called when the main interrupt handler cannot determine the source
->> + * of interrupt. It will deploy a workaround if we are running on an SMP
->> + * platform with only a single muxed SPI.
->> + *
->> + * The workaround disables the interrupt and distributes irqwork to all
->> + * other processors in the system. Hopefully one of them will clear the
->> + * interrupt...
->> + */
->> +static irqreturn_t cpu_pmu_handle_irq_none(int irq_num, struct arm_pmu *cpu_pmu)
->> +{
->> +       irqreturn_t ret = IRQ_NONE;
->> +       cpumask_t deploy_on_mask;
->> +       int cpu, work_ret;
->> +       if (irq_num != cpu_pmu->muxed_spi_workaround_irq)
->> +               return IRQ_NONE;
+> Peter.
 > 
-> return ret ?
 
-In general I prefer only to take return variables from variables on
-control paths where the return value is not constant.
+IRAM is a good candidate. Just tested draft patch version in QEMU, will give it
+more testing and polish during weekend and send next week.
 
-However this will also become moot if I remove the work_ret logic.
-
-
->> +
->> +       disable_irq_nosync(cpu_pmu->muxed_spi_workaround_irq);
->> +
->> +       cpumask_copy(&deploy_on_mask, cpu_online_mask);
->> +       cpumask_clear_cpu(smp_processor_id(), &deploy_on_mask);
->> +       atomic_add(cpumask_weight(&deploy_on_mask), &cpu_pmu->remaining_work);
->> +       smp_mb__after_atomic();
-> 
-> What's this barrier needed for?
-
-It pairs up with the implicit barrier in atomic_dec_and_test() and
-ensures the increment happens before the decrement (and therefore that
-the interrupt will be re-enabled).
-
-It can be removed providing we can rely on there being an implicit
-barrier in irq_work_queue_on(). Internally this function uses
-arch_send_call_function_single_ipi() there is definitely a barrier for
-that all current arm and arm64 platforms.
-
-I will remove this.
-
-
->> +
->> +       for_each_cpu(cpu, &deploy_on_mask) {
-> 
-> Why not for_each_online_cpu and then continue if cpu == smp_processor_id() ?
-> I  assume the race against hotplug is benign, as the interrupt will no longer
-> be asserted to the GIC if the source CPU goes offline?
-
-If cpu_online_mask changes after we have performed the atomic_add() but
-before (or during) the loop then we would mis-manage the value of
-remaining_work might fail to re-enable the interrupt.
-
-
->> +               struct pmu_hw_events *hw_events =
->> +                   per_cpu_ptr(cpu_pmu->hw_events, cpu);
->> +
->> +               /*
->> +                * The workaround code exits immediately without waiting to
->> +                * see if the interrupt was handled by another CPU. This makes
->> +                * it hard for us to decide between IRQ_HANDLED and IRQ_NONE.
->> +                * However, the handler isn't shared so we don't have to worry
->> +                * about being a good citizen, only about keeping the spurious
->> +                * interrupt detector working. This allows us to return the
->> +                * result of our *previous* attempt to deploy workaround.
->> +                */
->> +               work_ret = atomic_read(&hw_events->work_ret);
->> +               if (work_ret != IRQ_NONE)
->> +                       ret = work_ret;
-> 
-> Is this actually necessary, or can we always return handled?
-
-Ultimately it depends if we need the spurious interrupt detection logic
-to work. The work_ret approach is rather nasty (and most of your review
-comments are linked to it one way or another). Thus I think I'm OK to
-remove this altogether; spurious interrupts are very unlikely for the
-PMU IRQ.
-
-
->> +
->> +               if (!irq_work_queue_on(&hw_events->work, cpu))
->> +                       if (atomic_dec_and_test(&cpu_pmu->remaining_work))
-> 
-> I'm not convinced that we can't have old work racing on the remaining work
-> field with a subsequent interrupt.
-
-I don't think that can happen.
-
-For the interrupt to be re-enabled all cores must the started executing
-their irq_work handlers and called atomic_dec_and_test(). Even though
-they may not have completed the pending flag is cleared before they are
-called making it safe to re-trigger them.
-
-In fact even if that were not the case the error path for
-irq_work_queue_on() would resolve the problem for us (at the cost of
-re-entering the interrupt handler during races).
-
-
->> +                               enable_irq(cpu_pmu->muxed_spi_workaround_irq);
-> 
-> "This function (enable_irq) may be called from IRQ context only when
->  desc->irq_data.chip->bus_lock and desc->chip->bus_sync_unlock are NULL !"
-> 
-> Can we guarantee that in the general case?
-
-For the PMU I think we can.
-
-The irqchips that use these callbacks are found in one of the following
-directories:
-
-  arch/mips
-  drivers/base/regmap
-  drivers/gpio
-  drivers/mfd
-  drivers/platform/x86
-
-All of above would be a pretty astonishing way to hook up an intimate
-peripheral like the PMU.
-
->> +       }
->> +
->> +       return ret;
->> +}
->> +
->> +static int cpu_pmu_muxed_spi_workaround_init(struct arm_pmu *cpu_pmu)
->> +{
->> +       struct platform_device *pmu_device = cpu_pmu->plat_device;
->> +       int cpu;
->> +
->> +       for_each_possible_cpu(cpu) {
->> +               struct pmu_hw_events *hw_events =
->> +                   per_cpu_ptr(cpu_pmu->hw_events, cpu);
->> +
->> +               init_irq_work(&hw_events->work, cpu_pmu_do_percpu_work);
->> +               atomic_set(&hw_events->work_ret, IRQ_HANDLED);
->> +       }
->> +
->> +       aomic_set(cpu_pmu->remaining_work, 0);
-> 
-> So you didn't even build this...
-
-Oh no.
-
-I built... I found that typo... I fixed... I soak tested for an hour on
-i.MX6 (because I had changed the function from which we deploy the
-workaround since v2).
-
-After all that overlooking regenerating the patch before posting it
-really was rather foolish.
-
-Sorry.
-
-BTW I have just done a side by side diff with what I posted and what is
-in my git repo. The only other difference between what I tested and what
-I posted was a minor whitespace change.
+-- 
+Dmitry
