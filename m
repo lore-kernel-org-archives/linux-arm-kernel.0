@@ -1,67 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Jan 2015 15:22:18 +0000
-Subject: [GIT PULL] arm64: fixes for -rc4
-Message-ID: <20150109152217.GD11258@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Jan 2015 16:22:35 +0100
+Subject: [PATCH] ARM: mvebu: Update the SoC ID and revision definitions
+In-Reply-To: <1420729688-31882-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1420729688-31882-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150109152235.GC18832@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, Jan 08, 2015 at 04:08:08PM +0100, Gregory CLEMENT wrote:
+> Add the missing SoC and revision ID for the Armada 370 and 38x SoCs.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Here is a handful of minor arm64 fixes discovered and fixed over the
-Christmas break. The main part is adding some missing #includes that we
-seem to be getting transitively but have started causing problems in
--next. Please pull.
+Added to mvebu/soc
 
-Thanks,
+      Andrew
 
-Will
 
---->8
-
-The following changes since commit b1940cd21c0f4abdce101253e860feff547291b0:
-
-  Linux 3.19-rc3 (2015-01-05 17:05:20 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 0e63ea48b4d8035dd0e91a3fa6fb79458b47adfb:
-
-  arm64/efi: add missing call to early_ioremap_reset() (2015-01-08 11:57:04 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-- Fix early mapping fixmap corruption by EFI runtime services
-- Fix __NR_compat_syscalls off-by-one
-- Add missing sanity checks for some 32-bit registers
-- Add some missing #includes which we get transitively
-- Remove unused prepare_to_copy() macro
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64/efi: add missing call to early_ioremap_reset()
-
-Mark Rutland (2):
-      arm64: Correct __NR_compat_syscalls for bpf
-      arm64: sanity checks: add missing AArch32 registers
-
-Paul Walmsley (4):
-      arm64: fix missing asm/pgtable-hwdef.h include in asm/processor.h
-      arm64: fix missing linux/bug.h include in asm/arch_timer.h
-      arm64: fix missing asm/alternative.h include in kernel/module.c
-      arm64: fix missing asm/io.h include in kernel/smp_spin_table.c
-
-Tobias Klauser (1):
-      arm64: Remove unused prepare_to_copy()
-
- arch/arm64/include/asm/arch_timer.h |  1 +
- arch/arm64/include/asm/cpu.h        |  5 +++++
- arch/arm64/include/asm/processor.h  |  4 +---
- arch/arm64/include/asm/unistd.h     |  2 +-
- arch/arm64/kernel/cpuinfo.c         | 10 ++++++++++
- arch/arm64/kernel/efi.c             |  2 +-
- arch/arm64/kernel/module.c          |  1 +
- arch/arm64/kernel/setup.c           |  1 +
- arch/arm64/kernel/smp_spin_table.c  |  1 +
- 9 files changed, 22 insertions(+), 5 deletions(-)
+> ---
+>  arch/arm/mach-mvebu/mvebu-soc-id.h | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.h b/arch/arm/mach-mvebu/mvebu-soc-id.h
+> index c16bb68ca81f..e124a0b82a3e 100644
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.h
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.h
+> @@ -20,10 +20,28 @@
+>  #define MV78XX0_A0_REV	    0x1
+>  #define MV78XX0_B0_REV	    0x2
+>  
+> +/* Amada 370 ID */
+> +#define ARMADA_370_DEV_ID   0x6710
+> +
+> +/* Amada 370 Revision */
+> +#define ARMADA_370_A1_REV   0x1
+> +
+> +/* Armada 375 ID */
+> +#define ARMADA_375_DEV_ID   0x6720
+> +
+>  /* Armada 375 */
+>  #define ARMADA_375_Z1_REV   0x0
+>  #define ARMADA_375_A0_REV   0x3
+>  
+> +/* Armada 38x ID */
+> +#define ARMADA_380_DEV_ID   0x6810
+> +#define ARMADA_385_DEV_ID   0x6820
+> +#define ARMADA_388_DEV_ID   0x6828
+> +
+> +/* Armada 38x Revision */
+> +#define ARMADA_38x_Z1_REV   0x0
+> +#define ARMADA_38x_A0_REV   0x4
+> +
+>  #ifdef CONFIG_ARCH_MVEBU
+>  int mvebu_get_soc_id(u32 *dev, u32 *rev);
+>  #else
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
