@@ -1,74 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Jan 2015 09:48:17 +0100
-Subject: [PATCH] serial: 8250: Make ISA ports optional
-In-Reply-To: <54AF6378.6030202@hurleysoftware.com>
-References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
- <1896224.oMI8M6J5T7@wuerfel> <54AF6378.6030202@hurleysoftware.com>
-Message-ID: <3250953.b8pGJSWkfs@wuerfel>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 9 Jan 2015 16:53:40 +0800
+Subject: [PATCH] ASoC: wm8904: fix runtime warning
+Message-ID: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 January 2015 00:13:28 Peter Hurley wrote:
-> On 01/08/2015 05:05 PM, Arnd Bergmann wrote:
-> > On Thursday 08 January 2015 11:11:51 Peter Hurley wrote:
-> >>
-> >> This interface is just storage and minor allocation, since the
-> >> port-reuse behavior will be limited to the "universal" driver.
-> >> From a sub-driver perspective, the shared storage is actually
-> >> a hindrance, so that reduces the requirement to minor allocation.
-> >>
-> >> And that's where I'm stuck at the moment -- how to share ttyS
-> >> minor allocation. ttyS console is a related problem.
-> > 
-> > One idea that has come up in the past but never saw an implementation
-> > is to make the ttyS namespace and minor numbers completely generic and
-> > let any serial port driver use it. This would be a major rework, but
-> > have the added advantage of cleaning up a number of other namespace
-> > issues as well. There also lots of open question, in particular how
-> > to maintain compatibility with existing drivers. One could imagine
-> > that each uart always gets a ttyS device and optionally also gets
-> > a device node for the same port with a driver specific chardev as
-> > most of them do today. Or it could be an either/or decision that is
-> > made at compile time or as a module parameter.
-> 
-> I'm not totally convinced that sharing minor allocation is the right
-> solution. ISTM that the main goal is for at least one serial driver
-> to represent ttyS (assuming that it is a suitable work-alike to the
-> 8250 driver) while other ttyS serial drivers must still be able to
-> load and operate.
+As the commit 5fe5b76 (ASoC: dapm: Do not pretend to support
+controls for non mixer/mux widgets) remove the fake control.
 
-Unfortunately, we have already seen a case where we need to have
-two drivers enabled at the same time that both use the ttyS
-namespace and minor numbers at the moment.
+Then, the wm8904 throw out the following warning at runtime.
+--->8---
+wm8904 1-001a: Control not supported for path ADCL -> [Left] -> AIFOUTL
+wm8904 1-001a: ASoC: no dapm match for ADCL --> Left --> AIFOUTL
+wm8904 1-001a: ASoC: Failed to add route ADCL -> Left -> AIFOUTL
+wm8904 1-001a: Control not supported for path ADCR -> [Right] -> AIFOUTL
+wm8904 1-001a: ASoC: no dapm match for ADCR --> Right --> AIFOUTL
+wm8904 1-001a: ASoC: Failed to add route ADCR -> Right -> AIFOUTL
+wm8904 1-001a: Control not supported for path ADCL -> [Left] -> AIFOUTR
+wm8904 1-001a: ASoC: no dapm match for ADCL --> Left --> AIFOUTR
+wm8904 1-001a: ASoC: Failed to add route ADCL -> Left -> AIFOUTR
+wm8904 1-001a: Control not supported for path ADCR -> [Right] -> AIFOUTR
+wm8904 1-001a: ASoC: no dapm match for ADCR --> Right --> AIFOUTR
+wm8904 1-001a: ASoC: Failed to add route ADCR -> Right -> AIFOUTR
+wm8904 1-001a: Control not supported for path AIFINR -> [Right] -> DACL
+wm8904 1-001a: ASoC: no dapm match for AIFINR --> Right --> DACL
+wm8904 1-001a: ASoC: Failed to add route AIFINR -> Right -> DACL
+wm8904 1-001a: Control not supported for path AIFINL -> [Left] -> DACL
+wm8904 1-001a: ASoC: no dapm match for AIFINL --> Left --> DACL
+wm8904 1-001a: ASoC: Failed to add route AIFINL -> Left -> DACL
+wm8904 1-001a: Control not supported for path AIFINR -> [Right] -> DACR
+wm8904 1-001a: ASoC: no dapm match for AIFINR --> Right --> DACR
+wm8904 1-001a: ASoC: Failed to add route AIFINR -> Right -> DACR
+wm8904 1-001a: Control not supported for path AIFINL -> [Left] -> DACR
+wm8904 1-001a: ASoC: no dapm match for AIFINL --> Left --> DACR
+wm8904 1-001a: ASoC: Failed to add route AIFINL -> Left -> DACR
+---8<---
 
-> So for example, a UART that is ttyS in a typical configuration, might
-> be ttyX when another driver has been configured as ttyS instead.
-> Assuming that every uart driver has a unique, alternate base name,
-> then the problem is reduced to selecting the appropriate driver for
-> ttyS.
-> 
-> Some use cases would require selecting the ttyS driver at build time.
-> Others would probably require the notion of a preferred driver.
+This patch is used to remove these warning.
 
-Build-time selection looks problematic to me in the case of an
-ARM distro kernel that wants to support dozens of different
-uart drivers. At the moment this works for the most part because
-the conflicts are rare, but it's getting worse.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
 
-> What got me thinking about this approach instead of sharing minor
-> allocation was based on the 'first-come, first-served' question
-> I asked back in Dec. What happens when probe order varies and
-> console=ttyS0/login prompt doesn't show up where it's supposed to?
-> I've had this experience with multiple ethernet adapters and it's
-> not fun.
+ sound/soc/codecs/wm8904.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-In a lot of cases, we can solve the problem for a particular board
-by hardcoding the 'aliases' in the board specific dts file, at least
-when devicetree is used (as it is for the majority of the cases that
-are causing problems now).
-
-Using the aliases correctly at the moment is really awkward when you
-have multiple drivers for uarts on the same system and your serial0
-and serial1 uart turn into ttyS0 and ttyX1.
-
-	Arnd
+diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
+index 4d2d2b1..38582d7 100644
+--- a/sound/soc/codecs/wm8904.c
++++ b/sound/soc/codecs/wm8904.c
+@@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route adc_intercon[] = {
+ 	{ "Right Capture PGA", NULL, "Right Capture Mux" },
+ 	{ "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
+ 
+-	{ "AIFOUTL", "Left",  "ADCL" },
+-	{ "AIFOUTL", "Right", "ADCR" },
+-	{ "AIFOUTR", "Left",  "ADCL" },
+-	{ "AIFOUTR", "Right", "ADCR" },
++	{ "AIFOUTL", NULL, "ADCL" },
++	{ "AIFOUTL", NULL, "ADCR" },
++	{ "AIFOUTR", NULL, "ADCL" },
++	{ "AIFOUTR", NULL, "ADCR" },
+ 
+ 	{ "ADCL", NULL, "CLK_DSP" },
+ 	{ "ADCL", NULL, "Left Capture PGA" },
+@@ -1089,12 +1089,12 @@ static const struct snd_soc_dapm_route adc_intercon[] = {
+ };
+ 
+ static const struct snd_soc_dapm_route dac_intercon[] = {
+-	{ "DACL", "Right", "AIFINR" },
+-	{ "DACL", "Left",  "AIFINL" },
++	{ "DACL", NULL, "AIFINR" },
++	{ "DACL", NULL, "AIFINL" },
+ 	{ "DACL", NULL, "CLK_DSP" },
+ 
+-	{ "DACR", "Right", "AIFINR" },
+-	{ "DACR", "Left",  "AIFINL" },
++	{ "DACR", NULL, "AIFINR" },
++	{ "DACR", NULL, "AIFINL" },
+ 	{ "DACR", NULL, "CLK_DSP" },
+ 
+ 	{ "Charge pump", NULL, "SYSCLK" },
+-- 
+2.1.0.24.g4109c28
