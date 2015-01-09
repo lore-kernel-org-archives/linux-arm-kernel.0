@@ -1,153 +1,147 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 9 Jan 2015 18:49:12 +0530
-Subject: [PATCH v3 2/8] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <20150109125102.GL12302@n2100.arm.linux.org.uk>
-References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1420802889-4041-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <20150109125102.GL12302@n2100.arm.linux.org.uk>
-Message-ID: <CAJe_ZhdkF5o91HE8woAw0-DN5TuS_j6LM15NF0z6oHcQwPvnsQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 9 Jan 2015 14:20:31 +0100
+Subject: [PATCH] ARM: at91/Documentation: add a README for Atmel SoCs
+Message-ID: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 January 2015 at 18:21, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 09, 2015 at 07:28:09PM +0800, Vincent Yang wrote:
->> +static irqreturn_t mhu_rx_interrupt(int irq, void *p)
->> +{
->> +     struct mbox_chan *chan = p;
->> +     struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->> +     u32 val;
->> +
->> +     pr_debug("%s:%d\n", __func__, __LINE__);
->> +     val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
->> +     mbox_chan_received_data(chan, (void *)val);
->> +
->> +     writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
->> +
->> +     return IRQ_HANDLED;
->
-> What if 'val' was zero - is the interrupt still "handled" ?
->
-This irq shouldn't fire unless RX_STAT register has some non-zero value.
+Add a README file to describe Atmel SoCs (aka AT91) support in Mainline Linux:
+- SoC list + datasheet web links
+- Basic but useful information
+- Device Tree conventions and Work In Progress statement.
 
->> +static int mhu_startup(struct mbox_chan *chan)
->> +{
->> +     struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
->
-> Casts from void * are not necessary (repeated many times.)
->
->> +     u32 val;
->> +     int ret;
->> +
->> +     pr_debug("%s:%d\n", __func__, __LINE__);
->> +     val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->> +     writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
->> +
->> +     ret = request_irq(mlink->irq, mhu_rx_interrupt,
->> +                       IRQF_SHARED, "mhu_link", chan);
->> +     if (unlikely(ret)) {
->> +             pr_err("Unable to aquire IRQ\n");
->> +             return ret;
->> +     }
->> +
->> +     return 0;
->
-> Needlessly complicated, and doesn't need that unlikely().  Also doesn't
-> print the reason for failure, and merely printing "Unable to aquire IRQ"
-> into the kernel log with no indication what produced it is silly.  You
-> have the device struct (via chan->mbox->dev), so using dev_err() is a
-> definite possibility and improvement.
->
-> I'm sure this can be cleaned up and simplified.
->
->> +static int arm_mhu_probe(struct platform_device *pdev)
->> +{
->> +     int i, err;
->> +     struct arm_mhu *mhu;
->> +     struct resource *res;
->> +     int mhu_reg[3] = {0x0, 0x20, 0x200};
->> +
->> +     /* Allocate memory for device */
->> +     mhu = kzalloc(sizeof(*mhu), GFP_KERNEL);
->> +     if (!mhu)
->> +             return -ENOMEM;
->
-> Consider using dev_kzalloc().
->
->> +
->> +     mhu->clk = clk_get(&pdev->dev, "clk");
->
-> devm_clk_get().
->
->> +     if (unlikely(IS_ERR(mhu->clk)))
->> +             dev_info(&pdev->dev, "unable to init clock\n");
->> +     else
->> +             clk_prepare_enable(mhu->clk);
->> +
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     mhu->base = ioremap(res->start, resource_size(res));
->
-> That's an oops waiting to happen.  Consider using devm_ioremap_resource()
-> which will check for !res.
->
->> +     if (!mhu->base) {
->> +             dev_err(&pdev->dev, "ioremap failed.\n");
->> +             kfree(mhu);
->> +             return -EBUSY;
->> +     }
->> +
->> +     for (i = 0; i < 3; i++) {
->> +             mhu->chan[i].con_priv = &mhu->mlink[i];
->> +             res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
->> +             mhu->mlink[i].irq = res->start;
->> +             mhu->mlink[i].rx_reg = mhu->base + mhu_reg[i];
->> +             mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + 0x100;
->> +     }
->> +
->> +     mhu->mbox.dev = &pdev->dev;
->> +     mhu->mbox.chans = &mhu->chan[0];
->> +     mhu->mbox.num_chans = 3;
->> +     mhu->mbox.ops = &mhu_ops;
->> +     mhu->mbox.txdone_irq = false;
->> +     mhu->mbox.txdone_poll = true;
->> +     mhu->mbox.txpoll_period = 10;
->> +
->> +     platform_set_drvdata(pdev, mhu);
->> +
->> +     err = mbox_controller_register(&mhu->mbox);
->> +     if (err) {
->> +             dev_err(&pdev->dev, "Failed to register mailboxes %d\n", err);
->> +             iounmap(mhu->base);
->
-> You don't clk_put() the clock here.  Using devm_* as suggested above
-> means you wouldn't have made this mistake here...
->
->> +             kfree(mhu);
->> +     } else {
->> +             dev_info(&pdev->dev, "ARM MHU Mailbox registered\n");
->> +     }
->> +
->> +     return 0;
->
-> Always returns success even if mbox_controller_register() fails?
->
->> +}
->> +
->> +static int arm_mhu_remove(struct platform_device *pdev)
->> +{
->> +     struct arm_mhu *mhu = platform_get_drvdata(pdev);
->> +
->> +     mbox_controller_unregister(&mhu->mbox);
->> +
->> +     iounmap(mhu->base);
->> +
->> +     if (!IS_ERR(mhu->clk))
->> +             clk_disable_unprepare(mhu->clk);
->
-> No clk_put() ?  If you used devm_* stuff as suggested above, you wouldn't
-> need to...
->
-Yes, we should have implemented managed resource allocation. Will do.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: ARM Maintainers <arm@kernel.org>
+---
+ Documentation/arm/Atmel/README | 120 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 120 insertions(+)
+ create mode 100644 Documentation/arm/Atmel/README
 
-Thanks,
-Jassi
+diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
+new file mode 100644
+index 000000000000..538f8a556277
+--- /dev/null
++++ b/Documentation/arm/Atmel/README
+@@ -0,0 +1,120 @@
++ARM Atmel SoCs (aka AT91)
++=========================
++
++
++Introduction
++------------
++This document gives useful information about the ARM Atmel SoCs that are
++currently supported in Linux Mainline (you know, the one on kernel.org).
++
++It is important to note that the Atmel | SMART ARM-based MPU product line is
++historically named "AT91" or "at91" throughout the Linux kernel development
++process even if this product prefix has completely disappeared from the
++official Atmel product name. Anyway, files, directories, git trees,
++git branches/tags and email subject always contain this "at91" sub-string.
++
++
++AT91 SoCs
++---------
++Documentation and detailled datasheet for each product are available on
++the Atmel website: http://www.atmel.com.
++
++  Flavors:
++    * ARM 920 based SoC
++      - at91rm9200
++        + Datasheet
++          http://www.atmel.com/Images/doc1768.pdf
++
++    * ARM 926 based SoCs
++      - at91sam9260
++        + Datasheet
++          http://www.atmel.com/Images/doc6221.pdf
++
++      - at91sam9261
++        + Datasheet
++          http://www.atmel.com/Images/doc6062.pdf
++
++      - at91sam9263
++        + Datasheet
++          http://www.atmel.com/Images/Atmel_6249_32-bit-ARM926EJ-S-Microcontroller_SAM9263_Datasheet.pdf
++
++      - at91sam9rl
++        + Datasheet
++          http://www.atmel.com/Images/doc6289.pdf
++
++      - at91sam9g20
++        + Datasheet
++          http://www.atmel.com/Images/doc6384.pdf
++
++      - at91sam9g45 family
++        - at91sam9g45
++        - at91sam9g46
++        - at91sam9m10
++        - at91sam9m11 (device superset)
++        + Datasheet
++          http://www.atmel.com/Images/Atmel-6437-32-bit-ARM926-Embedded-Microprocessor-SAM9M11_Datasheet.pdf
++
++      - at91sam9x5 family (aka "The 5 series")
++        - at91sam9g15
++        - at91sam9g25
++        - at91sam9g35
++        - at91sam9x25
++        - at91sam9x35
++        + Datasheet (can be considered as covering the whole family)
++          http://www.atmel.com/Images/Atmel_11055_32-bit-ARM926EJ-S-Microcontroller_SAM9X35_Datasheet.pdf
++
++      - at91sam9n12
++        + Datasheet
++          http://www.atmel.com/Images/Atmel_11063_32-bit-ARM926EJ-S-Microcontroller_SAM9N12CN11CN12_Datasheet.pdf
++
++    * ARM Cortex-A5 based SoCs
++      - sama5d3 family
++        - sama5d31
++        - sama5d33
++        - sama5d34
++        - sama5d35
++        - sama5d36 (device superset)
++        + Datasheet
++          http://www.atmel.com/Images/Atmel-11121-32-bit-Cortex-A5-Microcontroller-SAMA5D3_Datasheet.pdf
++
++    * ARM Cortex-A5 + NEON based SoCs
++      - sama5d4 family
++        - sama5d41
++        - sama5d42
++        - sama5d43
++        - sama5d44 (device superset)
++        + Datasheet
++          http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
++
++
++Linux kernel information
++------------------------
++Linux kernel mach directory: arch/arm/mach-at91
++MAINTAINERS entry is: "ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES"
++
++
++Device Tree for AT91 SoCs and boards
++------------------------------------
++All AT91 SoCs are converted to Device Tree. Since Linux 3.19, these products
++must use this method to boot the Linux kernel.
++
++Work In Progress statement:
++Device Tree files and Device Tree bindings that apply to AT91 SoCs and boards are
++considered as "Unstable". To be completely clear, any at91 binding can change at
++any time. So, be sure to use a Device Tree Binary and a Kernel Image generated from
++the same source tree.
++Please refer to the Documentation/devicetree/bindings/ABI.txt file for a
++definition of a "Stable" binding/ABI.
++This statement will be removed by AT91 MAINTAINERS when appropriated.
++
++Naming conventions and best practice:
++- SoCs Device Tree Source Include files are named after the official name of
++  the product (at91sam9g20.dtsi or sama5d33.dtsi for instance).
++- Device Tree Source Include files (.dtsi) are used to collect common nodes that can be
++  shared across SoCs or boards (sama5d3.dtsi or at91sam9x5cm.dtsi for instance).
++  When collecting nodes for a particular peripheral or topic, the identifier have to
++  be placed at the end of the file name, separated with a "_" (at91sam9x5_can.dtsi
++  or sama5d3_gmac.dtsi for example).
++- board Device Tree Source files (.dts) are prefixed by the string "at91-" so
++  that they can be identified easily. Note that the sama5d3[13456]ek.dts files
++  are an historical exception to this rule.
+-- 
+2.1.3
