@@ -1,64 +1,67 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 9 Jan 2015 11:23:19 +0100
-Subject: [PATCH v15 11/11] KVM: arm/arm64: Add support to dissolve huge PUD
-In-Reply-To: <54AEB32B.3060504@samsung.com>
+Date: Fri, 9 Jan 2015 11:24:58 +0100
+Subject: [RESEND PATCH v15 07/11] KVM: arm: page logging 2nd stage fault
+ handling
+In-Reply-To: <54AEB03E.8080305@samsung.com>
 References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418628488-3696-12-git-send-email-m.smarduch@samsung.com>
- <20150107130514.GD21092@cbox> <54ADF2F6.8060906@samsung.com>
- <20150108113221.GK21092@cbox> <54AEB32B.3060504@samsung.com>
-Message-ID: <20150109102319.GM21092@cbox>
+ <1418868449-23397-1-git-send-email-m.smarduch@samsung.com>
+ <20150107123844.GA21092@cbox> <54ADE0B6.1060703@samsung.com>
+ <20150108104510.GI21092@cbox> <54AEB03E.8080305@samsung.com>
+Message-ID: <20150109102458.GN21092@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 08:41:15AM -0800, Mario Smarduch wrote:
-
-[...]
-
+On Thu, Jan 08, 2015 at 08:28:46AM -0800, Mario Smarduch wrote:
+> On 01/08/2015 02:45 AM, Christoffer Dall wrote:
+> > On Wed, Jan 07, 2015 at 05:43:18PM -0800, Mario Smarduch wrote:
+> >> Hi Christoffer,
+> >>   before going through your comments, I discovered that
+> >> in 3.18.0-rc2 - a generic __get_user_pages_fast()
+> >> was implemented, now ARM picks this up. This causes
+> >> gfn_to_pfn_prot() to return meaningful 'writable'
+> >> value for a read fault, provided the region is writable.
+> >>
+> >> Prior to that the weak version returned 0 and 'writable'
+> >> had no optimization effect to set pte/pmd - RW on
+> >> a read fault.
+> >>
+> >> As a consequence dirty logging broke in 3.18, I was seeing
+> Correction on this, proper __get_user_pages_fast()
+> behavior exposed a bug in page logging code.
+> 
+> >> weird but very intermittent issues. I just put in the
+> >> additional few lines to fix it, prevent pte RW (only R) on
+> >> read faults  while  logging writable region.
+> >>
+> >> On 01/07/2015 04:38 AM, Christoffer Dall wrote:
+> >>> On Wed, Dec 17, 2014 at 06:07:29PM -0800, Mario Smarduch wrote:
+> >>>> This patch is a followup to v15 patch series, with following changes:
+> >>>> - When clearing/dissolving a huge, PMD mark huge page range dirty, since
+> >>>>   the state of whole range is unknown. After the huge page is dissolved 
+> >>>>   dirty page logging is at page granularity.
 > >>>
-> >>> I'm just thinking here, why do we need to check if we get a valid pud
-> >>> back here, but we don't need the equivalent check in dissolve_pmd from
-> >>> patch 7?
+> >>> What is the sequence of events where you could have dirtied another page
+> >>> within the PMD range after the user initially requested dirty page
+> >>> logging?
 > >>
-> >> kvm_pud_huge() doesn't check bit 0 for invalid entry, but
-> >> pud_none() is not the right way to check either, maybe pud_bad()
-> >> first. Nothing is done in patch 7 since the pmd is retrieved from
-> >> stage2_get_pmd().
-> >>
-> > 
-> > hmmm, but stage2_get_pmd() can return a NULL pointer if you have the
-> > IOMAP flag set...
-> > 
-> >>>
-> >>> I think the rationale is that it should never happen because we never
-> >>> call these functions with the logging and iomap flags at the same
-> >>> time...
-> >>
-> >> I'm little lost here, not sure how it's related to above.
-> >> But I think a VFIO device will have a memslot and
-> >> it would be possible to enable logging. But to what
-> >> end I'm not sure.
+> >> No there is none. My issue was the start point for tracking dirty pages
+> >> and that would be second call to dirty log read. Not first
+> >> call after initial write protect where any page in range can
+> >> be assumed dirty. I'll remove this, not sure if there would be any
+> >> use case to call dirty log only once.
 > >>
 > > 
-> > As I said above, if you call the set_s2pte function with the IOMAP and
-> > LOGGING flags set, then you'll end up in a situation where you can get a
-> > NULL pointer back from stage2_get_pmd() but you're never checking
-> > against that.
+> > Calling dirty log once can not give you anything meaningful, right?  You
+> > must assume all memory is 'dirty' at this point, no?
 > 
-> I see what you're saying now.
-> > 
-> > Now, this raises an interesting point, we have now added code that
-> > prevents faults from ever happening on device maps, but introducing a
-> > path here where the user can set logging on a memslot with device memory
-> > regions, which introduces write faults on such regions.  My gut feeling
-> > is that we should avoid that from ever happening, and not allow this
-> > function to be called with both flags set.
+> There is the interval between KVM_MEM_LOG_DIRTY_PAGES and first
+> call to KVM_GET_DIRTY_LOG. Not sure of any use case, maybe enable
+> logging, wait a while do a dirty log read, disable logging.
+> Get an accumulated snapshot of dirty page activity.
 > 
-> Maybe kvm_arch_prepare_memory_region() can check if
-> KVM_MEM_LOG_DIRTY_PAGES is being enabled for an IO region
-> and don't allow it.
-> 
-
-Yeah, I think we need to add a check for that somewhere as part of this
-series (patch 7 perhaps?).
+ok, so from the time the user calls KVM_MEM_LOG_DIRTY_PAGES, then any
+fault on any huge page will dissolve that huge page into pages, and each
+dirty page will be logged accordingly for the first call to
+KVM_GET_DIRTY_LOG, right?  What am I missing here?
 
 -Christoffer
