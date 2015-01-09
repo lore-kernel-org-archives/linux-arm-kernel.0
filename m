@@ -1,43 +1,74 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 09 Jan 2015 09:02:20 +0100
-Subject: [alsa-devel] [PATCH] ASoC: rockchip: i2s: add
- rockchip_dmaengine_pcm_config
-In-Reply-To: <1420768369-6681-1-git-send-email-jay.xu@rock-chips.com>
-References: <1420768369-6681-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <54AF8B0C.2050301@metafoo.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 Jan 2015 09:34:46 +0100
+Subject: [PATCH 0/9] ARM Versatile multi-platform support
+In-Reply-To: <CAL_JsqKLNPVDCUELaZU8JW0roT3RcyqcxtJbvbYQrjzxjt3FeQ@mail.gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <CACRpkda8T8CwghVYtTw41h_y+GdCA5xCEaSL1Jy4VZBo3MAy-Q@mail.gmail.com>
+ <CAL_JsqKLNPVDCUELaZU8JW0roT3RcyqcxtJbvbYQrjzxjt3FeQ@mail.gmail.com>
+Message-ID: <CACRpkdZpwoY4-9K9_Eh-UikmP5hqQhfu2eZRb-wkVntVn1g5wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2015 02:52 AM, Jianqun Xu wrote:
-> This patch makes snd_dmaengine_pcm_register with rockchip_dmaengine_pcm_config,
-> which configure the parameters of period and buffer match to rockchip DMAC.
+On Thu, Jan 8, 2015 at 10:38 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Thu, Jan 8, 2015 at 1:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+>>
+>>> From: Rob Herring <robh@kernel.org>
+>>>
+>>> This series converts ARM Versatile platform to multi-platform. I started
+>>> this some time ago and some pieces were already merged. The primary
+>>> piece remaining is converting the PCI host to DT which I was waiting for
+>>> the common PCI DT parsing to get settled. Now that that is in place as
+>>> well as a few other pieces are in place like multi-platform fixes for
+>>> CLCD, we can fully convert Versatile to DT and multi-platform.
+>>>
+>>> There's still a few things that need DT support which can be done
+>>> later:
+>>> - MMC card detect and write protect. Should be able to use VExpress
+>>>   support
+>>> - Reboot support. Should be able to re-use Realview reboot code.
+>>> - flash phys-map support. Binding exists, but specifically Vpp control
+>>>   is needed.
+>>> - CLCD support. Not sure where this is at.
+>>
+>> I like it overall but would like to see some use of the syscon
+>> pattern to access random registers in syscon, and specifically not
+>> to refer to these registers as some "gpio" because they aren't.
 >
-> =======================
-> without rockchip_dmaengine_pcm_config, and test with command -
-> aplay -D hw:0,0 /tmp/a, there are the error dump:
-> [  134.899396] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(7)
-> [  134.906270] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(8)
-> [  134.913141] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(9)
->
-> And bellow sound from DMA debugger:
-> "I debugged it a little and it looks like what is happening is that requests
-> which aren't a multiple of burst size * burst length are coming in.  Right
-> now the i2s block is setting a burst size of 4 and burst length of 4, but
-> the dmaengine code has no idea about this restriction.  I was able to
-> eliminate the messages by changing burst length to 1 in the i2s driver.
-> This fix would always work as long as we're sending a multiple of 4 bytes
-> (which so far seems to be the case)"
->
-> This patch can make the length of dma buffer is aligned to a multiple of burst size
-> and burst length.
+> I'm not sure I follow. Creating GPIO lines for SD card detect and
+> write protect is exactly how VExpress syscon was implemented.
 
-No, all it does it sets the maximum size to something that is aligned, an 
-application can still choose something else.
+Hm it all boils down to this mfd/vexpress-sysreg.c driver that
+spawns some MFD devices.
 
-And this is the wrong approach anyway, we don't want to have new 
-snd_pcm_hardware for drivers using generic dmaengine PCM driver.
+>From there a LED, card detect and flash protection are modeled as
+"basic-mmio-gpio" instantiating the drivers/gpio/gpio-generic.c
+driver to drive/read various bits.
 
-The right approach is to modify the dmaengine PCM driver to set a constraint 
-that makes sure that the period size is a multiple of the burst size.
+Specifically commit 974cc7b93441a0e78f030495436d1be7eb7c208d
+that makes a layered MFD->gpio->gpio LED cake.
+Needless to say neither the GPIO maintainers or the GPIO
+mailing list was included in review of this patch and it was
+merged on its MFD merits :(
 
-- Lars
+It is sort of elegant in a way, but I don't like it when we describe
+registers that are not general purpose as "general purpose input
+output" it is simply ontologically wrong and a misleading hardware
+description. These bits are not general purpose *at* *all* they are
+special purpose.
+
+It is Linux GPIO implementation details leaking into the hardware
+description basically: it just happened to be very convenient to
+describe these register bits as "gpios" as the drivers etc were
+already in place.
+
+I prefer syscon->syscon LED as a two layer cake
+instead of a three layer cake involving GPIO and it's more to the point,
+describing the hardware properly, so I say let's go for that instead.
+
+For card detect and flash protection I suspect we can use
+syscon as well, avoiding shoehorning a GPIO abstraction between
+it.
+
+Yours,
+Linus Walleij
