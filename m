@@ -1,138 +1,460 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri,  9 Jan 2015 07:43:47 -0800
-Subject: [PATCH v4 3/7] pinctrl: zynq: Document DT binding
+Date: Fri,  9 Jan 2015 07:43:50 -0800
+Subject: [PATCH v4 6/7] ARM: zynq: DT: Add pinctrl information
 In-Reply-To: <1420818231-13451-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1420818231-13451-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1420818231-13451-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1420818231-13451-7-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for the devicetree binding for the Zynq pincontroller.
+Add pinctrl descriptions to the zc702 and zc706 device trees.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 Tested-by: Andreas F?rber <afaerber@suse.de>
 ---
 Changes since v1:
- - fix typo
- - add USB related documentation
  - remove 'pinctrl-' prefix for pinctrl sub-nodes
- - update documentation to enforce strict separation of pinmux
-   and pinconf nodes
-   - update example accordingly
----
- .../bindings/pinctrl/xlnx,zynq-pinctrl.txt         | 104 +++++++++++++++++++++
- 1 file changed, 104 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
+ - separate config and mux nodes
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
-new file mode 100644
-index 000000000000..b7b55a964f65
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/xlnx,zynq-pinctrl.txt
-@@ -0,0 +1,104 @@
-+	Binding for Xilinx Zynq Pinctrl
+Changes since RFC v2:
+ - add pinconf properties to zc702 mdio node
+ - remove arguments from bias-related props
+
+Changes since RFC v1:
+ - separate DT changes into their own patch
+---
+ arch/arm/boot/dts/zynq-7000.dtsi |   8 +-
+ arch/arm/boot/dts/zynq-zc702.dts | 181 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 152 ++++++++++++++++++++++++++++++++
+ 3 files changed, 340 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index ee3e5d675b05..9a19a319b0f1 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -237,7 +237,7 @@
+ 		slcr: slcr at f8000000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			compatible = "xlnx,zynq-slcr", "syscon";
++			compatible = "xlnx,zynq-slcr", "syscon", "simple-bus";
+ 			reg = <0xF8000000 0x1000>;
+ 			ranges;
+ 			clkc: clkc at 100 {
+@@ -257,6 +257,12 @@
+ 						"dbg_trc", "dbg_apb";
+ 				reg = <0x100 0x100>;
+ 			};
 +
-+Required properties:
-+- compatible: "xlnx,zynq-pinctrl"
-+- syscon: phandle to SLCR
-+- reg: Offset and length of pinctrl space in SLCR
-+
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices, including the meaning of the
-+phrase "pin configuration node".
-+
-+Zynq's pin configuration nodes act as a container for an arbitrary number of
-+subnodes. Each of these subnodes represents some desired configuration for a
-+pin, a group, or a list of pins or groups. This configuration can include the
-+mux function to select on those pin(s)/group(s), and various pin configuration
-+parameters, such as pull-up, slew rate, etc.
-+
-+Each configuration node can consist of multiple nodes describing the pinmux and
-+pinconf options. Those nodes can be pinmux nodes or pinconf nodes.
-+
-+The name of each subnode is not important; all subnodes should be enumerated
-+and processed purely based on their content.
-+
-+Required properties for pinmux nodes are:
-+ - groups: A list of pinmux groups.
-+ - function: The name of a pinmux function to activate for the specified set
-+   of groups.
-+
-+Required properties for configuration nodes:
-+One of:
-+ - pins: a list of pin names
-+ - groups: A list of pinmux groups.
-+
-+The following generic properties as defined in pinctrl-bindings.txt are valid
-+to specify in a pinmux subnode:
-+ groups, function
-+
-+The following generic properties as defined in pinctrl-bindings.txt are valid
-+to specify in a pinconf subnode:
-+ groups, pins, bias-disable, bias-high-impedance, bias-pull-up, slew-rate,
-+ low-power-disable, low-power-enable
-+
-+ Valid arguments for 'slew-rate' are '0' and '1' to select between slow and fast
-+ respectively.
-+
-+ Valid values for groups are:
-+   ethernet0_0_grp, ethernet1_0_grp, mdio0_0_grp, mdio1_0_grp,
-+   qspi0_0_grp, qspi1_0_grp, qspi_fbclk, qspi_cs1_grp, spi0_0_grp,
-+   spi0_1_grp - spi0_2_grp, spi1_0_grp - spi1_3_grp, sdio0_0_grp - sdio0_2_grp,
-+   sdio1_0_grp - sdio1_3_grp, sdio0_emio_wp, sdio0_emio_cd, sdio1_emio_wp,
-+   sdio1_emio_cd, smc0_nor, smc0_nor_cs1_grp, smc0_nor_addr25_grp, smc0_nand,
-+   can0_0_grp - can0_10_grp, can1_0_grp - can1_11_grp, uart0_0_grp - uart0_10_grp,
-+   uart1_0_grp - uart1_11_grp, i2c0_0_grp - i2c0_10_grp, i2c1_0_grp - i2c1_10_grp,
-+   ttc0_0_grp - ttc0_2_grp, ttc1_0_grp - ttc1_2_grp, swdt0_0_grp - swdt0_4_grp,
-+   gpio0_0_grp - gpio0_53_grp, usb0_0_grp, usb1_0_grp
-+
-+ Valid values for pins are:
-+   MIO0 - MIO53
-+
-+ Valid values for function are:
-+   ethernet0, ethernet1, mdio0, mdio1, qspi0, qspi1, qspi_fbclk, qspi_cs1,
-+   spi0, spi1, sdio0, sdio0_pc, sdio0_cd, sdio0_wp,
-+   sdio1, sdio1_pc, sdio1_cd, sdio1_wp,
-+   smc0_nor, smc0_nor_cs1, smc0_nor_addr25, smc0_nand, can0, can1, uart0, uart1,
-+   i2c0, i2c1, ttc0, ttc1, swdt0, gpio0, usb0, usb1
-+
-+The following driver-specific properties as defined here are valid to specify in
-+a pin configuration subnode:
-+ - io-standard: Configure the pin to use the selected IO standard according to
-+   this mapping:
-+    1: LVCMOS18
-+    2: LVCMOS25
-+    3: LVCMOS33
-+    4: HSTL
-+
-+Example:
-+	pinctrl0: pinctrl at 700 {
-+		compatible = "xlnx,pinctrl-zynq";
-+		reg = <0x700 0x200>;
-+		syscon = <&slcr>;
-+
-+		pinctrl_uart1_default: uart1-default {
-+			mux {
-+				groups = "uart1_10_grp";
-+				function = "uart1";
++			pinctrl0: pinctrl at 700 {
++				compatible = "xlnx,pinctrl-zynq";
++				reg = <0x700 0x200>;
++				syscon = <&slcr>;
 +			};
+ 		};
+ 
+ 		dmac_s: dmac at f8003000 {
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 280f02dd4ddc..4995412f116f 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -40,6 +40,8 @@
+ 
+ &can0 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_can0_default>;
+ };
+ 
+ &clkc {
+@@ -50,15 +52,24 @@
+ 	status = "okay";
+ 	phy-mode = "rgmii-id";
+ 	phy-handle = <&ethernet_phy>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gem0_default>;
+ 
+ 	ethernet_phy: ethernet-phy at 7 {
+ 		reg = <7>;
+ 	};
+ };
+ 
++&gpio0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpio0_default>;
++};
 +
-+			conf {
-+				groups = "uart1_10_grp";
-+				slew-rate = <0>;
-+				io-standard = <1>;
-+			};
+ &i2c0 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0_default>;
+ 
+ 	i2cswitch at 74 {
+ 		compatible = "nxp,pca9548";
+@@ -132,10 +143,180 @@
+ 	};
+ };
+ 
++&pinctrl0 {
++	pinctrl_can0_default: can0-default {
++		mux {
++			function = "can0";
++			groups = "can0_9_grp";
++		};
 +
-+			conf-rx {
-+				pins = "MIO49";
-+				bias-high-impedance;
-+			};
++		conf {
++			groups = "can0_9_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
 +
-+			conf-tx {
-+				pins = "MIO48";
-+				bias-disable;
-+			};
++		conf-rx {
++			pins = "MIO46";
++			bias-high-impedance;
++		};
++
++		conf-tx {
++			pins = "MIO47";
++			bias-disable;
 +		};
 +	};
++
++	pinctrl_gem0_default: gem0-default {
++		mux {
++			function = "ethernet0";
++			groups = "ethernet0_0_grp";
++		};
++
++		conf {
++			groups = "ethernet0_0_grp";
++			slew-rate = <0>;
++			io-standard = <4>;
++		};
++
++		conf-rx {
++			pins = "MIO22", "MIO23", "MIO24", "MIO25", "MIO26", "MIO27";
++			bias-high-impedance;
++			low-power-disable;
++		};
++
++		conf-tx {
++			pins = "MIO16", "MIO17", "MIO18", "MIO19", "MIO20", "MIO21";
++			bias-disable;
++			low-power-enable;
++		};
++
++		mux-mdio {
++			function = "mdio0";
++			groups = "mdio0_0_grp";
++		};
++
++		conf-mdio {
++			groups = "mdio0_0_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++			bias-disable;
++		};
++	};
++
++	pinctrl_gpio0_default: gpio0-default {
++		mux {
++			function = "gpio0";
++			groups = "gpio0_7_grp", "gpio0_8_grp", "gpio0_9_grp",
++				 "gpio0_10_grp", "gpio0_11_grp", "gpio0_12_grp",
++				 "gpio0_13_grp", "gpio0_14_grp";
++		};
++
++		conf {
++			groups = "gpio0_7_grp", "gpio0_8_grp", "gpio0_9_grp",
++				 "gpio0_10_grp", "gpio0_11_grp", "gpio0_12_grp",
++				 "gpio0_13_grp", "gpio0_14_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-pull-up {
++			pins = "MIO9", "MIO10", "MIO11", "MIO12", "MIO13", "MIO14";
++			bias-pull-up;
++		};
++
++		conf-pull-none {
++			pins = "MIO7", "MIO8";
++			bias-disable;
++		};
++	};
++
++	pinctrl_i2c0_default: i2c0-default {
++		mux {
++			groups = "i2c0_10_grp";
++			function = "i2c0";
++		};
++
++		conf {
++			groups = "i2c0_10_grp";
++			bias-pull-up;
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++	};
++
++	pinctrl_sdhci0_default: sdhci0-default {
++		mux {
++			groups = "sdio0_2_grp";
++			function = "sdio0";
++		};
++
++		conf {
++			groups = "sdio0_2_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++			bias-disable;
++		};
++
++		mux-cd {
++			groups = "gpio0_0_grp";
++			function = "sdio0_cd";
++		};
++
++		conf-cd {
++			groups = "gpio0_0_grp";
++			bias-high-impedance;
++			bias-pull-up;
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		mux-wp {
++			groups = "gpio0_15_grp";
++			function = "sdio0_wp";
++		};
++
++		conf-wp {
++			groups = "gpio0_15_grp";
++			bias-high-impedance;
++			bias-pull-up;
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++	};
++
++	pinctrl_uart1_default: uart1-default {
++		mux {
++			groups = "uart1_10_grp";
++			function = "uart1";
++		};
++
++		conf {
++			groups = "uart1_10_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-rx {
++			pins = "MIO49";
++			bias-high-impedance;
++		};
++
++		conf-tx {
++			pins = "MIO48";
++			bias-disable = <0>;
++		};
++	};
++};
++
+ &sdhci0 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sdhci0_default>;
+ };
+ 
+ &uart1 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_default>;
+ };
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 34f7812d2ee8..af590d2bb046 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -37,15 +37,24 @@
+ 	status = "okay";
+ 	phy-mode = "rgmii-id";
+ 	phy-handle = <&ethernet_phy>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gem0_default>;
+ 
+ 	ethernet_phy: ethernet-phy at 7 {
+ 		reg = <7>;
+ 	};
+ };
+ 
++&gpio0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpio0_default>;
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0_default>;
+ 
+ 	i2cswitch at 74 {
+ 		compatible = "nxp,pca9548";
+@@ -111,10 +120,153 @@
+ 	};
+ };
+ 
++&pinctrl0 {
++	pinctrl_gem0_default: gem0-default {
++		mux {
++			function = "ethernet0";
++			groups = "ethernet0_0_grp";
++		};
++
++		conf {
++			groups = "ethernet0_0_grp";
++			slew-rate = <0>;
++			io-standard = <4>;
++		};
++
++		conf-rx {
++			pins = "MIO22", "MIO23", "MIO24", "MIO25", "MIO26", "MIO27";
++			bias-high-impedance;
++			low-power-disable;
++		};
++
++		conf-tx {
++			pins = "MIO16", "MIO17", "MIO18", "MIO19", "MIO20", "MIO21";
++			low-power-enable;
++			bias-disable;
++		};
++
++		mux-mdio {
++			function = "mdio0";
++			groups = "mdio0_0_grp";
++		};
++
++		conf-mdio {
++			groups = "mdio0_0_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++			bias-disable;
++		};
++	};
++
++	pinctrl_gpio0_default: gpio0-default {
++		mux {
++			function = "gpio0";
++			groups = "gpio0_7_grp", "gpio0_46_grp", "gpio0_47_grp";
++		};
++
++		conf {
++			groups = "gpio0_7_grp", "gpio0_46_grp", "gpio0_47_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-pull-up {
++			pins = "MIO46", "MIO47";
++			bias-pull-up;
++		};
++
++		conf-pull-none {
++			pins = "MIO7";
++			bias-disable;
++		};
++	};
++
++	pinctrl_i2c0_default: i2c0-default {
++		mux {
++			groups = "i2c0_10_grp";
++			function = "i2c0";
++		};
++
++		conf {
++			groups = "i2c0_10_grp";
++			bias-pull-up;
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++	};
++
++	pinctrl_sdhci0_default: sdhci0-default {
++		mux {
++			groups = "sdio0_2_grp";
++			function = "sdio0";
++		};
++
++		conf {
++			groups = "sdio0_2_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++			bias-disable;
++		};
++
++		mux-cd {
++			groups = "gpio0_14_grp";
++			function = "sdio0_cd";
++		};
++
++		conf-cd {
++			groups = "gpio0_14_grp";
++			bias-high-impedance;
++			bias-pull-up;
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		mux-wp {
++			groups = "gpio0_15_grp";
++			function = "sdio0_wp";
++		};
++
++		conf-wp {
++			groups = "gpio0_15_grp";
++			bias-high-impedance;
++			bias-pull-up;
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++	};
++
++	pinctrl_uart1_default: uart1-default {
++		mux {
++			groups = "uart1_10_grp";
++			function = "uart1";
++		};
++
++		conf {
++			groups = "uart1_10_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-rx {
++			pins = "MIO49";
++			bias-high-impedance;
++		};
++
++		conf-tx {
++			pins = "MIO48";
++			bias-disable;
++		};
++	};
++};
++
+ &sdhci0 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sdhci0_default>;
+ };
+ 
+ &uart1 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_default>;
+ };
 -- 
 2.2.1.1.gb42cc81
