@@ -1,36 +1,57 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 09 Jan 2015 10:40:42 +0530
-Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
-In-Reply-To: <CAM4voamaqoje8Ccz3+UxvxaHN6GBd=QC5wRjVcz9Osfc=4aeiw@mail.gmail.com>
-References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>	<CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>	<5487C897.9050405@arm.com>	<CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>	<5487D726.6000603@arm.com>	<54AE278F.4020003@arm.com>
- <CAM4voamaqoje8Ccz3+UxvxaHN6GBd=QC5wRjVcz9Osfc=4aeiw@mail.gmail.com>
-Message-ID: <54AF62D2.7000400@arm.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 09 Jan 2015 00:13:28 -0500
+Subject: [PATCH] serial: 8250: Make ISA ports optional
+In-Reply-To: <1896224.oMI8M6J5T7@wuerfel>
+References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
+ <20150108131008.16c9a31c@lxorguk.ukuu.org.uk>
+ <54AEAC47.1040403@hurleysoftware.com> <1896224.oMI8M6J5T7@wuerfel>
+Message-ID: <54AF6378.6030202@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 08 January 2015 08:57 PM, Abhilash Kesavan wrote:
-> Hi Sudeep,
->
-> On Thu, Jan 8, 2015 at 12:15 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Abhilash,
-
-[...]
-
+On 01/08/2015 05:05 PM, Arnd Bergmann wrote:
+> On Thursday 08 January 2015 11:11:51 Peter Hurley wrote:
 >>
->> What's the status of this patch. It was useful for me on vexpress for some
->> testing. Please feel free to add
+>> This interface is just storage and minor allocation, since the
+>> port-reuse behavior will be limited to the "universal" driver.
+>> From a sub-driver perspective, the shared storage is actually
+>> a hindrance, so that reduces the requirement to minor allocation.
 >>
->> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
->>
->> if this is not yet queued.
->
-> Thanks for the tested-by. This patch has not been merged yet; I am not
-> quite sure who is supposed to pick this up.
->
+>> And that's where I'm stuck at the moment -- how to share ttyS
+>> minor allocation. ttyS console is a related problem.
+> 
+> One idea that has come up in the past but never saw an implementation
+> is to make the ttyS namespace and minor numbers completely generic and
+> let any serial port driver use it. This would be a major rework, but
+> have the added advantage of cleaning up a number of other namespace
+> issues as well. There also lots of open question, in particular how
+> to maintain compatibility with existing drivers. One could imagine
+> that each uart always gets a ttyS device and optionally also gets
+> a device node for the same port with a driver specific chardev as
+> most of them do today. Or it could be an either/or decision that is
+> made at compile time or as a module parameter.
 
-So far, most of the CCI patches are merged through arm-soc.
+I'm not totally convinced that sharing minor allocation is the right
+solution. ISTM that the main goal is for at least one serial driver
+to represent ttyS (assuming that it is a suitable work-alike to the
+8250 driver) while other ttyS serial drivers must still be able to
+load and operate.
+
+So for example, a UART that is ttyS in a typical configuration, might
+be ttyX when another driver has been configured as ttyS instead.
+Assuming that every uart driver has a unique, alternate base name,
+then the problem is reduced to selecting the appropriate driver for
+ttyS.
+
+Some use cases would require selecting the ttyS driver at build time.
+Others would probably require the notion of a preferred driver.
+
+What got me thinking about this approach instead of sharing minor
+allocation was based on the 'first-come, first-served' question
+I asked back in Dec. What happens when probe order varies and
+console=ttyS0/login prompt doesn't show up where it's supposed to?
+I've had this experience with multiple ethernet adapters and it's
+not fun.
 
 Regards,
-Sudeep
+Peter Hurley
