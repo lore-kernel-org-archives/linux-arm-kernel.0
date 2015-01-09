@@ -1,67 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Jan 2015 07:46:16 -0600
-Subject: [PATCH v5][resend v4] of: replace Asahi Kasei Corp vendor prefix
-In-Reply-To: <871tn4uv0j.wl%kuninori.morimoto.gx@renesas.com>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com> <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com> <20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
- <5469CD47.3040409@cogentembedded.com>
- <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
- <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
- <5478603D.1080404@cogentembedded.com>
- <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
- <87lhm7t37l.wl%kuninori.morimoto.gx@renesas.com>
- <87egr4vcxu.wl%kuninori.morimoto.gx@renesas.com>
- <54AF5AB0.2050208@wwwdotorg.org>
- <871tn4uv0j.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <CAL_Jsq+GjM+3M63amyh3Rvijkz7Lch_cdUt9vScc9wZeOubOPA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  9 Jan 2015 13:54:17 +0000
+Subject: [PATCH v2 5/5] iommu: io-pgtable-arm: add non-secure quirk
+In-Reply-To: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
+References: <1420811657-21321-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1420811657-21321-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 9, 2015 at 4:07 AM, Kuninori Morimoto
-<kuninori.morimoto.gx@renesas.com> wrote:
->
-> Hi Stephen
->
-> Thank you for your feedback
->
->> > I'm sending this "of: replace Asahi Kasei Corp vendor prefix" during
->> > half-year (since Jun 2014) , many times. But, no-one care it.
->> > I don't know who is the best maintainer.
->> >  - Stephen : because it has Tegra ?
->> >  - Olof    : because it has Tegra (= ARM) ?
->> >  - Arnd    : because it has Tegra (= ARM) ?
->> >  - Matthias: because it has Tegra (= ARM SoC) ?
->> >  - Rob     : because DT ?
->> >  - Andrew  : Last chance ?
->> >
->> > But, could you please care this patch ?
->> > I will re-send it again
->>
->> It doesn't seem to be ack'd by any of the DT maintainers. Retro-actively
->> changing a DT vendor name would need that, I think.
->
-> Rob ?
-> I had sent this patch to him since half-years ago, many times...
-> Or other maintainer ?
->
->> Thierry and Alex (both Tegra maintainers) appear to have ack'd it, so it
->> seems they expect it to go through some tree other than Tegra. Weren't
->> there a bunch of related patches along with this (e.g. updating relevant
->> drivers to support both prefixes?) so it was expected this patch would
->> be applied together with them?
->
-> I guess they expected it goes to DT branch (?)
-> This is only 1 patch. it doesn't have related patch-set
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-It is in my queue. If the users of it are fine with breaking things,
-who am I to argue with them.
+The quirk causes the Non-Secure bit to be set in all page table entries.
 
-Rob
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/io-pgtable-arm.c | 7 +++++++
+ drivers/iommu/io-pgtable.h     | 3 ++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 52fb21487f02..5a500edf00cc 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -82,11 +82,13 @@
+ #define ARM_LPAE_PTE_TYPE_TABLE		3
+ #define ARM_LPAE_PTE_TYPE_PAGE		3
+ 
++#define ARM_LPAE_PTE_NSTABLE		(((arm_lpae_iopte)1) << 63)
+ #define ARM_LPAE_PTE_XN			(((arm_lpae_iopte)3) << 53)
+ #define ARM_LPAE_PTE_AF			(((arm_lpae_iopte)1) << 10)
+ #define ARM_LPAE_PTE_SH_NS		(((arm_lpae_iopte)0) << 8)
+ #define ARM_LPAE_PTE_SH_OS		(((arm_lpae_iopte)2) << 8)
+ #define ARM_LPAE_PTE_SH_IS		(((arm_lpae_iopte)3) << 8)
++#define ARM_LPAE_PTE_NS			(((arm_lpae_iopte)1) << 5)
+ #define ARM_LPAE_PTE_VALID		(((arm_lpae_iopte)1) << 0)
+ 
+ #define ARM_LPAE_PTE_ATTR_LO_MASK	(((arm_lpae_iopte)0x3ff) << 2)
+@@ -208,6 +210,9 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+ 		return -EEXIST;
+ 	}
+ 
++	if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
++		pte |= ARM_LPAE_PTE_NS;
++
+ 	if (lvl == ARM_LPAE_MAX_LEVELS - 1)
+ 		pte |= ARM_LPAE_PTE_TYPE_PAGE;
+ 	else
+@@ -251,6 +256,8 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
+ 		data->iop.cfg.tlb->flush_pgtable(cptep, 1UL << data->pg_shift,
+ 						 cookie);
+ 		pte = __pa(cptep) | ARM_LPAE_PTE_TYPE_TABLE;
++		if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
++			pte |= ARM_LPAE_PTE_NSTABLE;
+ 		*ptep = pte;
+ 		data->iop.cfg.tlb->flush_pgtable(ptep, sizeof(*ptep), cookie);
+ 	} else {
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 05c4e593a25f..10e32f69c668 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -43,7 +43,8 @@ struct iommu_gather_ops {
+  * @tlb:           TLB management callbacks for this set of tables.
+  */
+ struct io_pgtable_cfg {
+-	int				quirks; /* IO_PGTABLE_QUIRK_* */
++	#define IO_PGTABLE_QUIRK_ARM_NS	(1 << 0)	/* Set NS bit in PTEs */
++	int				quirks;
+ 	unsigned long			pgsize_bitmap;
+ 	unsigned int			ias;
+ 	unsigned int			oas;
+-- 
+2.1.4
