@@ -1,117 +1,116 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Jan 2015 17:55:09 +0000
-Subject: [PATCH 1/2] irqchip: gicv3-its: Fix unsafe locking reported by lockdep
+Date: Fri,  9 Jan 2015 17:55:10 +0000
+Subject: [PATCH 2/2] irqchip: gic: Fix unsafe locking reported by lockdep
 In-Reply-To: <1420826110-1697-1-git-send-email-marc.zyngier@arm.com>
 References: <1420826110-1697-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1420826110-1697-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1420826110-1697-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 When compiled with CONFIG_LOCKDEP, the kernel shouts badly, saying
-that my locking is unsafe. I'm afraid the kernel is right:
+that the locking in the GIC code is unsafe. I'm afraid the kernel
+is right:
 
-       CPU0                    CPU1
-       ----                    ----
-  lock(&its->lock);
-                               local_irq_disable();
-                               lock(&irq_desc_lock_class);
-                               lock(&its->lock);
+       CPU0
+       ----
+  lock(irq_controller_lock);
   <Interrupt>
-    lock(&irq_desc_lock_class);
+    lock(irq_controller_lock);
 
  *** DEADLOCK ***
 
-The fix is to always take its->lock with interrupts disabled.
+This can happen while enabling, disabling, setting the type
+or the affinity of an interrupt.
 
-Reported-by: Will Deacon <will.deacon@arm.com>
+The fix is to take the interrupt_controller_lock with interrupts
+disabled in these cases.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ drivers/irqchip/irq-gic.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 2a2fb2e..c5c1a3c 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -415,13 +415,14 @@ static void its_send_single_command(struct its_node *its,
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index d617ee5..7e93aeb 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -154,23 +154,25 @@ static inline unsigned int gic_irq(struct irq_data *d)
+ static void gic_mask_irq(struct irq_data *d)
  {
- 	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
- 	struct its_collection *sync_col;
+ 	u32 mask = 1 << (gic_irq(d) % 32);
 +	unsigned long flags;
  
--	raw_spin_lock(&its->lock);
-+	raw_spin_lock_irqsave(&its->lock, flags);
- 
- 	cmd = its_allocate_entry(its);
- 	if (!cmd) {		/* We're soooooo screewed... */
- 		pr_err_ratelimited("ITS can't allocate, dropping command\n");
--		raw_spin_unlock(&its->lock);
-+		raw_spin_unlock_irqrestore(&its->lock, flags);
- 		return;
- 	}
- 	sync_col = builder(cmd, desc);
-@@ -441,7 +442,7 @@ static void its_send_single_command(struct its_node *its,
- 
- post:
- 	next_cmd = its_post_commands(its);
--	raw_spin_unlock(&its->lock);
-+	raw_spin_unlock_irqrestore(&its->lock, flags);
- 
- 	its_wait_for_range_completion(its, cmd, next_cmd);
+-	raw_spin_lock(&irq_controller_lock);
++	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+ 	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
+ 	if (gic_arch_extn.irq_mask)
+ 		gic_arch_extn.irq_mask(d);
+-	raw_spin_unlock(&irq_controller_lock);
++	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
  }
-@@ -1019,8 +1020,9 @@ static void its_cpu_init_collection(void)
- static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
+ 
+ static void gic_unmask_irq(struct irq_data *d)
  {
- 	struct its_device *its_dev = NULL, *tmp;
+ 	u32 mask = 1 << (gic_irq(d) % 32);
 +	unsigned long flags;
  
--	raw_spin_lock(&its->lock);
-+	raw_spin_lock_irqsave(&its->lock, flags);
- 
- 	list_for_each_entry(tmp, &its->its_device_list, entry) {
- 		if (tmp->device_id == dev_id) {
-@@ -1029,7 +1031,7 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
- 		}
- 	}
- 
--	raw_spin_unlock(&its->lock);
-+	raw_spin_unlock_irqrestore(&its->lock, flags);
- 
- 	return its_dev;
+-	raw_spin_lock(&irq_controller_lock);
++	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+ 	if (gic_arch_extn.irq_unmask)
+ 		gic_arch_extn.irq_unmask(d);
+ 	writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
+-	raw_spin_unlock(&irq_controller_lock);
++	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
  }
-@@ -1039,6 +1041,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 
+ static void gic_eoi_irq(struct irq_data *d)
+@@ -188,6 +190,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
  {
- 	struct its_device *dev;
- 	unsigned long *lpi_map;
+ 	void __iomem *base = gic_dist_base(d);
+ 	unsigned int gicirq = gic_irq(d);
 +	unsigned long flags;
- 	void *itt;
- 	int lpi_base;
- 	int nr_lpis;
-@@ -1074,9 +1077,9 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	dev->device_id = dev_id;
- 	INIT_LIST_HEAD(&dev->entry);
  
--	raw_spin_lock(&its->lock);
-+	raw_spin_lock_irqsave(&its->lock, flags);
- 	list_add(&dev->entry, &its->its_device_list);
--	raw_spin_unlock(&its->lock);
-+	raw_spin_unlock_irqrestore(&its->lock, flags);
+ 	/* Interrupt configuration for SGIs can't be changed */
+ 	if (gicirq < 16)
+@@ -196,14 +199,14 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ 	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+ 		return -EINVAL;
  
- 	/* Bind the device to the first possible CPU */
- 	cpu = cpumask_first(cpu_online_mask);
-@@ -1090,9 +1093,11 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+-	raw_spin_lock(&irq_controller_lock);
++	raw_spin_lock_irqsave(&irq_controller_lock, flags);
  
- static void its_free_device(struct its_device *its_dev)
- {
--	raw_spin_lock(&its_dev->its->lock);
+ 	if (gic_arch_extn.irq_set_type)
+ 		gic_arch_extn.irq_set_type(d, type);
+ 
+ 	gic_configure_irq(gicirq, type, base, NULL);
+ 
+-	raw_spin_unlock(&irq_controller_lock);
++	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -224,6 +227,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+ 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
+ 	u32 val, mask, bit;
 +	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&its_dev->its->lock, flags);
- 	list_del(&its_dev->entry);
--	raw_spin_unlock(&its_dev->its->lock);
-+	raw_spin_unlock_irqrestore(&its_dev->its->lock, flags);
- 	kfree(its_dev->itt);
- 	kfree(its_dev);
+ 
+ 	if (!force)
+ 		cpu = cpumask_any_and(mask_val, cpu_online_mask);
+@@ -233,12 +237,12 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+-	raw_spin_lock(&irq_controller_lock);
++	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+ 	mask = 0xff << shift;
+ 	bit = gic_cpu_map[cpu] << shift;
+ 	val = readl_relaxed(reg) & ~mask;
+ 	writel_relaxed(val | bit, reg);
+-	raw_spin_unlock(&irq_controller_lock);
++	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+ 
+ 	return IRQ_SET_MASK_OK;
  }
 -- 
 2.1.4
