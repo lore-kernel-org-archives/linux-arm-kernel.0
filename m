@@ -1,56 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 09 Jan 2015 22:35:27 +0300
-Subject: [RFC 02/11] i2c: add quirk checks to core
-In-Reply-To: <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
- <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <54B02D7F.7040501@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Jan 2015 20:42:28 +0100
+Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
+ X-Gene platform
+In-Reply-To: <CAL85gmCOXKiHEO=URrAGBNZpJpen5P5PH1xDoF1-jasj0iDg4Q@mail.gmail.com>
+References: <1412726809-7525-1-git-send-email-fkan@apm.com>
+ <1894616.4yY7dajl4R@wuerfel>
+ <CAL85gmCOXKiHEO=URrAGBNZpJpen5P5PH1xDoF1-jasj0iDg4Q@mail.gmail.com>
+Message-ID: <15808906.L2zUs54agU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 09 January 2015 10:56:51 Feng Kan wrote:
+> On Tue, Nov 11, 2014 at 1:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 07 October 2014 17:06:47 Feng Kan wrote:
+> >> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> >> index 2e45ae3..a03042c 100644
+> >> --- a/drivers/i2c/busses/Kconfig
+> >> +++ b/drivers/i2c/busses/Kconfig
+> >> @@ -1009,6 +1009,15 @@ config I2C_CROS_EC_TUNNEL
+> >>         connected there. This will work whatever the interface used to
+> >>         talk to the EC (SPI, I2C or LPC).
+> >>
+> >> +config I2C_XGENE_SLIMPRO
+> >> +     tristate "APM X-Gene SoC I2C SLIMpro devices support"
+> >> +     depends on ARCH_XGENE && XGENE_SLIMPRO_MBOX
+> >
+> > Why this dependency on XGENE_SLIMPRO_MBOX?
+> >
+> > Better replace it with a dependency on MAILBOX.
+> Arnd, just a question. Is this because this possibly help with future
+> compatibility by choosing a more broad dependency?
 
-On 01/09/2015 08:21 PM, Wolfram Sang wrote:
+The dependency should ideally describe build-time dependencies,
+to make it possible to build on other architectures for static
+code analysis purposes. If the driver makes no sense on other
+platforms you can also use
 
-> Let the core do the checks if HW quirks prevent a transfer. Saves code
-> from drivers and adds consistency.
+	depends on ARCH_XGENE || COMPILE_TEST
+	depends on MAILBOX
 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->   drivers/i2c/i2c-core.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 53 insertions(+)
->
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 39d25a8cb1ad..7b10a19abf5b 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -2063,6 +2063,56 @@ module_exit(i2c_exit);
->    * ----------------------------------------------------
->    */
->
-> +/* Check if val is exceeding the quirk IFF quirk is non 0 */
-> +#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
-> +
-> +static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
-> +{
-> +	dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
-> +	return -EOPNOTSUPP;
-> +}
+to cover both the build-time and run-time dependencies. But the
+dependency on XGENE_SLIMPRO_MBOX just shouldn't be there, the driver
+will work with any mailbox implementation if someone puts the same
+hardware into a different SoC.
 
-    Always returning the same value doesn't make much sense. Are you trying to 
-save space on the call sites?
-
-[...]
-> @@ -2080,6 +2130,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->   	unsigned long orig_jiffies;
->   	int ret, try;
->
-> +	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
-
-    So, you only check for non-zero result of this function? Perhaps it makes 
-sense to return true/false instead?
-
-> +		return -EOPNOTSUPP;
-> +
-
-WBR, Sergei
+	Arnd
