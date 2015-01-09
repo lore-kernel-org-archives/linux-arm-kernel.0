@@ -1,54 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Jan 2015 21:08:53 +0000 (UTC)
-Subject: [PATCH 4/4] clk: tegra: Add support for the Tegra132 CAR IP block
-In-Reply-To: <54B0417B.6030409@wwwdotorg.org>
-References: <20141216203813.22980.2301.stgit@chromeos-P9X79>
- <20141216203829.22980.64446.stgit@chromeos-P9X79>
- <20150109111954.GB16465@ulmo>
- <alpine.DEB.2.02.1501092030180.28771@utopia.booyaka.com>
- <54B0417B.6030409@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.02.1501092106070.28771@utopia.booyaka.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 09 Jan 2015 13:09:56 -0800
+Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
+In-Reply-To: <CAM4voamN1A-sqCDR2bT5rHRBARH2SmfA1wYkXZRn9oi-4-Gj8g@mail.gmail.com>
+ (Abhilash Kesavan's message of "Fri, 9 Jan 2015 21:58:42 +0530")
+References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>
+ <5487C897.9050405@arm.com>
+ <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
+ <5487D726.6000603@arm.com> <54AE278F.4020003@arm.com>
+ <CAM4voamaqoje8Ccz3+UxvxaHN6GBd=QC5wRjVcz9Osfc=4aeiw@mail.gmail.com>
+ <54AF62D2.7000400@arm.com>
+ <CAM4voamN1A-sqCDR2bT5rHRBARH2SmfA1wYkXZRn9oi-4-Gj8g@mail.gmail.com>
+Message-ID: <7hfvbjvexn.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Jan 2015, Stephen Warren wrote:
+Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
 
-> On 01/09/2015 01:52 PM, Paul Walmsley wrote:
-> > Hi Thierry
-> > 
-> > On Fri, 9 Jan 2015, Thierry Reding wrote:
-> > 
-> > > On Tue, Dec 16, 2014 at 12:38:29PM -0800, Paul Walmsley wrote:
-> > > > 
-> > > > This patch is based on several patches from others:
-> > > > 
-> > > > 1. a  patch from Peter De Schrijver:
-> > > > 
-> > > > http://lkml.iu.edu/hypermail/linux/kernel/1407.1/06094.html
-> > > > 
-> > > > 2. a patch from Bill Huang ("clk: tegra: enable cclk_g at boot on
-> > > > Tegra132"), and
-> > > > 
-> > > > 3. a patch from Allen Martin ("clk: Enable tegra clock driver for
-> > > > tegra132").
-> > > 
-> > > Doesn't this technically require Signed-off-bys from each of the above,
-> > > then?
-> > 
-> > I don't think so.  Documentation/SubmittingPatches states:
-> 
-> It's certainly been deemed acceptable in the past, if admittedly not optimal,
-> for the person who is the "exit point" of an organization/company for the
-> patch to be the only person to sign it off. The reason being they're vouching
-> that the Certificate of Origin applies to all the company-sponsored work
-> internal to the organization.
+> Hi Arnd/Olof,
+>
+> On Fri, Jan 9, 2015 at 10:40 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On Thursday 08 January 2015 08:57 PM, Abhilash Kesavan wrote:
+>>>
+>>> Hi Sudeep,
+>>>
+>>> On Thu, Jan 8, 2015 at 12:15 PM, Sudeep Holla <sudeep.holla@arm.com>
+>>> wrote:
+>>>>
+>>>> Hi Abhilash,
+>>
+>>
+>> [...]
+>>
+>>>>
+>>>> What's the status of this patch. It was useful for me on vexpress for
+>>>> some
+>>>> testing. Please feel free to add
+>>>>
+>>>> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>>
+>>>> if this is not yet queued.
+>>>
+>>>
+>>> Thanks for the tested-by. This patch has not been merged yet; I am not
+>>> quite sure who is supposed to pick this up.
+>>>
+>>
+>> So far, most of the CCI patches are merged through arm-soc.
+>
+> Would you be OK picking this up as is or do you want me to re-send
+> this with the RFT tag dropped ?
 
-I'm not even sure that applies to this patch.  If I were passing along a 
-verbatim copy of someone else's patch, or a copy with minor modifications, 
-then it definitely be appropriate and expected to pass along their 
-Signed-off-by:.  But this patch is original work; it's not a verbatim copy 
-of any of the patches that I mention above (which are all publicly 
-available, incidentally).
+Please resend without the RFT, and collect the Tested-by tags
+you can add mine:
 
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-- Paul
+Please send to arm at kernel.org where patches targeted for the arm-soc
+tree are collected.
+
+Thanks,
+
+Kevin
