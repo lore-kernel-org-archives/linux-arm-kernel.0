@@ -1,73 +1,62 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 9 Jan 2015 10:42:57 -0800
-Subject: [PATCH v2 1/9] Input: sun4i-ts: Add thermal zone sensor support
-In-Reply-To: <20150109183313.GA24190@developer>
-References: <1420798676-22856-1-git-send-email-wens@csie.org>
- <1420798676-22856-2-git-send-email-wens@csie.org>
- <20150109172318.GA39037@dtor-ws> <20150109183313.GA24190@developer>
-Message-ID: <20150109184257.GB39037@dtor-ws>
+From: mpeg.blue@free.fr (Mason)
+Date: Fri, 09 Jan 2015 19:42:58 +0100
+Subject: ioremap vs remap_pfn_range, VMSPLIT, etc
+In-Reply-To: <54B018B8.1080306@arm.com>
+References: <54AFD09E.1010806@free.fr>
+ <20150109131322.GO12302@n2100.arm.linux.org.uk> <54B013F0.10408@free.fr>
+ <54B018B8.1080306@arm.com>
+Message-ID: <54B02132.8060004@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 02:33:15PM -0400, Eduardo Valentin wrote:
-> Dmitry,
-> 
-> On Fri, Jan 09, 2015 at 09:23:18AM -0800, Dmitry Torokhov wrote:
-> > On Fri, Jan 09, 2015 at 06:17:48PM +0800, Chen-Yu Tsai wrote:
-> > > The touchscreen controller has a temperature sensor embedded in the SoC,
-> > > which already has hwmon support in the driver.
-> > > 
-> > > Add DT thermal zone support so we can use it with cpufreq for thermal
-> > > throttling.
-> > > 
-> > > This also adds a comment stating that we do not know the actual formula
-> > > for calculating the temperature.
-> > > 
-> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > 
-> > 
-> >   CC [M]  drivers/input/touchscreen/sun4i-ts.o
-> > drivers/input/touchscreen/sun4i-ts.c:208:15: error: variable
-> > ?sun4i_ts_tz_ops? has initializer but incomplete type
-> >  static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
-> >                ^
-> > drivers/input/touchscreen/sun4i-ts.c:209:2: error: unknown field
-> > ?get_temp? specified in initializer
-> >   .get_temp = get_temp,
-> >   ^
-> > drivers/input/touchscreen/sun4i-ts.c:209:2: warning: excess elements in
-> > struct initializer [enabled by default]
-> > drivers/input/touchscreen/sun4i-ts.c:209:2: warning: (near
-> > initialization for ?sun4i_ts_tz_ops?) [enabled by default]
-> > drivers/input/touchscreen/sun4i-ts.c: In function ?sun4i_ts_probe?:
-> > drivers/input/touchscreen/sun4i-ts.c:331:8: warning: passing argument 4
-> > of ?thermal_zone_of_sensor_register? from incompatible pointer type
-> > [enabled by default]
-> >         &sun4i_ts_tz_ops);
-> >         ^
-> > In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
-> > include/linux/thermal.h:302:1: note: expected ?int (*)(void *, long int
-> > *)? but argument is of type ?struct thermal_zone_of_device_ops *?
-> >  thermal_zone_of_sensor_register(struct device *dev, int id,
-> >  ^
-> > drivers/input/touchscreen/sun4i-ts.c:331:8: error: too few arguments to
-> > function ?thermal_zone_of_sensor_register?
-> >         &sun4i_ts_tz_ops);
-> >         ^
-> > In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
-> > include/linux/thermal.h:302:1: note: declared here
-> >  thermal_zone_of_sensor_register(struct device *dev, int id,
-> >  ^
-> > make[1]: *** [drivers/input/touchscreen/sun4i-ts.o] Error 1
-> > make: *** [drivers/input/touchscreen/sun4i-ts.o] Error 2
-> > 
-> 
-> What kernel version are you using?
-> 
-> It looks like you are missing the of thermal ops commit.
+Hello Vladimir,
 
-Ah, OK, I have not uprevved my branches with 3.19 stuff yet.
+On 09/01/2015 19:06, Vladimir Murzin wrote:
+> On 09/01/15 17:46, Mason wrote:
+>> On 09/01/2015 14:13, Russell King - ARM Linux wrote:
+>>
+>>> On Fri, Jan 09, 2015 at 01:59:10PM +0100, Mason wrote:
+>>>
+>>>> Yesterday, I used /dev/mem to mmap 2 GB and (to my surprise) it worked.
+>>>> Specifically, I opened /dev/mem O_RDWR | O_SYNC
+>>>> then called
+>>>>   mmap(NULL, 1U<<31, PROT_WRITE, MAP_SHARED, fd, 0x80000000);
+>>>
+>>> So you asked to map 2GB starting at 2GB physical.
+>>>
+>>>> And mmap returned a valid pointer.
+>>>
+>>> And that mapping would have been created to map physical addresses
+>>> 0x80000000-0xffffffff inclusive.
+>>>
+>>>> I was expecting it to fail.
+>>>>
+>>>> - the kernel is configured with VMSPLIT_3G (3G/1G user/kernel)
+>>>
+>>> This has no bearing on the above.
+>>
+>> I don't understand why.
+>>
+>> mmap allocates virtual addresses in the user-space process, yes?
+>> So if I had VMSPLIT_2G, user-space processes would be limited
+>> to 2G virtual addresses, and could not create a single 2G map
+>> on top of its stack and text space. Or am I missing something?
+> 
+> Because you are mmaping special file (dev/mem) mmap call is routed to
+> the dedicated hook, responsible for all "magic" you see. Please, take a
+> look at drivers/char/mem.c for details.
 
--- 
-Dmitry
+Errr, I thought it was clear I had read the source ;-)
+("I know /dev/mem's mmap calls remap_pfn_range [...]")
+http://lxr.free-electrons.com/source/drivers/char/mem.c#L307
+
+Hence my ioremap vs remap_pfn_range subject ;-)
+
+So are you saying I could use remap_pfn_range to map the
+full 4G of PA space into a process's VA space?
+
+Or, if I picked the VMSPLIT_2G option, are you saying
+mmap'ing 2G would succeed? (I will test these two
+scenarios ASAP.)
+
+Regards.
