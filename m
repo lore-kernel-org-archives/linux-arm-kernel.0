@@ -1,61 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Jan 2015 15:46:36 +0000
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <54AEBE45.9080203@redhat.com>
-References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
- <54AEBE45.9080203@redhat.com>
-Message-ID: <20150109154635.GG11258@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 09 Jan 2015 16:46:43 +0100
+Subject: [PATCH v2 2/4] Documentation: bindings: Add the regulator property
+ to the sub-nodes AHCI bindings
+In-Reply-To: <1420799989-10645-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1420799989-10645-1-git-send-email-gregory.clement@free-electrons.com>
+ <1420799989-10645-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <54AFF7E3.4070506@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 05:28:37PM +0000, Pratyush Anand wrote:
-> On Thursday 08 January 2015 09:53 PM, Will Deacon wrote:
-> > On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
-> >> I am trying to test following scenario, which seems valid to me. But I
-> >> am very new to ARM64 as well as to debugging tools, so seeking expert's
-> >> comment here.
-> >>
-> >> -- I have inserted a kprobe to the function uprobe_breakpoint_handler
-> >> which is called from elo_dbg
-> >> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
-> >>
-> >> -- kprobe is enabled.
-> >>
-> >> -- an uprobe is inserted into a test application and enabled.
-> >>
-> >> So, when uprobe is enabled and test code execution reaches to probe
-> >> instruction, it executes uprobe breakpoint instruction and el0_dbg
-> >> exception is raised.
-> >>
-> >> When control reaches to start of uprobe_breakpoint_handler and it
-> >> executes first instruction (which has been replaced with a kprobe
-> >> breakpoint instruction), el1_dbg exception is raised.
-> >
-> > Hmm, debug exceptions should be masked at this point so I don't see why
-> > you're taking the second debug exception.
-> >
-> 
-> So, you mean to say that when an exception which has been taken from 
-> lower exception level (EL0) is being executed, then we keep masked also 
-> the exception from current exception level (EL1)...
+Hi,
 
-Yeah, if you look at entry.S then you'll see that neither el0_dbg or el1_dbg
-re-enable debug exceptions (masked automatically by the CPU after taking the
-exception) until *after* the handling has completed. This is to prevent
-recursive debug exceptions, which I don't see how we can reasonable handle.
+On 09-01-15 11:39, Gregory CLEMENT wrote:
+> It is now possible to use a regulator property for each port of the
+> AHCI controller.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>   Documentation/devicetree/bindings/ata/ahci-platform.txt | 9 ++++++---
+>   1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index 4ab09f2202d4..87416d71c758 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -37,9 +37,10 @@ Required properties when using sub-nodes:
+>
+>
+>   Sub-nodes required properties:
+> -- reg               : the port number
+> -- phys              : reference to the SATA PHY node
+> -
+> +- reg					: the port number
+> +And at least one of the following properties:
+> +- phys              	: reference to the SATA PHY node
+> +- target-port<n>-supply	: regulator for SATA target power for port <n>
+>
+>   Examples:
+>           sata at ffe08000 {
+> @@ -68,10 +69,12 @@ With sub-nodes:
+>   		sata0: sata-port at 0 {
+>   			reg = <0>;
+>   			phys = <&sata_phy 0>;
+> +			target-port0-supply = <&reg_sata0>;
+>   		};
+>
 
-> If, so then how to handle it. One way is that I assign a __kprobe 
-> qualifier to uprobe_breakpoint_handler and uprobe_single_step_handler, 
-> so that an user can not insert a kprobe there. But, that does not seem 
-> to be a good idea, because it will only prevent these two functions to 
-> be probed. What about the functions which is being called by these 
-> functions like uprobe_pre_sstep_notifier & uprobe_post_sstep_notifier 
-> which lie in generic kernel code. So, may be we need something in 
-> debug-monitor, which handles this situation, no?
+I'm sorry, but I've to NAK this, I did not follow the regulator discussion.,
+thinking that it was just about the use of some utility function vs diy or
+some such, I had no idea this would impact the dt-binding.
 
-I'm not sure how to solve it, but we certainly can't allow debug exceptions
-to trigger on the debug exception handling path. The first thing to do would
-be finding out where they are getting re-enabled.
+The -port%d- bit is completely unnecessary from a dt pov. Devicetree is
+supposed to be OS agnostic, we cannot make the dt-binding ugly just because
+the regulator subsys in Linux does not provide the necessary functionality.
 
-Will
+I'm afraid you will have to get back to the regulator subsys people and tell
+them that we really need an of_regulator_get, so that we can tell the
+regulator subsys we want a regulator from a specific of_node.
+
+Please CC me when you re-open the discussion with the regulator people.
+
+Regards,
+
+Hans
