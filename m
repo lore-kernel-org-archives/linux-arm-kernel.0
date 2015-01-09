@@ -1,71 +1,130 @@
 From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Fri,  9 Jan 2015 16:11:44 +0100
-Subject: [PATCH 1/3] ARM: STi: Add STiH418 SoC support
+Date: Fri,  9 Jan 2015 16:11:46 +0100
+Subject: [PATCH 3/3] ARM: dts: STiH418: Add B2199 board support
 In-Reply-To: <1420816306-11305-1-git-send-email-maxime.coquelin@st.com>
 References: <1420816306-11305-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1420816306-11305-2-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1420816306-11305-4-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to STiH418 SoC.
+B2199 HDK is the reference board for STiH418 SoC.
+It has the following characteristics:
+ - 3GB DDR3
+ - 8GB eMMC / SD-Card slot
+ - 32MB NOR Flash
+ - 1 x Gbit Ethernet
+ - 1 x USB3.0 port
+ - 2 x USB2.0 ports
+ - 1 x Sata or Mini-PCIe port
+ - 1 x WiFi 802.11ac (Quantenna)
+ - 1 x HDMI out
+ - 1 x HDMI in
+ - 1 x SPDIF
 
 Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- Documentation/arm/sti/stih418-overview.txt    | 20 ++++++++++++++++++++
- Documentation/devicetree/bindings/arm/sti.txt |  4 ++++
- arch/arm/mach-sti/board-dt.c                  |  1 +
- 3 files changed, 25 insertions(+)
- create mode 100644 Documentation/arm/sti/stih418-overview.txt
+ arch/arm/boot/dts/Makefile          |  3 +-
+ arch/arm/boot/dts/stih418-b2199.dts | 78 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stih418-b2199.dts
 
-diff --git a/Documentation/arm/sti/stih418-overview.txt b/Documentation/arm/sti/stih418-overview.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 91bd5bd..cb37b5e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -441,7 +441,8 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
+ 	stih415-b2020.dtb \
+ 	stih416-b2000.dtb \
+ 	stih416-b2020.dtb \
+-	stih416-b2020e.dtb
++	stih416-b2020e.dtb \
++	stih418-b2199.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
 new file mode 100644
-index 0000000..1cd8fc8
+index 0000000..926235c
 --- /dev/null
-+++ b/Documentation/arm/sti/stih418-overview.txt
-@@ -0,0 +1,20 @@
-+			STiH418 Overview
-+			================
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2015 STMicroelectronics (R&D) Limited.
++ * Author: Maxime Coquelin <maxime.coquelin@st.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++#include "stih418.dtsi"
++/ {
++	model = "STiH418 B2199";
++	compatible = "st,stih418-b2199", "st,stih418";
 +
-+Introduction
-+------------
++	chosen {
++		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++		linux,stdout-path = &sbc_serial0;
++	};
 +
-+    The STiH418 is the new generation of SoC for UHDp60 set-top boxes
-+    and server/connected client application for satellite, cable, terrestrial
-+    and IP-STB markets.
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0xc0000000>;
++	};
 +
-+    Features
-+    - ARM Cortex-A9 1.5 GHz quad core CPU (28nm)
-+    - SATA2, USB 3.0, PCIe, Gbit Ethernet
-+    - HEVC L5.1 Main 10
-+    - VP9
++	aliases {
++		ttyAS0 = &sbc_serial0;
++	};
 +
-+  Document Author
-+  ---------------
++	soc {
++		sbc_serial0: serial at 9530000 {
++			status = "okay";
++		};
 +
-+  Maxime Coquelin <maxime.coquelin@st.com>, (c) 2015 ST Microelectronics
-diff --git a/Documentation/devicetree/bindings/arm/sti.txt b/Documentation/devicetree/bindings/arm/sti.txt
-index 92f16c7..d70ec35 100644
---- a/Documentation/devicetree/bindings/arm/sti.txt
-+++ b/Documentation/devicetree/bindings/arm/sti.txt
-@@ -13,3 +13,7 @@ Boards with the ST STiH407 SoC shall have the following properties:
- Required root node property:
- compatible = "st,stih407";
- 
-+Boards with the ST STiH418 SoC shall have the following properties:
-+Required root node property:
-+compatible = "st,stih418";
++		leds {
++			compatible = "gpio-leds";
++			red {
++				#gpio-cells = <2>;
++				label = "Front Panel LED";
++				gpios = <&pio4 1 0>;
++				linux,default-trigger = "heartbeat";
++			};
++			green {
++				#gpio-cells = <2>;
++				gpios = <&pio1 3 0>;
++				default-state = "off";
++			};
++		};
 +
-diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
-index 3cf6ef8..b067390 100644
---- a/arch/arm/mach-sti/board-dt.c
-+++ b/arch/arm/mach-sti/board-dt.c
-@@ -18,6 +18,7 @@ static const char *stih41x_dt_match[] __initdata = {
- 	"st,stih415",
- 	"st,stih416",
- 	"st,stih407",
-+	"st,stih418",
- 	NULL
- };
- 
++		i2c at 9842000 {
++			status = "okay";
++		};
++
++		i2c at 9843000 {
++			status = "okay";
++		};
++
++		i2c at 9844000 {
++			status = "okay";
++		};
++
++		i2c at 9845000 {
++			status = "okay";
++		};
++
++		i2c at 9540000 {
++			status = "okay";
++		};
++
++		/* SSC11 to HDMI */
++		i2c at 9541000 {
++			status = "okay";
++			/* HDMI V1.3a supports Standard mode only */
++			clock-frequency = <100000>;
++			st,i2c-min-scl-pulse-width-us = <0>;
++			st,i2c-min-sda-pulse-width-us = <5>;
++		};
++	};
++};
 -- 
 1.9.1
