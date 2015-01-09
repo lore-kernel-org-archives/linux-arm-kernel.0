@@ -1,81 +1,67 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 9 Jan 2015 12:44:44 -0800
-Subject: [PATCH] reset: sunxi: fix spinlock initialization
-In-Reply-To: <54AFE968.4010805@st.com>
-References: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
- <54AFC2A8.1010807@st.com> <54AFE968.4010805@st.com>
-Message-ID: <CANMBJr5VzdvSyh4e6yk0wCznVmEgHBEi_MqdgcBpR=Nbf0=WvQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 9 Jan 2015 21:45:22 +0100
+Subject: [RFC 02/11] i2c: add quirk checks to core
+In-Reply-To: <54B02D7F.7040501@cogentembedded.com>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+ <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+ <54B02D7F.7040501@cogentembedded.com>
+Message-ID: <20150109204522.GB1904@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Fri, Jan 09, 2015 at 10:35:27PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 01/09/2015 08:21 PM, Wolfram Sang wrote:
+> 
+> >Let the core do the checks if HW quirks prevent a transfer. Saves code
+> >from drivers and adds consistency.
+> 
+> >Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> >---
+> >  drivers/i2c/i2c-core.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 53 insertions(+)
+> >
+> >diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> >index 39d25a8cb1ad..7b10a19abf5b 100644
+> >--- a/drivers/i2c/i2c-core.c
+> >+++ b/drivers/i2c/i2c-core.c
+> >@@ -2063,6 +2063,56 @@ module_exit(i2c_exit);
+> >   * ----------------------------------------------------
+> >   */
+> >
+> >+/* Check if val is exceeding the quirk IFF quirk is non 0 */
+> >+#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
+> >+
+> >+static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
+> >+{
+> >+	dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
+> >+	return -EOPNOTSUPP;
+> >+}
+> 
+>    Always returning the same value doesn't make much sense. Are you trying
+> to save space on the call sites?
 
-On 9 January 2015 at 06:44, Maxime Coquelin <maxime.coquelin@st.com> wrote:
-> With Maxime in the To: list.
->
->
->
-> On 01/09/2015 12:59 PM, Maxime Coquelin wrote:
->>
->> Hi Tyler, Maxime,
->>
->> On 01/08/2015 01:54 AM, Tyler Baker wrote:
->>>
->>> Call spin_lock_init() before the spinlocks are used, preventing a lockdep
->>> splat.
->>>
->>> I have been observing lockdep complaining [1] during boot on my a80
->>> optimus [2]
->>> when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the
->>> splat,
->>> and has been tested on a few other sunxi platforms without issue.
->>>
->>> [1]
->>> http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
->>> [2] http://kernelci.org/boot/?a80-optimus
->>>
->>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
->>> ---
->>> This patch was tested on 3.19.0-rc3
->>>
->>>   drivers/reset/reset-sunxi.c | 2 ++
->>>   1 file changed, 2 insertions(+)
->>>
->>> diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
->>> index eebc52c..e37250c 100644
->>> --- a/drivers/reset/reset-sunxi.c
->>> +++ b/drivers/reset/reset-sunxi.c
->>> @@ -157,6 +157,8 @@ static int sunxi_reset_probe(struct platform_device
->>> *pdev)
->>>       if (IS_ERR(data->membase))
->>>           return PTR_ERR(data->membase);
->>>   +    spin_lock_init(&data->lock);
->>> +
->>
->> Shouldn't the lock be initialized also in early init function
->> (sunxi_reset_init) ?
+Please elaborate. I think it does. If a quirk matches, we report that we
+don't support this transfer.
 
-Thanks for pointing this out. It seems reasonable to me to add this
-for the sun6i platforms that use the early init function. Currently
-trying to track down a sun6i platform so I can run a few locking
-validation tests.
+> [...]
+> >@@ -2080,6 +2130,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+> >  	unsigned long orig_jiffies;
+> >  	int ret, try;
+> >
+> >+	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
+> 
+>    So, you only check for non-zero result of this function? Perhaps it makes
+> sense to return true/false instead?
 
->>
->> Regards,
->> Maxime
->>>
->>>       data->rcdev.owner = THIS_MODULE;
->>>       data->rcdev.nr_resets = resource_size(res) * 32;
->>>       data->rcdev.ops = &sunxi_reset_ops;
->>
->>
->
+Could be done, but what would be the advantage? A lot of functions
+return errno or 0.
 
-
-
--- 
-Tyler Baker
-Tech Lead, LAVA
-Linaro.org | Open source software for ARM SoCs
-Follow Linaro: http://www.facebook.com/pages/Linaro
-http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/6a035f82/attachment-0001.sig>
