@@ -1,76 +1,75 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 9 Jan 2015 02:42:15 +0100
-Subject: [PATCH 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c LED
- driver
-In-Reply-To: <54AF2275.9050600@gmail.com>
-References: <1420763178-10115-1-git-send-email-andrew@lunn.ch>
- <1420763178-10115-3-git-send-email-andrew@lunn.ch>
- <54AF2275.9050600@gmail.com>
-Message-ID: <20150109014215.GC10191@lunn.ch>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Fri,  9 Jan 2015 09:52:49 +0800
+Subject: [PATCH] ASoC: rockchip: i2s: add rockchip_dmaengine_pcm_config
+Message-ID: <1420768369-6681-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 06:06:05AM +0530, Varka Bhadram wrote:
-> 
-> On Friday 09 January 2015 05:56 AM, Andrew Lunn wrote:
-> >The TLC59116 is an I2C bus controlled 16-channel LED driver.  Each LED
-> >output has its own 8-bit fixed-frequency PWM controller to control the
-> >brightness of the LED.
-> >
-> >This is based on a driver from Belkin, but has been extensively
-> >rewritten.
-> >
-> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> >Cc: Matthew.Fatheree at belkin.com
-> >---
-> >  drivers/leds/Kconfig         |   7 ++
-> >  drivers/leds/Makefile        |   1 +
-> >  drivers/leds/leds-tlc59116.c | 253 +++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 261 insertions(+)
-> >  create mode 100644 drivers/leds/leds-tlc59116.c
-> >
-> (...)
-> 
-> >+static const struct of_device_id of_tlc59116_leds_match[] = {
-> >+	{ .compatible = "ti,tlc59116", },
-> >+	{},
-> >+};
-> >+
-> 
-> Missing MODULE_DEVICE_TABLE(of, ...)..?
+This patch makes snd_dmaengine_pcm_register with rockchip_dmaengine_pcm_config,
+which configure the parameters of period and buffer match to rockchip DMAC.
 
-Thanks. I will add it. I was using leds-tca6507.c as my reference. It
-also does not have one, but i will leave that to somebody else to fix.
+=======================
+without rockchip_dmaengine_pcm_config, and test with command -
+aplay -D hw:0,0 /tmp/a, there are the error dump:
+[  134.899396] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(7)
+[  134.906270] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(8)
+[  134.913141] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(9)
 
-     Andrew
+And bellow sound from DMA debugger:
+"I debugged it a little and it looks like what is happening is that requests
+which aren't a multiple of burst size * burst length are coming in.  Right
+now the i2s block is setting a burst size of 4 and burst length of 4, but
+the dmaengine code has no idea about this restriction.  I was able to
+eliminate the messages by changing burst length to 1 in the i2s driver.
+This fix would always work as long as we're sending a multiple of 4 bytes
+(which so far seems to be the case)"
+
+This patch can make the length of dma buffer is aligned to a multiple of burst size
+and burst length.
+
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index c74ba37..bdd1021 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -408,6 +408,24 @@ static const struct regmap_config rockchip_i2s_regmap_config = {
+ 	.cache_type = REGCACHE_FLAT,
+ };
  
-> >+static const struct i2c_device_id tlc59116_id[] = {
-> >+	{ "tlc59116" },
-> >+	{},
-> >+};
-> >+MODULE_DEVICE_TABLE(i2c, tlc59116_id);
-> >+
-> >+static struct i2c_driver tlc59116_driver = {
-> >+	.driver = {
-> >+		.name = "tlc59116",
-> >+		.of_match_table = of_match_ptr(of_tlc59116_leds_match),
-> >+
-> 
-> Remove this unnecessary line space...
-> 
-> >+	},
-> >+	.probe = tlc59116_probe,
-> >+	.remove = tlc59116_remove,
-> >+	.id_table = tlc59116_id,
-> >+};
-> >+
-> >+module_i2c_driver(tlc59116_driver);
-> >+
-> >+MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
-> >+MODULE_LICENSE("GPL");
-> >+MODULE_DESCRIPTION("TLC59116 LED driver");
-> 
-> -- 
-> Thanks and Regards,
-> Varka Bhadram.
-> 
++static const struct snd_pcm_hardware rockchip_pcm_hardware = {
++	.info			= SNDRV_PCM_INFO_MMAP |
++				  SNDRV_PCM_INFO_MMAP_VALID |
++				  SNDRV_PCM_INFO_INTERLEAVED,
++	.period_bytes_min	= 1024,
++	.period_bytes_max	= PAGE_SIZE,
++	.periods_min		= 3,
++	.periods_max		= 8,
++	.buffer_bytes_max	= 8 * PAGE_SIZE,
++	.fifo_size		= 16,
++};
++
++static const struct snd_dmaengine_pcm_config rockchip_dmaengine_pcm_config = {
++	.pcm_hardware = &rockchip_pcm_hardware,
++	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
++	.prealloc_buffer_size = PAGE_SIZE * 8,
++};
++
+ static int rockchip_i2s_probe(struct platform_device *pdev)
+ {
+ 	struct rk_i2s_dev *i2s;
+@@ -478,7 +496,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 		goto err_suspend;
+ 	}
+ 
+-	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
++	ret = snd_dmaengine_pcm_register(&pdev->dev,
++					 &rockchip_dmaengine_pcm_config, 0);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not register PCM\n");
+ 		goto err_pcm_register;
+-- 
+1.9.1
