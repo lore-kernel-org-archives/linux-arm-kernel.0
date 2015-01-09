@@ -1,23 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Jan 2015 01:06:56 +0100
-Subject: [PATCH 1/2] soc: qcom: Add TCSR driver
-In-Reply-To: <1420757577-20425-2-git-send-email-agross@codeaurora.org>
-References: <1420757577-20425-1-git-send-email-agross@codeaurora.org>
- <1420757577-20425-2-git-send-email-agross@codeaurora.org>
-Message-ID: <4757751.7cLGsvPiZX@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri,  9 Jan 2015 01:26:16 +0100
+Subject: [PATCH 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
+Message-ID: <1420763178-10115-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 January 2015 16:52:56 Andy Gross wrote:
-> This patch adds support for the TCSR (Top Control and Status Register) IP block
-> that is present in the Qualcomm IPQ8064, APQ8064, and some later processors.
-> This block contains additional configuration and mux settings for various
-> peripherals in the system, including the ADM DMA block and USB controller.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> 
+This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+driver. This driver is used on the Belkin WRT1900AC access point and
+the C code is derived from code Belkin contributed to OpenWRT.
+However it has been extensively re-written, and a device tree binding
+added to replace platform data.
 
-It sounds like this is a collection of random registers. Have you considered
-making it a syscon node instead?
+Cc: Matthew.Fatheree at belkin.com
 
-	Arnd
+Andrew Lunn (2):
+  leds: tlc59116: Document binding for the TI 16 Channel i2c LED driver
+  leds: tlc59116: Driver for the TI 16 Channel i2c LED driver
+
+ .../devicetree/bindings/leds/leds-tlc59116.txt     |  41 ++++
+ drivers/leds/Kconfig                               |   7 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-tlc59116.c                       | 253 +++++++++++++++++++++
+ 4 files changed, 302 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+ create mode 100644 drivers/leds/leds-tlc59116.c
+
+-- 
+2.1.3
