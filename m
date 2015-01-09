@@ -1,66 +1,108 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 09 Jan 2015 17:28:22 +0000
-Subject: [PATCH v20 08/11] ARM: kprobes: enable OPTPROBES for ARM 32
-In-Reply-To: <20150109163505.GS12302@n2100.arm.linux.org.uk>
-References: <1420457376-77366-1-git-send-email-wangnan0@huawei.com>
- <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
- <1420799154.4160.19.camel@linaro.org>
- <20150109163505.GS12302@n2100.arm.linux.org.uk>
-Message-ID: <1420824502.4160.62.camel@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 09 Jan 2015 09:34:46 -0800
+Subject: [PATCH] drivers: cpuidle: don't initialize big.LITTLE driver if
+ MCPM is unavailable
+In-Reply-To: <54AEEDDC.3070609@linaro.org> (Daniel Lezcano's message of "Thu,
+ 08 Jan 2015 21:51:40 +0100")
+References: <1420698544-10277-1-git-send-email-sudeep.holla@arm.com>
+ <54AE459B.8010703@linaro.org> <54AE4ADF.3030307@arm.com>
+ <54AE55CE.6040201@linaro.org> <54AE5C8F.9080600@arm.com>
+ <54AE65EC.3050808@linaro.org> <20150108122958.GB32308@red-moon>
+ <7hh9w1vwzr.fsf@deeprootsystems.com> <54AEEDDC.3070609@linaro.org>
+Message-ID: <7hoaq7vow9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-01-09 at 16:35 +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 09, 2015 at 10:25:54AM +0000, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2015-01-09 at 14:37 +0800, Wang Nan wrote:
-> > > +			"	and	r4, sp, #4\n"
-> > > +			"	sub	sp, sp, r4\n"
-> > > +#if __LINUX_ARM_ARCH__ >= 5
-> > > +			"	blx	r2\n"
-> > > +#else
-> > > +			"	mov     lr, pc\n"
-> > > +			"	bx	r2\n"
-> > 
-> > I think the BX instruction is not supported for ARMv4 chips that don't
-> > have Thumb support (e.g. SA110), at least an old ARM ARM I have says BX
-> > is supported on "Version 5 and above, and T variants of version 4".
-> 
-> Correct.
-> 
-> > Though building assabet_defconfig with kprobes enabled doesn't produce
-> > an error for the BX instruction (!?)
-> 
-> Which config are you using?  Does it have CONFIG_CPU_32v4 enabled?
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-Yes
+> On 01/08/2015 09:27 PM, Kevin Hilman wrote:
+>> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+>>
+>>> On Thu, Jan 08, 2015 at 11:11:40AM +0000, Daniel Lezcano wrote:
+>>>
+>>> [...]
+>>>
+>>>>>> IMO, it would be better to be more strict with the mcpm
+>>>>>> initialization and not let the system boot if something is wrong with
+>>>>>> it which I believe is coming from the firmware and let the user to
+>>>>>> figure out what is really happening by letting him to disable mcpm in
+>>>>>> the kernel configuration (which in turn will disable cpuidle).
+>>>>>
+>>>>> Again I fully agree, but in this case I manually switched to legacy boot
+>>>>> mode on TC2 and used same kernel with MCPM config enabled. Do you mean
+>>>>> to say we should not support that even when developer understand the
+>>>>> consequence of that ?
+>>>>
+>>>> Well, I see there are the exynos5410/5420/5422. For the 5422 on
+>>>> chromebook2 MCPM works well, IIUC. But for the 5422 on odroid-xu3, MCPM
+>>>> does not work, hence cpuidle neither because of the firmware.
+>>>>
+>>>> Silently disabling cpuidle because mcpm did not initialize will hide the
+>>>> issue.
+>>>
+>>> No. MCPM *will* initialize, Sudeep's patch does not silently disable
+>>> CPUidle.
+>>> To put it differently MCPM will initialize if CCI is in the DT and it
+>>> is "available", so unless defined differently in the dts mcpm will be
+>>> available and CPUidle will be initialized (and break if there is an issue
+>>> with the platform FW/HW).
+>>>
+>>> I agree the mechanism to define if MCPM is available can be improved
+>>> but that's what it is at the moment.
+>>>
+>>> The problem here is to boot a platform with different boot methods
+>>> and still have a single kernel image.
+>>>
+>>>> I understand your point about switching to legacy without recompiling
+>>>> the kernel.
+>>>>
+>>>> I suggest we add a big fat WARN_ON when the mcpm initialization fails
+>>>> with your patch.
+>>>
+>>> I think there are multiple facets we are tackling at once here and they
+>>> should not be mixed.
+>>>
+>>> 1) We left static idle states there to cope with legacy DTBs that were
+>>>     published before we introduced idle states bindings. If we want to
+>>>     boot eg vexpress in legacy mode but single kernel image with MCPM on,
+>>>     we could remove the idle states in DT and the problem would be
+>>>     solved; we can't do that since we were forced to leave the static
+>>>     idle tables. Overall I think this is not the way to fix the issue.
+>>> 2) The idle driver should be initialized if there is an idle state entry
+>>>     method, which in this case is MCPM. If I boot vexpress with MCPM
+>>>     enabled but legacy boot method (ie spin table) with a single kernel image
+>>>     I do not want to warn if the idle states entry method (MCPM) can't be
+>>>     initialized (and I do not want to get a warning if the idle driver is
+>>>     triggering a mcpm_cpu_suspend), so Sudeep's patch is valid and I am
+>>>     against adding a:
+>>>
+>>>     if (WARN_ON(!mcpm_is_available())
+>>>
+>>> 3) Sudeep's patch is not hiding anything. If CCI is in DT, CCI is
+>>>     probed so mcpm_is_available() == true. If the firmware is borked
+>>>     the idle states will be entered and we will notice there is something
+>>>     wrong
+>>>
+>>> So overall I think Sudeep's patch is sound. I also think we should
+>>> improve the way we detect if MCPM is available, and again, I think the
+>>> CPU operations on arm64 are a good example that we can and we should
+>>> replicate.
+>>
+>> This patch disables CPUidle all together, but shouldn't it just disable
+>> the states that rely on MCPM?  IOW, C1 should still work just fine since
+>> it doesn't use MCPM, right?  So, rather than fail the init, it should
+>> just drop any MCPM states (e.g. set ->state_count = 1)
+>
+> Well, that means we will have a cpuidle driver with the WFI state only
+> which is the default idle function when there is no cpuidle driver (+
+> without the governor math).
 
-> That should result in "-D__LINUX_ARM_ARCH__=4 -march=armv4" being
-> passed to the compiler (please check with make V=1).
+Ah, OK.  Then it makes more sense to disable the driver all together.
 
-I does have that, the arguments for compiling this source file
-include...
+Feel free to add
 
--mno-thumb-interwork -marm -D__LINUX_ARM_ARCH__=4 -march=armv4 -mtune=strongarm1100
+Acked-by: Kevin Hilman <khilman@linaro.org>
 
-Using objdump I can see that the BX instruction does indeed end up in
-the code, it hasn't been auto-magically turned into a MOV PC,R2.
+Thanks,
 
-Adding in a ".code 16" to the assembler produces "Error: selected
-processor does not support THUMB opcodes", so at least it's got that
-right. 
-
-I have "gcc version 4.9.1 (Ubuntu/Linaro 4.9.1-16ubuntu6)"
-
-Interestingly...
-
-$ echo 'asm ("bx r2\n");' | arm-linux-gnueabihf-gcc -x c -S -march=armv4 -
-<stdin>:1:0: warning: target CPU does not support THUMB instructions
-$
-
-but adding -marm gets rid of that error.
-
-$ echo 'asm ("bx r2\n");' | arm-linux-gnueabihf-gcc -x c -S -marm -march=armv4 -
-$
-
--- 
-Tixy
+Kevin
