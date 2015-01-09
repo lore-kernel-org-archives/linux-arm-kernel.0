@@ -1,64 +1,97 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 9 Jan 2015 09:34:50 -0600
-Subject: [PATCH v3 2/4] of: move of_dma_configure() to device,
- c to help re-use
-In-Reply-To: <2083932.v1GzgAfexK@wuerfel>
-References: <1420656594-8908-1-git-send-email-m-karicheri2@ti.com>
- <3861625.CJ6m15sZMh@wuerfel> <54AED9EC.1020703@ti.com>
- <2083932.v1GzgAfexK@wuerfel>
-Message-ID: <CAL_JsqLG2OQL2TMMrXi4U0PU1vNzgodUehoZwpds5z8JKsB1jQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Jan 2015 15:38:17 +0000
+Subject: [PATCH 7/8] arm64: use 'physmem' memblock to improve
+ CONFIG_STRICT_DEVMEM handling
+In-Reply-To: <1419275322-29811-8-git-send-email-ard.biesheuvel@linaro.org>
+References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1419275322-29811-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150109153817.GE11258@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 8, 2015 at 4:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 08 January 2015 14:26:36 Murali Karicheri wrote:
->> On 01/08/2015 03:40 AM, Arnd Bergmann wrote:
->> > On Wednesday 07 January 2015 17:37:56 Rob Herring wrote:
->> >> On Wed, Jan 7, 2015 at 12:49 PM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
->> >>
->> >>> +       ret = of_dma_get_range(np,&dma_addr,&paddr,&size);
->> >>> +       if (ret<  0) {
->> >>> +               dma_addr = offset = 0;
->> >>> +               size = dev->coherent_dma_mask + 1;
->> >>
->> >> If coherent_dma_mask is DMA_BIT_MASK(64), then you will overflow and
->> >> have a size of 0. There may also be a problem when the mask is only
->> >> 32-bit type.
->> >
->> > The mask is always a 64-bit type, it's not optional. But you are right,
->> > the 64-bit mask case is broken, so I guess we have to fix it differently
->> > by always passing the smaller value into arch_setup_dma_ops and
->> > adapting that function instead.
->> Arnd,
->>
->> What is the smaller value you are referring to in the below code?
->> between *dev->dma_mask and size from DT? But overflow can still happen
->> when size is to be calculated in arch_setup_dma_ops() for Non DT case or
->> when DT size is configured to be equivalent of DMA_BIT_MASK(64) + 1. Can
->> we discuss the code change you have in mind when you get a chance?
->
-> I meant changing every function that the size values gets passed into
-> to take a mask like 0xffffffff instead of a size like 0x100000000, so
-> we can represent a 64-bit capable bus correctly.
+On Mon, Dec 22, 2014 at 07:08:41PM +0000, Ard Biesheuvel wrote:
+> The 'physmem' memblock table allows us to classify memory as RAM even
+> if it is not covered by the ordinary 'memory' memblock table.
+> 
+> Under CONFIG_STRICT_DEVMEM, we can use this to:
+> - allow read-only access to parts of RAM that are not considered memory
+>   by the kernel, this is mainly intended for exposing UEFI configuration
+>   tables such as SMBIOS to userland;
+> - avoid using non-cached mappings for those parts of RAM, as it may
+>   result in mismatched attributes.
 
-Or you could special case a size of 0 to mean all/max? I'm not sure if
-we need to handle size=0 for other reasons beyond just wrong DT data.
+Looks fine to me assuming that the rest of the series is ok:
 
-> This means we also need to adapt the value returned from of_dma_get_range.
-> A minor complication here is that the DT properties sometimes already
-> contain the mask value, in particular when we want to represent a
-> full mapping like
->
->         bus {
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 dma-ranges = <0 0 0xffffffff>; /* all 4 GB, DMA_BIT_MASK(32) */
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-This is wrong though, right? The DT should be size. Certainly, this
-could be a valid size, but that would not make the mask 0xfffffffe. We
-would still want it to be 0xffffffff.
+Will
 
-We could do a fixup for these cases adding 1 if bit 0 is set (or not
-subtracting 1 if we want the mask).
-
-Rob
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig   |  1 +
+>  arch/arm64/mm/mmap.c |  2 +-
+>  arch/arm64/mm/mmu.c  | 15 ++++++++++++++-
+>  3 files changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b1f9a20a3677..86902f8d8e36 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -60,6 +60,7 @@ config ARM64
+>  	select HAVE_GENERIC_DMA_COHERENT
+>  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+>  	select HAVE_MEMBLOCK
+> +	select HAVE_MEMBLOCK_PHYS_MAP
+>  	select HAVE_PATA_PLATFORM
+>  	select HAVE_PERF_EVENTS
+>  	select HAVE_PERF_REGS
+> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+> index 54922d1275b8..9f558ab41f39 100644
+> --- a/arch/arm64/mm/mmap.c
+> +++ b/arch/arm64/mm/mmap.c
+> @@ -126,7 +126,7 @@ int devmem_is_allowed(unsigned long pfn)
+>  {
+>  	if (iomem_is_exclusive(pfn << PAGE_SHIFT))
+>  		return 0;
+> -	if (!page_is_ram(pfn))
+> +	if (!pfn_valid(pfn))
+>  		return 1;
+>  	return 0;
+>  }
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 328638548871..083be3de1a87 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -122,7 +122,7 @@ early_param("cachepolicy", early_cachepolicy);
+>  pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>  			      unsigned long size, pgprot_t vma_prot)
+>  {
+> -	if (!pfn_valid(pfn))
+> +	if (!memblock_is_physmem(PFN_PHYS(pfn)))
+>  		return pgprot_noncached(vma_prot);
+>  	else if (file->f_flags & O_SYNC)
+>  		return pgprot_writecombine(vma_prot);
+> @@ -130,6 +130,19 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>  }
+>  EXPORT_SYMBOL(phys_mem_access_prot);
+>  
+> +/*
+> + * This definition of phys_mem_access_prot_allowed() overrides
+> + * the __weak definition in drivers/char/mem.c
+> + */
+> +int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
+> +				 unsigned long size, pgprot_t *prot)
+> +{
+> +	/* Disallow read-write access to system RAM */
+> +	if (memblock_is_physmem(PFN_PHYS(pfn)) && pgprot_val(*prot) & PTE_WRITE)
+> +		return 0;
+> +	return 1;
+> +}
+> +
+>  static void __init *early_alloc(unsigned long sz)
+>  {
+>  	void *ptr = __va(memblock_alloc(sz, sz));
+> -- 
+> 1.8.3.2
+> 
+> 
