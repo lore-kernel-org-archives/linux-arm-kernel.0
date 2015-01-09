@@ -1,106 +1,76 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 9 Jan 2015 10:07:18 +0000
-Subject: [PATCH v5][resend v4] of: replace Asahi Kasei Corp vendor prefix
-In-Reply-To: <54AF5AB0.2050208@wwwdotorg.org>
-References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
- <20140922130026.GK3290@leverpostej>
- <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
- <20140922132743.GM3290@leverpostej>
- <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
- <1415845309.4269.6.camel@perches.com>
- <20141113025105.GA16652@verge.net.au>
- <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
- <20141113110740.GE3815@sirena.org.uk>
- <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
- <20141114093554.GC3810@ulmo>
- <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
- <5469CD47.3040409@cogentembedded.com>
- <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
- <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
- <5478603D.1080404@cogentembedded.com>
- <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
- <87lhm7t37l.wl%kuninori.morimoto.gx@renesas.com>
- <87egr4vcxu.wl%kuninori.morimoto.gx@renesas.com>
- <54AF5AB0.2050208@wwwdotorg.org>
-Message-ID: <871tn4uv0j.wl%kuninori.morimoto.gx@renesas.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 Jan 2015 11:12:16 +0100
+Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
+In-Reply-To: <1417131990-17954-2-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1417131990-17954-1-git-send-email-rjui@broadcom.com>
+ <1417131990-17954-2-git-send-email-rjui@broadcom.com>
+Message-ID: <CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 28, 2014 at 12:46 AM, Ray Jui <rjui@broadcom.com> wrote:
 
-Hi Stephen
+> Device tree binding documentation for Broadcom Cygnus pinctrl driver
+>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  .../bindings/pinctrl/brcm,cygnus-pinctrl.txt       |   92 ++++++++++++++++++++
+>  1 file changed, 92 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+> new file mode 100644
+> index 0000000..86e4579
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+> @@ -0,0 +1,92 @@
+> +Broadcom Cygnus Pin Controller
+> +
+> +The Cygnus pin controller supports setting the alternate functions of groups
+> +of pins. Pinmux configuration on individual pins is not supported by the
+> +Cygnus A0 SoC.
+> +
+> +Required properties:
+> +
+> +- compatible:
+> +    Must be "brcm,cygnus-pinctrl"
+> +
+> +- reg:
+> +    Define the base and range of the I/O address space that contain the Cygnus
+> +pin control registers
 
-Thank you for your feedback
+The following is subnodes. Indicate clearly in the binding that these are
+*not* properties of the main node, but individual subnodes.
 
-> > I'm sending this "of: replace Asahi Kasei Corp vendor prefix" during
-> > half-year (since Jun 2014) , many times. But, no-one care it.
-> > I don't know who is the best maintainer.
-> >  - Stephen : because it has Tegra ?
-> >  - Olof    : because it has Tegra (= ARM) ?
-> >  - Arnd    : because it has Tegra (= ARM) ?
-> >  - Matthias: because it has Tegra (= ARM SoC) ?
-> >  - Rob     : because DT ?
-> >  - Andrew  : Last chance ?
-> > 
-> > But, could you please care this patch ?
-> > I will re-send it again
-> 
-> It doesn't seem to be ack'd by any of the DT maintainers. Retro-actively
-> changing a DT vendor name would need that, I think.
+> +- brcm,groups:
+> +    This can be strings of one or more group names. This defines the group(s)
+> +that one wants to configure
+> +
+> +- brcm,function:
+> +    This is the alternate function that one wants to configure to. Valid
+> +alternate functions are "alt1", "alt2", "alt3", "alt4"
 
-Rob ?
-I had sent this patch to him since half-years ago, many times...
-Or other maintainer ?
+NAK. We have standardized bindings for groups and functions,
+and there are pending patches from S?ren Brinkmann adding
+this to the pinctrl DT parsing core.
 
-> Thierry and Alex (both Tegra maintainers) appear to have ack'd it, so it
-> seems they expect it to go through some tree other than Tegra. Weren't
-> there a bunch of related patches along with this (e.g. updating relevant
-> drivers to support both prefixes?) so it was expected this patch would
-> be applied together with them?
+Just use "groups" and "function" and refer to
+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
 
-I guess they expected it goes to DT branch (?)
-This is only 1 patch. it doesn't have related patch-set
+Then "alt1", "alt2" etc are non-functional names of functions.
+Use the real function names, like "spi0" or so. This
+alt-business seems to be just a shortcut to make it
+simple, don't do that.
 
-> >> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >>
-> >> Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
-> >> by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
-> >>
-> >> It went through the appropriate review process. But, almost all
-> >> Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
-> >> (arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
-> >>  but there are instances of "asahi-kasei,ak8975" in other dts files.
-> >>  And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
-> >> So, we made a mistake there.
-> >>
-> >> In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
-> >> prerfix in DT file.
-> >> (DT compatible string vendor "asahi-kasei" appears un-documented)
-> >>
-> >> Marking it deprecated and warning with checkpatch is certainly
-> >> preferable. So, this patch replace "ak" to "asahi-kasei" in
-> >> vendor-prefixes.txt. (and fixup tegra20-seaboard)
-> >>
-> >> OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
-> >> doesn't care about it. Because no DT is using that today.
-> >>
-> >> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >> Acked-by: Thierry Reding <treding@nvidia.com>
-> >> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> 
-> >> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> 
-> >> -ak	Asahi Kasei Corp.
-> 
-> >> +asahi-kasei	Asahi Kasei Corp.
-> 
-> >> diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-> 
-> >>  		magnetometer at c {
-> >> -			compatible = "ak,ak8975";
-> >> +			compatible = "asahi-kasei,ak8975";
-> 
+Then you use e.g. "spi0" as a group name. I prefer you
+call that "spi0_grp" or something to say it is a group of
+pins associated with spi0, as spi0 is actually the
+function.
 
+If unsure of the definitions of group and function, refer
+to Documentation/pinctrl.txt
 
-Best regards
----
-Kuninori Morimoto
+Yours,
+Linus Walleij
