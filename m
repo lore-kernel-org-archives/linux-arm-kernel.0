@@ -1,92 +1,30 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  9 Jan 2015 10:51:31 +0100
-Subject: [PATCH v2 5/8] ARM: at91: move the restart function to the system
- timer driver
-In-Reply-To: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1420797094-9444-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 9 Jan 2015 10:53:49 +0100
+Subject: [PATCH 1/3] gpio: sx150x: move to irqdomain framework for sx150x
+ driver
+In-Reply-To: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
+References: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdaYb3Fnbm5To0Y0tJe1xO-Jb0MdkmR9rsqVEWFEOXviFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Restarting on an at91rm9200 is handled by using the system timer. Move that
-function to the system timer driver.
+On Thu, Dec 4, 2014 at 1:12 PM, Barry Song <21cnbao@gmail.com> wrote:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91rm9200.c      | 11 -----------
- drivers/clocksource/timer-atmel-st.c | 12 ++++++++++++
- 2 files changed, 12 insertions(+), 11 deletions(-)
+> From: Wei Chen <Wei.Chen@csr.com>
+>
+> The sx150x gpio driver used a loop to set liner irq map for gpio pins.
+> Now we use the irq domain to rebuild this irq mappig and make sure the
+> codes are still compatible to old users.
+>
+> this patch also adds IRQF_ONESHOT flag to fix the IRQ flooding issues.
+>
+> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index b52916947535..4ea889cd6091 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -15,7 +15,6 @@
- 
- #include <asm/mach/map.h>
- #include <asm/system_misc.h>
--#include <mach/at91_st.h>
- #include <mach/hardware.h>
- 
- #include "soc.h"
-@@ -30,15 +29,6 @@ static void at91rm9200_idle(void)
- 	at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
- }
- 
--static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
--{
--	/*
--	 * Perform a hardware reset with the use of the Watchdog timer.
--	 */
--	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
--	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
--}
--
- /* --------------------------------------------------------------------
-  *  AT91RM9200 processor initialization
-  * -------------------------------------------------------------------- */
-@@ -51,7 +41,6 @@ static void __init at91rm9200_map_io(void)
- static void __init at91rm9200_initialize(void)
- {
- 	arm_pm_idle = at91rm9200_idle;
--	arm_pm_restart = at91rm9200_restart;
- }
- 
- 
-diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-index 51761f8927b7..522583d6cc78 100644
---- a/drivers/clocksource/timer-atmel-st.c
-+++ b/drivers/clocksource/timer-atmel-st.c
-@@ -29,6 +29,7 @@
- #include <linux/of_irq.h>
- 
- #include <asm/mach/time.h>
-+#include <asm/system_misc.h>
- 
- #include <mach/at91_st.h>
- #include <mach/hardware.h>
-@@ -180,6 +181,15 @@ static struct clock_event_device clkevt = {
- 	.set_mode	= clkevt32k_mode,
- };
- 
-+static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+	/*
-+	 * Perform a hardware reset with the use of the Watchdog timer.
-+	 */
-+	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-+	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-+}
-+
- void __iomem *at91_st_base;
- EXPORT_SYMBOL_GPL(at91_st_base);
- 
-@@ -248,4 +258,6 @@ void __init at91rm9200_timer_init(void)
- 
- 	/* register clocksource */
- 	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
-+
-+	arm_pm_restart = at91rm9200_restart;
- }
--- 
-2.1.0
+Excellent, patch applied.
+
+I added select GPIOLIB_IRQCHIP to the Kconfig though, to
+make sure we have the proper library functions.
+
+Yours,
+Linus Walleij
