@@ -1,54 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Jan 2015 15:49:24 +0000
-Subject: [PATCH v5 7/8] arm64/efi: remove free_boot_services() and friends
-In-Reply-To: <1420742914-2404-8-git-send-email-ard.biesheuvel@linaro.org>
-References: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
- <1420742914-2404-8-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150109154924.GH11258@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri,  9 Jan 2015 15:50:45 +0000
+Subject: [PATCH] irqchip: gicv3-its: fix ITS CPU init
+Message-ID: <1420818645-2349-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 06:48:33PM +0000, Ard Biesheuvel wrote:
-> Now that we are calling SetVirtualAddressMap() from the stub, there is no
-> need to reserve boot-only memory regions, which implies that there is also
-> no reason to free them again later.
-> 
-> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 123 +-----------------------------------------------
->  1 file changed, 1 insertion(+), 122 deletions(-)
+We skip initialisation of ITS in case the device-tree has no
+corresponding description, but we are still accessing to ITS bits while
+setting CPU interface what leads to the kernel panic:
 
-[...]
+ITS: No ITS available, not enabling LPIs
+CPU0: found redistributor 0 region 0:0x000000002f100000
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = ffffffc0007fb000
+[00000000] *pgd=00000000fc407003, *pud=00000000fc407003, *pmd=00000000fc408003, *pte=006000002f000707
+Internal error: Oops: 96000005 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.19.0-rc2+ #318
+Hardware name: FVP Base (DT)
+task: ffffffc00077edb0 ti: ffffffc00076c000 task.ti: ffffffc00076c000
+PC is at its_cpu_init+0x2c/0x320
+LR is at gic_cpu_init+0x168/0x1bc
 
-> -static void __init free_boot_services(void)
-> -{
-> -	u64 total_freed = 0;
-> -	u64 keep_end, free_start, free_end;
-> -	efi_memory_desc_t *md;
-> -
-> -	/*
-> -	 * If kernel uses larger pages than UEFI, we have to be careful
-> -	 * not to inadvertantly free memory we want to keep if there is
-> -	 * overlap at the kernel page size alignment. We do not want to
-> -	 * free is_reserve_region() memory nor the UEFI memmap itself.
-> -	 *
-> -	 * The memory map is sorted, so we keep track of the end of
-> -	 * any previous region we want to keep, remember any region
-> -	 * we want to free and defer freeing it until we encounter
-> -	 * the next region we want to keep. This way, before freeing
-> -	 * it, we can clip it as needed to avoid freeing memory we
-> -	 * want to keep for UEFI.
-> -	 */
-> -
-> -	keep_end = 0;
-> -	free_start = 0;
-> -
-> -	for_each_efi_memory_desc(&memmap, md) {
-> -		u64 paddr, npages, size;
+It happens in gic_rdists_supports_plpis() because gic_rdists is NULL.
+The gic_rdists is set to non-NULL only when ITS node is presented in
+the device-tree.
 
-I'm glad to see the back of this function, thanks.
+Fix this by moving the call to gic_rdists_supports_plpis() inside the
+!list_empty(&its_nodes) block, because it is that list that guards the
+validity of the rest of the information in this driver.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-Will
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 86e4684..128a12b 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1382,12 +1382,11 @@ static bool gic_rdists_supports_plpis(void)
+ 
+ int its_cpu_init(void)
+ {
+-	if (!gic_rdists_supports_plpis()) {
+-		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+-		return -ENXIO;
+-	}
+-
+ 	if (!list_empty(&its_nodes)) {
++		if (!gic_rdists_supports_plpis()) {
++			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
++			return -ENXIO;
++		}
+ 		its_cpu_init_lpis();
+ 		its_cpu_init_collection();
+ 	}
+-- 
+1.7.9.5
