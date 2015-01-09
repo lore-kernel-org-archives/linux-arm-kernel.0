@@ -1,87 +1,88 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  9 Jan 2015 10:51:34 +0100
-Subject: [PATCH v2 8/8] ARM: at91: remove useless include
-In-Reply-To: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1420797094-9444-9-git-send-email-alexandre.belloni@free-electrons.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  9 Jan 2015 11:15:33 +0100
+Subject: [PATCH v2] soc/tegra: pmc: Add Tegra132 support
+In-Reply-To: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
+References: <1420701657-32543-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1420798533-4036-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both drivers using the system timer are now converted to an MFD. mach/at91_st.h
-is now useless.
+From: Thierry Reding <treding@nvidia.com>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Tegra132 uses the same GPU as Tegra124 and therefore requires the same
+method to remove clamps. However Tegra132 has a separate chip ID, so in
+order to avoid having to extend the list of chip IDs for the special
+case, add a feature flag to the SoC data.
+
+Reviewed-by: Paul Walmsley <pwalmsley@nvidia.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/mach-at91/include/mach/at91_st.h | 61 -------------------------------
- 1 file changed, 61 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
+Changes in v2:
+- reword the commit message to be less misleading (Paul Walmsley)
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
-deleted file mode 100644
-index 67fdbd13c3ed..000000000000
---- a/arch/arm/mach-at91/include/mach/at91_st.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/at91_st.h
-- *
-- * Copyright (C) 2005 Ivan Kokshaysky
-- * Copyright (C) SAN People
-- *
-- * System Timer (ST) - System peripherals registers.
-- * Based on AT91RM9200 datasheet revision E.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef AT91_ST_H
--#define AT91_ST_H
--
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_st_base;
--
--#define at91_st_read(field) \
--	__raw_readl(at91_st_base + field)
--
--#define at91_st_write(field, value) \
--	__raw_writel(value, at91_st_base + field)
--#else
--.extern at91_st_base
--#endif
--
--#define	AT91_ST_CR		0x00			/* Control Register */
--#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
--
--#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
--#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
--
--#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
--#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
--#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
--#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
--
--#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
--#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
--
--#define	AT91_ST_SR		0x10			/* Status Register */
--#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
--#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
--#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
--#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
--
--#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
--#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
--#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
--
--#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
--#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
--
--#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
--#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
--
--#endif
+ drivers/soc/tegra/pmc.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index 4bdc654bd747..0f096e76574a 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -88,6 +88,8 @@ struct tegra_pmc_soc {
+ 	const char *const *powergates;
+ 	unsigned int num_cpu_powergates;
+ 	const u8 *cpu_powergates;
++
++	bool has_gpu_clamps;
+ };
+ 
+ /**
+@@ -225,11 +227,11 @@ int tegra_powergate_remove_clamping(int id)
+ 		return -EINVAL;
+ 
+ 	/*
+-	 * The Tegra124 GPU has a separate register (with different semantics)
+-	 * to remove clamps.
++	 * On Tegra124 and later, the clamps for the GPU are controlled by a
++	 * separate register (with different semantics).
+ 	 */
+-	if (tegra_get_chip_id() == TEGRA124) {
+-		if (id == TEGRA_POWERGATE_3D) {
++	if (id == TEGRA_POWERGATE_3D) {
++		if (pmc->soc->has_gpu_clamps) {
+ 			tegra_pmc_writel(0, GPU_RG_CNTRL);
+ 			return 0;
+ 		}
+@@ -773,6 +775,7 @@ static const struct tegra_pmc_soc tegra20_pmc_soc = {
+ 	.powergates = tegra20_powergates,
+ 	.num_cpu_powergates = 0,
+ 	.cpu_powergates = NULL,
++	.has_gpu_clamps = false,
+ };
+ 
+ static const char * const tegra30_powergates[] = {
+@@ -804,6 +807,7 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
+ 	.powergates = tegra30_powergates,
+ 	.num_cpu_powergates = ARRAY_SIZE(tegra30_cpu_powergates),
+ 	.cpu_powergates = tegra30_cpu_powergates,
++	.has_gpu_clamps = false,
+ };
+ 
+ static const char * const tegra114_powergates[] = {
+@@ -839,6 +843,7 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
+ 	.powergates = tegra114_powergates,
+ 	.num_cpu_powergates = ARRAY_SIZE(tegra114_cpu_powergates),
+ 	.cpu_powergates = tegra114_cpu_powergates,
++	.has_gpu_clamps = false,
+ };
+ 
+ static const char * const tegra124_powergates[] = {
+@@ -880,6 +885,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
+ 	.powergates = tegra124_powergates,
+ 	.num_cpu_powergates = ARRAY_SIZE(tegra124_cpu_powergates),
+ 	.cpu_powergates = tegra124_cpu_powergates,
++	.has_gpu_clamps = true,
+ };
+ 
+ static const struct of_device_id tegra_pmc_match[] = {
 -- 
-2.1.0
+2.1.3
