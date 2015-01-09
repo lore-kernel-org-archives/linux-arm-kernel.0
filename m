@@ -1,31 +1,52 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 9 Jan 2015 11:46:33 +0100
-Subject: [PATCH] ARM: tegra: Fix unit address for Cortex-A9 TWD timer
-In-Reply-To: <1420719873-9820-1-git-send-email-thierry.reding@gmail.com>
-References: <1420719873-9820-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20150109104632.GH27845@ulmo>
+Date: Fri,  9 Jan 2015 11:49:33 +0100
+Subject: [PATCH v3 3/3] soc/tegra: fuse: Add Tegra132 support
+In-Reply-To: <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
+References: <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1420800573-16385-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 01:24:33PM +0100, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The Cortex-A9 TWD timer has registers at address 0x50040600, but the
-> unit address was 50004600, most likely a typo.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra20.dtsi | 2 +-
->  arch/arm/boot/dts/tegra30.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+From: Thierry Reding <treding@nvidia.com>
 
-I've applied this to the for-3.20/dt branch.
+Tegra132 is very similar to Tegra124 from a peripheral point of view and
+uses the same fuse controller.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/8c3d4a2f/attachment.sig>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v3:
+- collapse TEGRA124 and TEGRA132 cases into a single one (Alex Courbot)
+
+Changes in v2:
+- add missing break in Tegra132 case for legacy fuse init (Vince Hsu)
+---
+ drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
+ drivers/soc/tegra/fuse/fuse-tegra30.c | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
+index 011a3363c265..c0d660f1aaac 100644
+--- a/drivers/soc/tegra/fuse/fuse-tegra.c
++++ b/drivers/soc/tegra/fuse/fuse-tegra.c
+@@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
+ 	{ .compatible = "nvidia,tegra30-car", },
+ 	{ .compatible = "nvidia,tegra114-car", },
+ 	{ .compatible = "nvidia,tegra124-car", },
++	{ .compatible = "nvidia,tegra132-car", },
+ 	{},
+ };
+ 
+diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
+index d1a4290cda5c..4d2f71bf65c5 100644
+--- a/drivers/soc/tegra/fuse/fuse-tegra30.c
++++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
+@@ -182,6 +182,7 @@ static void __init legacy_fuse_init(void)
+ 		fuse_info = &tegra114_info;
+ 		break;
+ 	case TEGRA124:
++	case TEGRA132:
+ 		fuse_info = &tegra124_info;
+ 		break;
+ 	default:
+-- 
+2.1.3
