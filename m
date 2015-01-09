@@ -1,43 +1,71 @@
-From: mhocko@suse.cz (Michal Hocko)
-Date: Fri, 9 Jan 2015 16:56:43 +0100
-Subject: Linux 3.19-rc3
-In-Reply-To: <54AEB25E.9050205@redhat.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com>
- <20150108150850.GD5658@dhcp22.suse.cz>
- <54AEB25E.9050205@redhat.com>
-Message-ID: <20150109155643.GC7596@dhcp22.suse.cz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  9 Jan 2015 15:57:27 +0000
+Subject: [PATCH 4/5] arm64: Remove asm/syscalls.h
+In-Reply-To: <1420819048-3515-1-git-send-email-catalin.marinas@arm.com>
+References: <1420819048-3515-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1420819048-3515-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 08-01-15 10:37:50, Mark Langsdorf wrote:
-> On 01/08/2015 09:08 AM, Michal Hocko wrote:
-> >[CCing linux-mm and CMA people]
-> >[Full message here:
-> >http://article.gmane.org/gmane.linux.ports.arm.kernel/383669]
-> 
-> >>[ 1054.095277] DMA: 109*64kB (UR) 53*128kB (R) 8*256kB (R) 0*512kB 0*1024kB
-> >>0*2048kB 1*4096kB (R) 0*8192kB 0*16384kB 1*32768kB (R) 0*65536kB = 52672kB
-> >>[ 1054.108621] Normal: 191*64kB (MR) 0*128kB 0*256kB 0*512kB 0*1024kB
-> >>0*2048kB 0*4096kB 0*8192kB 0*16384kB 0*32768kB 0*65536kB = 12224kB
-> >[...]
-> >>[ 1054.142545] Free swap  = 6598400kB
-> >>[ 1054.145928] Total swap = 8388544kB
-> >>[ 1054.149317] 262112 pages RAM
-> >>[ 1054.152180] 0 pages HighMem/MovableOnly
-> >>[ 1054.155995] 18446744073709544361 pages reserved
-> >>[ 1054.160505] 8192 pages cma reserved
-> >
-> >Besides underflow in the reserved pages accounting mentioned in other
-> >email the free lists look strange as well. All free blocks with some memory
-> >are marked as reserved. I would suspect something CMA related.
-> 
-> I get the same failure with CMA turned off entirely. I assume that means
-> CMA is not the culprit.
+This patch moves the sys_rt_sigreturn_wrapper prototype to
+arch/arm64/kernel/sys.c and removes the asm/syscalls.h header.
 
-OK. Do you see all the free page blocks completely reserved without CMA
-as well?
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/syscalls.h | 30 ------------------------------
+ arch/arm64/kernel/sys.c           |  3 +--
+ 2 files changed, 1 insertion(+), 32 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/syscalls.h
 
--- 
-Michal Hocko
-SUSE Labs
+diff --git a/arch/arm64/include/asm/syscalls.h b/arch/arm64/include/asm/syscalls.h
+deleted file mode 100644
+index 48fe7c600e98..000000000000
+--- a/arch/arm64/include/asm/syscalls.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_SYSCALLS_H
+-#define __ASM_SYSCALLS_H
+-
+-#include <linux/linkage.h>
+-#include <linux/compiler.h>
+-#include <linux/signal.h>
+-
+-/*
+- * System call wrappers implemented in kernel/entry.S.
+- */
+-asmlinkage long sys_rt_sigreturn_wrapper(void);
+-
+-#include <asm-generic/syscalls.h>
+-
+-#endif	/* __ASM_SYSCALLS_H */
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index 3fa98ff14f0e..dec351a9f3d6 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -39,10 +39,9 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+ /*
+  * Wrappers to pass the pt_regs argument.
+  */
++asmlinkage long sys_rt_sigreturn_wrapper(void);
+ #define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
+ 
+-#include <asm/syscalls.h>
+-
+ #undef __SYSCALL
+ #define __SYSCALL(nr, sym)	[nr] = sym,
+ 
