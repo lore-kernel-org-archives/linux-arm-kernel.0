@@ -1,36 +1,24 @@
-From: ggdavisiv@gmail.com (George G. Davis)
-Date: Fri,  9 Jan 2015 12:12:28 -0500
-Subject: [PATCH] ARM: mm: Fix dma_contiguous_reserve comment
-Message-ID: <1420823548-37979-1-git-send-email-george_davis@mentor.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 Jan 2015 17:13:07 +0000
+Subject: [PATCH 0/2] regulator: axp20x: Migrate to regulator core's
+ simplified DT parsing code
+In-Reply-To: <1420820624-10275-1-git-send-email-wens@csie.org>
+References: <1420820624-10275-1-git-send-email-wens@csie.org>
+Message-ID: <20150109171307.GI2634@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA contiguous allocations have been able to use highmem since commit
-"95b0e65 ARM: mm: don't limit default CMA region only to low memory"
-but a comment still notes the earlier "low memory" limitation.  Update
-the comment to remove the low memory limitation and fix the
-s/contigouos/contiguous/ typo while we're at it.
+On Sat, Jan 10, 2015 at 12:23:42AM +0800, Chen-Yu Tsai wrote:
+> Hi Mark, Liam,
+> 
+> This series adapts the axp20x regulator code to use the new simplified
+> DT parsing code in the regulator core.
 
-Signed-off-by: George G. Davis <george_davis@mentor.com>
----
- arch/arm/mm/init.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 98ad9c7..d538dc7 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -319,10 +319,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- 
- 	early_init_fdt_scan_reserved_mem();
- 
--	/*
--	 * reserve memory for DMA contigouos allocations,
--	 * must come from DMA area inside low memory
--	 */
-+	/* reserve memory for DMA contiguous allocations */
- 	dma_contiguous_reserve(arm_dma_limit);
- 
- 	arm_memblock_steal_permitted = false;
--- 
-1.9.3
+Applied both, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/19a61809/attachment.sig>
