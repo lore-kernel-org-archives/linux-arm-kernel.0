@@ -1,42 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Jan 2015 11:55:51 +0100
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20150109103307.GC24408@e104818-lin.cambridge.arm.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1610983.9vqJdsL27R@wuerfel>
- <20150109103307.GC24408@e104818-lin.cambridge.arm.com>
-Message-ID: <3341506.a2BFqPNg3k@wuerfel>
+From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
+Date: Fri, 9 Jan 2015 11:57:57 +0100
+Subject: [PATCH v2 0/8] Add Simple Power-Managed Bus Support
+In-Reply-To: <CAMuHMdVeEmKiqGTOmevaBDbJ=nBTbSi6d6Xrm0eyvbMTtyU=sA@mail.gmail.com>
+References: <1418842153-17113-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdVeEmKiqGTOmevaBDbJ=nBTbSi6d6Xrm0eyvbMTtyU=sA@mail.gmail.com>
+Message-ID: <CAO3366x64phBJ=tHOK03P6Ok_6LxiyLyC9LhjcocuqTx=86cfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 January 2015 10:33:07 Catalin Marinas wrote:
-> On Wed, Jan 07, 2015 at 07:48:48PM +0000, Arnd Bergmann wrote:
+On Thu, Jan 8, 2015 at 8:28 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Wed, Dec 17, 2014 at 7:49 PM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+>> The Renesas Bus State Controller (BSC) provides an external bus for
+>> connecting multiple external devices to an SoC, driving several chip
+>> select lines, for e.g. NOR FLASH, Ethernet and USB.
+>> On the kzm9g and ape6evm development boards, an smsc9220 Ethernet
+>> controller is connnected to the BSC of an SH-Mobile AG5 (sh73a0) resp.
+>> R-Mobile APE6 (r8a73a4) SoC.
+>
+> [...]
+>
+>> This was tested on sh73a0/kzm9g-multiplatform. Without this, Ethernet
+>> doesn't work, as the ZB clock is disabled by clk_disable_unused().
+>> Testing on r8a73a4/ape6evm-multiplatform would be appreciated.
+>
+> Has anyone tried this on r8a73a4/ape6evm-multiplatform?
 
-> > In other cases that's actually a good thing. One such example is the
-> > "Principles of ARM Memory Maps" document that tells hardware implementers
-> > to do a rather complex mapping "To support 36-bit x86 PAE compatible operating
-> > systems, such as Linux." but makes life much harder in the process than
-> > any of the random mappings we have seen in the wild.
-> 
-> Unfortunately, with any significant amount of RAM (say 16GB), this
-> document becomes pretty useless. It basically forces you to have a very
-> sparse physical address map from 0 to over 40-bit. I wouldn't apply the
-> ARM memory maps doc to server systems.
+Works like a charm.
 
-Are you sure? I was under the impression that this document was targetted
-specifically at servers.
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-> >   It's also not just the CPU core, other components also get easily
-> >   replaced, like a GICv3 that is not a strict superset of GICv2.
-> 
-> That's not a problem for Linux, we can describe them in DT or ACPI and
-> have drivers. GICv3 has an optional GICv2 compatible mode, though
-> vendors may decide not to implement it.
-
-I'm aware that we can deal with it after we have the drivers. My point
-was that we are unable to deal with this problem in general if we want
-to run existing kernels on new hardware that contains e.g. a GICv4/5/6
-that requires a new driver which has to first be written and then
-backported into distro kernels.
-
-	Arnd
+CU
+Uli
