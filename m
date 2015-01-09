@@ -1,29 +1,61 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  9 Jan 2015 14:45:37 -0800
-Subject: [PATCH 0/4] MAINTAINERS: Broadcom github updates
-Message-ID: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 Jan 2015 00:12:17 +0100
+Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54AC0F34.6040500@redhat.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <20150106141630.GG8829@e104818-lin.cambridge.arm.com>
+ <54AC0F34.6040500@redhat.com>
+Message-ID: <5078266.iyOixLMQK8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tuesday 06 January 2015 11:37:08 Jon Masters wrote:
+> On 01/06/2015 09:16 AM, Catalin Marinas wrote:
+> > On Tue, Jan 06, 2015 at 02:05:12PM +0000, Arnd Bergmann wrote:
+> >> On Tuesday 06 January 2015 11:29:29 Catalin Marinas wrote:
+> >>>>>> We will work on this both on ASWG and linux ACPI driver side, as Dong
+> >>>>>> and Charles pointed out, _OSI things can be solved in ACPI spec, when
+> >>>>>> that is done, we can modify the kernel driver to fix the problems above.
+> >>>>>
+> >>>>> Which driver?
+> >>>>
+> >>>> the ACPICA core driver as you suggested, sorry for the confusion.
+> >>>>
+> >>>>> What about ACPI_OS_NAME? Would you suggest it is fine to report
+> >>>>> "Microsoft Windows NT" on an ARM system? That _OS_ not _OSI.
+> >>>>
+> >>>> No, not at all. I prefer "Linux"
+> >>>> In include/acpi/acconfig.h, when ACPI_OS_NAME defined, it says:
+> >>>> "OS name, used for the _OS object.  The _OS object is essentially
+> >>>> obsolete,..."
+> >>>> for some legacy reasons, we needed  "Microsoft Windows NT", but ACPI
+> >>>> for ARM64 on linux is totally new, I think we can change it to
+> >>>> "Linux" when CONFIG_ARM64 as you suggested.
+> >>>
+> >>> We could ignore this change for now if we don't expect the _OS object to
+> >>> be used at all. But do we have any other way to check the AML code for
+> >>> this? Would FWTS catch such obsolete cases?
+> >>
+> >> How about just leaving it out? It's clearly not used for anything
+> >> good, so I don't see the point in passing either Linux or "Microsoft
+> >> Windows NT" here.
+> > 
+> > Do you mean defining it to NULL (so it ends up as NULL in
+> > acpi_gbl_pre_defined_names) or removing "_OS_" entirely from that array?
+> > I really can't tell what the implications are.
+> 
+> Setting it to NULL is almost certainly (99%+ likely IMO) going to result
+> in some firmware crashing nastily somewhere.
+> 
+> I think I've mentioned before that we're using the ACPI patches in an
+> early access program for partners that we announced last year. I've
+> pinged the team internally and asked that we swiftly change to use
+> whatever name is agreed in this thread so that we can get a lot of other
+> folks to begin testing with a correctly reported OS name.
 
-This patch series contains updates to multiple Broadcom SoCs MAINTAINERS
-entries since we have been able to centralize all of our Linux activies
-on github.com/Broadcom.
+If we have to put something in there, I'd vote for keeping the current
+string.  It's not clear whether Microsoft would follow the change to
+use "Linux" as the _OS_ string, and we probably don't want them to
+use incompatible IDs here.
 
-I can collect these patches in a branch somewhere on github.com/stblinux for
-instance for you to pull from.
-
-Thanks!
-
-Florian Fainelli (4):
-  MAINTAINERS: move BCM63xx ARM-based SoCs git tree
-  MAINTAINERS: update Broadcom Cygnus SoC git tree
-  MAINTAINERS: add a git entry for BCM7xxx ARM-based SoCs
-  MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs
-
- MAINTAINERS | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
--- 
-2.1.0
+	Arnd
