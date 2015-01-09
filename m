@@ -1,115 +1,116 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Thu, 8 Jan 2015 20:53:56 -0600
-Subject: [PATCHv6 5/5] arm: dts: Add Altera L2 Cache and OCRAM EDAC entries
-In-Reply-To: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
-References: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1420772036-3112-6-git-send-email-tthayer@opensource.altera.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 9 Jan 2015 03:40:07 +0000
+Subject: [PATCH v5][resend v4] of: replace Asahi Kasei Corp vendor prefix
+In-Reply-To: <87lhm7t37l.wl%kuninori.morimoto.gx@renesas.com>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
+ <20140922130026.GK3290@leverpostej>
+ <CAMuHMdX22z97SbGS1HDiYfJ1PXxyEN2S8D7w4sr+4bUwD+mJZw@mail.gmail.com>
+ <20140922132743.GM3290@leverpostej>
+ <87y4rfhmgl.wl%kuninori.morimoto.gx@renesas.com>
+ <1415845309.4269.6.camel@perches.com>
+ <20141113025105.GA16652@verge.net.au>
+ <87vbmjhj00.wl%kuninori.morimoto.gx@renesas.com>
+ <20141113110740.GE3815@sirena.org.uk>
+ <87k32yd0bd.wl%kuninori.morimoto.gx@renesas.com>
+ <20141114093554.GC3810@ulmo>
+ <87y4ra8xac.wl%kuninori.morimoto.gx@renesas.com>
+ <5469CD47.3040409@cogentembedded.com>
+ <877fytxsde.wl%kuninori.morimoto.gx@renesas.com>
+ <87egsob2cl.wl%kuninori.morimoto.gx@renesas.com>
+ <5478603D.1080404@cogentembedded.com>
+ <87d282sl6w.wl%kuninori.morimoto.gx@renesas.com>
+ <87lhm7t37l.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87egr4vcxu.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
 
-Adding the device tree entries and bindings needed to support
-the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-an earlier patch to declare and setup On-chip RAM properly.
-http://www.spinics.net/lists/devicetree/msg51117.html
+Hi Stephen, Olof, Arnd, Rob, Andrew
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2: Remove OCRAM declaration and reference prior patch.
+I'm sending this "of: replace Asahi Kasei Corp vendor prefix" during
+half-year (since Jun 2014) , many times. But, no-one care it.
+I don't know who is the best maintainer.
+ - Stephen : because it has Tegra ?
+ - Olof    : because it has Tegra (= ARM) ?
+ - Arnd    : because it has Tegra (= ARM) ?
+ - Matthias: because it has Tegra (= ARM SoC) ?
+ - Rob     : because DT ?
+ - Andrew  : Last chance ?
 
-v3-5: No Change
+But, could you please care this patch ?
+I will re-send it again
 
-v6: Change to nested EDAC device nodes based on community
-    feedback. Remove L2 syscon. Use consolidated binding.
----
- .../bindings/arm/altera/socfpga-edac.txt           |   46 ++++++++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |   20 +++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-new file mode 100644
-index 0000000..4bf32e1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-@@ -0,0 +1,46 @@
-+Altera SoCFPGA Error Detection and Correction [EDAC]
-+
-+Required Properties:
-+- compatible : Should be "altr,edac"
-+- #address-cells: must be 1
-+- #size-cells: must be 1
-+- ranges : standard definition, should translate from local addresses
-+
-+Subcomponents:
-+
-+L2 Cache ECC
-+Required Properties:
-+- compatible : Should be "altr,l2-edac"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+On Chip RAM ECC
-+Required Properties:
-+- compatible : Should be "altr,ocram-edac"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- iram : phandle to On-Chip RAM definition.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+Example:
-+
-+	soc_ecc {
-+		compatible = "altr,edac";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		l2edac at ffd08140 {
-+			compatible = "altr,l2-edac";
-+			reg = <0xffd08140 0x4>;
-+			interrupts = <0 36 1>, <0 37 1>;
-+		};
-+
-+		ocramedac at ffd08144 {
-+			compatible = "altr,ocram-edac";
-+			reg = <0xffd08144 0x4>;
-+			iram = <&ocram>;
-+			interrupts = <0 178 1>, <0 179 1>;
-+		};
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 252c3d1..e546e47 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -618,6 +618,26 @@
- 			interrupts = <0 39 4>;
- 		};
- 
-+		soc_ecc {
-+			compatible = "altr,edac";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			l2edac at ffd08140 {
-+				compatible = "altr,l2-edac";
-+				reg = <0xffd08140 0x4>;
-+				interrupts = <0 36 1>, <0 37 1>;
-+			};
-+
-+			ocramedac at ffd08144 {
-+				compatible = "altr,ocram-edac";
-+				reg = <0xffd08144 0x4>;
-+				iram = <&ocram>;
-+				interrupts = <0 178 1>, <0 179 1>;
-+			};
-+		};
-+
- 		L2: l2-cache at fffef000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xfffef000 0x1000>;
--- 
-1.7.9.5
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> Current vendor-prefixes.txt already has "ak" prefix for Asahi Kasei Corp
+> by ae8c4209af2c(of: Add vendor prefix for Asahi Kasei Corp.)
+> 
+> It went through the appropriate review process. But, almost all
+> Asahi Kasei chip drivers are using "asahi-kasei" prefix today.
+> (arch/arm/boot/dts/tegra20-seaboard.dts only is using "ak,ak8975",
+>  but there are instances of "asahi-kasei,ak8975" in other dts files.
+>  And drivers/iio/magnetometer/ak8975.c doesn't support "ak,ak8975" prefix)
+> So, we made a mistake there.
+> 
+> In addition, checkpatch.pl reports WARNING if it is using "asahi-kasei"
+> prerfix in DT file.
+> (DT compatible string vendor "asahi-kasei" appears un-documented)
+> 
+> Marking it deprecated and warning with checkpatch is certainly
+> preferable. So, this patch replace "ak" to "asahi-kasei" in
+> vendor-prefixes.txt. (and fixup tegra20-seaboard)
+> 
+> OTOH, Asahi Kasei is usually referred to as "AKM", but this patch
+> doesn't care about it. Because no DT is using that today.
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+> >> Linus
+> 
+> I had sent this patch to Linux ML and Maintainers many times,
+> but, no-one cares about it.
+> Can you please check and apply it ?
+> 
+> 
+>  .../devicetree/bindings/vendor-prefixes.txt        |    2 +-
+>  arch/arm/boot/dts/tegra20-seaboard.dts             |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 723999d..ddcb4cd 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -9,7 +9,6 @@ ad	Avionic Design GmbH
+>  adapteva	Adapteva, Inc.
+>  adi	Analog Devices, Inc.
+>  aeroflexgaisler	Aeroflex Gaisler AB
+> -ak	Asahi Kasei Corp.
+>  allwinner	Allwinner Technology Co., Ltd.
+>  altr	Altera Corp.
+>  amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
+> @@ -20,6 +19,7 @@ amstaos	AMS-Taos Inc.
+>  apm	Applied Micro Circuits Corporation (APM)
+>  arm	ARM Ltd.
+>  armadeus	ARMadeus Systems SARL
+> +asahi-kasei	Asahi Kasei Corp.
+>  atmel	Atmel Corporation
+>  auo	AU Optronics Corporation
+>  avago	Avago Technologies
+> diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
+> index a1d4bf9..7f5cf80 100644
+> --- a/arch/arm/boot/dts/tegra20-seaboard.dts
+> +++ b/arch/arm/boot/dts/tegra20-seaboard.dts
+> @@ -405,7 +405,7 @@
+>  		clock-frequency = <400000>;
+>  
+>  		magnetometer at c {
+> -			compatible = "ak,ak8975";
+> +			compatible = "asahi-kasei,ak8975";
+>  			reg = <0xc>;
+>  			interrupt-parent = <&gpio>;
+>  			interrupts = <TEGRA_GPIO(N, 5) IRQ_TYPE_LEVEL_HIGH>;
+> -- 
+> 1.7.9.5
+> 
