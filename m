@@ -1,326 +1,72 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 09 Jan 2015 11:42:23 +0900
-Subject: [PATCHv3 2/8] devfreq: exynos: Add documentation for generic
- exynos memory bus frequency driver
-In-Reply-To: <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
-References: <1420681257-3078-1-git-send-email-cw00.choi@samsung.com>
- <1420681257-3078-3-git-send-email-cw00.choi@samsung.com>
- <CAL_Jsq+5sdsm_-VW-ta+qV-NBao-XTHvsYWcbMdZmbP0Nw43Cw@mail.gmail.com>
-Message-ID: <54AF400F.5020002@samsung.com>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Thu, 8 Jan 2015 20:53:51 -0600
+Subject: [PATCHv6 0/5] Add Altera peripheral memories to EDAC framework
+Message-ID: <1420772036-3112-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-First of all, thanks for your review.
+This patch adds the L2 cache and OCRAM peripherals to the EDAC framework
+using the EDAC device framework. The ECC is enabled early in the boot
+process in the platform specific code.
 
-On 01/09/2015 06:18 AM, Rob Herring wrote:
-> Adding Viresh.
-> 
-> On Wed, Jan 7, 2015 at 7:40 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch adds the documentation for generic exynos memory bus frequency
->> driver.
->>
->> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  .../devicetree/bindings/devfreq/exynos-busfreq.txt | 184 +++++++++++++++++++++
->>  1 file changed, 184 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-busfreq.txt
->>
->> diff --git a/Documentation/devicetree/bindings/devfreq/exynos-busfreq.txt b/Documentation/devicetree/bindings/devfreq/exynos-busfreq.txt
->> new file mode 100644
->> index 0000000..c601e88
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/devfreq/exynos-busfreq.txt
->> @@ -0,0 +1,184 @@
->> +
->> +* Generic Exynos Memory Bus device
->> +
->> +The Samsung Exynos SoCs have many memory buses for data transfer between DRAM
->> +memory and MMC/sub-IP in SoC. Almost Exynos SoCs have the common architecture
->> +for memory buses. Generally, Exynos SoC express the memory bus by using memory
->> +bus group and block. The memory bus group has one more memory bus blocks and
->> +OPP table (including frequency and voltage for DVFS), regulator, devfreq-event
->> +devices. Each memory bus block has a clock for own memory bus speen and
->> +frequency table for DVFS. There are a little different among Exynos SoCs
->> +because each Exynos SoC has the different sub-IP and differnt memory bus.
->> +So, this difference should be specified in devicetree file.
->> +
->> +Required properties for memory bus group:
->> +- compatible: Should be "samsung,exynos-memory-bus".
->> +- operating-points: the OPP table including frequency/voltage information to
->> +                  support DVFS (Dynamic Voltage/Frequency Scaling) feature.
->> +- devfreq-events: the devfreq-event device to monitor the curret state of
->> +                  memory bus group.
-> 
-> I don't understand what goes in here.
+v2 changes:
+- Split On-Chip RAM ECC platform initialization into separate patch from
+  L2 ECC platform initialization.
+- Fix L2 cache dependency comments.
+- Remove OCRAM node from dts and reference prior patch.
 
-CPUFREQ use the cpu utilization data to decide the current state of CPU
-by CPUFREQ governor. 
+v3 changes:
+- Move L2 cache & On-Chip RAM EDAC code into altera_edac.c
+- Remove SDRAM module compile.
 
-Exynos busfreq with DEVFREQ must need the data to monitor the current state
-of memory bus of Exynos SoC. So, the devfreq-events provide the current state
-of memory bus like as cpu utilization. Exynos busfreq could decide the state
-of memory bus by using the devfreq-events.
+v4 changes:
+- Change mask defines to use BIT().
+- Fix comment style to agree with kernel coding style.
+- Better printk description for read != write in trigger.
+- Remove SysFS debugging message.
+- Better dci->mod_name
+- Move gen_pool pointer assignment to end of function.
+- Invert logic to reduce indent in ocram depenency check.
+- Change from dev_err() to edac_printk()
+- Replace magic numbers with defines & comments.
+- Improve error injection test.
+- Change Makefile intermediary name to altr (from alt)
 
-The summary of devfreq-event device is as following: (https://lkml.org/lkml/2015/1/7/795)
-: This patch add new devfreq_event class for devfreq_event device which provide
-raw data (e.g., memory bus utilization/GPU utilization). This raw data from
-devfreq_event data would be used for the governor of devfreq subsystem.
-- devfreq_event device : Provide raw data for governor of existing devfreq device
-- devfreq device       : Monitor device state and change frequency/voltage of device
-                         using the raw data from devfreq_event device
+v5 changes:
+- Remove l2cache.h by using if (IS_ENABLED(CONFIG_EDAC_ALTERA_L2C))
+- Remove ocram.h by using if (IS_ENABLED(CONFIG_EDAC_ALTERA_OCRAM))
+- Check prop variable before using. Include io.h.
+- Add defines for better readability. Remove MAINTAINERS changes.
 
-> 
->> +- vdd-mem-supply: the regulator to provide memory bus group with the voltage.
->> +
->> +Required properties for memory bus block:
->> +- clock-names : the name of clock used by the memory bus, "memory-bus".
->> +- clocks : phandles for clock specified in "clock-names" property.
->> +- #clock-cells: should be 1.
->> +- frequency: the frequency table to support DVFS feature.
-> 
-> So you have just defined a new OPP table format. We already have one
-> and Viresh is working to create a more extendable one. He asked about
-> what's needed in devfreq, so Viresh here you go. :)
-> 
->> +
->> +Example1 : Memory bus group/block in exynos3250.dtsi are listed below.
->> +       Exynos3250 has two memory bus group (MIF, INT group). MIF memory bus
->> +       group includes one memory bus block between DRAM and eMMC. Also, INT
->> +       memory bus group includes eight memory bus blocks which support each
->> +       sub-IPs between DRAM and sub-IPs.
->> +
->> +       memory_bus_mif: memory_bus at 0 {
->> +               compatible = "samsung,exynos-memory-bus";
->> +
->> +               operating-points = <
->> +                       400000 875000
->> +                       200000 800000
->> +                       133000 800000
->> +                       100000 800000
->> +                       50000  800000>;
->> +               status = "disabled";
-> 
-> Why is this not part of the DDR controller or /memory node?
+v6 changes:
+- Simplify OCRAM initialization. Remove be32_to_cpup() calls.
+- Remove syscon from L2 Cache. Force L2 Cache on if ECC enabled.
+- Convert to nested ECC in device tree. 
+- Additional comments to clarify debug error injection.
 
-Because the memory bus node in this patch was dependent on only Exynos SoC.
-I didn't check the memory bus of another SoC except for Exynos SoC.
+Thor Thayer (5):
+  arm: socfpga: Enable L2 Cache ECC on startup.
+  arm: socfpga: Enable OCRAM ECC on startup.
+  edac: altera: Remove SDRAM module compile
+  edac: altera: Add Altera L2 Cache and OCRAM EDAC Support
+  arm: dts: Add Altera L2 Cache and OCRAM EDAC entries
 
-> 
->> +               blocks {
->> +                       dmc_block: memory_bus_block1 {
->> +                               clocks = <&cmu_dmc CLK_DIV_DMC>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       400000
->> +                                       200000
->> +                                       133000
->> +                                       100000
->> +                                       50000>;
-> 
-> This is just duplicated from the operating-points table.
+ .../bindings/arm/altera/socfpga-edac.txt           |   46 ++
+ arch/arm/boot/dts/socfpga.dtsi                     |   20 +
+ arch/arm/mach-socfpga/Makefile                     |    2 +
+ arch/arm/mach-socfpga/core.h                       |    2 +
+ arch/arm/mach-socfpga/l2_cache.c                   |   39 ++
+ arch/arm/mach-socfpga/ocram.c                      |   97 ++++
+ arch/arm/mach-socfpga/socfpga.c                    |    4 +-
+ drivers/edac/Kconfig                               |   20 +-
+ drivers/edac/Makefile                              |    5 +-
+ drivers/edac/altera_edac.c                         |  506 +++++++++++++++++++-
+ 10 files changed, 735 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+ create mode 100644 arch/arm/mach-socfpga/l2_cache.c
+ create mode 100644 arch/arm/mach-socfpga/ocram.c
 
-First of all, I explain the meaning of 'memory bus group' and 'memory bus block'.
-- The 'memory bus group' includes various memory bus group and has one regulatot for power.
-Also, it must need the devfreq-events device to monitor the current state of memory buses.
-- The 'memory bus block' has only one clock for memory bus and different clock rate.
-And the memory bus blocks which are included in same 'memory bus group' use the same power rail (regulator).
-
-This patch adds 'frequency' table for each memory bus block because
-each memory bus block has different clock rate. Only one operating-point table
-cannot support various memory bus blocks.
-
-So, I added the frequency table to each memory bus block.
-
-> 
->> +                       };
->> +               };
->> +       };
->> +
->> +       memory_bus_int: memory_bus at 1 {
->> +               compatible = "samsung,exynos-memory-bus";
->> +
->> +               operating-points = <
->> +                       400000 950000
->> +                       200000 950000
->> +                       133000 925000
->> +                       100000 850000
->> +                       80000  850000
->> +                       50000  850000>;
->> +
->> +               status = "disabled";
->> +
->> +               blocks {
->> +                       peri_block: memory_bus_block1 {
-> 
-> Why is this and the following nodes not part of the respective
-> peripheral nodes or buses. If you need more hierarchy in your bus add
-> that to DT first.
-
-I explain the hierarchy of Exynos memory buses.
-
-This patch divide the memory bus group according to power rail (regulator).
-- MIF (Memory Interface ) memory bus group uses the VDD_MIF regulator.
-- INT (Internal) memory bus group uses the VDD_INT regulator.
-
-For example,.
-Each memory bus group contains only one power rail(regulator) and one more memory bus blocks as follwing:
-
-- MIF memory bus group                     
-power rail(VDD_MIF)-->|--- memory bus for DMC (Dynamic Memory Controller) block (dmc clock)
-
-
-- INT memory bus group
-                      |--- memory bus for PERI block (aclk_100 clock)
-                      |
-                      |--- memory bus for DISPLAY block (aclk_160 clock)
-                      |  
-                      |--- memory bus for ISP block (aclk_200 clock)
-                      |
-                      |--- memory bus for GPS block (aclk_266 clock)
-power rail(VDD_INT)-->|
-                      |--- memory bus for MCUISP block (aclk_400_mcuisp clock)
-                      |
-                      |--- memory bus for Leftbus block (gdl clock)
-                      |
-                      |--- memory bus for Rightbus block (gdr clock)
-                      |
-                      |--- memory bus for MFC block (mfc clock)
-
-
-> I'm sure just a flat "simple-bus" was done which
-> doesn't reflect the actual bus and now you need it to.
-
-I'm not sure that the memory bus concept of this patch
-would support the memory bus of all SoCs. So, I didn't modify common bus driver.
-
-If I misunderstand about your question, please explain in more detail about your opinion.
-
-> 
->> +                               clocks = <&cmu CLK_DIV_ACLK_100>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       100000
->> +                                       100000
->> +                                       100000
->> +                                       100000
->> +                                       50000
->> +                                       50000>;
->> +                       };
-> 
-> This just looks like constraints on the clock frequency. This should
-> be added in a standard way to the clock binding.
-
-I explained the 'frequency' table of each memory bus block on upper reply.
-
-> 
-> 
->> +
->> +                       display_block: memory_bus_block2 {
->> +                               clocks = <&cmu CLK_DIV_ACLK_160>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       200000
->> +                                       160000
->> +                                       100000
->> +                                       80000
->> +                                       80000
->> +                                       50000>;
->> +                       };
->> +
->> +                       isp_block: memory_bus_block3 {
->> +                               clocks = <&cmu CLK_DIV_ACLK_200>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       200000
->> +                                       200000
->> +                                       100000
->> +                                       80000
->> +                                       50000
->> +                                       50000>;
->> +                       };
->> +
->> +                       gps_block: memory_bus_block4 {
->> +                               clocks = <&cmu CLK_DIV_ACLK_266>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       300000
->> +                                       200000
->> +                                       133000
->> +                                       100000
->> +                                       50000
->> +                                       50000>;
->> +                       };
->> +
->> +                       mcuisp_block: memory_bus_block5 {
->> +                               clocks = <&cmu CLK_DIV_ACLK_400_MCUISP>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       400000
->> +                                       200000
->> +                                       50000
->> +                                       50000
->> +                                       50000
->> +                                       50000>;
->> +                       };
->> +
->> +                       leftbus_block: memory_bus_block6 {
->> +                               clocks = <&cmu CLK_DIV_GDL>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       200000
->> +                                       200000
->> +                                       133000
->> +                                       100000
->> +                                       100000
->> +                                       100000>;
->> +                       };
->> +
->> +                       rightbus_block: memory_bus_block7 {
->> +                               clocks = <&cmu CLK_DIV_GDR>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       200000
->> +                                       200000
->> +                                       133000
->> +                                       100000
->> +                                       100000
->> +                                       100000>;
->> +                       };
->> +
->> +                       mfc_block: memory_bus_block8 {
->> +                               clocks = <&cmu CLK_SCLK_MFC>;
->> +                               clock-names = "memory-bus";
->> +                               frequency = <
->> +                                       200000
->> +                                       200000
->> +                                       200000
->> +                                       133000
->> +                                       100000
->> +                                       80000>;
->> +                       };
->> +               };
->> +       };
->> +
->> +Example2 : Usage case to handle the frequency/voltage of memory bus on runtime
->> +       in exynos3250-rinato.dts are listed below.
->> +
->> +       &memory_bus_mif {
->> +               devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
->> +               vdd-mem-supply = <&buck1_reg>;
->> +               status = "okay";
->> +       };
->> +
->> +       &memory_bus_int {
->> +               devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
->> +               vdd-mem-supply = <&buck3_reg>;
->> +               status = "okay";
->> +       };
->> --
-
-Best Regards,
-Chanwoo Choi
+-- 
+1.7.9.5
