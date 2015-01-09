@@ -1,58 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Jan 2015 10:33:07 +0000
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <1610983.9vqJdsL27R@wuerfel>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <20150107172741.GY2634@sirena.org.uk> <54AD7098.5010700@redhat.com>
- <1610983.9vqJdsL27R@wuerfel>
-Message-ID: <20150109103307.GC24408@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Jan 2015 10:36:16 +0000
+Subject: [PATCH 2/2] arm64: Emulate SETEND for AArch32 tasks
+In-Reply-To: <54AFAB8C.5040803@arm.com>
+References: <1420647405-3907-1-git-send-email-suzuki.poulose@arm.com>
+ <1420647405-3907-3-git-send-email-suzuki.poulose@arm.com>
+ <20150108184258.GB31280@leverpostej> <54AFAB8C.5040803@arm.com>
+Message-ID: <20150109103616.GB27421@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 07:48:48PM +0000, Arnd Bergmann wrote:
-> On Wednesday 07 January 2015 12:44:56 Jon Masters wrote:
-> > I'm expecting to need new drivers for SoC IP blocks that are net new,
-> > but generational differences between iterations of the same SoC should
-> > be abstracted behind the firmware (and we are already seeing this with
-> > at least one platform). Platform wise, it's nice to already see e.g.
-> > mmconfig working to handle the specific ways a platform wires PCI.
+On Fri, Jan 09, 2015 at 10:21:00AM +0000, Suzuki K. Poulose wrote:
+> On 08/01/15 18:43, Mark Rutland wrote:
+> > Hi Suzuki,
+> >
+> > On Wed, Jan 07, 2015 at 04:16:45PM +0000, Suzuki K. Poulose wrote:
+> >> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> >>
+> >> Emulate deprecated 'setend' instruction for AArch32 bit tasks.
+> >>
+> >> 	setend [le/be] - Sets the endianness of EL0
+> >>
+> >> The hardware support for the instruction can be enabled by setting the
+> >> SCTLR_EL1.SED bit. Like the other emulated instructions it is controlled by
+> >> an entry in /proc/sys/abi/. For more information see :
+> >> 	Documentation/arm64/legacy_instructions.txt
+> >>
+> >> The instruction is emulated by setting/clearing the SPSR_EL1.E bit, which
+> >> will be reflected in the PSTATE.E in AArch32 context.
+> >
+> > A "fun" problem with emulating setend is that it will not always work
+> > unless we emulate the entire instruction set when userspace wants to be
+> > in an unsupported endianness.
+> >
+> > For implementations which are not bi-endian at EL0 (i.e. where
+> > ID_AA64MMFR0_EL1.BigEndEL0 == 0), SCTLR_EL1.E0E has a fixed value which
+> > we cannot change. The field names are misleading: in a BE-only system
+> > ID_AA64MMFR0_EL1.{BigEnd,BigEndEL0} == {0,0} and SCTLR_EL1.{EE,E0E} are
+> > fixed to {1,1}.
+> >
+> > I think we need to detect when EL0 has a fixed endianness such that we
+> > can treat the setend instruction as undefined. Otherwise we will
+> > silently fail to change EL0 endianness, advance the PC, and return to
+> > userspace in the wrong endianness, which will be very painful to debug.
+> > Userspace has the option of handling the resulting SIGILL in such cases.
 > 
-> Yes, the parts that are mandated by SBSA, like the way that PCI needs
-> to be done are generally good. Unfortunately a lot of the hardware that
-> I've seen has a rather lax interpretation of the spec, so just because
-> something is mandated doesn't mean it's done that way ;-)
-> 
-> In other cases that's actually a good thing. One such example is the
-> "Principles of ARM Memory Maps" document that tells hardware implementers
-> to do a rather complex mapping "To support 36-bit x86 PAE compatible operating
-> systems, such as Linux." but makes life much harder in the process than
-> any of the random mappings we have seen in the wild.
+> You are right. I missed this scenario. To add to that things get 
+> complicated when there are heterogeneous CPUs on the system that might 
+> have differing bits for BigEndEL0. I will take a look at this one. 
+> Thanks for pointing this out.
 
-Unfortunately, with any significant amount of RAM (say 16GB), this
-document becomes pretty useless. It basically forces you to have a very
-sparse physical address map from 0 to over 40-bit. I wouldn't apply the
-ARM memory maps doc to server systems.
+As I mention above the naming of {BigEnd,BigEndEL0} is misleading, as
+the describe mixed endian support rather than big endian support.
 
-> * There is a general mindset about deprecating unwanted features
->   early. ARMv8 aarch32 bit mode removes support for older instructions
->   or makes them optional. Even the virtualization mode doesn't allow
->   to trap on architecture version specific differences, so you can't
->   completely emulate an older architecture level.
->   This is nice for implementers but not so much for users that rely
->   on old (mis-)features.
+For example, if all CPUs have ID_AA64MMFR0_EL1.BigEndEL0 == 0 the
+endianness at EL0 is fixed, but that endianness may be LE or BE.
 
-This mindset is (slowly) changing. There are, of course, instructions
-like SWP that just can't always be implemented at the SoC level (not
-necessarily CPU level; requiring bus locks) but others like CP15
-barriers, I don't see why they should go away, it's just a decoder
-problem.
+Thus you will need to check whether any CPU has
+ID_AA64MMFR0_EL1.BigEndEL0 == 0, rather than whether the value of this
+field differs across CPUs.
 
->   It's also not just the CPU core, other components also get easily
->   replaced, like a GICv3 that is not a strict superset of GICv2.
-
-That's not a problem for Linux, we can describe them in DT or ACPI and
-have drivers. GICv3 has an optional GICv2 compatible mode, though
-vendors may decide not to implement it.
-
--- 
-Catalin
+Cheers,
+Mark.
