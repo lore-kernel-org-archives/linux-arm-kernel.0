@@ -1,88 +1,127 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 9 Jan 2015 10:51:35 +0100
-Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for
- tegra_resume() location store
-In-Reply-To: <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
-References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
- <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
- <54985C30.7020605@wwwdotorg.org>
- <20150108105742.GI1987@ulmo.nvidia.com>
- <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20150109095134.GC27845@ulmo>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  9 Jan 2015 10:51:29 +0100
+Subject: [PATCH v2 3/8] watchdog: at91rm9200: use the regmap from mfd
+In-Reply-To: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1420797094-9444-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 02:37:09PM +0200, Peter De Schrijver wrote:
-> On Thu, Jan 08, 2015 at 11:57:43AM +0100, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
-> > > On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
-> > > >22.12.2014 19:17, Stephen Warren ?????:
-> > > >>On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
-> > > >>>Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
-> > > >>>tegra_resume()
-> > > >>>location storing from late to early and as result broke suspend on tegra20.
-> > > >>>PMC scratch register 41 was used by tegra lp1 suspend core code for storing
-> > > >>>physical memory address of common resume function and in the same time used by
-> > > >>>tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
-> > > >>>strict order of scratch register use. Fix it by using scratch 40 instead of 41
-> > > >>>for tegra_resume() location store.
-> > > >>
-> > > >>You likely can't simply change the PMC scratch register usage arbitrarily;
-> > > >>specific registers are designated for specific purposes, and code outside the
-> > > >>Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
-> > > >>those specific values being in those registers. Without significant research,
-> > > >>I'd suggest not changing the PMC scratch register usage.
-> > > >
-> > > >Sure, that's why I asked to verify if scratch register 40 is in use in the
-> > > >comment after commit message.
-> > > 
-> > > Sorry, I didn't notice that.
-> > > 
-> > > >I've checked that u-boot doesn't use it (since
-> > > >upstream kernel doesn't care about any other bootloader), but no idea about
-> > > >secure monitor. It's definitely safer to avoid changing scratch regs usage, I
-> > > >thought that proposed solution would be best from the pure code point of view.
-> > > >So, I'm considering your answer as a rejection of the patch (please, let me know
-> > > >if I'm wrong) and will prepare another one. Btw, it would be nice to have
-> > > >scratch registers usage publicly documented somewhere (on "Tegra Public
-> > > >Application Notes" webpage for example), if it's possible, of course.
-> > > 
-> > > At this stage in Tegra20 development, I think it'd be best to avoid changing
-> > > any scratch register usage if at all possible.
-> > 
-> > Sorry, I had completely missed this discussion. When looking at the code
-> > it doesn't look like this particular "resettable" status needs to be
-> > stored in a PMC scratch register. It can't be stored in RAM because that
-> > goes into self-refresh as part of LP1, but how about just putting it
-> > into IRAM? That stays on in both LP1 and LP2, so should be suitable for
-> > this use-case. It would make the code slightly more complex but using a
-> > single scratch register for multiple purposes sounds brittle and easy to
-> > break (as evidenced by the offending commit).
-> > 
-> > Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
-> > configuration data across LP0 suspend/resume, so I wouldn't think it'd
-> > cause problems if we used that instead of PMC_SCRATCH41 to store the
-> > "resettable" state.
-> > 
-> 
-> No. Usually the scratch registers for EMC config data are setup once by the
-> bootloader and never touched by the kernel after that. So I would not
-> recommend reusing those registers for different purposes.
+The system timer MFD driver is providing a regmap. Use it to access the
+registers.
 
-Right, I misread the code in the downstream kernel. Though it's not the
-bootloader that does it (at least on Tegra20), but some early code in
-the kernel.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/watchdog/Kconfig          |  2 +-
+ drivers/watchdog/at91rm9200_wdt.c | 27 +++++++++------------------
+ 2 files changed, 10 insertions(+), 19 deletions(-)
 
-IRAM sounds like a good candidate still. Or do you know of anything that
-would exclude IRAM as storage location for this data?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/af3c398b/attachment.sig>
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 08f41add1461..18c73bc159fc 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -154,7 +154,7 @@ config ARM_SP805_WATCHDOG
+ 
+ config AT91RM9200_WATCHDOG
+ 	tristate "AT91RM9200 watchdog"
+-	depends on SOC_AT91RM9200
++	depends on SOC_AT91RM9200 && MFD_ATMEL_ST
+ 	help
+ 	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
+ 	  system when the timeout is reached.
+diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
+index d244112d5b6f..a493fe4b0dfc 100644
+--- a/drivers/watchdog/at91rm9200_wdt.c
++++ b/drivers/watchdog/at91rm9200_wdt.c
+@@ -14,25 +14,22 @@
+ #include <linux/bitops.h>
+ #include <linux/errno.h>
+ #include <linux/fs.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/mfd/atmel-st.h>
+ #include <linux/miscdevice.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/platform_device.h>
+-#include <linux/types.h>
++#include <linux/regmap.h>
+ #include <linux/watchdog.h>
+ #include <linux/uaccess.h>
+-#include <linux/of.h>
+-#include <linux/of_device.h>
+-#include <mach/at91_st.h>
+ 
+ #define WDT_DEFAULT_TIME	5	/* seconds */
+ #define WDT_MAX_TIME		256	/* seconds */
+ 
+ static int wdt_time = WDT_DEFAULT_TIME;
+ static bool nowayout = WATCHDOG_NOWAYOUT;
++static struct regmap *regmap_st;
+ 
+ module_param(wdt_time, int, 0);
+ MODULE_PARM_DESC(wdt_time, "Watchdog time in seconds. (default="
+@@ -55,7 +52,7 @@ static unsigned long at91wdt_busy;
+  */
+ static inline void at91_wdt_stop(void)
+ {
+-	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN);
++	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN);
+ }
+ 
+ /*
+@@ -63,9 +60,9 @@ static inline void at91_wdt_stop(void)
+  */
+ static inline void at91_wdt_start(void)
+ {
+-	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
++	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
+ 				(((65536 * wdt_time) >> 8) & AT91_ST_WDV));
+-	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
++	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+ }
+ 
+ /*
+@@ -73,7 +70,7 @@ static inline void at91_wdt_start(void)
+  */
+ static inline void at91_wdt_reload(void)
+ {
+-	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
++	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+ }
+ 
+ /* ......................................................................... */
+@@ -204,6 +201,7 @@ static struct miscdevice at91wdt_miscdev = {
+ static int at91wdt_probe(struct platform_device *pdev)
+ {
+ 	int res;
++	regmap_st = dev_get_drvdata(pdev->dev.parent);
+ 
+ 	if (at91wdt_miscdev.parent)
+ 		return -EBUSY;
+@@ -254,12 +252,6 @@ static int at91wdt_resume(struct platform_device *pdev)
+ #define at91wdt_resume	NULL
+ #endif
+ 
+-static const struct of_device_id at91_wdt_dt_ids[] = {
+-	{ .compatible = "atmel,at91rm9200-wdt" },
+-	{ /* sentinel */ }
+-};
+-MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
+-
+ static struct platform_driver at91wdt_driver = {
+ 	.probe		= at91wdt_probe,
+ 	.remove		= at91wdt_remove,
+@@ -267,8 +259,7 @@ static struct platform_driver at91wdt_driver = {
+ 	.suspend	= at91wdt_suspend,
+ 	.resume		= at91wdt_resume,
+ 	.driver		= {
+-		.name	= "at91_wdt",
+-		.of_match_table = at91_wdt_dt_ids,
++		.name	= "atmel_st_watchdog",
+ 	},
+ };
+ 
+-- 
+2.1.0
