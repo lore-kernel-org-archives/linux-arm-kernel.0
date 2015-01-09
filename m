@@ -1,99 +1,54 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 09 Jan 2015 09:14:05 -0500
-Subject: [PATCH] serial: 8250: Make ISA ports optional
-In-Reply-To: <3250953.b8pGJSWkfs@wuerfel>
-References: <1420513785-23660-1-git-send-email-peter@hurleysoftware.com>
- <1896224.oMI8M6J5T7@wuerfel> <54AF6378.6030202@hurleysoftware.com>
- <3250953.b8pGJSWkfs@wuerfel>
-Message-ID: <54AFE22D.3010306@hurleysoftware.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 9 Jan 2015 14:19:54 +0000
+Subject: Linux 3.19-rc3
+In-Reply-To: <20150109121348.GD12942@leverpostej>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
+Message-ID: <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2015 03:48 AM, Arnd Bergmann wrote:
-> On Friday 09 January 2015 00:13:28 Peter Hurley wrote:
->> On 01/08/2015 05:05 PM, Arnd Bergmann wrote:
->>> On Thursday 08 January 2015 11:11:51 Peter Hurley wrote:
->>>>
->>>> This interface is just storage and minor allocation, since the
->>>> port-reuse behavior will be limited to the "universal" driver.
->>>> From a sub-driver perspective, the shared storage is actually
->>>> a hindrance, so that reduces the requirement to minor allocation.
->>>>
->>>> And that's where I'm stuck at the moment -- how to share ttyS
->>>> minor allocation. ttyS console is a related problem.
->>>
->>> One idea that has come up in the past but never saw an implementation
->>> is to make the ttyS namespace and minor numbers completely generic and
->>> let any serial port driver use it. This would be a major rework, but
->>> have the added advantage of cleaning up a number of other namespace
->>> issues as well. There also lots of open question, in particular how
->>> to maintain compatibility with existing drivers. One could imagine
->>> that each uart always gets a ttyS device and optionally also gets
->>> a device node for the same port with a driver specific chardev as
->>> most of them do today. Or it could be an either/or decision that is
->>> made at compile time or as a module parameter.
+On 9 January 2015 at 12:13, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jan 08, 2015 at 12:51:31PM +0000, Mark Langsdorf wrote:
+>> On 01/05/2015 07:46 PM, Linus Torvalds wrote:
+>> > It's a day delayed - not because of any particular development issues,
+>> > but simply because I was tiling a bathroom yesterday. But rc3 is out
+>> > there now, and things have stayed reasonably calm. I really hope that
+>> > implies that 3.19 is looking good, but it's equally likely that it's
+>> > just that people are still recovering from the holiday season.
 >>
->> I'm not totally convinced that sharing minor allocation is the right
->> solution. ISTM that the main goal is for at least one serial driver
->> to represent ttyS (assuming that it is a suitable work-alike to the
->> 8250 driver) while other ttyS serial drivers must still be able to
->> load and operate.
-> 
-> Unfortunately, we have already seen a case where we need to have
-> two drivers enabled at the same time that both use the ttyS
-> namespace and minor numbers at the moment.
-
-Maybe you misunderstood me here. I'm suggesting that every ttyS-capable
-driver would be able to load into a pre-determined, unique alternate
-namespace. So at least one ttyS driver would be present, without naming
-conflicts, and every other ttyS-conflicting driver would be loaded
-in their respective alternate namespace.
-
-Unless what you mean is there is some userspace requirement for the
-ttyS namespace to be shared. If so, would you please expand on this use
-case so I can better understand the requirements.
-
->> So for example, a UART that is ttyS in a typical configuration, might
->> be ttyX when another driver has been configured as ttyS instead.
->> Assuming that every uart driver has a unique, alternate base name,
->> then the problem is reduced to selecting the appropriate driver for
->> ttyS.
+>> I'm consistently getting an out of memory killer triggered when
+>> compiling the kernel (make -j 16 -s) on a 16 core ARM64 system
+>> with 16 GB of memory. This doesn't happen when running a 3.18
+>> kernel.
 >>
->> Some use cases would require selecting the ttyS driver at build time.
->> Others would probably require the notion of a preferred driver.
-> 
-> Build-time selection looks problematic to me in the case of an
-> ARM distro kernel that wants to support dozens of different
-> uart drivers. At the moment this works for the most part because
-> the conflicts are rare, but it's getting worse.
+>> I'm going to start bisecting the failure now, but here's the crash
+>> log in case someone can see something obvious in it.
+>
+> FWIW I've just reproduced this with v3.19-rc3 defconfig +
+> CONFIG_ARM64_64K_PAGES=y by attempting a git clone of mainline. My
+> system has 16GB of RAM and 6 CPUs.
+>
+> I have a similarly dodgy looking number of pages reserved
+> (18446744073709544451 A.K.A. -7165). Log below.
+>
 
-A dt property could indicate which uart is the preferred ttyS.
+I think the negative page reserved count is a consequence of another bug.
 
+We have the following reporting code in lib/show_mem.c:
+#ifdef CONFIG_CMA
+        printk("%lu pages reserved\n", (reserved - totalcma_pages));
+        printk("%lu pages cma reserved\n", totalcma_pages);
+#else
 
->> What got me thinking about this approach instead of sharing minor
->> allocation was based on the 'first-come, first-served' question
->> I asked back in Dec. What happens when probe order varies and
->> console=ttyS0/login prompt doesn't show up where it's supposed to?
->> I've had this experience with multiple ethernet adapters and it's
->> not fun.
-> 
-> In a lot of cases, we can solve the problem for a particular board
-> by hardcoding the 'aliases' in the board specific dts file, at least
-> when devicetree is used (as it is for the majority of the cases that
-> are causing problems now).
-> 
-> Using the aliases correctly at the moment is really awkward when you
-> have multiple drivers for uarts on the same system and your serial0
-> and serial1 uart turn into ttyS0 and ttyX1.
+With totalcma_pages being reported as 8192, that would account for the
+-7000ish values reported.
 
-I'm concerned that this will devolve into some attempt at a
-persistent naming scheme from kernel-space; which has repeatedly been
-shown in other subsystems to be fruitless. That was my point about
-the ethernet adapters.
+That change appears to have come from:
+49abd8c lib/show_mem.c: add cma reserved information
 
-I have no problem sequentially numbering uarts as ttyS, but it would
-suck if that amount of work ultimately proved useless, when udev rules
-would have sufficed or became necessary anyway.
+Is the quickest way to exacerbate this OOM a kernel compile?
 
-Regards,
-Peter Hurley
+Cheers,
+--
+Steve
