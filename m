@@ -1,41 +1,37 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  9 Jan 2015 15:57:24 +0000
-Subject: [PATCH 1/5] compat: Declare compat_sys_sigpending and
- compat_sys_sigprocmask prototypes
+Date: Fri,  9 Jan 2015 15:57:28 +0000
+Subject: [PATCH 5/5] arm64: make sys_call_table const
 In-Reply-To: <1420819048-3515-1-git-send-email-catalin.marinas@arm.com>
 References: <1420819048-3515-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1420819048-3515-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1420819048-3515-6-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__ARCH_WANT_SYS_SIGPENDING or __ARCH_WANT_SYS_SIGPROGMASK may be defined
-for compat support but the corresponding prototypes are missing from
-linux/compat.h.
+From: Mark Rutland <mark.rutland@arm.com>
 
+As with x86, mark the sys_call_table const such that it will be placed
+in the .rodata section. This will cause attempts to modify the table
+(accidental or deliberate) to fail when strict page permissions are in
+place. In the absence of strict page permissions, there should be no
+functional change.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/compat.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/kernel/sys.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index 7450ca2ac1fc..ab25814690bc 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -689,6 +689,15 @@ asmlinkage long compat_sys_sendfile64(int out_fd, int in_fd,
- asmlinkage long compat_sys_sigaltstack(const compat_stack_t __user *uss_ptr,
- 				       compat_stack_t __user *uoss_ptr);
- 
-+#ifdef __ARCH_WANT_SYS_SIGPENDING
-+asmlinkage long compat_sys_sigpending(compat_old_sigset_t __user *set);
-+#endif
-+
-+#ifdef __ARCH_WANT_SYS_SIGPROCMASK
-+asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t __user *nset,
-+				       compat_old_sigset_t __user *oset);
-+#endif
-+
- int compat_restore_altstack(const compat_stack_t __user *uss);
- int __compat_save_altstack(compat_stack_t __user *, unsigned long);
- #define compat_save_altstack_ex(uss, sp) do { \
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index dec351a9f3d6..75151aaf1a52 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -49,7 +49,7 @@ asmlinkage long sys_rt_sigreturn_wrapper(void);
+  * The sys_call_table array must be 4K aligned to be accessible from
+  * kernel/entry.S.
+  */
+-void *sys_call_table[__NR_syscalls] __aligned(4096) = {
++void * const sys_call_table[__NR_syscalls] __aligned(4096) = {
+ 	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
+ #include <asm/unistd.h>
+ };
