@@ -1,59 +1,46 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri,  9 Jan 2015 16:57:20 -0700
-Subject: [PATCH 09/11] coresight: Fixing wrong #ifdef/#endif placement
+Date: Fri,  9 Jan 2015 16:57:16 -0700
+Subject: [PATCH 05/11] coresight-tpiu: use module_amba_driver to simplify the
+ code
 In-Reply-To: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1420847842-31769-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1420847842-31769-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Fixing problem reported by:
-        https://lkml.org/lkml/2015/1/6/86
+module_amba_driver() makes the code simpler by eliminating
+boilerplate code.
 
-The #ifdef/#endif is wrong and prevents the stub of function
-of_get_coresight_platform_data() from being visible when
-CONFIG_OF is not defined.
-
-Moving CONFIG_OF condition out of CONFIG_CORESIGHT, making
-them both independent.
-
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- include/linux/coresight.h | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/coresight/coresight-tpiu.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 7cbfecbfa643..cd6d4c384ca3 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -230,10 +230,6 @@ extern void coresight_disable(struct coresight_device *csdev);
- extern int coresight_is_bit_set(u32 val, int position, int value);
- extern int coresight_timeout(void __iomem *addr, u32 offset,
- 			     int position, int value);
--#ifdef CONFIG_OF
--extern struct coresight_platform_data *of_get_coresight_platform_data(
--				struct device *dev, struct device_node *node);
--#endif
- #else
- static inline struct coresight_device *
- coresight_register(struct coresight_desc *desc) { return NULL; }
-@@ -245,10 +241,14 @@ static inline int coresight_is_bit_set(u32 val, int position, int value)
- 					 { return 0; }
- static inline int coresight_timeout(void __iomem *addr, u32 offset,
- 				     int position, int value) { return 1; }
-+#endif
-+
- #ifdef CONFIG_OF
-+extern struct coresight_platform_data *of_get_coresight_platform_data(
-+				struct device *dev, struct device_node *node);
-+#else
- static inline struct coresight_platform_data *of_get_coresight_platform_data(
- 	struct device *dev, struct device_node *node) { return NULL; }
- #endif
--#endif
+diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/coresight/coresight-tpiu.c
+index ae101082791a..3b33af2416bb 100644
+--- a/drivers/coresight/coresight-tpiu.c
++++ b/drivers/coresight/coresight-tpiu.c
+@@ -201,17 +201,7 @@ static struct amba_driver tpiu_driver = {
+ 	.id_table	= tpiu_ids,
+ };
  
- #endif
+-static int __init tpiu_init(void)
+-{
+-	return amba_driver_register(&tpiu_driver);
+-}
+-module_init(tpiu_init);
+-
+-static void __exit tpiu_exit(void)
+-{
+-	amba_driver_unregister(&tpiu_driver);
+-}
+-module_exit(tpiu_exit);
++module_amba_driver(tpiu_driver);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("CoreSight Trace Port Interface Unit driver");
 -- 
 1.9.1
