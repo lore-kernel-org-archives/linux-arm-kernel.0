@@ -1,64 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 9 Jan 2015 16:22:35 +0100
-Subject: [PATCH] ARM: mvebu: Update the SoC ID and revision definitions
-In-Reply-To: <1420729688-31882-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1420729688-31882-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150109152235.GC18832@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jan 2015 15:24:02 +0000
+Subject: [PATCH v3 2/8] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <CAJe_ZhdkF5o91HE8woAw0-DN5TuS_j6LM15NF0z6oHcQwPvnsQ@mail.gmail.com>
+References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1420802889-4041-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <20150109125102.GL12302@n2100.arm.linux.org.uk>
+ <CAJe_ZhdkF5o91HE8woAw0-DN5TuS_j6LM15NF0z6oHcQwPvnsQ@mail.gmail.com>
+Message-ID: <20150109152402.GQ12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 04:08:08PM +0100, Gregory CLEMENT wrote:
-> Add the missing SoC and revision ID for the Armada 370 and 38x SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Fri, Jan 09, 2015 at 06:49:12PM +0530, Jassi Brar wrote:
+> On 9 January 2015 at 18:21, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jan 09, 2015 at 07:28:09PM +0800, Vincent Yang wrote:
+> >> +static irqreturn_t mhu_rx_interrupt(int irq, void *p)
+> >> +{
+> >> +     struct mbox_chan *chan = p;
+> >> +     struct mhu_link *mlink = (struct mhu_link *)chan->con_priv;
+> >> +     u32 val;
+> >> +
+> >> +     pr_debug("%s:%d\n", __func__, __LINE__);
+> >> +     val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
+> >> +     mbox_chan_received_data(chan, (void *)val);
+> >> +
+> >> +     writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
+> >> +
+> >> +     return IRQ_HANDLED;
+> >
+> > What if 'val' was zero - is the interrupt still "handled" ?
+> >
+> This irq shouldn't fire unless RX_STAT register has some non-zero value.
 
-Added to mvebu/soc
+You claim this interrupt handler using IRQF_SHARED - what if another user
+of this interrupt gets stuck?  Your handler above will prevent the kernel
+recovering as it will think that you are validly processing the stuck
+interrupt each time.
 
-      Andrew
+If it isn't shared, then don't use IRQF_SHARED.
 
+Either way, it is good practice to return IRQ_NONE if there's no work to
+be done.
 
-> ---
->  arch/arm/mach-mvebu/mvebu-soc-id.h | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.h b/arch/arm/mach-mvebu/mvebu-soc-id.h
-> index c16bb68ca81f..e124a0b82a3e 100644
-> --- a/arch/arm/mach-mvebu/mvebu-soc-id.h
-> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.h
-> @@ -20,10 +20,28 @@
->  #define MV78XX0_A0_REV	    0x1
->  #define MV78XX0_B0_REV	    0x2
->  
-> +/* Amada 370 ID */
-> +#define ARMADA_370_DEV_ID   0x6710
-> +
-> +/* Amada 370 Revision */
-> +#define ARMADA_370_A1_REV   0x1
-> +
-> +/* Armada 375 ID */
-> +#define ARMADA_375_DEV_ID   0x6720
-> +
->  /* Armada 375 */
->  #define ARMADA_375_Z1_REV   0x0
->  #define ARMADA_375_A0_REV   0x3
->  
-> +/* Armada 38x ID */
-> +#define ARMADA_380_DEV_ID   0x6810
-> +#define ARMADA_385_DEV_ID   0x6820
-> +#define ARMADA_388_DEV_ID   0x6828
-> +
-> +/* Armada 38x Revision */
-> +#define ARMADA_38x_Z1_REV   0x0
-> +#define ARMADA_38x_A0_REV   0x4
-> +
->  #ifdef CONFIG_ARCH_MVEBU
->  int mvebu_get_soc_id(u32 *dev, u32 *rev);
->  #else
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
