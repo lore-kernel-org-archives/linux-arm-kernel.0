@@ -1,70 +1,56 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 9 Jan 2015 11:16:47 -0800
-Subject: [PATCH] arm: Remove early stack deallocation from
- restore_user_regs
-In-Reply-To: <20150109172035.GZ12302@n2100.arm.linux.org.uk>
-References: <1418382718-16323-1-git-send-email-daniel.thompson@linaro.org>
- <1420470758-5874-1-git-send-email-daniel.thompson@linaro.org>
- <20150109164608.GV12302@n2100.arm.linux.org.uk>
- <54B00AAE.1050504@linaro.org>
- <20150109172035.GZ12302@n2100.arm.linux.org.uk>
-Message-ID: <20150109191647.GA1933@kroah.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 09 Jan 2015 19:18:49 +0000
+Subject: [PATCH v20 08/11] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <20150109175711.GA12302@n2100.arm.linux.org.uk>
+References: <1420457376-77366-1-git-send-email-wangnan0@huawei.com>
+ <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
+ <1420799154.4160.19.camel@linaro.org>
+ <20150109163505.GS12302@n2100.arm.linux.org.uk>
+ <1420824502.4160.62.camel@linaro.org>
+ <20150109175711.GA12302@n2100.arm.linux.org.uk>
+Message-ID: <1420831129.4160.78.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 05:20:35PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 09, 2015 at 05:06:54PM +0000, Daniel Thompson wrote:
-> > On 09/01/15 16:46, Russell King - ARM Linux wrote:
-> > > On Mon, Jan 05, 2015 at 03:12:38PM +0000, Daniel Thompson wrote:
-> > >> Currently restore_user_regs deallocates the SVC stack early in
-> > >> its execution and relies on no exception being taken between
-> > >> the deallocation and the registers being restored. The introduction
-> > >> of a default FIQ handler that also uses the SVC stack breaks this
-> > >> assumption and can result in corrupted register state.
-> > >>
-> > >> This patch works around the problem by removing the early
-> > >> stack deallocation and using r2 as a temporary instead. I have
-> > >> not found a way to do this without introducing an extra mov
-> > >> instruction to the macro.
-> > >>
-> > >> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> > >> ---
-> > > 
-> > > Please put it in the patch system, thanks.
-> > 
-> > Will do.
-> > 
-> > 
-> > > I think we should queue
-> > > this one for stable too, as I think we need this for v3.18
-> > > (as a result of c0e7f7ee717e2b4c5791e7422424c96b5008c39e,
-> > > ARM: 8150/3: fiq: Replace default FIQ handler)?
-> > 
-> > It's a close call.
+On Fri, 2015-01-09 at 17:57 +0000, Russell King - ARM Linux wrote:
+[...]
+> For me:
 > 
-> I agree.
+> $ echo 'asm ("bx r2\n");' | arm-linux-gcc -x c -c -marm -march=armv4 -v - -o o.o
 > 
-> > Before 8150/3 the system would probably crash if the default FIQ handler
-> > ran. After 8150/3 the system is also likely to crash since there's no
-> > code hooked into the handler in v3.18 that can clear the source of FIQ
-> > leaving us stuck re-entering the FIQ handler.
-> > 
-> > Nevertheless, this is a nasty gremlin to leave for backporters (it
-> > wasn't easy to find) so I'd be very happy to Cc: stable and see what
-> > they think.
+> calls the assembler thusly:
 > 
-> Well, we could ask Greg now.  It's not a regression (as nothing makes
-> use of the previously merged changes yet), but it is a nasty latent bug
-> which we could easily solve.
+> /usr/local/lib/gcc/arm-linux-gnueabi/4.7.4/../../../../arm-linux-gnueabi/bin/as \
+> -v -march=armv4 -meabi=5 --fix-v4bx -o o.o /tmp/ccB0cZgO.s
 > 
-> Having thought about it some more, I'm tempted to say... leave the
-> stable tag off it, and we can make the decision later - after it's had
-> a chance to really prove itself to a much wider audience.  That'd be
-> the lowest risk for the 3.18 stable tree.
+> Sure enough, the object file contains:
+> 
+> 00000000 <.text>:
+>    0:   e12fff12        bx      r2
+>                         0: R_ARM_V4BX   *ABS*
+> 
+> so it looks like it's been told...  Then if you do:
+> 
+> $ arm-linux-ld --fix-v4bx -o o1.o o.o
+> $ arm-linux-objdump -dr o1.o
+> 
+> you get:
+> 
+>     8074:       e1a0f002        mov     pc, r2
 
-That sounds like a good idea, you can always email stable@ to let us
-know of a patch we should add at a later time.
+I get results consistent with what you get above. A bit of googling
+seems to indicate the generate-BX-and-fix-it-in-the-linker came in many
+years ago with AEABI support.
 
-thanks,
+> Hmm, I wonder if this means we should have the kernel linker deal with
+> V4BX relocations on ARMv4, converting them to their mov pc, X variant.
+> 
+> Also, do we need --fix-v4bx for the link of vmlinux?
 
-greg k-h
+I guess the answer is yes if we want to catch uses of BX in inline
+assembly. A quick and not very thorough grep of arch/arm for 'bx'
+doesn't seem to turn up any existing dodgy uses, except in the kprobes
+test code I wrote :-(
+
+-- 
+Tixy
