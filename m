@@ -1,40 +1,63 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 9 Jan 2015 07:25:02 -0800
-Subject: [PATCH v3 0/7] Pinctrl support for Zynq
-In-Reply-To: <CACRpkdaKH21qz_RAcDtw6ycsw+5FD0RXQQs91_tZV53EuKVusQ@mail.gmail.com>
-References: <1d59c0972da04ec89dec6c09724986a1@BY2FFO11FD010.protection.gbl>
- <4d544fe425694a4e8043ddbf604db062@BN1AFFO11FD033.protection.gbl>
- <CACRpkdaKH21qz_RAcDtw6ycsw+5FD0RXQQs91_tZV53EuKVusQ@mail.gmail.com>
-Message-ID: <ba4ac5f77c7549f2a264a5a5b1318dc8@BN1BFFO11FD009.protection.gbl>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 9 Jan 2015 16:28:58 +0100
+Subject: [PATCH 3/5] tty/serial: at91: fix error handling in
+ atmel_serial_probe()
+In-Reply-To: <95ff85410e2f93993a4f7c5d255c4a88993fd462.1418131298.git.cyrille.pitchen@atmel.com>
+References: <cover.1418131298.git.cyrille.pitchen@atmel.com>
+ <95ff85410e2f93993a4f7c5d255c4a88993fd462.1418131298.git.cyrille.pitchen@atmel.com>
+Message-ID: <54AFF3BA.7090704@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-01-09 at 09:45AM +0100, Linus Walleij wrote:
-> On Fri, Dec 12, 2014 at 5:37 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
+Le 09/12/2014 14:31, Cyrille Pitchen a ?crit :
+> -EDEFER error wasn't handle properly by atmel_serial_probe().
+> As an example, when atmel_serial_probe() is called for the first time, we pass
+> the test_and_set_bit() test to check whether the port has already been
+> initalized. Then we call atmel_init_port(), which may return -EDEFER, possibly
+> returned before by clk_get(). Consequently atmel_serial_probe() used to return
+> this error code WITHOUT clearing the port bit in the "atmel_ports_in_use" mask.
+> When atmel_serial_probe() was called for the second time, it used to fail on
+> the test_and_set_bit() function then returning -EBUSY.
 > 
-> > Argh, this went through the wrong SMTP. I suspect threading is broken
-> > due to that. Let me know if you want me to resend this with intact
-> > threading.
+> When atmel_serial_probe() fails, this patch make it clear the port bit in the
+> "atmel_ports_in_use" mask, if needed, before returning the error code.
 > 
-> I don't care much about the threading, but all messages are quoted-printable
-> which doesn't apply :(
-> 
-> i.e.:
-> 
-> Content-Transfer-Encoding: quoted-printable
-> (...)
-> 
-> + const char *subnode_target_type =3D "pins";
-> =20
-> (...)
-> 
-> Can you resent with more sane encoding? I don't know where this
-> comes from but suspect the Microsoft Exchange SMTP server
-> does this when you use diacritics and german letters...
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Okay, I'll rebase to the latest pinctrl/devel branch (if needed) and
-send an updated version bypassing exchange. I hope that works then.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+and you can also add:
+Cc: <stable@vger.kernel.org> # 3.12+
 
-	Thanks,
-	S?ren
+Thanks.
+
+> ---
+>  drivers/tty/serial/atmel_serial.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index c6621dc..92a8b26 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2565,7 +2565,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>  
+>  	ret = atmel_init_port(port, pdev);
+>  	if (ret)
+> -		goto err;
+> +		goto err_clear_bit;
+>  
+>  	if (!atmel_use_pdc_rx(&port->uart)) {
+>  		ret = -ENOMEM;
+> @@ -2628,6 +2628,8 @@ err_alloc_ring:
+>  		clk_put(port->clk);
+>  		port->clk = NULL;
+>  	}
+> +err_clear_bit:
+> +	clear_bit(port->uart.line, atmel_ports_in_use);
+>  err:
+>  	return ret;
+>  }
+> 
+
+
+-- 
+Nicolas Ferre
