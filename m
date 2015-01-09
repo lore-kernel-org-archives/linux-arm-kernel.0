@@ -1,25 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Jan 2015 17:55:08 +0000
-Subject: [PATCH 0/2] irqchip: gic*: Fix unsafe locking reported by lockdep
-Message-ID: <1420826110-1697-1-git-send-email-marc.zyngier@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jan 2015 17:57:12 +0000
+Subject: [PATCH v20 08/11] ARM: kprobes: enable OPTPROBES for ARM 32
+In-Reply-To: <1420824502.4160.62.camel@linaro.org>
+References: <1420457376-77366-1-git-send-email-wangnan0@huawei.com>
+ <1420785456-21900-1-git-send-email-wangnan0@huawei.com>
+ <1420799154.4160.19.camel@linaro.org>
+ <20150109163505.GS12302@n2100.arm.linux.org.uk>
+ <1420824502.4160.62.camel@linaro.org>
+Message-ID: <20150109175711.GA12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon reported some locking issues in the GICv3 ITS driver
-(lockdep being quite angry...). After fixing those, I thought I'd
-check the GIC driver. Good thing I did, because lockdep wasn't happy
-either.
+On Fri, Jan 09, 2015 at 05:28:22PM +0000, Jon Medhurst (Tixy) wrote:
+> Using objdump I can see that the BX instruction does indeed end up in
+> the code, it hasn't been auto-magically turned into a MOV PC,R2.
+> 
+> Adding in a ".code 16" to the assembler produces "Error: selected
+> processor does not support THUMB opcodes", so at least it's got that
+> right. 
+> 
+> I have "gcc version 4.9.1 (Ubuntu/Linaro 4.9.1-16ubuntu6)"
 
-After these two patches, lockdep did stay quiet. Can't be completely
-bad...
+Remember that it's binutils which issues the errors about the assembly.
 
-Marc Zyngier (2):
-  irqchip: gicv3-its: Fix unsafe locking reported by lockdep
-  irqchip: gic: Fix unsafe locking reported by lockdep
+> Interestingly...
+> 
+> $ echo 'asm ("bx r2\n");' | arm-linux-gnueabihf-gcc -x c -S -march=armv4 -
+> <stdin>:1:0: warning: target CPU does not support THUMB instructions
+> $
 
- drivers/irqchip/irq-gic-v3-its.c | 23 ++++++++++++++---------
- drivers/irqchip/irq-gic.c        | 20 ++++++++++++--------
- 2 files changed, 26 insertions(+), 17 deletions(-)
+Mine doesn't do that.
+
+> but adding -marm gets rid of that error.
+> 
+> $ echo 'asm ("bx r2\n");' | arm-linux-gnueabihf-gcc -x c -S -marm -march=armv4 -
+> $
+
+Yes - but check the -.s file for the output... this won't run the assembler
+so the assembler won't check that the instruction is legal.
+
+For me:
+
+$ echo 'asm ("bx r2\n");' | arm-linux-gcc -x c -c -marm -march=armv4 -v - -o o.o
+
+calls the assembler thusly:
+
+/usr/local/lib/gcc/arm-linux-gnueabi/4.7.4/../../../../arm-linux-gnueabi/bin/as \
+-v -march=armv4 -meabi=5 --fix-v4bx -o o.o /tmp/ccB0cZgO.s
+
+Sure enough, the object file contains:
+
+00000000 <.text>:
+   0:   e12fff12        bx      r2
+                        0: R_ARM_V4BX   *ABS*
+
+so it looks like it's been told...  Then if you do:
+
+$ arm-linux-ld --fix-v4bx -o o1.o o.o
+$ arm-linux-objdump -dr o1.o
+
+you get:
+
+    8074:       e1a0f002        mov     pc, r2
+
+Hmm, I wonder if this means we should have the kernel linker deal with
+V4BX relocations on ARMv4, converting them to their mov pc, X variant.
+
+Also, do we need --fix-v4bx for the link of vmlinux?
 
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
