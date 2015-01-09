@@ -1,45 +1,65 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 9 Jan 2015 18:59:36 +0100
-Subject: [RFC 8/8] ARM64: Add uprobe support
-In-Reply-To: <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
-Message-ID: <20150109175936.GB13161@redhat.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat, 10 Jan 2015 02:02:39 +0800
+Subject: [PATCH 3/3] gpio: sx150x: add dts support for sx150x driver
+In-Reply-To: <CACRpkdaeSpvS=k6F-hjyQfGDZdWgckwRjvYwhnQk1NnAhKLJJw@mail.gmail.com>
+References: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
+ <1417695130-5712-3-git-send-email-21cnbao@gmail.com>
+ <CACRpkdaeSpvS=k6F-hjyQfGDZdWgckwRjvYwhnQk1NnAhKLJJw@mail.gmail.com>
+Message-ID: <CAGsJ_4xrTt1+6E-VhGb7PMY_6PHVK-e1nhip1SUHmWJcL4fQGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/31, Pratyush Anand wrote:
+2015-01-09 18:02 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Dec 4, 2014 at 1:12 PM, Barry Song <21cnbao@gmail.com> wrote:
 >
-> +int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> +		unsigned long addr)
-> +{
-> +	probe_opcode_t insn;
-> +
-> +	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
-> +
-> +	switch (arm_probe_decode_insn(insn, &auprobe->ainsn)) {
-> +	case INSN_REJECTED:
-> +		return -EINVAL;
-> +
-> +	case INSN_GOOD_NO_SLOT:
-> +		auprobe->simulate = true;
-> +		if (auprobe->ainsn.prepare)
-> +			auprobe->ainsn.prepare(insn, &auprobe->ainsn);
-> +		break;
-> +
-> +	case INSN_GOOD:
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
+>> From: Wei Chen <Wei.Chen@csr.com>
+>>
+>> Current sx150x gpio expander driver doesn't support DT. Now we added DT support
+>> for this driver.
+>>
+>> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> (...)
+>> +-pullup_ena:A bit-mask which enables or disables the pull-up resistor
+>> +       for each IO line in the expander. = <0x0>;
+>> +
+>> +-pulldn_ena:A bit-mask which enables-or disables the pull-down resistor
+>> +       for each IO line in the expander.
+>> +
+>> +-open_drain_ena:A bit-mask which enables-or disables open-drain
+>> +       operation for each IO line in the expander.
+>> +
+>> +-polarity: A bit-mask which enables polarity inversion for each IO line
+>> +       in the expander.
+>
+> I don't particularly like these properties.
+>
+> This is basically pin control stuff.
+>
+> I know that the driver was merged way before the pin control subsystem
+> existed and before I was maintainer of GPIO. So it has some tradition
+> behind it.
+>
+> Still I would *really* prefer that it was at least described the way
+> pin controllers usually are, so we have the option of converting it
+> to pin control later.
+>
+> The major difference if you check the pin control standard bindings,
+> is that instead of hammering down the config of different lines in
+> the controller, the config is tied to the consumers, as these are
+> the devices actually requiring that config.
+>
+> I.e. it's not a property of the *controller* that a line is pulled down,
+> that is a property of whatever is connected to that line.
+>
+> Maybe I'm overzealous so that this would require implenenting
+> a whole lot of pin control stuff and move the driver to drivers/pinctrl,
+> but I won't let it go without a discussion first.
 
-forgot to mention... shouldn't it also check IS_ALIGNED(addr, AARCH64_INSN_SIZE) ?
+my suggestion is we split this patch into two, the first one adds the
+basic gpio dt support, then we consider the pin configuration issue.
 
-I do not know if unaligned insn address is valid on arm64 or not, but please
-note that at least it should not cross the page boundary, set_swbp() needs to
-write AARCH64_INSN_SIZE == UPROBE_SWBP_INSN bytes and it assumes that this
-should fit the single page.
-
-Oleg.
+>
+> Yours,
+> Linus Walleij
+-barry
