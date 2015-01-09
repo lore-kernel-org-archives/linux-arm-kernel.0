@@ -1,24 +1,36 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 9 Jan 2015 12:34:56 +0100
-Subject: [PATCH] treewide: Convert clockevents_notify to use int cpu
-In-Reply-To: <1418254133.18092.22.camel@perches.com>
-References: <1418254133.18092.22.camel@perches.com>
-Message-ID: <20150109113452.GF16465@ulmo>
+From: vincent.yang.fujitsu@gmail.com (Vincent Yang)
+Date: Fri,  9 Jan 2015 19:35:50 +0800
+Subject: [PATCH v3 7/8] of: add Fujitsu vendor prefix
+In-Reply-To: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <1420803351-4436-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 10, 2014 at 03:28:53PM -0800, Joe Perches wrote:
-[...]
->  arch/arm/mach-tegra/cpuidle-tegra114.c |  4 ++--
->  arch/arm/mach-tegra/cpuidle-tegra20.c  |  8 ++++----
->  arch/arm/mach-tegra/cpuidle-tegra30.c  |  8 ++++----
-[...]
+From: Jassi Brar <jaswinder.singh@linaro.org>
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/5dc0810b/attachment.sig>
+Add 'fujitsu' as the vendor prefix for Fujitsu Semiconductor Ltd.
+
+Signed-off-by: Andy Green <andy.green@linaro.org>
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+Signed-off-by: Vincent Yang <Vincent.Yang@tw.fujitsu.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@jp.fujitsu.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index b1df0ad..4bc8103 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -59,6 +59,7 @@ everest	Everest Semiconductor Co. Ltd.
+ excito	Excito
+ fcs	Fairchild Semiconductor
+ fsl	Freescale Semiconductor
++fujitsu Fujitsu Semiconductor Ltd.
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
+-- 
+1.9.0
