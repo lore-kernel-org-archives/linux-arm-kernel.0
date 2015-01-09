@@ -1,77 +1,122 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  9 Jan 2015 14:13:54 +0100
-Subject: [PATCH 2/4] ARM: shmobile: kzm9g dts: Move Ethernet node to BSC
+Date: Fri,  9 Jan 2015 14:13:55 +0100
+Subject: [PATCH 3/4] ARM: shmobile: Enable kzm9g board in multiplatform
+ defconfig
 In-Reply-To: <1420809236-4105-1-git-send-email-geert+renesas@glider.be>
 References: <1420809236-4105-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1420809236-4105-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1420809236-4105-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the Ethernet node from the root of the device tree to the BSC node,
-as it's connected to the Bus State Controller.  This allows the system
-to know the right position of the Ethernet node in the clock and PM
-domain hierarchy, and manage the clock and PM domain appropriately.
-
-Also rename the node's name from "lan9220" to "ethernet", to conform to
-ePAPR generic name recomendations.
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-v3:
-  - No changes,
+ arch/arm/configs/shmobile_defconfig | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
 
-v2:
-  - s/confirm/conform/,
-  - Moved from kzm9g-reference to kzm9g.
----
- arch/arm/boot/dts/sh73a0-kzm9g.dts | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-index 6f00e6b680e8e0fa..022ba505f57339a9 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-@@ -84,19 +84,6 @@
- 		enable-active-high;
- 	};
- 
--	lan9220 at 10000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x10000000 0x100>;
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
--		reg-io-width = <4>;
--		smsc,irq-push-pull;
--		smsc,save-mac-address;
--		vddvario-supply = <&reg_1p8v>;
--		vdd33a-supply = <&reg_3p3v>;
--	};
--
- 	leds {
- 		compatible = "gpio-leds";
- 		led1 {
-@@ -178,6 +165,21 @@
- 	};
- };
- 
-+&bsc {
-+	ethernet at 10000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x10000000 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqpin0>;
-+		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
-+		reg-io-width = <4>;
-+		smsc,irq-push-pull;
-+		smsc,save-mac-address;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
-+	};
-+};
-+
- &cmt1 {
- 	status = "okay";
- };
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index adaa7aaf9178c4dc..e365c31e9dd513f3 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -17,6 +17,7 @@ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
+ CONFIG_ARCH_R8A7794=y
++CONFIG_ARCH_SH73A0=y
+ CONFIG_MACH_MARZEN=y
+ CONFIG_CPU_BPREDICT_DISABLE=y
+ CONFIG_PL310_ERRATA_588369=y
+@@ -44,7 +45,6 @@ CONFIG_CPUFREQ_DT=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -54,6 +54,7 @@ CONFIG_IP_PNP_DHCP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_SIMPLE_PM_BUS=y
+ CONFIG_MTD=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
+@@ -81,10 +82,13 @@ CONFIG_SMSC911X=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_MICREL_PHY=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ST1232=y
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_ADXL34X=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+@@ -93,6 +97,7 @@ CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=20
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
++CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_RIIC=y
+ CONFIG_I2C_SH_MOBILE=y
+@@ -103,14 +108,16 @@ CONFIG_SPI_SH_MSIOF=y
+ CONFIG_SPI_SH_HSPI=y
+ CONFIG_GPIO_EM=y
+ CONFIG_GPIO_RCAR=y
++CONFIG_GPIO_PCF857X=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=y
++CONFIG_MFD_AS3711=y
+ CONFIG_MFD_DA9063=y
+-CONFIG_REGULATOR=y
++CONFIG_REGULATOR_AS3711=y
+ CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_MEDIA_SUPPORT=y
+@@ -127,10 +134,12 @@ CONFIG_VIDEO_RENESAS_VSP1=y
+ CONFIG_VIDEO_ADV7180=y
+ CONFIG_DRM=y
+ CONFIG_DRM_RCAR_DU=y
+-CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_FB_SH_MOBILE_LCDC=y
++CONFIG_FB_SH_MOBILE_MERAM=y
+ # CONFIG_LCD_CLASS_DEVICE is not set
+ # CONFIG_BACKLIGHT_GENERIC is not set
+ CONFIG_BACKLIGHT_PWM=y
++CONFIG_BACKLIGHT_AS3711=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+@@ -141,6 +150,7 @@ CONFIG_SND_SOC_WM8978=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_R8A66597_HCD=y
+ CONFIG_USB_RENESAS_USBHS=y
+ CONFIG_USB_RCAR_PHY=y
+ CONFIG_USB_RCAR_GEN2_PHY=y
+@@ -154,11 +164,14 @@ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_RS5C372=y
+ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_RCAR_DMAC=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_IIO=y
++CONFIG_AK8975=y
+ CONFIG_PWM=y
+ CONFIG_PWM_RENESAS_TPU=y
+ # CONFIG_DNOTIFY is not set
 -- 
 1.9.1
