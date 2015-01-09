@@ -1,84 +1,243 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  9 Jan 2015 11:54:34 +0000
-Subject: [PATCH v6 16/20] arm64: GICv3: introduce symbolic names for GICv3
- ICC_SGI1R_EL1 fields
+Date: Fri,  9 Jan 2015 11:54:35 +0000
+Subject: [PATCH v6 17/20] arm64: KVM: add SGI generation register emulation
 In-Reply-To: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
 References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1420804478-17354-17-git-send-email-andre.przywara@arm.com>
+Message-ID: <1420804478-17354-18-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gic_send_sgi() function used hardcoded bit shift values to
-generate the ICC_SGI1R_EL1 register value.
-Replace this with symbolic names to allow reusing them later.
+While the generation of a (virtual) inter-processor interrupt (SGI)
+on a GICv2 works by writing to a MMIO register, GICv3 uses the system
+register ICC_SGI1R_EL1 to trigger them.
+Add a trap handler function that calls the new SGI register handler
+in the GICv3 code. As ICC_SRE_EL1.SRE at this point is still always 0,
+this will not trap yet, but will only be used later when all the data
+structures have been initialized properly.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v5...v6:
- (none)
+- add sysreg trapping for 32-bit guests
 
 Changelog v4...v5:
- (add Reviewed-by:)
+- fix merge conflict due to 3.18.0 rebase
+- minor style changes and comments fixes
 
 Changelog v3...v4:
-- (new patch)
+- moved addition of vgic_v3_dispatch_sgi() from earlier patch into here
+- move MPIDR comparison into extra function
+- use new ICC_SGI1R_ field names
+- improve readability of vgic_v3_dispatch_sgi()
+- add and refine comments
 
- drivers/irqchip/irq-gic-v3.c       |   14 +++++++++-----
- include/linux/irqchip/arm-gic-v3.h |   12 ++++++++++++
- 2 files changed, 21 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/sys_regs.c   |   27 +++++++++++
+ include/kvm/arm_vgic.h      |    1 +
+ virt/kvm/arm/vgic-v3-emul.c |  113 ++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 140 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 1a146cc..2ab290b 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -481,15 +481,19 @@ out:
- 	return tlist;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 136e679..8c30f26 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -165,6 +165,27 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
+ 	return true;
  }
  
-+#define MPIDR_TO_SGI_AFFINITY(cluster_id, level) \
-+	(MPIDR_AFFINITY_LEVEL(cluster_id, level) \
-+		<< ICC_SGI1R_AFFINITY_## level ##_SHIFT)
++/*
++ * Trap handler for the GICv3 SGI generation system register.
++ * Forward the request to the VGIC emulation.
++ * The cp15_64 code makes sure this automatically works
++ * for both AArch64 and AArch32 accesses.
++ */
++static bool access_gic_sgi(struct kvm_vcpu *vcpu,
++			   const struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	u64 val;
 +
- static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
- {
- 	u64 val;
- 
--	val = (MPIDR_AFFINITY_LEVEL(cluster_id, 3) << 48	|
--	       MPIDR_AFFINITY_LEVEL(cluster_id, 2) << 32	|
--	       irq << 24			    		|
--	       MPIDR_AFFINITY_LEVEL(cluster_id, 1) << 16	|
--	       tlist);
-+	val = (MPIDR_TO_SGI_AFFINITY(cluster_id, 3)	|
-+	       MPIDR_TO_SGI_AFFINITY(cluster_id, 2)	|
-+	       irq << ICC_SGI1R_SGI_ID_SHIFT		|
-+	       MPIDR_TO_SGI_AFFINITY(cluster_id, 1)	|
-+	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
- 
- 	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
- 	gic_write_sgi1r(val);
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 3fb4d85..800544b 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -280,6 +280,18 @@
- #define ICC_SRE_EL2_SRE			(1 << 0)
- #define ICC_SRE_EL2_ENABLE		(1 << 3)
- 
-+#define ICC_SGI1R_TARGET_LIST_SHIFT	0
-+#define ICC_SGI1R_TARGET_LIST_MASK	(0xffff << ICC_SGI1R_TARGET_LIST_SHIFT)
-+#define ICC_SGI1R_AFFINITY_1_SHIFT	16
-+#define ICC_SGI1R_AFFINITY_1_MASK	(0xff << ICC_SGI1R_AFFINITY_1_SHIFT)
-+#define ICC_SGI1R_SGI_ID_SHIFT		24
-+#define ICC_SGI1R_SGI_ID_MASK		(0xff << ICC_SGI1R_SGI_ID_SHIFT)
-+#define ICC_SGI1R_AFFINITY_2_SHIFT	32
-+#define ICC_SGI1R_AFFINITY_2_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
-+#define ICC_SGI1R_IRQ_ROUTING_MODE_BIT	40
-+#define ICC_SGI1R_AFFINITY_3_SHIFT	48
-+#define ICC_SGI1R_AFFINITY_3_MASK	(0xffULL << ICC_SGI1R_AFFINITY_1_SHIFT)
++	if (!p->is_write)
++		return read_from_write_only(vcpu, p);
 +
- /*
-  * System register definitions
++	val = *vcpu_reg(vcpu, p->Rt);
++	vgic_v3_dispatch_sgi(vcpu, val);
++
++	return true;
++}
++
+ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+ 			const struct sys_reg_params *p,
+ 			const struct sys_reg_desc *r)
+@@ -434,6 +455,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, VBAR_EL1, 0 },
+ 
++	/* ICC_SGI1R_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
++	  access_gic_sgi },
+ 	/* ICC_SRE_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
+ 	  trap_raz_wi },
+@@ -666,6 +690,8 @@ static const struct sys_reg_desc cp14_64_regs[] = {
+  * register).
   */
+ static const struct sys_reg_desc cp15_regs[] = {
++	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
++
+ 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
+@@ -713,6 +739,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 
+ static const struct sys_reg_desc cp15_64_regs[] = {
+ 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
++	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
+ 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
+ };
+ 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 98c3016..b9b2e05 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -307,6 +307,7 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level);
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		      struct kvm_exit_mmio *mmio);
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index 92f1494..2d49058 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -242,7 +242,7 @@ static unsigned long uncompress_mpidr(u32 value)
+  * Lookup the given MPIDR value to get the vcpu_id (if there is one)
+  * and store that in the irq_spi_cpu[] array.
+  * This limits the number of VCPUs to 255 for now, extending the data
+- * type (or storing kvm_vcpu poiners) should lift the limit.
++ * type (or storing kvm_vcpu pointers) should lift the limit.
+  * Store the original MPIDR value in an extra array to support read-as-written.
+  * Unallocated MPIDRs are translated to a special value and caught
+  * before any array accesses.
+@@ -843,6 +843,117 @@ int vgic_v3_init_emulation(struct kvm *kvm)
+ 	return 0;
+ }
+ 
++/*
++ * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
++ * generation register ICC_SGI1R_EL1) with a given VCPU.
++ * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
++ * return -1.
++ */
++static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
++{
++	unsigned long affinity;
++	int level0;
++
++	/*
++	 * Split the current VCPU's MPIDR into affinity level 0 and the
++	 * rest as this is what we have to compare against.
++	 */
++	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
++	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
++	affinity &= ~MPIDR_LEVEL_MASK;
++
++	/* bail out if the upper three levels don't match */
++	if (sgi_aff != affinity)
++		return -1;
++
++	/* Is this VCPU's bit set in the mask ? */
++	if (!(sgi_cpu_mask & BIT(level0)))
++		return -1;
++
++	return level0;
++}
++
++#define SGI_AFFINITY_LEVEL(reg, level) \
++	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
++	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
++
++/**
++ * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
++ * @vcpu: The VCPU requesting a SGI
++ * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
++ *
++ * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
++ * This will trap in sys_regs.c and call this function.
++ * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
++ * target processors as well as a bitmask of 16 Aff0 CPUs.
++ * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
++ * check for matching ones. If this bit is set, we signal all, but not the
++ * calling VCPU.
++ */
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++{
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *c_vcpu;
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	u16 target_cpus;
++	u64 mpidr;
++	int sgi, c;
++	int vcpu_id = vcpu->vcpu_id;
++	bool broadcast;
++	int updated = 0;
++
++	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
++	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
++	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
++	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
++
++	/*
++	 * We take the dist lock here, because we come from the sysregs
++	 * code path and not from the MMIO one (which already takes the lock).
++	 */
++	spin_lock(&dist->lock);
++
++	/*
++	 * We iterate over all VCPUs to find the MPIDRs matching the request.
++	 * If we have handled one CPU, we clear it's bit to detect early
++	 * if we are already finished. This avoids iterating through all
++	 * VCPUs when most of the times we just signal a single VCPU.
++	 */
++	kvm_for_each_vcpu(c, c_vcpu, kvm) {
++
++		/* Exit early if we have dealt with all requested CPUs */
++		if (!broadcast && target_cpus == 0)
++			break;
++
++		 /* Don't signal the calling VCPU */
++		if (broadcast && c == vcpu_id)
++			continue;
++
++		if (!broadcast) {
++			int level0;
++
++			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
++			if (level0 == -1)
++				continue;
++
++			/* remove this matching VCPU from the mask */
++			target_cpus &= ~BIT(level0);
++		}
++
++		/* Flag the SGI as pending */
++		vgic_dist_irq_set_pending(c_vcpu, sgi);
++		updated = 1;
++		kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
++	}
++	if (updated)
++		vgic_update_state(vcpu->kvm);
++	spin_unlock(&dist->lock);
++	if (updated)
++		vgic_kick_vcpus(vcpu->kvm);
++}
++
+ static int vgic_v3_create(struct kvm_device *dev, u32 type)
+ {
+ 	return kvm_vgic_create(dev->kvm, type);
 -- 
 1.7.9.5
