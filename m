@@ -1,89 +1,58 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 9 Jan 2015 12:29:22 +0200
-Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for
- tegra_resume() location store
-In-Reply-To: <20150109095134.GC27845@ulmo>
-References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
- <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
- <54985C30.7020605@wwwdotorg.org>
- <20150108105742.GI1987@ulmo.nvidia.com>
- <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
- <20150109095134.GC27845@ulmo>
-Message-ID: <20150109102922.GC10073@tbergstrom-lnx.Nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Jan 2015 10:33:07 +0000
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <1610983.9vqJdsL27R@wuerfel>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <20150107172741.GY2634@sirena.org.uk> <54AD7098.5010700@redhat.com>
+ <1610983.9vqJdsL27R@wuerfel>
+Message-ID: <20150109103307.GC24408@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 10:51:35AM +0100, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+On Wed, Jan 07, 2015 at 07:48:48PM +0000, Arnd Bergmann wrote:
+> On Wednesday 07 January 2015 12:44:56 Jon Masters wrote:
+> > I'm expecting to need new drivers for SoC IP blocks that are net new,
+> > but generational differences between iterations of the same SoC should
+> > be abstracted behind the firmware (and we are already seeing this with
+> > at least one platform). Platform wise, it's nice to already see e.g.
+> > mmconfig working to handle the specific ways a platform wires PCI.
 > 
-> On Thu, Jan 08, 2015 at 02:37:09PM +0200, Peter De Schrijver wrote:
-> > On Thu, Jan 08, 2015 at 11:57:43AM +0100, Thierry Reding wrote:
-> > > > Old Signed by an unknown key
-> > > 
-> > > On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
-> > > > On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
-> > > > >22.12.2014 19:17, Stephen Warren ?????:
-> > > > >>On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
-> > > > >>>Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
-> > > > >>>tegra_resume()
-> > > > >>>location storing from late to early and as result broke suspend on tegra20.
-> > > > >>>PMC scratch register 41 was used by tegra lp1 suspend core code for storing
-> > > > >>>physical memory address of common resume function and in the same time used by
-> > > > >>>tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
-> > > > >>>strict order of scratch register use. Fix it by using scratch 40 instead of 41
-> > > > >>>for tegra_resume() location store.
-> > > > >>
-> > > > >>You likely can't simply change the PMC scratch register usage arbitrarily;
-> > > > >>specific registers are designated for specific purposes, and code outside the
-> > > > >>Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
-> > > > >>those specific values being in those registers. Without significant research,
-> > > > >>I'd suggest not changing the PMC scratch register usage.
-> > > > >
-> > > > >Sure, that's why I asked to verify if scratch register 40 is in use in the
-> > > > >comment after commit message.
-> > > > 
-> > > > Sorry, I didn't notice that.
-> > > > 
-> > > > >I've checked that u-boot doesn't use it (since
-> > > > >upstream kernel doesn't care about any other bootloader), but no idea about
-> > > > >secure monitor. It's definitely safer to avoid changing scratch regs usage, I
-> > > > >thought that proposed solution would be best from the pure code point of view.
-> > > > >So, I'm considering your answer as a rejection of the patch (please, let me know
-> > > > >if I'm wrong) and will prepare another one. Btw, it would be nice to have
-> > > > >scratch registers usage publicly documented somewhere (on "Tegra Public
-> > > > >Application Notes" webpage for example), if it's possible, of course.
-> > > > 
-> > > > At this stage in Tegra20 development, I think it'd be best to avoid changing
-> > > > any scratch register usage if at all possible.
-> > > 
-> > > Sorry, I had completely missed this discussion. When looking at the code
-> > > it doesn't look like this particular "resettable" status needs to be
-> > > stored in a PMC scratch register. It can't be stored in RAM because that
-> > > goes into self-refresh as part of LP1, but how about just putting it
-> > > into IRAM? That stays on in both LP1 and LP2, so should be suitable for
-> > > this use-case. It would make the code slightly more complex but using a
-> > > single scratch register for multiple purposes sounds brittle and easy to
-> > > break (as evidenced by the offending commit).
-> > > 
-> > > Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
-> > > configuration data across LP0 suspend/resume, so I wouldn't think it'd
-> > > cause problems if we used that instead of PMC_SCRATCH41 to store the
-> > > "resettable" state.
-> > > 
-> > 
-> > No. Usually the scratch registers for EMC config data are setup once by the
-> > bootloader and never touched by the kernel after that. So I would not
-> > recommend reusing those registers for different purposes.
+> Yes, the parts that are mandated by SBSA, like the way that PCI needs
+> to be done are generally good. Unfortunately a lot of the hardware that
+> I've seen has a rather lax interpretation of the spec, so just because
+> something is mandated doesn't mean it's done that way ;-)
 > 
-> Right, I misread the code in the downstream kernel. Though it's not the
-> bootloader that does it (at least on Tegra20), but some early code in
-> the kernel.
-> 
-> IRAM sounds like a good candidate still. Or do you know of anything that
-> would exclude IRAM as storage location for this data?
+> In other cases that's actually a good thing. One such example is the
+> "Principles of ARM Memory Maps" document that tells hardware implementers
+> to do a rather complex mapping "To support 36-bit x86 PAE compatible operating
+> systems, such as Linux." but makes life much harder in the process than
+> any of the random mappings we have seen in the wild.
 
-No. I can't think of a reason this flag could not be in IRAM.
+Unfortunately, with any significant amount of RAM (say 16GB), this
+document becomes pretty useless. It basically forces you to have a very
+sparse physical address map from 0 to over 40-bit. I wouldn't apply the
+ARM memory maps doc to server systems.
 
-Cheers,
+> * There is a general mindset about deprecating unwanted features
+>   early. ARMv8 aarch32 bit mode removes support for older instructions
+>   or makes them optional. Even the virtualization mode doesn't allow
+>   to trap on architecture version specific differences, so you can't
+>   completely emulate an older architecture level.
+>   This is nice for implementers but not so much for users that rely
+>   on old (mis-)features.
 
-Peter.
+This mindset is (slowly) changing. There are, of course, instructions
+like SWP that just can't always be implemented at the SoC level (not
+necessarily CPU level; requiring bus locks) but others like CP15
+barriers, I don't see why they should go away, it's just a decoder
+problem.
+
+>   It's also not just the CPU core, other components also get easily
+>   replaced, like a GICv3 that is not a strict superset of GICv2.
+
+That's not a problem for Linux, we can describe them in DT or ACPI and
+have drivers. GICv3 has an optional GICv2 compatible mode, though
+vendors may decide not to implement it.
+
+-- 
+Catalin
