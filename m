@@ -1,44 +1,36 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  9 Jan 2015 16:32:42 +0100
-Subject: [PATCH 1/4] rtc: armada38x: Add the device tree binding documentation
-In-Reply-To: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1420817565-28800-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri,  9 Jan 2015 16:32:41 +0100
+Subject: [PATCH 0/4] Add a new RTC driver for recent mvebu SoCs
+Message-ID: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 38x SoCs come with a new RTC which differs from the one
-used in the other mvebu SoCs until now. This patch describes the
-binding of this RTC.
+Hi,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../devicetree/bindings/rtc/armada-380-rtc.txt          | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+The Marvell Armada 38x SoCs contains an RTC which differs from the RTC
+used in the other mvebu SoCs until now. This patch set adds support
+for this new IP and enable it in the Device Tree of the Armada 38x
+SoC.
+
+Thanks,
+
+Gr??gory
+
+Gregory CLEMENT (4):
+  rtc: armada38x: Add the device tree binding documentation
+  drivers/rtc/rtc-armada38x: Add a new RTC driver for recent mvebu SoCs
+  MAINTAINERS: Add the RTC driver for the Armada38x
+  ARM: mvebu: add Device Tree description of RTC on Armada 38x
+
+ .../devicetree/bindings/rtc/armada-380-rtc.txt     |  17 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |   6 +
+ drivers/rtc/Kconfig                                |  10 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-armada38x.c                        | 305 +++++++++++++++++++++
+ 6 files changed, 340 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+ create mode 100644 drivers/rtc/rtc-armada38x.c
 
-diff --git a/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-new file mode 100644
-index 000000000000..2c56bef9dd7e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-@@ -0,0 +1,17 @@
-+* Real Time Clock of te Armada 38x SoCs
-+
-+RTC controller for the Armada 38x SoCs
-+
-+Required properties:
-+- compatible : Should be "marvell,armada-380-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region. The second entires is for the IP configuration part.
-+- interrupts: IRQ line for the RTC.
-+
-+Example:
-+
-+rtc at 184a8 {
-+	compatible = "marvell,armada-380-rtc";
-+	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
-+	interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+};
 -- 
 1.9.1
