@@ -1,60 +1,40 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  9 Jan 2015 15:50:45 +0000
-Subject: [PATCH] irqchip: gicv3-its: fix ITS CPU init
-Message-ID: <1420818645-2349-1-git-send-email-vladimir.murzin@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 9 Jan 2015 16:52:04 +0100
+Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
+In-Reply-To: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150109165204.3d0d3d99@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We skip initialisation of ITS in case the device-tree has no
-corresponding description, but we are still accessing to ITS bits while
-setting CPU interface what leads to the kernel panic:
+Hello Andrew,
 
-ITS: No ITS available, not enabling LPIs
-CPU0: found redistributor 0 region 0:0x000000002f100000
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = ffffffc0007fb000
-[00000000] *pgd=00000000fc407003, *pud=00000000fc407003, *pmd=00000000fc408003, *pte=006000002f000707
-Internal error: Oops: 96000005 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.19.0-rc2+ #318
-Hardware name: FVP Base (DT)
-task: ffffffc00077edb0 ti: ffffffc00076c000 task.ti: ffffffc00076c000
-PC is at its_cpu_init+0x2c/0x320
-LR is at gic_cpu_init+0x168/0x1bc
+On Tue, 30 Dec 2014 13:43:41 +0100, Thomas Petazzoni wrote:
 
-It happens in gic_rdists_supports_plpis() because gic_rdists is NULL.
-The gic_rdists is set to non-NULL only when ITS node is presented in
-the device-tree.
+> Michal Mazur (1):
+>   bus: mvebu-mbus: fix support of MBus window 13 on Armada XP/375/38x
+> 
+> Thomas Petazzoni (5):
+>   dt: bindings: update mvebu-mbus DT binding with new compatible
+>     properties
+>   ARM: mvebu: fix compatible strings of MBus on Armada 375 and Armada
+>     38x
+>   bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus
+>     bridge window
+>   bus: mvebu-mbus: use automatic I/O synchronization barriers
+>   ARM: mvebu: use arm_coherent_dma_ops
 
-Fix this by moving the call to gic_rdists_supports_plpis() inside the
-!list_empty(&its_nodes) block, because it is that list that guards the
-validity of the rest of the information in this driver.
+Would it be possible to get those patches applied?
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Simon has started doing some testing with the automatic I/O sync
+barriers. It is still not working 100% properly, but it is apparently
+not worse than it was. And clearly the current situation is not good,
+and those patches make it slightly better.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 86e4684..128a12b 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1382,12 +1382,11 @@ static bool gic_rdists_supports_plpis(void)
- 
- int its_cpu_init(void)
- {
--	if (!gic_rdists_supports_plpis()) {
--		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
--		return -ENXIO;
--	}
--
- 	if (!list_empty(&its_nodes)) {
-+		if (!gic_rdists_supports_plpis()) {
-+			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-+			return -ENXIO;
-+		}
- 		its_cpu_init_lpis();
- 		its_cpu_init_collection();
- 	}
+Thanks,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
