@@ -1,75 +1,87 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Fri,  9 Jan 2015 09:52:49 +0800
-Subject: [PATCH] ASoC: rockchip: i2s: add rockchip_dmaengine_pcm_config
-Message-ID: <1420768369-6681-1-git-send-email-jay.xu@rock-chips.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 9 Jan 2015 10:16:32 +0800
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <20150108184059.GZ12302@n2100.arm.linux.org.uk>
+References: <20141030120127.GC32589@arm.com>
+ <CAKv+Gu9g5Q6fjPUy+P8YxkeDrH+bdO4kKGnxTQZRFhQpgPxaPA@mail.gmail.com>
+ <20141030135749.GE32589@arm.com>
+ <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+ <20141114095812.GG4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
+ <20150108184059.GZ12302@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes snd_dmaengine_pcm_register with rockchip_dmaengine_pcm_config,
-which configure the parameters of period and buffer match to rockchip DMAC.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, January 09, 2015 2:41 AM
+> To: Wang, Yalin
+> Cc: 'Will Deacon'; 'Ard Biesheuvel'; 'linux-kernel at vger.kernel.org';
+> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+> 
+> On Mon, Nov 17, 2014 at 10:38:58AM +0800, Wang, Yalin wrote:
+> > Joe has submitted patches to maintainers, So we need wait for them to
+> > be accepted .
+> 
+> I ran these patches through my autobuilder, and while most builds didn't
+> seem to be a problem, the randconfigs found errors:
+> 
+> /tmp/ccbiuDjS.s:137: Error: selected processor does not support ARM mode
+> `rbit r3,r2'
+> /tmp/ccbiuDjS.s:145: Error: selected processor does not support ARM mode
+> `rbit r0,r1'
+> make[4]: *** [drivers/iio/amplifiers/ad8366.o] Error 1
+> 
+> /tmp/ccFhnoO3.s:6789: Error: selected processor does not support ARM mode
+> `rbit r2,r2'
+> make[4]: *** [drivers/mtd/devices/docg3.o] Error 1
+> 
+> /tmp/cckMf2pp.s:239: Error: selected processor does not support ARM mode
+> `rbit ip,ip'
+> /tmp/cckMf2pp.s:241: Error: selected processor does not support ARM mode
+> `rbit r2,r2'
+> /tmp/cckMf2pp.s:248: Error: selected processor does not support ARM mode
+> `rbit lr,lr'
+> /tmp/cckMf2pp.s:250: Error: selected processor does not support ARM mode
+> `rbit r3,r3'
+> make[5]: *** [drivers/video/fbdev/nvidia/nvidia.o] Error 1
+> 
+> /tmp/ccTgULsO.s:1151: Error: selected processor does not support ARM mode
+> `rbit r1,r1'
+> /tmp/ccTgULsO.s:1158: Error: selected processor does not support ARM mode
+> `rbit r0,r0'
+> /tmp/ccTgULsO.s:1164: Error: selected processor does not support ARM mode
+> `rbit ip,ip'
+> /tmp/ccTgULsO.s:1166: Error: selected processor does not support ARM mode
+> `rbit r3,r3'
+> /tmp/ccTgULsO.s:1227: Error: selected processor does not support ARM mode
+> `rbit r5,r5'
+> /tmp/ccTgULsO.s:1229: Error: selected processor does not support ARM mode
+> `rbit lr,lr'
+> /tmp/ccTgULsO.s:1236: Error: selected processor does not support ARM mode
+> `rbit r0,r0'
+> /tmp/ccTgULsO.s:1238: Error: selected processor does not support ARM mode
+> `rbit r3,r3'
+> make[5]: *** [drivers/video/fbdev/nvidia/nv_accel.o] Error 1
+> 
+> The root cause is that the kernel being built is supposed to support both
+> ARMv7 and ARMv6K CPUs.  However, "rbit" is only available on
+> ARMv6T2 (thumb2) and ARMv7, and not plain ARMv6 or ARMv6K CPUs.
+> 
+In the patch that you applied:
+8205/1 	add bitrev.h file to support rbit instruction
 
-=======================
-without rockchip_dmaengine_pcm_config, and test with command -
-aplay -D hw:0,0 /tmp/a, there are the error dump:
-[  134.899396] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(7)
-[  134.906270] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(8)
-[  134.913141] dma-pl330 ffb20000.dma-controller: fill_queue:2251 Bad Desc(9)
+I have add :
++	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
 
-And bellow sound from DMA debugger:
-"I debugged it a little and it looks like what is happening is that requests
-which aren't a multiple of burst size * burst length are coming in.  Right
-now the i2s block is setting a burst size of 4 and burst length of 4, but
-the dmaengine code has no idea about this restriction.  I was able to
-eliminate the messages by changing burst length to 1 in the i2s driver.
-This fix would always work as long as we're sending a multiple of 4 bytes
-(which so far seems to be the case)"
+If you build kernel support ARMv6K, should CONFIG_CPU_V6=y, isn't it ?
+Then will not build hardware rbit instruction, isn't it ?
 
-This patch can make the length of dma buffer is aligned to a multiple of burst size
-and burst length.
-
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
-
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index c74ba37..bdd1021 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -408,6 +408,24 @@ static const struct regmap_config rockchip_i2s_regmap_config = {
- 	.cache_type = REGCACHE_FLAT,
- };
- 
-+static const struct snd_pcm_hardware rockchip_pcm_hardware = {
-+	.info			= SNDRV_PCM_INFO_MMAP |
-+				  SNDRV_PCM_INFO_MMAP_VALID |
-+				  SNDRV_PCM_INFO_INTERLEAVED,
-+	.period_bytes_min	= 1024,
-+	.period_bytes_max	= PAGE_SIZE,
-+	.periods_min		= 3,
-+	.periods_max		= 8,
-+	.buffer_bytes_max	= 8 * PAGE_SIZE,
-+	.fifo_size		= 16,
-+};
-+
-+static const struct snd_dmaengine_pcm_config rockchip_dmaengine_pcm_config = {
-+	.pcm_hardware = &rockchip_pcm_hardware,
-+	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
-+	.prealloc_buffer_size = PAGE_SIZE * 8,
-+};
-+
- static int rockchip_i2s_probe(struct platform_device *pdev)
- {
- 	struct rk_i2s_dev *i2s;
-@@ -478,7 +496,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 		goto err_suspend;
- 	}
- 
--	ret = snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
-+	ret = snd_dmaengine_pcm_register(&pdev->dev,
-+					 &rockchip_dmaengine_pcm_config, 0);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Could not register PCM\n");
- 		goto err_pcm_register;
--- 
-1.9.1
+Thanks
