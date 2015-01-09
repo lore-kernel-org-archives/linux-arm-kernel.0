@@ -1,40 +1,54 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Fri, 09 Jan 2015 13:59:10 +0100
-Subject: ioremap vs remap_pfn_range, VMSPLIT, etc
-Message-ID: <54AFD09E.1010806@free.fr>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 9 Jan 2015 18:33:54 +0530
+Subject: [PATCH v3 4/8] clk: Add clock driver for mb86s7x
+In-Reply-To: <20150109123958.GJ12302@n2100.arm.linux.org.uk>
+References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1420802977-4126-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <20150109123958.GJ12302@n2100.arm.linux.org.uk>
+Message-ID: <CAJe_ZhdH=xKjkGcX-9APaeEJveG-gT9UdHEG-J0PLTTaRwcbVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On 9 January 2015 at 18:09, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 09, 2015 at 07:29:37PM +0800, Vincent Yang wrote:
+>> +static int mb86s7x_clclk_of_init(void)
+>> +{
+>> +     int cpu;
+>> +     struct clk *clk;
+>> +
+>> +     for_each_possible_cpu(cpu) {
+>> +             struct device *cpu_dev = get_cpu_device(cpu);
+>> +
+>> +             if (!cpu_dev) {
+>> +                     pr_err("failed to get cpu%d device\n", cpu);
+>> +                     continue;
+>> +             }
+>> +
+>> +             clk = mb86s7x_clclk_register(cpu_dev);
+>> +             if (IS_ERR(clk)) {
+>> +                     pr_err("failed to register cpu%d clock\n", cpu);
+>> +                     continue;
+>> +             }
+>> +             if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
+>> +                     pr_err("failed to register cpu%d clock lookup\n", cpu);
+>> +                     continue;
+>> +             }
+>> +             pr_debug("registered clk for %s\n", dev_name(cpu_dev));
+>> +     }
+>> +
+>> +     platform_device_register_simple("arm-bL-cpufreq-dt", -1, NULL, 0);
+>> +
+>> +     return 0;
+>> +}
+>> +module_init(mb86s7x_clclk_of_init);
+>
+> What is the effect of this initialising on platforms which are not
+> a "mb86s7x" ?
+>
+Yeah, there should have been some check for node
+"fujitsu,mb86s70-scb-1.0" that guarantees we have a remote+protocol
+that this driver assumes.
 
-Yesterday, I used /dev/mem to mmap 2 GB and (to my surprise) it worked.
-Specifically, I opened /dev/mem O_RDWR | O_SYNC
-then called
-  mmap(NULL, 1U<<31, PROT_WRITE, MAP_SHARED, fd, 0x80000000);
-
-And mmap returned a valid pointer.
-
-I was expecting it to fail.
-
-- the kernel is configured with VMSPLIT_3G (3G/1G user/kernel)
-- the kernel manages 256 MB RAM
-- there is roughly 750 MB of VMALLOC space, no highmem
-
-I know /dev/mem's mmap calls remap_pfn_range, but I was expecting
-the VMALLOC space to impose a limit on the size of the mapping.
-Obviously this was incorrect?
-
-If I requested the same mapping *within the kernel* using ioremap,
-would that fail because of limited VMALLOC space?
-
-Moving to arch-specific questions (namely ARM Cortex-A9).
-If I understand correctly (which is very possibly NOT the case)
-the CPU has two registers pointing to page tables, one for
-the current process, one for the kernel. And the CPU automatically
-picks the correct one, based on the active context?
-It would seem possible to have a full 4G for process, and a full 4G
-for the kernel, using that method, no? (Like Ingo's old 4G/4G split).
-Without the performance overhead of fiddling with the page tables.
-What am I missing?
-
-Regards.
+Thanks
+Jassi
