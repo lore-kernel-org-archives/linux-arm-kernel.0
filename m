@@ -1,67 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  9 Jan 2015 23:45:44 +0100
-Subject: [PATCHv2 1/2] leds: tlc59116: Document binding for the TI 16 Channel
- i2c LED driver
-In-Reply-To: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
-References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1420843545-30892-2-git-send-email-andrew@lunn.ch>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri,  9 Jan 2015 14:45:39 -0800
+Subject: [PATCH 2/4] MAINTAINERS: update Broadcom Cygnus SoC git tree
+In-Reply-To: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
+References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1420843541-5166-3-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the binding for the TLC59116 LED driver.
+The Cygnus SoC git tree is moved from github.com/brcm/linux.git to its
+own git tree at github.com/Broadcom/cygnus-linux.git.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Matthew.Fatheree at belkin.com
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- .../devicetree/bindings/leds/leds-tlc59116.txt     | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/leds/leds-tlc59116.txt b/Documentation/devicetree/bindings/leds/leds-tlc59116.txt
-new file mode 100644
-index 000000000000..45c2123774d3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/leds/leds-tlc59116.txt
-@@ -0,0 +1,40 @@
-+LEDs connected to tcl59116
-+
-+Required properties
-+- compatible: should be "ti,tlc59116"
-+- #address-cells: must be 1
-+- #size-cells: must be 0
-+- reg: typically 0x68
-+
-+Each led is represented as a sub-node of the ti,,tlc59116.
-+See Documentation/devicetree/bindings/leds/common.txt
-+
-+LED sub-node properties:
-+- reg: number of LED line, 0 to 15
-+- label: (optional) name of LED
-+- linux,default-trigger : (optional)
-+
-+Examples:
-+
-+tlc59116 at 68 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	compatible = "ti,tlc59116";
-+	reg = <0x68>;
-+
-+	wan at 0 {
-+		label = "wrt1900ac:amber:wan";
-+		reg = <0x0>;
-+	};
-+
-+	2g at 2 {
-+		label = "wrt1900ac:white:2g";
-+		reg = <0x2>;
-+	};
-+
-+	alive at 9 {
-+		label = "wrt1900ac:green:alive";
-+		reg = <0x9>;
-+		linux,default_trigger = "heartbeat";
-+	};
-+};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ff73215cd165..4a8f3459f9c2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2192,7 +2192,7 @@ M:	Ray Jui <rjui@broadcom.com>
+ M:	Scott Branden <sbranden@broadcom.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	bcm-kernel-feedback-list at broadcom.com
+-T:	git git://git.github.com/brcm/linux.git
++T:	git git://git.github.com/Broadcom/cygnus-linux.git
+ S:	Maintained
+ N:	iproc
+ N:	cygnus
 -- 
-2.1.3
+2.1.0
