@@ -1,62 +1,287 @@
-From: mpeg.blue@free.fr (Mason)
-Date: Fri, 09 Jan 2015 19:42:58 +0100
-Subject: ioremap vs remap_pfn_range, VMSPLIT, etc
-In-Reply-To: <54B018B8.1080306@arm.com>
-References: <54AFD09E.1010806@free.fr>
- <20150109131322.GO12302@n2100.arm.linux.org.uk> <54B013F0.10408@free.fr>
- <54B018B8.1080306@arm.com>
-Message-ID: <54B02132.8060004@free.fr>
+From: fkan@apm.com (Feng Kan)
+Date: Fri, 9 Jan 2015 10:52:15 -0800
+Subject: [PATCH 4/6] i2c: busses: add SLIMpro I2C device driver on APM
+ X-Gene platform
+In-Reply-To: <20141111203237.GB6443@katana>
+References: <1412726809-7525-1-git-send-email-fkan@apm.com>
+ <1412726809-7525-5-git-send-email-fkan@apm.com>
+ <20141111203237.GB6443@katana>
+Message-ID: <CAL85gmB172hgTCHUQ=sshAAYjOwpNKc=YdovjfTFXfnW7LJTLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vladimir,
-
-On 09/01/2015 19:06, Vladimir Murzin wrote:
-> On 09/01/15 17:46, Mason wrote:
->> On 09/01/2015 14:13, Russell King - ARM Linux wrote:
+On Tue, Nov 11, 2014 at 12:32 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Tue, Oct 07, 2014 at 05:06:47PM -0700, Feng Kan wrote:
+>> Add SLIMpro I2C device driver on APM X-Gene platform. This I2C
+>> device driver use the SLIMpro Mailbox driver to tunnel message to
+>> the SLIMpro coprocessor to do the work of accessing I2C components.
 >>
->>> On Fri, Jan 09, 2015 at 01:59:10PM +0100, Mason wrote:
->>>
->>>> Yesterday, I used /dev/mem to mmap 2 GB and (to my surprise) it worked.
->>>> Specifically, I opened /dev/mem O_RDWR | O_SYNC
->>>> then called
->>>>   mmap(NULL, 1U<<31, PROT_WRITE, MAP_SHARED, fd, 0x80000000);
->>>
->>> So you asked to map 2GB starting at 2GB physical.
->>>
->>>> And mmap returned a valid pointer.
->>>
->>> And that mapping would have been created to map physical addresses
->>> 0x80000000-0xffffffff inclusive.
->>>
->>>> I was expecting it to fail.
->>>>
->>>> - the kernel is configured with VMSPLIT_3G (3G/1G user/kernel)
->>>
->>> This has no bearing on the above.
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Hieu Le <hnle@apm.com>
+>
+> Thank you for this submission!
+>
+>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> index 2e45ae3..a03042c 100644
+>> --- a/drivers/i2c/busses/Kconfig
+>> +++ b/drivers/i2c/busses/Kconfig
+>> @@ -1009,6 +1009,15 @@ config I2C_CROS_EC_TUNNEL
+>>         connected there. This will work whatever the interface used to
+>>         talk to the EC (SPI, I2C or LPC).
 >>
->> I don't understand why.
+>> +config I2C_XGENE_SLIMPRO
+>> +     tristate "APM X-Gene SoC I2C SLIMpro devices support"
+>> +     depends on ARCH_XGENE && XGENE_SLIMPRO_MBOX
+>> +     help
+>> +       Enable I2C bus access using the APM X-Gene SoC SLIMpro
+>> +       co-processor. The I2C device access the I2C bus via the X-Gene
+>> +       to SLIMpro (On chip coprocessor) mailbox mechanism.
+>> +       If unsure, say N.
+>> +
+>
+> I guess this is a driver for embedded? If so, please sort it properly.
+Sorry, having let this dangle for  a while.  I will fix up comments and submit
+another version. I can move this to embedded, however Xgene is
+suppose to be a server class chip.
+>
+>>  config SCx200_ACB
+>>       tristate "Geode ACCESS.bus support"
+>>       depends on X86_32 && PCI
+>> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+>> index 49bf07e..22b5f0c 100644
+>> --- a/drivers/i2c/busses/Makefile
+>> +++ b/drivers/i2c/busses/Makefile
+>> @@ -99,6 +99,7 @@ obj-$(CONFIG_I2C_CROS_EC_TUNNEL)    += i2c-cros-ec-tunnel.o
+>>  obj-$(CONFIG_I2C_ELEKTOR)    += i2c-elektor.o
+>>  obj-$(CONFIG_I2C_PCA_ISA)    += i2c-pca-isa.o
+>>  obj-$(CONFIG_I2C_SIBYTE)     += i2c-sibyte.o
+>> +obj-$(CONFIG_I2C_XGENE_SLIMPRO) += i2c-xgene-slimpro.o
+>
+> Ditto.
+>
+>>  obj-$(CONFIG_SCx200_ACB)     += scx200_acb.o
 >>
->> mmap allocates virtual addresses in the user-space process, yes?
->> So if I had VMSPLIT_2G, user-space processes would be limited
->> to 2G virtual addresses, and could not create a single 2G map
->> on top of its stack and text space. Or am I missing something?
-> 
-> Because you are mmaping special file (dev/mem) mmap call is routed to
-> the dedicated hook, responsible for all "magic" you see. Please, take a
-> look at drivers/char/mem.c for details.
-
-Errr, I thought it was clear I had read the source ;-)
-("I know /dev/mem's mmap calls remap_pfn_range [...]")
-http://lxr.free-electrons.com/source/drivers/char/mem.c#L307
-
-Hence my ioremap vs remap_pfn_range subject ;-)
-
-So are you saying I could use remap_pfn_range to map the
-full 4G of PA space into a process's VA space?
-
-Or, if I picked the VMSPLIT_2G option, are you saying
-mmap'ing 2G would succeed? (I will test these two
-scenarios ASAP.)
-
-Regards.
+>>  ccflags-$(CONFIG_I2C_DEBUG_BUS) := -DDEBUG
+>> diff --git a/drivers/i2c/busses/i2c-xgene-slimpro.c b/drivers/i2c/busses/i2c-xgene-slimpro.c
+>> new file mode 100644
+>> index 0000000..2cf6c33
+>> --- /dev/null
+>> +++ b/drivers/i2c/busses/i2c-xgene-slimpro.c
+>> @@ -0,0 +1,531 @@
+>> +/*
+>> + * X-Gene SLIMpro I2C Driver
+>> + *
+>> + * Copyright (c) 2014, Applied Micro Circuits Corporation
+>> + * Author: Feng Kan <fkan@apm.com>
+>> + * Author: Hieu Le <hnle@apm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation; either version 2 of
+>> + * the License, or (at your option) any later version.
+>
+> The license preamble and MODULE_LICENSE do not match!
+>
+>> +#include <linux/module.h>
+>> +#include <linux/version.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/i2c.h>
+>> +#include <linux/mailbox_client.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/dma-mapping.h>
+>
+> Please sort the includes.
+>
+>> +
+>> +#define XGENE_SLIMPRO_I2C            "xgene-slimpro-i2c"
+>
+> Only used once, not really needed
+>
+>> +
+>> +#define SLIMPRO_I2C_WAIT_COUNT               10000
+>> +
+>> +#define SLIMPRO_OP_TO_MS             1000    /* Operation time out in ms */
+>
+> *_TOUT_* or *_TIMEOUT_*. TO sounds like a conversion, from op to ms :)
+>
+>> +#define SLIMPRO_IIC_BUS                      1
+>
+> What does this '1' mean?
+>
+>> +static int start_i2c_msg_xfer(struct slimpro_i2c_dev *ctx)
+>> +{
+>> +     int count;
+>> +     unsigned long flags;
+>> +
+>> +     if (ctx->mbox_client.tx_block) {
+>> +             if (!wait_for_completion_timeout(&ctx->rd_complete,
+>> +                                              msecs_to_jiffies
+>> +                                              (SLIMPRO_OP_TO_MS)))
+>> +                     return -EIO;
+>
+> That should be -ETIMEDOUT, no?
+>
+>> +     } else {
+>> +             spin_lock_irqsave(&ctx->lock, flags);
+>> +             ctx->i2c_rx_poll = 1;
+>> +             for (count = SLIMPRO_I2C_WAIT_COUNT; count > 0; count--) {
+>> +                     if (ctx->i2c_rx_poll == 0)
+>> +                             break;
+>> +                     udelay(100);
+>> +             }
+>> +
+>> +             if (count == 0) {
+>> +                     ctx->i2c_rx_poll = 0;
+>> +                     ctx->mbox_client.tx_block = true;
+>> +                     spin_unlock_irqrestore(&ctx->lock, flags);
+>> +                     return -EIO;
+>
+> ditto.
+>
+>> +             }
+>> +             ctx->mbox_client.tx_block = true;
+>> +             spin_unlock_irqrestore(&ctx->lock, flags);
+>> +     }
+>> +
+>> +     /* Check of invalid data or no device */
+>> +     if (*ctx->resp_msg == 0xffffffff)
+>> +             return -ENODEV;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int slimpro_i2c_blkrd(struct slimpro_i2c_dev *ctx, u32 chip, u32 addr,
+>> +                             u32 addrlen, u32 protocol, u32 readlen,
+>> +                             u32 with_data_len, void *data)
+>> +{
+>> +     dma_addr_t paddr;
+>> +     u32 msg[3];
+>> +     int rc;
+>> +
+>> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
+>> +                            DMA_FROM_DEVICE);
+>> +     if (dma_mapping_error(ctx->dev, paddr)) {
+>> +             dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
+>> +                     ctx->dma_buffer);
+>> +             rc = -EIO;
+>
+> Return the err value from dma_mapping_error?
+>
+>> +             goto err;
+>> +     }
+>> +
+>> +     if (irqs_disabled())
+>> +             ctx->mbox_client.tx_block = false;
+>> +
+>> +     msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
+>> +                                     SLIMPRO_IIC_READ, protocol, addrlen,
+>> +                                     readlen);
+>> +     msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
+>> +              SLIMPRO_IIC_ENCODE_FLAG_WITH_DATA_LEN(with_data_len) |
+>> +              SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
+>> +              SLIMPRO_IIC_ENCODE_ADDR(addr);
+>> +     msg[2] = (u32) paddr;
+>> +     ctx->resp_msg = msg;
+>> +
+>> +     if (ctx->mbox_client.tx_block)
+>> +             init_completion(&ctx->rd_complete);
+>
+> reinit_completion? and init_completion in probe?
+>
+>> +
+>> +     rc = mbox_send_message(ctx->mbox_chan, &msg);
+>> +     if (rc < 0)
+>> +             goto err_unmap;
+>> +
+>> +     rc = start_i2c_msg_xfer(ctx);
+>> +
+>> +     /* Copy to destination */
+>> +     memcpy(data, ctx->dma_buffer, readlen);
+>> +
+>> +err_unmap:
+>> +     dma_unmap_single(ctx->dev, paddr, readlen, DMA_FROM_DEVICE);
+>> +err:
+>> +     ctx->resp_msg = NULL;
+>> +     return rc;
+>> +}
+>> +
+>> +static int slimpro_i2c_blkwr(struct slimpro_i2c_dev *ctx, u32 chip,
+>> +                          u32 addr, u32 addrlen, u32 protocol, u32 writelen,
+>> +                          void *data)
+>> +{
+>> +     dma_addr_t paddr;
+>> +     u32 msg[3];
+>> +     int rc;
+>> +
+>> +     memcpy(ctx->dma_buffer, data, writelen);
+>> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, writelen,
+>> +                            DMA_TO_DEVICE);
+>> +     if (dma_mapping_error(ctx->dev, paddr)) {
+>> +             dev_err(&ctx->adapter.dev, "Error in mapping dma buffer %p\n",
+>> +                     ctx->dma_buffer);
+>> +             rc = -EIO;
+>
+> same as above
+>
+>> +             goto err;
+>> +     }
+>> +
+>> +     if (irqs_disabled())
+>> +             ctx->mbox_client.tx_block = false;
+>> +
+>> +     msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
+>> +                                     SLIMPRO_IIC_WRITE, protocol, addrlen,
+>> +                                     writelen);
+>> +     msg[1] = SLIMPRO_IIC_ENCODE_FLAG_BUFADDR |
+>> +              SLIMPRO_IIC_ENCODE_UPPER_BUFADDR(paddr) |
+>> +              SLIMPRO_IIC_ENCODE_ADDR(addr);
+>> +     msg[2] = (u32) paddr;
+>> +     ctx->resp_msg = msg;
+>> +
+>> +     if (ctx->mbox_client.tx_block)
+>> +             init_completion(&ctx->rd_complete);
+>
+> ditto
+>
+>> +
+>> +     rc = mbox_send_message(ctx->mbox_chan, &msg);
+>> +     if (rc < 0)
+>> +             goto err_unmap;
+>> +
+>> +     rc = start_i2c_msg_xfer(ctx);
+>> +
+>> +err_unmap:
+>> +     dma_unmap_single(ctx->dev, paddr, writelen, DMA_TO_DEVICE);
+>> +err:
+>> +     ctx->resp_msg = NULL;
+>> +     return rc;
+>> +}
+>> +
+>> +static struct platform_driver xgene_slimpro_i2c_driver = {
+>> +     .probe  = xgene_slimpro_i2c_probe,
+>> +     .remove = xgene_slimpro_i2c_remove,
+>> +     .driver = {
+>> +             .name   = XGENE_SLIMPRO_I2C,
+>> +             .owner  = THIS_MODULE,
+>
+> Not needed.
+>
+>> +             .of_match_table = of_match_ptr(xgene_slimpro_i2c_id)
+>> +     },
+>> +};
+>> +
+>> +module_platform_driver(xgene_slimpro_i2c_driver);
+>> +
+>> +MODULE_DESCRIPTION("APM X-Gene SLIMpro I2C driver");
+>> +MODULE_LICENSE("GPL v2");
+>
+> So, only minor stuff. Looking good already to me.
+Will fix the rest of the comments, thanks
+>
+> Thanks,
+>
+>    Wolfram
+>
