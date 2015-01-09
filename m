@@ -1,77 +1,63 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 9 Jan 2015 20:40:56 +0800
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <20150109111048.GE12302@n2100.arm.linux.org.uk>
-References: <20141030135749.GE32589@arm.com>
- <35FD53F367049845BC99AC72306C23D103E010D18272@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
- <20141114095812.GG4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
- <20150108184059.GZ12302@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
- <20150109111048.GE12302@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E198@CNBJMBX05.corpusers.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Jan 2015 12:41:35 +0000
+Subject: [PATCH v3 3/8] ARM: MB86S7X: Add MCPM support
+In-Reply-To: <1420802934-4084-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1420802934-4084-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+Message-ID: <20150109124134.GK12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, January 09, 2015 7:11 PM
-> To: Wang, Yalin
-> Cc: 'Ard Biesheuvel'; 'Will Deacon'; 'linux-kernel at vger.kernel.org';
-> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
-> kernel at lists.infradead.org'
-> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-> 
-> On Fri, Jan 09, 2015 at 10:16:32AM +0800, Wang, Yalin wrote:
-> > > -----Original Message-----
-> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > > Sent: Friday, January 09, 2015 2:41 AM
-> > > To: Wang, Yalin
-> > > Cc: 'Will Deacon'; 'Ard Biesheuvel'; 'linux-kernel at vger.kernel.org';
-> > > 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches';
-> > > 'linux-arm- kernel at lists.infradead.org'
-> > > Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit
-> > > instruction
-> > >
-> > > The root cause is that the kernel being built is supposed to support
-> > > both
-> > > ARMv7 and ARMv6K CPUs.  However, "rbit" is only available on
-> > > ARMv6T2 (thumb2) and ARMv7, and not plain ARMv6 or ARMv6K CPUs.
-> > >
-> > In the patch that you applied:
-> > 8205/1 	add bitrev.h file to support rbit instruction
-> >
-> > I have add :
-> > +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
-> >
-> > If you build kernel support ARMv6K, should CONFIG_CPU_V6=y, isn't it ?
-> > Then will not build hardware rbit instruction, isn't it ?
-> 
-> The config has:
-> 
-> CONFIG_CPU_PJ4=y
-> # CONFIG_CPU_V6 is not set
-> CONFIG_CPU_V6K=y
-> CONFIG_CPU_V7=y
-> CONFIG_CPU_32v6=y
-> CONFIG_CPU_32v6K=y
-> CONFIG_CPU_32v7=y
-> 
-> And no, the CONFIG_CPU_V* flags refer to the CPUs.  The
-> CONFIG_CPU_32v* symbols refer to the CPU architectures.
-> 
-Oh, I see,
-How about change like this:
-+	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6 && !CPU_V6K)
-I am not sure if I also need add some older CPU types like !CPU_ARM9TDMI &&?!CPU_ARM940T ?
+On Fri, Jan 09, 2015 at 07:28:54PM +0800, Vincent Yang wrote:
+> +static int __init mb86s7x_mcpm_init(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +	struct mb86s7x_scb_version cmd;
+> +	int ret;
+> +
+> +	if (!cci_probed())
+> +		return -ENODEV;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	pr_info("Booting on cpu_%u cluster_%u\n", cpu, cluster);
+> +	mb86s7x_pm_use_count[cluster][cpu] = 1;
+> +
+> +	/* reset the wfi 'color' for primary cpu */
+> +	mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
+> +
+> +	/* Do SMC to set entry address for CPUs coming online */
+> +	mb86s7x_cpu_entry(virt_to_phys(mcpm_entry_point));
+> +
+> +	cmd.payload_size = sizeof(cmd);
+> +	cmd.version = 0;
+> +	cmd.config_version = 0;
+> +	ret = mb86s7x_send_packet(CMD_SCB_CAPABILITY_GET_REQ,
+> +				  &cmd, sizeof(cmd));
+> +	if (ret < 0) /* non fatal */
+> +		pr_err("%s:%d failed to get SCB version\n",
+> +		       __func__, __LINE__);
+> +	else
+> +		pr_err("MB86S7x SCB version 0x%x:0x%x\n",
+> +		       cmd.version, cmd.config_version);
+> +
+> +	ret = mcpm_platform_register(&mb86s7x_pm_power_ops);
+> +	if (!ret)
+> +		ret = mcpm_sync_init(mb86s7x_pm_power_up_setup);
+> +	if (!ret)
+> +		ret = mcpm_loopback(mb86s7x_cache_off); /* turn on the CCI */
+> +	if (!ret)
+> +		mcpm_smp_set_ops();
+> +
+> +	return ret;
+> +}
+> +early_initcall(mb86s7x_mcpm_init);
 
-Another solution is:
-+	select HAVE_ARCH_BITREVERSE if ((CPU_32V7M || CPU_32V7) && !CPU_32V6 && !CPU_32V5 && !CPU_32V4 && !CPU_32V4T && !CPU_32V3)
+What happens if this is built into a kernel running on another SoC where
+CCI has been probed?
 
-By the way, I am not clear about the difference between CPU_V6 and CPU_V6K, could you tell me? :)
-
-Thank you 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
