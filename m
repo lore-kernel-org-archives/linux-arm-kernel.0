@@ -1,122 +1,88 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 9 Jan 2015 13:33:45 +0100
-Subject: [PATCH v6 18/20] KVM: introduce kvm_check_device_type()
-In-Reply-To: <1420804478-17354-19-git-send-email-andre.przywara@arm.com>
-References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
- <1420804478-17354-19-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150109123345.GR21092@cbox>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 9 Jan 2015 20:13:06 +0800
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <54AD431F.6060403@gmail.com>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+ <54AD3EAE.6090009@gmail.com> <20150107222209.64ed24a0@xhacker>
+ <54AD431F.6060403@gmail.com>
+Message-ID: <20150109201306.4d1a296b@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 11:54:36AM +0000, Andre Przywara wrote:
-> While we can easily register and unregister KVM devices, there is
-> currently no easy way of checking whether a device has been
-> registered.
-> Introduce kvm_check_device_type() for that purpose and use it in two
-> existing functions. Also change the return code for an invalid
-> type number from ENOSPC to EINVAL.
-> This function will be later used by another patch set to check
-> whether a KVM_CREATE_IRQCHIP ioctl is valid.
+Dear Sebastian,
 
-I feel like this is misguided and the vgic should be able to figure this
-stuff out internally.  Did you have code for this approach somewhere
-that I can take a look at?
+On Wed, 7 Jan 2015 06:30:55 -0800
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-I forget: Are we still requiring KVM_CREATE_IRQCHIP for VGICv3 or are we
-just relying on users to use KVM_CREATE_DEVICE for anything in the
-future?
+> On 07.01.2015 15:22, Jisheng Zhang wrote:
+> > Dear Sebastian,
+> >
+> > On Wed, 7 Jan 2015 06:11:58 -0800
+> > Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> >
+> >> On 31.12.2014 09:57, Jisheng Zhang wrote:
+> >>> The "smemc" clock is removed on BG2Q SoCs. In fact, bit19 of clkenable
+> >>> register is for nfc. Current code use bit19 for non-exist "smemc"
+> >>> incorrectly, this prevents eMMC from working due to the sdhci's
+> >>> "core" clk is still gated.
+> >>>
+> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>> Cc: stable at vger.kernel.org # 3.16+
+> >>> ---
+> >>>    drivers/clk/berlin/bg2q.c | 1 -
+> >>>    1 file changed, 1 deletion(-)
+> >>>
+> >>> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+> >>> index 21784e4..440ef81 100644
+> >>> --- a/drivers/clk/berlin/bg2q.c
+> >>> +++ b/drivers/clk/berlin/bg2q.c
+> >>> @@ -285,7 +285,6 @@ static const struct berlin2_gate_data bg2q_gates[]
+> >>> __initconst = { { "pbridge",	"perif",	15,
+> >>> CLK_IGNORE_UNUSED }, { "sdio",	"perif",	16,
+> >>> CLK_IGNORE_UNUSED }, { "nfc",	"perif",	18 },
+> >
+> > The nfc here is really confusing, we call it as nfccore internally. Is it
+> > better to rename it as nfccore?
+> 
+> I guess it comes from some early Marvell BSP code, if there is no
+> issues with the name, e.g. something already depends on "nfc", feel
+> free to rename it to something more meaningful.
+
+In BG2, mrvl call the clock as nfccore. The code use "nfc" for it.
+The situation is similar for usbcore, satacore etc. So keep the name here,
+what do you think?
 
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog:
->  (new in v6)
+> >>> -	{ "smemc",	"perif",	19 },
+> >>
+> >> Jisheng,
+> >>
+> >> if bit 19 is for nfc, how does that work out with bit 18 which is
+> >> still assigned to nfc? Can you re-evaluate clkenable registers for
+> >
+> > bit 19 is for nfcEcc, the "io" clock; bit 18 is for nfcCore, the "core"
+> > clock.
 > 
->  include/linux/kvm_host.h |    1 +
->  virt/kvm/kvm_main.c      |   33 +++++++++++++++++++++------------
->  2 files changed, 22 insertions(+), 12 deletions(-)
+> Ok, then both bits should be dealt with accordingly, i.e. rename
+> "smemc" to "nfcecc" and use it in the corresponding dts node.
 > 
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index 83d770e..723d0d2 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -1038,6 +1038,7 @@ void kvm_device_get(struct kvm_device *dev);
->  void kvm_device_put(struct kvm_device *dev);
->  struct kvm_device *kvm_device_from_filp(struct file *filp);
->  int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type);
-> +int kvm_check_device_type(u32 type);
->  void kvm_unregister_device_ops(u32 type);
->  
->  extern struct kvm_device_ops kvm_mpic_ops;
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 1cc6e2e..c7711b2 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -2341,13 +2341,24 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
->  #endif
->  };
->  
-> -int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
-> +int kvm_check_device_type(u32 type)
->  {
->  	if (type >= ARRAY_SIZE(kvm_device_ops_table))
-> -		return -ENOSPC;
-> +		return -EINVAL;
->  
-> -	if (kvm_device_ops_table[type] != NULL)
-> -		return -EEXIST;
-> +	if (kvm_device_ops_table[type] == NULL)
-> +		return -ENODEV;
-> +
-> +	return -EEXIST;
+> If this clk_gate just disables a clock that is fed into another
+> gateable clock module, I can live with removing it - although I
+> still think it is best to leave the clk_gate in place and pick
+> another name that does not collide with any other clock name.
 
-I think this looks a bit screwy, the function always return errors...?
+The nfcecc is already defined in the bg2q_divs, the gate bit is correct there.
 
-> +}
-> +
-> +int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
-> +{
-> +	int ret;
-> +
-> +	ret = kvm_check_device_type(type);
-> +	if (ret != -ENODEV)
-> +		return ret;
->  
->  	kvm_device_ops_table[type] = ops;
->  	return 0;
-> @@ -2364,19 +2375,17 @@ static int kvm_ioctl_create_device(struct kvm *kvm,
->  {
->  	struct kvm_device_ops *ops = NULL;
->  	struct kvm_device *dev;
-> -	bool test = cd->flags & KVM_CREATE_DEVICE_TEST;
->  	int ret;
->  
-> -	if (cd->type >= ARRAY_SIZE(kvm_device_ops_table))
-> -		return -ENODEV;
-
-now you're basically changing a userspace-facing ABI because the ENODEV
-becomes an EINVAL, right?
-
-> -
-> -	ops = kvm_device_ops_table[cd->type];
-> -	if (ops == NULL)
-> -		return -ENODEV;
-> +	ret = kvm_check_device_type(cd->type);
-> +	if (ret != -EEXIST)
-> +		return ret;
->  
-> -	if (test)
-> +	if (cd->flags & KVM_CREATE_DEVICE_TEST)
->  		return 0;
->  
-> +	ops = kvm_device_ops_table[cd->type];
-> +
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->  	if (!dev)
->  		return -ENOMEM;
-> -- 
-> 1.7.9.5
 > 
+> >> BG2Q and fix it up accordingly? I'd suggest to still disable as many
+> >
+> > I'll recheck the clk driver for BG2Q.
+> 
+
+I checked the clk driver for BG2Q one by one. The only problem is the "smemc"
+issue. Removing it is the only thing we need to do. So I think we can use the
+patch I sent.
 
 Thanks,
--Christoffer
+Jisheng
