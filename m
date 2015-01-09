@@ -1,67 +1,88 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  9 Jan 2015 10:51:30 +0100
-Subject: [PATCH v2 4/8] ARM: at91: time: move the system timer driver to
- drivers/clocksource
-In-Reply-To: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1420797094-9444-5-git-send-email-alexandre.belloni@free-electrons.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Jan 2015 10:51:35 +0100
+Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for
+ tegra_resume() location store
+In-Reply-To: <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
+References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
+ <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
+ <54985C30.7020605@wwwdotorg.org>
+ <20150108105742.GI1987@ulmo.nvidia.com>
+ <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20150109095134.GC27845@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Import at91rm9200_time.c from mach-at91 as timer-atmel-st.c. Further cleanup is
-required to get rid of the mach-at91 headers.
+On Thu, Jan 08, 2015 at 02:37:09PM +0200, Peter De Schrijver wrote:
+> On Thu, Jan 08, 2015 at 11:57:43AM +0100, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
+> > > On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
+> > > >22.12.2014 19:17, Stephen Warren ?????:
+> > > >>On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
+> > > >>>Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
+> > > >>>tegra_resume()
+> > > >>>location storing from late to early and as result broke suspend on tegra20.
+> > > >>>PMC scratch register 41 was used by tegra lp1 suspend core code for storing
+> > > >>>physical memory address of common resume function and in the same time used by
+> > > >>>tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
+> > > >>>strict order of scratch register use. Fix it by using scratch 40 instead of 41
+> > > >>>for tegra_resume() location store.
+> > > >>
+> > > >>You likely can't simply change the PMC scratch register usage arbitrarily;
+> > > >>specific registers are designated for specific purposes, and code outside the
+> > > >>Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
+> > > >>those specific values being in those registers. Without significant research,
+> > > >>I'd suggest not changing the PMC scratch register usage.
+> > > >
+> > > >Sure, that's why I asked to verify if scratch register 40 is in use in the
+> > > >comment after commit message.
+> > > 
+> > > Sorry, I didn't notice that.
+> > > 
+> > > >I've checked that u-boot doesn't use it (since
+> > > >upstream kernel doesn't care about any other bootloader), but no idea about
+> > > >secure monitor. It's definitely safer to avoid changing scratch regs usage, I
+> > > >thought that proposed solution would be best from the pure code point of view.
+> > > >So, I'm considering your answer as a rejection of the patch (please, let me know
+> > > >if I'm wrong) and will prepare another one. Btw, it would be nice to have
+> > > >scratch registers usage publicly documented somewhere (on "Tegra Public
+> > > >Application Notes" webpage for example), if it's possible, of course.
+> > > 
+> > > At this stage in Tegra20 development, I think it'd be best to avoid changing
+> > > any scratch register usage if at all possible.
+> > 
+> > Sorry, I had completely missed this discussion. When looking at the code
+> > it doesn't look like this particular "resettable" status needs to be
+> > stored in a PMC scratch register. It can't be stored in RAM because that
+> > goes into self-refresh as part of LP1, but how about just putting it
+> > into IRAM? That stays on in both LP1 and LP2, so should be suitable for
+> > this use-case. It would make the code slightly more complex but using a
+> > single scratch register for multiple purposes sounds brittle and easy to
+> > break (as evidenced by the offending commit).
+> > 
+> > Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
+> > configuration data across LP0 suspend/resume, so I wouldn't think it'd
+> > cause problems if we used that instead of PMC_SCRATCH41 to store the
+> > "resettable" state.
+> > 
+> 
+> No. Usually the scratch registers for EMC config data are setup once by the
+> bootloader and never touched by the kernel after that. So I would not
+> recommend reusing those registers for different purposes.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/Makefile                                           | 2 +-
- drivers/clocksource/Kconfig                                           | 4 ++++
- drivers/clocksource/Makefile                                          | 1 +
- .../at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c         | 0
- 4 files changed, 6 insertions(+), 1 deletion(-)
- rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (100%)
+Right, I misread the code in the downstream kernel. Though it's not the
+bootloader that does it (at least on Tegra20), but some early code in
+the kernel.
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 7b6424d40764..5d1ee3a6f115 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -7,7 +7,7 @@ obj-y		:= setup.o sysirq_mask.o
- obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
- 
- # CPU-specific support
--obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
-+obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
- obj-$(CONFIG_SOC_AT91SAM9260)	+= at91sam9260.o
- obj-$(CONFIG_SOC_AT91SAM9261)	+= at91sam9261.o
- obj-$(CONFIG_SOC_AT91SAM9263)	+= at91sam9263.o
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index fc01ec27d3c8..f550f16a176d 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -128,6 +128,10 @@ config ATMEL_PIT
- 	select CLKSRC_OF if OF
- 	def_bool SOC_AT91SAM9 || SOC_SAMA5
- 
-+config ATMEL_ST
-+	select CLKSRC_OF
-+	def_bool SOC_AT91RM9200
-+
- config CLKSRC_METAG_GENERIC
- 	def_bool y if METAG
- 	help
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b24b56b..b7380ded4e4c 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
- obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
-+obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
- obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
- obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
- obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/drivers/clocksource/timer-atmel-st.c
-similarity index 100%
-rename from arch/arm/mach-at91/at91rm9200_time.c
-rename to drivers/clocksource/timer-atmel-st.c
--- 
-2.1.0
+IRAM sounds like a good candidate still. Or do you know of anything that
+would exclude IRAM as storage location for this data?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/af3c398b/attachment.sig>
