@@ -1,57 +1,46 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri,  9 Jan 2015 16:57:12 -0700
-Subject: [PATCH 01/11] coresight-etm: unlock on error paths in mode_store()
+Date: Fri,  9 Jan 2015 16:57:15 -0700
+Subject: [PATCH 04/11] coresight-tmc: use module_amba_driver to simplify the
+ code
 In-Reply-To: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1420847842-31769-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1420847842-31769-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dan Carpenter <dan.carpenter@oracle.com>
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-There are some missing unlocks on the error paths.
+module_amba_driver() makes the code simpler by eliminating
+boilerplate code.
 
-Fixes: a939fc5a71ad ('coresight-etm: add CoreSight ETM/PTM driver')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/coresight-etm3x.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/coresight/coresight-tmc.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
-index d9e3ed6aa857..369cac00afaa 100644
---- a/drivers/coresight/coresight-etm3x.c
-+++ b/drivers/coresight/coresight-etm3x.c
-@@ -573,7 +573,8 @@ static ssize_t mode_store(struct device *dev,
- 	if (drvdata->mode & ETM_MODE_STALL) {
- 		if (!(drvdata->etmccr & ETMCCR_FIFOFULL)) {
- 			dev_warn(drvdata->dev, "stall mode not supported\n");
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto err_unlock;
- 		}
- 		drvdata->ctrl |= ETMCR_STALL_MODE;
- 	 } else
-@@ -582,7 +583,8 @@ static ssize_t mode_store(struct device *dev,
- 	if (drvdata->mode & ETM_MODE_TIMESTAMP) {
- 		if (!(drvdata->etmccer & ETMCCER_TIMESTAMP)) {
- 			dev_warn(drvdata->dev, "timestamp not supported\n");
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto err_unlock;
- 		}
- 		drvdata->ctrl |= ETMCR_TIMESTAMP_EN;
- 	} else
-@@ -595,6 +597,10 @@ static ssize_t mode_store(struct device *dev,
- 	spin_unlock(&drvdata->spinlock);
+diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
+index ce2c293f1707..3ff232f9ddf7 100644
+--- a/drivers/coresight/coresight-tmc.c
++++ b/drivers/coresight/coresight-tmc.c
+@@ -760,17 +760,7 @@ static struct amba_driver tmc_driver = {
+ 	.id_table	= tmc_ids,
+ };
  
- 	return size;
-+
-+err_unlock:
-+	spin_unlock(&drvdata->spinlock);
-+	return ret;
- }
- static DEVICE_ATTR_RW(mode);
+-static int __init tmc_init(void)
+-{
+-	return amba_driver_register(&tmc_driver);
+-}
+-module_init(tmc_init);
+-
+-static void __exit tmc_exit(void)
+-{
+-	amba_driver_unregister(&tmc_driver);
+-}
+-module_exit(tmc_exit);
++module_amba_driver(tmc_driver);
  
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("CoreSight Trace Memory Controller driver");
 -- 
 1.9.1
