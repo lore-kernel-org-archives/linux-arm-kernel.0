@@ -1,58 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Jan 2015 11:02:58 +0100
-Subject: [PATCH 3/3] gpio: sx150x: add dts support for sx150x driver
-In-Reply-To: <1417695130-5712-3-git-send-email-21cnbao@gmail.com>
-References: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
- <1417695130-5712-3-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdaeSpvS=k6F-hjyQfGDZdWgckwRjvYwhnQk1NnAhKLJJw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 9 Jan 2015 11:05:12 +0100
+Subject: [PATCH v2 3/3] soc/tegra: fuse: Add Tegra132 support
+In-Reply-To: <CAAVeFuKbnquF0iBp4L8Sv4tp-F3YevKjaSkVtyT2LJnDDvXCbg@mail.gmail.com>
+References: <1420701887-1465-3-git-send-email-thierry.reding@gmail.com>
+ <1420707308-6974-1-git-send-email-thierry.reding@gmail.com>
+ <CAAVeFuKbnquF0iBp4L8Sv4tp-F3YevKjaSkVtyT2LJnDDvXCbg@mail.gmail.com>
+Message-ID: <20150109100510.GF27845@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 4, 2014 at 1:12 PM, Barry Song <21cnbao@gmail.com> wrote:
+On Fri, Jan 09, 2015 at 12:49:25PM +0900, Alexandre Courbot wrote:
+> On Thu, Jan 8, 2015 at 5:55 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > Tegra132 is very similar to Tegra124 from a peripheral point of view and
+> > uses the same fuse controller.
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> > Changes in v2:
+> > - add missing break in Tegra132 case for legacy fuse init (Vince Hsu)
+> >
+> >  drivers/soc/tegra/fuse/fuse-tegra.c   | 1 +
+> >  drivers/soc/tegra/fuse/fuse-tegra30.c | 3 +++
+> >  2 files changed, 4 insertions(+)
+> >
+> > diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
+> > index 011a3363c265..c0d660f1aaac 100644
+> > --- a/drivers/soc/tegra/fuse/fuse-tegra.c
+> > +++ b/drivers/soc/tegra/fuse/fuse-tegra.c
+> > @@ -81,6 +81,7 @@ static const struct of_device_id car_match[] __initconst = {
+> >         { .compatible = "nvidia,tegra30-car", },
+> >         { .compatible = "nvidia,tegra114-car", },
+> >         { .compatible = "nvidia,tegra124-car", },
+> > +       { .compatible = "nvidia,tegra132-car", },
+> >         {},
+> >  };
+> >
+> > diff --git a/drivers/soc/tegra/fuse/fuse-tegra30.c b/drivers/soc/tegra/fuse/fuse-tegra30.c
+> > index d1a4290cda5c..9e3679594259 100644
+> > --- a/drivers/soc/tegra/fuse/fuse-tegra30.c
+> > +++ b/drivers/soc/tegra/fuse/fuse-tegra30.c
+> > @@ -184,6 +184,9 @@ static void __init legacy_fuse_init(void)
+> >         case TEGRA124:
+> >                 fuse_info = &tegra124_info;
+> >                 break;
+> > +       case TEGRA132:
+> > +               fuse_info = &tegra124_info;
+> > +               break;
+> 
+> Nit, but why not
+> 
+>         case TEGRA124:
+> +       case TEGRA132:
+>                 fuse_info = &tegra124_info;
+>                 break;
 
-> From: Wei Chen <Wei.Chen@csr.com>
->
-> Current sx150x gpio expander driver doesn't support DT. Now we added DT support
-> for this driver.
->
-> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-(...)
-> +-pullup_ena:A bit-mask which enables or disables the pull-up resistor
-> +       for each IO line in the expander. = <0x0>;
-> +
-> +-pulldn_ena:A bit-mask which enables-or disables the pull-down resistor
-> +       for each IO line in the expander.
-> +
-> +-open_drain_ena:A bit-mask which enables-or disables open-drain
-> +       operation for each IO line in the expander.
-> +
-> +-polarity: A bit-mask which enables polarity inversion for each IO line
-> +       in the expander.
+Yes, that's even better.
 
-I don't particularly like these properties.
-
-This is basically pin control stuff.
-
-I know that the driver was merged way before the pin control subsystem
-existed and before I was maintainer of GPIO. So it has some tradition
-behind it.
-
-Still I would *really* prefer that it was at least described the way
-pin controllers usually are, so we have the option of converting it
-to pin control later.
-
-The major difference if you check the pin control standard bindings,
-is that instead of hammering down the config of different lines in
-the controller, the config is tied to the consumers, as these are
-the devices actually requiring that config.
-
-I.e. it's not a property of the *controller* that a line is pulled down,
-that is a property of whatever is connected to that line.
-
-Maybe I'm overzealous so that this would require implenenting
-a whole lot of pin control stuff and move the driver to drivers/pinctrl,
-but I won't let it go without a discussion first.
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/a8f08b0d/attachment.sig>
