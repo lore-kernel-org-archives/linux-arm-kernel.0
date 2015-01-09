@@ -1,63 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Jan 2015 12:41:35 +0000
-Subject: [PATCH v3 3/8] ARM: MB86S7X: Add MCPM support
-In-Reply-To: <1420802934-4084-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1420802934-4084-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
-Message-ID: <20150109124134.GK12302@n2100.arm.linux.org.uk>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 9 Jan 2015 13:45:06 +0100
+Subject: [PATCH v2 0/7] Fix sti drivers whcih mix reg address spaces
+In-Reply-To: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
+References: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <54AFCD52.4050302@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 07:28:54PM +0800, Vincent Yang wrote:
-> +static int __init mb86s7x_mcpm_init(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
-> +	struct mb86s7x_scb_version cmd;
-> +	int ret;
-> +
-> +	if (!cci_probed())
-> +		return -ENODEV;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	pr_info("Booting on cpu_%u cluster_%u\n", cpu, cluster);
-> +	mb86s7x_pm_use_count[cluster][cpu] = 1;
-> +
-> +	/* reset the wfi 'color' for primary cpu */
-> +	mb86s7x_set_wficolor(cluster, cpu, AT_WFI_DO_NOTHING);
-> +
-> +	/* Do SMC to set entry address for CPUs coming online */
-> +	mb86s7x_cpu_entry(virt_to_phys(mcpm_entry_point));
-> +
-> +	cmd.payload_size = sizeof(cmd);
-> +	cmd.version = 0;
-> +	cmd.config_version = 0;
-> +	ret = mb86s7x_send_packet(CMD_SCB_CAPABILITY_GET_REQ,
-> +				  &cmd, sizeof(cmd));
-> +	if (ret < 0) /* non fatal */
-> +		pr_err("%s:%d failed to get SCB version\n",
-> +		       __func__, __LINE__);
-> +	else
-> +		pr_err("MB86S7x SCB version 0x%x:0x%x\n",
-> +		       cmd.version, cmd.config_version);
-> +
-> +	ret = mcpm_platform_register(&mb86s7x_pm_power_ops);
-> +	if (!ret)
-> +		ret = mcpm_sync_init(mb86s7x_pm_power_up_setup);
-> +	if (!ret)
-> +		ret = mcpm_loopback(mb86s7x_cache_off); /* turn on the CCI */
-> +	if (!ret)
-> +		mcpm_smp_set_ops();
-> +
-> +	return ret;
-> +}
-> +early_initcall(mb86s7x_mcpm_init);
+Hi Peter,
 
-What happens if this is built into a kernel running on another SoC where
-CCI has been probed?
+On 01/07/2015 04:04 PM, Peter Griffin wrote:
+> Hi folks,
+>
+> A V2 of this old series incorporating Arnd and Lees Feedback form v1.
+>
+> Following on from Arnds comments about the picophy driver here
+> https://lkml.org/lkml/2014/11/13/161, this series fixes the
+> remaining upstreamed drivers for STI, which are mixing address spaces
+> in the reg property. We do this in a way similar to the keystone
+> and bcm7445 platforms, by having sysconfig phandle/ offset pair
+> (where only one register is required). Or phandle / integer array
+> where multiple offsets in the same bank are needed).
+>
+> This series breaks DT compatability! But the platform support
+> is WIP and only being used by the few developers who are upstreaming
+> support for it. I've made each change to the driver / dt doc / dt
+> file as a single atomic commit so the kernel will remain bisectable.
+>
+> This series then also enables the picophy driver, and adds back in
+> the ehci/ohci dt nodes for stih410 which make use of the picophy.
+>
+> regards,
+>
+> Peter.
+>
+> Changes since v1:
+> - Add missing space after */ (Lee)
+> - Change comment to "indexed from" rather than "not indexed from" (Lee)
+> - Change naming to phy1, phy2 rather than phy at 1 phy at 2 if there is no reg property (Arnd / Grant)
+> - Rebased on v3.19-rc3 (me)
+> - Checkpatch "no space before tabs" warning in stih41*.dtsi (me)
+>
+> Peter Griffin (7):
+>    phy: phy-stih407-usb: Pass sysconfig register offsets via syscfg
+>      property.
+>    phy: miphy365x: Pass sysconfig register offsets via syscfg dt
+>      property.
+>    ARM: STi: DT: STiH407: Add usb2 picophy dt nodes
+>    ARM: STi: DT: STiH410: Add usb2 picophy dt nodes
+>    ARM: STi: DT: STiH410: Add DT nodes for the ehci and ohci usb
+>      controllers.
+>    ARM: multi_v7_defconfig: Enable stih407 usb picophy
+>    stmmac: dwmac-sti: Pass sysconfig register offset via syscon dt
+>      property.
+>
+>   .../devicetree/bindings/net/sti-dwmac.txt          | 14 ++---
+>   .../devicetree/bindings/phy/phy-miphy365x.txt      | 15 ++---
+>   .../devicetree/bindings/phy/phy-stih407-usb.txt    | 10 +---
+>   arch/arm/boot/dts/stih407-family.dtsi              |  9 +++
+>   arch/arm/boot/dts/stih410.dtsi                     | 70 ++++++++++++++++++++++
+>   arch/arm/boot/dts/stih415.dtsi                     | 12 ++--
+>   arch/arm/boot/dts/stih416.dtsi                     | 22 +++----
+>   arch/arm/configs/multi_v7_defconfig                |  1 +
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 13 ++--
+>   drivers/phy/phy-miphy365x.c                        | 29 ++++-----
+>   drivers/phy/phy-stih407-usb.c                      | 25 ++++----
+>   11 files changed, 143 insertions(+), 77 deletions(-)
+>
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks! The series looks good to me.
+
+DT patches applied to sti-dt-for-v3.20 branch,
+and defconfig patch applied to sti-defconfig-for-v3.20.
+
+
+Regards,
+Maxime
