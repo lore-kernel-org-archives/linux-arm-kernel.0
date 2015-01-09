@@ -1,91 +1,77 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri,  9 Jan 2015 18:21:41 +0100
-Subject: [RFC 11/11] i2c: pmcmsp: make use of the new infrastructure for quirks
-In-Reply-To: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1420824103-24169-12-git-send-email-wsa@the-dreams.de>
+From: mpeg.blue@free.fr (Mason)
+Date: Fri, 09 Jan 2015 18:46:24 +0100
+Subject: ioremap vs remap_pfn_range, VMSPLIT, etc
+In-Reply-To: <20150109131322.GO12302@n2100.arm.linux.org.uk>
+References: <54AFD09E.1010806@free.fr>
+ <20150109131322.GO12302@n2100.arm.linux.org.uk>
+Message-ID: <54B013F0.10408@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/i2c/busses/i2c-pmcmsp.c | 42 ++++++++++++++++-------------------------
- 1 file changed, 16 insertions(+), 26 deletions(-)
+On 09/01/2015 14:13, Russell King - ARM Linux wrote:
 
-diff --git a/drivers/i2c/busses/i2c-pmcmsp.c b/drivers/i2c/busses/i2c-pmcmsp.c
-index 44f03eed00dd..e06efee9fa70 100644
---- a/drivers/i2c/busses/i2c-pmcmsp.c
-+++ b/drivers/i2c/busses/i2c-pmcmsp.c
-@@ -463,14 +463,6 @@ static enum pmcmsptwi_xfer_result pmcmsptwi_xfer_cmd(
- 		return -EINVAL;
- 	}
- 
--	if (cmd->read_len > MSP_MAX_BYTES_PER_RW ||
--	    cmd->write_len > MSP_MAX_BYTES_PER_RW) {
--		dev_err(&pmcmsptwi_adapter.dev,
--			"%s: Cannot transfer more than %d bytes\n",
--			__func__, MSP_MAX_BYTES_PER_RW);
--		return -EINVAL;
--	}
--
- 	mutex_lock(&data->lock);
- 	dev_dbg(&pmcmsptwi_adapter.dev,
- 		"Setting address to 0x%04x\n", cmd->addr);
-@@ -527,25 +519,14 @@ static int pmcmsptwi_master_xfer(struct i2c_adapter *adap,
- 	struct pmcmsptwi_cfg oldcfg, newcfg;
- 	int ret;
- 
--	if (num > 2) {
--		dev_dbg(&adap->dev, "%d messages unsupported\n", num);
--		return -EINVAL;
--	} else if (num == 2) {
--		/* Check for a dual write-then-read command */
-+	if (num == 2) {
- 		struct i2c_msg *nextmsg = msg + 1;
--		if (!(msg->flags & I2C_M_RD) &&
--		    (nextmsg->flags & I2C_M_RD) &&
--		    msg->addr == nextmsg->addr) {
--			cmd.type = MSP_TWI_CMD_WRITE_READ;
--			cmd.write_len = msg->len;
--			cmd.write_data = msg->buf;
--			cmd.read_len = nextmsg->len;
--			cmd.read_data = nextmsg->buf;
--		} else {
--			dev_dbg(&adap->dev,
--				"Non write-read dual messages unsupported\n");
--			return -EINVAL;
--		}
-+
-+		cmd.type = MSP_TWI_CMD_WRITE_READ;
-+		cmd.write_len = msg->len;
-+		cmd.write_data = msg->buf;
-+		cmd.read_len = nextmsg->len;
-+		cmd.read_data = nextmsg->buf;
- 	} else if (msg->flags & I2C_M_RD) {
- 		cmd.type = MSP_TWI_CMD_READ;
- 		cmd.read_len = msg->len;
-@@ -605,6 +586,14 @@ static u32 pmcmsptwi_i2c_func(struct i2c_adapter *adapter)
- 		I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_PROC_CALL;
- }
- 
-+static struct i2c_adapter_quirks pmcmsptwi_i2c_quirks = {
-+	.flags = I2C_ADAPTER_QUIRK_COMB_WRITE_THEN_READ,
-+	.max_write_len = MSP_MAX_BYTES_PER_RW,
-+	.max_read_len = MSP_MAX_BYTES_PER_RW,
-+	.max_comb_write_len = MSP_MAX_BYTES_PER_RW,
-+	.max_comb_read_len = MSP_MAX_BYTES_PER_RW,
-+};
-+
- /* -- Initialization -- */
- 
- static struct i2c_algorithm pmcmsptwi_algo = {
-@@ -616,6 +605,7 @@ static struct i2c_adapter pmcmsptwi_adapter = {
- 	.owner		= THIS_MODULE,
- 	.class		= I2C_CLASS_HWMON | I2C_CLASS_SPD,
- 	.algo		= &pmcmsptwi_algo,
-+	.quirks		= &pmcmsptwi_i2c_quirks,
- 	.name		= DRV_NAME,
- };
- 
--- 
-2.1.3
+> On Fri, Jan 09, 2015 at 01:59:10PM +0100, Mason wrote:
+>
+>> Yesterday, I used /dev/mem to mmap 2 GB and (to my surprise) it worked.
+>> Specifically, I opened /dev/mem O_RDWR | O_SYNC
+>> then called
+>>   mmap(NULL, 1U<<31, PROT_WRITE, MAP_SHARED, fd, 0x80000000);
+> 
+> So you asked to map 2GB starting at 2GB physical.
+> 
+>> And mmap returned a valid pointer.
+> 
+> And that mapping would have been created to map physical addresses
+> 0x80000000-0xffffffff inclusive.
+> 
+>> I was expecting it to fail.
+>>
+>> - the kernel is configured with VMSPLIT_3G (3G/1G user/kernel)
+> 
+> This has no bearing on the above.
+
+I don't understand why.
+
+mmap allocates virtual addresses in the user-space process, yes?
+So if I had VMSPLIT_2G, user-space processes would be limited
+to 2G virtual addresses, and could not create a single 2G map
+on top of its stack and text space. Or am I missing something?
+
+>> - the kernel manages 256 MB RAM
+>> - there is roughly 750 MB of VMALLOC space, no highmem
+> 
+> vmalloc has no bearing on the above, mmap() doesn't allocate anything
+> into vmalloc space.
+
+This means remap_pfn_range doesn't "put" anything in the kernel's
+virtual address space.
+
+>> If I requested the same mapping *within the kernel* using ioremap,
+>> would that fail because of limited VMALLOC space?
+> 
+> Correct.
+
+OK.
+
+>> Moving to arch-specific questions (namely ARM Cortex-A9).
+>> If I understand correctly (which is very possibly NOT the case)
+>> the CPU has two registers pointing to page tables, one for
+>> the current process, one for the kernel. And the CPU automatically
+>> picks the correct one, based on the active context?
+>> It would seem possible to have a full 4G for process, and a full 4G
+>> for the kernel, using that method, no? (Like Ingo's old 4G/4G split).
+>> Without the performance overhead of fiddling with the page tables.
+>> What am I missing?
+> 
+> It's possible to use both, but the CPU selects the page table register
+> according to the virtual address.  So it's not possible to have 4G for
+> both.  There's only a restricted set of options:  2G / 2G, where the
+> bottom 2G of virtual space uses TTBR0 and the upper 2G uses TTBR1.
+> 1G / 3G (1G for TTBR0, 3G for TTBR1).
+> 
+> We don't use it because most people run with 3G for userspace, which
+> isn't supported in hardware.
+
+I see. Thanks for spelling it out.
+
+Regards.
