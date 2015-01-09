@@ -1,219 +1,221 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  9 Jan 2015 11:54:19 +0000
-Subject: [PATCH v6 01/20] arm/arm64: KVM: rework MPIDR assignment and add
- accessors
+Date: Fri,  9 Jan 2015 11:54:38 +0000
+Subject: [PATCH v6 20/20] arm/arm64: KVM: allow userland to request a virtual
+ GICv3
 In-Reply-To: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
 References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1420804478-17354-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1420804478-17354-21-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The virtual MPIDR registers (containing topology information) for the
-guest are currently mapped linearily to the vcpu_id. Improve this
-mapping for arm64 by using three levels to not artificially limit the
-number of vCPUs.
-To help this, change and rename the kvm_vcpu_get_mpidr() function to
-mask off the non-affinity bits in the MPIDR register.
-Also add an accessor to later allow easier access to a vCPU with a
-given MPIDR. Use this new accessor in the PSCI emulation.
+With all of the GICv3 code in place now we allow userland to ask the
+kernel for using a virtual GICv3 in the guest.
+Also we provide the necessary support for guests setting the memory
+addresses for the virtual distributor and redistributors.
+This requires some userland code to make use of that feature and
+explicitly ask for a virtual GICv3.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
 Changelog v5...v6:
- (add Reviewed-by:)
+ (none)
 
 Changelog v4...v5:
- (add Reviewed-by:)
+- improving documentation text
 
 Changelog v3...v4:
-- rename kvm_vcpu_get_mpidr() to kvm_vcpu_get_mpidr_aff()
-- simplify kvm_mpidr_to_vcpu()
-- fixup comment
+- refine commit message
+- add documentation of new GICv3 KVM device
 
- arch/arm/include/asm/kvm_emulate.h   |    5 +++--
- arch/arm/include/asm/kvm_host.h      |    2 ++
- arch/arm/kvm/arm.c                   |   13 +++++++++++++
- arch/arm/kvm/psci.c                  |   17 +++++------------
- arch/arm64/include/asm/kvm_emulate.h |    5 +++--
- arch/arm64/include/asm/kvm_host.h    |    2 ++
- arch/arm64/kvm/sys_regs.c            |   13 +++++++++++--
- 7 files changed, 39 insertions(+), 18 deletions(-)
+ Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
+ arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
+ include/kvm/arm_vgic.h                         |    4 +--
+ virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
+ virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
+ 5 files changed, 65 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 66ce176..c528615 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -23,6 +23,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/kvm_arm.h>
-+#include <asm/cputype.h>
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 30f5427..5d4fd4b 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
  
- unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-@@ -167,9 +168,9 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
- }
+ Device types supported:
+   KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
++  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
  
--static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
-+static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
--	return vcpu->arch.cp15[c0_MPIDR];
-+	return vcpu->arch.cp15[c0_MPIDR] & MPIDR_HWID_BITMASK;
- }
+ Only one VGIC instance may be instantiated through either this API or the
+ legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+ controller, requiring emulated user-space devices to inject interrupts to the
+ VGIC instead of directly to CPUs.
  
- static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 254e065..a4e1155 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -234,6 +234,8 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
++Creating a guest GICv3 device requires a host GICv3 as well.
++GICv3 implementations with hardware compatibility support allow a guest GICv2
++as well.
 +
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 2d6d910..d0fadd6 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1045,6 +1045,19 @@ static void check_kvm_target_cpu(void *ret)
- 	*(int *)ret = kvm_target_cpu();
- }
+ Groups:
+   KVM_DEV_ARM_VGIC_GRP_ADDR
+   Attributes:
+     KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+       Base address in the guest physical address space of the GIC distributor
+-      register mappings.
++      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
  
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int i;
+     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+       Base address in the guest physical address space of the GIC virtual cpu
+-      interface register mappings.
++      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
 +
-+	mpidr &= MPIDR_HWID_BITMASK;
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (mpidr == kvm_vcpu_get_mpidr_aff(vcpu))
-+			return vcpu;
-+	}
-+	return NULL;
-+}
++    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
++      Base address in the guest physical address space of the GICv3 distributor
++      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
 +
++    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
++      Base address in the guest physical address space of the GICv3
++      redistributor register mappings. There are two 64K pages for each
++      VCPU and all of the redistributor pages are contiguous.
++      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
++
+ 
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+   Attributes:
+@@ -36,6 +52,7 @@ Groups:
+     the register.
+   Limitations:
+     - Priorities are not implemented, and registers are RAZ/WI
++    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+   Errors:
+     -ENODEV: Getting or setting this register is not yet supported
+     -EBUSY: One or more VCPUs are running
+@@ -68,6 +85,7 @@ Groups:
+ 
+   Limitations:
+     - Priorities are not implemented, and registers are RAZ/WI
++    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+   Errors:
+     -ENODEV: Getting or setting this register is not yet supported
+     -EBUSY: One or more VCPUs are running
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 480af34..3ef77a4 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -78,6 +78,13 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_DIST_SIZE		0x1000
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
+ 
++/* Supported VGICv3 address types  */
++#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
++#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++
++#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
++#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+ #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index b9b2e05..1bc0ca8 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -36,8 +36,8 @@
+ #define VGIC_V2_MAX_CPUS	8
+ 
+ /* Sanity checks... */
+-#if (KVM_MAX_VCPUS > 8)
+-#error	Invalid number of CPU interfaces
++#if (KVM_MAX_VCPUS > 255)
++#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
+ #endif
+ 
+ #if (VGIC_NR_IRQS_LEGACY & 31)
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index 2d49058..a6d2bdb 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -1009,6 +1009,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+ 		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+ 			return -ENXIO;
++		case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++			return 0;
+ 		}
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index e474bd2..186cf30 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1663,7 +1663,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
  /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 58cb324..02fa8ef 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -22,6 +22,7 @@
- #include <asm/cputype.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_psci.h>
-+#include <asm/kvm_host.h>
- 
- /*
-  * This is an implementation of the Power State Coordination Interface
-@@ -66,25 +67,17 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+  * kvm_vgic_addr - set or get vgic VM base addresses
+  * @kvm:   pointer to the vm struct
+- * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
++ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
+  * @addr:  pointer to address value
+  * @write: if true set the address in the VM address space, if false read the
+  *          address
+@@ -1677,29 +1677,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
  {
- 	struct kvm *kvm = source_vcpu->kvm;
--	struct kvm_vcpu *vcpu = NULL, *tmp;
-+	struct kvm_vcpu *vcpu = NULL;
- 	wait_queue_head_t *wq;
- 	unsigned long cpu_id;
- 	unsigned long context_id;
--	unsigned long mpidr;
- 	phys_addr_t target_pc;
--	int i;
+ 	int r = 0;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
++	int type_needed;
++	phys_addr_t *addr_ptr, block_size;
  
--	cpu_id = *vcpu_reg(source_vcpu, 1);
-+	cpu_id = *vcpu_reg(source_vcpu, 1) & MPIDR_HWID_BITMASK;
- 	if (vcpu_mode_is_32bit(source_vcpu))
- 		cpu_id &= ~((u32) 0);
- 
--	kvm_for_each_vcpu(i, tmp, kvm) {
--		mpidr = kvm_vcpu_get_mpidr(tmp);
--		if ((mpidr & MPIDR_HWID_BITMASK) == (cpu_id & MPIDR_HWID_BITMASK)) {
--			vcpu = tmp;
--			break;
+ 	mutex_lock(&kvm->lock);
+ 	switch (type) {
+ 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+-		if (write) {
+-			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+-					       *addr, KVM_VGIC_V2_DIST_SIZE);
+-		} else {
+-			*addr = vgic->vgic_dist_base;
 -		}
--	}
-+	vcpu = kvm_mpidr_to_vcpu(kvm, cpu_id);
- 
- 	/*
- 	 * Make sure the caller requested a valid CPU and that the CPU is
-@@ -155,7 +148,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
- 	 * then ON else OFF
- 	 */
- 	kvm_for_each_vcpu(i, tmp, kvm) {
--		mpidr = kvm_vcpu_get_mpidr(tmp);
-+		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
- 		if (((mpidr & target_affinity_mask) == target_affinity) &&
- 		    !tmp->arch.pause) {
- 			return PSCI_0_2_AFFINITY_LEVEL_ON;
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 8127e45..fc3459f 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -27,6 +27,7 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
-+#include <asm/cputype.h>
- 
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-@@ -187,9 +188,9 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
- }
- 
--static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
-+static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
--	return vcpu_sys_reg(vcpu, MPIDR_EL1);
-+	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
- }
- 
- static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0b7dfdb..37c4ff1 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -206,6 +206,8 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V2_DIST_SIZE;
+ 		break;
+ 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+-		if (write) {
+-			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+-					       *addr, KVM_VGIC_V2_CPU_SIZE);
+-		} else {
+-			*addr = vgic->vgic_cpu_base;
+-		}
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_cpu_base;
++		block_size = KVM_VGIC_V2_CPU_SIZE;
+ 		break;
++#ifdef CONFIG_ARM_GIC_V3
++	case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_dist_base;
++		block_size = KVM_VGIC_V3_DIST_SIZE;
++		break;
++	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_redist_base;
++		block_size = KVM_VGIC_V3_REDIST_SIZE;
++		break;
++#endif
+ 	default:
+ 		r = -ENODEV;
++		goto out;
++	}
 +
- static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 				       phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 3d7c2df..136e679 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -252,10 +252,19 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
++	if (vgic->vgic_model != type_needed) {
++		r = -ENODEV;
++		goto out;
+ 	}
  
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- {
-+	u64 mpidr;
++	if (write)
++		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
++	else
++		*addr = *addr_ptr;
 +
- 	/*
--	 * Simply map the vcpu_id into the Aff0 field of the MPIDR.
-+	 * Map the vcpu_id into the first three affinity level fields of
-+	 * the MPIDR. We limit the number of VCPUs in level 0 due to a
-+	 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
-+	 * of the GICv3 to be able to address each CPU directly when
-+	 * sending IPIs.
- 	 */
--	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1UL << 31) | (vcpu->vcpu_id & 0xff);
-+	mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
-+	mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
-+	mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
-+	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
++out:
+ 	mutex_unlock(&kvm->lock);
+ 	return r;
  }
- 
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
 -- 
 1.7.9.5
