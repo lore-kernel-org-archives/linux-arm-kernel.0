@@ -1,125 +1,215 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 9 Jan 2015 10:26:12 -0800
-Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
-In-Reply-To: <CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>
-References: <rjui@broadcom.com>	<1417131990-17954-1-git-send-email-rjui@broadcom.com>	<1417131990-17954-2-git-send-email-rjui@broadcom.com>
- <CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>
-Message-ID: <54B01D44.5080601@broadcom.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Jan 2015 02:28:07 +0800
+Subject: [PATCH v2 1/9] Input: sun4i-ts: Add thermal zone sensor support
+In-Reply-To: <20150109172318.GA39037@dtor-ws>
+References: <1420798676-22856-1-git-send-email-wens@csie.org>
+ <1420798676-22856-2-git-send-email-wens@csie.org>
+ <20150109172318.GA39037@dtor-ws>
+Message-ID: <CAGb2v66xpzZ-tXcKgirk9US9FGBeoZidDoQ3imymMTL_Tu9PWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/9/2015 2:12 AM, Linus Walleij wrote:
-> On Fri, Nov 28, 2014 at 12:46 AM, Ray Jui <rjui@broadcom.com> wrote:
-> 
->> Device tree binding documentation for Broadcom Cygnus pinctrl driver
+On Sat, Jan 10, 2015 at 1:23 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Fri, Jan 09, 2015 at 06:17:48PM +0800, Chen-Yu Tsai wrote:
+>> The touchscreen controller has a temperature sensor embedded in the SoC,
+>> which already has hwmon support in the driver.
 >>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> Add DT thermal zone support so we can use it with cpufreq for thermal
+>> throttling.
+>>
+>> This also adds a comment stating that we do not know the actual formula
+>> for calculating the temperature.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >> ---
->>  .../bindings/pinctrl/brcm,cygnus-pinctrl.txt       |   92 ++++++++++++++++++++
->>  1 file changed, 92 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
+>
+>
+>   CC [M]  drivers/input/touchscreen/sun4i-ts.o
+> drivers/input/touchscreen/sun4i-ts.c:208:15: error: variable
+> ?sun4i_ts_tz_ops? has initializer but incomplete type
+>  static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
+>                ^
+> drivers/input/touchscreen/sun4i-ts.c:209:2: error: unknown field
+> ?get_temp? specified in initializer
+>   .get_temp = get_temp,
+>   ^
+> drivers/input/touchscreen/sun4i-ts.c:209:2: warning: excess elements in
+> struct initializer [enabled by default]
+> drivers/input/touchscreen/sun4i-ts.c:209:2: warning: (near
+> initialization for ?sun4i_ts_tz_ops?) [enabled by default]
+> drivers/input/touchscreen/sun4i-ts.c: In function ?sun4i_ts_probe?:
+> drivers/input/touchscreen/sun4i-ts.c:331:8: warning: passing argument 4
+> of ?thermal_zone_of_sensor_register? from incompatible pointer type
+> [enabled by default]
+>         &sun4i_ts_tz_ops);
+>         ^
+> In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
+> include/linux/thermal.h:302:1: note: expected ?int (*)(void *, long int
+> *)? but argument is of type ?struct thermal_zone_of_device_ops *?
+>  thermal_zone_of_sensor_register(struct device *dev, int id,
+>  ^
+> drivers/input/touchscreen/sun4i-ts.c:331:8: error: too few arguments to
+> function ?thermal_zone_of_sensor_register?
+>         &sun4i_ts_tz_ops);
+>         ^
+> In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
+> include/linux/thermal.h:302:1: note: declared here
+>  thermal_zone_of_sensor_register(struct device *dev, int id,
+>  ^
+> make[1]: *** [drivers/input/touchscreen/sun4i-ts.o] Error 1
+> make: *** [drivers/input/touchscreen/sun4i-ts.o] Error 2
+>
+
+struct thermal_zone_of_device_ops was introduced in 3.19-rc1 in
+
+    184a4bf623fa thermal: of: Extend current of-thermal.c code to
+allow setting emulated temp
+
 >>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
->> new file mode 100644
->> index 0000000..86e4579
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-pinctrl.txt
->> @@ -0,0 +1,92 @@
->> +Broadcom Cygnus Pin Controller
+>> changes since v1:
+>>
+>>     - clean up thermal zone sensor when input device register fails
+>>     - unconditionally unregister thermal zone sensor on removal.
+>>       the unregister function checks the pointers passed in.
+>>     - add comment explaining the lack of documents for the temperature
+>>       calculation formula
+>>
+>> ---
+>>  .../bindings/input/touchscreen/sun4i.txt           |  2 +
+>>  drivers/input/touchscreen/sun4i-ts.c               | 47 ++++++++++++++++++++++
+>>  2 files changed, 49 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>> index aef57791f40b..a8405bab6c00 100644
+>> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>> @@ -5,6 +5,7 @@ Required properties:
+>>   - compatible: "allwinner,sun4i-a10-ts"
+>>   - reg: mmio address range of the chip
+>>   - interrupts: interrupt to which the chip is connected
+>> + - #thermal-sensor-cells: shall be 0
+>>
+>>  Optional properties:
+>>   - allwinner,ts-attached: boolean indicating that an actual touchscreen is
+>> @@ -17,4 +18,5 @@ Example:
+>>               reg = <0x01c25000 0x100>;
+>>               interrupts = <29>;
+>>               allwinner,ts-attached;
+>> +             #thermal-sensor-cells = <0>;
+>>       };
+>> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+>> index 28a06749ae42..aac49db0b09d 100644
+>> --- a/drivers/input/touchscreen/sun4i-ts.c
+>> +++ b/drivers/input/touchscreen/sun4i-ts.c
+>> @@ -34,6 +34,7 @@
+>>
+>>  #include <linux/err.h>
+>>  #include <linux/hwmon.h>
+>> +#include <linux/thermal.h>
+>>  #include <linux/init.h>
+>>  #include <linux/input.h>
+>>  #include <linux/interrupt.h>
+>> @@ -107,6 +108,7 @@
+>>  struct sun4i_ts_data {
+>>       struct device *dev;
+>>       struct input_dev *input;
+>> +     struct thermal_zone_device *tz;
+>>       void __iomem *base;
+>>       unsigned int irq;
+>>       bool ignore_fifo_data;
+>> @@ -180,6 +182,33 @@ static void sun4i_ts_close(struct input_dev *dev)
+>>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>>  }
+>>
+>> +static int get_temp(void *data, long *temp)
+>> +{
+>> +     struct sun4i_ts_data *ts = data;
 >> +
->> +The Cygnus pin controller supports setting the alternate functions of groups
->> +of pins. Pinmux configuration on individual pins is not supported by the
->> +Cygnus A0 SoC.
+>> +     /* No temp_data until the first irq */
+>> +     if (ts->temp_data == -1)
+>> +             return -EAGAIN;
 >> +
->> +Required properties:
+>> +     /*
+>> +      * The user manuals do not contain the formula for calculating
+>> +      * the temperature. The formula used here is from the AXP209,
+>> +      * which is designed by X-Powers, an affiliate of Allwinner:
+>> +      *
+>> +      *     temperature = -144.7 + (value * 0.1)
+>> +      *
+>> +      * This should be replaced with the correct one if such information
+>> +      * becomes available.
+>> +      */
+>> +     *temp = (ts->temp_data - 1447) * 100;
 >> +
->> +- compatible:
->> +    Must be "brcm,cygnus-pinctrl"
+>> +     return 0;
+>> +}
 >> +
->> +- reg:
->> +    Define the base and range of the I/O address space that contain the Cygnus
->> +pin control registers
-> 
-> The following is subnodes. Indicate clearly in the binding that these are
-> *not* properties of the main node, but individual subnodes.
-> 
-Right. I'll fix the document.
-
->> +- brcm,groups:
->> +    This can be strings of one or more group names. This defines the group(s)
->> +that one wants to configure
+>> +static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
+>> +     .get_temp = get_temp,
+>> +};
 >> +
->> +- brcm,function:
->> +    This is the alternate function that one wants to configure to. Valid
->> +alternate functions are "alt1", "alt2", "alt3", "alt4"
-> 
-> NAK. We have standardized bindings for groups and functions,
-> and there are pending patches from S?ren Brinkmann adding
-> this to the pinctrl DT parsing core.
-> 
-> Just use "groups" and "function" and refer to
-> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> 
-> Then "alt1", "alt2" etc are non-functional names of functions.
-> Use the real function names, like "spi0" or so. This
-> alt-business seems to be just a shortcut to make it
-> simple, don't do that.
-> 
-> Then you use e.g. "spi0" as a group name. I prefer you
-> call that "spi0_grp" or something to say it is a group of
-> pins associated with spi0, as spi0 is actually the
-> function.
-> 
-Hmmm, I did this by following brcm,bcm11351-pinctrl.txt:
-- function: String. Specifies the pin mux selection. Values must be one
-of: "alt1", "alt2", "alt3", "alt4"
+>>  static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+>>                        char *buf)
+>>  {
+>> @@ -189,6 +218,16 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+>>       if (ts->temp_data == -1)
+>>               return -EAGAIN;
+>>
+>> +     /*
+>> +      * The user manuals do not contain the formula for calculating
+>> +      * the temperature. The formula used here is from the AXP209,
+>> +      * which is designed by X-Powers, an affiliate of Allwinner:
+>> +      *
+>> +      *     temperature = -144.7 + (value * 0.1)
+>> +      *
+>> +      * This should be replaced with the correct one if such information
+>> +      * becomes available.
+>> +      */
+>>       return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
+>
+> Why duplicate it here, instead of doing:
+>
+> static int sun4i_get_temp(struct sun4i_ts_data *ts, int *temp)
+> {
+>         if (ts->temp_data == -1)
+>                 return -EAGAIN;
+>
+>         /* comment */
+>         *temp = (ts->temp_data - 1447) * 100);
+>
+>         return 0;
+> }
+>
+> static int sun4i_tz_get_temp(void *data, long *temp)
+> {
+>         return sun4i_get_temp(data, temp);
+> }
+>
+> static ssize_t sun4i_show_temp(...)
+> {
+>         error = sun4i_get_temp(ts, &temp);
+>         if (error)
+>                 return error;
+>
+>         return sprintf(buf, "%d\n", temp);
+> }
 
-But you are right, in the pinctrl binding document it describes the
-generic pin multiplexing nodes use "function" and "group".
+I suppose that would be better, especially after I added the large comment.
 
-Let me try to explain how the Cygnus pinctrl controller works and maybe
-you can help to comment whether or not it's suitable for what's
-described in pinctrl-binding.txt for the usage of "function" and "group".
+> Also, thermal core seems to allow creating hwmon devices for thermal
+> zones, can we use this feature?
 
-The Cygnus pinctrl contoller has a limitation that the mux configuration
-can only be group based. "group" here is a real configuration in the
-Cygnus pinctrl controller registers. One can configure a "group" to
-alternate function 1, 2, 3, or 4.
+For thermal sensors that also have hwmon devices registered, that step is
+skipped.
 
-For example, the group "lcd" covers 30 pins. When I configure "lcd" to
-alternate function 1, all 30 pins are muxed to LCD function. When
-configured to function 2, all pins are muxed to SRAM function. Now, here
-comes the issue, when configured to function 3, pins 1-15 and 20-30
-become GPIO function, but pins 16-19 becomes SPI5 function. When it's
-configured to function 4, all 30 pins become GPIO.
+I sort of like having separate hwmon bits, just for a nicer, more informative
+label. But I am not opposed to removing the bits from the driver and having
+it go through the thermal core. We could also remove the build dependency
+on HWMON as a result.
 
-In some other cases, when I configure a group to other functions, there
-could be spare pins which become unused (not brought out to the pad).
-Or, the spare pins may also become a separate function.
-
-Based on the LCD example, I'd assume I would do the following for the
-default LCD function:
-
-lcd_node {
-	group = "lcd_grp";
-	function = "lcd";
-};
-
-And in the case of function 3, I would call the function "spi5" and
-assume the rest of pins become either GPIO (or unused)?
-
-spi5_node {
-	group = "lcd_grp";
-	function = "spi5";
-};
+If you prefer this, I will do so in v3.
 
 
-> If unsure of the definitions of group and function, refer
-> to Documentation/pinctrl.txt
-> 
-> Yours,
-> Linus Walleij
-> 
+Thanks
+ChenYu
