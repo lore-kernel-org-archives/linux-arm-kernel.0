@@ -1,61 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Jan 2015 00:12:17 +0100
-Subject: [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54AC0F34.6040500@redhat.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <20150106141630.GG8829@e104818-lin.cambridge.arm.com>
- <54AC0F34.6040500@redhat.com>
-Message-ID: <5078266.iyOixLMQK8@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri,  9 Jan 2015 23:45:44 +0100
+Subject: [PATCHv2 1/2] leds: tlc59116: Document binding for the TI 16 Channel
+ i2c LED driver
+In-Reply-To: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
+References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1420843545-30892-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 January 2015 11:37:08 Jon Masters wrote:
-> On 01/06/2015 09:16 AM, Catalin Marinas wrote:
-> > On Tue, Jan 06, 2015 at 02:05:12PM +0000, Arnd Bergmann wrote:
-> >> On Tuesday 06 January 2015 11:29:29 Catalin Marinas wrote:
-> >>>>>> We will work on this both on ASWG and linux ACPI driver side, as Dong
-> >>>>>> and Charles pointed out, _OSI things can be solved in ACPI spec, when
-> >>>>>> that is done, we can modify the kernel driver to fix the problems above.
-> >>>>>
-> >>>>> Which driver?
-> >>>>
-> >>>> the ACPICA core driver as you suggested, sorry for the confusion.
-> >>>>
-> >>>>> What about ACPI_OS_NAME? Would you suggest it is fine to report
-> >>>>> "Microsoft Windows NT" on an ARM system? That _OS_ not _OSI.
-> >>>>
-> >>>> No, not at all. I prefer "Linux"
-> >>>> In include/acpi/acconfig.h, when ACPI_OS_NAME defined, it says:
-> >>>> "OS name, used for the _OS object.  The _OS object is essentially
-> >>>> obsolete,..."
-> >>>> for some legacy reasons, we needed  "Microsoft Windows NT", but ACPI
-> >>>> for ARM64 on linux is totally new, I think we can change it to
-> >>>> "Linux" when CONFIG_ARM64 as you suggested.
-> >>>
-> >>> We could ignore this change for now if we don't expect the _OS object to
-> >>> be used at all. But do we have any other way to check the AML code for
-> >>> this? Would FWTS catch such obsolete cases?
-> >>
-> >> How about just leaving it out? It's clearly not used for anything
-> >> good, so I don't see the point in passing either Linux or "Microsoft
-> >> Windows NT" here.
-> > 
-> > Do you mean defining it to NULL (so it ends up as NULL in
-> > acpi_gbl_pre_defined_names) or removing "_OS_" entirely from that array?
-> > I really can't tell what the implications are.
-> 
-> Setting it to NULL is almost certainly (99%+ likely IMO) going to result
-> in some firmware crashing nastily somewhere.
-> 
-> I think I've mentioned before that we're using the ACPI patches in an
-> early access program for partners that we announced last year. I've
-> pinged the team internally and asked that we swiftly change to use
-> whatever name is agreed in this thread so that we can get a lot of other
-> folks to begin testing with a correctly reported OS name.
+Document the binding for the TLC59116 LED driver.
 
-If we have to put something in there, I'd vote for keeping the current
-string.  It's not clear whether Microsoft would follow the change to
-use "Linux" as the _OS_ string, and we probably don't want them to
-use incompatible IDs here.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Cc: Matthew.Fatheree at belkin.com
+---
+ .../devicetree/bindings/leds/leds-tlc59116.txt     | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
 
-	Arnd
+diff --git a/Documentation/devicetree/bindings/leds/leds-tlc59116.txt b/Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+new file mode 100644
+index 000000000000..45c2123774d3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+@@ -0,0 +1,40 @@
++LEDs connected to tcl59116
++
++Required properties
++- compatible: should be "ti,tlc59116"
++- #address-cells: must be 1
++- #size-cells: must be 0
++- reg: typically 0x68
++
++Each led is represented as a sub-node of the ti,,tlc59116.
++See Documentation/devicetree/bindings/leds/common.txt
++
++LED sub-node properties:
++- reg: number of LED line, 0 to 15
++- label: (optional) name of LED
++- linux,default-trigger : (optional)
++
++Examples:
++
++tlc59116 at 68 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	compatible = "ti,tlc59116";
++	reg = <0x68>;
++
++	wan at 0 {
++		label = "wrt1900ac:amber:wan";
++		reg = <0x0>;
++	};
++
++	2g at 2 {
++		label = "wrt1900ac:white:2g";
++		reg = <0x2>;
++	};
++
++	alive at 9 {
++		label = "wrt1900ac:green:alive";
++		reg = <0x9>;
++		linux,default_trigger = "heartbeat";
++	};
++};
+-- 
+2.1.3
