@@ -1,55 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 09 Jan 2015 17:04:36 +0100
-Subject: [RESEND PATCH] ARM: EXYNOS: Add missing static to file-scope
- declarations
-Message-ID: <1420819476-23344-1-git-send-email-k.kozlowski@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 Jan 2015 16:04:49 +0000
+Subject: [PATCH v5][resend v4] of: replace Asahi Kasei Corp vendor prefix
+In-Reply-To: <5363275.ZK3ulH6EUO@wuerfel>
+References: <878ulzx6hr.wl%kuninori.morimoto.gx@gmail.com>
+ <871tn4uv0j.wl%kuninori.morimoto.gx@renesas.com>
+ <CAL_Jsq+GjM+3M63amyh3Rvijkz7Lch_cdUt9vScc9wZeOubOPA@mail.gmail.com>
+ <5363275.ZK3ulH6EUO@wuerfel>
+Message-ID: <20150109160449.GG2634@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'pm_data', 'exynos_release_ret_regs' and
-'exynos5420_release_ret_regs' are not exported nor used outside of
-suspend.c file. Make them static.
+On Fri, Jan 09, 2015 at 02:55:40PM +0100, Arnd Bergmann wrote:
 
-This fixes following sparse warnings:
-arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
-arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared. Should it be static?
-arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared. Should it be static?
+> It's an i2c device, so it won't break, based on the implementation
+> we use in the kernel that ignores the vendor part when the part number
+> matches the i2c driver name.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/suspend.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 342797b9bf3b..fef091f8e59f 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -75,7 +75,7 @@ struct exynos_pm_data {
- 	int (*cpu_suspend)(unsigned long);
- };
- 
--struct exynos_pm_data *pm_data;
-+static struct exynos_pm_data *pm_data;
- 
- static int exynos5420_cpu_state;
- static unsigned int exynos_pmu_spare3;
-@@ -98,7 +98,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
- 	{ /* sentinel */ },
- };
- 
--unsigned int exynos_release_ret_regs[] = {
-+static unsigned int exynos_release_ret_regs[] = {
- 	S5P_PAD_RET_MAUDIO_OPTION,
- 	S5P_PAD_RET_GPIO_OPTION,
- 	S5P_PAD_RET_UART_OPTION,
-@@ -109,7 +109,7 @@ unsigned int exynos_release_ret_regs[] = {
- 	REG_TABLE_END,
- };
- 
--unsigned int exynos5420_release_ret_regs[] = {
-+static unsigned int exynos5420_release_ret_regs[] = {
- 	EXYNOS_PAD_RET_DRAM_OPTION,
- 	EXYNOS_PAD_RET_MAUDIO_OPTION,
- 	EXYNOS_PAD_RET_JTAG_OPTION,
--- 
-1.9.1
+Plus this update is actually changing the board DT file have the ID
+which we've always had in the driver, the driver has always used the new
+string and never the ak, based one that the device tree is registering.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150109/0fb11c03/attachment.sig>
