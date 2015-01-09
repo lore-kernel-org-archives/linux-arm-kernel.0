@@ -1,226 +1,213 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 9 Jan 2015 02:38:15 +0100
-Subject: [PATCH 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c LED
- driver
-In-Reply-To: <CAK5ve-KLkP9kF4vEC655zyR1za8xYyLjT5pO67qxr2YAdk58cg@mail.gmail.com>
-References: <1420763178-10115-1-git-send-email-andrew@lunn.ch>
- <1420763178-10115-3-git-send-email-andrew@lunn.ch>
- <CAK5ve-KLkP9kF4vEC655zyR1za8xYyLjT5pO67qxr2YAdk58cg@mail.gmail.com>
-Message-ID: <20150109013815.GB10191@lunn.ch>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 08 Jan 2015 17:42:06 -0800
+Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
+ handling
+Message-ID: <1420767727-20851-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +static int
-> > +tlc59116_set_mode(struct regmap *regmap, uint8_t mode)
-> 
-> Why not just us u8 instead of uint8_t?
+This patch adds support for handling 2nd stage page faults during migration,
+it disables faulting in huge pages, and dissolves huge pages to normal pages.
+In case migration is canceled huge pages are used again, if memory conditions
+permit it. I applies cleanly on top patches series posted Dec 15:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012826.html
 
-It is what the Belkin driver did. I can change this.
+Patch number #11 of the series has be dropped.
 
-> 
-> > +{
-> > +       uint8_t val = 0;
-> > +
-> > +       if ((mode != MODE2_DIM) && (mode != MODE2_BLINK))
-> > +               mode = MODE2_DIM;
-> > +
-> > +       /* Configure MODE1 register */
-> > +       val &= 0x0;
-> You don't need this, since val = 0 from beginning.
-> 
-> > +       val &= MODE1_RESPON_ADDR_MASK;
-> > +       val |= MODE1_NORMAL_MODE;
-> > +       regmap_write(regmap, TLC59116_REG_MODE1, val);
-> > +
-> Need we check the return status of regmap_write()?
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
 
-I will do that.
+Change Log since last RESEND:
+- fixed bug exposed __get_user_pages_fast(), when region is writable prevent
+  write protection of pte so we can handle a future write fault and mark page
+  dirty.
+- Removed marking entire huge page dirty on initial dirty log read.
+- don't dissolve non-writable huge pages
+- Made updates based on Christoffers comments
+  - renamed logging status function to memslot_is_logging()
+  - changes few values to bool from
+  - streamlined user_mem_abort() to eliminate extra conditional checks
+ 
+---
+ arch/arm/kvm/mmu.c |   92 +++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 87 insertions(+), 5 deletions(-)
 
-Thanks for the feedback
-
-       Andrew
-
-> > +       /* Configure MODE2 Reg */
-> > +       val &= 0x00;
-> > +       val |= MODE2_OCH_STOP;
-> > +
-> > +       val |= mode;
-> > +
-> > +       regmap_write(regmap, TLC59116_REG_MODE2, val);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int
-> > +tlc59116_set_led(struct tlc59116_led *led, uint8_t val)
-> > +{
-> > +       struct regmap *regmap = led->regmap;
-> > +       int i = (led->led_no % 4) * 2;
-> > +       char addr = TLC59116_REG_LEDOUT(led->led_no);
-> > +       unsigned int mask = LED_MASK << i;
-> > +
-> > +       val = val << i;
-> > +
-> > +       return regmap_update_bits(regmap, addr, mask, val);
-> > +}
-> > +
-> > +static void
-> > +tlc59116_led_work(struct work_struct *work)
-> > +{
-> > +       struct tlc59116_led *led = work_to_led(work);
-> > +       struct regmap *regmap = led->regmap;
-> > +       uint8_t pwm;
-> > +
-> > +       pwm = TLC59116_REG_PWM(led->led_no);
-> > +       regmap_write(regmap, pwm, led->ldev.brightness);
-> > +}
-> > +
-> > +static void
-> > +tlc59116_led_set(struct led_classdev *led_cdev, enum led_brightness value)
-> > +{
-> > +       struct tlc59116_led *led = ldev_to_led(led_cdev);
-> > +
-> > +       led->ldev.brightness = value;
-> > +       schedule_work(&led->work);
-> > +}
-> > +
-> > +static void
-> > +tlc59116_destroy_devices(struct tlc59116_priv *priv, int i)
-> > +{
-> > +       while (--i >= 0) {
-> > +               if (priv->leds[i].active) {
-> > +                       led_classdev_unregister(&priv->leds[i].ldev);
-> > +                       cancel_work_sync(&priv->leds[i].work);
-> > +               }
-> > +       }
-> > +}
-> > +
-> > +static int
-> > +tlc59116_configure(struct device *dev,
-> > +                  struct tlc59116_priv *priv,
-> > +                  struct regmap *regmap)
-> > +{
-> > +       int i, err = 0;
-> > +
-> > +       tlc59116_set_mode(regmap, MODE2_DIM);
-> > +       for (i = 0; i < TLC59116_LEDS; i++) {
-> > +               struct tlc59116_led *led = &priv->leds[i];
-> > +
-> > +               if (!led->active)
-> > +                       continue;
-> > +
-> > +               led->regmap = regmap;
-> > +               led->led_no = i;
-> > +               led->ldev.brightness_set = tlc59116_led_set;
-> > +               led->ldev.max_brightness = LED_FULL;
-> > +               INIT_WORK(&led->work, tlc59116_led_work);
-> > +               err = led_classdev_register(dev, &led->ldev);
-> > +               if (err < 0) {
-> > +                       dev_err(dev, "couldn't register LED %s\n",
-> > +                               led->ldev.name);
-> > +                       goto exit;
-> > +               }
-> > +               tlc59116_set_led(led, TLC59116_DIM);
-> > +       }
-> > +
-> > +       return 0;
-> > +
-> > +exit:
-> > +       tlc59116_destroy_devices(priv, i);
-> > +       return err;
-> > +}
-> > +
-> > +static const struct regmap_config tlc59116_regmap = {
-> > +       .reg_bits = 8,
-> > +       .val_bits = 8,
-> > +       .max_register = 0x1e,
-> > +};
-> > +
-> > +static int
-> > +tlc59116_probe(struct i2c_client *client,
-> > +              const struct i2c_device_id *id)
-> > +{
-> > +       struct tlc59116_priv *priv = i2c_get_clientdata(client);
-> > +       struct device *dev = &client->dev;
-> > +       struct device_node *np = client->dev.of_node, *child;
-> > +       struct regmap *regmap;
-> > +       int err, count, reg;
-> > +
-> > +       count = of_get_child_count(np);
-> > +       if (!count || count > TLC59116_LEDS)
-> > +               return -EINVAL;
-> > +
-> > +       if (!i2c_check_functionality(client->adapter,
-> > +               I2C_FUNC_SMBUS_BYTE_DATA))
-> > +               return -EIO;
-> > +
-> > +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +       if (!priv)
-> > +               return -ENOMEM;
-> > +
-> > +       regmap = devm_regmap_init_i2c(client, &tlc59116_regmap);
-> > +       if (IS_ERR(regmap)) {
-> > +               err = PTR_ERR(regmap);
-> > +               dev_err(dev, "Failed to allocate register map: %d\n", err);
-> > +               return err;
-> > +       }
-> > +
-> > +       i2c_set_clientdata(client, priv);
-> > +
-> > +       for_each_child_of_node(np, child) {
-> > +               err = of_property_read_u32(child, "reg", &reg);
-> > +               if (err)
-> > +                       return err;
-> > +               if (reg < 0 || reg >= TLC59116_LEDS)
-> > +                       return -EINVAL;
-> > +               if (priv->leds[reg].active)
-> > +                       return -EINVAL;
-> > +               priv->leds[reg].active = true;
-> > +               priv->leds[reg].ldev.name =
-> > +                       of_get_property(child, "label", NULL) ? : child->name;
-> > +               priv->leds[reg].ldev.default_trigger =
-> > +                       of_get_property(child, "linux,default-trigger", NULL);
-> > +       }
-> > +       return tlc59116_configure(dev, priv, regmap);
-> > +}
-> > +
-> > +static int
-> > +tlc59116_remove(struct i2c_client *client)
-> > +{
-> > +       struct tlc59116_priv *priv = i2c_get_clientdata(client);
-> > +
-> > +       tlc59116_destroy_devices(priv, TLC59116_LEDS);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct of_device_id of_tlc59116_leds_match[] = {
-> > +       { .compatible = "ti,tlc59116", },
-> > +       {},
-> > +};
-> > +
-> > +static const struct i2c_device_id tlc59116_id[] = {
-> > +       { "tlc59116" },
-> > +       {},
-> > +};
-> > +MODULE_DEVICE_TABLE(i2c, tlc59116_id);
-> > +
-> > +static struct i2c_driver tlc59116_driver = {
-> > +       .driver = {
-> > +               .name = "tlc59116",
-> > +               .of_match_table = of_match_ptr(of_tlc59116_leds_match),
-> > +
-> > +       },
-> > +       .probe = tlc59116_probe,
-> > +       .remove = tlc59116_remove,
-> > +       .id_table = tlc59116_id,
-> > +};
-> > +
-> > +module_i2c_driver(tlc59116_driver);
-> > +
-> > +MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
-> > +MODULE_LICENSE("GPL");
-> > +MODULE_DESCRIPTION("TLC59116 LED driver");
-> > --
-> > 2.1.3
-> >
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 73d506f..2bfe22d 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ #define kvm_pud_huge(_x)	pud_huge(_x)
+ 
++#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
++#define KVM_S2PTE_FLAG_LOGGING_ACTIVE	(1UL << 1)
++
++static bool memslot_is_logging(struct kvm_memory_slot *memslot)
++{
++#ifdef CONFIG_ARM
++	return !!memslot->dirty_bitmap;
++#else
++	return false;
++#endif
++}
++
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	/*
+@@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
+ 
++/**
++ * stage2_dissolve_pmd() - clear and flush huge PMD entry
++ * @kvm:	pointer to kvm structure.
++ * @addr:	IPA
++ * @pmd:	pmd pointer for IPA
++ *
++ * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
++ * pages in the range dirty.
++ */
++static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
++{
++	if (!kvm_pmd_huge(*pmd))
++		return;
++
++	pmd_clear(pmd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	put_page(virt_to_page(pmd));
++}
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
+@@ -703,10 +734,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ }
+ 
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+-			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
++			  phys_addr_t addr, const pte_t *new_pte,
++			  unsigned long flags)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
++	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
++	bool logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
+ 
+ 	/* Create stage-2 page table mapping - Levels 0 and 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+@@ -718,6 +752,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 		return 0;
+ 	}
+ 
++	/*
++	 * While dirty page logging - dissolve huge PMD, then continue on to
++	 * allocate page.
++	 */
++	if (logging_active)
++		stage2_dissolve_pmd(kvm, addr, pmd);
++
+ 	/* Create stage-2 page mappings - Level 2 */
+ 	if (pmd_none(*pmd)) {
+ 		if (!cache)
+@@ -774,7 +815,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+-		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
++		ret = stage2_set_pte(kvm, &cache, addr, &pte,
++						KVM_S2PTE_FLAG_IS_IOMAP);
+ 		spin_unlock(&kvm->mmu_lock);
+ 		if (ret)
+ 			goto out;
+@@ -1002,6 +1044,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 	bool fault_ipa_uncached;
++	bool can_set_pte_rw = true;
++	unsigned long set_pte_flags = 0;
+ 
+ 	write_fault = kvm_is_write_fault(vcpu);
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -1009,6 +1053,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
++
+ 	/* Let's check if we will get back a huge page backed by hugetlbfs */
+ 	down_read(&current->mm->mmap_sem);
+ 	vma = find_vma_intersection(current->mm, hva, hva + 1);
+@@ -1065,6 +1110,26 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
++
++	/*
++	 * When logging is enabled general page fault handling changes:
++	 * -  Writable huge pages are dissolved on a read or write fault.
++	 * -  pte's are not allowed write permission on a read fault to
++	 *    writable region so future writes can be marked dirty
++	 * -  access to non-writable region is unchanged
++	 */
++	if (memslot_is_logging(memslot) && writable) {
++		set_pte_flags = KVM_S2PTE_FLAG_LOGGING_ACTIVE;
++		if (hugetlb) {
++			gfn += pte_index(fault_ipa);
++			pfn += pte_index(fault_ipa);
++			hugetlb = false;
++		}
++		force_pte = true;
++		if (!write_fault)
++			can_set_pte_rw = false;
++	}
++
+ 	if (!hugetlb && !force_pte)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+@@ -1082,16 +1147,26 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
+-		if (writable) {
++
++		if (pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE))
++			set_pte_flags |= KVM_S2PTE_FLAG_IS_IOMAP;
++
++		/*
++		 * Don't set write permission, for non-writable region, and
++		 * for read fault to writable region while logging.
++		 */
++		if (writable && can_set_pte_rw) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+ 					  fault_ipa_uncached);
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+-			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
++							set_pte_flags);
+ 	}
+ 
++	if (write_fault)
++		mark_page_dirty(kvm, gfn);
+ 
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
+@@ -1242,7 +1317,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
+-	stage2_set_pte(kvm, NULL, gpa, pte, false);
++	/*
++	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
++	 * flag clear because MMU notifiers will have unmapped a huge PMD before
++	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
++	 * therefore stage2_set_pte() never needs to clear out a huge PMD
++	 * through this calling path.
++	 */
++	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+ }
+ 
+ 
+-- 
+1.7.9.5
