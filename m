@@ -1,39 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  9 Jan 2015 23:45:43 +0100
-Subject: [PATCHv2 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
-Message-ID: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 9 Jan 2015 14:49:33 -0800
+Subject: [PATCH 2/4] MAINTAINERS: update Broadcom Cygnus SoC git tree
+In-Reply-To: <1420843541-5166-3-git-send-email-f.fainelli@gmail.com>
+References: <1420843541-5166-1-git-send-email-f.fainelli@gmail.com>
+ <1420843541-5166-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <54B05AFD.2030105@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is a driver for the TI tlc59116 16 Channel i2c LED
-driver. This driver is used on the Belkin WRT1900AC access point and
-the C code is derived from code Belkin contributed to OpenWRT.
-However it has been extensively re-written, and a device tree binding
-added to replace platform data.
 
-Cc: Matthew.Fatheree at belkin.com
 
-Since v1:
-      s/uint8_t/u8/g
-      Remove empty line
-      Removed #gpio-cells
-      Added select REGMAP_I2C
-      Sorted #includes into alphabetic order
-      Added missing MODULE_DEVICE_TABLE(of, ...)
-      Check return value of regmap_write()
-      Simplified tlc59116_set_mode()
+On 1/9/2015 2:45 PM, Florian Fainelli wrote:
+> The Cygnus SoC git tree is moved from github.com/brcm/linux.git to its
+> own git tree at github.com/Broadcom/cygnus-linux.git.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  MAINTAINERS | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ff73215cd165..4a8f3459f9c2 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2192,7 +2192,7 @@ M:	Ray Jui <rjui@broadcom.com>
+>  M:	Scott Branden <sbranden@broadcom.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  L:	bcm-kernel-feedback-list at broadcom.com
+> -T:	git git://git.github.com/brcm/linux.git
+> +T:	git git://git.github.com/Broadcom/cygnus-linux.git
 
-Andrew Lunn (2):
-  leds: tlc59116: Document binding for the TI 16 Channel i2c LED driver
-  leds: tlc59116: Driver for the TI 16 Channel i2c LED driver
+Looks fine to me!
 
- .../devicetree/bindings/leds/leds-tlc59116.txt     |  41 ++++
- drivers/leds/Kconfig                               |   7 +
- drivers/leds/Makefile                              |   1 +
- drivers/leds/leds-tlc59116.c                       | 253 +++++++++++++++++++++
- 4 files changed, 302 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
- create mode 100644 drivers/leds/leds-tlc59116.c
-
--- 
-2.1.3
+>  S:	Maintained
+>  N:	iproc
+>  N:	cygnus
+> 
