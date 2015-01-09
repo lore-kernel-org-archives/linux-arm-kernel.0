@@ -1,97 +1,85 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Jan 2015 09:57:08 -0700
-Subject: [PATCH] ARM: tegra: Use PMC scratch register 40 for tegra_resume()
- location store
-In-Reply-To: <20150109102922.GC10073@tbergstrom-lnx.Nvidia.com>
-References: <1419202392-1159-1-git-send-email-digetx@gmail.com>
- <54984429.8040905@wwwdotorg.org> <5498549B.8070101@gmail.com>
- <54985C30.7020605@wwwdotorg.org> <20150108105742.GI1987@ulmo.nvidia.com>
- <20150108123709.GX10073@tbergstrom-lnx.Nvidia.com>
- <20150109095134.GC27845@ulmo>
- <20150109102922.GC10073@tbergstrom-lnx.Nvidia.com>
-Message-ID: <54B00864.7040102@wwwdotorg.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri,  9 Jan 2015 16:56:03 +0000
+Subject: [PATCH RESEND] dma-mapping: tidy up dma_parms default handling
+Message-ID: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2015 03:29 AM, Peter De Schrijver wrote:
-> On Fri, Jan 09, 2015 at 10:51:35AM +0100, Thierry Reding wrote:
->> * PGP Signed by an unknown key
->>
->> On Thu, Jan 08, 2015 at 02:37:09PM +0200, Peter De Schrijver wrote:
->>> On Thu, Jan 08, 2015 at 11:57:43AM +0100, Thierry Reding wrote:
->>>>> Old Signed by an unknown key
->>>>
->>>> On Mon, Dec 22, 2014 at 11:00:16AM -0700, Stephen Warren wrote:
->>>>> On 12/22/2014 10:27 AM, Dmitry Osipenko wrote:
->>>>>> 22.12.2014 19:17, Stephen Warren ?????:
->>>>>>> On 12/21/2014 03:52 PM, Dmitry Osipenko wrote:
->>>>>>>> Commit 7232398abc6a ("ARM: tegra: Convert PMC to a driver") changed
->>>>>>>> tegra_resume()
->>>>>>>> location storing from late to early and as result broke suspend on tegra20.
->>>>>>>> PMC scratch register 41 was used by tegra lp1 suspend core code for storing
->>>>>>>> physical memory address of common resume function and in the same time used by
->>>>>>>> tegra20 cpuidle driver for storing cpu1 "resettable" status, so it implied
->>>>>>>> strict order of scratch register use. Fix it by using scratch 40 instead of 41
->>>>>>>> for tegra_resume() location store.
->>>>>>>
->>>>>>> You likely can't simply change the PMC scratch register usage arbitrarily;
->>>>>>> specific registers are designated for specific purposes, and code outside the
->>>>>>> Linux kernel (bootloaders, LP0 resume code, secure monitors, etc.) may depend on
->>>>>>> those specific values being in those registers. Without significant research,
->>>>>>> I'd suggest not changing the PMC scratch register usage.
->>>>>>
->>>>>> Sure, that's why I asked to verify if scratch register 40 is in use in the
->>>>>> comment after commit message.
->>>>>
->>>>> Sorry, I didn't notice that.
->>>>>
->>>>>> I've checked that u-boot doesn't use it (since
->>>>>> upstream kernel doesn't care about any other bootloader), but no idea about
->>>>>> secure monitor. It's definitely safer to avoid changing scratch regs usage, I
->>>>>> thought that proposed solution would be best from the pure code point of view.
->>>>>> So, I'm considering your answer as a rejection of the patch (please, let me know
->>>>>> if I'm wrong) and will prepare another one. Btw, it would be nice to have
->>>>>> scratch registers usage publicly documented somewhere (on "Tegra Public
->>>>>> Application Notes" webpage for example), if it's possible, of course.
->>>>>
->>>>> At this stage in Tegra20 development, I think it'd be best to avoid changing
->>>>> any scratch register usage if at all possible.
->>>>
->>>> Sorry, I had completely missed this discussion. When looking at the code
->>>> it doesn't look like this particular "resettable" status needs to be
->>>> stored in a PMC scratch register. It can't be stored in RAM because that
->>>> goes into self-refresh as part of LP1, but how about just putting it
->>>> into IRAM? That stays on in both LP1 and LP2, so should be suitable for
->>>> this use-case. It would make the code slightly more complex but using a
->>>> single scratch register for multiple purposes sounds brittle and easy to
->>>> break (as evidenced by the offending commit).
->>>>
->>>> Otherwise it would seem that PMC_SCRATCH40 is only used to store EMC
->>>> configuration data across LP0 suspend/resume, so I wouldn't think it'd
->>>> cause problems if we used that instead of PMC_SCRATCH41 to store the
->>>> "resettable" state.
->>>>
->>>
->>> No. Usually the scratch registers for EMC config data are setup once by the
->>> bootloader and never touched by the kernel after that. So I would not
->>> recommend reusing those registers for different purposes.
->>
->> Right, I misread the code in the downstream kernel. Though it's not the
->> bootloader that does it (at least on Tegra20), but some early code in
->> the kernel.
->>
->> IRAM sounds like a good candidate still. Or do you know of anything that
->> would exclude IRAM as storage location for this data?
->
-> No. I can't think of a reason this flag could not be in IRAM.
+Many DMA controllers and other devices set max_segment_size to
+indicate their scatter-gather capability, but have no interest in
+segment_boundary_mask. However, the existence of a dma_parms structure
+precludes the use of any default value, leaving them as zeros (assuming
+a properly kzalloc'ed structure). If a well-behaved IOMMU (or SWIOTLB)
+then tries to respect this by ensuring a mapped segment does not cross
+a zero-byte boundary, hilarity ensues.
 
-The only thing you might want to watch out for is whether something else 
-is using IRAM. For example, our product SW stacks use the AVP as a media 
-co-processor and that runs at least some of its code from IRAM. To 
-support something similar, you'd need to make sure to save/restore the 
-IRAM content when using it for other purposes rather than just blindly 
-over-writing it (and of course synchronize with any driver for the AVP 
-execution, to ensure it was shut down first and brought back up last 
-after any power saving event). Of course, we don't actually support 
-loading code onto the AVP upstream at the moment, so perhaps we can 
-defer handling that for now.
+Since zero is a nonsensical value for either parameter, treat it as an
+indicator for "default", as might be expected. In the process, clean up
+a bit by replacing the bare constants with slightly more meaningful
+macros and removing the superfluous "else" statements.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+
+Hi, various maintainers from Git logs ;)
+
+This one's a bit tricky to find a home for - I think technically it's 
+probably an IOMMU patch, but then the long-underlying problem doesn't
+seem to have blown up anything until arm64, and my motivation is to
+make bits of Juno work, which seems to nudge it towards arm64/arm-soc
+territory. Could anyone suggest which tree is most appropriate?
+
+Thanks,
+Robin.
+
+ include/linux/dma-mapping.h | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index c3007cb..99ba736 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -141,7 +141,9 @@ static inline void arch_teardown_dma_ops(struct device *dev) { }
+ 
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
+ {
+-	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
++	if (dev->dma_parms && dev->dma_parms->max_segment_size)
++		return dev->dma_parms->max_segment_size;
++	return SZ_64K;
+ }
+ 
+ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+@@ -150,14 +152,15 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+ 	if (dev->dma_parms) {
+ 		dev->dma_parms->max_segment_size = size;
+ 		return 0;
+-	} else
+-		return -EIO;
++	}
++	return -EIO;
+ }
+ 
+ static inline unsigned long dma_get_seg_boundary(struct device *dev)
+ {
+-	return dev->dma_parms ?
+-		dev->dma_parms->segment_boundary_mask : 0xffffffff;
++	if (dev->dma_parms && dev->dma_parms->segment_boundary_mask)
++		return dev->dma_parms->segment_boundary_mask;
++	return DMA_BIT_MASK(32);
+ }
+ 
+ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+@@ -165,8 +168,8 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+ 	if (dev->dma_parms) {
+ 		dev->dma_parms->segment_boundary_mask = mask;
+ 		return 0;
+-	} else
+-		return -EIO;
++	}
++	return -EIO;
+ }
+ 
+ #ifndef dma_max_pfn
+-- 
+1.9.1
