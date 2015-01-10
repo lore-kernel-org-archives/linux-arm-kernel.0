@@ -1,50 +1,75 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sat, 10 Jan 2015 08:41:36 +0530
-Subject: [PATCH 2/2] arm: dts: disable CCI on exynos420 based arndale-octa
-In-Reply-To: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
-References: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1420859496-27533-2-git-send-email-a.kesavan@samsung.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Sat, 10 Jan 2015 08:51:27 +0530
+Subject: [PATCH RFT 1/2] drivers: bus: check cci device tree node status
+In-Reply-To: <7hfvbjvexn.fsf@deeprootsystems.com>
+References: <1417186209-5256-1-git-send-email-a.kesavan@samsung.com>
+ <CAM4voakjWgnEXoXT1LH2ZFBy=U4vfXFXS1Su8VB7Cd3s3wqmSA@mail.gmail.com>
+ <5487C897.9050405@arm.com>
+ <CAM4voa=TQeOMTHmM2iBquDRwoEFPAgUFeMwJ73H4qdcSmR1Lug@mail.gmail.com>
+ <5487D726.6000603@arm.com> <54AE278F.4020003@arm.com>
+ <CAM4voamaqoje8Ccz3+UxvxaHN6GBd=QC5wRjVcz9Osfc=4aeiw@mail.gmail.com>
+ <54AF62D2.7000400@arm.com>
+ <CAM4voamN1A-sqCDR2bT5rHRBARH2SmfA1wYkXZRn9oi-4-Gj8g@mail.gmail.com>
+ <7hfvbjvexn.fsf@deeprootsystems.com>
+Message-ID: <CAM4voa=cbMDW=b4sESpGb0S+0tHYw06LC94P_=sxJo4CMYXtng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arndale-octa board was giving "imprecise external aborts" during
-boot-up with MCPM enabled. CCI enablement of the boot cluster was found
-to be the cause of these aborts (possibly because the secure f/w was not
-allowing it). Hence, disable CCI for the arndale-octa board.
+Hi Kevin,
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-Tested-by: Tyler Baker <tyler.baker@linaro.org>
----
- arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
- arch/arm/boot/dts/exynos5420.dtsi             | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+On Sat, Jan 10, 2015 at 2:39 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+>
+>> Hi Arnd/Olof,
+>>
+>> On Fri, Jan 9, 2015 at 10:40 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>
+>>> On Thursday 08 January 2015 08:57 PM, Abhilash Kesavan wrote:
+>>>>
+>>>> Hi Sudeep,
+>>>>
+>>>> On Thu, Jan 8, 2015 at 12:15 PM, Sudeep Holla <sudeep.holla@arm.com>
+>>>> wrote:
+>>>>>
+>>>>> Hi Abhilash,
+>>>
+>>>
+>>> [...]
+>>>
+>>>>>
+>>>>> What's the status of this patch. It was useful for me on vexpress for
+>>>>> some
+>>>>> testing. Please feel free to add
+>>>>>
+>>>>> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>>>
+>>>>> if this is not yet queued.
+>>>>
+>>>>
+>>>> Thanks for the tested-by. This patch has not been merged yet; I am not
+>>>> quite sure who is supposed to pick this up.
+>>>>
+>>>
+>>> So far, most of the CCI patches are merged through arm-soc.
+>>
+>> Would you be OK picking this up as is or do you want me to re-send
+>> this with the RFT tag dropped ?
+>
+> Please resend without the RFT, and collect the Tested-by tags
+> you can add mine:
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+>
+> Please send to arm at kernel.org where patches targeted for the arm-soc
+> tree are collected.
 
-diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-index aa7a7d7..db2c1c4 100644
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-@@ -372,3 +372,7 @@
- &usbdrd_dwc3_1 {
- 	dr_mode = "host";
- };
-+
-+&cci {
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 517e50f..0a82ae7 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -120,7 +120,7 @@
- 		};
- 	};
- 
--	cci at 10d20000 {
-+	cci: cci at 10d20000 {
- 		compatible = "arm,cci-400";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-2.2.0
+I have done as suggested. Kindly check.
+
+Regards,
+Abhilash
+>
+> Thanks,
+>
+> Kevin
+>
