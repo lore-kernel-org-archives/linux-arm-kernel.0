@@ -1,73 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Jan 2015 21:16:02 +0100
-Subject: Linux 3.19-rc3
-In-Reply-To: <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <20150110003540.GA32037@node.dhcp.inet.fi>
- <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
-Message-ID: <4665410.x9Uu42bKmJ@wuerfel>
+Date: Sat, 10 Jan 2015 21:40:07 +0100
+Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
+In-Reply-To: <20150110205721.6b3f71f8@free-electrons.com>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2707920.rUFmbmVqu6@wuerfel> <20150110205721.6b3f71f8@free-electrons.com>
+Message-ID: <2596012.A9D9qEFWVV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 January 2015 18:27:38 Linus Torvalds wrote:
-> On Fri, Jan 9, 2015 at 4:35 PM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
-> >
-> > With bigger page size there's also reduction in number of entities to
-> > handle by kernel: less memory occupied by struct pages, fewer pages on
-> > lru, etc.
+On Saturday 10 January 2015 20:57:21 Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
 > 
-> Really, do the math. [...]
->
-> With a 64kB page, that means that for caching the kernel tree (what,
-> closer to 50k files by now), you are basically wasting 60kB for most
-> source files. Say, 60kB * 30k files, or 1.8GB.
+> On Sat, 10 Jan 2015 19:56:59 +0100, Arnd Bergmann wrote:
+> 
+> > Despite my earlier analysis that concluded that the just using the
+> > normal coherent dma_ops with this fix was correct on all hardware,
+> > we have now seen a bug in the xor dmaengine driver (I haven't
+> > seen a confirmation for my oneline fix yet, but I still think it's
+> > the one), which gives us less confidence in the other drivers
+> > being correct.
+> > 
+> > I think that your patch is the only sensible approach going forward
+> > if we want coherent mappings, but we will need both more extensive
+> > testing and more review of each affected device driver before
+> > putting it into stable.
+> 
+> We will indeed need to do more extensive testing and review. However, I
+> don't agree that this should prevent this patch from going to stable:
+> the current situation in the kernel (and also past kernels) is known to
+> be broken: DMA coherent mappings allocated by dma_alloc_coherent() are
+> *not* coherent in the current situation. Writes made by the device to
+> the memory are not guaranteed to be immediately visible to the CPU,
+> unless an explicit I/O sync barrier is done, which obviously is never
+> done for DMA coherent mappings since those are assumed by Linux to be
+> coherent, and therefore not require any cache maintenance operation.
+> 
+> So, while I clearly agree that we haven't yet gotten to the bottom of
+> all problems, this patch is going in the right direction and making
+> things slightly better.
 
-On a recent kernel, I get 628 MB for storing all files of the
-kernel tree in 4KB pages, and 3141 MB for storing the same data
-in 64KB pages, almost exactly factor 5, or 2.45 GiB wasted.
-
-> Maybe things have changed, and maybe I did my math wrong, and people
-> can give a more exact number. But it's an example of why 64kB
-> granularity is completely unacceptable in any kind of general-purpose
-> load.
-
-I'd say it's unacceptable for any file backed mappings in general, but
-usually an improvement for anonymous maps, for the same reasons that
-transparent huge pages are great. IIRC, AIX works great with 64k
-pages, but only because of two reasons that don't apply on Linux:
-
-a) The PowerPC MMU can mix 4KB and 64KB pages in a single process.
-   Linux doesn't use this feature except for very special cases,
-   although it could be done on PowerPC but not most other architectures.
-
-b) Linux has a unified page cache page size that is used for both
-   anonymous and file backed mappings. It's a great feature of the
-   Linux MM code (it avoids having two copies of each mapped file
-   in memory), but other OSs can just use 4KB blocks in the file
-   system cache independent of the page size.
-
-> 4kB works well. 8kB is perfectly acceptable. 16kB is already wasting a
-> lot of memory. 32kB and up is complete garbage for general-purpose
-> computing.
-
-I was expecting 16KB pages to work better, but you are right:
-
-arnd:~/linux$ for i in 1 2 4 8 16 32 64 128 256 ; do echo -n "$i KiB pages: " ; total=0 ; git ls-files | xargs ls -ld | while read a b c d e f ; do echo $[((e + $i*1024 - 1) / (1024 * $i))  ]  ; done | sort -n | uniq -c | while read num size ; do total=$[$total + ($num * $size) * $i] ; echo $[total / 1024] MiB ; done  | tail -n 1 ; done
-1 KiB pages: 544 MiB
-2 KiB pages: 571 MiB
-4 KiB pages: 628 MiB
-8 KiB pages: 759 MiB
-16 KiB pages: 1055 MiB
-32 KiB pages: 1717 MiB
-64 KiB pages: 3141 MiB
-128 KiB pages: 6103 MiB
-256 KiB pages: 12125 MiB
-
-Regarding ARM64 in particular, I think it would be nice to investigate
-how to extend the THP code to cover 64KB TLBs when running with the 4KB
-page size. There is a hint bit in the page table to tell the CPU that
-a set of 16 aligned pages can share one TLB, and it would be nice to
-use that bit in Linux, and to make this case more common for anonymous
-mappings, and possible large file based mappings.
+Yes, but it may be better to stage this by first putting a patch
+into stable that completely disables the broken coherent mapping,
+and following up with another patch to bring the cohernet behavior
+in sync with mainline once we are reasonably sure it's good.
 
 	Arnd
