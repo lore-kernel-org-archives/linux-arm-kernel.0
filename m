@@ -1,51 +1,76 @@
-From: kmcmarti@redhat.com (Kyle McMartin)
-Date: Sat, 10 Jan 2015 10:22:59 -0500
-Subject: Linux 3.19-rc3
-In-Reply-To: <54B09CA3.1060501@redhat.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
- <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
- <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
- <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
- <54B09CA3.1060501@redhat.com>
-Message-ID: <20150110152259.GP18580@redacted.bos.redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 10 Jan 2015 17:30:01 +0100
+Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
+In-Reply-To: <20150109165204.3d0d3d99@free-electrons.com>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150109165204.3d0d3d99@free-electrons.com>
+Message-ID: <20150110163001.GA5392@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 04:29:39AM +0100, Laszlo Ersek wrote:
-> I've bisected this issue to
+On Fri, Jan 09, 2015 at 04:52:04PM +0100, Thomas Petazzoni wrote:
+> Hello Andrew,
 > 
+> On Tue, 30 Dec 2014 13:43:41 +0100, Thomas Petazzoni wrote:
+> 
+> > Michal Mazur (1):
+> >   bus: mvebu-mbus: fix support of MBus window 13 on Armada XP/375/38x
+> > 
+> > Thomas Petazzoni (5):
+> >   dt: bindings: update mvebu-mbus DT binding with new compatible
+> >     properties
+> >   ARM: mvebu: fix compatible strings of MBus on Armada 375 and Armada
+> >     38x
+> >   bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus
+> >     bridge window
+> >   bus: mvebu-mbus: use automatic I/O synchronization barriers
+> >   ARM: mvebu: use arm_coherent_dma_ops
+> 
+> Would it be possible to get those patches applied?
 
-Awesome, this was on my list of list of suspicious commits to check
-before my ARM64 box decided not to come back from reboot on Friday. :)
+Hi Thomas
 
-Thanks for bisecting!
+I added in Arnd, Olof and Jason and would like there comments and
+thoughts.
 
-cheers,
---Kyle
+As you have seen, i've taken the "easy" ones, the ones for the next
+merge window.
 
-> > f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1 is the first bad commit
-> > commit f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1
-> > Author: Linus Torvalds <torvalds@linux-foundation.org>
-> > Date:   Wed Dec 17 11:59:04 2014 -0800
-> >
-> >     mmu_gather: fix over-eager tlb_flush_mmu_free() calling
-> >
-> >     Dave Hansen reports that commit fb7332a9fedf ("mmu_gather: move minimal
-> >     range calculations into generic code") caused a performance problem:
-> >
-> >       "tlb_finish_mmu() goes up about 9x in the profiles (~0.4%->3.6%) and
-> >        tlb_flush_mmu_free() takes about 3.1% of CPU time with the patch
-> >        applied, but does not show up at all on the commit before"
-> >
-> >     and the reason is that Will moved the test for whether we need to flush
-> >     from tlb_flush_mmu() into tlb_flush_mmu_tlbonly().  But that meant that
-> >     tlb_flush_mmu_free() basically lost that check.
-> >
-> >     Move it back into tlb_flush_mmu() where it belongs, so that it covers
-> >     both tlb_flush_mmu_tlbonly() _and_ tlb_flush_mmu_free().
-> >
-> >     Reported-and-tested-by: Dave Hansen <dave@sr71.net>
-> >     Acked-by: Will Deacon <will.deacon@arm.com>
-> >     Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
-> >
+I'm a bit undecided about the others. There are two issues:
+
+Fixing window 13 is a big fix. It is getting late in the -rc cycle,
+which is partially my responsibility, since i was waiting for some
+tested-by:'s. But these patches are also heading towards
+stable. Stable rules state:
+
+ - It must be obviously correct and tested.
+ - It cannot be bigger than 100 lines, with context.
+ - It must fix only one thing.
+ - It must fix a real bug that bothers people (not a, "This could be a
+   problem..." type thing).
+ - It must fix a problem that causes a build error (but not for things
+   marked CONFIG_BROKEN), an oops, a hang, data corruption, a real
+   security issue, or some "oh, that's not good" issue.  In short, something
+   critical.
+
+The first patch is over 300 lines. Because of its size, i'm also not
+able to say it is obviously correct. It does however tick some of the
+other boxes, fix only one thing, fixes a real problem.
+
+Is there a more minimal fix? How big an impact is there in just
+disabling window 13? How much pressure do we have on windows? Can
+Michal Mazur live with one less window?
+
+We could then pushing this proper fix into the next merge window?
+
+For the IO Coherency fixes, obviousness is an issue. This is
+especially true since your own comment is "still not working 100%
+properly, but it is apparently not worse than it was."
+
+Maybe the correct fix for stable is to simply disable the I/O
+coherency hardware. That at least makes mainline stable.  Once we have
+a real, well tested, 100% fix, take it via the normal merge window.
+
+Lets discuss this,
+
+     Andrew
