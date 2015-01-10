@@ -1,35 +1,22 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Fri,  9 Jan 2015 16:57:21 -0700
-Subject: [PATCH 10/11] coresight: fix comment in of_coresight.c
-In-Reply-To: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1420847842-31769-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1420847842-31769-11-git-send-email-mathieu.poirier@linaro.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 10 Jan 2015 01:08:57 +0100
+Subject: [PATCH v2 0/2] serial: fsl_lpuart: fix DMA issues for 3.19
+Message-ID: <1420848539-4519-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kaixu Xia <xiakaixu@huawei.com>
+This is patch 1 and 3 of the first version of this patchset.
 
-Outports is a member of the struct pdata and should be
-a better choice.
+Changes since v1:
+- Reproduced on v3.19-rc3 and rebased ontop of that
+- Make sure that RDMAS is cleared on startup
 
-Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/coresight/of_coresight.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Stefan Agner (2):
+  serial: fsl_lpuart: delete timer on shutdown
+  serial: fsl_lpuart: avoid new transfer while DMA is running
 
-diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-index 8bd524e49518..89ebbe29ac97 100644
---- a/drivers/coresight/of_coresight.c
-+++ b/drivers/coresight/of_coresight.c
-@@ -93,7 +93,7 @@ static int of_coresight_alloc_memory(struct device *dev,
- 	if (!pdata->outports)
- 		return -ENOMEM;
- 
--	/* Children connected to this component via @outport */
-+	/* Children connected to this component via @outports */
- 	 pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
- 					  sizeof(*pdata->child_names),
- 					  GFP_KERNEL);
+ drivers/tty/serial/fsl_lpuart.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
 -- 
-1.9.1
+2.2.1
