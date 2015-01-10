@@ -1,39 +1,50 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Sat, 10 Jan 2015 08:41:35 +0530
-Subject: [PATCH 1/2] drivers: bus: check cci device tree node status
-Message-ID: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
+Date: Sat, 10 Jan 2015 08:41:36 +0530
+Subject: [PATCH 2/2] arm: dts: disable CCI on exynos420 based arndale-octa
+In-Reply-To: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
+References: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1420859496-27533-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm-cci driver completes the probe sequence even if the cci node is
-marked as disabled. Add a check in the driver to honour the cci status
-in the device tree.
+The arndale-octa board was giving "imprecise external aborts" during
+boot-up with MCPM enabled. CCI enablement of the boot cluster was found
+to be the cause of these aborts (possibly because the secure f/w was not
+allowing it). Hence, disable CCI for the arndale-octa board.
 
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
-Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Tested-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Tyler Baker <tyler.baker@linaro.org>
 ---
-Changes:
-	- Re-sending without the RFT tags
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
+ arch/arm/boot/dts/exynos5420.dtsi             | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
- drivers/bus/arm-cci.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 860da40..0ce5e2d 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -1312,6 +1312,9 @@ static int cci_probe(void)
- 	if (!np)
- 		return -ENODEV;
- 
-+	if (!of_device_is_available(np))
-+		return -ENODEV;
+diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+index aa7a7d7..db2c1c4 100644
+--- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
++++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+@@ -372,3 +372,7 @@
+ &usbdrd_dwc3_1 {
+ 	dr_mode = "host";
+ };
 +
- 	cci_config = of_match_node(arm_cci_matches, np)->data;
- 	if (!cci_config)
- 		return -ENODEV;
++&cci {
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 517e50f..0a82ae7 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -120,7 +120,7 @@
+ 		};
+ 	};
+ 
+-	cci at 10d20000 {
++	cci: cci at 10d20000 {
+ 		compatible = "arm,cci-400";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 2.2.0
