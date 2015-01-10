@@ -1,84 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Jan 2015 12:59:11 +0000
-Subject: [PATCH v2 08/21] irqchip: crossbar: convert dra7 crossbar to
- stacked domains
-In-Reply-To: <20150108143938.GA30790@kahuna>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-9-git-send-email-marc.zyngier@arm.com>
- <20150108143938.GA30790@kahuna>
-Message-ID: <e97280d427798349433906c08164ea27@www.loen.fr>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 10 Jan 2015 14:08:22 +0100
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <20150109201306.4d1a296b@xhacker>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+ <54AD3EAE.6090009@gmail.com> <20150107222209.64ed24a0@xhacker>
+ <54AD431F.6060403@gmail.com> <20150109201306.4d1a296b@xhacker>
+Message-ID: <54B12446.4030703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-08 14:39, Nishanth Menon wrote:
-> On 17:42-20150107, Marc Zyngier wrote:
-> [..]
->> diff --git a/arch/arm/boot/dts/dra7-evm.dts 
->> b/arch/arm/boot/dts/dra7-evm.dts
->> index 10b725c..048cfeb 100644
->> --- a/arch/arm/boot/dts/dra7-evm.dts
->> +++ b/arch/arm/boot/dts/dra7-evm.dts
->> @@ -423,7 +423,7 @@
->>  	status = "okay";
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&uart1_pins>;
->> -	interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
->> +	interrupts-extended = <&crossbar_mpu GIC_SPI 67 
->> IRQ_TYPE_LEVEL_HIGH>,
->>  			      <&dra7_pmx_core 0x3e0>;
-> ^^ interrrupt-extended for uart1 here
-> [..]
+On 09.01.2015 13:13, Jisheng Zhang wrote:
+> On Wed, 7 Jan 2015 06:30:55 -0800
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>> On 07.01.2015 15:22, Jisheng Zhang wrote:
+>>> On Wed, 7 Jan 2015 06:11:58 -0800
+>>> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>>>> On 31.12.2014 09:57, Jisheng Zhang wrote:
+>>>>> The "smemc" clock is removed on BG2Q SoCs. In fact, bit19 of clkenable
+>>>>> register is for nfc. Current code use bit19 for non-exist "smemc"
+>>>>> incorrectly, this prevents eMMC from working due to the sdhci's
+>>>>> "core" clk is still gated.
+>>>>>
+>>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>>>>> Cc: stable at vger.kernel.org # 3.16+
+>>>>> ---
+>>>>>     drivers/clk/berlin/bg2q.c | 1 -
+>>>>>     1 file changed, 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+>>>>> index 21784e4..440ef81 100644
+>>>>> --- a/drivers/clk/berlin/bg2q.c
+>>>>> +++ b/drivers/clk/berlin/bg2q.c
+>>>>> @@ -285,7 +285,6 @@ static const struct berlin2_gate_data bg2q_gates[]
+>>>>> __initconst = { { "pbridge",	"perif",	15,
+>>>>> CLK_IGNORE_UNUSED }, { "sdio",	"perif",	16,
+>>>>> CLK_IGNORE_UNUSED }, { "nfc",	"perif",	18 },
+>>>
+>>> The nfc here is really confusing, we call it as nfccore internally. Is it
+>>> better to rename it as nfccore?
+>>
+>> I guess it comes from some early Marvell BSP code, if there is no
+>> issues with the name, e.g. something already depends on "nfc", feel
+>> free to rename it to something more meaningful.
 >
->> diff --git a/arch/arm/boot/dts/dra7.dtsi 
->> b/arch/arm/boot/dts/dra7.dtsi
-> [...]
->> @@ -344,7 +344,7 @@
->>  		uart1: serial at 4806a000 {
->>  			compatible = "ti,omap4-uart";
->>  			reg = <0x4806a000 0x100>;
->> -			interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
->> +			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-> ^^ implies we will have both interrupts and interrupts-extended
-> properties for uart1 in dra7-evm.dtb
->
-> Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-> does not make it clear as to what the priority will be when both
-> properties are present.
+> In BG2, mrvl call the clock as nfccore. The code use "nfc" for it.
+> The situation is similar for usbcore, satacore etc. So keep the name here,
+> what do you think?
 
-Yup, good call. I don't think it matters (interrupts inherits the 
-implicit irq-parent, but consistency is good.
+Yes, I am fine with keeping the name as is.
 
-> [...]
-> Also, for 3.19-rc3, Missing the following causing x15 to fail boot.
+>>>>> -	{ "smemc",	"perif",	19 },
+>>>>
+>>>> if bit 19 is for nfc, how does that work out with bit 18 which is
+>>>> still assigned to nfc? Can you re-evaluate clkenable registers for
+>>>
+>>> bit 19 is for nfcEcc, the "io" clock; bit 18 is for nfcCore, the "core"
+>>> clock.
+>>
+>> Ok, then both bits should be dealt with accordingly, i.e. rename
+>> "smemc" to "nfcecc" and use it in the corresponding dts node.
+>>
+>> If this clk_gate just disables a clock that is fed into another
+>> gateable clock module, I can live with removing it - although I
+>> still think it is best to leave the clk_gate in place and pick
+>> another name that does not collide with any other clock name.
 >
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index 49edbda68cd5..c2241c2e5d9d 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -335,7 +335,6 @@
->  	mcp_rtc: rtc at 6f {
->  		compatible = "microchip,mcp7941x";
->  		reg = <0x6f>;
-> -		interrupt-parent = <&gic>;
->  		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_LOW>;  /* IRQ_SYS_1N */
->
->  		pinctrl-names = "default";
-> @@ -358,7 +357,7 @@
->
->  &uart3 {
->  	status = "okay";
-> -	interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-> +	interrupts-extended = <&crossbar_mpu GIC_SPI 69 
-> IRQ_TYPE_LEVEL_HIGH>,
->  			      <&dra7_pmx_core 0x248>;
->
->  	pinctrl-names = "default";
+> The nfcecc is already defined in the bg2q_divs, the gate bit is correct there.
 
-Ah, thanks for the patch, I've folded this in.
+Ok, I had a look in the actual code and agree that the same bit 19
+is used twice. The patch is fine and we can take it as is.
 
-Thanks,
+This is clk subsystem, so either Mike takes it through his fixes branch
+including my
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+or decides to agree that I take it instead with his Ack. I am fine
+with both.
+
+Sebastian
