@@ -1,85 +1,54 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 9 Jan 2015 20:39:05 -0800
-Subject: Linux 3.19-rc3
-In-Reply-To: <54B09CA3.1060501@redhat.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
- <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
- <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
- <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
- <54B09CA3.1060501@redhat.com>
-Message-ID: <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 10 Jan 2015 09:09:59 +0100
+Subject: [PATCH v2 1/2] serial: =?UTF-8?Q?fsl=5Flpuart=3A=20delete=20t?=
+ =?UTF-8?Q?imer=20on=20shutdown?=
+In-Reply-To: <20150110004858.GB4171@kroah.com>
+References: <1420848539-4519-1-git-send-email-stefan@agner.ch>
+ <1420848539-4519-2-git-send-email-stefan@agner.ch>
+ <20150110004858.GB4171@kroah.com>
+Message-ID: <a65e439b2fb720d94ae2a7effea96eb0@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 9, 2015 at 7:29 PM, Laszlo Ersek <lersek@redhat.com> wrote:
->
-> I've bisected this issue to
+On 2015-01-10 01:48, Greg KH wrote:
+> On Sat, Jan 10, 2015 at 01:08:58AM +0100, Stefan Agner wrote:
+>> If the serial port gets closed while a RX transfer is in progress,
+>> the timer might fire after the serial port shutdown finished. This
+>> leads in a NULL pointer dereference:
+>>
+>> [    7.508324] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>> [    7.516590] pgd = 86348000
+>> [    7.519445] [00000000] *pgd=86179831, *pte=00000000, *ppte=00000000
+>> [    7.526145] Internal error: Oops: 17 [#1] ARM
+>> [    7.530611] Modules linked in:
+>> [    7.533876] CPU: 0 PID: 123 Comm: systemd Not tainted 3.19.0-rc3-00004-g5b11ea7 #1778
+>> [    7.541827] Hardware name: Freescale Vybrid VF610 (Device Tree)
+>> [    7.547862] task: 861c3400 ti: 86ac8000 task.ti: 86ac8000
+>> [    7.553392] PC is at lpuart_timer_func+0x24/0xf8
+>> [    7.558127] LR is at lpuart_timer_func+0x20/0xf8
+>> [    7.562857] pc : [<802df99c>]    lr : [<802df998>]    psr: 600b0113
+>> [    7.562857] sp : 86ac9b90  ip : 86ac9b90  fp : 86ac9bbc
+>> [    7.574467] r10: 80817180  r9 : 80817b98  r8 : 80817998
+>> [    7.579803] r7 : 807acee0  r6 : 86989000  r5 : 00000100  r4 : 86997210
+>> [    7.586444] r3 : 86ac8000  r2 : 86ac9bc0  r1 : 86997210  r0 : 00000000
+>> [    7.593085] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+>> [    7.600341] Control: 10c5387d  Table: 86348059  DAC: 00000015
+>> [    7.606203] Process systemd (pid: 123, stack limit = 0x86ac8230)
+>>
+>> Setup the timer on UART startup which allows to delete the timer
+>> unconditionally on shutdown. This also saves the initialization
+>> on each transfer.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  drivers/tty/serial/fsl_lpuart.c | 7 ++++---
+>>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> Do stable kernels care about this as well, or is this just a regression
+> from 3.18?
 
-.. commit f045bbb9fa1b ("mmu_gather: fix over-eager
-tlb_flush_mmu_free() calling")
+This is an issue since DMA support for lpuart was included in the
+kernel, which was in 3.14.
 
-Hmm. That commit literally just undoes something that commit
-fb7332a9fedf ("mmu_gather: move minimal range calculations into
-generic code") changed, and that was very wrong on x86.
-
-But arm64 did have very different TLB flushing logic, so there may be
-some ARM64 reason that Will did that change originally, and then he
-forgot that reason when he ack'ed commit f045bbb9fa1b that undid it.
-
-Will?
-
-Before your mmu_gather range calculations commit, we used to have
-
-In tlb_flush_mmu_tlbonly():
-
-     tlb->need_flush = 0;
-
-and in tlb_flush_mmu():
-
-    if (!tlb->need_flush)
-                return;
-
-and your commit changed the rule to be
-
-    !tlb->need_flush == !tlb->end
-
-so in the current tree we have
-
- In tlb_flush_mmu_tlbonly():
-
-    __tlb_reset_range(tlb);   // replaces "tlb->need_flush = 0;"
-
-and in tlb_flush_mmu():
-
-    if (!tlb->end)    // replaces if (!tlb->need_flush)
-        return;
-
-so we seem to do exactly the same as 3.18.
-
-But in your original patch, you moved that "if (!tlb->end) return;"
-check from tlb_flush_mmu() into tlb_flush_mmu_tlbonly(), and that
-apparently is actually needed on arm64. But *why*?
-
-Also, looking at that commit fb7332a9fedf, I note that some of the
-"need_flush" setting was simply removed. See for example
-arch/powerpc/mm/hugetlbpage.c, and also in mm/memory.c:
-tlb_remove_table(). Is there something non-obvious that sets tlb->end
-there?
-
-The other need_flush removals seem to all be paired with adding a
-__tlb_adjust_range() call, which will set ->end.
-
-I'm starting to suspect that you moved the need_flush test into
-tlbonly exactly because you removed that
-
-        tlb->need_flush = 1;
-
-from mm/memory.c: tlb_remove_table().
-
-x86 doesn't care, because x86 doesn't *use* tlb_remove_table(). But
-arm64 does, at least with the RCU freeing.
-
-Any ideas?
-
-                         Linus
+--
+Stefan
