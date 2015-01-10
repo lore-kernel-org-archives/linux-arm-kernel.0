@@ -1,24 +1,30 @@
 From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Sat, 10 Jan 2015 21:18:05 +0000
+Date: Sat, 10 Jan 2015 21:18:58 +0000
 Subject: Getting new udev to run with 2.6.28
-In-Reply-To: <20150110191335.GA5125@fuloong-minipc.musicnaut.iki.fi>
-References: <20150110173920.GA31847@amd>
- <20150110191335.GA5125@fuloong-minipc.musicnaut.iki.fi>
-Message-ID: <20150110211805.GZ22149@ZenIV.linux.org.uk>
+In-Reply-To: <20150110181710.GA8884@kroah.com>
+References: <20150110173920.GA31847@amd> <20150110180532.GA8566@kroah.com>
+ <20150110180942.GA10142@amd> <20150110181710.GA8884@kroah.com>
+Message-ID: <20150110211857.GA22149@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 09:13:35PM +0200, Aaro Koskinen wrote:
-> Hi,
+On Sat, Jan 10, 2015 at 10:17:10AM -0800, Greg KH wrote:
+> > > Yes, 3.18, please use that instead.
+> > 
+> > Can't, sorry. My goal is to get 3.18/3.19 working, but I really need
+> > working kernel to debug userland (and then use that userland to debug kernel).
+> > 
+> > > Seriously, lots of things have changed, if you want to run a "new"
+> > > version of udev with an old kernel, try eudev, they have been attempting
+> > > to keep "legacy" support around in it, don't know how well it has been
+> > > working though, you really are on your own.
+> > 
+> > I was hoping someone has devtmpfs patches I could just apply over
+> > 2.6.28 and get a working system?
 > 
-> On Sat, Jan 10, 2015 at 06:39:20PM +0100, Pavel Machek wrote:
-> > N900 has real problems on 3.19, and 2.6.28 should be very well
-> > debugged version. Getting it to compile on recent distribution was
-> > fun, but I succeeded. Unfortunately, Debian 7's udev does not work
-> > with 2.6.28...
-> 
-> I guess you will have many other issues too if you want to run
-> such combination (legacy kernel + modern userspace). E.g. current glibc
-> requires >= 2.6.32.
+> If you want such a crazy thing, you have all of the source to do it
+> yourself, good luck.
 
-How current is current and just what does it require in 2.6.32?
+... and this, boys and girls, is why quite a few of us have loathed udev
+way before it got merged into even nastier shitpile.  Still do, for that
+matter.
