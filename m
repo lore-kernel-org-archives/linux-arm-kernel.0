@@ -1,63 +1,71 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 10 Jan 2015 22:40:22 +0100
-Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
- accesses
-In-Reply-To: <1420857290-8373-8-git-send-email-robh@kernel.org>
-References: <1420857290-8373-1-git-send-email-robh@kernel.org>
- <1420857290-8373-8-git-send-email-robh@kernel.org>
-Message-ID: <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
+Date: Sat, 10 Jan 2015 22:44:00 +0100
+Subject: [PATCH 4/5] pinctrl: mvebu: a38x: Add UART1 muxing options
+In-Reply-To: <20150109114505.GR24989@titan.lakedaemon.net>
+References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1417790698-9792-5-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdbhykx1FaxKrQ25yO=12K4Q03LxoX4n_Ba1Fkxmbdv-iQ@mail.gmail.com>
+ <20150109114505.GR24989@titan.lakedaemon.net>
+Message-ID: <CACRpkdb1Rjp8sN-eNjcZ9jch_GPNK13Zf5U0Qrg=j3aNeZT6Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 3:34 AM, Rob Herring <robh@kernel.org> wrote:
-
-> Convert the integrator PCI driver to use the generic config access
-> functions.
+On Fri, Jan 9, 2015 at 12:45 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Fri, Jan 09, 2015 at 11:05:53AM +0100, Linus Walleij wrote:
+>> On Fri, Dec 5, 2014 at 3:44 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>
+>> > The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
+>> > function.
+>> >
+>> > Add this case to the pinctrl driver.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Patch applied with Jason's ACK.
 >
-> This changes accesses from __raw_readX/__raw_writeX to readX/writeX
-> variants.
+> I did?
 
-Just as good.
+Yeah...
 
-> The spinlock is removed because it is unnecessary. The config
-> read and write functions are already protected with a spinlock and no
-> access can occur during the .pre_init function.
+Date: Fri, 5 Dec 2014 10:26:26 -0500
+From: Jason Cooper <jason@lakedaemon.net>
+To: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>,
+Andrew Lunn <andrew@lunn.ch>,
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+Linus Walleij <linus.walleij@linaro.org>,
+Thomas Petazzoni <thomas@free-electrons.com>,
+linux-arm-kernel at lists.infradead.org,
+Tawfik Bayouk <tawfik@marvell.com>,
+Nadav Haklai <nadavh@marvell.com>, Lior Amsalem <alior@marvell.com>
+Subject: Re: [PATCH 4/5] pinctrl: mvebu: a38x: Add UART1 muxing options
+Message-ID: <20141205152626.GF22670@titan.lakedaemon.net>
+References: <1417790698-9792-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1417790698-9792-5-git-send-email-maxime.ripard@free-electrons.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1417790698-9792-5-git-send-email-maxime.ripard@free-electrons.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+
+On Fri, Dec 05, 2014 at 03:44:57PM +0100, Maxime Ripard wrote:
+> The MPP19 and MMP20 pins also have the ability to be muxed to the uart1
+> function.
 >
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-
-I trust that you do the right thing I guess...
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
->  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
->                           int size, u32 *val)
->  {
-> -       addr = v3_open_config_window(bus, devfn, where);
-> +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
->         v3_close_config_window();
-> +       return ret;
->  }
+> Add this case to the pinctrl driver.
 >
->  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
->                            int size, u32 val)
->  {
-> +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
->         v3_close_config_window();
-> -       raw_spin_unlock_irqrestore(&v3_lock, flags);
-> +       return ret;
->  }
->
->  static struct pci_ops pci_v3_ops = {
-> +       .map_bus = v3_open_config_window,
->         .read   = v3_read_config,
->         .write  = v3_write_config,
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
-So .map_bus is called before every .read/.write operation I take it.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Wouldn't it be proper to call the v3_close_config_window() from a
-matching .unmap_bus() callback for symmetry?
+thx,
+
+Jason.
+
 
 Yours,
 Linus Walleij
