@@ -1,114 +1,64 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 10 Jan 2015 14:51:16 +0100
-Subject: [PATCH v2 2/4] Documentation: bindings: Add the regulator property
- to the sub-nodes AHCI bindings
-In-Reply-To: <20150110111748.GB4160@sirena.org.uk>
-References: <1420799989-10645-1-git-send-email-gregory.clement@free-electrons.com>
- <1420799989-10645-3-git-send-email-gregory.clement@free-electrons.com>
- <54AFF7E3.4070506@redhat.com> <54AFFFDC.7020307@free-electrons.com>
- <CAGb2v674q4Cjp9qy9CbUXe2j5pT_ez98CKxXHC8u4Diap2TT1A@mail.gmail.com>
- <20150109171131.GH2634@sirena.org.uk> <54B0FCDD.7000300@redhat.com>
- <20150110111748.GB4160@sirena.org.uk>
-Message-ID: <54B12E54.7000704@redhat.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Sat, 10 Jan 2015 15:13:40 +0100
+Subject: [PATCH v4 0/3] omapdss: Add video output support for gta04
+In-Reply-To: <1417642402-20538-1-git-send-email-marek@goldelico.com>
+References: <1417642402-20538-1-git-send-email-marek@goldelico.com>
+Message-ID: <CAAfyv35nBYmcRBWWCsCHnSqJ1qJ59QShDL6fvYjsYMaNUkcRYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tomi can you please pick up this series for 3.20 release? Thanks
 
-On 10-01-15 12:17, Mark Brown wrote:
-> On Sat, Jan 10, 2015 at 11:20:13AM +0100, Hans de Goede wrote:
->> On 09-01-15 18:11, Mark Brown wrote:
+On Wed, Dec 3, 2014 at 10:33 PM, Marek Belisko <marek@goldelico.com> wrote:
+> changes from v3:
+> - use GPL v2 instead GPL
+> - fix wrong gpios property name in doc and DT
+> - set gpio to NULL if invalid
+> - drop unnecessary header
 >
->>> Or if the supply is for the device at the other end of the link (which
->>> is what it sounded like) then use that.  This just sounds like the same
->>> problem we have for all the enumerable buses in embedded systems where
->>> we need to be able to understand that the device exists prior to it
->>> being fully ready to appear in the system.  Having the link/slot be a
->>> device in Linux does indeed seem to be a common way people think about
->>> doing this, it sounds like for this one it might be the most direct.
+> changes from v2:
+> - rename amplifier-opa362.c to encoder-opa362
+> - drop inversion handlign from driver
+> - add ti,invert-polarity to venc node
 >
->> I think we should be careful to not think too much from an implementation
->> pov here, the purpose of the devicetree description is to describe the hardware,
->> as is.
+> I also drop devconf1 handling patches because discussion how to
+> properly implement is not yet finished and this part is independent
+> from video driver.
 >
-> I don't think anyone is talking about changing the DT here, only the way
-> it's represented inside Linux.
+> changes from v1:
+> - fix opa362 compilation error
+> - fix opa362 DT documentation
+> - move devconf1 definition to omap3.dtsi
+> Marek Belisko (3):
+>   video: omapdss: Add opa362 driver
+>   Documentation: DT: Add documentation for ti,opa362 bindings
+>   arm: dts: omap3-gta04: Add handling for tv output
 >
->>                  sata0: sata-port at 0 {
->>                          reg = <0>;
->>                          phys = <&sata_phy 0>;
->> 			target-supply = <&reg_sata0>;
->>                  };
->>
->>                  sata1: sata-port at 1 {
->>                          reg = <1>;
->>                          phys = <&sata_phy 1>;
->> 			target-supply = <&reg_sata1>;
->>                  };
->>          };
+>  .../devicetree/bindings/video/ti,opa362.txt        |  38 +++
+>  arch/arm/boot/dts/omap3-gta04.dtsi                 |  49 ++++
+>  drivers/video/fbdev/omap2/displays-new/Kconfig     |   6 +
+>  drivers/video/fbdev/omap2/displays-new/Makefile    |   1 +
+>  .../fbdev/omap2/displays-new/encoder-opa362.c      | 285 +++++++++++++++++++++
+>  5 files changed, 379 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/ti,opa362.txt
+>  create mode 100644 drivers/video/fbdev/omap2/displays-new/encoder-opa362.c
 >
->> Seems to match the hardware pretty exactly, and also matches how we've
->> been describing similar devices with only one sata port + power plug sofar,
->> so from a consistency pov it also is a good model.
+> --
+> 1.9.1
 >
-> Right, I think that makes sense
 
-Good, as said I think getting the dt bit rights is the most important
-thing here. So if we agree that the above dt example looks sane, lets see
-how we can best implement that.
+BR,
 
- > it also looks to me like these things
-> should be representable as devices within Linux.
+marek
 
-I guess we could manually instantiate platform devices for each of the
-subnodes which represent an sata port here, yes that should not be
-hard to do, it feels like a bit overkill though.
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
 
-So for our this should likely look something like this:
-
-         if (IS_ENABLED(CONFIG_OF_ADDRESS) && dev->of_node) {
-                 for_each_child_of_node(dev->of_node, np) {
-                         pdev[i++] = of_platform_device_create(np, NULL, NULL);
-                 }
-         }
-
-and then loop over the pdev[] array and get the regulator, and phy for each.
-
-I wonder if of_platform_device_create can deal with nodes with
-#size-cells = <0>; is 0 though, if it cannot maybe we need to teach it.
-
->> So supporting this model requires having a regulator_get API which allows
->> specifying which of_node to get the regulator from, e.g. the proposed
->
-> It requires nothing of the sort.
-
-You're proposed solution of instantiating devices does more or less exactly
-what I say is required, it is a way to pass an of_node into regulator_get,
-but you're hiding the node inside dev->of_node. I can see the appeal in
-that.
-
->> of_regulator_get function. I know you (Mark) do not like this, but all
->> other subsystems have an of_foo_get function taking an of_node as argument,
->> I do not see how the regulator subsys is so special that it cannot have one,
->> and also notice that this is only a kernel internal API which we can always
->> change later.
->
-> Two things there.  One is that mostly those APIs are legacy APIs from
-> before we made DT a first class citizen and generally they shouldn't be
-> used these days.  The other is that at least for regulators we have
-> constant problems with people abusing the API in various ways, as a
-> result the API has a goal of not helping undesirable usage patterns in
-> order to help people spot problems.  Having an API which makes it easy
-> create broken bindings means that it is much more likely that people
-> will do just that.
-
-Hmm I can see where you're coming from, and your proposed solution may
-also be useful for when we get similar boards requiring explicit regulator
-handling with the sata ports described in ACPI tables.
-
-Gregory, can you give the setup using per sata port devices a try, and
-see how that works out code wise ?
-
-Regards,
-
-Hans
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
