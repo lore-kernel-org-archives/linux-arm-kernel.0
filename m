@@ -1,71 +1,111 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri,  9 Jan 2015 20:34:34 -0600
-Subject: [PATCH 00/16] PCI generic configuration space accessors
-Message-ID: <1420857290-8373-1-git-send-email-robh@kernel.org>
+Date: Fri,  9 Jan 2015 20:34:40 -0600
+Subject: [PATCH 06/16] ARM: cns3xxx: convert PCI to use generic config accesses
+In-Reply-To: <1420857290-8373-1-git-send-email-robh@kernel.org>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+Message-ID: <1420857290-8373-7-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds common accessor functions for PCI configuration space
-accesses. This supports most PCI hosts with memory mapped configuration
-space like ECAM or hosts with memory mapped address/data registers. ECAM
-is not generically supported by this series, but could be added on top
-of this. While some hosts have standard address decoding which could be 
-common as well, the various checks on bus numbers and device numbers are 
-quite varied. It is unclear how much of that is really necessary or 
-could be common. 
+Convert the cns3xxx PCI driver to use the generic config access functions.
 
-The first 4 patches are preparatory cleanup. Patch 5 introduces the
-common accessors. The remaining patches convert several PCI host
-controllers. This is in no way a complete list of host controllers. The
-conversion of more hosts should be possible. The Designware controller
-in particular should be able to be converted, but its config space
-accessors are a mess of override-able functions that I've not gotten my
-head around.
+This changes accesses from __raw_readl/__raw_writel to readl/writel.
 
-This series is available here [1].
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Krzysztof Halasa <khalasa@piap.pl>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-cns3xxx/pcie.c | 52 +++++++++-----------------------------------
+ 1 file changed, 10 insertions(+), 42 deletions(-)
 
-Rob
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git pci-config-access
-
-Rob Herring (16):
-  frv: add struct pci_ops member names to initialization
-  mips: add struct pci_ops member names to initialization
-  mn10300: add struct pci_ops member names to initialization
-  powerpc: add struct pci_ops member names to initialization
-  pci: introduce common pci config space accessors
-  ARM: cns3xxx: convert PCI to use generic config accesses
-  ARM: integrator: convert PCI to use generic config accesses
-  ARM: sa1100: convert PCI to use generic config accesses
-  ARM: ks8695: convert PCI to use generic config accesses
-  powerpc: fsl_pci: convert PCI to use generic config accesses
-  powerpc: powermac: convert PCI to use generic config accesses
-  pci/host: generic: convert to use generic config accesses
-  pci/host: rcar-gen2: convert to use generic config accesses
-  pci/host: tegra: convert to use generic config accesses
-  pci/host: xgene: convert to use generic config accesses
-  pci/host: xilinx: convert to use generic config accesses
-
- arch/arm/mach-cns3xxx/pcie.c                   |  52 ++----
- arch/arm/mach-integrator/pci_v3.c              |  61 +-------
- arch/arm/mach-ks8695/pci.c                     |  77 +--------
- arch/arm/mach-sa1100/pci-nanoengine.c          |  94 +----------
- arch/frv/mb93090-mb00/pci-vdk.c                |   4 +-
- arch/mips/pci/pci-bcm1480.c                    |   4 +-
- arch/mips/pci/pci-octeon.c                     |   4 +-
- arch/mips/pci/pcie-octeon.c                    |  12 +-
- arch/mn10300/unit-asb2305/pci.c                |   4 +-
- arch/powerpc/platforms/cell/celleb_scc_pciex.c |   4 +-
- arch/powerpc/platforms/powermac/pci.c          | 209 +++++--------------------
- arch/powerpc/sysdev/fsl_pci.c                  |  46 +-----
- drivers/pci/access.c                           |  87 ++++++++++
- drivers/pci/host/pci-host-generic.c            |  51 +-----
- drivers/pci/host/pci-rcar-gen2.c               |  51 +-----
- drivers/pci/host/pci-tegra.c                   |  55 +------
- drivers/pci/host/pci-xgene.c                   | 150 ++----------------
- drivers/pci/host/pcie-xilinx.c                 |  88 ++---------
- include/linux/pci.h                            |  11 ++
- 19 files changed, 212 insertions(+), 852 deletions(-)
-
+diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+index 45d6bd0..19b4e20 100644
+--- a/arch/arm/mach-cns3xxx/pcie.c
++++ b/arch/arm/mach-cns3xxx/pcie.c
+@@ -54,8 +54,8 @@ static struct cns3xxx_pcie *pbus_to_cnspci(struct pci_bus *bus)
+ 	return sysdata_to_cnspci(bus->sysdata);
+ }
+ 
+-static void __iomem *cns3xxx_pci_cfg_base(struct pci_bus *bus,
+-				  unsigned int devfn, int where)
++static void __iomem *cns3xxx_pci_map_bus(struct pci_bus *bus,
++					 unsigned int devfn, int where)
+ {
+ 	struct cns3xxx_pcie *cnspci = pbus_to_cnspci(bus);
+ 	int busno = bus->number;
+@@ -91,55 +91,22 @@ static void __iomem *cns3xxx_pci_cfg_base(struct pci_bus *bus,
+ static int cns3xxx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
+ 				   int where, int size, u32 *val)
+ {
+-	u32 v;
+-	void __iomem *base;
++	int ret;
+ 	u32 mask = (0x1ull << (size * 8)) - 1;
+ 	int shift = (where % 4) * 8;
+ 
+-	base = cns3xxx_pci_cfg_base(bus, devfn, where);
+-	if (!base) {
+-		*val = 0xffffffff;
+-		return PCIBIOS_SUCCESSFUL;
+-	}
+-
+-	v = __raw_readl(base);
++	ret = pci_generic_config_read32(bus, devfn, where, size, val);
+ 
+-	if (bus->number == 0 && devfn == 0 &&
+-			(where & 0xffc) == PCI_CLASS_REVISION) {
++	if (ret == PCIBIOS_SUCCESSFUL && !bus->number && !devfn &&
++	    (where & 0xffc) == PCI_CLASS_REVISION)
+ 		/*
+ 		 * RC's class is 0xb, but Linux PCI driver needs 0x604
+ 		 * for a PCIe bridge. So we must fixup the class code
+ 		 * to 0x604 here.
+ 		 */
+-		v &= 0xff;
+-		v |= 0x604 << 16;
+-	}
+-
+-	*val = (v >> shift) & mask;
+-
+-	return PCIBIOS_SUCCESSFUL;
+-}
+-
+-static int cns3xxx_pci_write_config(struct pci_bus *bus, unsigned int devfn,
+-				    int where, int size, u32 val)
+-{
+-	u32 v;
+-	void __iomem *base;
+-	u32 mask = (0x1ull << (size * 8)) - 1;
+-	int shift = (where % 4) * 8;
+-
+-	base = cns3xxx_pci_cfg_base(bus, devfn, where);
+-	if (!base)
+-		return PCIBIOS_SUCCESSFUL;
+-
+-	v = __raw_readl(base);
+-
+-	v &= ~(mask << shift);
+-	v |= (val & mask) << shift;
+-
+-	__raw_writel(v, base);
++		*val = (((((*val << shift) & 0xff) | (0x604 << 16)) >> shift) & mask;
+ 
+-	return PCIBIOS_SUCCESSFUL;
++	return ret;
+ }
+ 
+ static int cns3xxx_pci_setup(int nr, struct pci_sys_data *sys)
+@@ -158,8 +125,9 @@ static int cns3xxx_pci_setup(int nr, struct pci_sys_data *sys)
+ }
+ 
+ static struct pci_ops cns3xxx_pcie_ops = {
++	.map_bus = cns3xxx_pci_map_bus,
+ 	.read = cns3xxx_pci_read_config,
+-	.write = cns3xxx_pci_write_config,
++	.write = pci_generic_config_write,
+ };
+ 
+ static int cns3xxx_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 -- 
 2.1.0
