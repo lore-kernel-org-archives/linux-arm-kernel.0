@@ -1,162 +1,266 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Sat, 10 Jan 2015 04:29:39 +0100
-Subject: Linux 3.19-rc3
-In-Reply-To: <20150109194333.GA23028@arm.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
- <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
- <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
- <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
-Message-ID: <54B09CA3.1060501@redhat.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 09 Jan 2015 20:17:20 -0800
+Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
+ handling
+Message-ID: <1420863441-32592-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/15 20:43, Will Deacon wrote:
-> On Fri, Jan 09, 2015 at 06:37:36PM +0000, Marc Zyngier wrote:
->> On 09/01/15 17:57, Mark Rutland wrote:
->>> On Fri, Jan 09, 2015 at 02:27:06PM +0000, Mark Langsdorf wrote:
->>>> On 01/09/2015 08:19 AM, Steve Capper wrote:
->>>>> On 9 January 2015 at 12:13, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>>> On Thu, Jan 08, 2015 at 12:51:31PM +0000, Mark Langsdorf wrote:
->>>>>>> I'm consistently getting an out of memory killer triggered when
->>>>>>> compiling the kernel (make -j 16 -s) on a 16 core ARM64 system
->>>>>>> with 16 GB of memory. This doesn't happen when running a 3.18
->>>>>>> kernel.
->>>>>>>
->>>>>>> I'm going to start bisecting the failure now, but here's the crash
->>>>>>> log in case someone can see something obvious in it.
->>>>>>
->>>>>> FWIW I've just reproduced this with v3.19-rc3 defconfig +
->>>>>> CONFIG_ARM64_64K_PAGES=y by attempting a git clone of mainline. My
->>>>>> system has 16GB of RAM and 6 CPUs.
-> 
-> [...]
-> 
->>> I wasn't able to trigger the issue again with git, and the only way I've
->>> managed to trigger the issue is repeatedly building the kernel in a
->>> loop:
->>>
->>> while true; do
->>> 	git clean -fdx > /dev/null 2>&1;
->>> 	make defconfig > /dev/null 2>&1;
->>> 	make > /dev/null > 2>&1;
->>> done
->>>
->>> Which after a while died:
->>>
->>> -bash: fork: Cannot allocate memory
-> 
-> [...]
-> 
->> Just as another data point: I'm reproducing the exact same thing (it
->> only took a couple of kernel builds to kill the box), with almost all
->> 16GB of RAM stuck in Active(anon). I do *not* have CMA enabled though.
->>
->> I've kicked another run with 4k pages.
-> 
-> The `mallocstress' tool from LTP seems to be a quick way to reproduce
-> the memory leak behind this (leaks 5/8GB on my Juno). It spawns a bunch
-> of threads, that each call malloc until it returns NULL. I thought maybe
-> we're leaking page tables, but 5GB is pretty excessive.
-> 
-> However, I'm unable to reproduce the problem under a 32-bit kernel on my
-> TC2 board or on 3.18 + the 3.19 merge window pull for arm64.
-> 
-> I guess we should try to bisect using the above.
-> 
-> Will
-> 
+This patch adds support for 2nd stage page fault handling while dirty page
+logging. On huge page faults, huge pages are dissolved to normal pages, and
+rebuilding of 2nd stage huge pages is blocked. In case migration is 
+canceled this restriction is removed and huge pages may be rebuilt again.
 
-I've bisected this issue to
+This patch applies cleanly on top of patch series posted Dec. 15'th:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012826.html
 
-> f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1 is the first bad commit
-> commit f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1
-> Author: Linus Torvalds <torvalds@linux-foundation.org>
-> Date:   Wed Dec 17 11:59:04 2014 -0800
->
->     mmu_gather: fix over-eager tlb_flush_mmu_free() calling
->
->     Dave Hansen reports that commit fb7332a9fedf ("mmu_gather: move minimal
->     range calculations into generic code") caused a performance problem:
->
->       "tlb_finish_mmu() goes up about 9x in the profiles (~0.4%->3.6%) and
->        tlb_flush_mmu_free() takes about 3.1% of CPU time with the patch
->        applied, but does not show up at all on the commit before"
->
->     and the reason is that Will moved the test for whether we need to flush
->     from tlb_flush_mmu() into tlb_flush_mmu_tlbonly().  But that meant that
->     tlb_flush_mmu_free() basically lost that check.
->
->     Move it back into tlb_flush_mmu() where it belongs, so that it covers
->     both tlb_flush_mmu_tlbonly() _and_ tlb_flush_mmu_free().
->
->     Reported-and-tested-by: Dave Hansen <dave@sr71.net>
->     Acked-by: Will Deacon <will.deacon@arm.com>
->     Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
->
-> :040000 040000 a4768484a068b37a43863123ac782fb6d01149b7 75ff0be6a2f3e4caa9a06df6503fa54d25dfa44d M      mm
+Patch #11 has been dropped, and should not be applied.
 
-in an aarch64 QEMU/KVM guest running Fedora 21 Server (8GB RAM, 8
-VCPUs). I bisected between v3.18 and v3.19-rc3. I used
-"config-3.17.4-302.fc21.aarch64" as starting config, on which I kept
-running olddefconfig and localmodconfig.
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
 
-<tangent>
-It is beneficial to perform such a bisection in a virtual machine. Super
-fast reboot times, and the hot parts of the virtual disk are cached in
-host memory. It's easy to boot a test kernel for running the reproducer,
-and then reboot the known good distro kernel for building the next step
-in the bisection.
-</tangent>
+Change Log since last RESEND v1 --> v2:
+- Disallow dirty page logging of IO region - fail for initial write protect
+  and disable logging code in 2nd stage page fault handler.
+- Fixed auto spell correction errors
 
-As reproducer I used "./mallocstress -t 300" (recommended by Mark
-Langsdorf & Kyle McMartin, but also named by Will just above this
-thread).
+Change Log RESEND v0 --> v1:
+- fixed bug exposed by new generic __get_user_pages_fast(), when region is 
+  writable, prevent write protection of pte on read fault
+- Removed marking entire huge page dirty on initial access
+- don't dissolve huge pages of non-writable regions
+- Made updates based on Christoffers comments
+  - renamed logging status function to memslot_is_logging()
+  - changed few values to bool from longs
+  - streamlined user_mem_abort() to eliminate extra conditional checks
+---
+ arch/arm/kvm/mmu.c |  113 ++++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 105 insertions(+), 8 deletions(-)
 
-One thing I noticed during the several repro turns is that the OOM
-killer never hit while mallocstress was running "normally" (ie. before
-the first thread exited). In the broken kernels, the OOM killer always
-hit after a few (tens) of the threads had exited. The leak is probably
-related to thread exit. (Which is consistent with the kernel build
-reproducer, because that causes a lot of threads (processes) to exit
-too.)
-
-Bisection log below.
-
-Thanks
-Laszlo
-
-git bisect start
-# bad: [b1940cd21c0f4abdce101253e860feff547291b0] Linux 3.19-rc3
-git bisect bad b1940cd21c0f4abdce101253e860feff547291b0
-# good: [b2776bf7149bddd1f4161f14f79520f17fc1d71d] Linux 3.18
-git bisect good b2776bf7149bddd1f4161f14f79520f17fc1d71d
-# good: [a7cfef21e3d066343bec14d3113a9f9c92d1c2a8] Merge branches 'core', 'cxgb4', 'ipoib', 'iser', 'mlx4', 'ocrdma', 'odp' and 'srp' into for-next
-git bisect good a7cfef21e3d066343bec14d3113a9f9c92d1c2a8
-# good: [988adfdffdd43cfd841df734664727993076d7cb] Merge branch 'drm-next' of git://people.freedesktop.org/~airlied/linux
-git bisect good 988adfdffdd43cfd841df734664727993076d7cb
-# good: [eb64c3c6cdb8fa8a4d324eb71a9033b62e150918] Merge tag 'stable/for-linus-3.19-rc0b-tag' of git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip
-git bisect good eb64c3c6cdb8fa8a4d324eb71a9033b62e150918
-# bad: [385336e321c41b5174055c0194b60c19a27cc5c5] Merge tag 'platform-drivers-x86-v3.19-1' of git://git.infradead.org/users/dvhart/linux-platform-drivers-x86
-git bisect bad 385336e321c41b5174055c0194b60c19a27cc5c5
-# bad: [87c31b39abcb6fb6bd7d111200c9627a594bf6a9] Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/ebiederm/user-namespace
-git bisect bad 87c31b39abcb6fb6bd7d111200c9627a594bf6a9
-# good: [0ea90b9e79cff66934119e6dd8fa8e9d0f7d005a] Merge tag 'microblaze-3.19-rc1' of git://git.monstr.eu/linux-2.6-microblaze
-git bisect good 0ea90b9e79cff66934119e6dd8fa8e9d0f7d005a
-# good: [d797da41b2aceed5daa8cd2eee92cd74b2a0c652] Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/dtor/input
-git bisect good d797da41b2aceed5daa8cd2eee92cd74b2a0c652
-# good: [c89d99546dc5b076ccd6692c48ada9a92820a4ac] Merge branch 'eduardo-soc-thermal' into thermal-soc
-git bisect good c89d99546dc5b076ccd6692c48ada9a92820a4ac
-# good: [9f3e15129902bca9d8e296c165345f158bac94eb] Merge tag 'virtio-next-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux
-git bisect good 9f3e15129902bca9d8e296c165345f158bac94eb
-# good: [80dd00a23784b384ccea049bfb3f259d3f973b9d] userns: Check euid no fsuid when establishing an unprivileged uid mapping
-git bisect good 80dd00a23784b384ccea049bfb3f259d3f973b9d
-# good: [db86da7cb76f797a1a8b445166a15cb922c6ff85] userns: Unbreak the unprivileged remount tests
-git bisect good db86da7cb76f797a1a8b445166a15cb922c6ff85
-# good: [cc669743a39e3f61c9ca5e786e959bf478ccd197] Merge tag 'vfio-v3.19-rc1' of git://github.com/awilliam/linux-vfio
-git bisect good cc669743a39e3f61c9ca5e786e959bf478ccd197
-# bad: [f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1] mmu_gather: fix over-eager tlb_flush_mmu_free() calling
-git bisect bad f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1
-# good: [cf3c0a1579eff90195a791c5f464463c1011ef4a] x86: mm: fix VM_FAULT_RETRY handling
-git bisect good cf3c0a1579eff90195a791c5f464463c1011ef4a
-# first bad commit: [f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1] mmu_gather: fix over-eager tlb_flush_mmu_free() calling
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 73d506f..b878236 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ #define kvm_pud_huge(_x)	pud_huge(_x)
+ 
++#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
++#define KVM_S2PTE_FLAG_LOGGING_ACTIVE	(1UL << 1)
++
++static bool memslot_is_logging(struct kvm_memory_slot *memslot)
++{
++#ifdef CONFIG_ARM
++	return !!memslot->dirty_bitmap;
++#else
++	return false;
++#endif
++}
++
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	/*
+@@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
+ 
++/**
++ * stage2_dissolve_pmd() - clear and flush huge PMD entry
++ * @kvm:	pointer to kvm structure.
++ * @addr:	IPA
++ * @pmd:	pmd pointer for IPA
++ *
++ * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
++ * pages in the range dirty.
++ */
++static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
++{
++	if (!kvm_pmd_huge(*pmd))
++		return;
++
++	pmd_clear(pmd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	put_page(virt_to_page(pmd));
++}
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
+@@ -703,10 +734,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ }
+ 
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+-			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
++			  phys_addr_t addr, const pte_t *new_pte,
++			  unsigned long flags)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
++	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
++	bool logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
+ 
+ 	/* Create stage-2 page table mapping - Levels 0 and 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+@@ -718,6 +752,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 		return 0;
+ 	}
+ 
++	/*
++	 * While dirty page logging - dissolve huge PMD, then continue on to
++	 * allocate page.
++	 */
++	if (logging_active)
++		stage2_dissolve_pmd(kvm, addr, pmd);
++
+ 	/* Create stage-2 page mappings - Level 2 */
+ 	if (pmd_none(*pmd)) {
+ 		if (!cache)
+@@ -774,7 +815,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+-		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
++		ret = stage2_set_pte(kvm, &cache, addr, &pte,
++						KVM_S2PTE_FLAG_IS_IOMAP);
+ 		spin_unlock(&kvm->mmu_lock);
+ 		if (ret)
+ 			goto out;
+@@ -1002,6 +1044,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 	bool fault_ipa_uncached;
++	bool can_set_pte_rw = true;
++	unsigned long set_pte_flags = 0;
+ 
+ 	write_fault = kvm_is_write_fault(vcpu);
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -1009,6 +1053,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
++
+ 	/* Let's check if we will get back a huge page backed by hugetlbfs */
+ 	down_read(&current->mm->mmap_sem);
+ 	vma = find_vma_intersection(current->mm, hva, hva + 1);
+@@ -1059,12 +1104,35 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (is_error_pfn(pfn))
+ 		return -EFAULT;
+ 
+-	if (kvm_is_device_pfn(pfn))
++	if (kvm_is_device_pfn(pfn)) {
+ 		mem_type = PAGE_S2_DEVICE;
++		set_pte_flags = KVM_S2PTE_FLAG_IS_IOMAP;
++	}
+ 
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
++
++	/*
++	 * When logging is enabled general page fault handling changes:
++	 * -  Writable huge pages are dissolved on a read or write fault.
++	 * -  pte's are not allowed write permission on a read fault to
++	 *    writable region so future writes can be marked dirty
++	 * Access to non-writable region is unchanged, and logging of IO
++	 * regions is not allowed.
++	 */
++	if (memslot_is_logging(memslot) && writable) {
++		set_pte_flags = KVM_S2PTE_FLAG_LOGGING_ACTIVE;
++		if (hugetlb) {
++			gfn += pte_index(fault_ipa);
++			pfn += pte_index(fault_ipa);
++			hugetlb = false;
++		}
++		force_pte = true;
++		if (!write_fault)
++			can_set_pte_rw = false;
++	}
++
+ 	if (!hugetlb && !force_pte)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+@@ -1082,16 +1150,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
+-		if (writable) {
++
++		/*
++		 * Don't set write permission, for non-writable region, and
++		 * for read fault to writable region while logging.
++		 */
++		if (writable && can_set_pte_rw) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+ 					  fault_ipa_uncached);
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+-			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
++							set_pte_flags);
+ 	}
+ 
++	if (write_fault)
++		mark_page_dirty(kvm, gfn);
+ 
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
+@@ -1242,7 +1317,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
+-	stage2_set_pte(kvm, NULL, gpa, pte, false);
++	/*
++	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
++	 * flag clear because MMU notifiers will have unmapped a huge PMD before
++	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
++	 * therefore stage2_set_pte() never needs to clear out a huge PMD
++	 * through this calling path.
++	 */
++	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+ }
+ 
+ 
+@@ -1396,7 +1478,13 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 	bool writable = !(mem->flags & KVM_MEM_READONLY);
+ 	int ret = 0;
+ 
+-	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
++	/*
++	 * Let - enable of dirty page logging through, later check if it's for
++	 * an IO region and fail.
++	 */
++	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
++		change == KVM_MR_FLAGS_ONLY &&
++		!(memslot->flags & KVM_MEM_LOG_DIRTY_PAGES))
+ 		return 0;
+ 
+ 	/*
+@@ -1447,15 +1535,24 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
+ 					 vm_start - vma->vm_start;
+ 
+-			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
++			if (change != KVM_MR_FLAGS_ONLY)
++				ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+ 						    vm_end - vm_start,
+ 						    writable);
++			else
++				/* IO region dirty page logging not allowed */
++				return -EINVAL;
++
+ 			if (ret)
+ 				break;
+ 		}
+ 		hva = vm_end;
+ 	} while (hva < reg_end);
+ 
++	/* Anything after here doesn't apply to memslot flag changes */
++	if (change == KVM_MR_FLAGS_ONLY)
++		return ret;
++
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (ret)
+ 		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
+-- 
+1.7.9.5
