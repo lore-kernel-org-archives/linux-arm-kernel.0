@@ -1,32 +1,73 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Sat, 10 Jan 2015 21:08:11 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 Jan 2015 21:16:02 +0100
 Subject: Linux 3.19-rc3
-In-Reply-To: <CA+55aFzXYhyBW_pF___69o98uq7nnH60wvnTr37RYmrjQgsdQA@mail.gmail.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>	<54AE7D53.2020305@redhat.com>	<20150109121348.GD12942@leverpostej>	<CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>	<54AFE53A.4020004@redhat.com>	<20150109175702.GA27787@leverpostej>	<54B01FF0.3020900@arm.com>	<20150109194333.GA23028@arm.com>	<54B09CA3.1060501@redhat.com>	<CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>	<20150110133742.GA6999@arm.com>	<54B181B7.5080503@redhat.com>
- <CA+55aFzXYhyBW_pF___69o98uq7nnH60wvnTr37RYmrjQgsdQA@mail.gmail.com>
-Message-ID: <54B186AB.70806@redhat.com>
+In-Reply-To: <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <20150110003540.GA32037@node.dhcp.inet.fi>
+ <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
+Message-ID: <4665410.x9Uu42bKmJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/15 20:56, Linus Torvalds wrote:
-> On Sat, Jan 10, 2015 at 11:47 AM, Laszlo Ersek <lersek@redhat.com> wrote:
->>
->> I grepped the tree for "fullmm", and only tlb_gather_mmu() seems to set
->> it. There are several instances of that function, but each sets fullmm to:
->>
->>         /* Is it from 0 to ~0? */
->>         tlb->fullmm     = !(start | (end+1));
->>
->> So, a nonzero fullmm seems to imply (end == ~0UL).
+On Friday 09 January 2015 18:27:38 Linus Torvalds wrote:
+> On Fri, Jan 9, 2015 at 4:35 PM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
+> >
+> > With bigger page size there's also reduction in number of entities to
+> > handle by kernel: less memory occupied by struct pages, fewer pages on
+> > lru, etc.
 > 
-> Yes. But note how it imples "end == ~0ul", but it does *not* imply
-> "tlb->end" having that value.
+> Really, do the math. [...]
+>
+> With a 64kB page, that means that for caching the kernel tree (what,
+> closer to 50k files by now), you are basically wasting 60kB for most
+> source files. Say, 60kB * 30k files, or 1.8GB.
 
-Ooops! :)
+On a recent kernel, I get 628 MB for storing all files of the
+kernel tree in 4KB pages, and 3141 MB for storing the same data
+in 64KB pages, almost exactly factor 5, or 2.45 GiB wasted.
 
-> tlb->end is initialized to zero (not obvious, but it's what the call
-> to __tlb_reset_range() does). It's then updated by
-> __tlb_adjust_range() as we actually flush individual pages.
+> Maybe things have changed, and maybe I did my math wrong, and people
+> can give a more exact number. But it's an example of why 64kB
+> granularity is completely unacceptable in any kind of general-purpose
+> load.
 
-Thanks.
-Laszlo
+I'd say it's unacceptable for any file backed mappings in general, but
+usually an improvement for anonymous maps, for the same reasons that
+transparent huge pages are great. IIRC, AIX works great with 64k
+pages, but only because of two reasons that don't apply on Linux:
+
+a) The PowerPC MMU can mix 4KB and 64KB pages in a single process.
+   Linux doesn't use this feature except for very special cases,
+   although it could be done on PowerPC but not most other architectures.
+
+b) Linux has a unified page cache page size that is used for both
+   anonymous and file backed mappings. It's a great feature of the
+   Linux MM code (it avoids having two copies of each mapped file
+   in memory), but other OSs can just use 4KB blocks in the file
+   system cache independent of the page size.
+
+> 4kB works well. 8kB is perfectly acceptable. 16kB is already wasting a
+> lot of memory. 32kB and up is complete garbage for general-purpose
+> computing.
+
+I was expecting 16KB pages to work better, but you are right:
+
+arnd:~/linux$ for i in 1 2 4 8 16 32 64 128 256 ; do echo -n "$i KiB pages: " ; total=0 ; git ls-files | xargs ls -ld | while read a b c d e f ; do echo $[((e + $i*1024 - 1) / (1024 * $i))  ]  ; done | sort -n | uniq -c | while read num size ; do total=$[$total + ($num * $size) * $i] ; echo $[total / 1024] MiB ; done  | tail -n 1 ; done
+1 KiB pages: 544 MiB
+2 KiB pages: 571 MiB
+4 KiB pages: 628 MiB
+8 KiB pages: 759 MiB
+16 KiB pages: 1055 MiB
+32 KiB pages: 1717 MiB
+64 KiB pages: 3141 MiB
+128 KiB pages: 6103 MiB
+256 KiB pages: 12125 MiB
+
+Regarding ARM64 in particular, I think it would be nice to investigate
+how to extend the THP code to cover 64KB TLBs when running with the 4KB
+page size. There is a hint bit in the page table to tell the CPU that
+a set of 16 aligned pages can share one TLB, and it would be nice to
+use that bit in Linux, and to make this case more common for anonymous
+mappings, and possible large file based mappings.
+
+	Arnd
