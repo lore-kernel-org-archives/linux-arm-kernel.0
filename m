@@ -1,292 +1,113 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Jan 2015 13:34:56 +0000
-Subject: [PATCH v2 14/21] ARM: imx6: convert GPC to stacked domains
-In-Reply-To: <e8cdeef8763e808940d08f4c1b12b71c@agner.ch>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-15-git-send-email-marc.zyngier@arm.com>
- <e8cdeef8763e808940d08f4c1b12b71c@agner.ch>
-Message-ID: <322c674668ee442ea24740a01ef6f758@www.loen.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 10 Jan 2015 13:37:42 +0000
+Subject: Linux 3.19-rc3
+In-Reply-To: <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+ <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+Message-ID: <20150110133742.GA6999@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-09 17:40, Stefan Agner wrote:
-> Hi Marc,
->
-> On 2015-01-07 18:42, Marc Zyngier wrote:
->> IMX6 has been (ab)using the gic_arch_extn to provide
->> wakeup from suspend, and it makes a lot of sense to convert
->> this code to use stacked domains instead.
->>
->> This patch does just this, updating the DT files to actually
->> reflect what the HW provides.
->>
->> BIG FAT WARNING: because the DTs were so far lying by not
->> exposing the fact that the GPC block is actually the first
->> interrupt controller in the chain, kernels with this patch
->> applied wont have any suspend-resume facility when booted
->> with old DTs, and old kernels with updated DTs won't even boot.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/boot/dts/imx6qdl.dtsi  |   6 +-
->>  arch/arm/boot/dts/imx6sl.dtsi   |   5 +-
->>  arch/arm/boot/dts/imx6sx.dtsi   |   5 +-
->>  arch/arm/mach-imx/common.h      |   1 -
->>  arch/arm/mach-imx/gpc.c         | 127 
->> ++++++++++++++++++++++++++++++++--------
->>  arch/arm/mach-imx/mach-imx6q.c  |   1 -
->>  arch/arm/mach-imx/mach-imx6sl.c |   1 -
->>  arch/arm/mach-imx/mach-imx6sx.c |   1 -
->>  8 files changed, 116 insertions(+), 31 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi 
->> b/arch/arm/boot/dts/imx6qdl.dtsi
->> index 4fc03b7..c16d428 100644
->> --- a/arch/arm/boot/dts/imx6qdl.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
->> @@ -53,6 +53,7 @@
->>  		interrupt-controller;
->>  		reg = <0x00a01000 0x1000>,
->>  		      <0x00a00100 0x100>;
->> +		interrupt-parent = <&intc>;
->>  	};
->>
->>  	clocks {
->> @@ -82,7 +83,7 @@
->>  		#address-cells = <1>;
->>  		#size-cells = <1>;
->>  		compatible = "simple-bus";
->> -		interrupt-parent = <&intc>;
->> +		interrupt-parent = <&gpc>;
->>  		ranges;
->>
->>  		dma_apbh: dma-apbh at 00110000 {
->> @@ -122,6 +123,7 @@
->>  			compatible = "arm,cortex-a9-twd-timer";
->>  			reg = <0x00a00600 0x20>;
->>  			interrupts = <1 13 0xf01>;
->> +			interrupt-parent = <&intc>;
->>  			clocks = <&clks IMX6QDL_CLK_TWD>;
->>  		};
->>
->> @@ -694,8 +696,10 @@
->>  			gpc: gpc at 020dc000 {
->>  				compatible = "fsl,imx6q-gpc";
->>  				reg = <0x020dc000 0x4000>;
->> +				interrupt-controller;
->
-> #interrupt-cells = <3>; is missing here.
+Hi Linus, Laszlo,
 
-Ah, nice catch!
+On Sat, Jan 10, 2015 at 04:39:05AM +0000, Linus Torvalds wrote:
+> On Fri, Jan 9, 2015 at 7:29 PM, Laszlo Ersek <lersek@redhat.com> wrote:
+> > I've bisected this issue to
 
-> I tested the patchset on a Colibri iMX6, but the module stopped 
-> booting
-> at some point. No error, no warn, but it looked like IRQ's are not
-> working:
->
-> [    1.623939] platform sound: Driver imx-sgtl5000 requests probe
-> deferral
-> [    1.630677] backlight supply power not found, using dummy 
-> regulator
-> [    1.637067] pwm-backlight backlight: unable to request PWM, trying
-> legacy API
-> [    1.644271] pwm-backlight backlight: unable to request legacy PWM
-> [    1.650534] platform backlight: Driver pwm-backlight requests 
-> probe
-> deferral
-> [    1.658080] platform 2028000.ssi: Driver fsl-ssi-dai requests 
-> probe
-> deferral
-> [    1.665441] fec 2188000.ethernet eth0: Freescale FEC PHY driver
-> [Micrel KSZ8041] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
-> [    1.677157] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-> [freeze]
->
-> I figured out that the GPC code did not get called. After digging
-> through the parsing code, I found the reason: irq_find_host always 
-> opted
-> to intc because this was missing... So, interrupt-cells mandatory for
-> all interrupt-controller? Maybe we could add a warn somewhere..?
+Thanks for bisecting this!
 
-interrupt-cells has a default of 1, I believe. I suppose I could add a 
-WARN_ON in the xlate/alloc functions...
+> .. commit f045bbb9fa1b ("mmu_gather: fix over-eager
+> tlb_flush_mmu_free() calling")
+> 
+> Hmm. That commit literally just undoes something that commit
+> fb7332a9fedf ("mmu_gather: move minimal range calculations into
+> generic code") changed, and that was very wrong on x86.
+> 
+> But arm64 did have very different TLB flushing logic, so there may be
+> some ARM64 reason that Will did that change originally, and then he
+> forgot that reason when he ack'ed commit f045bbb9fa1b that undid it.
+> 
+> Will?
 
-> With that in place, it worked fine:
->
-> Tested-by: Stefan Agner <stefan@agner.ch>
+I'm wondering if this is now broken in the fullmm case, because tlb->end
+will be zero and we won't actually free any of the pages being unmapped
+on task exit. Does that sound plausible?
 
-Thanks!
+> Before your mmu_gather range calculations commit, we used to have
+> 
+> In tlb_flush_mmu_tlbonly():
+> 
+>      tlb->need_flush = 0;
+> 
+> and in tlb_flush_mmu():
+> 
+>     if (!tlb->need_flush)
+>                 return;
+> 
+> and your commit changed the rule to be
+> 
+>     !tlb->need_flush == !tlb->end
+> 
+> so in the current tree we have
+> 
+>  In tlb_flush_mmu_tlbonly():
+> 
+>     __tlb_reset_range(tlb);   // replaces "tlb->need_flush = 0;"
+> 
+> and in tlb_flush_mmu():
+> 
+>     if (!tlb->end)    // replaces if (!tlb->need_flush)
+>         return;
+> 
+> so we seem to do exactly the same as 3.18.
+> 
+> But in your original patch, you moved that "if (!tlb->end) return;"
+> check from tlb_flush_mmu() into tlb_flush_mmu_tlbonly(), and that
+> apparently is actually needed on arm64. But *why*?
 
->
->>  				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
->>  					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-parent = <&intc>;
->>  			};
->>
->>  			gpr: iomuxc-gpr at 020e0000 {
->> diff --git a/arch/arm/boot/dts/imx6sl.dtsi 
->> b/arch/arm/boot/dts/imx6sl.dtsi
->> index 36ab8e0..35099b7 100644
->> --- a/arch/arm/boot/dts/imx6sl.dtsi
->> +++ b/arch/arm/boot/dts/imx6sl.dtsi
->> @@ -72,6 +72,7 @@
->>  		interrupt-controller;
->>  		reg = <0x00a01000 0x1000>,
->>  		      <0x00a00100 0x100>;
->> +		interrupt-parent = <&intc>;
->>  	};
->>
->>  	clocks {
->> @@ -95,7 +96,7 @@
->>  		#address-cells = <1>;
->>  		#size-cells = <1>;
->>  		compatible = "simple-bus";
->> -		interrupt-parent = <&intc>;
->> +		interrupt-parent = <&gpc>;
->>  		ranges;
->>
->>  		ocram: sram at 00900000 {
->> @@ -603,7 +604,9 @@
->>  			gpc: gpc at 020dc000 {
->>  				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
->>  				reg = <0x020dc000 0x4000>;
->> +				interrupt-controller;
->>  				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-parent = <&intc>;
->>  			};
->>
->>  			gpr: iomuxc-gpr at 020e0000 {
->> diff --git a/arch/arm/boot/dts/imx6sx.dtsi 
->> b/arch/arm/boot/dts/imx6sx.dtsi
->> index 7a24fee..c476e67 100644
->> --- a/arch/arm/boot/dts/imx6sx.dtsi
->> +++ b/arch/arm/boot/dts/imx6sx.dtsi
->> @@ -88,6 +88,7 @@
->>  		interrupt-controller;
->>  		reg = <0x00a01000 0x1000>,
->>  		      <0x00a00100 0x100>;
->> +		interrupt-parent = <&intc>;
->>  	};
->>
->>  	clocks {
->> @@ -131,7 +132,7 @@
->>  		#address-cells = <1>;
->>  		#size-cells = <1>;
->>  		compatible = "simple-bus";
->> -		interrupt-parent = <&intc>;
->> +		interrupt-parent = <&gpc>;
->>  		ranges;
->>
->>  		pmu {
->> @@ -700,7 +701,9 @@
->>  			gpc: gpc at 020dc000 {
->>  				compatible = "fsl,imx6sx-gpc", "fsl,imx6q-gpc";
->>  				reg = <0x020dc000 0x4000>;
->> +				interrupt-controller;
->>  				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
->> +				interrupt-parent = <&intc>;
->>  			};
->>
->>  			iomuxc: iomuxc at 020e0000 {
->> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
->> index cfcdb62..7052302 100644
->> --- a/arch/arm/mach-imx/common.h
->> +++ b/arch/arm/mach-imx/common.h
->> @@ -102,7 +102,6 @@ static inline void imx_scu_map_io(void) {}
->>  static inline void imx_smp_prepare(void) {}
->>  #endif
->>  void imx_src_init(void);
->> -void imx_gpc_init(void);
->>  void imx_gpc_pre_suspend(bool arm_power_off);
->>  void imx_gpc_post_resume(void);
->>  void imx_gpc_mask_all(void);
->> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
->> index 5f3602e..240109b 100644
->> --- a/arch/arm/mach-imx/gpc.c
->> +++ b/arch/arm/mach-imx/gpc.c
->> @@ -22,6 +22,7 @@
->>  #define GPC_PGC_CPU_PDN		0x2a0
->>
->>  #define IMR_NUM			4
->> +#define GPC_MAX_IRQS		(IMR_NUM * 32)
->>
->>  static void __iomem *gpc_base;
->>  static u32 gpc_wake_irqs[IMR_NUM];
->> @@ -56,17 +57,17 @@ void imx_gpc_post_resume(void)
->>
->>  static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int 
->> on)
->>  {
->> -	unsigned int idx = d->hwirq / 32 - 1;
->> +	unsigned int idx = d->hwirq / 32;
->>  	u32 mask;
->>
->> -	/* Sanity check for SPI irq */
->> -	if (d->hwirq < 32)
->> -		return -EINVAL;
->> -
->>  	mask = 1 << d->hwirq % 32;
->>  	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
->>  				  gpc_wake_irqs[idx] & ~mask;
->>
->> +	/*
->> +	 * Do *not* call into the parent, as the GIC doesn't have any
->> +	 * wake-up facility...
->> +	 */
->>  	return 0;
->>  }
->>
->> @@ -96,7 +97,7 @@ void imx_gpc_hwirq_unmask(unsigned int hwirq)
->>  	void __iomem *reg;
->>  	u32 val;
->>
->> -	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
->> +	reg = gpc_base + GPC_IMR1 + hwirq / 32 * 4;
->>  	val = readl_relaxed(reg);
->>  	val &= ~(1 << hwirq % 32);
->>  	writel_relaxed(val, reg);
->> @@ -107,7 +108,7 @@ void imx_gpc_hwirq_mask(unsigned int hwirq)
->>  	void __iomem *reg;
->>  	u32 val;
->>
->> -	reg = gpc_base + GPC_IMR1 + (hwirq / 32 - 1) * 4;
->> +	reg = gpc_base + GPC_IMR1 + hwirq / 32 * 4;
->>  	val = readl_relaxed(reg);
->>  	val |= 1 << (hwirq % 32);
->>  	writel_relaxed(val, reg);
->> @@ -115,37 +116,115 @@ void imx_gpc_hwirq_mask(unsigned int hwirq)
->>
->>  static void imx_gpc_irq_unmask(struct irq_data *d)
->>  {
->> -	/* Sanity check for SPI irq */
->> -	if (d->hwirq < 32)
->> -		return;
->> -
->>  	imx_gpc_hwirq_unmask(d->hwirq);
->> +	irq_chip_unmask_parent(d);
->>  }
->>
->>  static void imx_gpc_irq_mask(struct irq_data *d)
->>  {
->> -	/* Sanity check for SPI irq */
->> -	if (d->hwirq < 32)
->> -		return;
->> -
->>  	imx_gpc_hwirq_mask(d->hwirq);
->> +	irq_chip_mask_parent(d);
->> +}
->
-> This two function end up very small, can't we just alter
-> imx_gpc_hwirq_unmask to use struct irq_data directly?
+My hunch is that when a task exits and sets fullmm, end is zero and so the
+old need_flush cases no longer run. With my original patch, we skipped the
+TLB invalidation (since the task is exiting and we will invalidate the TLB
+for that ASID before the ASID is reallocated) but still did the freeing.
+With the current code, we skip the freeing too, which causes us to leak
+pages on exit.
 
-Unfortunately, pm-imx6.c directly uses the HW irq number.
+> Also, looking at that commit fb7332a9fedf, I note that some of the
+> "need_flush" setting was simply removed. See for example
+> arch/powerpc/mm/hugetlbpage.c, and also in mm/memory.c:
+> tlb_remove_table(). Is there something non-obvious that sets tlb->end
+> there?
 
-> Code looks fine to me:
->
-> Acked-by: Stefan Agner <stefan@agner.ch>
+I figured that need_flush was already set in these cases, so the additional
+setting was redundant:
 
-Thanks again,
+  https://lkml.org/lkml/2014/11/10/340
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+> The other need_flush removals seem to all be paired with adding a
+> __tlb_adjust_range() call, which will set ->end.
+> 
+> I'm starting to suspect that you moved the need_flush test into
+> tlbonly exactly because you removed that
+> 
+>         tlb->need_flush = 1;
+> 
+> from mm/memory.c: tlb_remove_table().
+> 
+> x86 doesn't care, because x86 doesn't *use* tlb_remove_table(). But
+> arm64 does, at least with the RCU freeing.
+> 
+> Any ideas?
+
+I guess we can either check need_flush as well as end, or we could set both
+start == end == some_nonzero_value in __tlb_adjust_range when need_flush is
+set. Unfortunately, I'm away from my h/w right now, so it's not easy to test
+this.
+
+What do you reckon?
+
+Will
