@@ -1,33 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 10 Jan 2015 22:36:24 +0100
-Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
-In-Reply-To: <2596012.A9D9qEFWVV@wuerfel>
-References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <2707920.rUFmbmVqu6@wuerfel>
- <20150110205721.6b3f71f8@free-electrons.com>
- <2596012.A9D9qEFWVV@wuerfel>
-Message-ID: <20150110223624.74d21d47@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 10 Jan 2015 22:40:22 +0100
+Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
+ accesses
+In-Reply-To: <1420857290-8373-8-git-send-email-robh@kernel.org>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+ <1420857290-8373-8-git-send-email-robh@kernel.org>
+Message-ID: <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Sat, Jan 10, 2015 at 3:34 AM, Rob Herring <robh@kernel.org> wrote:
 
-On Sat, 10 Jan 2015 21:40:07 +0100, Arnd Bergmann wrote:
+> Convert the integrator PCI driver to use the generic config access
+> functions.
+>
+> This changes accesses from __raw_readX/__raw_writeX to readX/writeX
+> variants.
 
-> Yes, but it may be better to stage this by first putting a patch
-> into stable that completely disables the broken coherent mapping,
-> and following up with another patch to bring the cohernet behavior
-> in sync with mainline once we are reasonably sure it's good.
+Just as good.
 
-Fine with me. I'll submit such patches next week. Though for the next
-merge window, I'd like the proposed automatic I/O synchronization
-barriers to be merged, so that we progressively make progress towards
-the solution.
+> The spinlock is removed because it is unnecessary. The config
+> read and write functions are already protected with a spinlock and no
+> access can occur during the .pre_init function.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Thanks,
+I trust that you do the right thing I guess...
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+>                           int size, u32 *val)
+>  {
+> -       addr = v3_open_config_window(bus, devfn, where);
+> +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
+>         v3_close_config_window();
+> +       return ret;
+>  }
+>
+>  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+>                            int size, u32 val)
+>  {
+> +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
+>         v3_close_config_window();
+> -       raw_spin_unlock_irqrestore(&v3_lock, flags);
+> +       return ret;
+>  }
+>
+>  static struct pci_ops pci_v3_ops = {
+> +       .map_bus = v3_open_config_window,
+>         .read   = v3_read_config,
+>         .write  = v3_write_config,
+
+So .map_bus is called before every .read/.write operation I take it.
+
+Wouldn't it be proper to call the v3_close_config_window() from a
+matching .unmap_bus() callback for symmetry?
+
+Yours,
+Linus Walleij
