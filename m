@@ -1,113 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 10 Jan 2015 13:37:42 +0000
-Subject: Linux 3.19-rc3
-In-Reply-To: <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
- <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
- <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
- <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
- <54B09CA3.1060501@redhat.com>
- <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
-Message-ID: <20150110133742.GA6999@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 10 Jan 2015 13:45:32 +0000
+Subject: [PATCH v2 00/21] irqchip: gic: killing =?UTF-8?Q?gic=5Farch?=
+ =?UTF-8?Q?=5Fextn=20and=20co=2C=20slowly?=
+In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <cce4dbf67f406d352e1200c5cf84675e@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus, Laszlo,
+On 2015-01-07 17:42, Marc Zyngier wrote:
+> The gic_arch_extn hack that a number of platform use has been nagging
+> me for too long. It is only there for the benefit of a few platform,
+> and yet it impacts all GIC users. Moreover, it gives people the wrong
+> idea ("let's use it to put some new custom hack in there"...).
+>
+> But now that stacked irq domains have landed in -next, the time has
+> come for gic_arch_extn to meet the Big Bit Bucket.
+>
+> This patch series takes several steps towards the elimination of
+> gic_arch_extn:
+>
+> - moves Tegra's legacy interrupt controller support to
+>   drivers/irqchip, implementing a stacked domain on top of the
+>   standard GIC.
+>
+> - OMAP, imx6 and exynos are also converted to stacked domains, but
+>   their implementation is left in place (the code is far too
+>   intricately mixed with other details of the platform for me to even
+>   try to move it). Some OMAP variants get a special treatment as we
+>   also kill the crossbar horror (more on that below).
+>
+> - shmobile, ux500 and zynq are only slightly modified.
+>
+> - The GIC itself is cleaned up, and some other bits and bobs are
+>   adjusted for a good measure.
+>
+> About the TI crossbar:
+>
+> - The allocation of interrupts in this domain is fairly similar to
+>   what we do for MSI (see the GICv2m driver), and stacked domains 
+> have
+>   proved to be a fitting solution.
+>
+> - The current description in DT is currently entierely inaccurate, 
+> and
+>   as we already broke it for the OMAP WUGEN block, we might as well 
+> do
+>   it again for the TI crossbar.
+>
+> - The way crossbar, WUGEN and GIC interract is quite complex (this is
+>   effectively a stack of three interrupt controllers with interesting
+>   exceptions and braindead routing), and stacked domains are the 
+> right
+>   abstraction for that.
+>
+> - Other platforms (Freescale Vybrid) are starting to come up with the
+>   same type of things, and it'd be good to avoid them following the
+>   same broken model.
+>
+> - It removes a few lines from the code base so it can't completely be
+>   a bad idea!
+>
+> So this patch series does exactly that: make the crossbar a stacked
+> interrupt controller that only takes care of setting up the routing,
+> fix the DTs to represent the actual HW, and remove a bit of the
+> craziness from the GIC code.
+>
+> It is worth realizing that:
+>
+> - I haven't been able to test this as much as I would have wanted to
+>   (it's only been tested on tegra2 and omap5).
+>
+> - I've created DT bindings when needed, updated existing ones, but I
+>   haven't created a binding for platforms that already used an
+>   undocumented one (imx6, I'm looking at you).
+>
+> - I've relaxed quite a bit of the locking in the GIC code. I believe
+>   this is safe, but someone else should give it a long hard look.
+>
+> - This actively *breaks* existing setups. Once you boot a new kernel
+>   with an old DT, suspend/resume *will* be broken. Old kernels on a
+>   new DT won't even boot! You've been warned. This really outline the
+>   necessity of actually describing the HW in device trees...
+>
+> As for the patches, they are on top of 3.19-rc3.
+>
+> I've pushed the code to:
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> irq/die-gic-arch-extn-die-die-die
 
-On Sat, Jan 10, 2015 at 04:39:05AM +0000, Linus Torvalds wrote:
-> On Fri, Jan 9, 2015 at 7:29 PM, Laszlo Ersek <lersek@redhat.com> wrote:
-> > I've bisected this issue to
+I've updated this branch with the changes requested in this review 
+cycle. I'll give it a test run on Monday with the platforms I have 
+around (mainly Tegra20 and OMAP4/5).
 
-Thanks for bisecting this!
+Unless anything major comes up, I'll post v3 with a view of getting 
+this into 3.20.
 
-> .. commit f045bbb9fa1b ("mmu_gather: fix over-eager
-> tlb_flush_mmu_free() calling")
-> 
-> Hmm. That commit literally just undoes something that commit
-> fb7332a9fedf ("mmu_gather: move minimal range calculations into
-> generic code") changed, and that was very wrong on x86.
-> 
-> But arm64 did have very different TLB flushing logic, so there may be
-> some ARM64 reason that Will did that change originally, and then he
-> forgot that reason when he ack'ed commit f045bbb9fa1b that undid it.
-> 
-> Will?
+Thanks,
 
-I'm wondering if this is now broken in the fullmm case, because tlb->end
-will be zero and we won't actually free any of the pages being unmapped
-on task exit. Does that sound plausible?
-
-> Before your mmu_gather range calculations commit, we used to have
-> 
-> In tlb_flush_mmu_tlbonly():
-> 
->      tlb->need_flush = 0;
-> 
-> and in tlb_flush_mmu():
-> 
->     if (!tlb->need_flush)
->                 return;
-> 
-> and your commit changed the rule to be
-> 
->     !tlb->need_flush == !tlb->end
-> 
-> so in the current tree we have
-> 
->  In tlb_flush_mmu_tlbonly():
-> 
->     __tlb_reset_range(tlb);   // replaces "tlb->need_flush = 0;"
-> 
-> and in tlb_flush_mmu():
-> 
->     if (!tlb->end)    // replaces if (!tlb->need_flush)
->         return;
-> 
-> so we seem to do exactly the same as 3.18.
-> 
-> But in your original patch, you moved that "if (!tlb->end) return;"
-> check from tlb_flush_mmu() into tlb_flush_mmu_tlbonly(), and that
-> apparently is actually needed on arm64. But *why*?
-
-My hunch is that when a task exits and sets fullmm, end is zero and so the
-old need_flush cases no longer run. With my original patch, we skipped the
-TLB invalidation (since the task is exiting and we will invalidate the TLB
-for that ASID before the ASID is reallocated) but still did the freeing.
-With the current code, we skip the freeing too, which causes us to leak
-pages on exit.
-
-> Also, looking at that commit fb7332a9fedf, I note that some of the
-> "need_flush" setting was simply removed. See for example
-> arch/powerpc/mm/hugetlbpage.c, and also in mm/memory.c:
-> tlb_remove_table(). Is there something non-obvious that sets tlb->end
-> there?
-
-I figured that need_flush was already set in these cases, so the additional
-setting was redundant:
-
-  https://lkml.org/lkml/2014/11/10/340
-
-> The other need_flush removals seem to all be paired with adding a
-> __tlb_adjust_range() call, which will set ->end.
-> 
-> I'm starting to suspect that you moved the need_flush test into
-> tlbonly exactly because you removed that
-> 
->         tlb->need_flush = 1;
-> 
-> from mm/memory.c: tlb_remove_table().
-> 
-> x86 doesn't care, because x86 doesn't *use* tlb_remove_table(). But
-> arm64 does, at least with the RCU freeing.
-> 
-> Any ideas?
-
-I guess we can either check need_flush as well as end, or we could set both
-start == end == some_nonzero_value in __tlb_adjust_range when need_flush is
-set. Unfortunately, I'm away from my h/w right now, so it's not easy to test
-this.
-
-What do you reckon?
-
-Will
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
