@@ -1,103 +1,114 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Jan 2015 13:45:32 +0000
-Subject: [PATCH v2 00/21] irqchip: gic: killing =?UTF-8?Q?gic=5Farch?=
- =?UTF-8?Q?=5Fextn=20and=20co=2C=20slowly?=
-In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <cce4dbf67f406d352e1200c5cf84675e@www.loen.fr>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 10 Jan 2015 14:51:16 +0100
+Subject: [PATCH v2 2/4] Documentation: bindings: Add the regulator property
+ to the sub-nodes AHCI bindings
+In-Reply-To: <20150110111748.GB4160@sirena.org.uk>
+References: <1420799989-10645-1-git-send-email-gregory.clement@free-electrons.com>
+ <1420799989-10645-3-git-send-email-gregory.clement@free-electrons.com>
+ <54AFF7E3.4070506@redhat.com> <54AFFFDC.7020307@free-electrons.com>
+ <CAGb2v674q4Cjp9qy9CbUXe2j5pT_ez98CKxXHC8u4Diap2TT1A@mail.gmail.com>
+ <20150109171131.GH2634@sirena.org.uk> <54B0FCDD.7000300@redhat.com>
+ <20150110111748.GB4160@sirena.org.uk>
+Message-ID: <54B12E54.7000704@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-07 17:42, Marc Zyngier wrote:
-> The gic_arch_extn hack that a number of platform use has been nagging
-> me for too long. It is only there for the benefit of a few platform,
-> and yet it impacts all GIC users. Moreover, it gives people the wrong
-> idea ("let's use it to put some new custom hack in there"...).
->
-> But now that stacked irq domains have landed in -next, the time has
-> come for gic_arch_extn to meet the Big Bit Bucket.
->
-> This patch series takes several steps towards the elimination of
-> gic_arch_extn:
->
-> - moves Tegra's legacy interrupt controller support to
->   drivers/irqchip, implementing a stacked domain on top of the
->   standard GIC.
->
-> - OMAP, imx6 and exynos are also converted to stacked domains, but
->   their implementation is left in place (the code is far too
->   intricately mixed with other details of the platform for me to even
->   try to move it). Some OMAP variants get a special treatment as we
->   also kill the crossbar horror (more on that below).
->
-> - shmobile, ux500 and zynq are only slightly modified.
->
-> - The GIC itself is cleaned up, and some other bits and bobs are
->   adjusted for a good measure.
->
-> About the TI crossbar:
->
-> - The allocation of interrupts in this domain is fairly similar to
->   what we do for MSI (see the GICv2m driver), and stacked domains 
-> have
->   proved to be a fitting solution.
->
-> - The current description in DT is currently entierely inaccurate, 
-> and
->   as we already broke it for the OMAP WUGEN block, we might as well 
-> do
->   it again for the TI crossbar.
->
-> - The way crossbar, WUGEN and GIC interract is quite complex (this is
->   effectively a stack of three interrupt controllers with interesting
->   exceptions and braindead routing), and stacked domains are the 
-> right
->   abstraction for that.
->
-> - Other platforms (Freescale Vybrid) are starting to come up with the
->   same type of things, and it'd be good to avoid them following the
->   same broken model.
->
-> - It removes a few lines from the code base so it can't completely be
->   a bad idea!
->
-> So this patch series does exactly that: make the crossbar a stacked
-> interrupt controller that only takes care of setting up the routing,
-> fix the DTs to represent the actual HW, and remove a bit of the
-> craziness from the GIC code.
->
-> It is worth realizing that:
->
-> - I haven't been able to test this as much as I would have wanted to
->   (it's only been tested on tegra2 and omap5).
->
-> - I've created DT bindings when needed, updated existing ones, but I
->   haven't created a binding for platforms that already used an
->   undocumented one (imx6, I'm looking at you).
->
-> - I've relaxed quite a bit of the locking in the GIC code. I believe
->   this is safe, but someone else should give it a long hard look.
->
-> - This actively *breaks* existing setups. Once you boot a new kernel
->   with an old DT, suspend/resume *will* be broken. Old kernels on a
->   new DT won't even boot! You've been warned. This really outline the
->   necessity of actually describing the HW in device trees...
->
-> As for the patches, they are on top of 3.19-rc3.
->
-> I've pushed the code to:
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> irq/die-gic-arch-extn-die-die-die
+Hi,
 
-I've updated this branch with the changes requested in this review 
-cycle. I'll give it a test run on Monday with the platforms I have 
-around (mainly Tegra20 and OMAP4/5).
+On 10-01-15 12:17, Mark Brown wrote:
+> On Sat, Jan 10, 2015 at 11:20:13AM +0100, Hans de Goede wrote:
+>> On 09-01-15 18:11, Mark Brown wrote:
+>
+>>> Or if the supply is for the device at the other end of the link (which
+>>> is what it sounded like) then use that.  This just sounds like the same
+>>> problem we have for all the enumerable buses in embedded systems where
+>>> we need to be able to understand that the device exists prior to it
+>>> being fully ready to appear in the system.  Having the link/slot be a
+>>> device in Linux does indeed seem to be a common way people think about
+>>> doing this, it sounds like for this one it might be the most direct.
+>
+>> I think we should be careful to not think too much from an implementation
+>> pov here, the purpose of the devicetree description is to describe the hardware,
+>> as is.
+>
+> I don't think anyone is talking about changing the DT here, only the way
+> it's represented inside Linux.
+>
+>>                  sata0: sata-port at 0 {
+>>                          reg = <0>;
+>>                          phys = <&sata_phy 0>;
+>> 			target-supply = <&reg_sata0>;
+>>                  };
+>>
+>>                  sata1: sata-port at 1 {
+>>                          reg = <1>;
+>>                          phys = <&sata_phy 1>;
+>> 			target-supply = <&reg_sata1>;
+>>                  };
+>>          };
+>
+>> Seems to match the hardware pretty exactly, and also matches how we've
+>> been describing similar devices with only one sata port + power plug sofar,
+>> so from a consistency pov it also is a good model.
+>
+> Right, I think that makes sense
 
-Unless anything major comes up, I'll post v3 with a view of getting 
-this into 3.20.
+Good, as said I think getting the dt bit rights is the most important
+thing here. So if we agree that the above dt example looks sane, lets see
+how we can best implement that.
 
-Thanks,
+ > it also looks to me like these things
+> should be representable as devices within Linux.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+I guess we could manually instantiate platform devices for each of the
+subnodes which represent an sata port here, yes that should not be
+hard to do, it feels like a bit overkill though.
+
+So for our this should likely look something like this:
+
+         if (IS_ENABLED(CONFIG_OF_ADDRESS) && dev->of_node) {
+                 for_each_child_of_node(dev->of_node, np) {
+                         pdev[i++] = of_platform_device_create(np, NULL, NULL);
+                 }
+         }
+
+and then loop over the pdev[] array and get the regulator, and phy for each.
+
+I wonder if of_platform_device_create can deal with nodes with
+#size-cells = <0>; is 0 though, if it cannot maybe we need to teach it.
+
+>> So supporting this model requires having a regulator_get API which allows
+>> specifying which of_node to get the regulator from, e.g. the proposed
+>
+> It requires nothing of the sort.
+
+You're proposed solution of instantiating devices does more or less exactly
+what I say is required, it is a way to pass an of_node into regulator_get,
+but you're hiding the node inside dev->of_node. I can see the appeal in
+that.
+
+>> of_regulator_get function. I know you (Mark) do not like this, but all
+>> other subsystems have an of_foo_get function taking an of_node as argument,
+>> I do not see how the regulator subsys is so special that it cannot have one,
+>> and also notice that this is only a kernel internal API which we can always
+>> change later.
+>
+> Two things there.  One is that mostly those APIs are legacy APIs from
+> before we made DT a first class citizen and generally they shouldn't be
+> used these days.  The other is that at least for regulators we have
+> constant problems with people abusing the API in various ways, as a
+> result the API has a goal of not helping undesirable usage patterns in
+> order to help people spot problems.  Having an API which makes it easy
+> create broken bindings means that it is much more likely that people
+> will do just that.
+
+Hmm I can see where you're coming from, and your proposed solution may
+also be useful for when we get similar boards requiring explicit regulator
+handling with the sata ports described in ACPI tables.
+
+Gregory, can you give the setup using per sata port devices a try, and
+see how that works out code wise ?
+
+Regards,
+
+Hans
