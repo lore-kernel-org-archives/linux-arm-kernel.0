@@ -1,34 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 10 Jan 2015 22:51:52 +0100
-Subject: [PATCH] pinctrl: pass -DDEBUG in subdirs
-Message-ID: <1420926712-13447-1-git-send-email-linus.walleij@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 Jan 2015 22:53:06 +0100
+Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
+ accesses
+In-Reply-To: <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+ <1420857290-8373-8-git-send-email-robh@kernel.org>
+ <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
+Message-ID: <4938579.0KIk3QtTCP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When drivers are compiled in subdirectories the -DDEBUG flag need
-to be passed in the individual Makefiles.
+On Saturday 10 January 2015 22:40:22 Linus Walleij wrote:
+> >  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+> >                           int size, u32 *val)
+> >  {
+> > -       addr = v3_open_config_window(bus, devfn, where);
+> > +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
+> >         v3_close_config_window();
+> > +       return ret;
+> >  }
+> >
+> >  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+> >                            int size, u32 val)
+> >  {
+> > +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
+> >         v3_close_config_window();
+> > -       raw_spin_unlock_irqrestore(&v3_lock, flags);
+> > +       return ret;
+> >  }
+> >
+> >  static struct pci_ops pci_v3_ops = {
+> > +       .map_bus = v3_open_config_window,
+> >         .read   = v3_read_config,
+> >         .write  = v3_write_config,
+> 
+> So .map_bus is called before every .read/.write operation I take it.
+> 
+> Wouldn't it be proper to call the v3_close_config_window() from a
+> matching .unmap_bus() callback for symmetry?
 
-Reported-by: Mika Westerberg <mika.westerberg@linux.intel.com>
-Suggested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This replaces Mika's patch too.
----
- drivers/pinctrl/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It would be nicer for integrator but useless for anything else, so
+I'd vote for leaving it the way Rob posted.
 
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index c030b3db8034..c7139ba195fe 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -1,6 +1,6 @@
- # generic pinmux support
- 
--ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
-+subdir-ccflags-$(CONFIG_DEBUG_PINCTRL)	+= -DDEBUG
- 
- obj-$(CONFIG_PINCTRL)		+= core.o pinctrl-utils.o
- obj-$(CONFIG_PINMUX)		+= pinmux.o
--- 
-1.9.3
+	Arnd
