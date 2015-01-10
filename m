@@ -1,62 +1,137 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Sat, 10 Jan 2015 02:35:40 +0200
-Subject: Linux 3.19-rc3
-In-Reply-To: <20150109232707.GA6325@e104818-lin.cambridge.arm.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com>
- <20150108134520.GC14200@e104818-lin.cambridge.arm.com>
- <54AEBE84.6090307@redhat.com>
- <20150108173408.GF17290@e104818-lin.cambridge.arm.com>
- <54AED10C.7090305@redhat.com>
- <CA+55aFwpwkjRnTzBe2K0y+2DOH1F=5SpJkYe=P5z8ps5_1PQHQ@mail.gmail.com>
- <20150109232707.GA6325@e104818-lin.cambridge.arm.com>
-Message-ID: <20150110003540.GA32037@node.dhcp.inet.fi>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 09 Jan 2015 16:39:21 -0800
+Subject: [PATCH v2 3/8] watchdog: at91rm9200: use the regmap from mfd
+In-Reply-To: <1420797094-9444-4-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1420797094-9444-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B074B9.2090704@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 11:27:07PM +0000, Catalin Marinas wrote:
-> On Thu, Jan 08, 2015 at 07:21:02PM +0000, Linus Torvalds wrote:
-> > The only excuse for 64kB pages is "my hardware TLB is complete crap,
-> > and I have very specialized server-only loads".
-> 
-> I would make a slight correction: s/and/or/.
-> 
-> I agree that for a general purpose system (and even systems like web
-> hosting servers), 64KB is overkill; 16KB may be a better compromise.
-> 
-> There are however some specialised loads that benefit from this. The
-> main example here is virtualisation where if both guest and host use 4
-> levels of page tables each (that's what you may get with 4KB pages on
-> arm64), a full TLB miss in both stages of translation (the ARM
-> terminology for nested page tables) needs up to _24_ memory accesses
-> (though cached). Of course, once the TLB warms up, there will be much
-> less but for new mmaps you always get some misses.
-> 
-> With 64KB pages (in the host usually), you can reduce the page table
-> levels to three or two (the latter for 42-bit VA) or you could even
-> couple this with some insanely huge pages (512MB, the next up from 64KB)
-> to decrease the number of levels further.
-> 
-> I see three main advantages: the usual reduced TLB pressure (which
-> arguably can be solved with bigger TLBs), less TLB misses and, pretty
-> important with virtualisation, the cost of the TLB miss due to a reduced
-> number of levels. But that's for the user to balance the advantages and
-> disadvantages you already mentioned based on the planned workload (e.g.
-> host configured with 64KB pages while guests use 4KB).
-> 
-> Another aspect on ARM is the TLB flushing on (large) MP systems. With a
-> larger page size, we reduce the number of TLB operation (in-hardware)
-> broadcasting between CPUs (we could use non-broadcasting ops and IPIs,
-> not sure they are any faster though).
+On 01/09/2015 01:51 AM, Alexandre Belloni wrote:
+> The system timer MFD driver is providing a regmap. Use it to access the
+> registers.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   drivers/watchdog/Kconfig          |  2 +-
+>   drivers/watchdog/at91rm9200_wdt.c | 27 +++++++++------------------
+>   2 files changed, 10 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 08f41add1461..18c73bc159fc 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -154,7 +154,7 @@ config ARM_SP805_WATCHDOG
+>
+>   config AT91RM9200_WATCHDOG
+>   	tristate "AT91RM9200 watchdog"
+> -	depends on SOC_AT91RM9200
+> +	depends on SOC_AT91RM9200 && MFD_ATMEL_ST
+>   	help
+>   	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
+>   	  system when the timeout is reached.
+> diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
+> index d244112d5b6f..a493fe4b0dfc 100644
+> --- a/drivers/watchdog/at91rm9200_wdt.c
+> +++ b/drivers/watchdog/at91rm9200_wdt.c
+> @@ -14,25 +14,22 @@
+>   #include <linux/bitops.h>
+>   #include <linux/errno.h>
+>   #include <linux/fs.h>
+> -#include <linux/init.h>
+> -#include <linux/io.h>
+>   #include <linux/kernel.h>
+> +#include <linux/mfd/atmel-st.h>
+>   #include <linux/miscdevice.h>
+>   #include <linux/module.h>
+>   #include <linux/moduleparam.h>
+>   #include <linux/platform_device.h>
+> -#include <linux/types.h>
+> +#include <linux/regmap.h>
+>   #include <linux/watchdog.h>
+>   #include <linux/uaccess.h>
+> -#include <linux/of.h>
+> -#include <linux/of_device.h>
+> -#include <mach/at91_st.h>
+>
+>   #define WDT_DEFAULT_TIME	5	/* seconds */
+>   #define WDT_MAX_TIME		256	/* seconds */
+>
+>   static int wdt_time = WDT_DEFAULT_TIME;
+>   static bool nowayout = WATCHDOG_NOWAYOUT;
+> +static struct regmap *regmap_st;
+>
+>   module_param(wdt_time, int, 0);
+>   MODULE_PARM_DESC(wdt_time, "Watchdog time in seconds. (default="
+> @@ -55,7 +52,7 @@ static unsigned long at91wdt_busy;
+>    */
+>   static inline void at91_wdt_stop(void)
+>   {
+> -	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN);
+> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN);
+>   }
+>
+>   /*
+> @@ -63,9 +60,9 @@ static inline void at91_wdt_stop(void)
+>    */
+>   static inline void at91_wdt_start(void)
+>   {
+> -	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
+> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
+>   				(((65536 * wdt_time) >> 8) & AT91_ST_WDV));
+> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
+> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+>   }
+>
+>   /*
+> @@ -73,7 +70,7 @@ static inline void at91_wdt_start(void)
+>    */
+>   static inline void at91_wdt_reload(void)
+>   {
+> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
+> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+>   }
+>
+>   /* ......................................................................... */
+> @@ -204,6 +201,7 @@ static struct miscdevice at91wdt_miscdev = {
+>   static int at91wdt_probe(struct platform_device *pdev)
+>   {
+>   	int res;
+> +	regmap_st = dev_get_drvdata(pdev->dev.parent);
+>
 
-With bigger page size there's also reduction in number of entities to
-handle by kernel: less memory occupied by struct pages, fewer pages on
-lru, etc.
+Is it guaranteed that parent is never NULL, and that the parent's
+drvdata is always set ?
 
-Managing a lot of memory (TiB scale) with 4k chunks is just insane.
-We will need to find a way to cluster memory together to manage it
-reasonably. Whether it bigger base page size or some other mechanism.
-Maybe THP? ;)
+Also, it seems that regmap_st will be overwritten if the device
+is already open (see code below). That may not be a good idea.
 
--- 
- Kirill A. Shutemov
+Guenter
+
+>   	if (at91wdt_miscdev.parent)
+>   		return -EBUSY;
+> @@ -254,12 +252,6 @@ static int at91wdt_resume(struct platform_device *pdev)
+>   #define at91wdt_resume	NULL
+>   #endif
+>
+> -static const struct of_device_id at91_wdt_dt_ids[] = {
+> -	{ .compatible = "atmel,at91rm9200-wdt" },
+> -	{ /* sentinel */ }
+> -};
+> -MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
+> -
+>   static struct platform_driver at91wdt_driver = {
+>   	.probe		= at91wdt_probe,
+>   	.remove		= at91wdt_remove,
+> @@ -267,8 +259,7 @@ static struct platform_driver at91wdt_driver = {
+>   	.suspend	= at91wdt_suspend,
+>   	.resume		= at91wdt_resume,
+>   	.driver		= {
+> -		.name	= "at91_wdt",
+> -		.of_match_table = at91_wdt_dt_ids,
+> +		.name	= "atmel_st_watchdog",
+>   	},
+>   };
+>
+>
