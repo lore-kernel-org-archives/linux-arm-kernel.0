@@ -1,266 +1,81 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 09 Jan 2015 20:17:20 -0800
-Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
+Date: Fri, 09 Jan 2015 20:38:38 -0800
+Subject: [RESEND PATCH v15 07/11] KVM: arm: page logging 2nd stage fault
  handling
-Message-ID: <1420863441-32592-1-git-send-email-m.smarduch@samsung.com>
+In-Reply-To: <20150109102458.GN21092@cbox>
+References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
+ <1418868449-23397-1-git-send-email-m.smarduch@samsung.com>
+ <20150107123844.GA21092@cbox> <54ADE0B6.1060703@samsung.com>
+ <20150108104510.GI21092@cbox> <54AEB03E.8080305@samsung.com>
+ <20150109102458.GN21092@cbox>
+Message-ID: <54B0ACCE.4040109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for 2nd stage page fault handling while dirty page
-logging. On huge page faults, huge pages are dissolved to normal pages, and
-rebuilding of 2nd stage huge pages is blocked. In case migration is 
-canceled this restriction is removed and huge pages may be rebuilt again.
+On 01/09/2015 02:24 AM, Christoffer Dall wrote:
+> On Thu, Jan 08, 2015 at 08:28:46AM -0800, Mario Smarduch wrote:
+>> On 01/08/2015 02:45 AM, Christoffer Dall wrote:
+>>> On Wed, Jan 07, 2015 at 05:43:18PM -0800, Mario Smarduch wrote:
+>>>> Hi Christoffer,
+>>>>   before going through your comments, I discovered that
+>>>> in 3.18.0-rc2 - a generic __get_user_pages_fast()
+>>>> was implemented, now ARM picks this up. This causes
+>>>> gfn_to_pfn_prot() to return meaningful 'writable'
+>>>> value for a read fault, provided the region is writable.
+>>>>
+>>>> Prior to that the weak version returned 0 and 'writable'
+>>>> had no optimization effect to set pte/pmd - RW on
+>>>> a read fault.
+>>>>
+>>>> As a consequence dirty logging broke in 3.18, I was seeing
+>> Correction on this, proper __get_user_pages_fast()
+>> behavior exposed a bug in page logging code.
+>>
+>>>> weird but very intermittent issues. I just put in the
+>>>> additional few lines to fix it, prevent pte RW (only R) on
+>>>> read faults  while  logging writable region.
+>>>>
+>>>> On 01/07/2015 04:38 AM, Christoffer Dall wrote:
+>>>>> On Wed, Dec 17, 2014 at 06:07:29PM -0800, Mario Smarduch wrote:
+>>>>>> This patch is a followup to v15 patch series, with following changes:
+>>>>>> - When clearing/dissolving a huge, PMD mark huge page range dirty, since
+>>>>>>   the state of whole range is unknown. After the huge page is dissolved 
+>>>>>>   dirty page logging is at page granularity.
+>>>>>
+>>>>> What is the sequence of events where you could have dirtied another page
+>>>>> within the PMD range after the user initially requested dirty page
+>>>>> logging?
+>>>>
+>>>> No there is none. My issue was the start point for tracking dirty pages
+>>>> and that would be second call to dirty log read. Not first
+>>>> call after initial write protect where any page in range can
+>>>> be assumed dirty. I'll remove this, not sure if there would be any
+>>>> use case to call dirty log only once.
+>>>>
+>>>
+>>> Calling dirty log once can not give you anything meaningful, right?  You
+>>> must assume all memory is 'dirty' at this point, no?
+>>
+>> There is the interval between KVM_MEM_LOG_DIRTY_PAGES and first
+>> call to KVM_GET_DIRTY_LOG. Not sure of any use case, maybe enable
+>> logging, wait a while do a dirty log read, disable logging.
+>> Get an accumulated snapshot of dirty page activity.
+>>
+> ok, so from the time the user calls KVM_MEM_LOG_DIRTY_PAGES, then any
+> fault on any huge page will dissolve that huge page into pages, and each
+> dirty page will be logged accordingly for the first call to
+> KVM_GET_DIRTY_LOG, right?  What am I missing here?
 
-This patch applies cleanly on top of patch series posted Dec. 15'th:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012826.html
+Yes that's correct, this may or may not be meaningful in itself.
+The original point was first time access to a huge page (on
+first or some later call) and do we consider whole range dirty.
+Keeping track at page granularity + original image provides
+everything needed to reconstruct the source so it should
+not matter.
 
-Patch #11 has been dropped, and should not be applied.
+I think I convoluted this issue a bit.
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
-
-Change Log since last RESEND v1 --> v2:
-- Disallow dirty page logging of IO region - fail for initial write protect
-  and disable logging code in 2nd stage page fault handler.
-- Fixed auto spell correction errors
-
-Change Log RESEND v0 --> v1:
-- fixed bug exposed by new generic __get_user_pages_fast(), when region is 
-  writable, prevent write protection of pte on read fault
-- Removed marking entire huge page dirty on initial access
-- don't dissolve huge pages of non-writable regions
-- Made updates based on Christoffers comments
-  - renamed logging status function to memslot_is_logging()
-  - changed few values to bool from longs
-  - streamlined user_mem_abort() to eliminate extra conditional checks
----
- arch/arm/kvm/mmu.c |  113 ++++++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 105 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 73d506f..b878236 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
- #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
- #define kvm_pud_huge(_x)	pud_huge(_x)
- 
-+#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
-+#define KVM_S2PTE_FLAG_LOGGING_ACTIVE	(1UL << 1)
-+
-+static bool memslot_is_logging(struct kvm_memory_slot *memslot)
-+{
-+#ifdef CONFIG_ARM
-+	return !!memslot->dirty_bitmap;
-+#else
-+	return false;
-+#endif
-+}
-+
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	/*
-@@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
- }
- 
-+/**
-+ * stage2_dissolve_pmd() - clear and flush huge PMD entry
-+ * @kvm:	pointer to kvm structure.
-+ * @addr:	IPA
-+ * @pmd:	pmd pointer for IPA
-+ *
-+ * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-+ * pages in the range dirty.
-+ */
-+static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
-+{
-+	if (!kvm_pmd_huge(*pmd))
-+		return;
-+
-+	pmd_clear(pmd);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	put_page(virt_to_page(pmd));
-+}
-+
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
-@@ -703,10 +734,13 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- }
- 
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
--			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
-+			  phys_addr_t addr, const pte_t *new_pte,
-+			  unsigned long flags)
- {
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
-+	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-+	bool logging_active = flags & KVM_S2PTE_FLAG_LOGGING_ACTIVE;
- 
- 	/* Create stage-2 page table mapping - Levels 0 and 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
-@@ -718,6 +752,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		return 0;
- 	}
- 
-+	/*
-+	 * While dirty page logging - dissolve huge PMD, then continue on to
-+	 * allocate page.
-+	 */
-+	if (logging_active)
-+		stage2_dissolve_pmd(kvm, addr, pmd);
-+
- 	/* Create stage-2 page mappings - Level 2 */
- 	if (pmd_none(*pmd)) {
- 		if (!cache)
-@@ -774,7 +815,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
--		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
-+		ret = stage2_set_pte(kvm, &cache, addr, &pte,
-+						KVM_S2PTE_FLAG_IS_IOMAP);
- 		spin_unlock(&kvm->mmu_lock);
- 		if (ret)
- 			goto out;
-@@ -1002,6 +1044,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	pfn_t pfn;
- 	pgprot_t mem_type = PAGE_S2;
- 	bool fault_ipa_uncached;
-+	bool can_set_pte_rw = true;
-+	unsigned long set_pte_flags = 0;
- 
- 	write_fault = kvm_is_write_fault(vcpu);
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -1009,6 +1053,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		return -EFAULT;
- 	}
- 
-+
- 	/* Let's check if we will get back a huge page backed by hugetlbfs */
- 	down_read(&current->mm->mmap_sem);
- 	vma = find_vma_intersection(current->mm, hva, hva + 1);
-@@ -1059,12 +1104,35 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_error_pfn(pfn))
- 		return -EFAULT;
- 
--	if (kvm_is_device_pfn(pfn))
-+	if (kvm_is_device_pfn(pfn)) {
- 		mem_type = PAGE_S2_DEVICE;
-+		set_pte_flags = KVM_S2PTE_FLAG_IS_IOMAP;
-+	}
- 
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
-+
-+	/*
-+	 * When logging is enabled general page fault handling changes:
-+	 * -  Writable huge pages are dissolved on a read or write fault.
-+	 * -  pte's are not allowed write permission on a read fault to
-+	 *    writable region so future writes can be marked dirty
-+	 * Access to non-writable region is unchanged, and logging of IO
-+	 * regions is not allowed.
-+	 */
-+	if (memslot_is_logging(memslot) && writable) {
-+		set_pte_flags = KVM_S2PTE_FLAG_LOGGING_ACTIVE;
-+		if (hugetlb) {
-+			gfn += pte_index(fault_ipa);
-+			pfn += pte_index(fault_ipa);
-+			hugetlb = false;
-+		}
-+		force_pte = true;
-+		if (!write_fault)
-+			can_set_pte_rw = false;
-+	}
-+
- 	if (!hugetlb && !force_pte)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
-@@ -1082,16 +1150,23 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, mem_type);
--		if (writable) {
-+
-+		/*
-+		 * Don't set write permission, for non-writable region, and
-+		 * for read fault to writable region while logging.
-+		 */
-+		if (writable && can_set_pte_rw) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
- 					  fault_ipa_uncached);
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
--			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
-+							set_pte_flags);
- 	}
- 
-+	if (write_fault)
-+		mark_page_dirty(kvm, gfn);
- 
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
-@@ -1242,7 +1317,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
- {
- 	pte_t *pte = (pte_t *)data;
- 
--	stage2_set_pte(kvm, NULL, gpa, pte, false);
-+	/*
-+	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
-+	 * flag clear because MMU notifiers will have unmapped a huge PMD before
-+	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
-+	 * therefore stage2_set_pte() never needs to clear out a huge PMD
-+	 * through this calling path.
-+	 */
-+	stage2_set_pte(kvm, NULL, gpa, pte, 0);
- }
- 
- 
-@@ -1396,7 +1478,13 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 	bool writable = !(mem->flags & KVM_MEM_READONLY);
- 	int ret = 0;
- 
--	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
-+	/*
-+	 * Let - enable of dirty page logging through, later check if it's for
-+	 * an IO region and fail.
-+	 */
-+	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
-+		change == KVM_MR_FLAGS_ONLY &&
-+		!(memslot->flags & KVM_MEM_LOG_DIRTY_PAGES))
- 		return 0;
- 
- 	/*
-@@ -1447,15 +1535,24 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
- 					 vm_start - vma->vm_start;
- 
--			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
-+			if (change != KVM_MR_FLAGS_ONLY)
-+				ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
- 						    vm_end - vm_start,
- 						    writable);
-+			else
-+				/* IO region dirty page logging not allowed */
-+				return -EINVAL;
-+
- 			if (ret)
- 				break;
- 		}
- 		hva = vm_end;
- 	} while (hva < reg_end);
- 
-+	/* Anything after here doesn't apply to memslot flag changes */
-+	if (change == KVM_MR_FLAGS_ONLY)
-+		return ret;
-+
- 	spin_lock(&kvm->mmu_lock);
- 	if (ret)
- 		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
--- 
-1.7.9.5
+- Mario
+> 
+> -Christoffer
+> 
