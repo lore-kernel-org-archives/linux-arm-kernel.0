@@ -1,26 +1,34 @@
-From: svenjoac@gmx.de (Sven Joachim)
-Date: Sat, 10 Jan 2015 20:54:54 +0100
-Subject: Getting new udev to run with 2.6.28
-In-Reply-To: <20150110180942.GA10142@amd> (Pavel Machek's message of "Sat, 10
- Jan 2015 19:09:42 +0100")
-References: <20150110173920.GA31847@amd> <20150110180532.GA8566@kroah.com>
- <20150110180942.GA10142@amd>
-Message-ID: <87a91q2yy9.fsf@turtle.gmx.de>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Sat, 10 Jan 2015 11:56:55 -0800
+Subject: Linux 3.19-rc3
+In-Reply-To: <54B181B7.5080503@redhat.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+ <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+ <20150110133742.GA6999@arm.com> <54B181B7.5080503@redhat.com>
+Message-ID: <CA+55aFzXYhyBW_pF___69o98uq7nnH60wvnTr37RYmrjQgsdQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-10 19:09 +0100, Pavel Machek wrote:
+On Sat, Jan 10, 2015 at 11:47 AM, Laszlo Ersek <lersek@redhat.com> wrote:
+>
+> I grepped the tree for "fullmm", and only tlb_gather_mmu() seems to set
+> it. There are several instances of that function, but each sets fullmm to:
+>
+>         /* Is it from 0 to ~0? */
+>         tlb->fullmm     = !(start | (end+1));
+>
+> So, a nonzero fullmm seems to imply (end == ~0UL).
 
-> I was hoping someone has devtmpfs patches I could just apply over
-> 2.6.28 and get a working system?
+Yes. But note how it imples "end == ~0ul", but it does *not* imply
+"tlb->end" having that value.
 
-IIRC the udev version in Debian 7 does not require devtmpfs (that became
-mandatory only in udev 176), but kernel 2.6.32 or higher is required for
-other reasons.  See commit 67a77c8bf299f6264f001677becd056316ebce2f in
-udev[1].
+tlb->end is initialized to zero (not obvious, but it's what the call
+to __tlb_reset_range() does). It's then updated by
+__tlb_adjust_range() as we actually flush individual pages.
 
-Cheers,
-       Sven
-
-
-1. https://git.kernel.org/cgit/linux/hotplug/udev.git/commit/?id=67a77c8bf299f6264f001677becd056316ebce2f
+                           Linus
