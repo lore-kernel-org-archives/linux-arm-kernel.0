@@ -1,31 +1,51 @@
-From: georgebush815@gmail.com (George Bush)
-Date: Sat, 10 Jan 2015 23:14:33 +0800
-Subject: ARM64: hibernation: How to use hibernation/suspend-to-disk on ARMv8?
-Message-ID: <CADcZZT+nQ_0LfurU+z5wLC_OxNhEs6n0kCoLSkfoFCDqyOu04g@mail.gmail.com>
+From: kmcmarti@redhat.com (Kyle McMartin)
+Date: Sat, 10 Jan 2015 10:22:59 -0500
+Subject: Linux 3.19-rc3
+In-Reply-To: <54B09CA3.1060501@redhat.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+Message-ID: <20150110152259.GP18580@redacted.bos.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+On Sat, Jan 10, 2015 at 04:29:39AM +0100, Laszlo Ersek wrote:
+> I've bisected this issue to
+> 
 
-I notice we have hibernation.c in arm/kernel, however, I don't find it in arm64.
-Does it mean arm64 do not support hibernation/suspend-to-disk function?
+Awesome, this was on my list of list of suspicious commits to check
+before my ARM64 box decided not to come back from reboot on Friday. :)
 
-I tried some path to search the reason, but found nothing, they all say arm64
-has the backward compatibility. So I send this email to the community and
-hope to get the reason.
-Thanks!
+Thanks for bisecting!
 
-I ported the arm hibernation.c to arm64/kernel(with LP64), but failed in a
-strange way. When I do resume, the arch_restore_image() get a page_fault
-when it calls the copy_page(), like:
-"Unable to handle kernel paging request at virtual address 0xffffffbc055c3fa8"
-I'm sure the copy_page()'s parameters is in the memory area, why and how
-I get the strange address 0xffffffbc055c3fa8?
+cheers,
+--Kyle
 
-vmalloc:         0xffffff8000000000 - 0xffffffbb00000000
-vmemmap:     0xffffffbc01400000 - 0xffffffbc04f88000
-modules:       0xffffffbffc000000   -  0xffffffc000000000
-memory:        0xffffffc000000000 - 0xffffffc0be800000
-
-
-Look forward to your reply, thanks!
+> > f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1 is the first bad commit
+> > commit f045bbb9fa1bf6f507ad4de12d4e3471d8f672f1
+> > Author: Linus Torvalds <torvalds@linux-foundation.org>
+> > Date:   Wed Dec 17 11:59:04 2014 -0800
+> >
+> >     mmu_gather: fix over-eager tlb_flush_mmu_free() calling
+> >
+> >     Dave Hansen reports that commit fb7332a9fedf ("mmu_gather: move minimal
+> >     range calculations into generic code") caused a performance problem:
+> >
+> >       "tlb_finish_mmu() goes up about 9x in the profiles (~0.4%->3.6%) and
+> >        tlb_flush_mmu_free() takes about 3.1% of CPU time with the patch
+> >        applied, but does not show up at all on the commit before"
+> >
+> >     and the reason is that Will moved the test for whether we need to flush
+> >     from tlb_flush_mmu() into tlb_flush_mmu_tlbonly().  But that meant that
+> >     tlb_flush_mmu_free() basically lost that check.
+> >
+> >     Move it back into tlb_flush_mmu() where it belongs, so that it covers
+> >     both tlb_flush_mmu_tlbonly() _and_ tlb_flush_mmu_free().
+> >
+> >     Reported-and-tested-by: Dave Hansen <dave@sr71.net>
+> >     Acked-by: Will Deacon <will.deacon@arm.com>
+> >     Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+> >
