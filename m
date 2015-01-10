@@ -1,137 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 09 Jan 2015 16:39:21 -0800
-Subject: [PATCH v2 3/8] watchdog: at91rm9200: use the regmap from mfd
-In-Reply-To: <1420797094-9444-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1420797094-9444-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B074B9.2090704@roeck-us.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 9 Jan 2015 16:48:58 -0800
+Subject: [PATCH v2 1/2] serial: fsl_lpuart: delete timer on shutdown
+In-Reply-To: <1420848539-4519-2-git-send-email-stefan@agner.ch>
+References: <1420848539-4519-1-git-send-email-stefan@agner.ch>
+ <1420848539-4519-2-git-send-email-stefan@agner.ch>
+Message-ID: <20150110004858.GB4171@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2015 01:51 AM, Alexandre Belloni wrote:
-> The system timer MFD driver is providing a regmap. Use it to access the
-> registers.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Sat, Jan 10, 2015 at 01:08:58AM +0100, Stefan Agner wrote:
+> If the serial port gets closed while a RX transfer is in progress,
+> the timer might fire after the serial port shutdown finished. This
+> leads in a NULL pointer dereference:
+> 
+> [    7.508324] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [    7.516590] pgd = 86348000
+> [    7.519445] [00000000] *pgd=86179831, *pte=00000000, *ppte=00000000
+> [    7.526145] Internal error: Oops: 17 [#1] ARM
+> [    7.530611] Modules linked in:
+> [    7.533876] CPU: 0 PID: 123 Comm: systemd Not tainted 3.19.0-rc3-00004-g5b11ea7 #1778
+> [    7.541827] Hardware name: Freescale Vybrid VF610 (Device Tree)
+> [    7.547862] task: 861c3400 ti: 86ac8000 task.ti: 86ac8000
+> [    7.553392] PC is at lpuart_timer_func+0x24/0xf8
+> [    7.558127] LR is at lpuart_timer_func+0x20/0xf8
+> [    7.562857] pc : [<802df99c>]    lr : [<802df998>]    psr: 600b0113
+> [    7.562857] sp : 86ac9b90  ip : 86ac9b90  fp : 86ac9bbc
+> [    7.574467] r10: 80817180  r9 : 80817b98  r8 : 80817998
+> [    7.579803] r7 : 807acee0  r6 : 86989000  r5 : 00000100  r4 : 86997210
+> [    7.586444] r3 : 86ac8000  r2 : 86ac9bc0  r1 : 86997210  r0 : 00000000
+> [    7.593085] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> [    7.600341] Control: 10c5387d  Table: 86348059  DAC: 00000015
+> [    7.606203] Process systemd (pid: 123, stack limit = 0x86ac8230)
+> 
+> Setup the timer on UART startup which allows to delete the timer
+> unconditionally on shutdown. This also saves the initialization
+> on each transfer.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->   drivers/watchdog/Kconfig          |  2 +-
->   drivers/watchdog/at91rm9200_wdt.c | 27 +++++++++------------------
->   2 files changed, 10 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 08f41add1461..18c73bc159fc 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -154,7 +154,7 @@ config ARM_SP805_WATCHDOG
->
->   config AT91RM9200_WATCHDOG
->   	tristate "AT91RM9200 watchdog"
-> -	depends on SOC_AT91RM9200
-> +	depends on SOC_AT91RM9200 && MFD_ATMEL_ST
->   	help
->   	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
->   	  system when the timeout is reached.
-> diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
-> index d244112d5b6f..a493fe4b0dfc 100644
-> --- a/drivers/watchdog/at91rm9200_wdt.c
-> +++ b/drivers/watchdog/at91rm9200_wdt.c
-> @@ -14,25 +14,22 @@
->   #include <linux/bitops.h>
->   #include <linux/errno.h>
->   #include <linux/fs.h>
-> -#include <linux/init.h>
-> -#include <linux/io.h>
->   #include <linux/kernel.h>
-> +#include <linux/mfd/atmel-st.h>
->   #include <linux/miscdevice.h>
->   #include <linux/module.h>
->   #include <linux/moduleparam.h>
->   #include <linux/platform_device.h>
-> -#include <linux/types.h>
-> +#include <linux/regmap.h>
->   #include <linux/watchdog.h>
->   #include <linux/uaccess.h>
-> -#include <linux/of.h>
-> -#include <linux/of_device.h>
-> -#include <mach/at91_st.h>
->
->   #define WDT_DEFAULT_TIME	5	/* seconds */
->   #define WDT_MAX_TIME		256	/* seconds */
->
->   static int wdt_time = WDT_DEFAULT_TIME;
->   static bool nowayout = WATCHDOG_NOWAYOUT;
-> +static struct regmap *regmap_st;
->
->   module_param(wdt_time, int, 0);
->   MODULE_PARM_DESC(wdt_time, "Watchdog time in seconds. (default="
-> @@ -55,7 +52,7 @@ static unsigned long at91wdt_busy;
->    */
->   static inline void at91_wdt_stop(void)
->   {
-> -	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN);
-> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN);
->   }
->
->   /*
-> @@ -63,9 +60,9 @@ static inline void at91_wdt_stop(void)
->    */
->   static inline void at91_wdt_start(void)
->   {
-> -	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
-> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
->   				(((65536 * wdt_time) >> 8) & AT91_ST_WDV));
-> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
->   }
->
->   /*
-> @@ -73,7 +70,7 @@ static inline void at91_wdt_start(void)
->    */
->   static inline void at91_wdt_reload(void)
->   {
-> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
->   }
->
->   /* ......................................................................... */
-> @@ -204,6 +201,7 @@ static struct miscdevice at91wdt_miscdev = {
->   static int at91wdt_probe(struct platform_device *pdev)
->   {
->   	int res;
-> +	regmap_st = dev_get_drvdata(pdev->dev.parent);
->
+>  drivers/tty/serial/fsl_lpuart.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 
-Is it guaranteed that parent is never NULL, and that the parent's
-drvdata is always set ?
+Do stable kernels care about this as well, or is this just a regression
+from 3.18?
 
-Also, it seems that regmap_st will be overwritten if the device
-is already open (see code below). That may not be a good idea.
+thanks,
 
-Guenter
-
->   	if (at91wdt_miscdev.parent)
->   		return -EBUSY;
-> @@ -254,12 +252,6 @@ static int at91wdt_resume(struct platform_device *pdev)
->   #define at91wdt_resume	NULL
->   #endif
->
-> -static const struct of_device_id at91_wdt_dt_ids[] = {
-> -	{ .compatible = "atmel,at91rm9200-wdt" },
-> -	{ /* sentinel */ }
-> -};
-> -MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-> -
->   static struct platform_driver at91wdt_driver = {
->   	.probe		= at91wdt_probe,
->   	.remove		= at91wdt_remove,
-> @@ -267,8 +259,7 @@ static struct platform_driver at91wdt_driver = {
->   	.suspend	= at91wdt_suspend,
->   	.resume		= at91wdt_resume,
->   	.driver		= {
-> -		.name	= "at91_wdt",
-> -		.of_match_table = at91_wdt_dt_ids,
-> +		.name	= "atmel_st_watchdog",
->   	},
->   };
->
->
+greg k-h
