@@ -1,339 +1,269 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Sat, 10 Jan 2015 15:32:43 +0100
-Subject: [RFC PATCH v2 1/4] tty: serial_mctrl_gpio: Add irqs helpers for input
- lines
-Message-ID: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 10 Jan 2015 14:44:02 +0000
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <CACxGe6vRN2Tc97=Sx05gri02goxBaHnZm30hR37q=002agFLAA@mail.gmail.com>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <CACxGe6vRN2Tc97=Sx05gri02goxBaHnZm30hR37q=002agFLAA@mail.gmail.com>
+Message-ID: <CACxGe6sbGu53x5rsx2sWVVVVCnnFvmkQAk3Se9ZGNOXCkqpi=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A driver using mctrl_gpio called gpiod_get_direction() to check if
-gpio is input line. However .get_direction callback is not available
-for all platforms. The patch allows to avoid the function.
-The patch introduces the following helpers:
-- mctrl_gpio_request_irqs
-- mctrl_gpio_free_irqs
-- mctrl_gpio_enable_ms
-- mctrl_gpio_disable_ms
-They allow to:
-- simplify drivers which use mctrl_gpio
-- hide irq table in mctrl_gpio
-- use default irq handler for gpios
-- better separate code for gpio modem lines from uart's code
-In addition mctrl_gpio_init() has been renamed to mctrl_gpio_init_dt()
-to focus DT usage. Also mctrl_gpio_init_dt() initializes irq table for
-gpios now and passes struct uart_port into struct mctrl_gpios.
-This resulted in changed mctrl_gpio_init_dt() parameter.
-It also requires port->dev is set before the function is called.
+On Wed, Dec 17, 2014 at 10:26 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Tue, Dec 16, 2014 at 11:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Monday 15 December 2014 19:18:16 Al Stone wrote:
+>>> 7. Why is ACPI required?
+>>>    * Problem:
+>>>      * arm64 maintainers still haven't been convinced that ACPI is
+>>>        necessary.
+>>>      * Why do hardware and OS vendors say ACPI is required?
+>>>    * Status: Al & Grant collecting statements from OEMs to be posted
+>>>      publicly early in the new year; firmware summit for broader
+>>>      discussion planned.
+>>
+>> I was particularly hoping to see better progress on this item. It
+>> really shouldn't be that hard to explain why someone wants this feature.
+>
+> I've written something up in as a reply on the firmware summit thread.
+> I'm going to rework it to be a standalone document and post it
+> publicly. I hope that should resolve this issue.
 
-There were also fixed:
-- irq = 0 means invalid/unused (-EINVAL no more used)
-- mctrl_gpio_request_irqs() doesn't use negative enum value
-  if request_irq() failed. It just calls mctrl_gpio_free_irqs().
+I've posted an article on my blog, but I'm reposting it here because
+the mailing list is more conducive to discussion...
 
-The mctrl_gpio_is_gpio() inline function is under discussion
-and likely it can replace exported mctrl_gpio_to_gpiod() function.
+http://www.secretlab.ca/archives/151
 
-IRQ_NOAUTOEN setting and request_irq() order was not commented
-but it looks right according to other drivers.
+Why ACPI on ARM?
+----------------
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
+Why are we doing ACPI on ARM? That question has been asked many times,
+but we haven't yet had a good summary of the most important reasons
+for wanting ACPI on ARM. This article is an attempt to state the
+rationale clearly.
 
-The patch requires to update the drivers which use mctrl_gpio:
-- atmel_serial
-- mxs-auart
-- clps711x
+During an email conversation late last year, Catalin Marinas asked for
+a summary of exactly why we want ACPI on ARM, Dong Wei replied with
+the following list:
+> 1. Support multiple OSes, including Linux and Windows
+> 2. Support device configurations
+> 3. Support dynamic device configurations (hot add/removal)
+> 4. Support hardware abstraction through control methods
+> 5. Support power management
+> 6. Support thermal management
+> 7. Support RAS interfaces
 
-Changes since RFC v1:
- - patch renamed from:
-   ("serial: mctrl-gpio: Add irqs helpers for input lines")
-   to:
-   ("tty: serial_mctrl_gpio: Add irqs helpers for input lines")
- - mctrl_gpio_request_irqs: changed mctrl_gpio_free_irqs() and
-   dev_err() order to make debug easier
- - added patches for atmel_serial and clps711x serial drivers
+The above list is certainly true in that all of them need to be
+supported. However, that list doesn't give the rationale for choosing
+ACPI. We already have DT mechanisms for doing most of the above, and
+can certainly create new bindings for anything that is missing. So, if
+it isn't an issue of functionality, then how does ACPI differ from DT
+and why is ACPI a better fit for general purpose ARM servers?
 
-The patch applies to next (3.19.0-rc2) and was tested with mxs-auart
-using kernel 3.14 and 3.18. It wasn't tested on the next (only compiled).
+The difference is in the support model. To explain what I mean, I'm
+first going to expand on each of the items above and discuss the
+similarities and differences between ACPI and DT. Then, with that as
+the groundwork, I'll discuss how ACPI is a better fit for the general
+purpose hardware support model.
 
-The patchset delivers patches for mxs-auart, atmel_serial and clps711x.
-atmel_serial and clps711x were not tested - only compile tests were done.
+Device Configurations
+---------------------
+2. Support device configurations
+3. Support dynamic device configurations (hot add/removal)
 
----
- drivers/tty/serial/serial_mctrl_gpio.c | 109 ++++++++++++++++++++++++++++++++-
- drivers/tty/serial/serial_mctrl_gpio.h |  59 +++++++++++++++++-
- 2 files changed, 163 insertions(+), 5 deletions(-)
+>From day one, DT was about device configurations. There isn't any
+significant difference between ACPI & DT here. In fact, the majority
+of ACPI tables are completely analogous to DT descriptions. With the
+exception of the DSDT and SSDT tables, most ACPI tables are merely
+flat data used to describe hardware.
 
-diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
-index a38596c..215b15c 100644
---- a/drivers/tty/serial/serial_mctrl_gpio.c
-+++ b/drivers/tty/serial/serial_mctrl_gpio.c
-@@ -19,11 +19,15 @@
- #include <linux/device.h>
- #include <linux/gpio/consumer.h>
- #include <linux/termios.h>
-+#include <linux/irq.h>
- 
- #include "serial_mctrl_gpio.h"
- 
- struct mctrl_gpios {
-+	struct uart_port *port;
- 	struct gpio_desc *gpio[UART_GPIO_MAX];
-+	int irq[UART_GPIO_MAX];
-+	unsigned int mctrl_prev;
- };
- 
- static const struct {
-@@ -72,6 +76,12 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
- }
- EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
- 
-+inline
-+bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx gidx)
-+{
-+	return !IS_ERR_OR_NULL(gpios->gpio[gidx]);
-+}
-+
- unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
- {
- 	enum mctrl_gpio_idx i;
-@@ -96,8 +106,9 @@ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
- }
- EXPORT_SYMBOL_GPL(mctrl_gpio_get);
- 
--struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
-+struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx)
- {
-+	struct device *dev = port->dev;
- 	struct mctrl_gpios *gpios;
- 	enum mctrl_gpio_idx i;
- 	int err;
-@@ -106,6 +117,7 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
- 	if (!gpios)
- 		return ERR_PTR(-ENOMEM);
- 
-+	gpios->port = port;
- 	for (i = 0; i < UART_GPIO_MAX; i++) {
- 		gpios->gpio[i] = devm_gpiod_get_index(dev,
- 						      mctrl_gpios_desc[i].name,
-@@ -128,11 +140,13 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
- 			devm_gpiod_put(dev, gpios->gpio[i]);
- 			gpios->gpio[i] = NULL;
- 		}
-+		if (gpios->gpio[i] && !mctrl_gpios_desc[i].dir_out)
-+			gpios->irq[i] = gpiod_to_irq(gpios->gpio[i]);
- 	}
- 
- 	return gpios;
- }
--EXPORT_SYMBOL_GPL(mctrl_gpio_init);
-+EXPORT_SYMBOL_GPL(mctrl_gpio_init_dt);
- 
- void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
- {
-@@ -147,3 +161,94 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
- 	devm_kfree(dev, gpios);
- }
- EXPORT_SYMBOL_GPL(mctrl_gpio_free);
-+
-+/*
-+ * Dealing with GPIO interrupt
-+ */
-+#define MCTRL_ANY_DELTA        (TIOCM_RI | TIOCM_DSR | TIOCM_CD | TIOCM_CTS)
-+static irqreturn_t mctrl_gpio_irq_handle(int irq, void *context)
-+{
-+	struct mctrl_gpios *gpios = context;
-+	struct uart_port *port = gpios->port;
-+	u32 mctrl = gpios->mctrl_prev;
-+	u32 mctrl_diff;
-+
-+	mctrl_gpio_get(gpios, &mctrl);
-+
-+	mctrl_diff = mctrl ^ gpios->mctrl_prev;
-+	gpios->mctrl_prev = mctrl;
-+	if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
-+		if (mctrl_diff & TIOCM_RI)
-+			port->icount.rng++;
-+		if (mctrl_diff & TIOCM_DSR)
-+			port->icount.dsr++;
-+		if (mctrl_diff & TIOCM_CD)
-+			uart_handle_dcd_change(port, mctrl & TIOCM_CD);
-+		if (mctrl_diff & TIOCM_CTS)
-+			uart_handle_cts_change(port, mctrl & TIOCM_CTS);
-+
-+		wake_up_interruptible(&port->state->port.delta_msr_wait);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios)
-+{
-+	struct uart_port *port = gpios->port;
-+	int *irq = gpios->irq;
-+	enum mctrl_gpio_idx i;
-+	int err = 0;
-+
-+	for (i = 0; i < UART_GPIO_MAX; i++) {
-+		if (irq[i] <= 0)
-+			continue;
-+
-+		irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
-+		err = request_irq(irq[i], mctrl_gpio_irq_handle,
-+				  IRQ_TYPE_EDGE_BOTH,
-+				  dev_name(port->dev), gpios);
-+		if (err) {
-+			dev_err(port->dev, "%s: Can't get %d irq\n",
-+				__func__, irq[i]);
-+			mctrl_gpio_free_irqs(gpios);
-+			break;
-+		}
-+	}
-+
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(mctrl_gpio_request_irqs);
-+
-+void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios)
-+{
-+	enum mctrl_gpio_idx i;
-+
-+	for (i = 0; i < UART_GPIO_MAX; i++)
-+		if (gpios->irq[i] > 0)
-+			free_irq(gpios->irq[i], gpios);
-+}
-+EXPORT_SYMBOL_GPL(mctrl_gpio_free_irqs);
-+
-+void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
-+{
-+	enum mctrl_gpio_idx i;
-+
-+	/* get initial status of modem lines GPIOs */
-+	mctrl_gpio_get(gpios, &gpios->mctrl_prev);
-+
-+	for (i = 0; i < UART_GPIO_MAX; i++)
-+		if (gpios->irq[i] > 0)
-+			enable_irq(gpios->irq[i]);
-+}
-+EXPORT_SYMBOL_GPL(mctrl_gpio_enable_ms);
-+
-+void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
-+{
-+	enum mctrl_gpio_idx i;
-+
-+	for (i = 0; i < UART_GPIO_MAX; i++)
-+		if (gpios->irq[i] > 0)
-+			disable_irq(gpios->irq[i]);
-+}
-+EXPORT_SYMBOL_GPL(mctrl_gpio_disable_ms);
-diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
-index 400ba04..13ba3f4 100644
---- a/drivers/tty/serial/serial_mctrl_gpio.h
-+++ b/drivers/tty/serial/serial_mctrl_gpio.h
-@@ -21,6 +21,7 @@
- #include <linux/err.h>
- #include <linux/device.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/serial_core.h>
- 
- enum mctrl_gpio_idx {
- 	UART_GPIO_CTS,
-@@ -40,6 +41,13 @@ enum mctrl_gpio_idx {
-  */
- struct mctrl_gpios;
- 
-+/*
-+ * Return true if gidx is GPIO line, otherwise false.
-+ * It assumes that gpios is allocated and not NULL.
-+ */
-+inline
-+bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx gidx);
-+
- #ifdef CONFIG_GPIOLIB
- 
- /*
-@@ -60,12 +68,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
- 				      enum mctrl_gpio_idx gidx);
- 
- /*
-- * Request and set direction of modem control lines GPIOs.
-+ * Request and set direction of modem control lines GPIOs. DT is used.
-+ * Initialize irq table for GPIOs.
-  * devm_* functions are used, so there's no need to call mctrl_gpio_free().
-  * Returns a pointer to the allocated mctrl structure if ok, -ENOMEM on
-  * allocation error.
-  */
--struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
-+struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx);
- 
- /*
-  * Free the mctrl_gpios structure.
-@@ -74,6 +83,28 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
-  */
- void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios);
- 
-+/*
-+ * Request irqs for input lines GPIOs. The irqs are set disabled
-+ * and triggered on both edges.
-+ * Returns zero if OK, otherwise an error code.
-+ */
-+int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios);
-+
-+/*
-+ * Free irqs for input lines GPIOs.
-+ */
-+void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios);
-+
-+/*
-+ * Disable modem status interrupts assigned to GPIOs
-+ */
-+void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
-+
-+/*
-+ * Enable modem status interrupts assigned to GPIOs
-+ */
-+void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
-+
- #else /* GPIOLIB */
- 
- static inline
-@@ -95,7 +126,7 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
- }
- 
- static inline
--struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
-+struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx)
- {
- 	return ERR_PTR(-ENOSYS);
- }
-@@ -105,6 +136,28 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
- {
- }
- 
-+static inline
-+int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios)
-+{
-+	/*return -ENOTSUP;*/
-+	return 0;
-+}
-+
-+static inline
-+void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios)
-+{
-+}
-+
-+static inline
-+void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
-+{
-+}
-+
-+static inline
-+void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
-+{
-+}
-+
- #endif /* GPIOLIB */
- 
- #endif
--- 
-1.7.11.3
+DT platforms have also supported dynamic configuration and hotplug for
+years. There isn't a lot here that differentiates between ACPI and DT.
+The biggest difference is that dynamic changes to the ACPI namespace
+can be triggered by ACPI methods, whereas for DT changes are received
+as messages from firmware and have been very much platform specific
+(e.g. IBM pSeries does this)
+
+Power Management Model
+----------------------
+4. Support hardware abstraction through control methods
+5. Support power management
+6. Support thermal management
+
+Power, thermal, and clock management can all be dealt with as a group.
+ACPI defines a power management model (OSPM) that both the platform
+and the OS conform to. The OS implements the OSPM state machine, but
+the platform can provide state change behaviour in the form of
+bytecode methods. Methods can access hardware directly or hand off PM
+operations to a coprocessor. The OS really doesn't have to care about
+the details as long as the platform obeys the rules of the OSPM model.
+
+With DT, the kernel has device drivers for each and every component in
+the platform, and configures them using DT data. DT itself doesn't
+have a PM model. Rather the PM model is an implementation detail of
+the kernel. Device drivers use DT data to decide how to handle PM
+state changes. We have clock, pinctrl, and regulator frameworks in the
+kernel for working out runtime PM. However, this only works when all
+the drivers and support code have been merged into the kernel. When
+the kernel's PM model doesn't work for new hardware, then we change
+the model. This works very well for mobile/embedded because the vendor
+controls the kernel. We can change things when we need to, but we also
+struggle with getting board support mainlined.
+
+This difference has a big impact when it comes to OS support.
+Engineers from hardware vendors, Microsoft, and most vocally Red Hat
+have all told me bluntly that rebuilding the kernel doesn't work for
+enterprise OS support. Their model is based around a fixed OS release
+that ideally boots out-of-the-box. It may still need additional device
+drivers for specific peripherals/features, but from a system view, the
+OS works. When additional drivers are provided separately, those
+drivers fit within the existing OSPM model for power management. This
+is where ACPI has a technical advantage over DT. The ACPI OSPM model
+and it's bytecode gives the HW vendors a level of abstraction under
+their control, not the kernel's. When the hardware behaves differently
+from what the OS expects, the vendor is able to change the behaviour
+without changing the HW or patching the OS.
+
+At this point you'd be right to point out that it is harder to get the
+whole system working correctly when behaviour is split between the
+kernel and the platform. The OS must trust that the platform doesn't
+violate the OSPM model. All manner of bad things happen if it does.
+That is exactly why the DT model doesn't encode behaviour: It is
+easier to make changes and fix bugs when everything is within the same
+code base. We don't need a platform/kernel split when we can modify
+the kernel.
+
+However, the enterprise folks don't have that luxury. The
+platform/kernel split isn't a design choice. It is a characteristic of
+the market. Hardware and OS vendors each have their own product
+timetables, and they don't line up. The timeline for getting patches
+into the kernel and flowing through into OS releases puts OS support
+far downstream from the actual release of hardware. Hardware vendors
+simply cannot wait for OS support to come online to be able to release
+their products. They need to be able to work with available releases,
+and make their hardware behave in the way the OS expects. The
+advantage of ACPI OSPM is that it defines behaviour and limits what
+the hardware is allowed to do without involving the kernel.
+
+What remains is sorting out how we make sure everything works. How do
+we make sure there is enough cross platform testing to ensure new
+hardware doesn't ship broken and that new OS releases don't break on
+old hardware? Those are the reasons why a UEFI/ACPI firmware summit is
+being organized, it's why the UEFI forum holds plugfests 3 times a
+year, and it is why we're working on FWTS and LuvOS.
+
+Reliability, Availability & Serviceability (RAS)
+------------------------------------------------
+7. Support RAS interfaces
+
+This isn't a question of whether or not DT can support RAS. Of course
+it can. Rather it is a matter of RAS bindings already existing for
+ACPI, including a usage model. We've barely begun to explore this on
+DT. This item doesn't make ACPI technically superior to DT, but it
+certainly makes it more mature.
+
+Multiplatform support
+---------------------
+1. Support multiple OSes, including Linux and Windows
+
+I'm tackling this item last because I think it is the most contentious
+for those of us in the Linux world. I wanted to get the other issues
+out of the way before addressing it.
+
+The separation between hardware vendors and OS vendors in the server
+market is new for ARM. For the first time ARM hardware and OS release
+cycles are completely decoupled from each other, and neither are
+expected to have specific knowledge of the other (ie. the hardware
+vendor doesn't control the choice of OS). ARM and their partners want
+to create an ecosystem of independent OSes and hardware platforms that
+don't explicitly require the former to be ported to the latter.
+
+Now, one could argue that Linux is driving the potential market for
+ARM servers, and therefore Linux is the only thing that matters, but
+hardware vendors don't see it that way. For hardware vendors it is in
+their best interest to support as wide a choice of OSes as possible in
+order to catch the widest potential customer base. Even if the
+majority choose Linux, some will choose BSD, some will choose Windows,
+and some will choose something else. Whether or not we think this is
+foolish is beside the point; it isn't something we have influence
+over.
+
+During early ARM server planning meetings between ARM, its partners
+and other industry representatives (myself included) we discussed this
+exact point. Before us were two options, DT and ACPI. As one of the
+Linux people in the room, I advised that ACPI's closed governance
+model was a show stopper for Linux and that DT is the working
+interface. Microsoft on the other hand made it abundantly clear that
+ACPI was the only interface that they would support. For their part,
+the hardware vendors stated the platform abstraction behaviour of ACPI
+is a hard requirement for their support model and that they would not
+close the door on either Linux or Windows.
+
+However, the one thing that all of us could agree on was that
+supporting multiple interfaces doesn't help anyone: It would require
+twice as much effort on defining bindings (once for Linux-DT and once
+for Windows-ACPI) and it would require firmware to describe everything
+twice. Eventually we reached the compromise to use ACPI, but on the
+condition of opening the governance process to give Linux engineers
+equal influence over the specification. The fact that we now have a
+much better seat at the ACPI table, for both ARM and x86, is a direct
+result of these early ARM server negotiations. We are no longer second
+class citizens in the ACPI world and are actually driving much of the
+recent development.
+
+I know that this line of thought is more about market forces rather
+than a hard technical argument between ACPI and DT, but it is an
+equally significant one. Agreeing on a single way of doing things is
+important. The ARM server ecosystem is better for the agreement to use
+the same interface for all operating systems. This is what is meant by
+standards compliant. The standard is a codification of the mutually
+agreed interface. It provides confidence that all vendors are using
+the same rules for interoperability.
+
+Summary
+-------
+To summarize, here is the short form rationale for ACPI on ARM:
+
+ - ACPI's bytecode allows the platform to encode behaviour. DT
+explicitly does not support this. For hardware vendors, being able to
+encode behaviour is an important tool for supporting operating system
+releases on new hardware.
+ - ACPI's OSPM defines a power management model that constrains what
+the platform is allowed into a specific model while still having
+flexibility in hardware design.
+ - For enterprise use-cases, ACPI has extablished bindings, such as
+for RAS, which are used in production. DT does not. Yes, we can define
+those bindings but doing so means ARM and x86 will use completely
+different code paths in both firmware and the kernel.
+ - Choosing a single interface for platform/OS abstraction is
+important. It is not reasonable to require vendors to implement both
+DT and ACPI if they want to support multiple operating systems.
+Agreeing on a single interface instead of being fragmented into per-OS
+interfaces makes for better interoperability overall.
+ - The ACPI governance process works well and we're at the same table
+as HW vendors and other OS vendors. In fact, there is no longer any
+reason to feel that ACPI is a Windows thing or that we are playing
+second fiddle to Microsoft. The move of ACPI governance into the UEFI
+forum has significantly opened up the processes, and currently, a
+large portion of the changes being made to ACPI is being driven by
+Linux.
+
+At the beginning of this article I made the statement that the
+difference is in the support model. For servers, responsibility for
+hardware behaviour cannot be purely the domain of the kernel, but
+rather is split between the platform and the kernel. ACPI frees the OS
+from needing to understand all the minute details of the hardware so
+that the OS doesn't need to be ported to each and every device
+individually. It allows the hardware vendors to take responsibility
+for PM behaviour without depending on an OS release cycle which it is
+not under their control.
+
+ACPI is also important because hardware and OS vendors have already
+worked out how to use it to support the general purpose ecosystem. The
+infrastructure is in place, the bindings are in place, and the process
+is in place. DT does exactly what we need it to when working with
+vertically integrated devices, but we don't have good processes for
+supporting what the server vendors need. We could potentially get
+there with DT, but doing so doesn't buy us anything. ACPI already does
+what the hardware vendors need, Microsoft won't collaborate with us on
+DT, and the hardware vendors would still need to provide two
+completely separate firmware interface; one for Linux and one for
+Windows.
