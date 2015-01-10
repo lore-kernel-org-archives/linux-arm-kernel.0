@@ -1,50 +1,76 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 9 Jan 2015 16:49:10 -0800
-Subject: [PATCH v2 2/2] serial: fsl_lpuart: avoid new transfer while DMA
- is running
-In-Reply-To: <1420848539-4519-3-git-send-email-stefan@agner.ch>
-References: <1420848539-4519-1-git-send-email-stefan@agner.ch>
- <1420848539-4519-3-git-send-email-stefan@agner.ch>
-Message-ID: <20150110004910.GC4171@kroah.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 9 Jan 2015 18:27:38 -0800
+Subject: Linux 3.19-rc3
+In-Reply-To: <20150110003540.GA32037@node.dhcp.inet.fi>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com>
+ <20150108134520.GC14200@e104818-lin.cambridge.arm.com>
+ <54AEBE84.6090307@redhat.com>
+ <20150108173408.GF17290@e104818-lin.cambridge.arm.com>
+ <54AED10C.7090305@redhat.com>
+ <CA+55aFwpwkjRnTzBe2K0y+2DOH1F=5SpJkYe=P5z8ps5_1PQHQ@mail.gmail.com>
+ <20150109232707.GA6325@e104818-lin.cambridge.arm.com>
+ <20150110003540.GA32037@node.dhcp.inet.fi>
+Message-ID: <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 01:08:59AM +0100, Stefan Agner wrote:
-> When the UART is in DMA receive mode (RDMAS set) and one character
-> just arrived while another interrupt is handled (e.g. TX), the RDRF
-> (receiver data register full flag) is set due to the water level of
-> 1. But since the DMA will take care of this character, there is no
-> need to handle it by calling lpuart_prepare_rx. Handling it leads to
-> adding the RX timeout timer twice:
-> 
-> [   74.336698] Kernel BUG at 80053070 [verbose debug info unavailable]
-> [   74.342999] Internal error: Oops - BUG: 0 [#1] ARM0:00.00 khungtaskd
-> [   74.347817] Modules linked in:    0 S  0.0  0.0   0:00.00 writeback
-> [   74.350926] CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00001-g39d78e2 #1788
-> [   74.358617] Hardware name: Freescale Vybrid VF610 (Device Tree)t
-> [   74.364563] task: 807a7678 ti: 8079c000 task.ti: 8079c000 kblockd
-> [   74.370002] PC is at add_timer+0x24/0x28.0  0.0   0:00.09 kworker/u2:1
-> [   74.373960] LR is at lpuart_int+0x15c/0x3d8
-> [   74.378171] pc : [<80053070>]    lr : [<802e0d88>]    psr: a0010193
-> [   74.378171] sp : 8079de10  ip : 8079de20  fp : 8079de1c
-> [   74.389694] r10: 807d44c0  r9 : 8688c300  r8 : 00000013
-> [   74.394943] r7 : 20010193  r6 : 00000000  r5 : 000000a0  r4 : 86997210
-> [   74.401498] r3 : ffffa7da  r2 : 80817868  r1 : 86997210  r0 : 86997344
-> [   74.408052] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [   74.415489] Control: 10c5387d  Table: 8611c059  DAC: 00000015
-> [   74.421265] Process swapper (pid: 0, stack limit = 0x8079c230)
-> ...
-> 
-> Solve this by only execute the receiver path (lpuart_prepare_rx) if
-> the DMA receive mode (RDMAS) is not set. Also, make sure the flag is
-> cleared on initialization, in case it has been left set.
-> 
-> This can be best reproduced using UART as a serial console, then
-> running top while dd'ing data into the terminal.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/tty/serial/fsl_lpuart.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
+On Fri, Jan 9, 2015 at 4:35 PM, Kirill A. Shutemov <kirill@shutemov.name> wrote:
+>
+> With bigger page size there's also reduction in number of entities to
+> handle by kernel: less memory occupied by struct pages, fewer pages on
+> lru, etc.
 
-Same stable question as before.
+Bah. Humbug. You've been listening to HW people too much, but they see
+the small details, not the big picture.
+
+Page management was indeed a huge PITA for PAE. But that was because
+PAE is garbage.
+
+Really, do the math. 64kB pages waste so much memory due to internal
+fragmentation that any other memory use is completely immaterial.
+
+Pretty much the only situation where 64kB pages are fine is when you
+have one single meaningful load running on your machine, and that one
+single load is likely a database.
+
+Any other time, your filesystem caches will just suck.
+
+Just as an example, look at the kernel tree. Last I did the math
+(which is admittedly a long time ago), the median size (not average -
+median) of a file was pretty much 4kB.
+
+With a 64kB page, that means that for caching the kernel tree (what,
+closer to 50k files by now), you are basically wasting 60kB for most
+source files. Say, 60kB * 30k files, or 1.8GB.
+
+Read that again. 1.8 GIGABYTES. Wasted. Completely unused. Thrown
+away, with no upside. And that's just from the page cache for the
+kernel sources, which would be populated by a single "git grep".
+
+Maybe things have changed, and maybe I did my math wrong, and people
+can give a more exact number. But it's an example of why 64kB
+granularity is completely unacceptable in any kind of general-purpose
+load.
+
+Anybody who brings up TLB costs or costs of maintaining pages is just
+jying, or hasn't actually looked at the real issues. Anything you win
+in TLB you lose is *lots* and lots of extra IO, because you aren't
+using your memory efficiently for caching, and are basically easily
+throwing away half your RAM.
+
+Big pages are a bad bad bad idea. They work fine for databases, and
+that's pretty much just about it. I'm sure there are some other loads,
+but they are few and far between.
+
+4kB works well. 8kB is perfectly acceptable. 16kB is already wasting a
+lot of memory. 32kB and up is complete garbage for general-purpose
+computing.
+
+And no, source code isn't *that* special. There are lots of other
+cases where you have a multitude of small files. And small files are
+the things you want to cache - don't tell me about big video files etc
+that make a 64kB page size look small, because those files don't
+actually tend to be all that relevant for caching.
+
+                                   Linus
