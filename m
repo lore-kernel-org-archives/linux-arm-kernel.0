@@ -1,34 +1,49 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Sat, 10 Jan 2015 11:56:55 -0800
-Subject: Linux 3.19-rc3
-In-Reply-To: <54B181B7.5080503@redhat.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
- <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
- <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
- <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
- <54B09CA3.1060501@redhat.com>
- <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
- <20150110133742.GA6999@arm.com> <54B181B7.5080503@redhat.com>
-Message-ID: <CA+55aFzXYhyBW_pF___69o98uq7nnH60wvnTr37RYmrjQgsdQA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 10 Jan 2015 20:57:21 +0100
+Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
+In-Reply-To: <2707920.rUFmbmVqu6@wuerfel>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150110163001.GA5392@lunn.ch>
+ <20150110175030.186ef929@free-electrons.com>
+ <2707920.rUFmbmVqu6@wuerfel>
+Message-ID: <20150110205721.6b3f71f8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 11:47 AM, Laszlo Ersek <lersek@redhat.com> wrote:
->
-> I grepped the tree for "fullmm", and only tlb_gather_mmu() seems to set
-> it. There are several instances of that function, but each sets fullmm to:
->
->         /* Is it from 0 to ~0? */
->         tlb->fullmm     = !(start | (end+1));
->
-> So, a nonzero fullmm seems to imply (end == ~0UL).
+Dear Arnd Bergmann,
 
-Yes. But note how it imples "end == ~0ul", but it does *not* imply
-"tlb->end" having that value.
+On Sat, 10 Jan 2015 19:56:59 +0100, Arnd Bergmann wrote:
 
-tlb->end is initialized to zero (not obvious, but it's what the call
-to __tlb_reset_range() does). It's then updated by
-__tlb_adjust_range() as we actually flush individual pages.
+> Despite my earlier analysis that concluded that the just using the
+> normal coherent dma_ops with this fix was correct on all hardware,
+> we have now seen a bug in the xor dmaengine driver (I haven't
+> seen a confirmation for my oneline fix yet, but I still think it's
+> the one), which gives us less confidence in the other drivers
+> being correct.
+> 
+> I think that your patch is the only sensible approach going forward
+> if we want coherent mappings, but we will need both more extensive
+> testing and more review of each affected device driver before
+> putting it into stable.
 
-                           Linus
+We will indeed need to do more extensive testing and review. However, I
+don't agree that this should prevent this patch from going to stable:
+the current situation in the kernel (and also past kernels) is known to
+be broken: DMA coherent mappings allocated by dma_alloc_coherent() are
+*not* coherent in the current situation. Writes made by the device to
+the memory are not guaranteed to be immediately visible to the CPU,
+unless an explicit I/O sync barrier is done, which obviously is never
+done for DMA coherent mappings since those are assumed by Linux to be
+coherent, and therefore not require any cache maintenance operation.
+
+So, while I clearly agree that we haven't yet gotten to the bottom of
+all problems, this patch is going in the right direction and making
+things slightly better.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
