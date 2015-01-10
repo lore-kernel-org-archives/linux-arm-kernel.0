@@ -1,70 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 10 Jan 2015 12:28:32 +0000
-Subject: [PATCH v2 02/21] irqchip: tegra: add DT-based support for legacy
+Date: Sat, 10 Jan 2015 12:37:58 +0000
+Subject: [PATCH v2 04/21] ARM: tegra: update DTs to expose legacy
  interrupt controller
-In-Reply-To: <20150108150608.GA24654@kahuna>
+In-Reply-To: <20150108104141.GF1987@ulmo.nvidia.com>
 References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <1420652576-22309-3-git-send-email-marc.zyngier@arm.com>
- <20150108150608.GA24654@kahuna>
-Message-ID: <180a27ca37ef60b557aa1c18d7e251b1@www.loen.fr>
+ <1420652576-22309-5-git-send-email-marc.zyngier@arm.com>
+ <20150108104141.GF1987@ulmo.nvidia.com>
+Message-ID: <d6fe000bdc6f2fbfc18f0695ce88c321@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-01-08 15:06, Nishanth Menon wrote:
-> On 17:42-20150107, Marc Zyngier wrote:
->> Tegra's LIC (Legacy Interrupt Controller) has been so far only
->> supported as a weird extension of the GIC, which is not exactly
->> pretty.
->>
->> The stacked irq domain framework fits this pretty well, and allows
->> the LIC code to be turned into a standalone irqchip. In the process,
->> make the driver DT aware, something that was sorely missing from
->> the mach-tegra implementation.
+On 2015-01-08 10:41, Thierry Reding wrote:
+> On Wed, Jan 07, 2015 at 05:42:39PM +0000, Marc Zyngier wrote:
+>> Describe the legacy interrupt controller in every tegra DTSI files,
+>> and make it the parent of most interrupts.
 >>
 >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->
-> Saw a few checkpatch warnings as below: all of them seem minors.
->
-> @@ -0,0 +1,35 @@
-> +WARNING: added, moved or deleted file(s), does MAINTAINERS need 
-> updating?
+>>  arch/arm/boot/dts/tegra114.dtsi | 16 +++++++++++++++-
+>>  arch/arm/boot/dts/tegra124.dtsi | 16 +++++++++++++++-
+>>  arch/arm/boot/dts/tegra20.dtsi  | 15 ++++++++++++++-
+>>  arch/arm/boot/dts/tegra30.dtsi  | 16 +++++++++++++++-
+>>  4 files changed, 59 insertions(+), 4 deletions(-)
+>>
 
-I'll leave to the Tegra maintainers to update this file it they want 
-to.
-
-> +#36:
-> +new file mode 100644
-> +WARNING: line over 80 characters
-> +#169: FILE: drivers/irqchip/irq-tegra.c:129:
-> ++		tegra_ictlr_info->cpu_ier[i] = readl_relaxed(ictlr + 
-> ICTLR_CPU_IER);
-
-As a matter of principle, I ignore what checkpatch says about the 
-length of lines of code. I trust my eyes more than the tool.
+I've updated the patch to reflect the requested changes. See below for 
+the few contentious points:
 
 [...]
 
-> +WARNING: Missing a blank line after declarations
-> +#196: FILE: drivers/irqchip/irq-tegra.c:156:
-> ++		void __iomem *ictlr = tegra_ictlr_info->ictlr_reg_base[i];
-> ++		writel_relaxed(tegra_ictlr_info->cpu_iep[i],
+>> @@ -134,6 +134,19 @@
+>>  		      <0x50046000 0x2000>;
+>>  		interrupts = <GIC_PPI 9
+>>  			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>> +		interrupt-parent = <&gic>;
+>
+> Is this allowed? It makes the GIC its own parent. I guess we need it 
+> to
+> stop a loop from GIC -> LIC -> GIC, but it doesn't look quite right.
 
-Done.
+This seems to be the expected construct to override a parent interrupt 
+controller. Actually, this is already what happens when you have a 
+single interrupt-controller and a global interrupt-parent property.
 
-> +WARNING: line over 80 characters
-> +#284: FILE: drivers/irqchip/irq-tegra.c:244:
-> ++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, 
-> &parent_args);
-> +CHECK: Please don't use multiple blank lines
-> +#287: FILE: drivers/irqchip/irq-tegra.c:247:
-> ++
-> ++
-> +WARNING: Missing a blank line after declarations
-> +#296: FILE: drivers/irqchip/irq-tegra.c:256:
-> ++		struct irq_data *d = irq_domain_get_irq_data(domain, virq + i);
-> ++		irq_domain_reset_irq_data(d);
-> `
+[...]
+
+>>  	timer at 60005000 {
+>> @@ -766,5 +779,6 @@
+>>  				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>>  			<GIC_PPI 10
+>>  				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+>> +		interrupt-parent = <&gic>;
+>
+> Why does this get to have a non-default parent?
+
+The per-cpu timers are using PPIs.  As such,. they are not routed 
+through the LIC, but are wired to the GIC instead.
+
+[...]
+
+>>  	timer at 60005000 {
+>>  		compatible = "nvidia,tegra20-timer";
+>>  		reg = <0x60005000 0x60>;
+>
+> Why doesn't the Tegra timer get to keep the GIC as parent like for
+> Tegra114 and Tegra124? Instead I see that the Cortex-A9 TWD timer 
+> gets
+> to keep the parent instead.
+
+The Tegra timer is using SPI (and can probably be used as a wake-up 
+source). As such, it is connected to the LIC, not to the GIC.
+
+Per-CPU timers (arch timer for A15 and TWD for A9) are all using PPIs, 
+and are directly wired to the GIC.
+
+[...]
+
+>>  	timer at 60005000 {
+>>  		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
+>>  		reg = <0x60005000 0x400>;
+>
+> Like for Tegra20, the Tegra timer is now switched to the LIC as 
+> parent.
+
+Which, in my understanding, is the right thing to do. Unless I missed 
+something obvious about this?
 
 Thanks,
 
