@@ -1,47 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Jan 2015 21:40:07 +0100
-Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
-In-Reply-To: <20150110205721.6b3f71f8@free-electrons.com>
-References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <2707920.rUFmbmVqu6@wuerfel> <20150110205721.6b3f71f8@free-electrons.com>
-Message-ID: <2596012.A9D9qEFWVV@wuerfel>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Sat, 10 Jan 2015 13:00:27 -0800
+Subject: Linux 3.19-rc3
+In-Reply-To: <4665410.x9Uu42bKmJ@wuerfel>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <20150110003540.GA32037@node.dhcp.inet.fi>
+ <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
+ <4665410.x9Uu42bKmJ@wuerfel>
+Message-ID: <CA+55aFxphoLdFkwkVFQ87Q8EbYNqFAE-n0yTvCSOJzSO2MtDgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 January 2015 20:57:21 Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
-> 
-> On Sat, 10 Jan 2015 19:56:59 +0100, Arnd Bergmann wrote:
-> 
-> > Despite my earlier analysis that concluded that the just using the
-> > normal coherent dma_ops with this fix was correct on all hardware,
-> > we have now seen a bug in the xor dmaengine driver (I haven't
-> > seen a confirmation for my oneline fix yet, but I still think it's
-> > the one), which gives us less confidence in the other drivers
-> > being correct.
-> > 
-> > I think that your patch is the only sensible approach going forward
-> > if we want coherent mappings, but we will need both more extensive
-> > testing and more review of each affected device driver before
-> > putting it into stable.
-> 
-> We will indeed need to do more extensive testing and review. However, I
-> don't agree that this should prevent this patch from going to stable:
-> the current situation in the kernel (and also past kernels) is known to
-> be broken: DMA coherent mappings allocated by dma_alloc_coherent() are
-> *not* coherent in the current situation. Writes made by the device to
-> the memory are not guaranteed to be immediately visible to the CPU,
-> unless an explicit I/O sync barrier is done, which obviously is never
-> done for DMA coherent mappings since those are assumed by Linux to be
-> coherent, and therefore not require any cache maintenance operation.
-> 
-> So, while I clearly agree that we haven't yet gotten to the bottom of
-> all problems, this patch is going in the right direction and making
-> things slightly better.
+On Sat, Jan 10, 2015 at 12:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On a recent kernel, I get 628 MB for storing all files of the
+> kernel tree in 4KB pages, and 3141 MB for storing the same data
+> in 64KB pages, almost exactly factor 5, or 2.45 GiB wasted.
 
-Yes, but it may be better to stage this by first putting a patch
-into stable that completely disables the broken coherent mapping,
-and following up with another patch to bring the cohernet behavior
-in sync with mainline once we are reasonably sure it's good.
+Ok, so it's even worse than it used to be.  Partly because the tree
+has grown, partly because I did the math for 16kB and 64kB is just
+hugely worse.
 
-	Arnd
+I did the math back in the days when the PPC people were talking about
+16kB pages (iirc - it's been closer to a decade, so I might
+misremember the details).
+
+And back then, with 4kB pages I could cache the kernel tree twice over
+in 1GB, and have enough left to run a graphical desktop. So enough
+memory to build a tree and also enough to have two kernel trees and do
+"diff -urN" between them.
+
+Of course, back then, 1-2GB was the usual desktop memory size, so the
+"I can do kernel development in 1GB without excessive IO" mattered to
+me in ways it wouldn't today.
+
+And it was before "git", so the whole "two kernel trees and do diffs
+between them" was a real concern.
+
+With 16kB pages, I think I had to have twice the memory for the same loads.
+
+> IIRC, AIX works great with 64k pages, but only because of two
+> reasons that don't apply on Linux:
+
+.. there's a few other ones:
+
+ (c) nobody really runs AIX on dekstops. It's very much a DB load
+environment, with historically some HPC.
+
+ (d) the powerpc TLB fill/buildup/teardown costs are horrible, so on
+AIX the cost of lots of small pages is much higher too.
+
+Now obviously, we *could* try to have a 64kB page size, and then do
+lots of tricks to actually allocate file caches in partial pages in
+order to avoid the internal fragmentation costs. HOWEVER:
+
+ - that obviously doesn't help with the page management overhead (in
+fact, it hurts). So it would be purely about trying to optimize for
+bad TLB's.
+
+ - that adds a *lot* of complexity to the VM. The coherency issues
+when you may need to move cached information between partial pages and
+full pages (required for mmap, but *most* files don't get mmap'ed)
+would actually be pretty horrible.
+
+ - all of this cost and complexity wouldn't help at all on x86, so it
+would be largely untested and almost inevitably broken crap.
+
+so I feel pretty confident in saying it won't happen. It's just too
+much of a bother, for little to no actual upside. It's likely a much
+better approach to try to instead use THP for anonymous mappings.
+
+                            Linus
