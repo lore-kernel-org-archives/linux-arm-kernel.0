@@ -1,45 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Jan 2015 22:53:06 +0100
-Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
- accesses
-In-Reply-To: <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
-References: <1420857290-8373-1-git-send-email-robh@kernel.org>
- <1420857290-8373-8-git-send-email-robh@kernel.org>
- <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
-Message-ID: <4938579.0KIk3QtTCP@wuerfel>
+From: Martin@lichtvoll.de (Martin Steigerwald)
+Date: Sat, 10 Jan 2015 23:25:39 +0100
+Subject: Getting new udev to run with 2.6.28
+In-Reply-To: <20150110211857.GA22149@ZenIV.linux.org.uk>
+References: <20150110173920.GA31847@amd> <20150110181710.GA8884@kroah.com>
+ <20150110211857.GA22149@ZenIV.linux.org.uk>
+Message-ID: <7348917.heGelKEtgq@merkaba>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 January 2015 22:40:22 Linus Walleij wrote:
-> >  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
-> >                           int size, u32 *val)
-> >  {
-> > -       addr = v3_open_config_window(bus, devfn, where);
-> > +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
-> >         v3_close_config_window();
-> > +       return ret;
-> >  }
-> >
-> >  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
-> >                            int size, u32 val)
-> >  {
-> > +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
-> >         v3_close_config_window();
-> > -       raw_spin_unlock_irqrestore(&v3_lock, flags);
-> > +       return ret;
-> >  }
-> >
-> >  static struct pci_ops pci_v3_ops = {
-> > +       .map_bus = v3_open_config_window,
-> >         .read   = v3_read_config,
-> >         .write  = v3_write_config,
+Am Samstag, 10. Januar 2015, 21:18:58 schrieb Al Viro:
+> On Sat, Jan 10, 2015 at 10:17:10AM -0800, Greg KH wrote:
+> > > > Yes, 3.18, please use that instead.
+> > > 
+> > > Can't, sorry. My goal is to get 3.18/3.19 working, but I really need
+> > > working kernel to debug userland (and then use that userland to debug
+> > > kernel).> > 
+> > > > Seriously, lots of things have changed, if you want to run a "new"
+> > > > version of udev with an old kernel, try eudev, they have been
+> > > > attempting
+> > > > to keep "legacy" support around in it, don't know how well it has been
+> > > > working though, you really are on your own.
+> > > 
+> > > I was hoping someone has devtmpfs patches I could just apply over
+> > > 2.6.28 and get a working system?
+> > 
+> > If you want such a crazy thing, you have all of the source to do it
+> > yourself, good luck.
 > 
-> So .map_bus is called before every .read/.write operation I take it.
-> 
-> Wouldn't it be proper to call the v3_close_config_window() from a
-> matching .unmap_bus() callback for symmetry?
+> ... and this, boys and girls, is why quite a few of us have loathed udev
+> way before it got merged into even nastier shitpile.  Still do, for that
+> matter.
 
-It would be nicer for integrator but useless for anything else, so
-I'd vote for leaving it the way Rob posted.
+You mean systemd by that?
 
-	Arnd
+-- 
+Martin 'Helios' Steigerwald - http://www.Lichtvoll.de
+GPG: 03B0 0D6C 0040 0710 4AFA  B82F 991B EAAC A599 84C7
