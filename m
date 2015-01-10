@@ -1,81 +1,85 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 09 Jan 2015 20:38:38 -0800
-Subject: [RESEND PATCH v15 07/11] KVM: arm: page logging 2nd stage fault
- handling
-In-Reply-To: <20150109102458.GN21092@cbox>
-References: <1418628488-3696-1-git-send-email-m.smarduch@samsung.com>
- <1418868449-23397-1-git-send-email-m.smarduch@samsung.com>
- <20150107123844.GA21092@cbox> <54ADE0B6.1060703@samsung.com>
- <20150108104510.GI21092@cbox> <54AEB03E.8080305@samsung.com>
- <20150109102458.GN21092@cbox>
-Message-ID: <54B0ACCE.4040109@samsung.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 9 Jan 2015 20:39:05 -0800
+Subject: Linux 3.19-rc3
+In-Reply-To: <54B09CA3.1060501@redhat.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <54AE7D53.2020305@redhat.com> <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+Message-ID: <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2015 02:24 AM, Christoffer Dall wrote:
-> On Thu, Jan 08, 2015 at 08:28:46AM -0800, Mario Smarduch wrote:
->> On 01/08/2015 02:45 AM, Christoffer Dall wrote:
->>> On Wed, Jan 07, 2015 at 05:43:18PM -0800, Mario Smarduch wrote:
->>>> Hi Christoffer,
->>>>   before going through your comments, I discovered that
->>>> in 3.18.0-rc2 - a generic __get_user_pages_fast()
->>>> was implemented, now ARM picks this up. This causes
->>>> gfn_to_pfn_prot() to return meaningful 'writable'
->>>> value for a read fault, provided the region is writable.
->>>>
->>>> Prior to that the weak version returned 0 and 'writable'
->>>> had no optimization effect to set pte/pmd - RW on
->>>> a read fault.
->>>>
->>>> As a consequence dirty logging broke in 3.18, I was seeing
->> Correction on this, proper __get_user_pages_fast()
->> behavior exposed a bug in page logging code.
->>
->>>> weird but very intermittent issues. I just put in the
->>>> additional few lines to fix it, prevent pte RW (only R) on
->>>> read faults  while  logging writable region.
->>>>
->>>> On 01/07/2015 04:38 AM, Christoffer Dall wrote:
->>>>> On Wed, Dec 17, 2014 at 06:07:29PM -0800, Mario Smarduch wrote:
->>>>>> This patch is a followup to v15 patch series, with following changes:
->>>>>> - When clearing/dissolving a huge, PMD mark huge page range dirty, since
->>>>>>   the state of whole range is unknown. After the huge page is dissolved 
->>>>>>   dirty page logging is at page granularity.
->>>>>
->>>>> What is the sequence of events where you could have dirtied another page
->>>>> within the PMD range after the user initially requested dirty page
->>>>> logging?
->>>>
->>>> No there is none. My issue was the start point for tracking dirty pages
->>>> and that would be second call to dirty log read. Not first
->>>> call after initial write protect where any page in range can
->>>> be assumed dirty. I'll remove this, not sure if there would be any
->>>> use case to call dirty log only once.
->>>>
->>>
->>> Calling dirty log once can not give you anything meaningful, right?  You
->>> must assume all memory is 'dirty' at this point, no?
->>
->> There is the interval between KVM_MEM_LOG_DIRTY_PAGES and first
->> call to KVM_GET_DIRTY_LOG. Not sure of any use case, maybe enable
->> logging, wait a while do a dirty log read, disable logging.
->> Get an accumulated snapshot of dirty page activity.
->>
-> ok, so from the time the user calls KVM_MEM_LOG_DIRTY_PAGES, then any
-> fault on any huge page will dissolve that huge page into pages, and each
-> dirty page will be logged accordingly for the first call to
-> KVM_GET_DIRTY_LOG, right?  What am I missing here?
+On Fri, Jan 9, 2015 at 7:29 PM, Laszlo Ersek <lersek@redhat.com> wrote:
+>
+> I've bisected this issue to
 
-Yes that's correct, this may or may not be meaningful in itself.
-The original point was first time access to a huge page (on
-first or some later call) and do we consider whole range dirty.
-Keeping track at page granularity + original image provides
-everything needed to reconstruct the source so it should
-not matter.
+.. commit f045bbb9fa1b ("mmu_gather: fix over-eager
+tlb_flush_mmu_free() calling")
 
-I think I convoluted this issue a bit.
+Hmm. That commit literally just undoes something that commit
+fb7332a9fedf ("mmu_gather: move minimal range calculations into
+generic code") changed, and that was very wrong on x86.
 
-- Mario
-> 
-> -Christoffer
-> 
+But arm64 did have very different TLB flushing logic, so there may be
+some ARM64 reason that Will did that change originally, and then he
+forgot that reason when he ack'ed commit f045bbb9fa1b that undid it.
+
+Will?
+
+Before your mmu_gather range calculations commit, we used to have
+
+In tlb_flush_mmu_tlbonly():
+
+     tlb->need_flush = 0;
+
+and in tlb_flush_mmu():
+
+    if (!tlb->need_flush)
+                return;
+
+and your commit changed the rule to be
+
+    !tlb->need_flush == !tlb->end
+
+so in the current tree we have
+
+ In tlb_flush_mmu_tlbonly():
+
+    __tlb_reset_range(tlb);   // replaces "tlb->need_flush = 0;"
+
+and in tlb_flush_mmu():
+
+    if (!tlb->end)    // replaces if (!tlb->need_flush)
+        return;
+
+so we seem to do exactly the same as 3.18.
+
+But in your original patch, you moved that "if (!tlb->end) return;"
+check from tlb_flush_mmu() into tlb_flush_mmu_tlbonly(), and that
+apparently is actually needed on arm64. But *why*?
+
+Also, looking at that commit fb7332a9fedf, I note that some of the
+"need_flush" setting was simply removed. See for example
+arch/powerpc/mm/hugetlbpage.c, and also in mm/memory.c:
+tlb_remove_table(). Is there something non-obvious that sets tlb->end
+there?
+
+The other need_flush removals seem to all be paired with adding a
+__tlb_adjust_range() call, which will set ->end.
+
+I'm starting to suspect that you moved the need_flush test into
+tlbonly exactly because you removed that
+
+        tlb->need_flush = 1;
+
+from mm/memory.c: tlb_remove_table().
+
+x86 doesn't care, because x86 doesn't *use* tlb_remove_table(). But
+arm64 does, at least with the RCU freeing.
+
+Any ideas?
+
+                         Linus
