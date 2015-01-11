@@ -1,53 +1,45 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 11 Jan 2015 13:29:44 +0200
-Subject: [PATCH v2 4/8] irqchip: devicetree: document Conexant Digicolor
- irq binding
-In-Reply-To: <54AFEFEC.5000300@cogentembedded.com>
+Date: Sun, 11 Jan 2015 13:33:27 +0200
+Subject: [PATCH v2 0/8] ARM: Conexant Digicolor CX92755 SoC support
+In-Reply-To: <5966468.GiJYdzCvnt@wuerfel>
 References: <cover.1420744368.git.baruch@tkos.co.il>
- <3bdf8fa0bf971b4881024e72312c3c9d29298e79.1420744369.git.baruch@tkos.co.il>
- <54AFEFEC.5000300@cogentembedded.com>
-Message-ID: <20150111112944.GP2481@sapphire.tkos.co.il>
+ <5966468.GiJYdzCvnt@wuerfel>
+Message-ID: <20150111113327.GQ2481@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Arnd,
 
-On Fri, Jan 09, 2015 at 06:12:44PM +0300, Sergei Shtylyov wrote:
-> On 1/8/2015 10:40 PM, Baruch Siach wrote:
+On Thu, Jan 08, 2015 at 11:46:46PM +0100, Arnd Bergmann wrote:
+> On Thursday 08 January 2015 21:39:56 Baruch Siach wrote:
+> > This series adds initial support for the Conexant CX92755 SoC. The CX92755 is
+> > one of the Digicolor series of SoCs, all sharing many of the same peripherals.
+> > The code was tested on the CX92755 evaluation kit, AKA Equinox.
+> > 
+> > Uses attempting to try this code will most likely also want the UART/console
+> > driver available from https://patchwork.kernel.org/patch/5515861/.
+>  
+> Looks great overall now.
 > 
-> >Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> >---
-> >  .../bindings/interrupt-controller/digicolor-ic.txt   | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
+> I have just two more comments in one patch, and one general request:
 > 
-> >diff --git a/Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
-> >new file mode 100644
-> >index 000000000000..fdf9a4c59bf3
-> >--- /dev/null
-> >+++ b/Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
-> >@@ -0,0 +1,20 @@
-> >+Conexant Digicolor Interrupt Controller
-> >+
-> >+Required properties:
-> >+
-> >+- compatible : should be "cnxt,cx92755-ic"
-> >+- reg : Specifies base physical address and size of the MISC area, that is
-> >+  where the interrupt controller registers are located
-> >+- interrupt-controller : Identifies the node as an interrupt controller
-> >+- #interrupt-cells : Specifies the number of cells needed to encode an
-> >+  interrupt source. The value shall be 1.
-> >+
-> >+Example:
-> >+
-> >+	intc: intc at f0000000 {
+> Please add a patch description for every patch. The text above would
+> be a good start for the first patch, but it would be lost in the git
+> history if it's only in the cover letter.
 > 
->    The node name should be "interrupt-controller at f0000000", according to the
-> ePAPR standard, section 2.2.2.
+> other than that, feel free to add my
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I'll change that in my next submission.
+Thanks.
 
-Thanks,
+> Once there are no more review comments, please submit the first three
+> patches to arm at kernel.org, and send the other patches as separate
+> series to the respective maintainers for irqchip and clocksource.
+
+What about the last patch in this series (ARM: devicetree: document supported 
+Conexant Digicolor SoC)? What tree should it go through.
+
 baruch
 
 -- 
