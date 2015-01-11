@@ -1,294 +1,160 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 11 Jan 2015 21:12:57 +0100
-Subject: [PATCH v3 3/4] arm64: dts: Add mediatek MT8173 SoC and evaluation
- board dts and Makefile
-In-Reply-To: <1419582417-4448-4-git-send-email-eddie.huang@mediatek.com>
-References: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
- <1419582417-4448-4-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBe+=uTVFKCdpr7an-7jOZdQ91ERu0ObjfiW9fKv1CO1oAg@mail.gmail.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Sun, 11 Jan 2015 13:41:28 -0700
+Subject: [RFC v2] ACPI on arm64 TODO List, 11 Jan 2015
+Message-ID: <54B2DFF8.4020301@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-12-26 9:26 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
-> Add device tree support for MT8173 SoC and evaluation board based on it.
->
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  arch/arm64/boot/dts/Makefile                |   1 +
->  arch/arm64/boot/dts/mediatek/Makefile       |   5 +
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  34 ++++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 159 ++++++++++++++++++++++++++++
->  4 files changed, 199 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
->
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index 3b8d427..89124e4 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -2,6 +2,7 @@ dts-dirs += amd
->  dts-dirs += apm
->  dts-dirs += arm
->  dts-dirs += cavium
-> +dts-dirs += mediatek
->
->  always         := $(dtb-y)
->  subdir-y       := $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> new file mode 100644
-> index 0000000..3ce2462
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> +
-> +always         := $(dtb-y)
-> +subdir-y       := $(dts-dirs)
-> +clean-files    := *.dtb
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> new file mode 100644
-> index 0000000..b8b2621
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -0,0 +1,34 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Eddie Huang <eddie.huang@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt8173.dtsi"
-> +
-> +/ {
-> +       model = "mediatek,mt8173-evb";
-> +
-> +       aliases {
-> +               serial0 = &uart0;
-> +               serial1 = &uart1;
-> +               serial2 = &uart2;
-> +               serial3 = &uart3;
-> +       };
-> +
-> +       memory at 40000000 {
-> +               device_type = "memory";
-> +               reg = <0 0x40000000 0 0x80000000>;
-> +       };
-> +
-> +       chosen { };
-> +};
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> new file mode 100644
-> index 0000000..a4ea0b3
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -0,0 +1,159 @@
-> +/*
-> + * Copyright (c) 2014 MediaTek Inc.
-> + * Author: Eddie Huang <eddie.huang@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +       compatible = "mediatek,mt8173";
-> +       interrupt-parent = <&sysirq>;
-> +       #address-cells = <2>;
-> +       #size-cells = <2>;
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu-map {
-> +                       cluster0 {
-> +                               core0 {
-> +                                       cpu = <&cpu0>;
-> +                               };
-> +                               core1 {
-> +                                       cpu = <&cpu1>;
-> +                               };
-> +                       };
-> +
-> +                       cluster1 {
-> +                               core0 {
-> +                                       cpu = <&cpu2>;
-> +                               };
-> +                               core1 {
-> +                                       cpu = <&cpu3>;
-> +                               };
-> +                       };
-> +               };
-> +
-> +               cpu0: cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       reg = <0x000>;
-> +               };
-> +
-> +               cpu1: cpu at 1 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       reg = <0x001>;
-> +                       enable-method = "psci";
-> +               };
-> +
-> +               cpu2: cpu at 100 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a57";
-> +                       reg = <0x100>;
-> +                       enable-method = "psci";
-> +               };
-> +
-> +               cpu3: cpu at 101 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a57";
-> +                       reg = <0x101>;
-> +                       enable-method = "psci";
-> +               };
-> +       };
-> +
-> +       psci {
-> +               compatible = "arm,psci";
-> +               method = "smc";
-> +               cpu_suspend   = <0x84000001>;
-> +               cpu_off       = <0x84000002>;
-> +               cpu_on        = <0x84000003>;
-> +       };
-> +
-> +       uart_clk: dummy26m {
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <26000000>;
-> +               #clock-cells = <0>;
-> +       };
-> +
-> +       timer {
-> +               compatible = "arm,armv8-timer";
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <GIC_PPI 13
-> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 14
-> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 11
-> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 10
-> +                       (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +       };
-> +
-> +       soc {
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               compatible = "simple-bus";
-> +               ranges;
-> +
-> +               sysirq: intpol-controller at 10200620 {
-> +                       compatible = "mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq";
+Update for 11 Jan 2015:
 
-Please update the dts bindings for sysirq and add mediatek,mt8173-sysirq.
-Also check that the lines in this patch does not exceed the 80 character limit.
+Back in September 2014, a meeting was held at Linaro Connect where we
+discussed what issues remained before the arm64 ACPI core patches could
+be merged into the kernel, creating the TODO list below.  I should have
+published this list sooner; I got focused on trying to resolve some of
+the issues instead.
 
-> +                       interrupt-controller;
-> +                       #interrupt-cells = <3>;
-> +                       interrupt-parent = <&gic>;
-> +                       reg = <0 0x10200620 0 0x20>;
-> +               };
-> +
-> +               gic: interrupt-controller at 10220000 {
-> +                       compatible = "arm,gic-400";
-> +                       #interrupt-cells = <3>;
-> +                       interrupt-parent = <&gic>;
-> +                       interrupt-controller;
-> +                       reg = <0 0x10221000 0 0x1000>,
-> +                             <0 0x10222000 0 0x2000>,
-> +                             <0 0x10224000 0 0x2000>,
-> +                             <0 0x10226000 0 0x2000>;
-> +                       interrupts = <GIC_PPI 9
-> +                               (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +               };
-> +
-> +               uart0: serial at 11002000 {
-> +                       compatible = "mediatek,mt8173-uart","mediatek,mt6577-uart";
+We have made some progress on all of these items.  But, I want to make
+sure we haven't missed something.  Since this list was compiled by only
+the people in the room at Connect, it is probable we have.  I, for one,
+do not yet claim omniscience.
 
-Please update the dts binding documentation.
+So, I want to ask the ARM and ACPI communities:
 
-> +                       reg = <0 0x11002000 0 0x400>;
-> +                       interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
+  -- Is this list correct?
 
-Please disable the uart ports in the dtsi and enable the one used by
-the board in the dts.
-See [0] and [1] on how to do this.
+  -- Is this list complete?
 
-Apart from that, the series looks fine to me.
+Below is what we currently know about; very brief notes on status are
+included.  The TL;DR versions of the TODO list and the current status
+can be found at:
 
-Thanks,
-Matthias
+   https://wiki.linaro.org/LEG/Engineering/Kernel/ACPI/CoreUpstreamNotes
 
-[0] https://github.com/mbgg/linux-mediatek/commit/0714947369cdb2b9b8cc24aa07264d4b61ea4fd9
-[1] https://github.com/mbgg/linux-mediatek/commit/ac00aa4dcd085e4cf01761095ec1e2a141f86f38
+and I'll do my best to kept that up to date.
+
+Thanks.  Any and all feedback is greatly appreciated.
 
 
-> +
-> +               uart1: serial at 11003000 {
-> +                       compatible = "mediatek,mt8173-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11003000 0 0x400>;
-> +                       interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart2: serial at 11004000 {
-> +                       compatible = "mediatek,mt8173-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11004000 0 0x400>;
-> +                       interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +
-> +               uart3: serial at 11005000 {
-> +                       compatible = "mediatek,mt8173-uart","mediatek,mt6577-uart";
-> +                       reg = <0 0x11005000 0 0x400>;
-> +                       interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&uart_clk>;
-> +               };
-> +       };
-> +
-> +};
-> +
-> --
-> 1.8.1.1
->
-> ************* Email Confidentiality Notice ********************
-> The information contained in this e-mail message (including any
-> attachments) may be confidential, proprietary, privileged, or otherwise
-> exempt from disclosure under applicable laws. It is intended to be
-> conveyed only to the designated recipient(s). Any use, dissemination,
-> distribution, printing, retaining or copying of this e-mail (including its
-> attachments) by unintended recipient(s) is strictly prohibited and may
-> be unlawful. If you are not an intended recipient of this e-mail, or believe
-> that you have received this e-mail in error, please notify the sender
-> immediately (by replying to this e-mail), delete any and all copies of
-> this e-mail (including any attachments) from your system, and do not
-> disclose the content of this e-mail to any other person. Thank you!
+Changes since 14 Dec 2014:
+-- v6 of ACPI core patches posted
+-- Good progress in _OSI investigation, started preparing RFC for the
+   mailing lists
+-- Precise definition of kernel behavior when defaulting to DT and/or
+   using acpi=force being discussed again
+-- FWTS now runs and results posted after each merge of leg-kernel
+   (includes ACPI) with Linus' tree (i.e., each -rc).
+-- ACPI on arm64 kernel document updated, under extensive discussion on
+   the lists; starting coordination with SBBR content.
+-- Firmware Summit: planned for 26 Mar 2015, San Jose, CA, at the ARM
+   office; mailing list (with archives) now up and running; updated
+   agenda being prepared
+-- Merged items "Demonstrate the ACPI core patches work", and "Platform
+   support patches need review" because of their similarity.
+-- Further discussions have occurred regarding "Why ACPI?"; Grant has
+   a blog post explaining this better, and we will add that to kernel
+   document
+-- Further discussion on the usage of _DSD has occurred, but much more
+   is needed
 
 
+TODO List for ACPI on arm64:
+============================
+1. Define how Aarch64 OS identifies itself to firmware
+   * Problem:
+     * _OSI method is demonstrably unreliable. On x86, Linux claims to
+       be Windows.
+     * Proposal to use _OSC method as replacement is complicated and
+       creates an explosion of combinations
+   * Solution:
+     * Draft and propose OS identification rules to ABST and ASWG for
+       inclusion in ACPI spec.
+     * Draft and propose recommended practice for current ACPI 5.1 spec
+       platforms.
+   * Status: Good progress in _OSI investigation, started preparing RFC
+     for the mailing lists; general agreement to deprecate _OSI
+     completely
+
+2. Linux must choose DT booting by default when offered both ACPI and
+   DT on arm64
+   * Status: DONE, but being revisited for possible algorithmic change
+
+3. Linux UEFI/ACPI testing tools must be made available
+   * Problem:
+     * Hardware/Firmware vendors do not have tools to test Linux
+       compatibility.
+     * Common problems go undetected if not tested for.
+   * Solution:
+     * Port FWTS tool and LuvOS distribution to AArch64
+     * Make LuvOS images readily available
+     * Require hardware vendors to actively test against old and new
+       kernels.
+   * Status:
+     * LuvOS and FWTS ported to arm64; patches in mainline; additional
+       test cases being written.
+     * CI loop set up to run FWTS on Foundation model for each -rc
+       merge of Linus' tree into leg-kernel.
+     * AMD Seattle results pending updated kernel patches.
+     * LuvOS details at https://wiki.linaro.org/LEG/Engineering/luvOS
+
+4. Set clear expectations for those providing ACPI for use with Linux
+   * Problem:
+     * Hardware/Firmware vendors can and will create ACPI tables that
+       cannot be used by Linux without some guidance
+     * Kernel developers cannot determine whether the kernel or
+       firmware is broken without knowing what the firmware should do
+   * Solution: document the expectations, and iterate as needed.
+     Enforce when we must.
+   * Status: kernel text updated and under heavy discussion, AMD has
+     made their guidance document available, and starting to coordinate
+     content with SBBR; firmware summit date and location seems firm,
+     agenda being updated.
+
+5. Platform support patches need verification and review
+   * Problem: the core Aarch64 patches have been reviewed and are in
+     good shape, but there is not yet a good example of server platform
+     support patches that use them.
+   * Solution: post *good* patches for multiple ACPI platforms,
+     demonstrating that both the core patches work, and that the use of
+     the ACPI core makes sense.
+   * Status:
+     * ACPI core works on at least the Foundation model, Juno, APM
+       Mustang, and AMD Seattle
+     * FWTS results for the Foundation model have been posted
+     * First version for AMD Seattle has been posted to the public
+       linaro-acpi mailing list for initial review, refined versions to
+       be posted to broader lists after a few iterations for basic
+       cleanup
+
+6. How does the kernel handle_DSD usage?
+   * Problem:
+     * _DSD defines key-value properties in the DT style. How do we
+       ensure _DSD bindings are well defined?
+     * How do we ensure DT and _DSD bindings remain consistent with
+       each other?
+   * Solution: public documentation for all bindings, and a process for
+     defining them
+   * Status: proposal to require patch authors to point at public
+     binding documentation; kernel Documentation/devicetree/bindings
+     remains the default if no other location exists; UEFI forum has
+     set up a binding repository. Discussion continues.
+
+7. Why is ACPI required?
+   * Problem:
+     * arm64 maintainers still haven't been convinced that ACPI is
+       necessary.
+     * Why do hardware and OS vendors say ACPI is required?
+   * Solution: discussions between those who want ACPI and arm64
+     maintainers
+   * Status: Grant has provided a blog post at
+     http://www.secretlab.ca/archives/151.  Al will roll that content
+     into the kernel documentation, also.
 
 -- 
-motzblog.wordpress.com
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
