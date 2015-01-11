@@ -1,18 +1,20 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 11 Jan 2015 19:08:05 +0100
-Subject: [PATCH 3/7] arm64: remove ESR_EL1_* macros
-In-Reply-To: <1420632260-8798-4-git-send-email-mark.rutland@arm.com>
+Date: Sun, 11 Jan 2015 19:22:21 +0100
+Subject: [PATCH 4/7] arm64: decode ESR_ELx.EC when reporting exceptions
+In-Reply-To: <1420632260-8798-5-git-send-email-mark.rutland@arm.com>
 References: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
- <1420632260-8798-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150111180805.GJ21444@cbox>
+ <1420632260-8798-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150111182221.GK21444@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 07, 2015 at 12:04:16PM +0000, Mark Rutland wrote:
-> Now that all users have been moved over to the common ESR_ELx_* macros,
-> remove the redundant ESR_EL1 macros.
-> 
-> There should be no functional change as a result of this patch.
+On Wed, Jan 07, 2015 at 12:04:17PM +0000, Mark Rutland wrote:
+> To aid the developer when something triggers an unexpected exception,
+> decode the ESR_ELx.EC field when logging an ESR_ELx value. This doesn't
+> tell the developer the specifics of the exception encoded in the
+> remaining IL and ISS bits, but it can be helpful to distinguish between
+> exception classes (e.g. SError and a data abort) without having to
+> manually decode the field, which can be tiresome.
 > 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -20,8 +22,103 @@ On Wed, Jan 07, 2015 at 12:04:16PM +0000, Mark Rutland wrote:
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Cc: Peter Maydell <peter.maydell@linaro.org>
 > Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/esr.h |  6 ++++++
+>  arch/arm64/kernel/traps.c    | 50 ++++++++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 54 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+> index 19492e1..7669a7a 100644
+> --- a/arch/arm64/include/asm/esr.h
+> +++ b/arch/arm64/include/asm/esr.h
+> @@ -96,4 +96,10 @@
+>  #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
+>  #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+>  
+> +#ifndef __ASSEMBLY__
+> +#include <asm/types.h>
+> +
+> +const char *esr_get_class_string(u32 esr);
+> +#endif /* __ASSEMBLY */
+> +
+>  #endif /* __ASM_ESR_H */
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 0a801e3..1ef2940 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -33,6 +33,7 @@
+>  
+>  #include <asm/atomic.h>
+>  #include <asm/debug-monitors.h>
+> +#include <asm/esr.h>
+>  #include <asm/traps.h>
+>  #include <asm/stacktrace.h>
+>  #include <asm/exception.h>
+> @@ -373,6 +374,51 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+>  	return sys_ni_syscall();
+>  }
+>  
+> +static const char *esr_class_str[] = {
+> +	[0 ... ESR_ELx_EC_MAX]		= "UNRECOGNIZED EC",
+> +	[ESR_ELx_EC_UNKNOWN]		= "Unknown/Uncategorized",
+> +	[ESR_ELx_EC_WFx]		= "WFI/WFE",
+> +	[ESR_ELx_EC_CP15_32]		= "CP15 MCR/MRC",
+> +	[ESR_ELx_EC_CP15_64]		= "CP15 MCRR/MRRC",
+> +	[ESR_ELx_EC_CP14_MR]		= "CP14 MCR/MRC",
+> +	[ESR_ELx_EC_CP14_LS]		= "CP14 LDC/STC",
+> +	[ESR_ELx_EC_FP_ASIMD]		= "ASIMD",
+> +	[ESR_ELx_EC_CP10_ID]		= "CP10 MRC/VMRS",
+> +	[ESR_ELx_EC_CP14_64]		= "CP14 MCRR/MRRC",
+> +	[ESR_ELx_EC_ILL]		= "PSTATE.IL",
+> +	[ESR_ELx_EC_SVC32]		= "SVC (AArch32)",
+> +	[ESR_ELx_EC_HVC32]		= "HVC (AArch32)",
+> +	[ESR_ELx_EC_SMC32]		= "SMC (AArch32)",
+> +	[ESR_ELx_EC_SVC64]		= "SVC (AArch64)",
+> +	[ESR_ELx_EC_HVC64]		= "HVC (AArch64)",
+> +	[ESR_ELx_EC_SMC64]		= "SMC (AArch64)",
+> +	[ESR_ELx_EC_SYS64]		= "MSR/MRS (AArch64)",
+> +	[ESR_ELx_EC_IMP_DEF]		= "EL3 IMP DEF",
+> +	[ESR_ELx_EC_IABT_LOW]		= "IABT (lower EL)",
+> +	[ESR_ELx_EC_IABT_CUR]		= "IABT (current EL)",
+> +	[ESR_ELx_EC_PC_ALIGN]		= "PC Alignment",
+> +	[ESR_ELx_EC_DABT_LOW]		= "DABT (lower EL)",
+> +	[ESR_ELx_EC_DABT_CUR]		= "DABT (current EL)",
+> +	[ESR_ELx_EC_SP_ALIGN]		= "SP Alignment",
+> +	[ESR_ELx_EC_FP_EXC32]		= "FP (AArch32)",
+> +	[ESR_ELx_EC_FP_EXC64]		= "FP (AArch64)",
+> +	[ESR_ELx_EC_SERROR]		= "SError",
+> +	[ESR_ELx_EC_BREAKPT_LOW]	= "Breakpoint (lower EL)",
+> +	[ESR_ELx_EC_BREAKPT_CUR]	= "Breakpoint (current EL)",
+> +	[ESR_ELx_EC_SOFTSTP_LOW]	= "Software Step (lower EL)",
+> +	[ESR_ELx_EC_SOFTSTP_CUR]	= "Software Step (current EL)",
+> +	[ESR_ELx_EC_WATCHPT_LOW]	= "Watchpoint (lower EL)",
+> +	[ESR_ELx_EC_WATCHPT_CUR]	= "Watchpoint (current EL)",
+> +	[ESR_ELx_EC_BKPT32]		= "BKPT (AArch32)",
+> +	[ESR_ELx_EC_VECTOR32]		= "Vector catch (AArch32)",
+> +	[ESR_ELx_EC_BRK64]		= "BRK (AArch64)",
+> +};
+> +
+> +const char *esr_get_class_string(u32 esr)
+> +{
+> +	return esr_class_str[esr >> ESR_ELx_EC_SHIFT];
+> +}
+> +
+>  /*
+>   * bad_mode handles the impossible case in the exception vector.
+>   */
+> @@ -382,8 +428,8 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+>  	void __user *pc = (void __user *)instruction_pointer(regs);
+>  	console_verbose();
+>  
+> -	pr_crit("Bad mode in %s handler detected, code 0x%08x\n",
+> -		handler[reason], esr);
+> +	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
+> +		handler[reason], esr, esr_get_class_string(esr));
+>  	__show_regs(regs);
+>  
+>  	info.si_signo = SIGILL;
+> -- 
+> 1.9.1
+> 
 
-FYI: This breaks bisectability with KVM, so we should probably move the
-existing KVM references to the common definitions as part of this patch?
-
--Christoffer
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
