@@ -1,37 +1,18 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Sun, 11 Jan 2015 13:10:12 +0100
-Subject: [PATCH] avr32: remove fake at91 cpu identification
-In-Reply-To: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150111121012.GB4050@samfundet.no>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 11 Jan 2015 13:40:01 +0100
+Subject: [PATCH v3 1/2] KVM: arm/arm64: vgic: vgic_init returns -ENODEV
+ when no online vcpu
+In-Reply-To: <1418665413-31521-2-git-send-email-eric.auger@linaro.org>
+References: <1418665413-31521-1-git-send-email-eric.auger@linaro.org>
+ <1418665413-31521-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <20150111124001.GX21092@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Sun 11 Jan 2015 03:00:16 +0100 or thereabout, Alexandre Belloni wrote:
-> cpu_is_at91* are not used in any driver outside mach-at91. Remove those useless
-> definitions.
-
-Great, thank you for cleaning.
-
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->
-
-Acked-by: Hans-Chrisitan Egtvedt <egtvedt@samfundet.no>
-
-> ---
+On Mon, Dec 15, 2014 at 06:43:32PM +0100, Eric Auger wrote:
+> To be more explicit on vgic initialization failure, -ENODEV is
+> returned by vgic_init when no online vcpus can be found at init.
 > 
-> Hans-Christian,
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 > 
-> If you want, I guess that one could go through the at91 tree. Unless you have
-> more material and you want to do a pull request for 3.20.
-
-I have another patch in the pipe wiring up syscalls for AVR32, so I'll push
-this through my tree for 3.20.
-
->  arch/avr32/mach-at32ap/include/mach/cpu.h | 26 +-------------------------
->  1 file changed, 1 insertion(+), 25 deletions(-)
-
-<snipp diff>
-
--- 
-HcE
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
