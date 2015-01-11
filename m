@@ -1,42 +1,39 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 11 Jan 2015 14:10:09 +0100
-Subject: [GIT PULL 0/2] KVM/ARM Fixes for 3.19
-Message-ID: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
+Date: Sun, 11 Jan 2015 14:10:10 +0100
+Subject: [GIT PULL 1/2] arm64: KVM: Fix TLB invalidation by IPA/VMID
+In-Reply-To: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
+References: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1420981811-18731-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-The following changes since commit b1940cd21c0f4abdce101253e860feff547291b0:
+It took about two years for someone to notice that the IPA passed
+to TLBI IPAS2E1IS must be shifted by 12 bits. Clearly our reviewing
+is not as good as it should be...
 
-  Linux 3.19-rc3 (2015-01-05 17:05:20 -0800)
+Paper bag time for me.
 
-are available in the git repository at:
+Reported-by: Mario Smarduch <m.smarduch@samsung.com>
+Tested-by: Mario Smarduch <m.smarduch@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/hyp.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-3.19
-
-for you to fetch changes up to b5b8ddba844c6b6c5b96c27b284d9ed05a16fa13:
-
-  arm64: KVM: Fix HCR setting for 32bit guests (2015-01-11 13:54:51 +0100)
-
-(Note that I got an extra merge commit when merging kvm/master into
-kvmarm/master, which I think is because Linus applied the set of fixes
-from kvmarm/master directly from Marc's patches. Let me know if you need
-me to mangle this differently somehow.)
-
-Thanks,
--Christoffer
-
-----------------------------------------------------------------
-Fixes for KVM/ARM for 3.19 addressing TLB invalidation issues and 32-bit guest
-regression.
-
-----------------------------------------------------------------
-Marc Zyngier (2):
-      arm64: KVM: Fix TLB invalidation by IPA/VMID
-      arm64: KVM: Fix HCR setting for 32bit guests
-
- arch/arm64/include/asm/kvm_emulate.h | 2 ++
- arch/arm64/kvm/hyp.S                 | 1 +
- arch/arm64/kvm/reset.c               | 1 -
- 3 files changed, 3 insertions(+), 1 deletion(-)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index fbe909f..c3ca89c 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -1014,6 +1014,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	 * Instead, we invalidate Stage-2 for this IPA, and the
+ 	 * whole of Stage-1. Weep...
+ 	 */
++	lsr	x1, x1, #12
+ 	tlbi	ipas2e1is, x1
+ 	/*
+ 	 * We have to ensure completion of the invalidation at Stage-2,
+-- 
+2.1.2.330.g565301e.dirty
