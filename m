@@ -1,25 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 11 Jan 2015 15:58:52 +0100
-Subject: [PATCH v6 05/20] arm/arm64: KVM: introduce per-VM ops
-In-Reply-To: <1420804478-17354-6-git-send-email-andre.przywara@arm.com>
-References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
- <1420804478-17354-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150111145852.GB21444@cbox>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 11 Jan 2015 23:01:48 +0800
+Subject: [GIT PULL] CSR atlas7 debug ports for 3.20
+Message-ID: <CAGsJ_4z5h77BJu5D5nj3zSmiO_WUdTOb1nRy5NCykueSSDDkrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 11:54:23AM +0000, Andre Przywara wrote:
-> Currently we only have one virtual GIC model supported, so all guests
-> use the same emulation code. With the addition of another model we
-> end up with different guests using potentially different vGIC models,
-> so we have to split up some functions to be per VM.
-> Introduce a vgic_vm_ops struct to hold function pointers for those
-> functions that are different and provide the necessary code to
-> initialize them.
-> Also split up the vgic_init() function to separate out VGIC model
-> specific functionality into a separate function, which will later be
-> different for a GICv3 model.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Hi Arnd, Kevin, Olof,
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
+
+  Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+
+for you to fetch changes up to e5bd2e9be6e5a8aecb79913f99a91f143f2b5191:
+
+  ARM: sirf: add two debug ports for CSRatlas7 SoC (2015-01-11 22:53:34 +0800)
+
+----------------------------------------------------------------
+add debug ports for CSR atlas7
+
+- drop marco's debug port
+- add debug ports for atlas7
+- move to use DEBUG_UART_PHYS/VIRT for all CSR ports
+
+----------------------------------------------------------------
+Barry Song (1):
+      ARM: sirf: drop MARCO low-level debug port
+
+Guo Zeng (1):
+      ARM: sirf: add two debug ports for CSRatlas7 SoC
+
+ arch/arm/Kconfig.debug        |   37 ++++++++++++++++++++++++++++++-------
+ arch/arm/include/debug/sirf.S |   30 +++++++++++++-----------------
+ arch/arm/mach-prima2/lluart.c |    2 --
+ 3 files changed, 43 insertions(+), 26 deletions(-)
+
+-barry
