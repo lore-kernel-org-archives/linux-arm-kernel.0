@@ -1,57 +1,220 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Jan 2015 17:14:00 -0800
-Subject: [PATCH v2 3/8] watchdog: at91rm9200: use the regmap from mfd
-In-Reply-To: <20150110184146.GH2447@piout.net>
-References: <1420797094-9444-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1420797094-9444-4-git-send-email-alexandre.belloni@free-electrons.com>
- <54B074B9.2090704@roeck-us.net> <20150110184146.GH2447@piout.net>
-Message-ID: <54B1CE58.4040407@roeck-us.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 11 Jan 2015 09:59:30 +0800
+Subject: [PATCH v2 1/9] Input: sun4i-ts: Add thermal zone sensor support
+In-Reply-To: <CAGb2v66xpzZ-tXcKgirk9US9FGBeoZidDoQ3imymMTL_Tu9PWQ@mail.gmail.com>
+References: <1420798676-22856-1-git-send-email-wens@csie.org>
+ <1420798676-22856-2-git-send-email-wens@csie.org>
+ <20150109172318.GA39037@dtor-ws>
+ <CAGb2v66xpzZ-tXcKgirk9US9FGBeoZidDoQ3imymMTL_Tu9PWQ@mail.gmail.com>
+Message-ID: <CAGb2v673E3g0xifb_HKFmz1ELscQ5kZ5vcQnnYz+awRzjyKH5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2015 10:41 AM, Alexandre Belloni wrote:
-> On 09/01/2015 at 16:39:21 -0800, Guenter Roeck wrote :
->> On 01/09/2015 01:51 AM, Alexandre Belloni wrote:
->>>   /* ......................................................................... */
->>> @@ -204,6 +201,7 @@ static struct miscdevice at91wdt_miscdev = {
->>>   static int at91wdt_probe(struct platform_device *pdev)
->>>   {
->>>   	int res;
->>> +	regmap_st = dev_get_drvdata(pdev->dev.parent);
+On Sat, Jan 10, 2015 at 2:28 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sat, Jan 10, 2015 at 1:23 AM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+>> On Fri, Jan 09, 2015 at 06:17:48PM +0800, Chen-Yu Tsai wrote:
+>>> The touchscreen controller has a temperature sensor embedded in the SoC,
+>>> which already has hwmon support in the driver.
 >>>
+>>> Add DT thermal zone support so we can use it with cpufreq for thermal
+>>> throttling.
+>>>
+>>> This also adds a comment stating that we do not know the actual formula
+>>> for calculating the temperature.
+>>>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
 >>
->> Is it guaranteed that parent is never NULL, and that the parent's
->> drvdata is always set ?
+>>
+>>   CC [M]  drivers/input/touchscreen/sun4i-ts.o
+>> drivers/input/touchscreen/sun4i-ts.c:208:15: error: variable
+>> ?sun4i_ts_tz_ops? has initializer but incomplete type
+>>  static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
+>>                ^
+>> drivers/input/touchscreen/sun4i-ts.c:209:2: error: unknown field
+>> ?get_temp? specified in initializer
+>>   .get_temp = get_temp,
+>>   ^
+>> drivers/input/touchscreen/sun4i-ts.c:209:2: warning: excess elements in
+>> struct initializer [enabled by default]
+>> drivers/input/touchscreen/sun4i-ts.c:209:2: warning: (near
+>> initialization for ?sun4i_ts_tz_ops?) [enabled by default]
+>> drivers/input/touchscreen/sun4i-ts.c: In function ?sun4i_ts_probe?:
+>> drivers/input/touchscreen/sun4i-ts.c:331:8: warning: passing argument 4
+>> of ?thermal_zone_of_sensor_register? from incompatible pointer type
+>> [enabled by default]
+>>         &sun4i_ts_tz_ops);
+>>         ^
+>> In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
+>> include/linux/thermal.h:302:1: note: expected ?int (*)(void *, long int
+>> *)? but argument is of type ?struct thermal_zone_of_device_ops *?
+>>  thermal_zone_of_sensor_register(struct device *dev, int id,
+>>  ^
+>> drivers/input/touchscreen/sun4i-ts.c:331:8: error: too few arguments to
+>> function ?thermal_zone_of_sensor_register?
+>>         &sun4i_ts_tz_ops);
+>>         ^
+>> In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
+>> include/linux/thermal.h:302:1: note: declared here
+>>  thermal_zone_of_sensor_register(struct device *dev, int id,
+>>  ^
+>> make[1]: *** [drivers/input/touchscreen/sun4i-ts.o] Error 1
+>> make: *** [drivers/input/touchscreen/sun4i-ts.o] Error 2
 >>
 >
-> The only way to probe the driver left is to use platform_data. It is
-> done from the MFD driver. If you prefer, I can test for NULL here and
-> return.
+> struct thermal_zone_of_device_ops was introduced in 3.19-rc1 in
 >
-
-I am fine if you are sure about that. The problem though is still the
-check for double instantiation. Either the driver can not be instantiated
-multiple times, and the check is no longer necessary, or it can, meaning
-there must be some other means to instantiate it besides through the
-mfd driver. And in that case you don't necessarily know if platform_data
-is set.
-
->> Also, it seems that regmap_st will be overwritten if the device
->> is already open (see code below). That may not be a good idea.
+>     184a4bf623fa thermal: of: Extend current of-thermal.c code to
+> allow setting emulated temp
+>
+>>>
+>>> changes since v1:
+>>>
+>>>     - clean up thermal zone sensor when input device register fails
+>>>     - unconditionally unregister thermal zone sensor on removal.
+>>>       the unregister function checks the pointers passed in.
+>>>     - add comment explaining the lack of documents for the temperature
+>>>       calculation formula
+>>>
+>>> ---
+>>>  .../bindings/input/touchscreen/sun4i.txt           |  2 +
+>>>  drivers/input/touchscreen/sun4i-ts.c               | 47 ++++++++++++++++++++++
+>>>  2 files changed, 49 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>>> index aef57791f40b..a8405bab6c00 100644
+>>> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>>> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>>> @@ -5,6 +5,7 @@ Required properties:
+>>>   - compatible: "allwinner,sun4i-a10-ts"
+>>>   - reg: mmio address range of the chip
+>>>   - interrupts: interrupt to which the chip is connected
+>>> + - #thermal-sensor-cells: shall be 0
+>>>
+>>>  Optional properties:
+>>>   - allwinner,ts-attached: boolean indicating that an actual touchscreen is
+>>> @@ -17,4 +18,5 @@ Example:
+>>>               reg = <0x01c25000 0x100>;
+>>>               interrupts = <29>;
+>>>               allwinner,ts-attached;
+>>> +             #thermal-sensor-cells = <0>;
+>>>       };
+>>> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+>>> index 28a06749ae42..aac49db0b09d 100644
+>>> --- a/drivers/input/touchscreen/sun4i-ts.c
+>>> +++ b/drivers/input/touchscreen/sun4i-ts.c
+>>> @@ -34,6 +34,7 @@
+>>>
+>>>  #include <linux/err.h>
+>>>  #include <linux/hwmon.h>
+>>> +#include <linux/thermal.h>
+>>>  #include <linux/init.h>
+>>>  #include <linux/input.h>
+>>>  #include <linux/interrupt.h>
+>>> @@ -107,6 +108,7 @@
+>>>  struct sun4i_ts_data {
+>>>       struct device *dev;
+>>>       struct input_dev *input;
+>>> +     struct thermal_zone_device *tz;
+>>>       void __iomem *base;
+>>>       unsigned int irq;
+>>>       bool ignore_fifo_data;
+>>> @@ -180,6 +182,33 @@ static void sun4i_ts_close(struct input_dev *dev)
+>>>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>>>  }
+>>>
+>>> +static int get_temp(void *data, long *temp)
+>>> +{
+>>> +     struct sun4i_ts_data *ts = data;
+>>> +
+>>> +     /* No temp_data until the first irq */
+>>> +     if (ts->temp_data == -1)
+>>> +             return -EAGAIN;
+>>> +
+>>> +     /*
+>>> +      * The user manuals do not contain the formula for calculating
+>>> +      * the temperature. The formula used here is from the AXP209,
+>>> +      * which is designed by X-Powers, an affiliate of Allwinner:
+>>> +      *
+>>> +      *     temperature = -144.7 + (value * 0.1)
+>>> +      *
+>>> +      * This should be replaced with the correct one if such information
+>>> +      * becomes available.
+>>> +      */
+>>> +     *temp = (ts->temp_data - 1447) * 100;
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
+>>> +     .get_temp = get_temp,
+>>> +};
+>>> +
+>>>  static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+>>>                        char *buf)
+>>>  {
+>>> @@ -189,6 +218,16 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
+>>>       if (ts->temp_data == -1)
+>>>               return -EAGAIN;
+>>>
+>>> +     /*
+>>> +      * The user manuals do not contain the formula for calculating
+>>> +      * the temperature. The formula used here is from the AXP209,
+>>> +      * which is designed by X-Powers, an affiliate of Allwinner:
+>>> +      *
+>>> +      *     temperature = -144.7 + (value * 0.1)
+>>> +      *
+>>> +      * This should be replaced with the correct one if such information
+>>> +      * becomes available.
+>>> +      */
+>>>       return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
 >>
+>> Why duplicate it here, instead of doing:
+>>
+>> static int sun4i_get_temp(struct sun4i_ts_data *ts, int *temp)
+>> {
+>>         if (ts->temp_data == -1)
+>>                 return -EAGAIN;
+>>
+>>         /* comment */
+>>         *temp = (ts->temp_data - 1447) * 100);
+>>
+>>         return 0;
+>> }
+>>
+>> static int sun4i_tz_get_temp(void *data, long *temp)
+>> {
+>>         return sun4i_get_temp(data, temp);
+>> }
+>>
+>> static ssize_t sun4i_show_temp(...)
+>> {
+>>         error = sun4i_get_temp(ts, &temp);
+>>         if (error)
+>>                 return error;
+>>
+>>         return sprintf(buf, "%d\n", temp);
+>> }
 >
-> I'm not sure what you meani, pdev->dev.parent and at91wdt_miscdev.parent
-> are not the same thing. I didn't touch the code below but I believe
-> there is no reason to pass in the probe twice and return -EBUSY.
+> I suppose that would be better, especially after I added the large comment.
 >
+>> Also, thermal core seems to allow creating hwmon devices for thermal
+>> zones, can we use this feature?
+>
+> For thermal sensors that also have hwmon devices registered, that step is
+> skipped.
+>
+> I sort of like having separate hwmon bits, just for a nicer, more informative
+> label. But I am not opposed to removing the bits from the driver and having
+> it go through the thermal core. We could also remove the build dependency
+> on HWMON as a result.
 
-Not sure I understand what my comment has to do with 'parent'.
+OK. Just took a look at the thermal core. For DT based thermal zones, it
+does not create hwmon devices at all, possible to avoid duplicate devices
+which it cannot know about.
 
-The fact that the code checks if it has already been instantiated
-suggests that the original author of the driver was concerned about
-that case. Since you did not remove that check I have to assume that
-this can still happen. If so, the second instantiation attempt will
-overwrite regmap_st, since that variable is written prior to checking
-for the dual instantiation.
+I'll clean up the duplicate code and send v3.
 
-Guenter
+
+ChenYu
