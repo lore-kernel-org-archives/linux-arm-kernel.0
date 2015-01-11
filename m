@@ -1,46 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 Jan 2015 12:40:08 +0100
-Subject: [PATCH 3/5] clocksource: sun5i: Remove sched_clock
+Date: Sun, 11 Jan 2015 12:40:06 +0100
+Subject: [PATCH 1/5] clocksource: sun5i: Switch to request_irq
 In-Reply-To: <1420976410-7826-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1420976410-7826-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1420976410-7826-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1420976410-7826-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not possible to remove a sched_clock once it has been added, nor is it
-possible to change its rate.
-
-Since we will need to support a rate change, and that we have other
-sched_clocks in the system anyway, remove it.
+The current code uses setup_irq, while it could perfectly use the much simpler
+request_irq. Switch to that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/timer-sun5i.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/clocksource/timer-sun5i.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index ec82c4c69dfc..3db470dd7a5b 100644
+index 02268448dc85..738853873a3b 100644
 --- a/drivers/clocksource/timer-sun5i.c
 +++ b/drivers/clocksource/timer-sun5i.c
-@@ -130,11 +130,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
+@@ -130,13 +130,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
  	return IRQ_HANDLED;
  }
  
--static u64 sun5i_timer_sched_read(void)
--{
--	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
--}
+-static struct irqaction sun5i_timer_irq = {
+-	.name = "sun5i_timer0",
+-	.flags = IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler = sun5i_timer_interrupt,
+-	.dev_id = &sun5i_clockevent,
+-};
 -
- static void __init sun5i_timer_init(struct device_node *node)
+ static u64 sun5i_timer_sched_read(void)
  {
- 	struct reset_control *rstc;
-@@ -166,7 +161,6 @@ static void __init sun5i_timer_init(struct device_node *node)
- 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
- 	       timer_base + TIMER_CTL_REG(1));
+ 	return ~readl(timer_base + TIMER_CNTVAL_LO_REG(1));
+@@ -178,7 +171,8 @@ static void __init sun5i_timer_init(struct device_node *node)
  
--	sched_clock_register(sun5i_timer_sched_read, 32, rate);
- 	clocksource_mmio_init(timer_base + TIMER_CNTVAL_LO_REG(1), node->name,
- 			      rate, 340, 32, clocksource_mmio_readl_down);
+ 	ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+ 
+-	ret = setup_irq(irq, &sun5i_timer_irq);
++	ret = request_irq(irq, sun5i_timer_interrupt, IRQF_TIMER | IRQF_IRQPOLL,
++			  "sun5i_timer", &sun5i_clockevent);
+ 	if (ret)
+ 		pr_warn("failed to setup irq %d\n", irq);
  
 -- 
 2.2.1
