@@ -1,34 +1,68 @@
-From: richard.weinberger@gmail.com (Richard Weinberger)
-Date: Sun, 11 Jan 2015 11:43:16 +0100
-Subject: Getting new udev to run with 2.6.28
-In-Reply-To: <2200602.Xp3g1GYm9A@merkaba>
-References: <20150110173920.GA31847@amd> <7348917.heGelKEtgq@merkaba>
- <20150110230653.GB22149@ZenIV.linux.org.uk>
- <2200602.Xp3g1GYm9A@merkaba>
-Message-ID: <CAFLxGvzLHjnq89GM3z9NXFnFUu_XNkr-5Z-32E0pqTUwYXiKug@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 11 Jan 2015 13:21:41 +0200
+Subject: [PATCH v2 4/8] irqchip: devicetree: document Conexant Digicolor
+ irq binding
+In-Reply-To: <20150109115014.GC12942@leverpostej>
+References: <cover.1420744368.git.baruch@tkos.co.il>
+ <3bdf8fa0bf971b4881024e72312c3c9d29298e79.1420744369.git.baruch@tkos.co.il>
+ <20150109115014.GC12942@leverpostej>
+Message-ID: <20150111112141.GO2481@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 10:04 AM, Martin Steigerwald
-<Martin@lichtvoll.de> wrote:
-> Am Samstag, 10. Januar 2015, 23:06:53 schrieb Al Viro:
->> On Sat, Jan 10, 2015 at 11:25:39PM +0100, Martin Steigerwald wrote:
->> > > ... and this, boys and girls, is why quite a few of us have loathed udev
->> > > way before it got merged into even nastier shitpile.  Still do, for that
->> > > matter.
->> >
->> > You mean systemd by that?
->>
->> Yes, I do.  Has it been merged into any other?
->
-> Not that I am aware of.
->
-> I was just surprised to read such clear words about systemd from a kernel
-> developer ? now I wonder why tough. I think I thought most were in support for
-> it.
+Hi Mark,
 
-Not at all.
+On Fri, Jan 09, 2015 at 11:50:14AM +0000, Mark Rutland wrote:
+> On Thu, Jan 08, 2015 at 07:40:00PM +0000, Baruch Siach wrote:
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  .../bindings/interrupt-controller/digicolor-ic.txt   | 20 ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
+> > new file mode 100644
+> > index 000000000000..fdf9a4c59bf3
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/digicolor-ic.txt
+> > @@ -0,0 +1,20 @@
+> > +Conexant Digicolor Interrupt Controller
+> > +
+> > +Required properties:
+> > +
+> > +- compatible : should be "cnxt,cx92755-ic"
+> 
+> I didn't spot "cnxt" in
+> Documentation/devicetree/bindings/vendor-prefixes.txt in mainline, nor
+> did I spot it added as part of this series. Please add it, assuming a
+> patch doing so is not already queued elsewhere.
+
+I sent a vendor-prefixes.txt update earlier as part of the UART driver series. 
+Greg has it queued in the tty-testing branch of his tty tree 
+(https://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/commit/?h=tty-testing&id=48c738631753186e0ec7dd0079beffb3a6f4bb5c).
+
+> > +- reg : Specifies base physical address and size of the MISC area, that is
+> > +  where the interrupt controller registers are located
+> 
+> Is this area shared with other devices?
+
+Yes. The interrupt controller uses just a small area in this registers space 
+(offsets 0x40 - 0x80). This trouble is that I also need access to the system 
+global UC_IRQ_CONTROL register (offset 0x3a4), to configure interrupts channel 
+and routing (IRQ/FIQ). I wonder whether register access via syscon is better.
+
+> > +- interrupt-controller : Identifies the node as an interrupt controller
+> > +- #interrupt-cells : Specifies the number of cells needed to encode an
+> > +  interrupt source. The value shall be 1.
+> 
+> There is no configuration that can be applied to individual interrupt
+> lines (e.g. trigger type)?
+
+No. There is none.
+
+baruch
 
 -- 
-Thanks,
-//richard
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
