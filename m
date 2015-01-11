@@ -1,101 +1,144 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 12 Jan 2015 00:04:43 +0800
-Subject: [PATCH v4] clocksource: marco: rename marco to atlas7
-Message-ID: <1420992283-7307-1-git-send-email-21cnbao@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 11 Jan 2015 17:59:06 +0100
+Subject: [PATCH 1/7] arm64: introduce common ESR_ELx_* definitions
+In-Reply-To: <1420632260-8798-2-git-send-email-mark.rutland@arm.com>
+References: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
+ <1420632260-8798-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150111165906.GG21444@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Wed, Jan 07, 2015 at 12:04:14PM +0000, Mark Rutland wrote:
+> Currently we have separate ESR_EL{1,2}_* macros, despite the fact that
+> the encodings are common. While encodings are architected to refer to
+> the current EL or a lower EL, the macros refer to particular ELs (e.g.
+> ESR_ELx_EC_DABT_EL0). Having these duplicate definitions is redundant,
+> and their naming is misleading.
+> 
+> This patch introduces common ESR_ELx_* macros that can be used in all
+> cases, in preparation for later patches which will migrate existing
+> users over. Some additional cleanups are made in the process:
+> 
+> * Suffixes for particular exception levelts (e.g. _EL0, _EL1) are
+>   replaced with more general _LOW and _CUR suffixes, matching the
+>   architectural intent.
+> 
+> * ESR_ELx_EC_WFx, rather than ESR_ELx_EC_WFI is introduced, as this
+>   EC encoding covers traps from both WFE and WFI. Similarly,
+>   ESR_ELx_WFx_ISS_WFE rather than ESR_ELx_EC_WFI_ISS_WFE is introduced.
+> 
+> * Multi-bit fields are given consistently named _SHIFT and _MASK macros.
+> 
+> * UL() is used for compatiblity with assembly files.
+> 
+> * Comments are added for currently unallocated ESR_ELx.EC encodings.
+> 
+> For fields other than ESR_ELx.EC, macros are only implemented for fields
+> for which there is already an ESR_EL{1,2}_* macro.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/esr.h | 78 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 78 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+> index 72674f4..eaee379 100644
+> --- a/arch/arm64/include/asm/esr.h
+> +++ b/arch/arm64/include/asm/esr.h
+> @@ -54,4 +54,82 @@
+>  #define ESR_EL1_EC_BKPT32	(0x38)
+>  #define ESR_EL1_EC_BRK64	(0x3C)
+>  
+> +#define ESR_ELx_EC_UNKNOWN	(0x00)
+> +#define ESR_ELx_EC_WFx		(0x01)
+> +/* Unallocated EC: 0x02 */
+> +#define ESR_ELx_EC_CP15_32	(0x03)
+> +#define ESR_ELx_EC_CP15_64	(0x04)
+> +#define ESR_ELx_EC_CP14_MR	(0x05)
+> +#define ESR_ELx_EC_CP14_LS	(0x06)
+> +#define ESR_ELx_EC_FP_ASIMD	(0x07)
+> +#define ESR_ELx_EC_CP10_ID	(0x08)
+> +/* Unallocated EC: 0x09 - 0x0B */
+> +#define ESR_ELx_EC_CP14_64	(0x0C)
+> +/* Unallocated: 0x0d */
+> +#define ESR_ELx_EC_ILL		(0x0E)
+> +/* Unallocated EC: 0x0F - 0x10 */
+> +#define ESR_ELx_EC_SVC32	(0x11)
+> +#define ESR_ELx_EC_HVC32	(0x12)
+> +#define ESR_ELx_EC_SMC32	(0x13)
+> +/* Unallocated EC: 0x14 */
+> +#define ESR_ELx_EC_SVC64	(0x15)
+> +#define ESR_ELx_EC_HVC64	(0x16)
+> +#define ESR_ELx_EC_SMC64	(0x17)
+> +#define ESR_ELx_EC_SYS64	(0x18)
+> +/* Unallocated EC: 0x19 - 0x1E */
+> +#define ESR_ELx_EC_IMP_DEF	(0x1f)
+> +#define ESR_ELx_EC_IABT_LOW	(0x20)
+> +#define ESR_ELx_EC_IABT_CUR	(0x21)
+> +#define ESR_ELx_EC_PC_ALIGN	(0x22)
+> +/* Unallocated EC: 0x23 */
+> +#define ESR_ELx_EC_DABT_LOW	(0x24)
+> +#define ESR_ELx_EC_DABT_CUR	(0x25)
+> +#define ESR_ELx_EC_SP_ALIGN	(0x26)
+> +/* Unallocated EC: 0x27 */
+> +#define ESR_ELx_EC_FP_EXC32	(0x28)
+> +/* Unallocated EC: 0x29 - 0x2B */
+> +#define ESR_ELx_EC_FP_EXC64	(0x2C)
+> +/* Unallocated EC: 0x2D - 0x2E */
+> +#define ESR_ELx_EC_SERROR	(0x2F)
+> +#define ESR_ELx_EC_BREAKPT_LOW	(0x30)
+> +#define ESR_ELx_EC_BREAKPT_CUR	(0x31)
+> +#define ESR_ELx_EC_SOFTSTP_LOW	(0x32)
+> +#define ESR_ELx_EC_SOFTSTP_CUR	(0x33)
+> +#define ESR_ELx_EC_WATCHPT_LOW	(0x34)
+> +#define ESR_ELx_EC_WATCHPT_CUR	(0x35)
+> +/* Unallocated EC: 0x36 - 0x37 */
+> +#define ESR_ELx_EC_BKPT32	(0x38)
+> +/* Unallocated EC: 0x39 */
+> +#define ESR_ELx_EC_VECTOR32	(0x3A)
+> +/* Unallocted EC: 0x3B */
+> +#define ESR_ELx_EC_BRK64	(0x3C)
+> +/* Unallocated EC: 0x3D - 0x3F */
+> +#define ESR_ELx_EC_MAX		(0x3F)
+> +
+> +#define ESR_ELx_EC_SHIFT	(26)
+> +#define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
+> +
+> +#define ESR_ELx_IL		(UL(1) << 25)
+> +#define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
+> +#define ESR_ELx_ISV		(UL(1) << 24)
+> +#define ESR_ELx_SAS		(UL(1) << 22)
 
-marco project is replaced by atlas7 and we should obliterate
-its all traces.
+shouldn't this be UL(3) << 22 (or a mask/shift equivalend declaration)?
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- -v4:
- rebase againest Thierry Reding's
- [PATCH] clocksource: sirf: Remove unused variable
+> +#define ESR_ELx_SSE		(UL(1) << 21)
+> +#define ESR_ELx_SRT_SHIFT	(16)
+> +#define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
+> +#define ESR_ELx_SF 		(UL(1) << 15)
+> +#define ESR_ELx_AR 		(UL(1) << 14)
+> +#define ESR_ELx_EA 		(UL(1) << 9)
+> +#define ESR_ELx_CM 		(UL(1) << 8)
+> +#define ESR_ELx_S1PTW 		(UL(1) << 7)
+> +#define ESR_ELx_WNR		(UL(1) << 6)
+> +#define ESR_ELx_FSC		(0x3F)
+> +#define ESR_ELx_FSC_TYPE	(0x3C)
+> +#define ESR_ELx_FSC_EXTABT	(0x10)
+> +#define ESR_ELx_FSC_FAULT	(0x04)
+> +#define ESR_ELx_FSC_PERM	(0x0F)
 
- drivers/clocksource/Makefile                       |    2 +-
- .../clocksource/{timer-marco.c => timer-atlas7.c}  |   14 +++++++-------
- 2 files changed, 8 insertions(+), 8 deletions(-)
- rename drivers/clocksource/{timer-marco.c => timer-atlas7.c} (95%)
+this should be 0x0C right?
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 94d90b2..306bc47 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -18,7 +18,7 @@ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
--obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
-+obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
- obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_ARCH_PXA)		+= pxa_timer.o
-diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-atlas7.c
-similarity index 95%
-rename from drivers/clocksource/timer-marco.c
-rename to drivers/clocksource/timer-atlas7.c
-index 3ddb81f..60f9de3 100644
---- a/drivers/clocksource/timer-marco.c
-+++ b/drivers/clocksource/timer-atlas7.c
-@@ -38,7 +38,7 @@
- 
- #define SIRFSOC_TIMER_REG_CNT 6
- 
--static unsigned long marco_timer_rate;
-+static unsigned long atlas7_timer_rate;
- 
- static const u32 sirfsoc_timer_reg_list[SIRFSOC_TIMER_REG_CNT] = {
- 	SIRFSOC_TIMER_WATCHDOG_EN,
-@@ -195,7 +195,7 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
- 	ce->rating = 200;
- 	ce->set_mode = sirfsoc_timer_set_mode;
- 	ce->set_next_event = sirfsoc_timer_set_next_event;
--	clockevents_calc_mult_shift(ce, marco_timer_rate, 60);
-+	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
- 	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
- 	ce->min_delta_ns = clockevent_delta2ns(2, ce);
- 	ce->cpumask = cpumask_of(cpu);
-@@ -255,7 +255,7 @@ static void __init sirfsoc_clockevent_init(void)
- }
- 
- /* initialize the kernel jiffy timer source */
--static void __init sirfsoc_marco_timer_init(struct device_node *np)
-+static void __init sirfsoc_atlas7_timer_init(struct device_node *np)
- {
- 	struct clk *clk;
- 
-@@ -264,7 +264,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
- 
- 	BUG_ON(clk_prepare_enable(clk));
- 
--	marco_timer_rate = clk_get_rate(clk);
-+	atlas7_timer_rate = clk_get_rate(clk);
- 
- 	/* timer dividers: 0, not divided */
- 	writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
-@@ -282,7 +282,7 @@ static void __init sirfsoc_marco_timer_init(struct device_node *np)
- 	/* Clear all interrupts */
- 	writel_relaxed(0xFFFF, sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
- 
--	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, marco_timer_rate));
-+	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, atlas7_timer_rate));
- 
- 	sirfsoc_clockevent_init();
- }
-@@ -301,6 +301,6 @@ static void __init sirfsoc_of_timer_init(struct device_node *np)
- 	if (!sirfsoc_timer1_irq.irq)
- 		panic("No irq passed for timer1 via DT\n");
- 
--	sirfsoc_marco_timer_init(np);
-+	sirfsoc_atlas7_timer_init(np);
- }
--CLOCKSOURCE_OF_DECLARE(sirfsoc_marco_timer, "sirf,marco-tick", sirfsoc_of_timer_init );
-+CLOCKSOURCE_OF_DECLARE(sirfsoc_atlas7_timer, "sirf,atlas7-tick", sirfsoc_of_timer_init);
--- 
-1.7.9.5
+> +#define ESR_ELx_CV		(UL(1) << 24)
+> +#define ESR_ELx_COND_SHIFT	(20)
+> +#define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
+> +#define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+> +
+>  #endif /* __ASM_ESR_H */
+> -- 
+> 1.9.1
+> 
