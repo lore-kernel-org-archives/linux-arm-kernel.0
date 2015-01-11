@@ -1,31 +1,34 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 11 Jan 2015 11:38:54 +0200
-Subject: [PATCH v2 3/8] ARM: digicolor: add minimal device tree description
-In-Reply-To: <20150109114624.GB12942@leverpostej>
-References: <cover.1420744368.git.baruch@tkos.co.il>
- <9d8d7aed6220e9e92ab70217a65d3291924cfa71.1420744369.git.baruch@tkos.co.il>
- <20150109114624.GB12942@leverpostej>
-Message-ID: <20150111093853.GN2481@sapphire.tkos.co.il>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 11 Jan 2015 11:12:58 +0100
+Subject: Getting new udev to run with 2.6.28
+In-Reply-To: <2200602.Xp3g1GYm9A@merkaba>
+References: <20150110173920.GA31847@amd> <7348917.heGelKEtgq@merkaba>
+ <20150110230653.GB22149@ZenIV.linux.org.uk>
+ <2200602.Xp3g1GYm9A@merkaba>
+Message-ID: <20150111101258.GA11391@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Fri, Jan 09, 2015 at 11:46:24AM +0000, Mark Rutland wrote:
-> On Thu, Jan 08, 2015 at 07:39:59PM +0000, Baruch Siach wrote:
-> > cx92755.dtsi describes CX92755 on chip peripherals. conexant_equinox.dts
-> > describes the Equinox evaluation board for the CX92755 SoC.
+On Sun 2015-01-11 10:04:26, Martin Steigerwald wrote:
+> Am Samstag, 10. Januar 2015, 23:06:53 schrieb Al Viro:
+> > On Sat, Jan 10, 2015 at 11:25:39PM +0100, Martin Steigerwald wrote:
+> > > > ... and this, boys and girls, is why quite a few of us have loathed udev
+> > > > way before it got merged into even nastier shitpile.  Still do, for that
+> > > > matter.
+> > > 
+> > > You mean systemd by that?
+> > 
+> > Yes, I do.  Has it been merged into any other?
 > 
-> I didn't spot any cpu nodes below. While that might happen to work at
-> the moment for UP, there really should be a node for the boot CPU.
+> Not that I am aware of.
+> 
+> I was just surprised to read such clear words about systemd from a kernel 
+> developer ? now I wonder why tough. I think I thought most were in support for 
+> it.
 
-OK. I'll add one in the next revision.
-
-Thanks for reviewing.
-
-baruch
-
+I wonder where you got that impression. Anyway, this discussion is
+slightly offtopic on lkml.
+									Pavel
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
