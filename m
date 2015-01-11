@@ -1,61 +1,23 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 11 Jan 2015 22:01:51 +0100
-Subject: [GIT PULL] ARM: mediatek: DT changes for v3.20 (round 1)
-Message-ID: <CABuKBeK96CE-xR8Xknv1ES7u9TZybtyh84zZE9paFPPD5pZjGw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 11 Jan 2015 13:06:11 -0800
+Subject: [PATCH] ARM: nomadik: fix up leftover device tree pins
+In-Reply-To: <1420830680-18611-1-git-send-email-linus.walleij@linaro.org>
+References: <1420830680-18611-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150111210611.GA25777@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Fri, Jan 09, 2015 at 08:11:20PM +0100, Linus Walleij wrote:
+> We altered the device tree bindings for the Nomadik family of
+> pin controllers to be standard, this file was merged out-of-order
+> so we missed fixing this. Fix it up.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC guys: please pick this directly for fixes, I have no
+> other Nomadik fixes for this merge window AFAIK.
 
-Please take the following patches for v3.20.
+Thanks, applied to fixes.
 
-Thanks,
-Matthias
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-dts
-
-for you to fetch changes up to 3aa2e2811ab58e0299bb9a6457a15b405be86ff0:
-
-  ARM: mediatek: dts: Add uart to Aquaris5 (2015-01-11 21:17:49 +0100)
-
-----------------------------------------------------------------
-This adds support for the mediatek sysirq and the uarts for the following SoCs:
-- mt8135
-- mt8127
-- mt6598
-
-For mt6592 only the sysirq support was added.
-
-----------------------------------------------------------------
-Eddie Huang (3):
-      ARM: mediatek: add UART dts for mt8127 and mt8135
-      DTS: serial: Add bindings document for the Mediatek UARTs
-      ARM: mediatek: dts: Add UART dts for MT8127 and MT8135 boards
-
-Howard Chen (2):
-      ARM: mediatek: Add sysirq device node to mt6592 dtsi
-      dt-bindings: add mt6592 compatible string for mediatek sysirq
-
-Matthias Brugger (2):
-      ARM: mediatek: dts: Add uart to mt6589
-      ARM: mediatek: dts: Add uart to Aquaris5
-
-Yingjoe Chen (1):
-      ARM: mediatek: Add sysirq in mt6589/mt8135/mt8127 dtsi
-
- .../bindings/arm/mediatek/mediatek,sysirq.txt      |  1 +
- .../devicetree/bindings/serial/mtk-uart.txt        |  2 +
- arch/arm/boot/dts/mt6589-aquaris5.dts              | 12 ++++-
- arch/arm/boot/dts/mt6589.dtsi                      | 52 ++++++++++++++++++++-
- arch/arm/boot/dts/mt6592.dtsi                      | 15 ++++--
- arch/arm/boot/dts/mt8127-moose.dts                 |  4 ++
- arch/arm/boot/dts/mt8127.dtsi                      | 52 ++++++++++++++++++++-
- arch/arm/boot/dts/mt8135-evbp1.dts                 |  4 ++
- arch/arm/boot/dts/mt8135.dtsi                      | 54 +++++++++++++++++++++-
- 9 files changed, 185 insertions(+), 11 deletions(-)
+-Olof
