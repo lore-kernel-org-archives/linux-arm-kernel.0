@@ -1,72 +1,47 @@
-From: r.peniaev@gmail.com (Roman Pen)
-Date: Sun, 11 Jan 2015 23:32:31 +0900
-Subject: [PATCH 2/2] ARM: entry-common,
- ptrace: do not pass scno to syscall_trace_enter
-In-Reply-To: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
-Message-ID: <1420986751-30364-3-git-send-email-r.peniaev@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 11 Jan 2015 22:51:40 +0800
+Subject: [GIT PULL] CSR atlas7 init dts for 3.20
+Message-ID: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In previous patch current_thread_info()->syscall is set with
-corresponding syscall number prior to further calls, thus there
-is no any need to pass 'scno'.
+Hi Arnd, Kevin, Olof,
 
-Also, add explicit comment why do we have to reread 'scno' local
-variable.
+The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
 
-Signed-off-by: Roman Pen <r.peniaev@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Eric Paris <eparis@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/kernel/entry-common.S | 1 -
- arch/arm/kernel/ptrace.c       | 6 ++++--
- 2 files changed, 4 insertions(+), 3 deletions(-)
+  Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 89452ff..3d12eb5 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -228,7 +228,6 @@ ENDPROC(vector_swi)
- 	 * context switches, and waiting for our parent to respond.
- 	 */
- __sys_trace:
--	mov	r1, scno
- 	add	r0, sp, #S_OFF
- 	bl	syscall_trace_enter
- 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index ef9119f..1238787 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -928,9 +928,9 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 	regs->ARM_ip = ip;
- }
- 
--asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
-+asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- {
--	current_thread_info()->syscall = scno;
-+	int scno = current_thread_info()->syscall;
- 
- 	/* Do the secure computing check first; failures should be fast. */
- #ifdef CONFIG_HAVE_ARCH_SECCOMP_FILTER
-@@ -944,6 +944,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
- 	if (test_thread_flag(TIF_SYSCALL_TRACE))
- 		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
- 
-+	/* Syscall can be aborted (-1 can be set) or even changed
-+	 * by the tracer and subsequent PTRACE_SET_SYSCALL request */
- 	scno = current_thread_info()->syscall;
- 
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
--- 
-2.1.3
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+
+for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
+
+  ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
+
+----------------------------------------------------------------
+drop marco and add init dts for atlas7
+
+marco chip has been dropped and the new replacement is atlas7.
+so, drop marco dts, and add dts for atlas7.
+
+----------------------------------------------------------------
+Barry Song (1):
+      ARM: dts: drop MARCO platform DT stuff
+
+Zhiwu Song (1):
+      ARM: dts: add init dts file for CSR atlas7 SoC
+
+ Documentation/devicetree/bindings/arm/sirf.txt |    2 -
+ arch/arm/boot/dts/Makefile                     |    2 +-
+ arch/arm/boot/dts/atlas7-evb.dts               |  110 ++++
+ arch/arm/boot/dts/atlas7.dtsi                  |  813 ++++++++++++++++++++++++
+ arch/arm/boot/dts/marco-evb.dts                |   54 --
+ arch/arm/boot/dts/marco.dtsi                   |  757 ----------------------
+ 6 files changed, 924 insertions(+), 814 deletions(-)
+ create mode 100644 arch/arm/boot/dts/atlas7-evb.dts
+ create mode 100644 arch/arm/boot/dts/atlas7.dtsi
+ delete mode 100644 arch/arm/boot/dts/marco-evb.dts
+ delete mode 100644 arch/arm/boot/dts/marco.dtsi
+
+-barry
