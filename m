@@ -1,195 +1,235 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 11 Jan 2015 16:32:07 +0100
-Subject: [PATCH v6 19/20] arm/arm64: KVM: enable kernel side of GICv3
- emulation
-In-Reply-To: <1420804478-17354-20-git-send-email-andre.przywara@arm.com>
+Date: Sun, 11 Jan 2015 16:35:58 +0100
+Subject: [PATCH v6 20/20] arm/arm64: KVM: allow userland to request a
+ virtual GICv3
+In-Reply-To: <1420804478-17354-21-git-send-email-andre.przywara@arm.com>
 References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
- <1420804478-17354-20-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150111153207.GE21444@cbox>
+ <1420804478-17354-21-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150111153558.GF21444@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 11:54:37AM +0000, Andre Przywara wrote:
-> With all the necessary GICv3 emulation code in place, we can now
-> connect the code to the GICv3 backend in the kernel.
-> The LR register handling is different depending on the emulated GIC
-> model, so provide different implementations for each.
-> Also allow non-v2-compatible GICv3 implementations (which don't
-> provide MMIO regions for the virtual CPU interface in the DT), but
-> restrict those hosts to support GICv3 guests only.
-> If the device tree provides a GICv2 compatible GICV resource entry,
-> but that one is faulty, just disable the GICv2 emulation and let the
-> user use at least the GICv3 emulation for guests.
+On Fri, Jan 09, 2015 at 11:54:38AM +0000, Andre Przywara wrote:
+> With all of the GICv3 code in place now we allow userland to ask the
+> kernel for using a virtual GICv3 in the guest.
+> Also we provide the necessary support for guests setting the memory
+> addresses for the virtual distributor and redistributors.
+> This requires some userland code to make use of that feature and
+> explicitly ask for a virtual GICv3.
 > 
 > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
 > Changelog v5...v6:
-> - allow GICv3 emulation in case of invalid GICv2 DT compat entries
-> - use new kvm_check_device_type()
+>  (none)
 > 
 > Changelog v4...v5:
-> - minor whitespace and comments fixes
+> - improving documentation text
 > 
 > Changelog v3...v4:
-> - handle differences between GICv2-on-v3 and GICv3-on-v3 in existing functions
-> - remove init_*_emul() functions
-> - remove max_vcpus setting (done in earlier patches now)
-> - adapt to new vgic_v<n>_init_emulation behaviour
+> - refine commit message
+> - add documentation of new GICv3 KVM device
 > 
->  virt/kvm/arm/vgic-v3.c |   74 ++++++++++++++++++++++++++++++++----------------
->  virt/kvm/arm/vgic.c    |    9 ++++++
->  2 files changed, 58 insertions(+), 25 deletions(-)
+>  Documentation/virtual/kvm/devices/arm-vgic.txt |   22 ++++++++++--
+>  arch/arm64/include/uapi/asm/kvm.h              |    7 ++++
+>  include/kvm/arm_vgic.h                         |    4 +--
+>  virt/kvm/arm/vgic-v3-emul.c                    |    3 ++
+>  virt/kvm/arm/vgic.c                            |   46 +++++++++++++++++-------
+>  5 files changed, 65 insertions(+), 17 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-> index 5249048..d221b25 100644
-> --- a/virt/kvm/arm/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic-v3.c
-> @@ -34,6 +34,7 @@
->  #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
->  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->  #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
-> +#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> index 30f5427..5d4fd4b 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> @@ -3,22 +3,38 @@ ARM Virtual Generic Interrupt Controller (VGIC)
 >  
->  /*
->   * LRs are stored in reverse order in memory. make sure we index them
-> @@ -48,12 +49,17 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
->  	struct vgic_lr lr_desc;
->  	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+>  Device types supported:
+>    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+> +  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
 >  
-> -	lr_desc.irq	= val & GICH_LR_VIRTUALID;
-> -	if (lr_desc.irq <= 15)
-> -		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
-> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
->  	else
-> -		lr_desc.source = 0;
-> -	lr_desc.state	= 0;
-> +		lr_desc.irq = val & GICH_LR_VIRTUALID;
+>  Only one VGIC instance may be instantiated through either this API or the
+>  legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+>  controller, requiring emulated user-space devices to inject interrupts to the
+>  VGIC instead of directly to CPUs.
+>  
+> +Creating a guest GICv3 device requires a host GICv3 as well.
+> +GICv3 implementations with hardware compatibility support allow a guest GICv2
+> +as well.
 > +
-> +	lr_desc.source = 0;
-> +	if (lr_desc.irq <= 15 &&
-> +	    vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-> +		lr_desc.source = (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
+>  Groups:
+>    KVM_DEV_ARM_VGIC_GRP_ADDR
+>    Attributes:
+>      KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+>        Base address in the guest physical address space of the GIC distributor
+> -      register mappings.
+> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
+>  
+>      KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+>        Base address in the guest physical address space of the GIC virtual cpu
+> -      interface register mappings.
+> +      interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
 > +
-> +	lr_desc.state = 0;
->  
->  	if (val & ICH_LR_PENDING_BIT)
->  		lr_desc.state |= LR_STATE_PENDING;
-> @@ -68,8 +74,20 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
->  static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
->  			   struct vgic_lr lr_desc)
->  {
-> -	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
-> -		      lr_desc.irq);
-> +	u64 lr_val;
+> +    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
+> +      Base address in the guest physical address space of the GICv3 distributor
+> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
 > +
-> +	lr_val = lr_desc.irq;
+> +    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
+> +      Base address in the guest physical address space of the GICv3
+> +      redistributor register mappings. There are two 64K pages for each
+> +      VCPU and all of the redistributor pages are contiguous.
+> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
 > +
-> +	/*
-> +	 * Currently all guest IRQs are Group1, as Group0 would result
-> +	 * in a FIQ in the guest, which it wouldn't expect.
-> +	 * Eventually we want to make this configurable, so we may revisit
-> +	 * this in the future.
-> +	 */
-> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		lr_val |= ICH_LR_GROUP;
-> +	else
-> +		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+
+so did you decide on not specifying the alignment restrictions here?
+
 >  
->  	if (lr_desc.state & LR_STATE_PENDING)
->  		lr_val |= ICH_LR_PENDING_BIT;
-> @@ -154,7 +172,15 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  	 */
->  	vgic_v3->vgic_vmcr = 0;
+>    KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>    Attributes:
+> @@ -36,6 +52,7 @@ Groups:
+>      the register.
+>    Limitations:
+>      - Priorities are not implemented, and registers are RAZ/WI
+> +    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+>    Errors:
+>      -ENODEV: Getting or setting this register is not yet supported
+>      -EBUSY: One or more VCPUs are running
+> @@ -68,6 +85,7 @@ Groups:
 >  
-> -	vgic_v3->vgic_sre = 0;
-> +	/*
-> +	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
-> +	 * way, so we force SRE to 1 to demonstrate this to the guest.
-> +	 * This goes with the spec allowing the value to be RAO/WI.
-> +	 */
-> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-> +	else
-> +		vgic_v3->vgic_sre = 0;
+>    Limitations:
+>      - Priorities are not implemented, and registers are RAZ/WI
+> +    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+>    Errors:
+>      -ENODEV: Getting or setting this register is not yet supported
+>      -EBUSY: One or more VCPUs are running
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 480af34..3ef77a4 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -78,6 +78,13 @@ struct kvm_regs {
+>  #define KVM_VGIC_V2_DIST_SIZE		0x1000
+>  #define KVM_VGIC_V2_CPU_SIZE		0x2000
 >  
->  	/* Get the show on the road... */
->  	vgic_v3->vgic_hcr = ICH_HCR_EN;
-> @@ -215,28 +241,26 @@ int vgic_v3_probe(struct device_node *vgic_node,
+> +/* Supported VGICv3 address types  */
+> +#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+> +#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+> +
+> +#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+> +#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+> +
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index b9b2e05..1bc0ca8 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -36,8 +36,8 @@
+>  #define VGIC_V2_MAX_CPUS	8
 >  
->  	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
->  	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
-> -		kvm_err("Cannot obtain GICV region\n");
-> -		ret = -ENXIO;
-> -		goto out;
-> -	}
-> -
-> -	if (!PAGE_ALIGNED(vcpu_res.start)) {
-> -		kvm_err("GICV physical address 0x%llx not page aligned\n",
-> +		kvm_info("GICv3: no GICV resource entry\n");
-> +		vgic->vcpu_base = 0;
-> +	} else if (!PAGE_ALIGNED(vcpu_res.start)) {
-> +		pr_warn("GICV physical address 0x%llx not page aligned\n",
->  			(unsigned long long)vcpu_res.start);
-> -		ret = -ENXIO;
-> -		goto out;
-> -	}
-> -
-> -	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
-> -		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-> +		vgic->vcpu_base = 0;
-> +	} else if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
-> +		pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
->  			(unsigned long long)resource_size(&vcpu_res),
->  			PAGE_SIZE);
-> -		ret = -ENXIO;
-> -		goto out;
-> +		vgic->vcpu_base = 0;
-> +	} else {
-> +		vgic->vcpu_base = vcpu_res.start;
-> +		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
-> +					KVM_DEV_TYPE_ARM_VGIC_V2);
->  	}
-> -	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
-> +	if (vgic->vcpu_base == 0)
-> +		kvm_info("disabling GICv2 emulation\n");
-> +	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+>  /* Sanity checks... */
+> -#if (KVM_MAX_VCPUS > 8)
+> -#error	Invalid number of CPU interfaces
+> +#if (KVM_MAX_VCPUS > 255)
+> +#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
+>  #endif
 >  
-> -	vgic->vcpu_base = vcpu_res.start;
->  	vgic->vctrl_base = NULL;
->  	vgic->type = VGIC_V3;
->  	vgic->max_gic_vcpus = KVM_MAX_VCPUS;
+>  #if (VGIC_NR_IRQS_LEGACY & 31)
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index 2d49058..a6d2bdb 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -1009,6 +1009,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>  		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+>  		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+>  			return -ENXIO;
+> +		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> +		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> +			return 0;
+>  		}
+>  		break;
+>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
 > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index e0a23da..e474bd2 100644
+> index e474bd2..186cf30 100644
 > --- a/virt/kvm/arm/vgic.c
 > +++ b/virt/kvm/arm/vgic.c
-> @@ -1544,6 +1544,11 @@ static int init_vgic_model(struct kvm *kvm, int type)
->  	case KVM_DEV_TYPE_ARM_VGIC_V2:
->  		ret = vgic_v2_init_emulation(kvm);
+> @@ -1663,7 +1663,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+>  /**
+>   * kvm_vgic_addr - set or get vgic VM base addresses
+>   * @kvm:   pointer to the vm struct
+> - * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
+> + * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
+>   * @addr:  pointer to address value
+>   * @write: if true set the address in the VM address space, if false read the
+>   *          address
+> @@ -1677,29 +1677,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>  {
+>  	int r = 0;
+>  	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	int type_needed;
+> +	phys_addr_t *addr_ptr, block_size;
+>  
+>  	mutex_lock(&kvm->lock);
+>  	switch (type) {
+>  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+> -		if (write) {
+> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+> -					       *addr, KVM_VGIC_V2_DIST_SIZE);
+> -		} else {
+> -			*addr = vgic->vgic_dist_base;
+> -		}
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		addr_ptr = &vgic->vgic_dist_base;
+> +		block_size = KVM_VGIC_V2_DIST_SIZE;
+>  		break;
+>  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+> -		if (write) {
+> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+> -					       *addr, KVM_VGIC_V2_CPU_SIZE);
+> -		} else {
+> -			*addr = vgic->vgic_cpu_base;
+> -		}
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		addr_ptr = &vgic->vgic_cpu_base;
+> +		block_size = KVM_VGIC_V2_CPU_SIZE;
 >  		break;
 > +#ifdef CONFIG_ARM_GIC_V3
-> +	case KVM_DEV_TYPE_ARM_VGIC_V3:
-> +		ret = vgic_v3_init_emulation(kvm);
+> +	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		addr_ptr = &vgic->vgic_dist_base;
+> +		block_size = KVM_VGIC_V3_DIST_SIZE;
+> +		break;
+> +	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		addr_ptr = &vgic->vgic_redist_base;
+> +		block_size = KVM_VGIC_V3_REDIST_SIZE;
 > +		break;
 > +#endif
 >  	default:
->  		ret = -ENODEV;
->  		break;
-> @@ -1573,6 +1578,10 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
->  		goto out;
+>  		r = -ENODEV;
+> +		goto out;
+> +	}
+> +
+> +	if (vgic->vgic_model != type_needed) {
+> +		r = -ENODEV;
+> +		goto out;
 >  	}
 >  
-> +	ret = kvm_check_device_type(type);
-> +	if (ret != -EEXIST)
-> +		goto out;
-> +
->  	/*
->  	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
->  	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
-> -- 
+> +	if (write)
+> +		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
 
-Except for the kvm_check_device_type stuff, I'm now happy with this
-patch.
+you mentioned something about checking that the address for gicv3 is 64K
+aligned, which we're not doing at the moment.  What are the potential
+consequences?  Should we not just fix this?
+
+> +	else
+> +		*addr = *addr_ptr;
+> +
+> +out:
+>  	mutex_unlock(&kvm->lock);
+>  	return r;
+>  }
+> -- 
+> 1.7.9.5
+> 
 
 Thanks,
 -Christoffer
