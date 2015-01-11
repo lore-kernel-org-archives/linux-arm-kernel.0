@@ -1,220 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 11 Jan 2015 09:59:30 +0800
-Subject: [PATCH v2 1/9] Input: sun4i-ts: Add thermal zone sensor support
-In-Reply-To: <CAGb2v66xpzZ-tXcKgirk9US9FGBeoZidDoQ3imymMTL_Tu9PWQ@mail.gmail.com>
-References: <1420798676-22856-1-git-send-email-wens@csie.org>
- <1420798676-22856-2-git-send-email-wens@csie.org>
- <20150109172318.GA39037@dtor-ws>
- <CAGb2v66xpzZ-tXcKgirk9US9FGBeoZidDoQ3imymMTL_Tu9PWQ@mail.gmail.com>
-Message-ID: <CAGb2v673E3g0xifb_HKFmz1ELscQ5kZ5vcQnnYz+awRzjyKH5w@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 11 Jan 2015 03:00:16 +0100
+Subject: [PATCH] avr32: remove fake at91 cpu identification
+Message-ID: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 2:28 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sat, Jan 10, 2015 at 1:23 AM, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com> wrote:
->> On Fri, Jan 09, 2015 at 06:17:48PM +0800, Chen-Yu Tsai wrote:
->>> The touchscreen controller has a temperature sensor embedded in the SoC,
->>> which already has hwmon support in the driver.
->>>
->>> Add DT thermal zone support so we can use it with cpufreq for thermal
->>> throttling.
->>>
->>> This also adds a comment stating that we do not know the actual formula
->>> for calculating the temperature.
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>
->>
->>   CC [M]  drivers/input/touchscreen/sun4i-ts.o
->> drivers/input/touchscreen/sun4i-ts.c:208:15: error: variable
->> ?sun4i_ts_tz_ops? has initializer but incomplete type
->>  static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
->>                ^
->> drivers/input/touchscreen/sun4i-ts.c:209:2: error: unknown field
->> ?get_temp? specified in initializer
->>   .get_temp = get_temp,
->>   ^
->> drivers/input/touchscreen/sun4i-ts.c:209:2: warning: excess elements in
->> struct initializer [enabled by default]
->> drivers/input/touchscreen/sun4i-ts.c:209:2: warning: (near
->> initialization for ?sun4i_ts_tz_ops?) [enabled by default]
->> drivers/input/touchscreen/sun4i-ts.c: In function ?sun4i_ts_probe?:
->> drivers/input/touchscreen/sun4i-ts.c:331:8: warning: passing argument 4
->> of ?thermal_zone_of_sensor_register? from incompatible pointer type
->> [enabled by default]
->>         &sun4i_ts_tz_ops);
->>         ^
->> In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
->> include/linux/thermal.h:302:1: note: expected ?int (*)(void *, long int
->> *)? but argument is of type ?struct thermal_zone_of_device_ops *?
->>  thermal_zone_of_sensor_register(struct device *dev, int id,
->>  ^
->> drivers/input/touchscreen/sun4i-ts.c:331:8: error: too few arguments to
->> function ?thermal_zone_of_sensor_register?
->>         &sun4i_ts_tz_ops);
->>         ^
->> In file included from drivers/input/touchscreen/sun4i-ts.c:37:0:
->> include/linux/thermal.h:302:1: note: declared here
->>  thermal_zone_of_sensor_register(struct device *dev, int id,
->>  ^
->> make[1]: *** [drivers/input/touchscreen/sun4i-ts.o] Error 1
->> make: *** [drivers/input/touchscreen/sun4i-ts.o] Error 2
->>
->
-> struct thermal_zone_of_device_ops was introduced in 3.19-rc1 in
->
->     184a4bf623fa thermal: of: Extend current of-thermal.c code to
-> allow setting emulated temp
->
->>>
->>> changes since v1:
->>>
->>>     - clean up thermal zone sensor when input device register fails
->>>     - unconditionally unregister thermal zone sensor on removal.
->>>       the unregister function checks the pointers passed in.
->>>     - add comment explaining the lack of documents for the temperature
->>>       calculation formula
->>>
->>> ---
->>>  .../bindings/input/touchscreen/sun4i.txt           |  2 +
->>>  drivers/input/touchscreen/sun4i-ts.c               | 47 ++++++++++++++++++++++
->>>  2 files changed, 49 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
->>> index aef57791f40b..a8405bab6c00 100644
->>> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
->>> +++ b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
->>> @@ -5,6 +5,7 @@ Required properties:
->>>   - compatible: "allwinner,sun4i-a10-ts"
->>>   - reg: mmio address range of the chip
->>>   - interrupts: interrupt to which the chip is connected
->>> + - #thermal-sensor-cells: shall be 0
->>>
->>>  Optional properties:
->>>   - allwinner,ts-attached: boolean indicating that an actual touchscreen is
->>> @@ -17,4 +18,5 @@ Example:
->>>               reg = <0x01c25000 0x100>;
->>>               interrupts = <29>;
->>>               allwinner,ts-attached;
->>> +             #thermal-sensor-cells = <0>;
->>>       };
->>> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
->>> index 28a06749ae42..aac49db0b09d 100644
->>> --- a/drivers/input/touchscreen/sun4i-ts.c
->>> +++ b/drivers/input/touchscreen/sun4i-ts.c
->>> @@ -34,6 +34,7 @@
->>>
->>>  #include <linux/err.h>
->>>  #include <linux/hwmon.h>
->>> +#include <linux/thermal.h>
->>>  #include <linux/init.h>
->>>  #include <linux/input.h>
->>>  #include <linux/interrupt.h>
->>> @@ -107,6 +108,7 @@
->>>  struct sun4i_ts_data {
->>>       struct device *dev;
->>>       struct input_dev *input;
->>> +     struct thermal_zone_device *tz;
->>>       void __iomem *base;
->>>       unsigned int irq;
->>>       bool ignore_fifo_data;
->>> @@ -180,6 +182,33 @@ static void sun4i_ts_close(struct input_dev *dev)
->>>       writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
->>>  }
->>>
->>> +static int get_temp(void *data, long *temp)
->>> +{
->>> +     struct sun4i_ts_data *ts = data;
->>> +
->>> +     /* No temp_data until the first irq */
->>> +     if (ts->temp_data == -1)
->>> +             return -EAGAIN;
->>> +
->>> +     /*
->>> +      * The user manuals do not contain the formula for calculating
->>> +      * the temperature. The formula used here is from the AXP209,
->>> +      * which is designed by X-Powers, an affiliate of Allwinner:
->>> +      *
->>> +      *     temperature = -144.7 + (value * 0.1)
->>> +      *
->>> +      * This should be replaced with the correct one if such information
->>> +      * becomes available.
->>> +      */
->>> +     *temp = (ts->temp_data - 1447) * 100;
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
->>> +     .get_temp = get_temp,
->>> +};
->>> +
->>>  static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
->>>                        char *buf)
->>>  {
->>> @@ -189,6 +218,16 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
->>>       if (ts->temp_data == -1)
->>>               return -EAGAIN;
->>>
->>> +     /*
->>> +      * The user manuals do not contain the formula for calculating
->>> +      * the temperature. The formula used here is from the AXP209,
->>> +      * which is designed by X-Powers, an affiliate of Allwinner:
->>> +      *
->>> +      *     temperature = -144.7 + (value * 0.1)
->>> +      *
->>> +      * This should be replaced with the correct one if such information
->>> +      * becomes available.
->>> +      */
->>>       return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
->>
->> Why duplicate it here, instead of doing:
->>
->> static int sun4i_get_temp(struct sun4i_ts_data *ts, int *temp)
->> {
->>         if (ts->temp_data == -1)
->>                 return -EAGAIN;
->>
->>         /* comment */
->>         *temp = (ts->temp_data - 1447) * 100);
->>
->>         return 0;
->> }
->>
->> static int sun4i_tz_get_temp(void *data, long *temp)
->> {
->>         return sun4i_get_temp(data, temp);
->> }
->>
->> static ssize_t sun4i_show_temp(...)
->> {
->>         error = sun4i_get_temp(ts, &temp);
->>         if (error)
->>                 return error;
->>
->>         return sprintf(buf, "%d\n", temp);
->> }
->
-> I suppose that would be better, especially after I added the large comment.
->
->> Also, thermal core seems to allow creating hwmon devices for thermal
->> zones, can we use this feature?
->
-> For thermal sensors that also have hwmon devices registered, that step is
-> skipped.
->
-> I sort of like having separate hwmon bits, just for a nicer, more informative
-> label. But I am not opposed to removing the bits from the driver and having
-> it go through the thermal core. We could also remove the build dependency
-> on HWMON as a result.
+cpu_is_at91* are not used in any driver outside mach-at91. Remove those useless
+definitions.
 
-OK. Just took a look at the thermal core. For DT based thermal zones, it
-does not create hwmon devices at all, possible to avoid duplicate devices
-which it cannot know about.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-I'll clean up the duplicate code and send v3.
+Hans-Christian,
 
+If you want, I guess that one could go through the at91 tree. Unless you have
+more material and you want to do a pull request for 3.20.
 
-ChenYu
+Regards,
+
+ arch/avr32/mach-at32ap/include/mach/cpu.h | 26 +-------------------------
+ 1 file changed, 1 insertion(+), 25 deletions(-)
+
+diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
+index 16a24b14146c..4181086f4ddc 100644
+--- a/arch/avr32/mach-at32ap/include/mach/cpu.h
++++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
+@@ -1,5 +1,5 @@
+ /*
+- * AVR32 and (fake) AT91 CPU identification
++ * AVR32 CPU identification
+  *
+  * Copyright (C) 2007 Atmel Corporation
+  *
+@@ -20,28 +20,4 @@
+ # define cpu_is_at32ap7000()	(0)
+ #endif
+ 
+-/*
+- * Since this is AVR32, we will never run on any AT91 CPU. But these
+- * definitions may reduce clutter in common drivers.
+- */
+-#define cpu_is_at91rm9200()	(0)
+-#define cpu_is_at91sam9xe()	(0)
+-#define cpu_is_at91sam9260()	(0)
+-#define cpu_is_at91sam9261()	(0)
+-#define cpu_is_at91sam9263()	(0)
+-#define cpu_is_at91sam9rl()	(0)
+-#define cpu_is_at91sam9g10()	(0)
+-#define cpu_is_at91sam9g20()	(0)
+-#define cpu_is_at91sam9g45()	(0)
+-#define cpu_is_at91sam9g45es()	(0)
+-#define cpu_is_at91sam9m10()	(0)
+-#define cpu_is_at91sam9g46()	(0)
+-#define cpu_is_at91sam9m11()	(0)
+-#define cpu_is_at91sam9x5()	(0)
+-#define cpu_is_at91sam9g15()	(0)
+-#define cpu_is_at91sam9g35()	(0)
+-#define cpu_is_at91sam9x35()	(0)
+-#define cpu_is_at91sam9g25()	(0)
+-#define cpu_is_at91sam9x25()	(0)
+-
+ #endif /* __ASM_ARCH_CPU_H */
+-- 
+2.1.0
