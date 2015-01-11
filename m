@@ -1,21 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 11 Jan 2015 16:49:57 +0100
-Subject: [PATCH v2 0/8] ARM: Conexant Digicolor CX92755 SoC support
-In-Reply-To: <20150111113327.GQ2481@sapphire.tkos.co.il>
-References: <cover.1420744368.git.baruch@tkos.co.il>
- <5966468.GiJYdzCvnt@wuerfel> <20150111113327.GQ2481@sapphire.tkos.co.il>
-Message-ID: <2596137.dsVM7gCxOQ@wuerfel>
+From: baohua@kernel.org (Barry Song)
+Date: Sun, 11 Jan 2015 23:58:28 +0800
+Subject: [PATCH] clocksource: sirf: Remove unused variable
+In-Reply-To: <548F09B6.6010202@linaro.org>
+References: <1418659160-2115-1-git-send-email-thierry.reding@gmail.com>
+ <548F09B6.6010202@linaro.org>
+Message-ID: <CAGsJ_4zQqwNdu3z1hzuLd4gvxY8iA+9HfdoTE8_U2tDmRUBNYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 January 2015 13:33:27 Baruch Siach wrote:
-> > Once there are no more review comments, please submit the first three
-> > patches to arm at kernel.org, and send the other patches as separate
-> > series to the respective maintainers for irqchip and clocksource.
-> 
-> What about the last patch in this series (ARM: devicetree: document supported 
-> Conexant Digicolor SoC)? What tree should it go through.
+2014-12-16 0:17 GMT+08:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 12/15/2014 04:59 PM, Thierry Reding wrote:
+>>
+>> From: Thierry Reding <treding@nvidia.com>
+>>
+>> Commit ef89af1f4380 ("clocksource: sirf: Remove hard-coded clock rate")
+>> removes all uses of the timer_div variable. Since the variable is no
+>> longer used it should be removed.
+>>
+>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>> ---
+>
+>
+> Applied to my tree. Thanks!
 
-That can go along with the first three patches for the platform.
+Daniel,
 
-	Arnd
+i didn't find this commit in any tree in kernel.org. am i missing something?
+
+so i manually rebased "clocksource: marco: rename marco to atlas7"
+against this commit.
+
+can you help to apply the attached patch to your tree? i guess pulling
+by arm-soc will cause conflicts.
+
+
+>
+>   -- Daniel
+>
+
+-barry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-clocksource-marco-rename-marco-to-atlas7.patch
+Type: text/x-patch
+Size: 20190 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150111/d2680e92/attachment-0001.bin>
