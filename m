@@ -1,33 +1,95 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 11 Jan 2015 22:44:59 +0400
-Subject: [PATCH v2 2/3] usb: phy: add lubbock phy driver
-In-Reply-To: <20150108165834.GH31926@saruman>
-References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
- <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
- <20150108165834.GH31926@saruman>
-Message-ID: <CALT56yOaX0EQbbFSXiFK=uqSpCwv4pQsU4QFMSmSoTstq2d7zw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 11 Jan 2015 20:11:31 +0100
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+In-Reply-To: <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
+References: <20141121114950.GB3401@cbox>
+ <CAAhSdy3-+5T0sOEGHLtHbPQJ+3hXdZxL=695dq7PJ2J0qmVbTg@mail.gmail.com>
+ <20141124143753.GO3401@cbox>
+ <CAAhSdy0+Z8o6dx=Bq+Ep7ybQpTpj+QNJm4oJbKa8yCM7WS8oxg@mail.gmail.com>
+ <20141125134239.GI31297@cbox>
+ <CAAhSdy32G+-BVQk-=dWjfM1S-cytGavp4qq942m=3y7HUudguw@mail.gmail.com>
+ <5476FFAF.2010601@arm.com>
+ <CAAhSdy3US4H9DZLDmwawR6D22GUpQ8H5NqrZ8XvYJjhsnPzzRQ@mail.gmail.com>
+ <547705BF.5040609@arm.com>
+ <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
+Message-ID: <20150111191131.GC3868@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Dec 30, 2014 at 11:19:13AM +0530, Anup Patel wrote:
+> (dropping previous conversation for easy reading)
+> 
+> Hi Marc/Christoffer,
+> 
+> I tried implementing PMU context-switch via C code
+> in EL1 mode and in atomic context with irqs disabled.
+> The context switch itself works perfectly fine but
+> irq forwarding is not clean for PMU irq.
+> 
+> I found another issue that is GIC only samples irq
+> lines if they are enabled. This means for using
+> irq forwarding we will need to ensure that host PMU
+> irq is enabled.  The arch_timer code does this by
+> doing request_irq() for host virtual timer interrupt.
+> For PMU, we can either enable/disable host PMU
+> irq in context switch or we need to do have shared
+> irq handler between kvm pmu and host kernel pmu.
 
-2015-01-08 19:58 GMT+03:00 Felipe Balbi <balbi@ti.com>:
-> On Sun, Nov 30, 2014 at 01:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
->> Extract lubbock-specific code from pxa25x_udc driver. As a bonus, phy
->> driver determines connector/VBUS status by reading CPLD register. Also
->> it uses a work to call into udc stack, instead of pinging vbus session
->> right from irq handler.
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> ---
->>  drivers/usb/phy/Kconfig       |  10 ++
->>  drivers/usb/phy/Makefile      |   1 +
->
-> new phy drivers under drivers/phy only, sorry.
+could we simply require the host PMU driver to request the IRQ and have
+the driver inject the corresponding IRQ to the VM via a mechanism
+similar to VFIO using an eventfd and irqfds etc.?
 
-Hmm. How do drivers/phy drivers coordinate with usb gadget subsystem?
-I see none of them calling usb_gadget_vbus_connect/disconnect().
+(I haven't quite thought through if there's a way for the host PMU
+driver to distinguish between an IRQ for itself and one for the guest,
+though).
 
--- 
-With best wishes
-Dmitry
+It does feel like we will need some sort of communication/coordination
+between the host PMU driver and KVM...
+
+> 
+> I have rethinked about our discussion so far. I
+> understand that we need KVM PMU virtualization
+> to meet following criteria:
+> 1. No modification in host PMU driver
+
+is this really a strict requirement?  one of the advantages of KVM
+should be that the rest of the kernel should be supportive of KVM.
+
+> 2. No modification in guest PMU driver
+> 3. No mask/unmask dance for sharing host PMU irq
+> 4. Clean way to avoid infinite VM exits due to
+> PMU interrupt
+> 
+> I have discovered new approach which is as follows:
+> 1. Context switch PMU in atomic context (i.e. local_irq_disable())
+> 2. Ensure that host PMU irq is disabled when entering guest
+> mode and re-enable host PMU irq when exiting guest mode if
+> it was enabled previously.
+
+How does this look like software-engineering wise?  Would you be looking
+up the IRQ number from the DT in the KVM code again?  How does KVM then
+synchronize with the host PMU driver so they're not both requesting the
+same IRQ at the same time?
+
+> This is to avoid infinite VM exits
+> due to PMU interrupt because as-per new approach we
+> don't mask the PMU irq via PMINTENSET_EL1 register.
+> 3. Inject virtual PMU irq at time of entering guest mode if PMU
+> overflow register is non-zero (i.e. PMOVSSET_EL0) in atomic
+> context (i.e. local_irq_disable()).
+> 
+> The only limitation of this new approach is that virtual PMU irq
+> is injected at time of entering guest mode. This means guest
+> will receive virtual PMU  interrupt with little delay after actual
+> interrupt occurred.
+
+it may never receive it in the case of a tickless configuration AFAICT,
+so this doesn't sound like the right approach.
+
+> The PMU interrupts are only overflow events
+> and generally not used in any timing critical applications. If we
+> can live with this limitation then this can be a good approach
+> for KVM PMU virtualization.
+> 
+Thanks,
+-Christoffer
