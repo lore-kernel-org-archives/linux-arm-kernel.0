@@ -1,45 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 11 Jan 2015 13:56:15 +0100
-Subject: [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150111135615.3326d803@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 11 Jan 2015 14:10:09 +0100
+Subject: [GIT PULL 0/2] KVM/ARM Fixes for 3.19
+Message-ID: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Paolo,
 
-On Wed,  3 Dec 2014 21:44:04 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+The following changes since commit b1940cd21c0f4abdce101253e860feff547291b0:
 
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and
-> smc syscon regmaps.
-> 
-> The first 4 patches introduce 2 syscon devices needed to configure the
-> EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
-> patches declares the EBI related nodes in sama5d3 dts[i] files.
+  Linux 3.19-rc3 (2015-01-05 17:05:20 -0800)
 
-Can you take the first 4 patches of this series (adding 2 syscon
-devices and their associated bindings doc) for 3.20 ?
-Alexandre has worked on multi platform support for Atmel SoCs and his
-work depends on these two syscon devices.
+are available in the git repository at:
 
-Let me know if you want me to send to send a new series containing only
-those 4 commits.
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-3.19
 
-Best Regards,
+for you to fetch changes up to b5b8ddba844c6b6c5b96c27b284d9ed05a16fa13:
 
-Boris
+  arm64: KVM: Fix HCR setting for 32bit guests (2015-01-11 13:54:51 +0100)
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+(Note that I got an extra merge commit when merging kvm/master into
+kvmarm/master, which I think is because Linus applied the set of fixes
+from kvmarm/master directly from Marc's patches. Let me know if you need
+me to mangle this differently somehow.)
+
+Thanks,
+-Christoffer
+
+----------------------------------------------------------------
+Fixes for KVM/ARM for 3.19 addressing TLB invalidation issues and 32-bit guest
+regression.
+
+----------------------------------------------------------------
+Marc Zyngier (2):
+      arm64: KVM: Fix TLB invalidation by IPA/VMID
+      arm64: KVM: Fix HCR setting for 32bit guests
+
+ arch/arm64/include/asm/kvm_emulate.h | 2 ++
+ arch/arm64/kvm/hyp.S                 | 1 +
+ arch/arm64/kvm/reset.c               | 1 -
+ 3 files changed, 3 insertions(+), 1 deletion(-)
