@@ -1,78 +1,91 @@
 From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sun, 11 Jan 2015 16:18:23 +0100
-Subject: [PATCH 1/2] ARM: sa1111: Remove legacy suspend/resume support
-Message-ID: <1420989504-29845-1-git-send-email-lars@metafoo.de>
+Date: Sun, 11 Jan 2015 16:18:24 +0100
+Subject: [PATCH 2/2] ARM: locomo: Remove legacy suspend/resume support
+In-Reply-To: <1420989504-29845-1-git-send-email-lars@metafoo.de>
+References: <1420989504-29845-1-git-send-email-lars@metafoo.de>
+Message-ID: <1420989504-29845-2-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are currently no sa1111 device drivers that implement suspend/resume
+There are currently no locomo device driver that implements suspend/resume
 and this patch removes the bus specific legacy suspend and resume callbacks.
 This will allow us to eventually remove struct bus_type legacy suspend and
 resume support altogether.
 
-sa1111 device drivers wanting to implement suspend and resume can use dev PM
+Locomo device drivers wanting to implement suspend and resume can use dev PM
 ops which will work out of the box without further modifications necessary.
 
 Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 ---
- arch/arm/common/sa1111.c               | 24 ------------------------
- arch/arm/include/asm/hardware/sa1111.h |  2 --
- 2 files changed, 26 deletions(-)
+ arch/arm/common/locomo.c               | 28 ----------------------------
+ arch/arm/include/asm/hardware/locomo.h |  2 --
+ 2 files changed, 30 deletions(-)
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 5cc779c..a292b9a 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -1295,28 +1295,6 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
- 	return dev->devid & drv->devid;
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index b55c362..371f864 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -519,10 +519,6 @@ static int locomo_remove(struct platform_device *dev)
+ static struct platform_driver locomo_device_driver = {
+ 	.probe		= locomo_probe,
+ 	.remove		= locomo_remove,
+-#ifdef CONFIG_PM
+-	.suspend	= locomo_suspend,
+-	.resume		= locomo_resume,
+-#endif
+ 	.driver		= {
+ 		.name	= "locomo",
+ 	},
+@@ -826,28 +822,6 @@ static int locomo_match(struct device *_dev, struct device_driver *_drv)
+ 	return dev->devid == drv->devid;
  }
  
--static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
+-static int locomo_bus_suspend(struct device *dev, pm_message_t state)
 -{
--	struct sa1111_dev *sadev = SA1111_DEV(dev);
--	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+-	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
 -	int ret = 0;
 -
 -	if (drv && drv->suspend)
--		ret = drv->suspend(sadev, state);
+-		ret = drv->suspend(ldev, state);
 -	return ret;
 -}
 -
--static int sa1111_bus_resume(struct device *dev)
+-static int locomo_bus_resume(struct device *dev)
 -{
--	struct sa1111_dev *sadev = SA1111_DEV(dev);
--	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+-	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
 -	int ret = 0;
 -
 -	if (drv && drv->resume)
--		ret = drv->resume(sadev);
+-		ret = drv->resume(ldev);
 -	return ret;
 -}
 -
- static void sa1111_bus_shutdown(struct device *dev)
+ static int locomo_bus_probe(struct device *dev)
  {
- 	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
-@@ -1352,8 +1330,6 @@ struct bus_type sa1111_bus_type = {
- 	.match		= sa1111_match,
- 	.probe		= sa1111_bus_probe,
- 	.remove		= sa1111_bus_remove,
--	.suspend	= sa1111_bus_suspend,
--	.resume		= sa1111_bus_resume,
- 	.shutdown	= sa1111_bus_shutdown,
- };
- EXPORT_SYMBOL(sa1111_bus_type);
-diff --git a/arch/arm/include/asm/hardware/sa1111.h b/arch/arm/include/asm/hardware/sa1111.h
-index 7c2bbc7..8fc6363 100644
---- a/arch/arm/include/asm/hardware/sa1111.h
-+++ b/arch/arm/include/asm/hardware/sa1111.h
-@@ -430,8 +430,6 @@ struct sa1111_driver {
- 	unsigned int		devid;
- 	int (*probe)(struct sa1111_dev *);
- 	int (*remove)(struct sa1111_dev *);
--	int (*suspend)(struct sa1111_dev *, pm_message_t);
--	int (*resume)(struct sa1111_dev *);
- 	void (*shutdown)(struct sa1111_dev *);
+ 	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+@@ -875,8 +849,6 @@ struct bus_type locomo_bus_type = {
+ 	.match		= locomo_match,
+ 	.probe		= locomo_bus_probe,
+ 	.remove		= locomo_bus_remove,
+-	.suspend	= locomo_bus_suspend,
+-	.resume		= locomo_bus_resume,
  };
  
+ int locomo_driver_register(struct locomo_driver *driver)
+diff --git a/arch/arm/include/asm/hardware/locomo.h b/arch/arm/include/asm/hardware/locomo.h
+index 74e51d6b..f8712e3 100644
+--- a/arch/arm/include/asm/hardware/locomo.h
++++ b/arch/arm/include/asm/hardware/locomo.h
+@@ -189,8 +189,6 @@ struct locomo_driver {
+ 	unsigned int		devid;
+ 	int (*probe)(struct locomo_dev *);
+ 	int (*remove)(struct locomo_dev *);
+-	int (*suspend)(struct locomo_dev *, pm_message_t);
+-	int (*resume)(struct locomo_dev *);
+ };
+ 
+ #define LOCOMO_DRV(_d)	container_of((_d), struct locomo_driver, drv)
 -- 
 1.8.0
