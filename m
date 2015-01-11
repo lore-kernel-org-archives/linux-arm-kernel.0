@@ -1,36 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 Jan 2015 12:40:05 +0100
-Subject: [PATCH 0/5] clocksource: sun5i: Support parent clock rate changes
-Message-ID: <1420976410-7826-1-git-send-email-maxime.ripard@free-electrons.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Sun, 11 Jan 2015 13:10:12 +0100
+Subject: [PATCH] avr32: remove fake at91 cpu identification
+In-Reply-To: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150111121012.GB4050@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Around Sun 11 Jan 2015 03:00:16 +0100 or thereabout, Alexandre Belloni wrote:
+> cpu_is_at91* are not used in any driver outside mach-at91. Remove those useless
+> definitions.
 
-The Allwinner HS timers have the AHB clock as their parent
-clock. Since this clock is shared with other devices, we could very
-well have another driver requesting a rate change of that clock,
-making our timer change frequency at the same time.
+Great, thank you for cleaning.
 
-This is especially true on the A31, where the DMA controller needs to
-do such a rate change, making the HS timer unreliable at the time on
-the A31.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>
 
-This serie makes some cleanups and implements clock notifiers to be
-able to reflect such rate changes and make sure that the timer is
-always working.
+Acked-by: Hans-Chrisitan Egtvedt <egtvedt@samfundet.no>
 
-Maxime
+> ---
+> 
+> Hans-Christian,
+> 
+> If you want, I guess that one could go through the at91 tree. Unless you have
+> more material and you want to do a pull request for 3.20.
 
-Maxime Ripard (5):
-  clocksource: sun5i: Switch to request_irq
-  clocksource: sun5i: Use of_io_request_and_map
-  clocksource: sun5i: Remove sched_clock
-  clocksource: sun5i: Refactor the current code
-  clocksource: sun5i: Add clock notifiers
+I have another patch in the pipe wiring up syscalls for AVR32, so I'll push
+this through my tree for 3.20.
 
- drivers/clocksource/timer-sun5i.c | 306 +++++++++++++++++++++++++++++---------
- 1 file changed, 232 insertions(+), 74 deletions(-)
+>  arch/avr32/mach-at32ap/include/mach/cpu.h | 26 +-------------------------
+>  1 file changed, 1 insertion(+), 25 deletions(-)
+
+<snipp diff>
 
 -- 
-2.2.1
+HcE
