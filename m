@@ -1,76 +1,63 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 12 Jan 2015 15:26:39 +0100
-Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
-In-Reply-To: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
-References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAAObsKDXTwmXQ_oviSv4jyvaVepgsw8g5VJNpt1X=JCzfpTYuw@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 12 Jan 2015 15:28:12 +0100
+Subject: [RFC 8/8] ARM64: Add uprobe support
+In-Reply-To: <54B355FA.60702@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
+ <20150109175936.GB13161@redhat.com> <54B355FA.60702@redhat.com>
+Message-ID: <20150112142812.GB25914@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 January 2015 at 17:14, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> This is yet another try to solve the issues of dealing with power sequences for
-> the MMC subsystem. The latest attempt, see link below, took a generic approach
-> by adding a new top level driver layer. That's was rejected by several reasons.
-> http://lwn.net/Articles/602855/
+On 01/12, Pratyush Anand wrote:
 >
-> This time the approach is focused to fix the issues for MMC only.
 >
-> To give a short background, SOCs may specify a specific MMC power sequence. To
-> successfully detect an (e)MMC/SD/SDIO card, that power sequence must be followed
-> while initializing the card.
+> On Friday 09 January 2015 11:29 PM, Oleg Nesterov wrote:
+>> On 12/31, Pratyush Anand wrote:
+>>>
+>>> +int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
+>>> +		unsigned long addr)
+>>> +{
+>>> +	probe_opcode_t insn;
+>>> +
+>>> +	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
+>>> +
+>>> +	switch (arm_probe_decode_insn(insn, &auprobe->ainsn)) {
+>>> +	case INSN_REJECTED:
+>>> +		return -EINVAL;
+>>> +
+>>> +	case INSN_GOOD_NO_SLOT:
+>>> +		auprobe->simulate = true;
+>>> +		if (auprobe->ainsn.prepare)
+>>> +			auprobe->ainsn.prepare(insn, &auprobe->ainsn);
+>>> +		break;
+>>> +
+>>> +	case INSN_GOOD:
+>>> +	default:
+>>> +		break;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>
+>> forgot to mention... shouldn't it also check IS_ALIGNED(addr, AARCH64_INSN_SIZE) ?
+>>
+>> I do not know if unaligned insn address is valid on arm64 or not, but please
+>
+> AARCH64 instructions are always of fixed lenght ie 4 bytes. I do not see
+> possibility of addr being unaligned. Please let me know, if I am missing
+> something.
 
-Hi Ulf,
+A user can write any offset into uprobe_events, and the generic code doesn't
+check it is aligned.
 
-have used this to successfully init a mwifiex_sdio card but had to
-also add a delay while the reset line is asserted. May make sense to
-add a property to the pwrseq node to specify the minimum amount of
-time that the reset GPIO needs to be asserted?
+>> note that at least it should not cross the page boundary, set_swbp() needs to
+>> write AARCH64_INSN_SIZE == UPROBE_SWBP_INSN bytes and it assumes that this
+>> should fit the single page.
+>
+> So, again I do not see the possibility of crossing of page boundary for
+> any instruction address.
 
-Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+See above. So yes, it should really check IS_ALIGNED(AARCH64_INSN_SIZE).
 
-Thanks,
-
-Tomeu
-
-> To be able to handle these SOC specific power sequences, we add a MMC power
-> sequence interface, which helps the mmc core to deal with such.
->
-> A MMC power sequence provider then implements a set of callbacks from the above
-> mentioned interface. The provider has a corresponding DT compatibility string
-> and relies on CONFIG_OF to be set to find it's various resourses, like for
-> example a GPIO reset.
->
-> The mmc core will from mmc_of_parse() try find a "mmc-pwrseq" DT node and then
-> call the corresponding MMC power sequence provider's initialization function.
->
->
-> Ulf Hansson (4):
->   mmc: core: Initial support for MMC power sequences
->   mmc: pwrseq: Document DT bindings for the simple MMC power sequence
->   mmc: pwrseq: Initial support for the simple MMC power sequence
->     provider
->   mmc: pwrseq_simple: Add support for a reset GPIO pin
->
->  .../devicetree/bindings/mmc/mmc,pwrseq-simple.txt  |  23 +++++
->  Documentation/devicetree/bindings/mmc/mmc.txt      |   5 +
->  drivers/mmc/core/Makefile                          |   2 +-
->  drivers/mmc/core/core.c                            |   7 ++
->  drivers/mmc/core/host.c                            |   4 +-
->  drivers/mmc/core/pwrseq.c                          | 109 +++++++++++++++++++++
->  drivers/mmc/core/pwrseq.h                          |  42 ++++++++
->  drivers/mmc/core/pwrseq_simple.c                   |  86 ++++++++++++++++
->  include/linux/mmc/host.h                           |   2 +
->  9 files changed, 278 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
->  create mode 100644 drivers/mmc/core/pwrseq.c
->  create mode 100644 drivers/mmc/core/pwrseq.h
->  create mode 100644 drivers/mmc/core/pwrseq_simple.c
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Oleg.
