@@ -1,35 +1,36 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 13 Jan 2015 01:31:14 +0300
-Subject: [PATCH] ARM: shmobile: r8a7791: fix MSTP8 input clocks
-Message-ID: <4221957.7dd2kFrTHY@wasted.cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 12 Jan 2015 14:34:15 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 CCF Updates for v3.20
+In-Reply-To: <cover.1419809955.git.horms+renesas@verge.net.au>
+References: <cover.1419809955.git.horms+renesas@verge.net.au>
+Message-ID: <20150112223415.GJ22090@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I made  a mistake when rebasing Andrey Gusakov's patch adding MLB+ clock to the
-R8A7791 device  tree, inserting <&hp_clk> into the "clocks"  property of the
-MSTP8 node at a wrong position, so that the input clocks for MLB+ and IPMMU-SGX
-got swapped...
+On Mon, Dec 29, 2014 at 10:46:58AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC sh73a0 CCF updates for v3.20.
+> 
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-ccf-for-v3.20
+> 
+> for you to fetch changes up to 09bd745b555c262d1e2c851777317f3adf3cf3d4:
+> 
+>   ARM: shmobile: sh73a0: disable legacy clock initialization (2014-12-21 17:09:25 +0900)
 
-Fixes: 7408d3061d2f ("ARM: shmobile: r8a7791: add MLB+ clock")
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+This could really have been sliced slightly differently with the drivers/clk
+change going in a drivers branch, but that might be a bit too messy given that
+this is better done as a mostly-atomic switch over.
 
----
-The patch is against 'renesas-devel-20150108v2-v3.19-rc3' tag of Simon Horman's
-'renesas.git' repo.
+I've merged this into next/drivers as a whole now. Please be careful with
+conflicts against this branch with other new additions this cycle.
 
- arch/arm/boot/dts/r8a7791.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1196,7 +1196,7 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
-+			clocks = <&zg_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
- 			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
+-Olof
