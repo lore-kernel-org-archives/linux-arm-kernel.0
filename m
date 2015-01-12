@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Jan 2015 15:09:13 -0800
-Subject: [GIT PULL] ARM: brcmstb: SMP updates for v3.20
-Message-ID: <1421104153-6686-1-git-send-email-f.fainelli@gmail.com>
+Date: Mon, 12 Jan 2015 15:11:23 -0800
+Subject: [GIT PULL] Broadcom MAINTAINERS file updates for 3.20
+Message-ID: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,19 +11,25 @@ The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
 are available in the git repository at:
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/brcmstb-smp
+  http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
 
-for you to fetch changes up to a1ad3b94a7661b643fef2efbc6fc217bd148f462:
+for you to fetch changes up to c3a8f6399f6fb748bf0067bd3d97c0653d434648:
 
-  ARM: brcmstb: update CPU power management sequence (2015-01-12 14:59:29 -0800)
-
-----------------------------------------------------------------
-This pull request contains updates to the brcmstb SMP code to use the manual
-sequence instead of hardware state machine since it is not reliable.
+  MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs (2015-01-12 15:02:57 -0800)
 
 ----------------------------------------------------------------
-Brian Norris (1):
-      ARM: brcmstb: update CPU power management sequence
+This pull request contains updates to our MAINTAINERS files for all relevant
+Broadcom SoCs: BCM63xx, Cygnus/iProc, ARM & MIPS-based BCM7xxx (brcmstb).
 
- arch/arm/mach-bcm/platsmp-brcmstb.c | 85 +++++++++++++++++++++++++++----------
- 1 file changed, 63 insertions(+), 22 deletions(-)
+Our new code location for all Broadcom-related kernel activities is now on
+http://github.com/Broadcom/.
+
+----------------------------------------------------------------
+Florian Fainelli (4):
+      MAINTAINERS: move BCM63xx ARM-based SoCs git tree
+      MAINTAINERS: update Broadcom Cygnus SoC git tree
+      MAINTAINERS: add a git entry for BCM7xxx ARM-based SoCs
+      MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs
+
+ MAINTAINERS | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
