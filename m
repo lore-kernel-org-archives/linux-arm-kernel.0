@@ -1,52 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Jan 2015 16:18:47 +0100
-Subject: [PATCH] Added support for pogoplug e02 (pink/gray)
-In-Reply-To: <1421043061-2837-1-git-send-email-ottxor@gentoo.org>
-References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
- <1421043061-2837-1-git-send-email-ottxor@gentoo.org>
-Message-ID: <20150112151847.GD8094@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Jan 2015 16:27:52 +0100
+Subject: [GIT PULL] at91: fixes for 3.19 #1 (ter)
+Message-ID: <1421076472-10589-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 11:11:01PM -0700, Christoph Junghans wrote:
-> The pogoplug differs from the SheevaPlug only by a
-> few details, but especially in the led assignments.
-> This patch was tested under Gentoo Linux.
-> A version of this patch was included in Arch Linux
-> on Arm since Jun 2014:
-> https://github.com/archlinuxarm/PKGBUILDs/commit/250c2f0aa6ffe66c0ebda61efaa356e5dc709cc7
-> A similar patch is available for OpenWrt:
-> https://dev.openwrt.org/browser/trunk/target/linux/kirkwood/patches-3.14/150-pogoplug_e02.patch
-> 
-> Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
-> Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
-> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 114 +++++++++++++++++++++
->  3 files changed, 116 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index ac7269f..e5f58c6 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -32,6 +32,7 @@ cdns	Cadence Design Systems Inc.
->  chrp	Common Hardware Reference Platform
->  chunghwa	Chunghwa Picture Tubes Ltd.
->  cirrus	Cirrus Logic, Inc.
-> +cloudengines	Cloud Engines, Inc.
->  cortina	Cortina Systems, Inc.
->  crystalfontz	Crystalfontz America, Inc.
->  dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+Arnd, Olof, Kevin,
 
-Hi Christoph
+Here is the fixes pull-request for 3.19 that supersedes the ones already sent.
+It collects all the fixes that I have currently for this kernel revision.
 
-Please make sure the device tree maintainers see this part of the
-patch. I added them as Cc:
+Thanks, best regards,
 
-We can however take this change via mvebu->arm-soc if nobody objects.
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-   Andrew
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to b8659752c37ec157ee254cff443b1c9d523aea22:
+
+  ARM: at91: board-dt-sama5: add phy_fixup to override NAND_Tree (2015-01-12 15:50:23 +0100)
+
+----------------------------------------------------------------
+First fixes batch for AT91 on 3.19:
+- fix some DT entries
+- correct clock entry for the at91sam9263 LCD
+- add a phy_fixup for Eth1 on sama5d4
+
+----------------------------------------------------------------
+Alexander Stein (1):
+      ARM: at91/dt: sam9263: Add missing clocks to lcdc node
+
+Bo Shen (2):
+      ARM: at91/dt: sama5d4: fix the timer reg length
+      ARM: at91: sama5d3: dt: correct the sound route
+
+Wenyou Yang (1):
+      ARM: at91: board-dt-sama5: add phy_fixup to override NAND_Tree
+
+ arch/arm/boot/dts/at91sam9263.dtsi  |  2 ++
+ arch/arm/boot/dts/sama5d3xmb.dtsi   |  2 +-
+ arch/arm/boot/dts/sama5d4.dtsi      |  2 +-
+ arch/arm/mach-at91/board-dt-sama5.c | 18 ++++++++++++++++++
+ 4 files changed, 22 insertions(+), 2 deletions(-)
+
+-- 
+Nicolas Ferre
