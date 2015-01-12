@@ -1,79 +1,73 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 12 Jan 2015 14:45:14 +0000
-Subject: GIC_CPU_MASK_SIMPLE(8)" on big.LITTLE?
-In-Reply-To: <CAMuHMdWQQBECdXT1pbChT31y8YdHzcjvTGR1A2HhtdtwpRmdPQ@mail.gmail.com>
-References: <CAMuHMdWQQBECdXT1pbChT31y8YdHzcjvTGR1A2HhtdtwpRmdPQ@mail.gmail.com>
-Message-ID: <20150112144514.GL823@e106497-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Jan 2015 15:52:26 +0100
+Subject: [PATCH] ARM: at91: board-dt-sama5: add phy_fixup to override
+ NAND_Tree which improperly strapp-in during the reset period.
+In-Reply-To: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
+References: <1418283069-5648-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <54B3DFAA.9020804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 05, 2015 at 10:37:47AM +0000, Geert Uytterhoeven wrote:
-> A while ago, I wondered:
+Le 11/12/2014 08:31, Wenyou Yang a ?crit :
+> Appearance: On some SAMA5D4EK boards, after power up, the Eth1 doesn't work.
 > 
-> | It's my understanding GIC_CPU_MASK_SIMPLE should reflect the actual number
-> | of CPU cores the interrupt is wired too. Is that correct?
-> |
-> | [Fixes for incorrect masks on shmobile]
-> |
-> | Should it be "GIC_CPU_MASK_SIMPLE(8)" on big.LITTLE configurations
-> | with four Cortex-A15 cores and four Cortex-A7 cores?
-> | Or should the interrupts be delivered to the four Cortex-A15 cores
-> | only by default?
-> |
-> | Note that incorrect masks for GIC PPI interrupts are not limited to
-> | shmobile. Presumably the interrupt specifiers got copied around a lot,
-> | cfr. the proliferation of "GIC_CPU_MASK_SIMPLE(4)" (and the older
-> | hardcoded "0xf0x" variant) in various dtsi files, not always limited to
-> | quad-core CPUs.
+> Reason: The PIOE2 pin is connected to the NAND_Tree# of KSZ8081,
+> But it outputs LOW during the reset period, which cause the NAND_Tree# enabled.
 > 
-> In the mean time, arch/arm64/boot/dts/arm/juno.dts got added, which has 2 A57
-> cores and 4 A53 cores, and uses GIC_CPU_MASK_SIMPLE(6), so it seems like
-> my two RFC patches to use GIC_CPU_MASK_SIMPLE(8) for 4 A15 cores and 4
-> A7 cores are actually correct?
+> Add phy_fixup() to disable NAND_Tree by overriding the Operation
+> Mode Strap Override register(i.e. Register 16h) to clear the NAND_Tree bit.
 > 
-> Thanks for your comments!
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+
+Stacked on top of at91-3.19-fixes.
+
+Bye,
+
+
+> ---
+>  arch/arm/mach-at91/board-dt-sama5.c |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
-> References:
->   1. Original RFC series:
->      [PATCH/RFC 0/4] ARM: shmobile: Correct masks for GIC PPI interrupts
->      http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306743.html
->   2. RFC patches:
->        a. [PATCH/RFC 3/4] ARM: shmobile: r8a7790: Correct mask for GIC
-> PPI interrupts
->           http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306741.html
->        b. [PATCH/RFC 4/4] ARM: shmobile: r8a73a4: Correct mask for GIC
-> PPI interrupts
->           http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306740.html
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 8fb9ef5..97f7367 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/phy.h>
+>  #include <linux/clk-provider.h>
+> +#include <linux/phy.h>
+>  
+>  #include <asm/setup.h>
+>  #include <asm/irq.h>
+> @@ -26,8 +27,25 @@
+>  
+>  #include "generic.h"
+>  
+> +static int ksz8081_phy_fixup(struct phy_device *phy)
+> +{
+> +	int value;
+> +
+> +	value = phy_read(phy, 0x16);
+> +	value &= ~0x20;
+> +	phy_write(phy, 0x16, value);
+> +
+> +	return 0;
+> +}
+> +
+>  static void __init sama5_dt_device_init(void)
+>  {
+> +	if (of_machine_is_compatible("atmel,sama5d4ek") &&
+> +	   IS_ENABLED(CONFIG_PHYLIB)) {
+> +		phy_register_fixup_for_id("fc028000.etherne:00",
+> +						ksz8081_phy_fixup);
+> +	}
+> +
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+>  
 > 
 
-Hi Geert,
-
-Sorry for delay in responding, I'm just coming back online.
-
-Your patches are correct, the mask should reflect the number of CPUs present *and* they way
-they are wired in the GIC. AFAIK, HW designers have been sane so far and wired the CPUs
-in sequence in the GIC, but I lack inside knowledge of the shmobile design.
-
-Best regards,
-Liviu
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Nicolas Ferre
