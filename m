@@ -1,23 +1,55 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 12 Jan 2015 15:35:59 -0500 (EST)
-Subject: [PATCH] net/at91_ether: prepare and unprepare clock
-In-Reply-To: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150112.153559.783855617585288378.davem@davemloft.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 12 Jan 2015 23:40:21 +0300
+Subject: [PATCH] ARM: shmobile: r8a7791: add MLB+ clock
+In-Reply-To: <7846462.yepFC759KH@wasted.cogentembedded.com>
+References: <7846462.yepFC759KH@wasted.cogentembedded.com>
+Message-ID: <54B43135.6000002@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Date: Wed,  7 Jan 2015 23:59:26 +0100
+Hello.
 
-> The clock is enabled without being prepared, this leads to:
-> 
-> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
-> 
-> and a non working ethernet interface.
-> 
-> Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 12/18/2014 11:43 PM, Sergei Shtylyov wrote:
 
-Applied, thanks.
+> From: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
+
+> Add MLB+ clock to R8A7791 device tree.
+
+> Signed-off-by: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
+> [Sergei: rebased, renamed, added changelog]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> ---
+> This patch is against 'renesas-devel-20141218-v3.18' tag of Simon Horman's
+> 'renesas.git' repo.
+
+>   arch/arm/boot/dts/r8a7791.dtsi            |   10 +++++-----
+>   include/dt-bindings/clock/r8a7791-clock.h |    1 +
+>   2 files changed, 6 insertions(+), 5 deletions(-)
+
+> Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -1154,17 +1154,17 @@
+>   		mstp8_clks: mstp8_clks at e6150990 {
+>   			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+>   			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
+> -			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>,
+> -				 <&zs_clk>, <&zs_clk>;
+> +			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
+
+    Oops, the first two clocks need to be swapped. I'll send a fix (since this 
+patch has been merged already).
+
+> +			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
+>   			#clock-cells = <1>;
+>   			clock-indices = <
+> -				R8A7791_CLK_IPMMU_SGX
+> +				R8A7791_CLK_IPMMU_SGX R8A7791_CLK_MLB
+>   				R8A7791_CLK_VIN2 R8A7791_CLK_VIN1 R8A7791_CLK_VIN0
+>   				R8A7791_CLK_ETHER R8A7791_CLK_SATA1 R8A7791_CLK_SATA0
+>   			>;
+[...]
+
+WBR, Sergei
