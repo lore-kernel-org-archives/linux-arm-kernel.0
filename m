@@ -1,235 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 12 Jan 2015 12:25:46 +0000
-Subject: [RFC PATCH] serial: amba-pl011: Kickstart TX by explicit FIFO fill
-Message-ID: <1421065546-18074-1-git-send-email-Dave.Martin@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Jan 2015 13:54:11 +0100
+Subject: [PATCH v3 1/5] usb: atmel_usba_udc: Rework at91sam9rl errata
+ handling
+In-Reply-To: <1421064958.22660.54.camel@x220>
+References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421060278-27329-2-git-send-email-boris.brezillon@free-electrons.com>
+ <1421064958.22660.54.camel@x220>
+Message-ID: <20150112135411.29c6315e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the transmit state machine arranges for the TX IRQ
-always to be asserted whever the FIFO fill level is below the
-watermark set in IFLS, with all actual transmission being done on
-the back of the TX IRQ.
+Hi Paul,
 
-To kickstart transmission, pl011_startup() temporarily disables the
-FIFO, enables loopback mode and transmits a dummy character in
-order to trigger the initial assertion of the IRQ.
+On Mon, 12 Jan 2015 13:15:58 +0100
+Paul Bolle <pebolle@tiscali.nl> wrote:
 
-This leads to two problems:
+> On Mon, 2015-01-12 at 11:57 +0100, Boris Brezillon wrote:
+> > at91sam9rl SoC has an erratum forcing us to toggle the BIAS on USB
+> > suspend/resume events.
+> > 
+> > This specific handling is only activated when CONFIG_ARCH_AT91SAM9RL is
+> > set and this option is only set when building a non-DT kernel, which is
+> > problematic since non-DT support for at91sam9rl SoC has been removed.
+> 
+> This sentence is not entirely correct. Commit bcf8c7e7703b ("ARM: at91:
+> remove at91sam9rl legacy board support") actually removed the Kconfig
+> symbol ARCH_AT91SAM9RL entirely. So the check for CONFIG_ARCH_AT91SAM9RL
+> has been pointless since (next-20141110 and) v3.19-rc1. See my report at
+> https://lkml.org/lkml/2014/11/10/232 .
 
- * Unfortunately, at least some pl011-based systems seem to send
-   this dummy character down the wire even in loopback mode (in
-   addition to looping it back).  This means that if
-   pl011_startup() is called in between other transmissions, the
-   odd timing of the dummy tx forces the receiver out of sync.
+I'll rework my commit message.
 
-   This causes problems when the console is on pl011 and userspace
-   opens and closes the same port often (*cough* systemd *cough*,
-   where large amounts of console output get turned to garbage as a
-   result).
+> 
+> (I stumbled on this patch because I contemplated sending a patch to
+> simply remove the check for CONFIG_ARCH_AT91SAM9RL and the currently
+> useless function toggle_bias.)
 
-   It also causes a single framing error whenever the port is
-   opened, in particulary in kernel_init_freeable() when preparing
-   the initial userspace environment.
+Sorry, I forgot to add you in Cc of this series :-(, I'll do it it for
+the future iterations.
 
- * The ARM SBSA UART[1] is a cut-down version of pl011.  The lack
-   of a loopback mode means that the dummy tx strategy isn't
-   suitable for this UART, but the other differences should be less
-   invasive.
+Best Regards,
 
-This patch makes an initial call to pl011_tx_chars() to get things
-going instead of sending a dummy character.  This should reduce the
-turnaround time of an XON/XOFF by one IRQ latency or so, as well as
-eliminating some IRQs around short writes from the tty layer.
+Boris
 
-There is no way to find out the TX FIFO fill level from the
-hardware directly, which becomes a problem when transmitting
-characters outside the interrupt handler.  To address this while
-keeping status polling minimal, a minimum bound on the space
-available is maintained in uap->tx_avail.  For now, if we are not
-sure there is any FIFO space at all, the driver transmits nothing
-and falls back to waiting for the next TX inerrupt.
-
-Thanks to Andrew Jackson for spotting some dumb bugs while I was
-developing this patch.
-
-[1] ARM-DEN-0029 Server Base System Architecture, available (click-
-    thru...) from http://infocenter.arm.com.  Version v2.3 was
-    referred to when drawing the above conclusions.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Andre Przywara <Andre.Przywara@arm.com>
----
-
-Tested on ARM Juno, ARM Fast Models and qemu.
-
-Additional testing from anyone with some random hardware using
-pl011 for the console would be welcome.
-
- drivers/tty/serial/amba-pl011.c |   64 +++++++++++++++++----------------------
- 1 file changed, 28 insertions(+), 36 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8d94c19..eb397c7 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -157,6 +157,7 @@ struct uart_amba_port {
- 	unsigned int		lcrh_rx;	/* vendor-specific */
- 	unsigned int		old_cr;		/* state during shutdown */
- 	bool			autorts;
-+	unsigned int		tx_avail;	/* min TX FIFO space */
- 	char			type[12];
- #ifdef CONFIG_DMA_ENGINE
- 	/* DMA stuff */
-@@ -585,6 +586,7 @@ static int pl011_dma_tx_refill(struct uart_amba_port *uap)
- 	 */
- 	xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
- 	uap->port.icount.tx += count;
-+	uap->tx_avail = 0; /* DMA will be keeping the FIFO full now */
- 
- 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
- 		uart_write_wakeup(&uap->port);
-@@ -686,7 +688,8 @@ static inline bool pl011_dma_tx_start(struct uart_amba_port *uap)
- 	uap->dmacr &= ~UART011_TXDMAE;
- 	writew(uap->dmacr, uap->port.membase + UART011_DMACR);
- 
--	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF) {
-+	if (uap->tx_avail < 1 &&
-+	    readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF) {
- 		/*
- 		 * No space in the FIFO, so enable the transmit interrupt
- 		 * so we know when there is space.  Note that once we've
-@@ -698,6 +701,8 @@ static inline bool pl011_dma_tx_start(struct uart_amba_port *uap)
- 	writew(uap->port.x_char, uap->port.membase + UART01x_DR);
- 	uap->port.icount.tx++;
- 	uap->port.x_char = 0;
-+	if (uap->tx_avail > 0)
-+		uap->tx_avail--;
- 
- 	/* Success - restore the DMA state */
- 	uap->dmacr = dmacr;
-@@ -1208,6 +1213,8 @@ static void pl011_stop_tx(struct uart_port *port)
- 	pl011_dma_tx_stop(uap);
- }
- 
-+static void pl011_tx_chars(struct uart_amba_port *uap);
-+
- static void pl011_start_tx(struct uart_port *port)
- {
- 	struct uart_amba_port *uap =
-@@ -1216,6 +1223,7 @@ static void pl011_start_tx(struct uart_port *port)
- 	if (!pl011_dma_tx_start(uap)) {
- 		uap->im |= UART011_TXIM;
- 		writew(uap->im, uap->port.membase + UART011_IMSC);
-+		pl011_tx_chars(uap);
- 	}
- }
- 
-@@ -1283,6 +1291,7 @@ static void pl011_tx_chars(struct uart_amba_port *uap)
- 		writew(uap->port.x_char, uap->port.membase + UART01x_DR);
- 		uap->port.icount.tx++;
- 		uap->port.x_char = 0;
-+		uap->tx_avail--;
- 		return;
- 	}
- 	if (uart_circ_empty(xmit) || uart_tx_stopped(&uap->port)) {
-@@ -1294,14 +1303,16 @@ static void pl011_tx_chars(struct uart_amba_port *uap)
- 	if (pl011_dma_tx_irq(uap))
- 		return;
- 
--	count = uap->fifosize >> 1;
--	do {
-+	count = uart_circ_chars_pending(xmit);
-+	if (uap->tx_avail < count)
-+		count = uap->tx_avail;
-+
-+	while (count--) {
- 		writew(xmit->buf[xmit->tail], uap->port.membase + UART01x_DR);
- 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
- 		uap->port.icount.tx++;
--		if (uart_circ_empty(xmit))
--			break;
--	} while (--count > 0);
-+		uap->tx_avail--;
-+	}
- 
- 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
- 		uart_write_wakeup(&uap->port);
-@@ -1372,8 +1383,10 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 			if (status & (UART011_DSRMIS|UART011_DCDMIS|
- 				      UART011_CTSMIS|UART011_RIMIS))
- 				pl011_modem_status(uap);
--			if (status & UART011_TXIS)
-+			if (status & UART011_TXIS) {
-+				uap->tx_avail = uap->fifosize >> 1;
- 				pl011_tx_chars(uap);
-+			}
- 
- 			if (pass_counter-- == 0)
- 				break;
-@@ -1392,8 +1405,12 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
- {
- 	struct uart_amba_port *uap =
- 	    container_of(port, struct uart_amba_port, port);
--	unsigned int status = readw(uap->port.membase + UART01x_FR);
--	return status & (UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 : TIOCSER_TEMT;
-+	unsigned int status = readw(uap->port.membase + UART01x_FR) &
-+		(UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 : TIOCSER_TEMT;
-+
-+	if (status)
-+		uap->tx_avail = uap->fifosize;
-+	return status;
- }
- 
- static unsigned int pl011_get_mctrl(struct uart_port *port)
-@@ -1577,7 +1594,7 @@ static int pl011_startup(struct uart_port *port)
- {
- 	struct uart_amba_port *uap =
- 	    container_of(port, struct uart_amba_port, port);
--	unsigned int cr, lcr_h, fbrd, ibrd;
-+	unsigned int cr;
- 	int retval;
- 
- 	retval = pl011_hwinit(port);
-@@ -1594,38 +1611,13 @@ static int pl011_startup(struct uart_port *port)
- 		goto clk_dis;
- 
- 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
--
--	/*
--	 * Provoke TX FIFO interrupt into asserting. Taking care to preserve
--	 * baud rate and data format specified by FBRD, IBRD and LCRH as the
--	 * UART may already be in use as a console.
--	 */
--	spin_lock_irq(&uap->port.lock);
--
--	fbrd = readw(uap->port.membase + UART011_FBRD);
--	ibrd = readw(uap->port.membase + UART011_IBRD);
--	lcr_h = readw(uap->port.membase + uap->lcrh_rx);
--
--	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
--	writew(cr, uap->port.membase + UART011_CR);
--	writew(0, uap->port.membase + UART011_FBRD);
--	writew(1, uap->port.membase + UART011_IBRD);
--	pl011_write_lcr_h(uap, 0);
--	writew(0, uap->port.membase + UART01x_DR);
--	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
--		barrier();
--
--	writew(fbrd, uap->port.membase + UART011_FBRD);
--	writew(ibrd, uap->port.membase + UART011_IBRD);
--	pl011_write_lcr_h(uap, lcr_h);
-+	uap->tx_avail = uap->fifosize; /* FIFO should be empty */
- 
- 	/* restore RTS and DTR */
- 	cr = uap->old_cr & (UART011_CR_RTS | UART011_CR_DTR);
- 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
- 	writew(cr, uap->port.membase + UART011_CR);
- 
--	spin_unlock_irq(&uap->port.lock);
--
- 	/*
- 	 * initialise the old status of the modem signals
- 	 */
 -- 
-1.7.10.4
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
