@@ -1,49 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 19:42:12 +0100
-Subject: [PATCH 3/7] ARM: at91: remove useless config MACH_AT91SAM9_DT
-In-Reply-To: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421088136-10172-4-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jan 2015 19:55:02 +0100
+Subject: [PATCH v2 1/3] dmaengine: Add support for APM X-Gene SoC DMA
+ engine driver
+In-Reply-To: <CAFd313xp5rZZZSSKk-DDTC4ccY9ZucGgmWrc9oG-TiK2FMBS1g@mail.gmail.com>
+References: <1420628981-22774-1-git-send-email-rsahu@apm.com>
+ <1420628981-22774-2-git-send-email-rsahu@apm.com>
+ <CAFd313xp5rZZZSSKk-DDTC4ccY9ZucGgmWrc9oG-TiK2FMBS1g@mail.gmail.com>
+Message-ID: <1701652.4qUlzcU1j2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that at91sam9 SoCs are only supported through DT, remove
-CONFIG_MACH_AT91SAM9_DT and use CONFIG_SOC_AT91SAM9 instead.
+On Monday 12 January 2015 14:40:09 Rameshwar Sahu wrote:
+> > +
+> > +       dma_set_mask_and_coherent(&pdev->dev,
+> > +                                 (sizeof(dma_addr_t) == sizeof(u64)) ?
+> > +                                 DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
+> > +
+> 
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig  | 5 -----
- arch/arm/mach-at91/Makefile | 2 +-
- 2 files changed, 1 insertion(+), 6 deletions(-)
+I commented on this on v1 already: always set the device specific mask here,
+it's independent of the CPU architecture, but do check the return value.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 34725b296e4d..cec0fb5d621a 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -174,11 +174,6 @@ config SOC_AT91SAM9N12
- # ----------------------------------------------------------
- endif # SOC_SAM_V4_V5
- 
--config MACH_AT91SAM9_DT
--	def_bool SOC_AT91SAM9
--
--# ----------------------------------------------------------
--
- comment "AT91 Feature Selections"
- 
- config AT91_SLOW_CLOCK
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 55fc93f5638b..9165a4aa7f0d 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -20,7 +20,7 @@ obj-$(CONFIG_SOC_SAMA5D4)	+= sama5d4.o
- 
- # AT91SAM board with device-tree
- obj-$(CONFIG_SOC_AT91RM9200) += board-dt-rm9200.o
--obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
-+obj-$(CONFIG_SOC_AT91SAM9) += board-dt-sam9.o
- 
- # SAMA5 board with device-tree
- obj-$(CONFIG_SOC_SAMA5)		+= board-dt-sama5.o
--- 
-2.1.0
+Also add the correct dma-ranges property in the parent, or else this will
+fail in the future once we add proper checks to dma_set_mask.
+
+	Arnd
