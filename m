@@ -1,80 +1,83 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 12 Jan 2015 18:08:16 +0100
-Subject: [PATCH v6 15/20] arm/arm64: KVM: add virtual GICv3 distributor
- emulation
-In-Reply-To: <54B39A8B.1010505@arm.com>
-References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
- <1420804478-17354-16-git-send-email-andre.przywara@arm.com>
- <20150111151507.GC21444@cbox> <54B39A8B.1010505@arm.com>
-Message-ID: <20150112170816.GK3868@cbox>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 12 Jan 2015 18:09:13 +0100
+Subject: [PATCH v2 2/5] KVM: ARM: on IO mem abort - route the call to
+ KVM MMIO bus
+In-Reply-To: <20141207093749.17563.12497.stgit@i3820>
+References: <20141207093641.17563.84226.stgit@i3820>
+ <20141207093749.17563.12497.stgit@i3820>
+Message-ID: <54B3FFB9.3050406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 09:57:31AM +0000, Andre Przywara wrote:
-
-[...]
-
-> >> +static int vgic_v3_map_resources(struct kvm *kvm,
-> >> +                              const struct vgic_params *params)
-> >> +{
-> >> +     int ret = 0;
-> >> +     struct vgic_dist *dist = &kvm->arch.vgic;
-> >> +
-> >> +     if (!irqchip_in_kernel(kvm))
-> >> +             return 0;
-> >> +
-> >> +     mutex_lock(&kvm->lock);
-> >> +
-> >> +     if (vgic_ready(kvm))
-> >> +             goto out;
-> >> +
-> >> +     if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
-> >> +         IS_VGIC_ADDR_UNDEF(dist->vgic_redist_base)) {
-> >> +             kvm_err("Need to set vgic distributor addresses first\n");
-> >> +             return -ENXIO;
-> > 
-> > you're not returning to userspace iwth a mutex held...
+Hi Nikolay,
+On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
+> On IO memory abort, try to handle the MMIO access thorugh the KVM
+> registered read/write callbacks. This is done by invoking the relevant
+> kvm_io_bus_* API.
 > 
-> Good catch. Will fix that.
+> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+> ---
+>  arch/arm/kvm/mmio.c |   33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
 > 
-> >> +     }
-> >> +
-> >> +     /*
-> >> +      * Initialize the vgic if this hasn't already been done on demand by
-> >> +      * accessing the vgic state from userspace.
-> >> +      */
-> >> +     ret = vgic_init(kvm);
-> >> +     if (ret) {
-> >> +             kvm_err("Unable to allocate maps\n");
-> >> +             goto out;
-> >> +     }
-> > 
-> > I don't think we should allow automatic vgic_init from userspace
-> > anymore, but require userspace to manually initialize the vgic when
-> > using a GICv3.
-> > 
-> > In fact, I think we need to change all the places that do the on-demand
-> > vgic init to error out somehow, if you're using anything else than a
-> > gicv2.
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 4cb5a93..e42469f 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	return 0;
+>  }
+>  
+> +/**
+> + * handle_kernel_mmio - handle an in-kernel MMIO access
+> + * @vcpu:	pointer to the vcpu performing the access
+> + * @run:	pointer to the kvm_run structure
+> + * @mmio:	pointer to the data describing the access
+> + *
+> + * returns true if the MMIO access has been performed in kernel space,
+> + * and false if it needs to be emulated in user space.
+> + */
+> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> +		struct kvm_exit_mmio *mmio)
+> +{
+> +	int ret;
+> +
+> +	if (mmio->is_write) {
+> +		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+> +				mmio->len, &mmio->data);
+> +
+> +	} else {
+> +		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
+> +				mmio->len, &mmio->data);
+> +	}
+> +	if (!ret) {
+> +		kvm_prepare_mmio(run, mmio);
+> +		kvm_handle_mmio_return(vcpu, run);
+> +	}
+> +
+> +	return !ret;
+in case ret < 0 (-EOPNOTSUPP = -95) aren't we returning true too? return
+(ret==0)?
+
+> +}
+> +
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa)
+>  {
+> @@ -200,6 +230,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	if (vgic_handle_mmio(vcpu, run, &mmio))
+>  		return 1;
+>  
+> +	if (handle_kernel_mmio(vcpu, run, &mmio))
+> +		return 1;
+> +
+>  	kvm_prepare_mmio(run, &mmio);
+>  	return 0;
+currently the io_mem_abort returned value is not used by mmu.c code. I
+think this should be handed in kvm_handle_guest_abort. What do you think?
+
+Best Regards
+
+Eric
+>  }
 > 
-> Ah yes, I think we didn't discuss this before. I know that the intention
-> was to make the explicit vgic init mandatory for GICv3, but to me it
-> looks like we need extra code to support this, so I refrained from
-> adding that right now.
-> Why do we require the vgic init call in the first place? Is that just to
-> make this whole VGIC init sequence more clearer and get rid of the
-> cumbersome automatic init's all over the place? So basically to fix a
-> design decision that we cannot undo anymore for vGICv2?
->
-
-Yes, the auto-init keeps breaking on us and it's generally quite messy.
-
-If you introduce that functionality for GICv3 as well, it becomes ABI
-that we need to maintain forever, so I'd like that we address it now.
-
-One option is to rename all the auto vgic_init calls to vgic_init_auto
-and check if a GICv2 was created in there and error out in that case,
-that should make the changes in connection with this series a simple
-mechanical patch.
-
--Christoffer
