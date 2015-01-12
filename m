@@ -1,52 +1,47 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 12 Jan 2015 16:52:20 +0100
-Subject: [RFC PATCH 0/4] Genericise the IOVA allocator
-In-Reply-To: <cover.1416931258.git.robin.murphy@arm.com>
-References: <cover.1416931258.git.robin.murphy@arm.com>
-Message-ID: <20150112155220.GD6343@8bytes.org>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Mon, 12 Jan 2015 07:54:46 -0800
+Subject: [PATCH RESEND] reset: sunxi: fix spinlock initialization
+Message-ID: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Call spin_lock_init() before the spinlocks are used, both in early init 
+and probe functions preventing a lockdep splat.
 
-On Tue, Nov 25, 2014 at 05:27:24PM +0000, Robin Murphy wrote:
-> Hi all,
-> 
-> I've been implementing IOMMU DMA mapping for arm64, based on tidied-up
-> parts of the existing arch/arm/mm/dma-mapping.c with a clear divide
-> between the arch-specific parts and the general DMA-API to IOMMU-API layer
-> so that that can be shared; similar to what Ritesh started before and was
-> unable to complete[1], but working in the other direction.
-> 
-> The first part of that tidy-up involved ripping out the homebrewed IOVA
-> allocator and plumbing in iova.c, necessitating the changes presented here.
-> The rest is currently sat under arch/arm64 for the sake of getting it
-> working quickly with minimal impact - ideally I'd move it out and port
-> arch/arm before merging, but I don't know quite how impatient people are.
-> Regardless of that decision, this bit stands alone, so here it is.
-> 
-> Feel free to ignore patches 1 and 2, since I see Sakari has recently
-> posted a more thorough series for that[2], that frankly looks nicer ;)
-> I've merely left them in as context here.
-> 
-> [1]:http://thread.gmane.org/gmane.linux.ports.arm.kernel/331299
-> [2]:http://article.gmane.org/gmane.linux.kernel.iommu/7436
-> 
-> Robin Murphy (4):
->   iommu: build iova.c for any IOMMU
->   iommu: consolidate IOVA allocator code
->   iommu: make IOVA domain low limit flexible
->   iommu: make IOVA domain page size explicit
+I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+and has been tested on a few other sunxi platforms without issue.
 
-Thanks for doing this, I like this patch-set.
+[1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+[2] http://kernelci.org/boot/?a80-optimus
 
-I would also appreciate if someone from Intel could have a look at it,
-David?
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+Cc: <stable@vger.kernel.org>
+---
+ drivers/reset/reset-sunxi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Besides, can you please re-post this patch-set rebased to latest
-upstream with the better versions of patch 1 and 2, please?
-
-I consider to apply these changes then.
-
-
-	Joerg
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+index eebc52c..3d95c87 100644
+--- a/drivers/reset/reset-sunxi.c
++++ b/drivers/reset/reset-sunxi.c
+@@ -102,6 +102,8 @@ static int sunxi_reset_init(struct device_node *np)
+ 		goto err_alloc;
+ 	}
+ 
++	spin_lock_init(&data->lock);
++
+ 	data->rcdev.owner = THIS_MODULE;
+ 	data->rcdev.nr_resets = size * 32;
+ 	data->rcdev.ops = &sunxi_reset_ops;
+@@ -157,6 +159,8 @@ static int sunxi_reset_probe(struct platform_device *pdev)
+ 	if (IS_ERR(data->membase))
+ 		return PTR_ERR(data->membase);
+ 
++	spin_lock_init(&data->lock);
++
+ 	data->rcdev.owner = THIS_MODULE;
+ 	data->rcdev.nr_resets = resource_size(res) * 32;
+ 	data->rcdev.ops = &sunxi_reset_ops;
+-- 
+2.1.3
