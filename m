@@ -1,49 +1,107 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Jan 2015 13:54:11 +0100
-Subject: [PATCH v3 1/5] usb: atmel_usba_udc: Rework at91sam9rl errata
- handling
-In-Reply-To: <1421064958.22660.54.camel@x220>
-References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421060278-27329-2-git-send-email-boris.brezillon@free-electrons.com>
- <1421064958.22660.54.camel@x220>
-Message-ID: <20150112135411.29c6315e@bbrezillon>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 12 Jan 2015 14:59:24 +0200
+Subject: sata_dwc_460ex build failures in -next
+In-Reply-To: <20150112125037.GH12302@n2100.arm.linux.org.uk>
+References: <E1YAZyB-0007iE-CZ@debutante> <20150112123655.GF4160@sirena.org.uk>
+ <20150112125037.GH12302@n2100.arm.linux.org.uk>
+Message-ID: <1421067564.31903.3.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Mon, 12 Jan 2015 13:15:58 +0100
-Paul Bolle <pebolle@tiscali.nl> wrote:
-
-> On Mon, 2015-01-12 at 11:57 +0100, Boris Brezillon wrote:
-> > at91sam9rl SoC has an erratum forcing us to toggle the BIAS on USB
-> > suspend/resume events.
+On Mon, 2015-01-12 at 12:50 +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 12, 2015 at 12:36:55PM +0000, Mark Brown wrote:
+> > On Mon, Jan 12, 2015 at 08:03:27AM +0000, Build bot for Mark Brown wrote:
 > > 
-> > This specific handling is only activated when CONFIG_ARCH_AT91SAM9RL is
-> > set and this option is only set when building a non-DT kernel, which is
-> > problematic since non-DT support for at91sam9rl SoC has been removed.
+> > > 	arm64-allmodconfig
+> > > ../drivers/ata/sata_dwc_460ex.c:719:3: error: implicit declaration of function 'dma_cache_sync' [-Werror=implicit-function-declaration]
+> > > 
+> > > 	arm-allmodconfig
+> > > ../drivers/ata/sata_dwc_460ex.c:719:3: error: implicit declaration of function 'dma_cache_sync' [-Werror=implicit-function-declaration]
+> > 
+> > Since commit 84683a7e081ff60e (sata_dwc_460ex: enable COMPILE_TEST for
+> > the driver) the sata_dwc_460ex has been breaking the all*config builds
+> > for arm and arm64 as the driver uses dma_cache_sync() but this function
+> > is not provided on those architectures.
+> > 
+> > Either a more specific dependency is needed or the function shouldn't be
+> > used, I've not looked at the code.
 > 
-> This sentence is not entirely correct. Commit bcf8c7e7703b ("ARM: at91:
-> remove at91sam9rl legacy board support") actually removed the Kconfig
-> symbol ARCH_AT91SAM9RL entirely. So the check for CONFIG_ARCH_AT91SAM9RL
-> has been pointless since (next-20141110 and) v3.19-rc1. See my report at
-> https://lkml.org/lkml/2014/11/10/232 .
-
-I'll rework my commit message.
-
+> The driver does look rather broken.  Let's first read up when dma_cache_sync()
+> should be used:
 > 
-> (I stumbled on this patch because I contemplated sending a patch to
-> simply remove the check for CONFIG_ARCH_AT91SAM9RL and the currently
-> useless function toggle_bias.)
+>   void
+>   dma_cache_sync(struct device *dev, void *vaddr, size_t size,
+>                  enum dma_data_direction direction)
+>   
+>   Do a partial sync of memory that was allocated by
+>   dma_alloc_noncoherent(), starting at virtual address vaddr and
+>   continuing on for size.  Again, you *must* observe the cache line
+>   boundaries when doing this.
+> 
+> Note "memory that was allocated by dma_alloc_noncoherent()".
+> 
+> Now, let's look at the driver:
+> 
+> static int map_sg_to_lli(struct scatterlist *sg, int num_elems,
+>                         struct lli *lli, dma_addr_t dma_lli,
+>                         void __iomem *dmadr_addr, int dir)
+> {
+> ...
+>                 dma_cache_sync(NULL, lli, (sizeof(struct lli) * idx),
+>                                DMA_BIDIRECTIONAL);
+> }
+> 
+> static int dma_dwc_xfer_setup(struct scatterlist *sg, int num_elems,
+>                               struct lli *lli, dma_addr_t dma_lli,
+>                               void __iomem *addr, int dir)
+> {
+>         /* Convert SG list to linked list of items (LLIs) for AHB DMA */
+>         num_lli = map_sg_to_lli(sg, num_elems, lli, dma_lli, addr, dir);
+> }
+> 
+>         dma_chan = dma_dwc_xfer_setup(sg, qc->n_elem, hsdevp->llit[tag],
+>                                       hsdevp->llit_dma[tag],
+>                                       (void *__iomem)(&hsdev->sata_dwc_regs->\
+>                                       dmadr), qc->dma_dir);
+> 
+>         for (i = 0; i < SATA_DWC_QCMD_MAX; i++) {
+>                 hsdevp->llit[i] = dma_alloc_coherent(pdev,
+>                                                      SATA_DWC_DMAC_LLI_TBL_SZ,
+>                                                      &(hsdevp->llit_dma[i]),
+>                                                      GFP_ATOMIC);
+> 
+> So, hsdevp->llit[x] is allocated using dma_alloc_*coherent*(), not
+> dma_alloc_*noncohernet*(), so dma_cache_sync() should not be used
+> according to the DMA API documentation.
+> 
+> Moreover, that GFP_ATOMIC flag looks mightily suspicious - we've done
+> a previous allocation using kzalloc(, GFP_KERNEL), so we aren't in an
+> atomic region, so why use GFP_ATOMIC there?
+> 
+> It doesn't look like it'll pass sparse checks either:
+> 
+> struct sata_dwc_device {
+>         u8                      *reg_base;
+>         struct sata_dwc_regs    *sata_dwc_regs; /* DW Synopsys SATA specific */
+> };
+> 
+>         u8 *base = NULL;
+> 
+>         base = of_iomap(ofdev->dev.of_node, 0);
+>         hsdev->reg_base = base;
+>         hsdev->sata_dwc_regs = (void *__iomem)(base + SATA_DWC_REG_OFFSET);
+> 
+> Maybe it should be moved to drivers/staging? :)
 
-Sorry, I forgot to add you in Cc of this series :-(, I'll do it it for
-the future iterations.
+I'm working on it.
 
-Best Regards,
+My target is to remove private implementation of dw_dmac from this
+driver. It will make it mostly free of sparse / compiler warnings.
+Sorry, I didn't test on ARM platform since I have none.
 
-Boris
+I just send a plug patch to disable compilation on ARMs.
+
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
