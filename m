@@ -1,32 +1,34 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 12 Jan 2015 08:27:33 +0100
-Subject: [PATCH v4 6/7] ARM: zynq: DT: Add pinctrl information
-In-Reply-To: <CACRpkdZ1jfTUqfLKonJxar2Jn25+4wTF-D4XUXOszSsoJrA07w@mail.gmail.com>
+Date: Mon, 12 Jan 2015 08:35:53 +0100
+Subject: [PATCH v4 5/7] ARM: zynq: Enable pinctrl
+In-Reply-To: <CACRpkdam4x-cWjrDuWS-0oDD3eGq1_pD3bK6xWEffiOipfBcOg@mail.gmail.com>
 References: <1420818231-13451-1-git-send-email-soren.brinkmann@xilinx.com>
- <1420818231-13451-7-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdZ1jfTUqfLKonJxar2Jn25+4wTF-D4XUXOszSsoJrA07w@mail.gmail.com>
-Message-ID: <1a749692196d406a8229d4891f3563f4@BN1BFFO11FD016.protection.gbl>
+ <1420818231-13451-6-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdam4x-cWjrDuWS-0oDD3eGq1_pD3bK6xWEffiOipfBcOg@mail.gmail.com>
+Message-ID: <b03b673497694585802f77a4e40fd80b@BN1BFFO11FD036.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2015 10:38 PM, Linus Walleij wrote:
+On 01/11/2015 10:36 PM, Linus Walleij wrote:
 > On Fri, Jan 9, 2015 at 4:43 PM, Soren Brinkmann
 > <soren.brinkmann@xilinx.com> wrote:
 > 
->> Add pinctrl descriptions to the zc702 and zc706 device trees.
+>> Select pinctrl and the Zynq pinctrl driver.
 >>
 >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 >> Tested-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>> Changes since RFC v2:
+>>  - separate mach-zynq changes in their own patch
 > 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Beautiful and in line with how I want things to look.
-> 
-> Yours,
-> Linus Walleij
+> Since we're only selecting some symbols and these will appear
+> in the merge window this can be applied orthogonally in the Zynq
+> tree target for ARM SoC.
 > 
 
-Applied to zynq/dt.
+Applied to zynq/soc.
 
 Thanks,
 Michal
