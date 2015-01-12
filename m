@@ -1,56 +1,48 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 12 Jan 2015 17:14:33 +0800
-Subject: [PATCH v4 4/4] arm64: mediatek: Add MT8173 SoC Kconfig and defconfig
-In-Reply-To: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
-References: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1421054073-43468-5-git-send-email-eddie.huang@mediatek.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Jan 2015 10:19:11 +0100
+Subject: [linux-sunxi] Re: ARM: dts: sunxi: A20-OlinuXino-Lime2 raise
+ dcdc2 lower voltage limit
+In-Reply-To: <54AEBB92.9050909@gmail.com>
+References: <54ADB179.9000209@gmail.com>
+ <CAGb2v64xsLpQ63GuxDRj+X454f-FaHHqS+2QpEWEnvgVO2NFQA@mail.gmail.com>
+ <54AEBB92.9050909@gmail.com>
+Message-ID: <20150112091911.GF4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT8173 arm64 Kconfig and defconfig files
+On Thu, Jan 08, 2015 at 05:17:06PM +0000, Iain Paton wrote:
+> On 08/01/15 03:54, wens Tsai wrote:
+> 
+> > You should lower the maximum voltage as well, either in this patch
+> > or when you redo all the regulators. AFAIK the SoC certainly cannot
+> > take up to 2.275V. The regulator nodes are supposed to say what
+> > the board can handle.
+> 
+> Yes, I suspect several of them are not currently sensible. I just used 
+> the limits from the pmic datasheet at the time as there were no other 
+> boards with axp209 regulator defined, no fex file for the lime2 etc.
+> 
+> I likely would have sent a full respin based on your patches, but as 
+> only bits have been applied it seemed better to do this minimal one 
+> and fix the rest properly later. 
+> I can do a couple of the other Olimex boards that I have available 
+> to test while I'm doing it.
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- arch/arm64/Kconfig           | 6 ++++++
- arch/arm64/configs/defconfig | 2 ++
- 2 files changed, 8 insertions(+)
+All the meaningful patches should have been merged by now, so it would
+be good if you could resend this with the proper limits for all the
+regulators enabled.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b1f9a20..e627ead 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -148,6 +148,12 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_MEDIATEK
-+	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
-+	select ARM_GIC
-+	help
-+	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
-+
- config ARCH_SEATTLE
- 	bool "AMD Seattle SoC Family"
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index dd301be..ed84d21 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -32,6 +32,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_THUNDER=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
-@@ -87,6 +88,7 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
+Thanks!
+Maxime
+
 -- 
-1.8.1.1.dirty
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/6e083860/attachment.sig>
