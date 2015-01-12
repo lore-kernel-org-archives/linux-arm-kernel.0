@@ -1,47 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jan 2015 16:59:27 +0100
-Subject: [GIT PULL] at91: fixes for 3.19 #1 (bis)
-In-Reply-To: <54B3E35E.50400@atmel.com>
-References: <1420456477-18204-1-git-send-email-nicolas.ferre@atmel.com>
- <20150111211215.GC25777@quad.lixom.net> <54B3E35E.50400@atmel.com>
-Message-ID: <8332277.8EH8fqiOd7@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 12 Jan 2015 16:05:02 +0000
+Subject: [RFC PATCH 0/4] Genericise the IOVA allocator
+In-Reply-To: <20150112155220.GD6343@8bytes.org>
+References: <cover.1416931258.git.robin.murphy@arm.com>
+ <20150112155220.GD6343@8bytes.org>
+Message-ID: <54B3F0AE.608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 16:08:14 Nicolas Ferre wrote:
-> Le 11/01/2015 22:12, Olof Johansson a ?crit :
-> > On Fri, Jan 09, 2015 at 10:02:50AM +0100, Nicolas Ferre wrote:
-> >> Le 08/01/2015 23:41, Olof Johansson a ?crit :
-> >>> On Mon, Jan 05, 2015 at 12:14:37PM +0100, Nicolas Ferre wrote:
-> >>>
-> >>> This is the only fix among these patches, isn't it? The others seem to
-> >>> be code removals/cleanups better targeted for 3.20, as far as I can tell.
-> >>
-> >> Well, this is why I sent the first version of this pull-request very
-> >> early in the process. I didn't have the possibility to re-send it
-> >> earlier on top of -rc1 until this pull-request.
+Hi Joerg,
 
-I think this was a bit of a communication problem. I thought about
-applying the first pull request you sent for this, but then Kevin
-commented that it would be better to rebase it on top of -rc1.
-That made sense at the time, except then we all got caught by
-surprise by Christmas and suddenly it was -rc4 ;-)
+On 12/01/15 15:52, Joerg Roedel wrote:
+[...]
+>
+> Thanks for doing this, I like this patch-set.
+>
+> I would also appreciate if someone from Intel could have a look at it,
+> David?
+>
+> Besides, can you please re-post this patch-set rebased to latest
+> upstream with the better versions of patch 1 and 2, please?
+>
+> I consider to apply these changes then.
+>
 
-> > Since you mention that you have more fixes coming (why hold off on them?), do
-> > you want me to cherry-pick over that one fix to our fixes branch, or can you
-> > queue it with the other fixes when you send them up?
-> 
-> Fair enough, I build a new "at91: fixes for 3.19 #1 (ter)" with tree
-> more patches right now.
+Thanks! Funnily enough, that's on my "things I didn't quite get round to 
+yesterday" list. I have this series rebased onto -rc3 with the comments 
+addressed, and I'm in the middle of a final cleanup and check of the 
+arm64 dma-mapping stuff on top of it. Expect to see both later today.
 
-This seems for the best now. This kind of late cleanup that depends on
-multiple branches going in first happens occasionally and it's never
-nice whichever way you try to handle it.
-
-The only recommendation I have for the future is to discuss the merge
-strategy with us before the merge window instead of holding back patches
-that have other dependencies. I don't really mind merging them as a
-late branch into -rc1 if I know about them, but we should never plan
-to merge any non-bugfix patches later than -rc2.
-
-	Arnd
+Robin.
