@@ -1,132 +1,136 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 12 Jan 2015 20:17:20 +0900
-Subject: [PATCHv7 02/10] devfreq: event: Add the list of supported
- devfreq-event type
-In-Reply-To: <768125446.886831421046952335.JavaMail.weblogic@epmlwas09a>
-References: <768125446.886831421046952335.JavaMail.weblogic@epmlwas09a>
-Message-ID: <54B3AD40.3040308@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Jan 2015 11:19:25 +0000
+Subject: [PATCH v3] irqchip: gic: Allow interrupt level to be set for PPIs.
+In-Reply-To: <20150112111509.GC823@e106497-lin.cambridge.arm.com>
+References: <1417437909-20923-1-git-send-email-Liviu.Dudau@arm.com>
+ <54AA53C2.9040903@arm.com>
+ <20150112111509.GC823@e106497-lin.cambridge.arm.com>
+Message-ID: <54B3ADBD.6050009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Myungjoo,
+Hi Liviu,
 
-On 01/12/2015 04:15 PM, MyungJoo Ham wrote:
->>   
->>  This patch adds the list of supported devfreq-event type as following.
->> Each devfreq-event device driver would support the various devfreq-event type
->> for devfreq governor at the same time.
->> - DEVFREQ_EVENT_TYPE_RAW_DATA
->> - DEVFREQ_EVENT_TYPE_UTILIZATION
->> - DEVFREQ_EVENT_TYPE_BANDWIDTH
->> - DEVFREQ_EVENT_TYPE_LATENCY
+Welcome back! ;-)
+
+On 12/01/15 11:15, Liviu Dudau wrote:
+> On Mon, Jan 05, 2015 at 09:05:06AM +0000, Marc Zyngier wrote:
+>> Hi Liviu,
 > 
-> Did you try to say:
-> 
-> A devfreq-event device may support multiple devfreq-event types
-> simultaneously.
-
-I think that one devfreq-event device can support multiple devfreq-event types.
-but, devfreq-event device might provide only value at one point.
-
-But,
-This patch is ambiguous and includes a bug according to your comment
-(below switch statement). I'll drop this patch on next patch-set.
-
-This patch will be posted on further patch-set after resolving some issue.
-
-Best Regards,
-Chanwoo Choi
-
-> 
-> If so, your switch expressions are going to screw up.
-> 
+> Hi Marc,
 > 
 >>
->> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  drivers/devfreq/devfreq-event.c | 58 ++++++++++++++++++++++++++++++++++++-----
->>  include/linux/devfreq-event.h   | 25 +++++++++++++++---
->>  2 files changed, 73 insertions(+), 10 deletions(-)
+>> On 01/12/14 12:45, Liviu Dudau wrote:
+>>> During a recent cleanup of the arm64 DTs it has become clear that
+>>> the handling of PPIs in xxxx_set_type() is incorrect. The ARM TRMs
+>>> for GICv2 and later allow for "implementation defined" support for
+>>> setting the edge or level type of the PPI interrupts and don't restrict
+>>> the activation level of the signal. Current ARM implementations
+>>> do restrict the PPI level type to IRQ_TYPE_LEVEL_LOW, but licensees
+>>> of the IP can decide to shoot themselves in the foot at any time.
+>>>
+>>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>>> ---
+>>>
+>>> Made a stupid mistake in v2 and got my bit test confused with logical test.
+>>>
+>>>  Documentation/devicetree/bindings/arm/gic.txt |  8 ++++++--
+>>>  drivers/irqchip/irq-gic-common.c              | 21 +++++++++++++--------
+>>>  drivers/irqchip/irq-gic-common.h              |  2 +-
+>>>  drivers/irqchip/irq-gic-v3.c                  |  8 ++++----
+>>>  drivers/irqchip/irq-gic.c                     |  9 ++++++---
+>>>  drivers/irqchip/irq-hip04.c                   |  9 ++++++---
+>>>  6 files changed, 36 insertions(+), 21 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>>> index 8112d0c..c97484b 100644
+>>> --- a/Documentation/devicetree/bindings/arm/gic.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>>> @@ -32,12 +32,16 @@ Main node required properties:
+>>>    The 3rd cell is the flags, encoded as follows:
+>>>  	bits[3:0] trigger type and level flags.
+>>>  		1 = low-to-high edge triggered
+>>> -		2 = high-to-low edge triggered
+>>> +		2 = high-to-low edge triggered (invalid for SPIs)
+>>>  		4 = active high level-sensitive
+>>> -		8 = active low level-sensitive
+>>> +		8 = active low level-sensitive (invalid for SPIs).
+>>>  	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
+>>>  	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
+>>>  	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
+>>> +	Also note that the configurability of PPI interrupts is IMPLEMENTATION
+>>> +	DEFINED and as such not guaranteed to be present (most SoC available
+>>> +	in 2014 seem to ignore the setting of this flag and use the hardware
+>>> +	default value).
+>>>  
+>>>  - reg : Specifies base physical address(s) and size of the GIC registers. The
+>>>    first region is the GIC distributor register base and size. The 2nd region is
+>>> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+>>> index 61541ff..ffee521 100644
+>>> --- a/drivers/irqchip/irq-gic-common.c
+>>> +++ b/drivers/irqchip/irq-gic-common.c
+>>> @@ -21,7 +21,7 @@
+>>>  
+>>>  #include "irq-gic-common.h"
+>>>  
+>>> -void gic_configure_irq(unsigned int irq, unsigned int type,
+>>> +int gic_configure_irq(unsigned int irq, unsigned int type,
+>>>  		       void __iomem *base, void (*sync_access)(void))
+>>>  {
+>>>  	u32 enablemask = 1 << (irq % 32);
+>>> @@ -29,16 +29,17 @@ void gic_configure_irq(unsigned int irq, unsigned int type,
+>>>  	u32 confmask = 0x2 << ((irq % 16) * 2);
+>>>  	u32 confoff = (irq / 16) * 4;
+>>>  	bool enabled = false;
+>>> -	u32 val;
+>>> +	u32 val, oldval;
+>>> +	int ret = 0;
+>>>  
+>>>  	/*
+>>>  	 * Read current configuration register, and insert the config
+>>>  	 * for "irq", depending on "type".
+>>>  	 */
+>>> -	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+>>> -	if (type == IRQ_TYPE_LEVEL_HIGH)
+>>> +	val = oldval = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+>>> +	if (type & IRQ_TYPE_LEVEL_MASK)
+>>>  		val &= ~confmask;
+>>> -	else if (type == IRQ_TYPE_EDGE_RISING)
+>>> +	else if (type & IRQ_TYPE_EDGE_BOTH)
+>>>  		val |= confmask;
+>>>  
+>>>  	/*
+>>> @@ -54,15 +55,19 @@ void gic_configure_irq(unsigned int irq, unsigned int type,
+>>>  
+>>>  	/*
+>>>  	 * Write back the new configuration, and possibly re-enable
+>>> -	 * the interrupt.
+>>> +	 * the interrupt. If we tried to write a new configuration and failed,
+>>> +	 * return an error.
+>>>  	 */
+>>>  	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
+>>> -
+>>> -	if (enabled)
+>>> +	if (readl_relaxed(base + GIC_DIST_CONFIG + confoff) != val && val != oldval)
+>>> +		ret = -EINVAL;
+>>> +	else if (enabled)
+>>>  		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
 >>
->> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
->> index 81448ba..64c1764 100644
->> --- a/drivers/devfreq/devfreq-event.c
->> +++ b/drivers/devfreq/devfreq-event.c
->>  
-> []
->> -	mutex_lock(&edev->lock);
->> -	ret = edev->desc->ops->get_event(edev, edata);
->> -	mutex_unlock(&edev->lock);
->> +	switch (type) {
+>> So if you change the configuration of an enabled interrupt and fail to
+>> do so, you end-up with the interrupt disabled. This is a change in
+>> behaviour, and is likely to introduce regressions.
 > 
-> Bitwise value with switch? (what if type = RAW_DATA | BANDWIDTH, meaning
-> this is raw data of the bandwitdh.)
-> 
->> +	case DEVFREQ_EVENT_TYPE_RAW_DATA:
->> +	case DEVFREQ_EVENT_TYPE_BANDWIDTH:
->> +	case DEVFREQ_EVENT_TYPE_LATENCY:
->> +		if ((edata->event > EVENT_TYPE_RAW_DATA_MAX) ||
->> +			(edata->total_event > EVENT_TYPE_RAW_DATA_MAX)) {
-> 
-> Is it possible for unsigned long edata->event/total_event to be
->   > EVENT_TYPE_RAW_DATA_MAX = ULONG_MAX?
-> 
-> What was your intention?
-> 
-> If you were trying to detect overflow, you need to rethink about it.
-> If not, (overflow is harmless or not going to happen) you don't need to
-> check it.
-> 
-> 
->> +			edata->event = edata->total_event = 0;
->> +			ret = -EINVAL;
->> +		}
->> +		break;
->> +	case DEVFREQ_EVENT_TYPE_UTILIZATION:
->> +		edata->total_event = EVENT_TYPE_UTILIZATION_MAX;
->>  
->> -	if ((edata->total_event <= 0)
->> -		|| (edata->event > edata->total_event)) {
->> +		if (edata->event > EVENT_TYPE_UTILIZATION_MAX) {
->> +			edata->event = edata->total_event = 0;
->> +			ret = -EINVAL;
->> +		}
->> +		break;
->> +	default:
->>  		edata->event = edata->total_event = 0;
->>  		ret = -EINVAL;
->> +		break;
->>  	}
->>  
->> +	mutex_unlock(&edev->lock);
->> +
->>  	return ret;
->>  }
->>  EXPORT_SYMBOL_GPL(devfreq_event_get_event);
->> diff --git a/include/linux/devfreq-event.h b/include/linux/devfreq-event.h
->> index b7363f5..13a5703 100644
->> --- a/include/linux/devfreq-event.h
->> +++ b/include/linux/devfreq-event.h
->> @@ -36,6 +36,14 @@ struct devfreq_event_dev {
->>  	const struct devfreq_event_desc *desc;
->>  };
->>  
->> +/* The supported type by devfreq-event device */
->> +enum devfreq_event_type {
->> +	DEVFREQ_EVENT_TYPE_RAW_DATA	= BIT(0),
->> +	DEVFREQ_EVENT_TYPE_UTILIZATION	= BIT(1),
->> +	DEVFREQ_EVENT_TYPE_BANDWIDTH	= BIT(2),
->> +	DEVFREQ_EVENT_TYPE_LATENCY	= BIT(3),
->> +};
->> +
-> 
-> (Being curious) Is it possible to have multiple types
-> simultaneously?
-> 
-> 
-> []
-> N?????r??y???b?X???v?^?)?{.n?+????{?????x,??????}????z?&j:+v???????zZ+??+zf???h???~????i???z?
-?w????????&?)?fl===
-> 
+> Is it? Beforehand we were silently ignoring the fact that the new values haven't been
+> set, now we return an error. Should we continue to ignore the fact that there is now
+> a difference between what the kernel believes the setup is and what the hardware is
+> configured to do?
+
+Returning the error is fine. It is the fact that you've now disabled a
+line that was previously enabled.I don't think that sort of side effect
+is acceptable.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
