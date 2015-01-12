@@ -1,72 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Jan 2015 19:36:48 +0000
-Subject: [PATCH 2/2] arm64: mm: dump: add missing includes
-In-Reply-To: <1421091408-10660-1-git-send-email-mark.rutland@arm.com>
-References: <1421091408-10660-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1421091408-10660-3-git-send-email-mark.rutland@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 12 Jan 2015 20:39:05 +0100
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <CACxGe6ub0UsUNs1-2NziK_sGEtpxTjcDD+Eto3YOsNkvWxaNcw@mail.gmail.com>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <CACxGe6vRN2Tc97=Sx05gri02goxBaHnZm30hR37q=002agFLAA@mail.gmail.com>
+ <CACxGe6sbGu53x5rsx2sWVVVVCnnFvmkQAk3Se9ZGNOXCkqpi=A@mail.gmail.com>
+ <20150112142358.GA23680@amd>
+ <CACxGe6ub0UsUNs1-2NziK_sGEtpxTjcDD+Eto3YOsNkvWxaNcw@mail.gmail.com>
+Message-ID: <20150112193905.GB5281@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 dump code is currently relying on some definitions which are
-pulled in via transitive dependencies. While current build issues have
-been fixed by a separate patch, it seems we have implicit dependencies
-on the following definitions:
+On Mon 2015-01-12 14:41:50, Grant Likely wrote:
+> On Mon, Jan 12, 2015 at 2:23 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Sat 2015-01-10 14:44:02, Grant Likely wrote:
+> >> On Wed, Dec 17, 2014 at 10:26 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> >> > On Tue, Dec 16, 2014 at 11:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >> On Monday 15 December 2014 19:18:16 Al Stone wrote:
+> >> >>> 7. Why is ACPI required?
+> >> >>>    * Problem:
+> >> >>>      * arm64 maintainers still haven't been convinced that ACPI is
+> >> >>>        necessary.
+> >> >>>      * Why do hardware and OS vendors say ACPI is required?
+> >> >>>    * Status: Al & Grant collecting statements from OEMs to be posted
+> >> >>>      publicly early in the new year; firmware summit for broader
+> >> >>>      discussion planned.
+> >> >>
+> >> >> I was particularly hoping to see better progress on this item. It
+> >> >> really shouldn't be that hard to explain why someone wants this feature.
+> >> >
+> >> > I've written something up in as a reply on the firmware summit thread.
+> >> > I'm going to rework it to be a standalone document and post it
+> >> > publicly. I hope that should resolve this issue.
+> >>
+> >> I've posted an article on my blog, but I'm reposting it here because
+> >> the mailing list is more conducive to discussion...
+> >>
+> >> http://www.secretlab.ca/archives/151
+> >
+> > Unfortunately, I seen the blog post before the mailing list post, so
+> > here's reply in blog format.
+> >
+> > Grant Likely published article about ACPI and ARM at
+> >
+> > http://www.secretlab.ca/archives/151
+> >
+> > . He acknowledges systems with ACPI are harder to debug, but because
+> > Microsoft says so, we have to use ACPI (basically).
+> 
+> Please reread the blog post. Microsoft is a factor, but it is not the
+> primary driver by any means.
 
-* MODULES_VADDR         (asm/memory.h)
-* MODULES_END           (asm/memory.h)
-* PAGE_OFFSET           (asm/memory.h)
-* PTE_*                 (asm/pgtable-hwdef.h)
-* ENOMEM                (linux/errno.h)
-* device_initcall       (linux/init.h)
+Ok, so what is the primary reason? As far as I could tell it is
+"Microsoft wants ACPI" and "hardware people want Microsoft" and
+"fragmentation is bad so we do ACPI" (1) (and maybe "someone at RedHat
+says they want ACPI" -- but RedHat people should really speak for
+themselves.)
 
-This patch ensures we explicitly include the relevant headers for the
-above items, hopefully preventing future issues as headers are
-refactored.
+You snipped quite a lot of reasons why ACPI is inferior that were
+below this line in email.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Mark Brown <broonie@kernel.org>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Will Deacon <Will.Deacon@arm.com>
----
- arch/arm64/mm/dump.c | 4 ++++
- 1 file changed, 4 insertions(+)
+									Pavel
 
-This was previously posted as a standalone patch [1]. As patch 1 fixes
-the original issue, this patch has been modified to fix the remaining
-potential issues that we don't yet seem to be hitting. I've also taken
-Russell's advice to use linux/errno.h.
+(1) ignoring fact that it causes fragmentation between servers and phones.
 
-Steve, I've dropped your ack now that the fix for the original issue is
-in patch 1. Hopefully that's just a formality :)
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315326.html
-
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index 203a6cf..48a4a2f 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -14,13 +14,17 @@
-  * of the License.
-  */
- #include <linux/debugfs.h>
-+#include <linux/errno.h>
- #include <linux/fs.h>
-+#include <linux/init.h>
- #include <linux/mm.h>
- #include <linux/sched.h>
- #include <linux/seq_file.h>
- 
- #include <asm/fixmap.h>
-+#include <asm/memory.h>
- #include <asm/pgtable.h>
-+#include <asm/pgtable-hwdef.h>
- 
- #define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
- 
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
