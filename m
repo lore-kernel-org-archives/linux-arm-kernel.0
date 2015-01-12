@@ -1,76 +1,141 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Jan 2015 19:40:31 +0000
-Subject: [PATCH] arm64: mm: dump: add missing includes
-In-Reply-To: <20150112163825.GM12302@n2100.arm.linux.org.uk>
-References: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
- <20150112163825.GM12302@n2100.arm.linux.org.uk>
-Message-ID: <20150112194030.GA6397@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jan 2015 20:40:51 +0100
+Subject: [Linaro-acpi] [RFC] ACPI on arm64 TODO List
+In-Reply-To: <CACxGe6tMv7jz9h7RziPMj5jV5_0GZCx=enEXTwuaKS1GTsOouw@mail.gmail.com>
+References: <548F9668.6080900@linaro.org> <1636716.eAYJb6Z2AV@wuerfel>
+ <CACxGe6tMv7jz9h7RziPMj5jV5_0GZCx=enEXTwuaKS1GTsOouw@mail.gmail.com>
+Message-ID: <1421113529.giGjG4IzLy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 04:38:25PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 12, 2015 at 03:40:26PM +0000, Mark Rutland wrote:
-> > The arm64 dump code is currently relying on some definitions which are
-> > pulled in via transitive dependencies. On next-20150112 at least one of
-> > these (PCI_IOBASE) is no longer pulled in with a defconfig build,
-> > resulting in the following build failure:
-> > 
-> > arch/arm64/mm/dump.c:55:20: error: ?PCI_IOBASE? undeclared here (not in a function)
-> >   { (unsigned long) PCI_IOBASE,  "PCI I/O start" },
-> >                     ^
-> > It seems we have implicit dependencies on the following definitions:
-> > 
-> > * PCI_IOBASE            (asm/io.h)
-> > * MODULES_VADDR         (asm/memory.h)
-> > * MODULES_END           (asm/memory.h)
-> > * PAGE_OFFSET           (asm/memory.h)
-> > * PTE_*                 (asm/pgtable-hwdef.h)
-> > * ENOMEM                (asm/errno.h)
-> > * device_initcall       (linux/init.h)
-> > 
-> > This patch ensures we explicitly include the relevant headers for the
-> > above items, fixing the observed build issue and hopefully preventing
-> > future issues as headers are refactored.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reported-by: Mark Brown <broonie@kernel.org>
-> > Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> > Cc: Laura Abbott <lauraa@codeaurora.org>
-> > Cc: Steve Capper <steve.capper@linaro.org>
-> > Cc: Will Deacon <Will.Deacon@arm.com>
-> > ---
-> >  arch/arm64/mm/dump.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> > index cf33f33..df69e43 100644
-> > --- a/arch/arm64/mm/dump.c
-> > +++ b/arch/arm64/mm/dump.c
-> > @@ -15,12 +15,17 @@
-> >   */
-> >  #include <linux/debugfs.h>
-> >  #include <linux/fs.h>
-> > +#include <linux/init.h>
-> >  #include <linux/mm.h>
-> >  #include <linux/sched.h>
-> >  #include <linux/seq_file.h>
-> >  
-> > +#include <asm/errno.h>
-> >  #include <asm/fixmap.h>
-> > +#include <asm/io.h>
-> > +#include <asm/memory.h>
-> >  #include <asm/pgtable.h>
-> > +#include <asm/pgtable-hwdef.h>
+On Monday 12 January 2015 12:00:31 Grant Likely wrote:
+> On Mon, Jan 12, 2015 at 10:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Saturday 10 January 2015 14:44:02 Grant Likely wrote:
+> >> On Wed, Dec 17, 2014 at 10:26 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> > This seems like a great fit for AML indeed, but I wonder what exactly
+> > we want to hotplug here, since everything I can think of wouldn't need
+> > AML support for the specific use case of SBSA compliant servers:
 > 
-> Don't forget to use linux/*.h includes instead of asm/*.h includes where
-> appropriate.  That being errno.h and io.h.
+> [...]
+> 
+> I've trimmed the specific examples here because I think that misses
+> the point. The point is that regardless of interface (either ACPI or
+> DT) there are always going to be cases where the data needs to change
+> at runtime. Not all platforms will need to change the CPU data, but
+> some will (say for a machine that detects a failed CPU and removes
+> it). Some PCI add-in boards will carry along with them additional data
+> that needs to be inserted into the ACPI namespace or DT. Some
+> platforms will have system level component (ie. non-PCI) that may not
+> always be accessible.
 
-Sure thing for errno.h.
+Just to be sure I get this right: do you mean runtime or boot-time
+(re-)configuration for those?
 
-I discovered a problem in the way we handle PCI I/O space here, and
-my solution for that [1] removes the need for io.h.
+> ACPI has an interface baked in already for tying data changes to
+> events. DT currently needs platform specific support (which we can
+> improve on). I'm not even trying to argue for ACPI over DT in this
+> section, but I included it this document because it is one of the
+> reasons often given for choosing ACPI and I felt it required a more
+> nuanced discussion.
 
-Thanks,
-Mark.
+I can definitely see the need for an architected interface for
+dynamic reconfiguration in cases like this, and I think the ACPI
+model actually does this better than the IBM Power hypervisor
+model, I just didn't see the need on servers as opposed to something
+like a laptop docking station to give a more obvious example I know
+from x86.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315444.html
+> > * From the experience with x86, Linux tends to prefer using drivers
+> >   for hardware registers over the AML based drivers when both are
+> >   implemented, because of efficiency and correctness.
+> >
+> > We should probably discuss at some point how to get the best of
+> > both. I really don't like the idea of putting the low-level
+> > details that we tend to have DT into ACPI, but there are two
+> > things we can do: For systems that have a high-level abstraction
+> > for their PM in hardware (e.g. talking to an embedded controller
+> > that does the actual work), the ACPI description should contain
+> > enough information to implement a kernel-level driver for it as
+> > we have on Intel machines. For more traditional SoCs that do everything
+> > themselves, I would recommend to always have a working DT for
+> > those people wanting to get the most of their hardware. This will
+> > also enable any other SoC features that cannot be represented in
+> > ACPI.
+> 
+> The nice thing about ACPI is that we always have the option of
+> ignoring it when the driver knows better since it is always executed
+> under the control of the kernel interpreter. There is no ACPI going
+> off and doing something behind the kernel's back. To start with we
+> have the OSPM state model and devices can use additional ACPI methods
+> as needed, but as an optimization, the driver can do those operations
+> directly if the driver author has enough knowledge about the device.
+
+Ok, makes sense.
+
+> >> Reliability, Availability & Serviceability (RAS)
+> >> ------------------------------------------------
+> >> 7. Support RAS interfaces
+> >>
+> >> This isn't a question of whether or not DT can support RAS. Of course
+> >> it can. Rather it is a matter of RAS bindings already existing for
+> >> ACPI, including a usage model. We've barely begun to explore this on
+> >> DT. This item doesn't make ACPI technically superior to DT, but it
+> >> certainly makes it more mature.
+> >
+> > Unfortunately, RAS can mean a lot of things to different people.
+> > Is there some high-level description of what the APCI idea of RAS
+> > is? On systems I've worked on in the past, this was generally done
+> > out of band (e.g. in an IPMI BMC) because you can't really trust
+> > the running OS when you report errors that may impact data consistency
+> > of that OS.
+> 
+> RAS is also something where every company already has something that
+> they are using on their x86 machines. Those interfaces are being
+> ported over to the ARM platforms and will be equivalent to what they
+> already do for x86. So, for example, an ARM server from DELL will use
+> mostly the same RAS interfaces as an x86 server from DELL.
+
+Right, I'm still curious about what those are, in case we have to
+add DT bindings for them as well.
+
+> > I do think that this is in fact the most important argument in favor
+> > of doing ACPI on Linux, because a number of companies are betting on
+> > Windows (or some in-house OS that uses ACPI) support. At the same time,
+> > I don't think talking of a single 'ARM server ecosystem' that needs to
+> > agree on one interface is helpful here. Each server company has their
+> > own business plan and their own constraints. I absolutely think that
+> > getting as many companies as possible to agree on SBSA and UEFI is
+> > helpful here because it reduces the the differences between the platforms
+> > as seen by a distro. For companies that want to support Windows, it's
+> > obvious they want to have ACPI on their machines, for others the
+> > factors you mention above can be enough to justify the move to ACPI
+> > even without Windows support. Then there are other companies for
+> > which the tradeoffs are different, and I see no reason for forcing
+> > it on them. Finally there are and will likely always be chips that
+> > are not built around SBSA and someone will use the chips in creative
+> > ways to build servers from them, so we already don't have a homogeneous
+> > ecosystem.
+> 
+> Allow me to clarify my position here. This entire document is about
+> why ACPI was chosen for the ARM SBBR specification. 
+
+I thought it was about why we should merge ACPI support into the kernel,
+which seems to me like a different thing.
+ 
+> As far as we (Linux maintainers) are concerned, we've also been really
+> clear that DT is not a second class citizen to ACPI. Mainline cannot
+> and should not force certain classes of machines to use ACPI and other
+> classes of machines to use DT. As long as the code is well written and
+> conforms to our rules for what ACPI or DT code is allowed to do, then
+> we should be happy to take the patches.
+
+What we are still missing though is a recommendation for a boot protocol.
+The UEFI bits in SBBR are generally useful for having compatibility
+across machines that we support in the kernel regardless of the device
+description, and we also need to have guidelines along the lines of
+"if you do ACPI, then do it like this" that are in SBBR. However, the
+way that these two are coupled into "you have to use ACPI and UEFI
+this way to build a compliant server" really does make the document
+much less useful for Linux.
+
+	Arnd
