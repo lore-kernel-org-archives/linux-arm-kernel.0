@@ -1,86 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Jan 2015 16:12:50 +0100
-Subject: [RESEND PATCH] clk: at91: keep slow clk enabled to prevent system hang
-Message-ID: <1421075570-31200-1-git-send-email-boris.brezillon@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Jan 2015 16:19:01 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 01/11] clk: sunxi: Add mod0 and mmc
+ module clock support for A80
+In-Reply-To: <CAGb2v65xRf9PeAe2L-F-c9gJ9TQZEeh8jA4ehu7=ZuR8Z8A4FA@mail.gmail.com>
+References: <1418886058-8145-1-git-send-email-wens@csie.org>
+ <1418886058-8145-2-git-send-email-wens@csie.org>
+ <20141219180235.GO4820@lukather>
+ <CAGb2v66iEhdCxuLPRPLxJENUtB04GtbHDHu+7tuBHFqNL2foeA@mail.gmail.com>
+ <20150108093825.GP7853@lukather>
+ <CAGb2v65xRf9PeAe2L-F-c9gJ9TQZEeh8jA4ehu7=ZuR8Z8A4FA@mail.gmail.com>
+Message-ID: <20150112151901.GM4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All slow clk users are not properly requesting it (get + prepare + enable)
-before using it.
-If all users properly requesting this clock decide that they don't need it
-anymore (or are removed), this lead to this clock being disabled while
-faulty users are still requiring it, which in turn hangs the system.
+On Mon, Jan 12, 2015 at 10:39:38AM +0800, Chen-Yu Tsai wrote:
+> On Thu, Jan 8, 2015 at 5:38 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Sat, Dec 20, 2014 at 08:43:27PM +0800, Chen-Yu Tsai wrote:
+> >> > That looks a lot like the A10 MMC clock. What's changing? only the
+> >> > data to feed to the factors setup code?
+> >>
+> >> That's correct. Only the mux width in the data fed to the setup code
+> >> and the lock differ.
+> >>
+> >> The hardware can work with the a10 mod0 code, but it won't recover from
+> >> cases where someone writes to the upper bits of the mux, since it doesn't
+> >> know about them.
+> >
+> > I'd very much prefer if we could factorise that code then.
+> 
+> I was hoping to not have to extend sunxi-factors-clk any more. But yes,
+> I can add mux_width and mux_table fields to factors_data.
 
-Prevent slow oscillator clock from being disabled until all users are
-properly requesting it.
+I didn't really thought of putting it into sunxi-factors, just have a
+common probe for the two, with for example the code checking which
+compatible is used, and put one value or another.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Bo Shen <voice.shen@atmel.com>
-Cc: stable at vger.kernel.org
----
-Hi Mike,
+Maxime
 
-Sorry for the noise, but I forgot to add the LKML and LAKML in Cc.
-
-Can you have a look at this fix and let me know if this is how you want this
-problem addressed ?
-I can also request (get + prepare + enable) the clk in the pmc probe function,
-so that it can never be disabled.
-
-If you're fine with the approach, can you queue it for the next -rc ?
-
-Best Regards,
-
-Boris
-
- drivers/clk/at91/clk-slow.c | 28 ++++++++++++++++++++++++++--
- 1 file changed, 26 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index 32f7c1b..effe3b0 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -96,7 +96,19 @@ static void clk_slow_osc_unprepare(struct clk_hw *hw)
- 	if (tmp & AT91_SCKC_OSC32BYP)
- 		return;
- 
--	writel(tmp & ~AT91_SCKC_OSC32EN, sckcr);
-+	/*
-+	 * FIXME: All slow clk users are not properly requesting it (get +
-+	 * prepare + enable) before using it.
-+	 * If all users properly requesting this clock decide that they don't
-+	 * need it anymore (or are removed), this lead to this clock being
-+	 * disabled while faulty users are still requiring it, which in turn
-+	 * hangs the system.
-+	 * Prevent this clock from being disabled until all users are properly
-+	 * requesting it.
-+	 * Once this is done we should re-introduce this line:
-+	 *
-+	 * writel(tmp & ~AT91_SCKC_OSC32EN, sckcr);
-+	 */
- }
- 
- static int clk_slow_osc_is_prepared(struct clk_hw *hw)
-@@ -211,7 +223,19 @@ static void clk_slow_rc_osc_unprepare(struct clk_hw *hw)
- 	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
- 	void __iomem *sckcr = osc->sckcr;
- 
--	writel(readl(sckcr) & ~AT91_SCKC_RCEN, sckcr);
-+	/*
-+	 * FIXME: All slow clk users are not properly requesting it (get +
-+	 * prepare + enable) before using it.
-+	 * If all users properly requesting this clock decide that they don't
-+	 * need it anymore (or are removed), this lead to this clock being
-+	 * disabled while faulty users are still requiring it, which in turn
-+	 * hangs the system.
-+	 * Prevent this clock from being disabled until all users are properly
-+	 * requesting it.
-+	 * Once this is done we should re-introduce this line:
-+	 *
-+	 * writel(readl(sckcr) & ~AT91_SCKC_RCEN, sckcr);
-+	 */
- }
- 
- static int clk_slow_rc_osc_is_prepared(struct clk_hw *hw)
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/66668de5/attachment.sig>
