@@ -1,64 +1,38 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 12 Jan 2015 20:42:38 +0900
-Subject: [PATCH] kprobes: bugfix: force unoptimize when disable kprobes.
-In-Reply-To: <1420461140-27153-1-git-send-email-wangnan0@huawei.com>
-References: <1420461140-27153-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <54B3B32E.7070709@hitachi.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 12 Jan 2015 11:46:00 +0000
+Subject: [PATCH v5 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <1420742914-2404-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1420742914-2404-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150112114600.GE26589@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2015/01/05 21:32), Wang Nan wrote:
-> Original code failed to disarm the probed instruction after
-> 
-> echo 0 > /sys/kernel/debug/kprobes/enabled
-> 
-> if OPTPROBE is enabled.
-> 
-> This is caused by a piece of logically inconsistent code:
-> 
-> 	unoptimize_kprobe(p, false);
-> 	if (!kprobe_queued(p)) {
-> 		...
-> 	}
-> 
-> unoptimize_kprobe() with 'force' == false queues p onto
-> unoptimizing_list, so following kprobe_queued() check always fail unless
-> another core schedules optimizer and does the unoptimization very soon.
-> This logic causes arch_disarm_kprobe() failed to get execute, lefts a
-> breakpoint at the probed address, instead of restoring it.
-
-No, the root cause of this failure comes from the lack of checking
-kprobes_all_disarmed in unoptimized_kprobe(). It should check the flag
-and return soon if it is set.
-
-So, I Nak this patch.
-
-> 
-> This patch uses force unoptimize instead.
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> ---
->  kernel/kprobes.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-> index b185464..9fbe0c3 100644
-> --- a/kernel/kprobes.c
-> +++ b/kernel/kprobes.c
-> @@ -869,7 +869,7 @@ static void __disarm_kprobe(struct kprobe *p, bool reopt)
->  {
->  	struct kprobe *_p;
+On Thu, 08 Jan, at 06:48:32PM, Ard Biesheuvel wrote:
+> @@ -46,4 +54,26 @@ extern void efi_idmap_init(void);
 >  
-> -	unoptimize_kprobe(p, false);	/* Try to unoptimize */
-> +	unoptimize_kprobe(p, true);	/* Try to unoptimize */
+>  #define EFI_ALLOC_ALIGN		SZ_64K
 >  
->  	if (!kprobe_queued(p)) {
->  		arch_disarm_kprobe(p);
-> 
+> +/*
+> + * On ARM systems, virtually remapped UEFI runtime services are set up in three
+> + * distinct stages:
+> + * - The stub retrieves the final version of the memory map from UEFI, populates
+> + *   the virt_addr fields and calls the SetVirtualAddressMap() [SVAM] runtime
+> + *   service to communicate the new mapping to the firmware (Note that the new
+> + *   mapping is not live at this time)
+> + * - During early boot, the page tables are allocated and populated based on the
+> + *   virt_addr fields in the memory map, but only if all descriptors with the
+> + *   EFI_MEMORY_RUNTIME attribute have a non-zero value for virt_addr. If this
+> + *   succeeds, the EFI_VIRTMAP flag is set to indicate that the virtual mappings
+> + *   have been installed successfully.
+> + * - During an early initcall(), the UEFI Runtime Services are enabled and the
+> + *   EFI_RUNTIME_SERVICES bit set if some conditions are met, i.e., we need a
+> + *   non-early mapping of the UEFI system table, and we need to have the virtmap
+> + *   installed.
+> + */
+> +#define EFI_VIRTMAP		EFI_ARCH_1
 
+Lucid. Thanks, Ard!
 
 -- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Matt Fleming, Intel Open Source Technology Center
