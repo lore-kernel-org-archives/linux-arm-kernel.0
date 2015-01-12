@@ -1,36 +1,37 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 12 Jan 2015 17:51:48 +0900
-Subject: [RESEND PATCH] ARM: EXYNOS: Add exynos3250 suspend-to-ram support
-In-Reply-To: <54B38989.4030700@kernel.org>
-References: <1420681838-4292-1-git-send-email-cw00.choi@samsung.com>
- <54B38989.4030700@kernel.org>
-Message-ID: <54B38B24.20804@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jan 2015 09:52:57 +0100
+Subject: [PATCH net-next v11 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
+References: <1421049832-6224-1-git-send-email-dingtianhong@huawei.com>
+ <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <19225293.OPozO1Cbk5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+On Monday 12 January 2015 16:03:52 Ding Tianhong wrote:
+> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
 
-On 01/12/2015 05:44 PM, Kukjin Kim wrote:
-> On 01/08/15 10:50, Chanwoo Choi wrote:
->> This patch adds the support for suspend-to-ram feature of Exynos3250 SoC.
->> Exynos3250 don't contain the L2 cache.
->>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> Depend on:
->> - v3.19-rc3
->>
-> Chanwoo,
+Looks great to me in the latest version. Dave, unless you have further
+concerns, please apply.
+
+> v11: Add ethtool support for tx coalecse getting and setting, the xmit_more
+> is not supported for this patch, but I think it could work for hip04,
+> will support it later after some tests for performance better.
 > 
-> Can you please let me know why this is depending on v3.19-rc3?
-> If I apply this on top of my tree not including some stuff between
-> v3.19-rc1 and v3.19-rc3, is there a problem?
+> Here are some performance test results by ping and iperf(add tx_coalesce_frames/users),
+> it looks that the performance and latency is more better by tx_coalesce_frames/usecs.
+> 
+> - Before:
+> $ ping 192.168.1.1 ...
+> --- 192.168.1.1 ping statistics ---
+> 24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+> rtt min/avg/max/mdev = 0.180/0.202/0.403/0.043 ms
+> 
+> $ iperf -c 192.168.1.1 ...
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 1.0 sec   115 MBytes   945 Mbits/sec
 
-No problem.
-I'm sorry. It is my mistake about using meaning of dependency.
-This patch can be applied on v3.19-rc1. I just tested it on v3.19-rc3.
+Just to be sure: you were running the two tests simultaneously, right?
 
-Best Regards,
-Chanwoo Choi
+	Arnd
