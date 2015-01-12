@@ -1,68 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jan 2015 16:38:25 +0000
-Subject: [PATCH] arm64: mm: dump: add missing includes
-In-Reply-To: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
-References: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150112163825.GM12302@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Jan 2015 16:45:13 +0000
+Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
+Message-ID: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 03:40:26PM +0000, Mark Rutland wrote:
-> The arm64 dump code is currently relying on some definitions which are
-> pulled in via transitive dependencies. On next-20150112 at least one of
-> these (PCI_IOBASE) is no longer pulled in with a defconfig build,
-> resulting in the following build failure:
-> 
-> arch/arm64/mm/dump.c:55:20: error: ?PCI_IOBASE? undeclared here (not in a function)
->   { (unsigned long) PCI_IOBASE,  "PCI I/O start" },
->                     ^
-> It seems we have implicit dependencies on the following definitions:
-> 
-> * PCI_IOBASE            (asm/io.h)
-> * MODULES_VADDR         (asm/memory.h)
-> * MODULES_END           (asm/memory.h)
-> * PAGE_OFFSET           (asm/memory.h)
-> * PTE_*                 (asm/pgtable-hwdef.h)
-> * ENOMEM                (asm/errno.h)
-> * device_initcall       (linux/init.h)
-> 
-> This patch ensures we explicitly include the relevant headers for the
-> above items, fixing the observed build issue and hopefully preventing
-> future issues as headers are refactored.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Mark Brown <broonie@kernel.org>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> ---
->  arch/arm64/mm/dump.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index cf33f33..df69e43 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -15,12 +15,17 @@
->   */
->  #include <linux/debugfs.h>
->  #include <linux/fs.h>
-> +#include <linux/init.h>
->  #include <linux/mm.h>
->  #include <linux/sched.h>
->  #include <linux/seq_file.h>
->  
-> +#include <asm/errno.h>
->  #include <asm/fixmap.h>
-> +#include <asm/io.h>
-> +#include <asm/memory.h>
->  #include <asm/pgtable.h>
-> +#include <asm/pgtable-hwdef.h>
+Currently we have two sets of macros used for ESR_ELx handling, one used
+by core arm64 code and the other used by KVM. These differ slightly in
+naming convention and style of definition.
 
-Don't forget to use linux/*.h includes instead of asm/*.h includes where
-appropriate.  That being errno.h and io.h.
+This patch series introduces and migrates all users to a common set of
+macros for ESR_ELx handling, preventing further drift.
+
+Additionally this series adds exception class decoding when reporting
+exceptions, saving deveopers from having to perform tedious mental
+arithmetic to figure out what the likely cause of an unexpected
+exception was.
+
+Since v1 [1]:
+* Reorder patches to maintain KVM bisectability.
+* Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
+* Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of 
+  kvm_vcpu_dabt_get_as.
+* Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
+  list.
+
+Many thanks to those who have reviewed this so far.
+
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313934.html
+
+Mark Rutland (7):
+  arm64: introduce common ESR_ELx_* definitions
+  arm64: move to ESR_ELx macros
+  arm64: decode ESR_ELx.EC when reporting exceptions
+  arm64: kvm: move to ESR_ELx macros
+  arm64: remove ESR_EL1_* macros
+  arm64: kvm: remove ESR_EL2_* macros
+  arm64: kvm: decode ESR_ELx.EC when reporting exceptions
+
+ arch/arm64/include/asm/esr.h         | 117 +++++++++++++++++++++++++----------
+ arch/arm64/include/asm/kvm_arm.h     |  73 ++--------------------
+ arch/arm64/include/asm/kvm_emulate.h |  28 +++++----
+ arch/arm64/kernel/entry.S            |  64 +++++++++----------
+ arch/arm64/kernel/signal32.c         |   2 +-
+ arch/arm64/kernel/traps.c            |  50 ++++++++++++++-
+ arch/arm64/kvm/emulate.c             |   5 +-
+ arch/arm64/kvm/handle_exit.c         |  39 ++++++------
+ arch/arm64/kvm/hyp.S                 |  17 ++---
+ arch/arm64/kvm/inject_fault.c        |  14 ++---
+ arch/arm64/kvm/sys_regs.c            |  23 ++++---
+ arch/arm64/mm/fault.c                |   2 +-
+ 12 files changed, 237 insertions(+), 197 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
