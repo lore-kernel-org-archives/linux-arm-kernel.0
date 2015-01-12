@@ -1,25 +1,29 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Tue, 13 Jan 2015 00:07:49 +0100
-Subject: [PATCH v3 2/3] pinctrl: add driver for Amlogic Meson SoCs
-In-Reply-To: <CACRpkdY0tv77GgOF91EG8wEzsgQ4OsLUjogNxFjO-rjfY2Q15g@mail.gmail.com>
-References: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
- <1416168856-12747-3-git-send-email-b.galvani@gmail.com>
- <CACRpkda-U5OuKdBVGJ8UWprJkAtmTL1m11+AbNskVULPfyS72A@mail.gmail.com>
- <20141127223402.GA11418@gmail.com>
- <CACRpkdY0tv77GgOF91EG8wEzsgQ4OsLUjogNxFjO-rjfY2Q15g@mail.gmail.com>
-Message-ID: <20150112230749.GA1743@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 12 Jan 2015 15:09:13 -0800
+Subject: [GIT PULL] ARM: brcmstb: SMP updates for v3.20
+Message-ID: <1421104153-6686-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 01:00:16AM +0100, Linus Walleij wrote:
-> Hi Beniamino,
-> 
-> sorry for the delay to merging S?ren's patches.
-> 
-> Can you rebase this patch on top of the pin control "devel" branch:
-> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 
-I will rebase and submit the patch in the next days.
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 
-Thanks,
-Beniamino
+are available in the git repository at:
+
+  http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/brcmstb-smp
+
+for you to fetch changes up to a1ad3b94a7661b643fef2efbc6fc217bd148f462:
+
+  ARM: brcmstb: update CPU power management sequence (2015-01-12 14:59:29 -0800)
+
+----------------------------------------------------------------
+This pull request contains updates to the brcmstb SMP code to use the manual
+sequence instead of hardware state machine since it is not reliable.
+
+----------------------------------------------------------------
+Brian Norris (1):
+      ARM: brcmstb: update CPU power management sequence
+
+ arch/arm/mach-bcm/platsmp-brcmstb.c | 85 +++++++++++++++++++++++++++----------
+ 1 file changed, 63 insertions(+), 22 deletions(-)
