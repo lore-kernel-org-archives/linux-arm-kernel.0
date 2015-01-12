@@ -1,76 +1,51 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Jan 2015 11:57:56 +0100
-Subject: [PATCH v3 3/5] ARM: at91/dt: update udc compatible strings
+Date: Mon, 12 Jan 2015 11:57:57 +0100
+Subject: [PATCH v3 4/5] usb: atmel_usba_udc: Mask status with enabled irqs
 In-Reply-To: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1421060278-27329-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9g45, at91sam9x5 and sama5 SoCs should not use
-"atmel,at91sam9rl-udc" for their USB device compatible property since
-this compatible is attached to a specific hardware bug fix.
+Avoid interpreting useless status flags when we're not waiting for such
+events by masking the status variable with the interrupt enabled register
+value.
 
+Reported-by: Patrice VILCHEZ <patrice.vilchez@atmel.com>
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi  | 2 +-
- arch/arm/boot/dts/sama5d3.dtsi     | 2 +-
- arch/arm/boot/dts/sama5d4.dtsi     | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 2a8da8a..acd90eb 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1144,7 +1144,7 @@
- 			usb2: gadget at fff78000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				compatible = "atmel,at91sam9rl-udc";
-+				compatible = "atmel,at91sam9g45-udc";
- 				reg = <0x00600000 0x80000
- 				       0xfff78000 0x400>;
- 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 0>;
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index bbb3ba6..d213147 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -1057,7 +1057,7 @@
- 			usb2: gadget at f803c000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				compatible = "atmel,at91sam9rl-udc";
-+				compatible = "atmel,at91sam9g45-udc";
- 				reg = <0x00500000 0x80000
- 				       0xf803c000 0x400>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 5f4144d..2b407a4 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1264,7 +1264,7 @@
- 		usb0: gadget at 00500000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "atmel,at91sam9rl-udc";
-+			compatible = "atmel,sama5d3-udc";
- 			reg = <0x00500000 0x100000
- 			       0xf8030000 0x4000>;
- 			interrupts = <33 IRQ_TYPE_LEVEL_HIGH 2>;
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 1b0f30c..52dce24 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -112,7 +112,7 @@
- 		usb0: gadget at 00400000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
--			compatible = "atmel,at91sam9rl-udc";
-+			compatible = "atmel,sama5d3-udc";
- 			reg = <0x00400000 0x100000
- 			       0xfc02c000 0x4000>;
- 			interrupts = <47 IRQ_TYPE_LEVEL_HIGH 2>;
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 55c8dde..bc3a532 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1612,12 +1612,14 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 
+ 	spin_lock(&udc->lock);
+ 
+-	status = usba_readl(udc, INT_STA);
++	status = usba_readl(udc, INT_STA) & usba_readl(udc, INT_ENB);
+ 	DBG(DBG_INT, "irq, status=%#08x\n", status);
+ 
+ 	if (status & USBA_DET_SUSPEND) {
+ 		toggle_bias(udc, 0);
+ 		usba_writel(udc, INT_CLR, USBA_DET_SUSPEND);
++		usba_writel(udc, INT_ENB,
++			    usba_readl(udc, INT_ENB) | USBA_WAKE_UP);
+ 		udc->bias_pulse_needed = true;
+ 		DBG(DBG_BUS, "Suspend detected\n");
+ 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
+@@ -1631,6 +1633,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	if (status & USBA_WAKE_UP) {
+ 		toggle_bias(udc, 1);
+ 		usba_writel(udc, INT_CLR, USBA_WAKE_UP);
++		usba_writel(udc, INT_ENB,
++			    usba_readl(udc, INT_ENB) & ~USBA_WAKE_UP);
+ 		DBG(DBG_BUS, "Wake Up CPU detected\n");
+ 	}
+ 
 -- 
 1.9.1
