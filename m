@@ -1,46 +1,50 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 12 Jan 2015 14:59:23 +0530
-Subject: [PATCH v5 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <1521226.qVx3V7aJT6@wuerfel>
-References: <1418285264-21763-1-git-send-email-pankaj.dubey@samsung.com>
- <CAL_JsqKaf+w_D-xLCUizuTmxwT7uUHExA=qMpawQ+00G7uMcBg@mail.gmail.com>
- <548A9D27.1000504@samsung.com> <1521226.qVx3V7aJT6@wuerfel>
-Message-ID: <54B393F3.8070403@samsung.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 12 Jan 2015 10:30:36 +0100
+Subject: [alsa-devel] [PATCH] ASoC: wm8904: fix runtime warning
+In-Reply-To: <54B34035.60107@atmel.com>
+References: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
+ <20150109111642.GU14516@opensource.wolfsonmicro.com>
+ <54B34035.60107@atmel.com>
+Message-ID: <54B3943C.4040103@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-Sorry for late reply.
-
-On Friday 12 December 2014 05:01 PM, Arnd Bergmann wrote:
-> On Friday 12 December 2014 13:15:43 Pankaj Dubey wrote:
->>>> +
->>>> +static void __iomem *exynos_chipid_base;
->>>> +
->>>> +struct exynos_chipid_info exynos_soc_info;
->>>> +EXPORT_SYMBOL(exynos_soc_info);
+On 01/12/2015 04:32 AM, Bo Shen wrote:
+[...]
+>>> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
+>>> index 4d2d2b1..38582d7 100644
+>>> --- a/sound/soc/codecs/wm8904.c
+>>> +++ b/sound/soc/codecs/wm8904.c
+>>> @@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route
+>>> adc_intercon[] = {
+>>>       { "Right Capture PGA", NULL, "Right Capture Mux" },
+>>>       { "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
 >>>
->>> The soc_device already has similar data.Why is this needed? Is it
->>> temporary for compatibility?
+>>> -    { "AIFOUTL", "Left",  "ADCL" },
+>>> -    { "AIFOUTL", "Right", "ADCR" },
+>>> -    { "AIFOUTR", "Left",  "ADCL" },
+>>> -    { "AIFOUTR", "Right", "ADCR" },
+>>> +    { "AIFOUTL", NULL, "ADCL" },
+>>> +    { "AIFOUTL", NULL, "ADCR" },
+>>> +    { "AIFOUTR", NULL, "ADCL" },
+>>> +    { "AIFOUTR", NULL, "ADCR" },
 >>
->> struct soc_device_attribute can hold these two (product_id, and
->> revision) but they are defined as char * in soc_device_atttribute, and I
->> feel it's more specific for exposing via sysfs.
->> Also existing code in mach-exynos compares them via product_id/revision
->> macros, so I can say to keep compatibility.
+>> Is this the right fix here? I am not super familiar with the
+>> driver but it appears to contain an "AIFOUTL Mux" control which
+>> is not connected to anything. Looks like maybe this is a mistake
+>> the mux is indeded to be included in the path? Feels like we
+>> should either remove the control as well or hook it into the
+>> path.
 >
-> We had a similar discussion about the Marvell SoCs a while ago, and at
-> the time we concluded that it would be best to create a platform-
-> independent API to match the strings in soc_device_attribute against
-> a list of strings in the driver, either by matching the start of the
-> string, or using the glob_match() function. Would that work for you?
+> Thank for your information.
+> I think here it should correct the path name as
+> --->8---
+> { "AIFOUTL Mux", "Left",  "ADCL" },
+> { "AIFOUTL Mux", "Right", "ADCR" },
+> { "AIFOUTR Mux", "Left",  "ADCL" },
+> { "AIFOUTR Mux", "Right", "ADCR" },
+> ---8<---
 >
+> Thanks again. I will send out the new version.
 
-It might be useful, will you please point me to that discussion so that 
-I can dig more and see how I can reuse it, or if required work on it.
-
-Thanks,
-Pankaj Dubey
-> 	Arnd
->
+Your probably also need to connect the mux to the output pins.
