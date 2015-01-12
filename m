@@ -1,37 +1,35 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 12 Jan 2015 11:13:49 +0100
-Subject: [RFC 02/11] i2c: add quirk checks to core
-In-Reply-To: <20150112095847.GD3625@ldesroches-Latitude-E6320>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
- <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
- <20150112095847.GD3625@ldesroches-Latitude-E6320>
-Message-ID: <20150112101349.GA995@katana>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 12 Jan 2015 11:15:00 +0100
+Subject: [GIT PULL 0/2] KVM/ARM Fixes for 3.19
+In-Reply-To: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
+References: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <54B39EA4.50808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> I am not sure it will perfectly fit at91 quirks.
 
-I think it does.
+On 11/01/2015 14:10, Christoffer Dall wrote:
+> Hi Paolo,
+> 
+> The following changes since commit b1940cd21c0f4abdce101253e860feff547291b0:
+> 
+>   Linux 3.19-rc3 (2015-01-05 17:05:20 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-3.19
+> 
+> for you to fetch changes up to b5b8ddba844c6b6c5b96c27b284d9ed05a16fa13:
+> 
+>   arm64: KVM: Fix HCR setting for 32bit guests (2015-01-11 13:54:51 +0100)
+> 
+> (Note that I got an extra merge commit when merging kvm/master into
+> kvmarm/master, which I think is because Linus applied the set of fixes
+> from kvmarm/master directly from Marc's patches. Let me know if you need
+> me to mangle this differently somehow.)
 
-> The hardware can handle two messages by using the internal address
-> feature. The internal address size is from one byte to three bytes. Then
-> the length of the first message is limited to three but we don't have
-> this constraint for the second one. If we have 'write then read' no problem
-> but if we have two write messages, the second one will cause a quirk
-> exceeded error.
+Hmm, that's a bit ugly.  I'll apply the patches directly too, please do
+a "git reset --hard kvm/master" before applying more stuff.
 
-Yeah, for this reason I seperated I2C_ADAPTER_QUIRK_COMB_WRITE_FIRST
-out. The first message is checked against max_comb_write_len which is
-set to 3 for your driver. The second is checked agains max_write_len
-which is unset in your driver and thus can be of any length.
-
-That should work, no?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/8f6c67bb/attachment.sig>
+Paolo
