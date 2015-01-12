@@ -1,31 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Jan 2015 14:04:30 +0100
-Subject: ARM: mvebu: CONFIG_DEBUG_MVEBU_UART_ALTERNATE
-In-Reply-To: <1421055236.22660.12.camel@x220>
-References: <1421055236.22660.12.camel@x220>
-Message-ID: <20150112130430.GC19533@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 12 Jan 2015 13:07:05 +0000
+Subject: sata_dwc_460ex build failures in -next
+In-Reply-To: <1421067564.31903.3.camel@linux.intel.com>
+References: <E1YAZyB-0007iE-CZ@debutante> <20150112123655.GF4160@sirena.org.uk>
+ <20150112125037.GH12302@n2100.arm.linux.org.uk>
+ <1421067564.31903.3.camel@linux.intel.com>
+Message-ID: <20150112130705.GL4160@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 10:33:56AM +0100, Paul Bolle wrote:
-> Maxime,
-> 
-> Your commit d91125ddf962 ("ARM: mvebu: Rename DEBUG_LL to indicate UART
-> index") is included in today's linux-next (ie, next-20150112). So is the
-> related commit bd920490047a ("ARM: mvebu: Add UART1 as DEBUG_LL possible
-> target"). I noticed because a script I use, spotted a minor issue with
-> the first commit.
-> 
-> See, the first commit renamed DEBUG_MVEBU_UART_ALTERNATE to
-> DEBUG_MVEBU_UART0_ALTERNATE (so "0" was added). But there's still a last
-> reference to CONFIG_DEBUG_MVEBU_UART_ALTERNATE in a comment in
-> arch/arm/boot/dts/armada-xp-axpwifiap.dts. Is a patch to rename that
-> last reference queued somewhere? If not, should I submit a trivial patch
-> to do that?
+On Mon, Jan 12, 2015 at 02:59:24PM +0200, Andy Shevchenko wrote:
 
-Hi Paul
+> I just send a plug patch to disable compilation on ARMs.
 
-Nothing queued, so please do submit a patch.
-
-Thanks
-	Andrew
+Thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/12aead17/attachment.sig>
