@@ -1,118 +1,23 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Jan 2015 20:28:20 +0000
-Subject: [PATCH v2] arm64/efi: efistub: apply __init annotation
-Message-ID: <1421094500-15659-1-git-send-email-ard.biesheuvel@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 12 Jan 2015 15:35:59 -0500 (EST)
+Subject: [PATCH] net/at91_ether: prepare and unprepare clock
+In-Reply-To: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1420671566-30784-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150112.153559.783855617585288378.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This ensures all stub component are freed when the kernel proper is
-done booting, by prefixing the names of all ELF sections that have
-the SHF_ALLOC attribute with ".init". This approach ensures that even
-implicitly emitted allocated data (like initializer values and string
-literals) are covered.
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed,  7 Jan 2015 23:59:26 +0100
 
-At the same time, remove some __init annotations in the stub that have
-now become redundant, and add the __init annotation to handle_kernel_image
-which will now trigger a section mismatch warning without it.
+> The clock is enabled without being prepared, this leads to:
+> 
+> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:889 __clk_enable+0x24/0xa8()
+> 
+> and a non working ethernet interface.
+> 
+> Use clk_prepare_enable() and clk_disable_unprepare() to handle the clock.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: fixed an issue with spurious rebuilding of object files, now setting
-    $(extra-y) correctly, which also allows the .PRECIOUS: to be dropped.
-
-
- arch/arm64/kernel/efi-stub.c                   | 14 +++++++-------
- drivers/firmware/efi/libstub/Makefile          | 14 ++++++++++++++
- drivers/firmware/efi/libstub/arm-stub.c        |  8 ++++----
- drivers/firmware/efi/libstub/efi-stub-helper.c |  2 +-
- 4 files changed, 26 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index d27dd982ff26..f5374065ad53 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -13,13 +13,13 @@
- #include <asm/efi.h>
- #include <asm/sections.h>
- 
--efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
--				 unsigned long *image_addr,
--				 unsigned long *image_size,
--				 unsigned long *reserve_addr,
--				 unsigned long *reserve_size,
--				 unsigned long dram_base,
--				 efi_loaded_image_t *image)
-+efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
-+					unsigned long *image_addr,
-+					unsigned long *image_size,
-+					unsigned long *reserve_addr,
-+					unsigned long *reserve_size,
-+					unsigned long dram_base,
-+					efi_loaded_image_t *image)
- {
- 	efi_status_t status;
- 	unsigned long kernel_size, kernel_memsize = 0;
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index b14bc2b9fb4d..8902f52e0998 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -24,3 +24,17 @@ lib-y				:= efi-stub-helper.o
- lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o
- 
- CFLAGS_fdt.o			+= -I$(srctree)/scripts/dtc/libfdt/
-+
-+#
-+# arm64 puts the stub in the kernel proper, which will unnecessarily retain all
-+# code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
-+# So let's apply the __init annotations at the section level, by prefixing
-+# the section names directly. This will ensure that even all the inline string
-+# literals are covered.
-+#
-+extra-$(CONFIG_ARM64)		:= $(lib-y)
-+lib-$(CONFIG_ARM64)		:= $(patsubst %.o,%.init.o,$(lib-y))
-+
-+OBJCOPYFLAGS := --prefix-alloc-sections=.init
-+$(obj)/%.init.o: $(obj)/%.o FORCE
-+	$(call if_changed,objcopy)
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index e2432b39b6df..dcae482a9a17 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -17,10 +17,10 @@
- 
- #include "efistub.h"
- 
--static int __init efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
-+static int efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
- {
--	static efi_guid_t const var_guid __initconst = EFI_GLOBAL_VARIABLE_GUID;
--	static efi_char16_t const var_name[] __initconst = {
-+	static efi_guid_t const var_guid = EFI_GLOBAL_VARIABLE_GUID;
-+	static efi_char16_t const var_name[] = {
- 		'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
- 
- 	efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
-@@ -164,7 +164,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
-  * for both archictectures, with the arch-specific code provided in the
-  * handle_kernel_image() function.
-  */
--unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
-+unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 			       unsigned long *image_addr)
- {
- 	efi_loaded_image_t *image;
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index e766df60fbfb..2fe195002021 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -110,7 +110,7 @@ fail:
- }
- 
- 
--unsigned long __init get_dram_base(efi_system_table_t *sys_table_arg)
-+unsigned long get_dram_base(efi_system_table_t *sys_table_arg)
- {
- 	efi_status_t status;
- 	unsigned long map_size;
--- 
-1.8.3.2
+Applied, thanks.
