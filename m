@@ -1,49 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Jan 2015 16:09:24 +0000
-Subject: [PATCH v5 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <20150112114600.GE26589@codeblueprint.co.uk>
-References: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
- <1420742914-2404-7-git-send-email-ard.biesheuvel@linaro.org>
- <20150112114600.GE26589@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu9BQFEEpEpF3-O98W-kBYQC9yKf39ee2gvznuZYPiCo-g@mail.gmail.com>
+From: alan@linux.intel.com (Alan Cox)
+Date: Mon, 12 Jan 2015 16:08:38 +0000
+Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
+ option
+In-Reply-To: <3712986.8SuKNvhKTk@wuerfel>
+References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
+ <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+ <3712986.8SuKNvhKTk@wuerfel>
+Message-ID: <1421078918.31978.32.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2015 at 11:46, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Thu, 08 Jan, at 06:48:32PM, Ard Biesheuvel wrote:
->> @@ -46,4 +54,26 @@ extern void efi_idmap_init(void);
->>
->>  #define EFI_ALLOC_ALIGN              SZ_64K
->>
->> +/*
->> + * On ARM systems, virtually remapped UEFI runtime services are set up in three
->> + * distinct stages:
->> + * - The stub retrieves the final version of the memory map from UEFI, populates
->> + *   the virt_addr fields and calls the SetVirtualAddressMap() [SVAM] runtime
->> + *   service to communicate the new mapping to the firmware (Note that the new
->> + *   mapping is not live at this time)
->> + * - During early boot, the page tables are allocated and populated based on the
->> + *   virt_addr fields in the memory map, but only if all descriptors with the
->> + *   EFI_MEMORY_RUNTIME attribute have a non-zero value for virt_addr. If this
->> + *   succeeds, the EFI_VIRTMAP flag is set to indicate that the virtual mappings
->> + *   have been installed successfully.
->> + * - During an early initcall(), the UEFI Runtime Services are enabled and the
->> + *   EFI_RUNTIME_SERVICES bit set if some conditions are met, i.e., we need a
->> + *   non-early mapping of the UEFI system table, and we need to have the virtmap
->> + *   installed.
->> + */
->> +#define EFI_VIRTMAP          EFI_ARCH_1
->
-> Lucid. Thanks, Ard!
->
+On Mon, 2015-01-12 at 16:35 +0100, Arnd Bergmann wrote:
+> On Monday 12 January 2015 21:08:21 Eddie Huang wrote:
+> > Add earlycon support not only baudrate option, but also add noinit option.
+> > If use noinit option, 8250 earlycon will not init serial hardware and use
+> > loader setting.
+> > 
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> 
+> I probably missed something in the previous discussion, but why is
+> "noinit" not just the default? I believe that is how we handle early
+> serial ports on PowerPC, and I see no downsides to it.
 
-Cheers Matt
+Most PC hardware at least needs the port initialised to use it. It won't
+have been configured by the firmware in many cases.
 
-It appears this series is converging in time for 3.20, but this patch
-still lacks acked/reviewed-bys
-
-Are you ok with the remainder of the patch as well? In that case, may
-I have your ack so the series can be merged through the arm64 tree?
-
--- 
-Ard.
+Alan
