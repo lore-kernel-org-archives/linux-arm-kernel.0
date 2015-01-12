@@ -1,70 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Jan 2015 18:26:15 +0000
-Subject: [PATCH v3 09/21] DT: update ti,irq-crossbar binding
+Date: Mon, 12 Jan 2015 18:26:24 +0000
+Subject: [PATCH v3 18/21] ARM: shmobile: remove use of
+ gic_arch_extn.irq_set_wake
 In-Reply-To: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
 References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1421087187-26988-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1421087187-26988-19-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it look like a real interrupt controller.
+shmobile only uses gic_arch_extn.irq_set_wake to prevent the GIC
+from returning -ENXIO when receiving a wake-up configuration request.
 
+It is a lot simpler to tell the irq layer that we don't need any
+configuration by using the IRQCHIP_SKIP_SET_WAKE, thanks to the
+new gic_set_irqchip_flags function.
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../devicetree/bindings/arm/omap/crossbar.txt          | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+ arch/arm/mach-shmobile/intc-sh73a0.c   | 7 +------
+ arch/arm/mach-shmobile/setup-r8a7779.c | 7 +------
+ 2 files changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 4139db3..a9b28d7 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -9,7 +9,9 @@ inputs.
- Required properties:
- - compatible : Should be "ti,irq-crossbar"
- - reg: Base address and the size of the crossbar registers.
--- ti,max-irqs: Total number of irqs available at the interrupt controller.
-+- interrupt-controller: indicates that this block is an interrupt controller.
-+- interrupt-parent: the interrupt controller this block is connected to.
-+- ti,max-irqs: Total number of irqs available at the parent interrupt controller.
- - ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
- - ti,reg-size: Size of a individual register in bytes. Every individual
- 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
-@@ -27,13 +29,13 @@ Optional properties:
-   when the interrupt controller irq is unused (when not provided, default is 0)
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 9e36180..fd63ae6 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -252,11 +252,6 @@ static irqreturn_t sh73a0_intcs_demux(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
- Examples:
--		crossbar_mpu: @4a020000 {
-+		crossbar_mpu: crossbar at 4a002a48 {
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
- 			ti,max-irqs = <160>;
- 			ti,max-crossbar-sources = <400>;
- 			ti,reg-size = <2>;
--			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-+			ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
- 			ti,irqs-skip = <10 133 139 140>;
- 		};
- 
-@@ -44,10 +46,6 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--When the request number is between 0 to that described by
--"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
--request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
--quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -55,9 +53,3 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
+-static int sh73a0_set_wake(struct irq_data *data, unsigned int on)
+-{
+-	return 0; /* always allow wakeup */
+-}
 -
--	device_y at 0x4a033000 {
--		/* Direct mapped GIC SPI 1 used */
--		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
--		...
--	};
+ #define PINTER0_PHYS 0xe69000a0
+ #define PINTER1_PHYS 0xe69000a4
+ #define PINTER0_VIRT IOMEM(0xe69000a0)
+@@ -318,8 +313,8 @@ void __init sh73a0_init_irq(void)
+ 	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+ 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+ 
++	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+ 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+-	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
+ 
+ 	register_intc_controller(&intcs_desc);
+ 	register_intc_controller(&intc_pint0_desc);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 6156d17..989de2d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -713,14 +713,9 @@ void __init r8a7779_init_late(void)
+ }
+ 
+ #ifdef CONFIG_USE_OF
+-static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
+-{
+-	return 0; /* always allow wakeup */
+-}
+-
+ void __init r8a7779_init_irq_dt(void)
+ {
+-	gic_arch_extn.irq_set_wake = r8a7779_set_wake;
++	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+ 
+ 	irqchip_init();
+ 
 -- 
 2.1.4
