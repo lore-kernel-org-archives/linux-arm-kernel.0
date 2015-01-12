@@ -1,45 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Jan 2015 01:00:16 +0100
-Subject: [PATCH v3 2/3] pinctrl: add driver for Amlogic Meson SoCs
-In-Reply-To: <20141127223402.GA11418@gmail.com>
-References: <1416168856-12747-1-git-send-email-b.galvani@gmail.com>
- <1416168856-12747-3-git-send-email-b.galvani@gmail.com>
- <CACRpkda-U5OuKdBVGJ8UWprJkAtmTL1m11+AbNskVULPfyS72A@mail.gmail.com>
- <20141127223402.GA11418@gmail.com>
-Message-ID: <CACRpkdY0tv77GgOF91EG8wEzsgQ4OsLUjogNxFjO-rjfY2Q15g@mail.gmail.com>
+Date: Mon, 12 Jan 2015 01:04:10 +0100
+Subject: [PATCH v3 5/8] gpio: Add Fujitsu MB86S7x GPIO driver
+In-Reply-To: <CACRpkdZk3sLN43zmuWM+VYLB7vJdNCSq_goTx6mDSnzHrO=UHw@mail.gmail.com>
+References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <1420803212-4350-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
+ <CACRpkdZk3sLN43zmuWM+VYLB7vJdNCSq_goTx6mDSnzHrO=UHw@mail.gmail.com>
+Message-ID: <CACRpkdajpv0yK-m3WRxRRKJyQiBZxRppOiay+-CLTr_adOw9ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 27, 2014 at 11:34 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> On Thu, Nov 27, 2014 at 02:48:31PM +0100, Linus Walleij wrote:
->> On Sun, Nov 16, 2014 at 9:14 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
->>
->> > This is a driver for the pinmux and GPIO controller available in
->> > Amlogic Meson SoCs. At the moment it only supports Meson8 devices,
->> > however other SoC families like Meson6 and Meson8b (the Cortex-A5
->> > variant) appear to be similar, with just different sets of banks and
->> > registers.
->> >
->> > GPIO interrupts are not supported at the moment due to lack of
->> > documentation.
->> >
->> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
->>
->> This is dependent on S?ren's patches I guess?
->>
->> OK I'll merge this once we have that other code sorted out.
+On Sun, Jan 11, 2015 at 11:40 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+
+> First I thought maybe this could use the generic MMIO driver
+> but it seems you need this double register access for setting
+> the direction so it won't work.
 >
-> Yes, this depends on Soren's patches.
+> Otherwise it's sort of close ... have you looks at the option?
 
-Hi Beniamino,
-
-sorry for the delay to merging S?ren's patches.
-
-Can you rebase this patch on top of the pin control "devel" branch:
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel
-
-Some stuff like structs and functions were renamed by me since it was
-not generic enough.
+Bah, sorry I saw I already asked this in the past and you explained
+that the arithmetic is not simple enough. Sorry for forgetting what
+I already asked. This is over all looking very good, but waiting since
+you had some pending change, then I'll merge it.
 
 Yours,
 Linus Walleij
