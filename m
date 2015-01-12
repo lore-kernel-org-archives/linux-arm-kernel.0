@@ -1,72 +1,52 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 12 Jan 2015 15:45:10 +0000
-Subject: [PATCH] arm64: mm: dump: add missing includes
-In-Reply-To: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
-References: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAPvkgC0XcWW03KwSC5ao2=vj9QebmK7axrGoc_6ddgmj6KbXPw@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 12 Jan 2015 16:52:20 +0100
+Subject: [RFC PATCH 0/4] Genericise the IOVA allocator
+In-Reply-To: <cover.1416931258.git.robin.murphy@arm.com>
+References: <cover.1416931258.git.robin.murphy@arm.com>
+Message-ID: <20150112155220.GD6343@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2015 at 15:40, Mark Rutland <mark.rutland@arm.com> wrote:
-> The arm64 dump code is currently relying on some definitions which are
-> pulled in via transitive dependencies. On next-20150112 at least one of
-> these (PCI_IOBASE) is no longer pulled in with a defconfig build,
-> resulting in the following build failure:
->
-> arch/arm64/mm/dump.c:55:20: error: ?PCI_IOBASE? undeclared here (not in a function)
->   { (unsigned long) PCI_IOBASE,  "PCI I/O start" },
->                     ^
-> It seems we have implicit dependencies on the following definitions:
->
-> * PCI_IOBASE            (asm/io.h)
-> * MODULES_VADDR         (asm/memory.h)
-> * MODULES_END           (asm/memory.h)
-> * PAGE_OFFSET           (asm/memory.h)
-> * PTE_*                 (asm/pgtable-hwdef.h)
-> * ENOMEM                (asm/errno.h)
-> * device_initcall       (linux/init.h)
->
-> This patch ensures we explicitly include the relevant headers for the
-> above items, fixing the observed build issue and hopefully preventing
-> future issues as headers are refactored.
->
+Hi Robin,
 
-Looks good to me.
+On Tue, Nov 25, 2014 at 05:27:24PM +0000, Robin Murphy wrote:
+> Hi all,
+> 
+> I've been implementing IOMMU DMA mapping for arm64, based on tidied-up
+> parts of the existing arch/arm/mm/dma-mapping.c with a clear divide
+> between the arch-specific parts and the general DMA-API to IOMMU-API layer
+> so that that can be shared; similar to what Ritesh started before and was
+> unable to complete[1], but working in the other direction.
+> 
+> The first part of that tidy-up involved ripping out the homebrewed IOVA
+> allocator and plumbing in iova.c, necessitating the changes presented here.
+> The rest is currently sat under arch/arm64 for the sake of getting it
+> working quickly with minimal impact - ideally I'd move it out and port
+> arch/arm before merging, but I don't know quite how impatient people are.
+> Regardless of that decision, this bit stands alone, so here it is.
+> 
+> Feel free to ignore patches 1 and 2, since I see Sakari has recently
+> posted a more thorough series for that[2], that frankly looks nicer ;)
+> I've merely left them in as context here.
+> 
+> [1]:http://thread.gmane.org/gmane.linux.ports.arm.kernel/331299
+> [2]:http://article.gmane.org/gmane.linux.kernel.iommu/7436
+> 
+> Robin Murphy (4):
+>   iommu: build iova.c for any IOMMU
+>   iommu: consolidate IOVA allocator code
+>   iommu: make IOVA domain low limit flexible
+>   iommu: make IOVA domain page size explicit
 
-Acked-by: Steve Capper <steve.capper@linaro.org>
+Thanks for doing this, I like this patch-set.
 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Mark Brown <broonie@kernel.org>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Laura Abbott <lauraa@codeaurora.org>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> ---
->  arch/arm64/mm/dump.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index cf33f33..df69e43 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -15,12 +15,17 @@
->   */
->  #include <linux/debugfs.h>
->  #include <linux/fs.h>
-> +#include <linux/init.h>
->  #include <linux/mm.h>
->  #include <linux/sched.h>
->  #include <linux/seq_file.h>
->
-> +#include <asm/errno.h>
->  #include <asm/fixmap.h>
-> +#include <asm/io.h>
-> +#include <asm/memory.h>
->  #include <asm/pgtable.h>
-> +#include <asm/pgtable-hwdef.h>
->
->  #define LOWEST_ADDR    (UL(0xffffffffffffffff) << VA_BITS)
->
-> --
-> 1.9.1
->
+I would also appreciate if someone from Intel could have a look at it,
+David?
+
+Besides, can you please re-post this patch-set rebased to latest
+upstream with the better versions of patch 1 and 2, please?
+
+I consider to apply these changes then.
+
+
+	Joerg
