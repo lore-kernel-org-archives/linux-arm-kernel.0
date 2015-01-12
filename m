@@ -1,95 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 12 Jan 2015 10:46:54 -0600
-Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
- volatile
-In-Reply-To: <20150108162512.GC31926@saruman>
-References: <1419622104-25812-1-git-send-email-balbi@ti.com>
- <1419622104-25812-2-git-send-email-balbi@ti.com>
- <20150106173734.GL6502@saruman> <20150108162512.GC31926@saruman>
-Message-ID: <20150112164654.GB6525@saruman>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Jan 2015 17:52:48 +0100
+Subject: [GIT PULL] at91: fixes for 3.19 #1 (bis)
+In-Reply-To: <8332277.8EH8fqiOd7@wuerfel>
+References: <1420456477-18204-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150111211215.GC25777@quad.lixom.net> <54B3E35E.50400@atmel.com>
+ <8332277.8EH8fqiOd7@wuerfel>
+Message-ID: <54B3FBE0.6020603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 08, 2015 at 10:25:12AM -0600, Felipe Balbi wrote:
-> On Tue, Jan 06, 2015 at 11:37:34AM -0600, Felipe Balbi wrote:
-> > On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
-> > > STATUS register can be modified by the HW, so we
-> > > should bypass cache because of that.
-> > > 
-> > > In the case of INT[12] registers, they are the ones
-> > > that actually clear the IRQ source at the time they
-> > > are read. If we rely on the cache for them, we will
-> > > never be able to clear the interrupt, which will cause
-> > > our IRQ line to be disabled due to IRQ throttling.
-> > > 
-> > > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
-> > > Cc: <stable@vger.kernel.org> # v3.15+
-> > > Cc: Keerthy <j-keerthy@ti.com>
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > 
-> > ping
+Le 12/01/2015 16:59, Arnd Bergmann a ?crit :
+> On Monday 12 January 2015 16:08:14 Nicolas Ferre wrote:
+>> Le 11/01/2015 22:12, Olof Johansson a ?crit :
+>>> On Fri, Jan 09, 2015 at 10:02:50AM +0100, Nicolas Ferre wrote:
+>>>> Le 08/01/2015 23:41, Olof Johansson a ?crit :
+>>>>> On Mon, Jan 05, 2015 at 12:14:37PM +0100, Nicolas Ferre wrote:
+>>>>>
+>>>>> This is the only fix among these patches, isn't it? The others seem to
+>>>>> be code removals/cleanups better targeted for 3.20, as far as I can tell.
+>>>>
+>>>> Well, this is why I sent the first version of this pull-request very
+>>>> early in the process. I didn't have the possibility to re-send it
+>>>> earlier on top of -rc1 until this pull-request.
 > 
-> another ping. Without this and the following patch TPS65218 power button
-> driver which was already applied by Dmitry, won't work.
+> I think this was a bit of a communication problem. I thought about
+> applying the first pull request you sent for this, but then Kevin
+> commented that it would be better to rebase it on top of -rc1.
+> That made sense at the time, except then we all got caught by
+> surprise by Christmas and suddenly it was -rc4 ;-)
 
-Anybody ? -rc4 is out and tps65218 is still broken because nobody has
-acted on these two patches. All other patches which are meant for 3.20
-merge window are applied and because of these pending, those patches
-won't work.
+Exactly, by surprise like every year ;-)
 
-> > > ---
-> > >  drivers/mfd/tps65218.c | 11 +++++++++++
-> > >  1 file changed, 11 insertions(+)
-> > > 
-> > > diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-> > > index 0d256cb..2243f75 100644
-> > > --- a/drivers/mfd/tps65218.c
-> > > +++ b/drivers/mfd/tps65218.c
-> > > @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
-> > >  
-> > > +static const struct regmap_range tps65218_yes_ranges[] = {
-> > > +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
-> > > +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
-> > > +};
-> > > +
-> > > +static const struct regmap_access_table tps65218_volatile_table = {
-> > > +	.yes_ranges = tps65218_yes_ranges,
-> > > +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
-> > > +};
-> > > +
-> > >  static struct regmap_config tps65218_regmap_config = {
-> > >  	.reg_bits = 8,
-> > >  	.val_bits = 8,
-> > >  	.cache_type = REGCACHE_RBTREE,
-> > > +	.volatile_table = &tps65218_volatile_table,
-> > >  };
-> > >  
-> > >  static const struct regmap_irq tps65218_irqs[] = {
-> > > -- 
-> > > 2.2.0
-> > > 
-> > 
-> > -- 
-> > balbi
+>>> Since you mention that you have more fixes coming (why hold off on them?), do
+>>> you want me to cherry-pick over that one fix to our fixes branch, or can you
+>>> queue it with the other fixes when you send them up?
+>>
+>> Fair enough, I build a new "at91: fixes for 3.19 #1 (ter)" with tree
+>> more patches right now.
 > 
+> This seems for the best now. This kind of late cleanup that depends on
+> multiple branches going in first happens occasionally and it's never
+> nice whichever way you try to handle it.
 > 
-> 
-> -- 
-> balbi
+> The only recommendation I have for the future is to discuss the merge
+> strategy with us before the merge window instead of holding back patches
+> that have other dependencies. I don't really mind merging them as a
+> late branch into -rc1 if I know about them, but we should never plan
+> to merge any non-bugfix patches later than -rc2.
 
+Sure. I'll try to do better next time.
+I began to create the at91-3.20-cleanup branch with this late material
+and all will be fine anyway.
 
-
+Thanks, bye.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/f003e95c/attachment.sig>
+Nicolas Ferre
