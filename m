@@ -1,111 +1,41 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 12 Jan 2015 21:08:21 +0800
-Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit option
-In-Reply-To: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
-References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
+Date: Mon, 12 Jan 2015 21:08:20 +0800
+Subject: [PATCH v2 0/4] tty: serial: Add earlycon support to MT8173 SoC 
+Message-ID: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add earlycon support not only baudrate option, but also add noinit option.
-If use noinit option, 8250 earlycon will not init serial hardware and use
-loader setting.
+8250 earlycon will always init serial hardware. The hardware setting is
+from kernel earlycon parameters or by probe current baudrate. I add noinit
+options in 8250 earlycon to bypass init, such that earlycon can use the
+same hardware setting as loader.
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- drivers/tty/serial/8250/8250_early.c |  7 ++++---
- drivers/tty/serial/earlycon.c        | 17 ++++++++++++-----
- include/linux/serial_8250.h          |  2 ++
- include/linux/serial_core.h          |  1 +
- 4 files changed, 19 insertions(+), 8 deletions(-)
+This series also add MT8173 earlycon support, and stdout in device
+tree.
 
-diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
-index 4858b8a..a13d757 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -138,19 +138,20 @@ static void __init init_port(struct earlycon_device *device)
- 	serial8250_early_out(port, UART_LCR, c & ~UART_LCR_DLAB);
- }
- 
--static int __init early_serial8250_setup(struct earlycon_device *device,
-+int __init early_serial8250_setup(struct earlycon_device *device,
- 					 const char *options)
- {
- 	if (!(device->port.membase || device->port.iobase))
- 		return 0;
- 
--	if (!device->baud) {
-+	if (!device->baud && !device->noinit) {
- 		device->baud = probe_baud(&device->port);
- 		snprintf(device->options, sizeof(device->options), "%u",
- 			 device->baud);
- 	}
- 
--	init_port(device);
-+	if (!device->noinit)
-+		init_port(device);
- 
- 	early_device = device;
- 	device->con->write = early_serial8250_write;
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 64fe25a..4891251 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -58,7 +58,7 @@ static int __init parse_options(struct earlycon_device *device,
- 				char *options)
- {
- 	struct uart_port *port = &device->port;
--	int mmio, mmio32, length;
-+	int noinit, mmio, mmio32, length;
- 	unsigned long addr;
- 
- 	if (!options)
-@@ -92,10 +92,17 @@ static int __init parse_options(struct earlycon_device *device,
- 	options = strchr(options, ',');
- 	if (options) {
- 		options++;
--		device->baud = simple_strtoul(options, NULL, 0);
--		length = min(strcspn(options, " ") + 1,
--			     (size_t)(sizeof(device->options)));
--		strlcpy(device->options, options, length);
-+		noinit = !strncmp(options, "noinit", 6);
-+		if (noinit) {
-+			device->noinit = noinit;
-+			strlcpy(device->options, options, 6);
-+			device->options[6] = '\0';
-+		} else {
-+			device->baud = simple_strtoul(options, NULL, 0);
-+			length = min(strcspn(options, " ") + 1,
-+					(size_t)(sizeof(device->options)));
-+			strlcpy(device->options, options, length);
-+		}
- 	}
- 
- 	if (port->iotype == UPIO_MEM || port->iotype == UPIO_MEM32)
-diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
-index e02acf0..0e26eec 100644
---- a/include/linux/serial_8250.h
-+++ b/include/linux/serial_8250.h
-@@ -119,6 +119,8 @@ extern int serial8250_find_port(struct uart_port *p);
- extern int serial8250_find_port_for_earlycon(void);
- extern unsigned int serial8250_early_in(struct uart_port *port, int offset);
- extern void serial8250_early_out(struct uart_port *port, int offset, int value);
-+extern int early_serial8250_setup(struct earlycon_device *device,
-+					 const char *options);
- extern int setup_early_serial8250_console(char *cmdline);
- extern void serial8250_do_set_termios(struct uart_port *port,
- 		struct ktermios *termios, struct ktermios *old);
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 057038c..72c6698 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -326,6 +326,7 @@ struct earlycon_device {
- 	struct uart_port port;
- 	char options[16];		/* e.g., 115200n8 */
- 	unsigned int baud;
-+	int noinit;
- };
- int setup_earlycon(char *buf, const char *match,
- 		   int (*setup)(struct earlycon_device *, const char *));
--- 
+Change v2:
+1. Add noinit options.
+2. Remove duplicate code in 8250_mtk.c, reuse the 8250_early.c existed function.
+
+This patchset is based on 3.19-rc1, and my basic support for Mediatek
+MT8173 SoC [1].
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315165.html
+
+Eddie Huang (4):
+  tty: serial: Add 8250 earlycon to support noinit option
+  tty: serial: 8250_mtk: Add earlycon
+  arm64: dts: Add mediatek MT8173 earlycon support
+  Document: Modify 8250 earlycon kernel parameters
+
+ Documentation/kernel-parameters.txt         |  5 ++++-
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  4 +++-
+ drivers/tty/serial/8250/8250_early.c        |  7 ++++---
+ drivers/tty/serial/8250/8250_mtk.c          | 15 +++++++++++++++
+ drivers/tty/serial/earlycon.c               | 17 ++++++++++++-----
+ include/linux/serial_8250.h                 |  2 ++
+ include/linux/serial_core.h                 |  1 +
+ 7 files changed, 41 insertions(+), 10 deletions(-)
+
+--
 1.8.1.1.dirty
