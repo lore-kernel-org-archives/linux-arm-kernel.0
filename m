@@ -1,40 +1,99 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 12 Jan 2015 12:23:49 -0600
-Subject: [PATCH v3 3/5] ARM: at91/dt: update udc compatible strings
-In-Reply-To: <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150112182349.GJ6525@saruman>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 12 Jan 2015 19:25:22 +0100
+Subject: [PATCH net-next v11 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
+References: <1421049832-6224-1-git-send-email-dingtianhong@huawei.com>
+ <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <54B41192.3030400@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 11:57:56AM +0100, Boris Brezillon wrote:
-> at91sam9g45, at91sam9x5 and sama5 SoCs should not use
-> "atmel,at91sam9rl-udc" for their USB device compatible property since
-> this compatible is attached to a specific hardware bug fix.
+On 12.01.15 09:03, Ding Tianhong wrote:
+> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> v11: Add ethtool support for tx coalecse getting and setting, the xmit_more
+> is not supported for this patch, but I think it could work for hip04,
+> will support it later after some tests for performance better.
+> 
+> Here are some performance test results by ping and iperf(add tx_coalesce_frames/users),
+> it looks that the performance and latency is more better by tx_coalesce_frames/usecs.
+> 
+> - Before:
+> $ ping 192.168.1.1 ...
+> --- 192.168.1.1 ping statistics ---
 
-WARNING: DT compatible string "atmel,at91sam9g45-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
-#177: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1827:
-+       { .compatible = "atmel,at91sam9g45-udc" },
+Writing --- directly into your patch description is usually a pretty bad
+idea. Git am cuts off everything that comes after --- so your patch
+description ends here without manual intervention ;).
 
-WARNING: DT compatible string "atmel,sama5d3-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
-#178: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1828:
-+       { .compatible = "atmel,sama5d3-udc" },
+> 24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+> rtt min/avg/max/mdev = 0.180/0.202/0.403/0.043 ms
+> 
+> $ iperf -c 192.168.1.1 ...
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 1.0 sec   115 MBytes   945 Mbits/sec
+> 
+> - After:
+> $ ping 192.168.1.1 ...
+> --- 192.168.1.1 ping statistics ---
+> 24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+> rtt min/avg/max/mdev = 0.178/0.190/0.380/0.041 ms
+> 
+> $ iperf -c 192.168.1.1 ...
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 1.0 sec   115 MBytes   965 Mbits/sec
+> 
+> v10: According David Miller and Arnd Bergmann's suggestion, add some modification
 
-please fix and resend. Also, when resending, could you add Nicolas'
-Acked-by since he's already given it ?
+Version history however should go after a --- line, so that it doesn't
+show up in the patch description in the tree.
 
-Thanks
+> for v9 version
+> - drop the workqueue
+> - batch cleanup based on tx_coalesce_frames/usecs for better throughput
+> - use a reasonable default tx timeout (200us, could be shorted
+>   based on measurements) with a range timer
+> - fix napi poll function return value
+> - use a lockless queue for cleanup
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> ---
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/b2cccec7/attachment-0001.sig>
+
+[...]
+
+> +static int hip04_remove(struct platform_device *pdev)
+> +{
+> +	struct net_device *ndev = platform_get_drvdata(pdev);
+> +	struct hip04_priv *priv = netdev_priv(ndev);
+> +	struct device *d = &pdev->dev;
+> +
+> +	if (priv->phy)
+> +		phy_disconnect(priv->phy);
+> +
+> +	hip04_free_ring(ndev, d);
+> +	unregister_netdev(ndev);
+> +	free_irq(ndev->irq, ndev);
+> +	of_node_put(priv->phy_node);
+> +	cancel_work_sync(&priv->tx_timeout_task);
+> +	free_netdev(ndev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id hip04_mac_match[] = {
+> +	{ .compatible = "hisilicon,hip04-mac" },
+> +	{ }
+> +};
+
+This is missing
+
+MODULE_DEVICE_TABLE(of, hip04_mac_match);
+
+to enable automatic module loading, no?
+
+
+Alex
