@@ -1,55 +1,118 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Jan 2015 21:01:49 +0100
-Subject: [PATCH 0/6] AT91 DT for 3.20 #1
-In-Reply-To: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150112210149.581fe038@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Jan 2015 20:28:20 +0000
+Subject: [PATCH v2] arm64/efi: efistub: apply __init annotation
+Message-ID: <1421094500-15659-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jan 2015 20:01:51 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+This ensures all stub component are freed when the kernel proper is
+done booting, by prefixing the names of all ELF sections that have
+the SHF_ALLOC attribute with ".init". This approach ensures that even
+implicitly emitted allocated data (like initializer values and string
+literals) are covered.
 
-> This series enables RTC on the at91sam9n12 and at91rm9200.
-> It also adds nodes for the SRAM availabe on at91 SoCs.
-> 
-> Finally it adds a dtsi for the at91sam9xe and uses it for the ethernut5 dts.
+At the same time, remove some __init annotations in the stub that have
+now become redundant, and add the __init annotation to handle_kernel_image
+which will now trigger a section mismatch warning without it.
 
-To the whole series:
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> 
-> Alexandre Belloni (6):
->   ARM: at91/dt: at91sam9n12: Add RTC node
->   ARM: at91/dt: rm9200: add RTC node
->   ARM: at91/dt: at91rm9200ek: enable RTC
->   ARM: at91/dt: add SRAM nodes
->   ARM: at91/dt: Add a dtsi for at91sam9xe
->   ARM: at91/dt: ethernut5: use at91sam9xe.dtsi
-> 
->  .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
->  arch/arm/boot/dts/at91rm9200.dtsi                  | 12 +++++
->  arch/arm/boot/dts/at91rm9200ek.dts                 |  4 ++
->  arch/arm/boot/dts/at91sam9260.dtsi                 |  5 ++
->  arch/arm/boot/dts/at91sam9261.dtsi                 |  5 ++
->  arch/arm/boot/dts/at91sam9263.dtsi                 | 10 ++++
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |  9 ++++
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |  7 ++-
->  arch/arm/boot/dts/at91sam9n12.dtsi                 | 12 +++++
->  arch/arm/boot/dts/at91sam9rl.dtsi                  |  5 ++
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |  5 ++
->  arch/arm/boot/dts/at91sam9xe.dtsi                  | 60 ++++++++++++++++++++++
->  arch/arm/boot/dts/ethernut5.dts                    |  2 +-
->  arch/arm/boot/dts/sama5d3.dtsi                     |  5 ++
->  arch/arm/boot/dts/sama5d4.dtsi                     |  5 ++
->  15 files changed, 144 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/boot/dts/at91sam9xe.dtsi
-> 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2: fixed an issue with spurious rebuilding of object files, now setting
+    $(extra-y) correctly, which also allows the .PRECIOUS: to be dropped.
 
 
+ arch/arm64/kernel/efi-stub.c                   | 14 +++++++-------
+ drivers/firmware/efi/libstub/Makefile          | 14 ++++++++++++++
+ drivers/firmware/efi/libstub/arm-stub.c        |  8 ++++----
+ drivers/firmware/efi/libstub/efi-stub-helper.c |  2 +-
+ 4 files changed, 26 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index d27dd982ff26..f5374065ad53 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -13,13 +13,13 @@
+ #include <asm/efi.h>
+ #include <asm/sections.h>
+ 
+-efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+-				 unsigned long *image_addr,
+-				 unsigned long *image_size,
+-				 unsigned long *reserve_addr,
+-				 unsigned long *reserve_size,
+-				 unsigned long dram_base,
+-				 efi_loaded_image_t *image)
++efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
++					unsigned long *image_addr,
++					unsigned long *image_size,
++					unsigned long *reserve_addr,
++					unsigned long *reserve_size,
++					unsigned long dram_base,
++					efi_loaded_image_t *image)
+ {
+ 	efi_status_t status;
+ 	unsigned long kernel_size, kernel_memsize = 0;
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index b14bc2b9fb4d..8902f52e0998 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -24,3 +24,17 @@ lib-y				:= efi-stub-helper.o
+ lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o
+ 
+ CFLAGS_fdt.o			+= -I$(srctree)/scripts/dtc/libfdt/
++
++#
++# arm64 puts the stub in the kernel proper, which will unnecessarily retain all
++# code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
++# So let's apply the __init annotations at the section level, by prefixing
++# the section names directly. This will ensure that even all the inline string
++# literals are covered.
++#
++extra-$(CONFIG_ARM64)		:= $(lib-y)
++lib-$(CONFIG_ARM64)		:= $(patsubst %.o,%.init.o,$(lib-y))
++
++OBJCOPYFLAGS := --prefix-alloc-sections=.init
++$(obj)/%.init.o: $(obj)/%.o FORCE
++	$(call if_changed,objcopy)
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index e2432b39b6df..dcae482a9a17 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -17,10 +17,10 @@
+ 
+ #include "efistub.h"
+ 
+-static int __init efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
++static int efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
+ {
+-	static efi_guid_t const var_guid __initconst = EFI_GLOBAL_VARIABLE_GUID;
+-	static efi_char16_t const var_name[] __initconst = {
++	static efi_guid_t const var_guid = EFI_GLOBAL_VARIABLE_GUID;
++	static efi_char16_t const var_name[] = {
+ 		'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
+ 
+ 	efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
+@@ -164,7 +164,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+  * for both archictectures, with the arch-specific code provided in the
+  * handle_kernel_image() function.
+  */
+-unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
++unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 			       unsigned long *image_addr)
+ {
+ 	efi_loaded_image_t *image;
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index e766df60fbfb..2fe195002021 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -110,7 +110,7 @@ fail:
+ }
+ 
+ 
+-unsigned long __init get_dram_base(efi_system_table_t *sys_table_arg)
++unsigned long get_dram_base(efi_system_table_t *sys_table_arg)
+ {
+ 	efi_status_t status;
+ 	unsigned long map_size;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.3.2
