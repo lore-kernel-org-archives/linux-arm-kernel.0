@@ -1,75 +1,43 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Jan 2015 10:45:04 -0800
-Subject: [PATCH v5] can: Convert to runtime_pm
-In-Reply-To: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
-References: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
-Message-ID: <3a3437c5c8ff48d9a45fee7e81fa8dca@BY2FFO11FD058.protection.gbl>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 12 Jan 2015 19:47:38 +0100
+Subject: [GIT PULL 0/2] KVM/ARM Fixes for 3.19
+In-Reply-To: <54B4141E.5070602@redhat.com>
+References: <1420981811-18731-1-git-send-email-christoffer.dall@linaro.org>
+ <54B39EA4.50808@redhat.com> <20150112171923.GA24754@cbox>
+ <54B4141E.5070602@redhat.com>
+Message-ID: <20150112184738.GN3868@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-12 at 08:34PM +0530, Kedareswara rao Appana wrote:
-> Instead of enabling/disabling clocks at several locations in the driver,
-> Use the runtime_pm framework. This consolidates the actions for runtime PM
-> In the appropriate callbacks and makes the driver more readable and mantainable.
+On Mon, Jan 12, 2015 at 07:36:14PM +0100, Paolo Bonzini wrote:
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> Changes for v5:
->  - Updated with the review comments.
->    Updated the remove fuction to use runtime_pm.
-> Chnages for v4:
->  - Updated with the review comments.
-> Changes for v3:
->   - Converted the driver to use runtime_pm.
-> Changes for v2:
->   - Removed the struct platform_device* from suspend/resume
->     as suggest by Lothar.
 > 
->  drivers/net/can/xilinx_can.c |  157 ++++++++++++++++++++++++++++-------------
->  1 files changed, 107 insertions(+), 50 deletions(-)
-[..]
-> +static int __maybe_unused xcan_runtime_resume(struct device *dev)
->  {
-> -	struct platform_device *pdev = dev_get_drvdata(dev);
-> -	struct net_device *ndev = platform_get_drvdata(pdev);
-> +	struct net_device *ndev = dev_get_drvdata(dev);
->  	struct xcan_priv *priv = netdev_priv(ndev);
->  	int ret;
-> +	u32 isr, status;
->  
->  	ret = clk_enable(priv->bus_clk);
->  	if (ret) {
-> @@ -1014,15 +1030,28 @@ static int __maybe_unused xcan_resume(struct device *dev)
->  	ret = clk_enable(priv->can_clk);
->  	if (ret) {
->  		dev_err(dev, "Cannot enable clock.\n");
-> -		clk_disable_unprepare(priv->bus_clk);
-> +		clk_disable(priv->bus_clk);
-[...]
-> @@ -1173,12 +1219,23 @@ static int xcan_remove(struct platform_device *pdev)
->  {
->  	struct net_device *ndev = platform_get_drvdata(pdev);
->  	struct xcan_priv *priv = netdev_priv(ndev);
-> +	int ret;
-> +
-> +	ret = pm_runtime_get_sync(&pdev->dev);
-> +	if (ret < 0) {
-> +		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-> +				__func__, ret);
-> +		return ret;
-> +	}
->  
->  	if (set_reset_mode(ndev) < 0)
->  		netdev_err(ndev, "mode resetting failed!\n");
->  
->  	unregister_candev(ndev);
-> +	pm_runtime_disable(&pdev->dev);
->  	netif_napi_del(&priv->napi);
-> +	clk_disable_unprepare(priv->bus_clk);
-> +	clk_disable_unprepare(priv->can_clk);
+> On 12/01/2015 18:19, Christoffer Dall wrote:
+> >> > Hmm, that's a bit ugly.  I'll apply the patches directly too, please do
+> >> > a "git reset --hard kvm/master" before applying more stuff.
+> >> > 
+> > ok, we did try to (and say publicly) that we'd keep kvmarm/master a
+> > stable branch (like it also says about kvm/master on the KVM wiki), so
+> > that's why I did this.
+> > 
+> > I guess we can just require people that follow kvmarm/master (if any) to
+> > deal with things accordingly.
+> 
+> Yeah, I agree that this shouldn't have happened.
+> 
+> It's not the end of the world.  People that pull from kvmarm/master will
+> almost always rebase their trees, and the rebase will discard the
+> duplicate patches.
+> 
+> The big problem with rebasing happens if you _drop_ patches.  In that
+> case, whoever rebases will keep the patch that you dropped, and most
+> likely will not notice.
+> 
+That's a good point.  And I don't think anyone directly integrates the
+kvmarm/master branch into anything anyway.
 
-Shouldn't pretty much all these occurrences of clk_disable/enable
-disappear? This should all be handled by the runtime_pm framework now.
+I will reset the branch.
 
-	S?ren
+
+Thanks,
+-Christoffer
