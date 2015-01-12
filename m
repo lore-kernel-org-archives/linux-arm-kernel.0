@@ -1,37 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jan 2015 09:52:57 +0100
-Subject: [PATCH net-next v11 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
-References: <1421049832-6224-1-git-send-email-dingtianhong@huawei.com>
- <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
-Message-ID: <19225293.OPozO1Cbk5@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Jan 2015 09:55:03 +0100
+Subject: [PATCH] avr32: remove fake at91 cpu identification
+In-Reply-To: <20150111121012.GB4050@samfundet.no>
+References: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150111121012.GB4050@samfundet.no>
+Message-ID: <54B38BE7.1070203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 16:03:52 Ding Tianhong wrote:
-> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
-> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
-
-Looks great to me in the latest version. Dave, unless you have further
-concerns, please apply.
-
-> v11: Add ethtool support for tx coalecse getting and setting, the xmit_more
-> is not supported for this patch, but I think it could work for hip04,
-> will support it later after some tests for performance better.
+Le 11/01/2015 13:10, Hans-Christian Egtvedt a ?crit :
+> Around Sun 11 Jan 2015 03:00:16 +0100 or thereabout, Alexandre Belloni wrote:
+>> cpu_is_at91* are not used in any driver outside mach-at91. Remove those useless
+>> definitions.
 > 
-> Here are some performance test results by ping and iperf(add tx_coalesce_frames/users),
-> it looks that the performance and latency is more better by tx_coalesce_frames/usecs.
+> Great, thank you for cleaning.
 > 
-> - Before:
-> $ ping 192.168.1.1 ...
-> --- 192.168.1.1 ping statistics ---
-> 24 packets transmitted, 24 received, 0% packet loss, time 22999ms
-> rtt min/avg/max/mdev = 0.180/0.202/0.403/0.043 ms
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>
 > 
-> $ iperf -c 192.168.1.1 ...
-> [ ID] Interval       Transfer     Bandwidth
-> [  3]  0.0- 1.0 sec   115 MBytes   945 Mbits/sec
+> Acked-by: Hans-Chrisitan Egtvedt <egtvedt@samfundet.no>
+> 
+>> ---
+>>
+>> Hans-Christian,
+>>
+>> If you want, I guess that one could go through the at91 tree. Unless you have
+>> more material and you want to do a pull request for 3.20.
+> 
+> I have another patch in the pipe wiring up syscalls for AVR32, so I'll push
+> this through my tree for 3.20.
 
-Just to be sure: you were running the two tests simultaneously, right?
+Okay, so you can add my:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-	Arnd
+Bye,
+
+>>  arch/avr32/mach-at32ap/include/mach/cpu.h | 26 +-------------------------
+>>  1 file changed, 1 insertion(+), 25 deletions(-)
+> 
+> <snipp diff>
+> 
+
+
+-- 
+Nicolas Ferre
