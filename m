@@ -1,52 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 14:11:31 -0800
-Subject: [GIT PULL] Samsung fixes for v3.19
-In-Reply-To: <54B38550.6010707@kernel.org>
-References: <54B38550.6010707@kernel.org>
-Message-ID: <20150112221131.GC22090@quad.lixom.net>
+Date: Mon, 12 Jan 2015 14:12:30 -0800
+Subject: [GIT PULL] at91: fixes for 3.19 #1 (ter)
+In-Reply-To: <1421076472-10589-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1421076472-10589-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150112221230.GD22090@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 12, 2015 at 05:26:56PM +0900, Kukjin Kim wrote:
-> Hi Arnd, Olof, Kevin
+On Mon, Jan 12, 2015 at 04:27:52PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Please pull samsung fixes for v3.19.
+> Here is the fixes pull-request for 3.19 that supersedes the ones already sent.
+> It collects all the fixes that I have currently for this kernel revision.
 > 
-> Thanks,
-> Kukjin
+> Thanks, best regards,
 > 
 > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
 > 
 >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
 > 
 > are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.19-samsung-fixes
 > 
-> Andreas Faerber (1):
->       ARM: exynos_defconfig: Enable LM90 driver
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
 > 
-> Javier Martinez Canillas (1):
->       ARM: exynos_defconfig: Enable options for display panel support
+> for you to fetch changes up to b8659752c37ec157ee254cff443b1c9d523aea22:
 > 
-> Vivek Gautam (1):
->       arm: dts: Use pmu_system_controller phandle for dp phy
-> 
->  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
->  arch/arm/boot/dts/exynos5420.dtsi |    4 ++--
->  arch/arm/configs/exynos_defconfig |   18 +++++++++++++++++-
->  3 files changed, 20 insertions(+), 4 deletions(-)
+>   ARM: at91: board-dt-sama5: add phy_fixup to override NAND_Tree (2015-01-12 15:50:23 +0100)
 
-Please write a tag description and sign it. You used to do this, why stop?
-
-Also, you're not explaining what these patches fixes. I can see the usefulness
-in the display configuration options, but I'm less sure why 3.19 needs the LM90
-driver if it's just for consistency?
-
-Finally, please explain why pmu breaks. Sounds like an incompatible binding
-change?
+Thanks Nicolas, now merged!
 
 
 -Olof
