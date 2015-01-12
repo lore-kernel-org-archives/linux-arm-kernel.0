@@ -1,39 +1,38 @@
-From: moon.linux@yahoo.com (Anand Moon)
-Date: Tue, 13 Jan 2015 00:20:14 +0530
-Subject: [PATCH v3] ARM: exynos_defconfig Enable CONFIG_LOCKUP_DETECTOR.
-Message-ID: <1421088614-4662-1-git-send-email-moon.linux@yahoo.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 12 Jan 2015 10:53:14 -0800
+Subject: [PATCH 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <22570652.F088Afk9OX@wuerfel>
+References: <cover.1420499393.git.dhdang@apm.com>
+ <94f9823d9a8c9c7ef819173f0a5ab06fb8fff408.1420499393.git.dhdang@apm.com>
+ <22570652.F088Afk9OX@wuerfel>
+Message-ID: <CADaLND=C3AjdZpiMpom7+-Dgwc83NYo5pDjDWo+hrW7VDZ4m3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On enabling CONFIG_LOCKUP_DETECTOR the kernel to act as a watchdog
-to detect hard and soft lockups. Enabling CONFIG_LOCKUP_DETECTOR
-don't introduce much overhead on exyons SOC.
+On Tue, Jan 6, 2015 at 11:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 06 January 2015 08:15:41 Duc Dang wrote:
+>> X-Gene v1 SOC supports total 2688 MSI/MSIX vectors coalesced into
+>> 16 HW IRQ lines.
+>>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>>
+>
+> I might be a little behind the latest development, but why is this
+> not a struct msi_controller?
 
-CONFIG_LOCKUP_DETECTOR is enabled on multi_v7_defconfig.
+X-Gene V1 have a separate MSI block to handle MSI/MSIX and is shared
+among 5 PCIe ports.
+So in this driver for this MSI block, we implement X-Gene v1 sepcific
+arch_teardown_msi_irqs,
+arch_setup_msi_irqs and not using msi_controller struct.
 
-Changes since v3:
- * Made commit message more clear
- * Corrected difference between CONFIG_LOCKUP_DETECTOR and CONFIG_LOCKDEP.
+Please let me know if this approach needs to be changed to follow
+other implementations of MSI
+drivers in latest kernel.
+>
+>         Arnd
 
-Tested on Exynos5422 ODROID XU3 board.
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Anand Moon <moon.linux@yahoo.com>
----
- arch/arm/configs/exynos_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 5ef14de..64b2fe9 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -182,6 +182,7 @@ CONFIG_DETECT_HUNG_TASK=y
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
-+CONFIG_LOCKUP_DETECTOR=y
- CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_USER=y
- CONFIG_CRYPTO_SHA256=y
--- 
-2.1.0
+Regards,
+Duc Dang.
