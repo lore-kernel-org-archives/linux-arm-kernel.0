@@ -1,56 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 14:24:57 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC DT Cleanups for v3.20
-In-Reply-To: <cover.1419809027.git.horms+renesas@verge.net.au>
-References: <cover.1419809027.git.horms+renesas@verge.net.au>
-Message-ID: <20150112222457.GH22090@quad.lixom.net>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 13 Jan 2015 07:25:44 +0900
+Subject: [RFC PATCH v2 1/4] tty: serial_mctrl_gpio: Add irqs helpers for
+ input lines
+In-Reply-To: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <CAAVeFu+1=rF1P3Ro2kVTn=6-LvDtcOG0UcTJnKXsN-FQK9b7+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 29, 2014 at 10:43:39AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC DT cleanups for v3.20.
-> 
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups-for-v3.20
-> 
-> for you to fetch changes up to 338d1f0b5e877eae51c885da81d86b0efd6373e7:
-> 
->   ARM: shmobile: kzm9g-reference dts: Replace status value "ok" by "okay" (2014-12-21 16:55:32 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Cleanups for v3.20
-> 
-> * Replace status value "ok" with "okay"
-> 
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (7):
->       ARM: shmobile: genmai dts: Replace status value "ok" by "okay"
->       ARM: shmobile: armadillo800eva dts: Replace status value "ok" by "okay"
->       ARM: shmobile: lager dts: Replace status value "ok" by "okay"
->       ARM: shmobile: henninger dts: Replace status value "ok" by "okay"
->       ARM: shmobile: koelsch dts: Replace status value "ok" by "okay"
->       ARM: shmobile: alt dts: Replace status value "ok" by "okay"
->       ARM: shmobile: kzm9g-reference dts: Replace status value "ok" by "okay"
-> 
->  arch/arm/boot/dts/r7s72100-genmai.dts         |  2 +-
->  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |  4 ++--
->  arch/arm/boot/dts/r8a7790-lager.dts           | 12 ++++++------
->  arch/arm/boot/dts/r8a7791-henninger.dts       |  4 ++--
->  arch/arm/boot/dts/r8a7791-koelsch.dts         |  6 +++---
->  arch/arm/boot/dts/r8a7794-alt.dts             |  4 ++--
->  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts  |  2 +-
->  7 files changed, 17 insertions(+), 17 deletions(-)
+On Sat, Jan 10, 2015 at 11:32 PM, Janusz Uzycki <j.uzycki@elproma.com.pl> wrote:
+> A driver using mctrl_gpio called gpiod_get_direction() to check if
+> gpio is input line. However .get_direction callback is not available
+> for all platforms. The patch allows to avoid the function.
+> The patch introduces the following helpers:
+> - mctrl_gpio_request_irqs
+> - mctrl_gpio_free_irqs
+> - mctrl_gpio_enable_ms
+> - mctrl_gpio_disable_ms
+> They allow to:
+> - simplify drivers which use mctrl_gpio
+> - hide irq table in mctrl_gpio
+> - use default irq handler for gpios
+> - better separate code for gpio modem lines from uart's code
+> In addition mctrl_gpio_init() has been renamed to mctrl_gpio_init_dt()
+> to focus DT usage. Also mctrl_gpio_init_dt() initializes irq table for
+> gpios now and passes struct uart_port into struct mctrl_gpios.
+> This resulted in changed mctrl_gpio_init_dt() parameter.
+> It also requires port->dev is set before the function is called.
+>
+> There were also fixed:
+> - irq = 0 means invalid/unused (-EINVAL no more used)
+> - mctrl_gpio_request_irqs() doesn't use negative enum value
+>   if request_irq() failed. It just calls mctrl_gpio_free_irqs().
+>
+> The mctrl_gpio_is_gpio() inline function is under discussion
+> and likely it can replace exported mctrl_gpio_to_gpiod() function.
+>
+> IRQ_NOAUTOEN setting and request_irq() order was not commented
+> but it looks right according to other drivers.
 
-Thanks. This would normally go into a next/cleanup branch but I'm suspecting
-that'll just be conflict prone so I merged this into next/dt this time.
+I cannot provide a full review on this part of the kernel, but this
+series is also useful in that it will allow us to make
+gpiod_get_direction() private. This function should never have been
+public in the first place.
 
+The series,
 
--Olof
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
