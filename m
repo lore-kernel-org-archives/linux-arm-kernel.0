@@ -1,53 +1,47 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 12 Jan 2015 19:39:51 +0900
-Subject: [RESEND PATCH] ARM: EXYNOS: Add exynos3250 suspend-to-ram support
-In-Reply-To: <54B393B9.6060806@kernel.org>
-References: <1420681838-4292-1-git-send-email-cw00.choi@samsung.com>
- <54B38989.4030700@kernel.org> <54B38B24.20804@samsung.com>
- <54B393B9.6060806@kernel.org>
-Message-ID: <54B3A477.8080705@samsung.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 12 Jan 2015 11:41:06 +0100
+Subject: [PATCH RESEND 0/4] Small updates to Snow and Peach Pit/Pi DTS
+In-Reply-To: <1420212257-22443-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1420212257-22443-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <54B3A4C2.8070304@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+Hello Kukjin,
 
-On 01/12/2015 06:28 PM, Kukjin Kim wrote:
-> On 01/12/15 17:51, Chanwoo Choi wrote:
->> Dear Kukjin,
->>
->> On 01/12/2015 05:44 PM, Kukjin Kim wrote:
->>> On 01/08/15 10:50, Chanwoo Choi wrote:
->>>> This patch adds the support for suspend-to-ram feature of Exynos3250 SoC.
->>>> Exynos3250 don't contain the L2 cache.
->>>>
->>>> Cc: Kukjin Kim <kgene@kernel.org>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>> Depend on:
->>>> - v3.19-rc3
->>>>
->>> Chanwoo,
->>>
->>> Can you please let me know why this is depending on v3.19-rc3?
->>> If I apply this on top of my tree not including some stuff between
->>> v3.19-rc1 and v3.19-rc3, is there a problem?
->>
->> No problem.
->> I'm sorry. It is my mistake about using meaning of dependency.
->> This patch can be applied on v3.19-rc1. I just tested it on v3.19-rc3.
->>
-> OK, applied.
+On 01/02/2015 04:24 PM, Javier Martinez Canillas wrote:
+> 
+> This series adds some DTS snippets that were missing in the mainline
+> Snow and Peach Pit/Pi Device Trees but are present in the downstream
+> ChromeOS kernel.
+> 
+> The series is composed of the following patches:
+> 
+> Javier Martinez Canillas (4):
+>   ARM: dts: Add power and lid GPIO keys pinctrl for exynos5250-snow
+>   ARM: dts: Add lid GPIO key device node for Peach boards
+>   ARM: dts: Set Peach boards USB WebCam regulators to always on
+>   ARM: dts: Configure regulators for suspend on exynos Peach boards
+> 
+>  arch/arm/boot/dts/exynos5250-snow.dts      |  16 +++++
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 100 +++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 101 ++++++++++++++++++++++++++++-
+>  3 files changed, 215 insertions(+), 2 deletions(-)
+> 
+> Patch #1 adds some pinctrl lines for the GPIO keys in the Snow DTS.
+> 
+> Patch #2 adds a device node and pinctrl lines for the lid GPIO in
+> the Peach boards DTS.
+> 
+> Patch #3 sets the regulators that supply voltage to the USB WebCam
+> in Peach boards as always on.
+> 
+> Patch #4 configures the max77802 regulators on the Peach Pit and Pi
+> boards to be enabled or disabled during system suspend.
+> 
 
-Thanks for your apply.
+I saw that you collected some DTS patches for 3.20 but these are not
+included. Any comments about this series?
 
-I check this patch on your git repository on following:
-https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/commit/?h=v3.20-next/update-samsung&id=e2fb3668567d0b70563cca0d1e350afd5053e4a3
-
-Although this patch contains a little decription of patch,
-applied patch don't include any description of patch.
-
-If you possible, please add the description of patch.
-
-Best Regards,
-Chanwoo Choi
+Thanks a lot and best regards,
+Javier
