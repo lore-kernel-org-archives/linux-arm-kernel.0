@@ -1,58 +1,136 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Jan 2015 16:45:13 +0000
-Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
-Message-ID: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
+Date: Mon, 12 Jan 2015 16:45:14 +0000
+Subject: [PATCHv2 1/7] arm64: introduce common ESR_ELx_* definitions
+In-Reply-To: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
+References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1421081120-7694-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have two sets of macros used for ESR_ELx handling, one used
-by core arm64 code and the other used by KVM. These differ slightly in
-naming convention and style of definition.
+Currently we have separate ESR_EL{1,2}_* macros, despite the fact that
+the encodings are common. While encodings are architected to refer to
+the current EL or a lower EL, the macros refer to particular ELs (e.g.
+ESR_ELx_EC_DABT_EL0). Having these duplicate definitions is redundant,
+and their naming is misleading.
 
-This patch series introduces and migrates all users to a common set of
-macros for ESR_ELx handling, preventing further drift.
+This patch introduces common ESR_ELx_* macros that can be used in all
+cases, in preparation for later patches which will migrate existing
+users over. Some additional cleanups are made in the process:
 
-Additionally this series adds exception class decoding when reporting
-exceptions, saving deveopers from having to perform tedious mental
-arithmetic to figure out what the likely cause of an unexpected
-exception was.
+* Suffixes for particular exception levelts (e.g. _EL0, _EL1) are
+  replaced with more general _LOW and _CUR suffixes, matching the
+  architectural intent.
 
-Since v1 [1]:
-* Reorder patches to maintain KVM bisectability.
-* Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
-* Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of 
-  kvm_vcpu_dabt_get_as.
-* Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
-  list.
+* ESR_ELx_EC_WFx, rather than ESR_ELx_EC_WFI is introduced, as this
+  EC encoding covers traps from both WFE and WFI. Similarly,
+  ESR_ELx_WFx_ISS_WFE rather than ESR_ELx_EC_WFI_ISS_WFE is introduced.
 
-Many thanks to those who have reviewed this so far.
+* Multi-bit fields are given consistently named _SHIFT and _MASK macros.
 
-Mark.
+* UL() is used for compatiblity with assembly files.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313934.html
+* Comments are added for currently unallocated ESR_ELx.EC encodings.
 
-Mark Rutland (7):
-  arm64: introduce common ESR_ELx_* definitions
-  arm64: move to ESR_ELx macros
-  arm64: decode ESR_ELx.EC when reporting exceptions
-  arm64: kvm: move to ESR_ELx macros
-  arm64: remove ESR_EL1_* macros
-  arm64: kvm: remove ESR_EL2_* macros
-  arm64: kvm: decode ESR_ELx.EC when reporting exceptions
+For fields other than ESR_ELx.EC, macros are only implemented for fields
+for which there is already an ESR_EL{1,2}_* macro.
 
- arch/arm64/include/asm/esr.h         | 117 +++++++++++++++++++++++++----------
- arch/arm64/include/asm/kvm_arm.h     |  73 ++--------------------
- arch/arm64/include/asm/kvm_emulate.h |  28 +++++----
- arch/arm64/kernel/entry.S            |  64 +++++++++----------
- arch/arm64/kernel/signal32.c         |   2 +-
- arch/arm64/kernel/traps.c            |  50 ++++++++++++++-
- arch/arm64/kvm/emulate.c             |   5 +-
- arch/arm64/kvm/handle_exit.c         |  39 ++++++------
- arch/arm64/kvm/hyp.S                 |  17 ++---
- arch/arm64/kvm/inject_fault.c        |  14 ++---
- arch/arm64/kvm/sys_regs.c            |  23 ++++---
- arch/arm64/mm/fault.c                |   2 +-
- 12 files changed, 237 insertions(+), 197 deletions(-)
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Peter Maydell <peter.maydell@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 79 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
 
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 72674f4..0fd1b0e 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -54,4 +54,83 @@
+ #define ESR_EL1_EC_BKPT32	(0x38)
+ #define ESR_EL1_EC_BRK64	(0x3C)
+ 
++#define ESR_ELx_EC_UNKNOWN	(0x00)
++#define ESR_ELx_EC_WFx		(0x01)
++/* Unallocated EC: 0x02 */
++#define ESR_ELx_EC_CP15_32	(0x03)
++#define ESR_ELx_EC_CP15_64	(0x04)
++#define ESR_ELx_EC_CP14_MR	(0x05)
++#define ESR_ELx_EC_CP14_LS	(0x06)
++#define ESR_ELx_EC_FP_ASIMD	(0x07)
++#define ESR_ELx_EC_CP10_ID	(0x08)
++/* Unallocated EC: 0x09 - 0x0B */
++#define ESR_ELx_EC_CP14_64	(0x0C)
++/* Unallocated EC: 0x0d */
++#define ESR_ELx_EC_ILL		(0x0E)
++/* Unallocated EC: 0x0F - 0x10 */
++#define ESR_ELx_EC_SVC32	(0x11)
++#define ESR_ELx_EC_HVC32	(0x12)
++#define ESR_ELx_EC_SMC32	(0x13)
++/* Unallocated EC: 0x14 */
++#define ESR_ELx_EC_SVC64	(0x15)
++#define ESR_ELx_EC_HVC64	(0x16)
++#define ESR_ELx_EC_SMC64	(0x17)
++#define ESR_ELx_EC_SYS64	(0x18)
++/* Unallocated EC: 0x19 - 0x1E */
++#define ESR_ELx_EC_IMP_DEF	(0x1f)
++#define ESR_ELx_EC_IABT_LOW	(0x20)
++#define ESR_ELx_EC_IABT_CUR	(0x21)
++#define ESR_ELx_EC_PC_ALIGN	(0x22)
++/* Unallocated EC: 0x23 */
++#define ESR_ELx_EC_DABT_LOW	(0x24)
++#define ESR_ELx_EC_DABT_CUR	(0x25)
++#define ESR_ELx_EC_SP_ALIGN	(0x26)
++/* Unallocated EC: 0x27 */
++#define ESR_ELx_EC_FP_EXC32	(0x28)
++/* Unallocated EC: 0x29 - 0x2B */
++#define ESR_ELx_EC_FP_EXC64	(0x2C)
++/* Unallocated EC: 0x2D - 0x2E */
++#define ESR_ELx_EC_SERROR	(0x2F)
++#define ESR_ELx_EC_BREAKPT_LOW	(0x30)
++#define ESR_ELx_EC_BREAKPT_CUR	(0x31)
++#define ESR_ELx_EC_SOFTSTP_LOW	(0x32)
++#define ESR_ELx_EC_SOFTSTP_CUR	(0x33)
++#define ESR_ELx_EC_WATCHPT_LOW	(0x34)
++#define ESR_ELx_EC_WATCHPT_CUR	(0x35)
++/* Unallocated EC: 0x36 - 0x37 */
++#define ESR_ELx_EC_BKPT32	(0x38)
++/* Unallocated EC: 0x39 */
++#define ESR_ELx_EC_VECTOR32	(0x3A)
++/* Unallocted EC: 0x3B */
++#define ESR_ELx_EC_BRK64	(0x3C)
++/* Unallocated EC: 0x3D - 0x3F */
++#define ESR_ELx_EC_MAX		(0x3F)
++
++#define ESR_ELx_EC_SHIFT	(26)
++#define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
++
++#define ESR_ELx_IL		(UL(1) << 25)
++#define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
++#define ESR_ELx_ISV		(UL(1) << 24)
++#define ESR_ELx_SAS_SHIFT	(22)
++#define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
++#define ESR_ELx_SSE		(UL(1) << 21)
++#define ESR_ELx_SRT_SHIFT	(16)
++#define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
++#define ESR_ELx_SF 		(UL(1) << 15)
++#define ESR_ELx_AR 		(UL(1) << 14)
++#define ESR_ELx_EA 		(UL(1) << 9)
++#define ESR_ELx_CM 		(UL(1) << 8)
++#define ESR_ELx_S1PTW 		(UL(1) << 7)
++#define ESR_ELx_WNR		(UL(1) << 6)
++#define ESR_ELx_FSC		(0x3F)
++#define ESR_ELx_FSC_TYPE	(0x3C)
++#define ESR_ELx_FSC_EXTABT	(0x10)
++#define ESR_ELx_FSC_FAULT	(0x04)
++#define ESR_ELx_FSC_PERM	(0x0C)
++#define ESR_ELx_CV		(UL(1) << 24)
++#define ESR_ELx_COND_SHIFT	(20)
++#define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
++#define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
++
+ #endif /* __ASM_ESR_H */
 -- 
 1.9.1
