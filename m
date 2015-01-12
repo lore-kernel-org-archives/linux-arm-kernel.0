@@ -1,51 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 12 Jan 2015 13:31:26 -0600
-Subject: [PATCH v3 3/5] ARM: at91/dt: update udc compatible strings
-In-Reply-To: <20150112201816.6e57fe74@bbrezillon>
-References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
- <20150112182349.GJ6525@saruman>
- <20150112201816.6e57fe74@bbrezillon>
-Message-ID: <20150112193126.GC2858@saruman>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Jan 2015 19:36:46 +0000
+Subject: [PATCH 0/2] arm64: PCI_IOBASE fixes
+Message-ID: <1421091408-10660-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 08:18:16PM +0100, Boris Brezillon wrote:
-> Hi Felipe,
-> 
-> On Mon, 12 Jan 2015 12:23:49 -0600
-> Felipe Balbi <balbi@ti.com> wrote:
-> 
-> > On Mon, Jan 12, 2015 at 11:57:56AM +0100, Boris Brezillon wrote:
-> > > at91sam9g45, at91sam9x5 and sama5 SoCs should not use
-> > > "atmel,at91sam9rl-udc" for their USB device compatible property since
-> > > this compatible is attached to a specific hardware bug fix.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> > WARNING: DT compatible string "atmel,at91sam9g45-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
-> > #177: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1827:
-> > +       { .compatible = "atmel,at91sam9g45-udc" },
-> > 
-> > WARNING: DT compatible string "atmel,sama5d3-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
-> > #178: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1828:
-> > +       { .compatible = "atmel,sama5d3-udc" },
-> > 
-> > please fix and resend. Also, when resending, could you add Nicolas'
-> > Acked-by since he's already given it ?
-> 
-> Actually these compatible strings are documented in the first patch
-> (where they were introduced), but I'll send a v4 with Nicolas' ack.
+Mark Brown reported build failures in the page table dump code, due to
+lack of an explicit include for PCI_IOBASE.
 
-heh, checkpatch stupidity :-) My bad.
+While looking into that I spotted that the VA space allocated for PCI
+I/O overlaps with the fixmap allocation, and that in a couple of places
+we erroneously assume that the I/O space is 16MiB while the allocted VA
+space (and associated IO_SPACE_LIMIT) cover 32MiB.
+
+The first patch fixes the VA space allocation, preventing overlap and
+removing erroneous assumptions about the I/O space size. I'm still not
+that sure of my understanding of the fixmap code and the entries below
+__end_of_permanent_fixed_addresses (which aren't accounted for in
+mem_init or the page table dump code), but at least they now live at the
+very bottom of the kernel mapping and can't potentially overlap with
+anything.
+
+The second patch adds the missing explicit includes for the remaining
+definitions used in the dump code, and has been updated from the
+previous posting [2] to take the effects of patch 1 into account.
+
+I've built and boot tested a v3.19-rc4 defconfig with these patches applied.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315228.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315326.html
+
+Mark Rutland (2):
+  arm64: Fix overlapping VA allocations
+  arm64: mm: dump: add missing includes
+
+ arch/arm64/include/asm/io.h     | 5 +++--
+ arch/arm64/include/asm/memory.h | 4 +++-
+ arch/arm64/mm/dump.c            | 8 ++++++--
+ arch/arm64/mm/init.c            | 3 ++-
+ 4 files changed, 14 insertions(+), 6 deletions(-)
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/36f2cc6c/attachment.sig>
+1.9.1
