@@ -1,63 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Jan 2015 15:40:26 +0000
-Subject: [PATCH] arm64: mm: dump: add missing includes
-Message-ID: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jan 2015 16:42:14 +0100
+Subject: Linux 3.19-rc3
+In-Reply-To: <20150112142332.GC19807@e104818-lin.cambridge.arm.com>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <23318125.rGnCbWvYBR@wuerfel>
+ <20150112142332.GC19807@e104818-lin.cambridge.arm.com>
+Message-ID: <3791313.iJ2hL8LhRB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 dump code is currently relying on some definitions which are
-pulled in via transitive dependencies. On next-20150112 at least one of
-these (PCI_IOBASE) is no longer pulled in with a defconfig build,
-resulting in the following build failure:
+On Monday 12 January 2015 14:23:32 Catalin Marinas wrote:
+> 
+> So, I guess it's run-time cost of the LRU algorithm, especially under
+> memory pressure. Harder to benchmark though (we'll see when we get
+> hardware, though probably not very soon).
 
-arch/arm64/mm/dump.c:55:20: error: ?PCI_IOBASE? undeclared here (not in a function)
-  { (unsigned long) PCI_IOBASE,  "PCI I/O start" },
-                    ^
-It seems we have implicit dependencies on the following definitions:
+One thing you could try is to add an access fault handler that gathers
+statistics about number of calls (you could trivially get this by
+using gcov) and time spent in the handler for a workload that causes
+memory pressure.
 
-* PCI_IOBASE            (asm/io.h)
-* MODULES_VADDR         (asm/memory.h)
-* MODULES_END           (asm/memory.h)
-* PAGE_OFFSET           (asm/memory.h)
-* PTE_*                 (asm/pgtable-hwdef.h)
-* ENOMEM                (asm/errno.h)
-* device_initcall       (linux/init.h)
-
-This patch ensures we explicitly include the relevant headers for the
-above items, fixing the observed build issue and hopefully preventing
-future issues as headers are refactored.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Mark Brown <broonie@kernel.org>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Will Deacon <Will.Deacon@arm.com>
----
- arch/arm64/mm/dump.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index cf33f33..df69e43 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -15,12 +15,17 @@
-  */
- #include <linux/debugfs.h>
- #include <linux/fs.h>
-+#include <linux/init.h>
- #include <linux/mm.h>
- #include <linux/sched.h>
- #include <linux/seq_file.h>
- 
-+#include <asm/errno.h>
- #include <asm/fixmap.h>
-+#include <asm/io.h>
-+#include <asm/memory.h>
- #include <asm/pgtable.h>
-+#include <asm/pgtable-hwdef.h>
- 
- #define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
- 
--- 
-1.9.1
+	Arnd
