@@ -1,30 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 14:08:07 -0800
-Subject: [PATCH] ARM: rockchip: disable jtag/sdmmc autoswitching on rk3288
-In-Reply-To: <27329915.EKTrifTJzR@phil>
-References: <27329915.EKTrifTJzR@phil>
-Message-ID: <20150112220807.GB22090@quad.lixom.net>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 12 Jan 2015 15:09:09 -0700
+Subject: Tegra baseline test results for v3.19-rc4
+Message-ID: <54B44605.1010200@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 11:09:23PM +0100, Heiko St?bner wrote:
-> rk3288 SoCs have a function to automatically switch between jtag/sdmmc pinmux
-> settings depending on the card state. This collides with a lot of assumptions.
-> 
-> It only works when using the internal card-detect mechanism and breaks
-> horribly when using either the normal card-detect via the slot-gpio function
-> or via any other pin. Also there is of course no link between the mmc and jtag
-> on the software-side, so the jtag clocks may very well be disabled when the
-> card is ejected and the soc switches back to the jtag pinmux.
-> 
-> Leaving the switching function enabled did result in mmc timeouts and rcu
-> stalls thus hanging the system on 3.19-rc1. Therefore disable it in all cases,
-> as we expect the devicetree to explicitly select either mmc or jtag pinmuxes
-> anyway.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Here are some basic Tegra test results for Linux v3.19-rc4.
+Logs and other details at:
 
-Thanks, applied.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.19-rc4/20150111130104/
 
 
--Olof
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.19-rc3 (b1940cd21c0f4abdce101253e860feff547291b0)):
+    text     data      bss    total  kernel
+    +880     +120        0    +1000  multi_v7_defconfig
+    +448        0        0     +448  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.19-rc3 (b1940cd21c0f4abdce101253e860feff547291b0))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .      -4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .      -4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
