@@ -1,108 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Jan 2015 14:23:32 +0000
-Subject: Linux 3.19-rc3
-In-Reply-To: <23318125.rGnCbWvYBR@wuerfel>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <10028397.kdbz8TfPck@wuerfel>
- <20150112121815.GB19807@e104818-lin.cambridge.arm.com>
- <23318125.rGnCbWvYBR@wuerfel>
-Message-ID: <20150112142332.GC19807@e104818-lin.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 12 Jan 2015 15:23:59 +0100
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <CACxGe6sbGu53x5rsx2sWVVVVCnnFvmkQAk3Se9ZGNOXCkqpi=A@mail.gmail.com>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <CACxGe6vRN2Tc97=Sx05gri02goxBaHnZm30hR37q=002agFLAA@mail.gmail.com>
+ <CACxGe6sbGu53x5rsx2sWVVVVCnnFvmkQAk3Se9ZGNOXCkqpi=A@mail.gmail.com>
+Message-ID: <20150112142358.GA23680@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 01:57:48PM +0000, Arnd Bergmann wrote:
-> On Monday 12 January 2015 12:18:15 Catalin Marinas wrote:
-> > On Sat, Jan 10, 2015 at 09:36:13PM +0000, Arnd Bergmann wrote:
-> > > On Saturday 10 January 2015 13:00:27 Linus Torvalds wrote:
-> > > > > IIRC, AIX works great with 64k pages, but only because of two
-> > > > > reasons that don't apply on Linux:
-> > > > 
-> > > > .. there's a few other ones:
-> > > > 
-> > > >  (c) nobody really runs AIX on dekstops. It's very much a DB load
-> > > > environment, with historically some HPC.
-> > > > 
-> > > >  (d) the powerpc TLB fill/buildup/teardown costs are horrible, so on
-> > > > AIX the cost of lots of small pages is much higher too.
-> > > 
-> > > I think (d) applies to ARM as well, since it has no hardware
-> > > dirty/referenced bit tracking and requires the OS to mark the
-> > > pages as invalid/readonly until the first access. ARMv8.1
-> > > has a fix for that, but it's optional and we haven't seen any
-> > > implementations yet.
-> > 
-> > Do you happen have any data on how significantly non-hardware
-> > dirty/access bits impact the performance? I think it may affect the user
-> > process start-up time a but at run-time it shouldn't be that bad.
-> > 
-> > If it is that significant, we could optimise it further in the arch
-> > code. For example, make a fast exception path where we need to mark the
-> > pte dirty. This would be handled by arch code without even calling
-> > handle_pte_fault().
+On Sat 2015-01-10 14:44:02, Grant Likely wrote:
+> On Wed, Dec 17, 2014 at 10:26 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> > On Tue, Dec 16, 2014 at 11:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Monday 15 December 2014 19:18:16 Al Stone wrote:
+> >>> 7. Why is ACPI required?
+> >>>    * Problem:
+> >>>      * arm64 maintainers still haven't been convinced that ACPI is
+> >>>        necessary.
+> >>>      * Why do hardware and OS vendors say ACPI is required?
+> >>>    * Status: Al & Grant collecting statements from OEMs to be posted
+> >>>      publicly early in the new year; firmware summit for broader
+> >>>      discussion planned.
+> >>
+> >> I was particularly hoping to see better progress on this item. It
+> >> really shouldn't be that hard to explain why someone wants this feature.
+> >
+> > I've written something up in as a reply on the firmware summit thread.
+> > I'm going to rework it to be a standalone document and post it
+> > publicly. I hope that should resolve this issue.
 > 
-> If I understand the way that LRU works right, we end up clearing
-> the referenced bits in shrink_active_list()->page_referenced()->
-> page_referenced_one()->ptep_clear_flush_young_notify()->pte_mkold()
-> whenever there is memory pressure, so definitely not just for
-> startup.
-
-Yes. Actually, I think the start-up is probably not that bad. For pages
-pointing to zero-page, you need to go through the kernel to allocate an
-anonymous page and change the pte anyway. If the access was "write", the
-page is marked dirty already (same with the access flag, the page is
-marked young to avoid a subsequent fault).
-
-So, I guess it's run-time cost of the LRU algorithm, especially under
-memory pressure. Harder to benchmark though (we'll see when we get
-hardware, though probably not very soon).
-
-> > > > so I feel pretty confident in saying it won't happen. It's just too
-> > > > much of a bother, for little to no actual upside. It's likely a much
-> > > > better approach to try to instead use THP for anonymous mappings.
-> > > 
-> > > arm64 already supports 2MB transparent hugepages. I guess it
-> > > wouldn't be too hard to change it so that an existing hugepage
-> > > on an anonymous mapping that gets split up into 4KB pages gets
-> > > split along 64KB boundaries with the contiguous mapping bit set.
-> > > 
-> > > Having full support for multiple hugepage sizes (64KB, 2MB and 32MB
-> > > in case of ARM64 with 4KB PAGE_SIZE) would be even better and
-> > > probably negate any benefits of 64KB PAGE_SIZE, but requires more
-> > > changes to common mm code.
-> > 
-> > As I replied to your other email, I don't think that's simple for the
-> > transparent huge pages case.
-> > 
-> > The main advantage I see with 64KB pages is not the reduced TLB pressure
-> > but the number of levels of page tables. Take the AMD Seattle board for
-> > example, with 4KB pages you need 4 levels but 64KB allow only 2 levels
-> > (42-bit VA). Larger TLBs and improved walk caches (caching VA -> pmd
-> > entry translation rather than all the way to pte/PA) make things better
-> > but you still have the warming up time for any fork/new process as they
-> > don't share the same TLB entries.
+> I've posted an article on my blog, but I'm reposting it here because
+> the mailing list is more conducive to discussion...
 > 
-> Not sure I'm following. Does the A57 core cache partial TLBs or not?
+> http://www.secretlab.ca/archives/151
 
-AFAIK, yes (I think A15 started doing this years ago). Architecturally,
-an entry at any page table level could be cached in the TLB if it is
-valid, irrespective of whether the full translation is valid.
-Implementations, however, usually just cache the VA->pmd translation in
-the intermediate TLB. Anyway, populating such cache still requires 3
-accesses on a 4-level system.
+Unfortunately, I seen the blog post before the mailing list post, so
+here's reply in blog format.
 
-> Even if not, I would expect the page tables to be hot in dcache most
-> of the time, possibly with the exception of the last level on
-> multi-threaded processes, but then you are back to the difference
-> between the page size and the upper levels almost out of the equation.
+Grant Likely published article about ACPI and ARM at
 
-As I said, I think it's more important with virtualisation where each
-guest page table entry address needs to be translated from the guest
-address space (IPA) to the physical address via the stage 2 tables.
+http://www.secretlab.ca/archives/151
 
-BTW, arm64 can differentiate between a leaf TLB invalidation (just
-changing the pte) and an all-levels one (which affects the walk cache
-for a given VA). I have some hacked code to do this in Linux but I
-haven't had time to assess the impact properly.
+. He acknowledges systems with ACPI are harder to debug, but because
+Microsoft says so, we have to use ACPI (basically).
 
+I believe doing wrong technical choice "because Microsoft says so" is
+a wrong thing to do.
+
+Yes, ACPI gives more flexibility to hardware vendors. Imagine
+replacing block devices with interpretted bytecode coming from
+ROM. That is obviously bad, right? Why is it good for power
+management?
+
+It is not.
+
+Besides	being harder to	debug, there are more disadvantages:
+
+* Size, speed and complexity disadvantage of bytecode interpretter in
+the kernel.
+
+* Many more drivers. Imagine GPIO	switch,	controlling rfkill
+  (for
+  example). In device tree case, that's few lines in the .dts
+  specifying
+  which GPIO that switch is on.
+
+In ACPI	case, each hardware vendor initially implements	rfkill switch
+in AML,	differently. After few years, each vendor implements
+(different) kernel<->AML interface for querying	  rfkill state and
+toggling it in software. Few years after that, we implement kernel
+drivers for those AML interfaces, to properly integrate	    them in
+the
+kernel.
+
+* Incompatibility. ARM servers will now be very different from other
+ARM systems.
+
+Now, are there some arguments for ACPI? Yes -- it allows hw vendors to
+hack half-working drivers without touching kernel
+sources. (Half-working: such drivers are not properly integrated in
+all the various subsystems). Grant claims that power management is
+somehow special, and requirement for real drivers is somehow ok for
+normal drivers (block, video), but not for power management. Now,
+getting driver merged into the kernel does not take that long -- less
+than half a year if you know what you are doing. Plus, for power
+management, you can really just initialize hardware in the bootloader
+(into working but not optimal state). But basic drivers are likely to
+merged fast, and then you'll just have to supply DT tables.
+
+Avoid ACPI. It only makes things more complex and harder to debug.
+
+            	       	    	  	      	      	  	 Pavel
+							 
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
