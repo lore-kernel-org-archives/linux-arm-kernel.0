@@ -1,62 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Jan 2015 15:39:11 +0000
-Subject: [PATCH v2 00/21] irqchip: gic: killing gic_arch_extn and co,
- slowly
-In-Reply-To: <CAL_JsqLLGn1mZr7eNuLA1=M7BcwFRdOQ6xQGo+bbc2aScAVrnQ@mail.gmail.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
- <CAL_JsqLLGn1mZr7eNuLA1=M7BcwFRdOQ6xQGo+bbc2aScAVrnQ@mail.gmail.com>
-Message-ID: <54B3EA9F.3030501@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Jan 2015 15:40:26 +0000
+Subject: [PATCH] arm64: mm: dump: add missing includes
+Message-ID: <1421077226-5530-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/15 14:14, Rob Herring wrote:
-> On Wed, Jan 7, 2015 at 11:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> The gic_arch_extn hack that a number of platform use has been nagging
->> me for too long. It is only there for the benefit of a few platform,
->> and yet it impacts all GIC users. Moreover, it gives people the wrong
->> idea ("let's use it to put some new custom hack in there"...).
->>
->> But now that stacked irq domains have landed in -next, the time has
->> come for gic_arch_extn to meet the Big Bit Bucket.
-> 
-> [...]
-> 
->> - This actively *breaks* existing setups. Once you boot a new kernel
->>   with an old DT, suspend/resume *will* be broken. Old kernels on a
->>   new DT won't even boot! You've been warned. This really outline the
->>   necessity of actually describing the HW in device trees...
-> 
-> Just to be clear, you need some agreement from the maintainers of
-> those platforms before doing this. It doesn't appear there is
-> disagreement, but I don't see any explicit agreement either.
+The arm64 dump code is currently relying on some definitions which are
+pulled in via transitive dependencies. On next-20150112 at least one of
+these (PCI_IOBASE) is no longer pulled in with a defconfig build,
+resulting in the following build failure:
 
-I'm not trying to go behind anyone's back, if that's your concern. I
-fully intend to obtain every maintainer's explicit acknowledgement
-before removing any feature from the kernel. The warning above is there
-to get the maintainers attention on the disrupting effect of this series.
+arch/arm64/mm/dump.c:55:20: error: ?PCI_IOBASE? undeclared here (not in a function)
+  { (unsigned long) PCI_IOBASE,  "PCI I/O start" },
+                    ^
+It seems we have implicit dependencies on the following definitions:
 
-> This seems to model the interrupts as chained, but at least for some
-> cases aren't these auxiliary controllers in parallel to the GIC? In
+* PCI_IOBASE            (asm/io.h)
+* MODULES_VADDR         (asm/memory.h)
+* MODULES_END           (asm/memory.h)
+* PAGE_OFFSET           (asm/memory.h)
+* PTE_*                 (asm/pgtable-hwdef.h)
+* ENOMEM                (asm/errno.h)
+* device_initcall       (linux/init.h)
 
->From looking at the various TRMs, they all look to be chained interrupt
-controllers (at least Tegra, OMAP and IMX6 show this). I have not been
-able to find a publicly available TRM for any of the Samsung platforms,
-so this one could be different (but I really doubt it somehow).
+This patch ensures we explicitly include the relevant headers for the
+above items, fixing the observed build issue and hopefully preventing
+future issues as headers are refactored.
 
-> other words, do the they require configuration for interrupts to work
-> for the normal non-wakeup use? I'm not sure that the h/w is being
-> modeled any more accurately if that is the case. However, we don't
-> really have a way to describe an interrupt line is connected to 2
-> interrupt parents in DT, so I'm not sure what else you could do here.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Mark Brown <broonie@kernel.org>
+Cc: Catalin Marinas <Catalin.Marinas@arm.com>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Steve Capper <steve.capper@linaro.org>
+Cc: Will Deacon <Will.Deacon@arm.com>
+---
+ arch/arm64/mm/dump.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-The main problem is that they are not general-purpose interrupt
-controllers. They all come first on the interrupt path, and somehow feed
-two signals into the GIC: the actual interrupt, and the bypass signal.
-
-None of that is representable in DT. I'm willing to take any idea though.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index cf33f33..df69e43 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -15,12 +15,17 @@
+  */
+ #include <linux/debugfs.h>
+ #include <linux/fs.h>
++#include <linux/init.h>
+ #include <linux/mm.h>
+ #include <linux/sched.h>
+ #include <linux/seq_file.h>
+ 
++#include <asm/errno.h>
+ #include <asm/fixmap.h>
++#include <asm/io.h>
++#include <asm/memory.h>
+ #include <asm/pgtable.h>
++#include <asm/pgtable-hwdef.h>
+ 
+ #define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
+ 
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
