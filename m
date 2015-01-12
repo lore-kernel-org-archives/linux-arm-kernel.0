@@ -1,79 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Jan 2015 16:18:20 +0000
-Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
-In-Reply-To: <CAPDyKFpo=WpE3hDxqETVXOYX6pFsSmO7YybLJF=kJFyYFVcaoA@mail.gmail.com>
-References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
- <20150102181423.GS11285@n2100.arm.linux.org.uk>
- <CAPDyKFpo=WpE3hDxqETVXOYX6pFsSmO7YybLJF=kJFyYFVcaoA@mail.gmail.com>
-Message-ID: <20150112161820.GJ12302@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Jan 2015 17:17:06 +0100
+Subject: [PATCH RESEND] reset: sunxi: fix spinlock initialization
+In-Reply-To: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
+References: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <20150112161706.GO4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 03:29:54PM +0100, Ulf Hansson wrote:
-> Regarding you concern, about me propagating the same design mistake as
-> for the ->set_ios() callback, I am not sure I fully understand why you
-> think that's the case?
+On Mon, Jan 12, 2015 at 07:54:46AM -0800, Tyler Baker wrote:
+> Call spin_lock_init() before the spinlocks are used, both in early init 
+> and probe functions preventing a lockdep splat.
+> 
+> I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+> when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+> and has been tested on a few other sunxi platforms without issue.
+> 
+> [1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+> [2] http://kernelci.org/boot/?a80-optimus
+> 
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> Cc: <stable@vger.kernel.org>
 
-Because of this:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-mmc_pwrseq_power_up()- Invoked from mmc_power_up(), to power up.
-mmc_pwrseq_power_on()- Invoked from mmc_power_up(), to power on.
-
-This re-inforces the "power up, wait, power on" _power_ _sequence_
-as part of the software design.
-
-We know that _today_ there is hardware which does not work like that.
-We know that we have host adapters which ignore the "power up" part,
-because they deal with all the sequencing in hardware.
-
-I'll refer to your new infrastructure as "pwrseq" and the existing
-infrastructure as "power sequence".  (That alone shows what an
-absurd situation this is - we have two things which have the same
-name!)
-
-Let's say we have a pwrseq handler which implements the power_up()
-and power_on() callbacks.  It's written for use with a controller
-which implements appropriate actions on set_ios() with POWER_UP
-and POWER_ON states implemented.
-
-So, what we have is:
-
-pwrseq		power sequence	host state/action
-
-power_up			no power supplied
-		POWER_UP	host applies power to the card
-
-power_on			host is supplying power to card
-		POWER_ON	host applies clocks to the card
-
-Now, for a more inteligent host, where the hardware takes care of
-sequencing the application of power and clocks, we have this:
-
-pwrseq		power sequence	host action
-
-power_up			no power applied
-		POWER_UP	host does nothing
-
-power_on			no power applied
-		POWER_ON	host applies power to the card, waits,
-				and applies the clock
-
-As we can see, the hardware state which the power_on() method of the
-pwrseq is called is highly host dependent.  In the first case, power
-has already been applied.  In the second case, power has not been
-applied.
-
-To have consistency, you need to /first/ solve the problem which I've
-been pointing out, otherwise we're going to have these new pwrseq
-callbacks being called with inconsistent, host specific power states
-being applied to the card.
-
-An alternative way to get consistency is to eliminate the pwrseq
-"power_on" callback altogether; the "power_up" callback will always
-be made before the host interface power sequence is started - and
-that is about the only thing we can guarantee given the variability
-in host interface designs.
+Thanks!
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/47c3ad47/attachment.sig>
