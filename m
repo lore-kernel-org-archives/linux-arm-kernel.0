@@ -1,50 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Jan 2015 16:45:20 +0000
-Subject: [PATCHv2 7/7] arm64: kvm: decode ESR_ELx.EC when reporting exceptions
-In-Reply-To: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
-References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1421081120-7694-8-git-send-email-mark.rutland@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 12 Jan 2015 10:46:54 -0600
+Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
+ volatile
+In-Reply-To: <20150108162512.GC31926@saruman>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+ <1419622104-25812-2-git-send-email-balbi@ti.com>
+ <20150106173734.GL6502@saruman> <20150108162512.GC31926@saruman>
+Message-ID: <20150112164654.GB6525@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid the developer when something triggers an unexpected exception,
-decode the ESR_ELx.EC field when logging an ESR_ELx value using the
-newly introduced esr_get_class_string. This doesn't tell the developer
-the specifics of the exception encoded in the remaining IL and ISS bits,
-but it can be helpful to distinguish between exception classes (e.g.
-SError and a data abort) without having to manually decode the field,
-which can be tiresome.
+Hi,
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kvm/handle_exit.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+On Thu, Jan 08, 2015 at 10:25:12AM -0600, Felipe Balbi wrote:
+> On Tue, Jan 06, 2015 at 11:37:34AM -0600, Felipe Balbi wrote:
+> > On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
+> > > STATUS register can be modified by the HW, so we
+> > > should bypass cache because of that.
+> > > 
+> > > In the case of INT[12] registers, they are the ones
+> > > that actually clear the IRQ source at the time they
+> > > are read. If we rely on the cache for them, we will
+> > > never be able to clear the interrupt, which will cause
+> > > our IRQ line to be disabled due to IRQ throttling.
+> > > 
+> > > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
+> > > Cc: <stable@vger.kernel.org> # v3.15+
+> > > Cc: Keerthy <j-keerthy@ti.com>
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > ping
+> 
+> another ping. Without this and the following patch TPS65218 power button
+> driver which was already applied by Dmitry, won't work.
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index bcbc923..29b184a 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -91,12 +91,13 @@ static exit_handle_fn arm_exit_handlers[] = {
- 
- static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
- {
--	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
-+	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-+	u8 hsr_ec = hsr >> ESR_ELx_EC_SHIFT;
- 
- 	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
- 	    !arm_exit_handlers[hsr_ec]) {
--		kvm_err("Unknown exception class: hsr: %#08x\n",
--			(unsigned int)kvm_vcpu_get_hsr(vcpu));
-+		kvm_err("Unknown exception class: hsr: %#08x -- %s\n",
-+			hsr, esr_get_class_string(hsr));
- 		BUG();
- 	}
- 
+Anybody ? -rc4 is out and tps65218 is still broken because nobody has
+acted on these two patches. All other patches which are meant for 3.20
+merge window are applied and because of these pending, those patches
+won't work.
+
+> > > ---
+> > >  drivers/mfd/tps65218.c | 11 +++++++++++
+> > >  1 file changed, 11 insertions(+)
+> > > 
+> > > diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> > > index 0d256cb..2243f75 100644
+> > > --- a/drivers/mfd/tps65218.c
+> > > +++ b/drivers/mfd/tps65218.c
+> > > @@ -125,10 +125,21 @@ int tps65218_clear_bits(struct tps65218 *tps, unsigned int reg,
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(tps65218_clear_bits);
+> > >  
+> > > +static const struct regmap_range tps65218_yes_ranges[] = {
+> > > +	regmap_reg_range(TPS65218_REG_INT1, TPS65218_REG_INT2),
+> > > +	regmap_reg_range(TPS65218_REG_STATUS, TPS65218_REG_STATUS),
+> > > +};
+> > > +
+> > > +static const struct regmap_access_table tps65218_volatile_table = {
+> > > +	.yes_ranges = tps65218_yes_ranges,
+> > > +	.n_yes_ranges = ARRAY_SIZE(tps65218_yes_ranges),
+> > > +};
+> > > +
+> > >  static struct regmap_config tps65218_regmap_config = {
+> > >  	.reg_bits = 8,
+> > >  	.val_bits = 8,
+> > >  	.cache_type = REGCACHE_RBTREE,
+> > > +	.volatile_table = &tps65218_volatile_table,
+> > >  };
+> > >  
+> > >  static const struct regmap_irq tps65218_irqs[] = {
+> > > -- 
+> > > 2.2.0
+> > > 
+> > 
+> > -- 
+> > balbi
+> 
+> 
+> 
+> -- 
+> balbi
+
+
+
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/f003e95c/attachment.sig>
