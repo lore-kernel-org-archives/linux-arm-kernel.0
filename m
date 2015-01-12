@@ -1,57 +1,50 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Mon, 12 Jan 2015 17:18:38 +0800
-Subject: [PATCH v6 1/2] mtd: hisilicon: add a new NAND controller driver
- for hisilicon hip04 Soc
-In-Reply-To: <5265608.Ut8IQVYZc5@wuerfel>
-References: <1421047734-30818-1-git-send-email-wangzhou1@hisilicon.com>
- <1421047734-30818-2-git-send-email-wangzhou1@hisilicon.com>
- <5265608.Ut8IQVYZc5@wuerfel>
-Message-ID: <54B3916E.4040906@hisilicon.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Jan 2015 10:23:02 +0100
+Subject: [RFC 0/3] mmc: Add dynamic frequency scaling
+Message-ID: <1421054585-9032-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/12 16:21, Arnd Bergmann wrote:
-> On Monday 12 January 2015 15:28:53 Zhou Wang wrote:
->> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->> ---
-> 
-> I haven't looked at earlier versions, but it looks very good to
-> me overall. Just add a patch description above please.
+Hi,
 
-Hi Arnd,
 
-The earlier version is same with this one, just change E-mail
-address here. Will add a patch description in next version. Thanks!
+I would like to hear some comments about idea of scaling MMC clock
+frequency. The basic idea is to lower the clock when device is
+completely idle or not busy enough.
 
-> 
-> One tiny detail:
-> 
->> +static const struct of_device_id nfc_id_table[] = {
->> +	{ .compatible = "hisilicon,504-nfc" },
->> +	{}
->> +};
->> +MODULE_DEVICE_TABLE(of, nfc_id_table);
->> +
->> +static struct platform_driver hisi_nfc_driver = {
->> +	.driver = {
->> +		.name  = "hisi_nand",
->> +		.of_match_table = of_match_ptr(nfc_id_table),
->> +		.pm = &hisi_nfc_pm_ops,
->> +	},
->> +	.probe		= hisi_nfc_probe,
->> +	.remove		= hisi_nfc_remove,
->> +};
-> 
-> Remove the of_match_ptr() macro here to avoid a warning when
-> CONFIG_OF is not set.
+The patchset adds MMC card as a devfreq device and uses simple_ondemand
+as governor. In idle this gave benefits (less energy consumed during
+idle):
+1. Trats2 (Exynos4412): 2.6%
+2. Rinato (Exynos3250): 1%
 
-Will remove the macro here, thanks!
+but (especially on Rinato) it had impact on performance (probably
+because ondemand triggering a little to late). What is interesting
+manually changing the clock (without this patchset) gave slightly
+bigger benefits. Maybe the devfreq introduces noticeable overhead?
+
+
+Comments are welcomed. Maybe on other platforms this has bigger impact?
 
 Best regards,
-Zhou Wang
+Krzysztof
 
-> 
-> 	Arnd
-> 
-> .
-> 
+
+Krzysztof Kozlowski (3):
+  mmc: Add dynamic frequency scaling
+  ARM: dts: Specify MSHC realistic clocks and use frequency scaling
+  ARM: dts: Use frequency scaling for MSHC
+
+ Documentation/devicetree/bindings/mmc/mmc.txt |   2 +
+ arch/arm/boot/dts/exynos3250-rinato.dts       |   1 +
+ arch/arm/boot/dts/exynos4412-trats2.dts       |   4 +-
+ drivers/mmc/card/block.c                      | 247 ++++++++++++++++++++++++++
+ drivers/mmc/core/Kconfig                      |  16 ++
+ drivers/mmc/core/core.h                       |   1 -
+ drivers/mmc/core/host.c                       |   2 +
+ include/linux/mmc/card.h                      |   8 +
+ include/linux/mmc/host.h                      |   3 +
+ 9 files changed, 282 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
