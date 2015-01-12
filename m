@@ -1,92 +1,104 @@
-From: wei@redhat.com (Wei Huang)
-Date: Mon, 12 Jan 2015 12:08:16 -0600
-Subject: [PATCH v2] ARM: KVM: extend WFI tracepoint to differentiate
- between wfi and wfe
-In-Reply-To: <1421081776-2350-1-git-send-email-andre.przywara@arm.com>
-References: <1421081776-2350-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <54B40D90.3080203@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Jan 2015 17:51:25 +0000
+Subject: [PATCH 12/16] pci/host: generic: convert to use generic config
+ accesses
+In-Reply-To: <1420857290-8373-13-git-send-email-robh@kernel.org>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+ <1420857290-8373-13-git-send-email-robh@kernel.org>
+Message-ID: <20150112175125.GM13360@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/12/2015 10:56 AM, Andre Przywara wrote:
-> Currently the trace printk talks about "wfi" only, though the trace
-> point triggers both on wfi and wfe traps.
-> Add a parameter to differentiate between the two.
+On Sat, Jan 10, 2015 at 02:34:46AM +0000, Rob Herring wrote:
+> Convert the generic host PCI driver to use the generic config access
+> functions.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-
-Given that this patch is related to arm64 counter-part:
-
-Reviewed-by: Wei Huang <wei@redhat.com>
-
--Wei
-
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
 > ---
-> Hi,
+>  drivers/pci/host/pci-host-generic.c | 51 +++----------------------------------
+>  1 file changed, 3 insertions(+), 48 deletions(-)
+
+Looks like a fairly straightforward conversion for this driver!
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 6eb1aa7..925e29e 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -76,55 +76,9 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
+>  	.map_bus	= gen_pci_map_cfg_bus_ecam,
+>  };
+>  
+> -static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
+> -				int where, int size, u32 *val)
+> -{
+> -	void __iomem *addr;
+> -	struct pci_sys_data *sys = bus->sysdata;
+> -	struct gen_pci *pci = sys->private_data;
+> -
+> -	addr = pci->cfg.ops->map_bus(bus, devfn, where);
+> -
+> -	switch (size) {
+> -	case 1:
+> -		*val = readb(addr);
+> -		break;
+> -	case 2:
+> -		*val = readw(addr);
+> -		break;
+> -	default:
+> -		*val = readl(addr);
+> -	}
+> -
+> -	return PCIBIOS_SUCCESSFUL;
+> -}
+> -
+> -static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+> -				 int where, int size, u32 val)
+> -{
+> -	void __iomem *addr;
+> -	struct pci_sys_data *sys = bus->sysdata;
+> -	struct gen_pci *pci = sys->private_data;
+> -
+> -	addr = pci->cfg.ops->map_bus(bus, devfn, where);
+> -
+> -	switch (size) {
+> -	case 1:
+> -		writeb(val, addr);
+> -		break;
+> -	case 2:
+> -		writew(val, addr);
+> -		break;
+> -	default:
+> -		writel(val, addr);
+> -	}
+> -
+> -	return PCIBIOS_SUCCESSFUL;
+> -}
+> -
+>  static struct pci_ops gen_pci_ops = {
+> -	.read	= gen_pci_config_read,
+> -	.write	= gen_pci_config_write,
+> +	.read	= pci_generic_config_read,
+> +	.write	= pci_generic_config_write,
+>  };
+>  
+>  static const struct of_device_id gen_pci_of_match[] = {
+> @@ -287,6 +241,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  
+>  	of_id = of_match_node(gen_pci_of_match, np);
+>  	pci->cfg.ops = of_id->data;
+> +	gen_pci_ops.map_bus = pci->cfg.ops->map_bus;
+>  	pci->host.dev.parent = dev;
+>  	INIT_LIST_HEAD(&pci->host.windows);
+>  	INIT_LIST_HEAD(&pci->resources);
+> -- 
+> 2.1.0
 > 
-> this replaces the patch I sent earlier and now just contains the ARM
-> parts of it. The arm64 part is now merged into Wei's patch (which
-> isn't a prerequisite for this one anymore).
-> 
-> Cheers,
-> Andre.
-> 
->  arch/arm/kvm/handle_exit.c |    8 +++++---
->  arch/arm/kvm/trace.h       |   11 +++++++----
->  2 files changed, 12 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-> index a96a804..95f12b2 100644
-> --- a/arch/arm/kvm/handle_exit.c
-> +++ b/arch/arm/kvm/handle_exit.c
-> @@ -87,11 +87,13 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
->   */
->  static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	trace_kvm_wfi(*vcpu_pc(vcpu));
-> -	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
-> +	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE) {
-> +		trace_kvm_wfx(*vcpu_pc(vcpu), true);
->  		kvm_vcpu_on_spin(vcpu);
-> -	else
-> +	} else {
-> +		trace_kvm_wfx(*vcpu_pc(vcpu), false);
->  		kvm_vcpu_block(vcpu);
-> +	}
->  
->  	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
->  
-> diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
-> index b1d640f..f741449 100644
-> --- a/arch/arm/kvm/trace.h
-> +++ b/arch/arm/kvm/trace.h
-> @@ -140,19 +140,22 @@ TRACE_EVENT(kvm_emulate_cp15_imp,
->  			__entry->CRm, __entry->Op2)
->  );
->  
-> -TRACE_EVENT(kvm_wfi,
-> -	TP_PROTO(unsigned long vcpu_pc),
-> -	TP_ARGS(vcpu_pc),
-> +TRACE_EVENT(kvm_wfx,
-> +	TP_PROTO(unsigned long vcpu_pc, bool is_wfe),
-> +	TP_ARGS(vcpu_pc, is_wfe),
->  
->  	TP_STRUCT__entry(
->  		__field(	unsigned long,	vcpu_pc		)
-> +		__field(		 bool,	is_wfe		)
->  	),
->  
->  	TP_fast_assign(
->  		__entry->vcpu_pc		= vcpu_pc;
-> +		__entry->is_wfe			= is_wfe;
->  	),
->  
-> -	TP_printk("guest executed wfi at: 0x%08lx", __entry->vcpu_pc)
-> +	TP_printk("guest executed wf%c at: 0x%08lx",
-> +		__entry->is_wfe ? 'e' : 'i', __entry->vcpu_pc)
->  );
->  
->  TRACE_EVENT(kvm_unmap_hva,
 > 
