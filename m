@@ -1,39 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 12 Jan 2015 18:20:43 +0100
-Subject: [PATCH 3/7] arm64: remove ESR_EL1_* macros
-In-Reply-To: <20150112112737.GC16706@leverpostej>
-References: <1420632260-8798-1-git-send-email-mark.rutland@arm.com>
- <1420632260-8798-4-git-send-email-mark.rutland@arm.com>
- <20150111180805.GJ21444@cbox> <20150112112737.GC16706@leverpostej>
-Message-ID: <20150112172043.GB24754@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Jan 2015 17:23:33 +0000
+Subject: [PATCH 2/2] ARM: dma-mapping: don't detach devices without an IOMMU
+ during teardown
+In-Reply-To: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
+References: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1421083413-24798-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 11:27:37AM +0000, Mark Rutland wrote:
-> On Sun, Jan 11, 2015 at 06:08:05PM +0000, Christoffer Dall wrote:
-> > On Wed, Jan 07, 2015 at 12:04:16PM +0000, Mark Rutland wrote:
-> > > Now that all users have been moved over to the common ESR_ELx_* macros,
-> > > remove the redundant ESR_EL1 macros.
-> > > 
-> > > There should be no functional change as a result of this patch.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > Cc: Peter Maydell <peter.maydell@linaro.org>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > 
-> > FYI: This breaks bisectability with KVM, so we should probably move the
-> > existing KVM references to the common definitions as part of this patch?
-> 
-> Sorry about that, evidently I forgot the KVM code referred to some
-> ESR_EL1_* definitions when I reorganised the series.
-> 
-> Are you happy if I just move this patch after the KVM changes? That
-> should keep everything bisectable and leaves the KVM changes confined to
-> a single patch.
-> 
-sounds fine.
+When tearing down the DMA ops for a device via of_dma_deconfigure, we
+unconditionally detach the device from its IOMMU domain. For devices
+that aren't actually behind an IOMMU, this produces a "Not attached"
+warning message on the console.
 
--Christoffer
+This patch changes the teardown code so that we don't detach from the
+IOMMU domain when there isn't an IOMMU dma mapping to start with.
+
+Repoerted-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/dma-mapping.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7864797609b3..711c3d2802fb 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2023,7 +2023,10 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 
+ static void arm_teardown_iommu_dma_ops(struct device *dev)
+ {
+-	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
++	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
++
++	if (!mapping)
++		return;
+ 
+ 	arm_iommu_detach_device(dev);
+ 	arm_iommu_release_mapping(mapping);
+-- 
+2.1.4
