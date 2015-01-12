@@ -1,55 +1,61 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 12 Jan 2015 23:40:21 +0300
-Subject: [PATCH] ARM: shmobile: r8a7791: add MLB+ clock
-In-Reply-To: <7846462.yepFC759KH@wasted.cogentembedded.com>
-References: <7846462.yepFC759KH@wasted.cogentembedded.com>
-Message-ID: <54B43135.6000002@cogentembedded.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 12 Jan 2015 20:48:52 +0000
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+Message-ID: <cover.1421086706.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi all,
 
-On 12/18/2014 11:43 PM, Sergei Shtylyov wrote:
+Whilst it's a long way off perfect, this has reached the point of being
+functional and stable enough to be useful, so here it is. The core
+consists of the meat of the arch/arm implementation modified to remove
+the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
+allocator instead of the bitmap-based one. For that, this series depends
+on my "Genericise the IOVA allocator" series posted earlier[1].
 
-> From: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
+There are plenty of obvious things still to do, including:
 
-> Add MLB+ clock to R8A7791 device tree.
+ * Domain and group handling is all wrong, but that's a bigger problem.
+   For the moment it does more or less the same thing as the arch/arm
+   code, which at least works for the one-IOMMU-per-device situation.
+ * IOMMU domains and IOVA domains probably want to be better integrated
+   with devices and each other, rather than having a proliferation of
+   arch-specific structs.
+ * The temporary map_sg implementation - I have a 'proper' iommu_map_sg
+   based one in progress, but since the simple one works it's not been
+   as high a priority.
+ * Port arch/arm over to it. I'd guess it might be preferable to merge
+   this through arm64 first, though, rather than overcomplicate matters.
+ * There may well be scope for streamlining and tidying up the copied
+   parts - In general I've simply avoided touching anything I don't
+   fully understand.
+ * In the same vein, I'm sure lots of it is fairly ARM-specific, so will
+   need longer-term work to become truly generic.
 
-> Signed-off-by: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
-> [Sergei: rebased, renamed, added changelog]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/8208
 
-> ---
-> This patch is against 'renesas-devel-20141218-v3.18' tag of Simon Horman's
-> 'renesas.git' repo.
+Catalin Marinas (1):
+  arm64: Combine coherent and non-coherent swiotlb dma_ops
 
->   arch/arm/boot/dts/r8a7791.dtsi            |   10 +++++-----
->   include/dt-bindings/clock/r8a7791-clock.h |    1 +
->   2 files changed, 6 insertions(+), 5 deletions(-)
+Robin Murphy (4):
+  arm64: implement generic IOMMU configuration
+  iommu: implement common IOMMU ops for DMA mapping
+  arm64: add IOMMU dma_ops
+  arm64: hook up IOMMU dma_ops
 
-> Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -1154,17 +1154,17 @@
->   		mstp8_clks: mstp8_clks at e6150990 {
->   			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
->   			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
-> -			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>,
-> -				 <&zs_clk>, <&zs_clk>;
-> +			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/device.h      |   3 +
+ arch/arm64/include/asm/dma-mapping.h |  33 +--
+ arch/arm64/kernel/setup.c            |   2 +
+ arch/arm64/mm/dma-mapping.c          | 435 ++++++++++++++++++++++++++++-----
+ include/linux/dma-iommu.h            |  78 ++++++
+ lib/Kconfig                          |   8 +
+ lib/Makefile                         |   1 +
+ lib/dma-iommu.c                      | 455 +++++++++++++++++++++++++++++++++++
+ 9 files changed, 938 insertions(+), 78 deletions(-)
+ create mode 100644 include/linux/dma-iommu.h
+ create mode 100644 lib/dma-iommu.c
 
-    Oops, the first two clocks need to be swapped. I'll send a fix (since this 
-patch has been merged already).
-
-> +			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
->   			#clock-cells = <1>;
->   			clock-indices = <
-> -				R8A7791_CLK_IPMMU_SGX
-> +				R8A7791_CLK_IPMMU_SGX R8A7791_CLK_MLB
->   				R8A7791_CLK_VIN2 R8A7791_CLK_VIN1 R8A7791_CLK_VIN0
->   				R8A7791_CLK_ETHER R8A7791_CLK_SATA1 R8A7791_CLK_SATA0
->   			>;
-[...]
-
-WBR, Sergei
+-- 
+1.9.1
