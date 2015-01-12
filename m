@@ -1,96 +1,69 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 12 Jan 2015 14:40:15 +0100
-Subject: [PATCH v5 3/5] KVM: arm/arm64: implement
- kvm_arch_is_virtual_intc_initialized
-In-Reply-To: <20150111211250.GE3868@cbox>
-References: <1417622832-5460-1-git-send-email-eric.auger@linaro.org>
- <1417622832-5460-4-git-send-email-eric.auger@linaro.org>
- <20150111211250.GE3868@cbox>
-Message-ID: <54B3CEBF.3020108@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Jan 2015 13:46:11 +0000
+Subject: [PATCH] arm64: dump: Fix implicit inclusion of definition for
+ PCI_IOBASE
+In-Reply-To: <1421065784-31708-1-git-send-email-broonie@kernel.org>
+References: <1421065784-31708-1-git-send-email-broonie@kernel.org>
+Message-ID: <20150112134611.GF16706@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2015 10:12 PM, Christoffer Dall wrote:
-> On Wed, Dec 03, 2014 at 05:07:10PM +0100, Eric Auger wrote:
->> on arm/arm64 the VGIC is dynamically instantiated and it is useful
->> to expose its state, especially for irqfd setup.
->>
->> This patch defines __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED
->> and implements kvm_arch_is_virtual_intc_initialized
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h   | 6 ++++++
->>  arch/arm/kvm/arm.c                | 5 +++++
->>  arch/arm64/include/asm/kvm_host.h | 5 +++++
->>  3 files changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 53036e2..fe2c89b 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -27,6 +27,8 @@
->>  #include <asm/fpstate.h>
->>  #include <kvm/arm_arch_timer.h>
->>  
->> +#define __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED
->> +
->>  #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->>  #else
->> @@ -242,4 +244,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
->>  
->> +/* returns true if the vgic dynamic initialization is done*/
->> +bool kvm_arch_is_virtual_intc_initialized(struct kvm *kvm);
-> 
-> I feel like this should go in include/linux/kvm_host.h where there's
-> already a description of the function API.
-agreed
+Hi Mark,
 
-Eric
+On Mon, Jan 12, 2015 at 12:29:44PM +0000, Mark Brown wrote:
+> Since c9465b4ec37a68425 (arm64: add support to dump the kernel page tables)
+> allmodconfig has failed to build on arm64 as a result of:
 > 
->> +
->> +
->>  #endif /* __ARM_KVM_HOST_H__ */
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 9e193c8..5309e4b 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -439,6 +439,11 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->>  	return 0;
->>  }
->>  
->> +bool kvm_arch_is_virtual_intc_initialized(struct kvm *kvm)
->> +{
->> +	return vgic_initialized(kvm);
->> +}
->> +
->>  static void vcpu_pause(struct kvm_vcpu *vcpu)
->>  {
->>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 2012c4b..5badd30 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -28,6 +28,8 @@
->>  #include <asm/kvm_asm.h>
->>  #include <asm/kvm_mmio.h>
->>  
->> +#define __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED
->> +
->>  #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->>  #else
->> @@ -254,4 +256,7 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
->>  
->> +/* returns true if the vgic dynamic initialization is done*/
->> +bool kvm_arch_is_virtual_intc_initialized(struct kvm *kvm);
->> +
->>  #endif /* __ARM64_KVM_HOST_H__ */
->> -- 
->> 1.9.1
->>
+> ../arch/arm64/mm/dump.c:55:20: error: 'PCI_IOBASE' undeclared here (not in a function)
+
+When I build a v3.19-rc4 allmodconfig, I don't see this failure, but I
+agree that we need the explicit include for PCI_IOBASE.
+
+> Fix this by explicitly including io.h to ensure that a definition is
+> present.
+> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>  arch/arm64/mm/dump.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index cf33f33333cc..258ce731c5cd 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -14,6 +14,7 @@
+>   * of the License.
+>   */
+>  #include <linux/debugfs.h>
+> +#include <linux/io.h>
+>  #include <linux/fs.h>
+>  #include <linux/mm.h>
+>  #include <linux/sched.h>
+
+Nit: please keep includes ordered (unless there's some other include
+issue?).
+
+I see that for other definitions we include the asm headers rather than
+linux headers, and we also seem to be missing an include of asm/memory.h
+for MODULES_VADDR and PAGE_OFFSET.
+
+Does the below work for you?
+
+Thanks,
+Mark.
+
+---->8----
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index cf33f33..88f9ad9 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -19,7 +19,9 @@
+ #include <linux/sched.h>
+ #include <linux/seq_file.h>
+ 
++#include <asm/io.h>
+ #include <asm/fixmap.h>
++#include <asm/memory.h>
+ #include <asm/pgtable.h>
+ 
+ #define LOWEST_ADDR    (UL(0xffffffffffffffff) << VA_BITS)
