@@ -1,48 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Jan 2015 10:19:11 +0100
-Subject: [linux-sunxi] Re: ARM: dts: sunxi: A20-OlinuXino-Lime2 raise
- dcdc2 lower voltage limit
-In-Reply-To: <54AEBB92.9050909@gmail.com>
-References: <54ADB179.9000209@gmail.com>
- <CAGb2v64xsLpQ63GuxDRj+X454f-FaHHqS+2QpEWEnvgVO2NFQA@mail.gmail.com>
- <54AEBB92.9050909@gmail.com>
-Message-ID: <20150112091911.GF4891@lukather>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Mon, 12 Jan 2015 17:18:38 +0800
+Subject: [PATCH v6 1/2] mtd: hisilicon: add a new NAND controller driver
+ for hisilicon hip04 Soc
+In-Reply-To: <5265608.Ut8IQVYZc5@wuerfel>
+References: <1421047734-30818-1-git-send-email-wangzhou1@hisilicon.com>
+ <1421047734-30818-2-git-send-email-wangzhou1@hisilicon.com>
+ <5265608.Ut8IQVYZc5@wuerfel>
+Message-ID: <54B3916E.4040906@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 05:17:06PM +0000, Iain Paton wrote:
-> On 08/01/15 03:54, wens Tsai wrote:
+On 2015/1/12 16:21, Arnd Bergmann wrote:
+> On Monday 12 January 2015 15:28:53 Zhou Wang wrote:
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>> ---
 > 
-> > You should lower the maximum voltage as well, either in this patch
-> > or when you redo all the regulators. AFAIK the SoC certainly cannot
-> > take up to 2.275V. The regulator nodes are supposed to say what
-> > the board can handle.
+> I haven't looked at earlier versions, but it looks very good to
+> me overall. Just add a patch description above please.
+
+Hi Arnd,
+
+The earlier version is same with this one, just change E-mail
+address here. Will add a patch description in next version. Thanks!
+
 > 
-> Yes, I suspect several of them are not currently sensible. I just used 
-> the limits from the pmic datasheet at the time as there were no other 
-> boards with axp209 regulator defined, no fex file for the lime2 etc.
+> One tiny detail:
 > 
-> I likely would have sent a full respin based on your patches, but as 
-> only bits have been applied it seemed better to do this minimal one 
-> and fix the rest properly later. 
-> I can do a couple of the other Olimex boards that I have available 
-> to test while I'm doing it.
+>> +static const struct of_device_id nfc_id_table[] = {
+>> +	{ .compatible = "hisilicon,504-nfc" },
+>> +	{}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, nfc_id_table);
+>> +
+>> +static struct platform_driver hisi_nfc_driver = {
+>> +	.driver = {
+>> +		.name  = "hisi_nand",
+>> +		.of_match_table = of_match_ptr(nfc_id_table),
+>> +		.pm = &hisi_nfc_pm_ops,
+>> +	},
+>> +	.probe		= hisi_nfc_probe,
+>> +	.remove		= hisi_nfc_remove,
+>> +};
+> 
+> Remove the of_match_ptr() macro here to avoid a warning when
+> CONFIG_OF is not set.
 
-All the meaningful patches should have been merged by now, so it would
-be good if you could resend this with the proper limits for all the
-regulators enabled.
+Will remove the macro here, thanks!
 
-Thanks!
-Maxime
+Best regards,
+Zhou Wang
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/6e083860/attachment.sig>
+> 
+> 	Arnd
+> 
+> .
+> 
