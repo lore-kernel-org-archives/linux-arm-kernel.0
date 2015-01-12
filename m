@@ -1,45 +1,44 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Jan 2015 14:37:50 -0800
-Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.19
-In-Reply-To: <20150112220057.GA22090@quad.lixom.net>
-References: <544519A4.5090003@monstr.eu> <54AE44AF.6010808@monstr.eu>
- <20150112220057.GA22090@quad.lixom.net>
-Message-ID: <4fa414c23aa94471a0e6ff9e06b28da1@BY2FFO11FD051.protection.gbl>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 12 Jan 2015 14:42:03 -0800
+Subject: [PATCH V2] ARM: dts: Only build dtb if associated Arch and/or
+ SoC is enabled
+In-Reply-To: <1419920427-29121-1-git-send-email-pbrobinson@gmail.com>
+References: <1419920427-29121-1-git-send-email-pbrobinson@gmail.com>
+Message-ID: <20150112224203.GL22090@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-12 at 02:00PM -0800, Olof Johansson wrote:
-> On Thu, Jan 08, 2015 at 09:49:51AM +0100, Michal Simek wrote:
-> > Hi,
-> > 
-> > please consider to pull this one DT patch to your tree as fix for v3.19
-> > It is adding USD dt node. Driver has been added to v3.19.
-> > 
-> > Thanks,
-> > Michal
-> > 
-> > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> > 
-> >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-fixes-for-3.19
-> > 
-> > for you to fetch changes up to 1643b31658c44767a85469733c6bff4f6d0371c7:
-> > 
-> >   ARM: zynq: DT: Add USB to device tree (2015-01-08 09:35:04 +0100)
+On Tue, Dec 30, 2014 at 06:20:27AM +0000, Peter Robinson wrote:
+> A number of arches (EXYNOS/IMX/TEGRA) are separated out into finer grained
+> definitions whether it be sub ARCH or SOC definitions. The device tree blobs
+> should only be built if the specific option is enabled that supports that
+> device or it might be that there's an expectation that the device is supported
+> when in actual fact it's not. This ensures only the relevant bits are built.
 > 
-> Michal,
+> Also standardised the line break between the arch/soc definitions and the
+> dtbs to be on separate lines for better consistency as per feedback.
 > 
-> This isn't really a fix for something that is broken, is it? I.e. looks like
-> new hardware support to me, and unfortunately this time in the release is wrong
-> for that.
+> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
+> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/boot/dts/Makefile | 213 ++++++++++++++++++++++++++++++---------------
+>  1 file changed, 141 insertions(+), 72 deletions(-)
 
-Without it, USB is broken/not working on Zynq :P
-It just came a little late due to the holidays. Would be nice if it
-could still make it, since the driver is available now and the DT
-fragment is the only missing piece to provide out-of-the-box USB
-support.
-	
-	Soren
+(adding Nicolas on cc)
+
+Nice cleanup, but I really wish we had split up into subdirectories on ARM
+much earlier. Doing that now is too much churn.
+
+AT91 now sticks out a bit with its special case in formatting. Could be
+worth changing at some point.
+
+I've applied this on next/dt now, hopefully it won't become too much of
+a headache of conflicts during this release cycle. At least doing it on that
+branch should keep us from exposing it up outside our tree.
+
+
+
+-Olof
