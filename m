@@ -1,25 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Jan 2015 13:49:55 +0000
-Subject: [PATCH] arm64: dump: Fix implicit inclusion of definition for
- PCI_IOBASE
-In-Reply-To: <20150112134611.GF16706@leverpostej>
-References: <1421065784-31708-1-git-send-email-broonie@kernel.org>
- <20150112134611.GF16706@leverpostej>
-Message-ID: <20150112134954.GD13360@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Jan 2015 14:50:25 +0100
+Subject: [PATCH 1/1] ARM: at91/dt: sam9263: Add missing clocks to lcdc node
+In-Reply-To: <1417786299-14026-1-git-send-email-alexanders83@web.de>
+References: <1417786299-14026-1-git-send-email-alexanders83@web.de>
+Message-ID: <54B3D121.3010308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 01:46:11PM +0000, Mark Rutland wrote:
-> On Mon, Jan 12, 2015 at 12:29:44PM +0000, Mark Brown wrote:
-> > Since c9465b4ec37a68425 (arm64: add support to dump the kernel page tables)
-> > allmodconfig has failed to build on arm64 as a result of:
-> > 
-> > ../arch/arm64/mm/dump.c:55:20: error: 'PCI_IOBASE' undeclared here (not in a function)
+Le 05/12/2014 14:31, Alexander Stein a ?crit :
+> atmel_lcdfb needs also uses hclk clock, but AT91SAM9263 doesn't have that
+> specific clock, so use lcd_clk twice. The same is done in
+> arch/arm/mach-at91/at91sam9263.c
 > 
-> When I build a v3.19-rc4 allmodconfig, I don't see this failure, but I
-> agree that we need the explicit include for PCI_IOBASE.
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
 
-It's one of the failures in -next, but it didn't get resolved by Paul's
-series unfortunately (I probably just did a defconfig build for that).
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Will
+With modification by Alexandre, stacked on at91-3.19-fixes.
+Thanks, bye.
+
+> ---
+>  arch/arm/boot/dts/at91sam9263.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 635f871..7989756 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -932,6 +932,8 @@
+>  			interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&pinctrl_fb>;
+> +			clocks = <&lcd_clk>, <&lcd_clk>;
+> +			clock-names = "lcdc_clk", "hclk";
+>  			status = "disabled";
+>  		};
+>  
+> 
+
+
+-- 
+Nicolas Ferre
