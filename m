@@ -1,39 +1,96 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 Jan 2015 08:14:46 -0600
-Subject: [PATCH v2 00/21] irqchip: gic: killing gic_arch_extn and co,
- slowly
-In-Reply-To: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-References: <1420652576-22309-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAL_JsqLLGn1mZr7eNuLA1=M7BcwFRdOQ6xQGo+bbc2aScAVrnQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 12 Jan 2015 15:22:04 +0100
+Subject: [PATCH] clocksource: timer-atmel-pit: don't suspend/resume if
+ unused
+In-Reply-To: <54B3D450.7050405@atmel.com>
+References: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
+ <54B3D450.7050405@atmel.com>
+Message-ID: <54B3D88C.80702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 7, 2015 at 11:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> The gic_arch_extn hack that a number of platform use has been nagging
-> me for too long. It is only there for the benefit of a few platform,
-> and yet it impacts all GIC users. Moreover, it gives people the wrong
-> idea ("let's use it to put some new custom hack in there"...).
+On 01/12/2015 03:04 PM, Nicolas Ferre wrote:
+> Le 18/12/2014 15:05, Nicolas Ferre a ?crit :
+>> From: Sylvain Rochet <sylvain.rochet@finsecur.com>
+>>
+>> Waiting for PIT to stop counting takes a long time:
+>>    1/(Master clock/prescaler/PIVR)
+>> = 1/(133 MHz     /16       /2^20)
+>> = 126 ms
+>>
+>> Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
+>> of the unused PIT device reduce (suspend time + resume time) from ~140 ms
+>> to ~17 ms.
+>>
+>> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+>> [nicolas.ferre at atmel.com: move to newer clocksource driver]
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>> Hi Sylvain,
+>>
+>> I re-worked (and "Acked") your patch so it can be applied on the newer Mainline
+>> kernels. Beware, I changed the "subject line" as well. The PIT driver moved
+>> recently (3.18).
+>>
+>> Daniel,
+>> Can you take this patch in your tree?
 >
-> But now that stacked irq domains have landed in -next, the time has
-> come for gic_arch_extn to meet the Big Bit Bucket.
+> Hi Daniel,
+>
+> Anything prevents this patch from being merged (aka ping ;-))?
 
-[...]
+[Cc'ed tglx].
 
-> - This actively *breaks* existing setups. Once you boot a new kernel
->   with an old DT, suspend/resume *will* be broken. Old kernels on a
->   new DT won't even boot! You've been warned. This really outline the
->   necessity of actually describing the HW in device trees...
+Hi Nico,
 
-Just to be clear, you need some agreement from the maintainers of
-those platforms before doing this. It doesn't appear there is
-disagreement, but I don't see any explicit agreement either.
+thanks for the head up.
 
-This seems to model the interrupts as chained, but at least for some
-cases aren't these auxiliary controllers in parallel to the GIC? In
-other words, do the they require configuration for interrupts to work
-for the normal non-wakeup use? I'm not sure that the h/w is being
-modeled any more accurately if that is the case. However, we don't
-really have a way to describe an interrupt line is connected to 2
-interrupt parents in DT, so I'm not sure what else you could do here.
+Nothing prevents it but I am wondering if this change shouldn't be in 
+the generic framework (kernel/time/clocksource.c and 
+kernel/time/clockevents.c), so all drivers will benefit this change ?
 
-Rob
+
+>> Thanks, bye.
+>>    Nicolas.
+>>
+>>   drivers/clocksource/timer-atmel-pit.c | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+>> index b5b4d4585c9a..5408bc7c68d8 100644
+>> --- a/drivers/clocksource/timer-atmel-pit.c
+>> +++ b/drivers/clocksource/timer-atmel-pit.c
+>> @@ -123,6 +123,10 @@ static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
+>>   {
+>>   	struct pit_data *data = clkevt_to_pit_data(cedev);
+>>
+>> +	/* Don't suspend PIT if unused */
+>> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
+>> +		return;
+>> +
+>>   	/* Disable timer */
+>>   	pit_write(data->base, AT91_PIT_MR, 0);
+>>   }
+>> @@ -145,6 +149,10 @@ static void at91sam926x_pit_resume(struct clock_event_device *cedev)
+>>   {
+>>   	struct pit_data *data = clkevt_to_pit_data(cedev);
+>>
+>> +	/* Don't resume PIT if unused */
+>> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
+>> +		return;
+>> +
+>>   	at91sam926x_pit_reset(data);
+>>   }
+>>
+>>
+>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
