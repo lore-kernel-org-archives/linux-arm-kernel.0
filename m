@@ -1,38 +1,40 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 12 Jan 2015 11:46:00 +0000
-Subject: [PATCH v5 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
-In-Reply-To: <1420742914-2404-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
- <1420742914-2404-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150112114600.GE26589@codeblueprint.co.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Jan 2015 11:53:42 +0000
+Subject: Linux 3.19-rc3
+In-Reply-To: <4665410.x9Uu42bKmJ@wuerfel>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <20150110003540.GA32037@node.dhcp.inet.fi>
+ <CA+55aFz74hjhCcdz5J4r-xK4KW7oqNDA3i=jXHW0prGMMwgMvw@mail.gmail.com>
+ <4665410.x9Uu42bKmJ@wuerfel>
+Message-ID: <20150112115342.GA19807@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 08 Jan, at 06:48:32PM, Ard Biesheuvel wrote:
-> @@ -46,4 +54,26 @@ extern void efi_idmap_init(void);
->  
->  #define EFI_ALLOC_ALIGN		SZ_64K
->  
-> +/*
-> + * On ARM systems, virtually remapped UEFI runtime services are set up in three
-> + * distinct stages:
-> + * - The stub retrieves the final version of the memory map from UEFI, populates
-> + *   the virt_addr fields and calls the SetVirtualAddressMap() [SVAM] runtime
-> + *   service to communicate the new mapping to the firmware (Note that the new
-> + *   mapping is not live at this time)
-> + * - During early boot, the page tables are allocated and populated based on the
-> + *   virt_addr fields in the memory map, but only if all descriptors with the
-> + *   EFI_MEMORY_RUNTIME attribute have a non-zero value for virt_addr. If this
-> + *   succeeds, the EFI_VIRTMAP flag is set to indicate that the virtual mappings
-> + *   have been installed successfully.
-> + * - During an early initcall(), the UEFI Runtime Services are enabled and the
-> + *   EFI_RUNTIME_SERVICES bit set if some conditions are met, i.e., we need a
-> + *   non-early mapping of the UEFI system table, and we need to have the virtmap
-> + *   installed.
-> + */
-> +#define EFI_VIRTMAP		EFI_ARCH_1
+On Sat, Jan 10, 2015 at 08:16:02PM +0000, Arnd Bergmann wrote:
+> Regarding ARM64 in particular, I think it would be nice to investigate
+> how to extend the THP code to cover 64KB TLBs when running with the 4KB
+> page size. There is a hint bit in the page table to tell the CPU that
+> a set of 16 aligned pages can share one TLB, and it would be nice to
+> use that bit in Linux, and to make this case more common for anonymous
+> mappings, and possible large file based mappings.
 
-Lucid. Thanks, Ard!
+The generic THP code assumes that huge pages are done at the pmd level,
+which means 2MB for arm64 with 4KB page configuration. Hugetlb allows
+larger ptes which may not necessarily be at the pmd level, though we
+haven't implemented this on arm64 and it's not transparent either. As a
+first step it would be nice if at least we unify the APIs between
+hugetlbfs and THP (set_huge_pte_at vs. set_pmd_at).
+
+I think you could do some arch-only tricks by pretending that you have a
+pte with 16 entries only and a dummy pmd (without a corresponding
+hardware page table level) that can host a "huge" page (16 consecutive
+ptes). But we lose the 2MB transparent huge page as I don't see
+mm/huge_memory.c handling huge puds. We also lose the ability of
+building 4 real level page tables since we use the pmd as a dummy one.
+
+But it would be a nice investigation. Maybe something simpler like
+getting the mm layer to prefer contiguous 64KB ranges and we do the
+detection in the arch set_pte_at().
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Catalin
