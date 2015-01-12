@@ -1,27 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Jan 2015 01:04:10 +0100
-Subject: [PATCH v3 5/8] gpio: Add Fujitsu MB86S7x GPIO driver
-In-Reply-To: <CACRpkdZk3sLN43zmuWM+VYLB7vJdNCSq_goTx6mDSnzHrO=UHw@mail.gmail.com>
-References: <1420802369-3840-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <1420803212-4350-1-git-send-email-Vincent.Yang@tw.fujitsu.com>
- <CACRpkdZk3sLN43zmuWM+VYLB7vJdNCSq_goTx6mDSnzHrO=UHw@mail.gmail.com>
-Message-ID: <CACRpkdajpv0yK-m3WRxRRKJyQiBZxRppOiay+-CLTr_adOw9ww@mail.gmail.com>
+Date: Mon, 12 Jan 2015 01:05:12 +0100
+Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
+ accesses
+In-Reply-To: <4938579.0KIk3QtTCP@wuerfel>
+References: <1420857290-8373-1-git-send-email-robh@kernel.org>
+ <1420857290-8373-8-git-send-email-robh@kernel.org>
+ <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
+ <4938579.0KIk3QtTCP@wuerfel>
+Message-ID: <CACRpkdZSXWrVudiadVjbhQDS_zQrYttaytW-TUoeFUrc=beD1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 11:40 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-
-> First I thought maybe this could use the generic MMIO driver
-> but it seems you need this double register access for setting
-> the direction so it won't work.
+On Sat, Jan 10, 2015 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 10 January 2015 22:40:22 Linus Walleij wrote:
+>> >  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+>> >                           int size, u32 *val)
+>> >  {
+>> > -       addr = v3_open_config_window(bus, devfn, where);
+>> > +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
+>> >         v3_close_config_window();
+>> > +       return ret;
+>> >  }
+>> >
+>> >  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+>> >                            int size, u32 val)
+>> >  {
+>> > +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
+>> >         v3_close_config_window();
+>> > -       raw_spin_unlock_irqrestore(&v3_lock, flags);
+>> > +       return ret;
+>> >  }
+>> >
+>> >  static struct pci_ops pci_v3_ops = {
+>> > +       .map_bus = v3_open_config_window,
+>> >         .read   = v3_read_config,
+>> >         .write  = v3_write_config,
+>>
+>> So .map_bus is called before every .read/.write operation I take it.
+>>
+>> Wouldn't it be proper to call the v3_close_config_window() from a
+>> matching .unmap_bus() callback for symmetry?
 >
-> Otherwise it's sort of close ... have you looks at the option?
+> It would be nicer for integrator but useless for anything else, so
+> I'd vote for leaving it the way Rob posted.
 
-Bah, sorry I saw I already asked this in the past and you explained
-that the arithmetic is not simple enough. Sorry for forgetting what
-I already asked. This is over all looking very good, but waiting since
-you had some pending change, then I'll merge it.
+OK I buy that, throw in a comment about it in the code if there
+is some time for iterating the patch.
 
 Yours,
 Linus Walleij
