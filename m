@@ -1,39 +1,96 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 Jan 2015 07:41:25 -0600
-Subject: [PATCHv0 1/3] of: add vendor prefix for Abracon Corporation
-In-Reply-To: <754e04216222807206344fdd9f8575e6b504ed14.1421045942.git.arno@natisbad.org>
-References: <cover.1421045942.git.arno@natisbad.org>
- <754e04216222807206344fdd9f8575e6b504ed14.1421045942.git.arno@natisbad.org>
-Message-ID: <CAL_JsqL=yP1XmhNiV6Rq_t=ktE1FDBmRKYNNJ0Tn3iAkM3ecag@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 12 Jan 2015 14:40:15 +0100
+Subject: [PATCH v5 3/5] KVM: arm/arm64: implement
+ kvm_arch_is_virtual_intc_initialized
+In-Reply-To: <20150111211250.GE3868@cbox>
+References: <1417622832-5460-1-git-send-email-eric.auger@linaro.org>
+ <1417622832-5460-4-git-send-email-eric.auger@linaro.org>
+ <20150111211250.GE3868@cbox>
+Message-ID: <54B3CEBF.3020108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 2:16 AM, Arnaud Ebalard <arno@natisbad.org> wrote:
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index b1df0ad1306c..44defc3c162a 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -4,6 +4,7 @@ This isn't an exhaustive list, but you should add new prefixes to it before
->  using them to avoid name-space collisions.
->
->  abilis Abilis Systems
-> +abcn   Abracon Corporation
+On 01/11/2015 10:12 PM, Christoffer Dall wrote:
+> On Wed, Dec 03, 2014 at 05:07:10PM +0100, Eric Auger wrote:
+>> on arm/arm64 the VGIC is dynamically instantiated and it is useful
+>> to expose its state, especially for irqfd setup.
+>>
+>> This patch defines __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED
+>> and implements kvm_arch_is_virtual_intc_initialized
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h   | 6 ++++++
+>>  arch/arm/kvm/arm.c                | 5 +++++
+>>  arch/arm64/include/asm/kvm_host.h | 5 +++++
+>>  3 files changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 53036e2..fe2c89b 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -27,6 +27,8 @@
+>>  #include <asm/fpstate.h>
+>>  #include <kvm/arm_arch_timer.h>
+>>  
+>> +#define __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED
+>> +
+>>  #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+>>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>>  #else
+>> @@ -242,4 +244,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>>  
+>> +/* returns true if the vgic dynamic initialization is done*/
+>> +bool kvm_arch_is_virtual_intc_initialized(struct kvm *kvm);
+> 
+> I feel like this should go in include/linux/kvm_host.h where there's
+> already a description of the function API.
+agreed
 
-Is there some reason not to use "abracon"?
-
->  active-semi    Active-Semi International Inc
->  ad     Avionic Design GmbH
->  adapteva       Adapteva, Inc.
-> --
-> 2.1.1
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Eric
+> 
+>> +
+>> +
+>>  #endif /* __ARM_KVM_HOST_H__ */
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 9e193c8..5309e4b 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -439,6 +439,11 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+>>  	return 0;
+>>  }
+>>  
+>> +bool kvm_arch_is_virtual_intc_initialized(struct kvm *kvm)
+>> +{
+>> +	return vgic_initialized(kvm);
+>> +}
+>> +
+>>  static void vcpu_pause(struct kvm_vcpu *vcpu)
+>>  {
+>>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 2012c4b..5badd30 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -28,6 +28,8 @@
+>>  #include <asm/kvm_asm.h>
+>>  #include <asm/kvm_mmio.h>
+>>  
+>> +#define __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED
+>> +
+>>  #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+>>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>>  #else
+>> @@ -254,4 +256,7 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>>  
+>> +/* returns true if the vgic dynamic initialization is done*/
+>> +bool kvm_arch_is_virtual_intc_initialized(struct kvm *kvm);
+>> +
+>>  #endif /* __ARM64_KVM_HOST_H__ */
+>> -- 
+>> 1.9.1
+>>
