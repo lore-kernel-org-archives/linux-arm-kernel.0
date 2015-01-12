@@ -1,123 +1,48 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Mon, 12 Jan 2015 11:16:06 -0800
-Subject: IMX.6q FIQ help...
-Message-ID: <CAMB+bfLT1DNrvvZH8LYGL4OXggT8866VB26OEar7BZGO5r6cDw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Jan 2015 20:18:16 +0100
+Subject: [PATCH v3 3/5] ARM: at91/dt: update udc compatible strings
+In-Reply-To: <20150112182349.GJ6525@saruman>
+References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20150112182349.GJ6525@saruman>
+Message-ID: <20150112201816.6e57fe74@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am revising a driver that uses a FIQ on Freescale imx6q.
-The old driver relied on a 3.0.35 Freescale vendor kernel, and enbled
-the FIQ by poking the FIQ enable bit into memory address zero on cpu 3
+Hi Felipe,
 
-I'm trying to migrate to vanilla kernel, using code from fiq.c.
-The code below works BUT it looks like its just a normal interrupt.
-my_irq_handler_spurious handler is ALWAYS invoked,
-I'm not keeping up with my 50KHz irq source,
-and the counter in /proc/interrupts in incremented, which did not
-happen with the FIQ in the old kernel.
+On Mon, 12 Jan 2015 12:23:49 -0600
+Felipe Balbi <balbi@ti.com> wrote:
 
-Is there something more or something else entirely needed on imx.6
-in order to activate the FIQ?
+> On Mon, Jan 12, 2015 at 11:57:56AM +0100, Boris Brezillon wrote:
+> > at91sam9g45, at91sam9x5 and sama5 SoCs should not use
+> > "atmel,at91sam9rl-udc" for their USB device compatible property since
+> > this compatible is attached to a specific hardware bug fix.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> WARNING: DT compatible string "atmel,at91sam9g45-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> #177: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1827:
+> +       { .compatible = "atmel,at91sam9g45-udc" },
+> 
+> WARNING: DT compatible string "atmel,sama5d3-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
+> #178: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1828:
+> +       { .compatible = "atmel,sama5d3-udc" },
+> 
+> please fix and resend. Also, when resending, could you add Nicolas'
+> Acked-by since he's already given it ?
 
-Here is my (abreviated) init code (now called from probe):
+Actually these compatible strings are documented in the first patch
+(where they were introduced), but I'll send a v4 with Nicolas' ack.
 
-int my_init_fiq(struct my_device *dev)
-{
-        int ret;
-        irq = gpiod_to_irq(gpiod);
-        if (irq < 0) {
-                dev_err(dev->dev, "Error setting gpio as irq: %d\n", irq);
-                gpiod_put(gpiod);
-                return irq;
-        }
+Thanks,
 
-        ret = request_irq(irq, my_irq_handler_spurious, 0,
-                         "Data Ready Spurious IRQ", &my_device);
-        if (ret) {
-                dev_err(dev->dev, "Error requesting irq\n");
-                free_irq(irq, &my_device);
-                gpiod_put(gpiod);
-                return ret;
-        }
-        disable_fiq(irq); /* avoid unbalanced irq complaint */
-        ret = claim_fiq(&fiq_handle);
-
-        if (ret) {
-                dev_err(dev->dev, "Unable to claim FIQ\n");
-                return ret;
-        }
-
-        set_fiq_handler(&my_fiq_handler, SZ_256);
-        enable_fiq(irq);
-
-        if (ret) {
-                dev_err(dev->dev "Unable to enable FIQ\n");
-                release_fiq(&fiq_handle);
-                return ret;
-        }
-        return 0;
-}
+Boris
 
 
-...and the old code, which works with freescale 3.0.35 kernel
 
-#define FPGA_INTERRUPT_DIFF_GPIO_BANK 1
-#define FPGA_INTERRUPT_DIFF_GPIO_NUM 4
-#define FPGA_INTERRUPT_DIFF_PAD \
-        IMX_GPIO_NR(FPGA_INTERRUPT_DIFF_GPIO_BANK, \
-        FPGA_INTERRUPT_DIFF_GPIO_NUM)
-#define GPIO_CR_INT_ENABLE 0x00000014
-#define GIC_CPU_CTRL_BITS_FIQEN 0x08
-
-void fiq_enable(void * data)
-{
-        unsigned long val;
-
-        val = readl(GIC_CPU_CTRL);
-        val |= GIC_CPU_CTRL_BITS_FIQEN;
-        writel(val, GIC_CPU_CTRL);
-}
-
-int my_init_fiq(void)
-{
-        int ret;
-        unsigned long reg;
-        ret = request_irq(gpio_to_irq(FPGA_INTERRUPT_DIFF_PAD),
-                        my_handler_spurious, 0,
-                        "Data Ready Spurious IRQ", &my_device);
-        ret = claim_fiq(&fiq_handle);
-        if (ret)
-        {
-                printk(KERN_ALERT "Unable to claim FIQ\n");
-                return ret;
-        }
-
-        set_fiq_handler(&my_fiq_handler, SZ_256);
-
-        // enable the fiq on CPU 3
-        ret = smp_call_function_single(FIQ_CPU_TARGET, fiq_enable, NULL, 1);
-
-        if (ret)
-        {
-                printk(KERN_ALERT "Unable to enable FIQ on CPU %d\n",
-                          FIQ_CPU_TARGET);
-                release_fiq(&fiq_handle);
-                return ret;
-        }
-
-        // Set rising edge GPIO Peripheral trigger for GPIO 1 - 4
-        reg = readl(IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_CONF1));
-        reg &= ~(1 << FPGA_INTERRUPT_DIFF_GPIO_NUM);
-        reg |= (2 << FPGA_INTERRUPT_DIFF_GPIO_NUM);
-        writel(reg, IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_CONF1));
-
-        // Enable GPIO Peripheral interrupt for GPIO 1 - 4
-        reg = readl(IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_ENABLE));
-        reg |= (1 << FPGA_INTERRUPT_DIFF_GPIO_NUM);
-        writel(reg, IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_ENABLE));
-
-        writel((1 << FPGA_INTERRUPT_DIFF_GPIO_NUM) ,
-                 GIC_FPGA_INT_ENABLE_REG);
-
-        return 0;
-}
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
