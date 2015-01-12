@@ -1,23 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jan 2015 16:35:19 +0100
-Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit
- option
-In-Reply-To: <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
-References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
- <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <3712986.8SuKNvhKTk@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 12 Jan 2015 16:36:55 +0100
+Subject: [PATCH v3 0/8] Atmel System Timer cleanups
+Message-ID: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 21:08:21 Eddie Huang wrote:
-> Add earlycon support not only baudrate option, but also add noinit option.
-> If use noinit option, 8250 earlycon will not init serial hardware and use
-> loader setting.
-> 
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+This patch sets cleans up the system timer driver.
 
-I probably missed something in the previous discussion, but why is
-"noinit" not just the default? I believe that is how we handle early
-serial ports on PowerPC, and I see no downsides to it.
+The main goal is to get rid of the mach/ headers dependency. At the same time,
+it introduces proper probing and locking (using a regmap) for the watchdog
+driver.
 
-	Arnd
+Changes in v3:
+ - moved the watchdog regmap_st allocation after the multiple probe check
+ - check whether regmap_st is NULL in the watchdog driver
+
+Changes in v2:
+ - cleaned up more includes in the watchdog driver
+ - stop using if OF when selecting CLKSRC_OF
+ - stop initializing .owner
+
+
+Alexandre Belloni (8):
+  ARM: at91/dt: declare atmel,at91rm9200-st as a syscon
+  mfd: Add atmel-st driver
+  watchdog: at91rm9200: use the regmap from mfd
+  ARM: at91: time: move the system timer driver to drivers/clocksource
+  ARM: at91: move the restart function to the system timer driver
+  clocksource: atmel-st: properly initialize driver
+  clocksource: atmel-st: use syscon/regmap
+  ARM: at91: remove useless include
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |   2 +-
+ arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
+ arch/arm/mach-at91/Makefile                        |   2 +-
+ arch/arm/mach-at91/at91rm9200.c                    |  11 ---
+ arch/arm/mach-at91/board-dt-rm9200.c               |   7 --
+ arch/arm/mach-at91/generic.h                       |   3 -
+ drivers/clocksource/Kconfig                        |   4 +
+ drivers/clocksource/Makefile                       |   1 +
+ .../clocksource/timer-atmel-st.c                   | 109 +++++++++------------
+ drivers/mfd/Kconfig                                |   7 ++
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/atmel-st.c                             |  77 +++++++++++++++
+ drivers/watchdog/Kconfig                           |   2 +-
+ drivers/watchdog/at91rm9200_wdt.c                  |  25 +++--
+ .../mach/at91_st.h => include/linux/mfd/atmel-st.h |  20 +---
+ 15 files changed, 158 insertions(+), 115 deletions(-)
+ rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (74%)
+ create mode 100644 drivers/mfd/atmel-st.c
+ rename arch/arm/mach-at91/include/mach/at91_st.h => include/linux/mfd/atmel-st.h (84%)
+
+-- 
+2.1.0
