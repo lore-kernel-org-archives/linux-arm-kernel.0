@@ -1,46 +1,121 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Jan 2015 09:55:03 +0100
-Subject: [PATCH] avr32: remove fake at91 cpu identification
-In-Reply-To: <20150111121012.GB4050@samfundet.no>
-References: <1420941616-2777-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150111121012.GB4050@samfundet.no>
-Message-ID: <54B38BE7.1070203@atmel.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 12 Jan 2015 17:55:35 +0900
+Subject: [PATCHv7 03/10] devfreq: event: Add resource-managed function for
+ devfreq-event device
+In-Reply-To: <765071676.891461421049614417.JavaMail.weblogic@epmlwas09a>
+References: <765071676.891461421049614417.JavaMail.weblogic@epmlwas09a>
+Message-ID: <54B38C07.2010801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/01/2015 13:10, Hans-Christian Egtvedt a ?crit :
-> Around Sun 11 Jan 2015 03:00:16 +0100 or thereabout, Alexandre Belloni wrote:
->> cpu_is_at91* are not used in any driver outside mach-at91. Remove those useless
->> definitions.
-> 
-> Great, thank you for cleaning.
-> 
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Dear Myungjoo,
+
+Thanks for your review.
+
+On 01/12/2015 05:00 PM, MyungJoo Ham wrote:
+>>   
+>>  This patch add the resource-managed function for devfreq-event device as
+>> following functions. The devm_devfreq_event_add_edev() manages automatically
+>> the memory of devfreq-event device using resource management.
+>> - devm_devfreq_event_add_edev()
+>> - devm_devfreq_event_remove_edev()
 >>
-> 
-> Acked-by: Hans-Chrisitan Egtvedt <egtvedt@samfundet.no>
-> 
+>> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 >> ---
+>>  drivers/devfreq/devfreq-event.c | 63 +++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/devfreq-event.h   | 16 +++++++++++
+>>  2 files changed, 79 insertions(+)
 >>
->> Hans-Christian,
->>
->> If you want, I guess that one could go through the at91 tree. Unless you have
->> more material and you want to do a pull request for 3.20.
+>> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
+>> index 64c1764..5301e2b 100644
+>> --- a/drivers/devfreq/devfreq-event.c
+>> +++ b/drivers/devfreq/devfreq-event.c
+>> @@ -451,6 +451,69 @@ int devfreq_event_remove_edev(struct devfreq_event_dev *edev)
+>>  }
+>>  EXPORT_SYMBOL_GPL(devfreq_event_remove_edev);
+>>  
+>> +static int devm_devfreq_event_match(struct device *dev, void *res, void *data)
+>> +{
+>> +	struct devfreq_event_dev **r = res;
+>> +
+>> +	if (WARN_ON(!r || !*r))
+>> +		return 0;
+>> +
+>> +	return *r == data;
+>> +}
+>> +
+>> +static void devm_devfreq_event_release(struct device *dev, void *res)
+>> +{
+>> +	devfreq_event_remove_edev(*(struct devfreq_event_dev **)res);
+>> +}
 > 
-> I have another patch in the pipe wiring up syscalls for AVR32, so I'll push
-> this through my tree for 3.20.
+> Isn't dev-free functions supposed to check if it is already freed or not?
 
-Okay, so you can add my:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The devfreq_event_remove_edev() function check whether res is NULL or not.
+If some instance of devfreq_event_dev is freeed, devfreq_event_remove_edev()
+just return.
 
-Bye,
-
->>  arch/avr32/mach-at32ap/include/mach/cpu.h | 26 +-------------------------
->>  1 file changed, 1 insertion(+), 25 deletions(-)
 > 
-> <snipp diff>
+>> +
+>> +/**
+>> + * devm_devfreq_event_add_edev() - Resource-managed devfreq_event_add_edev()
+>> + * @dev		: the device owning the devfreq-event device being created
+>> + * @desc	: the devfreq-event device's decriptor which include essential
+>> + *		  data for devfreq-event device.
+>> + *
+>> + * Note that this function manages automatically the memory of devfreq-event
+>> + * device using device resource management and simplify the free operation
+>> + * for memory of devfreq-event device.
+>> + */
+>> +struct devfreq_event_dev *devm_devfreq_event_add_edev(struct device *dev,
+>> +						struct devfreq_event_desc *desc)
+>> +{
+>> +	struct devfreq_event_dev **ptr, *edev;
+>> +
+>> +	ptr = devres_alloc(devm_devfreq_event_release, sizeof(*ptr), GFP_KERNEL);
+>> +	if (!ptr)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	edev = devfreq_event_add_edev(dev, desc);
+>> +	if (IS_ERR(edev)) {
+>> +		devres_free(ptr);
+>> +		return ERR_PTR(-ENOMEM);
+>> +	}
+>> +
+>> +	*ptr = edev;
+>> +	devres_add(dev, ptr);
+>> +
+>> +	return edev;
+>> +}
+>> +EXPORT_SYMBOL(devm_devfreq_event_add_edev);
 > 
+> You are using GPL Symbol in this function (devres_alloc).
 
+I'll fix it. (EXPORT_SYMBOL -> EXPORT_SYMBOL_GPL).
 
--- 
-Nicolas Ferre
+> 
+>> +
+>> +/**
+>> + * devm_devfreq_event_remove_edev()- Resource-managed devfreq_event_remove_edev()
+>> + * @dev		: the device owning the devfreq-event device being created
+>> + * @edev	: the devfreq-event device
+>> + *
+>> + * Note that this function manages automatically the memory of devfreq-event
+>> + * device using device resource management.
+>> + */
+>> +void devm_devfreq_event_remove_edev(struct device *dev,
+>> +				struct devfreq_event_dev *edev)
+>> +{
+>> +	WARN_ON(devres_release(dev, devm_devfreq_event_release,
+>> +			       devm_devfreq_event_match, edev));
+>> +}
+>> +EXPORT_SYMBOL(devm_devfreq_event_remove_edev);
+> 
+> Here you are using GPL symbol as well (devres_release).
+
+I'll fix it. (EXPORT_SYMBOL -> EXPORT_SYMBOL_GPL).
+
+Best Regards,
+Chanwoo Choi
