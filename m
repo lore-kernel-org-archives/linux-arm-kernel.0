@@ -1,51 +1,63 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 19:42:10 +0100
-Subject: [PATCH 1/7] ARM: at91: remove unused mach/memory.h
+Date: Mon, 12 Jan 2015 19:42:15 +0100
+Subject: [PATCH 6/7] ARM: at91: remove useless at91rm9200_dt_initialize()
 In-Reply-To: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421088136-10172-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_NEED_MACH_MEMORY_H is not set by any at91 platform, remove mach/memory.h
+at91rm9200_dt_initialize() is doing the same as at91_dit_initialize(), use that
+one instead.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/include/mach/memory.h | 26 --------------------------
- 1 file changed, 26 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/memory.h
+ arch/arm/mach-at91/board-dt-rm9200.c | 2 +-
+ arch/arm/mach-at91/generic.h         | 1 -
+ arch/arm/mach-at91/setup.c           | 7 -------
+ 3 files changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/memory.h b/arch/arm/mach-at91/include/mach/memory.h
-deleted file mode 100644
-index 401c207f2f39..000000000000
---- a/arch/arm/mach-at91/include/mach/memory.h
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/memory.h
-- *
-- *  Copyright (C) 2004 SAN People
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
+diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+index 76dfe8f9af50..a15ab6f8de00 100644
+--- a/arch/arm/mach-at91/board-dt-rm9200.c
++++ b/arch/arm/mach-at91/board-dt-rm9200.c
+@@ -38,6 +38,6 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
+ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+ 	.init_time      = at91rm9200_dt_timer_init,
+ 	.map_io		= at91_map_io,
+-	.init_early	= at91rm9200_dt_initialize,
++	.init_early	= at91_dt_initialize,
+ 	.dt_compat	= at91rm9200_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index e0368aa06390..c10c2ddaae6d 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -22,7 +22,6 @@ extern void __init at91_init_sram(int bank, unsigned long base,
+ 
+  /* Processors */
+ extern void __init at91rm9200_set_type(int type);
+-extern void __init at91rm9200_dt_initialize(void);
+ extern void __init at91_dt_initialize(void);
+ 
+  /* Timer */
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index ce25e85720fb..acb8d7724609 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -429,13 +429,6 @@ static void at91_dt_ramc(void)
+ 	at91_pm_set_standby(standby);
+ }
+ 
+-void __init at91rm9200_dt_initialize(void)
+-{
+-	at91_dt_ramc();
 -
--#ifndef __ASM_ARCH_MEMORY_H
--#define __ASM_ARCH_MEMORY_H
+-	at91_boot_soc.init();
+-}
 -
--#include <mach/hardware.h>
--
--#endif
+ void __init at91_dt_initialize(void)
+ {
+ 	at91_dt_ramc();
 -- 
 2.1.0
