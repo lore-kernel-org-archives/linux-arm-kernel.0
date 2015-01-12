@@ -1,109 +1,164 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 12 Jan 2015 12:33:26 +0000
-Subject: [PATCH v6 18/20] KVM: introduce kvm_check_device_type()
-In-Reply-To: <20150111152239.GD21444@cbox>
-References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
- <1420804478-17354-19-git-send-email-andre.przywara@arm.com>
- <20150109123345.GR21092@cbox> <54AFDAD2.7010505@arm.com>
- <20150111152239.GD21444@cbox>
-Message-ID: <54B3BF16.2080105@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 12 Jan 2015 21:34:48 +0900
+Subject: [PATCHv8 0/9] devfreq: Add devfreq-event class to provide raw data for
+ devfreq device
+Message-ID: <1421066097-26237-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hej Christoffer,
+This patchset add new devfreq_event class to provide raw data to determine
+current utilization of device  which is used for devfreq governor.
 
-On 11/01/15 15:22, Christoffer Dall wrote:
-> On Fri, Jan 09, 2015 at 01:42:42PM +0000, Andre Przywara wrote:
->> Hi Christoffer,
->>
->> On 09/01/15 12:33, Christoffer Dall wrote:
->>> On Fri, Jan 09, 2015 at 11:54:36AM +0000, Andre Przywara wrote:
->>>> While we can easily register and unregister KVM devices, there is
->>>> currently no easy way of checking whether a device has been
->>>> registered.
->>>> Introduce kvm_check_device_type() for that purpose and use it in two
->>>> existing functions. Also change the return code for an invalid
->>>> type number from ENOSPC to EINVAL.
->>>> This function will be later used by another patch set to check
->>>> whether a KVM_CREATE_IRQCHIP ioctl is valid.
->>>
->>> I feel like this is misguided and the vgic should be able to figure this
->>> stuff out internally.  Did you have code for this approach somewhere
->>> that I can take a look at?
->>
->> I pushed my WIP patch on top of the kvm-gicv3/v6 tree.
->> Given how that looks I reckoned the generic solution would be more
->> preferable.
->> Basically we internally decide in the _probe function whether we support
->> GICv2 emulation or not, which is mostly driven by device tree
->> properties. So at the moment I just register the GIC_V2 KVM device or
->> not. Now with the "vgic internal" solution I misuse the GICV address
->> base as a hint of the GICv2 emulation availability. Alternatively I have
->> to introduce a new variable to mirror what the KVM device array already
->> holds, which seems kind of exerted to me.
->> Besides that I am not sure if the GICV address hint will always be a
->> reliable indicator and what we will do if there will be another GIC
->> model to be emulated in the future (maybe we need that for the ITS
->> emulation already?)
-> 
-> I don't think it looks that bad.
-> 
-> Only your gicv3 and gicv2 code files know what they are capable of
-> emulating, how you choose to store this state internally in those files
-> is a somewhat orthogonal discussion from using the kvm device API.
+The following description explains the feature of two kind of devfreq class:
+- devfreq class (existing)
+ : devfreq consumer device use raw data from devfreq_event device for
+   determining proper current system state and change voltage/frequency
+   dynamically using various governors.
+- devfreq_event class (new)
+ : Provide measured raw data to devfreq device for governor
 
-Well, the point is that the emulation capability is a hardware property
-and thus the knowledge is actually in the host part of the VGIC (so in
-vgic-v3.c and vgic-v2.c). From here we "communicate" the capability to
-userland by registering the respective VGIC KVM devices only. Since the
-emulation part of the VGIC lives in different files (vgic.c and
-vgic-vx-emul.c) we would need some kind of export to them, too. I found
-that it would be cleaner to just re-use what we already have with the
-KVM devices.
+---------
+Changelog:
 
-> Using the KVM device api is just another way of storing and exposing the
-> information globally (you take registering the device types as an
-> indication of the state).
-> 
-> Finally, I don't even think you ned the can_emulate function, I think
-> you should just return an error from init_vgic_model (which happens to
-> collide with my suggestion on making those functions a void function in
-> one of the previous patches) and you're done.
+Changes from v7:
+(https://lkml.org/lkml/2015/1/7/795)
+- Use EXPORT_SYMBOL_GPL macro instead of EXPORT_SYMBOL
+- Fix the binding document of exynos-ppmu.c driver
+- Drop the devfreq-event type patch because it isnt' clear
+- Fix bug of devfreq_event_add_edev() when fail to execute device_register()
+- Modify resource free operation on following functions:
+  : devfreq_event_remove_edev()
+  : devfreq_event_release_edev()
 
-I think I checked this before and since the init_vgic_model()
-implementations are in vgic-vx-emul.c we don't know the hardware
-capability anymore and would need some kind of variable holding that
-information (which lead me to re-using the KVM device knowledge). But I
-will re-check if there is an easy fix in here.
+Changes from v6:
+(https://lkml.org/lkml/2014/12/28/139)
+- This patchset is based on v3.19-rc3.
+1. devfreq-event class driver
+- Fix build break if devfreq-event framework is off
+- Add resource-managed function for devfreq-event device
+: devm_devfreq_event_add_edev()
+: devm_devfreq_event_remove_edev()
 
->>
->> So I prefer the more generic solution.
->> Let me know what you think, I can as well drop 18/20 and merge the above
->> mentioned patch.
->>
->>> I forget: Are we still requiring KVM_CREATE_IRQCHIP for VGICv3 or are we
->>> just relying on users to use KVM_CREATE_DEVICE for anything in the
->>> future?
->>
->> Since KVM_CREATE_IRQCHIP does not take an argument, we cannot use it for
->> GICv3. So GICv3 mandates KVM_CREATE_DEVICE. We need userspace
->> adjustments for GICv3 anyway, so that's not a problem.
-> 
-> ok, so KVM_CREATE_IRQCHIP is a direct alias for KVM_CREATE_DEVICE(GIC_V2)
-> and is deprecated for GICv3?  If so, we should probably update the
-> documentation to indicate the KVM_CREATE_IRQCHIP creates a GICv2 and
-> should not be used for any other in-kernel GIC versions.
+Changes from v5:
+(https://lkml.org/lkml/2014/12/22/527)
+- Rebase these patch-set on v3.19-rc1 and Test it.
+1. exynos-ppmu.c
+- Change the error value when of_iomap() fail to map the memory
+- Remove owner setting of platform_driver
+- Add exynos_ppmu_disable() function
+2. exynos dts file
+- Add PPMU node to Exynos3250-based Monk board
+- Remove ppmu_cpu node on Exynos4412-based TRATS2 board and add ppmu_leftbus/rightbus node
 
-What about the following wording in api.txt:
------
-On ARM/arm64, a GICv2 is created. Any other VGIC versions require the
-usage of KVM_CREATE_DEVICE (which can and should also be used to create
-a virtual GICv2).
------
+Changes from v4:
+(https://lkml.org/lkml/2014/12/16/511)
+1. devfreq-event class driver
+- Add devfreq_event_get_edev_count() function
+- Modify the simple description of devfreq-event framework in devfreq-event.c
+- Minimize the usage range of global lock usage in devfreq_event_add_edev()
+- Remove '_is_enabled()' function pointer in devfreq_event_ops structure
+- Add separte CONFIG_PM_DEVFREQ_EVENT configuration
+- Add new devfreq-event.h header file including devfreq-event helper functions
+2. exynos dts file
+- Add new patch to support PPMU with DEVFREQ-event on Exynos4412-based TRATS2
 
-In fact both QEMU and kvmtool currently try KVM_CREATE_DEVICE first even
-for a VGICv2 on a GICv2 and only fall back to KVM_CREATE_IRQCHIP if that
-fails (to support older kernels).
+Changes from v3:
+(https://lkml.org/lkml/2014/12/12/219)
+1. devfreq-event class driver
+- Fix return value of devfreq_event_get_event()
+- Add new structure devfreq_event_data for devfreq_event_get_event()
+- Modify the prototype of devfreq_event_get_event() function
+- Call of_node_put after calling of_parse_phandle() to decrement refcount
+2. exynos-ppmu driver
+- Modify usage of devfreq_event_get_event() function
+  according to new prototype of this funciton
+- Add the additional description to exynos-ppmu.txt how to add PPMU node
+  in board dts file
+- Use 'PPMU_EVENT' macro to remove duplicate codes
+- Add the support of PPMU for Exynos5260
+3. exynos dts file
+- Add missing PPMU_FSYS node to exynos3250.dtsi
+- Fix 'ppmu_mfc_l' node name as 'ppmu_mfc' because exynos3250 has only one MFC IP.
+- Add missing PPMU_ACP/G3D to exynos4.dtsi
+4. etc
+- Fix wrong abbreviation of PPMU (PPMU :Platform Performance Monitoring Unit)
+- Add new patch to support the PPMU of Exynos5260 SoC
 
-Cheers,
-Andre.
+Changes from v2:
+(https://lkml.org/lkml/2014/12/9/304)
+1. devfreq-event class driver
+- Rename all the helper functions of devfreq-event device
+- Add devfreq_event_remove_edev() instead of devfreq_put_event_dev()
+- Add devfreq_event_release_edev() to initialize it before put device
+- Add the detailed description of devfreq-event API
+- Add the attributes of devfreq-event class (enable_count)
+- Check the overflow about event/total_event data in devfreq_event_get_event()
+- Remove the 'exclusive flag' feature
+- Set set_event()/get_event() functions as mandary
+- Add missing of_node_put() call
+- Change variable type of 'get_event()' funciton from 'int' to 'u64'
+2. exynos-ppmu driver
+- Remove un-used field (struct devfreq)
+- Use 'of_get_child_by_name()' instead of 'of_find_node_by_name()'
+- Add missing of_node_put() call
+- Fix wrong clock control
+- Use devfreq_event_remove_edev() instead of devfreq_remove_device()
+- Add the documentation for exynos-ppmu driver
+- Remove 'enable/disable/is_enabled/reset' function of exynos-ppmu driver
+3. exynos3250-rinato.dts
+- Add ppmu_{leftbus|rightbus} dt node and remove ppmu_cpu dt node
+
+Changes from v1:
+(https://lkml.org/lkml/2014/9/5/11)
+- Code clean
+- Add the description of devfreq-event structure
+- Add 'is_enabled' function to devfreq_event_ops structure
+- Add 'enable_count' field to devfreq_event_dev structure
+- Check whether devfreq-event device is enabled or not
+  during calling devfreq_event API
+- Define the type of devfreq-event device as following
+  : DEVFREQ_EVENT_TYPE_RAW_DATA
+  : DEVFREQ_EVENT_TYPE_UTILIZATION
+  : DEVFREQ_EVENT_TYPE_BANDWIDTH
+  : DEVFREQ_EVENT_TYPE_LATENCY
+- Add the exclusive feature of devfreq-event device.
+  If devfreq-event device is used on only on devfreq driver,
+  should used 'devfreq_enable_event_dev_exclusive()' function
+- Add new patch6 for test on Exynos3250-based Rinato board
+
+Chanwoo Choi (9):
+  devfreq: event: Add new devfreq_event class to provide basic data for devfreq governor
+  devfreq: event: Add resource-managed function for devfreq-event device
+  devfreq: event: Add exynos-ppmu devfreq-event driver
+  devfreq: event: Add documentation for exynos-ppmu devfreq-event driver
+  ARM: dts: Add PPMU dt node for Exynos3250 SoC
+  ARM: dts: Add PPMU dt node for Exynos4 SoCs
+  ARM: dts: Add PPMU dt node for Exynos5260 SoC
+  ARM: dts: exynos: Add PPMU node to Exynos3250-based Rinato/Monk board
+  ARM: dts: exynos: Add PPMU node for Exynos4412-based TRATS2 board
+
+ .../bindings/devfreq/event/exynos-ppmu.txt         | 110 +++++
+ arch/arm/boot/dts/exynos3250-monk.dts              |  40 ++
+ arch/arm/boot/dts/exynos3250-rinato.dts            |  40 ++
+ arch/arm/boot/dts/exynos3250.dtsi                  |  74 +++
+ arch/arm/boot/dts/exynos4.dtsi                     | 108 +++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |   8 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |  40 ++
+ arch/arm/boot/dts/exynos5260.dtsi                  |  90 ++++
+ drivers/devfreq/Kconfig                            |   2 +
+ drivers/devfreq/Makefile                           |   6 +-
+ drivers/devfreq/devfreq-event.c                    | 511 +++++++++++++++++++++
+ drivers/devfreq/event/Kconfig                      |  25 +
+ drivers/devfreq/event/Makefile                     |   2 +
+ drivers/devfreq/event/exynos-ppmu.c                | 398 ++++++++++++++++
+ include/linux/devfreq-event.h                      | 186 ++++++++
+ 15 files changed, 1639 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+ create mode 100644 drivers/devfreq/devfreq-event.c
+ create mode 100644 drivers/devfreq/event/Kconfig
+ create mode 100644 drivers/devfreq/event/Makefile
+ create mode 100644 drivers/devfreq/event/exynos-ppmu.c
+ create mode 100644 include/linux/devfreq-event.h
+
+-- 
+1.8.5.5
