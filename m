@@ -1,27 +1,23 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 12 Jan 2015 11:20:29 -0700
-Subject: [PATCH 4/5] PCI: qcom: Add Qualcomm PCIe controller driver
-In-Reply-To: <1418404441-5518-5-git-send-email-svarbanov@mm-sol.com>
-References: <1418404441-5518-1-git-send-email-svarbanov@mm-sol.com>
- <1418404441-5518-5-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <20150112182029.GA2776@google.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 12 Jan 2015 10:20:49 -0800
+Subject: [PATCH] pinctrl: pinconf-generic: loose DT dependence
+In-Reply-To: <1421020166-22831-1-git-send-email-linus.walleij@linaro.org>
+References: <1421020166-22831-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <52c662b797754a37966532ef95304610@BL2FFO11FD050.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 12, 2014 at 07:14:00PM +0200, Stanimir Varbanov wrote:
-> The PCIe driver reuse the Designware common code for host
-> and MSI initialization, and also program the Qualcomm
-> application specific registers.
+On Mon, 2015-01-12 at 12:49AM +0100, Linus Walleij wrote:
+> New pin controllers such as ACPI-based may also have custom properties
+> to parse, and should be able to use generic pin config. Let's make the
+> code compile on !OF systems and rename members a bit to underscore it
+> is custom parameters and not necessarily DT parameters.
 > 
-> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> ---
->  drivers/pci/host/Kconfig     |    9 +
->  drivers/pci/host/Makefile    |    1 +
->  drivers/pci/host/pcie-qcom.c |  415 ++++++++++++++++++++++++++++++++++++++++++
+> This fixes a build regression for x86_64 on the zeroday kernel builds.
+> 
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-and-tested-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Hi Stanimir,
-
-Can you also add a MAINTAINERS update so I'll know who should ack changes
-to this driver?
-
-Bjorn
+	S?ren
