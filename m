@@ -1,32 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Jan 2015 16:05:02 +0000
-Subject: [RFC PATCH 0/4] Genericise the IOVA allocator
-In-Reply-To: <20150112155220.GD6343@8bytes.org>
-References: <cover.1416931258.git.robin.murphy@arm.com>
- <20150112155220.GD6343@8bytes.org>
-Message-ID: <54B3F0AE.608@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Jan 2015 16:09:24 +0000
+Subject: [PATCH v5 6/8] arm64/efi: move SetVirtualAddressMap() to UEFI stub
+In-Reply-To: <20150112114600.GE26589@codeblueprint.co.uk>
+References: <1420742914-2404-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1420742914-2404-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20150112114600.GE26589@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu9BQFEEpEpF3-O98W-kBYQC9yKf39ee2gvznuZYPiCo-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 12 January 2015 at 11:46, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Thu, 08 Jan, at 06:48:32PM, Ard Biesheuvel wrote:
+>> @@ -46,4 +54,26 @@ extern void efi_idmap_init(void);
+>>
+>>  #define EFI_ALLOC_ALIGN              SZ_64K
+>>
+>> +/*
+>> + * On ARM systems, virtually remapped UEFI runtime services are set up in three
+>> + * distinct stages:
+>> + * - The stub retrieves the final version of the memory map from UEFI, populates
+>> + *   the virt_addr fields and calls the SetVirtualAddressMap() [SVAM] runtime
+>> + *   service to communicate the new mapping to the firmware (Note that the new
+>> + *   mapping is not live at this time)
+>> + * - During early boot, the page tables are allocated and populated based on the
+>> + *   virt_addr fields in the memory map, but only if all descriptors with the
+>> + *   EFI_MEMORY_RUNTIME attribute have a non-zero value for virt_addr. If this
+>> + *   succeeds, the EFI_VIRTMAP flag is set to indicate that the virtual mappings
+>> + *   have been installed successfully.
+>> + * - During an early initcall(), the UEFI Runtime Services are enabled and the
+>> + *   EFI_RUNTIME_SERVICES bit set if some conditions are met, i.e., we need a
+>> + *   non-early mapping of the UEFI system table, and we need to have the virtmap
+>> + *   installed.
+>> + */
+>> +#define EFI_VIRTMAP          EFI_ARCH_1
+>
+> Lucid. Thanks, Ard!
+>
 
-On 12/01/15 15:52, Joerg Roedel wrote:
-[...]
->
-> Thanks for doing this, I like this patch-set.
->
-> I would also appreciate if someone from Intel could have a look at it,
-> David?
->
-> Besides, can you please re-post this patch-set rebased to latest
-> upstream with the better versions of patch 1 and 2, please?
->
-> I consider to apply these changes then.
->
+Cheers Matt
 
-Thanks! Funnily enough, that's on my "things I didn't quite get round to 
-yesterday" list. I have this series rebased onto -rc3 with the comments 
-addressed, and I'm in the middle of a final cleanup and check of the 
-arm64 dma-mapping stuff on top of it. Expect to see both later today.
+It appears this series is converging in time for 3.20, but this patch
+still lacks acked/reviewed-bys
 
-Robin.
+Are you ok with the remainder of the patch as well? In that case, may
+I have your ack so the series can be merged through the arm64 tree?
+
+-- 
+Ard.
