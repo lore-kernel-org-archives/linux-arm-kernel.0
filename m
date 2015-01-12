@@ -1,50 +1,24 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 12 Jan 2015 10:30:36 +0100
-Subject: [alsa-devel] [PATCH] ASoC: wm8904: fix runtime warning
-In-Reply-To: <54B34035.60107@atmel.com>
-References: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
- <20150109111642.GU14516@opensource.wolfsonmicro.com>
- <54B34035.60107@atmel.com>
-Message-ID: <54B3943C.4040103@metafoo.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 12 Jan 2015 10:33:56 +0100
+Subject: ARM: mvebu: CONFIG_DEBUG_MVEBU_UART_ALTERNATE
+Message-ID: <1421055236.22660.12.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 04:32 AM, Bo Shen wrote:
-[...]
->>> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
->>> index 4d2d2b1..38582d7 100644
->>> --- a/sound/soc/codecs/wm8904.c
->>> +++ b/sound/soc/codecs/wm8904.c
->>> @@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route
->>> adc_intercon[] = {
->>>       { "Right Capture PGA", NULL, "Right Capture Mux" },
->>>       { "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
->>>
->>> -    { "AIFOUTL", "Left",  "ADCL" },
->>> -    { "AIFOUTL", "Right", "ADCR" },
->>> -    { "AIFOUTR", "Left",  "ADCL" },
->>> -    { "AIFOUTR", "Right", "ADCR" },
->>> +    { "AIFOUTL", NULL, "ADCL" },
->>> +    { "AIFOUTL", NULL, "ADCR" },
->>> +    { "AIFOUTR", NULL, "ADCL" },
->>> +    { "AIFOUTR", NULL, "ADCR" },
->>
->> Is this the right fix here? I am not super familiar with the
->> driver but it appears to contain an "AIFOUTL Mux" control which
->> is not connected to anything. Looks like maybe this is a mistake
->> the mux is indeded to be included in the path? Feels like we
->> should either remove the control as well or hook it into the
->> path.
->
-> Thank for your information.
-> I think here it should correct the path name as
-> --->8---
-> { "AIFOUTL Mux", "Left",  "ADCL" },
-> { "AIFOUTL Mux", "Right", "ADCR" },
-> { "AIFOUTR Mux", "Left",  "ADCL" },
-> { "AIFOUTR Mux", "Right", "ADCR" },
-> ---8<---
->
-> Thanks again. I will send out the new version.
+Maxime,
 
-Your probably also need to connect the mux to the output pins.
+Your commit d91125ddf962 ("ARM: mvebu: Rename DEBUG_LL to indicate UART
+index") is included in today's linux-next (ie, next-20150112). So is the
+related commit bd920490047a ("ARM: mvebu: Add UART1 as DEBUG_LL possible
+target"). I noticed because a script I use, spotted a minor issue with
+the first commit.
+
+See, the first commit renamed DEBUG_MVEBU_UART_ALTERNATE to
+DEBUG_MVEBU_UART0_ALTERNATE (so "0" was added). But there's still a last
+reference to CONFIG_DEBUG_MVEBU_UART_ALTERNATE in a comment in
+arch/arm/boot/dts/armada-xp-axpwifiap.dts. Is a patch to rename that
+last reference queued somewhere? If not, should I submit a trivial patch
+to do that?
+
+
+Paul Bolle
