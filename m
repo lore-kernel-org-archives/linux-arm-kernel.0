@@ -1,33 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Jan 2015 17:23:32 +0000
-Subject: [PATCH 1/2] of/platform: teardown DMA mappings on device destruction
-In-Reply-To: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
-References: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1421083413-24798-2-git-send-email-will.deacon@arm.com>
+Date: Mon, 12 Jan 2015 17:25:34 +0000
+Subject: [PATCH] arm64: allow late use of early_ioremap
+In-Reply-To: <1421081711-1128-1-git-send-email-msalter@redhat.com>
+References: <1421081711-1128-1-git-send-email-msalter@redhat.com>
+Message-ID: <20150112172534.GJ13360@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can create and attach to IOMMU domains via of_dma_configure,
-make sure we give the architecture a chance to tear them down when a
-platform or amba device is destroyed.
+On Mon, Jan 12, 2015 at 04:55:11PM +0000, Mark Salter wrote:
+> Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
+> added a missing call to early_ioremap_reset(). This triggers a BUG if code
+> tries using early_ioremap() after the early_ioremap_reset(). This is a
+> problem for some ACPI code which needs short-lived temporary mappings
+> after paging_init() but before mm_init(). This patch adds definitions for
+> the __late_set_fixmap() and __late_clear_fixmap() which avoids the BUG
+> by allowing later use of early_ioremap().
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> CC: Leif Lindholm <leif.lindholm@linaro.org>
+> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/fixmap.h | 3 +++
+>  1 file changed, 3 insertions(+)
 
-Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/of/platform.c | 1 +
- 1 file changed, 1 insertion(+)
+Given that we don't support ACPI on arm64 in mainline, I assume this can
+wait until at least 3.20?
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 5b33c6a21807..3f61d668ded7 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -526,6 +526,7 @@ static int of_platform_device_destroy(struct device *dev, void *data)
- 		amba_device_unregister(to_amba_device(dev));
- #endif
- 
-+	of_dma_deconfigure(dev);
- 	of_node_clear_flag(dev->of_node, OF_POPULATED);
- 	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
- 	return 0;
--- 
-2.1.4
+Will
+
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 9ef6eca..e629c70 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -61,6 +61,9 @@ void __init early_fixmap_init(void);
+>  
+>  #define __early_set_fixmap __set_fixmap
+>  
+> +#define __late_set_fixmap __set_fixmap
+> +#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
+> +
+>  extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+>  
+>  #include <asm-generic/fixmap.h>
+> -- 
+> 1.8.3.1
+> 
+> 
