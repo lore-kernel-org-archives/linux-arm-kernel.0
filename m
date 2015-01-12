@@ -1,51 +1,67 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 12 Jan 2015 18:14:29 +0900
-Subject: [PATCH] ARM: samsung: add exynos-chipid binding information
-In-Reply-To: <54AA5D1D.9000409@samsung.com>
-References: <1417592664-10672-1-git-send-email-pankaj.dubey@samsung.com>
- <54AA5D1D.9000409@samsung.com>
-Message-ID: <54B39075.20406@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Jan 2015 10:10:20 +0100
+Subject: [PATCH v3 0/9] ARM: sunxi: Support cpufreq on sun[457]i
+In-Reply-To: <1421037249-28461-1-git-send-email-wens@csie.org>
+References: <1421037249-28461-1-git-send-email-wens@csie.org>
+Message-ID: <20150112091020.GA30908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/15 18:45, Pankaj Dubey wrote:
-> Gentle Ping.
+On Mon, Jan 12, 2015 at 12:34:00PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> On Wednesday 03 December 2014 01:14 PM, Pankaj Dubey wrote:
->> Exynos SoC's DT files are using Chipid device nodes, but it's binding
->> information is missing. This patch adds exynos-chipid binding
->> information.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   .../bindings/arm/samsung/exynos-chipid.txt         |   12 ++++++++++++
->>   1 file changed, 12 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
->>
->> diff --git
->> a/Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
->> b/Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
->> new file mode 100644
->> index 0000000..85c5dfd
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-chipid.txt
->> @@ -0,0 +1,12 @@
->> +SAMSUNG Exynos SoCs Chipid driver.
->> +
->> +Required properties:
->> +- compatible : Should at least contain "samsung,exynos4210-chipid".
->> +
->> +- reg: offset and length of the register set
->> +
->> +Example:
->> +    chipid at 10000000 {
->> +        compatible = "samsung,exynos4210-chipid";
->> +        reg = <0x10000000 0x100>;
->> +    };
->>
+> This is v3 of the cpufreq support series for sunxi. The series has been
+> rebased onto the latest sunxi-next. I've dropped all the patches Maxime
+> merged. This includes "ARM: sunxi: Register cpufreq-dt for sun[45678]i"
+> which was merged but not published yet.
+> 
+> Individual changes since v2 are listed within each patch.
+> 
+> 
+> Original cover letter follows:
+> 
+> This series adds support cpufreq support for sun[457]i using cpufreq-dt.
+> This also supports passive cpu cooling (thermal throttling) using thermal
+> zones with the temperature sensor in the SoC.
+> 
+> The operating points for the supported platforms were taken from the
+> linux-sunxi FEX files repository. The majority of boards use the same
+> settings. Only with sun7i do we see slight variations, either disabling
+> some frequencies, or bumping up the voltage a bit. In either case this
+> can be done by limiting the constraints for the supply regulator, or 
+> overriding the OPP table in the board dts file.
+> 
+> On sun7i, there is an additional operating point not found in the FEX
+> files, 960 MHz @ 1.4V, which is the full speed setting in both u-boot-sunxi
+> and mainline u-boot.
+> 
+> The series has been tested on the 4 boards I have. With cpufreq active,
+> the effects are visible as a decrease in SoC internal temperature.
+> Stability for the operating points has been tested using:
+> 
+>   http://linux-sunxi.org/Hardware_Reliability_Tests#Reliability_of_cpufreq_voltage.2Ffrequency_settings
+> 
+> More real world usage feedback is appreciated. Thermal throttling hasn't
+> been tested much, due to not being able to generate enough load without
+> the GPU for the SoC to heat up. Also on sun4i, the temperature sensor
+> still hasn't been calibrated, so the readings are highly inaccurate.
 
-I've applied. Sorry for late taking.
+Applied 2, 3, 6 and 8.
 
-Thanks,
-Kukjin
+There's still some discussions about the boards regulators, that apply
+to all of them, even though I commented on one in particular.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/85077dc8/attachment.sig>
