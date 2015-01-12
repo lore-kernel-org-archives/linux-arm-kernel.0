@@ -1,73 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Jan 2015 18:39:55 +0000
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
-Message-ID: <20150112183955.GO13360@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 12 Jan 2015 19:42:11 +0100
+Subject: [PATCH 2/7] ARM: at91: remove useless config MACH_AT91RM9200_DT
+In-Reply-To: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421088136-10172-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
-> thread_info->syscall is used only for ptrace, but syscall number
-> is also used by syscall_get_nr and returned to userspace by the
-> following proc file access:
-> 
->  $ cat /proc/self/syscall
->  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
->  ^
-> The first number is the syscall number, currently it is zero.
-> Patch fixes this:
-> 
->  $ cat /proc/self/syscall
->  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
->  ^
-> Right, read syscall
+Now that rm9200 is only supported through DT, remove CONFIG_MACH_AT91RM9200_DT
+and use CONFIG_SOC_AT91RM9200 instead.
 
-Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
-the /proc code requires syscall_get_nr to work regardless of
-TIF_SYSCALL_TRACE.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/Kconfig  | 3 ---
+ arch/arm/mach-at91/Makefile | 2 +-
+ 2 files changed, 1 insertion(+), 4 deletions(-)
 
-> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm/kernel/asm-offsets.c  | 1 +
->  arch/arm/kernel/entry-common.S | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 2d2d608..6911bad 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -70,6 +70,7 @@ int main(void)
->    DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
->    DEFINE(TI_CPU_DOMAIN,		offsetof(struct thread_info, cpu_domain));
->    DEFINE(TI_CPU_SAVE,		offsetof(struct thread_info, cpu_context));
-> +  DEFINE(TI_SYSCALL,		offsetof(struct thread_info, syscall));
->    DEFINE(TI_USED_CP,		offsetof(struct thread_info, used_cp));
->    DEFINE(TI_TP_VALUE,		offsetof(struct thread_info, tp_value));
->    DEFINE(TI_FPSTATE,		offsetof(struct thread_info, fpstate));
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index f8ccc21..89452ff 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
->  #endif
->  
->  local_restart:
-> +	str scno, [tsk, #TI_SYSCALL]		@ set syscall number
->  	ldr	r10, [tsk, #TI_FLAGS]		@ check for syscall tracing
->  	stmdb	sp!, {r4, r5}			@ push fifth and sixth args
-
-Do we definitely want to update scno on syscall restarting?
-
-Will
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 2395c68b3e32..34725b296e4d 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -174,9 +174,6 @@ config SOC_AT91SAM9N12
+ # ----------------------------------------------------------
+ endif # SOC_SAM_V4_V5
+ 
+-config MACH_AT91RM9200_DT
+-	def_bool SOC_AT91RM9200
+-
+ config MACH_AT91SAM9_DT
+ 	def_bool SOC_AT91SAM9
+ 
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 7b6424d40764..55fc93f5638b 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -19,7 +19,7 @@ obj-$(CONFIG_SOC_SAMA5D3)	+= sama5d3.o
+ obj-$(CONFIG_SOC_SAMA5D4)	+= sama5d4.o
+ 
+ # AT91SAM board with device-tree
+-obj-$(CONFIG_MACH_AT91RM9200_DT) += board-dt-rm9200.o
++obj-$(CONFIG_SOC_AT91RM9200) += board-dt-rm9200.o
+ obj-$(CONFIG_MACH_AT91SAM9_DT) += board-dt-sam9.o
+ 
+ # SAMA5 board with device-tree
+-- 
+2.1.0
