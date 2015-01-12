@@ -1,134 +1,67 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 12 Jan 2015 09:28:49 -0800
-Subject: [PATCH v3 3/8] watchdog: at91rm9200: use the regmap from mfd
-In-Reply-To: <1421077023-30954-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150112172849.GB19868@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Jan 2015 17:30:05 +0000
+Subject: Query: ARM64: Behavior of el1_dbg exception while executing
+ el0_dbg
+In-Reply-To: <54B00C39.1070809@redhat.com>
+References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
+ <54AEBE45.9080203@redhat.com> <20150109154635.GG11258@arm.com>
+ <54B00C39.1070809@redhat.com>
+Message-ID: <20150112173005.GK13360@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 04:36:58PM +0100, Alexandre Belloni wrote:
-> The system timer MFD driver is providing a regmap. Use it to access the
-> registers.
+On Fri, Jan 09, 2015 at 05:13:29PM +0000, Pratyush Anand wrote:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> On Friday 09 January 2015 09:16 PM, Will Deacon wrote:
+> > On Thu, Jan 08, 2015 at 05:28:37PM +0000, Pratyush Anand wrote:
+> >> On Thursday 08 January 2015 09:53 PM, Will Deacon wrote:
+> >>> On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
+> >>>> I am trying to test following scenario, which seems valid to me. But I
+> >>>> am very new to ARM64 as well as to debugging tools, so seeking expert's
+> >>>> comment here.
+> >>>>
+> >>>> -- I have inserted a kprobe to the function uprobe_breakpoint_handler
+> >>>> which is called from elo_dbg
+> >>>> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
+> >>>>
+> >>>> -- kprobe is enabled.
+> >>>>
+> >>>> -- an uprobe is inserted into a test application and enabled.
+> >>>>
+> >>>> So, when uprobe is enabled and test code execution reaches to probe
+> >>>> instruction, it executes uprobe breakpoint instruction and el0_dbg
+> >>>> exception is raised.
+> >>>>
+> >>>> When control reaches to start of uprobe_breakpoint_handler and it
+> >>>> executes first instruction (which has been replaced with a kprobe
+> >>>> breakpoint instruction), el1_dbg exception is raised.
+> >>>
+> >>> Hmm, debug exceptions should be masked at this point so I don't see why
+> >>> you're taking the second debug exception.
+> >>>
+> >>
+> >> So, you mean to say that when an exception which has been taken from
+> >> lower exception level (EL0) is being executed, then we keep masked also
+> >> the exception from current exception level (EL1)...
+> >
+> > Yeah, if you look at entry.S then you'll see that neither el0_dbg or el1_dbg
+> > re-enable debug exceptions (masked automatically by the CPU after taking the
+> > exception) until *after* the handling has completed. This is to prevent
+> > recursive debug exceptions, which I don't see how we can reasonable handle.
+> 
+> May be I am missing something, but my observation on silicon is 
+> different. Please have a look at git log of HEAD of following branch, 
+> which says that el1_dbg exception has been raised while el0_dbg was 
+> executing. Do not know what I am missing..
+> 
+> https://github.com/pratyushanand/linux/tree/ml_arm64_uprobe_devel_debug_kprobe_insertion_at_uprobe_breakpoint_handler
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+That page just says "Failed to load latest commit information." for me.
 
-> ---
->  drivers/watchdog/Kconfig          |  2 +-
->  drivers/watchdog/at91rm9200_wdt.c | 25 ++++++++++++-------------
->  2 files changed, 13 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 08f41add1461..18c73bc159fc 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -154,7 +154,7 @@ config ARM_SP805_WATCHDOG
->  
->  config AT91RM9200_WATCHDOG
->  	tristate "AT91RM9200 watchdog"
-> -	depends on SOC_AT91RM9200
-> +	depends on SOC_AT91RM9200 && MFD_ATMEL_ST
->  	help
->  	  Watchdog timer embedded into AT91RM9200 chips. This will reboot your
->  	  system when the timeout is reached.
-> diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
-> index d244112d5b6f..a4ac88e450a2 100644
-> --- a/drivers/watchdog/at91rm9200_wdt.c
-> +++ b/drivers/watchdog/at91rm9200_wdt.c
-> @@ -17,22 +17,24 @@
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
-> +#include <linux/mfd/atmel-st.h>
->  #include <linux/miscdevice.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regmap.h>
->  #include <linux/types.h>
->  #include <linux/watchdog.h>
->  #include <linux/uaccess.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> -#include <mach/at91_st.h>
->  
->  #define WDT_DEFAULT_TIME	5	/* seconds */
->  #define WDT_MAX_TIME		256	/* seconds */
->  
->  static int wdt_time = WDT_DEFAULT_TIME;
->  static bool nowayout = WATCHDOG_NOWAYOUT;
-> +static struct regmap *regmap_st;
->  
->  module_param(wdt_time, int, 0);
->  MODULE_PARM_DESC(wdt_time, "Watchdog time in seconds. (default="
-> @@ -55,7 +57,7 @@ static unsigned long at91wdt_busy;
->   */
->  static inline void at91_wdt_stop(void)
->  {
-> -	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN);
-> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN);
->  }
->  
->  /*
-> @@ -63,9 +65,9 @@ static inline void at91_wdt_stop(void)
->   */
->  static inline void at91_wdt_start(void)
->  {
-> -	at91_st_write(AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
-> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_EXTEN | AT91_ST_RSTEN |
->  				(((65536 * wdt_time) >> 8) & AT91_ST_WDV));
-> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
->  }
->  
->  /*
-> @@ -73,7 +75,7 @@ static inline void at91_wdt_start(void)
->   */
->  static inline void at91_wdt_reload(void)
->  {
-> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
->  }
->  
->  /* ......................................................................... */
-> @@ -209,6 +211,10 @@ static int at91wdt_probe(struct platform_device *pdev)
->  		return -EBUSY;
->  	at91wdt_miscdev.parent = &pdev->dev;
->  
-> +	regmap_st = dev_get_drvdata(pdev->dev.parent);
-> +	if (!regmap_st)
-> +		return -ENODEV;
-> +
->  	res = misc_register(&at91wdt_miscdev);
->  	if (res)
->  		return res;
-> @@ -254,12 +260,6 @@ static int at91wdt_resume(struct platform_device *pdev)
->  #define at91wdt_resume	NULL
->  #endif
->  
-> -static const struct of_device_id at91_wdt_dt_ids[] = {
-> -	{ .compatible = "atmel,at91rm9200-wdt" },
-> -	{ /* sentinel */ }
-> -};
-> -MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-> -
->  static struct platform_driver at91wdt_driver = {
->  	.probe		= at91wdt_probe,
->  	.remove		= at91wdt_remove,
-> @@ -267,8 +267,7 @@ static struct platform_driver at91wdt_driver = {
->  	.suspend	= at91wdt_suspend,
->  	.resume		= at91wdt_resume,
->  	.driver		= {
-> -		.name	= "at91_wdt",
-> -		.of_match_table = at91_wdt_dt_ids,
-> +		.name	= "atmel_st_watchdog",
->  	},
->  };
->  
-> -- 
-> 2.1.0
-> 
+Regardless, I think you need to debug further and found out if PSTATE.D is
+getting cleared and, if so, who is responsible for that. Somebody could be
+enabling IRQs, for example, which will then unmask debug exceptions in
+el1_irq.
+
+Will
