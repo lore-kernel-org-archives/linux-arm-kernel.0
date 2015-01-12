@@ -1,99 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 20:01:56 +0100
-Subject: [PATCH 5/6] ARM: at91/dt: Add a dtsi for at91sam9xe
-In-Reply-To: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421089317-12607-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: dave@sr71.net (Dave Hansen)
+Date: Mon, 12 Jan 2015 11:03:58 -0800
+Subject: Linux 3.19-rc3
+In-Reply-To: <20150112124256.GB13360@arm.com>
+References: <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+ <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+ <20150110133742.GA6999@arm.com>
+ <CA+55aFxBA6F4Kr89iZwPPeBnkiRO4GnrbUSd0CqVG-LD6ZQyiw@mail.gmail.com>
+ <20150112124256.GB13360@arm.com>
+Message-ID: <54B41A9E.4030705@sr71.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9xe is slightly different from at91sam9260, in particular it has a
-different SRAM size and location.
+On 01/12/2015 04:42 AM, Will Deacon wrote:
+> Since this effectively reverts f045bbb9fa1b, I've added Dave to Cc. It
+> should fix the leak without reintroducing the performance regression.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
- arch/arm/boot/dts/at91sam9xe.dtsi                  | 60 ++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91sam9xe.dtsi
-
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 571fc76c6edb..ad319f84f560 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -24,6 +24,7 @@ compatible: must be one of:
-     o "atmel,at91sam9g45"
-     o "atmel,at91sam9n12"
-     o "atmel,at91sam9rl"
-+    o "atmel,at91sam9xe"
-  * "atmel,sama5" for SoCs using a Cortex-A5, shall be extended with the specific
-    SoC family:
-     o "atmel,sama5d3" shall be extended with the specific SoC compatible:
-diff --git a/arch/arm/boot/dts/at91sam9xe.dtsi b/arch/arm/boot/dts/at91sam9xe.dtsi
-new file mode 100644
-index 000000000000..0278f63b2daf
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9xe.dtsi
-@@ -0,0 +1,60 @@
-+/*
-+ * at91sam9xe.dtsi - Device Tree Include file for AT91SAM9XE family SoC
-+ *
-+ *  Copyright (C) 2015 Atmel,
-+ *                2015 Alexandre Belloni <alexandre.Belloni@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "at91sam9260.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9XE family SoC";
-+	compatible = "atmel,at91sam9xe", "atmel,at91sam9260";
-+
-+	sram0: sram at 002ff000 {
-+		status = "disabled";
-+	};
-+
-+	sram1: sram at 00300000 {
-+		compatible = "mmio-sram";
-+		reg = <0x00300000 0x4000>;
-+	};
-+};
--- 
-2.1.0
+I ran this on the big system that showed the earlier issue.  Everything
+seems OK, at least with the test that showed the issue earlier (the brk1
+test from will-it-scale).
