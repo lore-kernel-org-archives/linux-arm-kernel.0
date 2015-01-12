@@ -1,51 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Jan 2015 01:05:12 +0100
-Subject: [PATCH 07/16] ARM: integrator: convert PCI to use generic config
- accesses
-In-Reply-To: <4938579.0KIk3QtTCP@wuerfel>
-References: <1420857290-8373-1-git-send-email-robh@kernel.org>
- <1420857290-8373-8-git-send-email-robh@kernel.org>
- <CACRpkdbwKN9LenqrWeu4WykhdZOGAdxpC_BYr2cYpc2_cn5GfA@mail.gmail.com>
- <4938579.0KIk3QtTCP@wuerfel>
-Message-ID: <CACRpkdZSXWrVudiadVjbhQDS_zQrYttaytW-TUoeFUrc=beD1A@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 12 Jan 2015 10:05:30 +0800
+Subject: FW: [RFC V6 2/3 resend] arm:add bitrev.h file to support rbit
+ instruction   
+Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E19A@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 10 January 2015 22:40:22 Linus Walleij wrote:
->> >  static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
->> >                           int size, u32 *val)
->> >  {
->> > -       addr = v3_open_config_window(bus, devfn, where);
->> > +       int ret = pci_generic_config_read(bus, devfn, where, size, val);
->> >         v3_close_config_window();
->> > +       return ret;
->> >  }
->> >
->> >  static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
->> >                            int size, u32 val)
->> >  {
->> > +       int ret = pci_generic_config_write(bus, devfn, where, size, val);
->> >         v3_close_config_window();
->> > -       raw_spin_unlock_irqrestore(&v3_lock, flags);
->> > +       return ret;
->> >  }
->> >
->> >  static struct pci_ops pci_v3_ops = {
->> > +       .map_bus = v3_open_config_window,
->> >         .read   = v3_read_config,
->> >         .write  = v3_write_config,
->>
->> So .map_bus is called before every .read/.write operation I take it.
->>
->> Wouldn't it be proper to call the v3_close_config_window() from a
->> matching .unmap_bus() callback for symmetry?
->
-> It would be nicer for integrator but useless for anything else, so
-> I'd vote for leaving it the way Rob posted.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, January 09, 2015 7:11 PM
+> To: Wang, Yalin
+> Cc: 'Ard Biesheuvel'; 'Will Deacon'; 'linux-kernel at vger.kernel.org'; 
+> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 
+> 'linux-arm- kernel at lists.infradead.org'
+> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit 
+> instruction
+> 
+> On Fri, Jan 09, 2015 at 10:16:32AM +0800, Wang, Yalin wrote:
+> > > -----Original Message-----
+> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > > Sent: Friday, January 09, 2015 2:41 AM
+> > > To: Wang, Yalin
+> > > Cc: 'Will Deacon'; 'Ard Biesheuvel'; 
+> > > 'linux-kernel at vger.kernel.org'; 'akinobu.mita at gmail.com'; 
+> > > 'linux-mm at kvack.org'; 'Joe Perches';
+> > > 'linux-arm- kernel at lists.infradead.org'
+> > > Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit 
+> > > instruction
+> > >
+> > > The root cause is that the kernel being built is supposed to 
+> > > support both
+> > > ARMv7 and ARMv6K CPUs.  However, "rbit" is only available on
+> > > ARMv6T2 (thumb2) and ARMv7, and not plain ARMv6 or ARMv6K CPUs.
+> > >
+> > In the patch that you applied:
+> > 8205/1 	add bitrev.h file to support rbit instruction
+> >
+> > I have add :
+> > +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
+> >
+> > If you build kernel support ARMv6K, should CONFIG_CPU_V6=y, isn't it ?
+> > Then will not build hardware rbit instruction, isn't it ?
+> 
+> The config has:
+> 
+> CONFIG_CPU_PJ4=y
+> # CONFIG_CPU_V6 is not set
+> CONFIG_CPU_V6K=y
+> CONFIG_CPU_V7=y
+> CONFIG_CPU_32v6=y
+> CONFIG_CPU_32v6K=y
+> CONFIG_CPU_32v7=y
+> 
+> And no, the CONFIG_CPU_V* flags refer to the CPUs.  The
+> CONFIG_CPU_32v* symbols refer to the CPU architectures.
+> 
+Oh, I see,
+How about change like this:
++	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6 && 
++!CPU_V6K)
+I am not sure if I also need add some older CPU types like !CPU_ARM9TDMI &&?!CPU_ARM940T ?
 
-OK I buy that, throw in a comment about it in the code if there
-is some time for iterating the patch.
+Another solution is:
++	select HAVE_ARCH_BITREVERSE if ((CPU_32V7M || CPU_32V7) && !CPU_32V6 
++&& !CPU_32V5 && !CPU_32V4 && !CPU_32V4T && !CPU_32V3)
 
-Yours,
-Linus Walleij
+By the way, I am not clear about the difference between CPU_V6 and CPU_V6K, could you tell me? :)
+
+Thank you 
