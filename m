@@ -1,43 +1,30 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 20:06:55 +0100
-Subject: [PATCH v2 1/6] ARM: at91/dt: at91sam9n12: Add RTC node
-In-Reply-To: <1421089317-12607-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421089317-12607-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421089615-13007-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 13 Jan 2015 08:07:12 +1300
+Subject: Linux 3.19-rc3
+In-Reply-To: <CA+55aFxD63S0PE4zBnEw2jn3pPSALO0BdxY7tP++8wKVdRKJ5g@mail.gmail.com>
+References: <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+ <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+ <20150110133742.GA6999@arm.com>
+ <CA+55aFxBA6F4Kr89iZwPPeBnkiRO4GnrbUSd0CqVG-LD6ZQyiw@mail.gmail.com>
+ <20150112124256.GB13360@arm.com>
+ <CA+55aFxD63S0PE4zBnEw2jn3pPSALO0BdxY7tP++8wKVdRKJ5g@mail.gmail.com>
+Message-ID: <CA+55aFw=urngjyQvuOWHP1BBe-tNKy0E4DC0c5PwP+XuvpSmEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for the RTC available on the at91sam9n12.
+On Tue, Jan 13, 2015 at 8:06 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+>
+> So I'm ok with it, as long as we don't have a performance regression.
+>
+> Your "don't bother freeing when the batch is empty" should hopefully
+> be fine. Dave, does that work for your case?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
+Oh, and Dave just replied that it's ok. So should I just take it
+directly, or expect it through the arm64 tree? Either works for me.
 
-Nicolas,
-
-following our discussion, I forgot to change that one, I'm removing the 9x5
-errata for the RTC on sam9n12.
-
-
- arch/arm/boot/dts/at91sam9n12.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 68eb9aded164..a7218bcc6a25 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -893,6 +893,13 @@
- 				status = "disabled";
- 			};
- 
-+			rtc at fffffeb0 {
-+				compatible = "atmel,at91rm9200-rtc";
-+				reg = <0xfffffeb0 0x40>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				status = "disabled";
-+			};
-+
- 			pwm0: pwm at f8034000 {
- 				compatible = "atmel,at91sam9rl-pwm";
- 				reg = <0xf8034000 0x300>;
--- 
-2.1.0
+            Linus
