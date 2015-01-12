@@ -1,57 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Jan 2015 17:52:48 +0100
-Subject: [GIT PULL] at91: fixes for 3.19 #1 (bis)
-In-Reply-To: <8332277.8EH8fqiOd7@wuerfel>
-References: <1420456477-18204-1-git-send-email-nicolas.ferre@atmel.com>
- <20150111211215.GC25777@quad.lixom.net> <54B3E35E.50400@atmel.com>
- <8332277.8EH8fqiOd7@wuerfel>
-Message-ID: <54B3FBE0.6020603@atmel.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 12 Jan 2015 08:29:13 -0800
+Subject: [PATCH RESEND v15 10/10] KVM: arm/arm64: Enable Dirty Page logging
+ for ARMv8
+In-Reply-To: <20150111140327.GY21092@cbox>
+References: <1420767727-20851-1-git-send-email-m.smarduch@samsung.com>
+ <1420767727-20851-2-git-send-email-m.smarduch@samsung.com>
+ <20150111140327.GY21092@cbox>
+Message-ID: <54B3F659.40309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/01/2015 16:59, Arnd Bergmann a ?crit :
-> On Monday 12 January 2015 16:08:14 Nicolas Ferre wrote:
->> Le 11/01/2015 22:12, Olof Johansson a ?crit :
->>> On Fri, Jan 09, 2015 at 10:02:50AM +0100, Nicolas Ferre wrote:
->>>> Le 08/01/2015 23:41, Olof Johansson a ?crit :
->>>>> On Mon, Jan 05, 2015 at 12:14:37PM +0100, Nicolas Ferre wrote:
->>>>>
->>>>> This is the only fix among these patches, isn't it? The others seem to
->>>>> be code removals/cleanups better targeted for 3.20, as far as I can tell.
->>>>
->>>> Well, this is why I sent the first version of this pull-request very
->>>> early in the process. I didn't have the possibility to re-send it
->>>> earlier on top of -rc1 until this pull-request.
-> 
-> I think this was a bit of a communication problem. I thought about
-> applying the first pull request you sent for this, but then Kevin
-> commented that it would be better to rebase it on top of -rc1.
-> That made sense at the time, except then we all got caught by
-> surprise by Christmas and suddenly it was -rc4 ;-)
-
-Exactly, by surprise like every year ;-)
-
->>> Since you mention that you have more fixes coming (why hold off on them?), do
->>> you want me to cherry-pick over that one fix to our fixes branch, or can you
->>> queue it with the other fixes when you send them up?
+On 01/11/2015 06:03 AM, Christoffer Dall wrote:
+> On Thu, Jan 08, 2015 at 05:42:07PM -0800, Mario Smarduch wrote:
+>> This patch enables ARMv8 dirty page logging support. Plugs ARMv8 into generic
+>> layer through Kconfig symbol, and drops earlier ARM64 constraints to enable
+>> logging at architecture layer. I applies cleanly on top patches series
+>> posted Dec 15:
+>> https://lists.cs.columbia.edu/pipermail/kvmarm/2014-December/012826.html
 >>
->> Fair enough, I build a new "at91: fixes for 3.19 #1 (ter)" with tree
->> more patches right now.
+>> Patch number #11 of the series has be dropped.
 > 
-> This seems for the best now. This kind of late cleanup that depends on
-> multiple branches going in first happens occasionally and it's never
-> nice whichever way you try to handle it.
+> Again, the stuff about where this applied and other information related
+> to the series should go below the '---' markers.
 > 
-> The only recommendation I have for the future is to discuss the merge
-> strategy with us before the merge window instead of holding back patches
-> that have other dependencies. I don't really mind merging them as a
-> late branch into -rc1 if I know about them, but we should never plan
-> to merge any non-bugfix patches later than -rc2.
+> I suggest we iterate on patch 07 and make sure we agree, and then you
+> send out a complete new series (collect the acks and reviewed-by's in
+> there please), so I know I'll end up picking the right patches, as this
+> whole series has sort of sprawled.
 
-Sure. I'll try to do better next time.
-I began to create the at91-3.20-cleanup branch with this late material
-and all will be fine anyway.
+Yes, the patchset went of track quite a bit. Will do.
 
-Thanks, bye.
--- 
-Nicolas Ferre
+- Mario
+> 
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> 
+> Otherwise:
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Thanks,
+> -Christoffer
+> 
