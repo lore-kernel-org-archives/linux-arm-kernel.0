@@ -1,35 +1,34 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Jan 2015 15:11:23 -0800
-Subject: [GIT PULL] Broadcom MAINTAINERS file updates for 3.20
-Message-ID: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
+Date: Mon, 12 Jan 2015 15:11:52 -0800
+Subject: [PATCH] ARM: brcmstb: update CPU power management sequence
+In-Reply-To: <CADtm3G5ZaOsJ_pvY2ho0yYhbhbqtCwsPZfnEc0rwhCBC1ho16g@mail.gmail.com>
+References: <1418786030-23455-1-git-send-email-computersforpeace@gmail.com>
+ <CADtm3G5ZaOsJ_pvY2ho0yYhbhbqtCwsPZfnEc0rwhCBC1ho16g@mail.gmail.com>
+Message-ID: <54B454B8.4000202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On 17/12/14 15:25, Gregory Fong wrote:
+> On Tue, Dec 16, 2014 at 7:13 PM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
+>> The automatic CPU power state machine for B15 CPUs does not work
+>> reliably as-is. This patch implements a manual sequence in software to
+>> replace it.
+>>
+>> This was tested successfully with over 10,000 hotplug cycles of
+>> something like this:
+>>
+>>   echo 0 > /sys/devices/system/cpu/cpu1/online
+>>   echo 1 > /sys/devices/system/cpu/cpu1/online
+>>
+>> whereas the existing sequence often locks up after a few hundred cycles.
+>>
+>> Fixes: 62639c2f5332 ("ARM: brcmstb: reintroduce SMP support")
+>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> 
+> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+> 
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
-
-for you to fetch changes up to c3a8f6399f6fb748bf0067bd3d97c0653d434648:
-
-  MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs (2015-01-12 15:02:57 -0800)
-
-----------------------------------------------------------------
-This pull request contains updates to our MAINTAINERS files for all relevant
-Broadcom SoCs: BCM63xx, Cygnus/iProc, ARM & MIPS-based BCM7xxx (brcmstb).
-
-Our new code location for all Broadcom-related kernel activities is now on
-http://github.com/Broadcom/.
-
-----------------------------------------------------------------
-Florian Fainelli (4):
-      MAINTAINERS: move BCM63xx ARM-based SoCs git tree
-      MAINTAINERS: update Broadcom Cygnus SoC git tree
-      MAINTAINERS: add a git entry for BCM7xxx ARM-based SoCs
-      MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs
-
- MAINTAINERS | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Applied, and queued up for 3.20, thanks!
+-- 
+Florian
