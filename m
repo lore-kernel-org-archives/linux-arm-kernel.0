@@ -1,47 +1,90 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 23:53:30 +0100
-Subject: [PATCH 05/11] usb: gadget: at91_udc: Remove non-DT handling code
-In-Reply-To: <20150112213905.GI2858@saruman>
-References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
- <1417606330-17753-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150112213905.GI2858@saruman>
-Message-ID: <20150112225330.GQ2447@piout.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 12 Jan 2015 14:57:33 -0800
+Subject: [PATCH 6/6] ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
+In-Reply-To: <1421097825-396-7-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421097825-396-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421097825-396-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150112225733.20842.93026@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Quoting Alexandre Belloni (2015-01-12 13:23:45)
+> Move at91rm9200_idle() along with at91sam9_idle() in clk/at91/pmc.c.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Cc: Mike Turquette <mturquette@linaro.org>
 
-I've rebased that patch series but it depends on another one (the mfd:
-syscon: part of "memory: add Atmel EBI (External Bus Interface) driver")
-that is not taken yet so applying it now will break the build. I still
-hope to get it merged for 3.20 and I'll resend it as soon as possible.
+Acked-by: Michael Turquette <mturquette@linaro.org>
 
-
-On 12/01/2015 at 15:39:05 -0600, Felipe Balbi wrote :
-> On Wed, Dec 03, 2014 at 12:32:04PM +0100, Boris Brezillon wrote:
-> > Since non-DT board support has been removed from the at91 architecture we
-> > can safely remove non-DT handling code.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> doesn't apply cleanly:
+> Mike, Boris,
+> I guess that one can go through the at91 tree unless you have any objections.
 > 
-> checking file drivers/usb/gadget/udc/Kconfig
-> checking file drivers/usb/gadget/udc/at91_udc.c
-> Hunk #1 succeeded at 1710 (offset 13 lines).
-> Hunk #2 succeeded at 1722 (offset 13 lines).
-> Hunk #3 succeeded at 1958 (offset 13 lines).
-> Hunk #4 FAILED at 1960.
-> 1 out of 4 hunks FAILED
+>  arch/arm/mach-at91/at91rm9200.c | 9 ---------
+>  arch/arm/mach-at91/generic.h    | 1 +
+>  drivers/clk/at91/pmc.c          | 9 +++++++++
+>  3 files changed, 10 insertions(+), 9 deletions(-)
 > 
-> please rebase on testing/next which I just pushed.
-> 
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index fc7c26138037..3be1963f5c56 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -21,14 +21,6 @@
+>  #include "soc.h"
+>  #include "generic.h"
+>  
+> -static void at91rm9200_idle(void)
+> -{
+> -       /*
+> -        * Disable the processor clock.  The processor will be automatically
+> -        * re-enabled by an interrupt or by a reset.
+> -        */
+> -       at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+> -}
+>  
+>  static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
+>  {
+> @@ -49,7 +41,6 @@ static void __init at91rm9200_initialize(void)
+>         arm_pm_restart = at91rm9200_restart;
+>  }
+>  
+> -
+>  AT91_SOC_START(at91rm9200)
+>         .init = at91rm9200_initialize,
+>  AT91_SOC_END
+> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+> index 18d5547f11d5..c4aa21fb765f 100644
+> --- a/arch/arm/mach-at91/generic.h
+> +++ b/arch/arm/mach-at91/generic.h
+> @@ -25,6 +25,7 @@ extern void __init at91_dt_initialize(void);
+>  extern void at91rm9200_timer_init(void);
+>  
+>  /* idle */
+> +extern void at91rm9200_idle(void);
+>  extern void at91sam9_idle(void);
+>  
+>  /* Matrix */
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index 386999b4f8eb..f07c8152e5cc 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -27,6 +27,15 @@
+>  void __iomem *at91_pmc_base;
+>  EXPORT_SYMBOL_GPL(at91_pmc_base);
+>  
+> +void at91rm9200_idle(void)
+> +{
+> +       /*
+> +        * Disable the processor clock.  The processor will be automatically
+> +        * re-enabled by an interrupt or by a reset.
+> +        */
+> +       at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+> +}
+> +
+>  void at91sam9_idle(void)
+>  {
+>         at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
 > -- 
-> balbi
-
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> 2.1.0
+> 
