@@ -1,40 +1,128 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 12 Jan 2015 13:15:58 +0100
-Subject: [PATCH v3 1/5] usb: atmel_usba_udc: Rework at91sam9rl errata
- handling
-In-Reply-To: <1421060278-27329-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421060278-27329-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1421064958.22660.54.camel@x220>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 12 Jan 2015 13:16:06 +0100
+Subject: [PATCH 3/3] ARM: dts: sun8i: Add dts file for Ippo Q8H v1.2
+ tablets
+In-Reply-To: <20150112112429.GI4891@lukather>
+References: <1420661775-20424-1-git-send-email-hdegoede@redhat.com>
+ <1420661775-20424-3-git-send-email-hdegoede@redhat.com>
+ <20150112112429.GI4891@lukather>
+Message-ID: <54B3BB06.1040306@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-12 at 11:57 +0100, Boris Brezillon wrote:
-> at91sam9rl SoC has an erratum forcing us to toggle the BIAS on USB
-> suspend/resume events.
-> 
-> This specific handling is only activated when CONFIG_ARCH_AT91SAM9RL is
-> set and this option is only set when building a non-DT kernel, which is
-> problematic since non-DT support for at91sam9rl SoC has been removed.
+Hi,
 
-This sentence is not entirely correct. Commit bcf8c7e7703b ("ARM: at91:
-remove at91sam9rl legacy board support") actually removed the Kconfig
-symbol ARCH_AT91SAM9RL entirely. So the check for CONFIG_ARCH_AT91SAM9RL
-has been pointless since (next-20141110 and) v3.19-rc1. See my report at
-https://lkml.org/lkml/2014/11/10/232 .
+On 12-01-15 12:24, Maxime Ripard wrote:
+> Hi,
+>
+> On Wed, Jan 07, 2015 at 09:16:15PM +0100, Hans de Goede wrote:
+>> The Ippo Q8H v1.2 is almost identical to the v5, still it needs a separate
+>> dtb file since some gpio-s surrounding the wlan/bluetooth are different,
+>> it uses different camera sensors, and different DRAM timings.
+>>
+>> Note that atm neither the wlan/bluetooth nor the camera are supported, so
+>> atm their is no difference between the dts files, but because of the different
+>> DRAM timings there are already separate u-boot configs for the 2 different
+>> versions, and the 1.2 config refers to sun8i-a23-ippo-q8h-v1.2.dtb to be
+>> future proof, so we need to provide a sun8i-a23-ippo-q8h-v1.2.dtb file.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                    |  3 +-
+>>   arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts | 58 +++++++++++++++++++++++++++
+>>   2 files changed, 60 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 4142831..7f66bab 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -478,7 +478,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>   	sun7i-a20-olinuxino-micro.dtb \
+>>   	sun7i-a20-pcduino3.dtb
+>>   dtb-$(CONFIG_MACH_SUN8I) += \
+>> -	sun8i-a23-ippo-q8h-v5.dtb
+>> +	sun8i-a23-ippo-q8h-v5.dtb \
+>> +	sun8i-a23-ippo-q8h-v1.2.dtb
+>>   dtb-$(CONFIG_MACH_SUN9I) += \
+>>   	sun9i-a80-optimus.dtb
+>>   dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>> diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
+>> new file mode 100644
+>> index 0000000..7056fc2
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
+>> @@ -0,0 +1,58 @@
+>> +/*
+>> + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *     You should have received a copy of the GNU General Public
+>> + *     License along with this file; if not, write to the Free
+>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>> + *     MA 02110-1301 USA
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/*
+>> + * The Ippo Q8H v1.2 is almost identical to the v5, still it needs a separate
+>> + * dtb file since some gpio-s surrounding the wlan/bluetooth are different,
+>> + * and it uses different camera sensors.
+>> + */
+>> +
+>> +#include "sun8i-a23-ippo-q8h-v5.dts"
+>> +
+>> +/ {
+>> +	model = "Ippo Q8H Dual Core Tablet (v1.2)";
+>
+> Maybe we should have a separate compatible too then, if we ever need
+> to differentiate the two for any other reason (quirks, mostly)?
+>
+> Something like
+>    compatible = "ippo,q8h-v5", "ippo,q8h", "allwinner,sun8i-a23";
+> and
+>    compatible = "ippo,q8h-v1.2", "ippo,q8h", "allwinner,sun8i-a23";
+>
+> in their respective DTs?
 
-(I stumbled on this patch because I contemplated sending a patch to
-simply remove the check for CONFIG_ARCH_AT91SAM9RL and the currently
-useless function toggle_bias.)
+Good idea, I'll fix this when I respin this patch-set.
 
-> Rework the toggle_bias implementation to attach it to the "at91sam9rl-udc"
-> compatible string.
-> 
-> Add new compatible strings to avoid executing at91sam9rl erratum handling
-> on other SoCs.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Regards,
 
-
-Paul Bolle
+Hans
