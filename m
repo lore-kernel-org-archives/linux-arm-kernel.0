@@ -1,63 +1,83 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Mon, 12 Jan 2015 15:28:12 +0100
-Subject: [RFC 8/8] ARM64: Add uprobe support
-In-Reply-To: <54B355FA.60702@redhat.com>
-References: <cover.1420038188.git.panand@redhat.com>
- <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
- <20150109175936.GB13161@redhat.com> <54B355FA.60702@redhat.com>
-Message-ID: <20150112142812.GB25914@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 12 Jan 2015 15:29:54 +0100
+Subject: [PATCH 0/4] mmc: core: Add support for MMC power sequences
+In-Reply-To: <20150102181423.GS11285@n2100.arm.linux.org.uk>
+References: <1420215248-20650-1-git-send-email-ulf.hansson@linaro.org>
+ <20150102181423.GS11285@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFpo=WpE3hDxqETVXOYX6pFsSmO7YybLJF=kJFyYFVcaoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12, Pratyush Anand wrote:
+On 2 January 2015 at 19:14, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 02, 2015 at 05:14:04PM +0100, Ulf Hansson wrote:
+>> To be able to handle these SOC specific power sequences, we add a MMC power
+>> sequence interface, which helps the mmc core to deal with such.
 >
+> I think this should be done differently - part of that is with hind sight
+> given that we now have a range of interface types.
 >
-> On Friday 09 January 2015 11:29 PM, Oleg Nesterov wrote:
->> On 12/31, Pratyush Anand wrote:
->>>
->>> +int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
->>> +		unsigned long addr)
->>> +{
->>> +	probe_opcode_t insn;
->>> +
->>> +	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
->>> +
->>> +	switch (arm_probe_decode_insn(insn, &auprobe->ainsn)) {
->>> +	case INSN_REJECTED:
->>> +		return -EINVAL;
->>> +
->>> +	case INSN_GOOD_NO_SLOT:
->>> +		auprobe->simulate = true;
->>> +		if (auprobe->ainsn.prepare)
->>> +			auprobe->ainsn.prepare(insn, &auprobe->ainsn);
->>> +		break;
->>> +
->>> +	case INSN_GOOD:
->>> +	default:
->>> +		break;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>
->> forgot to mention... shouldn't it also check IS_ALIGNED(addr, AARCH64_INSN_SIZE) ?
->>
->> I do not know if unaligned insn address is valid on arm64 or not, but please
+> One of my early design mistakes with MMC was to incorporate the power up
+> and initialisation protocol (the 74 clocks business) into the core code.
+> This was wrong, because it is a detail which only applies to dumb host
+> interfaces.  More inteligent interfaces do not need that complexity as
+> they handle that in hardware.
 >
-> AARCH64 instructions are always of fixed lenght ie 4 bytes. I do not see
-> possibility of addr being unaligned. Please let me know, if I am missing
-> something.
-
-A user can write any offset into uprobe_events, and the generic code doesn't
-check it is aligned.
-
->> note that at least it should not cross the page boundary, set_swbp() needs to
->> write AARCH64_INSN_SIZE == UPROBE_SWBP_INSN bytes and it assumes that this
->> should fit the single page.
+> Rather than MMC ending up with more layers and more infrastructure like
+> this - turning it more into the turd which is sdhci - I would like to see
+> some proper thought put into design, specifically addressing the above
+> design issue.
 >
-> So, again I do not see the possibility of crossing of page boundary for
-> any instruction address.
+> What should be done is to move away from the opaque "set_ios" method into
+> something more appropriate - a set of callbacks which describe what we
+> want to achieve.
+>
+> In the case of power up, there should be a single call into the host
+> controller code which is responsible for initiating the power up
+> sequence, and waits for the power up sequence to complete.  In other
+> words, most of mmc_power_up() should be moved to a library function,
+> which dumb host adapters hook into the "power up" method.  More
+> inteligent adapters (eg, PXA, sdhci) can add their own hook which poke
+> the hardware and return when the hardware has completed its power up
+> sequence.
+>
+> That avoids the "mmc_delay(10)" for inteligent adapters where these
+> delays are not required - which presumably also are not required if some
+> special power up sequence for eMMC is required.
+>
+> The same thing goes for this "powerseq" stuff - all you're doing is
+> propagating the same design mistake (with the POWER_UP/POWER_ON etc
+> details) into it.  That shouldn't be the case - think about the dumb
+> powerup method I described above vs the inteligent method - these are
+> two separate powerup methods, and should be implemented as such.
 
-See above. So yes, it should really check IS_ALIGNED(AARCH64_INSN_SIZE).
+Hi Russell,
 
-Oleg.
+Thanks for your comments!
+
+You certainly have a point around how to improve the use the existing
+->set_ios() callbacks. Though, as Hans also pointed out in his reply,
+I believe this patchset is not related to that.
+
+Regarding you concern, about me propagating the same design mistake as
+for the ->set_ios() callback, I am not sure I fully understand why you
+think that's the case?
+
+I am suggesting is to add a set of mmc-pwrseq callbacks, which I think
+is needed for a mmc-pwrseq provider to be able handle it's SOC
+specific mmc power sequence. There are no MMC/SD/SDIO protocol
+specific constraints that should be handled from them, but instead
+only SOC specific power resources and sequences.
+
+If the _simple_ mmc power sequence provider, turns out to be too
+complex while trying to support several SOCs, we shall instead add yet
+another provider. In this case, we should of course share as much code
+as possible between the different providers.
+
+Kind regards
+Uffe
+
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
