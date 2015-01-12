@@ -1,70 +1,34 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 12 Jan 2015 10:05:30 +0800
-Subject: FW: [RFC V6 2/3 resend] arm:add bitrev.h file to support rbit
- instruction   
-Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E19A@CNBJMBX05.corpusers.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 12 Jan 2015 10:39:38 +0800
+Subject: [linux-sunxi] Re: [PATCH v2 01/11] clk: sunxi: Add mod0 and mmc
+ module clock support for A80
+In-Reply-To: <20150108093825.GP7853@lukather>
+References: <1418886058-8145-1-git-send-email-wens@csie.org>
+ <1418886058-8145-2-git-send-email-wens@csie.org>
+ <20141219180235.GO4820@lukather>
+ <CAGb2v66iEhdCxuLPRPLxJENUtB04GtbHDHu+7tuBHFqNL2foeA@mail.gmail.com>
+ <20150108093825.GP7853@lukather>
+Message-ID: <CAGb2v65xRf9PeAe2L-F-c9gJ9TQZEeh8jA4ehu7=ZuR8Z8A4FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Friday, January 09, 2015 7:11 PM
-> To: Wang, Yalin
-> Cc: 'Ard Biesheuvel'; 'Will Deacon'; 'linux-kernel at vger.kernel.org'; 
-> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 
-> 'linux-arm- kernel at lists.infradead.org'
-> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit 
-> instruction
-> 
-> On Fri, Jan 09, 2015 at 10:16:32AM +0800, Wang, Yalin wrote:
-> > > -----Original Message-----
-> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > > Sent: Friday, January 09, 2015 2:41 AM
-> > > To: Wang, Yalin
-> > > Cc: 'Will Deacon'; 'Ard Biesheuvel'; 
-> > > 'linux-kernel at vger.kernel.org'; 'akinobu.mita at gmail.com'; 
-> > > 'linux-mm at kvack.org'; 'Joe Perches';
-> > > 'linux-arm- kernel at lists.infradead.org'
-> > > Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit 
-> > > instruction
-> > >
-> > > The root cause is that the kernel being built is supposed to 
-> > > support both
-> > > ARMv7 and ARMv6K CPUs.  However, "rbit" is only available on
-> > > ARMv6T2 (thumb2) and ARMv7, and not plain ARMv6 or ARMv6K CPUs.
-> > >
-> > In the patch that you applied:
-> > 8205/1 	add bitrev.h file to support rbit instruction
-> >
-> > I have add :
-> > +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6)
-> >
-> > If you build kernel support ARMv6K, should CONFIG_CPU_V6=y, isn't it ?
-> > Then will not build hardware rbit instruction, isn't it ?
-> 
-> The config has:
-> 
-> CONFIG_CPU_PJ4=y
-> # CONFIG_CPU_V6 is not set
-> CONFIG_CPU_V6K=y
-> CONFIG_CPU_V7=y
-> CONFIG_CPU_32v6=y
-> CONFIG_CPU_32v6K=y
-> CONFIG_CPU_32v7=y
-> 
-> And no, the CONFIG_CPU_V* flags refer to the CPUs.  The
-> CONFIG_CPU_32v* symbols refer to the CPU architectures.
-> 
-Oh, I see,
-How about change like this:
-+	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6 && 
-+!CPU_V6K)
-I am not sure if I also need add some older CPU types like !CPU_ARM9TDMI &&?!CPU_ARM940T ?
+On Thu, Jan 8, 2015 at 5:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Dec 20, 2014 at 08:43:27PM +0800, Chen-Yu Tsai wrote:
+>> > That looks a lot like the A10 MMC clock. What's changing? only the
+>> > data to feed to the factors setup code?
+>>
+>> That's correct. Only the mux width in the data fed to the setup code
+>> and the lock differ.
+>>
+>> The hardware can work with the a10 mod0 code, but it won't recover from
+>> cases where someone writes to the upper bits of the mux, since it doesn't
+>> know about them.
+>
+> I'd very much prefer if we could factorise that code then.
 
-Another solution is:
-+	select HAVE_ARCH_BITREVERSE if ((CPU_32V7M || CPU_32V7) && !CPU_32V6 
-+&& !CPU_32V5 && !CPU_32V4 && !CPU_32V4T && !CPU_32V3)
+I was hoping to not have to extend sunxi-factors-clk any more. But yes,
+I can add mux_width and mux_table fields to factors_data.
 
-By the way, I am not clear about the difference between CPU_V6 and CPU_V6K, could you tell me? :)
 
-Thank you 
+ChenYu
