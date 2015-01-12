@@ -1,52 +1,39 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 12 Jan 2015 14:40:03 +0100
-Subject: [PATCH v5 4/5] KVM: irqfd: use
- kvm_arch_is_virtual_intc_initialized
-In-Reply-To: <20150111211713.GF3868@cbox>
-References: <1417622832-5460-1-git-send-email-eric.auger@linaro.org>
- <1417622832-5460-5-git-send-email-eric.auger@linaro.org>
- <20150111211713.GF3868@cbox>
-Message-ID: <54B3CEB3.1010709@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 12 Jan 2015 07:41:25 -0600
+Subject: [PATCHv0 1/3] of: add vendor prefix for Abracon Corporation
+In-Reply-To: <754e04216222807206344fdd9f8575e6b504ed14.1421045942.git.arno@natisbad.org>
+References: <cover.1421045942.git.arno@natisbad.org>
+ <754e04216222807206344fdd9f8575e6b504ed14.1421045942.git.arno@natisbad.org>
+Message-ID: <CAL_JsqL=yP1XmhNiV6Rq_t=ktE1FDBmRKYNNJ0Tn3iAkM3ecag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2015 10:17 PM, Christoffer Dall wrote:
-> On Wed, Dec 03, 2014 at 05:07:11PM +0100, Eric Auger wrote:
->> On arm/arm64, the interrupt controller is dynamically instantiated.
->> There is a risk the user-space assigns an irqfd before this latter
->> is initialized and ready to accept virtual irq injection. On such
->> attempt, the IRQFD setup is rejected and -EAGAIN is returned.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  virt/kvm/eventfd.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
->> index b0fb390..f837c83 100644
->> --- a/virt/kvm/eventfd.c
->> +++ b/virt/kvm/eventfd.c
->> @@ -314,6 +314,9 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
->>  	unsigned int events;
->>  	int idx;
->>  
->> +	if (!kvm_arch_is_virtual_intc_initialized(kvm))
->> +		return -EAGAIN;
->> +
-> 
-> You can fold this into the patch that defines the static inline since
-> nothing defines the KVM_HAVE_ARCH_... yet.
-Not sure to understand what you mean:
-__KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED was defined in previous patch
-file (3/5). Nethertheless I can drop that patch file.
+On Mon, Jan 12, 2015 at 2:16 AM, Arnaud Ebalard <arno@natisbad.org> wrote:
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index b1df0ad1306c..44defc3c162a 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -4,6 +4,7 @@ This isn't an exhaustive list, but you should add new prefixes to it before
+>  using them to avoid name-space collisions.
+>
+>  abilis Abilis Systems
+> +abcn   Abracon Corporation
 
-Thanks
+Is there some reason not to use "abracon"?
 
-Eric
-> 
->>  	irqfd = kzalloc(sizeof(*irqfd), GFP_KERNEL);
->>  	if (!irqfd)
->>  		return -ENOMEM;
->> -- 
->> 1.9.1
->>
+>  active-semi    Active-Semi International Inc
+>  ad     Avionic Design GmbH
+>  adapteva       Adapteva, Inc.
+> --
+> 2.1.1
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
