@@ -1,54 +1,123 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 12 Jan 2015 14:09:38 -0500
-Subject: [PATCH] arm64: allow late use of early_ioremap
-In-Reply-To: <20150112172534.GJ13360@arm.com>
-References: <1421081711-1128-1-git-send-email-msalter@redhat.com>
- <20150112172534.GJ13360@arm.com>
-Message-ID: <1421089778.12632.2.camel@t520.localdomain>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Mon, 12 Jan 2015 11:16:06 -0800
+Subject: IMX.6q FIQ help...
+Message-ID: <CAMB+bfLT1DNrvvZH8LYGL4OXggT8866VB26OEar7BZGO5r6cDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-12 at 17:25 +0000, Will Deacon wrote:
-> On Mon, Jan 12, 2015 at 04:55:11PM +0000, Mark Salter wrote:
-> > Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
-> > added a missing call to early_ioremap_reset(). This triggers a BUG if code
-> > tries using early_ioremap() after the early_ioremap_reset(). This is a
-> > problem for some ACPI code which needs short-lived temporary mappings
-> > after paging_init() but before mm_init(). This patch adds definitions for
-> > the __late_set_fixmap() and __late_clear_fixmap() which avoids the BUG
-> > by allowing later use of early_ioremap().
-> > 
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > CC: Leif Lindholm <leif.lindholm@linaro.org>
-> > CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/fixmap.h | 3 +++
-> >  1 file changed, 3 insertions(+)
-> 
-> Given that we don't support ACPI on arm64 in mainline, I assume this can
-> wait until at least 3.20?
+I am revising a driver that uses a FIQ on Freescale imx6q.
+The old driver relied on a 3.0.35 Freescale vendor kernel, and enbled
+the FIQ by poking the FIQ enable bit into memory address zero on cpu 3
 
-Sure. Just needs it to go in before ACPI code. And tbh, the ACPI code
-could change and make this unneeded.
+I'm trying to migrate to vanilla kernel, using code from fiq.c.
+The code below works BUT it looks like its just a normal interrupt.
+my_irq_handler_spurious handler is ALWAYS invoked,
+I'm not keeping up with my 50KHz irq source,
+and the counter in /proc/interrupts in incremented, which did not
+happen with the FIQ in the old kernel.
 
-> 
-> Will
-> 
-> > diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-> > index 9ef6eca..e629c70 100644
-> > --- a/arch/arm64/include/asm/fixmap.h
-> > +++ b/arch/arm64/include/asm/fixmap.h
-> > @@ -61,6 +61,9 @@ void __init early_fixmap_init(void);
-> >  
-> >  #define __early_set_fixmap __set_fixmap
-> >  
-> > +#define __late_set_fixmap __set_fixmap
-> > +#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
-> > +
-> >  extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
-> >  
-> >  #include <asm-generic/fixmap.h>
-> > -- 
-> > 1.8.3.1
-> > 
-> > 
+Is there something more or something else entirely needed on imx.6
+in order to activate the FIQ?
+
+Here is my (abreviated) init code (now called from probe):
+
+int my_init_fiq(struct my_device *dev)
+{
+        int ret;
+        irq = gpiod_to_irq(gpiod);
+        if (irq < 0) {
+                dev_err(dev->dev, "Error setting gpio as irq: %d\n", irq);
+                gpiod_put(gpiod);
+                return irq;
+        }
+
+        ret = request_irq(irq, my_irq_handler_spurious, 0,
+                         "Data Ready Spurious IRQ", &my_device);
+        if (ret) {
+                dev_err(dev->dev, "Error requesting irq\n");
+                free_irq(irq, &my_device);
+                gpiod_put(gpiod);
+                return ret;
+        }
+        disable_fiq(irq); /* avoid unbalanced irq complaint */
+        ret = claim_fiq(&fiq_handle);
+
+        if (ret) {
+                dev_err(dev->dev, "Unable to claim FIQ\n");
+                return ret;
+        }
+
+        set_fiq_handler(&my_fiq_handler, SZ_256);
+        enable_fiq(irq);
+
+        if (ret) {
+                dev_err(dev->dev "Unable to enable FIQ\n");
+                release_fiq(&fiq_handle);
+                return ret;
+        }
+        return 0;
+}
+
+
+...and the old code, which works with freescale 3.0.35 kernel
+
+#define FPGA_INTERRUPT_DIFF_GPIO_BANK 1
+#define FPGA_INTERRUPT_DIFF_GPIO_NUM 4
+#define FPGA_INTERRUPT_DIFF_PAD \
+        IMX_GPIO_NR(FPGA_INTERRUPT_DIFF_GPIO_BANK, \
+        FPGA_INTERRUPT_DIFF_GPIO_NUM)
+#define GPIO_CR_INT_ENABLE 0x00000014
+#define GIC_CPU_CTRL_BITS_FIQEN 0x08
+
+void fiq_enable(void * data)
+{
+        unsigned long val;
+
+        val = readl(GIC_CPU_CTRL);
+        val |= GIC_CPU_CTRL_BITS_FIQEN;
+        writel(val, GIC_CPU_CTRL);
+}
+
+int my_init_fiq(void)
+{
+        int ret;
+        unsigned long reg;
+        ret = request_irq(gpio_to_irq(FPGA_INTERRUPT_DIFF_PAD),
+                        my_handler_spurious, 0,
+                        "Data Ready Spurious IRQ", &my_device);
+        ret = claim_fiq(&fiq_handle);
+        if (ret)
+        {
+                printk(KERN_ALERT "Unable to claim FIQ\n");
+                return ret;
+        }
+
+        set_fiq_handler(&my_fiq_handler, SZ_256);
+
+        // enable the fiq on CPU 3
+        ret = smp_call_function_single(FIQ_CPU_TARGET, fiq_enable, NULL, 1);
+
+        if (ret)
+        {
+                printk(KERN_ALERT "Unable to enable FIQ on CPU %d\n",
+                          FIQ_CPU_TARGET);
+                release_fiq(&fiq_handle);
+                return ret;
+        }
+
+        // Set rising edge GPIO Peripheral trigger for GPIO 1 - 4
+        reg = readl(IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_CONF1));
+        reg &= ~(1 << FPGA_INTERRUPT_DIFF_GPIO_NUM);
+        reg |= (2 << FPGA_INTERRUPT_DIFF_GPIO_NUM);
+        writel(reg, IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_CONF1));
+
+        // Enable GPIO Peripheral interrupt for GPIO 1 - 4
+        reg = readl(IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_ENABLE));
+        reg |= (1 << FPGA_INTERRUPT_DIFF_GPIO_NUM);
+        writel(reg, IO_ADDRESS(GPIO1_BASE_ADDR + GPIO_CR_INT_ENABLE));
+
+        writel((1 << FPGA_INTERRUPT_DIFF_GPIO_NUM) ,
+                 GIC_FPGA_INT_ENABLE_REG);
+
+        return 0;
+}
