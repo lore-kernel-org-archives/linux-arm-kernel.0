@@ -1,27 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jan 2015 20:55:31 +0100
-Subject: [RFC] ACPI on arm64 TODO List
-In-Reply-To: <20150112193905.GB5281@amd>
-References: <548F9668.6080900@linaro.org>
- <CACxGe6ub0UsUNs1-2NziK_sGEtpxTjcDD+Eto3YOsNkvWxaNcw@mail.gmail.com>
- <20150112193905.GB5281@amd>
-Message-ID: <6510884.pqfMoSc7Kv@wuerfel>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Jan 2015 21:01:49 +0100
+Subject: [PATCH 0/6] AT91 DT for 3.20 #1
+In-Reply-To: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150112210149.581fe038@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 20:39:05 Pavel Machek wrote:
+On Mon, 12 Jan 2015 20:01:51 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> This series enables RTC on the at91sam9n12 and at91rm9200.
+> It also adds nodes for the SRAM availabe on at91 SoCs.
 > 
-> Ok, so what is the primary reason? As far as I could tell it is
-> "Microsoft wants ACPI" and "hardware people want Microsoft" and
-> "fragmentation is bad so we do ACPI" (1) (and maybe "someone at RedHat
-> says they want ACPI" -- but RedHat people should really speak for
-> themselves.)
+> Finally it adds a dtsi for the at91sam9xe and uses it for the ethernut5 dts.
 
-I can only find the first two in Grant's document, not the third one,
-and I don't think it's on the table any more. The argument that was
-in there was that for a given platform that wants to support both
-Linux and Windows, they can use ACPI and Linux should work with that,
-but that is different from "all servers must use ACPI", which would
-be unrealistic.
+To the whole series:
 
-	Arnd
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> 
+> Alexandre Belloni (6):
+>   ARM: at91/dt: at91sam9n12: Add RTC node
+>   ARM: at91/dt: rm9200: add RTC node
+>   ARM: at91/dt: at91rm9200ek: enable RTC
+>   ARM: at91/dt: add SRAM nodes
+>   ARM: at91/dt: Add a dtsi for at91sam9xe
+>   ARM: at91/dt: ethernut5: use at91sam9xe.dtsi
+> 
+>  .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
+>  arch/arm/boot/dts/at91rm9200.dtsi                  | 12 +++++
+>  arch/arm/boot/dts/at91rm9200ek.dts                 |  4 ++
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |  5 ++
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |  5 ++
+>  arch/arm/boot/dts/at91sam9263.dtsi                 | 10 ++++
+>  arch/arm/boot/dts/at91sam9g20.dtsi                 |  9 ++++
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |  7 ++-
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 | 12 +++++
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |  5 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |  5 ++
+>  arch/arm/boot/dts/at91sam9xe.dtsi                  | 60 ++++++++++++++++++++++
+>  arch/arm/boot/dts/ethernut5.dts                    |  2 +-
+>  arch/arm/boot/dts/sama5d3.dtsi                     |  5 ++
+>  arch/arm/boot/dts/sama5d4.dtsi                     |  5 ++
+>  15 files changed, 144 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91sam9xe.dtsi
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
