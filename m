@@ -1,26 +1,45 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Mon, 12 Jan 2015 10:46:25 +0000
-Subject: [PATCH 1/8] arm64/efi: use UEFI memory map unconditionally if
- available
-In-Reply-To: <CAKv+Gu_q5wFhjb8M7VptVtHfm5vfp6_YiqN_XoTs9qV5=8OOdg@mail.gmail.com>
-References: <1419275322-29811-1-git-send-email-ard.biesheuvel@linaro.org>
- <1419275322-29811-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150106090407.GF3163@console-pimps.org>
- <CAKv+Gu_q5wFhjb8M7VptVtHfm5vfp6_YiqN_XoTs9qV5=8OOdg@mail.gmail.com>
-Message-ID: <20150112104625.GC26589@codeblueprint.co.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Jan 2015 11:57:53 +0100
+Subject: [PATCH v3 0/5] usb: atmel_usba_udc: Rework errata handling
+Message-ID: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 07 Jan, at 11:48:51AM, Ard Biesheuvel wrote:
-> On 6 January 2015 at 09:04, Matt Fleming <matt@console-pimps.org> wrote:
-> > It looks like you should be setting EFI_BOOT (and EFI_64BIT) in
-> > efi_init() if efi_get_fdt_params() succeeds.
-> >
-> 
-> Yes, I agree. We should probably set EFI_SYSTEM_TABLES in uefi_init()
-> then, and possibly unset it again if we fail to remap it.
+Hello,
 
-Yeah, I think that would be more correct.
+Here is a set of patches porting existing at91sam9rl erratum handling to
+DT and adding new code to handle at91sam9g45/9x5 erratum.
+It also adds several compatible strings to differentiate those errata.
+
+These patches should be backported to 3.17 and 3.18 stable releases but
+they do not apply cleanly on those stable branches.
+I'll send a backport of this series once it is merged in mainline.
+
+Regards,
+
+Boris
+
+Changes since v2:
+- remove UTF8 character in commit message of patch 2
+
+Changes since v1:
+- cache INT_ENB value to speedup INT_ENB read operations
+
+Boris Brezillon (5):
+  usb: atmel_usba_udc: Rework at91sam9rl errata handling
+  usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
+  ARM: at91/dt: update udc compatible strings
+  usb: atmel_usba_udc: Mask status with enabled irqs
+  usb: gadget: atmel_usba: Cache INT_ENB register value
+
+ .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
+ arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
+ arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
+ drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
+ 7 files changed, 111 insertions(+), 57 deletions(-)
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+1.9.1
