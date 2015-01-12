@@ -1,22 +1,32 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 12 Jan 2015 09:37:43 +0100
-Subject: [PATCH] reset: sunxi: fix spinlock initialization
-In-Reply-To: <CANMBJr5zzzjA3-zrQb0s3UxP9bfo7bjQRn_zGAyUXXvOW7httQ@mail.gmail.com>
-References: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>
- <54AFC2A8.1010807@st.com> <54AFE968.4010805@st.com>
- <CANMBJr5VzdvSyh4e6yk0wCznVmEgHBEi_MqdgcBpR=Nbf0=WvQ@mail.gmail.com>
- <CANMBJr5zzzjA3-zrQb0s3UxP9bfo7bjQRn_zGAyUXXvOW7httQ@mail.gmail.com>
-Message-ID: <1421051863.3081.0.camel@pengutronix.de>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Mon, 12 Jan 2015 17:37:59 +0900
+Subject: [PATCH v3] ARM: dts: Add dts file for odroid XU3 board
+In-Reply-To: <7htwzzvq0v.fsf@deeprootsystems.com>
+References: <1420671228-24692-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <7htwzzvq0v.fsf@deeprootsystems.com>
+Message-ID: <54B387E7.3080406@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On 01/10/15 02:10, Kevin Hilman wrote:
+> Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
+> 
+>> Add DTS for the Hardkernel Odroid XU3. The name of the DTS file is kept the
+>> same as the vendors naming, which means it's prefixed with exynos5422
+>> instead of exynos5800 as the SoC name even though it includes the
+>> exyno5800 dtsi.
+>>
+>> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> 
+> Boot tested on top of next-20150109 (with and without my hack for
+> bringing up 8 cores.)
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+Thanks for your test, Kevin.
 
-Am Freitag, den 09.01.2015, 16:22 -0800 schrieb Tyler Baker:
-> I'll go ahead and resend an updated patch and cc stable if Philipp and
-> Maxime R. they agree.
+I've applied, need to update devicetree bindings for samsung-boards
+though because it can be updated later.
 
-Please do.
-
-thanks
-Philipp
+Thanks,
+Kukjin
