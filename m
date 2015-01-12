@@ -1,39 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 12 Jan 2015 20:44:40 +0100
-Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
-In-Reply-To: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
-References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150112194440.GB26222@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jan 2015 20:44:50 +0100
+Subject: [PATCH 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <CADaLND=C3AjdZpiMpom7+-Dgwc83NYo5pDjDWo+hrW7VDZ4m3A@mail.gmail.com>
+References: <cover.1420499393.git.dhdang@apm.com> <22570652.F088Afk9OX@wuerfel>
+ <CADaLND=C3AjdZpiMpom7+-Dgwc83NYo5pDjDWo+hrW7VDZ4m3A@mail.gmail.com>
+Message-ID: <1678162.2PJ2o1jRen@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 04:45:13PM +0000, Mark Rutland wrote:
-> Currently we have two sets of macros used for ESR_ELx handling, one used
-> by core arm64 code and the other used by KVM. These differ slightly in
-> naming convention and style of definition.
+On Monday 12 January 2015 10:53:14 Duc Dang wrote:
+> On Tue, Jan 6, 2015 at 11:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 06 January 2015 08:15:41 Duc Dang wrote:
+> >> X-Gene v1 SOC supports total 2688 MSI/MSIX vectors coalesced into
+> >> 16 HW IRQ lines.
+> >>
+> >> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> >> Signed-off-by: Duc Dang <dhdang@apm.com>
+> >>
+> >
+> > I might be a little behind the latest development, but why is this
+> > not a struct msi_controller?
 > 
-> This patch series introduces and migrates all users to a common set of
-> macros for ESR_ELx handling, preventing further drift.
-> 
-> Additionally this series adds exception class decoding when reporting
-> exceptions, saving deveopers from having to perform tedious mental
-> arithmetic to figure out what the likely cause of an unexpected
-> exception was.
-> 
-> Since v1 [1]:
-> * Reorder patches to maintain KVM bisectability.
-> * Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
-> * Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of 
->   kvm_vcpu_dabt_get_as.
-> * Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
->   list.
-> 
-For the series:
+> X-Gene V1 have a separate MSI block to handle MSI/MSIX and is shared
+> among 5 PCIe ports.
+> So in this driver for this MSI block, we implement X-Gene v1 sepcific
+> arch_teardown_msi_irqs,
+> arch_setup_msi_irqs and not using msi_controller struct.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+I see.
 
-I also tested this with KVM on APM XGene and Juno with UEFI+Linux as a
-guest.
+> Please let me know if this approach needs to be changed to follow
+> other implementations of MSI
+> drivers in latest kernel.
 
-Thanks,
--Christoffer
+Yes, your approach does not work on distro kernels which will always
+enable multiple targets. You cannot override generic weak functions from
+a device driver.
+
+	Arnd
