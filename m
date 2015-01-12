@@ -1,47 +1,47 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Mon, 12 Jan 2015 07:54:46 -0800
-Subject: [PATCH RESEND] reset: sunxi: fix spinlock initialization
-Message-ID: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Jan 2015 16:59:27 +0100
+Subject: [GIT PULL] at91: fixes for 3.19 #1 (bis)
+In-Reply-To: <54B3E35E.50400@atmel.com>
+References: <1420456477-18204-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150111211215.GC25777@quad.lixom.net> <54B3E35E.50400@atmel.com>
+Message-ID: <8332277.8EH8fqiOd7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call spin_lock_init() before the spinlocks are used, both in early init 
-and probe functions preventing a lockdep splat.
+On Monday 12 January 2015 16:08:14 Nicolas Ferre wrote:
+> Le 11/01/2015 22:12, Olof Johansson a ?crit :
+> > On Fri, Jan 09, 2015 at 10:02:50AM +0100, Nicolas Ferre wrote:
+> >> Le 08/01/2015 23:41, Olof Johansson a ?crit :
+> >>> On Mon, Jan 05, 2015 at 12:14:37PM +0100, Nicolas Ferre wrote:
+> >>>
+> >>> This is the only fix among these patches, isn't it? The others seem to
+> >>> be code removals/cleanups better targeted for 3.20, as far as I can tell.
+> >>
+> >> Well, this is why I sent the first version of this pull-request very
+> >> early in the process. I didn't have the possibility to re-send it
+> >> earlier on top of -rc1 until this pull-request.
 
-I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
-when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
-and has been tested on a few other sunxi platforms without issue.
+I think this was a bit of a communication problem. I thought about
+applying the first pull request you sent for this, but then Kevin
+commented that it would be better to rebase it on top of -rc1.
+That made sense at the time, except then we all got caught by
+surprise by Christmas and suddenly it was -rc4 ;-)
 
-[1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
-[2] http://kernelci.org/boot/?a80-optimus
+> > Since you mention that you have more fixes coming (why hold off on them?), do
+> > you want me to cherry-pick over that one fix to our fixes branch, or can you
+> > queue it with the other fixes when you send them up?
+> 
+> Fair enough, I build a new "at91: fixes for 3.19 #1 (ter)" with tree
+> more patches right now.
 
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-Cc: <stable@vger.kernel.org>
----
- drivers/reset/reset-sunxi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+This seems for the best now. This kind of late cleanup that depends on
+multiple branches going in first happens occasionally and it's never
+nice whichever way you try to handle it.
 
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-index eebc52c..3d95c87 100644
---- a/drivers/reset/reset-sunxi.c
-+++ b/drivers/reset/reset-sunxi.c
-@@ -102,6 +102,8 @@ static int sunxi_reset_init(struct device_node *np)
- 		goto err_alloc;
- 	}
- 
-+	spin_lock_init(&data->lock);
-+
- 	data->rcdev.owner = THIS_MODULE;
- 	data->rcdev.nr_resets = size * 32;
- 	data->rcdev.ops = &sunxi_reset_ops;
-@@ -157,6 +159,8 @@ static int sunxi_reset_probe(struct platform_device *pdev)
- 	if (IS_ERR(data->membase))
- 		return PTR_ERR(data->membase);
- 
-+	spin_lock_init(&data->lock);
-+
- 	data->rcdev.owner = THIS_MODULE;
- 	data->rcdev.nr_resets = resource_size(res) * 32;
- 	data->rcdev.ops = &sunxi_reset_ops;
--- 
-2.1.3
+The only recommendation I have for the future is to discuss the merge
+strategy with us before the merge window instead of holding back patches
+that have other dependencies. I don't really mind merging them as a
+late branch into -rc1 if I know about them, but we should never plan
+to merge any non-bugfix patches later than -rc2.
+
+	Arnd
