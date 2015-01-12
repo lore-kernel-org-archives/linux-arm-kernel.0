@@ -1,144 +1,113 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 Jan 2015 17:38:12 +0800
-Subject: [PATCH v3 4/9] ARM: dts: sun7i: cubieboard2: add axp209 regulator
- nodes
-In-Reply-To: <20150112090603.GE4891@lukather>
-References: <1421037249-28461-1-git-send-email-wens@csie.org>
- <1421037249-28461-5-git-send-email-wens@csie.org>
- <20150112090603.GE4891@lukather>
-Message-ID: <CAGb2v66r6EG2F1-=Gaig7ZW58Z1KteQ5nDPfW5niisv7dCjY0Q@mail.gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Mon, 12 Jan 2015 18:43:31 +0900
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54B36C5A.6050109@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+ <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
+ <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
+ <54B36C5A.6050109@samsung.com>
+Message-ID: <54B39743.1010804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jan 12, 2015 at 5:06 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> On Mon, Jan 12, 2015 at 12:34:04PM +0800, Chen-Yu Tsai wrote:
->> This patch adds the regulator nodes for the axp209 by including
->> the axp209 dtsi. As the inputs of these regulators are from the
->> axp209's PS output, which is basically just a mux over the 2
->> inputs, it is considered to be unregulated. Thus we do not provide
->> input supply properties for them.
+On 01/12/2015 03:40 PM, Joonyoung Shim wrote:
+> Hi,
+> 
+> On 01/09/2015 01:42 AM, Javier Martinez Canillas wrote:
+>> Hello Joonyoung,
 >>
->> The regulator names and constraints are based on the board
->> schematics and the SoC datasheet.
+>> On 01/07/2015 10:55 AM, Joonyoung Shim wrote:
+>>>>>
+>>>>> I don't think iommu support and power domain issue are related. I also
+>>>>> get displaying stripes via hdmi but it is just power domain issue
+>>>>> regardless iommu support.
+>>>>>
+>>>>> I observed 8th bit from 0x1445000C register of mixer is set to 1 with
+>>>>> displaying stripes. It means "The graphic layer0 line buffer underflow".
+>>>>> There was same underflow issue on Exynos4 based boards. As Marek said,
+>>>>> because LCD0 power domain was turned off.
+>>>>>
+>>>>
+>>>> Interesting, thanks a lot for sharing this information.
+>>>>  
+>>>>> I just tried to turn off DISP1 power domain at u-boot and DISP1 power
+>>>>> domain is turned on from kernel hdmi and mixer driver on odroid xu3 
+>>>>> board. As the result, i can see displaying penguin logo from hdmi.
+>>>>>
+>>>>
+>>>> Can you share the patches you are using to turn on the DISP1 power domain
+>>>> since AFAIU the kernel does not know about the DISP1 power domain after
+>>>> commit d51cad7df871 ("ARM: dts: remove display power domain for exynos5420").
+>>>>
+>>>> I tried reverting that commit before so the kernel knows about the DISP1
+>>>> power domain and booting with pd_ignore_unused but still had the stripes.
+>>>>  
+>>>
+>>> I add DISP1 power domain on dts and please refer below patch[0] with
+>>> some modification on hdmi phy(Actually, i think this is not related).
+>>> You also should disable DISP1 power domain from bootloader.
+>>>
 >>
->> DCDC2 is used as the cpu power supply. This patch also references
->> it from the cpu node.
+>> Thanks a lot for the patch. With your changes I have some HDMI output on
+>> my Peach Pi. But the HDMI output is broken since the resolution is very
+>> low and the video as a lot of visual artifacts.
 >>
->> Also get rid of axp209 properties already set in axp209.dtsi.
+>> In your change you are also adding clock phandles for the pd oscillator
+>> clock and the CLK_MOUT_SW_ACLK200, CLK_MOUT_USER_ACLK200_DISP1 pairs for
+>> the parent input and input clocks of the devices attached to the pd.
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
+>> And also making changes to the clocks in the clk-exynos5420 driver. Can
+>> you please explain the rationale for those changes? I'm asking because
+>> without your clock changes (only adding the DISP1 pd and making the
+>> devices as consumers), I've HDMI output too but video is even worse. This
+>> [0] is the minimal change I have on top of 3.19-rc3 to have some output.
 >>
->> changes since v2
+> 
+> I just refer below patches,
+> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/34576
+> 
+> But i'm not sure whether DISP1 power domain is same case with MFC power domain.
+> 
+>> The docs I've access to, don't have information about the clock hierarchy.
+>> So each time there is a clock issue, I've a hard time to figure out what's
+>> happening.
 >>
->>     none
+>> So there seems to be two issues here, one is the mixer and hdmi modules not
+>> being attached to the DISP1 power domain and another one is the clocks setup
+>> not being correct to have proper HDMI video output.
+>>  
+> 
+> Hmm, i can see normal hdmi output still from latest upstream
+> kernel(3.19-rc4) with my kernel changes and u-boot changes(DISP1 power
+> domain disable) of prior mail on odroid xu3 board.
+> 
+>>>>> But the problem exists still because it is failed to control on/off of
+>>>>> DISP1 power domain more than twice from kernel hdmi and mixer driver.[0]
+>>>>>
 >>
->> changes since v1:
+>> I didn't have this issue when testing your patch against 3.19-rc2. From your
+>> log I see that you are testing on a 3.18.1. So maybe makes sense to test with
+>> the latest kernel version since this HDMI issue qualifies as an 3.19-rc fix?
 >>
->>     - Use preprocessor include for axp209.dtsi
->>     - Remove incorrectly squashed axp209.dtsi patch
+>> Since commit 2ed127697eb1 ("PM / Domains: Power on the PM domain right after attach completes")
+>> that landed in 3.19-rc1, I see that the power domain is powered on when a
+>> device is attached. So maybe that is what makes a difference here?
 >>
->> ---
->>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 35 +++++++++++++++++++++++++----
->>  1 file changed, 31 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> index 18fc5db9c976..ec1fc2c8b3e3 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> @@ -88,13 +88,9 @@
->>                       status = "okay";
->>
->>                       axp209: pmic at 34 {
->> -                             compatible = "x-powers,axp209";
->>                               reg = <0x34>;
->>                               interrupt-parent = <&nmi_intc>;
->>                               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> -
->> -                             interrupt-controller;
->> -                             #interrupt-cells = <1>;
->>                       };
->>               };
->>
->> @@ -145,3 +141,34 @@
->>               status = "okay";
->>       };
->>  };
->> +
->> +#include "axp209.dtsi"
->> +
->> +&cpu0 {
->> +     cpu-supply = <&reg_dcdc2>;
->> +};
->> +
->> +&reg_dcdc2 {
->> +     regulator-always-on;
->> +     regulator-min-microvolt = <1000000>;
->> +     regulator-max-microvolt = <1450000>;
->> +     regulator-name = "vdd-cpu";
->> +};
->> +
->> +&reg_dcdc3 {
->> +     regulator-always-on;
->> +     regulator-min-microvolt = <1000000>;
->> +     regulator-max-microvolt = <1400000>;
->> +     regulator-name = "vdd-int-dll";
->> +};
->> +
->> +&reg_ldo1 {
->> +     regulator-name = "vdd-rtc";
->> +};
->> +
->> +&reg_ldo2 {
->> +     regulator-always-on;
->> +     regulator-min-microvolt = <3000000>;
->> +     regulator-max-microvolt = <3000000>;
->> +     regulator-name = "avcc";
->> +};
->
-> How do reg_vcc3v3 and the other reg used in this DT (ahci, USB) fit
-> into that?
+> 
 
-The following applies to boards that use AXP209.
+I also get ashake hdmi output since commit 2ed127697eb1, it causes
+on and off of DISP1 power domain when hdmi/mixer driver probe is defered
+because regulator driver is not probed yet.
 
-reg_vcc3v3 or reg_vcc3v0 is an external buck regulator with it's
-enable pin tied to EXTEN on the AXP. This pin is controllable,
-but we do not have the driver for it. It is possible that multiple
-regulators are tied to this pin. I suggest not touching it without
-the correct schematics.
+I'm not sure why it causes abnormal hdmi operation.
 
-The source for usb and ahci regulators, or reg_vcc5v if you will,
-is either the unregulated 5v from the power supply or the usb otg
-port. For the Cubietruck, there's an additional uncontrollable
-boost regulator that boosts the lipo battery's power up to 5v.
+Thanks.
 
-On some of the Olimex boards that use higher input voltages, they
-use an uncontrollable buck regulator to step down the voltage to
-5v. The Olinuxino-Micro also has a boost regulator for the battery,
-tied to EXTEN.
-
-The AXP209 simply does not have enough outputs for all the needed
-voltages.
-
-You could probably chain the regulators in the DT via xxx-supply
-if it helps. But beyond that, it is hard to do anything meaningful
-at this point. Modeling them as fixed regulators beyond our control
-is simpler. We also do not have an IPSOUT regulator for the AXP.
-
-> Eventually, I think we would be able to remove
-> sunxi-common-regulators.dtsi, or at least, expose the proper regulator
-> hierarchy.
-
-The USB and SATA regulators are just GPIO enabled switches (MOSFETs)
-or current limiters. I think these will always exist because of the
-reference designs. Or do you want to move them back into the board
-dts files? FWIW, I like it the way it is now. Not that I don't like
-it to be accurate.
-
-
-ChenYu
+> I'm not sure, but i get same error results from 3.19-rc4. Did you test
+> using exynos drm driver? I used modetest of libdrm
+> 
