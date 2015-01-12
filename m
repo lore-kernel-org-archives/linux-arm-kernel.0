@@ -1,70 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Jan 2015 12:18:15 +0000
-Subject: Linux 3.19-rc3
-In-Reply-To: <10028397.kdbz8TfPck@wuerfel>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <4665410.x9Uu42bKmJ@wuerfel>
- <CA+55aFxphoLdFkwkVFQ87Q8EbYNqFAE-n0yTvCSOJzSO2MtDgw@mail.gmail.com>
- <10028397.kdbz8TfPck@wuerfel>
-Message-ID: <20150112121815.GB19807@e104818-lin.cambridge.arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Mon, 12 Jan 2015 20:09:23 +0800
+Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
+ unoptimized_kprobe().
+In-Reply-To: <54B3B32E.7070709@hitachi.com>
+References: <54B3B32E.7070709@hitachi.com>
+Message-ID: <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 09:36:13PM +0000, Arnd Bergmann wrote:
-> On Saturday 10 January 2015 13:00:27 Linus Torvalds wrote:
-> > > IIRC, AIX works great with 64k pages, but only because of two
-> > > reasons that don't apply on Linux:
-> > 
-> > .. there's a few other ones:
-> > 
-> >  (c) nobody really runs AIX on dekstops. It's very much a DB load
-> > environment, with historically some HPC.
-> > 
-> >  (d) the powerpc TLB fill/buildup/teardown costs are horrible, so on
-> > AIX the cost of lots of small pages is much higher too.
-> 
-> I think (d) applies to ARM as well, since it has no hardware
-> dirty/referenced bit tracking and requires the OS to mark the
-> pages as invalid/readonly until the first access. ARMv8.1
-> has a fix for that, but it's optional and we haven't seen any
-> implementations yet.
+Original code failed to disarm the probed instruction after
 
-Do you happen have any data on how significantly non-hardware
-dirty/access bits impact the performance? I think it may affect the user
-process start-up time a but at run-time it shouldn't be that bad.
+echo 0 > /sys/kernel/debug/kprobes/enabled
 
-If it is that significant, we could optimise it further in the arch
-code. For example, make a fast exception path where we need to mark the
-pte dirty. This would be handled by arch code without even calling
-handle_pte_fault().
+if OPTPROBE is enabled.
 
-> > so I feel pretty confident in saying it won't happen. It's just too
-> > much of a bother, for little to no actual upside. It's likely a much
-> > better approach to try to instead use THP for anonymous mappings.
-> 
-> arm64 already supports 2MB transparent hugepages. I guess it
-> wouldn't be too hard to change it so that an existing hugepage
-> on an anonymous mapping that gets split up into 4KB pages gets
-> split along 64KB boundaries with the contiguous mapping bit set.
-> 
-> Having full support for multiple hugepage sizes (64KB, 2MB and 32MB
-> in case of ARM64 with 4KB PAGE_SIZE) would be even better and
-> probably negate any benefits of 64KB PAGE_SIZE, but requires more
-> changes to common mm code.
+This patch checks kprobes_all_disarmed in unoptimized_kprobe().
 
-As I replied to your other email, I don't think that's simple for the
-transparent huge pages case.
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+---
+ kernel/kprobes.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-The main advantage I see with 64KB pages is not the reduced TLB pressure
-but the number of levels of page tables. Take the AMD Seattle board for
-example, with 4KB pages you need 4 levels but 64KB allow only 2 levels
-(42-bit VA). Larger TLBs and improved walk caches (caching VA -> pmd
-entry translation rather than all the way to pte/PA) make things better
-but you still have the warming up time for any fork/new process as they
-don't share the same TLB entries.
-
-But as Linus said already, the trade-off with the memory wastage
-is highly dependent on the targeted load.
-
+diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+index 9471710..f16936b 100644
+--- a/kernel/kprobes.c
++++ b/kernel/kprobes.c
+@@ -630,6 +630,9 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
+ {
+ 	struct optimized_kprobe *op;
+ 
++	if (kprobes_all_disarmed)
++		return;
++
+ 	if (!kprobe_aggrprobe(p) || kprobe_disarmed(p))
+ 		return; /* This is not an optprobe nor optimized */
+ 
 -- 
-Catalin
+1.8.4
