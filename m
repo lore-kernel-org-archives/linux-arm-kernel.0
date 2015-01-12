@@ -1,54 +1,235 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 12 Jan 2015 21:52:48 +0900
-Subject: [PATCH] kprobes: bugfix: checks kprobes_all_disarmed in
- unoptimized_kprobe().
-In-Reply-To: <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
-References: <54B3B32E.7070709@hitachi.com>
- <1421064563-77831-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <54B3C3A0.6010708@hitachi.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 12 Jan 2015 12:25:46 +0000
+Subject: [RFC PATCH] serial: amba-pl011: Kickstart TX by explicit FIFO fill
+Message-ID: <1421065546-18074-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2015/01/12 21:09), Wang Nan wrote:
-> Original code failed to disarm the probed instruction after
-> 
-> echo 0 > /sys/kernel/debug/kprobes/enabled
-> 
-> if OPTPROBE is enabled.
-> 
-> This patch checks kprobes_all_disarmed in unoptimized_kprobe().
-> 
+Currently, the transmit state machine arranges for the TX IRQ
+always to be asserted whever the FIFO fill level is below the
+watermark set in IFLS, with all actual transmission being done on
+the back of the TX IRQ.
 
-Looks good :)
+To kickstart transmission, pl011_startup() temporarily disables the
+FIFO, enables loopback mode and transmits a dummy character in
+order to trigger the initial assertion of the IRQ.
 
-Acked-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+This leads to two problems:
 
-Thank you!
+ * Unfortunately, at least some pl011-based systems seem to send
+   this dummy character down the wire even in loopback mode (in
+   addition to looping it back).  This means that if
+   pl011_startup() is called in between other transmissions, the
+   odd timing of the dummy tx forces the receiver out of sync.
 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> ---
->  kernel/kprobes.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
-> index 9471710..f16936b 100644
-> --- a/kernel/kprobes.c
-> +++ b/kernel/kprobes.c
-> @@ -630,6 +630,9 @@ static void unoptimize_kprobe(struct kprobe *p, bool force)
->  {
->  	struct optimized_kprobe *op;
->  
-> +	if (kprobes_all_disarmed)
-> +		return;
-> +
->  	if (!kprobe_aggrprobe(p) || kprobe_disarmed(p))
->  		return; /* This is not an optprobe nor optimized */
->  
-> 
+   This causes problems when the console is on pl011 and userspace
+   opens and closes the same port often (*cough* systemd *cough*,
+   where large amounts of console output get turned to garbage as a
+   result).
 
+   It also causes a single framing error whenever the port is
+   opened, in particulary in kernel_init_freeable() when preparing
+   the initial userspace environment.
 
+ * The ARM SBSA UART[1] is a cut-down version of pl011.  The lack
+   of a loopback mode means that the dummy tx strategy isn't
+   suitable for this UART, but the other differences should be less
+   invasive.
+
+This patch makes an initial call to pl011_tx_chars() to get things
+going instead of sending a dummy character.  This should reduce the
+turnaround time of an XON/XOFF by one IRQ latency or so, as well as
+eliminating some IRQs around short writes from the tty layer.
+
+There is no way to find out the TX FIFO fill level from the
+hardware directly, which becomes a problem when transmitting
+characters outside the interrupt handler.  To address this while
+keeping status polling minimal, a minimum bound on the space
+available is maintained in uap->tx_avail.  For now, if we are not
+sure there is any FIFO space at all, the driver transmits nothing
+and falls back to waiting for the next TX inerrupt.
+
+Thanks to Andrew Jackson for spotting some dumb bugs while I was
+developing this patch.
+
+[1] ARM-DEN-0029 Server Base System Architecture, available (click-
+    thru...) from http://infocenter.arm.com.  Version v2.3 was
+    referred to when drawing the above conclusions.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andre Przywara <Andre.Przywara@arm.com>
+---
+
+Tested on ARM Juno, ARM Fast Models and qemu.
+
+Additional testing from anyone with some random hardware using
+pl011 for the console would be welcome.
+
+ drivers/tty/serial/amba-pl011.c |   64 +++++++++++++++++----------------------
+ 1 file changed, 28 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8d94c19..eb397c7 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -157,6 +157,7 @@ struct uart_amba_port {
+ 	unsigned int		lcrh_rx;	/* vendor-specific */
+ 	unsigned int		old_cr;		/* state during shutdown */
+ 	bool			autorts;
++	unsigned int		tx_avail;	/* min TX FIFO space */
+ 	char			type[12];
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
+@@ -585,6 +586,7 @@ static int pl011_dma_tx_refill(struct uart_amba_port *uap)
+ 	 */
+ 	xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
+ 	uap->port.icount.tx += count;
++	uap->tx_avail = 0; /* DMA will be keeping the FIFO full now */
+ 
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+ 		uart_write_wakeup(&uap->port);
+@@ -686,7 +688,8 @@ static inline bool pl011_dma_tx_start(struct uart_amba_port *uap)
+ 	uap->dmacr &= ~UART011_TXDMAE;
+ 	writew(uap->dmacr, uap->port.membase + UART011_DMACR);
+ 
+-	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF) {
++	if (uap->tx_avail < 1 &&
++	    readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF) {
+ 		/*
+ 		 * No space in the FIFO, so enable the transmit interrupt
+ 		 * so we know when there is space.  Note that once we've
+@@ -698,6 +701,8 @@ static inline bool pl011_dma_tx_start(struct uart_amba_port *uap)
+ 	writew(uap->port.x_char, uap->port.membase + UART01x_DR);
+ 	uap->port.icount.tx++;
+ 	uap->port.x_char = 0;
++	if (uap->tx_avail > 0)
++		uap->tx_avail--;
+ 
+ 	/* Success - restore the DMA state */
+ 	uap->dmacr = dmacr;
+@@ -1208,6 +1213,8 @@ static void pl011_stop_tx(struct uart_port *port)
+ 	pl011_dma_tx_stop(uap);
+ }
+ 
++static void pl011_tx_chars(struct uart_amba_port *uap);
++
+ static void pl011_start_tx(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+@@ -1216,6 +1223,7 @@ static void pl011_start_tx(struct uart_port *port)
+ 	if (!pl011_dma_tx_start(uap)) {
+ 		uap->im |= UART011_TXIM;
+ 		writew(uap->im, uap->port.membase + UART011_IMSC);
++		pl011_tx_chars(uap);
+ 	}
+ }
+ 
+@@ -1283,6 +1291,7 @@ static void pl011_tx_chars(struct uart_amba_port *uap)
+ 		writew(uap->port.x_char, uap->port.membase + UART01x_DR);
+ 		uap->port.icount.tx++;
+ 		uap->port.x_char = 0;
++		uap->tx_avail--;
+ 		return;
+ 	}
+ 	if (uart_circ_empty(xmit) || uart_tx_stopped(&uap->port)) {
+@@ -1294,14 +1303,16 @@ static void pl011_tx_chars(struct uart_amba_port *uap)
+ 	if (pl011_dma_tx_irq(uap))
+ 		return;
+ 
+-	count = uap->fifosize >> 1;
+-	do {
++	count = uart_circ_chars_pending(xmit);
++	if (uap->tx_avail < count)
++		count = uap->tx_avail;
++
++	while (count--) {
+ 		writew(xmit->buf[xmit->tail], uap->port.membase + UART01x_DR);
+ 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+ 		uap->port.icount.tx++;
+-		if (uart_circ_empty(xmit))
+-			break;
+-	} while (--count > 0);
++		uap->tx_avail--;
++	}
+ 
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+ 		uart_write_wakeup(&uap->port);
+@@ -1372,8 +1383,10 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
+ 			if (status & (UART011_DSRMIS|UART011_DCDMIS|
+ 				      UART011_CTSMIS|UART011_RIMIS))
+ 				pl011_modem_status(uap);
+-			if (status & UART011_TXIS)
++			if (status & UART011_TXIS) {
++				uap->tx_avail = uap->fifosize >> 1;
+ 				pl011_tx_chars(uap);
++			}
+ 
+ 			if (pass_counter-- == 0)
+ 				break;
+@@ -1392,8 +1405,12 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+-	unsigned int status = readw(uap->port.membase + UART01x_FR);
+-	return status & (UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 : TIOCSER_TEMT;
++	unsigned int status = readw(uap->port.membase + UART01x_FR) &
++		(UART01x_FR_BUSY|UART01x_FR_TXFF) ? 0 : TIOCSER_TEMT;
++
++	if (status)
++		uap->tx_avail = uap->fifosize;
++	return status;
+ }
+ 
+ static unsigned int pl011_get_mctrl(struct uart_port *port)
+@@ -1577,7 +1594,7 @@ static int pl011_startup(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+-	unsigned int cr, lcr_h, fbrd, ibrd;
++	unsigned int cr;
+ 	int retval;
+ 
+ 	retval = pl011_hwinit(port);
+@@ -1594,38 +1611,13 @@ static int pl011_startup(struct uart_port *port)
+ 		goto clk_dis;
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+-
+-	/*
+-	 * Provoke TX FIFO interrupt into asserting. Taking care to preserve
+-	 * baud rate and data format specified by FBRD, IBRD and LCRH as the
+-	 * UART may already be in use as a console.
+-	 */
+-	spin_lock_irq(&uap->port.lock);
+-
+-	fbrd = readw(uap->port.membase + UART011_FBRD);
+-	ibrd = readw(uap->port.membase + UART011_IBRD);
+-	lcr_h = readw(uap->port.membase + uap->lcrh_rx);
+-
+-	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
+-	writew(cr, uap->port.membase + UART011_CR);
+-	writew(0, uap->port.membase + UART011_FBRD);
+-	writew(1, uap->port.membase + UART011_IBRD);
+-	pl011_write_lcr_h(uap, 0);
+-	writew(0, uap->port.membase + UART01x_DR);
+-	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
+-		barrier();
+-
+-	writew(fbrd, uap->port.membase + UART011_FBRD);
+-	writew(ibrd, uap->port.membase + UART011_IBRD);
+-	pl011_write_lcr_h(uap, lcr_h);
++	uap->tx_avail = uap->fifosize; /* FIFO should be empty */
+ 
+ 	/* restore RTS and DTR */
+ 	cr = uap->old_cr & (UART011_CR_RTS | UART011_CR_DTR);
+ 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
+ 	writew(cr, uap->port.membase + UART011_CR);
+ 
+-	spin_unlock_irq(&uap->port.lock);
+-
+ 	/*
+ 	 * initialise the old status of the modem signals
+ 	 */
 -- 
-Masami HIRAMATSU
-Software Platform Research Dept. Linux Technology Research Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+1.7.10.4
