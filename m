@@ -1,144 +1,51 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 12 Jan 2015 22:38:04 +1000
-Subject: [PATCH 09/16] ARM: ks8695: convert PCI to use generic config
- accesses
-In-Reply-To: <1420857290-8373-10-git-send-email-robh@kernel.org>
-References: <1420857290-8373-1-git-send-email-robh@kernel.org>
- <1420857290-8373-10-git-send-email-robh@kernel.org>
-Message-ID: <54B3C02C.10603@uclinux.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 12 Jan 2015 13:41:23 +0100
+Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
+In-Reply-To: <20150112123613.GG12302@n2100.arm.linux.org.uk>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150110163001.GA5392@lunn.ch>
+ <20150110175030.186ef929@free-electrons.com>
+ <2707920.rUFmbmVqu6@wuerfel>
+ <20150110205721.6b3f71f8@free-electrons.com>
+ <20150112123613.GG12302@n2100.arm.linux.org.uk>
+Message-ID: <20150112134123.5c27bfc3@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Russell,
 
-On 10/01/15 12:34, Rob Herring wrote:
-> Convert the ks8695 PCI driver to use the generic config access functions.
->
-> This changes accesses from __raw_readX/__raw_writeX to readX/writeX
-> variants.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Greg Ungerer <gerg@uclinux.org>
+On Mon, 12 Jan 2015 12:36:13 +0000, Russell King - ARM Linux wrote:
+> On Sat, Jan 10, 2015 at 08:57:21PM +0100, Thomas Petazzoni wrote:
+> > We will indeed need to do more extensive testing and review. However, I
+> > don't agree that this should prevent this patch from going to stable:
+> > the current situation in the kernel (and also past kernels) is known to
+> > be broken: DMA coherent mappings allocated by dma_alloc_coherent() are
+> > *not* coherent in the current situation. Writes made by the device to
+> > the memory are not guaranteed to be immediately visible to the CPU,
+> > unless an explicit I/O sync barrier is done, which obviously is never
+> > done for DMA coherent mappings since those are assumed by Linux to be
+> > coherent, and therefore not require any cache maintenance operation.
+> 
+> That's actually an incorrect statement.
+> 
+> On all ARMv6+ where DMA coherent memory is "normal memory, non-cached,
+> write combine" but because it's "normal memory", memory barriers are
+> required.  This is why we have the memory barriers in readl() and
+> writel().
 
-I wasn't CC'ed on the generic implementation patch ("pci: introduce
-common pci config space accessors"), but I assume this is it:
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg800405.html
+Except that a readl() or writel() do *not* imply the I/O
+synchronization barrier that is needed on I/O coherent Marvell CPUs to
+ensure that the CPU sees the changes made by a DMA master to the
+memory. At least in the current kernel code, at least.
 
-That all looks ok to me. I have not tested it, but:
+One option would maybe have been to add this I/O synchronization
+barrier in the memory barrier implementation, but it seems a lot
+simpler to rely on the automatic I/O synchronization mechanism instead.
 
-Acked-by: Greg Ungerer <gerg@uclinux.org>
+Thanks,
 
-Regards
-Greg
-
-
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->   arch/arm/mach-ks8695/pci.c | 77 ++++------------------------------------------
->   1 file changed, 6 insertions(+), 71 deletions(-)
->
-> diff --git a/arch/arm/mach-ks8695/pci.c b/arch/arm/mach-ks8695/pci.c
-> index bb18193..c1bc4c3 100644
-> --- a/arch/arm/mach-ks8695/pci.c
-> +++ b/arch/arm/mach-ks8695/pci.c
-> @@ -38,8 +38,6 @@
->   
->   
->   static int pci_dbg;
-> -static int pci_cfg_dbg;
-> -
->   
->   static void ks8695_pci_setupconfig(unsigned int bus_nr, unsigned int devfn, unsigned int where)
->   {
-> @@ -59,75 +57,11 @@ static void ks8695_pci_setupconfig(unsigned int bus_nr, unsigned int devfn, unsi
->   	}
->   }
->   
-> -
-> -/*
-> - * The KS8695 datasheet prohibits anything other than 32bit accesses
-> - * to the IO registers, so all our configuration must be done with
-> - * 32bit operations, and the correct bit masking and shifting.
-> - */
-> -
-> -static int ks8695_pci_readconfig(struct pci_bus *bus,
-> -			unsigned int devfn, int where, int size, u32 *value)
-> -{
-> -	ks8695_pci_setupconfig(bus->number, devfn, where);
-> -
-> -	*value = __raw_readl(KS8695_PCI_VA +  KS8695_PBCD);
-> -
-> -	switch (size) {
-> -		case 4:
-> -			break;
-> -		case 2:
-> -			*value = *value >> ((where & 2) * 8);
-> -			*value &= 0xffff;
-> -			break;
-> -		case 1:
-> -			*value = *value >> ((where & 3) * 8);
-> -			*value &= 0xff;
-> -			break;
-> -	}
-> -
-> -	if (pci_cfg_dbg) {
-> -		printk("read: %d,%08x,%02x,%d: %08x (%08x)\n",
-> -			bus->number, devfn, where, size, *value,
-> -			__raw_readl(KS8695_PCI_VA +  KS8695_PBCD));
-> -	}
-> -
-> -	return PCIBIOS_SUCCESSFUL;
-> -}
-> -
-> -static int ks8695_pci_writeconfig(struct pci_bus *bus,
-> -			unsigned int devfn, int where, int size, u32 value)
-> +static void __iomem *ks8695_pci_map_bus(struct pci_bus *bus, unsigned int devfn,
-> +					int where)
->   {
-> -	unsigned long tmp;
-> -
-> -	if (pci_cfg_dbg) {
-> -		printk("write: %d,%08x,%02x,%d: %08x\n",
-> -			bus->number, devfn, where, size, value);
-> -	}
-> -
->   	ks8695_pci_setupconfig(bus->number, devfn, where);
-> -
-> -	switch (size) {
-> -		case 4:
-> -			__raw_writel(value, KS8695_PCI_VA +  KS8695_PBCD);
-> -			break;
-> -		case 2:
-> -			tmp = __raw_readl(KS8695_PCI_VA +  KS8695_PBCD);
-> -			tmp &= ~(0xffff << ((where & 2) * 8));
-> -			tmp |= value << ((where & 2) * 8);
-> -
-> -			__raw_writel(tmp, KS8695_PCI_VA +  KS8695_PBCD);
-> -			break;
-> -		case 1:
-> -			tmp = __raw_readl(KS8695_PCI_VA +  KS8695_PBCD);
-> -			tmp &= ~(0xff << ((where & 3) * 8));
-> -			tmp |= value << ((where & 3) * 8);
-> -
-> -			__raw_writel(tmp, KS8695_PCI_VA +  KS8695_PBCD);
-> -			break;
-> -	}
-> -
-> -	return PCIBIOS_SUCCESSFUL;
-> +	return KS8695_PCI_VA +  KS8695_PBCD;
->   }
->   
->   static void ks8695_local_writeconfig(int where, u32 value)
-> @@ -137,8 +71,9 @@ static void ks8695_local_writeconfig(int where, u32 value)
->   }
->   
->   static struct pci_ops ks8695_pci_ops = {
-> -	.read	= ks8695_pci_readconfig,
-> -	.write	= ks8695_pci_writeconfig,
-> +	.map_bus = ks8695_pci_map_bus,
-> +	.read	= pci_generic_config_read32,
-> +	.write	= pci_generic_config_write32,
->   };
->   
->   static struct resource pci_mem = {
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
