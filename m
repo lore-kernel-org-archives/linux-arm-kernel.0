@@ -1,79 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 14:29:32 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Lager Board Removal for v3.20
-In-Reply-To: <cover.1419809774.git.horms+renesas@verge.net.au>
-References: <cover.1419809774.git.horms+renesas@verge.net.au>
-Message-ID: <20150112222932.GI22090@quad.lixom.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 Jan 2015 01:31:14 +0300
+Subject: [PATCH] ARM: shmobile: r8a7791: fix MSTP8 input clocks
+Message-ID: <4221957.7dd2kFrTHY@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 29, 2014 at 10:46:47AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC lager board removal for v3.20.
-> 
-> The serial port rename changes are not strictly related to lager board
-> removal from a feature point of view. But the lager portion of this change
-> depends on board removal to avoid a regression of booting using that code,
-> And thus it seems to make sense to put here. And it seems best to put the
-> koelsch and lager serial port rename changes in the same branch.
-> 
-> Likewise the removal of bootargs from lager DT depends on removing lager
-> board code to avoid a regression when using it and thus I have included
-> it in the same branch.
-> 
-> 
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-lager-board-removal-for-v3.20
-> 
-> for you to fetch changes up to 569dd56c9971c699472d3b270e988baf7f6de8c9:
-> 
->   ARM: shmobile: lager dts: Drop console= bootargs parameter (2014-12-21 17:03:53 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Lager Board Removal for v3.20
-> 
-> * Remove legacy r8a7790 SoC and its Lager board code
-> * Update serial port names on koelsch and lager boards
-> * Remove console bootargs parameter from lager DT
-> 
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (1):
->       ARM: shmobile: lager dts: Drop console= bootargs parameter
-> 
-> Laurent Pinchart (3):
->       ARM: shmobile: r8a7790: Remove legacy code
->       ARM: shmobile: lager: Rename SCIFA[01] serial ports to ttySC[01]
->       ARM: shmobile: koelsch: Rename SCIF[01] serial ports to ttySC[01]
-> 
-> Magnus Damm (2):
->       ARM: shmobile: lager-reference: DTS-only board support
->       ARM: shmobile: lager: Remove legacy board support
-> 
->  MAINTAINERS                                    |   1 -
->  arch/arm/boot/dts/Makefile                     |   1 -
->  arch/arm/boot/dts/r8a7790-lager.dts            |   6 +-
->  arch/arm/boot/dts/r8a7791-koelsch.dts          |   4 +-
->  arch/arm/configs/lager_defconfig               | 150 -----
->  arch/arm/configs/shmobile_defconfig            |   1 -
->  arch/arm/mach-shmobile/Kconfig                 |  20 -
->  arch/arm/mach-shmobile/Makefile                |   3 -
->  arch/arm/mach-shmobile/Makefile.boot           |   1 -
->  arch/arm/mach-shmobile/board-lager-reference.c |  39 --
->  arch/arm/mach-shmobile/board-lager.c           | 827 -------------------------
->  arch/arm/mach-shmobile/clock-r8a7790.c         | 459 --------------
->  arch/arm/mach-shmobile/r8a7790.h               |  28 -
->  arch/arm/mach-shmobile/setup-r8a7790.c         | 284 +--------
->  14 files changed, 6 insertions(+), 1818 deletions(-)
+I made  a mistake when rebasing Andrey Gusakov's patch adding MLB+ clock to the
+R8A7791 device  tree, inserting <&hp_clk> into the "clocks"  property of the
+MSTP8 node at a wrong position, so that the input clocks for MLB+ and IPMMU-SGX
+got swapped...
 
-Nice!!
+Fixes: 7408d3061d2f ("ARM: shmobile: r8a7791: add MLB+ clock")
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-I've merged this into next/cleanup.
+---
+The patch is against 'renesas-devel-20150108v2-v3.19-rc3' tag of Simon Horman's
+'renesas.git' repo.
 
+ arch/arm/boot/dts/r8a7791.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--Olof
+Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
++++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1196,7 +1196,7 @@
+ 		mstp8_clks: mstp8_clks at e6150990 {
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
+-			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
++			clocks = <&zg_clk>, <&hp_clk>, <&zg_clk>, <&zg_clk>,
+ 			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
