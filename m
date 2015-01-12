@@ -1,88 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 16:37:03 +0100
-Subject: [PATCH v3 8/8] ARM: at91: remove useless include
-In-Reply-To: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421077023-30954-9-git-send-email-alexandre.belloni@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 12 Jan 2015 16:37:45 +0100
+Subject: [PATCH] ARM: EXYNOS: Handle of of_iomap() failure
+Message-ID: <1421077065-30175-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both drivers using the system timer are now converted to an MFD. mach/at91_st.h
-is now useless.
+Prevent possible NULL pointer dereference if of_iomap() fails. Handle
+the error by skipping such power domain.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/mach-at91/include/mach/at91_st.h | 61 -------------------------------
- 1 file changed, 61 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
+ arch/arm/mach-exynos/pm_domains.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
-deleted file mode 100644
-index 67fdbd13c3ed..000000000000
---- a/arch/arm/mach-at91/include/mach/at91_st.h
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/at91_st.h
-- *
-- * Copyright (C) 2005 Ivan Kokshaysky
-- * Copyright (C) SAN People
-- *
-- * System Timer (ST) - System peripherals registers.
-- * Based on AT91RM9200 datasheet revision E.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef AT91_ST_H
--#define AT91_ST_H
--
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_st_base;
--
--#define at91_st_read(field) \
--	__raw_readl(at91_st_base + field)
--
--#define at91_st_write(field, value) \
--	__raw_writel(value, at91_st_base + field)
--#else
--.extern at91_st_base
--#endif
--
--#define	AT91_ST_CR		0x00			/* Control Register */
--#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
--
--#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
--#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
--
--#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
--#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
--#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
--#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
--
--#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
--#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
--
--#define	AT91_ST_SR		0x10			/* Status Register */
--#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
--#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
--#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
--#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
--
--#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
--#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
--#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
--
--#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
--#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
--
--#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
--#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
--
--#endif
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 20f267121b3e..fd7640a6b503 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -128,6 +128,13 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		pd->pd.name = kstrdup(np->name, GFP_KERNEL);
+ 		pd->name = pd->pd.name;
+ 		pd->base = of_iomap(np, 0);
++		if (!pd->base) {
++			dev_warn(&pdev->dev, "Failed to map memory\n");
++			kfree(pd);
++			of_node_put(np);
++			continue;
++		}
++
+ 		pd->pd.power_off = exynos_pd_power_off;
+ 		pd->pd.power_on = exynos_pd_power_on;
+ 
 -- 
-2.1.0
+1.9.1
