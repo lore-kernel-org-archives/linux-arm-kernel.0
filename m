@@ -1,62 +1,92 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Jan 2015 17:51:13 +0000
-Subject: [PATCH 1/4] iommu: allow building iova.c independently
-In-Reply-To: <cover.1420822848.git.robin.murphy@arm.com>
-References: <cover.1420822848.git.robin.murphy@arm.com>
-Message-ID: <defa67ffdfcb7cc3752b9cf44e0ebe8c0a06395a.1420822848.git.robin.murphy@arm.com>
+From: wei@redhat.com (Wei Huang)
+Date: Mon, 12 Jan 2015 12:08:16 -0600
+Subject: [PATCH v2] ARM: KVM: extend WFI tracepoint to differentiate
+ between wfi and wfe
+In-Reply-To: <1421081776-2350-1-git-send-email-andre.przywara@arm.com>
+References: <1421081776-2350-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <54B40D90.3080203@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for sharing the IOVA allocator, split it out under its
-own Kconfig symbol.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/Kconfig  | 4 ++++
- drivers/iommu/Makefile | 3 ++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 325188e..a839ca9 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -13,6 +13,9 @@ menuconfig IOMMU_SUPPORT
- 
- if IOMMU_SUPPORT
- 
-+config IOMMU_IOVA
-+	bool
-+
- config OF_IOMMU
-        def_bool y
-        depends on OF && IOMMU_API
-@@ -91,6 +94,7 @@ config INTEL_IOMMU
- 	bool "Support for Intel IOMMU using DMA Remapping Devices"
- 	depends on PCI_MSI && ACPI && (X86 || IA64_GENERIC)
- 	select IOMMU_API
-+	select IOMMU_IOVA
- 	select DMAR_TABLE
- 	help
- 	  DMA remapping (DMAR) devices support enables independent address
-diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-index 7b976f2..0b1b94e 100644
---- a/drivers/iommu/Makefile
-+++ b/drivers/iommu/Makefile
-@@ -1,13 +1,14 @@
- obj-$(CONFIG_IOMMU_API) += iommu.o
- obj-$(CONFIG_IOMMU_API) += iommu-traces.o
- obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
-+obj-$(CONFIG_IOMMU_IOVA) += iova.o
- obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
- obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
- obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
- obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
- obj-$(CONFIG_ARM_SMMU) += arm-smmu.o
- obj-$(CONFIG_DMAR_TABLE) += dmar.o
--obj-$(CONFIG_INTEL_IOMMU) += iova.o intel-iommu.o
-+obj-$(CONFIG_INTEL_IOMMU) += intel-iommu.o
- obj-$(CONFIG_IPMMU_VMSA) += ipmmu-vmsa.o
- obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
- obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
--- 
-1.9.1
+On 01/12/2015 10:56 AM, Andre Przywara wrote:
+> Currently the trace printk talks about "wfi" only, though the trace
+> point triggers both on wfi and wfe traps.
+> Add a parameter to differentiate between the two.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+
+Given that this patch is related to arm64 counter-part:
+
+Reviewed-by: Wei Huang <wei@redhat.com>
+
+-Wei
+
+> ---
+> Hi,
+> 
+> this replaces the patch I sent earlier and now just contains the ARM
+> parts of it. The arm64 part is now merged into Wei's patch (which
+> isn't a prerequisite for this one anymore).
+> 
+> Cheers,
+> Andre.
+> 
+>  arch/arm/kvm/handle_exit.c |    8 +++++---
+>  arch/arm/kvm/trace.h       |   11 +++++++----
+>  2 files changed, 12 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+> index a96a804..95f12b2 100644
+> --- a/arch/arm/kvm/handle_exit.c
+> +++ b/arch/arm/kvm/handle_exit.c
+> @@ -87,11 +87,13 @@ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>   */
+>  static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	trace_kvm_wfi(*vcpu_pc(vcpu));
+> -	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE)
+> +	if (kvm_vcpu_get_hsr(vcpu) & HSR_WFI_IS_WFE) {
+> +		trace_kvm_wfx(*vcpu_pc(vcpu), true);
+>  		kvm_vcpu_on_spin(vcpu);
+> -	else
+> +	} else {
+> +		trace_kvm_wfx(*vcpu_pc(vcpu), false);
+>  		kvm_vcpu_block(vcpu);
+> +	}
+>  
+>  	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+>  
+> diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
+> index b1d640f..f741449 100644
+> --- a/arch/arm/kvm/trace.h
+> +++ b/arch/arm/kvm/trace.h
+> @@ -140,19 +140,22 @@ TRACE_EVENT(kvm_emulate_cp15_imp,
+>  			__entry->CRm, __entry->Op2)
+>  );
+>  
+> -TRACE_EVENT(kvm_wfi,
+> -	TP_PROTO(unsigned long vcpu_pc),
+> -	TP_ARGS(vcpu_pc),
+> +TRACE_EVENT(kvm_wfx,
+> +	TP_PROTO(unsigned long vcpu_pc, bool is_wfe),
+> +	TP_ARGS(vcpu_pc, is_wfe),
+>  
+>  	TP_STRUCT__entry(
+>  		__field(	unsigned long,	vcpu_pc		)
+> +		__field(		 bool,	is_wfe		)
+>  	),
+>  
+>  	TP_fast_assign(
+>  		__entry->vcpu_pc		= vcpu_pc;
+> +		__entry->is_wfe			= is_wfe;
+>  	),
+>  
+> -	TP_printk("guest executed wfi at: 0x%08lx", __entry->vcpu_pc)
+> +	TP_printk("guest executed wf%c at: 0x%08lx",
+> +		__entry->is_wfe ? 'e' : 'i', __entry->vcpu_pc)
+>  );
+>  
+>  TRACE_EVENT(kvm_unmap_hva,
+> 
