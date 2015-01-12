@@ -1,121 +1,64 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 12 Jan 2015 17:55:35 +0900
-Subject: [PATCHv7 03/10] devfreq: event: Add resource-managed function for
- devfreq-event device
-In-Reply-To: <765071676.891461421049614417.JavaMail.weblogic@epmlwas09a>
-References: <765071676.891461421049614417.JavaMail.weblogic@epmlwas09a>
-Message-ID: <54B38C07.2010801@samsung.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 12 Jan 2015 17:04:36 +0800
+Subject: [GIT PULL]Hisilicon hip01 soc and development board updates for 3.20
+Message-ID: <54B38E24.6040901@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Myungjoo,
+Hi Arnd, Hi Olof, Hi Kevin, 
 
-Thanks for your review.
-
-On 01/12/2015 05:00 PM, MyungJoo Ham wrote:
->>   
->>  This patch add the resource-managed function for devfreq-event device as
->> following functions. The devm_devfreq_event_add_edev() manages automatically
->> the memory of devfreq-event device using resource management.
->> - devm_devfreq_event_add_edev()
->> - devm_devfreq_event_remove_edev()
->>
->> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  drivers/devfreq/devfreq-event.c | 63 +++++++++++++++++++++++++++++++++++++++++
->>  include/linux/devfreq-event.h   | 16 +++++++++++
->>  2 files changed, 79 insertions(+)
->>
->> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
->> index 64c1764..5301e2b 100644
->> --- a/drivers/devfreq/devfreq-event.c
->> +++ b/drivers/devfreq/devfreq-event.c
->> @@ -451,6 +451,69 @@ int devfreq_event_remove_edev(struct devfreq_event_dev *edev)
->>  }
->>  EXPORT_SYMBOL_GPL(devfreq_event_remove_edev);
->>  
->> +static int devm_devfreq_event_match(struct device *dev, void *res, void *data)
->> +{
->> +	struct devfreq_event_dev **r = res;
->> +
->> +	if (WARN_ON(!r || !*r))
->> +		return 0;
->> +
->> +	return *r == data;
->> +}
->> +
->> +static void devm_devfreq_event_release(struct device *dev, void *res)
->> +{
->> +	devfreq_event_remove_edev(*(struct devfreq_event_dev **)res);
->> +}
-> 
-> Isn't dev-free functions supposed to check if it is already freed or not?
-
-The devfreq_event_remove_edev() function check whether res is NULL or not.
-If some instance of devfreq_event_dev is freeed, devfreq_event_remove_edev()
-just return.
-
-> 
->> +
->> +/**
->> + * devm_devfreq_event_add_edev() - Resource-managed devfreq_event_add_edev()
->> + * @dev		: the device owning the devfreq-event device being created
->> + * @desc	: the devfreq-event device's decriptor which include essential
->> + *		  data for devfreq-event device.
->> + *
->> + * Note that this function manages automatically the memory of devfreq-event
->> + * device using device resource management and simplify the free operation
->> + * for memory of devfreq-event device.
->> + */
->> +struct devfreq_event_dev *devm_devfreq_event_add_edev(struct device *dev,
->> +						struct devfreq_event_desc *desc)
->> +{
->> +	struct devfreq_event_dev **ptr, *edev;
->> +
->> +	ptr = devres_alloc(devm_devfreq_event_release, sizeof(*ptr), GFP_KERNEL);
->> +	if (!ptr)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	edev = devfreq_event_add_edev(dev, desc);
->> +	if (IS_ERR(edev)) {
->> +		devres_free(ptr);
->> +		return ERR_PTR(-ENOMEM);
->> +	}
->> +
->> +	*ptr = edev;
->> +	devres_add(dev, ptr);
->> +
->> +	return edev;
->> +}
->> +EXPORT_SYMBOL(devm_devfreq_event_add_edev);
-> 
-> You are using GPL Symbol in this function (devres_alloc).
-
-I'll fix it. (EXPORT_SYMBOL -> EXPORT_SYMBOL_GPL).
-
-> 
->> +
->> +/**
->> + * devm_devfreq_event_remove_edev()- Resource-managed devfreq_event_remove_edev()
->> + * @dev		: the device owning the devfreq-event device being created
->> + * @edev	: the devfreq-event device
->> + *
->> + * Note that this function manages automatically the memory of devfreq-event
->> + * device using device resource management.
->> + */
->> +void devm_devfreq_event_remove_edev(struct device *dev,
->> +				struct devfreq_event_dev *edev)
->> +{
->> +	WARN_ON(devres_release(dev, devm_devfreq_event_release,
->> +			       devm_devfreq_event_match, edev));
->> +}
->> +EXPORT_SYMBOL(devm_devfreq_event_remove_edev);
-> 
-> Here you are using GPL symbol as well (devres_release).
-
-I'll fix it. (EXPORT_SYMBOL -> EXPORT_SYMBOL_GPL).
+Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
+Thanks!
 
 Best Regards,
-Chanwoo Choi
+Wei
+
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20
+
+for you to fetch changes up to 3a1d691f244b54f59958e2294779ddc6905b1d8f:
+
+  ARM: hisi: enable smp for HiP01 (2015-01-12 15:48:16 +0800)
+
+----------------------------------------------------------------
+ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
+
+- Add hip01 debug UART
+- Add hip01 DT_MACHINE and ARCH_HIP01 configure item
+- Add dts for Hisilicon hip01-ca9x2 board
+- Enable ARCH_HIP01 in the hisi_defconfig and multi_v7_defconfig
+- Add a common smp_prepares_cpus function
+- Rename hix5hd2_secondary_startup to hisi_secondary_startup
+- Enable smp for hip01
+
+----------------------------------------------------------------
+Wang Long (7):
+      ARM: debug: add HiP01 debug uart
+      ARM: hisi: enable HiP01 SoC
+      ARM: dts: Add hip01-ca9x2 dts file
+      ARM: config: enable ARCH_HIP01
+      ARM: hisi: add a common smp_prepares_cpus function
+      ARM: hisi: rename secondary_startup function
+      ARM: hisi: enable smp for HiP01
+
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  25 +++++++++++++++++++++++++
+ arch/arm/Kconfig.debug                                        |  10 ++++++++++
+ arch/arm/boot/dts/Makefile                                    |   1 +
+ arch/arm/boot/dts/hip01-ca9x2.dts                             |  51 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/hip01.dtsi                                  | 110 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/hisi_defconfig                               |   1 +
+ arch/arm/configs/multi_v7_defconfig                           |   1 +
+ arch/arm/mach-hisi/Kconfig                                    |   8 ++++++++
+ arch/arm/mach-hisi/core.h                                     |   5 ++++-
+ arch/arm/mach-hisi/headsmp.S                                  |   2 +-
+ arch/arm/mach-hisi/hisilicon.c                                |  10 ++++++++++
+ arch/arm/mach-hisi/hotplug.c                                  |  31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-hisi/platsmp.c                                  |  56 ++++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 13 files changed, 306 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
+ create mode 100644 arch/arm/boot/dts/hip01.dtsi
