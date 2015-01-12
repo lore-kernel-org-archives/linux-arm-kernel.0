@@ -1,75 +1,37 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 12 Jan 2015 21:34:57 +0900
-Subject: [PATCHv8 9/9] ARM: dts: exynos: Add PPMU node for Exynos4412-based
- TRATS2 board
-In-Reply-To: <1421066097-26237-1-git-send-email-cw00.choi@samsung.com>
-References: <1421066097-26237-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1421066097-26237-10-git-send-email-cw00.choi@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Jan 2015 12:36:13 +0000
+Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
+In-Reply-To: <20150110205721.6b3f71f8@free-electrons.com>
+References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150110163001.GA5392@lunn.ch>
+ <20150110175030.186ef929@free-electrons.com>
+ <2707920.rUFmbmVqu6@wuerfel>
+ <20150110205721.6b3f71f8@free-electrons.com>
+Message-ID: <20150112123613.GG12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add dt node for PPMU_{DMC0|DMC1|LEFTBUS|RIGHTBUS} for
-exynos4412-trats2 board. Each PPMU dt node includes one event of 'PPMU Count3'.
+On Sat, Jan 10, 2015 at 08:57:21PM +0100, Thomas Petazzoni wrote:
+> We will indeed need to do more extensive testing and review. However, I
+> don't agree that this should prevent this patch from going to stable:
+> the current situation in the kernel (and also past kernels) is known to
+> be broken: DMA coherent mappings allocated by dma_alloc_coherent() are
+> *not* coherent in the current situation. Writes made by the device to
+> the memory are not guaranteed to be immediately visible to the CPU,
+> unless an explicit I/O sync barrier is done, which obviously is never
+> done for DMA coherent mappings since those are assumed by Linux to be
+> coherent, and therefore not require any cache maintenance operation.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 40 +++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+That's actually an incorrect statement.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index c9b70b6..bee0eed 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -877,6 +877,46 @@
- 	};
- };
- 
-+&ppmu_dmc0 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc0_3: ppmu-event3-dmc0 {
-+			event-name = "ppmu-event3-dmc0";
-+		};
-+	};
-+};
-+
-+&ppmu_dmc1 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc1_3: ppmu-event3-dmc1 {
-+			event-name = "ppmu-event3-dmc1";
-+		};
-+	};
-+};
-+
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &pinctrl_0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sleep0>;
+On all ARMv6+ where DMA coherent memory is "normal memory, non-cached,
+write combine" but because it's "normal memory", memory barriers are
+required.  This is why we have the memory barriers in readl() and
+writel().
+
+Remember, DMA coherent memory is about avoiding effects from caching,
+not about avoiding weakly ordered memory effects.
+
 -- 
-1.8.5.5
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
