@@ -1,136 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 Jan 2015 12:34:02 +0800
-Subject: [PATCH v3 2/9] ARM: dts: sunxi: Add dtsi for AXP209 PMIC
-In-Reply-To: <1421037249-28461-1-git-send-email-wens@csie.org>
-References: <1421037249-28461-1-git-send-email-wens@csie.org>
-Message-ID: <1421037249-28461-3-git-send-email-wens@csie.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 12 Jan 2015 10:20:18 +0530
+Subject: [RFC 8/8] ARM64: Add uprobe support
+In-Reply-To: <20150109174524.GA13161@redhat.com>
+References: <cover.1420038188.git.panand@redhat.com>
+ <0694af6935f9c6873ef8d25ad51630a40a74a116.1420038188.git.panand@redhat.com>
+ <20150108170324.GT11583@arm.com> <54AEC470.50509@redhat.com>
+ <20150109174524.GA13161@redhat.com>
+Message-ID: <54B3528A.6070606@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP209 PMIC is used with some Allwinner SoCs. This patch adds
-a dtsi file listing all the regulator nodes. The regulators are
-initialized based on their device node names.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
 
-changes since v2:
+On Friday 09 January 2015 11:15 PM, Oleg Nesterov wrote:
+> On 01/08, Pratyush Anand wrote:
+>>
+>> On Thursday 08 January 2015 10:33 PM, Will Deacon wrote:
+>>>
+>>> I'm assuming that means you don't support compat (AArch32) tasks with this?
+>>
+>> Hummm.. Yes, compat not yet supported.
+>>
+>> I will come back on this.
+>
+> I obviously do not know how difficult is to support the compat tasks, and
+> in any case I leave this to you and Will.
+>
 
-    none
+I think most of the stuff can be picked from arch/arm. But I do not have 
+a platform to test this feature.So, I will not be taking up as of now.
 
-changes since v1:
-
-    - Moved interrupt controller properties to this patch
-    - Added default names for all the regulators
-    - Removed needless comment above regulators section
-
----
- arch/arm/boot/dts/axp209.dtsi | 97 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
- create mode 100644 arch/arm/boot/dts/axp209.dtsi
-
-diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
-new file mode 100644
-index 000000000000..c20cf537f5a5
---- /dev/null
-+++ b/arch/arm/boot/dts/axp209.dtsi
-@@ -0,0 +1,97 @@
-+/*
-+ * Copyright 2015 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/*
-+ * AXP202/209 Integrated Power Management Chip
-+ * http://www.x-powers.com/product/AXP20X.php
-+ * http://dl.linux-sunxi.org/AXP/AXP209%20Datasheet%20v1.0_cn.pdf
-+ */
-+
-+&axp209 {
-+	compatible = "x-powers,axp209";
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+
-+	regulators {
-+		/* Default work frequency for buck regulators */
-+		x-powers,dcdc-freq = <1500>;
-+
-+		reg_dcdc2: dcdc2 {
-+			regulator-name = "dcdc2";
-+		};
-+
-+		reg_dcdc3: dcdc3 {
-+			regulator-name = "dcdc3";
-+		};
-+
-+		reg_ldo1: ldo1 {
-+			/* LDO1 is a fixed output regulator */
-+			regulator-always-on;
-+			regulator-min-microvolt = <1300000>;
-+			regulator-max-microvolt = <1300000>;
-+			regulator-name = "ldo1";
-+		};
-+
-+		reg_ldo2: ldo2 {
-+			regulator-name = "ldo2";
-+		};
-+
-+		reg_ldo3: ldo3 {
-+			regulator-name = "ldo3";
-+		};
-+
-+		reg_ldo4: ldo4 {
-+			regulator-name = "ldo4";
-+		};
-+
-+		reg_ldo5: ldo5 {
-+			regulator-name = "ldo5";
-+		};
-+	};
-+};
--- 
-2.1.4
+~Pratyush
