@@ -1,30 +1,111 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Jan 2015 13:07:24 +0000
-Subject: [PATCH RESEND] dma-mapping: tidy up dma_parms default handling
-In-Reply-To: <2031542.TLqIP3YVGc@wuerfel>
-References: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
- <2031542.TLqIP3YVGc@wuerfel>
-Message-ID: <54B3C70C.4070009@arm.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 12 Jan 2015 21:08:21 +0800
+Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support noinit option
+In-Reply-To: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
+References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/15 19:45, Arnd Bergmann wrote:
-> On Friday 09 January 2015 16:56:03 Robin Murphy wrote:
->>
->> This one's a bit tricky to find a home for - I think technically it's
->> probably an IOMMU patch, but then the long-underlying problem doesn't
->> seem to have blown up anything until arm64, and my motivation is to
->> make bits of Juno work, which seems to nudge it towards arm64/arm-soc
->> territory. Could anyone suggest which tree is most appropriate?
->
-> I have a set of patches touching various dma-mapping.h related bits
-> across architectures and in ARM in particular. Your patch fits into
-> that series, and I guess we could either have it in my asm-generic
-> tree or in Andrew Morton's mm tree. Possibly also arm-soc for practical
-> reasons, although it really doesn't belong in there.
->
+Add earlycon support not only baudrate option, but also add noinit option.
+If use noinit option, 8250 earlycon will not init serial hardware and use
+loader setting.
 
-Thanks Arnd, I'd agree asm-generic or mm sound the most sensible - If 
-you're happy to carry this patch with your series that'd be really helpful.
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ drivers/tty/serial/8250/8250_early.c |  7 ++++---
+ drivers/tty/serial/earlycon.c        | 17 ++++++++++++-----
+ include/linux/serial_8250.h          |  2 ++
+ include/linux/serial_core.h          |  1 +
+ 4 files changed, 19 insertions(+), 8 deletions(-)
 
-Robin.
+diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+index 4858b8a..a13d757 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -138,19 +138,20 @@ static void __init init_port(struct earlycon_device *device)
+ 	serial8250_early_out(port, UART_LCR, c & ~UART_LCR_DLAB);
+ }
+ 
+-static int __init early_serial8250_setup(struct earlycon_device *device,
++int __init early_serial8250_setup(struct earlycon_device *device,
+ 					 const char *options)
+ {
+ 	if (!(device->port.membase || device->port.iobase))
+ 		return 0;
+ 
+-	if (!device->baud) {
++	if (!device->baud && !device->noinit) {
+ 		device->baud = probe_baud(&device->port);
+ 		snprintf(device->options, sizeof(device->options), "%u",
+ 			 device->baud);
+ 	}
+ 
+-	init_port(device);
++	if (!device->noinit)
++		init_port(device);
+ 
+ 	early_device = device;
+ 	device->con->write = early_serial8250_write;
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 64fe25a..4891251 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -58,7 +58,7 @@ static int __init parse_options(struct earlycon_device *device,
+ 				char *options)
+ {
+ 	struct uart_port *port = &device->port;
+-	int mmio, mmio32, length;
++	int noinit, mmio, mmio32, length;
+ 	unsigned long addr;
+ 
+ 	if (!options)
+@@ -92,10 +92,17 @@ static int __init parse_options(struct earlycon_device *device,
+ 	options = strchr(options, ',');
+ 	if (options) {
+ 		options++;
+-		device->baud = simple_strtoul(options, NULL, 0);
+-		length = min(strcspn(options, " ") + 1,
+-			     (size_t)(sizeof(device->options)));
+-		strlcpy(device->options, options, length);
++		noinit = !strncmp(options, "noinit", 6);
++		if (noinit) {
++			device->noinit = noinit;
++			strlcpy(device->options, options, 6);
++			device->options[6] = '\0';
++		} else {
++			device->baud = simple_strtoul(options, NULL, 0);
++			length = min(strcspn(options, " ") + 1,
++					(size_t)(sizeof(device->options)));
++			strlcpy(device->options, options, length);
++		}
+ 	}
+ 
+ 	if (port->iotype == UPIO_MEM || port->iotype == UPIO_MEM32)
+diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
+index e02acf0..0e26eec 100644
+--- a/include/linux/serial_8250.h
++++ b/include/linux/serial_8250.h
+@@ -119,6 +119,8 @@ extern int serial8250_find_port(struct uart_port *p);
+ extern int serial8250_find_port_for_earlycon(void);
+ extern unsigned int serial8250_early_in(struct uart_port *port, int offset);
+ extern void serial8250_early_out(struct uart_port *port, int offset, int value);
++extern int early_serial8250_setup(struct earlycon_device *device,
++					 const char *options);
+ extern int setup_early_serial8250_console(char *cmdline);
+ extern void serial8250_do_set_termios(struct uart_port *port,
+ 		struct ktermios *termios, struct ktermios *old);
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 057038c..72c6698 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -326,6 +326,7 @@ struct earlycon_device {
+ 	struct uart_port port;
+ 	char options[16];		/* e.g., 115200n8 */
+ 	unsigned int baud;
++	int noinit;
+ };
+ int setup_earlycon(char *buf, const char *match,
+ 		   int (*setup)(struct earlycon_device *, const char *));
+-- 
+1.8.1.1.dirty
