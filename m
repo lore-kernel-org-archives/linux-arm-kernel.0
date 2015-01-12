@@ -1,174 +1,42 @@
-From: ottxor@gentoo.org (Christoph Junghans)
-Date: Sun, 11 Jan 2015 23:11:01 -0700
-Subject: [PATCH] Added support for pogoplug e02 (pink/gray)
-In-Reply-To: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
-References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
-Message-ID: <1421043061-2837-1-git-send-email-ottxor@gentoo.org>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Mon, 12 Jan 2015 11:45:39 +0530
+Subject: ARM64: hibernation: How to use hibernation/suspend-to-disk on
+ ARMv8?
+In-Reply-To: <CADcZZT+nQ_0LfurU+z5wLC_OxNhEs6n0kCoLSkfoFCDqyOu04g@mail.gmail.com>
+References: <CADcZZT+nQ_0LfurU+z5wLC_OxNhEs6n0kCoLSkfoFCDqyOu04g@mail.gmail.com>
+Message-ID: <CAP245DUypHRtjdF4+nRc0UX-VWqyne6NMsgoWaBxKTXFP4QAOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pogoplug differs from the SheevaPlug only by a
-few details, but especially in the led assignments.
-This patch was tested under Gentoo Linux.
-A version of this patch was included in Arch Linux
-on Arm since Jun 2014:
-https://github.com/archlinuxarm/PKGBUILDs/commit/250c2f0aa6ffe66c0ebda61efaa356e5dc709cc7
-A similar patch is available for OpenWrt:
-https://dev.openwrt.org/browser/trunk/target/linux/kirkwood/patches-3.14/150-pogoplug_e02.patch
+(Fixing Sebastian's email address)
 
-Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
-Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
-Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
----
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 114 +++++++++++++++++++++
- 3 files changed, 116 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
+On Sat, Jan 10, 2015 at 8:44 PM, George Bush <georgebush815@gmail.com> wrote:
+> Hi all
+>
+> I notice we have hibernation.c in arm/kernel, however, I don't find it in arm64.
+> Does it mean arm64 do not support hibernation/suspend-to-disk function?
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..e5f58c6 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -32,6 +32,7 @@ cdns	Cadence Design Systems Inc.
- chrp	Common Hardware Reference Platform
- chunghwa	Chunghwa Picture Tubes Ltd.
- cirrus	Cirrus Logic, Inc.
-+cloudengines	Cloud Engines, Inc.
- cortina	Cortina Systems, Inc.
- crystalfontz	Crystalfontz America, Inc.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..cd974eb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -143,6 +143,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
- 	kirkwood-openrd-base.dtb \
- 	kirkwood-openrd-client.dtb \
- 	kirkwood-openrd-ultimate.dtb \
-+	kirkwood-pogo_e02.dtb \
- 	kirkwood-rd88f6192.dtb \
- 	kirkwood-rd88f6281-a0.dtb \
- 	kirkwood-rd88f6281-a1.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-pogo_e02.dts b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
-new file mode 100644
-index 0000000..286a6be
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
-@@ -0,0 +1,114 @@
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	model = "Cloud Engines Pogoplug E02";
-+	compatible = "cloudengines,pogoe02", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pmx_usb_power_enable: pmx-usb-power-enable {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_green: pmx-led-green {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_orange: pmx-led-orange {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
-+		};
-+		serial at 12000 {
-+			status = "ok";
-+		};
-+	};
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
-+			      &pmx_led_green >;
-+		pinctrl-names = "default";
-+
-+		health {
-+			label = "status:green:health";
-+			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
-+		};
-+		fault {
-+			label = "status:orange:fault";
-+			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_usb_power_enable>;
-+		pinctrl-names = "default";
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&nand {
-+	chip-delay = <40>;
-+	status = "okay";
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0x100000>;
-+		read-only;
-+	};
-+
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x0100000 0x400000>;
-+	};
-+
-+	partition at 500000 {
-+		label = "pogoplug";
-+		reg = <0x0500000 0x2000000>;
-+	};
-+
-+	partition at 2500000 {
-+		label = "root";
-+		reg = <0x02500000 0x5b00000>;
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
--- 
-2.0.5
+Correct. arm64 is a separate architecture and will need to implement
+something similar to SHA 603fb42a66499ab353466c7afa3d38beea20a8a9.
+
+> I tried some path to search the reason, but found nothing, they all say arm64
+> has the backward compatibility. So I send this email to the community and
+> hope to get the reason.
+> Thanks!
+>
+> I ported the arm hibernation.c to arm64/kernel(with LP64), but failed in a
+> strange way. When I do resume, the arch_restore_image() get a page_fault
+> when it calls the copy_page(), like:
+
+I'm afraid I can't help with the memory management aspects of arm64
+but you've cc'ed the right people who'd know.
+
+> "Unable to handle kernel paging request at virtual address 0xffffffbc055c3fa8"
+> I'm sure the copy_page()'s parameters is in the memory area, why and how
+> I get the strange address 0xffffffbc055c3fa8?
+>
+> vmalloc:         0xffffff8000000000 - 0xffffffbb00000000
+> vmemmap:     0xffffffbc01400000 - 0xffffffbc04f88000
+> modules:       0xffffffbffc000000   -  0xffffffc000000000
+> memory:        0xffffffc000000000 - 0xffffffc0be800000
+>
