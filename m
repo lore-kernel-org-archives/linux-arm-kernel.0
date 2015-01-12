@@ -1,79 +1,213 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Jan 2015 14:57:48 +0100
-Subject: Linux 3.19-rc3
-In-Reply-To: <20150112121815.GB19807@e104818-lin.cambridge.arm.com>
-References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
- <10028397.kdbz8TfPck@wuerfel>
- <20150112121815.GB19807@e104818-lin.cambridge.arm.com>
-Message-ID: <23318125.rGnCbWvYBR@wuerfel>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 12 Jan 2015 14:01:57 +0000
+Subject: [PATCH v4 5/6] arm64: Add kernel return probes support(kretprobes)
+In-Reply-To: <1420949002-3726-6-git-send-email-dave.long@linaro.org>
+References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>
+ <1420949002-3726-6-git-send-email-dave.long@linaro.org>
+Message-ID: <20150112140156.GC24728@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 12:18:15 Catalin Marinas wrote:
-> On Sat, Jan 10, 2015 at 09:36:13PM +0000, Arnd Bergmann wrote:
-> > On Saturday 10 January 2015 13:00:27 Linus Torvalds wrote:
-> > > > IIRC, AIX works great with 64k pages, but only because of two
-> > > > reasons that don't apply on Linux:
-> > > 
-> > > .. there's a few other ones:
-> > > 
-> > >  (c) nobody really runs AIX on dekstops. It's very much a DB load
-> > > environment, with historically some HPC.
-> > > 
-> > >  (d) the powerpc TLB fill/buildup/teardown costs are horrible, so on
-> > > AIX the cost of lots of small pages is much higher too.
-> > 
-> > I think (d) applies to ARM as well, since it has no hardware
-> > dirty/referenced bit tracking and requires the OS to mark the
-> > pages as invalid/readonly until the first access. ARMv8.1
-> > has a fix for that, but it's optional and we haven't seen any
-> > implementations yet.
+On Sat, Jan 10, 2015 at 11:03:20PM -0500, David Long wrote:
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 > 
-> Do you happen have any data on how significantly non-hardware
-> dirty/access bits impact the performance? I think it may affect the user
-> process start-up time a but at run-time it shouldn't be that bad.
+> AArch64 ISA does not have instructions to pop the PC register
+> value from the stack(like ARM v7 has ldmia {...,pc}) without using
+> one of the general purpose registers. This means return probes
+> cannot return to the actual return address directly without
+> modifying register context, and without trapping into debug exception.
 > 
-> If it is that significant, we could optimise it further in the arch
-> code. For example, make a fast exception path where we need to mark the
-> pte dirty. This would be handled by arch code without even calling
-> handle_pte_fault().
-
-If I understand the way that LRU works right, we end up clearing
-the referenced bits in shrink_active_list()->page_referenced()->
-page_referenced_one()->ptep_clear_flush_young_notify()->pte_mkold()
-whenever there is memory pressure, so definitely not just for
-startup.
-
-> > > so I feel pretty confident in saying it won't happen. It's just too
-> > > much of a bother, for little to no actual upside. It's likely a much
-> > > better approach to try to instead use THP for anonymous mappings.
-> > 
-> > arm64 already supports 2MB transparent hugepages. I guess it
-> > wouldn't be too hard to change it so that an existing hugepage
-> > on an anonymous mapping that gets split up into 4KB pages gets
-> > split along 64KB boundaries with the contiguous mapping bit set.
-> > 
-> > Having full support for multiple hugepage sizes (64KB, 2MB and 32MB
-> > in case of ARM64 with 4KB PAGE_SIZE) would be even better and
-> > probably negate any benefits of 64KB PAGE_SIZE, but requires more
-> > changes to common mm code.
+> So, like many other architectures, we prepare a global routine
+> with NOPs which serve as a trampoline to hack away the
+> function return address by placing an extra kprobe on the
+> trampoline entry.
 > 
-> As I replied to your other email, I don't think that's simple for the
-> transparent huge pages case.
+> The pre-handler of this special 'trampoline' kprobe executes the return
+> probe handler functions and restores original return address in ELR_EL1.
+> This way the saved pt_regs still hold the original register context to be
+> carried back to the probed kernel function.
 > 
-> The main advantage I see with 64KB pages is not the reduced TLB pressure
-> but the number of levels of page tables. Take the AMD Seattle board for
-> example, with 4KB pages you need 4 levels but 64KB allow only 2 levels
-> (42-bit VA). Larger TLBs and improved walk caches (caching VA -> pmd
-> entry translation rather than all the way to pte/PA) make things better
-> but you still have the warming up time for any fork/new process as they
-> don't share the same TLB entries.
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm64/Kconfig               |   1 +
+>  arch/arm64/include/asm/kprobes.h |   1 +
+>  arch/arm64/kernel/kprobes.c      | 114 ++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 115 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b3f61ba..de4f056 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -68,6 +68,7 @@ config ARM64
+>  	select HAVE_RCU_TABLE_FREE
+>  	select HAVE_SYSCALL_TRACEPOINTS
+>  	select HAVE_KPROBES if !XIP_KERNEL
+> +	select HAVE_KRETPROBES if HAVE_KPROBES
+>  	select IRQ_DOMAIN
+>  	select MODULES_USE_ELF_RELA
+>  	select NO_BOOTMEM
+> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+> index b35d3b9..a2de3b8 100644
+> --- a/arch/arm64/include/asm/kprobes.h
+> +++ b/arch/arm64/include/asm/kprobes.h
+> @@ -56,5 +56,6 @@ void arch_remove_kprobe(struct kprobe *);
+>  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+>  int kprobe_exceptions_notify(struct notifier_block *self,
+>  			     unsigned long val, void *data);
+> +void kretprobe_trampoline(void);
+>  
+>  #endif /* _ARM_KPROBES_H */
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index 31a7894e..cd1069c 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -559,6 +559,117 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Kretprobes: kernel return probes handling
+> + *
+> + * AArch64 mode does not support popping the PC value from the
+> + * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
+> + * register need to be used to achieve branching/return.
+> + * It means return probes cannot return back to the original
+> + * return address directly without modifying the register context.
+> + *
+> + * So like other architectures, we prepare a global routine
+> + * with NOPs, which serve as trampoline address that hack away the
+> + * function return, with the exact register context.
+> + * Placing a kprobe on trampoline routine entry will trap again to
+> + * execute return probe handlers and restore original return address
+> + * in ELR_EL1, this way saved pt_regs still hold the original
+> + * register values to be carried back to the caller.
+> + */
+> +static void __used kretprobe_trampoline_holder(void)
+> +{
+> +	asm volatile (".global kretprobe_trampoline\n"
+> +			"kretprobe_trampoline:\n"
+> +			"NOP\n\t"
+> +			"NOP\n\t");
+> +}
+> +
+> +static int __kprobes
+> +trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +	struct kretprobe_instance *ri = NULL;
+> +	struct hlist_head *head, empty_rp;
+> +	struct hlist_node *tmp;
+> +	unsigned long flags, orig_ret_addr = 0;
+> +	unsigned long trampoline_address =
+> +		(unsigned long)&kretprobe_trampoline;
+> +
+> +	INIT_HLIST_HEAD(&empty_rp);
+> +	kretprobe_hash_lock(current, &head, &flags);
+> +
+> +	/*
+> +	 * It is possible to have multiple instances associated with a given
+> +	 * task either because multiple functions in the call path have
+> +	 * a return probe installed on them, and/or more than one return
+> +	 * probe was registered for a target function.
+> +	 *
+> +	 * We can handle this because:
+> +	 *     - instances are always inserted at the head of the list
+> +	 *     - when multiple return probes are registered for the same
+> +	 *       function, the first instance's ret_addr will point to the
+> +	 *       real return address, and all the rest will point to
+> +	 *       kretprobe_trampoline
+> +	 */
+> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
+> +		if (ri->task != current)
+> +			/* another task is sharing our hash bucket */
+> +			continue;
+> +
+> +		if (ri->rp && ri->rp->handler) {
+> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
+> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+> +			ri->rp->handler(ri, regs);
+> +			__this_cpu_write(current_kprobe, NULL);
+> +		}
+> +
+> +		orig_ret_addr = (unsigned long)ri->ret_addr;
+> +		recycle_rp_inst(ri, &empty_rp);
+> +
+> +		if (orig_ret_addr != trampoline_address)
+> +			/*
+> +			 * This is the real return address. Any other
+> +			 * instances associated with this task are for
+> +			 * other calls deeper on the call stack
+> +			 */
+> +			break;
+> +	}
+> +
+> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
+> +	/* restore the original return address */
+> +	instruction_pointer(regs) = orig_ret_addr;
+> +	reset_current_kprobe();
+> +	kretprobe_hash_unlock(current, &flags);
+> +
+> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
+> +		hlist_del(&ri->hlist);
+> +		kfree(ri);
+> +	}
+> +
+> +	kprobes_restore_local_irqflag(regs);
 
-Not sure I'm following. Does the A57 core cache partial TLBs or not?
+I don't think we want this, it causes my system to crash when I do the
+following:
 
-Even if not, I would expect the page tables to be hot in dcache most
-of the time, possibly with the exception of the last level on
-multi-threaded processes, but then you are back to the difference
-between the page size and the upper levels almost out of the equation.
+echo "p:memcpy memcpy size=%x2" > /sys/kernel/debug/tracing/kprobe_events
+echo "r:memcpyret memcpy ret=%x0" >> /sys/kernel/debug/tracing/kprobe_events
+perf record -e 'kprobes:*' -a -g sleep 5
 
-	Arnd
+The failure mode is the familar one at:
+fs/buffer.c:1257
+
+static inline void check_irqs_on(void)
+{
+#ifdef irqs_disabled
+        BUG_ON(irqs_disabled());
+#endif
+}
+
+If I remove the line, then everything behaves for me.
+
+> +
+> +	/* return 1 so that post handlers not called */
+> +	return 1;
+> +}
+> +
+> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+> +				      struct pt_regs *regs)
+> +{
+> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
+> +
+> +	/* replace return addr (x30) with trampoline */
+> +	regs->regs[30] = (long)&kretprobe_trampoline;
+> +}
+> +
+> +static struct kprobe trampoline = {
+> +	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
+> +	.pre_handler = trampoline_probe_handler
+> +};
+> +
+> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+> +{
+> +	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
+> +}
+> +
+>  /* Break Handler hook */
+>  static struct break_hook kprobes_break_hook = {
+>  	.esr_mask = BRK64_ESR_MASK,
+> @@ -576,5 +687,6 @@ int __init arch_init_kprobes(void)
+>  	register_break_hook(&kprobes_break_hook);
+>  	register_step_hook(&kprobes_step_hook);
+>  
+> -	return 0;
+> +	/* register trampoline for kret probe */
+> +	return register_kprobe(&trampoline);
+>  }
+> -- 
+> 1.8.1.2
+> 
