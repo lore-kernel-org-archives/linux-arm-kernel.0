@@ -1,213 +1,80 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 12 Jan 2015 14:01:57 +0000
-Subject: [PATCH v4 5/6] arm64: Add kernel return probes support(kretprobes)
-In-Reply-To: <1420949002-3726-6-git-send-email-dave.long@linaro.org>
-References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>
- <1420949002-3726-6-git-send-email-dave.long@linaro.org>
-Message-ID: <20150112140156.GC24728@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Jan 2015 15:04:00 +0100
+Subject: [PATCH] clocksource: timer-atmel-pit: don't suspend/resume if
+ unused
+In-Reply-To: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <54B3D450.7050405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 11:03:20PM -0500, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+Le 18/12/2014 15:05, Nicolas Ferre a ?crit :
+> From: Sylvain Rochet <sylvain.rochet@finsecur.com>
 > 
-> AArch64 ISA does not have instructions to pop the PC register
-> value from the stack(like ARM v7 has ldmia {...,pc}) without using
-> one of the general purpose registers. This means return probes
-> cannot return to the actual return address directly without
-> modifying register context, and without trapping into debug exception.
+> Waiting for PIT to stop counting takes a long time:
+>   1/(Master clock/prescaler/PIVR)
+> = 1/(133 MHz     /16       /2^20)
+> = 126 ms
 > 
-> So, like many other architectures, we prepare a global routine
-> with NOPs which serve as a trampoline to hack away the
-> function return address by placing an extra kprobe on the
-> trampoline entry.
+> Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
+> of the unused PIT device reduce (suspend time + resume time) from ~140 ms
+> to ~17 ms.
 > 
-> The pre-handler of this special 'trampoline' kprobe executes the return
-> probe handler functions and restores original return address in ELR_EL1.
-> This way the saved pt_regs still hold the original register context to be
-> carried back to the probed kernel function.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> [nicolas.ferre at atmel.com: move to newer clocksource driver]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
->  arch/arm64/Kconfig               |   1 +
->  arch/arm64/include/asm/kprobes.h |   1 +
->  arch/arm64/kernel/kprobes.c      | 114 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 115 insertions(+), 1 deletion(-)
+> Hi Sylvain,
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index b3f61ba..de4f056 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -68,6 +68,7 @@ config ARM64
->  	select HAVE_RCU_TABLE_FREE
->  	select HAVE_SYSCALL_TRACEPOINTS
->  	select HAVE_KPROBES if !XIP_KERNEL
-> +	select HAVE_KRETPROBES if HAVE_KPROBES
->  	select IRQ_DOMAIN
->  	select MODULES_USE_ELF_RELA
->  	select NO_BOOTMEM
-> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-> index b35d3b9..a2de3b8 100644
-> --- a/arch/arm64/include/asm/kprobes.h
-> +++ b/arch/arm64/include/asm/kprobes.h
-> @@ -56,5 +56,6 @@ void arch_remove_kprobe(struct kprobe *);
->  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
->  int kprobe_exceptions_notify(struct notifier_block *self,
->  			     unsigned long val, void *data);
-> +void kretprobe_trampoline(void);
+> I re-worked (and "Acked") your patch so it can be applied on the newer Mainline
+> kernels. Beware, I changed the "subject line" as well. The PIT driver moved
+> recently (3.18).
+> 
+> Daniel,
+> Can you take this patch in your tree?
+
+Hi Daniel,
+
+Anything prevents this patch from being merged (aka ping ;-))?
+
+Bye,
+
+
+> Thanks, bye.
+>   Nicolas.
+> 
+>  drivers/clocksource/timer-atmel-pit.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+> index b5b4d4585c9a..5408bc7c68d8 100644
+> --- a/drivers/clocksource/timer-atmel-pit.c
+> +++ b/drivers/clocksource/timer-atmel-pit.c
+> @@ -123,6 +123,10 @@ static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
+>  {
+>  	struct pit_data *data = clkevt_to_pit_data(cedev);
 >  
->  #endif /* _ARM_KPROBES_H */
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index 31a7894e..cd1069c 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -559,6 +559,117 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->  	return 0;
+> +	/* Don't suspend PIT if unused */
+> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
+> +		return;
+> +
+>  	/* Disable timer */
+>  	pit_write(data->base, AT91_PIT_MR, 0);
+>  }
+> @@ -145,6 +149,10 @@ static void at91sam926x_pit_resume(struct clock_event_device *cedev)
+>  {
+>  	struct pit_data *data = clkevt_to_pit_data(cedev);
+>  
+> +	/* Don't resume PIT if unused */
+> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
+> +		return;
+> +
+>  	at91sam926x_pit_reset(data);
 >  }
 >  
-> +/*
-> + * Kretprobes: kernel return probes handling
-> + *
-> + * AArch64 mode does not support popping the PC value from the
-> + * stack like on ARM 32-bit (ldmia {..,pc}), so atleast one
-> + * register need to be used to achieve branching/return.
-> + * It means return probes cannot return back to the original
-> + * return address directly without modifying the register context.
-> + *
-> + * So like other architectures, we prepare a global routine
-> + * with NOPs, which serve as trampoline address that hack away the
-> + * function return, with the exact register context.
-> + * Placing a kprobe on trampoline routine entry will trap again to
-> + * execute return probe handlers and restore original return address
-> + * in ELR_EL1, this way saved pt_regs still hold the original
-> + * register values to be carried back to the caller.
-> + */
-> +static void __used kretprobe_trampoline_holder(void)
-> +{
-> +	asm volatile (".global kretprobe_trampoline\n"
-> +			"kretprobe_trampoline:\n"
-> +			"NOP\n\t"
-> +			"NOP\n\t");
-> +}
-> +
-> +static int __kprobes
-> +trampoline_probe_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +	struct kretprobe_instance *ri = NULL;
-> +	struct hlist_head *head, empty_rp;
-> +	struct hlist_node *tmp;
-> +	unsigned long flags, orig_ret_addr = 0;
-> +	unsigned long trampoline_address =
-> +		(unsigned long)&kretprobe_trampoline;
-> +
-> +	INIT_HLIST_HEAD(&empty_rp);
-> +	kretprobe_hash_lock(current, &head, &flags);
-> +
-> +	/*
-> +	 * It is possible to have multiple instances associated with a given
-> +	 * task either because multiple functions in the call path have
-> +	 * a return probe installed on them, and/or more than one return
-> +	 * probe was registered for a target function.
-> +	 *
-> +	 * We can handle this because:
-> +	 *     - instances are always inserted at the head of the list
-> +	 *     - when multiple return probes are registered for the same
-> +	 *       function, the first instance's ret_addr will point to the
-> +	 *       real return address, and all the rest will point to
-> +	 *       kretprobe_trampoline
-> +	 */
-> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
-> +		if (ri->task != current)
-> +			/* another task is sharing our hash bucket */
-> +			continue;
-> +
-> +		if (ri->rp && ri->rp->handler) {
-> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
-> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
-> +			ri->rp->handler(ri, regs);
-> +			__this_cpu_write(current_kprobe, NULL);
-> +		}
-> +
-> +		orig_ret_addr = (unsigned long)ri->ret_addr;
-> +		recycle_rp_inst(ri, &empty_rp);
-> +
-> +		if (orig_ret_addr != trampoline_address)
-> +			/*
-> +			 * This is the real return address. Any other
-> +			 * instances associated with this task are for
-> +			 * other calls deeper on the call stack
-> +			 */
-> +			break;
-> +	}
-> +
-> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
-> +	/* restore the original return address */
-> +	instruction_pointer(regs) = orig_ret_addr;
-> +	reset_current_kprobe();
-> +	kretprobe_hash_unlock(current, &flags);
-> +
-> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
-> +		hlist_del(&ri->hlist);
-> +		kfree(ri);
-> +	}
-> +
-> +	kprobes_restore_local_irqflag(regs);
-
-I don't think we want this, it causes my system to crash when I do the
-following:
-
-echo "p:memcpy memcpy size=%x2" > /sys/kernel/debug/tracing/kprobe_events
-echo "r:memcpyret memcpy ret=%x0" >> /sys/kernel/debug/tracing/kprobe_events
-perf record -e 'kprobes:*' -a -g sleep 5
-
-The failure mode is the familar one at:
-fs/buffer.c:1257
-
-static inline void check_irqs_on(void)
-{
-#ifdef irqs_disabled
-        BUG_ON(irqs_disabled());
-#endif
-}
-
-If I remove the line, then everything behaves for me.
-
-> +
-> +	/* return 1 so that post handlers not called */
-> +	return 1;
-> +}
-> +
-> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
-> +				      struct pt_regs *regs)
-> +{
-> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
-> +
-> +	/* replace return addr (x30) with trampoline */
-> +	regs->regs[30] = (long)&kretprobe_trampoline;
-> +}
-> +
-> +static struct kprobe trampoline = {
-> +	.addr = (kprobe_opcode_t *) &kretprobe_trampoline,
-> +	.pre_handler = trampoline_probe_handler
-> +};
-> +
-> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
-> +{
-> +	return p->addr == (kprobe_opcode_t *) &kretprobe_trampoline;
-> +}
-> +
->  /* Break Handler hook */
->  static struct break_hook kprobes_break_hook = {
->  	.esr_mask = BRK64_ESR_MASK,
-> @@ -576,5 +687,6 @@ int __init arch_init_kprobes(void)
->  	register_break_hook(&kprobes_break_hook);
->  	register_step_hook(&kprobes_step_hook);
->  
-> -	return 0;
-> +	/* register trampoline for kret probe */
-> +	return register_kprobe(&trampoline);
->  }
-> -- 
-> 1.8.1.2
 > 
+
+
+-- 
+Nicolas Ferre
