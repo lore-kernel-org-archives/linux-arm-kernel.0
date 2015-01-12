@@ -1,125 +1,143 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 12 Jan 2015 21:34:56 +0900
-Subject: [PATCHv8 8/9] ARM: dts: exynos: Add PPMU node to Exynos3250-based
- Rinato/Monk board
+Date: Mon, 12 Jan 2015 21:34:55 +0900
+Subject: [PATCHv8 7/9] ARM: dts: Add PPMU dt node for Exynos5260 SoC
 In-Reply-To: <1421066097-26237-1-git-send-email-cw00.choi@samsung.com>
 References: <1421066097-26237-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1421066097-26237-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1421066097-26237-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU dt node to Exynos3250-base Rinato/Monk board. The PPMU node
-is used to get the utilization of DMC0/DMC1/LEFTBUS/RIGHTBUS Block.
+This patch adds PPMU (Performance Profiling Monitoring Unit) dt node
+Exynos5260 SoC.
+
+Exynos5260 SoC has following PPMU IPs:
+- PPMU_DREX0_S0 0x10c60000
+- PPMU_DREX0_S1 0x10c70000
+- PPMU_DREX1_S0 0x10c80000
+- PPMU_DREX1_S1 0x10c90000
+- PPMU_EAGLE    0x10cc0000
+- PPMU_KFC      0x10cd0000
+- PPMU_MFC      0x11040000
+- PPMU_G3D      0x11880000
+- PPMU_FSYS     0x12220000
+- PPMU_ISP      0x13370000
+- PPMU_FICM     0x13cb0000
+- PPMU_GSCL     0x13e60000
+- PPMU_MSCL     0x13ee0000
+- PPMU_FIMD0X   0x145b0000
+- PPMU_FIMD1X   0x145c0000
+
+The drivers/devfreq/exynos/exynos5_bus.c supports the memory bus frequency/
+voltage scaling of Exynos5260 SoC with DEVFREQ framework.
 
 Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+Cc: Jonghwan Choi <jhbird.choi@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-monk.dts   | 40 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos3250-rinato.dts | 40 +++++++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
+ arch/arm/boot/dts/exynos5260.dtsi | 90 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-index 24822aa..fcceb59 100644
---- a/arch/arm/boot/dts/exynos3250-monk.dts
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -420,6 +420,46 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
+index 36da38e..26f3074 100644
+--- a/arch/arm/boot/dts/exynos5260.dtsi
++++ b/arch/arm/boot/dts/exynos5260.dtsi
+@@ -307,6 +307,96 @@
+ 			fifo-depth = <64>;
+ 			status = "disabled";
+ 		};
++
++		ppmu_drex0_s0: ppmu_drex0_s0 at 10c60000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x10c60000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_drex0_s1: ppmu_drex0_s1 at 10c70000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x10c70000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_drex1_s0: ppmu_drex1_s0 at 10c80000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x10c80000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_drex1_s1: ppmu_drex1_s1 at 10c90000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x10c90000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_eagle: ppmu_eagle at 10cc0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x10cc0000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_kfc: ppmu_kfc at 10cd0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x10cd0000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_mfc: ppmu_mfc at 11040000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x11040000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_g3d: ppmu_g3d at 11880000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x11880000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_fsys: ppmu_fsys at 12220000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x12220000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_isp: ppmu_isp at 13370000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x13370000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_fimc: ppmu_fimc at 13cb0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x13cb0000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_gscl: ppmu_gscl at 13e60000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x13e60000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_mscl: ppmu_gscl at 13ee0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x13ee0000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_fimd0x: ppmu_fimd0x at 145b0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x145b0000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_fimd1x: ppmu_fimd1x at 145c0000 {
++			compatible = "samsung,exynos-ppmu";
++			reg = <0x145c0000 0x2000>;
++			status = "disabled";
++		};
+ 	};
  };
  
-+&ppmu_dmc0 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc0_3: ppmu-event3-dmc0 {
-+			event-name = "ppmu-event3-dmc0";
-+		};
-+	};
-+};
-+
-+&ppmu_dmc1 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc1_3: ppmu-event3-dmc1 {
-+			event-name = "ppmu-event3-dmc1";
-+		};
-+	};
-+};
-+
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &xusbxti {
- 	clock-frequency = <24000000>;
- };
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 7cc52b5..9dd1ce1 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -595,6 +595,46 @@
- 	status = "okay";
- };
- 
-+&ppmu_dmc0 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc0_3: ppmu-event3-dmc0 {
-+			event-name = "ppmu-event3-dmc0";
-+		};
-+	};
-+};
-+
-+&ppmu_dmc1 {
-+	status = "okay";
-+
-+	events {
-+		ppmu_dmc1_3: ppmu-event3-dmc1 {
-+			event-name = "ppmu-event3-dmc1";
-+		};
-+	};
-+};
-+
-+&ppmu_leftbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_leftbus_3: ppmu-event3-leftbus {
-+			event-name = "ppmu-event3-leftbus";
-+		};
-+	};
-+};
-+
-+&ppmu_rightbus {
-+	status = "okay";
-+
-+	events {
-+		ppmu_rightbus_3: ppmu-event3-rightbus {
-+			event-name = "ppmu-event3-rightbus";
-+		};
-+	};
-+};
-+
- &xusbxti {
- 	clock-frequency = <24000000>;
- };
 -- 
 1.8.5.5
