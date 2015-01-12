@@ -1,54 +1,37 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Mon, 12 Jan 2015 15:38:25 +0530
-Subject: [PATCH v5 0/2] Cadence I2C driver fixes
-In-Reply-To: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
-References: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
-Message-ID: <CAFcVECJ9-aTu=FFNr-yctHfQQEJx1TL2R-uRuqszaSvJk-yLTA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 12 Jan 2015 11:13:49 +0100
+Subject: [RFC 02/11] i2c: add quirk checks to core
+In-Reply-To: <20150112095847.GD3625@ldesroches-Latitude-E6320>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+ <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+ <20150112095847.GD3625@ldesroches-Latitude-E6320>
+Message-ID: <20150112101349.GA995@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Any further comments on this?
+> I am not sure it will perfectly fit at91 quirks.
 
-Regards,
-Harini
+I think it does.
 
-On Fri, Dec 12, 2014 at 9:48 AM, Harini Katakam <harinik@xilinx.com> wrote:
-> This series implements workarounds for some bugs in Cadence I2C controller.
->
-> - The I2C controller when configured in Master Mode generates invalid read transactions.
-> When HOLD bit is set and HW timeout occurs, invalid read transactions are
-> generated on the bus. This will affect repeated start conditions and large
-> data transfer condtions where transfer_size_register has to be updated again.
-> The transfer size register rolls over erroneously under these conditions.
-> Note that this HW timeout cannot be disabled even if the interrupt is unused.
-> Errata link: http://www.xilinx.com/support/answers/61664.html
->
-> -The I2C controller when configured in Master Mode is the missing master completion interrupt.
-> During repeated start condition, the driver has to set the HOLD bit for
-> the set of transfer being done together and clear the HOLD bit just before
-> the last transfer. But the controller does not indicate completion when
-> a read/receive transfer is done if the HOLD bit is set. This affects
-> all repeated start operation where a read/receive transfer is not
-> the last transfer.
-> Errata link: http://www.xilinx.com/support/answers/61665.html
->
-> To address the above,
-> - >252 byte transfers are done such that transfer_size never becomes zero.
-> - timeout register value is increased (even though the driver doesn't use this).
-> - A check is performed to see if there is any transfer following a
-> read/receive transfer in the set of messages using repeated start.
-> An error is returned in such cases because if we proceed, completion interrupt
-> is never obtained and a SW timeout will occur.
->
-> Harini Katakam (2):
->   i2c: cadence: Handle > 252 byte transfers
->   i2c: cadence: Check for errata condition involving master receive
->
->  drivers/i2c/busses/i2c-cadence.c |  185 +++++++++++++++++++++++---------------
->  1 file changed, 112 insertions(+), 73 deletions(-)
->
-> --
-> 1.7.9.5
->
+> The hardware can handle two messages by using the internal address
+> feature. The internal address size is from one byte to three bytes. Then
+> the length of the first message is limited to three but we don't have
+> this constraint for the second one. If we have 'write then read' no problem
+> but if we have two write messages, the second one will cause a quirk
+> exceeded error.
+
+Yeah, for this reason I seperated I2C_ADAPTER_QUIRK_COMB_WRITE_FIRST
+out. The first message is checked against max_comb_write_len which is
+set to 3 for your driver. The second is checked agains max_write_len
+which is unset in your driver and thus can be of any length.
+
+That should work, no?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/8f6c67bb/attachment.sig>
