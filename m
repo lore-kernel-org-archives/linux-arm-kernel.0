@@ -1,45 +1,38 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 12 Jan 2015 12:34:36 +0100
-Subject: [PATCH v9 07/12] coresight-etm: add CoreSight ETM/PTM driver
-In-Reply-To: <1415647928.21229.23.camel@x220>
-References: <1415038066-22423-1-git-send-email-mathieu.poirier@linaro.org>
- <1415038066-22423-8-git-send-email-mathieu.poirier@linaro.org>
- <1415615671.4862.30.camel@x220>
- <CANLsYkxivqgyRZspS2uP9Mkwit4obCjZxYr0YUhR3G_zQejERg@mail.gmail.com>
- <1415647928.21229.23.camel@x220>
-Message-ID: <1421062476.22660.46.camel@x220>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 12 Jan 2015 13:37:22 +0200
+Subject: Linux 3.19-rc3
+In-Reply-To: <10028397.kdbz8TfPck@wuerfel>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <4665410.x9Uu42bKmJ@wuerfel>
+ <CA+55aFxphoLdFkwkVFQ87Q8EbYNqFAE-n0yTvCSOJzSO2MtDgw@mail.gmail.com>
+ <10028397.kdbz8TfPck@wuerfel>
+Message-ID: <20150112113722.GC16935@node.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-11-10 at 20:32 +0100, Paul Bolle wrote:
-> On Mon, 2014-11-10 at 08:40 -0700, Mathieu Poirier wrote:
-> > On 10 November 2014 03:34, Paul Bolle <pebolle@tiscali.nl> wrote:
-> > > On Mon, 2014-11-03 at 11:07 -0700, mathieu.poirier at linaro.org wrote:
-> > >> +#ifdef CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE
-> > >
-> > > There's no Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE. Neither
-> > > is there a preprocessor definition of this macro. So why was this
-> > > added?
-> > 
-> > Correct - the feature (as we really want it) is currently being worked
-> > on but not yet part of the code base.  The default option probably
-> > should have been removed but it doesn't do much else when mandating
-> > one to add a boot option on the kernel cmd line.
+On Sat, Jan 10, 2015 at 10:36:13PM +0100, Arnd Bergmann wrote:
+> On Saturday 10 January 2015 13:00:27 Linus Torvalds wrote:
+> > so I feel pretty confident in saying it won't happen. It's just too
+> > much of a bother, for little to no actual upside. It's likely a much
+> > better approach to try to instead use THP for anonymous mappings.
 > 
-> I'm afraid I'm not sure what you mean here. Anyhow, using a Kconfig
-> symbol to set a default for something that can also be set through a
-> kernel parameter might be considered overdoing it. But that's not for me
-> to decide.
+> arm64 already supports 2MB transparent hugepages. I guess it
+> wouldn't be too hard to change it so that an existing hugepage
+> on an anonymous mapping that gets split up into 4KB pages gets
+> split along 64KB boundaries with the contiguous mapping bit set.
+
+What you are talking about is in fact multi-level transparent huge page
+support: you need to couple 4k pages into 64k to avoid breaking them apart
+by compactation or migration or whatever.
+
+That definetely would not make THP code simplier.
+
+> Having full support for multiple hugepage sizes (64KB, 2MB and 32MB
+> in case of ARM64 with 4KB PAGE_SIZE) would be even better and
+> probably negate any benefits of 64KB PAGE_SIZE, but requires more
+> changes to common mm code.
 > 
-> Unless the patch that adds this Kconfig symbol takes a long time to land
-> in linux-next, I won't be bothering you again.
+> 	Arnd
 
-Two months have passed. This code made it unchanged into v3.19-rc1. A
-Kconfig symbol CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE is not yet part of
-linux-next.
-
-Should I submit a trivial patch to drop the useless check for
-CONFIG_CORESIGHT_SOURCE_ETM_DEFAULT_ENABLE?
-
-
-Paul Bolle
+-- 
+ Kirill A. Shutemov
