@@ -1,205 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Jan 2015 18:26:10 +0000
-Subject: [PATCH v3 04/21] ARM: tegra: update DTs to expose legacy interrupt
+Date: Mon, 12 Jan 2015 18:26:11 +0000
+Subject: [PATCH v3 05/21] DT: tegra: add binding for the legacy interrupt
  controller
 In-Reply-To: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
 References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1421087187-26988-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1421087187-26988-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the legacy interrupt controller in every tegra DTSI files,
-and make it the parent of most interrupts.
-
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/dts/tegra114.dtsi | 16 +++++++++++++++-
- arch/arm/boot/dts/tegra124.dtsi | 16 +++++++++++++++-
- arch/arm/boot/dts/tegra20.dtsi  | 15 ++++++++++++++-
- arch/arm/boot/dts/tegra30.dtsi  | 16 +++++++++++++++-
- 4 files changed, 59 insertions(+), 4 deletions(-)
+ .../interrupt-controller/nvidia,tegra-ictlr.txt    | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 4296b53..f58a3d9 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -8,7 +8,7 @@
- 
- / {
- 	compatible = "nvidia,tegra114";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&lic>;
- 
- 	host1x at 50000000 {
- 		compatible = "nvidia,tegra114-host1x", "simple-bus";
-@@ -134,6 +134,19 @@
- 		      <0x50046000 0x2000>;
- 		interrupts = <GIC_PPI 9
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupt-parent = <&gic>;
-+	};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+new file mode 100644
+index 0000000..1099fe0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+@@ -0,0 +1,43 @@
++NVIDIA Legacy Interrupt Controller
 +
-+	lic: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra114-ictlr", "nvidia,tegra30-ictlr";
-+		reg = <0x60004000 0x100>,
-+		      <0x60004100 0x50>,
-+		      <0x60004200 0x50>,
-+		      <0x60004300 0x50>,
-+		      <0x60004400 0x50>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
- 	};
- 
- 	timer at 60005000 {
-@@ -766,5 +779,6 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 			<GIC_PPI 10
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&gic>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 4be06c6..db85695 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -10,7 +10,7 @@
- 
- / {
- 	compatible = "nvidia,tegra124";
--	interrupt-parent = <&gic>;
-+	interrupt-parent = <&lic>;
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-@@ -173,6 +173,7 @@
- 		      <0x0 0x50046000 0x0 0x2000>;
- 		interrupts = <GIC_PPI 9
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupt-parent = <&gic>;
- 	};
- 
- 	gpu at 0,57000000 {
-@@ -190,6 +191,18 @@
- 		status = "disabled";
- 	};
- 
-+	lic: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra124-ictlr", "nvidia,tegra30-ictlr";
-+		reg = <0x0 0x60004000 0x0 0x100>,
-+		      <0x0 0x60004100 0x0 0x100>,
-+		      <0x0 0x60004200 0x0 0x100>,
-+		      <0x0 0x60004300 0x0 0x100>,
-+		      <0x0 0x60004400 0x0 0x100>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+	};
++All Tegra SoCs contain a legacy interrupt controller that routes
++interrupts to the GIC, and also serves as a wakeup source. It is also
++referred to as "ictlr", hence the name of the binding.
 +
- 	timer at 0,60005000 {
- 		compatible = "nvidia,tegra124-timer", "nvidia,tegra20-timer";
- 		reg = <0x0 0x60005000 0x0 0x400>;
-@@ -955,5 +968,6 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 			     <GIC_PPI 10
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&gic>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 8acf5d8..362bb21 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -7,7 +7,7 @@
- 
- / {
- 	compatible = "nvidia,tegra20";
--	interrupt-parent = <&intc>;
-+	interrupt-parent = <&lic>;
- 
- 	host1x at 50000000 {
- 		compatible = "nvidia,tegra20-host1x", "simple-bus";
-@@ -142,6 +142,7 @@
- 
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
-+		interrupt-parent = <&intc>;
- 		reg = <0x50040600 0x20>;
- 		interrupts = <GIC_PPI 13
- 			(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-@@ -154,6 +155,7 @@
- 		       0x50040100 0x0100>;
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
- 	};
- 
- 	cache-controller at 50043000 {
-@@ -165,6 +167,17 @@
- 		cache-level = <2>;
- 	};
- 
-+	lic: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra20-ictlr";
-+		reg = <0x60004000 0x100>,
-+		      <0x60004100 0x50>,
-+		      <0x60004200 0x50>,
-+		      <0x60004300 0x50>;
++The HW block exposes a number of interrupt controllers, each
++implementing a set of 32 interrupts.
++
++Required properties:
++
++- compatible : should be: "nvidia,tegra<chip>-ictlr". The LIC on
++  subsequent SoCs remained backwards-compatible with Tegra30, so on
++  Tegra generations later than Tegra30 the compatible value should
++  include "nvidia,tegra30-ictlr".	
++- reg : Specifies base physical address and size of the registers.
++  Each controller must be described separately (Tegra20 has 4 of them,
++  whereas Tegra30 and later have 5"  
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 3.
++- interrupt-parent : a phandle to the GIC these interrupts are routed
++  to.
++
++Notes:
++
++- Because this HW ultimately routes interrupts to the GIC, the
++  interrupt specifier must be that of the GIC.
++- Only SPIs can use the ictlr as an interrupt parent. SGIs and PPIs
++  are explicitly forbidden.
++
++Example:
++
++	ictlr: interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
++		reg = <0x60004000 64>,
++		      <0x60004100 64>,
++		      <0x60004200 64>,
++		      <0x60004300 64>;
 +		interrupt-controller;
 +		#interrupt-cells = <3>;
 +		interrupt-parent = <&intc>;
 +	};
-+
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x60>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 99475f6..6bea674 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -8,7 +8,7 @@
- 
- / {
- 	compatible = "nvidia,tegra30";
--	interrupt-parent = <&intc>;
-+	interrupt-parent = <&lic>;
- 
- 	pcie-controller at 00003000 {
- 		compatible = "nvidia,tegra30-pcie";
-@@ -228,6 +228,7 @@
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
-+		interrupt-parent = <&intc>;
- 		interrupts = <GIC_PPI 13
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		clocks = <&tegra_car TEGRA30_CLK_TWD>;
-@@ -239,6 +240,7 @@
- 		       0x50040100 0x0100>;
- 		interrupt-controller;
- 		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
- 	};
- 
- 	cache-controller at 50043000 {
-@@ -250,6 +252,18 @@
- 		cache-level = <2>;
- 	};
- 
-+	lic: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra30-ictlr";
-+		reg = <0x60004000 0x100>,
-+		      <0x60004100 0x50>,
-+		      <0x60004200 0x50>,
-+		      <0x60004300 0x50>,
-+		      <0x60004400 0x50>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
-+	};
-+
- 	timer at 60005000 {
- 		compatible = "nvidia,tegra30-timer", "nvidia,tegra20-timer";
- 		reg = <0x60005000 0x400>;
 -- 
 2.1.4
