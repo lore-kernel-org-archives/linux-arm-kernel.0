@@ -1,35 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 12 Jan 2015 16:37:45 +0100
-Subject: [PATCH] ARM: EXYNOS: Handle of of_iomap() failure
-Message-ID: <1421077065-30175-1-git-send-email-k.kozlowski@samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Jan 2015 09:38:52 -0600
+Subject: [PATCH] ARM: fix v7M build for !CONFIG_PRINTK
+In-Reply-To: <1759104.LDHVCAfBKo@wuerfel>
+References: <1421036749-5308-1-git-send-email-robh@kernel.org>
+ <1759104.LDHVCAfBKo@wuerfel>
+Message-ID: <CAL_JsqJRWK0EiZxD7i2QK2-7ztc4_UL-ro7MeYERwN_WTQjj6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevent possible NULL pointer dereference if of_iomap() fails. Handle
-the error by skipping such power domain.
+On Mon, Jan 12, 2015 at 2:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 11 January 2015 22:25:49 Rob Herring wrote:
+>>
+>>  __invalid_entry:
+>>         v7m_exception_entry
+>> +#ifdef CONFIG_PRINTK
+>>         adr     r0, strerr
+>>         mrs     r1, ipsr
+>>         mov     r2, lr
+>>         bl      printk
+>> +#endif
+>>         mov     r0, sp
+>>         bl      show_regs
+>>  1:     b       1b
+>>
+>
+> Should the show_regs call be commented out as well? While
+> the function is still there without printk support, I believe
+> it doesn't actually do anything.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/pm_domains.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+It does still call unwind_backtrace which still constructs the
+backtrace from looking at the disassembly output. That's probably not
+too useful unless it is saved to memory that could be examined with a
+debugger. One would probably just enable printk at that point though.
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 20f267121b3e..fd7640a6b503 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -128,6 +128,13 @@ static __init int exynos4_pm_init_power_domain(void)
- 		pd->pd.name = kstrdup(np->name, GFP_KERNEL);
- 		pd->name = pd->pd.name;
- 		pd->base = of_iomap(np, 0);
-+		if (!pd->base) {
-+			dev_warn(&pdev->dev, "Failed to map memory\n");
-+			kfree(pd);
-+			of_node_put(np);
-+			continue;
-+		}
-+
- 		pd->pd.power_off = exynos_pd_power_off;
- 		pd->pd.power_on = exynos_pd_power_on;
- 
--- 
-1.9.1
+Rob
