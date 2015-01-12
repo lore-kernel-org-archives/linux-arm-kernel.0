@@ -1,57 +1,115 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Jan 2015 14:28:13 +0100
-Subject: [PATCH] dmaengine: at_hdmac: declare slave capabilities
-In-Reply-To: <1420562186-22386-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1420562186-22386-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <54B3CBED.1080702@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Jan 2015 13:29:51 +0000
+Subject: [PATCH] arm64/efi: efistub: apply __init annotation
+Message-ID: <1421069391-6902-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/01/2015 17:36, Ludovic Desroches a ?crit :
-> Declare slave capabilities to suppress "this driver doesn't support generic
-> slave capabilities reporting" warning.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+This ensures all stub component are freed when the kernel proper is
+done booting, by prefixing the names of all ELF sections that have
+the SHF_ALLOC attribute with ".init". This approach ensures that even
+implicitly emitted allocated data (like initializer values and string
+literals) are covered.
 
-Okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+At the same time, remove some __init annotations in the stub that have
+now become redundant, and add the __init annotation to handle_kernel_image
+which will trigger a section mismatch without it.
 
-Thanks Ludovic.
-Bye.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi-stub.c                   | 14 +++++++-------
+ drivers/firmware/efi/libstub/Makefile          | 15 +++++++++++++++
+ drivers/firmware/efi/libstub/arm-stub.c        |  8 ++++----
+ drivers/firmware/efi/libstub/efi-stub-helper.c |  2 +-
+ 4 files changed, 27 insertions(+), 12 deletions(-)
 
-> ---
->  drivers/dma/at_hdmac.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 86450b3..1e1a4c5 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -42,6 +42,11 @@
->  #define	ATC_DEFAULT_CFG		(ATC_FIFOCFG_HALFFIFO)
->  #define	ATC_DEFAULT_CTRLB	(ATC_SIF(AT_DMA_MEM_IF) \
->  				|ATC_DIF(AT_DMA_MEM_IF))
-> +#define ATC_DMA_BUSWIDTHS\
-> +	(BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED) |\
-> +	BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |\
-> +	BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |\
-> +	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
->  
->  /*
->   * Initial number of descriptors to allocate for each channel. This could
-> @@ -1531,6 +1536,10 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  		atdma->dma_common.device_pause = atc_pause;
->  		atdma->dma_common.device_resume = atc_resume;
->  		atdma->dma_common.device_terminate_all = atc_terminate_all;
-> +		atdma->dma_common.src_addr_widths = ATC_DMA_BUSWIDTHS;
-> +		atdma->dma_common.dst_addr_widths = ATC_DMA_BUSWIDTHS;
-> +		atdma->dma_common.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-> +		atdma->dma_common.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
->  	}
->  
->  	dma_writel(atdma, EN, AT_DMA_ENABLE);
-> 
-
-
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index d27dd982ff26..f5374065ad53 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -13,13 +13,13 @@
+ #include <asm/efi.h>
+ #include <asm/sections.h>
+ 
+-efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+-				 unsigned long *image_addr,
+-				 unsigned long *image_size,
+-				 unsigned long *reserve_addr,
+-				 unsigned long *reserve_size,
+-				 unsigned long dram_base,
+-				 efi_loaded_image_t *image)
++efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
++					unsigned long *image_addr,
++					unsigned long *image_size,
++					unsigned long *reserve_addr,
++					unsigned long *reserve_size,
++					unsigned long dram_base,
++					efi_loaded_image_t *image)
+ {
+ 	efi_status_t status;
+ 	unsigned long kernel_size, kernel_memsize = 0;
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index b14bc2b9fb4d..4e7de244c663 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -24,3 +24,18 @@ lib-y				:= efi-stub-helper.o
+ lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o
+ 
+ CFLAGS_fdt.o			+= -I$(srctree)/scripts/dtc/libfdt/
++
++#
++# arm64 puts the stub in the kernel proper, which will unnecessarily retain all
++# code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
++# So let's apply the __init annotations at the section level, by prefixing
++# the section names directly. This will ensure that even all the inline string
++# literals are covered.
++#
++lib-$(CONFIG_ARM64)		:= $(addsuffix .init,$(lib-y))
++
++OBJCOPYFLAGS := --prefix-alloc-sections=.init
++$(obj)/%.o.init: $(obj)/%.o FORCE
++	$(call if_changed,objcopy)
++
++.PRECIOUS: $(obj)/%.o
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index e2432b39b6df..dcae482a9a17 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -17,10 +17,10 @@
+ 
+ #include "efistub.h"
+ 
+-static int __init efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
++static int efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
+ {
+-	static efi_guid_t const var_guid __initconst = EFI_GLOBAL_VARIABLE_GUID;
+-	static efi_char16_t const var_name[] __initconst = {
++	static efi_guid_t const var_guid = EFI_GLOBAL_VARIABLE_GUID;
++	static efi_char16_t const var_name[] = {
+ 		'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
+ 
+ 	efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
+@@ -164,7 +164,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+  * for both archictectures, with the arch-specific code provided in the
+  * handle_kernel_image() function.
+  */
+-unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
++unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 			       unsigned long *image_addr)
+ {
+ 	efi_loaded_image_t *image;
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index e766df60fbfb..2fe195002021 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -110,7 +110,7 @@ fail:
+ }
+ 
+ 
+-unsigned long __init get_dram_base(efi_system_table_t *sys_table_arg)
++unsigned long get_dram_base(efi_system_table_t *sys_table_arg)
+ {
+ 	efi_status_t status;
+ 	unsigned long map_size;
 -- 
-Nicolas Ferre
+1.8.3.2
