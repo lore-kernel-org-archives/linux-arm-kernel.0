@@ -1,67 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Jan 2015 10:10:20 +0100
-Subject: [PATCH v3 0/9] ARM: sunxi: Support cpufreq on sun[457]i
-In-Reply-To: <1421037249-28461-1-git-send-email-wens@csie.org>
-References: <1421037249-28461-1-git-send-email-wens@csie.org>
-Message-ID: <20150112091020.GA30908@lukather>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 12 Jan 2015 17:14:30 +0800
+Subject: [PATCH v4 1/4] Document: DT: Add bindings for mediatek MT8173 SoC
+ Platform
+In-Reply-To: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
+References: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1421054073-43468-2-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 12:34:00PM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> This is v3 of the cpufreq support series for sunxi. The series has been
-> rebased onto the latest sunxi-next. I've dropped all the patches Maxime
-> merged. This includes "ARM: sunxi: Register cpufreq-dt for sun[45678]i"
-> which was merged but not published yet.
-> 
-> Individual changes since v2 are listed within each patch.
-> 
-> 
-> Original cover letter follows:
-> 
-> This series adds support cpufreq support for sun[457]i using cpufreq-dt.
-> This also supports passive cpu cooling (thermal throttling) using thermal
-> zones with the temperature sensor in the SoC.
-> 
-> The operating points for the supported platforms were taken from the
-> linux-sunxi FEX files repository. The majority of boards use the same
-> settings. Only with sun7i do we see slight variations, either disabling
-> some frequencies, or bumping up the voltage a bit. In either case this
-> can be done by limiting the constraints for the supply regulator, or 
-> overriding the OPP table in the board dts file.
-> 
-> On sun7i, there is an additional operating point not found in the FEX
-> files, 960 MHz @ 1.4V, which is the full speed setting in both u-boot-sunxi
-> and mainline u-boot.
-> 
-> The series has been tested on the 4 boards I have. With cpufreq active,
-> the effects are visible as a decrease in SoC internal temperature.
-> Stability for the operating points has been tested using:
-> 
->   http://linux-sunxi.org/Hardware_Reliability_Tests#Reliability_of_cpufreq_voltage.2Ffrequency_settings
-> 
-> More real world usage feedback is appreciated. Thermal throttling hasn't
-> been tested much, due to not being able to generate enough load without
-> the GPU for the SoC to heat up. Also on sun4i, the temperature sensor
-> still hasn't been calibrated, so the readings are highly inaccurate.
+MT8173 is a 64-bit four core Soc.
+And mt8173-evb is a evaluation board based on mt8173.
+This commit add the devicetree binding document for
+  mediatek MT8173 SoC
+  MT8173 sysirq
+  MT8173 uart
 
-Applied 2, 3, 6 and 8.
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+---
+ Documentation/devicetree/bindings/arm/mediatek.txt                 | 4 ++++
+ Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt | 1 +
+ Documentation/devicetree/bindings/serial/mtk-uart.txt              | 4 +++-
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-There's still some discussions about the boards regulators, that apply
-to all of them, even though I commented on one in particular.
-
-Thanks!
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index 3be4013..dd7550a 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -9,6 +9,7 @@ compatible: Must contain one of
+    "mediatek,mt6592"
+    "mediatek,mt8127"
+    "mediatek,mt8135"
++   "mediatek,mt8173"
+ 
+ 
+ Supported boards:
+@@ -25,3 +26,6 @@ Supported boards:
+ - MTK mt8135 tablet EVB:
+     Required root node properties:
+       - compatible = "mediatek,mt8135-evbp1", "mediatek,mt8135";
++- MTK mt8173 tablet EVB:
++    Required root node properties:
++      - compatible = "mediatek,mt8173-evb", "mediatek,mt8173";
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+index d680b07..8794f8d 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
+@@ -5,6 +5,7 @@ interrupt.
+ 
+ Required properties:
+ - compatible: should be one of:
++	"mediatek,mt8173-sysirq"
+ 	"mediatek,mt8135-sysirq"
+ 	"mediatek,mt8127-sysirq"
+ 	"mediatek,mt6589-sysirq"
+diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+index 48358a3..0e41b6e 100644
+--- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
++++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
+@@ -2,9 +2,11 @@
+ 
+ Required properties:
+ - compatible should contain:
++  * "mediatek,mt8173-uart" for MT8173 compatible UARTS
+   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
+   * "mediatek,mt6582-uart" for MT6582 compatible UARTS
+-  * "mediatek,mt6577-uart" for all compatible UARTS (MT6589, MT6582, MT6577)
++  * "mediatek,mt6577-uart" for all compatible UARTS (MT8173, MT6589, MT6582, 
++	MT6577)
+ 
+ - reg: The base address of the UART register bank.
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/85077dc8/attachment.sig>
+1.8.1.1.dirty
