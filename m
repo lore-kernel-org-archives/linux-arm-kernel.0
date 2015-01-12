@@ -1,51 +1,123 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 12 Jan 2015 13:41:23 +0100
-Subject: [PATCH 0/6] ARM: mvebu: mvebu-mbus and I/O coherency fixes
-In-Reply-To: <20150112123613.GG12302@n2100.arm.linux.org.uk>
-References: <1419943428-18491-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150110163001.GA5392@lunn.ch>
- <20150110175030.186ef929@free-electrons.com>
- <2707920.rUFmbmVqu6@wuerfel>
- <20150110205721.6b3f71f8@free-electrons.com>
- <20150112123613.GG12302@n2100.arm.linux.org.uk>
-Message-ID: <20150112134123.5c27bfc3@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Jan 2015 12:42:56 +0000
+Subject: Linux 3.19-rc3
+In-Reply-To: <CA+55aFxBA6F4Kr89iZwPPeBnkiRO4GnrbUSd0CqVG-LD6ZQyiw@mail.gmail.com>
+References: <20150109121348.GD12942@leverpostej>
+ <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
+ <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
+ <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
+ <54B09CA3.1060501@redhat.com>
+ <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
+ <20150110133742.GA6999@arm.com>
+ <CA+55aFxBA6F4Kr89iZwPPeBnkiRO4GnrbUSd0CqVG-LD6ZQyiw@mail.gmail.com>
+Message-ID: <20150112124256.GB13360@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Mon, 12 Jan 2015 12:36:13 +0000, Russell King - ARM Linux wrote:
-> On Sat, Jan 10, 2015 at 08:57:21PM +0100, Thomas Petazzoni wrote:
-> > We will indeed need to do more extensive testing and review. However, I
-> > don't agree that this should prevent this patch from going to stable:
-> > the current situation in the kernel (and also past kernels) is known to
-> > be broken: DMA coherent mappings allocated by dma_alloc_coherent() are
-> > *not* coherent in the current situation. Writes made by the device to
-> > the memory are not guaranteed to be immediately visible to the CPU,
-> > unless an explicit I/O sync barrier is done, which obviously is never
-> > done for DMA coherent mappings since those are assumed by Linux to be
-> > coherent, and therefore not require any cache maintenance operation.
+On Sat, Jan 10, 2015 at 07:51:03PM +0000, Linus Torvalds wrote:
+> On Sat, Jan 10, 2015 at 5:37 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >>
+> >> Will?
+> >
+> > I'm wondering if this is now broken in the fullmm case, because tlb->end
+> > will be zero and we won't actually free any of the pages being unmapped
+> > on task exit. Does that sound plausible?
 > 
-> That's actually an incorrect statement.
-> 
-> On all ARMv6+ where DMA coherent memory is "normal memory, non-cached,
-> write combine" but because it's "normal memory", memory barriers are
-> required.  This is why we have the memory barriers in readl() and
-> writel().
+> But did anything change wrt fullmm? I don't see any changes wrt fullmm
+> logic in generic code.
 
-Except that a readl() or writel() do *not* imply the I/O
-synchronization barrier that is needed on I/O coherent Marvell CPUs to
-ensure that the CPU sees the changes made by a DMA master to the
-memory. At least in the current kernel code, at least.
+No, and now that I've had a play, the issue is worse than I thought.
 
-One option would maybe have been to add this I/O synchronization
-barrier in the memory barrier implementation, but it seems a lot
-simpler to rely on the automatic I/O synchronization mechanism instead.
+> The arm64 code changed more, so maybe there was somethinig I missed.
+> Again, arm64 uses tlb_end_vma() etc, so arm64 certainly triggers code
+> that x86 does not.
 
-Thanks,
+Yup, and I think tlb_end_vma is also problematic. The issue is that we
+reset the range in __tlb_end_vma, and therefore the batched pages don't
+get freed. We also have an issue in the fullmm case, because
+tlb_flush_mmu tests tlb->end != 0 before doing any freeing.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The fundamental problem is that tlb->end *only* indicates whether or not
+TLB invalidation is required, *not* whether there are pages to be freed.
+The advantage of the old need_flush flag was that it was sticky over
+calls to things like tlb_flush_mmu_tlbonly.
+
+> I can revert the commit that causes problems, but considering the
+> performance impact on x86 (it would be a regression since 3.18), I
+> would *really* like to fix the arm64 problem instead. So I'll wait
+> with the revert for at least a week, I think, hoping that the arm64
+> people figure this out. Sound reasonable?
+
+Sure. I've put together the following patch which:
+
+  (1) Uses tlb->end != 0 only as the predicate for TLB invalidation
+
+  (2) Uses tlb->local.nr as the predicate for page freeing in
+      tlb_flush_mmu_free
+
+  (3) Ensures tlb->end != 0 for the fullmm case (I think this was a
+      benign change introduced by my original patch, but this puts us
+      back to 3.18 behaviour)
+
+Since this effectively reverts f045bbb9fa1b, I've added Dave to Cc. It
+should fix the leak without reintroducing the performance regression.
+
+Linus: this moves the tlb->end check back into tlb_flush_mmu_tlbonly.
+How much do you hate that?
+
+Will
+
+--->8
+
+diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
+index 08848050922e..db284bff29dc 100644
+--- a/include/asm-generic/tlb.h
++++ b/include/asm-generic/tlb.h
+@@ -136,8 +136,12 @@ static inline void __tlb_adjust_range(struct mmu_gather *tlb,
+ 
+ static inline void __tlb_reset_range(struct mmu_gather *tlb)
+ {
+-	tlb->start = TASK_SIZE;
+-	tlb->end = 0;
++	if (tlb->fullmm) {
++		tlb->start = tlb->end = ~0;
++	} else {
++		tlb->start = TASK_SIZE;
++		tlb->end = 0;
++	}
+ }
+ 
+ /*
+diff --git a/mm/memory.c b/mm/memory.c
+index c6565f00fb38..54f3a9b00956 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -235,6 +235,9 @@ void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long
+ 
+ static void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+ {
++	if (!tlb->end)
++		return;
++
+ 	tlb_flush(tlb);
+ 	mmu_notifier_invalidate_range(tlb->mm, tlb->start, tlb->end);
+ #ifdef CONFIG_HAVE_RCU_TABLE_FREE
+@@ -247,7 +250,7 @@ static void tlb_flush_mmu_free(struct mmu_gather *tlb)
+ {
+ 	struct mmu_gather_batch *batch;
+ 
+-	for (batch = &tlb->local; batch; batch = batch->next) {
++	for (batch = &tlb->local; batch && batch->nr; batch = batch->next) {
+ 		free_pages_and_swap_cache(batch->pages, batch->nr);
+ 		batch->nr = 0;
+ 	}
+@@ -256,9 +259,6 @@ static void tlb_flush_mmu_free(struct mmu_gather *tlb)
+ 
+ void tlb_flush_mmu(struct mmu_gather *tlb)
+ {
+-	if (!tlb->end)
+-		return;
+-
+ 	tlb_flush_mmu_tlbonly(tlb);
+ 	tlb_flush_mmu_free(tlb);
+ }
