@@ -1,42 +1,29 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Jan 2015 17:23:33 +0000
-Subject: [PATCH 2/2] ARM: dma-mapping: don't detach devices without an IOMMU
- during teardown
-In-Reply-To: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
-References: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1421083413-24798-3-git-send-email-will.deacon@arm.com>
+Date: Mon, 12 Jan 2015 17:23:31 +0000
+Subject: [PATCH 0/2] A couple of DMA teardown fixes for 3.19
+Message-ID: <1421083413-24798-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When tearing down the DMA ops for a device via of_dma_deconfigure, we
-unconditionally detach the device from its IOMMU domain. For devices
-that aren't actually behind an IOMMU, this produces a "Not attached"
-warning message on the console.
+Hi all,
 
-This patch changes the teardown code so that we don't detach from the
-IOMMU domain when there isn't an IOMMU dma mapping to start with.
+Here are a couple of DMA teardown fixes for 3.19. The first patch adds
+a call to of_dma_deconfigure on device destruction and the second patch
+fixes a redundant "Not attached" message on the console when a device
+without an IOMMU is destroyed on ARM.
 
-Repoerted-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+I guess the second patch can go independently via rmk?
+
+Will
+
+Will Deacon (2):
+  of/platform: teardown DMA mappings on device destruction
+  ARM: dma-mapping: don't detach devices without an IOMMU during
+    teardown
+
  arch/arm/mm/dma-mapping.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/of/platform.c     | 1 +
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7864797609b3..711c3d2802fb 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2023,7 +2023,10 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 
- static void arm_teardown_iommu_dma_ops(struct device *dev)
- {
--	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-+	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
-+
-+	if (!mapping)
-+		return;
- 
- 	arm_iommu_detach_device(dev);
- 	arm_iommu_release_mapping(mapping);
 -- 
 2.1.4
