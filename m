@@ -1,612 +1,138 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 11 Jan 2015 22:59:38 -0500 (EST)
-Subject: [PATCH] ARM: remove ARMv3 user access code again
-Message-ID: <alpine.LFD.2.11.1501112253320.1322@knanqh.ubzr>
+From: anup@brainfault.org (Anup Patel)
+Date: Mon, 12 Jan 2015 09:49:13 +0530
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+In-Reply-To: <20150111191131.GC3868@cbox>
+References: <20141121114950.GB3401@cbox>
+ <CAAhSdy3-+5T0sOEGHLtHbPQJ+3hXdZxL=695dq7PJ2J0qmVbTg@mail.gmail.com>
+ <20141124143753.GO3401@cbox>
+ <CAAhSdy0+Z8o6dx=Bq+Ep7ybQpTpj+QNJm4oJbKa8yCM7WS8oxg@mail.gmail.com>
+ <20141125134239.GI31297@cbox>
+ <CAAhSdy32G+-BVQk-=dWjfM1S-cytGavp4qq942m=3y7HUudguw@mail.gmail.com>
+ <5476FFAF.2010601@arm.com>
+ <CAAhSdy3US4H9DZLDmwawR6D22GUpQ8H5NqrZ8XvYJjhsnPzzRQ@mail.gmail.com>
+ <547705BF.5040609@arm.com>
+ <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
+ <20150111191131.GC3868@cbox>
+Message-ID: <CAAhSdy0FjX0TfkzThkmCz0k=mbnhJiE7tHU=jYUTFpxgDZZXeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 12, 2015 at 12:41 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Tue, Dec 30, 2014 at 11:19:13AM +0530, Anup Patel wrote:
+>> (dropping previous conversation for easy reading)
+>>
+>> Hi Marc/Christoffer,
+>>
+>> I tried implementing PMU context-switch via C code
+>> in EL1 mode and in atomic context with irqs disabled.
+>> The context switch itself works perfectly fine but
+>> irq forwarding is not clean for PMU irq.
+>>
+>> I found another issue that is GIC only samples irq
+>> lines if they are enabled. This means for using
+>> irq forwarding we will need to ensure that host PMU
+>> irq is enabled.  The arch_timer code does this by
+>> doing request_irq() for host virtual timer interrupt.
+>> For PMU, we can either enable/disable host PMU
+>> irq in context switch or we need to do have shared
+>> irq handler between kvm pmu and host kernel pmu.
+>
+> could we simply require the host PMU driver to request the IRQ and have
+> the driver inject the corresponding IRQ to the VM via a mechanism
+> similar to VFIO using an eventfd and irqfds etc.?
 
-This code was restored with commit 080fc66fb5 ("ARM: Bring back ARMv3 IO
-and user access code") because the RiscPC memory bus does not understand
-half-word load/stores.  However only the IO code needed restoring since
-the alternative user access code contains no half-word accesses, is 
-already used when CONFIG_PREEMPT is set and it runs faster on a StrongARM.
+Currently, the host PMU driver does request_irq() only when
+there is some event to be monitored. This means host will do
+request_irq() only when we run perf application on host
+user space.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Initially, I though that we could simply pass IRQF_SHARED
+for request_irq() in host PMU driver and do the same for
+reqest_irq() in KVM PMU code but the PMU irq can be
+SPI or PPI. If the PMU irq is SPI then IRQF_SHARED
+flag would fine but if its PPI then we have no way to
+set IRQF_SHARED flag because request_percpu_irq()
+does not have irq flags parameter.
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index 0573faab96..d8a7807995 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -15,19 +15,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
- 		   call_with_stack.o bswapsdi2.o
- 
--mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
--
--# the code in uaccess.S is not preemption safe and
--# probably faster on ARMv3 only
--ifeq ($(CONFIG_PREEMPT),y)
--  mmu-y	+= copy_from_user.o copy_to_user.o
--else
--ifneq ($(CONFIG_CPU_32v3),y)
--  mmu-y	+= copy_from_user.o copy_to_user.o
--else
--  mmu-y	+= uaccess.o
--endif
--endif
-+mmu-y		:= clear_user.o copy_page.o getuser.o putuser.o       \
-+		   copy_from_user.o copy_to_user.o
- 
- # using lib_ here won't override already available weak symbols
- obj-$(CONFIG_UACCESS_WITH_MEMCPY) += uaccess_with_memcpy.o
-diff --git a/arch/arm/lib/uaccess.S b/arch/arm/lib/uaccess.S
-deleted file mode 100644
-index e50520904b..0000000000
---- a/arch/arm/lib/uaccess.S
-+++ /dev/null
-@@ -1,564 +0,0 @@
--/*
-- *  linux/arch/arm/lib/uaccess.S
-- *
-- *  Copyright (C) 1995, 1996,1997,1998 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- *  Routines to block copy data to/from user memory
-- *   These are highly optimised both for the 4k page size
-- *   and for various alignments.
-- */
--#include <linux/linkage.h>
--#include <asm/assembler.h>
--#include <asm/errno.h>
--#include <asm/domain.h>
--
--		.text
--
--#define PAGE_SHIFT 12
--
--/* Prototype: int __copy_to_user(void *to, const char *from, size_t n)
-- * Purpose  : copy a block to user memory from kernel memory
-- * Params   : to   - user memory
-- *          : from - kernel memory
-- *          : n    - number of bytes to copy
-- * Returns  : Number of bytes NOT copied.
-- */
--
--.Lc2u_dest_not_aligned:
--		rsb	ip, ip, #4
--		cmp	ip, #2
--		ldrb	r3, [r1], #1
--USER(	TUSER(	strb)	r3, [r0], #1)			@ May fault
--		ldrgeb	r3, [r1], #1
--USER(	TUSER(	strgeb) r3, [r0], #1)			@ May fault
--		ldrgtb	r3, [r1], #1
--USER(	TUSER(	strgtb) r3, [r0], #1)			@ May fault
--		sub	r2, r2, ip
--		b	.Lc2u_dest_aligned
--
--ENTRY(__copy_to_user)
--		stmfd	sp!, {r2, r4 - r7, lr}
--		cmp	r2, #4
--		blt	.Lc2u_not_enough
--		ands	ip, r0, #3
--		bne	.Lc2u_dest_not_aligned
--.Lc2u_dest_aligned:
--
--		ands	ip, r1, #3
--		bne	.Lc2u_src_not_aligned
--/*
-- * Seeing as there has to be at least 8 bytes to copy, we can
-- * copy one word, and force a user-mode page fault...
-- */
--
--.Lc2u_0fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lc2u_0nowords
--		ldr	r3, [r1], #4
--USER(	TUSER(	str)	r3, [r0], #4)			@ May fault
--		mov	ip, r0, lsl #32 - PAGE_SHIFT	@ On each page, use a ld/st??t instruction
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lc2u_0fupi
--/*
-- * ip = max no. of bytes to copy before needing another "strt" insn
-- */
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #32
--		blt	.Lc2u_0rem8lp
--
--.Lc2u_0cpy8lp:	ldmia	r1!, {r3 - r6}
--		stmia	r0!, {r3 - r6}			@ Shouldnt fault
--		ldmia	r1!, {r3 - r6}
--		subs	ip, ip, #32
--		stmia	r0!, {r3 - r6}			@ Shouldnt fault
--		bpl	.Lc2u_0cpy8lp
--
--.Lc2u_0rem8lp:	cmn	ip, #16
--		ldmgeia	r1!, {r3 - r6}
--		stmgeia	r0!, {r3 - r6}			@ Shouldnt fault
--		tst	ip, #8
--		ldmneia	r1!, {r3 - r4}
--		stmneia	r0!, {r3 - r4}			@ Shouldnt fault
--		tst	ip, #4
--		ldrne	r3, [r1], #4
--	TUSER(	strne) r3, [r0], #4			@ Shouldnt fault
--		ands	ip, ip, #3
--		beq	.Lc2u_0fupi
--.Lc2u_0nowords:	teq	ip, #0
--		beq	.Lc2u_finished
--.Lc2u_nowords:	cmp	ip, #2
--		ldrb	r3, [r1], #1
--USER(	TUSER(	strb)	r3, [r0], #1)			@ May fault
--		ldrgeb	r3, [r1], #1
--USER(	TUSER(	strgeb) r3, [r0], #1)			@ May fault
--		ldrgtb	r3, [r1], #1
--USER(	TUSER(	strgtb) r3, [r0], #1)			@ May fault
--		b	.Lc2u_finished
--
--.Lc2u_not_enough:
--		movs	ip, r2
--		bne	.Lc2u_nowords
--.Lc2u_finished:	mov	r0, #0
--		ldmfd	sp!, {r2, r4 - r7, pc}
--
--.Lc2u_src_not_aligned:
--		bic	r1, r1, #3
--		ldr	r7, [r1], #4
--		cmp	ip, #2
--		bgt	.Lc2u_3fupi
--		beq	.Lc2u_2fupi
--.Lc2u_1fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lc2u_1nowords
--		mov	r3, r7, lspull #8
--		ldr	r7, [r1], #4
--		orr	r3, r3, r7, lspush #24
--USER(	TUSER(	str)	r3, [r0], #4)			@ May fault
--		mov	ip, r0, lsl #32 - PAGE_SHIFT
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lc2u_1fupi
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #16
--		blt	.Lc2u_1rem8lp
--
--.Lc2u_1cpy8lp:	mov	r3, r7, lspull #8
--		ldmia	r1!, {r4 - r7}
--		subs	ip, ip, #16
--		orr	r3, r3, r4, lspush #24
--		mov	r4, r4, lspull #8
--		orr	r4, r4, r5, lspush #24
--		mov	r5, r5, lspull #8
--		orr	r5, r5, r6, lspush #24
--		mov	r6, r6, lspull #8
--		orr	r6, r6, r7, lspush #24
--		stmia	r0!, {r3 - r6}			@ Shouldnt fault
--		bpl	.Lc2u_1cpy8lp
--
--.Lc2u_1rem8lp:	tst	ip, #8
--		movne	r3, r7, lspull #8
--		ldmneia	r1!, {r4, r7}
--		orrne	r3, r3, r4, lspush #24
--		movne	r4, r4, lspull #8
--		orrne	r4, r4, r7, lspush #24
--		stmneia	r0!, {r3 - r4}			@ Shouldnt fault
--		tst	ip, #4
--		movne	r3, r7, lspull #8
--		ldrne	r7, [r1], #4
--		orrne	r3, r3, r7, lspush #24
--	TUSER(	strne) r3, [r0], #4			@ Shouldnt fault
--		ands	ip, ip, #3
--		beq	.Lc2u_1fupi
--.Lc2u_1nowords:	mov	r3, r7, get_byte_1
--		teq	ip, #0
--		beq	.Lc2u_finished
--		cmp	ip, #2
--USER(	TUSER(	strb)	r3, [r0], #1)			@ May fault
--		movge	r3, r7, get_byte_2
--USER(	TUSER(	strgeb) r3, [r0], #1)			@ May fault
--		movgt	r3, r7, get_byte_3
--USER(	TUSER(	strgtb) r3, [r0], #1)			@ May fault
--		b	.Lc2u_finished
--
--.Lc2u_2fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lc2u_2nowords
--		mov	r3, r7, lspull #16
--		ldr	r7, [r1], #4
--		orr	r3, r3, r7, lspush #16
--USER(	TUSER(	str)	r3, [r0], #4)			@ May fault
--		mov	ip, r0, lsl #32 - PAGE_SHIFT
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lc2u_2fupi
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #16
--		blt	.Lc2u_2rem8lp
--
--.Lc2u_2cpy8lp:	mov	r3, r7, lspull #16
--		ldmia	r1!, {r4 - r7}
--		subs	ip, ip, #16
--		orr	r3, r3, r4, lspush #16
--		mov	r4, r4, lspull #16
--		orr	r4, r4, r5, lspush #16
--		mov	r5, r5, lspull #16
--		orr	r5, r5, r6, lspush #16
--		mov	r6, r6, lspull #16
--		orr	r6, r6, r7, lspush #16
--		stmia	r0!, {r3 - r6}			@ Shouldnt fault
--		bpl	.Lc2u_2cpy8lp
--
--.Lc2u_2rem8lp:	tst	ip, #8
--		movne	r3, r7, lspull #16
--		ldmneia	r1!, {r4, r7}
--		orrne	r3, r3, r4, lspush #16
--		movne	r4, r4, lspull #16
--		orrne	r4, r4, r7, lspush #16
--		stmneia	r0!, {r3 - r4}			@ Shouldnt fault
--		tst	ip, #4
--		movne	r3, r7, lspull #16
--		ldrne	r7, [r1], #4
--		orrne	r3, r3, r7, lspush #16
--	TUSER(	strne) r3, [r0], #4			@ Shouldnt fault
--		ands	ip, ip, #3
--		beq	.Lc2u_2fupi
--.Lc2u_2nowords:	mov	r3, r7, get_byte_2
--		teq	ip, #0
--		beq	.Lc2u_finished
--		cmp	ip, #2
--USER(	TUSER(	strb)	r3, [r0], #1)			@ May fault
--		movge	r3, r7, get_byte_3
--USER(	TUSER(	strgeb) r3, [r0], #1)			@ May fault
--		ldrgtb	r3, [r1], #0
--USER(	TUSER(	strgtb) r3, [r0], #1)			@ May fault
--		b	.Lc2u_finished
--
--.Lc2u_3fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lc2u_3nowords
--		mov	r3, r7, lspull #24
--		ldr	r7, [r1], #4
--		orr	r3, r3, r7, lspush #8
--USER(	TUSER(	str)	r3, [r0], #4)			@ May fault
--		mov	ip, r0, lsl #32 - PAGE_SHIFT
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lc2u_3fupi
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #16
--		blt	.Lc2u_3rem8lp
--
--.Lc2u_3cpy8lp:	mov	r3, r7, lspull #24
--		ldmia	r1!, {r4 - r7}
--		subs	ip, ip, #16
--		orr	r3, r3, r4, lspush #8
--		mov	r4, r4, lspull #24
--		orr	r4, r4, r5, lspush #8
--		mov	r5, r5, lspull #24
--		orr	r5, r5, r6, lspush #8
--		mov	r6, r6, lspull #24
--		orr	r6, r6, r7, lspush #8
--		stmia	r0!, {r3 - r6}			@ Shouldnt fault
--		bpl	.Lc2u_3cpy8lp
--
--.Lc2u_3rem8lp:	tst	ip, #8
--		movne	r3, r7, lspull #24
--		ldmneia	r1!, {r4, r7}
--		orrne	r3, r3, r4, lspush #8
--		movne	r4, r4, lspull #24
--		orrne	r4, r4, r7, lspush #8
--		stmneia	r0!, {r3 - r4}			@ Shouldnt fault
--		tst	ip, #4
--		movne	r3, r7, lspull #24
--		ldrne	r7, [r1], #4
--		orrne	r3, r3, r7, lspush #8
--	TUSER(	strne) r3, [r0], #4			@ Shouldnt fault
--		ands	ip, ip, #3
--		beq	.Lc2u_3fupi
--.Lc2u_3nowords:	mov	r3, r7, get_byte_3
--		teq	ip, #0
--		beq	.Lc2u_finished
--		cmp	ip, #2
--USER(	TUSER(	strb)	r3, [r0], #1)			@ May fault
--		ldrgeb	r3, [r1], #1
--USER(	TUSER(	strgeb) r3, [r0], #1)			@ May fault
--		ldrgtb	r3, [r1], #0
--USER(	TUSER(	strgtb) r3, [r0], #1)			@ May fault
--		b	.Lc2u_finished
--ENDPROC(__copy_to_user)
--
--		.pushsection .fixup,"ax"
--		.align	0
--9001:		ldmfd	sp!, {r0, r4 - r7, pc}
--		.popsection
--
--/* Prototype: unsigned long __copy_from_user(void *to,const void *from,unsigned long n);
-- * Purpose  : copy a block from user memory to kernel memory
-- * Params   : to   - kernel memory
-- *          : from - user memory
-- *          : n    - number of bytes to copy
-- * Returns  : Number of bytes NOT copied.
-- */
--.Lcfu_dest_not_aligned:
--		rsb	ip, ip, #4
--		cmp	ip, #2
--USER(	TUSER(	ldrb)	r3, [r1], #1)			@ May fault
--		strb	r3, [r0], #1
--USER(	TUSER(	ldrgeb) r3, [r1], #1)			@ May fault
--		strgeb	r3, [r0], #1
--USER(	TUSER(	ldrgtb) r3, [r1], #1)			@ May fault
--		strgtb	r3, [r0], #1
--		sub	r2, r2, ip
--		b	.Lcfu_dest_aligned
--
--ENTRY(__copy_from_user)
--		stmfd	sp!, {r0, r2, r4 - r7, lr}
--		cmp	r2, #4
--		blt	.Lcfu_not_enough
--		ands	ip, r0, #3
--		bne	.Lcfu_dest_not_aligned
--.Lcfu_dest_aligned:
--		ands	ip, r1, #3
--		bne	.Lcfu_src_not_aligned
--
--/*
-- * Seeing as there has to be at least 8 bytes to copy, we can
-- * copy one word, and force a user-mode page fault...
-- */
--
--.Lcfu_0fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lcfu_0nowords
--USER(	TUSER(	ldr)	r3, [r1], #4)
--		str	r3, [r0], #4
--		mov	ip, r1, lsl #32 - PAGE_SHIFT	@ On each page, use a ld/st??t instruction
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lcfu_0fupi
--/*
-- * ip = max no. of bytes to copy before needing another "strt" insn
-- */
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #32
--		blt	.Lcfu_0rem8lp
--
--.Lcfu_0cpy8lp:	ldmia	r1!, {r3 - r6}			@ Shouldnt fault
--		stmia	r0!, {r3 - r6}
--		ldmia	r1!, {r3 - r6}			@ Shouldnt fault
--		subs	ip, ip, #32
--		stmia	r0!, {r3 - r6}
--		bpl	.Lcfu_0cpy8lp
--
--.Lcfu_0rem8lp:	cmn	ip, #16
--		ldmgeia	r1!, {r3 - r6}			@ Shouldnt fault
--		stmgeia	r0!, {r3 - r6}
--		tst	ip, #8
--		ldmneia	r1!, {r3 - r4}			@ Shouldnt fault
--		stmneia	r0!, {r3 - r4}
--		tst	ip, #4
--	TUSER(	ldrne) r3, [r1], #4			@ Shouldnt fault
--		strne	r3, [r0], #4
--		ands	ip, ip, #3
--		beq	.Lcfu_0fupi
--.Lcfu_0nowords:	teq	ip, #0
--		beq	.Lcfu_finished
--.Lcfu_nowords:	cmp	ip, #2
--USER(	TUSER(	ldrb)	r3, [r1], #1)			@ May fault
--		strb	r3, [r0], #1
--USER(	TUSER(	ldrgeb) r3, [r1], #1)			@ May fault
--		strgeb	r3, [r0], #1
--USER(	TUSER(	ldrgtb) r3, [r1], #1)			@ May fault
--		strgtb	r3, [r0], #1
--		b	.Lcfu_finished
--
--.Lcfu_not_enough:
--		movs	ip, r2
--		bne	.Lcfu_nowords
--.Lcfu_finished:	mov	r0, #0
--		add	sp, sp, #8
--		ldmfd	sp!, {r4 - r7, pc}
--
--.Lcfu_src_not_aligned:
--		bic	r1, r1, #3
--USER(	TUSER(	ldr)	r7, [r1], #4)			@ May fault
--		cmp	ip, #2
--		bgt	.Lcfu_3fupi
--		beq	.Lcfu_2fupi
--.Lcfu_1fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lcfu_1nowords
--		mov	r3, r7, lspull #8
--USER(	TUSER(	ldr)	r7, [r1], #4)			@ May fault
--		orr	r3, r3, r7, lspush #24
--		str	r3, [r0], #4
--		mov	ip, r1, lsl #32 - PAGE_SHIFT
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lcfu_1fupi
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #16
--		blt	.Lcfu_1rem8lp
--
--.Lcfu_1cpy8lp:	mov	r3, r7, lspull #8
--		ldmia	r1!, {r4 - r7}			@ Shouldnt fault
--		subs	ip, ip, #16
--		orr	r3, r3, r4, lspush #24
--		mov	r4, r4, lspull #8
--		orr	r4, r4, r5, lspush #24
--		mov	r5, r5, lspull #8
--		orr	r5, r5, r6, lspush #24
--		mov	r6, r6, lspull #8
--		orr	r6, r6, r7, lspush #24
--		stmia	r0!, {r3 - r6}
--		bpl	.Lcfu_1cpy8lp
--
--.Lcfu_1rem8lp:	tst	ip, #8
--		movne	r3, r7, lspull #8
--		ldmneia	r1!, {r4, r7}			@ Shouldnt fault
--		orrne	r3, r3, r4, lspush #24
--		movne	r4, r4, lspull #8
--		orrne	r4, r4, r7, lspush #24
--		stmneia	r0!, {r3 - r4}
--		tst	ip, #4
--		movne	r3, r7, lspull #8
--USER(	TUSER(	ldrne) r7, [r1], #4)			@ May fault
--		orrne	r3, r3, r7, lspush #24
--		strne	r3, [r0], #4
--		ands	ip, ip, #3
--		beq	.Lcfu_1fupi
--.Lcfu_1nowords:	mov	r3, r7, get_byte_1
--		teq	ip, #0
--		beq	.Lcfu_finished
--		cmp	ip, #2
--		strb	r3, [r0], #1
--		movge	r3, r7, get_byte_2
--		strgeb	r3, [r0], #1
--		movgt	r3, r7, get_byte_3
--		strgtb	r3, [r0], #1
--		b	.Lcfu_finished
--
--.Lcfu_2fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lcfu_2nowords
--		mov	r3, r7, lspull #16
--USER(	TUSER(	ldr)	r7, [r1], #4)			@ May fault
--		orr	r3, r3, r7, lspush #16
--		str	r3, [r0], #4
--		mov	ip, r1, lsl #32 - PAGE_SHIFT
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lcfu_2fupi
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #16
--		blt	.Lcfu_2rem8lp
--
--
--.Lcfu_2cpy8lp:	mov	r3, r7, lspull #16
--		ldmia	r1!, {r4 - r7}			@ Shouldnt fault
--		subs	ip, ip, #16
--		orr	r3, r3, r4, lspush #16
--		mov	r4, r4, lspull #16
--		orr	r4, r4, r5, lspush #16
--		mov	r5, r5, lspull #16
--		orr	r5, r5, r6, lspush #16
--		mov	r6, r6, lspull #16
--		orr	r6, r6, r7, lspush #16
--		stmia	r0!, {r3 - r6}
--		bpl	.Lcfu_2cpy8lp
--
--.Lcfu_2rem8lp:	tst	ip, #8
--		movne	r3, r7, lspull #16
--		ldmneia	r1!, {r4, r7}			@ Shouldnt fault
--		orrne	r3, r3, r4, lspush #16
--		movne	r4, r4, lspull #16
--		orrne	r4, r4, r7, lspush #16
--		stmneia	r0!, {r3 - r4}
--		tst	ip, #4
--		movne	r3, r7, lspull #16
--USER(	TUSER(	ldrne) r7, [r1], #4)			@ May fault
--		orrne	r3, r3, r7, lspush #16
--		strne	r3, [r0], #4
--		ands	ip, ip, #3
--		beq	.Lcfu_2fupi
--.Lcfu_2nowords:	mov	r3, r7, get_byte_2
--		teq	ip, #0
--		beq	.Lcfu_finished
--		cmp	ip, #2
--		strb	r3, [r0], #1
--		movge	r3, r7, get_byte_3
--		strgeb	r3, [r0], #1
--USER(	TUSER(	ldrgtb) r3, [r1], #0)			@ May fault
--		strgtb	r3, [r0], #1
--		b	.Lcfu_finished
--
--.Lcfu_3fupi:	subs	r2, r2, #4
--		addmi	ip, r2, #4
--		bmi	.Lcfu_3nowords
--		mov	r3, r7, lspull #24
--USER(	TUSER(	ldr)	r7, [r1], #4)			@ May fault
--		orr	r3, r3, r7, lspush #8
--		str	r3, [r0], #4
--		mov	ip, r1, lsl #32 - PAGE_SHIFT
--		rsb	ip, ip, #0
--		movs	ip, ip, lsr #32 - PAGE_SHIFT
--		beq	.Lcfu_3fupi
--		cmp	r2, ip
--		movlt	ip, r2
--		sub	r2, r2, ip
--		subs	ip, ip, #16
--		blt	.Lcfu_3rem8lp
--
--.Lcfu_3cpy8lp:	mov	r3, r7, lspull #24
--		ldmia	r1!, {r4 - r7}			@ Shouldnt fault
--		orr	r3, r3, r4, lspush #8
--		mov	r4, r4, lspull #24
--		orr	r4, r4, r5, lspush #8
--		mov	r5, r5, lspull #24
--		orr	r5, r5, r6, lspush #8
--		mov	r6, r6, lspull #24
--		orr	r6, r6, r7, lspush #8
--		stmia	r0!, {r3 - r6}
--		subs	ip, ip, #16
--		bpl	.Lcfu_3cpy8lp
--
--.Lcfu_3rem8lp:	tst	ip, #8
--		movne	r3, r7, lspull #24
--		ldmneia	r1!, {r4, r7}			@ Shouldnt fault
--		orrne	r3, r3, r4, lspush #8
--		movne	r4, r4, lspull #24
--		orrne	r4, r4, r7, lspush #8
--		stmneia	r0!, {r3 - r4}
--		tst	ip, #4
--		movne	r3, r7, lspull #24
--USER(	TUSER(	ldrne) r7, [r1], #4)			@ May fault
--		orrne	r3, r3, r7, lspush #8
--		strne	r3, [r0], #4
--		ands	ip, ip, #3
--		beq	.Lcfu_3fupi
--.Lcfu_3nowords:	mov	r3, r7, get_byte_3
--		teq	ip, #0
--		beq	.Lcfu_finished
--		cmp	ip, #2
--		strb	r3, [r0], #1
--USER(	TUSER(	ldrgeb) r3, [r1], #1)			@ May fault
--		strgeb	r3, [r0], #1
--USER(	TUSER(	ldrgtb) r3, [r1], #1)			@ May fault
--		strgtb	r3, [r0], #1
--		b	.Lcfu_finished
--ENDPROC(__copy_from_user)
--
--		.pushsection .fixup,"ax"
--		.align	0
--		/*
--		 * We took an exception.  r0 contains a pointer to
--		 * the byte not copied.
--		 */
--9001:		ldr	r2, [sp], #4			@ void *to
--		sub	r2, r0, r2			@ bytes copied
--		ldr	r1, [sp], #4			@ unsigned long count
--		subs	r4, r1, r2			@ bytes left to copy
--		movne	r1, r4
--		blne	__memzero
--		mov	r0, r4
--		ldmfd	sp!, {r4 - r7, pc}
--		.popsection
--
+>
+> (I haven't quite thought through if there's a way for the host PMU
+> driver to distinguish between an IRQ for itself and one for the guest,
+> though).
+>
+> It does feel like we will need some sort of communication/coordination
+> between the host PMU driver and KVM...
+>
+>>
+>> I have rethinked about our discussion so far. I
+>> understand that we need KVM PMU virtualization
+>> to meet following criteria:
+>> 1. No modification in host PMU driver
+>
+> is this really a strict requirement?  one of the advantages of KVM
+> should be that the rest of the kernel should be supportive of KVM.
+
+I guess so because host PMU driver should not do things
+differently for host and guest. I think this the reason why
+we discarded the mask/unmask PMU irq approach which
+I had implemented in RFC v1.
+
+>
+>> 2. No modification in guest PMU driver
+>> 3. No mask/unmask dance for sharing host PMU irq
+>> 4. Clean way to avoid infinite VM exits due to
+>> PMU interrupt
+>>
+>> I have discovered new approach which is as follows:
+>> 1. Context switch PMU in atomic context (i.e. local_irq_disable())
+>> 2. Ensure that host PMU irq is disabled when entering guest
+>> mode and re-enable host PMU irq when exiting guest mode if
+>> it was enabled previously.
+>
+> How does this look like software-engineering wise?  Would you be looking
+> up the IRQ number from the DT in the KVM code again?  How does KVM then
+> synchronize with the host PMU driver so they're not both requesting the
+> same IRQ at the same time?
+
+We only lookup host PMU irq numbers from DT at HYP init time.
+
+During context switch we know the host PMU irq number for
+current host CPU so we can get state of host PMU irq in
+context switch code.
+
+If we go by the shard irq handler approach then both KVM
+and host PMU driver will do request_irq() on same host
+PMU irq. In other words, there is no virtual PMU irq provided
+by HW for guest.
+
+>
+>> This is to avoid infinite VM exits
+>> due to PMU interrupt because as-per new approach we
+>> don't mask the PMU irq via PMINTENSET_EL1 register.
+>> 3. Inject virtual PMU irq at time of entering guest mode if PMU
+>> overflow register is non-zero (i.e. PMOVSSET_EL0) in atomic
+>> context (i.e. local_irq_disable()).
+>>
+>> The only limitation of this new approach is that virtual PMU irq
+>> is injected at time of entering guest mode. This means guest
+>> will receive virtual PMU  interrupt with little delay after actual
+>> interrupt occurred.
+>
+> it may never receive it in the case of a tickless configuration AFAICT,
+> so this doesn't sound like the right approach.
+
+I think irrespective to any approach we take, we need a mechanism
+to have shared irq handlers in KVM PMU and host PMU driver for
+both PPI and SPI.
+
+>
+>> The PMU interrupts are only overflow events
+>> and generally not used in any timing critical applications. If we
+>> can live with this limitation then this can be a good approach
+>> for KVM PMU virtualization.
+>>
+> Thanks,
+> -Christoffer
+
+Regards,
+Anup
