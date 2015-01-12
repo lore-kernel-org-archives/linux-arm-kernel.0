@@ -1,96 +1,108 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 12 Jan 2015 15:22:04 +0100
-Subject: [PATCH] clocksource: timer-atmel-pit: don't suspend/resume if
- unused
-In-Reply-To: <54B3D450.7050405@atmel.com>
-References: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
- <54B3D450.7050405@atmel.com>
-Message-ID: <54B3D88C.80702@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Jan 2015 14:23:32 +0000
+Subject: Linux 3.19-rc3
+In-Reply-To: <23318125.rGnCbWvYBR@wuerfel>
+References: <CA+55aFwsxoyLb9OWMSCL3doe_cz_EQtKsEFCyPUYn_T87pbz0A@mail.gmail.com>
+ <10028397.kdbz8TfPck@wuerfel>
+ <20150112121815.GB19807@e104818-lin.cambridge.arm.com>
+ <23318125.rGnCbWvYBR@wuerfel>
+Message-ID: <20150112142332.GC19807@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 03:04 PM, Nicolas Ferre wrote:
-> Le 18/12/2014 15:05, Nicolas Ferre a ?crit :
->> From: Sylvain Rochet <sylvain.rochet@finsecur.com>
->>
->> Waiting for PIT to stop counting takes a long time:
->>    1/(Master clock/prescaler/PIVR)
->> = 1/(133 MHz     /16       /2^20)
->> = 126 ms
->>
->> Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
->> of the unused PIT device reduce (suspend time + resume time) from ~140 ms
->> to ~17 ms.
->>
->> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
->> [nicolas.ferre at atmel.com: move to newer clocksource driver]
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->> Hi Sylvain,
->>
->> I re-worked (and "Acked") your patch so it can be applied on the newer Mainline
->> kernels. Beware, I changed the "subject line" as well. The PIT driver moved
->> recently (3.18).
->>
->> Daniel,
->> Can you take this patch in your tree?
->
-> Hi Daniel,
->
-> Anything prevents this patch from being merged (aka ping ;-))?
+On Mon, Jan 12, 2015 at 01:57:48PM +0000, Arnd Bergmann wrote:
+> On Monday 12 January 2015 12:18:15 Catalin Marinas wrote:
+> > On Sat, Jan 10, 2015 at 09:36:13PM +0000, Arnd Bergmann wrote:
+> > > On Saturday 10 January 2015 13:00:27 Linus Torvalds wrote:
+> > > > > IIRC, AIX works great with 64k pages, but only because of two
+> > > > > reasons that don't apply on Linux:
+> > > > 
+> > > > .. there's a few other ones:
+> > > > 
+> > > >  (c) nobody really runs AIX on dekstops. It's very much a DB load
+> > > > environment, with historically some HPC.
+> > > > 
+> > > >  (d) the powerpc TLB fill/buildup/teardown costs are horrible, so on
+> > > > AIX the cost of lots of small pages is much higher too.
+> > > 
+> > > I think (d) applies to ARM as well, since it has no hardware
+> > > dirty/referenced bit tracking and requires the OS to mark the
+> > > pages as invalid/readonly until the first access. ARMv8.1
+> > > has a fix for that, but it's optional and we haven't seen any
+> > > implementations yet.
+> > 
+> > Do you happen have any data on how significantly non-hardware
+> > dirty/access bits impact the performance? I think it may affect the user
+> > process start-up time a but at run-time it shouldn't be that bad.
+> > 
+> > If it is that significant, we could optimise it further in the arch
+> > code. For example, make a fast exception path where we need to mark the
+> > pte dirty. This would be handled by arch code without even calling
+> > handle_pte_fault().
+> 
+> If I understand the way that LRU works right, we end up clearing
+> the referenced bits in shrink_active_list()->page_referenced()->
+> page_referenced_one()->ptep_clear_flush_young_notify()->pte_mkold()
+> whenever there is memory pressure, so definitely not just for
+> startup.
 
-[Cc'ed tglx].
+Yes. Actually, I think the start-up is probably not that bad. For pages
+pointing to zero-page, you need to go through the kernel to allocate an
+anonymous page and change the pte anyway. If the access was "write", the
+page is marked dirty already (same with the access flag, the page is
+marked young to avoid a subsequent fault).
 
-Hi Nico,
+So, I guess it's run-time cost of the LRU algorithm, especially under
+memory pressure. Harder to benchmark though (we'll see when we get
+hardware, though probably not very soon).
 
-thanks for the head up.
+> > > > so I feel pretty confident in saying it won't happen. It's just too
+> > > > much of a bother, for little to no actual upside. It's likely a much
+> > > > better approach to try to instead use THP for anonymous mappings.
+> > > 
+> > > arm64 already supports 2MB transparent hugepages. I guess it
+> > > wouldn't be too hard to change it so that an existing hugepage
+> > > on an anonymous mapping that gets split up into 4KB pages gets
+> > > split along 64KB boundaries with the contiguous mapping bit set.
+> > > 
+> > > Having full support for multiple hugepage sizes (64KB, 2MB and 32MB
+> > > in case of ARM64 with 4KB PAGE_SIZE) would be even better and
+> > > probably negate any benefits of 64KB PAGE_SIZE, but requires more
+> > > changes to common mm code.
+> > 
+> > As I replied to your other email, I don't think that's simple for the
+> > transparent huge pages case.
+> > 
+> > The main advantage I see with 64KB pages is not the reduced TLB pressure
+> > but the number of levels of page tables. Take the AMD Seattle board for
+> > example, with 4KB pages you need 4 levels but 64KB allow only 2 levels
+> > (42-bit VA). Larger TLBs and improved walk caches (caching VA -> pmd
+> > entry translation rather than all the way to pte/PA) make things better
+> > but you still have the warming up time for any fork/new process as they
+> > don't share the same TLB entries.
+> 
+> Not sure I'm following. Does the A57 core cache partial TLBs or not?
 
-Nothing prevents it but I am wondering if this change shouldn't be in 
-the generic framework (kernel/time/clocksource.c and 
-kernel/time/clockevents.c), so all drivers will benefit this change ?
+AFAIK, yes (I think A15 started doing this years ago). Architecturally,
+an entry at any page table level could be cached in the TLB if it is
+valid, irrespective of whether the full translation is valid.
+Implementations, however, usually just cache the VA->pmd translation in
+the intermediate TLB. Anyway, populating such cache still requires 3
+accesses on a 4-level system.
 
+> Even if not, I would expect the page tables to be hot in dcache most
+> of the time, possibly with the exception of the last level on
+> multi-threaded processes, but then you are back to the difference
+> between the page size and the upper levels almost out of the equation.
 
->> Thanks, bye.
->>    Nicolas.
->>
->>   drivers/clocksource/timer-atmel-pit.c | 8 ++++++++
->>   1 file changed, 8 insertions(+)
->>
->> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
->> index b5b4d4585c9a..5408bc7c68d8 100644
->> --- a/drivers/clocksource/timer-atmel-pit.c
->> +++ b/drivers/clocksource/timer-atmel-pit.c
->> @@ -123,6 +123,10 @@ static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
->>   {
->>   	struct pit_data *data = clkevt_to_pit_data(cedev);
->>
->> +	/* Don't suspend PIT if unused */
->> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
->> +		return;
->> +
->>   	/* Disable timer */
->>   	pit_write(data->base, AT91_PIT_MR, 0);
->>   }
->> @@ -145,6 +149,10 @@ static void at91sam926x_pit_resume(struct clock_event_device *cedev)
->>   {
->>   	struct pit_data *data = clkevt_to_pit_data(cedev);
->>
->> +	/* Don't resume PIT if unused */
->> +	if (cedev->mode == CLOCK_EVT_MODE_UNUSED)
->> +		return;
->> +
->>   	at91sam926x_pit_reset(data);
->>   }
->>
->>
->
->
+As I said, I think it's more important with virtualisation where each
+guest page table entry address needs to be translated from the guest
+address space (IPA) to the physical address via the stage 2 tables.
 
+BTW, arm64 can differentiate between a leaf TLB invalidation (just
+changing the pte) and an all-levels one (which affects the walk cache
+for a given VA). I have some hacked code to do this in Linux but I
+haven't had time to assess the impact properly.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Catalin
