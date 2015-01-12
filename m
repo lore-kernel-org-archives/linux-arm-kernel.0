@@ -1,30 +1,54 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 13 Jan 2015 08:07:12 +1300
-Subject: Linux 3.19-rc3
-In-Reply-To: <CA+55aFxD63S0PE4zBnEw2jn3pPSALO0BdxY7tP++8wKVdRKJ5g@mail.gmail.com>
-References: <20150109121348.GD12942@leverpostej>
- <CAPvkgC23LHhs7Tw4rdAPFooimonji8R7kEAbWYRKPJwouwUzBA@mail.gmail.com>
- <54AFE53A.4020004@redhat.com> <20150109175702.GA27787@leverpostej>
- <54B01FF0.3020900@arm.com> <20150109194333.GA23028@arm.com>
- <54B09CA3.1060501@redhat.com>
- <CA+55aFw3aGeiWOiKxQaC23VVX_Q9B0cDeZc37vVfK+SJVjGwFw@mail.gmail.com>
- <20150110133742.GA6999@arm.com>
- <CA+55aFxBA6F4Kr89iZwPPeBnkiRO4GnrbUSd0CqVG-LD6ZQyiw@mail.gmail.com>
- <20150112124256.GB13360@arm.com>
- <CA+55aFxD63S0PE4zBnEw2jn3pPSALO0BdxY7tP++8wKVdRKJ5g@mail.gmail.com>
-Message-ID: <CA+55aFw=urngjyQvuOWHP1BBe-tNKy0E4DC0c5PwP+XuvpSmEg@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 12 Jan 2015 14:09:38 -0500
+Subject: [PATCH] arm64: allow late use of early_ioremap
+In-Reply-To: <20150112172534.GJ13360@arm.com>
+References: <1421081711-1128-1-git-send-email-msalter@redhat.com>
+ <20150112172534.GJ13360@arm.com>
+Message-ID: <1421089778.12632.2.camel@t520.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 8:06 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
->
-> So I'm ok with it, as long as we don't have a performance regression.
->
-> Your "don't bother freeing when the batch is empty" should hopefully
-> be fine. Dave, does that work for your case?
+On Mon, 2015-01-12 at 17:25 +0000, Will Deacon wrote:
+> On Mon, Jan 12, 2015 at 04:55:11PM +0000, Mark Salter wrote:
+> > Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
+> > added a missing call to early_ioremap_reset(). This triggers a BUG if code
+> > tries using early_ioremap() after the early_ioremap_reset(). This is a
+> > problem for some ACPI code which needs short-lived temporary mappings
+> > after paging_init() but before mm_init(). This patch adds definitions for
+> > the __late_set_fixmap() and __late_clear_fixmap() which avoids the BUG
+> > by allowing later use of early_ioremap().
+> > 
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > CC: Leif Lindholm <leif.lindholm@linaro.org>
+> > CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/fixmap.h | 3 +++
+> >  1 file changed, 3 insertions(+)
+> 
+> Given that we don't support ACPI on arm64 in mainline, I assume this can
+> wait until at least 3.20?
 
-Oh, and Dave just replied that it's ok. So should I just take it
-directly, or expect it through the arm64 tree? Either works for me.
+Sure. Just needs it to go in before ACPI code. And tbh, the ACPI code
+could change and make this unneeded.
 
-            Linus
+> 
+> Will
+> 
+> > diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> > index 9ef6eca..e629c70 100644
+> > --- a/arch/arm64/include/asm/fixmap.h
+> > +++ b/arch/arm64/include/asm/fixmap.h
+> > @@ -61,6 +61,9 @@ void __init early_fixmap_init(void);
+> >  
+> >  #define __early_set_fixmap __set_fixmap
+> >  
+> > +#define __late_set_fixmap __set_fixmap
+> > +#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
+> > +
+> >  extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+> >  
+> >  #include <asm-generic/fixmap.h>
+> > -- 
+> > 1.8.3.1
+> > 
+> > 
