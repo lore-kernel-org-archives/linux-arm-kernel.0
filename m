@@ -1,43 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Jan 2015 14:50:25 +0100
-Subject: [PATCH 1/1] ARM: at91/dt: sam9263: Add missing clocks to lcdc node
-In-Reply-To: <1417786299-14026-1-git-send-email-alexanders83@web.de>
-References: <1417786299-14026-1-git-send-email-alexanders83@web.de>
-Message-ID: <54B3D121.3010308@atmel.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Mon, 12 Jan 2015 19:22:47 +0530
+Subject: [PATCH v3 1/4] mmc: dw_mmc: exynos: incorporate ciu_div into
+ timing property
+In-Reply-To: <CAD=FV=U0U2ycmd4jyVyFiEq0+3ujSpdBeFg27iYYbMRxpRCmmQ@mail.gmail.com>
+References: <1420008185-24758-1-git-send-email-alim.akhtar@samsung.com>
+ <1420008185-24758-2-git-send-email-alim.akhtar@samsung.com>
+ <CAD=FV=WXzPt=VKxB=KHK+hC=RN6WbmdnQcLUT4zFQ0Ud7BFanQ@mail.gmail.com>
+ <CAGOxZ509kASim7keNkAGj5gAGO02=7vZM=VL-MRMObv3x+CzTg@mail.gmail.com>
+ <CAD=FV=U0U2ycmd4jyVyFiEq0+3ujSpdBeFg27iYYbMRxpRCmmQ@mail.gmail.com>
+Message-ID: <CAGOxZ52Fn3Q=mhkX+CPZsnNz-T5z09xR6ZGYhjYMQ9BOugs_+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/12/2014 14:31, Alexander Stein a ?crit :
-> atmel_lcdfb needs also uses hclk clock, but AT91SAM9263 doesn't have that
-> specific clock, so use lcd_clk twice. The same is done in
-> arch/arm/mach-at91/at91sam9263.c
-> 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
+Hi Doug,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tue, Jan 6, 2015 at 6:37 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Alim,
+>
+> On Sun, Jan 4, 2015 at 2:43 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>>> You are breaking backward compatibility here.  If your change is
+>>> merged then all old boards will instantly break.  Since the "dts" and
+>>> code changes will likely be merged through different trees you'll end
+>>> up with a bunch of broken trees until everything is merged together.
+>>> Even if you don't subscribe to the stable bindings theory this is not
+>>> acceptable.
+>>>
+>> yes the major concern in this series is probably this, which breaks
+>> things unless everything merge in one go and via one tree. Thats why I
+>> re-based everything including dts change on mmc-tree for this case and
+>> added device-tree mailing list for more opinion etc.
+>
+> Got it.  I doubt that folks will like this, but I could be wrong.  In
+> order for this to work, you'd need all changes in the series to land
+> in _both_ the ARMSoC tree and the MMC tree.  That's not unheard of,
+> but it doesn't seem ideal.
+>
+> You also break bisect-ability here since without the code the DTS
+> change will break things and without the DTS change the code will
+> break things.
+>
+> If you add all the above to the fact that bindings are supposed to be
+> stable (ish) I'm not convinced this will land.
+>
+Hmmm......Ok, let me take a re-look on this, I will try to use
+existing bindings.
+>
+> -Doug
 
-With modification by Alexandre, stacked on at91-3.19-fixes.
-Thanks, bye.
-
-> ---
->  arch/arm/boot/dts/at91sam9263.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index 635f871..7989756 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -932,6 +932,8 @@
->  			interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_fb>;
-> +			clocks = <&lcd_clk>, <&lcd_clk>;
-> +			clock-names = "lcdc_clk", "hclk";
->  			status = "disabled";
->  		};
->  
-> 
 
 
 -- 
-Nicolas Ferre
+Regards,
+Alim
