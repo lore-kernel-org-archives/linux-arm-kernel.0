@@ -1,112 +1,125 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 19:42:14 +0100
-Subject: [PATCH 5/7] ARM: at91: move debug-macro.S into the common space
-In-Reply-To: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421088136-10172-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 12 Jan 2015 11:43:49 -0700
+Subject: [PATCH 3/5] PCI: st: Provide support for the sti PCIe controller
+In-Reply-To: <1418812486-12394-4-git-send-email-gabriel.fernandez@linaro.org>
+References: <1418812486-12394-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1418812486-12394-4-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20150112184349.GB2776@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move debug-macro.S from include/mach/ to include/debug where all other common
-debug macros are.
+On Wed, Dec 17, 2014 at 11:34:44AM +0100, Gabriel FERNANDEZ wrote:
+> sti pcie is built around a Synopsis Designware PCIe IP.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  drivers/pci/host/Kconfig  |   5 +
+>  drivers/pci/host/Makefile |   1 +
+>  drivers/pci/host/pci-st.c | 713 ++++++++++++++++++++++++++++++++++++++++++++++
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- MAINTAINERS                                           |  1 +
- arch/arm/Kconfig.debug                                |  9 +++++++--
- .../mach/debug-macro.S => include/debug/at91.S}       | 19 +++++++++++--------
- 3 files changed, 19 insertions(+), 10 deletions(-)
- rename arch/arm/{mach-at91/include/mach/debug-macro.S => include/debug/at91.S} (68%)
+Hi Gabriel,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3589d67437f8..8c25979a3c43 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -877,6 +877,7 @@ F:	arch/arm/boot/dts/at91*.dts
- F:	arch/arm/boot/dts/at91*.dtsi
- F:	arch/arm/boot/dts/sama*.dts
- F:	arch/arm/boot/dts/sama*.dtsi
-+F:	arch/arm/include/debug/at91.S
- 
- ARM/ATMEL AT91 Clock Support
- M:	Boris Brezillon <boris.brezillon@free-electrons.com>
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 5ddd4906f7a7..e34d24949c6a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -115,15 +115,18 @@ choice
- 		    0x80024000      | 0xf0024000     | UART9
- 
- 	config AT91_DEBUG_LL_DBGU0
--		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl"
-+		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10, 9rl, 9x5, 9n12"
-+		select DEBUG_AT91_UART
- 		depends on HAVE_AT91_DBGU0
- 
- 	config AT91_DEBUG_LL_DBGU1
--		bool "Kernel low-level debugging on 9263 and 9g45"
-+		bool "Kernel low-level debugging on 9263, 9g45 and sama5d3"
-+		select DEBUG_AT91_UART
- 		depends on HAVE_AT91_DBGU1
- 
- 	config AT91_DEBUG_LL_DBGU2
- 		bool "Kernel low-level debugging on sama5d4"
-+		select DEBUG_AT91_UART
- 		depends on HAVE_AT91_DBGU2
- 
- 	config DEBUG_BCM2835
-@@ -1165,6 +1168,8 @@ config DEBUG_LL_INCLUDE
- 	string
- 	default "debug/sa1100.S" if DEBUG_SA1100
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
-+	default "debug/at91.S" if AT91_DEBUG_LL_DBGU0 || AT91_DEBUG_LL_DBGU1 || \
-+				AT91_DEBUG_LL_DBGU2
- 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
- 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
- 	default "debug/meson.S" if DEBUG_MESON_UARTAO
-diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/include/debug/at91.S
-similarity index 68%
-rename from arch/arm/mach-at91/include/mach/debug-macro.S
-rename to arch/arm/include/debug/at91.S
-index 2103a90f2261..80a6501b4d50 100644
---- a/arch/arm/mach-at91/include/mach/debug-macro.S
-+++ b/arch/arm/include/debug/at91.S
-@@ -1,6 +1,4 @@
- /*
-- * arch/arm/mach-at91/include/mach/debug-macro.S
-- *
-  *  Copyright (C) 2003-2005 SAN People
-  *
-  * Debugging macro include header
-@@ -11,18 +9,23 @@
-  *
- */
- 
--#include <mach/hardware.h>
--#include <mach/at91_dbgu.h>
--
- #if defined(CONFIG_AT91_DEBUG_LL_DBGU0)
--#define AT91_DBGU AT91_BASE_DBGU0
-+#define AT91_DBGU 0xfffff200 /* AT91_BASE_DBGU0 */
- #elif defined(CONFIG_AT91_DEBUG_LL_DBGU1)
--#define AT91_DBGU AT91_BASE_DBGU1
-+#define AT91_DBGU 0xffffee00 /* AT91_BASE_DBGU1 */
- #else
- /* On sama5d4, use USART3 as low level serial console */
--#define AT91_DBGU SAMA5D4_BASE_USART3
-+#define AT91_DBGU 0xfc00c000 /* SAMA5D4_BASE_USART3 */
- #endif
- 
-+/* Keep in sync with mach-at91/include/mach/hardware.h */
-+#define AT91_IO_P2V(x) ((x) - 0x01000000)
-+
-+#define AT91_DBGU_SR		(0x14)	/* Status Register */
-+#define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
-+#define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
-+#define AT91_DBGU_TXEMPTY	(1 << 9)	/* Transmitter Empty */
-+
- 	.macro	addruart, rp, rv, tmp
- 	ldr	\rp, =AT91_DBGU				@ System peripherals (phys address)
- 	ldr	\rv, =AT91_IO_P2V(AT91_DBGU)		@ System peripherals (virt address)
--- 
-2.1.0
+Can you add a MAINTAINERS update so I know who should ack changes to this
+driver?
+
+>  3 files changed, 719 insertions(+)
+>  create mode 100644 drivers/pci/host/pci-st.c
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index c4b6568..999d2b9 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -102,4 +102,9 @@ config PCI_LAYERSCAPE
+>  	help
+>  	  Say Y here if you want PCIe controller support on Layerscape SoCs.
+>  
+> +config PCI_ST
+> +	bool "ST STiH41x PCIe controller"
+> +	depends on ARCH_STI
+> +	select PCIE_DW
+
+Please add help text here.
+
+> +static int st_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+> +				 unsigned int devfn, int where, int size,
+> +				 u32 *val)
+> +{
+> +	u32 data;
+> +	u32 bdf;
+> +	struct st_pcie *pcie = to_st_pcie(pp);
+> +	int is_root_bus = pci_is_root_bus(bus);
+> +	int retry_count = 0;
+> +	int ret;
+> +	void __iomem *addr;
+> +
+> +	/*
+> +	 * Prerequisite
+> +	 * PCI express devices will respond to all config type 0 cycles, since
+> +	 * they are point to point links. Thus to avoid probing for multiple
+> +	 * devices on the root, dw-pcie already check for us if it is on the
+> +	 * root bus / other slots. Also, dw-pcie checks for the link being up
+> +	 * as we will hang if we issue a config request and the link is down.
+> +	 * A switch will reject requests for slots it knows do not exist.
+> +	 */
+> +	bdf = bdf_num(bus->number, devfn, is_root_bus);
+> +	addr = pcie->config_area + config_addr(where,
+> +			bus->parent->number == pp->root_bus_nr);
+> +retry:
+> +	/* Set the config packet devfn */
+> +	writel_relaxed(bdf, pp->dbi_base + FUNC0_BDF_NUM);
+> +	readl_relaxed(pp->dbi_base + FUNC0_BDF_NUM);
+> +
+> +	ret = dw_pcie_cfg_read(addr, where, size, &data);
+> +
+> +	/*
+> +	 * This is intended to help with when we are probing the bus. The
+> +	 * problem is that the wrapper logic doesn't have any way to
+> +	 * interrogate if the configuration request failed or not.
+> +	 * On the ARM we actually get a real bus error.
+> +	 *
+> +	 * Unfortunately this means it is impossible to tell the difference
+> +	 * between when a device doesn't exist (the switch will return a UR
+> +	 * completion) or the device does exist but isn't yet ready to accept
+> +	 * configuration requests (the device will return a CRS completion)
+
+We do have CRS support in the Linux PCI core, so I guess this comment means
+that the ST host bridge doesn't handle CRS correctly?
+
+> +	 *
+> +	 * The result of this is that we will miss devices when probing.
+> +	 *
+> +	 * So if we are trying to read the dev/vendor id on devfn 0 and we
+> +	 * appear to get zero back, then we retry the request.  We know that
+> +	 * zero can never be a valid device/vendor id. The specification says
+> +	 * we must retry for up to a second before we decide the device is
+> +	 * dead. If we are still dead then we assume there is nothing there and
+> +	 * return ~0
+> +	 *
+> +	 * The downside of this is that we incur a delay of 1s for every pci
+> +	 * express link that doesn't have a device connected.
+
+That sounds pretty bad and I assume is a consequence of CRS handling being
+broken in hardware.
+
+> +	 */
+> +	if (((where & ~3) == 0) && devfn == 0 && (data == 0 || data == ~0)) {
+> +		if (retry_count++ < 1000) {
+> +			mdelay(1);
+> +			goto retry;
+> +		} else {
+> +			*val = ~0;
+> +			return PCIBIOS_DEVICE_NOT_FOUND;
+> +		}
+> +	}
+> +
+> +	*val = data;
+> +	return ret;
+> +}
+
+> +MODULE_LICENSE("GPLv2");
+
+See license_is_gpl_compatible().  This string needs to be "GPL v2", not
+"GPLv2" to avoid tainting the kernel.
+
+Bjorn
