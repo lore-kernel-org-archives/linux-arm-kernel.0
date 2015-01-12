@@ -1,23 +1,40 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 12 Jan 2015 10:20:49 -0800
-Subject: [PATCH] pinctrl: pinconf-generic: loose DT dependence
-In-Reply-To: <1421020166-22831-1-git-send-email-linus.walleij@linaro.org>
-References: <1421020166-22831-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <52c662b797754a37966532ef95304610@BL2FFO11FD050.protection.gbl>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 12 Jan 2015 12:23:49 -0600
+Subject: [PATCH v3 3/5] ARM: at91/dt: update udc compatible strings
+In-Reply-To: <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421060278-27329-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150112182349.GJ6525@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-12 at 12:49AM +0100, Linus Walleij wrote:
-> New pin controllers such as ACPI-based may also have custom properties
-> to parse, and should be able to use generic pin config. Let's make the
-> code compile on !OF systems and rename members a bit to underscore it
-> is custom parameters and not necessarily DT parameters.
+On Mon, Jan 12, 2015 at 11:57:56AM +0100, Boris Brezillon wrote:
+> at91sam9g45, at91sam9x5 and sama5 SoCs should not use
+> "atmel,at91sam9rl-udc" for their USB device compatible property since
+> this compatible is attached to a specific hardware bug fix.
 > 
-> This fixes a build regression for x86_64 on the zeroday kernel builds.
-> 
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-and-tested-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-	S?ren
+WARNING: DT compatible string "atmel,at91sam9g45-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
+#177: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1827:
++       { .compatible = "atmel,at91sam9g45-udc" },
+
+WARNING: DT compatible string "atmel,sama5d3-udc" appears un-documented -- check ./Documentation/devicetree/bindings/
+#178: FILE: drivers/usb/gadget/udc/atmel_usba_udc.c:1828:
++       { .compatible = "atmel,sama5d3-udc" },
+
+please fix and resend. Also, when resending, could you add Nicolas'
+Acked-by since he's already given it ?
+
+Thanks
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150112/b2cccec7/attachment-0001.sig>
