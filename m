@@ -1,38 +1,46 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 12 Jan 2015 11:55:11 -0500
-Subject: [PATCH] arm64: allow late use of early_ioremap
-Message-ID: <1421081711-1128-1-git-send-email-msalter@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 12 Jan 2015 17:55:31 +0100
+Subject: [PATCH v5 4/5] KVM: irqfd: use
+ kvm_arch_is_virtual_intc_initialized
+In-Reply-To: <54B3CEB3.1010709@linaro.org>
+References: <1417622832-5460-1-git-send-email-eric.auger@linaro.org>
+ <1417622832-5460-5-git-send-email-eric.auger@linaro.org>
+ <20150111211713.GF3868@cbox> <54B3CEB3.1010709@linaro.org>
+Message-ID: <20150112165531.GJ3868@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
-added a missing call to early_ioremap_reset(). This triggers a BUG if code
-tries using early_ioremap() after the early_ioremap_reset(). This is a
-problem for some ACPI code which needs short-lived temporary mappings
-after paging_init() but before mm_init(). This patch adds definitions for
-the __late_set_fixmap() and __late_clear_fixmap() which avoids the BUG
-by allowing later use of early_ioremap().
+On Mon, Jan 12, 2015 at 02:40:03PM +0100, Eric Auger wrote:
+> On 01/11/2015 10:17 PM, Christoffer Dall wrote:
+> > On Wed, Dec 03, 2014 at 05:07:11PM +0100, Eric Auger wrote:
+> >> On arm/arm64, the interrupt controller is dynamically instantiated.
+> >> There is a risk the user-space assigns an irqfd before this latter
+> >> is initialized and ready to accept virtual irq injection. On such
+> >> attempt, the IRQFD setup is rejected and -EAGAIN is returned.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >> ---
+> >>  virt/kvm/eventfd.c | 3 +++
+> >>  1 file changed, 3 insertions(+)
+> >>
+> >> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+> >> index b0fb390..f837c83 100644
+> >> --- a/virt/kvm/eventfd.c
+> >> +++ b/virt/kvm/eventfd.c
+> >> @@ -314,6 +314,9 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
+> >>  	unsigned int events;
+> >>  	int idx;
+> >>  
+> >> +	if (!kvm_arch_is_virtual_intc_initialized(kvm))
+> >> +		return -EAGAIN;
+> >> +
+> > 
+> > You can fold this into the patch that defines the static inline since
+> > nothing defines the KVM_HAVE_ARCH_... yet.
+> Not sure to understand what you mean:
+> __KVM_HAVE_ARCH_VIRTUAL_INTC_INITIALIZED was defined in previous patch
+> file (3/5). Nethertheless I can drop that patch file.
+> 
+I'm just saying that you don't need to split this into multiple patches.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-CC: Leif Lindholm <leif.lindholm@linaro.org>
-CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/fixmap.h | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 9ef6eca..e629c70 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -61,6 +61,9 @@ void __init early_fixmap_init(void);
- 
- #define __early_set_fixmap __set_fixmap
- 
-+#define __late_set_fixmap __set_fixmap
-+#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
-+
- extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
- 
- #include <asm-generic/fixmap.h>
--- 
-1.8.3.1
+-Christoffer
