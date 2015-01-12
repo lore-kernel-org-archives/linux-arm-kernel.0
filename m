@@ -1,40 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Jan 2015 20:01:51 +0100
-Subject: [PATCH 0/6] AT91 DT for 3.20 #1
-Message-ID: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 12 Jan 2015 20:01:53 +0100
+Subject: [PATCH 2/6] ARM: at91/dt: rm9200: add RTC node
+In-Reply-To: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421089317-12607-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables RTC on the at91sam9n12 and at91rm9200.
-It also adds nodes for the SRAM availabe on at91 SoCs.
+Add a node for the RTC available on at91rm9200.
 
-Finally it adds a dtsi for the at91sam9xe and uses it for the ethernut5 dts.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91rm9200.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Alexandre Belloni (6):
-  ARM: at91/dt: at91sam9n12: Add RTC node
-  ARM: at91/dt: rm9200: add RTC node
-  ARM: at91/dt: at91rm9200ek: enable RTC
-  ARM: at91/dt: add SRAM nodes
-  ARM: at91/dt: Add a dtsi for at91sam9xe
-  ARM: at91/dt: ethernut5: use at91sam9xe.dtsi
-
- .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
- arch/arm/boot/dts/at91rm9200.dtsi                  | 12 +++++
- arch/arm/boot/dts/at91rm9200ek.dts                 |  4 ++
- arch/arm/boot/dts/at91sam9260.dtsi                 |  5 ++
- arch/arm/boot/dts/at91sam9261.dtsi                 |  5 ++
- arch/arm/boot/dts/at91sam9263.dtsi                 | 10 ++++
- arch/arm/boot/dts/at91sam9g20.dtsi                 |  9 ++++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  7 ++-
- arch/arm/boot/dts/at91sam9n12.dtsi                 | 12 +++++
- arch/arm/boot/dts/at91sam9rl.dtsi                  |  5 ++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  5 ++
- arch/arm/boot/dts/at91sam9xe.dtsi                  | 60 ++++++++++++++++++++++
- arch/arm/boot/dts/ethernut5.dts                    |  2 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |  5 ++
- arch/arm/boot/dts/sama5d4.dtsi                     |  5 ++
- 15 files changed, 144 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9xe.dtsi
-
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index 6c97d4af61ee..f449a864b81e 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -356,6 +356,13 @@
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 			};
+ 
++			rtc: rtc at fffffe00 {
++				compatible = "atmel,at91rm9200-rtc";
++				reg = <0xfffffe00 0x40>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				status = "disabled";
++			};
++
+ 			tcb0: timer at fffa0000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffa0000 0x100>;
 -- 
 2.1.0
