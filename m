@@ -1,150 +1,62 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Jan 2015 17:51:16 +0000
-Subject: [PATCH 4/4] iommu: make IOVA domain page size explicit
+Date: Mon, 12 Jan 2015 17:51:13 +0000
+Subject: [PATCH 1/4] iommu: allow building iova.c independently
 In-Reply-To: <cover.1420822848.git.robin.murphy@arm.com>
 References: <cover.1420822848.git.robin.murphy@arm.com>
-Message-ID: <b7956fb2f2a867009d154598f54c4faf00c6592a.1420822848.git.robin.murphy@arm.com>
+Message-ID: <defa67ffdfcb7cc3752b9cf44e0ebe8c0a06395a.1420822848.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Systems may contain heterogeneous IOMMUs supporting differing minimum
-page sizes, which may also not be common with the CPU page size.
-Thus it is practical to have an explicit notion of IOVA granularity
-to simplify handling of mapping and allocation constraints.
-
-As an initial step, move the IOVA page granularity from an implicit
-compile-time constant to a per-domain property so we can make use
-of it in IOVA domain context at runtime. To keep the abstraction tidy,
-extend the little API of inline iova_* helpers to parallel some of the
-equivalent PAGE_* macros.
+In preparation for sharing the IOVA allocator, split it out under its
+own Kconfig symbol.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/intel-iommu.c |  9 ++++++---
- drivers/iommu/iova.c        | 12 ++++++++++--
- include/linux/iova.h        | 35 +++++++++++++++++++++++++++++++++--
- 3 files changed, 49 insertions(+), 7 deletions(-)
+ drivers/iommu/Kconfig  | 4 ++++
+ drivers/iommu/Makefile | 3 ++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 275d056..a0f5817 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -1635,7 +1635,8 @@ static int dmar_init_reserved_ranges(void)
- 	struct iova *iova;
- 	int i;
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 325188e..a839ca9 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -13,6 +13,9 @@ menuconfig IOMMU_SUPPORT
  
--	init_iova_domain(&reserved_iova_list, IOVA_START_PFN, DMA_32BIT_PFN);
-+	init_iova_domain(&reserved_iova_list, VTD_PAGE_SIZE, IOVA_START_PFN,
-+			DMA_32BIT_PFN);
+ if IOMMU_SUPPORT
  
- 	lockdep_set_class(&reserved_iova_list.iova_rbtree_lock,
- 		&reserved_rbtree_key);
-@@ -1693,7 +1694,8 @@ static int domain_init(struct dmar_domain *domain, int guest_width)
- 	int adjust_width, agaw;
- 	unsigned long sagaw;
- 
--	init_iova_domain(&domain->iovad, IOVA_START_PFN, DMA_32BIT_PFN);
-+	init_iova_domain(&domain->iovad, VTD_PAGE_SIZE, IOVA_START_PFN,
-+			DMA_32BIT_PFN);
- 	domain_reserve_special_ranges(domain);
- 
- 	/* calculate AGAW */
-@@ -4324,7 +4326,8 @@ static int md_domain_init(struct dmar_domain *domain, int guest_width)
- {
- 	int adjust_width;
- 
--	init_iova_domain(&domain->iovad, IOVA_START_PFN, DMA_32BIT_PFN);
-+	init_iova_domain(&domain->iovad, VTD_PAGE_SIZE, IOVA_START_PFN,
-+			DMA_32BIT_PFN);
- 	domain_reserve_special_ranges(domain);
- 
- 	/* calculate AGAW */
-diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
-index a3dbba8..9dd8208 100644
---- a/drivers/iommu/iova.c
-+++ b/drivers/iommu/iova.c
-@@ -55,12 +55,20 @@ void free_iova_mem(struct iova *iova)
- }
- 
- void
--init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
--	unsigned long pfn_32bit)
-+init_iova_domain(struct iova_domain *iovad, unsigned long granule,
-+	unsigned long start_pfn, unsigned long pfn_32bit)
- {
-+	/*
-+	 * IOVA granularity will normally be equal to the smallest
-+	 * supported IOMMU page size; both *must* be capable of
-+	 * representing individual CPU pages exactly.
-+	 */
-+	BUG_ON((granule > PAGE_SIZE) || !is_power_of_2(granule));
++config IOMMU_IOVA
++	bool
 +
- 	spin_lock_init(&iovad->iova_rbtree_lock);
- 	iovad->rbroot = RB_ROOT;
- 	iovad->cached32_node = NULL;
-+	iovad->granule = granule;
- 	iovad->start_pfn = start_pfn;
- 	iovad->dma_32bit_pfn = pfn_32bit;
- }
-diff --git a/include/linux/iova.h b/include/linux/iova.h
-index 591b196..3920a19 100644
---- a/include/linux/iova.h
-+++ b/include/linux/iova.h
-@@ -28,6 +28,7 @@ struct iova_domain {
- 	spinlock_t	iova_rbtree_lock; /* Lock to protect update of rbtree */
- 	struct rb_root	rbroot;		/* iova domain rbtree root */
- 	struct rb_node	*cached32_node; /* Save last alloced node */
-+	unsigned long	granule;	/* pfn granularity for this domain */
- 	unsigned long	start_pfn;	/* Lower limit for this domain */
- 	unsigned long	dma_32bit_pfn;
- };
-@@ -37,6 +38,36 @@ static inline unsigned long iova_size(struct iova *iova)
- 	return iova->pfn_hi - iova->pfn_lo + 1;
- }
- 
-+static inline unsigned long iova_shift(struct iova_domain *iovad)
-+{
-+	return __ffs(iovad->granule);
-+}
-+
-+static inline unsigned long iova_mask(struct iova_domain *iovad)
-+{
-+	return iovad->granule - 1;
-+}
-+
-+static inline size_t iova_offset(struct iova_domain *iovad, dma_addr_t iova)
-+{
-+	return iova & iova_mask(iovad);
-+}
-+
-+static inline size_t iova_align(struct iova_domain *iovad, size_t size)
-+{
-+	return ALIGN(size, iovad->granule);
-+}
-+
-+static inline dma_addr_t iova_dma_addr(struct iova_domain *iovad, struct iova *iova)
-+{
-+	return (dma_addr_t)iova->pfn_lo << iova_shift(iovad);
-+}
-+
-+static inline unsigned long iova_pfn(struct iova_domain *iovad, dma_addr_t iova)
-+{
-+	return iova >> iova_shift(iovad);
-+}
-+
- int iommu_iova_cache_init(void);
- void iommu_iova_cache_destroy(void);
- 
-@@ -50,8 +81,8 @@ struct iova *alloc_iova(struct iova_domain *iovad, unsigned long size,
- struct iova *reserve_iova(struct iova_domain *iovad, unsigned long pfn_lo,
- 	unsigned long pfn_hi);
- void copy_reserved_iova(struct iova_domain *from, struct iova_domain *to);
--void init_iova_domain(struct iova_domain *iovad, unsigned long start_pfn,
--	unsigned long pfn_32bit);
-+void init_iova_domain(struct iova_domain *iovad, unsigned long granule,
-+	unsigned long start_pfn, unsigned long pfn_32bit);
- struct iova *find_iova(struct iova_domain *iovad, unsigned long pfn);
- void put_iova_domain(struct iova_domain *iovad);
- struct iova *split_and_remove_iova(struct iova_domain *iovad,
+ config OF_IOMMU
+        def_bool y
+        depends on OF && IOMMU_API
+@@ -91,6 +94,7 @@ config INTEL_IOMMU
+ 	bool "Support for Intel IOMMU using DMA Remapping Devices"
+ 	depends on PCI_MSI && ACPI && (X86 || IA64_GENERIC)
+ 	select IOMMU_API
++	select IOMMU_IOVA
+ 	select DMAR_TABLE
+ 	help
+ 	  DMA remapping (DMAR) devices support enables independent address
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index 7b976f2..0b1b94e 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -1,13 +1,14 @@
+ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+ obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
++obj-$(CONFIG_IOMMU_IOVA) += iova.o
+ obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
+ obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
+ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
+ obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
+ obj-$(CONFIG_ARM_SMMU) += arm-smmu.o
+ obj-$(CONFIG_DMAR_TABLE) += dmar.o
+-obj-$(CONFIG_INTEL_IOMMU) += iova.o intel-iommu.o
++obj-$(CONFIG_INTEL_IOMMU) += intel-iommu.o
+ obj-$(CONFIG_IPMMU_VMSA) += ipmmu-vmsa.o
+ obj-$(CONFIG_IRQ_REMAP) += intel_irq_remapping.o irq_remapping.o
+ obj-$(CONFIG_OMAP_IOMMU) += omap-iommu.o
 -- 
 1.9.1
