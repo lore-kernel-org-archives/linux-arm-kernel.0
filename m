@@ -1,255 +1,107 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 12 Jan 2015 14:08:43 +0100
-Subject: [PATCH v4 1/5] usb: atmel_usba_udc: Rework at91sam9rl errata handling
-In-Reply-To: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1421068123-29541-1-git-send-email-boris.brezillon@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 12 Jan 2015 14:15:32 +0100
+Subject: [RFC 02/11] i2c: add quirk checks to core
+In-Reply-To: <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
+ <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
+Message-ID: <CABuKBe++yut6ZfhPrsWXGA4fZRvum6WOuRxHucM0gBJCGuou5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9rl SoC has an erratum forcing us to toggle the BIAS on USB
-suspend/resume events.
+2015-01-09 18:21 GMT+01:00 Wolfram Sang <wsa@the-dreams.de>:
+> Let the core do the checks if HW quirks prevent a transfer. Saves code
+> from drivers and adds consistency.
+>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> ---
+>  drivers/i2c/i2c-core.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 39d25a8cb1ad..7b10a19abf5b 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -2063,6 +2063,56 @@ module_exit(i2c_exit);
+>   * ----------------------------------------------------
+>   */
+>
+> +/* Check if val is exceeding the quirk IFF quirk is non 0 */
+> +#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
+> +
+> +static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
+> +{
+> +       dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
+> +       return -EOPNOTSUPP;
+> +}
+> +
+> +static int i2c_check_for_quirks(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+> +{
+> +       struct i2c_adapter_quirks *q = adap->quirks;
+> +       u16 max_read = q->max_read_len, max_write = q->max_write_len;
+> +       int max_num = q->max_num_msgs, i;
+> +
+> +       if (q->flags & I2C_ADAPTER_QUIRK_COMB_WRITE_THEN_READ)
+> +               max_num = 2;
+> +
+> +       if (i2c_quirk_exceeded(num, max_num))
+> +               return i2c_quirk_error(adap, &msgs[0], "too many messages");
+> +
+> +       if (num == 2 && q->flags & I2C_ADAPTER_QUIRK_COMB_WRITE_FIRST) {
+> +               if (msgs[0].flags & I2C_M_RD)
+> +                       return i2c_quirk_error(adap, &msgs[0], "invalid first write msg");
+> +
+> +               max_write = q->max_comb_write_len;
+> +       }
+> +
+> +       if (num == 2 && q->flags & I2C_ADAPTER_QUIRK_COMB_READ_SECOND) {
+> +               if (!(msgs[1].flags & I2C_M_RD) || msgs[0].addr != msgs[1].addr)
+> +                       return i2c_quirk_error(adap, &msgs[1], "invalid second read msg");
+> +
+> +               max_read = q->max_comb_read_len;
+> +       }
+> +
+> +       for (i = 0; i < num; i++) {
+> +               u16 len = msgs[i].len;
+> +
+> +               if (msgs[i].flags & I2C_M_RD) {
+> +                       if (i2c_quirk_exceeded(len, max_read))
+> +                               return i2c_quirk_error(adap, &msgs[i], "msg too long");
+> +               } else {
+> +                       if (i2c_quirk_exceeded(len, max_write))
+> +                               return i2c_quirk_error(adap, &msgs[i], "msg too long");
+> +               }
 
-This specific handling was only activated when CONFIG_ARCH_AT91SAM9RL
-was set, but commit bcf8c7e7703b ("ARM: at91: remove at91sam9rl legacy
-board support") removed this option.
+What about being more verbose in the error message, specifying if it
+was a read or a write message that failed?
 
-Rework the toggle_bias implementation to attach it to the "at91sam9rl-udc"
-compatible string.
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  /**
+>   * __i2c_transfer - unlocked flavor of i2c_transfer
+>   * @adap: Handle to I2C bus
+> @@ -2080,6 +2130,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+>         unsigned long orig_jiffies;
+>         int ret, try;
+>
+> +       if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
+> +               return -EOPNOTSUPP;
+> +
+>         /* i2c_trace_msg gets enabled when tracepoint i2c_transfer gets
+>          * enabled.  This is an efficient way of keeping the for-loop from
+>          * being executed when not needed.
+> --
+> 2.1.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Add new compatible strings to avoid executing at91sam9rl erratum handling
-on other SoCs.
 
-Reported-by: Paul Bolle <pebolle@tiscali.nl>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
 
-Changes since v3:
-- rework commit message
-
- .../devicetree/bindings/usb/atmel-usb.txt          |  5 +-
- drivers/usb/gadget/udc/atmel_usba_udc.c            | 78 ++++++++++++----------
- drivers/usb/gadget/udc/atmel_usba_udc.h            |  5 ++
- 3 files changed, 52 insertions(+), 36 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-index bc2222c..38fee0f 100644
---- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-@@ -51,7 +51,10 @@ usb1: gadget at fffa4000 {
- Atmel High-Speed USB device controller
- 
- Required properties:
-- - compatible: Should be "atmel,at91sam9rl-udc"
-+ - compatible: Should be one of the following
-+	       "at91sam9rl-udc"
-+	       "at91sam9g45-udc"
-+	       "sama5d3-udc"
-  - reg: Address and length of the register set for the device
-  - interrupts: Should contain usba interrupt
-  - ep childnode: To specify the number of endpoints and their properties.
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index ce88237..36fd34b 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- #include <linux/clk.h>
-+#include <linux/clk/at91_pmc.h>
- #include <linux/module.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-@@ -324,28 +325,12 @@ static int vbus_is_present(struct usba_udc *udc)
- 	return 1;
- }
- 
--#if defined(CONFIG_ARCH_AT91SAM9RL)
--
--#include <linux/clk/at91_pmc.h>
--
--static void toggle_bias(int is_on)
--{
--	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
--
--	if (is_on)
--		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
--	else
--		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
--}
--
--#else
--
--static void toggle_bias(int is_on)
-+static void toggle_bias(struct usba_udc *udc, int is_on)
- {
-+	if (udc->errata && udc->errata->toggle_bias)
-+		udc->errata->toggle_bias(udc, is_on);
- }
- 
--#endif /* CONFIG_ARCH_AT91SAM9RL */
--
- static void next_fifo_transaction(struct usba_ep *ep, struct usba_request *req)
- {
- 	unsigned int transaction_len;
-@@ -1620,7 +1605,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 	DBG(DBG_INT, "irq, status=%#08x\n", status);
- 
- 	if (status & USBA_DET_SUSPEND) {
--		toggle_bias(0);
-+		toggle_bias(udc, 0);
- 		usba_writel(udc, INT_CLR, USBA_DET_SUSPEND);
- 		DBG(DBG_BUS, "Suspend detected\n");
- 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
-@@ -1632,7 +1617,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 	}
- 
- 	if (status & USBA_WAKE_UP) {
--		toggle_bias(1);
-+		toggle_bias(udc, 1);
- 		usba_writel(udc, INT_CLR, USBA_WAKE_UP);
- 		DBG(DBG_BUS, "Wake Up CPU detected\n");
- 	}
-@@ -1736,13 +1721,13 @@ static irqreturn_t usba_vbus_irq(int irq, void *devid)
- 	vbus = vbus_is_present(udc);
- 	if (vbus != udc->vbus_prev) {
- 		if (vbus) {
--			toggle_bias(1);
-+			toggle_bias(udc, 1);
- 			usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 			usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
- 		} else {
- 			udc->gadget.speed = USB_SPEED_UNKNOWN;
- 			reset_all_endpoints(udc);
--			toggle_bias(0);
-+			toggle_bias(udc, 0);
- 			usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 			if (udc->driver->disconnect) {
- 				spin_unlock(&udc->lock);
-@@ -1788,7 +1773,7 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 	/* If Vbus is present, enable the controller and wait for reset */
- 	spin_lock_irqsave(&udc->lock, flags);
- 	if (vbus_is_present(udc) && udc->vbus_prev == 0) {
--		toggle_bias(1);
-+		toggle_bias(udc, 1);
- 		usba_writel(udc, CTRL, USBA_ENABLE_MASK);
- 		usba_writel(udc, INT_ENB, USBA_END_OF_RESET);
- 	}
-@@ -1811,7 +1796,7 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
- 	spin_unlock_irqrestore(&udc->lock, flags);
- 
- 	/* This will also disable the DP pullup */
--	toggle_bias(0);
-+	toggle_bias(udc, 0);
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 
- 	clk_disable_unprepare(udc->hclk);
-@@ -1823,6 +1808,29 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
- }
- 
- #ifdef CONFIG_OF
-+static void at91sam9rl_toggle_bias(struct usba_udc *udc, int is_on)
-+{
-+	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
-+
-+	if (is_on)
-+		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
-+	else
-+		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
-+}
-+
-+static const struct usba_udc_errata at91sam9rl_errata = {
-+	.toggle_bias = at91sam9rl_toggle_bias,
-+};
-+
-+static const struct of_device_id atmel_udc_dt_ids[] = {
-+	{ .compatible = "atmel,at91sam9rl-udc", .data = &at91sam9rl_errata },
-+	{ .compatible = "atmel,at91sam9g45-udc" },
-+	{ .compatible = "atmel,sama5d3-udc" },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, atmel_udc_dt_ids);
-+
- static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 						    struct usba_udc *udc)
- {
-@@ -1830,10 +1838,17 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 	const char *name;
- 	enum of_gpio_flags flags;
- 	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match;
- 	struct device_node *pp;
- 	int i, ret;
- 	struct usba_ep *eps, *ep;
- 
-+	match = of_match_node(atmel_udc_dt_ids, np);
-+	if (!match)
-+		return ERR_PTR(-EINVAL);
-+
-+	udc->errata = match->data;
-+
- 	udc->num_ep = 0;
- 
- 	udc->vbus_pin = of_get_named_gpio_flags(np, "atmel,vbus-gpio", 0,
-@@ -2024,7 +2039,7 @@ static int usba_udc_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Unable to enable pclk, aborting.\n");
- 		return ret;
- 	}
--	toggle_bias(0);
-+
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 	clk_disable_unprepare(pclk);
- 
-@@ -2033,6 +2048,8 @@ static int usba_udc_probe(struct platform_device *pdev)
- 	else
- 		udc->usba_ep = usba_udc_pdata(pdev, udc);
- 
-+	toggle_bias(udc, 0);
-+
- 	if (IS_ERR(udc->usba_ep))
- 		return PTR_ERR(udc->usba_ep);
- 
-@@ -2092,15 +2109,6 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#if defined(CONFIG_OF)
--static const struct of_device_id atmel_udc_dt_ids[] = {
--	{ .compatible = "atmel,at91sam9rl-udc" },
--	{ /* sentinel */ }
--};
--
--MODULE_DEVICE_TABLE(of, atmel_udc_dt_ids);
--#endif
--
- static struct platform_driver udc_driver = {
- 	.remove		= __exit_p(usba_udc_remove),
- 	.driver		= {
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index a70706e..456899e 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
-@@ -304,6 +304,10 @@ struct usba_request {
- 	unsigned int				mapped:1;
- };
- 
-+struct usba_udc_errata {
-+	void (*toggle_bias)(struct usba_udc *udc, int is_on);
-+};
-+
- struct usba_udc {
- 	/* Protect hw registers from concurrent modifications */
- 	spinlock_t lock;
-@@ -314,6 +318,7 @@ struct usba_udc {
- 	struct usb_gadget gadget;
- 	struct usb_gadget_driver *driver;
- 	struct platform_device *pdev;
-+	const struct usba_udc_errata *errata;
- 	int irq;
- 	int vbus_pin;
- 	int vbus_pin_inverted;
 -- 
-1.9.1
+motzblog.wordpress.com
