@@ -1,68 +1,174 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 12 Jan 2015 13:39:22 +0800
-Subject: [PATCH v3 3/4] arm64: dts: Add mediatek MT8173 SoC and
- evaluation board dts and Makefile
-In-Reply-To: <CABuKBe+=uTVFKCdpr7an-7jOZdQ91ERu0ObjfiW9fKv1CO1oAg@mail.gmail.com>
-References: <1419582417-4448-1-git-send-email-eddie.huang@mediatek.com>
- <1419582417-4448-4-git-send-email-eddie.huang@mediatek.com>
- <CABuKBe+=uTVFKCdpr7an-7jOZdQ91ERu0ObjfiW9fKv1CO1oAg@mail.gmail.com>
-Message-ID: <1421041162.2792.2.camel@mtksdaap41>
+From: ottxor@gentoo.org (Christoph Junghans)
+Date: Sun, 11 Jan 2015 23:11:01 -0700
+Subject: [PATCH] Added support for pogoplug e02 (pink/gray)
+In-Reply-To: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+Message-ID: <1421043061-2837-1-git-send-email-ottxor@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+The pogoplug differs from the SheevaPlug only by a
+few details, but especially in the led assignments.
+This patch was tested under Gentoo Linux.
+A version of this patch was included in Arch Linux
+on Arm since Jun 2014:
+https://github.com/archlinuxarm/PKGBUILDs/commit/250c2f0aa6ffe66c0ebda61efaa356e5dc709cc7
+A similar patch is available for OpenWrt:
+https://dev.openwrt.org/browser/trunk/target/linux/kirkwood/patches-3.14/150-pogoplug_e02.patch
 
-Thanks your review, I will modify in next version.
+Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
+Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
+Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+---
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 114 +++++++++++++++++++++
+ 3 files changed, 116 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
 
-
-On Sun, 2015-01-11 at 21:12 +0100, Matthias Brugger wrote:
-> 2014-12-26 9:26 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
-> > Add device tree support for MT8173 SoC and evaluation board based on it.
-> >
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/Makefile                |   1 +
-> >  arch/arm64/boot/dts/mediatek/Makefile       |   5 +
-> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  34 ++++++
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 159 ++++++++++++++++++++++++++++
-> >  4 files changed, 199 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/Makefile
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >
-> > +
-> > +       soc {
-> > +               #address-cells = <2>;
-> > +               #size-cells = <2>;
-> > +               compatible = "simple-bus";
-> > +               ranges;
-> > +
-> > +               sysirq: intpol-controller at 10200620 {
-> > +                       compatible = "mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq";
-> 
-> Please update the dts bindings for sysirq and add mediatek,mt8173-sysirq.
-> Also check that the lines in this patch does not exceed the 80 character limit.
-> 
-> > +
-> > +               uart0: serial at 11002000 {
-> > +                       compatible = "mediatek,mt8173-uart","mediatek,mt6577-uart";
-> 
-> Please update the dts binding documentation.
-> 
-> > +                       reg = <0 0x11002000 0 0x400>;
-> > +                       interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>;
-> > +                       clocks = <&uart_clk>;
-> > +               };
-> 
-> Please disable the uart ports in the dtsi and enable the one used by
-> the board in the dts.
-> See [0] and [1] on how to do this.
-> 
-> Apart from that, the series looks fine to me.
-> 
-> Thanks,
-> Matthias
-> 
-> [0] https://github.com/mbgg/linux-mediatek/commit/0714947369cdb2b9b8cc24aa07264d4b61ea4fd9
-> [1] https://github.com/mbgg/linux-mediatek/commit/ac00aa4dcd085e4cf01761095ec1e2a141f86f38
-> 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ac7269f..e5f58c6 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -32,6 +32,7 @@ cdns	Cadence Design Systems Inc.
+ chrp	Common Hardware Reference Platform
+ chunghwa	Chunghwa Picture Tubes Ltd.
+ cirrus	Cirrus Logic, Inc.
++cloudengines	Cloud Engines, Inc.
+ cortina	Cortina Systems, Inc.
+ crystalfontz	Crystalfontz America, Inc.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b8c5cd3..cd974eb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -143,6 +143,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
+ 	kirkwood-openrd-base.dtb \
+ 	kirkwood-openrd-client.dtb \
+ 	kirkwood-openrd-ultimate.dtb \
++	kirkwood-pogo_e02.dtb \
+ 	kirkwood-rd88f6192.dtb \
+ 	kirkwood-rd88f6281-a0.dtb \
+ 	kirkwood-rd88f6281-a1.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-pogo_e02.dts b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
+new file mode 100644
+index 0000000..286a6be
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
+@@ -0,0 +1,114 @@
++/dts-v1/;
++
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++
++/ {
++	model = "Cloud Engines Pogoplug E02";
++	compatible = "cloudengines,pogoe02", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
++	};
++
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			pmx_usb_power_enable: pmx-usb-power-enable {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++			pmx_led_green: pmx-led-green {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++			pmx_led_orange: pmx-led-orange {
++				marvell,pins = "mpp49";
++				marvell,function = "gpio";
++			};
++		};
++		serial at 12000 {
++			status = "ok";
++		};
++	};
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
++			      &pmx_led_green >;
++		pinctrl-names = "default";
++
++		health {
++			label = "status:green:health";
++			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++		};
++		fault {
++			label = "status:orange:fault";
++			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_usb_power_enable>;
++		pinctrl-names = "default";
++
++		usb_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&nand {
++	chip-delay = <40>;
++	status = "okay";
++
++	partition at 0 {
++		label = "u-boot";
++		reg = <0x0000000 0x100000>;
++		read-only;
++	};
++
++	partition at 100000 {
++		label = "uImage";
++		reg = <0x0100000 0x400000>;
++	};
++
++	partition at 500000 {
++		label = "pogoplug";
++		reg = <0x0500000 0x2000000>;
++	};
++
++	partition at 2500000 {
++		label = "root";
++		reg = <0x02500000 0x5b00000>;
++	};
++};
++
++&mdio {
++	status = "okay";
++
++	ethphy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
++&eth0 {
++	status = "okay";
++	ethernet0-port at 0 {
++		phy-handle = <&ethphy0>;
++	};
++};
+-- 
+2.0.5
