@@ -1,109 +1,54 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 12 Jan 2015 10:58:47 +0100
-Subject: [RFC 02/11] i2c: add quirk checks to core
-In-Reply-To: <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
- <1420824103-24169-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <20150112095847.GD3625@ldesroches-Latitude-E6320>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Mon, 12 Jan 2015 15:38:25 +0530
+Subject: [PATCH v5 0/2] Cadence I2C driver fixes
+In-Reply-To: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
+References: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
+Message-ID: <CAFcVECJ9-aTu=FFNr-yctHfQQEJx1TL2R-uRuqszaSvJk-yLTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Hi,
 
-On Fri, Jan 09, 2015 at 06:21:32PM +0100, Wolfram Sang wrote:
-> Let the core do the checks if HW quirks prevent a transfer. Saves code
-> from drivers and adds consistency.
-> 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  drivers/i2c/i2c-core.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 39d25a8cb1ad..7b10a19abf5b 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -2063,6 +2063,56 @@ module_exit(i2c_exit);
->   * ----------------------------------------------------
->   */
->  
-> +/* Check if val is exceeding the quirk IFF quirk is non 0 */
-> +#define i2c_quirk_exceeded(val, quirk) ((quirk) && ((val) > (quirk)))
-> +
-> +static int i2c_quirk_error(struct i2c_adapter *adap, struct i2c_msg *msg, char *err_msg)
-> +{
-> +	dev_err(&adap->dev, "quirk: %s (addr 0x%04x, size %u)\n", err_msg, msg->addr, msg->len);
-> +	return -EOPNOTSUPP;
-> +}
-> +
-> +static int i2c_check_for_quirks(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
-> +{
-> +	struct i2c_adapter_quirks *q = adap->quirks;
-> +	u16 max_read = q->max_read_len, max_write = q->max_write_len;
-> +	int max_num = q->max_num_msgs, i;
-> +
-> +	if (q->flags & I2C_ADAPTER_QUIRK_COMB_WRITE_THEN_READ)
-> +		max_num = 2;
-> +
-> +	if (i2c_quirk_exceeded(num, max_num))
-> +		return i2c_quirk_error(adap, &msgs[0], "too many messages");
-> +
-> +	if (num == 2 && q->flags & I2C_ADAPTER_QUIRK_COMB_WRITE_FIRST) {
-> +		if (msgs[0].flags & I2C_M_RD)
-> +			return i2c_quirk_error(adap, &msgs[0], "invalid first write msg");
-> +
-> +		max_write = q->max_comb_write_len;
-> +	}
-> +
-> +	if (num == 2 && q->flags & I2C_ADAPTER_QUIRK_COMB_READ_SECOND) {
-> +		if (!(msgs[1].flags & I2C_M_RD) || msgs[0].addr != msgs[1].addr)
-> +			return i2c_quirk_error(adap, &msgs[1], "invalid second read msg");
-> +
-> +		max_read = q->max_comb_read_len;
-> +	}
-> +
-> +	for (i = 0; i < num; i++) {
-> +		u16 len = msgs[i].len;
-> +
-> +		if (msgs[i].flags & I2C_M_RD) {
-> +			if (i2c_quirk_exceeded(len, max_read))
-> +				return i2c_quirk_error(adap, &msgs[i], "msg too long");
-> +		} else {
-> +			if (i2c_quirk_exceeded(len, max_write))
-> +				return i2c_quirk_error(adap, &msgs[i], "msg too long");
-> +		}
-> +	}
-> +
+Any further comments on this?
 
-I am not sure it will perfectly fit at91 quirks.
+Regards,
+Harini
 
-The hardware can handle two messages by using the internal address
-feature. The internal address size is from one byte to three bytes. Then
-the length of the first message is limited to three but we don't have
-this constraint for the second one. If we have 'write then read' no problem
-but if we have two write messages, the second one will cause a quirk
-exceeded error.
-
-Regards
-
-Ludovic
-
-> +	return 0;
-> +}
-> +
->  /**
->   * __i2c_transfer - unlocked flavor of i2c_transfer
->   * @adap: Handle to I2C bus
-> @@ -2080,6 +2130,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->  	unsigned long orig_jiffies;
->  	int ret, try;
->  
-> +	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
-> +		return -EOPNOTSUPP;
-> +
->  	/* i2c_trace_msg gets enabled when tracepoint i2c_transfer gets
->  	 * enabled.  This is an efficient way of keeping the for-loop from
->  	 * being executed when not needed.
-> -- 
-> 2.1.3
-> 
+On Fri, Dec 12, 2014 at 9:48 AM, Harini Katakam <harinik@xilinx.com> wrote:
+> This series implements workarounds for some bugs in Cadence I2C controller.
+>
+> - The I2C controller when configured in Master Mode generates invalid read transactions.
+> When HOLD bit is set and HW timeout occurs, invalid read transactions are
+> generated on the bus. This will affect repeated start conditions and large
+> data transfer condtions where transfer_size_register has to be updated again.
+> The transfer size register rolls over erroneously under these conditions.
+> Note that this HW timeout cannot be disabled even if the interrupt is unused.
+> Errata link: http://www.xilinx.com/support/answers/61664.html
+>
+> -The I2C controller when configured in Master Mode is the missing master completion interrupt.
+> During repeated start condition, the driver has to set the HOLD bit for
+> the set of transfer being done together and clear the HOLD bit just before
+> the last transfer. But the controller does not indicate completion when
+> a read/receive transfer is done if the HOLD bit is set. This affects
+> all repeated start operation where a read/receive transfer is not
+> the last transfer.
+> Errata link: http://www.xilinx.com/support/answers/61665.html
+>
+> To address the above,
+> - >252 byte transfers are done such that transfer_size never becomes zero.
+> - timeout register value is increased (even though the driver doesn't use this).
+> - A check is performed to see if there is any transfer following a
+> read/receive transfer in the set of messages using repeated start.
+> An error is returned in such cases because if we proceed, completion interrupt
+> is never obtained and a SW timeout will occur.
+>
+> Harini Katakam (2):
+>   i2c: cadence: Handle > 252 byte transfers
+>   i2c: cadence: Check for errata condition involving master receive
+>
+>  drivers/i2c/busses/i2c-cadence.c |  185 +++++++++++++++++++++++---------------
+>  1 file changed, 112 insertions(+), 73 deletions(-)
+>
+> --
+> 1.7.9.5
+>
