@@ -1,51 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Jan 2015 15:32:56 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.19
-In-Reply-To: <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
-References: <cover.1421113695.git.horms+renesas@verge.net.au>
- <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
-Message-ID: <20150113233256.GJ15087@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Jan 2015 15:37:49 -0800
+Subject: [PATCH 1/4] ARM: OMAP2+: Add board-generic.c entry for ti81xx
+In-Reply-To: <1421192272-20754-1-git-send-email-tony@atomide.com>
+References: <1421192272-20754-1-git-send-email-tony@atomide.com>
+Message-ID: <1421192272-20754-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 09:10:08AM +0100, Geert Uytterhoeven wrote:
-> On Tue, Jan 13, 2015 at 3:13 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> >
-> > Please consider these Renesas ARM based SoC fixes for v3.19.
-> >
-> > This pull request is based on the last round of SoC updates for v3.19,
-> > Fourth Round of Renesas ARM Based SoC Updates for v3.19, tagged as
-> > renesas-soc3-for-v3.19, merged into your next/soc branch and included in
-> > v3.19-rc1.
-> >
-> > * ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
-> 
-> That's the description for the regression below.
-> Should have been: "Set .control_parent for all irqpin instances for sh73a0
-> SoC when booting using legacy C."
-> 
-> >   This fixes a long standing problem which has been present since
-> >   the sh73a0 SoC started using the INTC External IRQ pin driver.
-> >
-> >   The patch that introduced the problem is 341eb5465f67437a ("ARM:
-> >   shmobile: INTC External IRQ pin driver on sh73a0") which was included
-> >   in v3.10.
-> >
-> > * This fixes a regression in the r8a7740 SoC due to
-> >   9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
-> >   which was included in v3.18-rc2.
-> 
-> > ----------------------------------------------------------------
-> > Renesas ARM Based SoC Fixes for v3.19
-> >
-> > * Set .control_parent for all irqpin instances for sh73a0 SoC when booting
-> >   using legacy C
-> > * Instantiate GIC board for r8a7740 SoC when using legacy C
+This allows booting ti81xx boards with with when a .dts
+file is in place.
 
-Thanks, I fixed up the commit message when I pulled the branch.
+Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/board-generic.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-
-Merged.
-
--Olof
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 608079a..e95b8f7 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -142,6 +142,40 @@ DT_MACHINE_START(AM3517_DT, "Generic AM3517 (Flattened Device Tree)")
+ 	.dt_compat	= am3517_boards_compat,
+ 	.restart	= omap3xxx_restart,
+ MACHINE_END
++
++static const char *const ti814x_boards_compat[] __initconst = {
++	"ti,dm8148",
++	"ti,dm814",
++	NULL,
++};
++
++DT_MACHINE_START(TI81XX_DT, "Generic ti814x (Flattened Device Tree)")
++	.reserve	= omap_reserve,
++	.map_io		= ti81xx_map_io,
++	.init_early	= ti814x_init_early,
++	.init_machine	= omap_generic_init,
++	.init_late	= ti81xx_init_late,
++	.init_time	= omap3_gptimer_timer_init,
++	.dt_compat	= ti814x_boards_compat,
++	.restart	= ti81xx_restart,
++MACHINE_END
++
++static const char *const ti816x_boards_compat[] __initconst = {
++	"ti,dm8168",
++	"ti,dm816",
++	NULL,
++};
++
++DT_MACHINE_START(TI816X_DT, "Generic ti816x (Flattened Device Tree)")
++	.reserve	= omap_reserve,
++	.map_io		= ti81xx_map_io,
++	.init_early	= ti816x_init_early,
++	.init_machine	= omap_generic_init,
++	.init_late	= ti81xx_init_late,
++	.init_time	= omap3_gptimer_timer_init,
++	.dt_compat	= ti816x_boards_compat,
++	.restart	= ti81xx_restart,
++MACHINE_END
+ #endif
+ 
+ #ifdef CONFIG_SOC_AM33XX
+-- 
+2.1.4
