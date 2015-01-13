@@ -1,87 +1,147 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 13 Jan 2015 16:58:26 +0100
-Subject: [PATCH 6/7] ARM: at91: remove useless at91rm9200_dt_initialize()
-In-Reply-To: <54B473D3.6090008@atmel.com>
-References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
- <54B473D3.6090008@atmel.com>
-Message-ID: <54B540A2.1020805@atmel.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Wed, 14 Jan 2015 00:58:32 +0900
+Subject: [RFC PATCH 00/11] Early kprobe: enable kprobes at very early
+In-Reply-To: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
+References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <54B540A8.1020804@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2015 02:24, Bo Shen a ?crit :
-> Hi Alexandre,
+(2015/01/07 16:34), Wang Nan wrote:
+> This patch series shows early kprobe, a mechanism allows users to track
+> events at very early. It should be useful for optimization of system
+> booting. This can also be used by BSP developers to hook their platform
+> specific procedures at kernel booting stages after setup_arch().
+
+Good work!! :)
+
+> This patch series provides X86 and ARM support for early kprobes. The ARM
+> portion is based on my OPTPROBES for ARM 32 patches (ARM: kprobes: OPTPROBES
+> and other improvements), which have not been accepted yet.
 > 
-> On 01/13/2015 02:42 AM, Alexandre Belloni wrote:
->> at91rm9200_dt_initialize() is doing the same as at91_dit_initialize(), use that
+> Kprobes is very useful for tracking events. However, it can only be used
+> after system fully initialized. When debugging kernel booting stage, for
+> example, checking memory consumption during booting, analyzing boot
+> phase processes creation and optimization of booting speed, specific
+> tools must be created. Sometimes we have to modify kernel code.
 > 
-> s/at91_dit_initialize/at91_dt_initialize
+> Early kprobes is my idea on it. By utilizing OPTPROBES which converts probed
+> instructions into branches instead of breakpoints, kprobe can be used even
+> before setup of exception handlers. By adding cmdline options, one can insert
+> kprobes to track kernel booting stage without code modification. 
 
-Alex I'll correct that when including it to the at91-3.20-cleanup
-branch. No need to resend.
+Hmm, for arm32, this strategy is good. but on x86, not so many instructions
+can be optimized. I doubt that we really need to use it before initializing
+exception handlers. Since any exception can be happen on early point, we
+need to initialize it on very early stage.
 
-Voice: thanks for the review.
-
-Bye,
-
-
->> one instead.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> ---
->>   arch/arm/mach-at91/board-dt-rm9200.c | 2 +-
->>   arch/arm/mach-at91/generic.h         | 1 -
->>   arch/arm/mach-at91/setup.c           | 7 -------
->>   3 files changed, 1 insertion(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
->> index 76dfe8f9af50..a15ab6f8de00 100644
->> --- a/arch/arm/mach-at91/board-dt-rm9200.c
->> +++ b/arch/arm/mach-at91/board-dt-rm9200.c
->> @@ -38,6 +38,6 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
->>   DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
->>   	.init_time      = at91rm9200_dt_timer_init,
->>   	.map_io		= at91_map_io,
->> -	.init_early	= at91rm9200_dt_initialize,
->> +	.init_early	= at91_dt_initialize,
->>   	.dt_compat	= at91rm9200_dt_board_compat,
->>   MACHINE_END
->> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
->> index e0368aa06390..c10c2ddaae6d 100644
->> --- a/arch/arm/mach-at91/generic.h
->> +++ b/arch/arm/mach-at91/generic.h
->> @@ -22,7 +22,6 @@ extern void __init at91_init_sram(int bank, unsigned long base,
->>
->>    /* Processors */
->>   extern void __init at91rm9200_set_type(int type);
->> -extern void __init at91rm9200_dt_initialize(void);
->>   extern void __init at91_dt_initialize(void);
->>
->>    /* Timer */
->> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
->> index ce25e85720fb..acb8d7724609 100644
->> --- a/arch/arm/mach-at91/setup.c
->> +++ b/arch/arm/mach-at91/setup.c
->> @@ -429,13 +429,6 @@ static void at91_dt_ramc(void)
->>   	at91_pm_set_standby(standby);
->>   }
->>
->> -void __init at91rm9200_dt_initialize(void)
->> -{
->> -	at91_dt_ramc();
->> -
->> -	at91_boot_soc.init();
->> -}
->> -
->>   void __init at91_dt_initialize(void)
->>   {
->>   	at91_dt_ramc();
->>
+> BSP developers can also benefit from it. For example, when booting an
+> SoC equipped with unstoppable watchdog like IMP706, wathdog writting
+> code must be inserted into different places to avoid watchdog resetting
+> system before watchdogd is pulled up (especially during memory
+> initialization, which is the most time-consuming portion of booting).
+> With early kprobe, BSP developers are able to put such code at their
+> private directory without disturbing arch-independent code.
 > 
-> Best Regards,
-> Bo Shen
+> In this patch series, early kprobes simply print messagees when the
+> probed instructions are hit. My futher plan is to connect 'ekprobe='
+> cmdline parameters to '/sys/kernel/debug/tracing/kprobe_events', allows
+> installing kprobe events from kernel cmdline, and dump early kprobe
+> messages into ring buffer without print them out.
+
+Yeah, I really need this early-ftrace (event-trace) feature to
+trace booting kernel, even without kprobe events.
+
+> Patch 1 - 4 are architecture dependent code, allow text modification
+> before kprobes_initialized is setup, and alloc resources statically from
+> vmlinux.lds. Currently only x86 and ARM are supported.
+> 
+> Patch 5 - 8 define required flags and macros.
+> 
+> Patch 9 is the core logic of early kprobes. When register_kprobe() is
+> called before kprobes_initialized, it marks the probed kprobes as
+> 'KPROBE_FLAG_EARLY' and allocs resources from slots which is reserved
+> during linking. After kprobe is fully initialized, it converts early
+> kprobes to normal kprobes.
+> 
+> Patch 10 enables cmdline option 'ekprobe=', allows setup probe at
+> cmdline. However, currently the kprobe handler is only a simple printk.
+> 
+> Patch 11 introduces required Kconfig options to actually enable early
+> kprobes.
+
+BTW, did you ensure all patches in the series are "bisect-clean" ?
+It seems some early patches in the series depend on later patches.
+
+> 
+> Usage of early kprobe is as follow:
+> 
+> Booting kernel with cmdline 'ekprobe=', like:
+> 
+> ... rdinit=/sbin/init ekprobe=0xc00f3c2c ekprobe=__free_pages ...
+> 
+> During boot, kernel will print trace using printk:
+> 
+>  ...
+>  Hit early kprobe at __alloc_pages_nodemask+0x4
+>  Hit early kprobe at __free_pages+0x0
+>  Hit early kprobe at __alloc_pages_nodemask+0x4
+>  Hit early kprobe at __free_pages+0x0
+>  Hit early kprobe at __free_pages+0x0
+>  Hit early kprobe at __alloc_pages_nodemask+0x4
+>  ...
+> 
+> After fully initialized, early kprobes will be converted to normal
+> kprobes, and can be turned-off using:
+
+I think it should be just removed automatically instead of converting.
+
+Thank you!
+
+> 
+>  echo 0 > /sys/kernel/debug/kprobes/enabled
+> 
+> And reenabled using:
+> 
+>  echo 1 > /sys/kernel/debug/kprobes/enabled
+> 
+> Also, optimization can be turned off using:
+> 
+>  echo 0 > /proc/sys/debug/kprobes-optimization
+> 
+> There's no way to remove specific early kprobe now. I'd like to convert
+> early kprobes into kprobe events in futher patches, and then they can be
+> totally removed through event interface.
+> 
+> Wang Nan (11):
+>   ARM: kprobes: directly modify code if kprobe is not initialized.
+>   ARM: kprobes: introduce early kprobes related code area.
+>   x86: kprobes: directly modify code if kprobe is not initialized.
+>   x86: kprobes: introduce early kprobes related code area.
+>   kprobes: Add an KPROBE_FLAG_EARLY for early kprobe.
+>   kprobes: makes kprobes_initialized globally visable.
+>   kprobes: introduces macros for allocing early kprobe resources.
+>   kprobes: allows __alloc_insn_slot() from early kprobes slots.
+>   kprobes: core logic of eraly kprobes.
+>   kprobes: enable 'ekprobe=' cmdline option for early kprobes.
+>   kprobes: add CONFIG_EARLY_KPROBES option.
+> 
+>  arch/Kconfig                      |  12 ++
+>  arch/arm/include/asm/kprobes.h    |  29 ++++-
+>  arch/arm/kernel/vmlinux.lds.S     |   2 +
+>  arch/arm/probes/kprobes/opt-arm.c |  11 +-
+>  arch/x86/include/asm/insn.h       |   7 +-
+>  arch/x86/include/asm/kprobes.h    |  44 +++++--
+>  arch/x86/kernel/kprobes/opt.c     |   7 +-
+>  arch/x86/kernel/vmlinux.lds.S     |   2 +
+>  include/linux/kprobes.h           | 109 ++++++++++++++++++
+>  kernel/kprobes.c                  | 237 ++++++++++++++++++++++++++++++++++++--
+>  10 files changed, 437 insertions(+), 23 deletions(-)
 > 
 
 
 -- 
-Nicolas Ferre
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
