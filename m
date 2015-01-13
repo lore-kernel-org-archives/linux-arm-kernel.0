@@ -1,115 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Jan 2015 23:46:55 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <54AD166C.9060507@ti.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
- <54AA4CD4.40105@ti.com>
- <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
- <54AD166C.9060507@ti.com>
-Message-ID: <alpine.DEB.2.02.1501132345220.28034@utopia.booyaka.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Jan 2015 00:47:59 +0100
+Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
+In-Reply-To: <20150113230956.GA15087@quad.lixom.net>
+References: <20150112224203.GL22090@quad.lixom.net>
+ <1421160180-23452-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150113230956.GA15087@quad.lixom.net>
+Message-ID: <20150113234759.GH3843@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Jan 2015, Roger Quadros wrote:
+Hi Olof,
 
-> > From: Paul Walmsley <paul@pwsan.com>
-> > Date: Mon, 5 Jan 2015 15:49:57 -0700
-> > Subject: [PATCH] Only skip ioremap() if IP block does not have OCP header
-> >  registers. Experimental.
+On 13/01/2015 at 15:09:56 -0800, Olof Johansson wrote :
+> On Tue, Jan 13, 2015 at 03:43:00PM +0100, Nicolas Ferre wrote:
+> > The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
+> > options may be removed in the near future.
 > > 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > > ---
-> >  arch/arm/mach-omap2/omap_hwmod.c | 33 +++++++++++++++++++++------------
-> >  1 file changed, 21 insertions(+), 12 deletions(-)
+> > Hi Olof,
 > > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> > index cbb908dc5cf0..03df8833d399 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> > @@ -1938,6 +1938,8 @@ static int _reset(struct omap_hwmod *oh)
-> >  	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
-> >  
-> >  	if (oh->class->reset) {
-> > +		WARN(!oh->_mpu_rt_va, "Attempt to call custom reset with no MPU register target ioremapped: %s",
-> > +		     oh->name);
+> > This is an attempt to match other ARM SoC families format.
+> > If you feel that the patch can be good, do not hesitate to take it yourself. I
+> > don't plan to integrate it in any of my pull-request so it can appear quickly in
+> > arm-soc and can be used by everyone.
 > 
-> Not part of $subject.
-
-Hmm, how do you mean?  If we skip the ioremap(), wouldn't you like to know 
-before some custom reset code gets called that pretty much always depends 
-on the ioremap() succeeding? :-)
-
-> >  		r = oh->class->reset(oh);
-> >  	} else {
-> >  		if (oh->rst_lines_cnt > 0) {
-> > @@ -2358,15 +2360,19 @@ static int of_dev_hwmod_lookup(struct device_node *np,
-> >  }
-> >  
-> >  /**
-> > - * _init_mpu_rt_base - populate the virtual address for a hwmod
-> > + * _init_mpu_rt_base - populate the MPU port and virtual address
-> >   * @oh: struct omap_hwmod * to locate the virtual address
-> >   * @data: (unused, caller should pass NULL)
-> >   * @index: index of the reg entry iospace in device tree
-> >   * @np: struct device_node * of the IP block's device node in the DT data
-> >   *
-> > - * Cache the virtual address used by the MPU to access this IP block's
-> > - * registers.  This address is needed early so the OCP registers that
-> > - * are part of the device's address space can be ioremapped properly.
-> > + * Cache the interconnect target port and the virtual address used by
-> > + * the MPU to access this IP block's registers.  The address is needed
-> > + * early so the OCP registers that are part of the device's address
-> > + * space can be ioremapped properly.  The presence or absence of the
-> > + * interconnect target port also indicates whether the hwmod code
-> > + * should wait for the IP block to indicate readiness after it is
-> > + * enabled.
-> >   *
-> >   * Returns 0 on success, -EINVAL if an invalid hwmod is passed, and
-> >   * -ENXIO on absent or invalid register target address space.
-> > @@ -2385,6 +2391,13 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
-> >  	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
-> >  		return -ENXIO;
-> >  
-> > +	/*
-> > +	 * If there's no need for the hwmod code to read or write to
-> > +	 * the IP block registers, bail out early before the ioremap()
-> > +	 */
-> > +	if (!oh->class->sysc)
-> > +		return 0;
-> > +
-> >  	mem = _find_mpu_rt_addr_space(oh);
-> >  	if (!mem) {
-> >  		pr_debug("omap_hwmod: %s: no MPU register target found\n",
-> > @@ -2451,14 +2464,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
-> >  				oh->name, np->name);
-> >  	}
-> >  
-> > -	if (oh->class->sysc) {
-> > -		r = _init_mpu_rt_base(oh, NULL, index, np);
-> > -		if (r < 0) {
-> > -			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
-> > -			     oh->name);
-> > -			return 0;
-> > -		}
-> > -	}
-> > +	r = _init_mpu_rt_base(oh, NULL, index, np);
-> > +	if (r < 0)
-> > +		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
-> > +			 oh->name);
+> Hi,
 > 
-> This is the real piece that fixes the issue.
+> If you see what Peter did, he split up the rules per-SoC based on how
+> things were selectable in Kconfig. Since you seem to have the Kconfig
+> entries already, how about doing the same? That way the same information
+> w.r.t. SoC family that you have as comments isn't lost either.
 > 
-> >  
-> >  	r = _init_clocks(oh, NULL);
-> >  	if (r < 0) {
-> > 
-> 
-> I've tested this patch on am43x-gp-evm, and it seems to fix the issue 
-> although with some unpleasant warning messages.
 
-Could you paste those in?
+You didn't see the patch set yet because it depends on a lot of other
+series still being discussed but after the switch to multiplatform, the
+only config option left will be SOC_AT91RM9200, SOC_AT91SAM9 (both
+under SOC_SAM_V4_V5) and SOC_SAMA5, under SOC_SAM_V7.
 
+That's our plan, unless you feel that we should keep one config option
+per SoC.
 
-- Paul
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
