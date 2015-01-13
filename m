@@ -1,40 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Jan 2015 23:29:32 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <54AC1800.1020406@ti.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
- <54AA4CD4.40105@ti.com>
- <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
- <54AB9983.1040703@ti.com> <54AC1800.1020406@ti.com>
-Message-ID: <alpine.DEB.2.02.1501132324150.28034@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Jan 2015 15:30:38 -0800
+Subject: [GIT PULL] Broadcom MAINTAINERS file updates for 3.20
+In-Reply-To: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
+References: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150113233038.GI15087@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On Mon, Jan 12, 2015 at 03:11:23PM -0800, Florian Fainelli wrote:
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
+> 
+> for you to fetch changes up to c3a8f6399f6fb748bf0067bd3d97c0653d434648:
+> 
+>   MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs (2015-01-12 15:02:57 -0800)
+> 
+> ----------------------------------------------------------------
+> This pull request contains updates to our MAINTAINERS files for all relevant
+> Broadcom SoCs: BCM63xx, Cygnus/iProc, ARM & MIPS-based BCM7xxx (brcmstb).
+> 
+> Our new code location for all Broadcom-related kernel activities is now on
+> http://github.com/Broadcom/.
 
-thanks for pitching in on this!
+3 of the 4 changes refer to github.com/broadcom, and one to
+github.com/Broadcom. Care to respin and make it consistent (for extra credit,
+also consistent with the tag :)?
 
-On Tue, 6 Jan 2015, Suman Anna wrote:
+Thanks,
 
-> You have removed the return from the above block on failure. If any DT
-> entry doesn't have the reg property, this will hang the kernel boot.
-> Just remove the "reg" entry from any of the existing DT, and you will
-> run into the issue, this is what 6423d6df1440 ("ARM: OMAP2+: hwmod:
-> check for module address space during init") fixed. 
-
-Seems like that's the problem that we need to track down, then.  If a 
-hwmod has no MPU-accessible registers, it should still be possible to 
-init the clocks for the device, etc. ...
-
-> Also, are you sure you want to turn the WARN into a pr_debug, it won't 
-> even show during the kernel boot log if the reg base is missing.
-
-No, I'm not sure :-)  I guess it depends how many hwmods we'll have with 
-no MPU-accessible registers.  We don't seem to have address ranges for the 
-interconnects defined; we could fix that fairly easily. 
-
-
-- Paul
+-Olof
