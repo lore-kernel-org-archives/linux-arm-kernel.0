@@ -1,48 +1,52 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 13 Jan 2015 11:44:30 +0100
-Subject: [PATCH v2 1/3] ARM: dts: sun4i: Add dts file for Chuwi V7 CW0825
- tablet
-Message-ID: <1421145872-17828-1-git-send-email-hdegoede@redhat.com>
+Date: Tue, 13 Jan 2015 11:44:32 +0100
+Subject: [PATCH v2 3/3] ARM: dts: sun8i: Add dts file for Ippo Q8H v1.2 tablets
+In-Reply-To: <1421145872-17828-1-git-send-email-hdegoede@redhat.com>
+References: <1421145872-17828-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1421145872-17828-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Chuwi V7 is an A10 (sun4i) based tablet with 1G of RAM, 16G of nand flash,
-microsd slot, 7" 1024x768 lvds ips panel, mini hdmi out, headphones out,
-stereo speakers, front & back camera and usb wifi.
+The Ippo Q8H v1.2 is almost identical to the v5, still it needs a separate
+dtb file since some gpio-s surrounding the wlan/bluetooth are different,
+it uses different camera sensors, and different DRAM timings.
 
-It is clearly marked "CHUWI", "V7" and "Model: CW0825" on the back of the
-tablet.
+Note that atm neither the wlan/bluetooth nor the camera are supported, so
+atm their is no difference between the dts files, but because of the different
+DRAM timings there are already separate u-boot configs for the 2 different
+versions, and the 1.2 config refers to sun8i-a23-ippo-q8h-v1.2.dtb to be
+future proof, so we need to provide a sun8i-a23-ippo-q8h-v1.2.dtb file.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
-- Use cpp style includes
-- Use GPIO header for the GPIO flags
-- Address nodes by reference rather then by their full dt path
+-Change compatible for v1.2 from "ippo,q8h-v5" to "ippo,q8h-v1.2"
 ---
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 99 +++++++++++++++++++++++++
- 2 files changed, 100 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+ arch/arm/boot/dts/Makefile                    |  3 +-
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts | 59 +++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a86f232..548520f 100644
+index 4142831..7f66bab 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -445,6 +445,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
- dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-a1000.dtb \
- 	sun4i-a10-ba10-tvbox.dtb \
-+	sun4i-a10-chuwi-v7-cw0825.dtb \
- 	sun4i-a10-cubieboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-hackberry.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -478,7 +478,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-olinuxino-micro.dtb \
+ 	sun7i-a20-pcduino3.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+-	sun8i-a23-ippo-q8h-v5.dtb
++	sun8i-a23-ippo-q8h-v5.dtb \
++	sun8i-a23-ippo-q8h-v1.2.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
 new file mode 100644
-index 0000000..0654d30
+index 0000000..dd31c53
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-@@ -0,0 +1,99 @@
++++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts
+@@ -0,0 +1,59 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -90,57 +94,17 @@ index 0000000..0654d30
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+/dts-v1/;
-+#include "sun4i-a10.dtsi"
-+#include "sunxi-common-regulators.dtsi"
++/*
++ * The Ippo Q8H v1.2 is almost identical to the v5, still it needs a separate
++ * dtb file since some gpio-s surrounding the wlan/bluetooth are different,
++ * and it uses different camera sensors.
++ */
++
++#include "sun8i-a23-ippo-q8h-v5.dts"
 +
 +/ {
-+	model = "Chuwi V7 CW0825";
-+	compatible = "chuwi,v7-cw0825", "allwinner,sun4i-a10";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		compatible = "x-powers,axp209";
-+		reg = <0x34>;
-+		interrupts = <0>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
++	model = "Ippo Q8H Dual Core Tablet (v1.2)";
++	compatible = "ippo,q8h-v1.2", "allwinner,sun8i-a23";
 +};
 -- 
 2.1.0
