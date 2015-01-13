@@ -1,31 +1,89 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Jan 2015 15:31:37 +0100
-Subject: [PATCH v2 02/13] pinctrl: sun6i: Add A31s pinctrl support
-In-Reply-To: <1418836704-15689-3-git-send-email-hdegoede@redhat.com>
-References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
- <1418836704-15689-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdb8wzjAc+14tK=d7coi6H8gts7TrvwELqo0e0RHLsB6Rw@mail.gmail.com>
+From: david.paris@st.com (David Paris)
+Date: Tue, 13 Jan 2015 15:32:13 +0100
+Subject: [4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <20150113142341.GA15707@roeck-us.net>
+References: <1414077524-6469-5-git-send-email-lee.jones@linaro.org>
+ <20150113142341.GA15707@roeck-us.net>
+Message-ID: <54B52C6D.20006@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 6:18 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+Hi Guenter,
 
-> The A31s is a stripped down version of the A31, as such it is missing some
-> pins and some functions on some pins.
->
-> The new pinctrl-sun6i-a31s.c this commit adds is a copy of pinctrl-sun6i-a31s.c
-> with the missing pins and functions removed.
->
-> Note there is no a31s specific version of pinctrl-sun6i-a31-r.c, as the
-> prcm pins are identical between the A31 and the A31s.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Sync i2c3 muxing with v2 of "pinctrl: sun6i: Add some missing functions"
-> -Add myself to the copyright header
+     Please forget this implementation of ST LPC Watchdog, Lee has 
+provided a new patchset. Search for "[STLinux Kernel] [PATCH 0/8] mfd: 
+watchdog: rtc: New driver for ST's LPC IP"
 
-Patch applied with Maxime's ACK.
+     David
 
-Yours,
-Linus Walleij
+On 01/13/2015 03:23 PM, Guenter Roeck wrote:
+> On Thu, Oct 23, 2014 at 04:18:44PM +0100, Lee Jones wrote:
+>> Signed-off-by: David Paris <david.paris@st.com>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Digging myself out of my hole. Sorry for the laaaate reply.
+>
+>> ---
+>>   drivers/watchdog/Kconfig  |  16 +++
+>>   drivers/watchdog/Makefile |   1 +
+>>   drivers/watchdog/st_wdt.c | 317 ++++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 334 insertions(+)
+>>   create mode 100644 drivers/watchdog/st_wdt.c
+>>
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index f57312f..c8abf57 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -432,6 +432,22 @@ config SIRFSOC_WATCHDOG
+>>   	  Support for CSR SiRFprimaII and SiRFatlasVI watchdog. When
+>>   	  the watchdog triggers the system will be reset.
+>>   
+>> +config ST_WATCHDOG
+>> +       tristate "STMicroelectronics LPC Watchdog"
+>> +       depends on ARCH_STI && OF
+>> +       depends on !RTC_DRV_ST_LPC
+> RTC_DRV_ST_LPC is not in mainline nor in -next. Is this still current ?
+>
+>> +       select WATCHDOG_CORE
+>> +       help
+>> +	 Say Y here to include Watchdog timer support for the watchdog
+>> +	 existing in the LPC of STMicroelectronics SOCs.
+>> +	 !!! BE CARREFUL !!!
+>> +	 This driver shares hardware resources with RTC Alarm part of the
+>> +	 LPC. Both LPC Watchdog driver and LPC RTC driver cannot be
+>> +	 used together.
+>> +
+> Arnd has asked if/how this is enforced by the code. Was this ever resolved ?
+>
+>> +	 To compile this driver as a module, choose M here: the
+>> +	 module will be called st-wdt.
+>> +
+> [ ... ]
+>
+>> +	watchdog_set_drvdata(&st_wdog_dev, st_wdog);
+>> +	watchdog_set_nowayout(&st_wdog_dev, WATCHDOG_NOWAYOUT);
+>> +
+>> +	/* Init Watchdog timeout with value in DT */
+>> +	ret = watchdog_init_timeout(&st_wdog_dev, 0, &pdev->dev);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Unable to initialise watchdog timeout\n");
+> Missing clk_disable_unprepare().
+>
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = watchdog_register_device(&st_wdog_dev);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Unable to register watchdog\n");
+>> +		clk_disable_unprepare(clk);
+>> +		return ret;
+>> +	}
+>> +
+>> +	st_wdog_setup(st_wdog, true);
+>> +
+>> +	dev_info(&pdev->dev, "LPC Watchdog driver registered, reset type is %s",
+>> +		 st_wdog->warm_reset ? "warm" : "cold");
+> Missing newline.
+>
+> Guenter
+>
+>
