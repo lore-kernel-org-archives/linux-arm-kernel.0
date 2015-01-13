@@ -1,130 +1,212 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Jan 2015 11:11:57 +0100
-Subject: [PATCH v4 2/5] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <1418772873-19747-3-git-send-email-hongzhou.yang@mediatek.com>
-References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
- <1418772873-19747-3-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdamBePQMR_b5g=t=9DvtuV3gE75=TjP7eURzD1NgHWqpQ@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 13 Jan 2015 10:26:51 +0000
+Subject: [PATCH 3.19-rc2 v14 0/7] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1421144818-14036-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 12:34 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+Hi Thomas, Hi Jason:
+    Patches 1 to 3 are for you (and should be separable from the rest
+    of the series). The patches haven't changes since the last time
+    I posted them. The changes in v14 tidy up the later part of the
+    patch set in order to share more code between x86 and arm.
 
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
->
-> Add devicetree bindings for Mediatek SoC pinctrl driver.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ and uses this feature to
+implement arch_trigger_all_cpu_backtrace for arm.
 
-So following from the discussion with Sascha...
+On platforms not capable of supporting FIQ the signal to generate a
+backtrace we fall back to using IRQ for propagation instead (relying on
+a timeout to avoid wedging the CPU requesting the backtrace if other
+CPUs are not responsive).
 
-(...)
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-> new file mode 100644
-> index 0000000..3bf34f9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-> @@ -0,0 +1,142 @@
-> +* Mediatek MT65XX Pin Controller
-> +
-> +The Mediatek's Pin controller is used to control SoC pins.
-> +
-> +Required properties:
-> +- compatible: value should be either of the following.
-> +    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
-> +- mediatek,pctl-regmap: Should be a phandle of the syscfg node.
-> +- gpio-controller : Marks the device node as a gpio controller.
-> +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
-> +  binding is used, the amount of cells must be specified as 2. See the below
-> +  mentioned gpio binding representation for description of particular cells.
-> +
-> +       Eg: <&pio 6 0>
-> +       <[phandle of the gpio controller node]
-> +       [pin number within the gpio controller]
+It has been tested on two systems capable of supporting grouping
+(Freescale i.MX6 and STiH416) and two that do not (vexpress-a9 and
+Qualcomm Snapdragon 600).
 
-Call this "line number", not "pin number" as GPIO != pin
+v14:
 
-> +       [flags]>
-> +
-> +       Values for gpio specifier:
-> +       - Pin number: is a value between 0 to 202.
+* Moved a nmi_vprintk() and friends from arch/x86/kernel/apic/hw_nmi.c
+  to printk.c (Steven Rostedt)
 
-Line number.
+v13:
 
-> +       - Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
-> +            Only the following flags are supported:
-> +            0 - GPIO_ACTIVE_HIGH
-> +            1 - GPIO_ACTIVE_LOW
-> +- reg: physicall address base for EINT registers
-> +- interrupt-controller: Marks the device node as an interrupt controller
-> +- #interrupt-cells: Should be two.
-> +- interrupts : The interrupt outputs from the controller.
-> +
-> +Please refer to pinctrl-bindings.txt in this directory for details of the
-> +common pinctrl bindings used by client devices.
-> +
-> +A pinctrl node should contain at least one subnodes representing the
-> +pinctrl groups available on the machine. Each subnode will list the
-> +pins it needs, and how they should be configured, with regard to muxer
-> +configuration, pullups, drive strngth, input enable/disable and input schmitt.
-> +
-> +Required subnode-properties:
-> +
-> +- pins: 2 integers array, represents gpio pinmux number and config
-> +  setting. The format as following
-> +
-> +    node {
-> +     pins = <PIN_NUMBER_PINMUX>;
-> +                     GENERIC_PINCONFIG;
-> +    };
+* Updated the code to print the backtrace to replicate Steven Rostedt's
+  x86 work to make SysRq-l safe. This is pretty much a total rewrite of
+  patches 4 and 5.
 
-As discussed with sascha, pins = ... is for pins specified with a string.
+v12:
 
-Either
+* Squash first two patches into a single one and re-describe
+  (Thomas Gleixner).
 
-- Specify your pins with a string
+* Improve description of "irqchip: gic: Make gic_raise_softirq FIQ-safe"
+  (Thomas Gleixner).
 
-- Come up wiyj some new unique way to name pins identfied by
-  numbers, maybe just "pinno = <...>" Sascha suggested "pinmux"
-  but that is strange if the number is used for pin config.
+v11:
 
-(Check with Sascha!)
+* Optimized gic_raise_softirq() by replacing a register read with
+  a memory read (Jason Cooper).
 
-> +    The PIN_NUMBER_PINMUX is combination of GPIO number and pinmux, it can
-> +    use macros which already defind in boot/dts/mt8135-pinfunc.h directly.
+v10:
 
-So is that prop to be named pinmux, pinno, pinid or something..
+* Add a further patch to optimize away some of the locking on systems
+  where CONFIG_BL_SWITCHER is not set (Marc Zyngier). Compiles OK with
+  exynos_defconfig (which is the only defconfig to set this option).
 
-> +    The GENERIC_PINCONFIG is the generic pinconfig options to use, bias-disable,
-> +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
-> +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+* Whitespace fixes in patch 4. That patch previously used spaces for
+  alignment of new constants but the rest of the file used tabs.
 
-Nice!
+v9:
 
-> +       pinctrl at 01c20800 {
-> +               compatible = "mediatek,mt8135-pinctrl";
-> +               reg = <0 0x1000B000 0 0x1000>;
-> +               mediatek,pctl-regmap = <&syscfg_pctl_a &syscfg_pctl_b>;
-> +               gpio-controller;
-> +               #gpio-cells = <2>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <2>;
-> +               interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-> +                               <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +               i2c0_pins_a: i2c0 at 0 {
-> +                       pins1 {
-> +                               pins = <MT8135_PIN_100_SDA0__FUNC_SDA0>,
-> +                                               <MT8135_PIN_101_SCL0__FUNC_SCL0>;
+* Improved documentation and structure of initial patch (now initial
+  two patches) to make gic_raise_softirq() safe to call from FIQ
+  (Thomas Gleixner).
 
-So this prop need to be renamed.
+* Avoid masking interrupts during gic_raise_softirq(). The use of the
+  read lock makes this redundant (because we can safely re-enter the
+  function).
 
-> +                               bias-disable;
-> +                       };
-> +               };
+v8:
 
-Yours,
-Linus Walleij
+* Fixed build on arm64 causes by a spurious include file in irq-gic.c.
+
+v7-2 (accidentally released twice with same number):
+
+* Fixed boot regression on vexpress-a9 (reported by Russell King).
+
+* Rebased on v3.18-rc3; removed one patch from set that is already
+  included in mainline.
+
+* Dropped arm64/fiq.h patch from the set (still useful but not related
+  to issuing backtraces).
+
+v7:
+
+* Re-arranged code within the patch series to fix a regression
+  introduced midway through the series and corrected by a later patch
+  (testing by Olof's autobuilder). Tested offending patch in isolation
+  using defconfig identified by the autobuilder.
+
+v6:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optional avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code
+  to avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+v5:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+v4:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+v3:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+v2:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (7):
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  printk: Simple implementation for NMI backtracing
+  x86/nmi: Use common printk functions
+  ARM: Add support for on-demand backtrace of other CPUs
+  ARM: Fix on-demand backtrace triggered by IRQ
+
+ arch/Kconfig                    |   3 +
+ arch/arm/Kconfig                |   1 +
+ arch/arm/include/asm/hardirq.h  |   2 +-
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  84 +++++++++++++++++
+ arch/arm/kernel/traps.c         |   8 +-
+ arch/x86/Kconfig                |   1 +
+ arch/x86/kernel/apic/hw_nmi.c   |  94 ++-----------------
+ drivers/irqchip/irq-gic.c       | 203 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   8 ++
+ include/linux/printk.h          |  22 +++++
+ kernel/printk/printk.c          | 122 ++++++++++++++++++++++++
+ 13 files changed, 452 insertions(+), 104 deletions(-)
+
+--
+1.9.3
