@@ -1,60 +1,49 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Tue, 13 Jan 2015 11:40:34 +0530
-Subject: [PATCH 2/4] clk: samsung: exynos7: add clocks for SPI block
-In-Reply-To: <CAFp+6iHaJ3b9+ERygksNLcyG9PxP2yf-6BTtwFgFgcUOqX+PVg@mail.gmail.com>
-References: <1418995427-7712-1-git-send-email-padma.v@samsung.com>
- <1418995427-7712-3-git-send-email-padma.v@samsung.com>
- <CAFp+6iFzawDY1wFA-2AQUHFCk54WsaCJAOkrqvX9t7b-XugY8g@mail.gmail.com>
- <CAFp+6iHaJ3b9+ERygksNLcyG9PxP2yf-6BTtwFgFgcUOqX+PVg@mail.gmail.com>
-Message-ID: <CAAgF-BcVRUY-kWRJ0KmpkX6GPsppDBd0O73R_pLdPU=OOen8Kw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 13 Jan 2015 11:40:58 +0530
+Subject: [PATCH v2 2/3] usb: phy: add lubbock phy driver
+In-Reply-To: <20150112215159.GM2858@saruman>
+References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
+ <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
+ <20150108165834.GH31926@saruman>
+ <CALT56yOaX0EQbbFSXiFK=uqSpCwv4pQsU4QFMSmSoTstq2d7zw@mail.gmail.com>
+ <20150112215159.GM2858@saruman>
+Message-ID: <54B4B6F2.9040404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ViVek,
+Hi,
 
-On 1/9/15, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
-> On Fri, Jan 9, 2015 at 5:18 PM, Vivek Gautam <gautamvivek1987@gmail.com>
-> wrote:
->> Hi Padma,
+On Tuesday 13 January 2015 03:21 AM, Felipe Balbi wrote:
+> On Sun, Jan 11, 2015 at 10:44:59PM +0400, Dmitry Eremin-Solenikov wrote:
+>> Hello,
 >>
->>
->> On Fri, Dec 19, 2014 at 6:53 PM, Padmavathi Venna <padma.v@samsung.com>
->> wrote:
->>> Add clock support for 5 SPI channels.
+>> 2015-01-08 19:58 GMT+03:00 Felipe Balbi <balbi@ti.com>:
+>>> On Sun, Nov 30, 2014 at 01:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
+>>>> Extract lubbock-specific code from pxa25x_udc driver. As a bonus, phy
+>>>> driver determines connector/VBUS status by reading CPLD register. Also
+>>>> it uses a work to call into udc stack, instead of pinging vbus session
+>>>> right from irq handler.
+>>>>
+>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>> ---
+>>>>  drivers/usb/phy/Kconfig       |  10 ++
+>>>>  drivers/usb/phy/Makefile      |   1 +
 >>>
->>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->>> ---
-
-[snip]
-
->> Same here for SCLK_SPI5, unused in the patch.
-
-ok.
-
+>>> new phy drivers under drivers/phy only, sorry.
 >>
->> [snip]
->>
->> The rest all looks good in this patch. I have also verified from the
->> Exynos7 UM.
->
-> missed it earlier. You may also want to add update documentation for
-> clock sources
-> of peric1 block.
+>> Hmm. How do drivers/phy drivers coordinate with usb gadget subsystem?
+>> I see none of them calling usb_gadget_vbus_connect/disconnect().
+> 
+> I'll leave that to Kishon, since he wrote drivers/phy. Kishon, any
+> hints?
 
-I will add the required source clks.
-Thanks for the review.
+Extcon framework can be used to detect the connector status. So the PHY driver
+should register with the extcon framework if it has the capability to determine
+the connector status and the gadget driver should register with the extcon
+framework if it has to receive the connector status.
 
-Padma
->
->
-> --
-> Best Regards
-> Vivek Gautam
-> Samsung R&D Institute, Bangalore
-> India
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+I'm not sure if we should be adding these extcon APIs inside the PHY framework
+itself as all PHYs might not have the capability to detect the connector status.
+
+Thanks
+Kishon
