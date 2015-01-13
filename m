@@ -1,216 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 13 Jan 2015 03:11:56 +0100
-Subject: [PATCH v2] Added support for pogoplug e02 (pink/gray)
-In-Reply-To: <1421112132-9651-1-git-send-email-ottxor@gentoo.org>
-References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
- <1421112132-9651-1-git-send-email-ottxor@gentoo.org>
-Message-ID: <20150113021156.GB2434@lunn.ch>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 13 Jan 2015 11:13:27 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7740: Instantiate GIC from C board code
+ in legacy builds
+In-Reply-To: <cover.1421113695.git.horms+renesas@verge.net.au>
+References: <cover.1421113695.git.horms+renesas@verge.net.au>
+Message-ID: <d034f53cc6c5c09a4e10cb9716986f3844c58514.1421113695.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 06:22:12PM -0700, Christoph Junghans wrote:
-> The pogoplug differs from the SheevaPlug only by a
-> few details, but especially in the led assignments.
-> This patch was tested under Gentoo Linux and is
-> based on dts files from Arch Linux ARM and OpenWrt.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hi Christoph
+As of commit 9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq
+domain."), armadillo-legacy hangs during boot with:
 
-I just tried compiling this with 3.19-rc1:
+     sh-tmu.0: ch0: used for clock events
+     sh-tmu.0: ch0: used for periodic clock events
+     sh-tmu.0: ch0: failed to request irq 230
+     sh-tmu.0: ch1: used as clock source
+     sh-cmt-48.1: ch0: failed to request irq 90
+     sh-cmt-48.1: ch0: registration failed
+    earlytimer: unable to probe sh-cmt-48 early.
+    Calibrating delay loop...
 
-  DTC     arch/arm/boot/dts/kirkwood-pogo_e02.dtb
-ERROR (duplicate_label): Duplicate label 'pinctrl' on /ocp at f1000000/pinctrl at 10000 and /ocp at f1000000/pin-controller at 10000
-ERROR: Input tree has errors, aborting (use -f to force output)
+This happens because the IRQ numbers of the GIC are now virtual, and no
+longer match the hardcoded hardware IRQ numbers in the platform board
+code.
+To fix this, instantiate the GIC from platform board code when compiling
+a legacy kernel, like is done on sh73a0 for kzm9g-legacy.
 
-> Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
-> Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
-> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
-> ---
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7740.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-It is normal to say here, after the --- what you have changed since
-the previous version.
-
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 129 +++++++++++++++++++++
->  3 files changed, 131 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index ac7269f..e5f58c6 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -32,6 +32,7 @@ cdns	Cadence Design Systems Inc.
->  chrp	Common Hardware Reference Platform
->  chunghwa	Chunghwa Picture Tubes Ltd.
->  cirrus	Cirrus Logic, Inc.
-> +cloudengines	Cloud Engines, Inc.
->  cortina	Cortina Systems, Inc.
-
-This failed to apply. cnm was added Wed May 14 2014, so i guess you are not using 3.19-rc1?
-
->  crystalfontz	Crystalfontz America, Inc.
->  dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b8c5cd3..cd974eb 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -143,6 +143,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
->  	kirkwood-openrd-base.dtb \
->  	kirkwood-openrd-client.dtb \
->  	kirkwood-openrd-ultimate.dtb \
-> +	kirkwood-pogo_e02.dtb \
->  	kirkwood-rd88f6192.dtb \
->  	kirkwood-rd88f6281-a0.dtb \
->  	kirkwood-rd88f6281-a1.dtb \
-> diff --git a/arch/arm/boot/dts/kirkwood-pogo_e02.dts b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
-> new file mode 100644
-> index 0000000..be38dab
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
-> @@ -0,0 +1,129 @@
-> +/*
-> + * kirkwood-sheevaplug.dts - Device tree file for Pogoplug E02
-> + *
-> + * Copyright (C) 2015 Christoph Junghans <ottxor@gentoo.org>
-> + *
-> + * based on information of dts files from
-> + *  Arch Linux ARM by Oleg Rakhmanov <moonman.ca@gmail.com>
-> + *  OpenWrt by Felix Kaechele <heffer@fedoraproject.org>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "kirkwood.dtsi"
-> +#include "kirkwood-6281.dtsi"
-> +
-> +/ {
-> +	model = "Cloud Engines Pogoplug E02";
-> +	compatible = "cloudengines,pogoe02", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x10000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8";
-> +		linux,stdout-path = &serial1;
-
-This is not what i was expecting. I would expect it to be
-
-                stdout-path = &uart0;
-
-
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pinctrl at 10000 {
-> +			pmx_usb_power_enable: pmx-usb-power-enable {
-> +				marvell,pins = "mpp29";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_green: pmx-led-green {
-> +				marvell,pins = "mpp48";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_orange: pmx-led-orange {
-> +				marvell,pins = "mpp49";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-
-To fix the error above, i suggest you take a look at:
-
-https://lkml.org/lkml/2014/12/28/34
-
-	Andrew
-
-> +		serial1: serial at 12000 {
-> +			status = "ok";
-> +		};
-> +	};
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
-> +			      &pmx_led_green >;
-> +		pinctrl-names = "default";
-> +
-> +		health {
-> +			label = "pogo_e02:green:health";
-> +			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-> +			default-state = "keep";
-> +		};
-> +		fault {
-> +			label = "pogo_e02:orange:fault";
-> +			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-0 = <&pmx_usb_power_enable>;
-> +		pinctrl-names = "default";
-> +
-> +		usb_power: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "USB Power";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			enable-active-high;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +};
-> +
-> +&nand {
-> +	chip-delay = <40>;
-> +	status = "okay";
-> +
-> +	partition at 0 {
-> +		label = "u-boot";
-> +		reg = <0x0000000 0x100000>;
-> +		read-only;
-> +	};
-> +
-> +	partition at 100000 {
-> +		label = "uImage";
-> +		reg = <0x0100000 0x400000>;
-> +	};
-> +
-> +	partition at 500000 {
-> +		label = "pogoplug";
-> +		reg = <0x0500000 0x2000000>;
-> +	};
-> +
-> +	partition at 2500000 {
-> +		label = "root";
-> +		reg = <0x02500000 0x5b00000>;
-> +	};
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	ethphy0: ethernet-phy at 0 {
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&eth0 {
-> +	status = "okay";
-> +	ethernet0-port at 0 {
-> +		phy-handle = <&ethphy0>;
-> +	};
-> +};
-> -- 
-> 2.0.5
-> 
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 0bfe226..e76e2f8 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -793,7 +793,14 @@ void __init r8a7740_init_irq_of(void)
+ 	void __iomem *intc_msk_base = ioremap_nocache(0xe6900040, 0x10);
+ 	void __iomem *pfc_inta_ctrl = ioremap_nocache(0xe605807c, 0x4);
+ 
++#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
++	void __iomem *gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
++	void __iomem *gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
++
++	gic_init(0, 29, gic_dist_base, gic_cpu_base);
++#else
+ 	irqchip_init();
++#endif
+ 
+ 	/* route signals to GIC */
+ 	iowrite32(0x0, pfc_inta_ctrl);
+-- 
+2.1.4
