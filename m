@@ -1,46 +1,27 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Tue, 13 Jan 2015 11:46:39 +0530
-Subject: [PATCH 3/4] clk: samsung: exynos7: add clocks for audio block
-In-Reply-To: <549833EA.8040506@samsung.com>
-References: <1418995427-7712-1-git-send-email-padma.v@samsung.com>
- <1418995427-7712-4-git-send-email-padma.v@samsung.com>
- <549833EA.8040506@samsung.com>
-Message-ID: <CAAgF-BdUwuCSGG1cnALdQ+j3b+EWAGyS2F5-2a0D1kvBwhCLog@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Jan 2015 07:17:29 +0100
+Subject: [RFC 05/15] gpio: move DT parsing code to separate functions
+In-Reply-To: <1418226513-14105-6-git-send-email-a.hajda@samsung.com>
+References: <1418226513-14105-1-git-send-email-a.hajda@samsung.com>
+ <1418226513-14105-6-git-send-email-a.hajda@samsung.com>
+Message-ID: <CACRpkdZLw=dTQ0zcHYSJ7rC5k3hjTJ-i__25eDyY8gz6PpnpsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Wed, Dec 10, 2014 at 4:48 PM, Andrzej Hajda <a.hajda@samsung.com> wrote:
 
-On 12/22/14, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> Hi,
+> The patch moves Device Tree parsing logic to separate
+> function.
 >
-> On 19/12/14 14:23, Padmavathi Venna wrote:
->> Add required clk support for I2S,PCM amd SPDIF
->
-> There is a non-trivial conflict with the MSCL CMU patch, could you
-> please resend rebased onto my exynos7 branch:
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Ok. I willl rebase the patch on your tree.
+I think this patch need to be rebased on the GPIO devel branch, but
+looks like it makes things cleaner so can stand on its own merits.
+We moves stuff around a bit in the OF code though.
 
->
-> git://linuxtv.org/snawrocki/samsung.git for-v3.20/clk/exynos7 ?
->
-> Is exynos7420 documentation applicable to this ?
+Please remember to send this patch to the linux-gpio list and comaintainer
+Alexandre Courbot on reposts. (Cc-tags in the patch are good
+for this.)
 
-This is applicable only for exynos7.
-
-> Would be nice to have someone else who has access to the SoC
-> documentation replied with a Reviewed-by tag.
->
-> --
-> Thanks,
-> Sylwester
-
-Thanks
-Padma
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Yours,
+Linus Walleij
