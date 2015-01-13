@@ -1,30 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
 Date: Tue, 13 Jan 2015 10:43:59 +0100
-Subject: [PATCH v4 1/5] ARM: mediatek: Add config options for mediatek
- SoCs.
-In-Reply-To: <1418772873-19747-2-git-send-email-hongzhou.yang@mediatek.com>
-References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
- <1418772873-19747-2-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkda2pHpjMAsEeuEebShQnbqf5knfNbEGtSHLN=o18HC5nQ@mail.gmail.com>
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54B4D9E1.10400@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+ <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
+ <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
+ <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
+ <54B4ABFB.5000501@samsung.com> <54B4D9E1.10400@samsung.com>
+Message-ID: <54B4E8DF.90807@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 12:34 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+Hello Joonyoung,
 
-> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
->
-> The upcoming MTK pinctrl driver have a big pin table for each SoC
-> and we don't want to bloat the kernel binary if we don't need it.
-> Add config options so we can build for one SoC only.
->
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+On 01/13/2015 09:40 AM, Joonyoung Shim wrote:
+>>> >> These are the changes I have now [0]. Please let me know what you think.
+>>> >>
+>> > 
+>> > Good, it's working with your patch without u-boot changes and reverting
+>> > of commit 2ed127697eb.
+>> >
+> But i also get stripe hdmi output if hdmi/mixer drivers aren't defered
+> probed, because DISP1 power domain isn't disabled on booting by defered
+> probe so is always on.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Could you please elaborate on this? I'm not sure I undestood what you meant
+so it would be great if you can give me the steps to reproduce your issue.
 
-I guess this goes directly to the ARM SoC tree. As it is only
-Kconfig symbols it should be OK to merge out-of-order.
-
-Yours,
-Linus Walleij
+Best regards,
+Javier
