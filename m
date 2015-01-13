@@ -1,29 +1,31 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 13 Jan 2015 18:28:12 +0200
-Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
- readl/writel
-In-Reply-To: <20150113143654.GG7660@katana>
-References: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
- <20150113143654.GG7660@katana>
-Message-ID: <20150113162812.GA2227@tarshish>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Jan 2015 17:34:05 +0100
+Subject: CFT: move outer_cache_sync() out of line
+In-Reply-To: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+References: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+Message-ID: <4576899.a2tdJxHBKo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Monday 12 January 2015 16:36:48 Russell King - ARM Linux wrote:
 
-On Tue, Jan 13, 2015 at 03:36:54PM +0100, Wolfram Sang wrote:
-> > The driver does not perform DMA, so it's safe to use the relaxed version.
-> > From another side, the relaxed io accessor macros are available on all
-> > architectures now, so we can use the relaxed versions instead.
+> Theoretically, this should help overall system performance, since the
+> branch predictor should be able to predict this better, but it's entirely
+> possible that trying to benchmark a single workload won't be measurably
+> different.
 > 
-> Can the designware core make use of DMA in theory?
+> In terms of kernel size figures, this change alone saves almost 17K of
+> 10MB of kernel text on my iMX6 kernels - which is bordering on
+> insignificant since that's not quite a 0.2% saving.
+> 
+> So... right now I can't justify this change, but I'm hoping some can come
+> up with some figures which shows that it benefits their workload without
+> causing a performance regression for others.
 
-According to the "DesignWare DW_apb_i2c Databook" version I have it can 
-(optionally).
+>From the theory, I think it can only help to do this. I would guess that
+the time spent inside of the cache_sync function dwarfs both the extra
+unconditional branch you introduce and the possible misprediction, so
+17K in space savings sounds like more than enough justification to just
+do it.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Acked-by: Arnd Bergmann <arnd@arndb.de>
