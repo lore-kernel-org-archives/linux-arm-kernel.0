@@ -1,51 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 13 Jan 2015 12:26:49 +0100
-Subject: [PATCH] ARM: at91/Documentation: add a README for Atmel SoCs
-In-Reply-To: <20150113020325.GB28758@quad.lixom.net>
-References: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
- <20150113020325.GB28758@quad.lixom.net>
-Message-ID: <54B500F9.4000507@atmel.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 13 Jan 2015 12:28:54 +0100
+Subject: [PATCH v5 1/2] i2c: cadence: Handle > 252 byte transfers
+In-Reply-To: <1418357907-4215-2-git-send-email-harinik@xilinx.com>
+References: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
+ <1418357907-4215-2-git-send-email-harinik@xilinx.com>
+Message-ID: <20150113112854.GA7660@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2015 03:03, Olof Johansson a ?crit :
-> On Fri, Jan 09, 2015 at 02:20:31PM +0100, Nicolas Ferre wrote:
->> Add a README file to describe Atmel SoCs (aka AT91) support in Mainline Linux:
->> - SoC list + datasheet web links
->> - Basic but useful information
->> - Device Tree conventions and Work In Progress statement.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: ARM Maintainers <arm@kernel.org>
+On Fri, Dec 12, 2014 at 09:48:26AM +0530, Harini Katakam wrote:
+> The I2C controller sends a NACK to the slave when transfer size register
+> reaches zero, irrespective of the hold bit. So, in order to handle transfers
+> greater than 252 bytes, the transfer size register has to be maintained at a
+> value >= 1. This patch implements the same.
+> The interrupt status is cleared at the beginning of the isr instead of
+> the end, to avoid missing any interrupts.
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> With the understanding that:
-> 
->> +Device Tree for AT91 SoCs and boards
->> +------------------------------------
->> +All AT91 SoCs are converted to Device Tree. Since Linux 3.19, these products
->> +must use this method to boot the Linux kernel.
->> +
->> +Work In Progress statement:
->> +Device Tree files and Device Tree bindings that apply to AT91 SoCs and boards are
->> +considered as "Unstable". To be completely clear, any at91 binding can change at
->> +any time. So, be sure to use a Device Tree Binary and a Kernel Image generated from
->> +the same source tree.
->> +Please refer to the Documentation/devicetree/bindings/ABI.txt file for a
->> +definition of a "Stable" binding/ABI.
->> +This statement will be removed by AT91 MAINTAINERS when appropriated.
-> 
-> While this statement is here, at the end of the day if you break a user
-> you're responsible for fixing them. I.e. if a tree falls in the forest
-> and nobody notices, then so be it.
-> 
-> But you can't break existing users and point to this and get away with
-> it. However, hopefully based on this doc users will go with practices
-> that means that you can revise bindings if you have to.
+> Signed-off-by: Harini Katakam <harinik@xilinx.com>
 
-Yes, that was the intention.
+Applied to for-next, thanks!
 
-Thanks, bye,
--- 
-Nicolas Ferre
+> @@ -333,10 +359,11 @@ static void cdns_i2c_mrecv(struct cdns_i2c *id)
+>  	 * receive if it is less than transfer size and transfer size if
+>  	 * it is more. Enable the interrupts.
+>  	 */
+> -	if (id->recv_count > CDNS_I2C_TRANSFER_SIZE)
+> +	if (id->recv_count > CDNS_I2C_TRANSFER_SIZE) {
+>  		cdns_i2c_writereg(CDNS_I2C_TRANSFER_SIZE,
+>  				  CDNS_I2C_XFER_SIZE_OFFSET);
+> -	else
+> +		id->curr_recv_count = CDNS_I2C_TRANSFER_SIZE;
+> +	} else
+>  		cdns_i2c_writereg(id->recv_count, CDNS_I2C_XFER_SIZE_OFFSET);
+
+else branch must have braces, too! I fixed that.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/e62b6b87/attachment.sig>
