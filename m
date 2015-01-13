@@ -1,36 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Jan 2015 15:30:38 -0800
-Subject: [GIT PULL] Broadcom MAINTAINERS file updates for 3.20
-In-Reply-To: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
-References: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20150113233038.GI15087@quad.lixom.net>
+Date: Tue, 13 Jan 2015 15:32:56 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.19
+In-Reply-To: <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
+References: <cover.1421113695.git.horms+renesas@verge.net.au>
+ <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
+Message-ID: <20150113233256.GJ15087@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 03:11:23PM -0800, Florian Fainelli wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+On Tue, Jan 13, 2015 at 09:10:08AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Jan 13, 2015 at 3:13 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> >
+> > Please consider these Renesas ARM based SoC fixes for v3.19.
+> >
+> > This pull request is based on the last round of SoC updates for v3.19,
+> > Fourth Round of Renesas ARM Based SoC Updates for v3.19, tagged as
+> > renesas-soc3-for-v3.19, merged into your next/soc branch and included in
+> > v3.19-rc1.
+> >
+> > * ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
 > 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> That's the description for the regression below.
+> Should have been: "Set .control_parent for all irqpin instances for sh73a0
+> SoC when booting using legacy C."
 > 
-> are available in the git repository at:
+> >   This fixes a long standing problem which has been present since
+> >   the sh73a0 SoC started using the INTC External IRQ pin driver.
+> >
+> >   The patch that introduced the problem is 341eb5465f67437a ("ARM:
+> >   shmobile: INTC External IRQ pin driver on sh73a0") which was included
+> >   in v3.10.
+> >
+> > * This fixes a regression in the r8a7740 SoC due to
+> >   9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
+> >   which was included in v3.18-rc2.
 > 
->   http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
-> 
-> for you to fetch changes up to c3a8f6399f6fb748bf0067bd3d97c0653d434648:
-> 
->   MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs (2015-01-12 15:02:57 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request contains updates to our MAINTAINERS files for all relevant
-> Broadcom SoCs: BCM63xx, Cygnus/iProc, ARM & MIPS-based BCM7xxx (brcmstb).
-> 
-> Our new code location for all Broadcom-related kernel activities is now on
-> http://github.com/Broadcom/.
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC Fixes for v3.19
+> >
+> > * Set .control_parent for all irqpin instances for sh73a0 SoC when booting
+> >   using legacy C
+> > * Instantiate GIC board for r8a7740 SoC when using legacy C
 
-3 of the 4 changes refer to github.com/broadcom, and one to
-github.com/Broadcom. Care to respin and make it consistent (for extra credit,
-also consistent with the tag :)?
+Thanks, I fixed up the commit message when I pulled the branch.
 
-Thanks,
+
+Merged.
 
 -Olof
