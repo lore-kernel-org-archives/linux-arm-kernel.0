@@ -1,33 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 14:18:32 +0100
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-In-Reply-To: <20150113111636.7bc5785c@canb.auug.org.au>
-References: <20150113111636.7bc5785c@canb.auug.org.au>
-Message-ID: <3097971.rZTsHKr4DO@wuerfel>
+Date: Tue, 13 Jan 2015 14:20:31 +0100
+Subject: -next build failures in k3dma.c
+In-Reply-To: <20150113120751.GQ4160@sirena.org.uk>
+References: <E1YAwSG-0000zm-Cs@debutante> <20150113120751.GQ4160@sirena.org.uk>
+Message-ID: <2546132.YsPQSK8ktD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 January 2015 11:16:36 Stephen Rothwell wrote:
->  -      imx6q-tx6q-1110.dtb \
->  -      imx6sl-evk.dtb \
->  +      imx6q-tx6q-1110.dtb
->  +dtb-$(CONFIG_SOC_IMX6SL) += \
->  +      imx6sl-evk.dtb
->  +dtb-$(CONFIG_SOC_IMX6SX) += \
-> +       imx6sx-sabreauto.dtb \
->         imx6sx-sdb.dtb \
->  +dtb-$(CONFIG_SOC_LS1021A) += \
->         ls1021a-qds.dtb \
->  -      ls1021a-twr.dtb \
->  +      ls1021a-twr.dtb
->  +dtb-$(CONFIG_SOC_VF610) += \
+On Tuesday 13 January 2015 12:07:51 Mark Brown wrote:
+> On Tue, Jan 13, 2015 at 08:04:00AM +0000, Build bot for Mark Brown wrote:
 > 
+> > 	arm-allmodconfig
+> > ../drivers/dma/k3dma.c:823:12: error: conflicting types for 'k3_dma_resume'
+> 
+> For several days now k3dma.c has been failing to build in an ARM
+> allmodconfig because the definition of k3_dma_resume() introduced in
+> db08425ebd51f (dmaengine: k3: Split device_control) taking a struct
+> dma_chan * conflicts with that which has been in the file since it was
+> originally merged taking a struct device *.
 
-There is an extraneous '\' character behind imx6sx-sdb.dtb now, which caused
-build errors for me. We should soon be able to merge the other branches into
-arm-soc to avoid the entire set of merge conflicts, until then please
-change your recorded resolution to avoid the build error.
-
-Thanks!
+Incidentally, I've restarted by randconfig build testing today, will follow
+up with my fix.
 
 	Arnd
