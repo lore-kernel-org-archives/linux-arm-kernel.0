@@ -1,75 +1,53 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 Jan 2015 15:52:56 -0800
-Subject: [PATCH 4/4] clk: pxa: add missing pxa27x clocks for Irda and
- sa1100-rtc
-In-Reply-To: <1419688528-760-5-git-send-email-robert.jarzmik@free.fr>
-References: <1419688528-760-1-git-send-email-robert.jarzmik@free.fr>
- <1419688528-760-5-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20150112235256.20842.68349@quantum>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 13 Jan 2015 11:16:36 +1100
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+Message-ID: <20150113111636.7bc5785c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Robert Jarzmik (2014-12-27 05:55:28)
-> Add 2 clocks which were erronously forgotten by the clock framework
-> port, namely :
->  - sa1100-rtc
->  - irda for pxa2xx-ir:UARTCLK
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi Shawn,
 
-Acked-by: Michael Turquette <mturquette@linaro.org>
+Today's linux-next merge of the imx-mxs tree got a conflict in
+arch/arm/boot/dts/Makefile between commit 6f1650f15bc4 ("ARM: dts: Only
+build dtb if associated Arch and/or SoC is enabled") from the arm-soc
+tree and commit 99fc5ba0bfb6 ("ARM: dts: imx6sx: add i.mx6sx sabreauto
+board support") from the imx-mxs tree.
 
-> ---
->  drivers/clk/pxa/clk-pxa27x.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/drivers/clk/pxa/clk-pxa27x.c b/drivers/clk/pxa/clk-pxa27x.c
-> index 2b8343a..9a31b77 100644
-> --- a/drivers/clk/pxa/clk-pxa27x.c
-> +++ b/drivers/clk/pxa/clk-pxa27x.c
-> @@ -353,6 +353,34 @@ static u8 clk_pxa27x_memory_get_parent(struct clk_hw *hw)
->  PARENTS(clk_pxa27x_memory) = { "osc_13mhz", "system_bus", "run" };
->  MUX_RO_RATE_RO_OPS(clk_pxa27x_memory, "memory");
->  
-> +#define DUMMY_CLK(_con_id, _dev_id, _parent) \
-> +       { .con_id = _con_id, .dev_id = _dev_id, .parent = _parent }
-> +struct dummy_clk {
-> +       const char *con_id;
-> +       const char *dev_id;
-> +       const char *parent;
-> +};
-> +static struct dummy_clk dummy_clks[] __initdata = {
-> +       DUMMY_CLK(NULL, "pxa27x-gpio", "osc_32_768khz"),
-> +       DUMMY_CLK(NULL, "sa1100-rtc", "osc_32_768khz"),
-> +       DUMMY_CLK("UARTCLK", "pxa2xx-ir", "STUART"),
-> +};
-> +
-> +static void __init pxa27x_dummy_clocks_init(void)
-> +{
-> +       struct clk *clk;
-> +       struct dummy_clk *d;
-> +       const char *name;
-> +       int i;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(dummy_clks); i++) {
-> +               d = &dummy_clks[i];
-> +               name = d->dev_id ? d->dev_id : d->con_id;
-> +               clk = clk_register_fixed_factor(NULL, name, d->parent, 0, 1, 1);
-> +               clk_register_clkdev(clk, d->con_id, d->dev_id);
-> +       }
-> +}
-> +
->  static void __init pxa27x_base_clocks_init(void)
->  {
->         pxa27x_register_plls();
-> @@ -365,6 +393,7 @@ static void __init pxa27x_base_clocks_init(void)
->  int __init pxa27x_clocks_init(void)
->  {
->         pxa27x_base_clocks_init();
-> +       pxa27x_dummy_clocks_init();
->         return clk_pxa_cken_init(pxa27x_clocks, ARRAY_SIZE(pxa27x_clocks));
->  }
->  
-> -- 
-> 2.1.0
-> 
+I fixed it up (I think - see below) and can carry the fix as necessary
+(no action is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/Makefile
+index 1c1cefc434a2,1236b8c0eb60..000000000000
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@@ -295,15 -265,12 +296,16 @@@ dtb-$(CONFIG_SOC_IMX6Q) += 
+  	imx6q-tx6q-1010-comtft.dtb \
+  	imx6q-tx6q-1020.dtb \
+  	imx6q-tx6q-1020-comtft.dtb \
+ -	imx6q-tx6q-1110.dtb \
+ -	imx6sl-evk.dtb \
+ +	imx6q-tx6q-1110.dtb
+ +dtb-$(CONFIG_SOC_IMX6SL) += \
+ +	imx6sl-evk.dtb
+ +dtb-$(CONFIG_SOC_IMX6SX) += \
++ 	imx6sx-sabreauto.dtb \
+  	imx6sx-sdb.dtb \
+ +dtb-$(CONFIG_SOC_LS1021A) += \
+  	ls1021a-qds.dtb \
+ -	ls1021a-twr.dtb \
+ +	ls1021a-twr.dtb
+ +dtb-$(CONFIG_SOC_VF610) += \
+  	vf500-colibri-eval-v3.dtb \
+  	vf610-colibri-eval-v3.dtb \
+  	vf610-cosmic.dtb \
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/3cf6eac9/attachment.sig>
