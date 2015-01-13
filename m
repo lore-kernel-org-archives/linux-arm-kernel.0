@@ -1,75 +1,58 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 13 Jan 2015 15:25:19 -0700
-Subject: [PATCH] coresight: fix the link between orphan connection and
- newly added device
-In-Reply-To: <1421148196-17928-1-git-send-email-xiakaixu@huawei.com>
-References: <1421148196-17928-1-git-send-email-xiakaixu@huawei.com>
-Message-ID: <CANLsYkzPrM23Dche=bKqV31Rv687T7_0u-UiiMpamhYUoUY9TQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Jan 2015 16:27:48 -0600
+Subject: [RFC PATCH 2/3] core: platform: fix an invalid kfree during
+ of_platform_depopulate
+In-Reply-To: <1420651854-17768-3-git-send-email-s-anna@ti.com>
+References: <1420651854-17768-1-git-send-email-s-anna@ti.com>
+ <1420651854-17768-3-git-send-email-s-anna@ti.com>
+Message-ID: <CAL_JsqK8ZAUZwd1zjjZ57MQZ+KD-_qiCyMXnhQ-zZ38wxUtf-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2015 at 04:23, Kaixu Xia <xiakaixu@huawei.com> wrote:
-> When found a component that has one orphan connection, we should
-> validate if it match the newly added device. If it does not match,
-> this component still has an orphan connection(still_orphan = true).
-> The process should be like this. The original logic maybe cause
-> path building failed.
+On Wed, Jan 7, 2015 at 11:30 AM, Suman Anna <s-anna@ti.com> wrote:
+> Drivers can use of_platform_populate() to create platform devices
+> for children of the device main node, and a complementary API
+> of_platform_depopulate() is provided to delete these child devices.
+> Any platform_data supplied for the OF devices through auxdata lookup
+> data is populated directly in the device's platform_data field, unlike
+> those created using platform API. The of_platform_depopulate()
+> leverages the platform code for cleanup, and this will result in a
+> kernel oops due to an invalid kfree on this direct populated
+> platform_data.
 >
-> The tested result as follows.
-> pre:
-> /sys/bus/coresight/devices # echo 1 > e3c42000.etb/enable_sink
-> /sys/bus/coresight/devices # echo 1 > e3c7c000.ptm/enable_source
-> [   15.527692] Unable to handle kernel NULL pointer dereference at virtual address 00000124
-> [   15.555142] pgd = c2294000
-> [   15.564226] [00000124] *pgd=3d393831, *pte=00000000, *ppte=00000000
-> [   15.585391] Internal error: Oops: 817 [#1] PREEMPT SMP ARM
-> [   15.603807] CPU: 0 PID: 144 Comm: sh Not tainted 3.17.0-rc1-12634-g1222fe0-dirty #3
-> [   15.629490] task: ed3803c0 ti: c213a000 task.ti: c213a000
-> [   15.647627] PC is at coresight_build_paths+0x1c/0x314
-> [   15.664579] LR is at coresight_build_paths+0x6c/0x314
-> [   15.681526] pc : [<c02da20c>]    lr : [<c02da25c>]    psr: 20000013
-> [   15.681526] sp : c213be88  ip : c02da800  fp : 00000000
-> [   15.720023] r10: 00000002  r9 : ed13250c  r8 : 00000001
-> [   15.737549] r7 : c213bee8  r6 : ffffffea  r5 : 00000000  r4 : 00000124
-> [   15.759446] r3 : ed216f24  r2 : 00000001  r1 : c213bee8  r0 : 00000000
-> [   15.781346] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
->
-> post:
-> /sys/bus/coresight/devices # echo 1 > e3c42000.etb/enable_sink
-> /sys/bus/coresight/devices # echo 1 > e3c7c000.ptm/enable_source
-> [   59.934255] coresight-etb10 e3c42000.etb: ETB enabled
-> [   59.951317] coresight-replicator replicator0: REPLICATOR enabled
-> [   59.971581] coresight-funnel e3c41000.funnel: FUNNEL inport 0 enabled
-> [   59.993334] coresight-etm3x e3c7c000.ptm: ETM tracing enabled
->
-> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
-> ---
->  drivers/coresight/coresight.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
-> index 6e0181f..11968b7 100644
-> --- a/drivers/coresight/coresight.c
-> +++ b/drivers/coresight/coresight.c
-> @@ -504,11 +504,12 @@ static int coresight_orphan_match(struct device *dev, void *data)
->                 /* We have found at least one orphan connection */
->                 if (conn->child_dev == NULL) {
->                         /* Does it match this newly added device? */
-> -                       if (!strcmp(dev_name(&csdev->dev), conn->child_name))
-> +                       if (!strcmp(dev_name(&csdev->dev), conn->child_name)) {
->                                 conn->child_dev = csdev;
-> -               } else {
-> -                       /* Too bad, this component still has an orphan */
-> -                       still_orphan = true;
-> +                       } else {
-> +                               /* Too bad, this component still has an orphan */
-> +                               still_orphan = true;
-> +                       }
->                 }
->         }
->
-> --
-> 1.8.5.5
->
+> Fix this by resetting the platform data for OF devices during
+> platform device cleanup.
 
-Applied, after annotating the commit log and fixing a checkpatch error.
+We should probably copy the platform_data like is done for non-OF
+platform devices. I'm sure there was some reason for it. It looks
+strange doing this in release.
+
+However, I'm inclined to not fix this and force users to move off of
+auxdata. That's intended to be a temporary migration path and there
+are only 54 instances of it that have platform_data. What device do
+you care about?
+
+Rob
+
+>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  drivers/base/platform.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index 9421fed40905..129e69c8c894 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -200,6 +200,8 @@ static void platform_device_release(struct device *dev)
+>         struct platform_object *pa = container_of(dev, struct platform_object,
+>                                                   pdev.dev);
+>
+> +       if (pa->pdev.dev.of_node)
+> +               pa->pdev.dev.platform_data = NULL;
+>         of_device_node_put(&pa->pdev.dev);
+>         kfree(pa->pdev.dev.platform_data);
+>         kfree(pa->pdev.mfd_cell);
+> --
+> 2.2.1
+>
