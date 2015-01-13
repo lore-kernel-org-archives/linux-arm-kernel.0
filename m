@@ -1,168 +1,54 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jan 2015 12:36:57 +0100
-Subject: [PATCH] ARM: at91/Documentation: add a README for Atmel SoCs
-In-Reply-To: <54B500CC.6020205@atmel.com>
-References: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
- <54B500CC.6020205@atmel.com>
-Message-ID: <20150113113657.GB3843@piout.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Jan 2015 11:41:01 +0000
+Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
+In-Reply-To: <CACRpkdZbGjNecrggrFr_18zjobXMBpkrSjBMAUfyfs2ZCebB0w@mail.gmail.com>
+References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
+ <1918116.UxUgDPTmcq@wuerfel>
+ <CAAVeFuL2MKRA7YLm_wsyftNy-sxgEYPrmqBm8XTRZQb66YF-qw@mail.gmail.com>
+ <1628217.66frkAqHMc@wuerfel>
+ <CAAVeFuJhiten-eVLCa2sMG-nsRwjPMiZap8UJM1kNCuRyK-b1w@mail.gmail.com>
+ <20141217104428.GV11285@n2100.arm.linux.org.uk>
+ <CACRpkdZbGjNecrggrFr_18zjobXMBpkrSjBMAUfyfs2ZCebB0w@mail.gmail.com>
+Message-ID: <20150113114101.GO12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/2015 at 12:26:04 +0100, Nicolas Ferre wrote :
-> Le 09/01/2015 14:20, Nicolas Ferre a ?crit :
-> > Add a README file to describe Atmel SoCs (aka AT91) support in Mainline Linux:
-> > - SoC list + datasheet web links
-> > - Basic but useful information
-> > - Device Tree conventions and Work In Progress statement.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Cc: ARM Maintainers <arm@kernel.org>
-> > ---
-> >  Documentation/arm/Atmel/README | 120 +++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 120 insertions(+)
-> >  create mode 100644 Documentation/arm/Atmel/README
-> > 
-> > diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
-> > new file mode 100644
-> > index 000000000000..538f8a556277
-> > --- /dev/null
-> > +++ b/Documentation/arm/Atmel/README
-> > @@ -0,0 +1,120 @@
-> > +ARM Atmel SoCs (aka AT91)
-> > +=========================
-> > +
-> > +
-> > +Introduction
-> > +------------
-> > +This document gives useful information about the ARM Atmel SoCs that are
-> > +currently supported in Linux Mainline (you know, the one on kernel.org).
-> > +
-> > +It is important to note that the Atmel | SMART ARM-based MPU product line is
-> > +historically named "AT91" or "at91" throughout the Linux kernel development
-> > +process even if this product prefix has completely disappeared from the
-> > +official Atmel product name. Anyway, files, directories, git trees,
-> > +git branches/tags and email subject always contain this "at91" sub-string.
-> > +
-> > +
-> > +AT91 SoCs
-> > +---------
-> > +Documentation and detailled datasheet for each product are available on
-> > +the Atmel website: http://www.atmel.com.
-> > +
-> > +  Flavors:
-> > +    * ARM 920 based SoC
-> > +      - at91rm9200
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/doc1768.pdf
-> > +
-> > +    * ARM 926 based SoCs
-> > +      - at91sam9260
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/doc6221.pdf
-> > +
-
-at91sam9xe is still supported, the datasheet is there:
-http://www.atmel.com/Images/Atmel-6254-32-bit-ARM926EJ-S-Embedded-Microprocessor-SAM9XE_Datasheet.pdf
-
-> > +      - at91sam9261
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/doc6062.pdf
-> > +
-> > +      - at91sam9263
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel_6249_32-bit-ARM926EJ-S-Microcontroller_SAM9263_Datasheet.pdf
-> > +
-> > +      - at91sam9rl
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/doc6289.pdf
-> > +
-> > +      - at91sam9g20
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/doc6384.pdf
-> > +
-> > +      - at91sam9g45 family
-> > +        - at91sam9g45
-> > +        - at91sam9g46
-> > +        - at91sam9m10
-> > +        - at91sam9m11 (device superset)
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel-6437-32-bit-ARM926-Embedded-Microprocessor-SAM9M11_Datasheet.pdf
-> > +
-> > +      - at91sam9x5 family (aka "The 5 series")
-> > +        - at91sam9g15
-> > +        - at91sam9g25
-> > +        - at91sam9g35
-> > +        - at91sam9x25
-> > +        - at91sam9x35
-> > +        + Datasheet (can be considered as covering the whole family)
-> > +          http://www.atmel.com/Images/Atmel_11055_32-bit-ARM926EJ-S-Microcontroller_SAM9X35_Datasheet.pdf
-> > +
-> > +      - at91sam9n12
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel_11063_32-bit-ARM926EJ-S-Microcontroller_SAM9N12CN11CN12_Datasheet.pdf
-> > +
-> > +    * ARM Cortex-A5 based SoCs
-> > +      - sama5d3 family
-> > +        - sama5d31
-> > +        - sama5d33
-> > +        - sama5d34
-> > +        - sama5d35
-> > +        - sama5d36 (device superset)
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel-11121-32-bit-Cortex-A5-Microcontroller-SAMA5D3_Datasheet.pdf
-> > +
-> > +    * ARM Cortex-A5 + NEON based SoCs
-> > +      - sama5d4 family
-> > +        - sama5d41
-> > +        - sama5d42
-> > +        - sama5d43
-> > +        - sama5d44 (device superset)
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
-> > +
-> > +
-> > +Linux kernel information
-> > +------------------------
-> > +Linux kernel mach directory: arch/arm/mach-at91
-> > +MAINTAINERS entry is: "ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES"
-> > +
-> > +
-> > +Device Tree for AT91 SoCs and boards
-> > +------------------------------------
-> > +All AT91 SoCs are converted to Device Tree. Since Linux 3.19, these products
-> > +must use this method to boot the Linux kernel.
-> > +
-> > +Work In Progress statement:
-> > +Device Tree files and Device Tree bindings that apply to AT91 SoCs and boards are
-> > +considered as "Unstable". To be completely clear, any at91 binding can change at
-> > +any time. So, be sure to use a Device Tree Binary and a Kernel Image generated from
-> > +the same source tree.
-> > +Please refer to the Documentation/devicetree/bindings/ABI.txt file for a
-> > +definition of a "Stable" binding/ABI.
-> > +This statement will be removed by AT91 MAINTAINERS when appropriated.
-> > +
-> > +Naming conventions and best practice:
-> > +- SoCs Device Tree Source Include files are named after the official name of
-> > +  the product (at91sam9g20.dtsi or sama5d33.dtsi for instance).
-> > +- Device Tree Source Include files (.dtsi) are used to collect common nodes that can be
-> > +  shared across SoCs or boards (sama5d3.dtsi or at91sam9x5cm.dtsi for instance).
-> > +  When collecting nodes for a particular peripheral or topic, the identifier have to
-> > +  be placed at the end of the file name, separated with a "_" (at91sam9x5_can.dtsi
-> > +  or sama5d3_gmac.dtsi for example).
-> > +- board Device Tree Source files (.dts) are prefixed by the string "at91-" so
-> > +  that they can be identified easily. Note that the sama5d3[13456]ek.dts files
-> > +  are an historical exception to this rule.
+On Tue, Jan 13, 2015 at 09:06:15AM +0100, Linus Walleij wrote:
+> On Wed, Dec 17, 2014 at 11:44 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Dec 17, 2014 at 11:45:01AM +0900, Alexandre Courbot wrote:
+> >> Actually we are not that far from being able to do completely without
+> >> any GPIO number, and maybe that's what we should aim for. I think the
+> >> only remaining offender is the sysfs interface.
+> >
+> > And that is a user API, and there's lots of users of it (eg, on Raspberry
+> > Pi platforms.)  So changing it isn't going to be easy - I'd say that it's
+> > impractical.
+> >
+> > What you're suggesting would be like re-numbering Linux syscalls.
 > 
-> In fact, this set of boards are not the only exception. I will rephrase
-> the sentence as:
-> "Note that some files are historical exceptions to this rule
-> (sama5d3[13456]ek.dts, usb_a9g20.dts or animeo_ip.dts for example)."
+> The problem is that right now if we set the .base of a gpio_chip
+> to -1 for dynamic allocation of GPIO numbers and we have more
+> than one GPIO chip in the system, the numbers basically depend
+> on probe order, and may theoretically even differ between two boots.
 > 
-> Bye,
-> -- 
-> Nicolas Ferre
+> So in these cases preserving the ABI means preserving the
+> unpredictability of these assigned numbers or something.
+> 
+> For the old usecases with a single GPIO controller and a fixed
+> base offset of e.g. 0 (which I suspect was implicit in the initial
+> design of the subsystem) things work fine as always, it's these new
+> dynamic use cases that destabilize the ABI.
+
+Since GPIOs are exported through sysfs into userland by GPIO number,
+and we know that there are users of it (see
+https://github.com/pilight/wiringX) which hard encode GPIO numbers,
+so this is *really* something that we as kernel developers can't
+change without breaking such users.
+
+So, what I'm saying is be very careful about moving to a fully
+dynamic space: you could end up breaking userspace if you do.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
