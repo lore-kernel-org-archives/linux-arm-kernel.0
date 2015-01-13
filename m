@@ -1,35 +1,43 @@
-From: renjithg@tataelxsi.co.in (Renjith G)
-Date: Tue, 13 Jan 2015 13:10:42 +0530
-Subject: Linux kernel boot up on ARMv7l based board - failed
-Message-ID: <54B4CBFA.70006@tataelxsi.co.in>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Jan 2015 08:57:30 +0100
+Subject: [PATCH 1/5] gpio: Cygnus: define Broadcom Cygnus GPIO binding
+In-Reply-To: <1417826408-1600-2-git-send-email-rjui@broadcom.com>
+References: <rjui@broadcom.com>
+ <1417826408-1600-1-git-send-email-rjui@broadcom.com>
+ <1417826408-1600-2-git-send-email-rjui@broadcom.com>
+Message-ID: <CACRpkdaTU_efMOpKoEdBA0rDHyn6wcn7VamUZRiX-K2MYZygBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Dec 6, 2014 at 1:40 AM, Ray Jui <rjui@broadcom.com> wrote:
 
-I have an R-Car H2 development board (Lager) from Renesas and it was 
-correctly running with Linux Kernel 3.4.81-ltsi till last week.
+> Document the GPIO device tree binding for Broadcom Cygnus SoC
+>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+(...)
+> +- #gpio-cells:
+> +    Must be two. The first cell is the GPIO pin number (within the
+> +controller's domain) and the second cell is used for the following:
+> +    bit[0]: polarity (0 for normal and 1 for inverted)
+> +    bit[18:16]: internal pull up/down: 0 - pull up/down disabled
+> +                                       1 - pull up enabled
+> +                                       2 - pull down enabled
+> +    bit[22:20]: drive strength: 0 - 2 mA
+> +                                1 - 4 mA
+> +                                2 - 6 mA
+> +                                3 - 8 mA
+> +                                4 - 10 mA
+> +                                5 - 12 mA
+> +                                6 - 14 mA
+> +                                7 - 16 mA
 
-But unfortunately now, During boot up the kernel hangs and shows till 
-"Starting kernel....."
+No. This pull up/down and drive strength is pin controller
+business, use a pin control backend behind the GPIO driver
+see Documentation/pinctrl.txt.
 
-I have enabled earlyprintk and here is the code flow till freeze point.
-1. It is reaching till '/arch/arm/mm/mmu.c' in function 
-'devicemaps_init()' and then it calls 'local_flush_tlb_all()'
-2. The 'local_flush_tlb_all()' is defined in 
-'/arch/arm/include/asm/tlbflush.h' and from there it calls 
-'tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", zero);'
-3. The above call hangs and hence not returning, so it the boot up hangs.
+Initial states for these configurations can be set up using
+pin control hogs since pin control and GPIO is orthogonal.
 
-Do you have any suggestions?
-
-Is this due to any board failure? If so, is there any ways I can tweak it?
-
-I see in step 2, executes some co-processor specific instructions and 
-the board has ARM CA9 , ARM CA15 and SH4A processors mentioned in the 
-reference manual and I am not so sure.
-
-Expecting your reply.
-
-Many kind regards,
-/renjith_g
+Yours,
+Linus Walleij
