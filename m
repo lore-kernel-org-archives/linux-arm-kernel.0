@@ -1,64 +1,57 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 13 Jan 2015 17:45:16 +0900
-Subject: [PATCH] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
-In-Reply-To: <54897C14.3040702@samsung.com>
-References: <1418027967-12923-1-git-send-email-acourbot@nvidia.com>
- <54897C14.3040702@samsung.com>
-Message-ID: <CAAVeFuL-x1-vmaViYou6ViRR+ipCnz5WdwbmKC4Cu5ViD+pVNA@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 13 Jan 2015 16:42:38 +0800
+Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
+In-Reply-To: <9190510.INCMcmsads@wuerfel>
+References: <54B48D5E.6050902@hisilicon.com> <9190510.INCMcmsads@wuerfel>
+Message-ID: <54B4DA7E.2020602@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping? This patch still seems to be needed as of today...
 
-On Thu, Dec 11, 2014 at 8:12 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
->
-> On 2014-12-08 09:39, Alexandre Courbot wrote:
+
+On 2015/1/13 16:33, Arnd Bergmann wrote:
+> On Tuesday 13 January 2015 11:13:34 Wei Xu wrote:
+>> There is 8MB SRAM in hip04.
+>> Moving the bootwrapper into SRAM could avoid to worry about poking
+>> holes into DRAM memory or allocation algorithms either.
 >>
->> There doesn't seem to be any valid reason to allocate the pages array
->> with the same flags as the buffer itself. Doing so can eventually lead
->> to the following safeguard in mm/slab.c to be hit:
->>
->> BUG_ON(flags & GFP_SLAB_BUG_MASK);
->>
->> This happens when buffers are allocated with __GFP_DMA32 or
->> __GFP_HIGHMEM.
->>
->> Fix this by allocating the pages array with GFP_KERNEL to follow what is
->> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
->> is safe because atomic allocations are handled by __iommu_alloc_atomic().
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Thierry Reding <treding@nvidia.com>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->
->
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->
+>> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
 >> ---
->>   arch/arm/mm/dma-mapping.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>  arch/arm/boot/dts/hip04.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index e8907117861e..bc495354c802 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct
->> device *dev, size_t size,
->>         int i = 0;
->>         if (array_size <= PAGE_SIZE)
->> -               pages = kzalloc(array_size, gfp);
->> +               pages = kzalloc(array_size, GFP_KERNEL);
->>         else
->>                 pages = vzalloc(array_size);
->>         if (!pages)
->
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
+>> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+>> index 2388145..f0dfac7 100644
+>> --- a/arch/arm/boot/dts/hip04.dtsi
+>> +++ b/arch/arm/boot/dts/hip04.dtsi
+>> @@ -22,7 +22,7 @@
+>>  
+>>         bootwrapper {
+>>         compatible = "hisilicon,hip04-bootwrapper";
+>> -       boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
+>> +       boot-method = <0xe00f0000 0x10000>, <0xe0000100 0x1000>;
+>>         };
+
+Hi Arnd,
+ 
+> Is this backwards compatible with old firmware?
+
+Sorry, it is not backwards compatible.
+Another reason is that it could support opensuse 
+more smoothly.
+
+I have updated the firmware and uploaded it 
+into Linaro Hisilicon git tree last month.
+We will update the wiki on Linaro soon.
+
+Do you think it is OK?
+Thanks!
+
+Best Regards,
+Wei
+
+> 
+> 	Arnd
+> 
+> .
+> 
