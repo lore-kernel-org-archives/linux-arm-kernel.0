@@ -1,69 +1,82 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 13 Jan 2015 17:33:12 +0800
-Subject: [alsa-devel] [PATCH] ASoC: wm8904: fix runtime warning
-In-Reply-To: <54B4DDC9.2000902@metafoo.de>
-References: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
- <20150109111642.GU14516@opensource.wolfsonmicro.com>
- <54B34035.60107@atmel.com> <54B3943C.4040103@metafoo.de>
- <54B4AED5.1000001@atmel.com> <54B4DDC9.2000902@metafoo.de>
-Message-ID: <54B4E658.8070506@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 13 Jan 2015 10:35:24 +0100
+Subject: [RFC PATCH v2 2/4] serial: mxs-auart: Use helpers for gpio irqs
+In-Reply-To: <54B4E588.5010602@elproma.com.pl>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
+ <20150113080817.GG22880@pengutronix.de>
+ <54B4E588.5010602@elproma.com.pl>
+Message-ID: <20150113093524.GI22880@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars-Peter Clausen,
+Hello,
 
-On 01/13/2015 04:56 PM, Lars-Peter Clausen wrote:
-> On 01/13/2015 06:36 AM, Bo Shen wrote:
->> Hi Lars-Perter Clausen,
->>
->> On 01/12/2015 05:30 PM, Lars-Peter Clausen wrote:
->>> On 01/12/2015 04:32 AM, Bo Shen wrote:
->>> [...]
->>>>>> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
->>>>>> index 4d2d2b1..38582d7 100644
->>>>>> --- a/sound/soc/codecs/wm8904.c
->>>>>> +++ b/sound/soc/codecs/wm8904.c
->>>>>> @@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route
->>>>>> adc_intercon[] = {
->>>>>>       { "Right Capture PGA", NULL, "Right Capture Mux" },
->>>>>>       { "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
->>>>>>
->>>>>> -    { "AIFOUTL", "Left",  "ADCL" },
->>>>>> -    { "AIFOUTL", "Right", "ADCR" },
->>>>>> -    { "AIFOUTR", "Left",  "ADCL" },
->>>>>> -    { "AIFOUTR", "Right", "ADCR" },
->>>>>> +    { "AIFOUTL", NULL, "ADCL" },
->>>>>> +    { "AIFOUTL", NULL, "ADCR" },
->>>>>> +    { "AIFOUTR", NULL, "ADCL" },
->>>>>> +    { "AIFOUTR", NULL, "ADCR" },
->>>>>
->>>>> Is this the right fix here? I am not super familiar with the
->>>>> driver but it appears to contain an "AIFOUTL Mux" control which
->>>>> is not connected to anything. Looks like maybe this is a mistake
->>>>> the mux is indeded to be included in the path? Feels like we
->>>>> should either remove the control as well or hook it into the
->>>>> path.
->>>>
->>>> Thank for your information.
->>>> I think here it should correct the path name as
->>>> --->8---
->>>> { "AIFOUTL Mux", "Left",  "ADCL" },
->>>> { "AIFOUTL Mux", "Right", "ADCR" },
->>>> { "AIFOUTR Mux", "Left",  "ADCL" },
->>>> { "AIFOUTR Mux", "Right", "ADCR" },
->>>> ---8<---
->>>>
->>>> Thanks again. I will send out the new version.
->>>
->>> Your probably also need to connect the mux to the output pins.
->>
->> Thanks for you information, after check the datasheet, I still don't know
->> which the mux should connect to which output pins.
->
-> AIFOUTL Mux to AIFOUTL
-> AIFOUTR Mux to AIFOUTR
+On Tue, Jan 13, 2015 at 10:29:44AM +0100, Janusz U?ycki wrote:
+> 
+> W dniu 2015-01-13 o 09:08, Uwe Kleine-K?nig pisze:
+> >Hello,
+> >
+> >On Sat, Jan 10, 2015 at 03:32:44PM +0100, Janusz Uzycki wrote:
+> >>The patch updates mxs-auart driver to use new mctrl_gpio helpers for
+> >>gpio irqs. The code is much simpler now.
+> >>
+> >>Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+> >>---
+> >>
+> >>There is no changes since v1 (rebased only).
+> >>
+> >>---
+> >>  drivers/tty/serial/mxs-auart.c | 133 ++++-------------------------------------
+> >>  1 file changed, 13 insertions(+), 120 deletions(-)
+> >Very nice!
+> >
+> >>diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> >>index ec553f8..2ddba69 100644
+> >>--- a/drivers/tty/serial/mxs-auart.c
+> >>+++ b/drivers/tty/serial/mxs-auart.c
+> >>[...]
+> >>@@ -483,18 +458,9 @@ static void mxs_auart_enable_ms(struct uart_port *port)
+> >>  	s->ms_irq_enabled = true;
+> >>-	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
+> >>-		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
+> >>-	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
+> >>-
+> >>-	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
+> >>-		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
+> >>-
+> >>-	if (s->gpio_irq[UART_GPIO_RI] >= 0)
+> >>-		enable_irq(s->gpio_irq[UART_GPIO_RI]);
+> >>-
+> >>-	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
+> >>-		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
+> >>+	mctrl_gpio_enable_ms(s->gpios);
+> >>+	/* TODO: enable AUART_INTR_CTSMIEN
+> >>+	 * if s->gpios->irq[UART_GPIO_CTS] == 0 */
+> >What is the problem here? For the other lines nothing needs to be done?
+> >This comment doesn't match the coding style.
+> 
+> Right, the comment should be rather:
+> /* TODO: enable AUART_INTR_CTSMIEN
+>  * if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS)) */
+I'd say:
 
-Thanks. I will send new version patch for review.
+	/*
+	 * TODO: enable AUART_INTR_CTSMIEN if CTS isn't handled by
+	 * mctrl_gpio.
+	 */
 
-Best Regards,
-Bo Shen
+> In this place I marked that CTSMIEN should be switched on
+> enable/disable_ms if CTS
+> is not a gpio. The driver enables CTSMIEN forever what is wrong but
+> I can't test it
+> and I don't need it so I've just marked the fact in the comment.
+That's what I thought. You're not affected because CTS is a gpio for
+you (or not?)?  What would be the effect otherwise?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
