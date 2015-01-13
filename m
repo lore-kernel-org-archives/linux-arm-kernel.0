@@ -1,219 +1,173 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 13 Jan 2015 12:31:24 +0800
-Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
- references
-Message-ID: <1421123484-21387-1-git-send-email-wens@csie.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 12 Jan 2015 20:55:11 -0800
+Subject: [PATCH v3 04/13] mtd: st_spi_fsm: Fetch boot device locations
+ from DT match tables
+In-Reply-To: <1418644760-18773-5-git-send-email-lee.jones@linaro.org>
+References: <1418644760-18773-1-git-send-email-lee.jones@linaro.org>
+ <1418644760-18773-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150113045511.GO9759@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using label references is preferred when override settings from the
-included dtsi.
++ devicetree
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+On Mon, Dec 15, 2014 at 11:59:11AM +0000, Lee Jones wrote:
+> To trim down on the amount of properties used by this driver and to conform
+> to the newly agreed method of acquiring syscfg registers/offsets, we now
+> obtain this information using match tables.
+> 
+> In the process we are deprecating the old generic compatible string and
+> providing 3 shiny new ones for each of the support platforms.  The
+> deprecated compatible string will be removed in due course.
 
-My AXP221 series touches this file. I thought I'd convert it first.
+I'm not sure how this agreement was done, but by default, we expect not
+to break backwards compatibility. This patch does just that.
 
-This looks like a lot of changes. But if you filter out all the
-indentation changes, it's just the opening lines for each node.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/devices/st_spi_fsm.c | 75 ++++++++++++++++++++++++++++++----------
+>  1 file changed, 57 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+> index fac0fe9..d82394a 100644
+> --- a/drivers/mtd/devices/st_spi_fsm.c
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -29,6 +29,21 @@
+>  #include "serial_flash_cmds.h"
+>  
+>  /*
+> + * FSM SPI Boot Mode Registers/Masks
+> + */
+> +#define STID127_SYSCON_BOOT_DEV_REG	0x0D8
+> +#define STID127_SYSCON_BOOT_DEV_SPI	0x068
+> +#define STID127_SYSCON_BOOT_DEV_MASK	0x07C
+> +
+> +#define STIH407_SYSCON_BOOT_DEV_REG	0x8C4
+> +#define STIH407_SYSCON_BOOT_DEV_SPI	0x068
+> +#define STIH407_SYSCON_BOOT_DEV_MASK	0x07C
+> +
+> +#define STIH416_SYSCON_BOOT_DEV_REG	0x958
+> +#define STIH416_SYSCON_BOOT_DEV_SPI	0x01A
+> +#define STIH416_SYSCON_BOOT_DEV_MASK	0x01F
+> +
+> +/*
+>   * FSM SPI Controller Registers
+>   */
+>  #define SPI_CLOCKDIV			0x0010
+> @@ -288,6 +303,12 @@ struct seq_rw_config {
+>  	uint8_t         dummy_cycles;   /* No. of DUMMY cycles */
+>  };
+>  
+> +struct stfsm_boot_dev {
+> +	uint32_t		reg;
+> +	uint32_t		spi;
+> +	uint32_t		mask;
+> +};
+> +
+>  /* SPI Flash Device Table */
+>  struct flash_info {
+>  	char            *name;
+> @@ -313,6 +334,24 @@ struct flash_info {
+>  	int             (*config)(struct stfsm *);
+>  };
+>  
+> +static struct stfsm_boot_dev stfsm_stid127_data = {
+> +	.reg  = STID127_SYSCON_BOOT_DEV_REG,
+> +	.spi  = STID127_SYSCON_BOOT_DEV_SPI,
+> +	.mask = STID127_SYSCON_BOOT_DEV_MASK,
+> +};
+> +
+> +static struct stfsm_boot_dev stfsm_stih407_data = {
+> +	.reg  = STIH407_SYSCON_BOOT_DEV_REG,
+> +	.spi  = STIH407_SYSCON_BOOT_DEV_SPI,
+> +	.mask = STIH407_SYSCON_BOOT_DEV_MASK,
+> +};
+> +
+> +static struct stfsm_boot_dev stfsm_stih416_data = {
+> +	.reg  = STIH416_SYSCON_BOOT_DEV_REG,
+> +	.spi  = STIH416_SYSCON_BOOT_DEV_SPI,
+> +	.mask = STIH416_SYSCON_BOOT_DEV_MASK,
+> +};
+> +
+>  static int stfsm_n25q_config(struct stfsm *fsm);
+>  static int stfsm_mx25_config(struct stfsm *fsm);
+>  static int stfsm_s25fl_config(struct stfsm *fsm);
+> @@ -1977,14 +2016,23 @@ static int stfsm_init(struct stfsm *fsm)
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id stfsm_match[] = {
+> +	{ .compatible = "st,spi-fsm" }, /* DEPRECATED */
+> +	{ .compatible = "st,stid127-spi-fsm", .data = &stfsm_stid127_data },
+> +	{ .compatible = "st,stih407-spi-fsm", .data = &stfsm_stih407_data },
+> +	{ .compatible = "st,stih416-spi-fsm", .data = &stfsm_stih416_data },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, stfsm_match);
+> +
+>  static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+>  {
+>  	struct stfsm *fsm = platform_get_drvdata(pdev);
+>  	struct device_node *np = pdev->dev.of_node;
+> +	const struct stfsm_boot_dev *boot_dev;
+> +	const struct of_device_id *match;
+>  	struct regmap *regmap;
+> -	uint32_t boot_device_reg;
+> -	uint32_t boot_device_spi;
+> -	uint32_t boot_device;     /* Value we read from *boot_device_reg */
+> +	uint32_t boot_device;    /* Value we read from the boot dev mode pins */
+>  	int ret;
+>  
+>  	/* Booting from SPI NOR Flash is the default */
+> @@ -1998,21 +2046,18 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+>  
+>  	fsm->reset_por = of_property_read_bool(np, "st,reset-por");
+>  
+> -	/* Where in the syscon the boot device information lives */
+> -	ret = of_property_read_u32(np, "st,boot-device-reg", &boot_device_reg);
+> -	if (ret)
+> +	match = of_match_node(stfsm_match, np);
+> +	if (!match)
+>  		goto boot_device_fail;
+> +	boot_dev = match->data;
+>  
+> -	/* Boot device value when booted from SPI NOR */
+> -	ret = of_property_read_u32(np, "st,boot-device-spi", &boot_device_spi);
+> +	ret = regmap_read(regmap, boot_dev->reg, &boot_device);
 
----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181 ++++++++++++++--------------
- 1 file changed, 88 insertions(+), 93 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index ebd5f7854b1b..97dbaeb76416 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -61,101 +61,96 @@
- 	chosen {
- 		bootargs = "earlyprintk console=ttyS0,115200";
- 	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PA8";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&mmc0_pins_a {
-+	/* external pull-ups missing for some pins */
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
-+
-+&usb1_vbus_pin_a {
-+	/* different pin from sunxi-common-regulators */
-+	allwinner,pins = "PH24";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	/* pull-ups and devices require AXP221 DLDO3 */
-+	status = "failed";
-+};
- 
--	soc at 01c00000 {
--		mmc0: mmc at 01c0f000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
--			vmmc-supply = <&reg_vcc3v0>;
--			bus-width = <4>;
--			cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
--			cd-inverted;
--			status = "okay";
--		};
--
--		usbphy: phy at 01c19400 {
--			usb1_vbus-supply = <&reg_usb1_vbus>;
--			status = "okay";
--		};
--
--		ehci0: usb at 01c1a000 {
--			status = "okay";
--		};
--
--		ohci0: usb at 01c1a400 {
--			status = "okay";
--		};
--
--		pio: pinctrl at 01c20800 {
--			mmc0_pins_a: mmc0 at 0 {
--				/* external pull-ups missing for some pins */
--				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
--			};
--
--			mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
--				allwinner,pins = "PA8";
--				allwinner,function = "gpio_in";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
--			};
--
--			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
--				allwinner,pins = "PH24";
--				allwinner,function = "gpio_out";
--				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--			};
--		};
--
--		uart0: serial at 01c28000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&uart0_pins_a>;
--			status = "okay";
--		};
--
--		i2c0: i2c at 01c2ac00 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins_a>;
--			/* pull-ups and devices require AXP221 DLDO3 */
--			status = "failed";
--		};
--
--		i2c1: i2c at 01c2b000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c1_pins_a>;
--			status = "okay";
--		};
--
--		i2c2: i2c at 01c2b400 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c2_pins_a>;
--			status = "okay";
--
--			pcf8563: rtc at 51 {
--				compatible = "nxp,pcf8563";
--				reg = <0x51>;
--			};
--		};
--
--		gmac: ethernet at 01c30000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&gmac_pins_rgmii_a>;
--			phy = <&phy1>;
--			phy-mode = "rgmii";
--			snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>;
--			snps,reset-active-low;
--			snps,reset-delays-us = <0 10000 30000>;
--			status = "okay";
--
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
--		};
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+
-+	pcf8563: rtc at 51 {
-+		compatible = "nxp,pcf8563";
-+		reg = <0x51>;
- 	};
-+};
- 
--	reg_usb1_vbus: usb1-vbus {
--		pinctrl-0 = <&usb1_vbus_pin_a>;
--		gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>; /* PH24 */
--		status = "okay";
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 30000>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
- 	};
- };
-+
-+&reg_usb1_vbus {
-+	gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>; /* PH24 */
-+	status = "okay";
-+};
--- 
-2.1.4
+^^^ NULL pointer dereference for any existing DTB that uses the
+"st,spi-fsm" compatible string. So I'll NAK this patch as-is. Either we
+need to completely drop the "deprecated" compatible property (what's the
+point binding to it, if we're going to OOPS on it anyway), or else we
+need to maintain both methods (at least for whatever deprecation period
+is deemed acceptable).
+
+>  	if (ret)
+>  		goto boot_device_fail;
+>  
+> -	ret = regmap_read(regmap, boot_device_reg, &boot_device);
+> -	if (ret)
+> -		goto boot_device_fail;
+> +	boot_device &= boot_dev->mask;
+>  
+> -	if (boot_device != boot_device_spi)
+> +	if (boot_device != boot_dev->spi)
+>  		fsm->booted_from_spi = false;
+>  
+>  	return;
+> @@ -2156,12 +2201,6 @@ static int stfsmfsm_resume(struct device *dev)
+>  
+>  static SIMPLE_DEV_PM_OPS(stfsm_pm_ops, stfsmfsm_suspend, stfsmfsm_resume);
+>  
+> -static const struct of_device_id stfsm_match[] = {
+> -	{ .compatible = "st,spi-fsm", },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, stfsm_match);
+> -
+>  static struct platform_driver stfsm_driver = {
+>  	.probe		= stfsm_probe,
+>  	.remove		= stfsm_remove,
+
+Brian
