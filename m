@@ -1,170 +1,83 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Jan 2015 15:22:33 +0100
-Subject: [PATCH v3 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the SATA
- port
-In-Reply-To: <1421158953-2957-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421158953-2957-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421158953-2957-5-git-send-email-gregory.clement@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 13 Jan 2015 06:23:41 -0800
+Subject: [4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <1414077524-6469-5-git-send-email-lee.jones@linaro.org>
+References: <1414077524-6469-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150113142341.GA15707@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the regulators to each SATA port.
+On Thu, Oct 23, 2014 at 04:18:44PM +0100, Lee Jones wrote:
+> Signed-off-by: David Paris <david.paris@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-388-gp.dts | 126 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 126 insertions(+)
+Digging myself out of my hole. Sorry for the laaaate reply.
 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 4df22bf91683..590b383db323 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -173,6 +173,16 @@
- 				status = "okay";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+
-+				sata0: sata-port at 0 {
-+					reg = <0>;
-+					target-supply = <&reg_5v_sata0>;
-+				};
-+
-+				sata1: sata-port at 1 {
-+					reg = <1>;
-+					target-supply = <&reg_5v_sata1>;
-+				};
- 			};
- 
- 			sata at e0000 {
-@@ -181,6 +191,16 @@
- 				status = "okay";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+
-+				sata2: sata-port at 0 {
-+					reg = <0>;
-+					target-supply = <&reg_5v_sata2>;
-+				};
-+
-+				sata3: sata-port at 1 {
-+					reg = <1>;
-+					target-supply = <&reg_5v_sata3>;
-+				};
- 			};
- 
- 			sdhci at d8000 {
-@@ -278,6 +298,112 @@
- 		regulator-always-on;
- 		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
- 	};
-+
-+	reg_sata0: pwr-sata0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "pwr_en_sata0";
-+		enable-active-high;
-+		regulator-always-on;
-+
-+	};
-+
-+	reg_5v_sata0: v5-sata0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v5.0-sata0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata0>;
-+	};
-+
-+	reg_12v_sata0: v12-sata0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v12.0-sata0";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata0>;
-+	};
-+
-+	reg_sata1: pwr-sata1 {
-+		regulator-name = "pwr_en_sata1";
-+		compatible = "regulator-fixed";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+		enable-active-high;
-+		regulator-always-on;
-+		gpio = <&expander0 3 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_5v_sata1: v5-sata1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v5.0-sata1";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata1>;
-+	};
-+
-+	reg_12v_sata1: v12-sata1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v12.0-sata1";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata1>;
-+	};
-+
-+	reg_sata2: pwr-sata2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "pwr_en_sata2";
-+		enable-active-high;
-+		regulator-always-on;
-+		gpio = <&expander0 11 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_5v_sata2: v5-sata2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v5.0-sata2";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata2>;
-+	};
-+
-+	reg_12v_sata2: v12-sata2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v12.0-sata2";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata2>;
-+	};
-+
-+	reg_sata3: pwr-sata3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "pwr_en_sata3";
-+		enable-active-high;
-+		regulator-always-on;
-+		gpio = <&expander0 12 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_5v_sata3: v5-sata3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v5.0-sata3";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata3>;
-+	};
-+
-+	reg_12v_sata3: v12-sata3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v12.0-sata3";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+		regulator-always-on;
-+		vin-supply = <&reg_sata3>;
-+	};
- };
- 
- &pinctrl {
--- 
-1.9.1
+> ---
+>  drivers/watchdog/Kconfig  |  16 +++
+>  drivers/watchdog/Makefile |   1 +
+>  drivers/watchdog/st_wdt.c | 317 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 334 insertions(+)
+>  create mode 100644 drivers/watchdog/st_wdt.c
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index f57312f..c8abf57 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -432,6 +432,22 @@ config SIRFSOC_WATCHDOG
+>  	  Support for CSR SiRFprimaII and SiRFatlasVI watchdog. When
+>  	  the watchdog triggers the system will be reset.
+>  
+> +config ST_WATCHDOG
+> +       tristate "STMicroelectronics LPC Watchdog"
+> +       depends on ARCH_STI && OF
+> +       depends on !RTC_DRV_ST_LPC
+
+RTC_DRV_ST_LPC is not in mainline nor in -next. Is this still current ?
+
+> +       select WATCHDOG_CORE
+> +       help
+> +	 Say Y here to include Watchdog timer support for the watchdog
+> +	 existing in the LPC of STMicroelectronics SOCs.
+> +	 !!! BE CARREFUL !!!
+> +	 This driver shares hardware resources with RTC Alarm part of the
+> +	 LPC. Both LPC Watchdog driver and LPC RTC driver cannot be
+> +	 used together.
+> +
+
+Arnd has asked if/how this is enforced by the code. Was this ever resolved ?
+
+> +	 To compile this driver as a module, choose M here: the
+> +	 module will be called st-wdt.
+> +
+
+[ ... ]
+
+> +	watchdog_set_drvdata(&st_wdog_dev, st_wdog);
+> +	watchdog_set_nowayout(&st_wdog_dev, WATCHDOG_NOWAYOUT);
+> +
+> +	/* Init Watchdog timeout with value in DT */
+> +	ret = watchdog_init_timeout(&st_wdog_dev, 0, &pdev->dev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Unable to initialise watchdog timeout\n");
+
+Missing clk_disable_unprepare().
+
+> +		return ret;
+> +	}
+> +
+> +	ret = watchdog_register_device(&st_wdog_dev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Unable to register watchdog\n");
+> +		clk_disable_unprepare(clk);
+> +		return ret;
+> +	}
+> +
+> +	st_wdog_setup(st_wdog, true);
+> +
+> +	dev_info(&pdev->dev, "LPC Watchdog driver registered, reset type is %s",
+> +		 st_wdog->warm_reset ? "warm" : "cold");
+
+Missing newline.
+
+Guenter
