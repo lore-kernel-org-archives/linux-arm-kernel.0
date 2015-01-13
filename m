@@ -1,47 +1,22 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 13 Jan 2015 11:27:07 -0800
-Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
-In-Reply-To: <54B50CDA.3090307@gmail.com>
-References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
- <1420016272-6789-4-git-send-email-jszhang@marvell.com>
- <54AD3EAE.6090009@gmail.com> <20150107222209.64ed24a0@xhacker>
- <54AD431F.6060403@gmail.com> <20150109201306.4d1a296b@xhacker>
- <54B12446.4030703@gmail.com> <20150113002817.20842.98432@quantum>
- <54B50CDA.3090307@gmail.com>
-Message-ID: <20150113192707.20842.42495@quantum>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 13 Jan 2015 20:28:49 +0100
+Subject: [PATCHv2 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c
+ LED driver
+In-Reply-To: <CAK5ve-LS0KO4avfprz=6rS4MT5AdiAtF02EVvv=cRbz03t4E_w@mail.gmail.com>
+References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
+ <1420843545-30892-3-git-send-email-andrew@lunn.ch>
+ <CAK5ve-JQJJH_Dk=+PbFyRL3cjQUU4a5au4h9Kfcz6L6_iAfPKA@mail.gmail.com>
+ <20150113191349.GE14570@lunn.ch>
+ <CAK5ve-LS0KO4avfprz=6rS4MT5AdiAtF02EVvv=cRbz03t4E_w@mail.gmail.com>
+Message-ID: <20150113192849.GF14570@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2015-01-13 04:17:30)
-> On 01/13/2015 01:28 AM, Mike Turquette wrote:
-> > Quoting Sebastian Hesselbarth (2015-01-10 05:08:22)
-> >> This is clk subsystem, so either Mike takes it through his fixes branch
-> >> including my
-> >>
-> >> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>
-> >> or decides to agree that I take it instead with his Ack. I am fine
-> >> with both.
-> >
-> > Acked-by: Michael Turquette <mturquette@linaro.org>
-> >
-> > Now the three fixes can stay together and live happily ever after.
-> 
-> Mike,
-> 
-> I already had the two others pulled by Olof some days ago.
-> If you plan for a fixes branch for v3.19, please take this in too.
-> 
-> If you have no other fixes, I can take it and do a 2nd round of
-> fixes for Berlin.
+> Can you update that one without that gpio thing in the example? And if
+> there is no objection from others, I will take it.
 
-The fixes family has been broken up. How sad.
+Hi Bryan
 
-Applied to clk-fixes for the next -rc.
+v2 of the patch has the #gpio-cells removed.
 
-Regards,
-Mike
-
-> 
-> Sebastian
-> 
+   Andrew 
