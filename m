@@ -1,22 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 13 Jan 2015 20:28:49 +0100
-Subject: [PATCHv2 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c
- LED driver
-In-Reply-To: <CAK5ve-LS0KO4avfprz=6rS4MT5AdiAtF02EVvv=cRbz03t4E_w@mail.gmail.com>
-References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
- <1420843545-30892-3-git-send-email-andrew@lunn.ch>
- <CAK5ve-JQJJH_Dk=+PbFyRL3cjQUU4a5au4h9Kfcz6L6_iAfPKA@mail.gmail.com>
- <20150113191349.GE14570@lunn.ch>
- <CAK5ve-LS0KO4avfprz=6rS4MT5AdiAtF02EVvv=cRbz03t4E_w@mail.gmail.com>
-Message-ID: <20150113192849.GF14570@lunn.ch>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Jan 2015 14:02:54 -0600
+Subject: [PATCH] dma-mapping: fix debug print to display correct
+ dma_pfn_offset
+In-Reply-To: <1419262509-9811-1-git-send-email-m-karicheri2@ti.com>
+References: <1419262509-9811-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <CAL_JsqJb2ufqwgHNUepiNs8NRa57caxacoEfVa6-RYT8HUfS5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Can you update that one without that gpio thing in the example? And if
-> there is no objection from others, I will take it.
+On Mon, Dec 22, 2014 at 9:35 AM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> fix the dev_dbg to display the offset which is the calculated
+> dma_pfn_offset value and set later in the code.
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Hi Bryan
+Applied for 3.20. Thanks.
 
-v2 of the patch has the #gpio-cells removed.
-
-   Andrew 
+> ---
+>  drivers/of/platform.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 5b33c6a..a54ec10 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -188,7 +188,7 @@ static void of_dma_configure(struct device *dev)
+>                 size = dev->coherent_dma_mask;
+>         } else {
+>                 offset = PFN_DOWN(paddr - dma_addr);
+> -               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+> +               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>         }
+>         dev->dma_pfn_offset = offset;
+>
+> --
+> 1.7.9.5
+>
