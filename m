@@ -1,72 +1,91 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Jan 2015 14:00:50 -0500
-Subject: [PATCH v2 2/5] irqchip: Add DT binding doc for dumb demuxer chips
-In-Reply-To: <1421174781-4340-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421174781-4340-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150113190050.GZ24989@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 13 Jan 2015 11:06:57 -0800
+Subject: [PATCH v2] clk: at91: keep slow clk enabled to prevent system hang
+In-Reply-To: <1421160246-29712-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1421160246-29712-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150113190657.20842.90692@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
-
-On Tue, Jan 13, 2015 at 07:46:18PM +0100, Boris Brezillon wrote:
-> Add documentation for the dumb demuxer.
+Quoting Boris Brezillon (2015-01-13 06:44:06)
+> All slow clk users are not properly claiming it (get + prepare + enable)
+> before using it.
+> If all users properly claiming this clock release it, the clock is
+> disabled, but faulty users still depends on it, and the system hangs.
+> 
+> This fix prevents the slow clock from being disabled, and should solve the
+> hanging issue, but offending drivers should be patched to properly claim
+> this clock.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reported-by: Bo Shen <voice.shen@atmel.com>
+> Cc: stable at vger.kernel.org
+
+Applied to clk-fixes towards the next -rc.
+
+Thanks,
+Mike
+
 > ---
->  .../bindings/interrupt-controller/dumb-demux.txt   | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+>  drivers/clk/at91/clk-slow.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> new file mode 100644
-> index 0000000..1c777ef
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
-> @@ -0,0 +1,34 @@
-> +* Generic Dumb Interrupt Demultiplexer
+> diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+> index 32f7c1b..2f13bd5 100644
+> --- a/drivers/clk/at91/clk-slow.c
+> +++ b/drivers/clk/at91/clk-slow.c
+> @@ -70,6 +70,7 @@ struct clk_sam9x5_slow {
+>  
+>  #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
+>  
+> +static struct clk *slow_clk;
+>  
+>  static int clk_slow_osc_prepare(struct clk_hw *hw)
+>  {
+> @@ -357,6 +358,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
+>         clk = clk_register(NULL, &slowck->hw);
+>         if (IS_ERR(clk))
+>                 kfree(slowck);
+> +       else
+> +               slow_clk = clk;
+>  
+>         return clk;
+>  }
+> @@ -433,6 +436,8 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
+>         clk = clk_register(NULL, &slowck->hw);
+>         if (IS_ERR(clk))
+>                 kfree(slowck);
+> +       else
+> +               slow_clk = clk;
+>  
+>         return clk;
+>  }
+> @@ -465,3 +470,25 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
+>  
+>         of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>  }
 > +
-> +This Dumb demultiplixer simply forward all incoming interrupts to its
-> +enabled/unmasked children.
-
-Please forgive the potentially na?ve question, but what hardware is this
-describing?
-
-thx,
-
-Jason.
-
+> +/*
+> + * FIXME: All slow clk users are not properly claiming it (get + prepare +
+> + * enable) before using it.
+> + * If all users properly claiming this clock decide that they don't need it
+> + * anymore (or are removed), it is disabled while faulty users are still
+> + * requiring it, and the system hangs.
+> + * Prevent this clock from being disabled until all users are properly
+> + * requesting it.
+> + * Once this is done we should remove this function and the slow_clk variable.
+> + */
+> +static int __init of_at91_clk_slow_retain(void)
+> +{
+> +       if (!slow_clk)
+> +               return 0;
 > +
-> +Required properties:
-> +- compatible: Should be "irqchip-dumb-demux".
-> +- interrupt-controller: Identifies the node as an interrupt controller.
-> +- interrupts-extended or interrupt-parent and interrupts: Reference the source
-> +  interrupt connected to this dumb demuxer.
-> +- #interrupt-cells: The number of cells to define the interrupts (should be 1).
-> +  The only cell is the IRQ number.
-> +- irqs: u32 bitfield specifying the interrupts provided by the demuxer.
+> +       __clk_get(slow_clk);
+> +       clk_prepare_enable(slow_clk);
 > +
-> +Examples:
-> +	/*
-> +	 * Dumb demuxer controller
-> +	 */
-> +	dumb_irq1_demux: dumb-irq-demux at 1 {
-> +		compatible = "irqchip-dumb-demux";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		interrupts-extended = <&aic 1 IRQ_TYPE_LEVEL_HIGH 7>;
-> +		irqs = <0x3f>;
-> +	};
-> +
-> +	/*
-> +	 * Device connected on this dumb demuxer
-> +	 */
-> +	dma: dma-controller at ffffec00 {
-> +		compatible = "atmel,at91sam9g45-dma";
-> +		reg = <0xffffec00 0x200>;
-> +		interrupts-extended = <&dumb_irq1_demux 0>;
-> +	};
+> +       return 0;
+> +}
+> +arch_initcall(of_at91_clk_slow_retain);
 > -- 
 > 1.9.1
 > 
