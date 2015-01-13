@@ -1,128 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 13 Jan 2015 15:43:09 -0800
-Subject: [PATCH 2/2] ARM: entry-common,
- ptrace: do not pass scno to syscall_trace_enter
-In-Reply-To: <CACZ9PQU6rAgSX3yRnSbUyk4GqJLtvpEKGQaqu_MDoWo_FB5A3g@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-3-git-send-email-r.peniaev@gmail.com>
- <CAGXu5jLi=6QTzF_z9pFAeXQqLZPfSCcwZc+q-a7b-tKwwBo4vg@mail.gmail.com>
- <CACZ9PQU6rAgSX3yRnSbUyk4GqJLtvpEKGQaqu_MDoWo_FB5A3g@mail.gmail.com>
-Message-ID: <CAGXu5jL6_CQmi1RRP5JbiaDgUK77_sQ+pwghANLaRMkdGeMAzw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Jan 2015 23:45:09 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
+ without sysc
+In-Reply-To: <54AC1AFB.4070504@ti.com>
+References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
+ <5492F84E.7020706@ti.com>
+ <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
+ <54AA4CD4.40105@ti.com>
+ <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
+ <54AB9983.1040703@ti.com>
+ <54AC1800.1020406@ti.com> <54AC1AFB.4070504@ti.com>
+Message-ID: <alpine.DEB.2.02.1501132330460.28034@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 3:21 PM, Roman Peniaev <r.peniaev@gmail.com> wrote:
-> On Wed, Jan 14, 2015 at 5:08 AM, Kees Cook <keescook@chromium.org> wrote:
->> On Sun, Jan 11, 2015 at 6:32 AM, Roman Pen <r.peniaev@gmail.com> wrote:
->>> In previous patch current_thread_info()->syscall is set with
->>> corresponding syscall number prior to further calls, thus there
->>> is no any need to pass 'scno'.
->>>
->>> Also, add explicit comment why do we have to reread 'scno' local
->>> variable.
->>>
->>> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: Kees Cook <keescook@chromium.org>
->>> Cc: Andy Lutomirski <luto@amacapital.net>
->>> Cc: Eric Paris <eparis@redhat.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> ---
->>>  arch/arm/kernel/entry-common.S | 1 -
->>>  arch/arm/kernel/ptrace.c       | 6 ++++--
->>>  2 files changed, 4 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->>> index 89452ff..3d12eb5 100644
->>> --- a/arch/arm/kernel/entry-common.S
->>> +++ b/arch/arm/kernel/entry-common.S
->>> @@ -228,7 +228,6 @@ ENDPROC(vector_swi)
->>>          * context switches, and waiting for our parent to respond.
->>>          */
->>>  __sys_trace:
->>> -       mov     r1, scno
->>>         add     r0, sp, #S_OFF
->>>         bl      syscall_trace_enter
->>>
->>> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
->>> index ef9119f..1238787 100644
->>> --- a/arch/arm/kernel/ptrace.c
->>> +++ b/arch/arm/kernel/ptrace.c
->>> @@ -928,9 +928,9 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->>>         regs->ARM_ip = ip;
->>>  }
->>>
->>> -asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->>> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->>>  {
->>> -       current_thread_info()->syscall = scno;
->>> +       int scno = current_thread_info()->syscall;
->>
->> Was this assignment of current_thread_info()->syscall redundant? If
->> so, this looks fine. If not, what will now be setting the thread_info?
->
-> [sorry, i have to resend this email because previously I sent it using my phone
->  and arm maillist rejected it because of html inside]
->
-> Yes, it is redundant.
-> Because of the previous patch thread_info->syscall already contains
-> corresponding scnr,
-> so we use it instead of passing the same number from asm.
+Hi Suman
 
-Ah! Okay, I wasn't CCed on the 1/2 patch. I see it now, thanks!
+On Tue, 6 Jan 2015, Suman Anna wrote:
 
-> So everything should work fine without current patch, and also current
-> patch should not
-> change anything in the expected behavior.
+> Looking at your rc3 log @
+> http://www.pwsan.com/omap/testlogs/test_v3.19-rc3/20150105224749/boot/4460varsomom/,
+> I do see a missing reg entry for mailbox, and that's the reason for your
+> hang because of the missing bail out in your new patch.
+> 
+> [    0.261932] ------------[ cut here ]------------
+> [    0.261962] WARNING: CPU: 0 PID: 1 at
+> arch/arm/mach-omap2/omap_hwmod.c:2458 _init+0x3a0/0x3f0()
+> [    0.261962] omap_hwmod: mailbox: doesn't have mpu register target base
+> ...
+> ...
+> [    0.262329] ---[ end trace a1be72591db4662e ]---
+> 
+> Now that said, this is weird, since the reg property for mailbox is
+> defined in the base omap4.dtsi and should be inherited by the 4460
+> VAR-SOM-OM, unless you are booting with an old dtb.
 
-Great. If this still passes the seccomp testsuite, I'm fine for it. I
-can test it later this week if no one else gets to it.
-
-Reviewed-by: Kees Cook <keescook@chromium.org>
-
-Thanks!
-
--Kees
-
->
-> --
-> Roman
->
->
->
->
->>
->> -Kees
->>
->>>
->>>         /* Do the secure computing check first; failures should be fast. */
->>>  #ifdef CONFIG_HAVE_ARCH_SECCOMP_FILTER
->>> @@ -944,6 +944,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->>>         if (test_thread_flag(TIF_SYSCALL_TRACE))
->>>                 tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->>>
->>> +       /* Syscall can be aborted (-1 can be set) or even changed
->>> +        * by the tracer and subsequent PTRACE_SET_SYSCALL request */
->>>         scno = current_thread_info()->syscall;
->>>
->>>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->>> --
->>> 2.1.3
->>>
->>
->>
->>
->> --
->> Kees Cook
->> Chrome OS Security
+Yeah, it doesn't make sense.  I'm pretty sure I'm using the right DTB 
+here, since that board is booting with a concatenated uImage + DTB.  
+Well, at least there's a good test platform here.
 
 
-
--- 
-Kees Cook
-Chrome OS Security
+- Paul
