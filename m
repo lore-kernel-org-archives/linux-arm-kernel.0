@@ -1,66 +1,157 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 13 Jan 2015 12:20:44 +0100
-Subject: [PATCH] ARM: DMA: Fix kzalloc flags in __iommu_alloc_buffer()
-In-Reply-To: <CAAVeFuL-x1-vmaViYou6ViRR+ipCnz5WdwbmKC4Cu5ViD+pVNA@mail.gmail.com>
-References: <1418027967-12923-1-git-send-email-acourbot@nvidia.com>
- <54897C14.3040702@samsung.com>
- <CAAVeFuL-x1-vmaViYou6ViRR+ipCnz5WdwbmKC4Cu5ViD+pVNA@mail.gmail.com>
-Message-ID: <54B4FF8C.50805@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 13 Jan 2015 12:26:04 +0100
+Subject: [PATCH] ARM: at91/Documentation: add a README for Atmel SoCs
+In-Reply-To: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <54B500CC.6020205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Le 09/01/2015 14:20, Nicolas Ferre a ?crit :
+> Add a README file to describe Atmel SoCs (aka AT91) support in Mainline Linux:
+> - SoC list + datasheet web links
+> - Basic but useful information
+> - Device Tree conventions and Work In Progress statement.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: ARM Maintainers <arm@kernel.org>
+> ---
+>  Documentation/arm/Atmel/README | 120 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 120 insertions(+)
+>  create mode 100644 Documentation/arm/Atmel/README
+> 
+> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
+> new file mode 100644
+> index 000000000000..538f8a556277
+> --- /dev/null
+> +++ b/Documentation/arm/Atmel/README
+> @@ -0,0 +1,120 @@
+> +ARM Atmel SoCs (aka AT91)
+> +=========================
+> +
+> +
+> +Introduction
+> +------------
+> +This document gives useful information about the ARM Atmel SoCs that are
+> +currently supported in Linux Mainline (you know, the one on kernel.org).
+> +
+> +It is important to note that the Atmel | SMART ARM-based MPU product line is
+> +historically named "AT91" or "at91" throughout the Linux kernel development
+> +process even if this product prefix has completely disappeared from the
+> +official Atmel product name. Anyway, files, directories, git trees,
+> +git branches/tags and email subject always contain this "at91" sub-string.
+> +
+> +
+> +AT91 SoCs
+> +---------
+> +Documentation and detailled datasheet for each product are available on
+> +the Atmel website: http://www.atmel.com.
+> +
+> +  Flavors:
+> +    * ARM 920 based SoC
+> +      - at91rm9200
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc1768.pdf
+> +
+> +    * ARM 926 based SoCs
+> +      - at91sam9260
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6221.pdf
+> +
+> +      - at91sam9261
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6062.pdf
+> +
+> +      - at91sam9263
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel_6249_32-bit-ARM926EJ-S-Microcontroller_SAM9263_Datasheet.pdf
+> +
+> +      - at91sam9rl
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6289.pdf
+> +
+> +      - at91sam9g20
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6384.pdf
+> +
+> +      - at91sam9g45 family
+> +        - at91sam9g45
+> +        - at91sam9g46
+> +        - at91sam9m10
+> +        - at91sam9m11 (device superset)
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel-6437-32-bit-ARM926-Embedded-Microprocessor-SAM9M11_Datasheet.pdf
+> +
+> +      - at91sam9x5 family (aka "The 5 series")
+> +        - at91sam9g15
+> +        - at91sam9g25
+> +        - at91sam9g35
+> +        - at91sam9x25
+> +        - at91sam9x35
+> +        + Datasheet (can be considered as covering the whole family)
+> +          http://www.atmel.com/Images/Atmel_11055_32-bit-ARM926EJ-S-Microcontroller_SAM9X35_Datasheet.pdf
+> +
+> +      - at91sam9n12
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel_11063_32-bit-ARM926EJ-S-Microcontroller_SAM9N12CN11CN12_Datasheet.pdf
+> +
+> +    * ARM Cortex-A5 based SoCs
+> +      - sama5d3 family
+> +        - sama5d31
+> +        - sama5d33
+> +        - sama5d34
+> +        - sama5d35
+> +        - sama5d36 (device superset)
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel-11121-32-bit-Cortex-A5-Microcontroller-SAMA5D3_Datasheet.pdf
+> +
+> +    * ARM Cortex-A5 + NEON based SoCs
+> +      - sama5d4 family
+> +        - sama5d41
+> +        - sama5d42
+> +        - sama5d43
+> +        - sama5d44 (device superset)
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
+> +
+> +
+> +Linux kernel information
+> +------------------------
+> +Linux kernel mach directory: arch/arm/mach-at91
+> +MAINTAINERS entry is: "ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES"
+> +
+> +
+> +Device Tree for AT91 SoCs and boards
+> +------------------------------------
+> +All AT91 SoCs are converted to Device Tree. Since Linux 3.19, these products
+> +must use this method to boot the Linux kernel.
+> +
+> +Work In Progress statement:
+> +Device Tree files and Device Tree bindings that apply to AT91 SoCs and boards are
+> +considered as "Unstable". To be completely clear, any at91 binding can change at
+> +any time. So, be sure to use a Device Tree Binary and a Kernel Image generated from
+> +the same source tree.
+> +Please refer to the Documentation/devicetree/bindings/ABI.txt file for a
+> +definition of a "Stable" binding/ABI.
+> +This statement will be removed by AT91 MAINTAINERS when appropriated.
+> +
+> +Naming conventions and best practice:
+> +- SoCs Device Tree Source Include files are named after the official name of
+> +  the product (at91sam9g20.dtsi or sama5d33.dtsi for instance).
+> +- Device Tree Source Include files (.dtsi) are used to collect common nodes that can be
+> +  shared across SoCs or boards (sama5d3.dtsi or at91sam9x5cm.dtsi for instance).
+> +  When collecting nodes for a particular peripheral or topic, the identifier have to
+> +  be placed at the end of the file name, separated with a "_" (at91sam9x5_can.dtsi
+> +  or sama5d3_gmac.dtsi for example).
+> +- board Device Tree Source files (.dts) are prefixed by the string "at91-" so
+> +  that they can be identified easily. Note that the sama5d3[13456]ek.dts files
+> +  are an historical exception to this rule.
 
-On 2015-01-13 09:45, Alexandre Courbot wrote:
-> Ping? This patch still seems to be needed as of today...
+In fact, this set of boards are not the only exception. I will rephrase
+the sentence as:
+"Note that some files are historical exceptions to this rule
+(sama5d3[13456]ek.dts, usb_a9g20.dts or animeo_ip.dts for example)."
 
-Arnd, could you take this patch together with your other pending 
-dma-mapping.h changes?
-
-> On Thu, Dec 11, 2014 at 8:12 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> On 2014-12-08 09:39, Alexandre Courbot wrote:
->>> There doesn't seem to be any valid reason to allocate the pages array
->>> with the same flags as the buffer itself. Doing so can eventually lead
->>> to the following safeguard in mm/slab.c to be hit:
->>>
->>> BUG_ON(flags & GFP_SLAB_BUG_MASK);
->>>
->>> This happens when buffers are allocated with __GFP_DMA32 or
->>> __GFP_HIGHMEM.
->>>
->>> Fix this by allocating the pages array with GFP_KERNEL to follow what is
->>> done elsewhere in this file. Using GFP_KERNEL in __iommu_alloc_buffer()
->>> is safe because atomic allocations are handled by __iommu_alloc_atomic().
->>>
->>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Thierry Reding <treding@nvidia.com>
->>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->>> ---
->>>    arch/arm/mm/dma-mapping.c | 2 +-
->>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>> index e8907117861e..bc495354c802 100644
->>> --- a/arch/arm/mm/dma-mapping.c
->>> +++ b/arch/arm/mm/dma-mapping.c
->>> @@ -1106,7 +1106,7 @@ static struct page **__iommu_alloc_buffer(struct
->>> device *dev, size_t size,
->>>          int i = 0;
->>>          if (array_size <= PAGE_SIZE)
->>> -               pages = kzalloc(array_size, gfp);
->>> +               pages = kzalloc(array_size, GFP_KERNEL);
->>>          else
->>>                  pages = vzalloc(array_size);
->>>          if (!pages)
->>>
-
-Best regards
+Bye,
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Nicolas Ferre
