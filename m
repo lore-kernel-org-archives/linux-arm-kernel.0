@@ -1,189 +1,109 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 13 Jan 2015 16:13:48 +0000
-Subject: [PATCH] ARM: kprobes: check register usage for probed instruction
-In-Reply-To: <1421161268.4215.56.camel@linaro.org>
-References: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
- <1420457384-77449-1-git-send-email-wangnan0@huawei.com>
- <1421161268.4215.56.camel@linaro.org>
-Message-ID: <1421165628.4215.63.camel@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 13 Jan 2015 17:16:14 +0100
+Subject: [PATCH v3 2/3] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <CACRpkdYXrdiRWMV8YpxrSLe2rLEV-ZnX7=36w21zGquh==6WgA@mail.gmail.com>
+References: <1415709535-31515-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1415709535-31515-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdYSe_BH_qiHma2BA+c2otEi3wd0TBXy83t8vwrNL+3U2g@mail.gmail.com>
+ <20141127101830.GP30369@pengutronix.de>
+ <CACRpkdbMdJT6y-NL36RgQe0-CAFAVGqKiwY9+yFcwA7JDLmA+Q@mail.gmail.com>
+ <20141202135527.GM30369@pengutronix.de>
+ <CACRpkdZeRd+j7d_iRphruHRg8p3XjqWK8_HQzLH2PTZ_pqOrYA@mail.gmail.com>
+ <20150112122200.GC18908@pengutronix.de>
+ <CACRpkdYXrdiRWMV8YpxrSLe2rLEV-ZnX7=36w21zGquh==6WgA@mail.gmail.com>
+Message-ID: <20150113161614.GF23940@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch utilizes the previously introduced checker to check
-register usage for probed ARM instruction and saves it in a mask.
-A further patch will use such information to avoid simulation or
-emulation.
+On Tue, Jan 13, 2015 at 11:05:22AM +0100, Linus Walleij wrote:
+> >> I am worried that there is something in your reasoning that sort of
+> >> assumes all pin controllers mux pins one-by-one and not in groups.
+> >> How do we make it impossible to write a device tree that also
+> >> make hardware that do groupwise config viable without ambiguities?
+> >
+> > Sorry, I don't understand this sentence. What do you mean here?
+> >
+> > The bindings I suggested are for individual pin based controllers
+> > only. I know there are group based controllers, but I don't want to
+> > change their bindings. I believe there is no single binding that is
+> > good for both types of controllers.
+> >
+> > I think we must face it that individual pin based controllers are
+> > different from group based controllers. That's the main difference
+> > between different pin controllers and I think there are good reasons
+> > to reflect that in the device tree.
+> 
+> OK let's work on a binding for this usecase.
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Reviewed-by: Jon Medhurst <tixy@linaro.org>
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+Okay.
 
-This patch applies my review comments on "[PATCH v19 10/11] ARM:
-kprobes: check register usage for probed instruction."
+> 
+> > You often talk about ambiguities. Could you give an example what
+> > ambiguities you mean?
+> 
+> What happened was this pins = ; arguments were sometimes
+> strings and sometimes integers, that becomes strange to handle
+> in code, ambiguous.
 
-It is also rebased on top of the kprobes-opt branch at
-git://git.linaro.org/people/tixy/kernel.git
+I see. I like naming it 'pinmux' because that's what it is: pins and
+mux settings. A plain 'pinno' suggests that it contains only pin mubers,
+without mux setting. How about 'pin-no-mux'? We also could add an
+explicit "pins-are-numbered" property instead of distinguishing this
+by property names.
 
- arch/arm/include/asm/probes.h          |  1 +
- arch/arm/probes/decode.c               |  7 +++
- arch/arm/probes/kprobes/actions-arm.c  |  2 +-
- arch/arm/probes/kprobes/checkers-arm.c | 93 ++++++++++++++++++++++++++++++++++
- arch/arm/probes/kprobes/checkers.h     |  1 +
- 5 files changed, 103 insertions(+), 1 deletion(-)
+> 
+> I'm fuzzily referring to the concept of things being named the
+> same way in different device trees, yet lacking commonality,
+> confusing a human reader that they may be the same thing,
+> even if it is possible to write schemas and parsers handling
+> it unambigously, so not ambiguity in the formal logic sense.
+> 
+> If i later want to refactor the code around this to a central
+> parser I cannot do so because it would lead to formal ambiguities
+> and is non-doable.
 
-diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
-index cd9e815..b668e60 100644
---- a/arch/arm/include/asm/probes.h
-+++ b/arch/arm/include/asm/probes.h
-@@ -41,6 +41,7 @@ struct arch_probes_insn {
- 	probes_insn_singlestep_t	*insn_singlestep;
- 	probes_insn_fn_t		*insn_fn;
- 	int				stack_space;
-+	unsigned long			register_usage_flags;
- };
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm/probes/decode.c b/arch/arm/probes/decode.c
-index f9d7c42..880ebe0 100644
---- a/arch/arm/probes/decode.c
-+++ b/arch/arm/probes/decode.c
-@@ -435,6 +435,13 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
- 	 */
- 	asi->stack_space = 0;
- 
-+	/*
-+	 * Similarly to stack_space, register_usage_flags is filled by
-+	 * checkers. Its default value is set to ~0, which is 'all
-+	 * registers are used', to prevent any potential optimization.
-+	 */
-+	asi->register_usage_flags = ~0UL;
-+
- 	if (emulate)
- 		insn = prepare_emulated_insn(insn, asi, thumb);
- 
-diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
-index 06988ef..b9056d6 100644
---- a/arch/arm/probes/kprobes/actions-arm.c
-+++ b/arch/arm/probes/kprobes/actions-arm.c
-@@ -341,4 +341,4 @@ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
- 	[PROBES_LDMSTM] = {.decoder = kprobe_decode_ldmstm}
- };
- 
--const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, NULL};
-+const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, arm_regs_checker, NULL};
-diff --git a/arch/arm/probes/kprobes/checkers-arm.c b/arch/arm/probes/kprobes/checkers-arm.c
-index f817663..7b98173 100644
---- a/arch/arm/probes/kprobes/checkers-arm.c
-+++ b/arch/arm/probes/kprobes/checkers-arm.c
-@@ -97,3 +97,96 @@ const struct decode_checker arm_stack_checker[NUM_PROBES_ARM_ACTIONS] = {
- 	[PROBES_STORE] = {.checker = arm_check_stack},
- 	[PROBES_LDMSTM] = {.checker = arm_check_stack},
- };
-+
-+static enum probes_insn __kprobes arm_check_regs_nouse(probes_opcode_t insn,
-+		struct arch_probes_insn *asi,
-+		const struct decode_header *h)
-+{
-+	asi->register_usage_flags = 0;
-+	return INSN_GOOD;
-+}
-+
-+static enum probes_insn arm_check_regs_normal(probes_opcode_t insn,
-+		struct arch_probes_insn *asi,
-+		const struct decode_header *h)
-+{
-+	u32 regs = h->type_regs.bits >> DECODE_TYPE_BITS;
-+	int i;
-+
-+	asi->register_usage_flags = 0;
-+	for (i = 0; i < 5; regs >>= 4, insn >>= 4, i++)
-+		if (regs & 0xf)
-+			asi->register_usage_flags |= 1 << (insn & 0xf);
-+
-+	return INSN_GOOD;
-+}
-+
-+
-+static enum probes_insn arm_check_regs_ldmstm(probes_opcode_t insn,
-+		struct arch_probes_insn *asi,
-+		const struct decode_header *h)
-+{
-+	unsigned int reglist = insn & 0xffff;
-+	unsigned int rn = (insn >> 16) & 0xf;
-+	asi->register_usage_flags = reglist | (1 << rn);
-+	return INSN_GOOD;
-+}
-+
-+static enum probes_insn arm_check_regs_mov_ip_sp(probes_opcode_t insn,
-+		struct arch_probes_insn *asi,
-+		const struct decode_header *h)
-+{
-+	/* Instruction is 'mov ip, sp' i.e. 'mov r12, r13' */
-+	asi->register_usage_flags = (1 << 12) | (1<< 13);
-+	return INSN_GOOD;
-+}
-+
-+/*
-+ *                                    | Rn |Rt/d|         | Rm |
-+ * LDRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1101 xxxx
-+ * STRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1111 xxxx
-+ *                                    | Rn |Rt/d|         |imm4L|
-+ * LDRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1101 xxxx
-+ * STRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1111 xxxx
-+ *
-+ * Such instructions access Rt/d and its next register, so different
-+ * from others, a specific checker is required to handle this extra
-+ * implicit register usage.
-+ */
-+static enum probes_insn arm_check_regs_ldrdstrd(probes_opcode_t insn,
-+		struct arch_probes_insn *asi,
-+		const struct decode_header *h)
-+{
-+	int rdt = (insn >> 12) & 0xf;
-+	arm_check_regs_normal(insn, asi, h);
-+	asi->register_usage_flags |= 1 << (rdt + 1);
-+	return INSN_GOOD;
-+}
-+
-+
-+const struct decode_checker arm_regs_checker[NUM_PROBES_ARM_ACTIONS] = {
-+	[PROBES_MRS] = {.checker = arm_check_regs_normal},
-+	[PROBES_SATURATING_ARITHMETIC] = {.checker = arm_check_regs_normal},
-+	[PROBES_MUL1] = {.checker = arm_check_regs_normal},
-+	[PROBES_MUL2] = {.checker = arm_check_regs_normal},
-+	[PROBES_MUL_ADD_LONG] = {.checker = arm_check_regs_normal},
-+	[PROBES_MUL_ADD] = {.checker = arm_check_regs_normal},
-+	[PROBES_LOAD] = {.checker = arm_check_regs_normal},
-+	[PROBES_LOAD_EXTRA] = {.checker = arm_check_regs_normal},
-+	[PROBES_STORE] = {.checker = arm_check_regs_normal},
-+	[PROBES_STORE_EXTRA] = {.checker = arm_check_regs_normal},
-+	[PROBES_DATA_PROCESSING_REG] = {.checker = arm_check_regs_normal},
-+	[PROBES_DATA_PROCESSING_IMM] = {.checker = arm_check_regs_normal},
-+	[PROBES_SEV] = {.checker = arm_check_regs_nouse},
-+	[PROBES_WFE] = {.checker = arm_check_regs_nouse},
-+	[PROBES_SATURATE] = {.checker = arm_check_regs_normal},
-+	[PROBES_REV] = {.checker = arm_check_regs_normal},
-+	[PROBES_MMI] = {.checker = arm_check_regs_normal},
-+	[PROBES_PACK] = {.checker = arm_check_regs_normal},
-+	[PROBES_EXTEND] = {.checker = arm_check_regs_normal},
-+	[PROBES_EXTEND_ADD] = {.checker = arm_check_regs_normal},
-+	[PROBES_BITFIELD] = {.checker = arm_check_regs_normal},
-+	[PROBES_LDMSTM] = {.checker = arm_check_regs_ldmstm},
-+	[PROBES_MOV_IP_SP] = {.checker = arm_check_regs_mov_ip_sp},
-+	[PROBES_LDRSTRD] = {.checker = arm_check_regs_ldrdstrd},
-+};
-diff --git a/arch/arm/probes/kprobes/checkers.h b/arch/arm/probes/kprobes/checkers.h
-index bddfa0e..cf6c9e7 100644
---- a/arch/arm/probes/kprobes/checkers.h
-+++ b/arch/arm/probes/kprobes/checkers.h
-@@ -47,6 +47,7 @@ extern const union decode_action stack_check_actions[];
- 
- #ifndef CONFIG_THUMB2_KERNEL
- extern const struct decode_checker arm_stack_checker[];
-+extern const struct decode_checker arm_regs_checker[];
- #else
- #endif
- extern const struct decode_checker t32_stack_checker[];
+There could be a flag in the pinctroller struct indicating whether the
+properties are to be interpreted as strings or as numbers.
+
+> 
+> > Note that the way we combine pin/mux in a single define is not new,
+> > the i.MX pin controller uses this already and so far I'm not aware of
+> > any problems this makes.
+> 
+> Yeah we never had time to sit down and come up with proper
+> generic pin control bindings, we went with custom bindings
+> partly because of general disagreements, partly because I
+> was new to device tree and honestly had no idea of how
+> to skin this cat.
+> 
+> Now that we get to formalize generic bindings for DT and
+> ACPI and whatever alike, I prefer if we make both groupwise
+> and per-pin pin controllers as strict and well defined as
+> possible.
+> 
+> One minor problem I have with using an integer for mux config
+> is that it assumes something about how many pins, configs etc
+> that may exist on such a system. This should be stated
+> explicitly in the bindings atleast so we know what restrictions
+> we build into them. String-based function+group matching has
+> no such restrictions.
+
+No problem, that can be documented. Normally the defines should be used
+anyway, not the plain pin numbers.
+
+BTW one thing I really like about integers is the pure binary size. In
+barebox I also parse the pinmux settings from the device tree. The
+drivers using string matching are multiple times bigger due to the
+string tables:
+
+-rw-r--r-- 1 sha ptx  5436 Jan 13 15:00 imx-iomux-v3.o
+-rw-r--r-- 1 sha ptx 42060 Jan 13 15:00 pinctrl-tegra30.o
+
+Sascha
+
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
