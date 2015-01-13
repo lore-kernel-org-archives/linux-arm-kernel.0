@@ -1,49 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 13 Jan 2015 16:05:57 +0100
-Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel
- isi and ov2640 sensor
-In-Reply-To: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
-References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <54B53455.9050407@atmel.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 13 Jan 2015 23:15:54 +0800
+Subject: [PATCH v3 0/2] ARM: mediatek: Add driver for Mediatek I2C
+ controller
+In-Reply-To: <20150113095725.GC1059@katana>
+References: <1416821928-11453-1-git-send-email-xudong.chen@mediatek.com>
+ <20141124121555.GG3733@katana> <1417096856.12707.59.camel@mtksdaap41>
+ <20141127164536.GC5667@katana> <1418352022.4994.44.camel@mtksdaap41>
+ <20150106133753.GA3754@katana>  <20150113095725.GC1059@katana>
+Message-ID: <1421162154.27675.75.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/01/2015 10:02, Josh Wu a ?crit :
-> This patch series add ISI and ov2640 support on dts files.
+On Tue, 2015-01-13 at 10:57 +0100, Wolfram Sang wrote:
+> On Tue, Jan 06, 2015 at 02:37:53PM +0100, Wolfram Sang wrote:
+> > 
+> > > We've started upstream work for MT8173[1].
+> > > 
+> > > We've fixed these issues for new SoC, and we believe it is fully I2C
+> > > compatible now. We'll add mt8173 support to this driver, so this driver
+> > > will support both fully I2C compatible SoC and the current one.
+> > 
+> > From what you tell, I'd rather add the MT8173 support incrementally.
+> > Let's get first the limited support properly implemented, then add
+> > another controller.
+> > 
+> > I'll send out my draft for describing the quirks later today.
 > 
-> As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
-> So I want to send this dt patch early for a review.
-> 
-> v1 -> v2:
->   1. add one more patch to change the pin name of ISI_MCK
->   2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
->   3. move the common chip parts of ISI node to sama5d3.dtsi.
-> 
-> Bo Shen (3):
->   ARM: at91: dts: sama5d3: split isi pinctrl
->   ARM: at91: dts: sama5d3: add missing pins of isi
->   ARM: at91: dts: sama5d3: move the isi mck pin to mb
-> 
-> Josh Wu (5):
->   ARM: at91: dts: sama5d3: add isi clock
->   ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
->   ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
->   ARM: at91: dts: sama5d3: add ov2640 camera sensor support
->   ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
+> What do you think about my two proposals?
 
-Josh,
+I think the quirks can describe our HW limitation without issue.
+We are porting our i2c driver base on that. Will let you know the test
+result.
+Thanks
 
-It seems that this patch doesn't show up in the series: I only received
-up to 6/8 patches (2 missing?). Can you please send it(them?)?
-
-Bye,
-
->  arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
->  arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
->  arch/arm/configs/sama5_defconfig  |  6 ++++++
->  3 files changed, 61 insertions(+), 9 deletions(-)
-> 
-
-
--- 
-Nicolas Ferre
+Joe.C
