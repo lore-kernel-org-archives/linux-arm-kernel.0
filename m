@@ -1,115 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Jan 2015 16:44:15 +0100
-Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
- references
-In-Reply-To: <1421123484-21387-1-git-send-email-wens@csie.org>
-References: <1421123484-21387-1-git-send-email-wens@csie.org>
-Message-ID: <20150113154415.GY4891@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 13 Jan 2015 15:45:52 +0000
+Subject: CFT: move outer_cache_sync() out of line
+In-Reply-To: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+References: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+Message-ID: <20150113154551.GF16524@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 12, 2015 at 04:36:48PM +0000, Russell King - ARM Linux wrote:
+> The theory is that moving outer_cache_sync() out of line moves the
+> conditional test from multiple sites to a single location, which
+> in turn means that the branch predictor stands a better chance of
+> making the correct decision.
+[...]
+> --- a/arch/arm/mm/l2c-common.c
+> +++ b/arch/arm/mm/l2c-common.c
+> @@ -7,9 +7,17 @@
+>   * published by the Free Software Foundation.
+>   */
+>  #include <linux/bug.h>
+> +#include <linux/export.h>
+>  #include <linux/smp.h>
+>  #include <asm/outercache.h>
+>  
+> +void outer_sync(void)
+> +{
+> +	if (outer_cache.sync)
+> +		outer_cache.sync();
+> +}
 
-On Tue, Jan 13, 2015 at 12:31:24PM +0800, Chen-Yu Tsai wrote:
-> Using label references is preferred when override settings from the
-> included dtsi.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> My AXP221 series touches this file. I thought I'd convert it first.
-> 
-> This looks like a lot of changes. But if you filter out all the
-> indentation changes, it's just the opening lines for each node.
-> 
-> ---
->  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181 ++++++++++++++--------------
->  1 file changed, 88 insertions(+), 93 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-> index ebd5f7854b1b..97dbaeb76416 100644
-> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-> @@ -61,101 +61,96 @@
->  	chosen {
->  		bootargs = "earlyprintk console=ttyS0,115200";
->  	};
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
-> +	vmmc-supply = <&reg_vcc3v0>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	usb1_vbus-supply = <&reg_usb1_vbus>;
-> +	status = "okay";
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	status = "okay";
-> +};
-> +
-> +&pio {
-> +	mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
-> +		allwinner,pins = "PA8";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
-> +};
-> +
-> +&mmc0_pins_a {
-> +	/* external pull-ups missing for some pins */
-> +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +};
-> +
-> +&usb1_vbus_pin_a {
-> +	/* different pin from sunxi-common-regulators */
-> +	allwinner,pins = "PH24";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	/* pull-ups and devices require AXP221 DLDO3 */
-> +	status = "failed";
-> +};
+But don't you end up with two branches now? With an outer cache, I guess
+the additional branch won't be noticed, especially if the prediction on
+the outer_cache.sync() call is better (but that's not a simple
+conditional branch prediction, it relies on predicting the value of the
+pointer, not entirely sure how this works).
 
-I think we should define a convention about how to sort these nodes
-before we actually start merging some of it.
-
-This of course also apply to the other patches doing that, hence why
-Hans is CC'd.
-
-I guess sorting them by label alphabetical order would make
-sense. What do you think?
-
-Maxime
+However, on SoCs without an outer cache (and single kernel image), we
+end up with a permanent branch/return even though such branch would not
+be needed.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/928f1484/attachment-0001.sig>
+Catalin
