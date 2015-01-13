@@ -1,65 +1,163 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 13 Jan 2015 10:36:29 +0000
-Subject: [PATCH 3.19-rc2 v13 4/5] ARM: Add support for on-demand backtrace
- of other CPUs
-In-Reply-To: <20150111183700.55ea2434@gandalf.local.home>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>	<1420469699-25350-1-git-send-email-daniel.thompson@linaro.org>	<1420469699-25350-5-git-send-email-daniel.thompson@linaro.org>	<20150105101925.64e8ecec@gandalf.local.home>	<20150109164801.GW12302@n2100.arm.linux.org.uk>
- <20150111183700.55ea2434@gandalf.local.home>
-Message-ID: <54B4F52D.8010403@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 13 Jan 2015 11:38:14 +0100 (CET)
+Subject: [RFC PATCH] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <1420725159-20720-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <alpine.DEB.2.11.1412162125000.17382@nanos>
+ <1420725159-20720-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <alpine.DEB.2.11.1501131117120.17382@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/15 23:37, Steven Rostedt wrote:
-> On Fri, 9 Jan 2015 16:48:01 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
->> On Mon, Jan 05, 2015 at 10:19:25AM -0500, Steven Rostedt wrote:
->>> On Mon,  5 Jan 2015 14:54:58 +0000
->>> Daniel Thompson <daniel.thompson@linaro.org> wrote:
->>>> +/* For reliability, we're prepared to waste bits here. */
->>>> +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
->>>> +static  cpumask_t printtrace_mask;
->>>> +
->>>> +#define NMI_BUF_SIZE		4096
->>>> +
->>>> +struct nmi_seq_buf {
->>>> +	unsigned char		buffer[NMI_BUF_SIZE];
->>>> +	struct seq_buf		seq;
->>>> +};
->>
->> Am I missing something or does this limit us to 4096 characters of
->> backtrace output per CPU?
->>
->>> This is the same code as in x86. I wonder if we should move the
->>> duplicate code into kernel/printk/ and have it compiled if the arch
->>> requests it (CONFIG_ARCH_WANT_NMI_PRINTK or something). That way we
->>> don't have 20 copies of the same nmi_vprintk() and later find that we
->>> need to change it, and have to change it in 20 different archs.
->>
->> Agreed, though I wonder about the buffer size.
->>
-> 
-> Have we had kernel back traces bigger than that? Since the stack size
-> is limited to page size, it would seem dangerous if backtraces filled
-> up a page size itself, as most function frames are bigger than the
-> typical 60 bytes of data per line.
-> 
-> We could change that hard coded 4096 to PAGE_SIZE, for those archs with
-> bigger pages.
+On Thu, 8 Jan 2015, Boris Brezillon wrote:
+> 1) Is it close to what you had in mind ?
 
-I've just updated the patchset with a couple of patches to common up the
-printk code between arm and x86.
+Yes.
 
-Just for the record I haven't changed the hard coded 4096 as part of
-this. I'd be quite happy to but I didn't want to introduce any "secret"
-changes to the code whilst the patch header claims I am just copying stuff.
+> 2) I'm not sure which part of the code should go where, so don't hesitate
+>    to point out misplaced sections.
 
+Looks sane. Nits below.
 
-Daniel.
+> 3) Do I need to disable the source irq (the one feeding the irqchip) when
+>    entering suspend (and enable it on resume) ?
 
-> Also, if the backtrace were to fill up that much. Most the pertinent
-> data from a back trace is at the beginning of the trace. Seldom do we
-> care about the top most callers (bottom of the output).
-> 
-> -- Steve
-> 
+That probably needs to be part of the dumb mask/unmask functions.,
+i.e. if no demux interrupt is enabled, the source irq should be
+masked.
+
+> 4) I'm not sure of what flags should be set/cleared when mapping an
+>    interrupt. Should I let the caller decide of this config (something
+>    similar to what is done in generic-chip) ?
+
+I don't think you need to set/clear anything. Lets look at that dumb
+demux chip as a real electronic circuit
+
+     	     	  |----------------|
+		  |                |
+     	     	  |  --|Unmasked|--|---- Demux0
+		  |  |             |
+     SRC irq -----|-- -|Unmasked|--|---- Demux1
+		  |  |             |
+     	     	  |  --|Unmasked|--|---- Demux2
+		  |                |
+     	     	  |----------------|
+
+Whether a demultiplexed interrupt is mapped or not is not really
+important. The only relevant information is whether its masked or
+not. So the default state is masked until a demultiplexed interrupt
+gets requested.
+
+> +/**
+> + * enum irq_dumb_demux_flags - Initialization flags for generic irq chips
+> + * @IRQ_DD_INIT_NESTED_LOCK:	Set the lock class of the irqs to nested for
+> + *				irq chips which need to call irq_set_wake() on
+> + *				the parent irq. Usually GPIO implementations
+> + */
+> +enum irq_dumb_demux_flags {
+> +	IRQ_DD_INIT_NESTED_LOCK		= 1 << 0,
+> +};
+> +
+> +/**
+> + * struct irq_chip_dumb_demux - Dumb demultiplexer irq chip data structure
+> + * @domain:		irq domain pointer
+> + * @max_irq:		Last valid irq
+> + * @available:		Bitfield of valid irqs
+> + * @unmasked:		Bitfield containing irqs status
+> + * @flags:		irq_dumb_demux_flags flags
+> + *
+> + * Note, that irq_chip_generic can have multiple irq_chip_type
+> + * implementations which can be associated to a particular irq line of
+> + * an irq_chip_generic instance. That allows to share and protect
+> + * state in an irq_chip_generic instance when we need to implement
+> + * different flow mechanisms (level/edge) for it.
+> + */
+> +struct irq_chip_dumb_demux {
+> +	struct irq_domain *domain;
+> +	int max_irq;
+> +	unsigned long *available;
+> +	unsigned long *unmasked;
+
+Why pointers? A single ulong is certainly enough.
+
+> +/**
+> + *	handle_dumb_demux_irq - Dumb demuxer irq handle function.
+> + *	@irq:	the interrupt number
+> + *	@desc:	the interrupt description structure for this irq
+> + *
+> + *	Dumb demux interrupts are sent from a demultiplexing interrupt handler
+> + *	which is not able to decide which child interrupt interrupt handler
+> + *	should be called.
+> + *
+> + *	Note: The caller is expected to handle the ack, clear, mask and
+> + *	unmask issues if necessary.
+> + */
+> +irqreturn_t
+> +handle_dumb_demux_irq(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	irqreturn_t retval = IRQ_NONE;
+> +
+> +	raw_spin_lock(&desc->lock);
+> +
+> +	if (!irq_may_run(desc))
+> +		goto out_unlock;
+> +
+> +	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
+> +	kstat_incr_irqs_this_cpu(irq, desc);
+> +
+> +	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
+> +		desc->istate |= IRQS_PENDING;
+> +		goto out_unlock;
+> +	}
+> +
+> +	retval = handle_irq_event_no_spurious_check(desc);
+> +
+> +out_unlock:
+> +	raw_spin_unlock(&desc->lock);
+> +
+> +	return retval;
+> +}
+> +EXPORT_SYMBOL_GPL(handle_dumb_demux_irq);
+
+This should go into the new file as well, so it gets compiled out when
+not enabled.
+
+> +static void irq_dumb_demux_mask(struct irq_data *d)
+> +{
+> +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
+> +
+> +	clear_bit(d->hwirq, demux->unmasked);
+> +}
+> +
+> +static void irq_dumb_demux_unmask(struct irq_data *d)
+> +{
+> +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
+> +
+> +	set_bit(d->hwirq, demux->unmasked);
+> +}
+
+So this needs the handling of enabling/disabling the source irq.
+
+> +static struct irq_chip irq_dumb_demux_chip = {
+> +	.name = "dumb-demux-irq",
+> +	.irq_mask = irq_dumb_demux_mask,
+> +	.irq_unmask = irq_dumb_demux_unmask,
+
++	.name		= "dumb-demux-irq",
++	.irq_mask	= irq_dumb_demux_mask,
++	.irq_unmask	= irq_dumb_demux_unmask,
+
+Makes it simpler to read.
+
+> +struct irq_domain_ops irq_dumb_demux_domain_ops = {
+> +	.map	= irq_map_dumb_demux_chip,
+> +	.xlate	= irq_domain_xlate_onecell,
+> +};
+> +EXPORT_SYMBOL(irq_dumb_demux_domain_ops);
+
+SYMBOL_GPL please
+
+Rest looks good.
+
+Thanks,
+
+	tglx
