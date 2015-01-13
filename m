@@ -1,22 +1,55 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 13 Jan 2015 15:56:57 -0500
-Subject: [PATCH] ata: pata_at91: depend on !ARCH_MULTIPLATFORM
-In-Reply-To: <1421173517-21246-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421173517-21246-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150113205657.GF9489@htj.dyndns.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 13 Jan 2015 22:00:55 +0100 (CET)
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <alpine.DEB.2.11.1501132153210.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 07:25:17PM +0100, Alexandre Belloni wrote:
-> Until the driver is corrected to stop using mach/at91isam9_smc.h, it won't
-> compile in a ARCH_MULTIPLATFORM configuration.
-> 
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Tue, 13 Jan 2015, Boris Brezillon wrote:
+> +	ret = irq_set_handler_data(irq, demux);
+> +	if (ret) {
+> +		pr_err("Failed to assign handler data\n");
+> +		goto err_free_domain;
+> +	}
+> +
+> +	irq_set_chained_handler(irq, irq_dumb_demux_handler);
+> +
+> +	/*
+> +	 * Disable the src irq (automatically enabled by
+> +	 * irq_set_chained_handler) to prevent irqs from happening while
+> +	 * nobody requested any of the demuxed irqs.
+> +	 */
+> +	disable_irq(irq);
 
-Applied to libata/for-3.19-fixes.
+We rather prevent the startup of the irq line right away.
 
-Thanks.
+enum {
+     IRQ_CHAINED_NONE,
+     IRQ_CHAINED_STARTUP,
+     IRQ_CHAINED_NOSTARTUP,
+};
 
--- 
-tejun
+-__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
+-                  const char *name);
++__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int chained_mode,
++                  const char *name);
+
+{
+....
+        if (handle != handle_bad_irq && chained_mode) {
+                irq_settings_set_noprobe(desc);
+                irq_settings_set_norequest(desc);
+                irq_settings_set_nothread(desc);
+-               irq_startup(desc, true);
++               if (chained_mode == IRQ_CHAINED_STARTUP)
++                       irq_startup(desc, true);
+	}
+....
+}
+
+Hmm?
+
+	tglx
