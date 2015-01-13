@@ -1,28 +1,52 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 13 Jan 2015 16:56:57 -0500 (EST)
-Subject: [PATCH] rocker: fix harmless warning on 32-bit machines
-In-Reply-To: <4047824.AYNhYQQ6UI@wuerfel>
-References: <4047824.AYNhYQQ6UI@wuerfel>
-Message-ID: <20150113.165657.1171408376100942920.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Jan 2015 22:59:47 +0100
+Subject: [PATCH] tty/isicom: fix big-endian compile warning
+Message-ID: <2188320.G0IBCG4UeO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 13 Jan 2015 15:23:52 +0100
+Building an arm allmodconfig kernel triggers a lengthy but harmless
+warning in the isicom driver:
 
-> The rocker driver tries to assign a pointer to a 64-bit integer
-> and then back to a pointer. This is safe on all architectures,
-> but causes a compiler warning when pointers are shorter than
-> 64-bit:
-> 
-> rocker/rocker.c: In function 'rocker_desc_cookie_ptr_get':
-> rocker/rocker.c:809:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->   return (void *) desc_info->desc->cookie;
->          ^
-> 
-> This adds another cast to uintptr_t to tell the compiler
-> that it's safe.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+drvers/tty/isicom.c: In function 'isicom_send_break':
+uapi/linux/swab.h:13:15: warning: integer overflow in expression [-Woverflow]
+  (((__u16)(x) & (__u16)0x00ffU) << 8) |   \
+               ^
+uapi/linux/swab.h:107:2: note: in expansion of macro '___constant_swab16'
+  ___constant_swab16(x) :   \
+  ^
+uapi/linux/byteorder/big_endian.h:34:43: note: in expansion of macro '__swab16'
+ #define __cpu_to_le16(x) ((__force __le16)__swab16((x)))
+                                           ^
+linux/byteorder/generic.h:89:21: note: in expansion of macro '__cpu_to_le16'
+ #define cpu_to_le16 __cpu_to_le16
+                     ^
+include/asm/io.h:270:6: note: in expansion of macro 'cpu_to_le16'
+      cpu_to_le16(v),__io(p)); })
+      ^
+drivers/tty/isicom.c:1058:2: note: in expansion of macro 'outw'
+  outw((length & 0xff00), base);
+  ^
 
-Applied to net-next, thanks.
+Apparently, the problem is related to the fact that the value 0xff00,
+when used as a 16-bit number, is negative and passed into bitwise
+operands of the generic byte swapping code.
+
+Marking the input argument as unsigned in both technically correct
+and avoids the warning.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/tty/isicom.c b/drivers/tty/isicom.c
+index 59ed783c4bcd..2054427992e0 100644
+--- a/drivers/tty/isicom.c
++++ b/drivers/tty/isicom.c
+@@ -1055,7 +1055,7 @@ static int isicom_send_break(struct tty_struct *tty, int length)
+ 
+ 	outw(0x8000 | ((port->channel) << (card->shift_count)) | 0x3, base);
+ 	outw((length & 0xff) << 8 | 0x00, base);
+-	outw((length & 0xff00), base);
++	outw((length & 0xff00u), base);
+ 	InterruptTheCard(base);
+ 
+ 	unlock_card(card);
