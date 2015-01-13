@@ -1,22 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 14:30:21 +0100
-Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
-In-Reply-To: <54B4F48B.6020206@suse.de>
-References: <54B48D5E.6050902@hisilicon.com> <54B4F350.5040007@hisilicon.com>
- <54B4F48B.6020206@suse.de>
-Message-ID: <5729331.m4QfoTlcib@wuerfel>
+Date: Tue, 13 Jan 2015 14:31:46 +0100
+Subject: [PATCH 2/2] dmaengine: mmp-tdma: fix terminate_all return code
+In-Reply-To: <2099590.pAO9NcseBT@wuerfel>
+References: <2099590.pAO9NcseBT@wuerfel>
+Message-ID: <9755822.HDlnFBj4xE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 January 2015 11:33:47 Alexander Graf wrote:
-> 
-> The "real" solution to all of this would be proper PSCI calls, but I'd
-> rather not be the one implementing all of the frameworks for it :). And
-> I'm not it's worth the effort for a 32bit platform that basically works
-> now with bootwrapper living in SRAM.
-> 
+In a recent cleanup, the mmp_tdma_terminate_all function was
+introduced but does not set a proper return value. Almost
+no slave driver uses that return value, but if one does, the
+result will be undefined, which the compiler warns about:
 
-That would still leave the same problem, since we'd still need to deal
-with old firmware that does not have PSCI.
+dma/mmp_tdma.c: In function 'mmp_tdma_terminate_all':
+dma/mmp_tdma.c:474:1: warning: no return statement in function returning non-void [-Wreturn-type]
 
-	Arnd
+This changes the driver to return zero, like most other
+drivers do.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: f43a6fd400ba6 ("dmaengine: mmp-tdma: Split device_control")
+
+diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
+index 91fb241102f7..70c2fa9963cd 100644
+--- a/drivers/dma/mmp_tdma.c
++++ b/drivers/dma/mmp_tdma.c
+@@ -471,6 +471,8 @@ static int mmp_tdma_terminate_all(struct dma_chan *chan)
+ 	mmp_tdma_disable_chan(chan);
+ 	/* disable interrupt */
+ 	mmp_tdma_enable_irq(tdmac, false);
++
++	return 0;
+ }
+ 
+ static int mmp_tdma_config(struct dma_chan *chan,
