@@ -1,46 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 18:03:25 -0800
-Subject: [PATCH] ARM: at91/Documentation: add a README for Atmel SoCs
-In-Reply-To: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150113020325.GB28758@quad.lixom.net>
+Date: Mon, 12 Jan 2015 18:05:48 -0800
+Subject: [PATCH 2/2] arm: dts: disable CCI on exynos420 based arndale-octa
+In-Reply-To: <1420859496-27533-2-git-send-email-a.kesavan@samsung.com>
+References: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
+ <1420859496-27533-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <20150113020548.GC28758@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 02:20:31PM +0100, Nicolas Ferre wrote:
-> Add a README file to describe Atmel SoCs (aka AT91) support in Mainline Linux:
-> - SoC list + datasheet web links
-> - Basic but useful information
-> - Device Tree conventions and Work In Progress statement.
+On Sat, Jan 10, 2015 at 08:41:36AM +0530, Abhilash Kesavan wrote:
+> The arndale-octa board was giving "imprecise external aborts" during
+> boot-up with MCPM enabled. CCI enablement of the boot cluster was found
+> to be the cause of these aborts (possibly because the secure f/w was not
+> allowing it). Hence, disable CCI for the arndale-octa board.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: ARM Maintainers <arm@kernel.org>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Tested-by: Tyler Baker <tyler.baker@linaro.org>
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Applied 1-2 to fixes for 3.19.
 
-With the understanding that:
+Fixed two typos (arm->ARM in subject, and 420->5420).
 
-> +Device Tree for AT91 SoCs and boards
-> +------------------------------------
-> +All AT91 SoCs are converted to Device Tree. Since Linux 3.19, these products
-> +must use this method to boot the Linux kernel.
-> +
-> +Work In Progress statement:
-> +Device Tree files and Device Tree bindings that apply to AT91 SoCs and boards are
-> +considered as "Unstable". To be completely clear, any at91 binding can change at
-> +any time. So, be sure to use a Device Tree Binary and a Kernel Image generated from
-> +the same source tree.
-> +Please refer to the Documentation/devicetree/bindings/ABI.txt file for a
-> +definition of a "Stable" binding/ABI.
-> +This statement will be removed by AT91 MAINTAINERS when appropriated.
 
-While this statement is here, at the end of the day if you break a user
-you're responsible for fixing them. I.e. if a tree falls in the forest
-and nobody notices, then so be it.
-
-But you can't break existing users and point to this and get away with
-it. However, hopefully based on this doc users will go with practices
-that means that you can revise bindings if you have to.
-
+Thanks,
 
 -Olof
