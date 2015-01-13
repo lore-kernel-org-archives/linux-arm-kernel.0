@@ -1,34 +1,109 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 09:33:14 +0100
-Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
-In-Reply-To: <54B48D5E.6050902@hisilicon.com>
-References: <54B48D5E.6050902@hisilicon.com>
-Message-ID: <9190510.INCMcmsads@wuerfel>
+From: r.peniaev@gmail.com (Roman Peniaev)
+Date: Tue, 13 Jan 2015 17:35:20 +0900
+Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
+ thread_info->syscall
+In-Reply-To: <20150112183955.GO13360@arm.com>
+References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
+ <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
+ <20150112183955.GO13360@arm.com>
+Message-ID: <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 January 2015 11:13:34 Wei Xu wrote:
-> There is 8MB SRAM in hip04.
-> Moving the bootwrapper into SRAM could avoid to worry about poking
-> holes into DRAM memory or allocation algorithms either.
-> 
-> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
-> ---
->  arch/arm/boot/dts/hip04.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-> index 2388145..f0dfac7 100644
-> --- a/arch/arm/boot/dts/hip04.dtsi
-> +++ b/arch/arm/boot/dts/hip04.dtsi
-> @@ -22,7 +22,7 @@
->  
->         bootwrapper {
->         compatible = "hisilicon,hip04-bootwrapper";
-> -       boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
-> +       boot-method = <0xe00f0000 0x10000>, <0xe0000100 0x1000>;
->         };
+On Tue, Jan 13, 2015 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
+>> thread_info->syscall is used only for ptrace, but syscall number
+>> is also used by syscall_get_nr and returned to userspace by the
+>> following proc file access:
+>>
+>>  $ cat /proc/self/syscall
+>>  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
+>>  ^
+>> The first number is the syscall number, currently it is zero.
+>> Patch fixes this:
+>>
+>>  $ cat /proc/self/syscall
+>>  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
+>>  ^
+>> Right, read syscall
+>
+> Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
+> the /proc code requires syscall_get_nr to work regardless of
+> TIF_SYSCALL_TRACE.
+>
+>> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: stable at vger.kernel.org
+>> ---
+>>  arch/arm/kernel/asm-offsets.c  | 1 +
+>>  arch/arm/kernel/entry-common.S | 1 +
+>>  2 files changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+>> index 2d2d608..6911bad 100644
+>> --- a/arch/arm/kernel/asm-offsets.c
+>> +++ b/arch/arm/kernel/asm-offsets.c
+>> @@ -70,6 +70,7 @@ int main(void)
+>>    DEFINE(TI_CPU,             offsetof(struct thread_info, cpu));
+>>    DEFINE(TI_CPU_DOMAIN,              offsetof(struct thread_info, cpu_domain));
+>>    DEFINE(TI_CPU_SAVE,                offsetof(struct thread_info, cpu_context));
+>> +  DEFINE(TI_SYSCALL,         offsetof(struct thread_info, syscall));
+>>    DEFINE(TI_USED_CP,         offsetof(struct thread_info, used_cp));
+>>    DEFINE(TI_TP_VALUE,                offsetof(struct thread_info, tp_value));
+>>    DEFINE(TI_FPSTATE,         offsetof(struct thread_info, fpstate));
+>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+>> index f8ccc21..89452ff 100644
+>> --- a/arch/arm/kernel/entry-common.S
+>> +++ b/arch/arm/kernel/entry-common.S
+>> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
+>>  #endif
+>>
+>>  local_restart:
+>> +     str scno, [tsk, #TI_SYSCALL]            @ set syscall number
+>>       ldr     r10, [tsk, #TI_FLAGS]           @ check for syscall tracing
+>>       stmdb   sp!, {r4, r5}                   @ push fifth and sixth args
+>
+> Do we definitely want to update scno on syscall restarting?
 
-Is this backwards compatible with old firmware?
 
-	Arnd
+Good question.
+
+First thing to mention is __sys_trace will trace 'restart_syscall',
+not the real syscall we are going to restart.
+
+E.g. in test application we do infinite poll and then send STOP and
+CONT to this app:
+
+    test-243   [002] ...1  1792.067726: sys_enter: NR 168 (0, 0,
+ffffffff, 0, 0, 0)
+    test-243   [002] ...1  1802.299073: sys_exit: NR 168 = -516
+    test-243   [004] ...1  1814.716264: sys_enter: NR 0 (0, 0,
+ffffffff, 0, 0, 0)
+    test-243   [004] ...1  2183.687225: sys_exit: NR 0 = -516
+
+the poll was restarted and trace shows that we are in restart_syscall.
+
+Is that expected?
+
+And the second thing is that my next patch did some tweaks in
+'syscall_trace_enter', where we take scno not from param we passed,
+but from thread_info->syscall we previously set.
+
+So, regarding your question, if I set scno only once - I will break
+previous behavior, and __sys_trace will trace the syscall we restarted.
+
+And I think this is what we need, because according to the
+'syscall_trace_enter' code we do 'secure_computing' and
+'audit_syscall_entry', which definitely expect original syscall, not
+the 'restart_syscall'.
+
+
+--
+Roman
