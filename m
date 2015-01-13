@@ -1,113 +1,51 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 13 Jan 2015 09:14:41 -0800
-Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
-In-Reply-To: <CACRpkdbW5P=w0CPYYf_gfBuD7W0WOdAYCKpTXM5MsK9mdYDc5w@mail.gmail.com>
-References: <rjui@broadcom.com>	<1417131990-17954-1-git-send-email-rjui@broadcom.com>	<1417131990-17954-2-git-send-email-rjui@broadcom.com>	<CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>	<54B01D44.5080601@broadcom.com>
- <CACRpkdbW5P=w0CPYYf_gfBuD7W0WOdAYCKpTXM5MsK9mdYDc5w@mail.gmail.com>
-Message-ID: <54B55281.2050004@broadcom.com>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Tue, 13 Jan 2015 22:46:27 +0530
+Subject: [PATCH v5 2/2] i2c: cadence: Check for errata condition involving
+ master receive
+In-Reply-To: <20150113113538.GB7660@katana>
+References: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
+ <1418357907-4215-3-git-send-email-harinik@xilinx.com>
+ <20150113113538.GB7660@katana>
+Message-ID: <CAFcVECK6qYd=6MW=EPWpUHVbQRCVEpE21r15DUwVtZXyBQBoUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Tue, Jan 13, 2015 at 5:05 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> @@ -541,6 +541,18 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>>        * processed with a repeated start.
+>>        */
+>>       if (num > 1) {
+>> +             /*
+>> +              * This controller does not give completion interrupt after a
+>> +              * master receive transfer if HOLD bit is set (repeated start),
+>> +              * resulting in SW timeout. Hence, if a receive transfer is
+>> +              * followed by any other transfer, an error is returned
+>> +              * indicating that this sequence is not supported.
+>> +              */
+>> +             for (count = 0; count < num-1; count++) {
+>> +                     if (msgs[count].flags & I2C_M_RD)
+>> +                             dev_warn(adap->dev.parent, "No support for repeated start when receive is followed by a transfer\n");
+>> +                             return -EOPNOTSUPP;
+>> +             }
+>>               id->bus_hold_flag = 1;
+>>               reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
+>>               reg |= CDNS_I2C_CR_HOLD;
+>
+> Have you ever tested this code? There is a huge bug in it :(
 
-On 1/13/2015 12:20 AM, Linus Walleij wrote:
-> On Fri, Jan 9, 2015 at 7:26 PM, Ray Jui <rjui@broadcom.com> wrote:
->> On 1/9/2015 2:12 AM, Linus Walleij wrote:
-> 
->>> Just use "groups" and "function" and refer to
->>> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>>
->>> Then "alt1", "alt2" etc are non-functional names of functions.
->>> Use the real function names, like "spi0" or so. This
->>> alt-business seems to be just a shortcut to make it
->>> simple, don't do that.
->>>
->>> Then you use e.g. "spi0" as a group name. I prefer you
->>> call that "spi0_grp" or something to say it is a group of
->>> pins associated with spi0, as spi0 is actually the
->>> function.
->>>
->> Hmmm, I did this by following brcm,bcm11351-pinctrl.txt:
->> - function: String. Specifies the pin mux selection. Values must be one
->> of: "alt1", "alt2", "alt3", "alt4"
->>
->> But you are right, in the pinctrl binding document it describes the
->> generic pin multiplexing nodes use "function" and "group".
-> 
-> Note "function" and "groups". Note groups is pluralis. You can
-> select multiple groups for a single function.
-> 
->> For example, the group "lcd" covers 30 pins. When I configure "lcd" to
->> alternate function 1, all 30 pins are muxed to LCD function. When
->> configured to function 2, all pins are muxed to SRAM function. Now, here
->> comes the issue, when configured to function 3, pins 1-15 and 20-30
->> become GPIO function, but pins 16-19 becomes SPI5 function. When it's
->> configured to function 4, all 30 pins become GPIO.
-> 
-> I would split the use case in two groups for LCD and SRAM,
-> and three groups for GPIO:
-> "lcd_grp", "sram_grp", "gpio-1-15_grp",
-> "gpio-16-19_grp", "gpio-20-30_grp", "spi5_grp"
-> 
+I'm sorry. I'll send another patch with the braces for the if statement.
+I seem to have tested with only the return statement and no dev_warn.
 
-> Valid combinations become
-> 
-> function = "lcd"
-> groups = "lcd_grp";
-> 
-> function = "sram"
-> groups = "sram_grp"
-> 
-> For all GPIO only this:
-> 
-> function = "gpio"
-> groups = "gpio-1-16_grp", "gpio-16-19_grp", "gpio-20-30_grp"
-> 
-> For a combined GPIO+SPI:
-> 
-> function = "gpio"
-> groups = "gpio-1-16_grp", "gpio-20-30_grp"
-> 
-> function = "spi5"
-> groups = "spi5_grp"
-> 
-> The pinctrl runtile will protest if you try to combine spi5_grp
-> with gpio-16-19_grp.
-> 
-Okay this makes sense. Thanks.
+>
+> Also, in the comment, use "message" instead of "transfer". One transfer
+> consists of multiple messages.
+>
+> Maybe the warning can be simplified, too: "can't do repeated start after
+> read messages".
+>
+I'll do that.
 
->> In some other cases, when I configure a group to other functions, there
->> could be spare pins which become unused (not brought out to the pad).
->> Or, the spare pins may also become a separate function.
-> 
-> That's cool.
-> 
->> Based on the LCD example, I'd assume I would do the following for the
->> default LCD function:
->>
->> lcd_node {
->>         group = "lcd_grp";
->>         function = "lcd";
->> };
->>
->> And in the case of function 3, I would call the function "spi5" and
->> assume the rest of pins become either GPIO (or unused)?
->>
->> spi5_node {
->>         group = "lcd_grp";
->>         function = "spi5";
->> };
-> 
-> Looks cool per above.
-> 
-> You need some clever code in the driver to handle double-configuration
-> of registers and so on, but I think it can be done.
-Let me see what I can come up with.
-
-> 
-> Using pin control as a GPIO backend can be a bit tricky and will need
-> some testing and elaboration, but the subsystem will block collisions.
-> 
-> Yours,
-> Linus Walleij
-> 
+Regards,
+Harini
