@@ -1,36 +1,68 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 13 Jan 2015 09:05:29 +0800
-Subject: [PATCH v2 1/4] tty: serial: Add 8250 earlycon to support
- noinit option
-In-Reply-To: <1421078918.31978.32.camel@linux.intel.com>
-References: <1421068104-30463-1-git-send-email-eddie.huang@mediatek.com>
- <1421068104-30463-2-git-send-email-eddie.huang@mediatek.com>
- <3712986.8SuKNvhKTk@wuerfel>  <1421078918.31978.32.camel@linux.intel.com>
-Message-ID: <1421111129.10374.4.camel@mtksdaap41>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 13 Jan 2015 02:05:38 +0100
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+In-Reply-To: <20150113112016.2db3f982@canb.auug.org.au>
+References: <20150113112016.2db3f982@canb.auug.org.au>
+Message-ID: <20150113010538.GA2434@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Mon, 2015-01-12 at 16:08 +0000, Alan Cox wrote:
-> On Mon, 2015-01-12 at 16:35 +0100, Arnd Bergmann wrote:
-> > On Monday 12 January 2015 21:08:21 Eddie Huang wrote:
-> > > Add earlycon support not only baudrate option, but also add noinit option.
-> > > If use noinit option, 8250 earlycon will not init serial hardware and use
-> > > loader setting.
-> > > 
-> > > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > 
-> > I probably missed something in the previous discussion, but why is
-> > "noinit" not just the default? I believe that is how we handle early
-> > serial ports on PowerPC, and I see no downsides to it.
+On Tue, Jan 13, 2015 at 11:20:16AM +1100, Stephen Rothwell wrote:
+> Hi all,
 > 
-> Most PC hardware at least needs the port initialised to use it. It won't
-> have been configured by the firmware in many cases.
+> Today's linux-next merge of the mvebu tree got a conflict in
+> arch/arm/boot/dts/Makefile between commit 6f1650f15bc4 ("ARM: dts: Only
+> build dtb if associated Arch and/or SoC is enabled") from the arm-soc
+> tree and commit dd7d2be1d2b8 ("Kirkwood: add support for Seagate
+> BlackArmor NAS220") from the mvebu tree.
 > 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/boot/dts/Makefile
+> index abb810f1fe29,17ee1d6a0ac0..000000000000
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@@ -112,24 -101,18 +112,25 @@@ dtb-$(CONFIG_ARCH_EXYNOS5) += 
+>   	exynos5440-sd5v1.dtb \
+>   	exynos5440-ssdk5440.dtb \
+>   	exynos5800-peach-pi.dtb
+>  -dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
+>  -dtb-$(CONFIG_ARCH_HIX5HD2) += hisi-x5hd2-dkb.dtb
+>  -dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>  +dtb-$(CONFIG_ARCH_HI3xxx) += \
+>  +	hi3620-hi4511.dtb
+>  +dtb-$(CONFIG_ARCH_HIX5HD2) += \
+>  +	hisi-x5hd2-dkb.dtb
+>  +dtb-$(CONFIG_ARCH_HIGHBANK) += \
+>  +	highbank.dtb \
+>   	ecx-2000.dtb
+>  -dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
+>  -dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+>  +dtb-$(CONFIG_ARCH_HIP04) += \
+>  +	hip04-d01.dtb
+>  +dtb-$(CONFIG_ARCH_INTEGRATOR) += \
+>  +	integratorap.dtb \
+>   	integratorcp.dtb
+>  -dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
+>  +dtb-$(CONFIG_ARCH_KEYSTONE) += \
+>  +	k2hk-evm.dtb \
+>   	k2l-evm.dtb \
+>   	k2e-evm.dtb
+>  -dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
+>  +dtb-$(CONFIG_MACH_KIRKWOOD) += \
+>  +	kirkwood-b3.dtb \
+> + 	kirkwood-blackarmor-nas220.dtb \
+>   	kirkwood-cloudbox.dtb \
+>   	kirkwood-d2net.dtb \
+>   	kirkwood-db-88f6281.dtb \
 
-Sorry no continue discuss in previous series. Since other 8250 user may
-already depend on current init behavior, I think it's better to keep it
-and add noinit by extra setting.
+Hi Stephen
 
-Eddie 
+Thanks for the fixup.
+
+       Andrew
