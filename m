@@ -1,92 +1,94 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 13 Jan 2015 12:16:36 +0530
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <20150112173005.GK13360@arm.com>
-References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
- <54AEBE45.9080203@redhat.com> <20150109154635.GG11258@arm.com>
- <54B00C39.1070809@redhat.com> <20150112173005.GK13360@arm.com>
-Message-ID: <54B4BF4C.2030009@redhat.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 13 Jan 2015 14:48:51 +0800
+Subject: CFT: move outer_cache_sync() out of line
+In-Reply-To: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+References: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+Message-ID: <20150113144851.1944cf0d@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
+On Mon, 12 Jan 2015 08:36:48 -0800
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-On Monday 12 January 2015 11:00 PM, Will Deacon wrote:
-> On Fri, Jan 09, 2015 at 05:13:29PM +0000, Pratyush Anand wrote:
->>
->>
->> On Friday 09 January 2015 09:16 PM, Will Deacon wrote:
->>> On Thu, Jan 08, 2015 at 05:28:37PM +0000, Pratyush Anand wrote:
->>>> On Thursday 08 January 2015 09:53 PM, Will Deacon wrote:
->>>>> On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
->>>>>> I am trying to test following scenario, which seems valid to me. But I
->>>>>> am very new to ARM64 as well as to debugging tools, so seeking expert's
->>>>>> comment here.
->>>>>>
->>>>>> -- I have inserted a kprobe to the function uprobe_breakpoint_handler
->>>>>> which is called from elo_dbg
->>>>>> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
->>>>>>
->>>>>> -- kprobe is enabled.
->>>>>>
->>>>>> -- an uprobe is inserted into a test application and enabled.
->>>>>>
->>>>>> So, when uprobe is enabled and test code execution reaches to probe
->>>>>> instruction, it executes uprobe breakpoint instruction and el0_dbg
->>>>>> exception is raised.
->>>>>>
->>>>>> When control reaches to start of uprobe_breakpoint_handler and it
->>>>>> executes first instruction (which has been replaced with a kprobe
->>>>>> breakpoint instruction), el1_dbg exception is raised.
->>>>>
->>>>> Hmm, debug exceptions should be masked at this point so I don't see why
->>>>> you're taking the second debug exception.
->>>>>
->>>>
->>>> So, you mean to say that when an exception which has been taken from
->>>> lower exception level (EL0) is being executed, then we keep masked also
->>>> the exception from current exception level (EL1)...
->>>
->>> Yeah, if you look at entry.S then you'll see that neither el0_dbg or el1_dbg
->>> re-enable debug exceptions (masked automatically by the CPU after taking the
->>> exception) until *after* the handling has completed. This is to prevent
->>> recursive debug exceptions, which I don't see how we can reasonable handle.
->>
->> May be I am missing something, but my observation on silicon is
->> different. Please have a look at git log of HEAD of following branch,
->> which says that el1_dbg exception has been raised while el0_dbg was
->> executing. Do not know what I am missing..
->>
->> https://github.com/pratyushanand/linux/tree/ml_arm64_uprobe_devel_debug_kprobe_insertion_at_uprobe_breakpoint_handler
->
-> That page just says "Failed to load latest commit information." for me.
+> The theory is that moving outer_cache_sync() out of line moves the
+> conditional test from multiple sites to a single location, which
+> in turn means that the branch predictor stands a better chance of
+> making the correct decision.
+> 
+> However, I'm a hardware pauper - I have the choice of testing this
+> on iMX6 (which seems to have bus limitations, and seems to produce
+> a wide variation on measured performance which makes it hard to
+> evaluate any differences) or the Versatile Express, which really is
+> not suitable for making IO performance measurements.
+> 
+> So, without help from people with "good" hardware, I can't evaluate
+> the performance impact of this change.  Anyone willing to do some
+> performance testing on this and feedback any numbers?
 
-may be you can fetch https://github.com/pratyushanand/linux.git and can 
-see git log of HEAD of 
-ml_arm64_uprobe_devel_debug_kprobe_insertion_at_uprobe_breakpoint_handler.
+I applied your patch into marvell internal bsp tree, then did a basic emmc
+performance test via. dd cmd, the performance is improved by 0.13%
+the sdhc host driver is drivers/mmc/host/sdhci-pxav3.c, I'm not sure
+it make use of a lot of non-relaxed IO accessors.
 
-Or, you can apply attached patches on top of v3.18 kernel.
-
->
-> Regardless, I think you need to debug further and found out if PSTATE.D is
-> getting cleared and, if so, who is responsible for that. Somebody could be
-> enabling IRQs, for example, which will then unmask debug exceptions in
-> el1_irq.
->
-
-
-This is what I see for pstate, When el0_dbg exception is raised (ie an 
-exception raised with ESR = ESR_EL1_EC_BRK64 after executing instruction 
-BRK64_OPCODE_UPROBES = 0xD4200100 in EL0, user mode), spsr_el1 value is 
-0x80000000. Which means, all exceptions are unmasked. Is it expected?
-
-
-~Pratyush
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: uprobe_kprobe_patches_over_v3.18.tar.bz2
-Type: application/x-bzip
-Size: 26669 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/4cbfc661/attachment-0001.bin>
+> 
+> Obviously, drivers which make use of a lot of non-relaxed IO accessors
+> will be most affected by this - so you really have to know your
+> drivers when deciding how to evaluate this (sorry, I can't say "measure
+> network bandwidth" or "measure SSD sata performance" is a good test.)
+> 
+> Theoretically, this should help overall system performance, since the
+> branch predictor should be able to predict this better, but it's entirely
+> possible that trying to benchmark a single workload won't be measurably
+> different.
+> 
+> In terms of kernel size figures, this change alone saves almost 17K of
+> 10MB of kernel text on my iMX6 kernels - which is bordering on
+> insignificant since that's not quite a 0.2% saving.
+> 
+> So... right now I can't justify this change, but I'm hoping some can come
+> up with some figures which shows that it benefits their workload without
+> causing a performance regression for others.
+> 
+> diff --git a/arch/arm/include/asm/outercache.h
+> b/arch/arm/include/asm/outercache.h index 891a56b35bcf..807e4e71c8e7 100644
+> --- a/arch/arm/include/asm/outercache.h
+> +++ b/arch/arm/include/asm/outercache.h
+> @@ -133,11 +133,7 @@ static inline void outer_resume(void) { }
+>   * Ensure that all outer cache operations are complete and any store
+>   * buffers are drained.
+>   */
+> -static inline void outer_sync(void)
+> -{
+> -	if (outer_cache.sync)
+> -		outer_cache.sync();
+> -}
+> +extern void outer_sync(void);
+>  #else
+>  static inline void outer_sync(void)
+>  { }
+> diff --git a/arch/arm/mm/l2c-common.c b/arch/arm/mm/l2c-common.c
+> index 10a3cf28c362..b1c24c8c1eb9 100644
+> --- a/arch/arm/mm/l2c-common.c
+> +++ b/arch/arm/mm/l2c-common.c
+> @@ -7,9 +7,17 @@
+>   * published by the Free Software Foundation.
+>   */
+>  #include <linux/bug.h>
+> +#include <linux/export.h>
+>  #include <linux/smp.h>
+>  #include <asm/outercache.h>
+>  
+> +void outer_sync(void)
+> +{
+> +	if (outer_cache.sync)
+> +		outer_cache.sync();
+> +}
+> +EXPORT_SYMBOL(outer_sync);
+> +
+>  void outer_disable(void)
+>  {
+>  	WARN_ON(!irqs_disabled());
+> 
+> 
