@@ -1,166 +1,100 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Jan 2015 10:40:36 +0100
-Subject: [PATCH v3 4/9] ARM: dts: sun7i: cubieboard2: add axp209
- regulator nodes
-In-Reply-To: <CAGb2v66r6EG2F1-=Gaig7ZW58Z1KteQ5nDPfW5niisv7dCjY0Q@mail.gmail.com>
-References: <1421037249-28461-1-git-send-email-wens@csie.org>
- <1421037249-28461-5-git-send-email-wens@csie.org>
- <20150112090603.GE4891@lukather>
- <CAGb2v66r6EG2F1-=Gaig7ZW58Z1KteQ5nDPfW5niisv7dCjY0Q@mail.gmail.com>
-Message-ID: <20150113094036.GR4891@lukather>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Tue, 13 Jan 2015 10:48:47 +0100
+Subject: [RFC PATCH v2 2/4] serial: mxs-auart: Use helpers for gpio irqs
+In-Reply-To: <20150113093524.GI22880@pengutronix.de>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
+ <20150113080817.GG22880@pengutronix.de> <54B4E588.5010602@elproma.com.pl>
+ <20150113093524.GI22880@pengutronix.de>
+Message-ID: <54B4E9FF.5090003@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, Jan 12, 2015 at 05:38:12PM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Mon, Jan 12, 2015 at 5:06 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Chen-Yu,
-> >
-> > On Mon, Jan 12, 2015 at 12:34:04PM +0800, Chen-Yu Tsai wrote:
-> >> This patch adds the regulator nodes for the axp209 by including
-> >> the axp209 dtsi. As the inputs of these regulators are from the
-> >> axp209's PS output, which is basically just a mux over the 2
-> >> inputs, it is considered to be unregulated. Thus we do not provide
-> >> input supply properties for them.
-> >>
-> >> The regulator names and constraints are based on the board
-> >> schematics and the SoC datasheet.
-> >>
-> >> DCDC2 is used as the cpu power supply. This patch also references
-> >> it from the cpu node.
-> >>
-> >> Also get rid of axp209 properties already set in axp209.dtsi.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>
-> >> changes since v2
-> >>
-> >>     none
-> >>
-> >> changes since v1:
-> >>
-> >>     - Use preprocessor include for axp209.dtsi
-> >>     - Remove incorrectly squashed axp209.dtsi patch
-> >>
-> >> ---
-> >>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 35 +++++++++++++++++++++++++----
-> >>  1 file changed, 31 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> >> index 18fc5db9c976..ec1fc2c8b3e3 100644
-> >> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> >> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-> >> @@ -88,13 +88,9 @@
-> >>                       status = "okay";
-> >>
-> >>                       axp209: pmic at 34 {
-> >> -                             compatible = "x-powers,axp209";
-> >>                               reg = <0x34>;
-> >>                               interrupt-parent = <&nmi_intc>;
-> >>                               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> >> -
-> >> -                             interrupt-controller;
-> >> -                             #interrupt-cells = <1>;
-> >>                       };
-> >>               };
-> >>
-> >> @@ -145,3 +141,34 @@
-> >>               status = "okay";
-> >>       };
-> >>  };
-> >> +
-> >> +#include "axp209.dtsi"
-> >> +
-> >> +&cpu0 {
-> >> +     cpu-supply = <&reg_dcdc2>;
-> >> +};
-> >> +
-> >> +&reg_dcdc2 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <1000000>;
-> >> +     regulator-max-microvolt = <1450000>;
-> >> +     regulator-name = "vdd-cpu";
-> >> +};
-> >> +
-> >> +&reg_dcdc3 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <1000000>;
-> >> +     regulator-max-microvolt = <1400000>;
-> >> +     regulator-name = "vdd-int-dll";
-> >> +};
-> >> +
-> >> +&reg_ldo1 {
-> >> +     regulator-name = "vdd-rtc";
-> >> +};
-> >> +
-> >> +&reg_ldo2 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <3000000>;
-> >> +     regulator-max-microvolt = <3000000>;
-> >> +     regulator-name = "avcc";
-> >> +};
-> >
-> > How do reg_vcc3v3 and the other reg used in this DT (ahci, USB) fit
-> > into that?
-> 
-> The following applies to boards that use AXP209.
-> 
-> reg_vcc3v3 or reg_vcc3v0 is an external buck regulator with it's
-> enable pin tied to EXTEN on the AXP. This pin is controllable,
-> but we do not have the driver for it. It is possible that multiple
-> regulators are tied to this pin. I suggest not touching it without
-> the correct schematics.
-> 
-> The source for usb and ahci regulators, or reg_vcc5v if you will,
-> is either the unregulated 5v from the power supply or the usb otg
-> port. For the Cubietruck, there's an additional uncontrollable
-> boost regulator that boosts the lipo battery's power up to 5v.
-> 
-> On some of the Olimex boards that use higher input voltages, they
-> use an uncontrollable buck regulator to step down the voltage to
-> 5v. The Olinuxino-Micro also has a boost regulator for the battery,
-> tied to EXTEN.
-> 
-> The AXP209 simply does not have enough outputs for all the needed
-> voltages.
+W dniu 2015-01-13 o 10:35, Uwe Kleine-K?nig pisze:
+> Hello,
+>
+> On Tue, Jan 13, 2015 at 10:29:44AM +0100, Janusz U?ycki wrote:
+>> W dniu 2015-01-13 o 09:08, Uwe Kleine-K?nig pisze:
+>>> Hello,
+>>>
+>>> On Sat, Jan 10, 2015 at 03:32:44PM +0100, Janusz Uzycki wrote:
+>>>> The patch updates mxs-auart driver to use new mctrl_gpio helpers for
+>>>> gpio irqs. The code is much simpler now.
+>>>>
+>>>> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+>>>> ---
+>>>>
+>>>> There is no changes since v1 (rebased only).
+>>>>
+>>>> ---
+>>>>   drivers/tty/serial/mxs-auart.c | 133 ++++-------------------------------------
+>>>>   1 file changed, 13 insertions(+), 120 deletions(-)
+>>> Very nice!
+>>>
+>>>> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+>>>> index ec553f8..2ddba69 100644
+>>>> --- a/drivers/tty/serial/mxs-auart.c
+>>>> +++ b/drivers/tty/serial/mxs-auart.c
+>>>> [...]
+>>>> @@ -483,18 +458,9 @@ static void mxs_auart_enable_ms(struct uart_port *port)
+>>>>   	s->ms_irq_enabled = true;
+>>>> -	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
+>>>> -		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
+>>>> -	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
+>>>> -
+>>>> -	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
+>>>> -		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
+>>>> -
+>>>> -	if (s->gpio_irq[UART_GPIO_RI] >= 0)
+>>>> -		enable_irq(s->gpio_irq[UART_GPIO_RI]);
+>>>> -
+>>>> -	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
+>>>> -		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
+>>>> +	mctrl_gpio_enable_ms(s->gpios);
+>>>> +	/* TODO: enable AUART_INTR_CTSMIEN
+>>>> +	 * if s->gpios->irq[UART_GPIO_CTS] == 0 */
+>>> What is the problem here? For the other lines nothing needs to be done?
+>>> This comment doesn't match the coding style.
+>> Right, the comment should be rather:
+>> /* TODO: enable AUART_INTR_CTSMIEN
+>>   * if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS)) */
+> I'd say:
+>
+> 	/*
+> 	 * TODO: enable AUART_INTR_CTSMIEN if CTS isn't handled by
+> 	 * mctrl_gpio.
+> 	 */
 
-Hmm, yes, ok. It makes sense.
+exactly, thanks
 
-> You could probably chain the regulators in the DT via xxx-supply
-> if it helps. But beyond that, it is hard to do anything meaningful
-> at this point. Modeling them as fixed regulators beyond our control
-> is simpler. We also do not have an IPSOUT regulator for the AXP.
-> 
-> > Eventually, I think we would be able to remove
-> > sunxi-common-regulators.dtsi, or at least, expose the proper regulator
-> > hierarchy.
-> 
-> The USB and SATA regulators are just GPIO enabled switches (MOSFETs)
-> or current limiters. I think these will always exist because of the
-> reference designs. Or do you want to move them back into the board
-> dts files? FWIW, I like it the way it is now. Not that I don't like
-> it to be accurate.
+>
+>> In this place I marked that CTSMIEN should be switched on
+>> enable/disable_ms if CTS
+>> is not a gpio. The driver enables CTSMIEN forever what is wrong but
+>> I can't test it
+>> and I don't need it so I've just marked the fact in the comment.
+> That's what I thought. You're not affected because CTS is a gpio for
+> you (or not?)?  What would be the effect otherwise?
 
-At least providing the right hierarchy at the board level would be
-great. Adding the -supply property to all our fixed regulators
-wouldn't take too much code, and would be enough to model properly the
-regulator trees.
+Yes, my CTS is a gpio.
+CTSMIEN control CTS signal of auart block. There is a choice in DT:
+- use auart block's CTS: hardware flow control works for all baud rates, 
+DMA can be used
+- use gpio as CTS: hardware flow control is limited, DMA disabled but 
+CTS line is
+   not limited by hardware pinmux
+Both options can't be set at once. I workarounded auart block's CTS irq 
+handler in condition:
+"if (CTS_AT_AUART() && s->ms_irq_enabled)". Support by _ms would be more 
+elegance
+but as I wrote I couldn't test all cases. Therefore the code for auart 
+block's CTS is preserved.
 
-Maxime
+best regards
+Janusz
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/8911096f/attachment-0001.sig>
+>
+> Best regards
+> Uwe
+>
