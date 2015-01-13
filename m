@@ -1,245 +1,93 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 Jan 2015 16:25:10 -0800
-Subject: [PATCH v3 1/4] clk: sunxi: Rework MMC phase clocks
-In-Reply-To: <1421006457-23631-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421006457-23631-1-git-send-email-maxime.ripard@free-electrons.com>
- <1421006457-23631-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150113002510.20842.84605@quantum>
+Date: Mon, 12 Jan 2015 16:28:17 -0800
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <54B12446.4030703@gmail.com>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+ <54AD3EAE.6090009@gmail.com> <20150107222209.64ed24a0@xhacker>
+ <54AD431F.6060403@gmail.com> <20150109201306.4d1a296b@xhacker>
+ <54B12446.4030703@gmail.com>
+Message-ID: <20150113002817.20842.98432@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2015-01-11 12:00:54)
-> Instead of having three different clocks for the main MMC clock and the two
-> phase sub-clocks, which involved having three different drivers sharing the
-> same register, rework it to have the same single driver registering three
-> different clocks.
+Quoting Sebastian Hesselbarth (2015-01-10 05:08:22)
+> On 09.01.2015 13:13, Jisheng Zhang wrote:
+> > On Wed, 7 Jan 2015 06:30:55 -0800
+> > Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> >> On 07.01.2015 15:22, Jisheng Zhang wrote:
+> >>> On Wed, 7 Jan 2015 06:11:58 -0800
+> >>> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> >>>> On 31.12.2014 09:57, Jisheng Zhang wrote:
+> >>>>> The "smemc" clock is removed on BG2Q SoCs. In fact, bit19 of clkenable
+> >>>>> register is for nfc. Current code use bit19 for non-exist "smemc"
+> >>>>> incorrectly, this prevents eMMC from working due to the sdhci's
+> >>>>> "core" clk is still gated.
+> >>>>>
+> >>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>>>> Cc: stable at vger.kernel.org # 3.16+
+> >>>>> ---
+> >>>>>     drivers/clk/berlin/bg2q.c | 1 -
+> >>>>>     1 file changed, 1 deletion(-)
+> >>>>>
+> >>>>> diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
+> >>>>> index 21784e4..440ef81 100644
+> >>>>> --- a/drivers/clk/berlin/bg2q.c
+> >>>>> +++ b/drivers/clk/berlin/bg2q.c
+> >>>>> @@ -285,7 +285,6 @@ static const struct berlin2_gate_data bg2q_gates[]
+> >>>>> __initconst = { { "pbridge",      "perif",        15,
+> >>>>> CLK_IGNORE_UNUSED }, { "sdio",    "perif",        16,
+> >>>>> CLK_IGNORE_UNUSED }, { "nfc",     "perif",        18 },
+> >>>
+> >>> The nfc here is really confusing, we call it as nfccore internally. Is it
+> >>> better to rename it as nfccore?
+> >>
+> >> I guess it comes from some early Marvell BSP code, if there is no
+> >> issues with the name, e.g. something already depends on "nfc", feel
+> >> free to rename it to something more meaningful.
+> >
+> > In BG2, mrvl call the clock as nfccore. The code use "nfc" for it.
+> > The situation is similar for usbcore, satacore etc. So keep the name here,
+> > what do you think?
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> Tested-by: Chen-Yu Tsai <wens@csie.org>
+> Yes, I am fine with keeping the name as is.
+> 
+> >>>>> - { "smemc",      "perif",        19 },
+> >>>>
+> >>>> if bit 19 is for nfc, how does that work out with bit 18 which is
+> >>>> still assigned to nfc? Can you re-evaluate clkenable registers for
+> >>>
+> >>> bit 19 is for nfcEcc, the "io" clock; bit 18 is for nfcCore, the "core"
+> >>> clock.
+> >>
+> >> Ok, then both bits should be dealt with accordingly, i.e. rename
+> >> "smemc" to "nfcecc" and use it in the corresponding dts node.
+> >>
+> >> If this clk_gate just disables a clock that is fed into another
+> >> gateable clock module, I can live with removing it - although I
+> >> still think it is best to leave the clk_gate in place and pick
+> >> another name that does not collide with any other clock name.
+> >
+> > The nfcecc is already defined in the bg2q_divs, the gate bit is correct there.
+> 
+> Ok, I had a look in the actual code and agree that the same bit 19
+> is used twice. The patch is fine and we can take it as is.
+> 
+> This is clk subsystem, so either Mike takes it through his fixes branch
+> including my
+> 
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+> or decides to agree that I take it instead with his Ack. I am fine
+> with both.
 
-Looks good to me.
+Acked-by: Michael Turquette <mturquette@linaro.org>
+
+Now the three fixes can stay together and live happily ever after.
 
 Regards,
 Mike
 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  13 ++-
->  drivers/clk/sunxi/clk-mod0.c                      | 131 ++++++++++++----------
->  2 files changed, 77 insertions(+), 67 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 9dc4f55a04ad..e4c42276c577 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -55,8 +55,7 @@ Required properties:
->         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->         "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
->         "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
-> -       "allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
-> -       "allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
-> +       "allwinner,sun4i-a10-mmc-clk" - for the MMC clock
->         "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
->         "allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
->         "allwinner,sun7i-a20-out-clk" - for the external output clocks
-> @@ -95,6 +94,10 @@ For "allwinner,sun6i-a31-pll6-clk", there are 2 outputs. The first output
->  is the normal PLL6 output, or "pll6". The second output is rate doubled
->  PLL6, or "pll6x2".
->  
-> +The "allwinner,sun4i-a10-mmc-clk" has three different outputs: the
-> +main clock, with the ID 0, and the output and sample clocks, with the
-> +IDs 1 and 2, respectively.
-> +
->  For example:
->  
->  osc24M: clk at 01c20050 {
-> @@ -138,11 +141,11 @@ cpu: cpu at 01c20054 {
->  };
->  
->  mmc0_clk: clk at 01c20088 {
-> -       #clock-cells = <0>;
-> -       compatible = "allwinner,sun4i-mod0-clk";
-> +       #clock-cells = <1>;
-> +       compatible = "allwinner,sun4i-a10-mmc-clk";
->         reg = <0x01c20088 0x4>;
->         clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
-> -       clock-output-names = "mmc0";
-> +       clock-output-names = "mmc0", "mmc0_output", "mmc0_sample";
->  };
->  
->  mii_phy_tx_clk: clk at 2 {
-> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-> index bf8fcd8c940e..e37eb6fe19e8 100644
-> --- a/drivers/clk/sunxi/clk-mod0.c
-> +++ b/drivers/clk/sunxi/clk-mod0.c
-> @@ -152,14 +152,10 @@ static void __init sun5i_a13_mbus_setup(struct device_node *node)
->  }
->  CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
->  
-> -struct mmc_phase_data {
-> -       u8      offset;
-> -};
-> -
->  struct mmc_phase {
->         struct clk_hw           hw;
-> +       u8                      offset;
->         void __iomem            *reg;
-> -       struct mmc_phase_data   *data;
->         spinlock_t              *lock;
->  };
->  
-> @@ -175,7 +171,7 @@ static int mmc_get_phase(struct clk_hw *hw)
->         u8 delay;
->  
->         value = readl(phase->reg);
-> -       delay = (value >> phase->data->offset) & 0x3;
-> +       delay = (value >> phase->offset) & 0x3;
->  
->         if (!delay)
->                 return 180;
-> @@ -263,8 +259,8 @@ static int mmc_set_phase(struct clk_hw *hw, int degrees)
->  
->         spin_lock_irqsave(phase->lock, flags);
->         value = readl(phase->reg);
-> -       value &= ~GENMASK(phase->data->offset + 3, phase->data->offset);
-> -       value |= delay << phase->data->offset;
-> +       value &= ~GENMASK(phase->offset + 3, phase->offset);
-> +       value |= delay << phase->offset;
->         writel(value, phase->reg);
->         spin_unlock_irqrestore(phase->lock, flags);
->  
-> @@ -276,66 +272,77 @@ static const struct clk_ops mmc_clk_ops = {
->         .set_phase      = mmc_set_phase,
->  };
->  
-> -static void __init sun4i_a10_mmc_phase_setup(struct device_node *node,
-> -                                            struct mmc_phase_data *data)
-> -{
-> -       const char *parent_names[1] = { of_clk_get_parent_name(node, 0) };
-> -       struct clk_init_data init = {
-> -               .num_parents    = 1,
-> -               .parent_names   = parent_names,
-> -               .ops            = &mmc_clk_ops,
-> -       };
-> -
-> -       struct mmc_phase *phase;
-> -       struct clk *clk;
-> -
-> -       phase = kmalloc(sizeof(*phase), GFP_KERNEL);
-> -       if (!phase)
-> -               return;
-> -
-> -       phase->hw.init = &init;
-> +static DEFINE_SPINLOCK(sun4i_a10_mmc_lock);
->  
-> -       phase->reg = of_iomap(node, 0);
-> -       if (!phase->reg)
-> -               goto err_free;
-> +static void __init sun4i_a10_mmc_setup(struct device_node *node)
-> +{
-> +       struct clk_onecell_data *clk_data;
-> +       const char *parent;
-> +       void __iomem *reg;
-> +       int i;
->  
-> -       phase->data = data;
-> -       phase->lock = &sun4i_a10_mod0_lock;
-> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +       if (IS_ERR(reg)) {
-> +               pr_err("Couldn't map the %s clock registers\n", node->name);
-> +               return;
-> +       }
->  
-> -       if (of_property_read_string(node, "clock-output-names", &init.name))
-> -               init.name = node->name;
-> +       clk_data = kmalloc(sizeof(*clk_data), GFP_KERNEL);
-> +       if (!clk_data)
-> +               return;
->  
-> -       clk = clk_register(NULL, &phase->hw);
-> -       if (IS_ERR(clk))
-> -               goto err_unmap;
-> +       clk_data->clks = kcalloc(3, sizeof(*clk_data->clks), GFP_KERNEL);
-> +       if (!clk_data->clks)
-> +               goto err_free_data;
-> +
-> +       clk_data->clk_num = 3;
-> +       clk_data->clks[0] = sunxi_factors_register(node,
-> +                                                  &sun4i_a10_mod0_data,
-> +                                                  &sun4i_a10_mmc_lock, reg);
-> +       if (!clk_data->clks[0])
-> +               goto err_free_clks;
-> +
-> +       parent = __clk_get_name(clk_data->clks[0]);
-> +
-> +       for (i = 1; i < 3; i++) {
-> +               struct clk_init_data init = {
-> +                       .num_parents    = 1,
-> +                       .parent_names   = &parent,
-> +                       .ops            = &mmc_clk_ops,
-> +               };
-> +               struct mmc_phase *phase;
-> +
-> +               phase = kmalloc(sizeof(*phase), GFP_KERNEL);
-> +               if (!phase)
-> +                       continue;
-> +
-> +               phase->hw.init = &init;
-> +               phase->reg = reg;
-> +               phase->lock = &sun4i_a10_mmc_lock;
-> +
-> +               if (i == 1)
-> +                       phase->offset = 8;
-> +               else
-> +                       phase->offset = 20;
-> +
-> +               if (of_property_read_string_index(node, "clock-output-names",
-> +                                                 i, &init.name))
-> +                       init.name = node->name;
-> +
-> +               clk_data->clks[i] = clk_register(NULL, &phase->hw);
-> +               if (IS_ERR(clk_data->clks[i])) {
-> +                       kfree(phase);
-> +                       continue;
-> +               }
-> +       }
->  
-> -       of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->  
->         return;
->  
-> -err_unmap:
-> -       iounmap(phase->reg);
-> -err_free:
-> -       kfree(phase);
-> -}
-> -
-> -
-> -static struct mmc_phase_data mmc_output_clk = {
-> -       .offset = 8,
-> -};
-> -
-> -static struct mmc_phase_data mmc_sample_clk = {
-> -       .offset = 20,
-> -};
-> -
-> -static void __init sun4i_a10_mmc_output_setup(struct device_node *node)
-> -{
-> -       sun4i_a10_mmc_phase_setup(node, &mmc_output_clk);
-> -}
-> -CLK_OF_DECLARE(sun4i_a10_mmc_output, "allwinner,sun4i-a10-mmc-output-clk", sun4i_a10_mmc_output_setup);
-> -
-> -static void __init sun4i_a10_mmc_sample_setup(struct device_node *node)
-> -{
-> -       sun4i_a10_mmc_phase_setup(node, &mmc_sample_clk);
-> +err_free_clks:
-> +       kfree(clk_data->clks);
-> +err_free_data:
-> +       kfree(clk_data);
->  }
-> -CLK_OF_DECLARE(sun4i_a10_mmc_sample, "allwinner,sun4i-a10-mmc-sample-clk", sun4i_a10_mmc_sample_setup);
-> +CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
-> -- 
-> 2.2.1
+> Sebastian
 > 
