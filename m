@@ -1,109 +1,74 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Tue, 13 Jan 2015 17:35:20 +0900
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <20150112183955.GO13360@arm.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
-Message-ID: <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Tue, 13 Jan 2015 17:40:01 +0900
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54B4ABFB.5000501@samsung.com>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+ <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
+ <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
+ <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
+ <54B4ABFB.5000501@samsung.com>
+Message-ID: <54B4D9E1.10400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
->> thread_info->syscall is used only for ptrace, but syscall number
->> is also used by syscall_get_nr and returned to userspace by the
->> following proc file access:
+On 01/13/2015 02:24 PM, Joonyoung Shim wrote:
+> Hi,
+> 
+> On 01/13/2015 01:09 AM, Javier Martinez Canillas wrote:
+>> Hello Joonyoung,
 >>
->>  $ cat /proc/self/syscall
->>  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
->>  ^
->> The first number is the syscall number, currently it is zero.
->> Patch fixes this:
+>> On 01/12/2015 07:40 AM, Joonyoung Shim wrote:
+>>>> And also making changes to the clocks in the clk-exynos5420 driver. Can
+>>>> you please explain the rationale for those changes? I'm asking because
+>>>> without your clock changes (only adding the DISP1 pd and making the
+>>>> devices as consumers), I've HDMI output too but video is even worse. This
+>>>> [0] is the minimal change I have on top of 3.19-rc3 to have some output.
+>>>>
+>>>
+>>> I just refer below patches,
+>>> http://comments.gmane.org/gmane.linux.kernel.samsung-soc/34576
+>>>
+>>> But i'm not sure whether DISP1 power domain is same case with MFC power domain.
+>>>
 >>
->>  $ cat /proc/self/syscall
->>  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
->>  ^
->> Right, read syscall
->
-> Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
-> the /proc code requires syscall_get_nr to work regardless of
-> TIF_SYSCALL_TRACE.
->
->> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: stable at vger.kernel.org
->> ---
->>  arch/arm/kernel/asm-offsets.c  | 1 +
->>  arch/arm/kernel/entry-common.S | 1 +
->>  2 files changed, 2 insertions(+)
+>> Thanks a lot for sharing those patches, now your changes are much more
+>> clear to me.
 >>
->> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> index 2d2d608..6911bad 100644
->> --- a/arch/arm/kernel/asm-offsets.c
->> +++ b/arch/arm/kernel/asm-offsets.c
->> @@ -70,6 +70,7 @@ int main(void)
->>    DEFINE(TI_CPU,             offsetof(struct thread_info, cpu));
->>    DEFINE(TI_CPU_DOMAIN,              offsetof(struct thread_info, cpu_domain));
->>    DEFINE(TI_CPU_SAVE,                offsetof(struct thread_info, cpu_context));
->> +  DEFINE(TI_SYSCALL,         offsetof(struct thread_info, syscall));
->>    DEFINE(TI_USED_CP,         offsetof(struct thread_info, used_cp));
->>    DEFINE(TI_TP_VALUE,                offsetof(struct thread_info, tp_value));
->>    DEFINE(TI_FPSTATE,         offsetof(struct thread_info, fpstate));
->> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->> index f8ccc21..89452ff 100644
->> --- a/arch/arm/kernel/entry-common.S
->> +++ b/arch/arm/kernel/entry-common.S
->> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
->>  #endif
+>>>>
+>>>> So there seems to be two issues here, one is the mixer and hdmi modules not
+>>>> being attached to the DISP1 power domain and another one is the clocks setup
+>>>> not being correct to have proper HDMI video output.
+>>>>  
+>>>
+>>> Hmm, i can see normal hdmi output still from latest upstream
+>>> kernel(3.19-rc4) with my kernel changes and u-boot changes(DISP1 power
+>>> domain disable) of prior mail on odroid xu3 board.
+>>>
 >>
->>  local_restart:
->> +     str scno, [tsk, #TI_SYSCALL]            @ set syscall number
->>       ldr     r10, [tsk, #TI_FLAGS]           @ check for syscall tracing
->>       stmdb   sp!, {r4, r5}                   @ push fifth and sixth args
->
-> Do we definitely want to update scno on syscall restarting?
+>> I thought you said on another email that after commit 2ed127697eb1 which
+>> landed on 3.19-rc1 you had bad HDMI output?
+>>
+>> In your changes, it was missing the SW_ACLK_400_DISP1 and USER_ACLK_400_DISP1
+>> clock mux outputs that goes to internal buses in the DISP1. Adding IDs for
+>> these in the exynos5420 clock driver and to the parent and input clock paris
+>> list in the DISP1 power domain gives me a good HDMI output on 3.19-rc2.
+>>
+>> Also, the SW_ACLK_300_DISP1 and USER_ACLK_300_DISP1 are needed for the FIMD
+>> parent and input clock respectively. Adding those to the clocks list of the
+>> DISP1 power domain gives me working display + HDMI on my Exynos5800 Peach Pi.
+>>
+>> These are the changes I have now [0]. Please let me know what you think.
+>>
+> 
+> Good, it's working with your patch without u-boot changes and reverting
+> of commit 2ed127697eb.
+> 
 
+But i also get stripe hdmi output if hdmi/mixer drivers aren't defered
+probed, because DISP1 power domain isn't disabled on booting by defered
+probe so is always on.
 
-Good question.
-
-First thing to mention is __sys_trace will trace 'restart_syscall',
-not the real syscall we are going to restart.
-
-E.g. in test application we do infinite poll and then send STOP and
-CONT to this app:
-
-    test-243   [002] ...1  1792.067726: sys_enter: NR 168 (0, 0,
-ffffffff, 0, 0, 0)
-    test-243   [002] ...1  1802.299073: sys_exit: NR 168 = -516
-    test-243   [004] ...1  1814.716264: sys_enter: NR 0 (0, 0,
-ffffffff, 0, 0, 0)
-    test-243   [004] ...1  2183.687225: sys_exit: NR 0 = -516
-
-the poll was restarted and trace shows that we are in restart_syscall.
-
-Is that expected?
-
-And the second thing is that my next patch did some tweaks in
-'syscall_trace_enter', where we take scno not from param we passed,
-but from thread_info->syscall we previously set.
-
-So, regarding your question, if I set scno only once - I will break
-previous behavior, and __sys_trace will trace the syscall we restarted.
-
-And I think this is what we need, because according to the
-'syscall_trace_enter' code we do 'secure_computing' and
-'audit_syscall_entry', which definitely expect original syscall, not
-the 'restart_syscall'.
-
-
---
-Roman
+Thanks.
