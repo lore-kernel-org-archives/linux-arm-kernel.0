@@ -1,116 +1,87 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 13 Jan 2015 23:54:21 +0800
-Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
- references
-In-Reply-To: <20150113154415.GY4891@lukather>
-References: <1421123484-21387-1-git-send-email-wens@csie.org>
- <20150113154415.GY4891@lukather>
-Message-ID: <CAGb2v67sQyNcFQgvm60TUzjp3QBusckvP2i_xkj-eLRZubkALA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 13 Jan 2015 16:58:26 +0100
+Subject: [PATCH 6/7] ARM: at91: remove useless at91rm9200_dt_initialize()
+In-Reply-To: <54B473D3.6090008@atmel.com>
+References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
+ <54B473D3.6090008@atmel.com>
+Message-ID: <54B540A2.1020805@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 11:44 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Jan 13, 2015 at 12:31:24PM +0800, Chen-Yu Tsai wrote:
->> Using label references is preferred when override settings from the
->> included dtsi.
+Le 13/01/2015 02:24, Bo Shen a ?crit :
+> Hi Alexandre,
+> 
+> On 01/13/2015 02:42 AM, Alexandre Belloni wrote:
+>> at91rm9200_dt_initialize() is doing the same as at91_dit_initialize(), use that
+> 
+> s/at91_dit_initialize/at91_dt_initialize
+
+Alex I'll correct that when including it to the at91-3.20-cleanup
+branch. No need to resend.
+
+Voice: thanks for the review.
+
+Bye,
+
+
+>> one instead.
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 >> ---
+>>   arch/arm/mach-at91/board-dt-rm9200.c | 2 +-
+>>   arch/arm/mach-at91/generic.h         | 1 -
+>>   arch/arm/mach-at91/setup.c           | 7 -------
+>>   3 files changed, 1 insertion(+), 9 deletions(-)
 >>
->> My AXP221 series touches this file. I thought I'd convert it first.
+>> diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+>> index 76dfe8f9af50..a15ab6f8de00 100644
+>> --- a/arch/arm/mach-at91/board-dt-rm9200.c
+>> +++ b/arch/arm/mach-at91/board-dt-rm9200.c
+>> @@ -38,6 +38,6 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
+>>   DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+>>   	.init_time      = at91rm9200_dt_timer_init,
+>>   	.map_io		= at91_map_io,
+>> -	.init_early	= at91rm9200_dt_initialize,
+>> +	.init_early	= at91_dt_initialize,
+>>   	.dt_compat	= at91rm9200_dt_board_compat,
+>>   MACHINE_END
+>> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+>> index e0368aa06390..c10c2ddaae6d 100644
+>> --- a/arch/arm/mach-at91/generic.h
+>> +++ b/arch/arm/mach-at91/generic.h
+>> @@ -22,7 +22,6 @@ extern void __init at91_init_sram(int bank, unsigned long base,
 >>
->> This looks like a lot of changes. But if you filter out all the
->> indentation changes, it's just the opening lines for each node.
+>>    /* Processors */
+>>   extern void __init at91rm9200_set_type(int type);
+>> -extern void __init at91rm9200_dt_initialize(void);
+>>   extern void __init at91_dt_initialize(void);
 >>
->> ---
->>  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181 ++++++++++++++--------------
->>  1 file changed, 88 insertions(+), 93 deletions(-)
+>>    /* Timer */
+>> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+>> index ce25e85720fb..acb8d7724609 100644
+>> --- a/arch/arm/mach-at91/setup.c
+>> +++ b/arch/arm/mach-at91/setup.c
+>> @@ -429,13 +429,6 @@ static void at91_dt_ramc(void)
+>>   	at91_pm_set_standby(standby);
+>>   }
 >>
->> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> index ebd5f7854b1b..97dbaeb76416 100644
->> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> @@ -61,101 +61,96 @@
->>       chosen {
->>               bootargs = "earlyprintk console=ttyS0,115200";
->>       };
->> +};
->> +
->> +&mmc0 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
->> +     vmmc-supply = <&reg_vcc3v0>;
->> +     bus-width = <4>;
->> +     cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
->> +     cd-inverted;
->> +     status = "okay";
->> +};
->> +
->> +&usbphy {
->> +     usb1_vbus-supply = <&reg_usb1_vbus>;
->> +     status = "okay";
->> +};
->> +
->> +&ehci0 {
->> +     status = "okay";
->> +};
->> +
->> +&ohci0 {
->> +     status = "okay";
->> +};
->> +
->> +&pio {
->> +     mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
->> +             allwinner,pins = "PA8";
->> +             allwinner,function = "gpio_in";
->> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +             allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->> +     };
->> +};
->> +
->> +&mmc0_pins_a {
->> +     /* external pull-ups missing for some pins */
->> +     allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->> +};
->> +
->> +&usb1_vbus_pin_a {
->> +     /* different pin from sunxi-common-regulators */
->> +     allwinner,pins = "PH24";
->> +};
->> +
->> +&uart0 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&uart0_pins_a>;
->> +     status = "okay";
->> +};
->> +
->> +&i2c0 {
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&i2c0_pins_a>;
->> +     /* pull-ups and devices require AXP221 DLDO3 */
->> +     status = "failed";
->> +};
->
-> I think we should define a convention about how to sort these nodes
-> before we actually start merging some of it.
->
-> This of course also apply to the other patches doing that, hence why
-> Hans is CC'd.
->
-> I guess sorting them by label alphabetical order would make
-> sense. What do you think?
-
-I'm currently using the ordering from the dtsi, which is based
-on address. Even if it's not visible, if you're creating the
-dts by looking at the dtsi and enabling the devices available,
-that's the order you add them by, so it kind of makes sense.
-
-The pins are grouped around &pio, and sorted by name.
-
-And the regulators are listed at the bottom.
+>> -void __init at91rm9200_dt_initialize(void)
+>> -{
+>> -	at91_dt_ramc();
+>> -
+>> -	at91_boot_soc.init();
+>> -}
+>> -
+>>   void __init at91_dt_initialize(void)
+>>   {
+>>   	at91_dt_ramc();
+>>
+> 
+> Best Regards,
+> Bo Shen
+> 
 
 
-ChenYu
+-- 
+Nicolas Ferre
