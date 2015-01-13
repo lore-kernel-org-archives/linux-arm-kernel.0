@@ -1,31 +1,35 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Jan 2015 12:07:54 +0000
-Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <1421136128.27675.58.camel@mtksdaap41>
-References: <cover.1421086706.git.robin.murphy@arm.com>
- <1421136128.27675.58.camel@mtksdaap41>
-Message-ID: <54B50A9A.9010308@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 Jan 2015 15:11:21 +0300
+Subject: [PATCH 1/2] ARM: dts: sun8i: Add lradc node to sun8i-a23.dtsi
+In-Reply-To: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
+References: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <54B50B69.6000002@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/15 08:02, Yingjoe Chen wrote:
-> On Mon, 2015-01-12 at 20:48 +0000, Robin Murphy wrote:
->> Hi all,
->>
->> Whilst it's a long way off perfect, this has reached the point of being
->> functional and stable enough to be useful, so here it is. The core
->> consists of the meat of the arch/arm implementation modified to remove
->> the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
->> allocator instead of the bitmap-based one. For that, this series depends
->> on my "Genericise the IOVA allocator" series posted earlier[1].
->
-> Hi Robin,
->
-> We'd to give it a try. Do you have a public git tree contains both
-> series?
->
+Hello.
 
-Thanks! Unfortunately I don't have a public tree yet, but I'll try to 
-get one set up shortly.
+On 1/13/2015 1:47 PM, Hans de Goede wrote:
 
-Robin.
+> The A23 has the same lradc controller as previous Allwinner SoCs.
+
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>   arch/arm/boot/dts/sun8i-a23.dtsi | 7 +++++++
+>   1 file changed, 7 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+> index a31842d..c2ceafb 100644
+> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+> @@ -419,6 +419,13 @@
+>   			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+>   		};
+>
+> +		lradc: lradc at 01c22800 {
+> +			compatible = "allwinner,sun4i-a10-lradc-keys";
+
+    If this is a keyboard controller, its node name should probably be 
+"keyboard", according to the ePAPR standard...
+
+WBR, Sergei
