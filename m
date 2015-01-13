@@ -1,292 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Jan 2015 15:37:51 -0800
-Subject: [PATCH 3/4] ARM: dts: Add basic clocks for dm816x
-In-Reply-To: <1421192272-20754-1-git-send-email-tony@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
-Message-ID: <1421192272-20754-4-git-send-email-tony@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 13 Jan 2015 15:42:46 -0800
+Subject: [GIT PULL] Broadcom MAINTAINERS file updates for 3.20
+In-Reply-To: <20150113233038.GI15087@quad.lixom.net>
+References: <1421104283-6798-1-git-send-email-f.fainelli@gmail.com>
+ <20150113233038.GI15087@quad.lixom.net>
+Message-ID: <54B5AD76.7080801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks on dm816x are a bit different from the other omap
-variants. The clocks are sourced from a FAPLL (Flying Adder PLL)
-unlike on other omaps. Other than that, it's a similar setup
-to am33xx with extra muxes and dividers that can be defined
-as existing component clocks.
+On 13/01/15 15:30, Olof Johansson wrote:
+> On Mon, Jan 12, 2015 at 03:11:23PM -0800, Florian Fainelli wrote:
+>> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+>>
+>>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/maintainer
+>>
+>> for you to fetch changes up to c3a8f6399f6fb748bf0067bd3d97c0653d434648:
+>>
+>>   MAINTAINERS: add a git entry for BMIPS-based BCM7xxx SoCs (2015-01-12 15:02:57 -0800)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains updates to our MAINTAINERS files for all relevant
+>> Broadcom SoCs: BCM63xx, Cygnus/iProc, ARM & MIPS-based BCM7xxx (brcmstb).
+>>
+>> Our new code location for all Broadcom-related kernel activities is now on
+>> http://github.com/Broadcom/.
+> 
+> 3 of the 4 changes refer to github.com/broadcom, and one to
+> github.com/Broadcom. Care to respin and make it consistent (for extra credit,
+> also consistent with the tag :)?
 
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/dm816x-clocks.dtsi | 250 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dm816x.dtsi        |   1 +
- 2 files changed, 251 insertions(+)
- create mode 100644 arch/arm/boot/dts/dm816x-clocks.dtsi
-
-diff --git a/arch/arm/boot/dts/dm816x-clocks.dtsi b/arch/arm/boot/dts/dm816x-clocks.dtsi
-new file mode 100644
-index 0000000..50d9d33
---- /dev/null
-+++ b/arch/arm/boot/dts/dm816x-clocks.dtsi
-@@ -0,0 +1,250 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+&scrm {
-+	main_fapll: main_fapll {
-+		#clock-cells = <1>;
-+		compatible = "ti,dm816-fapll-clock";
-+		reg = <0x400 0x40>;
-+		clocks = <&sys_clkin_ck &sys_clkin_ck>;
-+		clock-indices = <1>, <2>, <3>, <4>, <5>,
-+				<6>, <7>;
-+		clock-output-names = "main_pll_clk1",
-+				     "main_pll_clk2",
-+				     "main_pll_clk3",
-+				     "main_pll_clk4",
-+				     "main_pll_clk5",
-+				     "main_pll_clk6",
-+				     "main_pll_clk7";
-+	};
-+
-+	ddr_fapll: ddr_fapll {
-+		#clock-cells = <1>;
-+		compatible = "ti,dm816-fapll-clock";
-+		reg = <0x440 0x30>;
-+		clocks = <&sys_clkin_ck &sys_clkin_ck>;
-+		clock-indices = <1>, <2>, <3>, <4>;
-+		clock-output-names = "ddr_pll_clk1",
-+				     "ddr_pll_clk2",
-+				     "ddr_pll_clk3",
-+				     "ddr_pll_clk4";
-+	};
-+
-+	video_fapll: video_fapll {
-+		#clock-cells = <1>;
-+		compatible = "ti,dm816-fapll-clock";
-+		reg = <0x470 0x30>;
-+		clocks = <&sys_clkin_ck &sys_clkin_ck>;
-+		clock-indices = <1>, <2>, <3>;
-+		clock-output-names = "video_pll_clk1",
-+				     "video_pll_clk2",
-+				     "video_pll_clk3";
-+	};
-+
-+	audio_fapll: audio_fapll {
-+		#clock-cells = <1>;
-+		compatible = "ti,dm816-fapll-clock";
-+		reg = <0x4a0 0x30>;
-+		clocks = <&main_fapll 7>, < &sys_clkin_ck>;
-+		clock-indices = <1>, <2>, <3>, <4>, <5>;
-+		clock-output-names = "audio_pll_clk1",
-+				     "audio_pll_clk2",
-+				     "audio_pll_clk3",
-+				     "audio_pll_clk4",
-+				     "audio_pll_clk5";
-+	};
-+};
-+
-+&scrm_clocks {
-+	secure_32k_ck: secure_32k_ck {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+	};
-+
-+	sys_32k_ck: sys_32k_ck {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+	};
-+
-+	tclkin_ck: tclkin_ck {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+	};
-+
-+	sys_clkin_ck: sys_clkin_ck {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <27000000>;
-+	};
-+};
-+
-+/* 0x48180000 */
-+&prcm_clocks {
-+	clkout_pre_ck: clkout_pre_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&main_fapll 5 &ddr_fapll 1 &video_fapll 1
-+			  &audio_fapll 1>;
-+		reg = <0x100>;
-+	};
-+
-+	clkout_div_ck: clkout_div_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&clkout_pre_ck>;
-+		ti,bit-shift = <3>;
-+		ti,max-div = <8>;
-+		reg = <0x100>;
-+	};
-+
-+	clkout_ck: clkout_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&clkout_div_ck>;
-+		ti,bit-shift = <7>;
-+		reg = <0x100>;
-+	};
-+
-+	/* CM_DPLL clocks p1795 */
-+	sysclk1_ck: sysclk1_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&main_fapll 1>;
-+		ti,max-div = <7>;
-+		reg = <0x0300>;
-+	};
-+
-+	sysclk2_ck: sysclk2_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&main_fapll 2>;
-+		ti,max-div = <7>;
-+		reg = <0x0304>;
-+	};
-+
-+	sysclk3_ck: sysclk3_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&main_fapll 3>;
-+		ti,max-div = <7>;
-+		reg = <0x0308>;
-+	};
-+
-+	sysclk4_ck: sysclk4_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&main_fapll 4>;
-+		ti,max-div = <1>;
-+		reg = <0x030c>;
-+	};
-+
-+	sysclk5_ck: sysclk5_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&sysclk4_ck>;
-+		ti,max-div = <1>;
-+		reg = <0x0310>;
-+	};
-+
-+	sysclk6_ck: sysclk6_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&main_fapll 4>;
-+		ti,dividers = <2>, <4>;
-+		reg = <0x0314>;
-+	};
-+
-+	sysclk10_ck: sysclk10_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&ddr_fapll 2>;
-+		ti,max-div = <7>;
-+		reg = <0x0324>;
-+	};
-+
-+	sysclk24_ck: sysclk24_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&main_fapll 5>;
-+		ti,max-div = <7>;
-+		reg = <0x03b4>;
-+	};
-+
-+	mpu_ck: mpu_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&sysclk2_ck>;
-+		ti,bit-shift = <1>;
-+                reg = <0x15dc>;
-+	};
-+
-+	audio_pll_a_ck: audio_pll_a_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&audio_fapll 1>;
-+		ti,max-div = <7>;
-+		reg = <0x035c>;
-+	};
-+
-+	sysclk18_ck: sysclk18_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&sys_32k_ck>, <&audio_pll_a_ck>;
-+		reg = <0x0378>;
-+	};
-+
-+	timer1_fck: timer1_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x0390>;
-+	};
-+
-+	timer2_fck: timer2_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x0394>;
-+	};
-+
-+	timer3_fck: timer3_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x0398>;
-+	};
-+
-+	timer4_fck: timer4_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x039c>;
-+	};
-+
-+	timer5_fck: timer5_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x03a0>;
-+	};
-+
-+	timer6_fck: timer6_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x03a4>;
-+	};
-+
-+	timer7_fck: timer7_fck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&tclkin_ck>, <&sysclk18_ck>, <&sys_clkin_ck>;
-+		reg = <0x03a8>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
-index 7d575ac..c1029db 100644
---- a/arch/arm/boot/dts/dm816x.dtsi
-+++ b/arch/arm/boot/dts/dm816x.dtsi
-@@ -372,3 +372,4 @@
- 	};
- };
- 
-+#include "dm816x-clocks.dtsi"
+Of course, stay tuned, a new pull request is on its way. Thanks!
 -- 
-2.1.4
+Florian
