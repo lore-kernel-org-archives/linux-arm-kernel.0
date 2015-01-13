@@ -1,72 +1,33 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 13 Jan 2015 09:24:35 +0800
-Subject: [PATCH 6/7] ARM: at91: remove useless at91rm9200_dt_initialize()
-In-Reply-To: <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B473D3.6090008@atmel.com>
+From: ideal.song@samsung.com (Inha Song)
+Date: Tue, 13 Jan 2015 10:27:34 +0900
+Subject: [alsa-devel] [PATCH 2/3] ASoC: samsung: Document Trats2 audio
+ subsystem bindings
+In-Reply-To: <20150105152918.GT11764@sirena.org.uk>
+References: <1420457117-11030-1-git-send-email-ideal.song@samsung.com>
+ <1420457117-11030-3-git-send-email-ideal.song@samsung.com>
+ <20150105152918.GT11764@sirena.org.uk>
+Message-ID: <20150113102734.7a3aa77a@songinha-Samsung-DeskTop-System>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi Mark,
 
-On 01/13/2015 02:42 AM, Alexandre Belloni wrote:
-> at91rm9200_dt_initialize() is doing the same as at91_dit_initialize(), use that
+Thank you for your feedback and sorry for late response.
 
-s/at91_dit_initialize/at91_dt_initialize
-
-> one instead.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/mach-at91/board-dt-rm9200.c | 2 +-
->   arch/arm/mach-at91/generic.h         | 1 -
->   arch/arm/mach-at91/setup.c           | 7 -------
->   3 files changed, 1 insertion(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
-> index 76dfe8f9af50..a15ab6f8de00 100644
-> --- a/arch/arm/mach-at91/board-dt-rm9200.c
-> +++ b/arch/arm/mach-at91/board-dt-rm9200.c
-> @@ -38,6 +38,6 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
->   DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
->   	.init_time      = at91rm9200_dt_timer_init,
->   	.map_io		= at91_map_io,
-> -	.init_early	= at91rm9200_dt_initialize,
-> +	.init_early	= at91_dt_initialize,
->   	.dt_compat	= at91rm9200_dt_board_compat,
->   MACHINE_END
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index e0368aa06390..c10c2ddaae6d 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -22,7 +22,6 @@ extern void __init at91_init_sram(int bank, unsigned long base,
->
->    /* Processors */
->   extern void __init at91rm9200_set_type(int type);
-> -extern void __init at91rm9200_dt_initialize(void);
->   extern void __init at91_dt_initialize(void);
->
->    /* Timer */
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index ce25e85720fb..acb8d7724609 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -429,13 +429,6 @@ static void at91_dt_ramc(void)
->   	at91_pm_set_standby(standby);
->   }
->
-> -void __init at91rm9200_dt_initialize(void)
-> -{
-> -	at91_dt_ramc();
-> -
-> -	at91_boot_soc.init();
-> -}
-> -
->   void __init at91_dt_initialize(void)
->   {
->   	at91_dt_ramc();
->
+I think, I should remove clock settings in machine driver.
+If the clock settings are necessary, I will add "assigned-clocks" nodes
+in trats2 sound DT like odroid board.
 
 Best Regards,
-Bo Shen
+Inha Song.
+
+> On Mon, Jan 05, 2015 at 08:25:16PM +0900, Inha Song wrote:
+> 
+> > + - clocks : Reference to the codec master clock
+> > + - clock-names : The clock should be named "mclk"
+> 
+> This should be done in the CODEC driver, not in the machine driver - the
+> CODEC always needs the clock, it's not something specific to this
+> machine.  Even if we decide that for Linux the best thing to do is to
+> manage the clock in the machine driver it should be described in the DT
+> as being attached to the CODEC.
