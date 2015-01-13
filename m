@@ -1,40 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 18:13:47 -0800
-Subject: [GIT PULL] CSR atlas7 init dts for 3.20
-In-Reply-To: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
-References: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
-Message-ID: <20150113021347.GD28758@quad.lixom.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 13 Jan 2015 11:13:25 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.19
+Message-ID: <cover.1421113695.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 10:51:40PM +0800, Barry Song wrote:
-> Hi Arnd, Kevin, Olof,
-> 
-> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
-> 
->   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-> 
-> for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
-> 
->   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
-> 
-> ----------------------------------------------------------------
-> drop marco and add init dts for atlas7
-> 
-> marco chip has been dropped and the new replacement is atlas7.
-> so, drop marco dts, and add dts for atlas7.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Hi,
+Please consider these Renesas ARM based SoC fixes for v3.19.
 
-Can you please elaborate a bit. Was marco never shipped to customers
-that could be interested in mainline support, and atlas7 is a replacement
-SoC that is in development or has shipped?
+This pull request is based on the last round of SoC updates for v3.19,
+Fourth Round of Renesas ARM Based SoC Updates for v3.19, tagged as
+renesas-soc3-for-v3.19, merged into your next/soc branch and included in
+v3.19-rc1.
 
 
-Thanks,
+* ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
 
--Olof
+  This fixes a long standing problem which has been present since
+  the sh73a0 SoC started using the INTC External IRQ pin driver.
+
+  The patch that introduced the problem is 341eb5465f67437a ("ARM:
+  shmobile: INTC External IRQ pin driver on sh73a0") which was included
+  in v3.10.
+
+* This fixes a regression in the r8a7740 SoC due to
+  9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
+  which was included in v3.18-rc2.
+
+
+The following changes since commit 7a2071c58f36450fbf44a27d2e5d371c18534a25:
+
+  ARM: shmobile: Add early debugging support using SCIF(A) (2014-11-17 10:29:58 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v3.19
+
+for you to fetch changes up to b0ddb319db3d7a1943445f0de0a45c07a7f3457a:
+
+  ARM: shmobile: sh73a0 legacy: Set .control_parent for all irqpin instances (2015-01-08 09:15:16 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v3.19
+
+* Set .control_parent for all irqpin instances for sh73a0 SoC when booting
+  using legacy C
+* Instantiate GIC board for r8a7740 SoC when using legacy C
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
+      ARM: shmobile: sh73a0 legacy: Set .control_parent for all irqpin instances
+
+ arch/arm/mach-shmobile/setup-r8a7740.c | 7 +++++++
+ arch/arm/mach-shmobile/setup-sh73a0.c  | 3 +++
+ 2 files changed, 10 insertions(+)
