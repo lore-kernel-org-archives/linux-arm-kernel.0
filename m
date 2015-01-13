@@ -1,28 +1,26 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Tue, 13 Jan 2015 16:29:30 +0200
-Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
- readl/writel
-In-Reply-To: <20150113115205.GE7660@katana>
-References: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
- <20141219104315.0ccbba9c@xhacker> <20150113115205.GE7660@katana>
-Message-ID: <20150113142930.GT1386@lahna.fi.intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Jan 2015 15:29:38 +0100
+Subject: [PATCH v2 01/13] pinctrl: sun6i: Add some missing functions
+In-Reply-To: <1418836704-15689-2-git-send-email-hdegoede@redhat.com>
+References: <1418836704-15689-1-git-send-email-hdegoede@redhat.com>
+ <1418836704-15689-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACRpkdZMv0VNjSmhB0VoGt=wo02+g56YQtekD9MnxYUSmJDXEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 12:52:05PM +0100, Wolfram Sang wrote:
-> On Fri, Dec 19, 2014 at 10:43:15AM +0800, Jisheng Zhang wrote:
-> > Dear all,
-> > 
-> > Is there any issue I need to resolve so that the patch can be merged?
-> 
-> Adding Mika to the loop. He uses the driver a lot (and knows other
-> people who do)...
+On Wed, Dec 17, 2014 at 6:18 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 
-I don't see problems with this patch.
+> While working on pinctrl for the A31s, I noticed that function 4 of
+> PA15 - PA18 was missing, add these.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Drop the changes to the muxing of i2c3 this was based on
+>  "A31s Datasheet v1.40.pdf", but all other A31 related info puts them at the
+>  pins where we already have them, so leave this as is
 
-On x86 we have readl_relaxed() the same as readl() so this patch does
-not change anything there.
+Patch applied with Maxime's ACK.
 
-Feel free to add,
-
-Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+Yours,
+Linus Walleij
