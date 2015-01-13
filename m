@@ -1,134 +1,127 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 13 Jan 2015 15:41:31 +0100
-Subject: [RFC PATCH v2 1/4] tty: serial_mctrl_gpio: Add irqs helpers for
- input lines
-In-Reply-To: <54B52CCB.3030100@elproma.com.pl>
-References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
- <CACQ1gAibCAwWavjhT8VW8WkjEq0qGobQ9qF=pNtHRu1WUaRigA@mail.gmail.com>
- <54B52304.1030008@elproma.com.pl>
- <CACQ1gAipk7mfGdg7fjoGvFaN+1hc8iOhW65i5bkr-avXmtB+8g@mail.gmail.com>
- <54B52CCB.3030100@elproma.com.pl>
-Message-ID: <CACQ1gAiYH_ff8==rrcmnNNZHXTftGyfrqPyeSZZwrLSmsns6Fg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 13 Jan 2015 15:43:00 +0100
+Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
+In-Reply-To: <20150112224203.GL22090@quad.lixom.net>
+References: <20150112224203.GL22090@quad.lixom.net>
+Message-ID: <1421160180-23452-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-13 15:33 GMT+01:00 Janusz U?ycki <j.uzycki@elproma.com.pl>:
->
-> W dniu 2015-01-13 o 15:30, Richard Genoud pisze:
->
->> 2015-01-13 14:52 GMT+01:00 Janusz U?ycki <j.uzycki@elproma.com.pl>:
->>>
->>> W dniu 2015-01-13 o 14:04, Richard Genoud pisze:
->>>
->>>> 2015-01-10 15:32 GMT+01:00 Janusz Uzycki <j.uzycki@elproma.com.pl>:
->>>>>
->>>>> diff --git a/drivers/tty/serial/serial_mctrl_gpio.h
->>>>> b/drivers/tty/serial/serial_mctrl_gpio.h
->>>>> index 400ba04..13ba3f4 100644
->>>>> --- a/drivers/tty/serial/serial_mctrl_gpio.h
->>>>> +++ b/drivers/tty/serial/serial_mctrl_gpio.h
->>>>> @@ -21,6 +21,7 @@
->>>>>    #include <linux/err.h>
->>>>>    #include <linux/device.h>
->>>>>    #include <linux/gpio/consumer.h>
->>>>> +#include <linux/serial_core.h>
->>>>>
->>>>>    enum mctrl_gpio_idx {
->>>>>           UART_GPIO_CTS,
->>>>> @@ -40,6 +41,13 @@ enum mctrl_gpio_idx {
->>>>>     */
->>>>>    struct mctrl_gpios;
->>>>>
->>>>> +/*
->>>>> + * Return true if gidx is GPIO line, otherwise false.
->>>>> + * It assumes that gpios is allocated and not NULL.
->>>>> + */
->>>>> +inline
->>>>> +bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx
->>>>> gidx);
->>>>> +
->>>>
->>>> This leads to a compile error :
->>>>     CC      drivers/tty/serial/atmel_serial.o
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/atmel_serial.c: In function
->>>> 'atmel_disable_ms.part.22':
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:536:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:539:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:542:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:545:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/atmel_serial.c: In function 'atmel_enable_ms':
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:503:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:506:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:509:25: error: called from here
->>>> In file included from drivers/tty/serial/atmel_serial.c:64:0:
->>>> drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
->>>> call to always_inline 'mctrl_gpio_is_gpio': function body not
->>>> available
->>>> drivers/tty/serial/atmel_serial.c:512:25: error: called from here
->>>> make[3]: *** [drivers/tty/serial/atmel_serial.o] Error 1
->>>> make[2]: *** [drivers/tty/serial] Error 2
->>>> make[1]: *** [drivers/tty] Error 2
->>>> make: *** [drivers] Error 2
->>>
->>>
->>> Do you compile atmel_serial as module? I compiled built-in and it was
->>> fine
->>> for me.
->>> So the function should be exported like mctrl_gpio_to_gpiod() I guess.
->>> An other reason can be you have CONFIG_GPIOLIB=n ?
->>> In fact, mctrl_gpio_is_gpio() should depend on CONFIG_GPIOLIB for empty
->>> body.
->>>
->> well, I'm also compiling it built-in (I even have config_module=N)
->
->
-> You have no CONFIG_GPIOLIB enabled and it is the bug in the patchset.
-> Thanks.
-> Janusz
+The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
+options may be removed in the near future.
 
-Actually, I have CONFIG_GPIOLIB=y, only it doesn't appears in the defconfig.
-I did:
-# cp defconfig arch/arm/configs/toto_defconfig
-# ARCH=arm make toto_defconfig
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi Olof,
 
-# grep CONFIG_GPIOLIB .config
-CONFIG_GPIOLIB=y
-CONFIG_GPIOLIB_IRQCHIP=y
+This is an attempt to match other ARM SoC families format.
+If you feel that the patch can be good, do not hesitate to take it yourself. I
+don't plan to integrate it in any of my pull-request so it can appear quickly in
+arm-soc and can be used by everyone.
 
-# LANG=C ARCH=arm
-CROSS_COMPILE=~/dev/LNS/buildroot-VIP/output/host/usr/bin/arm-linux-
-make -j12 uImage
-[...]
-drivers/tty/serial/serial_mctrl_gpio.h:49:6: error: inlining failed in
-call to always_inline 'mctrl_gpio_is_gpio': function body not
-available
-drivers/tty/serial/atmel_serial.c:536:25: error: called from here
-In file included from drivers/tty/serial/atmel_serial.c:64:0:
+ arch/arm/boot/dts/Makefile | 90 +++++++++++++++++++++-------------------------
+ 1 file changed, 40 insertions(+), 50 deletions(-)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7be7a6f62d81..66ea13037dbc 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1,56 +1,46 @@
+ ifeq ($(CONFIG_OF),y)
+ 
+ # Keep at91 dtb files sorted alphabetically for each SoC
+-# rm9200
+-dtb-$(CONFIG_ARCH_AT91) += at91rm9200ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += mpa1600.dtb
+-# sam9260
+-dtb-$(CONFIG_ARCH_AT91) += animeo_ip.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91-qil_a9260.dtb
+-dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb
+-dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+-dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
+-dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
+-dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
+-# sam9261
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
+-# sam9263
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
+-dtb-$(CONFIG_ARCH_AT91) += usb_a9263.dtb
+-# sam9g20
+-dtb-$(CONFIG_ARCH_AT91) += at91-foxg20.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek_2mmc.dtb
+-dtb-$(CONFIG_ARCH_AT91) += kizbox.dtb
+-dtb-$(CONFIG_ARCH_AT91) += tny_a9g20.dtb
+-dtb-$(CONFIG_ARCH_AT91) += usb_a9g20.dtb
+-dtb-$(CONFIG_ARCH_AT91) += usb_a9g20_lpw.dtb
+-# sam9g45
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9m10g45ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
+-# sam9n12
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
+-# sam9rl
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9rlek.dtb
+-# sam9x5
+-dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91-cosino_mega2560.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9g15ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9g25ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9g35ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9x25ek.dtb
+-dtb-$(CONFIG_ARCH_AT91) += at91sam9x35ek.dtb
+-# sama5d3
+-dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d3_xplained.dtb
+-dtb-$(CONFIG_ARCH_AT91)	+= sama5d31ek.dtb
+-dtb-$(CONFIG_ARCH_AT91)	+= sama5d33ek.dtb
+-dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
+-dtb-$(CONFIG_ARCH_AT91)	+= sama5d35ek.dtb
+-dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dtb
+-# sama5d4
+-dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d4ek.dtb
+-
++dtb-$(CONFIG_SOC_SAM_V4_V5) += \
++	at91rm9200ek.dtb \
++	mpa1600.dtb \
++	animeo_ip.dtb \
++	at91-qil_a9260.dtb \
++	aks-cdu.dtb \
++	ethernut5.dtb \
++	evk-pro3.dtb \
++	tny_a9260.dtb \
++	usb_a9260.dtb \
++	at91sam9261ek.dtb \
++	at91sam9263ek.dtb \
++	tny_a9263.dtb \
++	usb_a9263.dtb \
++	at91-foxg20.dtb \
++	at91sam9g20ek.dtb \
++	at91sam9g20ek_2mmc.dtb \
++	kizbox.dtb \
++	tny_a9g20.dtb \
++	usb_a9g20.dtb \
++	usb_a9g20_lpw.dtb \
++	at91sam9m10g45ek.dtb \
++	pm9g45.dtb \
++	at91sam9n12ek.dtb \
++	at91sam9rlek.dtb \
++	at91-ariag25.dtb \
++	at91-cosino_mega2560.dtb \
++	at91sam9g15ek.dtb \
++	at91sam9g25ek.dtb \
++	at91sam9g35ek.dtb \
++	at91sam9x25ek.dtb \
++	at91sam9x35ek.dtb
++dtb-$(CONFIG_SOC_SAM_V7) += \
++	at91-sama5d3_xplained.dtb \
++	sama5d31ek.dtb \
++	sama5d33ek.dtb \
++	sama5d34ek.dtb \
++	sama5d35ek.dtb \
++	sama5d36ek.dtb \
++	at91-sama5d4ek.dtb
+ dtb-$(CONFIG_ARCH_ATLAS6) += \
+ 	atlas6-evb.dtb
+ dtb-$(CONFIG_ARCH_AXXIA) += \
+-- 
+2.1.3
