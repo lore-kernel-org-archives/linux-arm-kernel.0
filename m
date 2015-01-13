@@ -1,99 +1,106 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 13 Jan 2015 09:08:38 -0800
-Subject: [PATCH v5] can: Convert to runtime_pm
-In-Reply-To: <54B4FCB5.6040904@pengutronix.de>
-References: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
- <3a3437c5c8ff48d9a45fee7e81fa8dca@BY2FFO11FD058.protection.gbl>
- <54B4FCB5.6040904@pengutronix.de>
-Message-ID: <6ea3c0ea0f5c4deb9a6e4738a8d94a36@BN1AFFO11FD047.protection.gbl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Jan 2015 17:09:11 +0000
+Subject: CFT: move outer_cache_sync() out of line
+In-Reply-To: <20150113162753.GS12302@n2100.arm.linux.org.uk>
+References: <20150112163648.GL12302@n2100.arm.linux.org.uk>
+ <20150113154551.GF16524@e104818-lin.cambridge.arm.com>
+ <20150113162753.GS12302@n2100.arm.linux.org.uk>
+Message-ID: <20150113170910.GT12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-01-13 at 12:08PM +0100, Marc Kleine-Budde wrote:
-> On 01/12/2015 07:45 PM, S?ren Brinkmann wrote:
-> > On Mon, 2015-01-12 at 08:34PM +0530, Kedareswara rao Appana wrote:
-> >> Instead of enabling/disabling clocks at several locations in the driver,
-> >> Use the runtime_pm framework. This consolidates the actions for runtime PM
-> >> In the appropriate callbacks and makes the driver more readable and mantainable.
-> >>
-> >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> >> ---
-> >> Changes for v5:
-> >>  - Updated with the review comments.
-> >>    Updated the remove fuction to use runtime_pm.
-> >> Chnages for v4:
-> >>  - Updated with the review comments.
-> >> Changes for v3:
-> >>   - Converted the driver to use runtime_pm.
-> >> Changes for v2:
-> >>   - Removed the struct platform_device* from suspend/resume
-> >>     as suggest by Lothar.
-> >>
-> >>  drivers/net/can/xilinx_can.c |  157 ++++++++++++++++++++++++++++-------------
-> >>  1 files changed, 107 insertions(+), 50 deletions(-)
-> > [..]
-> >> +static int __maybe_unused xcan_runtime_resume(struct device *dev)
-> >>  {
-> >> -	struct platform_device *pdev = dev_get_drvdata(dev);
-> >> -	struct net_device *ndev = platform_get_drvdata(pdev);
-> >> +	struct net_device *ndev = dev_get_drvdata(dev);
-> >>  	struct xcan_priv *priv = netdev_priv(ndev);
-> >>  	int ret;
-> >> +	u32 isr, status;
-> >>  
-> >>  	ret = clk_enable(priv->bus_clk);
-> >>  	if (ret) {
-> >> @@ -1014,15 +1030,28 @@ static int __maybe_unused xcan_resume(struct device *dev)
-> >>  	ret = clk_enable(priv->can_clk);
-> >>  	if (ret) {
-> >>  		dev_err(dev, "Cannot enable clock.\n");
-> >> -		clk_disable_unprepare(priv->bus_clk);
-> >> +		clk_disable(priv->bus_clk);
+On Tue, Jan 13, 2015 at 04:27:54PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 13, 2015 at 03:45:52PM +0000, Catalin Marinas wrote:
+> > On Mon, Jan 12, 2015 at 04:36:48PM +0000, Russell King - ARM Linux wrote:
+> > > The theory is that moving outer_cache_sync() out of line moves the
+> > > conditional test from multiple sites to a single location, which
+> > > in turn means that the branch predictor stands a better chance of
+> > > making the correct decision.
 > > [...]
-> >> @@ -1173,12 +1219,23 @@ static int xcan_remove(struct platform_device *pdev)
-> >>  {
-> >>  	struct net_device *ndev = platform_get_drvdata(pdev);
-> >>  	struct xcan_priv *priv = netdev_priv(ndev);
-> >> +	int ret;
-> >> +
-> >> +	ret = pm_runtime_get_sync(&pdev->dev);
-> >> +	if (ret < 0) {
-> >> +		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-> >> +				__func__, ret);
-> >> +		return ret;
-> >> +	}
-> >>  
-> >>  	if (set_reset_mode(ndev) < 0)
-> >>  		netdev_err(ndev, "mode resetting failed!\n");
-> >>  
-> >>  	unregister_candev(ndev);
-> >> +	pm_runtime_disable(&pdev->dev);
-> >>  	netif_napi_del(&priv->napi);
-> >> +	clk_disable_unprepare(priv->bus_clk);
-> >> +	clk_disable_unprepare(priv->can_clk);
+> > > --- a/arch/arm/mm/l2c-common.c
+> > > +++ b/arch/arm/mm/l2c-common.c
+> > > @@ -7,9 +7,17 @@
+> > >   * published by the Free Software Foundation.
+> > >   */
+> > >  #include <linux/bug.h>
+> > > +#include <linux/export.h>
+> > >  #include <linux/smp.h>
+> > >  #include <asm/outercache.h>
+> > >  
+> > > +void outer_sync(void)
+> > > +{
+> > > +	if (outer_cache.sync)
+> > > +		outer_cache.sync();
+> > > +}
 > > 
-> > Shouldn't pretty much all these occurrences of clk_disable/enable
-> > disappear? This should all be handled by the runtime_pm framework now.
+> > But don't you end up with two branches now? With an outer cache, I guess
+> > the additional branch won't be noticed, especially if the prediction on
+> > the outer_cache.sync() call is better (but that's not a simple
+> > conditional branch prediction, it relies on predicting the value of the
+> > pointer, not entirely sure how this works).
 > 
-> We have:
-> - clk_prepare_enable() in probe
+> Yes, we end up with two branches.  The branch to this function is 
+> unconditional and always taken - if a branch predictor gets that wrong,
+> then the branch predictor is broken!
+> 
+> However, that is not the only side effect of this change: the other
+> change is a reduction in instruction cache usage.
+> 
+> > However, on SoCs without an outer cache (and single kernel image), we
+> > end up with a permanent branch/return even though such branch would not
+> > be needed.
+> 
+> Right, so we go from something like this:
+> 
+>  188:   e594301c        ldr     r3, [r4, #28]
+>  18c:   e3002356        movw    r2, #854        ; 0x356
+>  190:   e3402100        movt    r2, #256        ; 0x100
+>  194:   e583204c        str     r2, [r3, #76]   ; 0x4c
+>  198:   f57ff04e        dsb     st
+>  19c:   e5953014        ldr     r3, [r5, #20]
+>  1a0:   e3530000        cmp     r3, #0
+>  1a4:   0a000000        beq     1ac <ipu_dp_csc_init+0x1ac>
+>  1a8:   e12fff33        blx     r3
+> 
+> down to:
+> 
+>  1e0:   e594301c        ldr     r3, [r4, #28]
+>  1e4:   e3002356        movw    r2, #854        ; 0x356
+>  1e8:   e3402100        movt    r2, #256        ; 0x100
+>  1ec:   e583204c        str     r2, [r3, #76]   ; 0x4c
+>  1f0:   f57ff04e        dsb     st
+>  1f4:   ebfffffe        bl      0 <outer_sync>
+> 
+> which saves 12 bytes per writel() - in favour of having the contents
+> of outer_cache_sync() being in one location in the kernel, and will
+> therefore be hotter in the instruction cache.
+> 
+> (Addresses different because the optimiser arranges the functions
+> differently.)
+> 
+> I'm willing to bet that the excessive use of "inline" in the kernel is
+> actually harming things: it made sense when taking a branch was expensive
+> (such as with older ARM CPUs) but this isn't the case anymore.
 
-This should become something like pm_runtime_get_sync(), shouldn't it?
+BTW, what we /could/ do is to be a little more clever at these (and
+similar) callsites.
 
-> - clk_disable_unprepare() in remove
+We could have the linker build a table of callsites and a pointer to
+the indirect function pointer, and we initialise each of the callsites
+to a small "dynamic patcher."
 
-pm_runtime_put()
+When one of these sites is hit, the dynamic patcher is called, which
+looks up the site in the linker built table, and patches the callsite
+with a direct call to the required function, or if the function pointer
+is NULL, replaces it with a NOP instruction.
 
-> - clk_enable() in runtime_resume
-> - clk_disable() in runtime_suspend
+This eliminates the loads to get the function pointer, the test, and
+the conditional branch, turning the whole thing into a _single_ well
+known branch or a NOP instruction.
 
-These are the ones needed.
+Since things like the cache ops, processor ops, etc are all constant
+at runtime, I think this would make sense.
 
-The above makes me suspect that the clocks are always on, regardless of
-the runtime suspend state since they are enabled in probe and disabled
-in remove, is that right? Ideally, the usage in probe and remove should
-be migrated to runtime_pm and clocks should really only be running when
-needed and not throughout the whole lifetime of the driver.
-
-	S?ren
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
