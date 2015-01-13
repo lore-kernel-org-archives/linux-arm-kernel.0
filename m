@@ -1,50 +1,34 @@
-From: jiri@resnulli.us (Jiri Pirko)
-Date: Tue, 13 Jan 2015 15:36:35 +0100
-Subject: [PATCH] rocker: fix harmless warning on 32-bit machines
-In-Reply-To: <4047824.AYNhYQQ6UI@wuerfel>
-References: <4047824.AYNhYQQ6UI@wuerfel>
-Message-ID: <20150113143635.GB1839@nanopsycho.lan>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 13 Jan 2015 15:36:54 +0100
+Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
+ readl/writel
+In-Reply-To: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
+References: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150113143654.GG7660@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tue, Jan 13, 2015 at 03:23:52PM CET, arnd at arndb.de wrote:
->The rocker driver tries to assign a pointer to a 64-bit integer
->and then back to a pointer. This is safe on all architectures,
->but causes a compiler warning when pointers are shorter than
->64-bit:
->
->rocker/rocker.c: In function 'rocker_desc_cookie_ptr_get':
->rocker/rocker.c:809:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->  return (void *) desc_info->desc->cookie;
->         ^
->
->This adds another cast to uintptr_t to tell the compiler
->that it's safe.
->
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
+On Thu, Dec 11, 2014 at 02:26:41PM +0800, Jisheng Zhang wrote:
+> readl/writel is too expensive especially on Cortex A9 w/ outer L2 cache.
+> This introduces i2c read/write errors on Marvell BG2/BG2Q SoCs when there
+> are heavy L2 cache maintenance operations at the same time.
 
-Acked-by: Jiri Pirko <jiri@resnulli.us>
+Reading this again, I got a question:
 
->
->diff --git a/drivers/net/ethernet/rocker/rocker.c b/drivers/net/ethernet/rocker/rocker.c
->index 2f398fa4b9e6..cad8cf962cdf 100644
->--- a/drivers/net/ethernet/rocker/rocker.c
->+++ b/drivers/net/ethernet/rocker/rocker.c
->@@ -806,13 +806,13 @@ static bool rocker_desc_gen(struct rocker_desc_info *desc_info)
-> 
-> static void *rocker_desc_cookie_ptr_get(struct rocker_desc_info *desc_info)
-> {
->-	return (void *) desc_info->desc->cookie;
->+	return (void *)(uintptr_t)desc_info->desc->cookie;
-> }
-> 
-> static void rocker_desc_cookie_ptr_set(struct rocker_desc_info *desc_info,
-> 				       void *ptr)
-> {
->-	desc_info->desc->cookie = (long) ptr;
->+	desc_info->desc->cookie = (uintptr_t) ptr;
-> }
-> 
-> static struct rocker_desc_info *
->
+Really read/write errors? I would think that there is a performance
+penalty because of the memory barriers. But errors?
+
+> The driver does not perform DMA, so it's safe to use the relaxed version.
+> From another side, the relaxed io accessor macros are available on all
+> architectures now, so we can use the relaxed versions instead.
+
+Can the designware core make use of DMA in theory?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/471af9f5/attachment.sig>
