@@ -1,185 +1,72 @@
-From: ottxor@gentoo.org (Christoph Junghans)
-Date: Mon, 12 Jan 2015 18:22:12 -0700
-Subject: [PATCH v2] Added support for pogoplug e02 (pink/gray)
-In-Reply-To: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
-References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
-Message-ID: <1421112132-9651-1-git-send-email-ottxor@gentoo.org>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 13 Jan 2015 09:24:35 +0800
+Subject: [PATCH 6/7] ARM: at91: remove useless at91rm9200_dt_initialize()
+In-Reply-To: <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421088136-10172-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B473D3.6090008@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pogoplug differs from the SheevaPlug only by a
-few details, but especially in the led assignments.
-This patch was tested under Gentoo Linux and is
-based on dts files from Arch Linux ARM and OpenWrt.
+Hi Alexandre,
 
-Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
-Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
-Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
----
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 129 +++++++++++++++++++++
- 3 files changed, 131 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
+On 01/13/2015 02:42 AM, Alexandre Belloni wrote:
+> at91rm9200_dt_initialize() is doing the same as at91_dit_initialize(), use that
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..e5f58c6 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -32,6 +32,7 @@ cdns	Cadence Design Systems Inc.
- chrp	Common Hardware Reference Platform
- chunghwa	Chunghwa Picture Tubes Ltd.
- cirrus	Cirrus Logic, Inc.
-+cloudengines	Cloud Engines, Inc.
- cortina	Cortina Systems, Inc.
- crystalfontz	Crystalfontz America, Inc.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..cd974eb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -143,6 +143,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
- 	kirkwood-openrd-base.dtb \
- 	kirkwood-openrd-client.dtb \
- 	kirkwood-openrd-ultimate.dtb \
-+	kirkwood-pogo_e02.dtb \
- 	kirkwood-rd88f6192.dtb \
- 	kirkwood-rd88f6281-a0.dtb \
- 	kirkwood-rd88f6281-a1.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-pogo_e02.dts b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
-new file mode 100644
-index 0000000..be38dab
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
-@@ -0,0 +1,129 @@
-+/*
-+ * kirkwood-sheevaplug.dts - Device tree file for Pogoplug E02
-+ *
-+ * Copyright (C) 2015 Christoph Junghans <ottxor@gentoo.org>
-+ *
-+ * based on information of dts files from
-+ *  Arch Linux ARM by Oleg Rakhmanov <moonman.ca@gmail.com>
-+ *  OpenWrt by Felix Kaechele <heffer@fedoraproject.org>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	model = "Cloud Engines Pogoplug E02";
-+	compatible = "cloudengines,pogoe02", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+		linux,stdout-path = &serial1;
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pmx_usb_power_enable: pmx-usb-power-enable {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_green: pmx-led-green {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_orange: pmx-led-orange {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
-+		};
-+		serial1: serial at 12000 {
-+			status = "ok";
-+		};
-+	};
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
-+			      &pmx_led_green >;
-+		pinctrl-names = "default";
-+
-+		health {
-+			label = "pogo_e02:green:health";
-+			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
-+		};
-+		fault {
-+			label = "pogo_e02:orange:fault";
-+			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_usb_power_enable>;
-+		pinctrl-names = "default";
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&nand {
-+	chip-delay = <40>;
-+	status = "okay";
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0x100000>;
-+		read-only;
-+	};
-+
-+	partition at 100000 {
-+		label = "uImage";
-+		reg = <0x0100000 0x400000>;
-+	};
-+
-+	partition at 500000 {
-+		label = "pogoplug";
-+		reg = <0x0500000 0x2000000>;
-+	};
-+
-+	partition at 2500000 {
-+		label = "root";
-+		reg = <0x02500000 0x5b00000>;
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
--- 
-2.0.5
+s/at91_dit_initialize/at91_dt_initialize
+
+> one instead.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   arch/arm/mach-at91/board-dt-rm9200.c | 2 +-
+>   arch/arm/mach-at91/generic.h         | 1 -
+>   arch/arm/mach-at91/setup.c           | 7 -------
+>   3 files changed, 1 insertion(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+> index 76dfe8f9af50..a15ab6f8de00 100644
+> --- a/arch/arm/mach-at91/board-dt-rm9200.c
+> +++ b/arch/arm/mach-at91/board-dt-rm9200.c
+> @@ -38,6 +38,6 @@ static const char *at91rm9200_dt_board_compat[] __initdata = {
+>   DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+>   	.init_time      = at91rm9200_dt_timer_init,
+>   	.map_io		= at91_map_io,
+> -	.init_early	= at91rm9200_dt_initialize,
+> +	.init_early	= at91_dt_initialize,
+>   	.dt_compat	= at91rm9200_dt_board_compat,
+>   MACHINE_END
+> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+> index e0368aa06390..c10c2ddaae6d 100644
+> --- a/arch/arm/mach-at91/generic.h
+> +++ b/arch/arm/mach-at91/generic.h
+> @@ -22,7 +22,6 @@ extern void __init at91_init_sram(int bank, unsigned long base,
+>
+>    /* Processors */
+>   extern void __init at91rm9200_set_type(int type);
+> -extern void __init at91rm9200_dt_initialize(void);
+>   extern void __init at91_dt_initialize(void);
+>
+>    /* Timer */
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index ce25e85720fb..acb8d7724609 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -429,13 +429,6 @@ static void at91_dt_ramc(void)
+>   	at91_pm_set_standby(standby);
+>   }
+>
+> -void __init at91rm9200_dt_initialize(void)
+> -{
+> -	at91_dt_ramc();
+> -
+> -	at91_boot_soc.init();
+> -}
+> -
+>   void __init at91_dt_initialize(void)
+>   {
+>   	at91_dt_ramc();
+>
+
+Best Regards,
+Bo Shen
