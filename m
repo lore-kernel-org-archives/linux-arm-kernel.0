@@ -1,58 +1,67 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 13 Jan 2015 11:47:04 +0100
-Subject: [PATCH 2/2] ARM: dts: sun8i: Enable lradc on a23-ippo-q8h-v5
-In-Reply-To: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
-References: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1421146024-17957-2-git-send-email-hdegoede@redhat.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 13 Jan 2015 11:47:48 +0100 (CET)
+Subject: [PATCH] clocksource: timer-atmel-pit: don't suspend/resume if
+ unused
+In-Reply-To: <54B3D88C.80702@linaro.org>
+References: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
+ <54B3D450.7050405@atmel.com> <54B3D88C.80702@linaro.org>
+Message-ID: <alpine.DEB.2.11.1501131143250.17382@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The a23-ippo-q8h tablets have volume up/down buttons using the lradc. This
-has been tested on both a v5 and a v1.2 tablet.
+On Mon, 12 Jan 2015, Daniel Lezcano wrote:
 
-Tested-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> On 01/12/2015 03:04 PM, Nicolas Ferre wrote:
+> > Le 18/12/2014 15:05, Nicolas Ferre a ?crit :
+> > > From: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> > > 
+> > > Waiting for PIT to stop counting takes a long time:
+> > >    1/(Master clock/prescaler/PIVR)
+> > > = 1/(133 MHz     /16       /2^20)
+> > > = 126 ms
+> > > 
+> > > Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
+> > > of the unused PIT device reduce (suspend time + resume time) from ~140 ms
+> > > to ~17 ms.
+> > > 
+> > > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> > > [nicolas.ferre at atmel.com: move to newer clocksource driver]
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > ---
+> > > Hi Sylvain,
+> > > 
+> > > I re-worked (and "Acked") your patch so it can be applied on the newer
+> > > Mainline
+> > > kernels. Beware, I changed the "subject line" as well. The PIT driver
+> > > moved
+> > > recently (3.18).
+> > > 
+> > > Daniel,
+> > > Can you take this patch in your tree?
+> > 
+> > Hi Daniel,
+> > 
+> > Anything prevents this patch from being merged (aka ping ;-))?
+> 
+> [Cc'ed tglx].
+> 
+> Hi Nico,
+> 
+> thanks for the head up.
+> 
+> Nothing prevents it but I am wondering if this change shouldn't be in the
+> generic framework (kernel/time/clocksource.c and kernel/time/clockevents.c),
+> so all drivers will benefit this change ?
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-index 1da31d0..623573e 100644
---- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-@@ -52,6 +52,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
-@@ -86,6 +87,25 @@
- 			};
- 		};
- 
-+		lradc: lradc at 01c22800 {
-+			vref-supply = <&reg_vcc3v0>;
-+			status = "okay";
-+
-+			button at 200 {
-+				label = "Volume Up";
-+				linux,code = <KEY_VOLUMEUP>;
-+				channel = <0>;
-+				voltage = <200000>;
-+			};
-+
-+			button at 400 {
-+				label = "Volume Down";
-+				linux,code = <KEY_VOLUMEDOWN>;
-+				channel = <0>;
-+				voltage = <400000>;
-+			};
-+		};
-+
- 		i2c0: i2c at 01c2ac00 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
--- 
-2.1.0
+Indeed. There is no point in calling suspend/resume for unused
+clockevents. They should be stopped and disabled already.
+
+Now with clocksources this might be different. We have no explicit
+state for this, but its trivial to add one at least for those
+clocksources which have enable/disable callbacks. For the other ones
+not so much.
+
+Thanks,
+
+	tglx
