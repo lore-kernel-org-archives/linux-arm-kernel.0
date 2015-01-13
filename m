@@ -1,66 +1,80 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 13 Jan 2015 09:37:25 +0800
-Subject: [PATCH v3 03/13] ARM: dts: sun9i: Add mmc module clock nodes for A80
+Date: Tue, 13 Jan 2015 09:37:23 +0800
+Subject: [PATCH v3 01/13] clk: sunxi: Add a common setup function for mmc
+ module clocks
 In-Reply-To: <1421113055-17867-1-git-send-email-wens@csie.org>
 References: <1421113055-17867-1-git-send-email-wens@csie.org>
-Message-ID: <1421113055-17867-4-git-send-email-wens@csie.org>
+Message-ID: <1421113055-17867-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmc module clocks are A80 specific module 0 (storage) type clocks.
+The only difference between module clocks on different platforms is the
+width of the mux register bits and the valid values, which are passed in
+through struct factors_data. The phase clocks parts are identical.
+
+This patch generalizes the setup function, so most of the code can be
+reused when adding sun9i support, which has a wider mux register.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/clk/sunxi/clk-mod0.c | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 4b584cb9c2f0..ddc34676987d 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -219,6 +219,42 @@
- 			clock-output-names = "cci400";
- 		};
+diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+index e37eb6fe19e8..4430d1398ce6 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
++++ b/drivers/clk/sunxi/clk-mod0.c
+@@ -272,9 +272,16 @@ static const struct clk_ops mmc_clk_ops = {
+ 	.set_phase	= mmc_set_phase,
+ };
  
-+		mmc0_clk: clk at 06000410 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-mmc-clk";
-+			reg = <0x06000410 0x4>;
-+			clocks = <&osc24M>, <&pll4>;
-+			clock-output-names = "mmc0", "mmc0_output",
-+					     "mmc0_sample";
-+		};
+-static DEFINE_SPINLOCK(sun4i_a10_mmc_lock);
+-
+-static void __init sun4i_a10_mmc_setup(struct device_node *node)
++/*
++ * sunxi_mmc_setup - Common setup function for mmc module clocks
++ *
++ * The only difference between module clocks on different platforms is the
++ * width of the mux register bits and the valid values, which are passed in
++ * through struct factors_data. The phase clocks parts are identical.
++ */
++static void __init sunxi_mmc_setup(struct device_node *node,
++				   const struct factors_data *data,
++				   spinlock_t *lock)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	const char *parent;
+@@ -296,9 +303,7 @@ static void __init sun4i_a10_mmc_setup(struct device_node *node)
+ 		goto err_free_data;
+ 
+ 	clk_data->clk_num = 3;
+-	clk_data->clks[0] = sunxi_factors_register(node,
+-						   &sun4i_a10_mod0_data,
+-						   &sun4i_a10_mmc_lock, reg);
++	clk_data->clks[0] = sunxi_factors_register(node, data, lock, reg);
+ 	if (!clk_data->clks[0])
+ 		goto err_free_clks;
+ 
+@@ -318,7 +323,7 @@ static void __init sun4i_a10_mmc_setup(struct device_node *node)
+ 
+ 		phase->hw.init = &init;
+ 		phase->reg = reg;
+-		phase->lock = &sun4i_a10_mmc_lock;
++		phase->lock = lock;
+ 
+ 		if (i == 1)
+ 			phase->offset = 8;
+@@ -345,4 +350,11 @@ err_free_clks:
+ err_free_data:
+ 	kfree(clk_data);
+ }
 +
-+		mmc1_clk: clk at 06000414 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-mmc-clk";
-+			reg = <0x06000414 0x4>;
-+			clocks = <&osc24M>, <&pll4>;
-+			clock-output-names = "mmc1", "mmc1_output",
-+					     "mmc1_sample";
-+		};
++static DEFINE_SPINLOCK(sun4i_a10_mmc_lock);
 +
-+		mmc2_clk: clk at 06000418 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-mmc-clk";
-+			reg = <0x06000418 0x4>;
-+			clocks = <&osc24M>, <&pll4>;
-+			clock-output-names = "mmc2", "mmc2_output",
-+					     "mmc2_sample";
-+		};
-+
-+		mmc3_clk: clk at 0600041c {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun9i-a80-mmc-clk";
-+			reg = <0x0600041c 0x4>;
-+			clocks = <&osc24M>, <&pll4>;
-+			clock-output-names = "mmc3", "mmc3_output",
-+					     "mmc3_sample";
-+		};
-+
- 		ahb0_gates: clk at 06000580 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
++static void __init sun4i_a10_mmc_setup(struct device_node *node)
++{
++	sunxi_mmc_setup(node, &sun4i_a10_mod0_data, &sun4i_a10_mmc_lock);
++}
+ CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
 -- 
 2.1.4
