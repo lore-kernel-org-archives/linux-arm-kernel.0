@@ -1,39 +1,47 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Tue, 13 Jan 2015 11:18:30 -0800
-Subject: [PATCHv2 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c
- LED driver
-In-Reply-To: <20150113191349.GE14570@lunn.ch>
-References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
- <1420843545-30892-3-git-send-email-andrew@lunn.ch>
- <CAK5ve-JQJJH_Dk=+PbFyRL3cjQUU4a5au4h9Kfcz6L6_iAfPKA@mail.gmail.com>
- <20150113191349.GE14570@lunn.ch>
-Message-ID: <CAK5ve-LS0KO4avfprz=6rS4MT5AdiAtF02EVvv=cRbz03t4E_w@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 13 Jan 2015 11:27:07 -0800
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <54B50CDA.3090307@gmail.com>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+ <54AD3EAE.6090009@gmail.com> <20150107222209.64ed24a0@xhacker>
+ <54AD431F.6060403@gmail.com> <20150109201306.4d1a296b@xhacker>
+ <54B12446.4030703@gmail.com> <20150113002817.20842.98432@quantum>
+ <54B50CDA.3090307@gmail.com>
+Message-ID: <20150113192707.20842.42495@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 11:13 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Jan 13, 2015 at 10:55:23AM -0800, Bryan Wu wrote:
->> On Fri, Jan 9, 2015 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > The TLC59116 is an I2C bus controlled 16-channel LED driver.  Each LED
->> > output has its own 8-bit fixed-frequency PWM controller to control the
->> > brightness of the LED.
->> >
->> > This is based on a driver from Belkin, but has been extensively
->> > rewritten.
->> >
->> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> > Cc: Matthew.Fatheree at belkin.com
->>
->> Looks good, applied to my tree.
->
-> Great, thanks.
->
-> Will you also take the device tree binding document patch?
->
-> Thanks
->         Andrew
+Quoting Sebastian Hesselbarth (2015-01-13 04:17:30)
+> On 01/13/2015 01:28 AM, Mike Turquette wrote:
+> > Quoting Sebastian Hesselbarth (2015-01-10 05:08:22)
+> >> This is clk subsystem, so either Mike takes it through his fixes branch
+> >> including my
+> >>
+> >> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >>
+> >> or decides to agree that I take it instead with his Ack. I am fine
+> >> with both.
+> >
+> > Acked-by: Michael Turquette <mturquette@linaro.org>
+> >
+> > Now the three fixes can stay together and live happily ever after.
+> 
+> Mike,
+> 
+> I already had the two others pulled by Olof some days ago.
+> If you plan for a fixes branch for v3.19, please take this in too.
+> 
+> If you have no other fixes, I can take it and do a 2nd round of
+> fixes for Berlin.
 
-Can you update that one without that gpio thing in the example? And if
-there is no objection from others, I will take it.
+The fixes family has been broken up. How sad.
 
--Bryan
+Applied to clk-fixes for the next -rc.
+
+Regards,
+Mike
+
+> 
+> Sebastian
+> 
