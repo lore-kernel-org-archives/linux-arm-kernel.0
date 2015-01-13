@@ -1,44 +1,96 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 13 Jan 2015 13:08:12 +0200
-Subject: [PATCH v7 1/3] of: Decrement refcount of previous endpoint in
- of_graph_get_next_endpoint
-In-Reply-To: <1419340158-20567-2-git-send-email-p.zabel@pengutronix.de>
-References: <1419340158-20567-1-git-send-email-p.zabel@pengutronix.de>
- <1419340158-20567-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <54B4FC9C.2050207@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 13 Jan 2015 12:08:37 +0100
+Subject: [PATCH v5] can: Convert to runtime_pm
+In-Reply-To: <3a3437c5c8ff48d9a45fee7e81fa8dca@BY2FFO11FD058.protection.gbl>
+References: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
+ <3a3437c5c8ff48d9a45fee7e81fa8dca@BY2FFO11FD058.protection.gbl>
+Message-ID: <54B4FCB5.6040904@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/12/14 15:09, Philipp Zabel wrote:
-> Decrementing the reference count of the previous endpoint node allows to
-> use the of_graph_get_next_endpoint function in a for_each_... style macro.
-> All current users of this function that pass a non-NULL prev parameter
-> (coresight, rcar-du, imx-drm, soc_camera, and omap2-dss) are changed to
-> not decrement the passed prev argument's refcount themselves.
+On 01/12/2015 07:45 PM, S?ren Brinkmann wrote:
+> On Mon, 2015-01-12 at 08:34PM +0530, Kedareswara rao Appana wrote:
+>> Instead of enabling/disabling clocks at several locations in the driver,
+>> Use the runtime_pm framework. This consolidates the actions for runtime PM
+>> In the appropriate callbacks and makes the driver more readable and mantainable.
+>>
+>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+>> ---
+>> Changes for v5:
+>>  - Updated with the review comments.
+>>    Updated the remove fuction to use runtime_pm.
+>> Chnages for v4:
+>>  - Updated with the review comments.
+>> Changes for v3:
+>>   - Converted the driver to use runtime_pm.
+>> Changes for v2:
+>>   - Removed the struct platform_device* from suspend/resume
+>>     as suggest by Lothar.
+>>
+>>  drivers/net/can/xilinx_can.c |  157 ++++++++++++++++++++++++++++-------------
+>>  1 files changed, 107 insertions(+), 50 deletions(-)
+> [..]
+>> +static int __maybe_unused xcan_runtime_resume(struct device *dev)
+>>  {
+>> -	struct platform_device *pdev = dev_get_drvdata(dev);
+>> -	struct net_device *ndev = platform_get_drvdata(pdev);
+>> +	struct net_device *ndev = dev_get_drvdata(dev);
+>>  	struct xcan_priv *priv = netdev_priv(ndev);
+>>  	int ret;
+>> +	u32 isr, status;
+>>  
+>>  	ret = clk_enable(priv->bus_clk);
+>>  	if (ret) {
+>> @@ -1014,15 +1030,28 @@ static int __maybe_unused xcan_resume(struct device *dev)
+>>  	ret = clk_enable(priv->can_clk);
+>>  	if (ret) {
+>>  		dev_err(dev, "Cannot enable clock.\n");
+>> -		clk_disable_unprepare(priv->bus_clk);
+>> +		clk_disable(priv->bus_clk);
+> [...]
+>> @@ -1173,12 +1219,23 @@ static int xcan_remove(struct platform_device *pdev)
+>>  {
+>>  	struct net_device *ndev = platform_get_drvdata(pdev);
+>>  	struct xcan_priv *priv = netdev_priv(ndev);
+>> +	int ret;
+>> +
+>> +	ret = pm_runtime_get_sync(&pdev->dev);
+>> +	if (ret < 0) {
+>> +		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
+>> +				__func__, ret);
+>> +		return ret;
+>> +	}
+>>  
+>>  	if (set_reset_mode(ndev) < 0)
+>>  		netdev_err(ndev, "mode resetting failed!\n");
+>>  
+>>  	unregister_candev(ndev);
+>> +	pm_runtime_disable(&pdev->dev);
+>>  	netif_napi_del(&priv->napi);
+>> +	clk_disable_unprepare(priv->bus_clk);
+>> +	clk_disable_unprepare(priv->can_clk);
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
-> Changes since v6:
->  - Added omap2-dss.
->  - Added Mathieu's ack.
-> ---
->  drivers/coresight/of_coresight.c                  | 13 ++-----------
->  drivers/gpu/drm/imx/imx-drm-core.c                | 13 ++-----------
->  drivers/gpu/drm/rcar-du/rcar_du_kms.c             | 15 ++++-----------
->  drivers/media/platform/soc_camera/soc_camera.c    |  3 ++-
->  drivers/of/base.c                                 |  9 +--------
->  drivers/video/fbdev/omap2/dss/omapdss-boot-init.c |  7 +------
->  6 files changed, 12 insertions(+), 48 deletions(-)
-> 
+> Shouldn't pretty much all these occurrences of clk_disable/enable
+> disappear? This should all be handled by the runtime_pm framework now.
 
-For omapdss:
+We have:
+- clk_prepare_enable() in probe
+- clk_disable_unprepare() in remove
+- clk_enable() in runtime_resume
+- clk_disable() in runtime_suspend
 
-Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Which is, as far as I understand the right way to do it. Maybe
+Kedareswara can post the clock debug output again with this patch
+iteration. Have I missed something?
 
- Tomi
-
+regards,
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -46,4 +98,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/d171a937/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/f110ad7a/attachment.sig>
