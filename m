@@ -1,91 +1,32 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 13 Jan 2015 11:06:57 -0800
-Subject: [PATCH v2] clk: at91: keep slow clk enabled to prevent system hang
-In-Reply-To: <1421160246-29712-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421160246-29712-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150113190657.20842.90692@quantum>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 13 Jan 2015 20:13:49 +0100
+Subject: [PATCHv2 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c
+ LED driver
+In-Reply-To: <CAK5ve-JQJJH_Dk=+PbFyRL3cjQUU4a5au4h9Kfcz6L6_iAfPKA@mail.gmail.com>
+References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
+ <1420843545-30892-3-git-send-email-andrew@lunn.ch>
+ <CAK5ve-JQJJH_Dk=+PbFyRL3cjQUU4a5au4h9Kfcz6L6_iAfPKA@mail.gmail.com>
+Message-ID: <20150113191349.GE14570@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris Brezillon (2015-01-13 06:44:06)
-> All slow clk users are not properly claiming it (get + prepare + enable)
-> before using it.
-> If all users properly claiming this clock release it, the clock is
-> disabled, but faulty users still depends on it, and the system hangs.
+On Tue, Jan 13, 2015 at 10:55:23AM -0800, Bryan Wu wrote:
+> On Fri, Jan 9, 2015 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > The TLC59116 is an I2C bus controlled 16-channel LED driver.  Each LED
+> > output has its own 8-bit fixed-frequency PWM controller to control the
+> > brightness of the LED.
+> >
+> > This is based on a driver from Belkin, but has been extensively
+> > rewritten.
+> >
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Matthew.Fatheree at belkin.com
 > 
-> This fix prevents the slow clock from being disabled, and should solve the
-> hanging issue, but offending drivers should be patched to properly claim
-> this clock.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Bo Shen <voice.shen@atmel.com>
-> Cc: stable at vger.kernel.org
+> Looks good, applied to my tree.
 
-Applied to clk-fixes towards the next -rc.
+Great, thanks.
 
-Thanks,
-Mike
+Will you also take the device tree binding document patch?
 
-> ---
->  drivers/clk/at91/clk-slow.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-> index 32f7c1b..2f13bd5 100644
-> --- a/drivers/clk/at91/clk-slow.c
-> +++ b/drivers/clk/at91/clk-slow.c
-> @@ -70,6 +70,7 @@ struct clk_sam9x5_slow {
->  
->  #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
->  
-> +static struct clk *slow_clk;
->  
->  static int clk_slow_osc_prepare(struct clk_hw *hw)
->  {
-> @@ -357,6 +358,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
->         clk = clk_register(NULL, &slowck->hw);
->         if (IS_ERR(clk))
->                 kfree(slowck);
-> +       else
-> +               slow_clk = clk;
->  
->         return clk;
->  }
-> @@ -433,6 +436,8 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
->         clk = clk_register(NULL, &slowck->hw);
->         if (IS_ERR(clk))
->                 kfree(slowck);
-> +       else
-> +               slow_clk = clk;
->  
->         return clk;
->  }
-> @@ -465,3 +470,25 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
->  
->         of_clk_add_provider(np, of_clk_src_simple_get, clk);
->  }
-> +
-> +/*
-> + * FIXME: All slow clk users are not properly claiming it (get + prepare +
-> + * enable) before using it.
-> + * If all users properly claiming this clock decide that they don't need it
-> + * anymore (or are removed), it is disabled while faulty users are still
-> + * requiring it, and the system hangs.
-> + * Prevent this clock from being disabled until all users are properly
-> + * requesting it.
-> + * Once this is done we should remove this function and the slow_clk variable.
-> + */
-> +static int __init of_at91_clk_slow_retain(void)
-> +{
-> +       if (!slow_clk)
-> +               return 0;
-> +
-> +       __clk_get(slow_clk);
-> +       clk_prepare_enable(slow_clk);
-> +
-> +       return 0;
-> +}
-> +arch_initcall(of_at91_clk_slow_retain);
-> -- 
-> 1.9.1
-> 
+Thanks
+	Andrew
