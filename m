@@ -1,70 +1,52 @@
-From: harinik@xilinx.com (Harini Katakam)
-Date: Wed, 14 Jan 2015 00:04:59 +0530
-Subject: [PATCH v6] i2c: cadence: Check for errata condition involving master
- receive
-Message-ID: <1421174099-19839-1-git-send-email-harinik@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Jan 2015 18:36:17 +0000
+Subject: [PATCH v3 14/21] ARM: imx6: convert GPC to stacked domains
+In-Reply-To: <CACRpkdYHnBtP39xpEkjdibpijGip0Y3+YLvEA8KUGfentKbZ9A@mail.gmail.com>
+References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>	<1421087187-26988-15-git-send-email-marc.zyngier@arm.com>
+ <CACRpkdYHnBtP39xpEkjdibpijGip0Y3+YLvEA8KUGfentKbZ9A@mail.gmail.com>
+Message-ID: <54B565A1.5010206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cadence I2C controller has the following bugs:
-- completion indication is not given to the driver at the end of
-a read/receive transfer with HOLD bit set.
-- Invalid read transaction are generated on the bus when HW timeout
-condition occurs with HOLD bit set.
+On 13/01/15 06:09, Linus Walleij wrote:
 
-As a result of the above, if a set of messages to be transferred with
-repeated start includes any message following a read message,
-completion is never indicated and timeout occurs.
-Hence a check is implemented to return -EOPNOTSUPP for such sequences.
+Hi Linus,
 
-Signed-off-by: Harini Katakam <harinik@xilinx.com>
-Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
----
+> On Mon, Jan 12, 2015 at 7:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+>> IMX6 has been (ab)using the gic_arch_extn to provide
+>> wakeup from suspend, and it makes a lot of sense to convert
+>> this code to use stacked domains instead.
+>>
+>> This patch does just this, updating the DT files to actually
+>> reflect what the HW provides.
+>>
+>> BIG FAT WARNING: because the DTs were so far lying by not
+>> exposing the fact that the GPC block is actually the first
+>> interrupt controller in the chain, kernels with this patch
+>> applied wont have any suspend-resume facility when booted
+>> with old DTs, and old kernels with updated DTs won't even boot.
+>>
+>> Tested-by: Stefan Agner <stefan@agner.ch>
+>> Acked-by: Stefan Agner <stefan@agner.ch>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> (...)
+> 
+>> +static int imx_gpc_domain_alloc(struct irq_domain *domain,
+>> +                                 unsigned int virq,
+> 
+> Nutcase nitpick on this nice patch series: every time I see "virq" my
+> OCD triggers, as I think the "v" in "virq" stand for virtual. These irqs
+> are no more virtual than any other Linux irq numbers, hwirq is
+> more to the point.
+> 
+> I just refer to these as "irq" (sans "v") in any code I write.
 
-v6:
-- Correct if condition - add braces to include both statements.
-- Modify comments and warning message.
+That's fair enough. I'll update that as I fix some other nits.
 
-v5:
-Make warning grepable in driver.
+Thanks,
 
-v4:
-Use single dev_warn and make message grep-able.
-
-v3:
-Add warning in case of unsupported transfer.
-
-v2:
-Dont defeteature repeated start. Just check for unsupported conditions in the
-driver and return error.
-
----
- drivers/i2c/busses/i2c-cadence.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 5f5d4fa..c7be4fb 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -541,6 +541,19 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 	 * processed with a repeated start.
- 	 */
- 	if (num > 1) {
-+		/*
-+		 * This controller does not give completion interrupt after a
-+		 * master receive message if HOLD bit is set (repeated start),
-+		 * resulting in SW timeout. Hence, if a receive message is
-+		 * followed by any other message, an error is returned
-+		 * indicating that this sequence is not supported.
-+		 */
-+		for (count = 0; count < num-1; count++) {
-+			if (msgs[count].flags & I2C_M_RD) {
-+				dev_warn(adap->dev.parent, "Can't do repeated start after a receive message\n");
-+				return -EOPNOTSUPP;
-+			}
-+		}
- 		id->bus_hold_flag = 1;
- 		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
- 		reg |= CDNS_I2C_CR_HOLD;
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
