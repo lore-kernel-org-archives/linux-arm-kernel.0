@@ -1,38 +1,40 @@
-From: frediano.ziglio@huawei.com (Frediano Ziglio)
-Date: Tue, 13 Jan 2015 14:18:16 +0000
-Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
-In-Reply-To: <4774908.c54zTnV4pN@wuerfel>
-References: <54B48D5E.6050902@hisilicon.com> <3703587.1qvjMFgdrL@wuerfel>
- <54B4F350.5040007@hisilicon.com> <4774908.c54zTnV4pN@wuerfel>
-Message-ID: <B944B469BF5302468AC6EB05E56CC70DB3BAA8@lhreml503-mbs.china.huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Jan 2015 15:20:05 +0100
+Subject: [PATCH] PCI: xilinx: fix harmless format string warning
+Message-ID: <1759235.dcJCuiggea@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tuesday 13 January 2015 18:28:32 Wei Xu wrote:
-> >
-> > > Generally speaking it's not ok to change firmware interfaces in an
-> > > incompatible way. The preferred way to handle this would be to have
-> > > the firmware that puts the boot wrapper into a different place also
-> > > update this property, if at all possible.
-> >
-> > I very agreed with you.
-> >
-> > But before we have two kind of firmwares one is boot from SVC
-> > supporting PXE/NAND/SATA/GRUB booting and the other is boot from HYP
-> > just supporting NAND booting.
-> > This time we updated the firmware and made it boot from HYP
-> supporting
-> > PXE/NAND/SATA/GRUB as we hoped(thanks for Alex's supporting!).
-> >
-> > Since we have to publish a new firmware I think it is a chance to
-> > update the dts of kernel. How do you think about it?
-> 
-> The intention is certainly good. If you expect no further incompatible
-> changes, how about adding another .dts file for this machine that can
-> work with the old firmware?
-> 
-> 	Arnd
+The xilinx pcie driver prints a register value whose type is
+propagated to the type returned by the GENMASK() macro.
+Unfortunately, that type has recently changed as the result
+of a bug fix, so now we get a warning about the type:
 
-Would much prefer to have PSCI support instead directly in the firmware.
+drivers/pci/host/pcie-xilinx.c: In function 'xilinx_pcie_clear_err_interrupts':
+drivers/pci/host/pcie-xilinx.c:154:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
 
-Frediano
+This changes the code so we always print the number as an
+'unsigned long' type to avoid the warning. The original code
+was fine on 32-bit architectures but not on 64-bit. Now it
+works as expected on both.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 00b4d9a1412 ("bitops: Fix shift overflow in GENMASK macros")
+
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index ef3ebaf9a738..ce1c61d85b2c 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -148,10 +148,10 @@ static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
+  */
+ static void xilinx_pcie_clear_err_interrupts(struct xilinx_pcie_port *port)
+ {
+-	u32 val = pcie_read(port, XILINX_PCIE_REG_RPEFR);
++	unsigned long val = pcie_read(port, XILINX_PCIE_REG_RPEFR);
+ 
+ 	if (val & XILINX_PCIE_RPEFR_ERR_VALID) {
+-		dev_dbg(port->dev, "Requester ID %d\n",
++		dev_dbg(port->dev, "Requester ID %lu\n",
+ 			val & XILINX_PCIE_RPEFR_REQ_ID);
+ 		pcie_write(port, XILINX_PCIE_RPEFR_ALL_MASK,
+ 			   XILINX_PCIE_REG_RPEFR);
