@@ -1,61 +1,57 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 13 Jan 2015 09:56:41 +0100
-Subject: [alsa-devel] [PATCH] ASoC: wm8904: fix runtime warning
-In-Reply-To: <54B4AED5.1000001@atmel.com>
-References: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
- <20150109111642.GU14516@opensource.wolfsonmicro.com>
- <54B34035.60107@atmel.com> <54B3943C.4040103@metafoo.de>
- <54B4AED5.1000001@atmel.com>
-Message-ID: <54B4DDC9.2000902@metafoo.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Jan 2015 10:02:59 +0100
+Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
+In-Reply-To: <54B4DA7E.2020602@hisilicon.com>
+References: <54B48D5E.6050902@hisilicon.com> <9190510.INCMcmsads@wuerfel>
+ <54B4DA7E.2020602@hisilicon.com>
+Message-ID: <3703587.1qvjMFgdrL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2015 06:36 AM, Bo Shen wrote:
-> Hi Lars-Perter Clausen,
->
-> On 01/12/2015 05:30 PM, Lars-Peter Clausen wrote:
->> On 01/12/2015 04:32 AM, Bo Shen wrote:
->> [...]
->>>>> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
->>>>> index 4d2d2b1..38582d7 100644
->>>>> --- a/sound/soc/codecs/wm8904.c
->>>>> +++ b/sound/soc/codecs/wm8904.c
->>>>> @@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route
->>>>> adc_intercon[] = {
->>>>>       { "Right Capture PGA", NULL, "Right Capture Mux" },
->>>>>       { "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
->>>>>
->>>>> -    { "AIFOUTL", "Left",  "ADCL" },
->>>>> -    { "AIFOUTL", "Right", "ADCR" },
->>>>> -    { "AIFOUTR", "Left",  "ADCL" },
->>>>> -    { "AIFOUTR", "Right", "ADCR" },
->>>>> +    { "AIFOUTL", NULL, "ADCL" },
->>>>> +    { "AIFOUTL", NULL, "ADCR" },
->>>>> +    { "AIFOUTR", NULL, "ADCL" },
->>>>> +    { "AIFOUTR", NULL, "ADCR" },
->>>>
->>>> Is this the right fix here? I am not super familiar with the
->>>> driver but it appears to contain an "AIFOUTL Mux" control which
->>>> is not connected to anything. Looks like maybe this is a mistake
->>>> the mux is indeded to be included in the path? Feels like we
->>>> should either remove the control as well or hook it into the
->>>> path.
->>>
->>> Thank for your information.
->>> I think here it should correct the path name as
->>> --->8---
->>> { "AIFOUTL Mux", "Left",  "ADCL" },
->>> { "AIFOUTL Mux", "Right", "ADCR" },
->>> { "AIFOUTR Mux", "Left",  "ADCL" },
->>> { "AIFOUTR Mux", "Right", "ADCR" },
->>> ---8<---
->>>
->>> Thanks again. I will send out the new version.
->>
->> Your probably also need to connect the mux to the output pins.
->
-> Thanks for you information, after check the datasheet, I still don't know
-> which the mux should connect to which output pins.
+On Tuesday 13 January 2015 16:42:38 Wei Xu wrote:
+> On 2015/1/13 16:33, Arnd Bergmann wrote:
+> > On Tuesday 13 January 2015 11:13:34 Wei Xu wrote:
+> >> There is 8MB SRAM in hip04.
+> >> Moving the bootwrapper into SRAM could avoid to worry about poking
+> >> holes into DRAM memory or allocation algorithms either.
+> >>
+> >> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+> >> ---
+> >>  arch/arm/boot/dts/hip04.dtsi | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+> >> index 2388145..f0dfac7 100644
+> >> --- a/arch/arm/boot/dts/hip04.dtsi
+> >> +++ b/arch/arm/boot/dts/hip04.dtsi
+> >> @@ -22,7 +22,7 @@
+> >>  
+> >>         bootwrapper {
+> >>         compatible = "hisilicon,hip04-bootwrapper";
+> >> -       boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
+> >> +       boot-method = <0xe00f0000 0x10000>, <0xe0000100 0x1000>;
+> >>         };
+> 
+> Hi Arnd,
+>  
+> > Is this backwards compatible with old firmware?
+> 
+> Sorry, it is not backwards compatible.
+> Another reason is that it could support opensuse 
+> more smoothly.
+> 
+> I have updated the firmware and uploaded it 
+> into Linaro Hisilicon git tree last month.
+> We will update the wiki on Linaro soon.
+> 
+> Do you think it is OK?
 
-AIFOUTL Mux to AIFOUTL
-AIFOUTR Mux to AIFOUTR
+Generally speaking it's not ok to change firmware interfaces in
+an incompatible way. The preferred way to handle this would be
+to have the firmware that puts the boot wrapper into a different
+place also update this property, if at all possible.
+
+This unfortunately means that you will have to yet again publish
+a firmware update image.
+
+	Arnd
