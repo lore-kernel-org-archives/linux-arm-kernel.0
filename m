@@ -1,60 +1,59 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 13 Jan 2015 19:44:40 +0100
-Subject: [GIT PULL] Xilinx Zynq dt fixes for v3.19
-In-Reply-To: <20150112220057.GA22090@quad.lixom.net>
-References: <544519A4.5090003@monstr.eu> <54AE44AF.6010808@monstr.eu>
- <20150112220057.GA22090@quad.lixom.net>
-Message-ID: <54B56798.6070001@monstr.eu>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 13 Jan 2015 19:46:18 +0100
+Subject: [PATCH v2 2/5] irqchip: Add DT binding doc for dumb demuxer chips
+In-Reply-To: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1421174781-4340-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 11:00 PM, Olof Johansson wrote:
-> On Thu, Jan 08, 2015 at 09:49:51AM +0100, Michal Simek wrote:
->> Hi,
->>
->> please consider to pull this one DT patch to your tree as fix for v3.19
->> It is adding USD dt node. Driver has been added to v3.19.
->>
->> Thanks,
->> Michal
->>
->> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>
->>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>
->> are available in the git repository at:
->>
->>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-fixes-for-3.19
->>
->> for you to fetch changes up to 1643b31658c44767a85469733c6bff4f6d0371c7:
->>
->>   ARM: zynq: DT: Add USB to device tree (2015-01-08 09:35:04 +0100)
-> 
-> Michal,
-> 
-> This isn't really a fix for something that is broken, is it? I.e. looks like
-> new hardware support to me, and unfortunately this time in the release is wrong
-> for that.
-> 
-> I'd be happy to queue it up for 3.20 though, so please confirm.
+Add documentation for the dumb demuxer.
 
-No problem to queue it up for 3.20. I will add some more patches on the top of this branch.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ .../bindings/interrupt-controller/dumb-demux.txt   | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
 
-Thanks,
-Michal
-
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+new file mode 100644
+index 0000000..1c777ef
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+@@ -0,0 +1,34 @@
++* Generic Dumb Interrupt Demultiplexer
++
++This Dumb demultiplixer simply forward all incoming interrupts to its
++enabled/unmasked children.
++
++Required properties:
++- compatible: Should be "irqchip-dumb-demux".
++- interrupt-controller: Identifies the node as an interrupt controller.
++- interrupts-extended or interrupt-parent and interrupts: Reference the source
++  interrupt connected to this dumb demuxer.
++- #interrupt-cells: The number of cells to define the interrupts (should be 1).
++  The only cell is the IRQ number.
++- irqs: u32 bitfield specifying the interrupts provided by the demuxer.
++
++Examples:
++	/*
++	 * Dumb demuxer controller
++	 */
++	dumb_irq1_demux: dumb-irq-demux at 1 {
++		compatible = "irqchip-dumb-demux";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		interrupts-extended = <&aic 1 IRQ_TYPE_LEVEL_HIGH 7>;
++		irqs = <0x3f>;
++	};
++
++	/*
++	 * Device connected on this dumb demuxer
++	 */
++	dma: dma-controller at ffffec00 {
++		compatible = "atmel,at91sam9g45-dma";
++		reg = <0xffffec00 0x200>;
++		interrupts-extended = <&dumb_irq1_demux 0>;
++	};
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/7136bee9/attachment.sig>
+1.9.1
