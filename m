@@ -1,54 +1,85 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 13 Jan 2015 08:59:03 -0800
-Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
-Message-ID: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
+Date: Tue, 13 Jan 2015 08:59:04 -0800
+Subject: [PATCH 2/2] perf symbols: debuglink should take symfs option into
+ account
+In-Reply-To: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
+References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1421168344-5363-2-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aarch64 ELF files use mapping symbols with special names $x, $d
-to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
-IHI 0056B", section "4.5.4 Mapping symbols").
+Currently code that tries to read corresponding debug symbol
+file from .gnu_debuglink section (DSO_BINARY_TYPE__DEBUGLINK)
+does not take in account symfs option, so filename__read_debuglink
+function cannot open ELF file, if symfs option is used.
 
-The patch filters out these symbols at load time, similar to
-"696b97a perf symbols: Ignore mapping symbols on ARM" changes
-done for ARM before V8.
+Fix is to add proper handling of symfs as it is done in other
+places: use __symbol__join_symfs function to get real file name
+of target ELF file.
+
+Created malloced copy of target filename in symfs before passing
+it to __symbol__join_symfs function because filename will be
+modified by it if corresponding debuglink is found.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Cc: Paul Mackerras <paulus@samba.org>
 Cc: Ingo Molnar <mingo@redhat.com>
 Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Adrian Hunter <adrian.hunter@intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Jiri Olsa <jolsa@kernel.org>
 Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Avi Kivity <avi@cloudius-systems.com>
-Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Cc: Anton Blanchard <anton@samba.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Waiman Long <Waiman.Long@hp.com>
 Cc: David Ahern <dsahern@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Dave Martin <Dave.Martin@arm.com>
 ---
- tools/perf/util/symbol-elf.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ tools/perf/util/dso.c | 33 ++++++++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 11 deletions(-)
 
-diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
-index 06fcd1b..1e188dd 100644
---- a/tools/perf/util/symbol-elf.c
-+++ b/tools/perf/util/symbol-elf.c
-@@ -862,6 +862,14 @@ int dso__load_sym(struct dso *dso, struct map *map,
- 			    !strcmp(elf_name, "$t"))
- 				continue;
- 		}
-+		/* Reject Aarch64 ELF "mapping symbols": these aren't unique and
-+		 * don't identify functions, so will confuse the profile
-+		 * output: */
-+		if (ehdr.e_machine == EM_AARCH64) {
-+			if (!strcmp(elf_name, "$x") ||
-+			    !strcmp(elf_name, "$d"))
-+				continue;
-+		}
+diff --git a/tools/perf/util/dso.c b/tools/perf/util/dso.c
+index 45be944..6a2f663 100644
+--- a/tools/perf/util/dso.c
++++ b/tools/perf/util/dso.c
+@@ -42,19 +42,30 @@ int dso__read_binary_type_filename(const struct dso *dso,
+ 	size_t len;
  
- 		if (runtime_ss->opdsec && sym.st_shndx == runtime_ss->opdidx) {
- 			u32 offset = sym.st_value - syms_ss->opdshdr.sh_addr;
+ 	switch (type) {
+-	case DSO_BINARY_TYPE__DEBUGLINK: {
++	case DSO_BINARY_TYPE__DEBUGLINK:
++	{
+ 		char *debuglink;
+-
+-		strncpy(filename, dso->long_name, size);
+-		debuglink = filename + dso->long_name_len;
+-		while (debuglink != filename && *debuglink != '/')
+-			debuglink--;
+-		if (*debuglink == '/')
+-			debuglink++;
+-		ret = filename__read_debuglink(dso->long_name, debuglink,
+-					       size - (debuglink - filename));
+-		}
++		char *filename_copy;
++
++		filename_copy = malloc(PATH_MAX);
++		if (filename_copy) {
++			len = __symbol__join_symfs(filename, size,
++						   dso->long_name);
++			strncpy(filename_copy, filename, PATH_MAX);
++			debuglink = filename + len;
++			while (debuglink != filename && *debuglink != '/')
++				debuglink--;
++			if (*debuglink == '/')
++				debuglink++;
++			ret = filename__read_debuglink(filename_copy, debuglink,
++						       size - (debuglink -
++							       filename));
++			free(filename_copy);
++		} else
++			ret = -1;
+ 		break;
++	}
++
+ 	case DSO_BINARY_TYPE__BUILD_ID_CACHE:
+ 		/* skip the locally configured cache if a symfs is given */
+ 		if (symbol_conf.symfs[0] ||
 -- 
 1.9.3
