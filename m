@@ -1,32 +1,59 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Jan 2015 15:09:56 -0800
-Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
-In-Reply-To: <1421160180-23452-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20150112224203.GL22090@quad.lixom.net>
- <1421160180-23452-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150113230956.GA15087@quad.lixom.net>
+Date: Tue, 13 Jan 2015 15:11:52 -0800
+Subject: [GIT PULL] CSR atlas7 init dts for 3.20
+In-Reply-To: <CAGsJ_4yKaKRTAdA8RthPo5dEBBoy6dp5Xf-P9+A4Omo+eOL=Rw@mail.gmail.com>
+References: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
+ <20150113021347.GD28758@quad.lixom.net>
+ <CAGsJ_4x35UqL65_NYzdTp=YOu5mUuSxHaVEXG6ArsKfvQEqOAw@mail.gmail.com>
+ <CAGsJ_4yKaKRTAdA8RthPo5dEBBoy6dp5Xf-P9+A4Omo+eOL=Rw@mail.gmail.com>
+Message-ID: <20150113231152.GB15087@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 03:43:00PM +0100, Nicolas Ferre wrote:
-> The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
-> options may be removed in the near future.
+On Tue, Jan 13, 2015 at 10:26:44PM +0800, Barry Song wrote:
+> 2015-01-13 10:22 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+> > 2015-01-13 10:13 GMT+08:00 Olof Johansson <olof@lixom.net>:
+> >> On Sun, Jan 11, 2015 at 10:51:40PM +0800, Barry Song wrote:
+> >>> Hi Arnd, Kevin, Olof,
+> >>>
+> >>> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
+> >>>
+> >>>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+> >>>
+> >>> are available in the git repository at:
+> >>>
+> >>>   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+> >>>
+> >>> for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
+> >>>
+> >>>   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
+> >>>
+> >>> ----------------------------------------------------------------
+> >>> drop marco and add init dts for atlas7
+> >>>
+> >>> marco chip has been dropped and the new replacement is atlas7.
+> >>> so, drop marco dts, and add dts for atlas7.
+> >>
+> >> Hi,
+> >>
+> >> Can you please elaborate a bit. Was marco never shipped to customers
+> >> that could be interested in mainline support, and atlas7 is a replacement
+> >> SoC that is in development or has shipped?
+> >>
+> >
+> > marco never shipped to customers that could be interested in mainline support.
+> > atlas7 is a replacement SoC that is in development.
+> >
+> > do you mean i need to put this into tag log?
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Hi Olof,
-> 
-> This is an attempt to match other ARM SoC families format.
-> If you feel that the patch can be good, do not hesitate to take it yourself. I
-> don't plan to integrate it in any of my pull-request so it can appear quickly in
-> arm-soc and can be used by everyone.
+> Hi Olof, i did a refine for this tag according to your suggestion, see:
+> https://git.kernel.org/cgit/linux/kernel/git/baohua/linux.git/tag/?id=atlas7-init-dts-for-3.20
 
-Hi,
+Yeah, that's better -- please format the message a little nicer if you don't
+mind though (capital letters, etc). And please send a fresh pull request for
+it.
 
-If you see what Peter did, he split up the rules per-SoC based on how
-things were selectable in Kconfig. Since you seem to have the Kconfig
-entries already, how about doing the same? That way the same information
-w.r.t. SoC family that you have as comments isn't lost either.
 
+Thanks!
 
 -Olof
