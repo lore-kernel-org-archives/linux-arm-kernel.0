@@ -1,51 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 15:37:11 +0100
-Subject: [PATCH] serial: digicolor: fix sysrq handling
-Message-ID: <1730002.vWGOEymGdz@wuerfel>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 13 Jan 2015 06:41:18 -0800
+Subject: [PATCH] ARM: ARM_KERNMEM_PERMS only works with MMU enabled
+In-Reply-To: <1976703.4VfV2sWda0@wuerfel>
+References: <1976703.4VfV2sWda0@wuerfel>
+Message-ID: <CAGXu5jK=we1RBr225jSLsJC6o-WxwN4KQnvtAVbSwv+UEfwafQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trying to build the digicolor-usart driver when sysrq is disabled
-results in a compile error:
+On Tue, Jan 13, 2015 at 6:14 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The recently added ARM_KERNMEM_PERMS feature works by manipulating
+> the kernel page tables, which obviously requires an MMU. Trying
+> to enable this feature when the MMU is disabled results in a lot
+> of compile errors in mm/init.c, so let's add a Kconfig dependency
+> to avoid that case.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-drivers/tty/serial/digicolor-usart.c: In function 'digicolor_uart_console_write':
-drivers/tty/serial/digicolor-usart.c:407:33: error: 'struct uart_port' has no member named 'sysrq'
+Yeah, good call.
 
-Like a lot of other drivers, this one requires an #ifdef to avoid
-accessing the sysrq field here. While looking into this, I noticed
-that the case where sysrq support is enabled is also broken, because
-the driver fails to set the SUPPORT_SYSRQ macro.
+Acked-by: Kees Cook <keescook@chromium.org>
 
-This patch hopefully fixes both, but I do not hardware to test if sysrq
-is actually working now.
+Thanks!
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+-Kees
 
-diff --git a/drivers/tty/serial/digicolor-usart.c b/drivers/tty/serial/digicolor-usart.c
-index 09ce0b3764e2..1e4bdd895804 100644
---- a/drivers/tty/serial/digicolor-usart.c
-+++ b/drivers/tty/serial/digicolor-usart.c
-@@ -23,6 +23,10 @@
- #include <linux/platform_device.h>
- #include <linux/workqueue.h>
- 
-+#if defined(CONFIG_SERIAL_CONEXANT_DIGICOLOR_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #define UA_ENABLE			0x00
- #define UA_ENABLE_ENABLE		BIT(0)
- 
-@@ -403,10 +407,11 @@ static void digicolor_uart_console_write(struct console *co, const char *c,
- 	u8 status;
- 	unsigned long flags;
- 	int locked = 1;
--
-+#ifdef SUPPORT_SYSRQ
- 	if (port->sysrq || oops_in_progress)
- 		locked = spin_trylock_irqsave(&port->lock, flags);
- 	else
-+#endif
- 		spin_lock_irqsave(&port->lock, flags);
- 
- 	uart_console_write(port, c, n, digicolor_uart_console_putchar);
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index eaaf196fe4e1..0051cd924fb1 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1010,6 +1010,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>
+>  config ARM_KERNMEM_PERMS
+>         bool "Restrict kernel memory permissions"
+> +       depends on MMU
+>         help
+>           If this is set, kernel memory other than kernel text (and rodata)
+>           will be made non-executable. The tradeoff is that each region is
+>
+
+
+
+-- 
+Kees Cook
+Chrome OS Security
