@@ -1,31 +1,46 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 13 Jan 2015 16:57:39 +0530
-Subject: [PATCH V2 0/3] Add clk support for PDMA, SPI and audio on Exynos7
-Message-ID: <1421148462-11755-1-git-send-email-padma.v@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 13 Jan 2015 12:35:38 +0100
+Subject: [PATCH v5 2/2] i2c: cadence: Check for errata condition
+ involving master receive
+In-Reply-To: <1418357907-4215-3-git-send-email-harinik@xilinx.com>
+References: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
+ <1418357907-4215-3-git-send-email-harinik@xilinx.com>
+Message-ID: <20150113113538.GB7660@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PDMA0,PDMA1 gate clock, required clks for 5 SPI channels and 
-for clks in audio block.
+> @@ -541,6 +541,18 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>  	 * processed with a repeated start.
+>  	 */
+>  	if (num > 1) {
+> +		/*
+> +		 * This controller does not give completion interrupt after a
+> +		 * master receive transfer if HOLD bit is set (repeated start),
+> +		 * resulting in SW timeout. Hence, if a receive transfer is
+> +		 * followed by any other transfer, an error is returned
+> +		 * indicating that this sequence is not supported.
+> +		 */
+> +		for (count = 0; count < num-1; count++) {
+> +			if (msgs[count].flags & I2C_M_RD)
+> +				dev_warn(adap->dev.parent, "No support for repeated start when receive is followed by a transfer\n");
+> +				return -EOPNOTSUPP;
+> +		}
+>  		id->bus_hold_flag = 1;
+>  		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
+>  		reg |= CDNS_I2C_CR_HOLD;
 
-This patchset is dependent on usb clk support from Vivek in below link.
-http://www.spinics.net/lists/linux-samsung-soc/msg39342.html
+Have you ever tested this code? There is a huge bug in it :(
 
-Changes since V1:
-	- Added documentation for source clks of peric1 block.
-	- Changed the parent of sclk_i2s1_user,sclk_pcm1_user and sclk_spdif_user
-	  from divider clk to gate clk.
-	- Removed unused clk IDs
+Also, in the comment, use "message" instead of "transfer". One transfer
+consists of multiple messages.
 
-Padmavathi Venna (3):
-  clk: samsung: exynos7: add gate clock for DMA block
-  clk: samsung: exynos7: add clocks for SPI block
-  clk: samsung: exynos7: add clocks for audio block
+Maybe the warning can be simplified, too: "can't do repeated start after
+read messages".
 
- .../devicetree/bindings/clock/exynos7-clock.txt    |   14 ++
- drivers/clk/samsung/clk-exynos7.c                  |  220 +++++++++++++++++++-
- include/dt-bindings/clock/exynos7-clk.h            |   43 ++++-
- 3 files changed, 271 insertions(+), 6 deletions(-)
-
--- 
-1.7.4.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/0c9bc59e/attachment-0001.sig>
