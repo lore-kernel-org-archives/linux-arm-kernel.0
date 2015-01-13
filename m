@@ -1,136 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Jan 2015 16:00:08 -0600
-Subject: [RFC PATCH 1/3] of/device: manage resources similar to
- platform_device_add
-In-Reply-To: <54B58D5D.5070508@ti.com>
-References: <1420651854-17768-1-git-send-email-s-anna@ti.com>
- <1420651854-17768-2-git-send-email-s-anna@ti.com>
- <CAL_Jsq+79cnCiww6g8ejki0yT59-N8eucHC3QGMbsXG4DksWuQ@mail.gmail.com>
- <54B58D5D.5070508@ti.com>
-Message-ID: <CAL_JsqLW9PRktHntLquohH3x_bPgJrrn2Y2_8RYA_HnKhpTDHg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 13 Jan 2015 17:08:47 -0500 (EST)
+Subject: [PATCH] mISDN: avoid arch specific __builtin_return_address call
+In-Reply-To: <1816278.9Bv8N8K5IB@wuerfel>
+References: <1816278.9Bv8N8K5IB@wuerfel>
+Message-ID: <20150113.170847.166125234153799669.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 3:25 PM, Suman Anna <s-anna@ti.com> wrote:
-> Hi Rob,
->
-> On 01/13/2015 02:38 PM, Rob Herring wrote:
->> On Wed, Jan 7, 2015 at 11:30 AM, Suman Anna <s-anna@ti.com> wrote:
->>> Drivers can use of_platform_populate() to create platform devices
->>> for children of the device main node, and a complementary API
->>> of_platform_depopulate() is provided to delete these child platform
->>> devices. The of_platform_depopulate() leverages the platform API
->>> for performing the cleanup of these devices.
->>>
->>> The platform device resources are managed differently between
->>> of_device_add and platform_device_add, and this asymmetry causes
->>> a kernel oops in platform_device_del during removal of the resources.
->>> Manage the platform device resources similar to platform_device_add
->>> to fix this kernel oops.
->>
->> This is a known issue and has been attempted to be fixed before (I
->> believe there is a revert in mainline). The problem is there are known
->> devicetrees which have overlapping resources and they will break with
->> your change.
->
-> Are you referring to 02bbde7849e6 (Revert "of: use
-> platform_device_add")?
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 13 Jan 2015 17:10:58 +0100
 
-I believe that's the one.
+> Not all architectures are able to call __builtin_return_address().
+> On ARM, the mISDN code produces this warning:
+> 
+> hardware/mISDN/w6692.c: In function 'w6692_dctrl':
+> hardware/mISDN/w6692.c:1181:75: warning: unsupported argument to '__builtin_return_address'
+>   pr_debug("%s: %s dev(%d) open from %p\n", card->name, __func__,
+>                                                                            ^
+> hardware/mISDN/mISDNipac.c: In function 'open_dchannel':
+> hardware/mISDN/mISDNipac.c:759:75: warning: unsupported argument to '__builtin_return_address'
+>   pr_debug("%s: %s dev(%d) open from %p\n", isac->name, __func__,
+>                                                                            ^
+> 
+> In a lot of cases, this is relatively easy to work around by
+> passing the value of __builtin_return_address(0) from the
+> callers into the functions that want it. One exception is
+> the indirect 'open' function call in struct isac_hw. While it
+> would be possible to fix this as well, this patch only addresses
+> the other callers properly and lets this one return the direct
+> parent function, which should be good enough.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> That one seems to be in registration path, and
-> this crash is in the unregistration path. If so, to fix the crash,
-> should we be skipping the release_resource() for now in
-> platform_device_del for DT nodes, or replace platform_device_unregister
-> with of_device_unregister in of_platform_device_destroy()?
-
-IIRC, the problem is inserting a resource twice on add from 2
-different nodes, not the removal path. Perhaps we could make a
-collision non-fatal for in the DT case. Grant may have some ideas on
-what's needed here.
-
-> This is a common crash and we cannot use of_platform_depopulate() today
-> in drivers to complement of_platform_populate().
-
-Yes, I know.
-
-> Also, the platform_data crash is independent of this, I could reproduce
-> that one even with using of_device_unregister in a loop in driver remove.
-
-Missed this one. I'll reply to that patch.
-
-Rob
-
->
-> regards
-> Suman
->
->>
->> Rob
->>
->>>
->>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>> ---
->>>  drivers/of/device.c | 38 +++++++++++++++++++++++++++++++++++++-
->>>  1 file changed, 37 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/of/device.c b/drivers/of/device.c
->>> index 46d6c75c1404..fa27c1c71f29 100644
->>> --- a/drivers/of/device.c
->>> +++ b/drivers/of/device.c
->>> @@ -50,6 +50,8 @@ EXPORT_SYMBOL(of_dev_put);
->>>
->>>  int of_device_add(struct platform_device *ofdev)
->>>  {
->>> +       int i, ret;
->>> +
->>>         BUG_ON(ofdev->dev.of_node == NULL);
->>>
->>>         /* name and id have to be set so that the platform bus doesn't get
->>> @@ -63,7 +65,41 @@ int of_device_add(struct platform_device *ofdev)
->>>         if (!ofdev->dev.parent)
->>>                 set_dev_node(&ofdev->dev, of_node_to_nid(ofdev->dev.of_node));
->>>
->>> -       return device_add(&ofdev->dev);
->>> +       for (i = 0; i < ofdev->num_resources; i++) {
->>> +               struct resource *p, *r = &ofdev->resource[i];
->>> +
->>> +               if (!r->name)
->>> +                       r->name = dev_name(&ofdev->dev);
->>> +
->>> +               p = r->parent;
->>> +               if (!p) {
->>> +                       if (resource_type(r) == IORESOURCE_MEM)
->>> +                               p = &iomem_resource;
->>> +                       else if (resource_type(r) == IORESOURCE_IO)
->>> +                               p = &ioport_resource;
->>> +               }
->>> +
->>> +               if (p && insert_resource(p, r)) {
->>> +                       dev_err(&ofdev->dev, "failed to claim resource %d\n",
->>> +                               i);
->>> +                       ret = -EBUSY;
->>> +                       goto failed;
->>> +               }
->>> +       }
->>> +
->>> +       ret = device_add(&ofdev->dev);
->>> +       if (ret == 0)
->>> +               return ret;
->>> +
->>> +failed:
->>> +       while (--i >= 0) {
->>> +               struct resource *r = &ofdev->resource[i];
->>> +               unsigned long type = resource_type(r);
->>> +
->>> +               if (type == IORESOURCE_MEM || type == IORESOURCE_IO)
->>> +                       release_resource(r);
->>> +       }
->>> +       return ret;
->>>  }
->>>
->>>  int of_device_register(struct platform_device *pdev)
->>> --
->>> 2.2.1
->>>
->
+Applied.
