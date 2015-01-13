@@ -1,98 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jan 2015 09:50:27 +0100
-Subject: [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150113085027.GA3843@piout.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 13 Jan 2015 10:57:26 +0100
+Subject: [PATCH v3 0/2] ARM: mediatek: Add driver for Mediatek I2C
+ controller
+In-Reply-To: <20150106133753.GA3754@katana>
+References: <1416821928-11453-1-git-send-email-xudong.chen@mediatek.com>
+ <20141124121555.GG3733@katana>
+ <1417096856.12707.59.camel@mtksdaap41>
+ <20141127164536.GC5667@katana>
+ <1418352022.4994.44.camel@mtksdaap41>
+ <20150106133753.GA3754@katana>
+Message-ID: <20150113095725.GC1059@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Tue, Jan 06, 2015 at 02:37:53PM +0100, Wolfram Sang wrote:
+> 
+> > We've started upstream work for MT8173[1].
+> > 
+> > We've fixed these issues for new SoC, and we believe it is fully I2C
+> > compatible now. We'll add mt8173 support to this driver, so this driver
+> > will support both fully I2C compatible SoC and the current one.
+> 
+> From what you tell, I'd rather add the MT8173 support incrementally.
+> Let's get first the limited support properly implemented, then add
+> another controller.
+> 
+> I'll send out my draft for describing the quirks later today.
 
-There has not been any comment on that series since a while and we have
-other series on hold, waiting for the first 4 patches to be taken.
+What do you think about my two proposals?
 
-Could you have a look at those 4 patches and take them if you don't have
-any comment ?
-
-Thanks.
-
-On 03/12/2014 at 21:44:04 +0100, Boris Brezillon wrote :
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and
-> smc syscon regmaps.
-> 
-> The first 4 patches introduce 2 syscon devices needed to configure the
-> EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
-> patches declares the EBI related nodes in sama5d3 dts[i] files.
-> 
-> Changes since v4:
-> - fix inconsistencies in SMC and MATRIX registers definition
-> - add missing compatible strings for at91sam9rl SoC
-> - fix DT bindings documentation
-> - replace "atmel,generic-dev" property by "atmel,specialized-logic"
-> 
-> Changes since v3:
-> - added AT91_MATRIX_USBPUCR_PUON definition
-> - removed useless macros (those directly returning SoC specific register
->   offsets)
-> - use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
->   syscon_node_to_regmap
-> - drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
-> 
-> Changes since v2:
-> - minor fixes int DT bindings doc
-> - fix SMC macros
-> - make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
-> 
-> Changes since v1:
-> - almost everything :-)
-> 
-> Boris Brezillon (11):
->   mfd: syscon: Add atmel-matrix registers definition
->   mfd: syscon: Add Atmel Matrix bus DT binding documentation
->   mfd: syscon: Add atmel-smc registers definition
->   mfd: syscon: Add Atmel SMC binding doc
->   memory: add Atmel EBI (External Bus Interface) driver
->   memory: atmel-ebi: add DT bindings documentation
->   ARM: at91: select ATMEL_EBI when compiling a kernel for at91sam9 or
->     sama5d3
->   ARM: at91/dt: add HSMC (Static Memory Controller) node in sama5d3 dtsi
->   ARM: at91/dt: add matrix node in sama5d3 dtsi
->   ARM: at91/dt: add EBI (External Bus Interface) node in sama5d3 dtsi
->   ARM: at91/dt: add NOR definition in sama5d3xcm dtsi
-> 
->  .../bindings/memory-controllers/atmel-ebi.txt      | 155 ++++++
->  .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
->  .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
->  arch/arm/boot/dts/sama5d3.dtsi                     |  93 ++++
->  arch/arm/boot/dts/sama5d3xcm.dtsi                  |  33 ++
->  arch/arm/mach-at91/Kconfig                         |   2 +
->  drivers/memory/Kconfig                             |  11 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/atmel-ebi.c                         | 579 +++++++++++++++++++++
->  include/linux/mfd/syscon/atmel-matrix.h            | 117 +++++
->  include/linux/mfd/syscon/atmel-smc.h               | 173 ++++++
->  11 files changed, 1207 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel-ebi.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
->  create mode 100644 drivers/memory/atmel-ebi.c
->  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
->  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
-> 
-> -- 
-> 1.9.1
-> 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/a96017f0/attachment.sig>
