@@ -1,36 +1,30 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 13 Jan 2015 13:28:56 +0100
-Subject: [PATCH v5 2/2] ARM: mediatek: dts: Add bindings for watchdog
-In-Reply-To: <1421152136-5007-1-git-send-email-matthias.bgg@gmail.com>
-References: <1421152136-5007-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1421152136-5007-3-git-send-email-matthias.bgg@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 13 Jan 2015 13:30:27 +0100
+Subject: [PATCH next 0/2] mmc: sdhci-pxav3: fix unbalanced pm and clock
+ issues
+In-Reply-To: <1420384548-7816-1-git-send-email-jszhang@marvell.com>
+References: <1420384548-7816-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAPDyKFpE-rgBB66R3iS_rQssa8z8LsTz=e6asi+8_EdUMfTBfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+On 4 January 2015 at 16:15, Jisheng Zhang <jszhang@marvell.com> wrote:
+> These two patches fix unbalanced pm and clock issues. The clock unbalance
+> issue would cause power consumption regression because the clock will never
+> be gated at runtime PM suspend.
+>
+> Jisheng Zhang (2):
+>   mmc: sdhci-pxav3: fix unbalanced clock issues during probe
+>   mmc: sdhci-pxav3: fix pm unbalanced issue in -> remove()
+>
+>  drivers/mmc/host/sdhci-pxav3.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+>
+> --
+> 2.1.4
+>
 
-diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-new file mode 100644
-index 0000000..af9eb5b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-@@ -0,0 +1,13 @@
-+Mediatek SoCs Watchdog timer
-+
-+Required properties:
-+
-+- compatible : should be "mediatek,mt6589-wdt"
-+- reg : Specifies base physical address and size of the registers.
-+
-+Example:
-+
-+wdt: watchdog at 010000000 {
-+	compatible = "mediatek,mt6589-wdt";
-+	reg = <0x10000000 0x18>;
-+};
--- 
-1.9.1
+Thanks! Applied for next.
+
+Kind regards
+Uffe
