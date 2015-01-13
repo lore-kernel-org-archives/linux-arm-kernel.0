@@ -1,108 +1,67 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Wed, 14 Jan 2015 08:21:43 +0900
-Subject: [PATCH 2/2] ARM: entry-common,
- ptrace: do not pass scno to syscall_trace_enter
-In-Reply-To: <CAGXu5jLi=6QTzF_z9pFAeXQqLZPfSCcwZc+q-a7b-tKwwBo4vg@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-3-git-send-email-r.peniaev@gmail.com>
- <CAGXu5jLi=6QTzF_z9pFAeXQqLZPfSCcwZc+q-a7b-tKwwBo4vg@mail.gmail.com>
-Message-ID: <CACZ9PQU6rAgSX3yRnSbUyk4GqJLtvpEKGQaqu_MDoWo_FB5A3g@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Jan 2015 15:23:04 -0800
+Subject: [GIT PULL]Hisilicon hip01 soc and development board updates for
+ 3.20
+In-Reply-To: <54B38E24.6040901@hisilicon.com>
+References: <54B38E24.6040901@hisilicon.com>
+Message-ID: <20150113232304.GG15087@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 5:08 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Sun, Jan 11, 2015 at 6:32 AM, Roman Pen <r.peniaev@gmail.com> wrote:
->> In previous patch current_thread_info()->syscall is set with
->> corresponding syscall number prior to further calls, thus there
->> is no any need to pass 'scno'.
->>
->> Also, add explicit comment why do we have to reread 'scno' local
->> variable.
->>
->> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Kees Cook <keescook@chromium.org>
->> Cc: Andy Lutomirski <luto@amacapital.net>
->> Cc: Eric Paris <eparis@redhat.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>  arch/arm/kernel/entry-common.S | 1 -
->>  arch/arm/kernel/ptrace.c       | 6 ++++--
->>  2 files changed, 4 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->> index 89452ff..3d12eb5 100644
->> --- a/arch/arm/kernel/entry-common.S
->> +++ b/arch/arm/kernel/entry-common.S
->> @@ -228,7 +228,6 @@ ENDPROC(vector_swi)
->>          * context switches, and waiting for our parent to respond.
->>          */
->>  __sys_trace:
->> -       mov     r1, scno
->>         add     r0, sp, #S_OFF
->>         bl      syscall_trace_enter
->>
->> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
->> index ef9119f..1238787 100644
->> --- a/arch/arm/kernel/ptrace.c
->> +++ b/arch/arm/kernel/ptrace.c
->> @@ -928,9 +928,9 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->>         regs->ARM_ip = ip;
->>  }
->>
->> -asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->>  {
->> -       current_thread_info()->syscall = scno;
->> +       int scno = current_thread_info()->syscall;
->
-> Was this assignment of current_thread_info()->syscall redundant? If
-> so, this looks fine. If not, what will now be setting the thread_info?
+Hi,
 
-[sorry, i have to resend this email because previously I sent it using my phone
- and arm maillist rejected it because of html inside]
+This is very close to inclusion, can I just ask you to make a few tweaks?
 
-Yes, it is redundant.
-Because of the previous patch thread_info->syscall already contains
-corresponding scnr,
-so we use it instead of passing the same number from asm.
+On Mon, Jan 12, 2015 at 05:04:36PM +0800, Wei Xu wrote:
+> Hi Arnd, Hi Olof, Hi Kevin, 
+> 
+> Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
+> Thanks!
+> 
+> Best Regards,
+> Wei
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20
+> 
+> for you to fetch changes up to 3a1d691f244b54f59958e2294779ddc6905b1d8f:
+> 
+>   ARM: hisi: enable smp for HiP01 (2015-01-12 15:48:16 +0800)
+> 
+> ----------------------------------------------------------------
+> ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
+> 
+> - Add hip01 debug UART
+> - Add hip01 DT_MACHINE and ARCH_HIP01 configure item
+> - Add dts for Hisilicon hip01-ca9x2 board
+> - Enable ARCH_HIP01 in the hisi_defconfig and multi_v7_defconfig
+> - Add a common smp_prepares_cpus function
+> - Rename hix5hd2_secondary_startup to hisi_secondary_startup
+> - Enable smp for hip01
+> 
+> ----------------------------------------------------------------
+> Wang Long (7):
+>       ARM: debug: add HiP01 debug uart
+>       ARM: hisi: enable HiP01 SoC
+>       ARM: dts: Add hip01-ca9x2 dts file
+>       ARM: config: enable ARCH_HIP01
 
-So everything should work fine without current patch, and also current
-patch should not
-change anything in the expected behavior.
+Please split this patch out (at least the multi_v7 piece) and send it
+separately. You can send it just as a patch instead of as a single-patch pull
+request and we'll apply it directly.
 
---
-Roman
+>       ARM: hisi: add a common smp_prepares_cpus function
+
+This is just a rename, and the patch below calls it a rename -- you should do
+that here too.
 
 
+Thanks!
 
 
->
-> -Kees
->
->>
->>         /* Do the secure computing check first; failures should be fast. */
->>  #ifdef CONFIG_HAVE_ARCH_SECCOMP_FILTER
->> @@ -944,6 +944,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->>         if (test_thread_flag(TIF_SYSCALL_TRACE))
->>                 tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->>
->> +       /* Syscall can be aborted (-1 can be set) or even changed
->> +        * by the tracer and subsequent PTRACE_SET_SYSCALL request */
->>         scno = current_thread_info()->syscall;
->>
->>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->> --
->> 2.1.3
->>
->
->
->
-> --
-> Kees Cook
-> Chrome OS Security
+-Olof
