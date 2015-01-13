@@ -1,45 +1,93 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 13 Jan 2015 13:32:41 +0100
-Subject: [PATCH 1/2] ARM: dts: sun8i: Add lradc node to sun8i-a23.dtsi
-In-Reply-To: <54B50B69.6000002@cogentembedded.com>
-References: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
- <54B50B69.6000002@cogentembedded.com>
-Message-ID: <54B51069.3000506@redhat.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 13 Jan 2015 20:34:02 +0800
+Subject: [PATCH v2 2/8] PCI/MSI: Add hooks to populate the msi_domain field
+In-Reply-To: <1420736772-11088-3-git-send-email-marc.zyngier@arm.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+ <1420736772-11088-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <54B510BA.7030202@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>  static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  					   struct pci_dev *bridge, int busnr)
+>  {
+> @@ -713,6 +727,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  	bridge->subordinate = child;
+>  
+>  add_dev:
+> +	pci_set_bus_msi_domain(child);
+>  	ret = device_register(&child->dev);
+>  	WARN_ON(ret < 0);
+>  
+> @@ -1507,6 +1522,17 @@ static void pci_init_capabilities(struct pci_dev *dev)
+>  	pci_enable_acs(dev);
+>  }
+>  
+> +static void pci_set_msi_domain(struct pci_dev *dev)
+> +{
+> +	/*
+> +	 * If no domain has been set through the pcibios callback,
+> +	 * inherit the default from the bus device.
+> +	 */
+> +	if (!dev_get_msi_domain(&dev->dev))
+> +		dev_set_msi_domain(&dev->dev,
+> +				   dev_get_msi_domain(&dev->bus->dev));
+> +}
 
-On 13-01-15 13:11, Sergei Shtylyov wrote:
-> Hello.
->
-> On 1/13/2015 1:47 PM, Hans de Goede wrote:
->
->> The A23 has the same lradc controller as previous Allwinner SoCs.
->
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/sun8i-a23.dtsi | 7 +++++++
->>   1 file changed, 7 insertions(+)
->
->> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
->> index a31842d..c2ceafb 100644
->> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
->> @@ -419,6 +419,13 @@
->>               interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->>           };
->>
->> +        lradc: lradc at 01c22800 {
->> +            compatible = "allwinner,sun4i-a10-lradc-keys";
->
->     If this is a keyboard controller, its node name should probably be "keyboard", according to the ePAPR standard...
+Hi Marc, now we have two ways to associate the pci_dev and msi_domain, right ?
 
-I'm not sure this qualifies as a keyboard controller, more over we
-already have the same name in all other sun?i-a*.dtsi files, so if
-we fix this it should be fixed by a follow up patch, and be fixed
-everywhere.
+1. associate pci_dev and msi_domain in pcibios_add_device() like x86.
 
-Regards,
+2. Inherit msi_domain from pci_dev->bus.
 
-Hans
+My question is if all pci devices inherit msi_domain from the pci_bus,
+so all pci devices under same pci host bridge have the same msi_domain assigned by
+weak pcibios_set_phb_msi_domain(). So why not save the pci host bridge specific
+msi_domain in pci_host_bridge. Then pci devices could inherit the msi_domain from
+its pci host bridge directly, no need to involve pci bus in the assignment.
+
+If I misunderstood, please let me know, :)
+
+Thanks!
+Yijing.
+
+> +
+>  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  {
+>  	int ret;
+> @@ -1547,6 +1573,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  	ret = pcibios_add_device(dev);
+>  	WARN_ON(ret < 0);
+>  
+> +	/* Setup MSI irq domain */
+> +	pci_set_msi_domain(dev);
+> +
+>  	/* Notifier could use PCI capabilities */
+>  	dev->match_driver = false;
+>  	ret = device_add(&dev->dev);
+> @@ -1937,6 +1966,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  	b->bridge = get_device(&bridge->dev);
+>  	device_enable_async_suspend(b->bridge);
+>  	pci_set_bus_of_node(b);
+> +	pci_set_bus_msi_domain(b);
+>  
+>  	if (!parent)
+>  		set_dev_node(b->bridge, pcibus_to_node(b));
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 360a966..13c65ab 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1640,6 +1640,7 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+>  int pcibios_add_device(struct pci_dev *dev);
+>  void pcibios_release_device(struct pci_dev *dev);
+>  void pcibios_penalize_isa_irq(int irq, int active);
+> +void pcibios_set_phb_msi_domain(struct pci_bus *bus);
+>  
+>  #ifdef CONFIG_HIBERNATE_CALLBACKS
+>  extern struct dev_pm_ops pcibios_pm_ops;
+> 
+
+
+-- 
+Thanks!
+Yijing
