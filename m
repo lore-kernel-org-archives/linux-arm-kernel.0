@@ -1,30 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Jan 2015 15:24:48 -0800
-Subject: [GIT PULL] ARM: brcmstb: SMP updates for v3.20
-In-Reply-To: <1421104153-6686-1-git-send-email-f.fainelli@gmail.com>
-References: <1421104153-6686-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20150113232448.GH15087@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Jan 2015 15:22:33 -0800
+Subject: [PATCH 0/2] Add clockdomain and hwmod data needed to boot dm816x
+Message-ID: <1421191355-12835-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 03:09:13PM -0800, Florian Fainelli wrote:
-> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> 
->   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/broadcom/stblinux tags/arm-soc/for-3.20/brcmstb-smp
-> 
-> for you to fetch changes up to a1ad3b94a7661b643fef2efbc6fc217bd148f462:
-> 
->   ARM: brcmstb: update CPU power management sequence (2015-01-12 14:59:29 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request contains updates to the brcmstb SMP code to use the manual
-> sequence instead of hardware state machine since it is not reliable.
+Hi,
+
+These patches add the basic data needed for booting dm816x
+after the fixes I posted earlier today. Note that also the
+device tree related changes are needed that will be posted
+in another series.
+
+Regards,
+
+Tony
 
 
-Merged, thanks.
+Aida Mynzhasova (1):
+  ARM: OMAP2+: Add clock domain support for dm816x
 
--Olof
+Tony Lindgren (1):
+  ARM: OMAP2+: Add dm816x hwmod support
+
+ arch/arm/mach-omap2/Makefile                |    3 +
+ arch/arm/mach-omap2/clockdomain.h           |    1 +
+ arch/arm/mach-omap2/clockdomains81xx_data.c |  191 +++++
+ arch/arm/mach-omap2/cm81xx.h                |   61 ++
+ arch/arm/mach-omap2/io.c                    |   12 +-
+ arch/arm/mach-omap2/omap_hwmod.c            |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.h            |    1 +
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c  | 1025 +++++++++++++++++++++++++++
+ 8 files changed, 1291 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomains81xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cm81xx.h
+ create mode 100644 arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+
+-- 
+2.1.4
