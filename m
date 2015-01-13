@@ -1,35 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Jan 2015 12:28:53 +0000
-Subject: [PATCH] efi: rtc-efi: mark UIE as unsupported
-Message-ID: <1421152133-28506-1-git-send-email-ard.biesheuvel@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 13 Jan 2015 13:28:54 +0100
+Subject: [PATCH v5 0/2] ARM: mediatek: Add watchdog driver
+Message-ID: <1421152136-5007-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tools like hwclock attempt to enable the RTC update interrupt (UIE) to
-maximize the accuracy of the reported time value. The EFI rtc does not
-have interrupt capability so this is a pointless exercise to begin with,
-but the generic RTC framework ends up issuing a SetWakeupTime() Runtime
-Services call before drawing that conclusion on its own.
+Mediatek SoCs have a watchdog driver. This patch set adds driver and DTS
+binding. The driver also implements a restart handler to reboot the SoC.
 
-Instead, we can mark UIE as unsupported at driver probe time. The net
-result is the same, but without the spurious SetWakeupTime() call.
+Changes for v5:
+- add newline in dev_info message
+- add tested-by and reviewed-by
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/rtc/rtc-efi.c | 1 +
- 1 file changed, 1 insertion(+)
+Changes for v4:
+- fix indentation errors
+- delete unused include
+- reorganize while loop to eliminate code duplication
+- eliminate indirection to watchdog_device structure
+- delete unnecessary brackets
 
-diff --git a/drivers/rtc/rtc-efi.c b/drivers/rtc/rtc-efi.c
-index b37b0c80bd5a..cb989cd00b14 100644
---- a/drivers/rtc/rtc-efi.c
-+++ b/drivers/rtc/rtc-efi.c
-@@ -218,6 +218,7 @@ static int __init efi_rtc_probe(struct platform_device *dev)
- 	if (IS_ERR(rtc))
- 		return PTR_ERR(rtc);
- 
-+	rtc->uie_unsupported = 1;
- 	platform_set_drvdata(dev, rtc);
- 
- 	return 0;
+Changes for v3:
+- fix based on file name
+- fix style problems
+- fix error return value and warning message
+- delete unnecessary watchdog_set_drvdata
+- delete unused variable
+
+Changes for v2:
+- we don't need to have the watchdog enabled to do a software reset
+- disable dual mode and irq mode when starting the watchdog
+- update commit message to name the SoCs the driver supports
+
+
+Matthias Brugger (2):
+  watchdog: Add driver for Mediatek watchdog
+  ARM: mediatek: dts: Add bindings for watchdog
+
+ .../devicetree/bindings/watchdog/mtk-wdt.txt       |  13 ++
+ drivers/watchdog/Kconfig                           |  10 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/mtk_wdt.c                         | 252 +++++++++++++++++++++
+ 4 files changed, 276 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+ create mode 100644 drivers/watchdog/mtk_wdt.c
+
 -- 
-1.8.3.2
+1.9.1
