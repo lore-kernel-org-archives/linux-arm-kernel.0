@@ -1,56 +1,50 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 13 Jan 2015 10:15:17 +0800
-Subject: [PATCH v3 0/5] usb: atmel_usba_udc: Rework errata handling
-In-Reply-To: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <54B47FB5.8080807@atmel.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 13 Jan 2015 10:22:19 +0800
+Subject: [GIT PULL] CSR atlas7 init dts for 3.20
+In-Reply-To: <20150113021347.GD28758@quad.lixom.net>
+References: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
+ <20150113021347.GD28758@quad.lixom.net>
+Message-ID: <CAGsJ_4x35UqL65_NYzdTp=YOu5mUuSxHaVEXG6ArsKfvQEqOAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-On 01/12/2015 06:57 PM, Boris Brezillon wrote:
-> Hello,
+2015-01-13 10:13 GMT+08:00 Olof Johansson <olof@lixom.net>:
+> On Sun, Jan 11, 2015 at 10:51:40PM +0800, Barry Song wrote:
+>> Hi Arnd, Kevin, Olof,
+>>
+>> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
+>>
+>>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+>>
+>> for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
+>>
+>>   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
+>>
+>> ----------------------------------------------------------------
+>> drop marco and add init dts for atlas7
+>>
+>> marco chip has been dropped and the new replacement is atlas7.
+>> so, drop marco dts, and add dts for atlas7.
 >
-> Here is a set of patches porting existing at91sam9rl erratum handling to
-> DT and adding new code to handle at91sam9g45/9x5 erratum.
-> It also adds several compatible strings to differentiate those errata.
+> Hi,
 >
-> These patches should be backported to 3.17 and 3.18 stable releases but
-> they do not apply cleanly on those stable branches.
-> I'll send a backport of this series once it is merged in mainline.
->
-> Regards,
->
-> Boris
->
-> Changes since v2:
-> - remove UTF8 character in commit message of patch 2
->
-> Changes since v1:
-> - cache INT_ENB value to speedup INT_ENB read operations
-
-For the whole series, test OK on at91sam9m10g45ek board with mass 
-storage gadget, test OK on sama5d36ek with serial gadget.
-
-Tested-by: Bo Shen <voice.shen@atmel.com>
-
-> Boris Brezillon (5):
->    usb: atmel_usba_udc: Rework at91sam9rl errata handling
->    usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
->    ARM: at91/dt: update udc compatible strings
->    usb: atmel_usba_udc: Mask status with enabled irqs
->    usb: gadget: atmel_usba: Cache INT_ENB register value
->
->   .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
->   arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
->   arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
->   arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
->   arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
->   drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
->   drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
->   7 files changed, 111 insertions(+), 57 deletions(-)
+> Can you please elaborate a bit. Was marco never shipped to customers
+> that could be interested in mainline support, and atlas7 is a replacement
+> SoC that is in development or has shipped?
 >
 
-Best Regards,
-Bo Shen
+marco never shipped to customers that could be interested in mainline support.
+atlas7 is a replacement SoC that is in development.
+
+do you mean i need to put this into tag log?
+
+>
+> Thanks,
+>
+> -Olof
+
+-barry
