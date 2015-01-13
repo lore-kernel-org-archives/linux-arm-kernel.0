@@ -1,63 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Jan 2015 10:25:49 +0100
-Subject: [PATCH v2 RESEND 2/3] Documentation: gpio: Add APM X-Gene standby
- GPIO controller DTS binding
-In-Reply-To: <1418793050-26927-3-git-send-email-yvo@apm.com>
-References: <1418793050-26927-1-git-send-email-yvo@apm.com>
- <1418793050-26927-3-git-send-email-yvo@apm.com>
-Message-ID: <CACRpkdbcdf7Ub9uYbeqUe1La1dnVeWCxK8N7=iVZuBtuKHFHFA@mail.gmail.com>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Tue, 13 Jan 2015 10:29:44 +0100
+Subject: [RFC PATCH v2 2/4] serial: mxs-auart: Use helpers for gpio irqs
+In-Reply-To: <20150113080817.GG22880@pengutronix.de>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
+ <20150113080817.GG22880@pengutronix.de>
+Message-ID: <54B4E588.5010602@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 17, 2014 at 6:10 AM, Y Vo <yvo@apm.com> wrote:
-> Documentation for APM X-Gene standby GPIO controller DTS binding.
+
+W dniu 2015-01-13 o 09:08, Uwe Kleine-K?nig pisze:
+> Hello,
 >
-> Signed-off-by: Y Vo <yvo@apm.com>
-> ---
->  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> On Sat, Jan 10, 2015 at 03:32:44PM +0100, Janusz Uzycki wrote:
+>> The patch updates mxs-auart driver to use new mctrl_gpio helpers for
+>> gpio irqs. The code is much simpler now.
+>>
+>> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+>> ---
+>>
+>> There is no changes since v1 (rebased only).
+>>
+>> ---
+>>   drivers/tty/serial/mxs-auart.c | 133 ++++-------------------------------------
+>>   1 file changed, 13 insertions(+), 120 deletions(-)
+> Very nice!
 >
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> new file mode 100644
-> index 0000000..3215e4d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> @@ -0,0 +1,31 @@
-> +APM X-Gene Standby GPIO controller bindings
-> +
-> +This is a gpio controller in standby domain.
-> +
-> +There are 20 GPIO pins from 0..21. There is no GPIO_DS14 and GPIO_DS15.
-> +Only GPIO_DS8..GPIO_DS13 support interrupt. IRQ mapping 0x28..0x2d.
-> +
-> +Required properties:
-> +- compatible: "apm,xgene-gpio-sb" for X-Gene Standby GPIO controller
-> +- reg: Physical base address and size of the controller's registers
-> +- #gpio-cells: Should be two.
-> +       - first cell is the pin number
-> +       - second cell is used to specify the gpio polarity:
-> +               0 = active high
-> +               1 = active low
-> +- gpio-controller: Marks the device node as a GPIO controller.
-> +- interrupts: Shall contains the interrupts.
+>> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+>> index ec553f8..2ddba69 100644
+>> --- a/drivers/tty/serial/mxs-auart.c
+>> +++ b/drivers/tty/serial/mxs-auart.c
+>> [...]
+>> @@ -483,18 +458,9 @@ static void mxs_auart_enable_ms(struct uart_port *port)
+>>   
+>>   	s->ms_irq_enabled = true;
+>>   
+>> -	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
+>> -		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
+>> -	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
+>> -
+>> -	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
+>> -		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
+>> -
+>> -	if (s->gpio_irq[UART_GPIO_RI] >= 0)
+>> -		enable_irq(s->gpio_irq[UART_GPIO_RI]);
+>> -
+>> -	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
+>> -		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
+>> +	mctrl_gpio_enable_ms(s->gpios);
+>> +	/* TODO: enable AUART_INTR_CTSMIEN
+>> +	 * if s->gpios->irq[UART_GPIO_CTS] == 0 */
+> What is the problem here? For the other lines nothing needs to be done?
+> This comment doesn't match the coding style.
 
->From the example it seems it must contain exactly 6 interrupts?
-Then state this.
+Right, the comment should be rather:
+/* TODO: enable AUART_INTR_CTSMIEN
+  * if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS)) */
 
-> +Example:
-> +       sbgpio: sbgpio at 17001000 {
-> +               compatible = "apm,xgene-gpio-sb";
-> +               reg = <0x0 0x17001000 0x0 0x400>;
-> +               #gpio-cells = <2>;
-> +               gpio-controller;
-> +               interrupts =    <0x0 0x28 0x1>,
-> +                               <0x0 0x29 0x1>,
-> +                               <0x0 0x2a 0x1>,
-> +                               <0x0 0x2b 0x1>,
-> +                               <0x0 0x2c 0x1>,
-> +                               <0x0 0x2d 0x1>;
-> +       };
+In this place I marked that CTSMIEN should be switched on 
+enable/disable_ms if CTS
+is not a gpio. The driver enables CTSMIEN forever what is wrong but I 
+can't test it
+and I don't need it so I've just marked the fact in the comment.
 
-Yours,
-Linus Walleij
+>
+> Other than that, this patch looks good.
+>
+> Uwe
+>
+
+Thanks
+Janusz
