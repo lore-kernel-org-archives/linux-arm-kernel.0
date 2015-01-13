@@ -1,58 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 Jan 2015 11:13:27 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7740: Instantiate GIC from C board code
- in legacy builds
+Date: Tue, 13 Jan 2015 11:13:28 +0900
+Subject: [PATCH 2/2] ARM: shmobile: sh73a0 legacy: Set .control_parent for all
+ irqpin instances
 In-Reply-To: <cover.1421113695.git.horms+renesas@verge.net.au>
 References: <cover.1421113695.git.horms+renesas@verge.net.au>
-Message-ID: <d034f53cc6c5c09a4e10cb9716986f3844c58514.1421113695.git.horms+renesas@verge.net.au>
+Message-ID: <b0ddb319db3d7a1943445f0de0a45c07a7f3457a.1421113695.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-As of commit 9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq
-domain."), armadillo-legacy hangs during boot with:
+The sh73a0 INTC can't mask interrupts properly most likely due to a
+hardware bug. Set the .control_parent flag to delegate masking to the
+parent interrupt controller, like was already done for irqpin1.
 
-     sh-tmu.0: ch0: used for clock events
-     sh-tmu.0: ch0: used for periodic clock events
-     sh-tmu.0: ch0: failed to request irq 230
-     sh-tmu.0: ch1: used as clock source
-     sh-cmt-48.1: ch0: failed to request irq 90
-     sh-cmt-48.1: ch0: registration failed
-    earlytimer: unable to probe sh-cmt-48 early.
-    Calibrating delay loop...
+Without this, accessing the three-axis digital accelerometer ADXL345
+on kzm9g through /dev/input/event1 causes an interrupt storm, which
+requires a power-cycle to recover from.
 
-This happens because the IRQ numbers of the GIC are now virtual, and no
-longer match the hardcoded hardware IRQ numbers in the platform board
-code.
-To fix this, instantiate the GIC from platform board code when compiling
-a legacy kernel, like is done on sh73a0 for kzm9g-legacy.
+This was inspired by a patch for arch/arm/boot/dts/sh73a0.dtsi from
+Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Fixes: 341eb5465f67437a ("ARM: shmobile: INTC External IRQ pin driver on sh73a0")
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-shmobile/setup-sh73a0.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 0bfe226..e76e2f8 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -793,7 +793,14 @@ void __init r8a7740_init_irq_of(void)
- 	void __iomem *intc_msk_base = ioremap_nocache(0xe6900040, 0x10);
- 	void __iomem *pfc_inta_ctrl = ioremap_nocache(0xe605807c, 0x4);
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fa7cab8..b5d0cf5 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -579,6 +579,7 @@ static struct platform_device ipmmu_device = {
  
-+#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
-+	void __iomem *gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
-+	void __iomem *gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
-+
-+	gic_init(0, 29, gic_dist_base, gic_cpu_base);
-+#else
- 	irqchip_init();
-+#endif
+ static struct renesas_intc_irqpin_config irqpin0_platform_data = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ7 */
++	.control_parent = true,
+ };
  
- 	/* route signals to GIC */
- 	iowrite32(0x0, pfc_inta_ctrl);
+ static struct resource irqpin0_resources[] = {
+@@ -640,6 +641,7 @@ static struct platform_device irqpin1_device = {
+ 
+ static struct renesas_intc_irqpin_config irqpin2_platform_data = {
+ 	.irq_base = irq_pin(16), /* IRQ16 -> IRQ23 */
++	.control_parent = true,
+ };
+ 
+ static struct resource irqpin2_resources[] = {
+@@ -670,6 +672,7 @@ static struct platform_device irqpin2_device = {
+ 
+ static struct renesas_intc_irqpin_config irqpin3_platform_data = {
+ 	.irq_base = irq_pin(24), /* IRQ24 -> IRQ31 */
++	.control_parent = true,
+ };
+ 
+ static struct resource irqpin3_resources[] = {
 -- 
 2.1.4
