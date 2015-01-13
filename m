@@ -1,35 +1,36 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 13 Jan 2015 15:11:21 +0300
-Subject: [PATCH 1/2] ARM: dts: sun8i: Add lradc node to sun8i-a23.dtsi
-In-Reply-To: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
-References: <1421146024-17957-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <54B50B69.6000002@cogentembedded.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 13 Jan 2015 13:17:30 +0100
+Subject: [PATCH 3/3] clk: berlin: bg2q: remove non-exist "smemc" gate clock
+In-Reply-To: <20150113002817.20842.98432@quantum>
+References: <1420016272-6789-1-git-send-email-jszhang@marvell.com>
+ <1420016272-6789-4-git-send-email-jszhang@marvell.com>
+ <54AD3EAE.6090009@gmail.com> <20150107222209.64ed24a0@xhacker>
+ <54AD431F.6060403@gmail.com> <20150109201306.4d1a296b@xhacker>
+ <54B12446.4030703@gmail.com> <20150113002817.20842.98432@quantum>
+Message-ID: <54B50CDA.3090307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 1/13/2015 1:47 PM, Hans de Goede wrote:
-
-> The A23 has the same lradc controller as previous Allwinner SoCs.
-
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->   arch/arm/boot/dts/sun8i-a23.dtsi | 7 +++++++
->   1 file changed, 7 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-> index a31842d..c2ceafb 100644
-> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-> @@ -419,6 +419,13 @@
->   			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->   		};
+On 01/13/2015 01:28 AM, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2015-01-10 05:08:22)
+>> This is clk subsystem, so either Mike takes it through his fixes branch
+>> including my
+>>
+>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>
+>> or decides to agree that I take it instead with his Ack. I am fine
+>> with both.
 >
-> +		lradc: lradc at 01c22800 {
-> +			compatible = "allwinner,sun4i-a10-lradc-keys";
+> Acked-by: Michael Turquette <mturquette@linaro.org>
+>
+> Now the three fixes can stay together and live happily ever after.
 
-    If this is a keyboard controller, its node name should probably be 
-"keyboard", according to the ePAPR standard...
+Mike,
 
-WBR, Sergei
+I already had the two others pulled by Olof some days ago.
+If you plan for a fixes branch for v3.19, please take this in too.
+
+If you have no other fixes, I can take it and do a 2nd round of
+fixes for Berlin.
+
+Sebastian
