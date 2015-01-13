@@ -1,73 +1,51 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 Jan 2015 10:41:02 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI base address,
- clock labels and output-names
-Message-ID: <1421113262-19433-1-git-send-email-horms+renesas@verge.net.au>
+From: pbrobinson@gmail.com (Peter Robinson)
+Date: Tue, 13 Jan 2015 01:57:53 +0000
+Subject: [PATCH] drivers/rtc/rtc-em3027.c: add device tree support
+Message-ID: <1421114273-16368-1-git-send-email-pbrobinson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Correct base address of SD3 div6 clk.
-* Update div6 labels and MSTP output names
-  There appears to have been some inconsistency and confusion here as on
-  the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
-  the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
+Set the of_match_table for this driver so that devices can be described
+in the device tree. This device is used in the Trimslice and is already
+defined in the Trimslice device tree.
 
-This has no run-time affect as the clock nodes are not currently used.
-
-Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
+Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
 ---
-* A similar change to update the div6 clock node names and labels,
-  and the MSTP clock output-names is required for the r8a7791.
-  The base addresses appear to be correct there.
----
- arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/rtc/rtc-em3027.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 8f78da5..b98534e 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -294,16 +294,16 @@
- 					     "lb", "qspi", "sdh", "sd0", "z";
- 		};
- 		/* Variable factor clocks */
--		sd1_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2_clk at e6150078 {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sd1";
- 		};
--		sd2_clk: sd3_clk at e615007c {
-+		sd3_clk: sd3_clk at e615026c {
- 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
--			reg = <0 0xe615007c 0 4>;
-+			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sd2";
-@@ -518,7 +518,7 @@
- 		mstp3_clks: mstp3_clks at e615013c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
--			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
-+			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
- 			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
-@@ -527,7 +527,7 @@
- 				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
- 			>;
- 			clock-output-names =
--			        "sdhi2", "sdhi1", "sdhi0",
-+			        "sdhi3", "sdhi2", "sdhi0",
- 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
- 		};
- 		mstp7_clks: mstp7_clks at e615014c {
+diff --git a/drivers/rtc/rtc-em3027.c b/drivers/rtc/rtc-em3027.c
+index fccf366..4f4930a 100644
+--- a/drivers/rtc/rtc-em3027.c
++++ b/drivers/rtc/rtc-em3027.c
+@@ -15,6 +15,7 @@
+ #include <linux/rtc.h>
+ #include <linux/bcd.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ 
+ /* Registers */
+ #define EM3027_REG_ON_OFF_CTRL	0x00
+@@ -135,10 +136,20 @@ static struct i2c_device_id em3027_id[] = {
+ 	{ "em3027", 0 },
+ 	{ }
+ };
++MODULE_DEVICE_TABLE(i2c, em3027_id);
++
++#ifdef CONFIG_OF
++static const struct of_device_id em3027_of_match[] = {
++	{ .compatible = "emmicro,em3027", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, em3027_of_match);
++#endif
+ 
+ static struct i2c_driver em3027_driver = {
+ 	.driver = {
+ 		   .name = "rtc-em3027",
++		   .of_match_table = of_match_ptr(em3027_of_match),
+ 	},
+ 	.probe = &em3027_probe,
+ 	.id_table = em3027_id,
 -- 
-2.1.4
+2.1.0
