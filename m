@@ -1,60 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 13 Jan 2015 09:08:17 +0100
-Subject: [RFC PATCH v2 2/4] serial: mxs-auart: Use helpers for gpio irqs
-In-Reply-To: <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
-References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
- <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <20150113080817.GG22880@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 13 Jan 2015 09:10:08 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.19
+In-Reply-To: <cover.1421113695.git.horms+renesas@verge.net.au>
+References: <cover.1421113695.git.horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 13, 2015 at 3:13 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+>
+> Please consider these Renesas ARM based SoC fixes for v3.19.
+>
+> This pull request is based on the last round of SoC updates for v3.19,
+> Fourth Round of Renesas ARM Based SoC Updates for v3.19, tagged as
+> renesas-soc3-for-v3.19, merged into your next/soc branch and included in
+> v3.19-rc1.
+>
+> * ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
 
-On Sat, Jan 10, 2015 at 03:32:44PM +0100, Janusz Uzycki wrote:
-> The patch updates mxs-auart driver to use new mctrl_gpio helpers for
-> gpio irqs. The code is much simpler now.
-> 
-> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
-> ---
-> 
-> There is no changes since v1 (rebased only).
-> 
-> ---
->  drivers/tty/serial/mxs-auart.c | 133 ++++-------------------------------------
->  1 file changed, 13 insertions(+), 120 deletions(-)
-Very nice!
+That's the description for the regression below.
+Should have been: "Set .control_parent for all irqpin instances for sh73a0
+SoC when booting using legacy C."
 
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index ec553f8..2ddba69 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> [...]
-> @@ -483,18 +458,9 @@ static void mxs_auart_enable_ms(struct uart_port *port)
->  
->  	s->ms_irq_enabled = true;
->  
-> -	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
-> -	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
-> -
-> -	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
-> -
-> -	if (s->gpio_irq[UART_GPIO_RI] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_RI]);
-> -
-> -	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
-> -		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
-> +	mctrl_gpio_enable_ms(s->gpios);
-> +	/* TODO: enable AUART_INTR_CTSMIEN
-> +	 * if s->gpios->irq[UART_GPIO_CTS] == 0 */
-What is the problem here? For the other lines nothing needs to be done?
-This comment doesn't match the coding style.
+>   This fixes a long standing problem which has been present since
+>   the sh73a0 SoC started using the INTC External IRQ pin driver.
+>
+>   The patch that introduced the problem is 341eb5465f67437a ("ARM:
+>   shmobile: INTC External IRQ pin driver on sh73a0") which was included
+>   in v3.10.
+>
+> * This fixes a regression in the r8a7740 SoC due to
+>   9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
+>   which was included in v3.18-rc2.
 
-Other than that, this patch looks good.
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Fixes for v3.19
+>
+> * Set .control_parent for all irqpin instances for sh73a0 SoC when booting
+>   using legacy C
+> * Instantiate GIC board for r8a7740 SoC when using legacy C
 
-Uwe
+Gr{oetje,eeting}s,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
