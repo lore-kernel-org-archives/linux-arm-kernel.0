@@ -1,81 +1,38 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 13 Jan 2015 15:44:06 +0100
-Subject: [PATCH v2] clk: at91: keep slow clk enabled to prevent system hang
-Message-ID: <1421160246-29712-1-git-send-email-boris.brezillon@free-electrons.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 13 Jan 2015 20:13:20 +0530
+Subject: [PATCH 1/2] dmaengine: mmp-tdma: don't include mach/regs-icu.h
+In-Reply-To: <2099590.pAO9NcseBT@wuerfel>
+References: <2099590.pAO9NcseBT@wuerfel>
+Message-ID: <20150113144320.GB3085@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All slow clk users are not properly claiming it (get + prepare + enable)
-before using it.
-If all users properly claiming this clock release it, the clock is
-disabled, but faulty users still depends on it, and the system hangs.
+On Tue, Jan 13, 2015 at 02:25:19PM +0100, Arnd Bergmann wrote:
+> The mmp tdma driver does not actually require this header, and
+> we want to enable multiplatform support for MMP, which would
+> make it inaccessible and cause a build error.
+> 
+> This patch just removes the old #include.
+Applied, both thanks
 
-This fix prevents the slow clock from being disabled, and should solve the
-hanging issue, but offending drivers should be patched to properly claim
-this clock.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Bo Shen <voice.shen@atmel.com>
-Cc: stable at vger.kernel.org
----
- drivers/clk/at91/clk-slow.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index 32f7c1b..2f13bd5 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -70,6 +70,7 @@ struct clk_sam9x5_slow {
- 
- #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
- 
-+static struct clk *slow_clk;
- 
- static int clk_slow_osc_prepare(struct clk_hw *hw)
- {
-@@ -357,6 +358,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- 	clk = clk_register(NULL, &slowck->hw);
- 	if (IS_ERR(clk))
- 		kfree(slowck);
-+	else
-+		slow_clk = clk;
- 
- 	return clk;
- }
-@@ -433,6 +436,8 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
- 	clk = clk_register(NULL, &slowck->hw);
- 	if (IS_ERR(clk))
- 		kfree(slowck);
-+	else
-+		slow_clk = clk;
- 
- 	return clk;
- }
-@@ -465,3 +470,25 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
- 
- 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
-+
-+/*
-+ * FIXME: All slow clk users are not properly claiming it (get + prepare +
-+ * enable) before using it.
-+ * If all users properly claiming this clock decide that they don't need it
-+ * anymore (or are removed), it is disabled while faulty users are still
-+ * requiring it, and the system hangs.
-+ * Prevent this clock from being disabled until all users are properly
-+ * requesting it.
-+ * Once this is done we should remove this function and the slow_clk variable.
-+ */
-+static int __init of_at91_clk_slow_retain(void)
-+{
-+	if (!slow_clk)
-+		return 0;
-+
-+	__clk_get(slow_clk);
-+	clk_prepare_enable(slow_clk);
-+
-+	return 0;
-+}
-+arch_initcall(of_at91_clk_slow_retain);
 -- 
-1.9.1
+~Vinod
+
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
+> index a8a79b1763d5..91fb241102f7 100644
+> --- a/drivers/dma/mmp_tdma.c
+> +++ b/drivers/dma/mmp_tdma.c
+> @@ -19,7 +19,6 @@
+>  #include <linux/dmaengine.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/device.h>
+> -#include <mach/regs-icu.h>
+>  #include <linux/platform_data/dma-mmp_tdma.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_dma.h>
+> 
+
+-- 
