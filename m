@@ -1,94 +1,189 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 17:10:58 +0100
-Subject: [PATCH] mISDN: avoid arch specific __builtin_return_address call
-Message-ID: <1816278.9Bv8N8K5IB@wuerfel>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 13 Jan 2015 16:13:48 +0000
+Subject: [PATCH] ARM: kprobes: check register usage for probed instruction
+In-Reply-To: <1421161268.4215.56.camel@linaro.org>
+References: <1420457284-76923-1-git-send-email-wangnan0@huawei.com>
+ <1420457384-77449-1-git-send-email-wangnan0@huawei.com>
+ <1421161268.4215.56.camel@linaro.org>
+Message-ID: <1421165628.4215.63.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all architectures are able to call __builtin_return_address().
-On ARM, the mISDN code produces this warning:
+This patch utilizes the previously introduced checker to check
+register usage for probed ARM instruction and saves it in a mask.
+A further patch will use such information to avoid simulation or
+emulation.
 
-hardware/mISDN/w6692.c: In function 'w6692_dctrl':
-hardware/mISDN/w6692.c:1181:75: warning: unsupported argument to '__builtin_return_address'
-  pr_debug("%s: %s dev(%d) open from %p\n", card->name, __func__,
-                                                                           ^
-hardware/mISDN/mISDNipac.c: In function 'open_dchannel':
-hardware/mISDN/mISDNipac.c:759:75: warning: unsupported argument to '__builtin_return_address'
-  pr_debug("%s: %s dev(%d) open from %p\n", isac->name, __func__,
-                                                                           ^
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Reviewed-by: Jon Medhurst <tixy@linaro.org>
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
 
-In a lot of cases, this is relatively easy to work around by
-passing the value of __builtin_return_address(0) from the
-callers into the functions that want it. One exception is
-the indirect 'open' function call in struct isac_hw. While it
-would be possible to fix this as well, this patch only addresses
-the other callers properly and lets this one return the direct
-parent function, which should be good enough.
+This patch applies my review comments on "[PATCH v19 10/11] ARM:
+kprobes: check register usage for probed instruction."
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+It is also rebased on top of the kprobes-opt branch at
+git://git.linaro.org/people/tixy/kernel.git
 
-diff --git a/drivers/isdn/hardware/mISDN/mISDNipac.c b/drivers/isdn/hardware/mISDN/mISDNipac.c
-index ccd7d851be26..a77eea594b69 100644
---- a/drivers/isdn/hardware/mISDN/mISDNipac.c
-+++ b/drivers/isdn/hardware/mISDN/mISDNipac.c
-@@ -754,10 +754,10 @@ dbusy_timer_handler(struct isac_hw *isac)
- }
+ arch/arm/include/asm/probes.h          |  1 +
+ arch/arm/probes/decode.c               |  7 +++
+ arch/arm/probes/kprobes/actions-arm.c  |  2 +-
+ arch/arm/probes/kprobes/checkers-arm.c | 93 ++++++++++++++++++++++++++++++++++
+ arch/arm/probes/kprobes/checkers.h     |  1 +
+ 5 files changed, 103 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/probes.h b/arch/arm/include/asm/probes.h
+index cd9e815..b668e60 100644
+--- a/arch/arm/include/asm/probes.h
++++ b/arch/arm/include/asm/probes.h
+@@ -41,6 +41,7 @@ struct arch_probes_insn {
+ 	probes_insn_singlestep_t	*insn_singlestep;
+ 	probes_insn_fn_t		*insn_fn;
+ 	int				stack_space;
++	unsigned long			register_usage_flags;
+ };
  
- static int
--open_dchannel(struct isac_hw *isac, struct channel_req *rq)
-+open_dchannel_caller(struct isac_hw *isac, struct channel_req *rq, void *caller)
- {
- 	pr_debug("%s: %s dev(%d) open from %p\n", isac->name, __func__,
--		 isac->dch.dev.id, __builtin_return_address(1));
-+		 isac->dch.dev.id, caller);
- 	if (rq->protocol != ISDN_P_TE_S0)
- 		return -EINVAL;
- 	if (rq->adr.channel == 1)
-@@ -771,6 +771,12 @@ open_dchannel(struct isac_hw *isac, struct channel_req *rq)
- 	return 0;
- }
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm/probes/decode.c b/arch/arm/probes/decode.c
+index f9d7c42..880ebe0 100644
+--- a/arch/arm/probes/decode.c
++++ b/arch/arm/probes/decode.c
+@@ -435,6 +435,13 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+ 	 */
+ 	asi->stack_space = 0;
  
-+static int
-+open_dchannel(struct isac_hw *isac, struct channel_req *rq)
++	/*
++	 * Similarly to stack_space, register_usage_flags is filled by
++	 * checkers. Its default value is set to ~0, which is 'all
++	 * registers are used', to prevent any potential optimization.
++	 */
++	asi->register_usage_flags = ~0UL;
++
+ 	if (emulate)
+ 		insn = prepare_emulated_insn(insn, asi, thumb);
+ 
+diff --git a/arch/arm/probes/kprobes/actions-arm.c b/arch/arm/probes/kprobes/actions-arm.c
+index 06988ef..b9056d6 100644
+--- a/arch/arm/probes/kprobes/actions-arm.c
++++ b/arch/arm/probes/kprobes/actions-arm.c
+@@ -341,4 +341,4 @@ const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
+ 	[PROBES_LDMSTM] = {.decoder = kprobe_decode_ldmstm}
+ };
+ 
+-const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, NULL};
++const struct decode_checker *kprobes_arm_checkers[] = {arm_stack_checker, arm_regs_checker, NULL};
+diff --git a/arch/arm/probes/kprobes/checkers-arm.c b/arch/arm/probes/kprobes/checkers-arm.c
+index f817663..7b98173 100644
+--- a/arch/arm/probes/kprobes/checkers-arm.c
++++ b/arch/arm/probes/kprobes/checkers-arm.c
+@@ -97,3 +97,96 @@ const struct decode_checker arm_stack_checker[NUM_PROBES_ARM_ACTIONS] = {
+ 	[PROBES_STORE] = {.checker = arm_check_stack},
+ 	[PROBES_LDMSTM] = {.checker = arm_check_stack},
+ };
++
++static enum probes_insn __kprobes arm_check_regs_nouse(probes_opcode_t insn,
++		struct arch_probes_insn *asi,
++		const struct decode_header *h)
 +{
-+	return open_dchannel_caller(isac, rq, __builtin_return_address(0));
++	asi->register_usage_flags = 0;
++	return INSN_GOOD;
 +}
 +
- static const char *ISACVer[] =
- {"2086/2186 V1.1", "2085 B1", "2085 B2",
-  "2085 V2.3"};
-@@ -1548,7 +1554,7 @@ ipac_dctrl(struct mISDNchannel *ch, u32 cmd, void *arg)
- 	case OPEN_CHANNEL:
- 		rq = arg;
- 		if (rq->protocol == ISDN_P_TE_S0)
--			err = open_dchannel(isac, rq);
-+			err = open_dchannel_caller(isac, rq, __builtin_return_address(0));
- 		else
- 			err = open_bchannel(ipac, rq);
- 		if (err)
-diff --git a/drivers/isdn/hardware/mISDN/w6692.c b/drivers/isdn/hardware/mISDN/w6692.c
-index de69f6828c76..741675525b53 100644
---- a/drivers/isdn/hardware/mISDN/w6692.c
-+++ b/drivers/isdn/hardware/mISDN/w6692.c
-@@ -1176,10 +1176,10 @@ w6692_l1callback(struct dchannel *dch, u32 cmd)
- }
++static enum probes_insn arm_check_regs_normal(probes_opcode_t insn,
++		struct arch_probes_insn *asi,
++		const struct decode_header *h)
++{
++	u32 regs = h->type_regs.bits >> DECODE_TYPE_BITS;
++	int i;
++
++	asi->register_usage_flags = 0;
++	for (i = 0; i < 5; regs >>= 4, insn >>= 4, i++)
++		if (regs & 0xf)
++			asi->register_usage_flags |= 1 << (insn & 0xf);
++
++	return INSN_GOOD;
++}
++
++
++static enum probes_insn arm_check_regs_ldmstm(probes_opcode_t insn,
++		struct arch_probes_insn *asi,
++		const struct decode_header *h)
++{
++	unsigned int reglist = insn & 0xffff;
++	unsigned int rn = (insn >> 16) & 0xf;
++	asi->register_usage_flags = reglist | (1 << rn);
++	return INSN_GOOD;
++}
++
++static enum probes_insn arm_check_regs_mov_ip_sp(probes_opcode_t insn,
++		struct arch_probes_insn *asi,
++		const struct decode_header *h)
++{
++	/* Instruction is 'mov ip, sp' i.e. 'mov r12, r13' */
++	asi->register_usage_flags = (1 << 12) | (1<< 13);
++	return INSN_GOOD;
++}
++
++/*
++ *                                    | Rn |Rt/d|         | Rm |
++ * LDRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1101 xxxx
++ * STRD (register)      cccc 000x x0x0 xxxx xxxx xxxx 1111 xxxx
++ *                                    | Rn |Rt/d|         |imm4L|
++ * LDRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1101 xxxx
++ * STRD (immediate)     cccc 000x x1x0 xxxx xxxx xxxx 1111 xxxx
++ *
++ * Such instructions access Rt/d and its next register, so different
++ * from others, a specific checker is required to handle this extra
++ * implicit register usage.
++ */
++static enum probes_insn arm_check_regs_ldrdstrd(probes_opcode_t insn,
++		struct arch_probes_insn *asi,
++		const struct decode_header *h)
++{
++	int rdt = (insn >> 12) & 0xf;
++	arm_check_regs_normal(insn, asi, h);
++	asi->register_usage_flags |= 1 << (rdt + 1);
++	return INSN_GOOD;
++}
++
++
++const struct decode_checker arm_regs_checker[NUM_PROBES_ARM_ACTIONS] = {
++	[PROBES_MRS] = {.checker = arm_check_regs_normal},
++	[PROBES_SATURATING_ARITHMETIC] = {.checker = arm_check_regs_normal},
++	[PROBES_MUL1] = {.checker = arm_check_regs_normal},
++	[PROBES_MUL2] = {.checker = arm_check_regs_normal},
++	[PROBES_MUL_ADD_LONG] = {.checker = arm_check_regs_normal},
++	[PROBES_MUL_ADD] = {.checker = arm_check_regs_normal},
++	[PROBES_LOAD] = {.checker = arm_check_regs_normal},
++	[PROBES_LOAD_EXTRA] = {.checker = arm_check_regs_normal},
++	[PROBES_STORE] = {.checker = arm_check_regs_normal},
++	[PROBES_STORE_EXTRA] = {.checker = arm_check_regs_normal},
++	[PROBES_DATA_PROCESSING_REG] = {.checker = arm_check_regs_normal},
++	[PROBES_DATA_PROCESSING_IMM] = {.checker = arm_check_regs_normal},
++	[PROBES_SEV] = {.checker = arm_check_regs_nouse},
++	[PROBES_WFE] = {.checker = arm_check_regs_nouse},
++	[PROBES_SATURATE] = {.checker = arm_check_regs_normal},
++	[PROBES_REV] = {.checker = arm_check_regs_normal},
++	[PROBES_MMI] = {.checker = arm_check_regs_normal},
++	[PROBES_PACK] = {.checker = arm_check_regs_normal},
++	[PROBES_EXTEND] = {.checker = arm_check_regs_normal},
++	[PROBES_EXTEND_ADD] = {.checker = arm_check_regs_normal},
++	[PROBES_BITFIELD] = {.checker = arm_check_regs_normal},
++	[PROBES_LDMSTM] = {.checker = arm_check_regs_ldmstm},
++	[PROBES_MOV_IP_SP] = {.checker = arm_check_regs_mov_ip_sp},
++	[PROBES_LDRSTRD] = {.checker = arm_check_regs_ldrdstrd},
++};
+diff --git a/arch/arm/probes/kprobes/checkers.h b/arch/arm/probes/kprobes/checkers.h
+index bddfa0e..cf6c9e7 100644
+--- a/arch/arm/probes/kprobes/checkers.h
++++ b/arch/arm/probes/kprobes/checkers.h
+@@ -47,6 +47,7 @@ extern const union decode_action stack_check_actions[];
  
- static int
--open_dchannel(struct w6692_hw *card, struct channel_req *rq)
-+open_dchannel(struct w6692_hw *card, struct channel_req *rq, void *caller)
- {
- 	pr_debug("%s: %s dev(%d) open from %p\n", card->name, __func__,
--		 card->dch.dev.id, __builtin_return_address(1));
-+		 card->dch.dev.id, caller);
- 	if (rq->protocol != ISDN_P_TE_S0)
- 		return -EINVAL;
- 	if (rq->adr.channel == 1)
-@@ -1207,7 +1207,7 @@ w6692_dctrl(struct mISDNchannel *ch, u32 cmd, void *arg)
- 	case OPEN_CHANNEL:
- 		rq = arg;
- 		if (rq->protocol == ISDN_P_TE_S0)
--			err = open_dchannel(card, rq);
-+			err = open_dchannel(card, rq, __builtin_return_address(0));
- 		else
- 			err = open_bchannel(card, rq);
- 		if (err)
+ #ifndef CONFIG_THUMB2_KERNEL
+ extern const struct decode_checker arm_stack_checker[];
++extern const struct decode_checker arm_regs_checker[];
+ #else
+ #endif
+ extern const struct decode_checker t32_stack_checker[];
+-- 
+2.1.4
