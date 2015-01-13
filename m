@@ -1,52 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Jan 2015 18:36:17 +0000
-Subject: [PATCH v3 14/21] ARM: imx6: convert GPC to stacked domains
-In-Reply-To: <CACRpkdYHnBtP39xpEkjdibpijGip0Y3+YLvEA8KUGfentKbZ9A@mail.gmail.com>
-References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>	<1421087187-26988-15-git-send-email-marc.zyngier@arm.com>
- <CACRpkdYHnBtP39xpEkjdibpijGip0Y3+YLvEA8KUGfentKbZ9A@mail.gmail.com>
-Message-ID: <54B565A1.5010206@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 13 Jan 2015 12:35:29 -0600
+Subject: [PATCH 05/11] usb: gadget: at91_udc: Remove non-DT handling code
+In-Reply-To: <20150113180526.GE3843@piout.net>
+References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417606330-17753-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150112213905.GI2858@saruman> <20150112225330.GQ2447@piout.net>
+ <20150113163654.GI16533@saruman> <20150113180526.GE3843@piout.net>
+Message-ID: <20150113183529.GO16533@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/15 06:09, Linus Walleij wrote:
-
-Hi Linus,
-
-> On Mon, Jan 12, 2015 at 7:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Tue, Jan 13, 2015 at 07:05:26PM +0100, Alexandre Belloni wrote:
+> Hi,
 > 
->> IMX6 has been (ab)using the gic_arch_extn to provide
->> wakeup from suspend, and it makes a lot of sense to convert
->> this code to use stacked domains instead.
->>
->> This patch does just this, updating the DT files to actually
->> reflect what the HW provides.
->>
->> BIG FAT WARNING: because the DTs were so far lying by not
->> exposing the fact that the GPC block is actually the first
->> interrupt controller in the chain, kernels with this patch
->> applied wont have any suspend-resume facility when booted
->> with old DTs, and old kernels with updated DTs won't even boot.
->>
->> Tested-by: Stefan Agner <stefan@agner.ch>
->> Acked-by: Stefan Agner <stefan@agner.ch>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> On 13/01/2015 at 10:36:54 -0600, Felipe Balbi wrote :
+> > > I've rebased that patch series but it depends on another one (the mfd:
+> > > syscon: part of "memory: add Atmel EBI (External Bus Interface)
+> > > driver") that is not taken yet so applying it now will break the
+> > > build. I still hope to get it merged for 3.20 and I'll resend it as
+> > > soon as possible.
+> > 
+> > In that case, we either take the entire series through MFD (including
+> > the gadget patches) or we delay the gadget patches until all
+> > dependencies have been sorted out.
 > 
-> (...)
-> 
->> +static int imx_gpc_domain_alloc(struct irq_domain *domain,
->> +                                 unsigned int virq,
-> 
-> Nutcase nitpick on this nice patch series: every time I see "virq" my
-> OCD triggers, as I think the "v" in "virq" stand for virtual. These irqs
-> are no more virtual than any other Linux irq numbers, hwirq is
-> more to the point.
-> 
-> I just refer to these as "irq" (sans "v") in any code I write.
+> I would prefer not to miss 3.20, can I resend the patches now so you can
+> review and ack them? Then they could go through the mfd tree.
 
-That's fair enough. I'll update that as I fix some other nits.
+Sure, please do
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/820e8cf9/attachment-0001.sig>
