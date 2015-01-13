@@ -1,68 +1,185 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 13 Jan 2015 02:05:38 +0100
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-In-Reply-To: <20150113112016.2db3f982@canb.auug.org.au>
-References: <20150113112016.2db3f982@canb.auug.org.au>
-Message-ID: <20150113010538.GA2434@lunn.ch>
+From: ottxor@gentoo.org (Christoph Junghans)
+Date: Mon, 12 Jan 2015 18:22:12 -0700
+Subject: [PATCH v2] Added support for pogoplug e02 (pink/gray)
+In-Reply-To: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+Message-ID: <1421112132-9651-1-git-send-email-ottxor@gentoo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 11:20:16AM +1100, Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the mvebu tree got a conflict in
-> arch/arm/boot/dts/Makefile between commit 6f1650f15bc4 ("ARM: dts: Only
-> build dtb if associated Arch and/or SoC is enabled") from the arm-soc
-> tree and commit dd7d2be1d2b8 ("Kirkwood: add support for Seagate
-> BlackArmor NAS220") from the mvebu tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc arch/arm/boot/dts/Makefile
-> index abb810f1fe29,17ee1d6a0ac0..000000000000
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@@ -112,24 -101,18 +112,25 @@@ dtb-$(CONFIG_ARCH_EXYNOS5) += 
->   	exynos5440-sd5v1.dtb \
->   	exynos5440-ssdk5440.dtb \
->   	exynos5800-peach-pi.dtb
->  -dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
->  -dtb-$(CONFIG_ARCH_HIX5HD2) += hisi-x5hd2-dkb.dtb
->  -dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->  +dtb-$(CONFIG_ARCH_HI3xxx) += \
->  +	hi3620-hi4511.dtb
->  +dtb-$(CONFIG_ARCH_HIX5HD2) += \
->  +	hisi-x5hd2-dkb.dtb
->  +dtb-$(CONFIG_ARCH_HIGHBANK) += \
->  +	highbank.dtb \
->   	ecx-2000.dtb
->  -dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
->  -dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
->  +dtb-$(CONFIG_ARCH_HIP04) += \
->  +	hip04-d01.dtb
->  +dtb-$(CONFIG_ARCH_INTEGRATOR) += \
->  +	integratorap.dtb \
->   	integratorcp.dtb
->  -dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
->  +dtb-$(CONFIG_ARCH_KEYSTONE) += \
->  +	k2hk-evm.dtb \
->   	k2l-evm.dtb \
->   	k2e-evm.dtb
->  -dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
->  +dtb-$(CONFIG_MACH_KIRKWOOD) += \
->  +	kirkwood-b3.dtb \
-> + 	kirkwood-blackarmor-nas220.dtb \
->   	kirkwood-cloudbox.dtb \
->   	kirkwood-d2net.dtb \
->   	kirkwood-db-88f6281.dtb \
+The pogoplug differs from the SheevaPlug only by a
+few details, but especially in the led assignments.
+This patch was tested under Gentoo Linux and is
+based on dts files from Arch Linux ARM and OpenWrt.
 
-Hi Stephen
+Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
+Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
+Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+---
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/kirkwood-pogo_e02.dts            | 129 +++++++++++++++++++++
+ 3 files changed, 131 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-pogo_e02.dts
 
-Thanks for the fixup.
-
-       Andrew
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index ac7269f..e5f58c6 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -32,6 +32,7 @@ cdns	Cadence Design Systems Inc.
+ chrp	Common Hardware Reference Platform
+ chunghwa	Chunghwa Picture Tubes Ltd.
+ cirrus	Cirrus Logic, Inc.
++cloudengines	Cloud Engines, Inc.
+ cortina	Cortina Systems, Inc.
+ crystalfontz	Crystalfontz America, Inc.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b8c5cd3..cd974eb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -143,6 +143,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
+ 	kirkwood-openrd-base.dtb \
+ 	kirkwood-openrd-client.dtb \
+ 	kirkwood-openrd-ultimate.dtb \
++	kirkwood-pogo_e02.dtb \
+ 	kirkwood-rd88f6192.dtb \
+ 	kirkwood-rd88f6281-a0.dtb \
+ 	kirkwood-rd88f6281-a1.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-pogo_e02.dts b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
+new file mode 100644
+index 0000000..be38dab
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-pogo_e02.dts
+@@ -0,0 +1,129 @@
++/*
++ * kirkwood-sheevaplug.dts - Device tree file for Pogoplug E02
++ *
++ * Copyright (C) 2015 Christoph Junghans <ottxor@gentoo.org>
++ *
++ * based on information of dts files from
++ *  Arch Linux ARM by Oleg Rakhmanov <moonman.ca@gmail.com>
++ *  OpenWrt by Felix Kaechele <heffer@fedoraproject.org>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++
++/ {
++	model = "Cloud Engines Pogoplug E02";
++	compatible = "cloudengines,pogoe02", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8";
++		linux,stdout-path = &serial1;
++	};
++
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			pmx_usb_power_enable: pmx-usb-power-enable {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++			pmx_led_green: pmx-led-green {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++			pmx_led_orange: pmx-led-orange {
++				marvell,pins = "mpp49";
++				marvell,function = "gpio";
++			};
++		};
++		serial1: serial at 12000 {
++			status = "ok";
++		};
++	};
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
++			      &pmx_led_green >;
++		pinctrl-names = "default";
++
++		health {
++			label = "pogo_e02:green:health";
++			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++		};
++		fault {
++			label = "pogo_e02:orange:fault";
++			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_usb_power_enable>;
++		pinctrl-names = "default";
++
++		usb_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&nand {
++	chip-delay = <40>;
++	status = "okay";
++
++	partition at 0 {
++		label = "u-boot";
++		reg = <0x0000000 0x100000>;
++		read-only;
++	};
++
++	partition at 100000 {
++		label = "uImage";
++		reg = <0x0100000 0x400000>;
++	};
++
++	partition at 500000 {
++		label = "pogoplug";
++		reg = <0x0500000 0x2000000>;
++	};
++
++	partition at 2500000 {
++		label = "root";
++		reg = <0x02500000 0x5b00000>;
++	};
++};
++
++&mdio {
++	status = "okay";
++
++	ethphy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
++&eth0 {
++	status = "okay";
++	ethernet0-port at 0 {
++		phy-handle = <&ethphy0>;
++	};
++};
+-- 
+2.0.5
