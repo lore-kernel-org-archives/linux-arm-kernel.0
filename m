@@ -1,36 +1,33 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 13 Jan 2015 14:12:35 +0100
-Subject: [PATCH v4 2/4] irqchip: mtk-sysirq: Get irq number from register
- resource size
-In-Reply-To: <1421054073-43468-3-git-send-email-eddie.huang@mediatek.com>
-References: <1421054073-43468-1-git-send-email-eddie.huang@mediatek.com>
- <1421054073-43468-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBeKGbxR8YQcVPJyZDpnVsNUsTxQQhsisW_F2L13zfgeyjw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Jan 2015 14:18:32 +0100
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+In-Reply-To: <20150113111636.7bc5785c@canb.auug.org.au>
+References: <20150113111636.7bc5785c@canb.auug.org.au>
+Message-ID: <3097971.rZTsHKr4DO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-12 10:14 GMT+01:00 Eddie Huang <eddie.huang@mediatek.com>:
-> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
->
-> Originally mtk-sysirq hardcoded supported irq number to 224. This
-> was fine since all SoCs before support the same number of irqs for
-> intpol.
->
-> However MT8173 intpol support 32 more irq pins, changes to get
-> irq number from register resource size to suppor MT8173 properly.
->
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  drivers/irqchip/irq-mtk-sysirq.c | 18 +++++++++++-------
->  1 file changed, 11 insertions(+), 7 deletions(-)
->
+On Tuesday 13 January 2015 11:16:36 Stephen Rothwell wrote:
+>  -      imx6q-tx6q-1110.dtb \
+>  -      imx6sl-evk.dtb \
+>  +      imx6q-tx6q-1110.dtb
+>  +dtb-$(CONFIG_SOC_IMX6SL) += \
+>  +      imx6sl-evk.dtb
+>  +dtb-$(CONFIG_SOC_IMX6SX) += \
+> +       imx6sx-sabreauto.dtb \
+>         imx6sx-sdb.dtb \
+>  +dtb-$(CONFIG_SOC_LS1021A) += \
+>         ls1021a-qds.dtb \
+>  -      ls1021a-twr.dtb \
+>  +      ls1021a-twr.dtb
+>  +dtb-$(CONFIG_SOC_VF610) += \
+> 
 
-Jason, Thomas, will you take this patch through your branch?
-I will take the rest of the series.
+There is an extraneous '\' character behind imx6sx-sdb.dtb now, which caused
+build errors for me. We should soon be able to merge the other branches into
+arm-soc to avoid the entire set of merge conflicts, until then please
+change your recorded resolution to avoid the build error.
 
-Best regards,
-Matthias
+Thanks!
 
--- 
-motzblog.wordpress.com
+	Arnd
