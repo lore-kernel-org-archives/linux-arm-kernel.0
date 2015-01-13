@@ -1,54 +1,103 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 13 Jan 2015 09:51:37 -0800
-Subject: [PATCH] mmc: dw_mmc: rockchip: Add DW_MCI_QUIRK_RETRY_DELAY
-Message-ID: <1421171497-9440-1-git-send-email-dianders@chromium.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 13 Jan 2015 23:23:25 +0530
+Subject: Query: ARM64: Behavior of el1_dbg exception while executing
+ el0_dbg
+In-Reply-To: <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
+References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
+ <54AEBE45.9080203@redhat.com> <20150109154635.GG11258@arm.com>
+ <54B00C39.1070809@redhat.com> <20150112173005.GK13360@arm.com>
+ <54B4BF4C.2030009@redhat.com>
+ <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
+Message-ID: <54B55B95.1070402@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've seen at least one card that can get confused during all the
-errors generated during tuning on rk3288.  These errors seem to go
-away with DW_MCI_QUIRK_RETRY_DELAY.  That quirk is documented to be
-for 2.11a and on rk3288 I believe we have 2.70a, but it seems to be
-the same type of problem.
 
-Specifically it looks like in certain error conditions (I saw this
-with Response CRC errors) that data keeps showing up in the FIFO even
-after the error is reported and the CD (command done) bit is set.  If
-we don't wait for this data to finish transferring then it confuses
-the next transaction.  In the specific failure case I ran into I found
-that I could monitor the data_state_mc_busy bit and wait for it to
-clear, but in other failure cases this bit was stuck at busy when we
-saw an error.  Hence a generic big delay seems like the only option.
 
-I have seen this on rk3288, but adding it as a quirk for all Rockchip
-IP for now since most previous quirks have shown up on older IP as
-well.
+On Tuesday 13 January 2015 09:22 PM, Catalin Marinas wrote:
+> On Tue, Jan 13, 2015 at 06:46:36AM +0000, Pratyush Anand wrote:
+>> On Monday 12 January 2015 11:00 PM, Will Deacon wrote:
+>>> On Fri, Jan 09, 2015 at 05:13:29PM +0000, Pratyush Anand wrote:
+>>>> On Friday 09 January 2015 09:16 PM, Will Deacon wrote:
+>>>>> On Thu, Jan 08, 2015 at 05:28:37PM +0000, Pratyush Anand wrote:
+>>>>>> On Thursday 08 January 2015 09:53 PM, Will Deacon wrote:
+>>>>>>> On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
+>>>>>>>> I am trying to test following scenario, which seems valid to me. But I
+>>>>>>>> am very new to ARM64 as well as to debugging tools, so seeking expert's
+>>>>>>>> comment here.
+>>>>>>>>
+>>>>>>>> -- I have inserted a kprobe to the function uprobe_breakpoint_handler
+>>>>>>>> which is called from elo_dbg
+>>>>>>>> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
+>>>>>>>>
+>>>>>>>> -- kprobe is enabled.
+>>>>>>>>
+>>>>>>>> -- an uprobe is inserted into a test application and enabled.
+>>>>>>>>
+>>>>>>>> So, when uprobe is enabled and test code execution reaches to probe
+>>>>>>>> instruction, it executes uprobe breakpoint instruction and el0_dbg
+>>>>>>>> exception is raised.
+>>>>>>>>
+>>>>>>>> When control reaches to start of uprobe_breakpoint_handler and it
+>>>>>>>> executes first instruction (which has been replaced with a kprobe
+>>>>>>>> breakpoint instruction), el1_dbg exception is raised.
+>>>>>>>
+>>>>>>> Hmm, debug exceptions should be masked at this point so I don't see why
+>>>>>>> you're taking the second debug exception.
+>>>>>>
+>>>>>> So, you mean to say that when an exception which has been taken from
+>>>>>> lower exception level (EL0) is being executed, then we keep masked also
+>>>>>> the exception from current exception level (EL1)...
+>>>>>
+>>>>> Yeah, if you look at entry.S then you'll see that neither el0_dbg or el1_dbg
+>>>>> re-enable debug exceptions (masked automatically by the CPU after taking the
+>>>>> exception) until *after* the handling has completed. This is to prevent
+>>>>> recursive debug exceptions, which I don't see how we can reasonable handle.
+>>>>
+>>>> May be I am missing something, but my observation on silicon is
+>>>> different. Please have a look at git log of HEAD of following branch,
+>>>> which says that el1_dbg exception has been raised while el0_dbg was
+>>>> executing. Do not know what I am missing..
+> [...]
+>>> Regardless, I think you need to debug further and found out if PSTATE.D is
+>>> getting cleared and, if so, who is responsible for that. Somebody could be
+>>> enabling IRQs, for example, which will then unmask debug exceptions in
+>>> el1_irq.
+>>
+>> This is what I see for pstate, When el0_dbg exception is raised (ie an
+>> exception raised with ESR = ESR_EL1_EC_BRK64 after executing instruction
+>> BRK64_OPCODE_UPROBES = 0xD4200100 in EL0, user mode), spsr_el1 value is
+>> 0x80000000. Which means, all exceptions are unmasked. Is it expected?
+>
+> spsr_el1 is the EL0 pstate saved when entering EL1. So it is expected
+> that user space always has interrupts enabled.
+>
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-NOTES:
-* This is based atop Addy's patch (mmc: dw_mmc: add quirk for broken
-data transfer over scheme) at
-<https://patchwork.kernel.org/patch/5565431/>, but it would be trivial
-to apply this patch without that one if that were desirable.
-* If someone has a better solution to this problem, I'm all ears.
+Yes, I was wrong :(
+By the way, is there a way to read cpsr or current PSTATE.D?
 
- drivers/mmc/host/dw_mmc-rockchip.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+That would help me to know if PSTATE.D was unmasked just before 
+executing BRK64_OPCODE_UPROBES. Actually, print in enable_dbg macro give 
+me other issues and does not allow system to boot.
 
-diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
-index ba92ebd..b4caf1a 100644
---- a/drivers/mmc/host/dw_mmc-rockchip.c
-+++ b/drivers/mmc/host/dw_mmc-rockchip.c
-@@ -74,7 +74,8 @@ static int dw_mci_rockchip_init(struct dw_mci *host)
- 	host->sdio_id0 = 8;
- 
- 	/* It needs this quirk on all Rockchip SoCs */
--	host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO;
-+	host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_DTO |
-+		DW_MCI_QUIRK_RETRY_DELAY;
- 
- 	return 0;
- }
--- 
-2.2.0.rc0.207.ga3a616c
+I will still try to find some way to capture enable_dbg macro 
+path.However, if I just examine the code flow then I do not see a 
+situation where enable_dbg could have been called after receiving 
+el0_dbg.(or other than enable_dbg is there some other path too which can 
+re-enable debug exception??)
+
+-- Application executes  BRK64_OPCODE_UPROBES.
+-- el0_sync is raised.
+-- el0_sync
+	-> kernel_entry 0
+	-> el0_dbg
+		-> do_debug_exception
+			->brk_handler
+				->call_break_hook
+					->uprobe_breakpoint_handler
+
+None of the above path seems calling enable_dbg, then how do we receive 
+el1_sync when first instruction of uprobe_breakpoint_handler (which has 
+been replaced with BRK64_OPCODE_KPROBES) is executed?
+
+~Pratyush
