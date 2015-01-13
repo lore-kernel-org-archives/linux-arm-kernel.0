@@ -1,107 +1,324 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 13 Jan 2015 19:46:21 +0100
-Subject: [PATCH v2 5/5] ARM: at91/dt: define a dumb irq demultiplexer chip
- connected on irq1
-In-Reply-To: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1421174781-4340-6-git-send-email-boris.brezillon@free-electrons.com>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Tue, 13 Jan 2015 10:55:23 -0800
+Subject: [PATCHv2 2/2] leds: tlc59116: Driver for the TI 16 Channel i2c
+ LED driver
+In-Reply-To: <1420843545-30892-3-git-send-email-andrew@lunn.ch>
+References: <1420843545-30892-1-git-send-email-andrew@lunn.ch>
+ <1420843545-30892-3-git-send-email-andrew@lunn.ch>
+Message-ID: <CAK5ve-JQJJH_Dk=+PbFyRL3cjQUU4a5au4h9Kfcz6L6_iAfPKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IRQ is multiplexing several peripheral IRQs, but there's no way to
-properly demultiplex those IRQs.
-Use a dumb irq demux chip to achieve this demultiplexing operation.
+On Fri, Jan 9, 2015 at 2:45 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> The TLC59116 is an I2C bus controlled 16-channel LED driver.  Each LED
+> output has its own 8-bit fixed-frequency PWM controller to control the
+> brightness of the LED.
+>
+> This is based on a driver from Belkin, but has been extensively
+> rewritten.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: Matthew.Fatheree at belkin.com
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi | 26 ++++++++++++++++++++------
- 1 file changed, 20 insertions(+), 6 deletions(-)
+Looks good, applied to my tree.
+-Bryan
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index dd1313c..debe8d2 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -10,7 +10,7 @@
- 
- #include "skeleton.dtsi"
- #include <dt-bindings/pinctrl/at91.h>
--#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/atmel-aic.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/clock/at91.h>
- 
-@@ -89,6 +89,7 @@
- 				atmel,external-irqs = <29 30 31>;
- 			};
- 
-+
- 			ramc0: ramc at ffffea00 {
- 				compatible = "atmel,at91sam9260-sdramc";
- 				reg = <0xffffea00 0x200>;
-@@ -97,7 +98,7 @@
- 			pmc: pmc at fffffc00 {
- 				compatible = "atmel,at91sam9260-pmc";
- 				reg = <0xfffffc00 0x100>;
--				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupts-extended = <&dumb_irq1_demux AIC_IRQ1_PMC>;
- 				interrupt-controller;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -364,7 +365,7 @@
- 			pit: timer at fffffd30 {
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xfffffd30 0xf>;
--				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupts-extended = <&dumb_irq1_demux AIC_IRQ1_PIT>;
- 				clocks = <&mck>;
- 			};
- 
-@@ -750,7 +751,7 @@
- 			dbgu: serial at fffff200 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
--				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupts-extended = <&dumb_irq1_demux AIC_IRQ1_DBGU>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_dbgu>;
- 				clocks = <&mck>;
-@@ -959,7 +960,7 @@
- 			rtc at fffffd20 {
- 				compatible = "atmel,at91sam9260-rtt";
- 				reg = <0xfffffd20 0x10>;
--				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupts-extended = <&dumb_irq1_demux AIC_IRQ1_RTT>;
- 				clocks = <&clk32k>;
- 				status = "disabled";
- 			};
-@@ -967,7 +968,7 @@
- 			watchdog at fffffd40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffd40 0x10>;
--				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupts-extended = <&dumb_irq1_demux AIC_IRQ1_WATCHDOG>;
- 				atmel,watchdog-type = "hardware";
- 				atmel,reset-type = "all";
- 				atmel,dbg-halt;
-@@ -1010,6 +1011,19 @@
- 		};
- 	};
- 
-+	dumb_irq1_demux: dumb-irq-demux at 1 {
-+		compatible = "irqchip-dumb-demux";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+		irqs = <(AIC_IRQ_MASK(AIC_IRQ1_PMC) |
-+			 AIC_IRQ_MASK(AIC_IRQ1_PIT) |
-+			 AIC_IRQ_MASK(AIC_IRQ1_DBGU) |
-+			 AIC_IRQ_MASK(AIC_IRQ1_RTT) |
-+			 AIC_IRQ_MASK(AIC_IRQ1_WATCHDOG) |
-+			 AIC_IRQ_MASK(AIC_IRQ1_RSTC))>;
-+	};
-+
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
- 		gpios = <&pioA 23 GPIO_ACTIVE_HIGH /* sda */
--- 
-1.9.1
+> ---
+>  drivers/leds/Kconfig         |   8 ++
+>  drivers/leds/Makefile        |   1 +
+>  drivers/leds/leds-tlc59116.c | 252 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 261 insertions(+)
+>  create mode 100644 drivers/leds/leds-tlc59116.c
+>
+> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> index a6c3d2f153f3..8fc283c01673 100644
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -457,6 +457,14 @@ config LEDS_TCA6507
+>           LED driver chips accessed via the I2C bus.
+>           Driver support brightness control and hardware-assisted blinking.
+>
+> +config LEDS_TLC59116
+> +       tristate "LED driver for TLC59116F controllers"
+> +       depends on LEDS_CLASS && I2C
+> +       select REGMAP_I2C
+> +       help
+> +         This option enables support for Texas Instruments TLC59116F
+> +         LED controller.
+> +
+>  config LEDS_MAX8997
+>         tristate "LED support for MAX8997 PMIC"
+>         depends on LEDS_CLASS && MFD_MAX8997
+> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+> index 1c65a191d907..8e7d20acfa7b 100644
+> --- a/drivers/leds/Makefile
+> +++ b/drivers/leds/Makefile
+> @@ -30,6 +30,7 @@ obj-$(CONFIG_LEDS_LP8501)             += leds-lp8501.o
+>  obj-$(CONFIG_LEDS_LP8788)              += leds-lp8788.o
+>  obj-$(CONFIG_LEDS_LP8860)              += leds-lp8860.o
+>  obj-$(CONFIG_LEDS_TCA6507)             += leds-tca6507.o
+> +obj-$(CONFIG_LEDS_TLC59116)            += leds-tlc59116.o
+>  obj-$(CONFIG_LEDS_CLEVO_MAIL)          += leds-clevo-mail.o
+>  obj-$(CONFIG_LEDS_IPAQ_MICRO)          += leds-ipaq-micro.o
+>  obj-$(CONFIG_LEDS_HP6XX)               += leds-hp6xx.o
+> diff --git a/drivers/leds/leds-tlc59116.c b/drivers/leds/leds-tlc59116.c
+> new file mode 100644
+> index 000000000000..9ed8175e7992
+> --- /dev/null
+> +++ b/drivers/leds/leds-tlc59116.c
+> @@ -0,0 +1,252 @@
+> +/*
+> + * Copyright 2014 Belkin Inc.
+> + * Copyright 2014 Andrew Lunn <andrew@lunn.ch>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + */
+> +
+> +#include <linux/i2c.h>
+> +#include <linux/leds.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/workqueue.h>
+> +
+> +#define TLC59116_LEDS          16
+> +
+> +#define TLC59116_REG_MODE1     0x00    /* Mode register 0 */
+> +#define MODE1_RESPON_ADDR_MASK 0xF0
+> +#define MODE1_NORMAL_MODE      (0 << 4)
+> +#define MODE1_SPEED_MODE       (1 << 4)
+> +
+> +#define TLC59116_REG_MODE2     0x01    /* Mode register 1 */
+> +#define MODE2_DIM              (0 << 5)
+> +#define MODE2_BLINK            (1 << 5)
+> +#define MODE2_OCH_STOP         (0 << 3)
+> +#define MODE2_OCH_ACK          (1 << 3)
+> +
+> +#define TLC59116_REG_PWM(x)    (0x02 + x)
+> +
+> +#define TLC59116_REG_GRPPWM    0x12
+> +#define TLC59116_REG_GRPFREQ   0x13
+> +
+> +/* LED Driver Output State, determine the source that drives LED outputs */
+> +#define TLC59116_REG_LEDOUT(x) (0x14 + (x >> 2))
+> +#define TLC59116_LED_OFF       0x0     /* Output LOW */
+> +#define TLC59116_LED_ON                0x1     /* Output HI-Z */
+> +#define TLC59116_DIM           0x2     /* Dimming */
+> +#define TLC59116_BLINK         0x3     /* Blinking */
+> +#define LED_MASK               0x3
+> +
+> +#define ldev_to_led(c)         container_of(c, struct tlc59116_led, ldev)
+> +#define work_to_led(work)      container_of(work, struct tlc59116_led, work)
+> +
+> +struct tlc59116_led {
+> +       bool active;
+> +       struct regmap *regmap;
+> +       int led_no;
+> +       struct led_classdev ldev;
+> +       struct work_struct work;
+> +};
+> +
+> +struct tlc59116_priv {
+> +       struct tlc59116_led leds[TLC59116_LEDS];
+> +};
+> +
+> +static int
+> +tlc59116_set_mode(struct regmap *regmap, u8 mode)
+> +{
+> +       u8 val = 0;
+> +       int err;
+> +
+> +       if ((mode != MODE2_DIM) && (mode != MODE2_BLINK))
+> +               mode = MODE2_DIM;
+> +
+> +       /* Configure MODE1 register */
+> +       err = regmap_write(regmap, TLC59116_REG_MODE1, MODE1_NORMAL_MODE);
+> +       if (err)
+> +               return err;
+> +
+> +       /* Configure MODE2 Reg */
+> +       val |= MODE2_OCH_STOP;
+> +       val |= mode;
+> +
+> +       return regmap_write(regmap, TLC59116_REG_MODE2, val);
+> +}
+> +
+> +static int
+> +tlc59116_set_led(struct tlc59116_led *led, u8 val)
+> +{
+> +       struct regmap *regmap = led->regmap;
+> +       int i = (led->led_no % 4) * 2;
+> +       char addr = TLC59116_REG_LEDOUT(led->led_no);
+> +       unsigned int mask = LED_MASK << i;
+> +
+> +       val = val << i;
+> +
+> +       return regmap_update_bits(regmap, addr, mask, val);
+> +}
+> +
+> +static void
+> +tlc59116_led_work(struct work_struct *work)
+> +{
+> +       struct tlc59116_led *led = work_to_led(work);
+> +       struct regmap *regmap = led->regmap;
+> +       int err;
+> +       u8 pwm;
+> +
+> +       pwm = TLC59116_REG_PWM(led->led_no);
+> +       err = regmap_write(regmap, pwm, led->ldev.brightness);
+> +       if (err)
+> +               dev_err(led->ldev.dev, "Failed setting brightness\n");
+> +}
+> +
+> +static void
+> +tlc59116_led_set(struct led_classdev *led_cdev, enum led_brightness value)
+> +{
+> +       struct tlc59116_led *led = ldev_to_led(led_cdev);
+> +
+> +       led->ldev.brightness = value;
+> +       schedule_work(&led->work);
+> +}
+> +
+> +static void
+> +tlc59116_destroy_devices(struct tlc59116_priv *priv, int i)
+> +{
+> +       while (--i >= 0) {
+> +               if (priv->leds[i].active) {
+> +                       led_classdev_unregister(&priv->leds[i].ldev);
+> +                       cancel_work_sync(&priv->leds[i].work);
+> +               }
+> +       }
+> +}
+> +
+> +static int
+> +tlc59116_configure(struct device *dev,
+> +                  struct tlc59116_priv *priv,
+> +                  struct regmap *regmap)
+> +{
+> +       int i, err = 0;
+> +
+> +       tlc59116_set_mode(regmap, MODE2_DIM);
+> +       for (i = 0; i < TLC59116_LEDS; i++) {
+> +               struct tlc59116_led *led = &priv->leds[i];
+> +
+> +               if (!led->active)
+> +                       continue;
+> +
+> +               led->regmap = regmap;
+> +               led->led_no = i;
+> +               led->ldev.brightness_set = tlc59116_led_set;
+> +               led->ldev.max_brightness = LED_FULL;
+> +               INIT_WORK(&led->work, tlc59116_led_work);
+> +               err = led_classdev_register(dev, &led->ldev);
+> +               if (err < 0) {
+> +                       dev_err(dev, "couldn't register LED %s\n",
+> +                               led->ldev.name);
+> +                       goto exit;
+> +               }
+> +               tlc59116_set_led(led, TLC59116_DIM);
+> +       }
+> +
+> +       return 0;
+> +
+> +exit:
+> +       tlc59116_destroy_devices(priv, i);
+> +       return err;
+> +}
+> +
+> +static const struct regmap_config tlc59116_regmap = {
+> +       .reg_bits = 8,
+> +       .val_bits = 8,
+> +       .max_register = 0x1e,
+> +};
+> +
+> +static int
+> +tlc59116_probe(struct i2c_client *client,
+> +              const struct i2c_device_id *id)
+> +{
+> +       struct tlc59116_priv *priv = i2c_get_clientdata(client);
+> +       struct device *dev = &client->dev;
+> +       struct device_node *np = client->dev.of_node, *child;
+> +       struct regmap *regmap;
+> +       int err, count, reg;
+> +
+> +       count = of_get_child_count(np);
+> +       if (!count || count > TLC59116_LEDS)
+> +               return -EINVAL;
+> +
+> +       if (!i2c_check_functionality(client->adapter,
+> +               I2C_FUNC_SMBUS_BYTE_DATA))
+> +               return -EIO;
+> +
+> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +       if (!priv)
+> +               return -ENOMEM;
+> +
+> +       regmap = devm_regmap_init_i2c(client, &tlc59116_regmap);
+> +       if (IS_ERR(regmap)) {
+> +               err = PTR_ERR(regmap);
+> +               dev_err(dev, "Failed to allocate register map: %d\n", err);
+> +               return err;
+> +       }
+> +
+> +       i2c_set_clientdata(client, priv);
+> +
+> +       for_each_child_of_node(np, child) {
+> +               err = of_property_read_u32(child, "reg", &reg);
+> +               if (err)
+> +                       return err;
+> +               if (reg < 0 || reg >= TLC59116_LEDS)
+> +                       return -EINVAL;
+> +               if (priv->leds[reg].active)
+> +                       return -EINVAL;
+> +               priv->leds[reg].active = true;
+> +               priv->leds[reg].ldev.name =
+> +                       of_get_property(child, "label", NULL) ? : child->name;
+> +               priv->leds[reg].ldev.default_trigger =
+> +                       of_get_property(child, "linux,default-trigger", NULL);
+> +       }
+> +       return tlc59116_configure(dev, priv, regmap);
+> +}
+> +
+> +static int
+> +tlc59116_remove(struct i2c_client *client)
+> +{
+> +       struct tlc59116_priv *priv = i2c_get_clientdata(client);
+> +
+> +       tlc59116_destroy_devices(priv, TLC59116_LEDS);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id of_tlc59116_leds_match[] = {
+> +       { .compatible = "ti,tlc59116", },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, of_tlc59116_leds_match);
+> +
+> +static const struct i2c_device_id tlc59116_id[] = {
+> +       { "tlc59116" },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(i2c, tlc59116_id);
+> +
+> +static struct i2c_driver tlc59116_driver = {
+> +       .driver = {
+> +               .name = "tlc59116",
+> +               .of_match_table = of_match_ptr(of_tlc59116_leds_match),
+> +       },
+> +       .probe = tlc59116_probe,
+> +       .remove = tlc59116_remove,
+> +       .id_table = tlc59116_id,
+> +};
+> +
+> +module_i2c_driver(tlc59116_driver);
+> +
+> +MODULE_AUTHOR("Andrew Lunn <andrew@lunn.ch>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("TLC59116 LED driver");
+> --
+> 2.1.3
+>
