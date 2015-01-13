@@ -1,110 +1,111 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jan 2015 09:21:29 +0100
-Subject: [PATCH 4/6] ARM: at91/dt: add SRAM nodes
-In-Reply-To: <54B476EC.3090207@atmel.com>
-References: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421089317-12607-5-git-send-email-alexandre.belloni@free-electrons.com>
- <54B476EC.3090207@atmel.com>
-Message-ID: <20150113082129.GA4104@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Jan 2015 09:25:57 +0100
+Subject: [PATCH 2/4] pinctrl: cygnus: add initial pinctrl support
+In-Reply-To: <54B0201E.3000307@broadcom.com>
+References: <rjui@broadcom.com>
+ <1417131990-17954-1-git-send-email-rjui@broadcom.com>
+ <1417131990-17954-3-git-send-email-rjui@broadcom.com>
+ <CACRpkdbZx1hcvd-q9AL3FPQRqU+wJjeSV8AdSno5PVr+fqhpRQ@mail.gmail.com>
+ <54B0201E.3000307@broadcom.com>
+Message-ID: <CACRpkdZUaB-tt2N0dbaV5RkVS5PuFi63TqgOg15Jb2ACH52Yug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/2015 at 09:37:48 +0800, Bo Shen wrote :
-> Hi Alexandre,
-> 
-> On 01/13/2015 03:01 AM, Alexandre Belloni wrote:
-> >
-> >+	sram0: sram at 002ff000 {
-> 
-> Why here is 002ff000, while not 00200000?
-> 
-> >+		compatible = "mmio-sram";
-> >+		reg = <0x00200000 0x2000>;
-> >+	};
-> >+
+On Fri, Jan 9, 2015 at 7:38 PM, Ray Jui <rjui@broadcom.com> wrote:
+> On 1/9/2015 3:03 AM, Linus Walleij wrote:
+>> On Fri, Nov 28, 2014 at 12:46 AM, Ray Jui <rjui@broadcom.com> wrote:
 
-I'll correct that one. I followed what was done before. The sam9260 has
-two banks, one at 0x00200000, and the other one at 0x00300000. Thanks to
-address mirroring on the range, we can declare that as one contiguous
-range of sram, starting at 0x002ff000.
+>> I don't know if the hardware has any similarity though, so invite
+>> the authors of the previous drivers to review this code.
+>>
+> They are completely different. The only similarity between Cygnus and
+> bcm281xx pinctrl is that they use the same concept of alternation
+> functions (1, 2, 3, 4) for mux configuration.
 
+Then you can probably look at that driver for inspiration on how to handle
+the situation you described earlier with collissions.
 
-> >  	ahb {
-> >  		compatible = "simple-bus";
-> >  		#address-cells = <1>;
-> >diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-> >index cdb9ed612109..e247b0b5fdab 100644
-> >--- a/arch/arm/boot/dts/at91sam9261.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-> >@@ -60,6 +60,11 @@
-> >  		};
-> >  	};
-> >
-> >+	sram: sram at 00300000 {
-> >+		compatible = "mmio-sram";
-> >+		reg = <0x00300000 0x28000>;
-> >+	};
-> >+
-> >  	ahb {
-> >  		compatible = "simple-bus";
-> >  		#address-cells = <1>;
-> >diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> >index ef8a70c27439..8a210d5033b1 100644
-> >--- a/arch/arm/boot/dts/at91sam9263.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> >@@ -62,6 +62,16 @@
-> >  		};
-> >  	};
-> >
-> >+	sram0: sram at 00300000 {
-> >+		compatible = "mmio-sram";
-> >+		reg = <0x00300000 0x14000>;
-> >+	};
-> >+
-> >+	sram1: sram at 00500000 {
-> >+		compatible = "mmio-sram";
-> >+		reg = <0x00300000 0x4000>;
-> >+	};
-> >+
-> >  	ahb {
-> >  		compatible = "simple-bus";
-> >  		#address-cells = <1>;
-> >diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> >index a50ee587a7af..9012fe9d7758 100644
-> >--- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> >@@ -16,6 +16,15 @@
-> >  		reg = <0x20000000 0x08000000>;
-> >  	};
-> >
-> >+	sram0: sram at 002ff000 {
-> 
-> Why here is 002ff000, while not 00200000?
-> 
-> >+		status = "disabled";
-> 
-> Btw, why it needs set to disabled.
-> 
-> >+	};
-> >+
-> >+	sram1: sram at 002fc000 {
-> 
-> Why here is 002fc000, while not 00300000? And length is on 0x4000.
-> 
+>>> +/*
+>>> + * List of groups of pins
+>>> + */
+>>> +static const unsigned gpio0_pins[] = { 12 };
+>>> +static const unsigned gpio1_pins[] = { 13 };
+>>> +static const unsigned gpio2_pins[] = { 14 };
+>>> +static const unsigned gpio3_pins[] = { 15 };
+>>> +static const unsigned gpio4_pins[] = { 16 };
+>>> +static const unsigned gpio5_pins[] = { 17 };
+>>> +static const unsigned gpio6_pins[] = { 18 };
+>>> +static const unsigned gpio7_pins[] = { 19 };
+>>> +static const unsigned gpio8_pins[] = { 20 };
+>>> +static const unsigned gpio9_pins[] = { 21 };
+>>> +static const unsigned gpio10_pins[] = { 22 };
+>>> +static const unsigned gpio11_pins[] = { 23 };
+>>> +static const unsigned gpio12_pins[] = { 24 };
+>>> +static const unsigned gpio13_pins[] = { 25 };
+>>> +static const unsigned gpio14_pins[] = { 26 };
+>>> +static const unsigned gpio15_pins[] = { 27 };
+>>> +static const unsigned gpio16_pins[] = { 28 };
+>>> +static const unsigned gpio17_pins[] = { 29 };
+>>> +static const unsigned gpio18_pins[] = { 30 };
+>>> +static const unsigned gpio19_pins[] = { 31 };
+>>> +static const unsigned gpio20_pins[] = { 32 };
+>>> +static const unsigned gpio21_pins[] = { 33 };
+>>> +static const unsigned gpio22_pins[] = { 34 };
+>>> +static const unsigned gpio23_pins[] = { 35 };
+>>
+>> Have you considered implementing .gpio_request_enable()
+>> and .gpio_disable_free() to get around having to have one
+>> group for each GPIO line?
+>>
+> Okay the Cygnus pin controller is really a mess. GPIO 0 ~ GPIO23 are
+> really 23 distinct groups, each with one pin. Then the rest of GPIOs go
+> under other groups. In general, when we set a group to alternate
+> function 4, all pins become GPIO.
 
-The same here, because we use mirroring, we have to disable the one that
-is coming from at91sam9260.dtsi and then declare another one. I'll
-correct the addresses in the reg properties. I was first declaring two
-banks but we chose to switch back to only one range.
+It will require some complicated code no matter how you
+handle it I'm afraid. Rely on the pin control subsystem
+to handle collisions though.
 
-> >+		compatible = "mmio-sram";
-> >+		reg = <0x00200000 0x8000>;
-> >+	};
-> >+
+>>> +static const unsigned qspi_gpio_pins[] = { 108, 109 };
+>>> +static const unsigned smart_card0_fcb_pins[] = { 45 };
+>>> +static const unsigned smart_card1_fcb_pins[] = { 51 };
+>>> +static const unsigned gpio0_3p3_pins[] = { 176 };
+>>> +static const unsigned gpio1_3p3_pins[] = { 177 };
+>>> +static const unsigned gpio2_3p3_pins[] = { 178 };
+>>
+>> Looks good...
+>>
+> Note these pins are definitions in the driver that help to describe the
+> pad layout. We can't really configure any individual pins in Cygnus.
 
-Thanks for the review.
+Yeah it's a groupwise controller then, that's similar to
+e.g. the coh901 driver.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+We should be able to accomodate this...
+
+>>> +static int cygnus_dt_node_to_map(struct pinctrl_dev *pctrl_dev,
+>>> +               struct device_node *np, struct pinctrl_map **map,
+>>> +               unsigned *num_maps)
+>>> +{
+>>
+>> After S?ren Brinkmanns patches youy should be able to use core
+>> functions for this and avoid this code altogether.
+>
+> Will that help to take care our case, based on the way we will use
+> "function" and "group"?
+
+groupS but yes it will work with your controller, though I think
+.set_mux and the controller state will need some elaborate code
+to handle what the framework requests.
+
+>>> +       num_groups = of_property_count_strings(np, "brcm,groups");
+>>
+>> As mentioned, just "groups".
+>>
+> I guess I will use "group"?
+
+No groups, as with the standard attribute "gpios", this may be
+a single group too, it's just a standard binding.
+
+Yours,
+Linus Walleij
