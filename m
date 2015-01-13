@@ -1,68 +1,58 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 13 Jan 2015 21:50:56 +0100
-Subject: [PATCH 0/4] Drop legacy support for omap3517
-In-Reply-To: <20150113204219.GJ2419@atomide.com>
-References: <1421171865-5209-1-git-send-email-tony@atomide.com>
- <10549142.7lWnPtPtZG@wuerfel> <20150113204219.GJ2419@atomide.com>
-Message-ID: <201501132150.56938@pali>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 13 Jan 2015 21:52:07 +0100
+Subject: [PATCH v2 2/5] irqchip: Add DT binding doc for dumb demuxer chips
+In-Reply-To: <20150113190050.GZ24989@titan.lakedaemon.net>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20150113190050.GZ24989@titan.lakedaemon.net>
+Message-ID: <20150113215207.185d92b4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 January 2015 21:42:20 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [150113 12:27]:
-> > On Tuesday 13 January 2015 09:57:41 Tony Lindgren wrote:
-> > > It seems we can now drop omap3517 legacy booting support
-> > > to get a bit closer to making all of omap3 boot in device
-> > > tree only mode.
-> > > 
-> > > All these boards have at least minimal support for booting
-> > > with device tree, and pretty much anything supported with
-> > > the legacy board files can be configured also for device
-> > > tree based booting if not done already.
-> > 
-> > Ah, very nice.
-> > 
-> > Just out of curiosity, what are the remaining showstoppers
-> > for the 3430 and 3530 based boards?
-> 
-> Not much really. We're now printing a warning to get a people
-> to upgrade their systems. So with some boards we need to wait
-> a while.
-> 
-> Then here are the remaining items that I'm aware of:
-> 
-> - A regression at least on some n900 with appended DTB not
-> booting properly any longer reported by Pali
-> 
-> - A regression where the legacy ATAGs don't seem to get
-> properly translated by the uncompress code for atag_rev at
-> least reported by Pali
-> 
-> - A few missing .dts files for devkit8000, omap3logic,
-> omap3stalker, omap3pandora and omap3touchbook
-> 
-> Pali and Sebastian probably know best of any other remaining
-> issues to drop n900 legacy booting.
-> 
-> If people have the boards listed above, please pitch in to do
-> the .dts files or send the boards to me and I can do minimal
-> .dts files for them.
-> 
-> Regards,
-> 
-> Tony
+Hi Jason,
 
-CCing Pavel Machek
+On Tue, 13 Jan 2015 14:00:50 -0500
+Jason Cooper <jason@lakedaemon.net> wrote:
 
-He reported also some (still not fixed) regressions on n900.
+> Boris,
+> 
+> On Tue, Jan 13, 2015 at 07:46:18PM +0100, Boris Brezillon wrote:
+> > Add documentation for the dumb demuxer.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  .../bindings/interrupt-controller/dumb-demux.txt   | 34 ++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > new file mode 100644
+> > index 0000000..1c777ef
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/dumb-demux.txt
+> > @@ -0,0 +1,34 @@
+> > +* Generic Dumb Interrupt Demultiplexer
+> > +
+> > +This Dumb demultiplixer simply forward all incoming interrupts to its
+> > +enabled/unmasked children.
+> 
+> Please forgive the potentially na?ve question, but what hardware is this
+> describing?
+
+That's not a real hardware per se, but on some hardware (like at91 SoCs)
+some IRQ line are shared by several peripherals, and this dumb
+demultiplex is here to represent such shared irq lines which cannot be
+easily demultiplexed (because they do not provide a 'cause'
+register).
+
+You can see it as a virtual irqchip provided to address broken hardware
+designs.
+
+Regards,
+
+Boris
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/3ba7d988/attachment.sig>
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
