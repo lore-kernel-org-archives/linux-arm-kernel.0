@@ -1,103 +1,52 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 13 Jan 2015 23:23:25 +0530
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
-References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
- <54AEBE45.9080203@redhat.com> <20150109154635.GG11258@arm.com>
- <54B00C39.1070809@redhat.com> <20150112173005.GK13360@arm.com>
- <54B4BF4C.2030009@redhat.com>
- <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
-Message-ID: <54B55B95.1070402@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Jan 2015 09:57:41 -0800
+Subject: [PATCH 0/4] Drop legacy support for omap3517
+Message-ID: <1421171865-5209-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
+
+It seems we can now drop omap3517 legacy booting support to get
+a bit closer to making all of omap3 boot in device tree only mode.
+
+All these boards have at least minimal support for booting with
+device tree, and pretty much anything supported with the legacy
+board files can be configured also for device tree based booting
+if not done already.
+
+If anybody has issues booting 3517 with appended device tree,
+please post the isssues to the mailing lists so we can promptly
+fix those.
+
+Regards,
+
+Tony
 
 
-On Tuesday 13 January 2015 09:22 PM, Catalin Marinas wrote:
-> On Tue, Jan 13, 2015 at 06:46:36AM +0000, Pratyush Anand wrote:
->> On Monday 12 January 2015 11:00 PM, Will Deacon wrote:
->>> On Fri, Jan 09, 2015 at 05:13:29PM +0000, Pratyush Anand wrote:
->>>> On Friday 09 January 2015 09:16 PM, Will Deacon wrote:
->>>>> On Thu, Jan 08, 2015 at 05:28:37PM +0000, Pratyush Anand wrote:
->>>>>> On Thursday 08 January 2015 09:53 PM, Will Deacon wrote:
->>>>>>> On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
->>>>>>>> I am trying to test following scenario, which seems valid to me. But I
->>>>>>>> am very new to ARM64 as well as to debugging tools, so seeking expert's
->>>>>>>> comment here.
->>>>>>>>
->>>>>>>> -- I have inserted a kprobe to the function uprobe_breakpoint_handler
->>>>>>>> which is called from elo_dbg
->>>>>>>> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
->>>>>>>>
->>>>>>>> -- kprobe is enabled.
->>>>>>>>
->>>>>>>> -- an uprobe is inserted into a test application and enabled.
->>>>>>>>
->>>>>>>> So, when uprobe is enabled and test code execution reaches to probe
->>>>>>>> instruction, it executes uprobe breakpoint instruction and el0_dbg
->>>>>>>> exception is raised.
->>>>>>>>
->>>>>>>> When control reaches to start of uprobe_breakpoint_handler and it
->>>>>>>> executes first instruction (which has been replaced with a kprobe
->>>>>>>> breakpoint instruction), el1_dbg exception is raised.
->>>>>>>
->>>>>>> Hmm, debug exceptions should be masked at this point so I don't see why
->>>>>>> you're taking the second debug exception.
->>>>>>
->>>>>> So, you mean to say that when an exception which has been taken from
->>>>>> lower exception level (EL0) is being executed, then we keep masked also
->>>>>> the exception from current exception level (EL1)...
->>>>>
->>>>> Yeah, if you look at entry.S then you'll see that neither el0_dbg or el1_dbg
->>>>> re-enable debug exceptions (masked automatically by the CPU after taking the
->>>>> exception) until *after* the handling has completed. This is to prevent
->>>>> recursive debug exceptions, which I don't see how we can reasonable handle.
->>>>
->>>> May be I am missing something, but my observation on silicon is
->>>> different. Please have a look at git log of HEAD of following branch,
->>>> which says that el1_dbg exception has been raised while el0_dbg was
->>>> executing. Do not know what I am missing..
-> [...]
->>> Regardless, I think you need to debug further and found out if PSTATE.D is
->>> getting cleared and, if so, who is responsible for that. Somebody could be
->>> enabling IRQs, for example, which will then unmask debug exceptions in
->>> el1_irq.
->>
->> This is what I see for pstate, When el0_dbg exception is raised (ie an
->> exception raised with ESR = ESR_EL1_EC_BRK64 after executing instruction
->> BRK64_OPCODE_UPROBES = 0xD4200100 in EL0, user mode), spsr_el1 value is
->> 0x80000000. Which means, all exceptions are unmasked. Is it expected?
->
-> spsr_el1 is the EL0 pstate saved when entering EL1. So it is expected
-> that user space always has interrupts enabled.
->
+Tony Lindgren (4):
+  ARM: OMAP3: Remove legacy support for am3517-evm
+  ARM: OMAP3: Remove legacy support for am3517crane
+  ARM: OMAP3: Remove cm-t3517 legacy support
+  ARM: OMAP3: Remove legacy support for am35xx-emac
 
-Yes, I was wrong :(
-By the way, is there a way to read cpsr or current PSTATE.D?
+ arch/arm/mach-omap2/Kconfig                |  17 --
+ arch/arm/mach-omap2/Makefile               |   8 -
+ arch/arm/mach-omap2/am35xx-emac.c          | 114 ---------
+ arch/arm/mach-omap2/am35xx-emac.h          |  15 --
+ arch/arm/mach-omap2/am35xx.h               |  46 ----
+ arch/arm/mach-omap2/board-am3517crane.c    | 150 ------------
+ arch/arm/mach-omap2/board-am3517evm.c      | 373 -----------------------------
+ arch/arm/mach-omap2/board-cm-t3517.c       | 335 --------------------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  33 +--
+ arch/arm/mach-omap2/pdata-quirks.c         |   1 -
+ 10 files changed, 2 insertions(+), 1090 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/am35xx-emac.c
+ delete mode 100644 arch/arm/mach-omap2/am35xx-emac.h
+ delete mode 100644 arch/arm/mach-omap2/am35xx.h
+ delete mode 100644 arch/arm/mach-omap2/board-am3517crane.c
+ delete mode 100644 arch/arm/mach-omap2/board-am3517evm.c
+ delete mode 100644 arch/arm/mach-omap2/board-cm-t3517.c
 
-That would help me to know if PSTATE.D was unmasked just before 
-executing BRK64_OPCODE_UPROBES. Actually, print in enable_dbg macro give 
-me other issues and does not allow system to boot.
-
-I will still try to find some way to capture enable_dbg macro 
-path.However, if I just examine the code flow then I do not see a 
-situation where enable_dbg could have been called after receiving 
-el0_dbg.(or other than enable_dbg is there some other path too which can 
-re-enable debug exception??)
-
--- Application executes  BRK64_OPCODE_UPROBES.
--- el0_sync is raised.
--- el0_sync
-	-> kernel_entry 0
-	-> el0_dbg
-		-> do_debug_exception
-			->brk_handler
-				->call_break_hook
-					->uprobe_breakpoint_handler
-
-None of the above path seems calling enable_dbg, then how do we receive 
-el1_sync when first instruction of uprobe_breakpoint_handler (which has 
-been replaced with BRK64_OPCODE_KPROBES) is executed?
-
-~Pratyush
+-- 
+2.1.4
