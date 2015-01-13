@@ -1,35 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 13:23:06 +0100
-Subject: [PATCH V2] ARM: dts: Only build dtb if associated Arch and/or SoC
- is enabled
-In-Reply-To: <20150112224203.GL22090@quad.lixom.net>
-References: <1419920427-29121-1-git-send-email-pbrobinson@gmail.com>
- <20150112224203.GL22090@quad.lixom.net>
-Message-ID: <2841623.hUI7NQFVvE@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Jan 2015 13:27:26 +0100
+Subject: [PATCH] Asoc: sam9x5_wm8731: depend on ARCH_AT91 instead of
+ SOC_AT91SAM9X5
+Message-ID: <1421152046-20069-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 14:42:03 Olof Johansson wrote:
-> 
-> I've applied this on next/dt now, hopefully it won't become too much of
-> a headache of conflicts during this release cycle. At least doing it on that
-> branch should keep us from exposing it up outside our tree.
-> 
+The SOC_AT91SAM9X5 option is going to be removed, only depend on ARCH_AT91 like
+for the other drivers.
 
-I had to add this snippet to get my local tree to build again:
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ sound/soc/atmel/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7be7a6f62d81..3308d110bdc7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -303,7 +303,7 @@ dtb-$(CONFIG_SOC_IMX6SL) += \
- 	imx6sl-evk.dtb
- dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sabreauto.dtb \
--	imx6sx-sdb.dtb \
-+	imx6sx-sdb.dtb
- dtb-$(CONFIG_SOC_LS1021A) += \
- 	ls1021a-qds.dtb \
- 	ls1021a-twr.dtb
-
-	Arnd
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index fb3878312bf8..1579e994acf8 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -45,7 +45,7 @@ config SND_ATMEL_SOC_WM8904
+ 
+ config SND_AT91_SOC_SAM9X5_WM8731
+ 	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
+-	depends on ATMEL_SSC && SND_ATMEL_SOC && SOC_AT91SAM9X5
++	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC
+ 	select SND_ATMEL_SOC_SSC
+ 	select SND_ATMEL_SOC_DMA
+ 	select SND_SOC_WM8731
+-- 
+2.1.0
