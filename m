@@ -1,70 +1,35 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 13 Jan 2015 16:35:30 +0000
-Subject: [RFC PATCH 4/5] arm: perf: Make v7 support FIQ-safe
-In-Reply-To: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
-References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1421166931-14134-5-git-send-email-daniel.thompson@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 13 Jan 2015 10:36:54 -0600
+Subject: [PATCH 05/11] usb: gadget: at91_udc: Remove non-DT handling code
+In-Reply-To: <20150112225330.GQ2447@piout.net>
+References: <1417606330-17753-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1417606330-17753-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150112213905.GI2858@saruman> <20150112225330.GQ2447@piout.net>
+Message-ID: <20150113163654.GI16533@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-armv7pmu_disable_event() is called during irq handler. If irq handling
-switches over to fiq then the spin locks in this function risks deadlock.
-Both armv7_pmnc_disable_counter() and armv7_pmnc_disable_intens() are
-unconditional co-processor writes. I haven't yet come up with an
-schedule where other users of pmu_lock would break if interleaved with
-these calls so I have simply removed them.
+Hi,
 
-The other changed required it so avoid calling irq_work_run() when run
-from a FIQ handler. The pended work will either be dispatched by the
-irq work IPI or by a timer handler.
+On Mon, Jan 12, 2015 at 11:53:30PM +0100, Alexandre Belloni wrote:
+> Hi Felipe,
+> 
+> I've rebased that patch series but it depends on another one (the mfd:
+> syscon: part of "memory: add Atmel EBI (External Bus Interface)
+> driver") that is not taken yet so applying it now will break the
+> build. I still hope to get it merged for 3.20 and I'll resend it as
+> soon as possible.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/kernel/perf_event_v7.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+In that case, we either take the entire series through MFD (including
+the gadget patches) or we delay the gadget patches until all
+dependencies have been sorted out.
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 8993770c47de..08f426486d3e 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -744,7 +744,6 @@ static void armv7pmu_enable_event(struct perf_event *event)
- 
- static void armv7pmu_disable_event(struct perf_event *event)
- {
--	unsigned long flags;
- 	struct hw_perf_event *hwc = &event->hw;
- 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct pmu_hw_events *events = this_cpu_ptr(cpu_pmu->hw_events);
-@@ -757,11 +756,6 @@ static void armv7pmu_disable_event(struct perf_event *event)
- 	}
- 
- 	/*
--	 * Disable counter and interrupt
--	 */
--	raw_spin_lock_irqsave(&events->pmu_lock, flags);
--
--	/*
- 	 * Disable counter
- 	 */
- 	armv7_pmnc_disable_counter(idx);
-@@ -770,8 +764,6 @@ static void armv7pmu_disable_event(struct perf_event *event)
- 	 * Disable interrupt for this counter
- 	 */
- 	armv7_pmnc_disable_intens(idx);
--
--	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
- }
- 
- static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
-@@ -831,7 +823,8 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
- 	 * platforms that can have the PMU interrupts raised as an NMI, this
- 	 * will not work.
- 	 */
--	irq_work_run();
-+	if (!in_nmi())
-+		irq_work_run();
- 
- 	return IRQ_HANDLED;
- }
 -- 
-1.9.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/4af46e2e/attachment.sig>
