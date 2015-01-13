@@ -1,31 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 Jan 2015 11:08:18 +0900
-Subject: [PATCH 0/4] ARM: shmobile: sh73a0/kzm9g: Complete multiplatform
- support
-In-Reply-To: <1420809866-4330-1-git-send-email-geert+renesas@glider.be>
-References: <1420809866-4330-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150113020818.GB21265@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 12 Jan 2015 18:13:47 -0800
+Subject: [GIT PULL] CSR atlas7 init dts for 3.20
+In-Reply-To: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
+References: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
+Message-ID: <20150113021347.GD28758@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 02:24:26PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
+On Sun, Jan 11, 2015 at 10:51:40PM +0800, Barry Song wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> This patch series completes the migration from kzm9g-reference (legacy
-> DT based) to kzm9g-multiplatform (ARM multiplatform DT based with
-> common clock framework).
+> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
 > 
->   - The first two patches fix Ethernet on kzm9g, by adding a Bus State
->     Controller node, as introduced in "[PATCH v3 0/4] drivers: bus:
->     Add Simple Power-Managed Bus", and moving the Ethernet node to it,
->   - The third path enables kzm9g support in shmobile_defconfig,
->   - The fourth patch removes all kzm9g-reference support, now the
->     sh73a0 generic multiplatform case has the same feature set
->     (better, it provides 16 MiB more RAM!).
+>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
 > 
-> Thanks for applying!
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+> 
+> for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
+> 
+>   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
+> 
+> ----------------------------------------------------------------
+> drop marco and add init dts for atlas7
+> 
+> marco chip has been dropped and the new replacement is atlas7.
+> so, drop marco dts, and add dts for atlas7.
 
-It seems to me that at the first two patches require the patchset
-referenced above in order to work. For that reason I am holding off
-on applying this series. I am quite happy to negotiate merging
-some or all of this series earlier than later :)
+Hi,
+
+Can you please elaborate a bit. Was marco never shipped to customers
+that could be interested in mainline support, and atlas7 is a replacement
+SoC that is in development or has shipped?
+
+
+Thanks,
+
+-Olof
