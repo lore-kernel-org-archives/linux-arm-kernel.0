@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Jan 2015 15:13:58 -0800
-Subject: [GIT PULL] ARM: mediatek: defconfig changes for v3.20
-In-Reply-To: <CABuKBeKBXwMaBOL27jZoZ7fgAaGLLWyPK75KopYy=DiBLrhJUw@mail.gmail.com>
-References: <CABuKBeKBXwMaBOL27jZoZ7fgAaGLLWyPK75KopYy=DiBLrhJUw@mail.gmail.com>
-Message-ID: <20150113231358.GE15087@quad.lixom.net>
+Date: Tue, 13 Jan 2015 15:14:46 -0800
+Subject: [GIT PULL] ARM: mediatek: DT changes for v3.20 (round 1)
+In-Reply-To: <CABuKBeK96CE-xR8Xknv1ES7u9TZybtyh84zZE9paFPPD5pZjGw@mail.gmail.com>
+References: <CABuKBeK96CE-xR8Xknv1ES7u9TZybtyh84zZE9paFPPD5pZjGw@mail.gmail.com>
+Message-ID: <20150113231446.GF15087@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 09:58:52PM +0100, Matthias Brugger wrote:
+On Sun, Jan 11, 2015 at 10:01:51PM +0100, Matthias Brugger wrote:
 > Hi Arnd and Olof,
 > 
-> Please take the following patch into account for v3.20.
+> Please take the following patches for v3.20.
 > 
 > Thanks,
 > Matthias
@@ -21,14 +21,12 @@ On Sun, Jan 11, 2015 at 09:58:52PM +0100, Matthias Brugger wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-defconfig
+>   https://github.com/mbgg/linux-mediatek.git tags/v3.20-next-dts
 > 
-> for you to fetch changes up to 7bae74f04d03f81c40c8b614e94b15975dd25ff6:
+> for you to fetch changes up to 3aa2e2811ab58e0299bb9a6457a15b405be86ff0:
 > 
->   ARM: Add mediatek SoC UART support in defconfig (2015-01-02 11:27:18 +0100)
+>   ARM: mediatek: dts: Add uart to Aquaris5 (2015-01-11 21:17:49 +0100)
 
-Merged, thanks. Single-patch requests like this, feel free to just send the
-patch (and mention that you want us to apply it below the --- fold).
-
+Merged, thanks.
 
 -Olof
