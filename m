@@ -1,74 +1,95 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Tue, 13 Jan 2015 10:29:44 +0100
-Subject: [RFC PATCH v2 2/4] serial: mxs-auart: Use helpers for gpio irqs
-In-Reply-To: <20150113080817.GG22880@pengutronix.de>
-References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
- <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
- <20150113080817.GG22880@pengutronix.de>
-Message-ID: <54B4E588.5010602@elproma.com.pl>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 13 Jan 2015 17:34:02 +0800
+Subject: [PATCH v2] ASoC: wm8904: fix runtime warning
+Message-ID: <1421141643-30105-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Correct the path name for mux to get rid of the following warning:
 
-W dniu 2015-01-13 o 09:08, Uwe Kleine-K?nig pisze:
-> Hello,
->
-> On Sat, Jan 10, 2015 at 03:32:44PM +0100, Janusz Uzycki wrote:
->> The patch updates mxs-auart driver to use new mctrl_gpio helpers for
->> gpio irqs. The code is much simpler now.
->>
->> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
->> ---
->>
->> There is no changes since v1 (rebased only).
->>
->> ---
->>   drivers/tty/serial/mxs-auart.c | 133 ++++-------------------------------------
->>   1 file changed, 13 insertions(+), 120 deletions(-)
-> Very nice!
->
->> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
->> index ec553f8..2ddba69 100644
->> --- a/drivers/tty/serial/mxs-auart.c
->> +++ b/drivers/tty/serial/mxs-auart.c
->> [...]
->> @@ -483,18 +458,9 @@ static void mxs_auart_enable_ms(struct uart_port *port)
->>   
->>   	s->ms_irq_enabled = true;
->>   
->> -	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
->> -		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
->> -	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
->> -
->> -	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
->> -		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
->> -
->> -	if (s->gpio_irq[UART_GPIO_RI] >= 0)
->> -		enable_irq(s->gpio_irq[UART_GPIO_RI]);
->> -
->> -	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
->> -		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
->> +	mctrl_gpio_enable_ms(s->gpios);
->> +	/* TODO: enable AUART_INTR_CTSMIEN
->> +	 * if s->gpios->irq[UART_GPIO_CTS] == 0 */
-> What is the problem here? For the other lines nothing needs to be done?
-> This comment doesn't match the coding style.
+--->8---
+wm8904 1-001a: Control not supported for path ADCL -> [Left] -> AIFOUTL
+wm8904 1-001a: ASoC: no dapm match for ADCL --> Left --> AIFOUTL
+wm8904 1-001a: ASoC: Failed to add route ADCL -> Left -> AIFOUTL
+wm8904 1-001a: Control not supported for path ADCR -> [Right] -> AIFOUTL
+wm8904 1-001a: ASoC: no dapm match for ADCR --> Right --> AIFOUTL
+wm8904 1-001a: ASoC: Failed to add route ADCR -> Right -> AIFOUTL
+wm8904 1-001a: Control not supported for path ADCL -> [Left] -> AIFOUTR
+wm8904 1-001a: ASoC: no dapm match for ADCL --> Left --> AIFOUTR
+wm8904 1-001a: ASoC: Failed to add route ADCL -> Left -> AIFOUTR
+wm8904 1-001a: Control not supported for path ADCR -> [Right] -> AIFOUTR
+wm8904 1-001a: ASoC: no dapm match for ADCR --> Right --> AIFOUTR
+wm8904 1-001a: ASoC: Failed to add route ADCR -> Right -> AIFOUTR
+wm8904 1-001a: Control not supported for path AIFINR -> [Right] -> DACL
+wm8904 1-001a: ASoC: no dapm match for AIFINR --> Right --> DACL
+wm8904 1-001a: ASoC: Failed to add route AIFINR -> Right -> DACL
+wm8904 1-001a: Control not supported for path AIFINL -> [Left] -> DACL
+wm8904 1-001a: ASoC: no dapm match for AIFINL --> Left --> DACL
+wm8904 1-001a: ASoC: Failed to add route AIFINL -> Left -> DACL
+wm8904 1-001a: Control not supported for path AIFINR -> [Right] -> DACR
+wm8904 1-001a: ASoC: no dapm match for AIFINR --> Right --> DACR
+wm8904 1-001a: ASoC: Failed to add route AIFINR -> Right -> DACR
+wm8904 1-001a: Control not supported for path AIFINL -> [Left] -> DACR
+wm8904 1-001a: ASoC: no dapm match for AIFINL --> Left --> DACR
+wm8904 1-001a: ASoC: Failed to add route AIFINL -> Left -> DACR
+---8<---
 
-Right, the comment should be rather:
-/* TODO: enable AUART_INTR_CTSMIEN
-  * if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS)) */
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
 
-In this place I marked that CTSMIEN should be switched on 
-enable/disable_ms if CTS
-is not a gpio. The driver enables CTSMIEN forever what is wrong but I 
-can't test it
-and I don't need it so I've just marked the fact in the comment.
+Changes in v2:
+- Correct the mux path name.
+- Route the mux to the pins.
 
->
-> Other than that, this patch looks good.
->
-> Uwe
->
+ sound/soc/codecs/wm8904.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
 
-Thanks
-Janusz
+diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
+index 4d2d2b1..110d0e6 100644
+--- a/sound/soc/codecs/wm8904.c
++++ b/sound/soc/codecs/wm8904.c
+@@ -1076,10 +1076,13 @@ static const struct snd_soc_dapm_route adc_intercon[] = {
+ 	{ "Right Capture PGA", NULL, "Right Capture Mux" },
+ 	{ "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
+ 
+-	{ "AIFOUTL", "Left",  "ADCL" },
+-	{ "AIFOUTL", "Right", "ADCR" },
+-	{ "AIFOUTR", "Left",  "ADCL" },
+-	{ "AIFOUTR", "Right", "ADCR" },
++	{ "AIFOUTL Mux", "Left", "ADCL" },
++	{ "AIFOUTL Mux", "Right", "ADCR" },
++	{ "AIFOUTR Mux", "Left", "ADCL" },
++	{ "AIFOUTR Mux", "Right", "ADCR" },
++
++	{ "AIFOUTL", NULL, "AIFOUTL Mux" },
++	{ "AIFOUTR", NULL, "AIFOUTR Mux" },
+ 
+ 	{ "ADCL", NULL, "CLK_DSP" },
+ 	{ "ADCL", NULL, "Left Capture PGA" },
+@@ -1089,14 +1092,20 @@ static const struct snd_soc_dapm_route adc_intercon[] = {
+ };
+ 
+ static const struct snd_soc_dapm_route dac_intercon[] = {
+-	{ "DACL", "Right", "AIFINR" },
+-	{ "DACL", "Left",  "AIFINL" },
++	{ "DACL", NULL, "AIFINL" },
++	{ "DACL", NULL, "AIFINR" },
+ 	{ "DACL", NULL, "CLK_DSP" },
+ 
+-	{ "DACR", "Right", "AIFINR" },
+-	{ "DACR", "Left",  "AIFINL" },
++	{ "DACR", NULL, "AIFINL" },
++	{ "DACR", NULL, "AIFINR" },
+ 	{ "DACR", NULL, "CLK_DSP" },
+ 
++	{ "DACL Mux", "Left", "DACL" },
++	{ "DACL Mux", "Right", "DACR" },
++
++	{ "DACR Mux", "Left", "DACL" },
++	{ "DACR Mux", "Right", "DACR" },
++
+ 	{ "Charge pump", NULL, "SYSCLK" },
+ 
+ 	{ "Headphone Output", NULL, "HPL PGA" },
+-- 
+2.1.0.24.g4109c28
