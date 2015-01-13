@@ -1,66 +1,65 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 13 Jan 2015 11:20:16 +1100
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-Message-ID: <20150113112016.2db3f982@canb.auug.org.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 Jan 2015 09:21:08 +0900
+Subject: [GIT PULL v2] Renesas ARM Based SoC DT PM Updates for v3.20
+In-Reply-To: <20150112224859.GM22090@quad.lixom.net>
+References: <cover.1420429758.git.horms+renesas@verge.net.au>
+ <20150112224859.GM22090@quad.lixom.net>
+Message-ID: <20150113002105.GA27284@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Jan 12, 2015 at 02:48:59PM -0800, Olof Johansson wrote:
+> Hi Simon,
+> 
+> On Mon, Jan 05, 2015 at 12:52:15PM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC DT PM updates for v3.20.
+> > 
+> > 
+> > As requested by Geert Uytterhoeven I have dropped
+> > "ARM: shmobile: R-Mobile: Enable module clocks if !CONFIG_PM_RUNTIME"
+> > from v2 of this pull-request.
+> > 
+> > 
+> > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> > 
+> >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-pm-for-v3.20
+> > 
+> > for you to fetch changes up to b21cadc64dc34fb531ad49d462021c2b6a14cfff:
+> > 
+> >   ARM: shmobile: r8a7740 dtsi: Add PM domain support (2014-12-31 15:28:31 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC DT PM Updates for v3.20
+> > 
+> > * DT support from PM domains
+> > * Enable DT support for PM domains on r8a7740
+> > 
+> > ----------------------------------------------------------------
+> > Geert Uytterhoeven (5):
+> >       PM / Domains: Add DT bindings for the R-Mobile System Controller
+> >       ARM: shmobile: R-Mobile: Use generic_pm_domain.attach_dev() for pm_clk setup
+> >       ARM: shmobile: R-Mobile: Store SYSC base address in rmobile_pm_domain
+> >       ARM: shmobile: R-Mobile: Add DT support for PM domains
+> >       ARM: shmobile: r8a7740 dtsi: Add PM domain support
+> > 
+> >  .../bindings/power/renesas,sysc-rmobile.txt        |  98 ++++++++
+> >  arch/arm/boot/dts/r8a7740.dtsi                     |  99 ++++++++
+> >  arch/arm/mach-shmobile/Kconfig                     |   3 +-
+> >  arch/arm/mach-shmobile/pm-r8a7740.c                |  14 ++
+> >  arch/arm/mach-shmobile/pm-rmobile.c                | 273 +++++++++++++++++++--
+> >  arch/arm/mach-shmobile/pm-rmobile.h                |   3 +-
+> >  arch/arm/mach-shmobile/pm-sh7372.c                 |  11 +
+> 
+> I think the dts change and the binding change here should go in a dt
+> branch, and the rest should probably to in an SoC branch.
+> 
+> Would you mind respinning, or should I cherry-pick them between the branches
+> here?
 
-Today's linux-next merge of the mvebu tree got a conflict in
-arch/arm/boot/dts/Makefile between commit 6f1650f15bc4 ("ARM: dts: Only
-build dtb if associated Arch and/or SoC is enabled") from the arm-soc
-tree and commit dd7d2be1d2b8 ("Kirkwood: add support for Seagate
-BlackArmor NAS220") from the mvebu tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/boot/dts/Makefile
-index abb810f1fe29,17ee1d6a0ac0..000000000000
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@@ -112,24 -101,18 +112,25 @@@ dtb-$(CONFIG_ARCH_EXYNOS5) += 
-  	exynos5440-sd5v1.dtb \
-  	exynos5440-ssdk5440.dtb \
-  	exynos5800-peach-pi.dtb
- -dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
- -dtb-$(CONFIG_ARCH_HIX5HD2) += hisi-x5hd2-dkb.dtb
- -dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- +dtb-$(CONFIG_ARCH_HI3xxx) += \
- +	hi3620-hi4511.dtb
- +dtb-$(CONFIG_ARCH_HIX5HD2) += \
- +	hisi-x5hd2-dkb.dtb
- +dtb-$(CONFIG_ARCH_HIGHBANK) += \
- +	highbank.dtb \
-  	ecx-2000.dtb
- -dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
- -dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- +dtb-$(CONFIG_ARCH_HIP04) += \
- +	hip04-d01.dtb
- +dtb-$(CONFIG_ARCH_INTEGRATOR) += \
- +	integratorap.dtb \
-  	integratorcp.dtb
- -dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
- +dtb-$(CONFIG_ARCH_KEYSTONE) += \
- +	k2hk-evm.dtb \
-  	k2l-evm.dtb \
-  	k2e-evm.dtb
- -dtb-$(CONFIG_MACH_KIRKWOOD) += kirkwood-b3.dtb \
- +dtb-$(CONFIG_MACH_KIRKWOOD) += \
- +	kirkwood-b3.dtb \
-+ 	kirkwood-blackarmor-nas220.dtb \
-  	kirkwood-cloudbox.dtb \
-  	kirkwood-d2net.dtb \
-  	kirkwood-db-88f6281.dtb \
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/9cd572c1/attachment.sig>
+Thanks, I can respin.
