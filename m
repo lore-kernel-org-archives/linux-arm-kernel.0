@@ -1,72 +1,116 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Jan 2015 15:52:21 +0000
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <54B4BF4C.2030009@redhat.com>
-References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
- <54AEBE45.9080203@redhat.com> <20150109154635.GG11258@arm.com>
- <54B00C39.1070809@redhat.com> <20150112173005.GK13360@arm.com>
- <54B4BF4C.2030009@redhat.com>
-Message-ID: <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 13 Jan 2015 23:54:21 +0800
+Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
+ references
+In-Reply-To: <20150113154415.GY4891@lukather>
+References: <1421123484-21387-1-git-send-email-wens@csie.org>
+ <20150113154415.GY4891@lukather>
+Message-ID: <CAGb2v67sQyNcFQgvm60TUzjp3QBusckvP2i_xkj-eLRZubkALA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 06:46:36AM +0000, Pratyush Anand wrote:
-> On Monday 12 January 2015 11:00 PM, Will Deacon wrote:
-> > On Fri, Jan 09, 2015 at 05:13:29PM +0000, Pratyush Anand wrote:
-> >> On Friday 09 January 2015 09:16 PM, Will Deacon wrote:
-> >>> On Thu, Jan 08, 2015 at 05:28:37PM +0000, Pratyush Anand wrote:
-> >>>> On Thursday 08 January 2015 09:53 PM, Will Deacon wrote:
-> >>>>> On Thu, Jan 08, 2015 at 01:15:58PM +0000, Pratyush Anand wrote:
-> >>>>>> I am trying to test following scenario, which seems valid to me. But I
-> >>>>>> am very new to ARM64 as well as to debugging tools, so seeking expert's
-> >>>>>> comment here.
-> >>>>>>
-> >>>>>> -- I have inserted a kprobe to the function uprobe_breakpoint_handler
-> >>>>>> which is called from elo_dbg
-> >>>>>> (el0_dbg->do_debug_exception->brk_handler->call_break_hook->uprobe_breakpoint_handler)
-> >>>>>>
-> >>>>>> -- kprobe is enabled.
-> >>>>>>
-> >>>>>> -- an uprobe is inserted into a test application and enabled.
-> >>>>>>
-> >>>>>> So, when uprobe is enabled and test code execution reaches to probe
-> >>>>>> instruction, it executes uprobe breakpoint instruction and el0_dbg
-> >>>>>> exception is raised.
-> >>>>>>
-> >>>>>> When control reaches to start of uprobe_breakpoint_handler and it
-> >>>>>> executes first instruction (which has been replaced with a kprobe
-> >>>>>> breakpoint instruction), el1_dbg exception is raised.
-> >>>>>
-> >>>>> Hmm, debug exceptions should be masked at this point so I don't see why
-> >>>>> you're taking the second debug exception.
-> >>>>
-> >>>> So, you mean to say that when an exception which has been taken from
-> >>>> lower exception level (EL0) is being executed, then we keep masked also
-> >>>> the exception from current exception level (EL1)...
-> >>>
-> >>> Yeah, if you look at entry.S then you'll see that neither el0_dbg or el1_dbg
-> >>> re-enable debug exceptions (masked automatically by the CPU after taking the
-> >>> exception) until *after* the handling has completed. This is to prevent
-> >>> recursive debug exceptions, which I don't see how we can reasonable handle.
-> >>
-> >> May be I am missing something, but my observation on silicon is
-> >> different. Please have a look at git log of HEAD of following branch,
-> >> which says that el1_dbg exception has been raised while el0_dbg was
-> >> executing. Do not know what I am missing..
-[...]
-> > Regardless, I think you need to debug further and found out if PSTATE.D is
-> > getting cleared and, if so, who is responsible for that. Somebody could be
-> > enabling IRQs, for example, which will then unmask debug exceptions in
-> > el1_irq.
-> 
-> This is what I see for pstate, When el0_dbg exception is raised (ie an 
-> exception raised with ESR = ESR_EL1_EC_BRK64 after executing instruction 
-> BRK64_OPCODE_UPROBES = 0xD4200100 in EL0, user mode), spsr_el1 value is 
-> 0x80000000. Which means, all exceptions are unmasked. Is it expected?
+On Tue, Jan 13, 2015 at 11:44 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Jan 13, 2015 at 12:31:24PM +0800, Chen-Yu Tsai wrote:
+>> Using label references is preferred when override settings from the
+>> included dtsi.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>
+>> My AXP221 series touches this file. I thought I'd convert it first.
+>>
+>> This looks like a lot of changes. But if you filter out all the
+>> indentation changes, it's just the opening lines for each node.
+>>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181 ++++++++++++++--------------
+>>  1 file changed, 88 insertions(+), 93 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> index ebd5f7854b1b..97dbaeb76416 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> @@ -61,101 +61,96 @@
+>>       chosen {
+>>               bootargs = "earlyprintk console=ttyS0,115200";
+>>       };
+>> +};
+>> +
+>> +&mmc0 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+>> +     vmmc-supply = <&reg_vcc3v0>;
+>> +     bus-width = <4>;
+>> +     cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+>> +     cd-inverted;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&usbphy {
+>> +     usb1_vbus-supply = <&reg_usb1_vbus>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&ehci0 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&ohci0 {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&pio {
+>> +     mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
+>> +             allwinner,pins = "PA8";
+>> +             allwinner,function = "gpio_in";
+>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +             allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> +     };
+>> +};
+>> +
+>> +&mmc0_pins_a {
+>> +     /* external pull-ups missing for some pins */
+>> +     allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> +};
+>> +
+>> +&usb1_vbus_pin_a {
+>> +     /* different pin from sunxi-common-regulators */
+>> +     allwinner,pins = "PH24";
+>> +};
+>> +
+>> +&uart0 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&uart0_pins_a>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&i2c0 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&i2c0_pins_a>;
+>> +     /* pull-ups and devices require AXP221 DLDO3 */
+>> +     status = "failed";
+>> +};
+>
+> I think we should define a convention about how to sort these nodes
+> before we actually start merging some of it.
+>
+> This of course also apply to the other patches doing that, hence why
+> Hans is CC'd.
+>
+> I guess sorting them by label alphabetical order would make
+> sense. What do you think?
 
-spsr_el1 is the EL0 pstate saved when entering EL1. So it is expected
-that user space always has interrupts enabled.
+I'm currently using the ordering from the dtsi, which is based
+on address. Even if it's not visible, if you're creating the
+dts by looking at the dtsi and enabling the devices available,
+that's the order you add them by, so it kind of makes sense.
 
--- 
-Catalin
+The pins are grouped around &pio, and sorted by name.
+
+And the regulators are listed at the bottom.
+
+
+ChenYu
