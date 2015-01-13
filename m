@@ -1,67 +1,198 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 13 Jan 2015 11:47:48 +0100 (CET)
-Subject: [PATCH] clocksource: timer-atmel-pit: don't suspend/resume if
- unused
-In-Reply-To: <54B3D88C.80702@linaro.org>
-References: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
- <54B3D450.7050405@atmel.com> <54B3D88C.80702@linaro.org>
-Message-ID: <alpine.DEB.2.11.1501131143250.17382@nanos>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 13 Jan 2015 11:58:30 +0100
+Subject: [RFC PATCH] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <alpine.DEB.2.11.1501131117120.17382@nanos>
+References: <alpine.DEB.2.11.1412162125000.17382@nanos>
+ <1420725159-20720-1-git-send-email-boris.brezillon@free-electrons.com>
+ <alpine.DEB.2.11.1501131117120.17382@nanos>
+Message-ID: <20150113115830.43ef505d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jan 2015, Daniel Lezcano wrote:
+Hi Thomas,
 
-> On 01/12/2015 03:04 PM, Nicolas Ferre wrote:
-> > Le 18/12/2014 15:05, Nicolas Ferre a ?crit :
-> > > From: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> > > 
-> > > Waiting for PIT to stop counting takes a long time:
-> > >    1/(Master clock/prescaler/PIVR)
-> > > = 1/(133 MHz     /16       /2^20)
-> > > = 126 ms
-> > > 
-> > > Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
-> > > of the unused PIT device reduce (suspend time + resume time) from ~140 ms
-> > > to ~17 ms.
-> > > 
-> > > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> > > [nicolas.ferre at atmel.com: move to newer clocksource driver]
-> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > > ---
-> > > Hi Sylvain,
-> > > 
-> > > I re-worked (and "Acked") your patch so it can be applied on the newer
-> > > Mainline
-> > > kernels. Beware, I changed the "subject line" as well. The PIT driver
-> > > moved
-> > > recently (3.18).
-> > > 
-> > > Daniel,
-> > > Can you take this patch in your tree?
-> > 
-> > Hi Daniel,
-> > 
-> > Anything prevents this patch from being merged (aka ping ;-))?
-> 
-> [Cc'ed tglx].
-> 
-> Hi Nico,
-> 
-> thanks for the head up.
-> 
-> Nothing prevents it but I am wondering if this change shouldn't be in the
-> generic framework (kernel/time/clocksource.c and kernel/time/clockevents.c),
-> so all drivers will benefit this change ?
+On Tue, 13 Jan 2015 11:38:14 +0100 (CET)
+Thomas Gleixner <tglx@linutronix.de> wrote:
 
-Indeed. There is no point in calling suspend/resume for unused
-clockevents. They should be stopped and disabled already.
+> On Thu, 8 Jan 2015, Boris Brezillon wrote:
+> > 1) Is it close to what you had in mind ?
+> 
+> Yes.
+> 
+> > 2) I'm not sure which part of the code should go where, so don't hesitate
+> >    to point out misplaced sections.
+> 
+> Looks sane. Nits below.
+> 
+> > 3) Do I need to disable the source irq (the one feeding the irqchip) when
+> >    entering suspend (and enable it on resume) ?
+> 
+> That probably needs to be part of the dumb mask/unmask functions.,
+> i.e. if no demux interrupt is enabled, the source irq should be
+> masked.
 
-Now with clocksources this might be different. We have no explicit
-state for this, but its trivial to add one at least for those
-clocksources which have enable/disable callbacks. For the other ones
-not so much.
+Ok, I'll add that part.
+
+> 
+> > 4) I'm not sure of what flags should be set/cleared when mapping an
+> >    interrupt. Should I let the caller decide of this config (something
+> >    similar to what is done in generic-chip) ?
+> 
+> I don't think you need to set/clear anything. Lets look at that dumb
+> demux chip as a real electronic circuit
+> 
+>      	     	  |----------------|
+> 		  |                |
+>      	     	  |  --|Unmasked|--|---- Demux0
+> 		  |  |             |
+>      SRC irq -----|-- -|Unmasked|--|---- Demux1
+> 		  |  |             |
+>      	     	  |  --|Unmasked|--|---- Demux2
+> 		  |                |
+>      	     	  |----------------|
+> 
+> Whether a demultiplexed interrupt is mapped or not is not really
+> important. The only relevant information is whether its masked or
+> not. So the default state is masked until a demultiplexed interrupt
+> gets requested.
+
+Hmm, my question was not really clear: I was talking about irq flags [1]
+(those that are set with irq_modify_status in the generic irq chip [2]).
+
+> 
+> > +/**
+> > + * enum irq_dumb_demux_flags - Initialization flags for generic irq chips
+> > + * @IRQ_DD_INIT_NESTED_LOCK:	Set the lock class of the irqs to nested for
+> > + *				irq chips which need to call irq_set_wake() on
+> > + *				the parent irq. Usually GPIO implementations
+> > + */
+> > +enum irq_dumb_demux_flags {
+> > +	IRQ_DD_INIT_NESTED_LOCK		= 1 << 0,
+> > +};
+> > +
+> > +/**
+> > + * struct irq_chip_dumb_demux - Dumb demultiplexer irq chip data structure
+> > + * @domain:		irq domain pointer
+> > + * @max_irq:		Last valid irq
+> > + * @available:		Bitfield of valid irqs
+> > + * @unmasked:		Bitfield containing irqs status
+> > + * @flags:		irq_dumb_demux_flags flags
+> > + *
+> > + * Note, that irq_chip_generic can have multiple irq_chip_type
+> > + * implementations which can be associated to a particular irq line of
+> > + * an irq_chip_generic instance. That allows to share and protect
+> > + * state in an irq_chip_generic instance when we need to implement
+> > + * different flow mechanisms (level/edge) for it.
+> > + */
+> > +struct irq_chip_dumb_demux {
+> > +	struct irq_domain *domain;
+> > +	int max_irq;
+> > +	unsigned long *available;
+> > +	unsigned long *unmasked;
+> 
+> Why pointers? A single ulong is certainly enough.
+
+Okay, just thought one might need a dumb demuxer with more than 32 (or
+64) outputs, but I guess we can limit it to an unsigned long for now.
+
+> 
+> > +/**
+> > + *	handle_dumb_demux_irq - Dumb demuxer irq handle function.
+> > + *	@irq:	the interrupt number
+> > + *	@desc:	the interrupt description structure for this irq
+> > + *
+> > + *	Dumb demux interrupts are sent from a demultiplexing interrupt handler
+> > + *	which is not able to decide which child interrupt interrupt handler
+> > + *	should be called.
+> > + *
+> > + *	Note: The caller is expected to handle the ack, clear, mask and
+> > + *	unmask issues if necessary.
+> > + */
+> > +irqreturn_t
+> > +handle_dumb_demux_irq(unsigned int irq, struct irq_desc *desc)
+> > +{
+> > +	irqreturn_t retval = IRQ_NONE;
+> > +
+> > +	raw_spin_lock(&desc->lock);
+> > +
+> > +	if (!irq_may_run(desc))
+> > +		goto out_unlock;
+> > +
+> > +	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
+> > +	kstat_incr_irqs_this_cpu(irq, desc);
+> > +
+> > +	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data))) {
+> > +		desc->istate |= IRQS_PENDING;
+> > +		goto out_unlock;
+> > +	}
+> > +
+> > +	retval = handle_irq_event_no_spurious_check(desc);
+> > +
+> > +out_unlock:
+> > +	raw_spin_unlock(&desc->lock);
+> > +
+> > +	return retval;
+> > +}
+> > +EXPORT_SYMBOL_GPL(handle_dumb_demux_irq);
+> 
+> This should go into the new file as well, so it gets compiled out when
+> not enabled.
+
+Sure.
+
+> 
+> > +static void irq_dumb_demux_mask(struct irq_data *d)
+> > +{
+> > +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
+> > +
+> > +	clear_bit(d->hwirq, demux->unmasked);
+> > +}
+> > +
+> > +static void irq_dumb_demux_unmask(struct irq_data *d)
+> > +{
+> > +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
+> > +
+> > +	set_bit(d->hwirq, demux->unmasked);
+> > +}
+> 
+> So this needs the handling of enabling/disabling the source irq.
+
+Yep.
+
+> 
+> > +static struct irq_chip irq_dumb_demux_chip = {
+> > +	.name = "dumb-demux-irq",
+> > +	.irq_mask = irq_dumb_demux_mask,
+> > +	.irq_unmask = irq_dumb_demux_unmask,
+> 
+> +	.name		= "dumb-demux-irq",
+> +	.irq_mask	= irq_dumb_demux_mask,
+> +	.irq_unmask	= irq_dumb_demux_unmask,
+> 
+> Makes it simpler to read.
+
+I'll fix that
+
+> 
+> > +struct irq_domain_ops irq_dumb_demux_domain_ops = {
+> > +	.map	= irq_map_dumb_demux_chip,
+> > +	.xlate	= irq_domain_xlate_onecell,
+> > +};
+> > +EXPORT_SYMBOL(irq_dumb_demux_domain_ops);
+> 
+> SYMBOL_GPL please
+
+and that too.
 
 Thanks,
 
-	tglx
+Boris
+
+
+[1]http://lxr.free-electrons.com/source/kernel/irq/settings.h#L21
+[2]http://lxr.free-electrons.com/source/kernel/irq/generic-chip.c#L394
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
