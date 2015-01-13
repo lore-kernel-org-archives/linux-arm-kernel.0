@@ -1,105 +1,87 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Jan 2015 14:06:24 -0600
-Subject: [PATCH] pinctrl: fix up device tree bindings
-In-Reply-To: <1420924457-12730-1-git-send-email-linus.walleij@linaro.org>
-References: <1420924457-12730-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAL_JsqKQJzUOWE2oJsABH3Aa1cCD+526L0G7-WRH=LbKFxesyQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 13 Jan 2015 12:08:48 -0800
+Subject: [PATCH 2/2] ARM: entry-common,
+ ptrace: do not pass scno to syscall_trace_enter
+In-Reply-To: <1420986751-30364-3-git-send-email-r.peniaev@gmail.com>
+References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
+ <1420986751-30364-3-git-send-email-r.peniaev@gmail.com>
+Message-ID: <CAGXu5jLi=6QTzF_z9pFAeXQqLZPfSCcwZc+q-a7b-tKwwBo4vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 3:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> After the Nomadik pin controller was force migrated to generic pin
-> control bindings, some leftovers in the documentation need to be
-> cleaned up. The code and device trees are already migrated.
+On Sun, Jan 11, 2015 at 6:32 AM, Roman Pen <r.peniaev@gmail.com> wrote:
+> In previous patch current_thread_info()->syscall is set with
+> corresponding syscall number prior to further calls, thus there
+> is no any need to pass 'scno'.
 >
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Applied for 3.20. Thanks.
-
+> Also, add explicit comment why do we have to reread 'scno' local
+> variable.
+>
+> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Andy Lutomirski <luto@amacapital.net>
+> Cc: Eric Paris <eparis@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 > ---
->  .../devicetree/bindings/pinctrl/ste,nomadik.txt    | 35 ++++++++++++----------
->  1 file changed, 20 insertions(+), 15 deletions(-)
+>  arch/arm/kernel/entry-common.S | 1 -
+>  arch/arm/kernel/ptrace.c       | 6 ++++--
+>  2 files changed, 4 insertions(+), 3 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-> index 6b33b9f18e88..f63fcb3ed352 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-> @@ -16,17 +16,22 @@ mux function to select on those pin(s)/group(s), and various pin configuration
->  parameters, such as input, output, pull up, pull down...
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 89452ff..3d12eb5 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -228,7 +228,6 @@ ENDPROC(vector_swi)
+>          * context switches, and waiting for our parent to respond.
+>          */
+>  __sys_trace:
+> -       mov     r1, scno
+>         add     r0, sp, #S_OFF
+>         bl      syscall_trace_enter
 >
->  The name of each subnode is not important; all subnodes should be enumerated
-> -and processed purely based on their content.
-> +and processed purely based on their content. The subnodes use the generic
-> +pin multiplexing node layout from the standard pin control bindings
-> +(see pinctrl-bindings.txt):
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index ef9119f..1238787 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -928,9 +928,9 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>         regs->ARM_ip = ip;
+>  }
 >
-> -Required subnode-properties:
-> -- ste,pins : An array of strings. Each string contains the name of a pin or
-> -    group.
-> -
-> -Optional subnode-properties:
-> -- ste,function: A string containing the name of the function to mux to the
-> +Required pin multiplexing subnode properties:
-> +- function: A string containing the name of the function to mux to the
->    pin or group.
-> +- groups : An array of strings. Each string contains the name of a pin
-> +  group that will be combined with the function to form a multiplexing
-> +  set-up.
+> -asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+> +asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  {
+> -       current_thread_info()->syscall = scno;
+> +       int scno = current_thread_info()->syscall;
+
+Was this assignment of current_thread_info()->syscall redundant? If
+so, this looks fine. If not, what will now be setting the thread_info?
+
+-Kees
+
 >
-> -- ste,config: Handle of pin configuration node (e.g. ste,config = <&slpm_in_wkup_pdis>)
-> +Required pin configuration subnode properties:
-> +- pins: A string array describing the pins affected by the configuration
-> +  in the node.
-> +- ste,config: Handle of pin configuration node
-> +  (e.g. ste,config = <&slpm_in_wkup_pdis>)
+>         /* Do the secure computing check first; failures should be fast. */
+>  #ifdef CONFIG_HAVE_ARCH_SECCOMP_FILTER
+> @@ -944,6 +944,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+>         if (test_thread_flag(TIF_SYSCALL_TRACE))
+>                 tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
 >
->  - ste,input : <0/1/2>
->         0: input with no pull
-> @@ -97,32 +102,32 @@ Example board file extract:
->                 uart0 {
->                         uart0_default_mux: uart0_mux {
->                                 u0_default_mux {
-> -                                       ste,function = "u0";
-> -                                       ste,pins = "u0_a_1";
-> +                                       function = "u0";
-> +                                       pins = "u0_a_1";
->                                 };
->                         };
->                         uart0_default_mode: uart0_default {
->                                 uart0_default_cfg1 {
-> -                                       ste,pins = "GPIO0", "GPIO2";
-> +                                       pins = "GPIO0", "GPIO2";
->                                         ste,input = <1>;
->                                 };
+> +       /* Syscall can be aborted (-1 can be set) or even changed
+> +        * by the tracer and subsequent PTRACE_SET_SYSCALL request */
+>         scno = current_thread_info()->syscall;
 >
->                                 uart0_default_cfg2 {
-> -                                       ste,pins = "GPIO1", "GPIO3";
-> +                                       pins = "GPIO1", "GPIO3";
->                                         ste,output = <1>;
->                                 };
->                         };
->                         uart0_sleep_mode: uart0_sleep {
->                                 uart0_sleep_cfg1 {
-> -                                       ste,pins = "GPIO0", "GPIO2";
-> +                                       pins = "GPIO0", "GPIO2";
->                                         ste,config = <&slpm_in_wkup_pdis>;
->                                 };
->                                 uart0_sleep_cfg2 {
-> -                                       ste,pins = "GPIO1";
-> +                                       pins = "GPIO1";
->                                         ste,config = <&slpm_out_hi_wkup_pdis>;
->                                 };
->                                 uart0_sleep_cfg3 {
-> -                                       ste,pins = "GPIO3";
-> +                                       pins = "GPIO3";
->                                         ste,config = <&slpm_out_wkup_pdis>;
->                                 };
->                         };
+>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
 > --
-> 1.9.3
+> 2.1.3
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Kees Cook
+Chrome OS Security
