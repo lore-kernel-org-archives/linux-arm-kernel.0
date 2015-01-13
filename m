@@ -1,40 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Jan 2015 09:01:38 +0100
-Subject: [PATCH v5 1/3] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <2063145.N1Hk6vVF2S@wuerfel>
-References: <1418342706-14755-2-git-send-email-rjui@broadcom.com>
- <1628217.66frkAqHMc@wuerfel> <548F5433.5090901@broadcom.com>
- <2063145.N1Hk6vVF2S@wuerfel>
-Message-ID: <CACRpkdaZ=Yg6YeDh4yR7+YgiJj6CM3v=prB10TK=w=mu8VQNuA@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 13 Jan 2015 16:02:08 +0800
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <cover.1421086706.git.robin.murphy@arm.com>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+Message-ID: <1421136128.27675.58.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 10:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 15 December 2014 13:35:47 Ray Jui wrote:
->>
->> Like I said previously, dynamic GPIO allocation works fine in the
->> kernel, as long as all of our GPIO clients in the kernel use gpiod based
->> API, which is what we will enforce going forward. The only problem is
->> with some of our customers who use GPIO through sysfs and expect fixed
->> global GPIO numbers. Thinking about this more, it's probably not that
->> difficult to add a script for those customers to convert/map the GPIO
->> numbers based on readings parsed from sysfs, so I guess that's fine.
->>
->
-> I think we discussed the user space interface a number of times
-> in the past, but I forgot the outcome. Either there is already
-> a way to name gpio lines uniquely in sysfs, or there should be
-> one.
+On Mon, 2015-01-12 at 20:48 +0000, Robin Murphy wrote:
+> Hi all,
+> 
+> Whilst it's a long way off perfect, this has reached the point of being
+> functional and stable enough to be useful, so here it is. The core
+> consists of the meat of the arch/arm implementation modified to remove
+> the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
+> allocator instead of the bitmap-based one. For that, this series depends
+> on my "Genericise the IOVA allocator" series posted earlier[1].
 
-There is one. The struct gpio_chip contains a .names field with
-strings giving names to the GPIOs on the chip.
+Hi Robin,
 
-This field does not have standardized DT bindings or anything
-but should be used.
+We'd to give it a try. Do you have a public git tree contains both
+series?
 
-Overall the sysfs interface is an abomination for relying on
-the notoriously unstable GPIO numberspace and other things.
-It was merged when the subsystem lacked a maintainer.
-
-Yours,
-Linus Walleij
+Joe.C
