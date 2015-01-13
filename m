@@ -1,31 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 17:34:05 +0100
-Subject: CFT: move outer_cache_sync() out of line
-In-Reply-To: <20150112163648.GL12302@n2100.arm.linux.org.uk>
-References: <20150112163648.GL12302@n2100.arm.linux.org.uk>
-Message-ID: <4576899.a2tdJxHBKo@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 13 Jan 2015 16:35:26 +0000
+Subject: [RFC PATCH 0/5] irq: Allow irqs to be routed to NMI/FIQ
+Message-ID: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 January 2015 16:36:48 Russell King - ARM Linux wrote:
+Hi Thomas, Hi Russell:
+    This RFC is particularly for your attention since it results
+    directly from feedback I've received from both of you, albeit
+    quite a few months ago now.
 
-> Theoretically, this should help overall system performance, since the
-> branch predictor should be able to predict this better, but it's entirely
-> possible that trying to benchmark a single workload won't be measurably
-> different.
-> 
-> In terms of kernel size figures, this change alone saves almost 17K of
-> 10MB of kernel text on my iMX6 kernels - which is bordering on
-> insignificant since that's not quite a 0.2% saving.
-> 
-> So... right now I can't justify this change, but I'm hoping some can come
-> up with some figures which shows that it benefits their workload without
-> causing a performance regression for others.
+This patchset demonstrates using FIQ to improve the quality of the
+PMU trace on ARM systems. To do so it introduces generic changes
+that allow irqs to be routed to NMI.
 
->From the theory, I think it can only help to do this. I would guess that
-the time spent inside of the cache_sync function dwarfs both the extra
-unconditional branch you introduce and the possible misprediction, so
-17K in space savings sounds like more than enough justification to just
-do it.
+This patchset applies on top of my own patchset:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+    arm: Implement arch_trigger_all_cpu_backtrace
+    http://thread.gmane.org/gmane.linux.kernel/1864829
+
+I think the important points of this set are clear without reference to
+the previous patchset but the patches will not run (nor apply cleanly)
+without the previous patchset.
+
+Currently these patches strictly honour a request from Russell to avoid
+indirection (notifiers, etc) in the ARM default FIQ handler. I have
+therefore separated the request that an irq be routed to NMI from the
+installation of a handler for it.
+
+Avoiding indirection does raise some problems though, because it means
+we arrive in the PMU code without a context pointer. At present I have
+just added a global variables into the ARM PMU code in order to hold
+information about irq allocations in a form I can safely read from NMI.
+
+
+Daniel Thompson (5):
+  arm: irq: Add a __nmi_count stat
+  irq: Allow interrupts to routed to NMI (or similar)
+  irq: gic: Add support for NMI routing
+  arm: perf: Make v7 support FIQ-safe
+  arm: perf: Use FIQ to handle PMU events.
+
+ arch/arm/include/asm/hardirq.h   |  1 +
+ arch/arm/include/asm/pmu.h       |  4 +++
+ arch/arm/kernel/irq.c            |  7 +++-
+ arch/arm/kernel/perf_event.c     |  2 +-
+ arch/arm/kernel/perf_event_cpu.c | 35 +++++++++++++++++--
+ arch/arm/kernel/perf_event_v7.c  | 11 ++----
+ arch/arm/kernel/traps.c          | 15 +++++---
+ drivers/irqchip/irq-gic.c        | 75 ++++++++++++++++++++++++++++++----------
+ include/linux/interrupt.h        | 20 +++++++++++
+ include/linux/irq.h              |  2 ++
+ include/linux/irqchip/arm-gic.h  |  8 ++++-
+ kernel/irq/manage.c              | 29 ++++++++++++++--
+ 12 files changed, 169 insertions(+), 40 deletions(-)
+
+--
+1.9.3
