@@ -1,43 +1,112 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Jan 2015 08:57:30 +0100
-Subject: [PATCH 1/5] gpio: Cygnus: define Broadcom Cygnus GPIO binding
-In-Reply-To: <1417826408-1600-2-git-send-email-rjui@broadcom.com>
-References: <rjui@broadcom.com>
- <1417826408-1600-1-git-send-email-rjui@broadcom.com>
- <1417826408-1600-2-git-send-email-rjui@broadcom.com>
-Message-ID: <CACRpkdaTU_efMOpKoEdBA0rDHyn6wcn7VamUZRiX-K2MYZygBQ@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 13 Jan 2015 15:55:03 +0800
+Subject: [PATCH net-next v11 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <54B41192.3030400@suse.de>
+References: <1421049832-6224-1-git-send-email-dingtianhong@huawei.com>
+ <1421049832-6224-4-git-send-email-dingtianhong@huawei.com>
+ <54B41192.3030400@suse.de>
+Message-ID: <54B4CF57.4020505@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 6, 2014 at 1:40 AM, Ray Jui <rjui@broadcom.com> wrote:
+On 2015/1/13 2:25, Alexander Graf wrote:
+> On 12.01.15 09:03, Ding Tianhong wrote:
+>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
+>>
+>> v11: Add ethtool support for tx coalecse getting and setting, the xmit_more
+>> is not supported for this patch, but I think it could work for hip04,
+>> will support it later after some tests for performance better.
+>>
+>> Here are some performance test results by ping and iperf(add tx_coalesce_frames/users),
+>> it looks that the performance and latency is more better by tx_coalesce_frames/usecs.
+>>
+>> - Before:
+>> $ ping 192.168.1.1 ...
+>> --- 192.168.1.1 ping statistics ---
+> 
+> Writing --- directly into your patch description is usually a pretty bad
+> idea. Git am cuts off everything that comes after --- so your patch
+> description ends here without manual intervention ;).
+> 
+>> 24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+>> rtt min/avg/max/mdev = 0.180/0.202/0.403/0.043 ms
+>>
+>> $ iperf -c 192.168.1.1 ...
+>> [ ID] Interval       Transfer     Bandwidth
+>> [  3]  0.0- 1.0 sec   115 MBytes   945 Mbits/sec
+>>
+>> - After:
+>> $ ping 192.168.1.1 ...
+>> --- 192.168.1.1 ping statistics ---
+>> 24 packets transmitted, 24 received, 0% packet loss, time 22999ms
+>> rtt min/avg/max/mdev = 0.178/0.190/0.380/0.041 ms
+>>
+>> $ iperf -c 192.168.1.1 ...
+>> [ ID] Interval       Transfer     Bandwidth
+>> [  3]  0.0- 1.0 sec   115 MBytes   965 Mbits/sec
+>>
+>> v10: According David Miller and Arnd Bergmann's suggestion, add some modification
+> 
+> Version history however should go after a --- line, so that it doesn't
+> show up in the patch description in the tree.
+> 
 
-> Document the GPIO device tree binding for Broadcom Cygnus SoC
->
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-(...)
-> +- #gpio-cells:
-> +    Must be two. The first cell is the GPIO pin number (within the
-> +controller's domain) and the second cell is used for the following:
-> +    bit[0]: polarity (0 for normal and 1 for inverted)
-> +    bit[18:16]: internal pull up/down: 0 - pull up/down disabled
-> +                                       1 - pull up enabled
-> +                                       2 - pull down enabled
-> +    bit[22:20]: drive strength: 0 - 2 mA
-> +                                1 - 4 mA
-> +                                2 - 6 mA
-> +                                3 - 8 mA
-> +                                4 - 10 mA
-> +                                5 - 12 mA
-> +                                6 - 14 mA
-> +                                7 - 16 mA
+ok
 
-No. This pull up/down and drive strength is pin controller
-business, use a pin control backend behind the GPIO driver
-see Documentation/pinctrl.txt.
+>> for v9 version
+>> - drop the workqueue
+>> - batch cleanup based on tx_coalesce_frames/usecs for better throughput
+>> - use a reasonable default tx timeout (200us, could be shorted
+>>   based on measurements) with a range timer
+>> - fix napi poll function return value
+>> - use a lockless queue for cleanup
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+> 
+> 
+> [...]
+> 
+>> +static int hip04_remove(struct platform_device *pdev)
+>> +{
+>> +	struct net_device *ndev = platform_get_drvdata(pdev);
+>> +	struct hip04_priv *priv = netdev_priv(ndev);
+>> +	struct device *d = &pdev->dev;
+>> +
+>> +	if (priv->phy)
+>> +		phy_disconnect(priv->phy);
+>> +
+>> +	hip04_free_ring(ndev, d);
+>> +	unregister_netdev(ndev);
+>> +	free_irq(ndev->irq, ndev);
+>> +	of_node_put(priv->phy_node);
+>> +	cancel_work_sync(&priv->tx_timeout_task);
+>> +	free_netdev(ndev);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id hip04_mac_match[] = {
+>> +	{ .compatible = "hisilicon,hip04-mac" },
+>> +	{ }
+>> +};
+> 
+> This is missing
+> 
+> MODULE_DEVICE_TABLE(of, hip04_mac_match);
+> 
+> to enable automatic module loading, no?
+> 
+looks good to me, thanks.
 
-Initial states for these configurations can be set up using
-pin control hogs since pin control and GPIO is orthogonal.
+Ding
 
-Yours,
-Linus Walleij
+> 
+> Alex
+> 
+> 
+> .
+> 
