@@ -1,20 +1,31 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 13 Jan 2015 04:03:25 -0800
-Subject: [PATCH v4 1/2] watchdog: Add driver for Mediatek watchdog
-In-Reply-To: <1421076884-15860-2-git-send-email-matthias.bgg@gmail.com>
-References: <1421076884-15860-1-git-send-email-matthias.bgg@gmail.com>
- <1421076884-15860-2-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <54B5098D.9030108@roeck-us.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 13 Jan 2015 12:07:54 +0000
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <1421136128.27675.58.camel@mtksdaap41>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+ <1421136128.27675.58.camel@mtksdaap41>
+Message-ID: <54B50A9A.9010308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 07:34 AM, Matthias Brugger wrote:
-> This patch adds a driver for the Mediatek SoC integrated
-> watchdog. This driver supports watchdog and software reset
-> for mt65xx and mt81xx SoCs.
+On 13/01/15 08:02, Yingjoe Chen wrote:
+> On Mon, 2015-01-12 at 20:48 +0000, Robin Murphy wrote:
+>> Hi all,
+>>
+>> Whilst it's a long way off perfect, this has reached the point of being
+>> functional and stable enough to be useful, so here it is. The core
+>> consists of the meat of the arch/arm implementation modified to remove
+>> the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
+>> allocator instead of the bitmap-based one. For that, this series depends
+>> on my "Genericise the IOVA allocator" series posted earlier[1].
 >
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Hi Robin,
+>
+> We'd to give it a try. Do you have a public git tree contains both
+> series?
+>
 
-Assuming you fix the missing newline, as pointed out by Joe:
+Thanks! Unfortunately I don't have a public tree yet, but I'll try to 
+get one set up shortly.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Robin.
