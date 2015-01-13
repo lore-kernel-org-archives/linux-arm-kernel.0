@@ -1,29 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Jan 2015 18:05:48 -0800
-Subject: [PATCH 2/2] arm: dts: disable CCI on exynos420 based arndale-octa
-In-Reply-To: <1420859496-27533-2-git-send-email-a.kesavan@samsung.com>
-References: <1420859496-27533-1-git-send-email-a.kesavan@samsung.com>
- <1420859496-27533-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20150113020548.GC28758@quad.lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 Jan 2015 11:08:14 +0900
+Subject: [PATCH 0/4] ARM: shmobile: sh73a0/kzm9g: Introduce multiplatform
+ support
+In-Reply-To: <1420808932-3899-1-git-send-email-geert+renesas@glider.be>
+References: <1420808932-3899-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150113020811.GA21265@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 10, 2015 at 08:41:36AM +0530, Abhilash Kesavan wrote:
-> The arndale-octa board was giving "imprecise external aborts" during
-> boot-up with MCPM enabled. CCI enablement of the boot cluster was found
-> to be the cause of these aborts (possibly because the secure f/w was not
-> allowing it). Hence, disable CCI for the arndale-octa board.
+On Fri, Jan 09, 2015 at 02:08:48PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Tested-by: Tyler Baker <tyler.baker@linaro.org>
+> This patch series (by Magnus) introduces multiplatform support for the
+> sh73a0 platform. After this kzm9g can boot a sh73a0 multiplatform
+> kernel fine, except for working Ethernet (the ZB clock is disabled by
+> clk_disable_unused()).
+> 
+> This series has been sent before by Magnus as part of the series
+> "[PATCH v2 00/05] ARM: shmobile: sh73a0 and kzm9g Multiplatform
+> revisit" (http://www.spinics.net/lists/linux-sh/msg38384.html).
+> I've updated the kzm9g DTS sync patch for recent changes to the
+> kzm9g-reference DTS.
+> 
+> Thanks for applying!
 
-Applied 1-2 to fixes for 3.19.
-
-Fixed two typos (arm->ARM in subject, and 420->5420).
-
-
-Thanks,
-
--Olof
+Thanks, done.
