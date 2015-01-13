@@ -1,90 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 13 Jan 2015 17:46:06 +0100
-Subject: Including empty regulator nodes in axp209.dtsi is a BAD idea
-In-Reply-To: <54B4E7B5.6060304@redhat.com>
-References: <54B4E7B5.6060304@redhat.com>
-Message-ID: <20150113164606.GA4891@lukather>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 13 Jan 2015 08:59:03 -0800
+Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
+Message-ID: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
-> Hi ChenYu, Maxime,
-> 
-> During the review of a few dts files for new boards Maxime asked me to use
-> axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
-> boards using the axp209 pmic.
-> 
-> But axp209.dtsi includes empty regulator nodes, e.g. :
-> 
->                 reg_dcdc3: dcdc3 {
->                         regulator-name = "dcdc3";
->                 };
-> 
-> This is a BAD idea, the presence of these empty nodes causes the
-> axp20x-regulator driver to actually register regulators for them,
-> and then on late_init the regulator subsys turns them off, since
-> they have absolutely no constraints set (nor users registered)
-> and the regulator subsys assumes that when devicetree is used their
-> is always a compete set of constraints and that thus turning them
-> off is safe.
-> 
-> So when I switched to using axp209.dtsi for the bananapro.dts,
-> and booted the bananapro this is the last message I got from the
-> kernel while booting:
-> 
-> [    2.314014] dcdc3: disabling
-> 
-> And away went our DRAM power-supply, oops.
-> 
-> So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
-> should contain reasonable constraints (eg the operating range
-> from the datasheet)
+Aarch64 ELF files use mapping symbols with special names $x, $d
+to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
+IHI 0056B", section "4.5.4 Mapping symbols").
 
-Indeed.
+The patch filters out these symbols at load time, similar to
+"696b97a perf symbols: Ignore mapping symbols on ARM" changes
+done for ARM before V8.
 
-> and an always-on property.
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Avi Kivity <avi@cloudius-systems.com>
+Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: David Ahern <dsahern@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Dave Martin <Dave.Martin@arm.com>
+---
+ tools/perf/util/symbol-elf.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-I disagree. The regulator disabling is a feature, and how the board is
-wired is, well, up to the board.
-
-If an always-on property is needed, then it's in the DTS, not in the
-AXP DTSI.
-
-> The ldo-s are trickier, since we simply do not know how those
-> are used, I think ldo2 is used for Avcc on most boards, so it
-> too should be always on, since almost any board will have some
-> analog parts on it (be it the ir receiver, lradc, rtp, lvds, vga,
-> or analog audio in/out). Assuming that we're willing to assume
-> that ldo2 is used this way, we should give it matching constraints
-> and always mark it always-on.
-
-Ideally, all the drivers that have a analogic component should have a
-reference to the regulator they use. But again, at the board
-level. And more realistically, putting always-on should also happen at
-the board level.
-
-> As for ldo3 - 5 I've no idea when / for what these are used, but
-> if we do not know it is better to just leave them be then to turn
-> them off IMHO, so we should remove the nodes for these from axp209.dtsi
-> 
-> Anyways sorting this all out is going to take some time, so I'm
-> not going to use axp209.dtsi in dts files for new boards for now.
-
-I'm afraid it's an "all or nothing" situation. Either you load the
-PMIC and describe as accurately as possible which regulator are in
-use, or you don't. I'm fine with both, even if have a small preference
-for the former, but getting stuck half-way is not really an option.
-
-Maxime
-
+diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
+index 06fcd1b..1e188dd 100644
+--- a/tools/perf/util/symbol-elf.c
++++ b/tools/perf/util/symbol-elf.c
+@@ -862,6 +862,14 @@ int dso__load_sym(struct dso *dso, struct map *map,
+ 			    !strcmp(elf_name, "$t"))
+ 				continue;
+ 		}
++		/* Reject Aarch64 ELF "mapping symbols": these aren't unique and
++		 * don't identify functions, so will confuse the profile
++		 * output: */
++		if (ehdr.e_machine == EM_AARCH64) {
++			if (!strcmp(elf_name, "$x") ||
++			    !strcmp(elf_name, "$d"))
++				continue;
++		}
+ 
+ 		if (runtime_ss->opdsec && sym.st_shndx == runtime_ss->opdidx) {
+ 			u32 offset = sym.st_value - syms_ss->opdshdr.sh_addr;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/5c323c1e/attachment.sig>
+1.9.3
