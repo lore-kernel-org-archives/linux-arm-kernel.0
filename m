@@ -1,24 +1,219 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 12 Jan 2015 20:04:41 -0800
-Subject: [PATCH v3 11/13] mtd: st_spi_fsm: General tidy-up
-In-Reply-To: <1418644760-18773-12-git-send-email-lee.jones@linaro.org>
-References: <1418644760-18773-1-git-send-email-lee.jones@linaro.org>
- <1418644760-18773-12-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150113040441.GL9759@ld-irv-0074>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 13 Jan 2015 12:31:24 +0800
+Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
+ references
+Message-ID: <1421123484-21387-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 11:59:18AM +0000, Lee Jones wrote:
-> Due to the nature of the port (lots of copy/paste) much of the white-space
-> is taken up by spaces instead of tab separators. This patch aims to change
-> that.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Using label references is preferred when override settings from the
+included dtsi.
 
-checkpatch.pl gives several warnings like this on this patch:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-    WARNING:SPACE_BEFORE_TAB: please, no space before tabs
+My AXP221 series touches this file. I thought I'd convert it first.
 
-Please consider fixing them up.
+This looks like a lot of changes. But if you filter out all the
+indentation changes, it's just the opening lines for each node.
 
-Brian
+---
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181 ++++++++++++++--------------
+ 1 file changed, 88 insertions(+), 93 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index ebd5f7854b1b..97dbaeb76416 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -61,101 +61,96 @@
+ 	chosen {
+ 		bootargs = "earlyprintk console=ttyS0,115200";
+ 	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
++	vmmc-supply = <&reg_vcc3v0>;
++	bus-width = <4>;
++	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
++	cd-inverted;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&pio {
++	mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
++		allwinner,pins = "PA8";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++};
++
++&mmc0_pins_a {
++	/* external pull-ups missing for some pins */
++	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++};
++
++&usb1_vbus_pin_a {
++	/* different pin from sunxi-common-regulators */
++	allwinner,pins = "PH24";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	/* pull-ups and devices require AXP221 DLDO3 */
++	status = "failed";
++};
+ 
+-	soc at 01c00000 {
+-		mmc0: mmc at 01c0f000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+-			vmmc-supply = <&reg_vcc3v0>;
+-			bus-width = <4>;
+-			cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+-			cd-inverted;
+-			status = "okay";
+-		};
+-
+-		usbphy: phy at 01c19400 {
+-			usb1_vbus-supply = <&reg_usb1_vbus>;
+-			status = "okay";
+-		};
+-
+-		ehci0: usb at 01c1a000 {
+-			status = "okay";
+-		};
+-
+-		ohci0: usb at 01c1a400 {
+-			status = "okay";
+-		};
+-
+-		pio: pinctrl at 01c20800 {
+-			mmc0_pins_a: mmc0 at 0 {
+-				/* external pull-ups missing for some pins */
+-				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-			};
+-
+-			mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
+-				allwinner,pins = "PA8";
+-				allwinner,function = "gpio_in";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-			};
+-
+-			usb1_vbus_pin_a: usb1_vbus_pin at 0 {
+-				allwinner,pins = "PH24";
+-				allwinner,function = "gpio_out";
+-				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-			};
+-		};
+-
+-		uart0: serial at 01c28000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&uart0_pins_a>;
+-			status = "okay";
+-		};
+-
+-		i2c0: i2c at 01c2ac00 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c0_pins_a>;
+-			/* pull-ups and devices require AXP221 DLDO3 */
+-			status = "failed";
+-		};
+-
+-		i2c1: i2c at 01c2b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c1_pins_a>;
+-			status = "okay";
+-		};
+-
+-		i2c2: i2c at 01c2b400 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c2_pins_a>;
+-			status = "okay";
+-
+-			pcf8563: rtc at 51 {
+-				compatible = "nxp,pcf8563";
+-				reg = <0x51>;
+-			};
+-		};
+-
+-		gmac: ethernet at 01c30000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&gmac_pins_rgmii_a>;
+-			phy = <&phy1>;
+-			phy-mode = "rgmii";
+-			snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>;
+-			snps,reset-active-low;
+-			snps,reset-delays-us = <0 10000 30000>;
+-			status = "okay";
+-
+-			phy1: ethernet-phy at 1 {
+-				reg = <1>;
+-			};
+-		};
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++
++	pcf8563: rtc at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
+ 	};
++};
+ 
+-	reg_usb1_vbus: usb1-vbus {
+-		pinctrl-0 = <&usb1_vbus_pin_a>;
+-		gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>; /* PH24 */
+-		status = "okay";
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 30000>;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
+ 	};
+ };
++
++&reg_usb1_vbus {
++	gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>; /* PH24 */
++	status = "okay";
++};
+-- 
+2.1.4
