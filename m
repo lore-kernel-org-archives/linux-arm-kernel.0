@@ -1,38 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 Jan 2015 09:38:23 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 CCF Updates for v3.20
-In-Reply-To: <20150112223415.GJ22090@quad.lixom.net>
-References: <cover.1419809955.git.horms+renesas@verge.net.au>
- <20150112223415.GJ22090@quad.lixom.net>
-Message-ID: <20150113003823.GC27284@verge.net.au>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Mon, 12 Jan 2015 16:41:58 -0800
+Subject: [PATCH RESEND] reset: sunxi: fix spinlock initialization
+In-Reply-To: <20150112221325.GE22090@quad.lixom.net>
+References: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
+ <20150112161706.GO4891@lukather>
+ <20150112221325.GE22090@quad.lixom.net>
+Message-ID: <CANMBJr7aRwRjALLuVRYKMdD9AjTYnK5a6r4NAr+dqgG7H3dv9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 02:34:15PM -0800, Olof Johansson wrote:
-> On Mon, Dec 29, 2014 at 10:46:58AM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM based SoC sh73a0 CCF updates for v3.20.
-> > 
-> > 
-> > The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-> > 
-> >   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-ccf-for-v3.20
-> > 
-> > for you to fetch changes up to 09bd745b555c262d1e2c851777317f3adf3cf3d4:
-> > 
-> >   ARM: shmobile: sh73a0: disable legacy clock initialization (2014-12-21 17:09:25 +0900)
-> 
-> This could really have been sliced slightly differently with the drivers/clk
-> change going in a drivers branch, but that might be a bit too messy given that
-> this is better done as a mostly-atomic switch over.
-> 
-> I've merged this into next/drivers as a whole now. Please be careful with
-> conflicts against this branch with other new additions this cycle.
+On 12 January 2015 at 14:13, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Jan 12, 2015 at 05:17:06PM +0100, Maxime Ripard wrote:
+>> On Mon, Jan 12, 2015 at 07:54:46AM -0800, Tyler Baker wrote:
+>> > Call spin_lock_init() before the spinlocks are used, both in early init
+>> > and probe functions preventing a lockdep splat.
+>> >
+>> > I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+>> > when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+>> > and has been tested on a few other sunxi platforms without issue.
+>> >
+>> > [1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+>> > [2] http://kernelci.org/boot/?a80-optimus
+>> >
+>> > Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>> > Cc: <stable@vger.kernel.org>
+>>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Not entirely sure what to do with this one. You sent it to:arm at kernel.org, but
+> it should probably have gone to Philipp?
 
-Thanks. The motivation for this branch arrangement was indeed
-the atomic switch over.
+Apologies, that was my copy and paste error.
+
+>
+> We can pick it up with an ack from him though, no problem.
+
+Philipp is on CC so I'll let him decide, otherwise I can resend if needed.
+
+>
+>
+> -Olof
+
+Sorry for any confusion.
+
+-- 
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
