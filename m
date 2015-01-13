@@ -1,45 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Jan 2015 15:25:11 +0100
-Subject: [PATCH] usb: phy: mv-usb: fix usb_phy build errors
-Message-ID: <1707713.rDByqtApOc@wuerfel>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 13 Jan 2015 22:26:44 +0800
+Subject: [GIT PULL] CSR atlas7 init dts for 3.20
+In-Reply-To: <CAGsJ_4x35UqL65_NYzdTp=YOu5mUuSxHaVEXG6ArsKfvQEqOAw@mail.gmail.com>
+References: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
+ <20150113021347.GD28758@quad.lixom.net>
+ <CAGsJ_4x35UqL65_NYzdTp=YOu5mUuSxHaVEXG6ArsKfvQEqOAw@mail.gmail.com>
+Message-ID: <CAGsJ_4yKaKRTAdA8RthPo5dEBBoy6dp5Xf-P9+A4Omo+eOL=Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver was recently adapted to a core API change, but the
-change was incomplete, missing out the suspend helper and
-leaving an extraneous local variable around:
+2015-01-13 10:22 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+> 2015-01-13 10:13 GMT+08:00 Olof Johansson <olof@lixom.net>:
+>> On Sun, Jan 11, 2015 at 10:51:40PM +0800, Barry Song wrote:
+>>> Hi Arnd, Kevin, Olof,
+>>>
+>>> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
+>>>
+>>>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+>>>
+>>> for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
+>>>
+>>>   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
+>>>
+>>> ----------------------------------------------------------------
+>>> drop marco and add init dts for atlas7
+>>>
+>>> marco chip has been dropped and the new replacement is atlas7.
+>>> so, drop marco dts, and add dts for atlas7.
+>>
+>> Hi,
+>>
+>> Can you please elaborate a bit. Was marco never shipped to customers
+>> that could be interested in mainline support, and atlas7 is a replacement
+>> SoC that is in development or has shipped?
+>>
+>
+> marco never shipped to customers that could be interested in mainline support.
+> atlas7 is a replacement SoC that is in development.
+>
+> do you mean i need to put this into tag log?
 
-usb/phy/phy-mv-usb.c: In function 'mv_otg_update_state':
-usb/phy/phy-mv-usb.c:341:18: warning: unused variable 'phy' [-Wunused-variable]
+Hi Olof, i did a refine for this tag according to your suggestion, see:
+https://git.kernel.org/cgit/linux/kernel/git/baohua/linux.git/tag/?id=atlas7-init-dts-for-3.20
 
-usb/phy/phy-mv-usb.c: In function 'mv_otg_suspend':
-usb/phy/phy-mv-usb.c:861:16: error: 'struct usb_phy' has no member named 'state'
+>
+>>
+>> Thanks,
+>>
+>> -Olof
+>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e47d92545c297 ("usb: move the OTG state from the USB PHY to the OTG structure")
----
-diff --git a/drivers/usb/phy/phy-mv-usb.c b/drivers/usb/phy/phy-mv-usb.c
-index 699e38c73d82..697a741a0cb1 100644
---- a/drivers/usb/phy/phy-mv-usb.c
-+++ b/drivers/usb/phy/phy-mv-usb.c
-@@ -338,7 +338,6 @@ static void mv_otg_update_inputs(struct mv_otg *mvotg)
- static void mv_otg_update_state(struct mv_otg *mvotg)
- {
- 	struct mv_otg_ctrl *otg_ctrl = &mvotg->otg_ctrl;
--	struct usb_phy *phy = &mvotg->phy;
- 	int old_state = mvotg->phy.otg->state;
- 
- 	switch (old_state) {
-@@ -858,10 +857,10 @@ static int mv_otg_suspend(struct platform_device *pdev, pm_message_t state)
- {
- 	struct mv_otg *mvotg = platform_get_drvdata(pdev);
- 
--	if (mvotg->phy.state != OTG_STATE_B_IDLE) {
-+	if (mvotg->phy.otg->state != OTG_STATE_B_IDLE) {
- 		dev_info(&pdev->dev,
- 			 "OTG state is not B_IDLE, it is %d!\n",
--			 mvotg->phy.state);
-+			 mvotg->phy.otg->state);
- 		return -EAGAIN;
- 	}
- 
+-barry
