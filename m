@@ -1,27 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 13 Jan 2015 21:28:28 +0530
-Subject: [PATCH 06/28] dma: drop owner assignment from platform_drivers
-In-Reply-To: <20141231102350.GB1461@katana>
-References: <1419196495-9626-1-git-send-email-wsa@the-dreams.de>
- <1419196495-9626-7-git-send-email-wsa@the-dreams.de>
- <20141222153822.GP16827@intel.com> <20141231102350.GB1461@katana>
-Message-ID: <20150113155828.GB14630@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Jan 2015 07:56:35 -0800
+Subject: [PATCH v4 3/3] arm: dts: omap3-gta04: Add handling for tv output
+In-Reply-To: <54B4EF43.50300@ti.com>
+References: <1417642402-20538-1-git-send-email-marek@goldelico.com>
+ <1417642402-20538-4-git-send-email-marek@goldelico.com>
+ <54B4EF43.50300@ti.com>
+Message-ID: <20150113155634.GD2419@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 31, 2014 at 11:23:50AM +0100, Wolfram Sang wrote:
-> On Mon, Dec 22, 2014 at 09:08:22PM +0530, Vinod Koul wrote:
-> > On Sun, Dec 21, 2014 at 10:14:27PM +0100, Wolfram Sang wrote:
-> > > This platform_driver does not need to set an owner, it will be populated by the
-> > > driver core.
-> > > 
-> > After susbstem name if fixed
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [150113 02:14]:
+> On 03/12/14 23:33, Marek Belisko wrote:
+> > Add handling for gta04 tv out chain:
+> > venc -> opa362 -> svideo
 > > 
-> > Acked-by: Vinod Koul <vinod.koul@intel.com>
+> > Use invert-polarity in venc node because opa362
+> > is doing polarity inversion also.
+> > 
+> > Signed-off-by: Marek Belisko <marek@goldelico.com>
+> > ---
+> >  arch/arm/boot/dts/omap3-gta04.dtsi | 49 ++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 49 insertions(+)
 > 
-> Since I'd prefer this to go via your tree, can you fix it or shall I
-> resend?
-Sorry I don't have this patch, would you mind resending
+> Looks fine to me.
+> 
+> Tony, do you want to pick this up? I can take the first two patches via
+> fbdev.
 
--- 
-~Vinod
+OK will pick the dtsi change.
+
+Thanks,
+
+Tony
