@@ -1,46 +1,50 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 13 Jan 2015 12:35:38 +0100
-Subject: [PATCH v5 2/2] i2c: cadence: Check for errata condition
- involving master receive
-In-Reply-To: <1418357907-4215-3-git-send-email-harinik@xilinx.com>
-References: <1418357907-4215-1-git-send-email-harinik@xilinx.com>
- <1418357907-4215-3-git-send-email-harinik@xilinx.com>
-Message-ID: <20150113113538.GB7660@katana>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 13 Jan 2015 16:57:40 +0530
+Subject: [PATCH 1/3] clk: samsung: exynos7: add gate clock for DMA block
+In-Reply-To: <1421148462-11755-1-git-send-email-padma.v@samsung.com>
+References: <1421148462-11755-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1421148462-11755-2-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @@ -541,6 +541,18 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
->  	 * processed with a repeated start.
->  	 */
->  	if (num > 1) {
-> +		/*
-> +		 * This controller does not give completion interrupt after a
-> +		 * master receive transfer if HOLD bit is set (repeated start),
-> +		 * resulting in SW timeout. Hence, if a receive transfer is
-> +		 * followed by any other transfer, an error is returned
-> +		 * indicating that this sequence is not supported.
-> +		 */
-> +		for (count = 0; count < num-1; count++) {
-> +			if (msgs[count].flags & I2C_M_RD)
-> +				dev_warn(adap->dev.parent, "No support for repeated start when receive is followed by a transfer\n");
-> +				return -EOPNOTSUPP;
-> +		}
->  		id->bus_hold_flag = 1;
->  		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
->  		reg |= CDNS_I2C_CR_HOLD;
+Add support for PDMA0 and PDMA1 gate clks.
 
-Have you ever tested this code? There is a huge bug in it :(
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos7.c       |    4 ++++
+ include/dt-bindings/clock/exynos7-clk.h |    4 +++-
+ 2 files changed, 7 insertions(+), 1 deletions(-)
 
-Also, in the comment, use "message" instead of "transfer". One transfer
-consists of multiple messages.
-
-Maybe the warning can be simplified, too: "can't do repeated start after
-read messages".
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/0c9bc59e/attachment-0001.sig>
+diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
+index 945f41c..d01d766 100644
+--- a/drivers/clk/samsung/clk-exynos7.c
++++ b/drivers/clk/samsung/clk-exynos7.c
+@@ -722,6 +722,10 @@ static struct samsung_gate_clock fsys0_gate_clks[] __initdata = {
+ 	GATE(ACLK_AXIUS_USBDRD30X_FSYS0X, "aclk_axius_usbdrd30x_fsys0x",
+ 		"mout_aclk_fsys0_200_user",
+ 		ENABLE_ACLK_FSYS00, 19, 0, 0),
++	GATE(ACLK_PDMA1, "aclk_pdma1", "mout_aclk_fsys0_200_user",
++			ENABLE_ACLK_FSYS00, 3, 0, 0),
++	GATE(ACLK_PDMA0, "aclk_pdma0", "mout_aclk_fsys0_200_user",
++			ENABLE_ACLK_FSYS00, 4, 0, 0),
+ 
+ 	GATE(ACLK_USBDRD300, "aclk_usbdrd300", "mout_aclk_fsys0_200_user",
+ 		ENABLE_ACLK_FSYS01, 29, 0, 0),
+diff --git a/include/dt-bindings/clock/exynos7-clk.h b/include/dt-bindings/clock/exynos7-clk.h
+index e33d0ca..05e2a47 100644
+--- a/include/dt-bindings/clock/exynos7-clk.h
++++ b/include/dt-bindings/clock/exynos7-clk.h
+@@ -91,7 +91,9 @@
+ #define PHYCLK_USBDRD300_UDRD30_PIPE_PCLK_USER		6
+ #define PHYCLK_USBDRD300_UDRD30_PHYCLK_USER		7
+ #define OSCCLK_PHY_CLKOUT_USB30_PHY		8
+-#define FSYS0_NR_CLK			9
++#define ACLK_PDMA0			9
++#define ACLK_PDMA1			10
++#define FSYS0_NR_CLK			11
+ 
+ /* FSYS1 */
+ #define ACLK_MMC1			1
+-- 
+1.7.4.4
