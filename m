@@ -1,31 +1,39 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 14 Jan 2015 07:29:52 +1100
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-In-Reply-To: <3097971.rZTsHKr4DO@wuerfel>
-References: <20150113111636.7bc5785c@canb.auug.org.au>
- <3097971.rZTsHKr4DO@wuerfel>
-Message-ID: <20150114072952.0e0546d1@canb.auug.org.au>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 13 Jan 2015 15:38:02 -0500
+Subject: [PATCH] dma-mapping: limit dma_mask in arch_setup_dma_ops()
+In-Reply-To: <1419458139-4034-1-git-send-email-m-karicheri2@ti.com>
+References: <1419458139-4034-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <54B5822A.8050506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Tue, 13 Jan 2015 14:18:32 +0100 Arnd Bergmann <arnd@arndb.de> wrote:
+On 12/24/2014 04:55 PM, Murali Karicheri wrote:
+> dma_mask should be limited to minimum of the default dma mask
+> and dma-range size configured in DT for proper operation.
 >
-> There is an extraneous '\' character behind imx6sx-sdb.dtb now, which caused
-> build errors for me. We should soon be able to merge the other branches into
-> arm-soc to avoid the entire set of merge conflicts, until then please
-> change your recorded resolution to avoid the build error.
+> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+> Reviewed-by: Arnd Bergmann<arnd@arndb.de>
+> ---
+>   arch/arm/mm/dma-mapping.c |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7864797..5cea1fc 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -2053,6 +2053,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   {
+>   	struct dma_map_ops *dma_ops;
+>
+> +	*dev->dma_mask = min((*dev->dma_mask), (dma_base + size - 1));
+>   	dev->archdata.dma_coherent = coherent;
+>   	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+>   		dma_ops = arm_get_iommu_dma_map_ops(coherent);
+Please discard this as this is still a work in progress. Any change if 
+required will be added to my series with subject "PCI: get DMA 
+configuration from parent device"
 
-Oops, sorry about that. Fixed.
-
+Thanks.
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/68eb7dff/attachment.sig>
+Murali Karicheri
+Linux Kernel, Texas Instruments
