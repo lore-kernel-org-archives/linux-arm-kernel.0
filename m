@@ -1,59 +1,43 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 13 Jan 2015 13:36:21 +0800
-Subject: [alsa-devel] [PATCH] ASoC: wm8904: fix runtime warning
-In-Reply-To: <54B3943C.4040103@metafoo.de>
-References: <1420793620-2866-1-git-send-email-voice.shen@atmel.com>
- <20150109111642.GU14516@opensource.wolfsonmicro.com>
- <54B34035.60107@atmel.com> <54B3943C.4040103@metafoo.de>
-Message-ID: <54B4AED5.1000001@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Jan 2015 07:09:20 +0100
+Subject: [PATCH v3 14/21] ARM: imx6: convert GPC to stacked domains
+In-Reply-To: <1421087187-26988-15-git-send-email-marc.zyngier@arm.com>
+References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
+ <1421087187-26988-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CACRpkdYHnBtP39xpEkjdibpijGip0Y3+YLvEA8KUGfentKbZ9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars-Perter Clausen,
+On Mon, Jan 12, 2015 at 7:26 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-On 01/12/2015 05:30 PM, Lars-Peter Clausen wrote:
-> On 01/12/2015 04:32 AM, Bo Shen wrote:
-> [...]
->>>> diff --git a/sound/soc/codecs/wm8904.c b/sound/soc/codecs/wm8904.c
->>>> index 4d2d2b1..38582d7 100644
->>>> --- a/sound/soc/codecs/wm8904.c
->>>> +++ b/sound/soc/codecs/wm8904.c
->>>> @@ -1076,10 +1076,10 @@ static const struct snd_soc_dapm_route
->>>> adc_intercon[] = {
->>>>       { "Right Capture PGA", NULL, "Right Capture Mux" },
->>>>       { "Right Capture PGA", NULL, "Right Capture Inverting Mux" },
->>>>
->>>> -    { "AIFOUTL", "Left",  "ADCL" },
->>>> -    { "AIFOUTL", "Right", "ADCR" },
->>>> -    { "AIFOUTR", "Left",  "ADCL" },
->>>> -    { "AIFOUTR", "Right", "ADCR" },
->>>> +    { "AIFOUTL", NULL, "ADCL" },
->>>> +    { "AIFOUTL", NULL, "ADCR" },
->>>> +    { "AIFOUTR", NULL, "ADCL" },
->>>> +    { "AIFOUTR", NULL, "ADCR" },
->>>
->>> Is this the right fix here? I am not super familiar with the
->>> driver but it appears to contain an "AIFOUTL Mux" control which
->>> is not connected to anything. Looks like maybe this is a mistake
->>> the mux is indeded to be included in the path? Feels like we
->>> should either remove the control as well or hook it into the
->>> path.
->>
->> Thank for your information.
->> I think here it should correct the path name as
->> --->8---
->> { "AIFOUTL Mux", "Left",  "ADCL" },
->> { "AIFOUTL Mux", "Right", "ADCR" },
->> { "AIFOUTR Mux", "Left",  "ADCL" },
->> { "AIFOUTR Mux", "Right", "ADCR" },
->> ---8<---
->>
->> Thanks again. I will send out the new version.
+> IMX6 has been (ab)using the gic_arch_extn to provide
+> wakeup from suspend, and it makes a lot of sense to convert
+> this code to use stacked domains instead.
 >
-> Your probably also need to connect the mux to the output pins.
+> This patch does just this, updating the DT files to actually
+> reflect what the HW provides.
+>
+> BIG FAT WARNING: because the DTs were so far lying by not
+> exposing the fact that the GPC block is actually the first
+> interrupt controller in the chain, kernels with this patch
+> applied wont have any suspend-resume facility when booted
+> with old DTs, and old kernels with updated DTs won't even boot.
+>
+> Tested-by: Stefan Agner <stefan@agner.ch>
+> Acked-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks for you information, after check the datasheet, I still don't 
-know which the mux should connect to which output pins.
+(...)
 
-Best Regards,
-Bo Shen
+> +static int imx_gpc_domain_alloc(struct irq_domain *domain,
+> +                                 unsigned int virq,
+
+Nutcase nitpick on this nice patch series: every time I see "virq" my
+OCD triggers, as I think the "v" in "virq" stand for virtual. These irqs
+are no more virtual than any other Linux irq numbers, hwirq is
+more to the point.
+
+I just refer to these as "irq" (sans "v") in any code I write.
+
+Yours,
+Linus Walleij
