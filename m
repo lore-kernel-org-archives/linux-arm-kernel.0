@@ -1,108 +1,385 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 13 Jan 2015 17:11:27 +0800
-Subject: [PATCH net-next v12 0/3] add hisilicon hip04 ethernet driver
-Message-ID: <1421140290-5492-1-git-send-email-dingtianhong@huawei.com>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Tue, 13 Jan 2015 10:20:37 +0100
+Subject: [RFC PATCH v2 1/4] tty: serial_mctrl_gpio: Add irqs helpers for
+ input lines
+In-Reply-To: <20150113080356.GF22880@pengutronix.de>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+ <20150113080356.GF22880@pengutronix.de>
+Message-ID: <54B4E365.4020001@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v12:
-- According Alex's suggestion, modify the changelog and add MODULE_DEVICE_TABLE
-  for hip04 ethernet.
+Hello Uwe.
 
-v11:
-- Add ethtool support for tx coalecse getting and setting, the xmit_more
-  is not supported for this patch, but I think it could work for hip04,
-  will support it later after some tests for performance better.
+W dniu 2015-01-13 o 09:03, Uwe Kleine-K?nig pisze:
+> On Sat, Jan 10, 2015 at 03:32:43PM +0100, Janusz Uzycki wrote:
+>> A driver using mctrl_gpio called gpiod_get_direction() to check if
+>> gpio is input line. However .get_direction callback is not available
+>> for all platforms. The patch allows to avoid the function.
+>> The patch introduces the following helpers:
+>> - mctrl_gpio_request_irqs
+>> - mctrl_gpio_free_irqs
+>> - mctrl_gpio_enable_ms
+>> - mctrl_gpio_disable_ms
+>> They allow to:
+>> - simplify drivers which use mctrl_gpio
+>> - hide irq table in mctrl_gpio
+>> - use default irq handler for gpios
+>> - better separate code for gpio modem lines from uart's code
+>> In addition mctrl_gpio_init() has been renamed to mctrl_gpio_init_dt()
+> Note that this breaks the drivers that are already using
+> mctrl_gpio_init. This is fixed up in the follow up patches, but still
+> you break bisection.
 
-  Here are some performance test results by ping and iperf(add tx_coalesce_frames/users),
-  it looks that the performance and latency is more better by tx_coalesce_frames/usecs.
+Could you give me more details about "break bisection" problem and how 
+to correct it?
+I've decided to change the name in the same patch as parameter has been 
+also changed.
 
-  - Before:
-    $ ping 192.168.1.1 ...
-    === 192.168.1.1 ping statistics ===
-    24 packets transmitted, 24 received, 0% packet loss, time 22999ms
-    rtt min/avg/max/mdev = 0.180/0.202/0.403/0.043 ms
 
-    $ iperf -c 192.168.1.1 ...
-    [ ID] Interval       Transfer     Bandwidth
-    [  3]  0.0- 1.0 sec   115 MBytes   945 Mbits/sec
+>> to focus DT usage. Also mctrl_gpio_init_dt() initializes irq table for
+>> gpios now and passes struct uart_port into struct mctrl_gpios.
+>> This resulted in changed mctrl_gpio_init_dt() parameter.
+>> It also requires port->dev is set before the function is called.
+>>
+>> There were also fixed:
+>> - irq = 0 means invalid/unused (-EINVAL no more used)
+>> - mctrl_gpio_request_irqs() doesn't use negative enum value
+>>    if request_irq() failed. It just calls mctrl_gpio_free_irqs().
+>>
+>> The mctrl_gpio_is_gpio() inline function is under discussion
+>> and likely it can replace exported mctrl_gpio_to_gpiod() function.
 
-  - After:
-    $ ping 192.168.1.1 ...
-    === 192.168.1.1 ping statistics ===
-    24 packets transmitted, 24 received, 0% packet loss, time 22999ms
-    rtt min/avg/max/mdev = 0.178/0.190/0.380/0.041 ms
+What do you think about? mctrl_gpio_to_gpiod() could be removed.
 
-    $ iperf -c 192.168.1.1 ...
-    [ ID] Interval       Transfer     Bandwidth
-    [  3]  0.0- 1.0 sec   115 MBytes   965 Mbits/sec
+>>
+>> IRQ_NOAUTOEN setting and request_irq() order was not commented
+>> but it looks right according to other drivers.
+> I suggest to add a comment for that. Something like:
+>
+> 	/*
+> 	 * XXX: This is not undone in the error path. To be fixed
+> 	 * properly this needs to be set atomically together with
+> 	 * request_irq.
+> 	 */
 
-v10:
-- According Arnd's suggestion, remove the skb_orphan and use the hrtimer
-  for the cleanup of the TX queue and add some modification for the hip04
-  drivers.
-  1) drop the broken skb_orphan call
-  2) drop the workqueue
-  3) batch cleanup based on tx_coalesce_frames/usecs for better throughput
-  4) use a reasonable default tx timeout (200us, could be shorted
-     based on measurements) with a range timer
-  5) fix napi poll function return value
-  6) use a lockless queue for cleanup
+OK. What does XXX mean?
+Since v1 I've seen more drivers set the flag but I didn't find any 
+comment about.
 
-v9:
-- There is no tx completion interrupts to free DMAd Tx packets, it means taht
-  we rely on new tx packets arriving to run the destructors of completed packets,
-  which open up space in their sockets's send queues. Sometimes we don't get such
-  new packets causing Tx to stall, a single UDP transmitter is a good example of
-  this situation, so we need a clean up workqueue to reclaims completed packets,
-  the workqueue will only free the last packets which is already stay for several jiffies.
-  Also fix some format cleanups.
+>   
+>> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+> There is no binding documentation for mctrl. This should be fixed, too.
 
-v8:
-- Use poll to reclaim xmitted buffer as workaround since no tx done interrupt 
+The bindings are added to atmel_serial and mxs-auart drivers because 
+they use mctrl.
+Is it possible to improve bindings and how?
 
-v7:
-- Remove select NET_CORE in 0002
+>
+>> ---
+>>
+>> The patch requires to update the drivers which use mctrl_gpio:
+>> - atmel_serial
+>> - mxs-auart
+>> - clps711x
+>>
+>> Changes since RFC v1:
+>>   - patch renamed from:
+>>     ("serial: mctrl-gpio: Add irqs helpers for input lines")
+>>     to:
+>>     ("tty: serial_mctrl_gpio: Add irqs helpers for input lines")
+>>   - mctrl_gpio_request_irqs: changed mctrl_gpio_free_irqs() and
+>>     dev_err() order to make debug easier
+>>   - added patches for atmel_serial and clps711x serial drivers
+>>
+>> The patch applies to next (3.19.0-rc2) and was tested with mxs-auart
+>> using kernel 3.14 and 3.18. It wasn't tested on the next (only compiled).
+>>
+>> The patchset delivers patches for mxs-auart, atmel_serial and clps711x.
+>> atmel_serial and clps711x were not tested - only compile tests were done.
+>>
+>> ---
+>>   drivers/tty/serial/serial_mctrl_gpio.c | 109 ++++++++++++++++++++++++++++++++-
+>>   drivers/tty/serial/serial_mctrl_gpio.h |  59 +++++++++++++++++-
+>>   2 files changed, 163 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+>> index a38596c..215b15c 100644
+>> --- a/drivers/tty/serial/serial_mctrl_gpio.c
+>> +++ b/drivers/tty/serial/serial_mctrl_gpio.c
+>> @@ -19,11 +19,15 @@
+>>   #include <linux/device.h>
+>>   #include <linux/gpio/consumer.h>
+>>   #include <linux/termios.h>
+>> +#include <linux/irq.h>
+>>   
+>>   #include "serial_mctrl_gpio.h"
+>>   
+>>   struct mctrl_gpios {
+>> +	struct uart_port *port;
+>>   	struct gpio_desc *gpio[UART_GPIO_MAX];
+>> +	int irq[UART_GPIO_MAX];
+>> +	unsigned int mctrl_prev;
+>>   };
+>>   
+>>   static const struct {
+>> @@ -72,6 +76,12 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>>   }
+>>   EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+>>   
+>> +inline
+>> +bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx gidx)
+>> +{
+>> +	return !IS_ERR_OR_NULL(gpios->gpio[gidx]);
+>> +}
+>> +
+>>   unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+>>   {
+>>   	enum mctrl_gpio_idx i;
+>> @@ -96,8 +106,9 @@ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+>>   }
+>>   EXPORT_SYMBOL_GPL(mctrl_gpio_get);
+>>   
+>> -struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>> +struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx)
+>>   {
+>> +	struct device *dev = port->dev;
+>>   	struct mctrl_gpios *gpios;
+>>   	enum mctrl_gpio_idx i;
+>>   	int err;
+>> @@ -106,6 +117,7 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>>   	if (!gpios)
+>>   		return ERR_PTR(-ENOMEM);
+>>   
+>> +	gpios->port = port;
+>>   	for (i = 0; i < UART_GPIO_MAX; i++) {
+>>   		gpios->gpio[i] = devm_gpiod_get_index(dev,
+>>   						      mctrl_gpios_desc[i].name,
+>> @@ -128,11 +140,13 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>>   			devm_gpiod_put(dev, gpios->gpio[i]);
+>>   			gpios->gpio[i] = NULL;
+>>   		}
+>> +		if (gpios->gpio[i] && !mctrl_gpios_desc[i].dir_out)
+>> +			gpios->irq[i] = gpiod_to_irq(gpios->gpio[i]);
+>>   	}
+>>   
+>>   	return gpios;
+>>   }
+>> -EXPORT_SYMBOL_GPL(mctrl_gpio_init);
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_init_dt);
+>>   
+>>   void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>>   {
+>> @@ -147,3 +161,94 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>>   	devm_kfree(dev, gpios);
+>>   }
+>>   EXPORT_SYMBOL_GPL(mctrl_gpio_free);
+>> +
+>> +/*
+>> + * Dealing with GPIO interrupt
+>> + */
+>> +#define MCTRL_ANY_DELTA        (TIOCM_RI | TIOCM_DSR | TIOCM_CD | TIOCM_CTS)
+>> +static irqreturn_t mctrl_gpio_irq_handle(int irq, void *context)
+>> +{
+>> +	struct mctrl_gpios *gpios = context;
+>> +	struct uart_port *port = gpios->port;
+>> +	u32 mctrl = gpios->mctrl_prev;
+>> +	u32 mctrl_diff;
+>> +
+>> +	mctrl_gpio_get(gpios, &mctrl);
+>> +
+>> +	mctrl_diff = mctrl ^ gpios->mctrl_prev;
+>> +	gpios->mctrl_prev = mctrl;
+>> +	if (mctrl_diff & MCTRL_ANY_DELTA && port->state != NULL) {
+>> +		if (mctrl_diff & TIOCM_RI)
+>> +			port->icount.rng++;
+>> +		if (mctrl_diff & TIOCM_DSR)
+>> +			port->icount.dsr++;
+>> +		if (mctrl_diff & TIOCM_CD)
+>> +			uart_handle_dcd_change(port, mctrl & TIOCM_CD);
+>> +		if (mctrl_diff & TIOCM_CTS)
+>> +			uart_handle_cts_change(port, mctrl & TIOCM_CTS);
+>> +
+>> +		wake_up_interruptible(&port->state->port.delta_msr_wait);
+>> +	}
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios)
+>> +{
+>> +	struct uart_port *port = gpios->port;
+>> +	int *irq = gpios->irq;
+>> +	enum mctrl_gpio_idx i;
+>> +	int err = 0;
+>> +
+>> +	for (i = 0; i < UART_GPIO_MAX; i++) {
+>> +		if (irq[i] <= 0)
+>> +			continue;
+>> +
+>> +		irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
+>> +		err = request_irq(irq[i], mctrl_gpio_irq_handle,
+>> +				  IRQ_TYPE_EDGE_BOTH,
+>> +				  dev_name(port->dev), gpios);
+>> +		if (err) {
+>> +			dev_err(port->dev, "%s: Can't get %d irq\n",
+>> +				__func__, irq[i]);
+>> +			mctrl_gpio_free_irqs(gpios);
+>> +			break;
+>> +		}
+>> +	}
+>> +
+>> +	return err;
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_request_irqs);
+>> +
+>> +void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios)
+>> +{
+>> +	enum mctrl_gpio_idx i;
+>> +
+>> +	for (i = 0; i < UART_GPIO_MAX; i++)
+>> +		if (gpios->irq[i] > 0)
+>> +			free_irq(gpios->irq[i], gpios);
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_free_irqs);
+>> +
+>> +void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
+>> +{
+>> +	enum mctrl_gpio_idx i;
+>> +
+>> +	/* get initial status of modem lines GPIOs */
+>> +	mctrl_gpio_get(gpios, &gpios->mctrl_prev);
+>> +
+>> +	for (i = 0; i < UART_GPIO_MAX; i++)
+>> +		if (gpios->irq[i] > 0)
+>> +			enable_irq(gpios->irq[i]);
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_enable_ms);
+>> +
+>> +void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+>> +{
+>> +	enum mctrl_gpio_idx i;
+>> +
+>> +	for (i = 0; i < UART_GPIO_MAX; i++)
+>> +		if (gpios->irq[i] > 0)
+>> +			disable_irq(gpios->irq[i]);
+>> +}
+>> +EXPORT_SYMBOL_GPL(mctrl_gpio_disable_ms);
 
-v6:
-- Suggest by Russell: Use netdev_sent_queue & netdev_completed_queue to solve latency issue 
-  Also shorten the period of timer, which is used to wakeup the queue since no
-  tx completed interrupt.
+It looks the functions should check if gpios is not NULL or drivers 
+should fail probe on it.
+Which is the right way?
 
-v5:
-- no big change, fix typo
-
-v4:
-- Modify accoringly to the suggetion from Arnd, Florian, Eric, David
-  Use of_parse_phandle_with_fixed_args & syscon_node_to_regmap get ppe info
-  Add skb_orphan() and tx_timer for reclaim since no tx_finished interrupt
-  Update timeout, and move of_phy_connect to probe to reuse open/stop
-
-v3:
-- Suggest from Arnd, use syscon & regmap_write/read to replace static void __iomem *ppebase.
-  Modify hisilicon-hip04-net.txt accrordingly to suggestion from Florian and Sergei.
-
-v2:
-- Got many suggestions from Russell, Arnd, Florian, Mark and Sergei
-  Remove memcpy, use dma_map/unmap_single, use dma_alloc_coherent rather than dma_pool, etc.
-  Refer property in ethernet.txt, change ppe description, etc.
-
-Ding Tianhong (1):
-  net: hisilicon: new hip04 ethernet driver
-
-Zhangfei Gao (2):
-  Documentation: add Device tree bindings for Hisilicon hip04 ethernet
-  net: hisilicon: new hip04 MDIO driver
-
- .../bindings/net/hisilicon-hip04-net.txt           |  88 ++
- drivers/net/ethernet/hisilicon/Kconfig             |   9 +
- drivers/net/ethernet/hisilicon/Makefile            |   1 +
- drivers/net/ethernet/hisilicon/hip04_eth.c         | 968 +++++++++++++++++++++
- drivers/net/ethernet/hisilicon/hip04_mdio.c        | 186 ++++
- 5 files changed, 1252 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
- create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
- create mode 100644 drivers/net/ethernet/hisilicon/hip04_mdio.c
-
--- 
-1.8.0
+>> diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
+>> index 400ba04..13ba3f4 100644
+>> --- a/drivers/tty/serial/serial_mctrl_gpio.h
+>> +++ b/drivers/tty/serial/serial_mctrl_gpio.h
+>> @@ -21,6 +21,7 @@
+>>   #include <linux/err.h>
+>>   #include <linux/device.h>
+>>   #include <linux/gpio/consumer.h>
+>> +#include <linux/serial_core.h>
+>>   
+>>   enum mctrl_gpio_idx {
+>>   	UART_GPIO_CTS,
+>> @@ -40,6 +41,13 @@ enum mctrl_gpio_idx {
+>>    */
+>>   struct mctrl_gpios;
+>>   
+>> +/*
+>> + * Return true if gidx is GPIO line, otherwise false.
+>> + * It assumes that gpios is allocated and not NULL.
+>> + */
+>> +inline
+>> +bool mctrl_gpio_is_gpio(struct mctrl_gpios *gpios, enum mctrl_gpio_idx gidx);
+>> +
+>>   #ifdef CONFIG_GPIOLIB
+>>   
+>>   /*
+>> @@ -60,12 +68,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>>   				      enum mctrl_gpio_idx gidx);
+>>   
+>>   /*
+>> - * Request and set direction of modem control lines GPIOs.
+>> + * Request and set direction of modem control lines GPIOs. DT is used.
+>> + * Initialize irq table for GPIOs.
+>>    * devm_* functions are used, so there's no need to call mctrl_gpio_free().
+>>    * Returns a pointer to the allocated mctrl structure if ok, -ENOMEM on
+>>    * allocation error.
+>>    */
+>> -struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
+>> +struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx);
+>>   
+>>   /*
+>>    * Free the mctrl_gpios structure.
+>> @@ -74,6 +83,28 @@ struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx);
+>>    */
+>>   void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios);
+>>   
+>> +/*
+>> + * Request irqs for input lines GPIOs. The irqs are set disabled
+>> + * and triggered on both edges.
+>> + * Returns zero if OK, otherwise an error code.
+>> + */
+>> +int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios);
+>> +
+>> +/*
+>> + * Free irqs for input lines GPIOs.
+>> + */
+>> +void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios);
+>> +
+>> +/*
+>> + * Disable modem status interrupts assigned to GPIOs
+>> + */
+>> +void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
+>> +
+>> +/*
+>> + * Enable modem status interrupts assigned to GPIOs
+>> + */
+>> +void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
+>> +
+>>   #else /* GPIOLIB */
+>>   
+>>   static inline
+>> @@ -95,7 +126,7 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>>   }
+>>   
+>>   static inline
+>> -struct mctrl_gpios *mctrl_gpio_init(struct device *dev, unsigned int idx)
+>> +struct mctrl_gpios *mctrl_gpio_init_dt(struct uart_port *port, unsigned int idx)
+>>   {
+>>   	return ERR_PTR(-ENOSYS);
+>>   }
+>> @@ -105,6 +136,28 @@ void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+>>   {
+>>   }
+>>   
+>> +static inline
+>> +int mctrl_gpio_request_irqs(struct mctrl_gpios *gpios)
+>> +{
+>> +	/*return -ENOTSUP;*/
+>> +	return 0;
+>> +}
+>> +
+>> +static inline
+>> +void mctrl_gpio_free_irqs(struct mctrl_gpios *gpios)
+>> +{
+>> +}
+>> +
+>> +static inline
+>> +void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
+>> +{
+>> +}
+>> +
+>> +static inline
+>> +void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+>> +{
+>> +}
+>> +
+>>   #endif /* GPIOLIB */
+>>   
+>>   #endif
+>> -- 
+>> 1.7.11.3
+>>
+>>
