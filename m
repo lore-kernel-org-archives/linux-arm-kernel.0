@@ -1,59 +1,76 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 13 Jan 2015 16:35:26 +0000
-Subject: [RFC PATCH 0/5] irq: Allow irqs to be routed to NMI/FIQ
-Message-ID: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+Date: Tue, 13 Jan 2015 16:35:27 +0000
+Subject: [RFC PATCH 1/5] arm: irq: Add a __nmi_count stat
+In-Reply-To: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+References: <1421166931-14134-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1421166931-14134-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Hi Russell:
-    This RFC is particularly for your attention since it results
-    directly from feedback I've received from both of you, albeit
-    quite a few months ago now.
+Extends the irq statistics for ARM, making it possible to quickly
+observe how many times the default FIQ handler has executed.
 
-This patchset demonstrates using FIQ to improve the quality of the
-PMU trace on ARM systems. To do so it introduces generic changes
-that allow irqs to be routed to NMI.
+In /proc/interrupts we use the NMI terminology (rather than FIQ) because
+the statistic is only likely to be updated when we run the default FIQ
+handler (handle_fiq_as_nmi).
 
-This patchset applies on top of my own patchset:
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ arch/arm/include/asm/hardirq.h | 1 +
+ arch/arm/kernel/irq.c          | 7 ++++++-
+ arch/arm/kernel/traps.c        | 2 ++
+ 3 files changed, 9 insertions(+), 1 deletion(-)
 
-    arm: Implement arch_trigger_all_cpu_backtrace
-    http://thread.gmane.org/gmane.linux.kernel/1864829
-
-I think the important points of this set are clear without reference to
-the previous patchset but the patches will not run (nor apply cleanly)
-without the previous patchset.
-
-Currently these patches strictly honour a request from Russell to avoid
-indirection (notifiers, etc) in the ARM default FIQ handler. I have
-therefore separated the request that an irq be routed to NMI from the
-installation of a handler for it.
-
-Avoiding indirection does raise some problems though, because it means
-we arrive in the PMU code without a context pointer. At present I have
-just added a global variables into the ARM PMU code in order to hold
-information about irq allocations in a form I can safely read from NMI.
-
-
-Daniel Thompson (5):
-  arm: irq: Add a __nmi_count stat
-  irq: Allow interrupts to routed to NMI (or similar)
-  irq: gic: Add support for NMI routing
-  arm: perf: Make v7 support FIQ-safe
-  arm: perf: Use FIQ to handle PMU events.
-
- arch/arm/include/asm/hardirq.h   |  1 +
- arch/arm/include/asm/pmu.h       |  4 +++
- arch/arm/kernel/irq.c            |  7 +++-
- arch/arm/kernel/perf_event.c     |  2 +-
- arch/arm/kernel/perf_event_cpu.c | 35 +++++++++++++++++--
- arch/arm/kernel/perf_event_v7.c  | 11 ++----
- arch/arm/kernel/traps.c          | 15 +++++---
- drivers/irqchip/irq-gic.c        | 75 ++++++++++++++++++++++++++++++----------
- include/linux/interrupt.h        | 20 +++++++++++
- include/linux/irq.h              |  2 ++
- include/linux/irqchip/arm-gic.h  |  8 ++++-
- kernel/irq/manage.c              | 29 ++++++++++++++--
- 12 files changed, 169 insertions(+), 40 deletions(-)
-
---
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 5df33e30ae1b..27ab43b5d7e2 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -9,6 +9,7 @@
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
++	unsigned int __nmi_count;
+ #ifdef CONFIG_SMP
+ 	unsigned int ipi_irqs[NR_IPI];
+ #endif
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index ad857bada96c..6dd1619e0700 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -48,13 +48,18 @@ unsigned long irq_err_count;
+ 
+ int arch_show_interrupts(struct seq_file *p, int prec)
+ {
++	int i;
++
+ #ifdef CONFIG_FIQ
+ 	show_fiq_list(p, prec);
+ #endif
+ #ifdef CONFIG_SMP
+ 	show_ipi_list(p, prec);
+ #endif
+-	seq_printf(p, "%*s: %10lu\n", prec, "Err", irq_err_count);
++	seq_printf(p, "%*s: ", prec, "NMI");
++	for_each_online_cpu(i)
++		seq_printf(p, "%10u ", __get_irq_stat(i, __nmi_count));
++	seq_printf(p, "\n%*s: %10lu\n", prec, "Err", irq_err_count);
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 1836415b8a5c..5645f81ac4cc 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -476,8 +476,10 @@ die_sig:
+  */
+ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
+ {
++	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	__inc_irq_stat(cpu, __nmi_count);
+ 	nmi_enter();
+ 
+ #ifdef CONFIG_ARM_GIC
+-- 
 1.9.3
