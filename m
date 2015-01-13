@@ -1,249 +1,73 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 13 Jan 2015 09:37:48 +0800
-Subject: [PATCH 4/6] ARM: at91/dt: add SRAM nodes
-In-Reply-To: <1421089317-12607-5-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421089317-12607-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421089317-12607-5-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B476EC.3090207@atmel.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 13 Jan 2015 10:41:02 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Correct SDHI base address,
+ clock labels and output-names
+Message-ID: <1421113262-19433-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+* Correct base address of SD3 div6 clk.
+* Update div6 labels and MSTP output names
+  There appears to have been some inconsistency and confusion here as on
+  the r8a7790 these clocks are referred to as SD(HI)1 and SD(HI)2 while on
+  the r8a7791 and r8a7794 they are referred to as SD(HI)2 and SD(HI)3.
 
-On 01/13/2015 03:01 AM, Alexandre Belloni wrote:
-> Add nodes for the SRAM available on atmel SoCs
->
-> Remove leftover TODOs in the sam9g45 file
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   arch/arm/boot/dts/at91rm9200.dtsi  |  5 +++++
->   arch/arm/boot/dts/at91sam9260.dtsi |  5 +++++
->   arch/arm/boot/dts/at91sam9261.dtsi |  5 +++++
->   arch/arm/boot/dts/at91sam9263.dtsi | 10 ++++++++++
->   arch/arm/boot/dts/at91sam9g20.dtsi |  9 +++++++++
->   arch/arm/boot/dts/at91sam9g45.dtsi |  7 +++++--
->   arch/arm/boot/dts/at91sam9n12.dtsi |  5 +++++
->   arch/arm/boot/dts/at91sam9rl.dtsi  |  5 +++++
->   arch/arm/boot/dts/at91sam9x5.dtsi  |  5 +++++
->   arch/arm/boot/dts/sama5d3.dtsi     |  5 +++++
->   arch/arm/boot/dts/sama5d4.dtsi     |  5 +++++
->   11 files changed, 64 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-> index f449a864b81e..21c2b504f977 100644
-> --- a/arch/arm/boot/dts/at91rm9200.dtsi
-> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
-> @@ -66,6 +66,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00200000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00200000 0x4000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index dd1313cbc314..6f52cb2eacd8 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -69,6 +69,11 @@
->   		};
->   	};
->
-> +	sram0: sram at 002ff000 {
+This has no run-time affect as the clock nodes are not currently used.
 
-Why here is 002ff000, while not 00200000?
+Fixes: 8e181633e6ca96049 ("ARM: shmobile: r8a7794: Add SDHI clocks to device tree")
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-> +		compatible = "mmio-sram";
-> +		reg = <0x00200000 0x2000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-> index cdb9ed612109..e247b0b5fdab 100644
-> --- a/arch/arm/boot/dts/at91sam9261.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
-> @@ -60,6 +60,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x28000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index ef8a70c27439..8a210d5033b1 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -62,6 +62,16 @@
->   		};
->   	};
->
-> +	sram0: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x14000>;
-> +	};
-> +
-> +	sram1: sram at 00500000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x4000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index a50ee587a7af..9012fe9d7758 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -16,6 +16,15 @@
->   		reg = <0x20000000 0x08000000>;
->   	};
->
-> +	sram0: sram at 002ff000 {
+---
+* A similar change to update the div6 clock node names and labels,
+  and the MSTP clock output-names is required for the r8a7791.
+  The base addresses appear to be correct there.
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Why here is 002ff000, while not 00200000?
-
-> +		status = "disabled";
-
-Btw, why it needs set to disabled.
-
-> +	};
-> +
-> +	sram1: sram at 002fc000 {
-
-Why here is 002fc000, while not 00300000? And length is on 0x4000.
-
-> +		compatible = "mmio-sram";
-> +		reg = <0x00200000 0x8000>;
-> +	};
-> +
->   	ahb {
->   		apb {
->   			i2c0: i2c at fffac000 {
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 2a8da8a884b4..ee80aa9c0759 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -74,6 +74,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x10000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> @@ -1287,7 +1292,6 @@
->   			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->   			reg = <0x00700000 0x100000>;
->   			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-> -			//TODO
->   			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
->   			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
->   			status = "disabled";
-> @@ -1297,7 +1301,6 @@
->   			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
->   			reg = <0x00800000 0x100000>;
->   			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-> -			//TODO
->   			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
->   			clock-names = "usb_clk", "ehci_clk", "hclk", "uhpck";
->   			status = "disabled";
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index a7218bcc6a25..6ea7ee3b8ff8 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -64,6 +64,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x8000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-> index 72424371413e..c055da2f151f 100644
-> --- a/arch/arm/boot/dts/at91sam9rl.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-> @@ -70,6 +70,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x4000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index bbb3ba65165f..818dabdd8c0e 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -72,6 +72,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x8000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index d701ddda0e00..e17614fe58a9 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -78,6 +78,11 @@
->   		};
->   	};
->
-> +	sram: sram at 00300000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00300000 0x20000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index 0a2477fe5525..1b4fe4e19721 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -103,6 +103,11 @@
->   		};
->   	};
->
-> +	ns_sram: sram at 00210000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00210000 0x10000>;
-> +	};
-> +
->   	ahb {
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
->
-
-Best Regards,
-Bo Shen
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 8f78da5..b98534e 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -294,16 +294,16 @@
+ 					     "lb", "qspi", "sdh", "sd0", "z";
+ 		};
+ 		/* Variable factor clocks */
+-		sd1_clk: sd2_clk at e6150078 {
++		sd2_clk: sd2_clk at e6150078 {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150078 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd1";
+ 		};
+-		sd2_clk: sd3_clk at e615007c {
++		sd3_clk: sd3_clk at e615026c {
+ 			compatible = "renesas,r8a7794-div6-clock", "renesas,cpg-div6-clock";
+-			reg = <0 0xe615007c 0 4>;
++			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sd2";
+@@ -518,7 +518,7 @@
+ 		mstp3_clks: mstp3_clks at e615013c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
+-			clocks = <&sd2_clk>, <&sd1_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
++			clocks = <&sd3_clk>, <&sd2_clk>, <&cpg_clocks R8A7794_CLK_SD0>,
+ 			         <&mmc0_clk>, <&rclk_clk>, <&hp_clk>, <&hp_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+@@ -527,7 +527,7 @@
+ 				R8A7794_CLK_USBDMAC0 R8A7794_CLK_USBDMAC1
+ 			>;
+ 			clock-output-names =
+-			        "sdhi2", "sdhi1", "sdhi0",
++			        "sdhi3", "sdhi2", "sdhi0",
+ 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
+ 		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+-- 
+2.1.4
