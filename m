@@ -1,74 +1,63 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 13 Jan 2015 09:37:27 +0800
-Subject: [PATCH v3 05/13] ARM: dts: sun9i: Add clock-indices property for bus
- gate clocks
+Date: Tue, 13 Jan 2015 09:37:33 +0800
+Subject: [PATCH v3 11/13] ARM: dts: sun9i: Enable mmc0 on A80 Optimus Board
 In-Reply-To: <1421113055-17867-1-git-send-email-wens@csie.org>
 References: <1421113055-17867-1-git-send-email-wens@csie.org>
-Message-ID: <1421113055-17867-6-git-send-email-wens@csie.org>
+Message-ID: <1421113055-17867-12-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_clk_get_parent_name() uses the clock-indices property to resolve
-clock phandle arguments in case that the argument index does not
-match the clock-output-names sequence.
-
-This is the case on sunxi, where we use the actual bit index as the
-argument to the phandle. Add the clock-indices property so that
-of_clk_get_parent_name() resolves the names correctly.
+Enable the micro-sd slot on the A80 Optimus Board, which is connected to
+mmc0. This adds the card-detect gpio and enables mmc0.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index ddc34676987d..9d0a66c14caf 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -260,6 +260,9 @@
- 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
- 			reg = <0x06000580 0x4>;
- 			clocks = <&ahb0>;
-+			clock-indices = <0>, <1>, <3>, <5>, <8>, <12>, <13>,
-+					<14>, <15>, <16>, <18>, <20>, <21>,
-+					<22>, <23>;
- 			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
- 					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
- 					"ahb0_nand0", "ahb0_sdram",
-@@ -273,6 +276,7 @@
- 			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
- 			reg = <0x06000584 0x4>;
- 			clocks = <&ahb1>;
-+			clock-indices = <0>, <1>, <17>, <21>, <22>, <23>, <24>;
- 			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
- 					"ahb1_gmac", "ahb1_msgbox",
- 					"ahb1_spinlock", "ahb1_hstimer",
-@@ -284,6 +288,8 @@
- 			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
- 			reg = <0x06000588 0x4>;
- 			clocks = <&ahb2>;
-+			clock-indices = <0>, <1>, <2>, <4>, <5>, <7>, <8>,
-+					<11>;
- 			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
- 					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
- 					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
-@@ -294,6 +300,8 @@
- 			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
- 			reg = <0x06000590 0x4>;
- 			clocks = <&apb0>;
-+			clock-indices = <1>, <5>, <11>, <12>, <13>, <15>,
-+					<17>, <18>, <19>;
- 			clock-output-names = "apb0_spdif", "apb0_pio",
- 					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
- 					"apb0_lradc", "apb0_gpadc", "apb0_twd",
-@@ -305,6 +313,8 @@
- 			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
- 			reg = <0x06000594 0x4>;
- 			clocks = <&apb1>;
-+			clock-indices = <0>, <1>, <2>, <3>, <4>,
-+					<16>, <17>, <18>, <19>, <20>, <21>;
- 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
- 					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
- 					"apb1_uart0", "apb1_uart1",
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index f329ec85f4e4..c8e038aafa9f 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -49,6 +49,7 @@
+ 
+ /dts-v1/;
+ #include "sun9i-a80.dtsi"
++#include "sunxi-common-regulators.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+@@ -82,6 +83,16 @@
+ 	};
+ };
+ 
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_optimus>;
++	vmmc-supply = <&reg_vcc3v0>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH8 */
++	cd-inverted;
++	status = "okay";
++};
++
+ &pio {
+ 	led_pins_optimus: led-pins at 0 {
+ 		allwinner,pins = "PH0", "PH1";
+@@ -89,6 +100,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
++	mmc0_cd_pin_optimus: mmc0_cd_pin at 0 {
++		allwinner,pins = "PH18";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
+ };
+ 
+ &i2c3_pins_a {
 -- 
 2.1.4
