@@ -1,35 +1,19 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 13 Jan 2015 15:43:11 +0100
-Subject: [PATCH] PCI: xilinx: fix harmless format string warning
-In-Reply-To: <1759235.dcJCuiggea@wuerfel>
-References: <1759235.dcJCuiggea@wuerfel>
-Message-ID: <54B52EFF.3070505@st.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 13 Jan 2015 06:49:57 -0800
+Subject: [4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <54B52C6D.20006@st.com>
+References: <1414077524-6469-5-git-send-email-lee.jones@linaro.org>
+ <20150113142341.GA15707@roeck-us.net> <54B52C6D.20006@st.com>
+Message-ID: <54B53095.5090903@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 01/13/2015 03:20 PM, Arnd Bergmann wrote:
-> The xilinx pcie driver prints a register value whose type is
-> propagated to the type returned by the GENMASK() macro.
-> Unfortunately, that type has recently changed as the result
-> of a bug fix, so now we get a warning about the type:
+On 01/13/2015 06:32 AM, David Paris wrote:
+> Hi Guenter,
 >
-> drivers/pci/host/pcie-xilinx.c: In function 'xilinx_pcie_clear_err_interrupts':
-> drivers/pci/host/pcie-xilinx.c:154:3: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
->
-> This changes the code so we always print the number as an
-> 'unsigned long' type to avoid the warning. The original code
-> was fine on 32-bit architectures but not on 64-bit. Now it
-> works as expected on both.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 00b4d9a1412 ("bitops: Fix shift overflow in GENMASK macros")
->
+>      Please forget this implementation of ST LPC Watchdog, Lee has provided a new patchset. Search for "[STLinux Kernel] [PATCH 0/8] mfd: watchdog: rtc: New driver for ST's LPC IP"
 >
 
-You can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+And I even looked it and provided feedback. Oh well ...
 
-Thanks!
-Maxime
+Guenter
