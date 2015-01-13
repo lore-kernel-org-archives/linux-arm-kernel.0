@@ -1,25 +1,31 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 12 Jan 2015 18:42:42 -0800
-Subject: [PATCH v4 1/2] watchdog: Add driver for Mediatek watchdog
-In-Reply-To: <1421076884-15860-2-git-send-email-matthias.bgg@gmail.com>
-References: <1421076884-15860-1-git-send-email-matthias.bgg@gmail.com>
- <1421076884-15860-2-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1421116962.9233.17.camel@perches.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 13 Jan 2015 11:13:34 +0800
+Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
+Message-ID: <54B48D5E.6050902@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-01-12 at 16:34 +0100, Matthias Brugger wrote:
-> This patch adds a driver for the Mediatek SoC integrated
-> watchdog. This driver supports watchdog and software reset
-> for mt65xx and mt81xx SoCs.
+There is 8MB SRAM in hip04.
+Moving the bootwrapper into SRAM could avoid to worry about poking
+holes into DRAM memory or allocation algorithms either.
 
-trivia:
+Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+---
+ arch/arm/boot/dts/hip04.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
-[]
-> +static int mtk_wdt_probe(struct platform_device *pdev)
-> +{
-[]
-> +	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
-
-missing terminating \n newline
+diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+index 2388145..f0dfac7 100644
+--- a/arch/arm/boot/dts/hip04.dtsi
++++ b/arch/arm/boot/dts/hip04.dtsi
+@@ -22,7 +22,7 @@
+ 
+ 	bootwrapper {
+ 	compatible = "hisilicon,hip04-bootwrapper";
+-	boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
++	boot-method = <0xe00f0000 0x10000>, <0xe0000100 0x1000>;
+ 	};
+ 
+ 	cpus {
+-- 
+1.8.1.2
