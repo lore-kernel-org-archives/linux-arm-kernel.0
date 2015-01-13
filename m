@@ -1,50 +1,50 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 13 Jan 2015 10:22:19 +0800
-Subject: [GIT PULL] CSR atlas7 init dts for 3.20
-In-Reply-To: <20150113021347.GD28758@quad.lixom.net>
-References: <CAGsJ_4wBEmLa8t-bVBQTBhJDHSU=-ciycpAnH4arWPNUq-tHWA@mail.gmail.com>
- <20150113021347.GD28758@quad.lixom.net>
-Message-ID: <CAGsJ_4x35UqL65_NYzdTp=YOu5mUuSxHaVEXG6ArsKfvQEqOAw@mail.gmail.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 13 Jan 2015 10:30:38 +0800
+Subject: [PATCH v4 0/2] ARM: mediatek: Add watchdog driver
+In-Reply-To: <1421076884-15860-1-git-send-email-matthias.bgg@gmail.com>
+References: <1421076884-15860-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1421116238.22982.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-01-13 10:13 GMT+08:00 Olof Johansson <olof@lixom.net>:
-> On Sun, Jan 11, 2015 at 10:51:40PM +0800, Barry Song wrote:
->> Hi Arnd, Kevin, Olof,
->>
->> The following changes since commit b7392d2247cfe6771f95d256374f1a8e6a6f48d6:
->>
->>   Linux 3.19-rc2 (2014-12-28 16:49:37 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
->>
->> for you to fetch changes up to e57574b88f1d29de0b0e9a3a994cd60c8b800253:
->>
->>   ARM: dts: add init dts file for CSR atlas7 SoC (2015-01-11 22:39:10 +0800)
->>
->> ----------------------------------------------------------------
->> drop marco and add init dts for atlas7
->>
->> marco chip has been dropped and the new replacement is atlas7.
->> so, drop marco dts, and add dts for atlas7.
->
-> Hi,
->
-> Can you please elaborate a bit. Was marco never shipped to customers
-> that could be interested in mainline support, and atlas7 is a replacement
-> SoC that is in development or has shipped?
->
+Hi Matthias,
 
-marco never shipped to customers that could be interested in mainline support.
-atlas7 is a replacement SoC that is in development.
+On Mon, 2015-01-12 at 16:34 +0100, Matthias Brugger wrote:
+> Mediatek SoCs have a watchdog driver. This patch set adds driver and DTS
+> binding. The driver also implements a restart handler to reboot the SoC.
+> 
+> Changes for v4:
+> - fix indentation errors
+> - delete unused include
+> - reorganize while loop to eliminate code duplication
+> - eliminate indirection to watchdog_device structure
+> - delete unnecessary brackets
+> 
+> Changes for v3:
+> - fix based on file name
+> - fix style problems
+> - fix error return value and warning message
+> - delete unnecessary watchdog_set_drvdata
+> - delete unused variable
+> 
+> Changes for v2:
+> - we don't need to have the watchdog enabled to do a software reset
+> - disable dual mode and irq mode when starting the watchdog
+> - update commit message to name the SoCs the driver supports
+> 
+> Matthias Brugger (2):
+>   watchdog: Add driver for Mediatek watchdog
+>   ARM: mediatek: dts: Add bindings for watchdog
+> 
+>  .../devicetree/bindings/watchdog/mtk-wdt.txt       |  13 ++
+>  drivers/watchdog/Kconfig                           |  10 +
+>  drivers/watchdog/Makefile                          |   1 +
+>  drivers/watchdog/mtk_wdt.c                         | 252 +++++++++++++++++++++
+>  4 files changed, 276 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+>  create mode 100644 drivers/watchdog/mtk_wdt.c
+> 
 
-do you mean i need to put this into tag log?
+Test OK on mt8173 platform.
 
->
-> Thanks,
->
-> -Olof
-
--barry
+Tested-by: Eddie Huang <eddie.huang@mediatek.com>
