@@ -1,32 +1,74 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 12 Jan 2015 21:07:15 -0800
-Subject: [PATCH v3 08/13] mtd: st_spi_fsm: Update the JEDEC probe to
- handle extended READIDs
-In-Reply-To: <1418644760-18773-9-git-send-email-lee.jones@linaro.org>
+Date: Mon, 12 Jan 2015 21:14:52 -0800
+Subject: [PATCH v3 00/13] mtd: st_spi_fsm: Align with ST's internal
+ development
+In-Reply-To: <1418644760-18773-1-git-send-email-lee.jones@linaro.org>
 References: <1418644760-18773-1-git-send-email-lee.jones@linaro.org>
- <1418644760-18773-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150113050715.GQ9759@ld-irv-0074>
+Message-ID: <20150113051452.GR9759@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 15, 2014 at 11:59:15AM +0000, Lee Jones wrote:
-> The previous code was based on 3-byte JEDEC IDs, with a possible 2-byte
-> extension.  However, devices are now emerging that return 6 or more bytes of
-> READID data and the additional bytes are required to differentiate between
-> variants or generations of similar devices.
+On Mon, Dec 15, 2014 at 11:59:07AM +0000, Lee Jones wrote:
+> Hi Brian, all,
+>  
+>  [x] Bulid test
+>  [x] Bisectable
+>  [x] Smatch
+>  [x] Sparse
+
+Picked patches 1, 2, and 5 to l2-mtd.git. I requested changes to patch 3
+and possibly 4. The rest look OK, but I don't want to futz with patch
+conflicts on the remaining. Please rebase to l2-mtd.git if/when you
+resend.
+
+> v3:
+>   Further aligned with upstream changes as suggested by Peter Griffin.
+>   The clk_ignore_unused kernel command line parameter is due to be turned
+>   off on STiH4* platforms, so we no longer give the driver the chance to
+>   opt-out of fetching the EMI clock.  We also now provide syscfg offsets
+>   inside the driver, as it's simpler and reduces the cost of having lots
+>   of extra DT properties.
+
+Typically "simpler" and "reducing the cost of having lots of extra DT
+properties" aren't good enough reasons for immediately breaking an
+existing DT binding. We usually expect to support both for some period
+of time.
+
+> v2:
+>   These are the last remaining patches in the set, all rebased and
+>   with the DT documentation requested after the last submission.
+>  
+> v1:
+>   This patch-set updates ST's FSM SPI-NOR driver with all the internal
+>   goodness which has happened since the initial (now upstreamed) snapshot
+>   was taken. It covers just over 6 months worth of internal development
+>   and bug-fixes. A final whitespace clean-up is also appended to the set
+>   - to make it look pretty and stuff. :)
 > 
-> This patch refactors the device table and JEDEC probe code to handle arbitrary
-> length READIDs, with the standard JEDEC definition now becoming a special case.
-> Functionally, there should be no change in behaviour.  A subsequent patch will
-> update the table with extended READIDs where applicable.
-
-BTW, how's that promise going, where you work on adapting this driver to
-the spi-nor framework? We've already done some of this same work there.
-
-> +#define RDID(...) __VA_ARGS__  /* Dummy macro to protect array argument. */
-
-What? What needs "protected"?
-
-...
+> Angus Clark (3):
+>   mtd: st_spi_fsm: Add support for N25Q512 and N25Q00A devices
+>   mtd: st_spi_fsm: Update Spansion device entries
+>   mtd: st_spi_fsm: Improve busy wait handling
+> 
+> Lee Jones (9):
+>   mtd: st_spi_fsm: Extend fsm_clear_fifo to handle unwanted bytes
+>   mtd: st_spi_fsm: Obtain and use EMI clock
+>   mtd: st_spi_fsm: dt-bindings: Deprecate generic compatible string
+>   mtd: st_spi_fsm: Fetch boot device locations from DT match tables
+>   mtd: st_spi_fsm: Fix [-Wsign-compare] build warning
+>   mtd: st_spi_fsm: Update the JEDEC probe to handle extended READIDs
+>   mtd: st_spi_fsm: General tidy-up
+>   ARM: STi: stih416: Use new platform specific compatible string
+>   ARM: STi: stih416: Supply EMI clock reference to FSM SPI NOR
+> 
+> Nunzio Raciti (1):
+>   mtd: st_spi_fsm: Add support for Micron N25Q512A
+> 
+>  Documentation/devicetree/bindings/mtd/st-fsm.txt |  20 +-
+>  arch/arm/boot/dts/stih416.dtsi                   |   6 +-
+>  drivers/mtd/devices/st_spi_fsm.c                 | 747 +++++++++++++++--------
+>  include/dt-bindings/clock/stih416-clks.h         |   1 +
+>  4 files changed, 519 insertions(+), 255 deletions(-)
+> 
 
 Brian
