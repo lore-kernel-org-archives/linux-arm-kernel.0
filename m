@@ -1,46 +1,107 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 13 Jan 2015 09:18:08 +0100
-Subject: [PATCH v3] ARM: exynos_defconfig Enable CONFIG_LOCKUP_DETECTOR.
-In-Reply-To: <1421088614-4662-1-git-send-email-moon.linux@yahoo.com>
-References: <1421088614-4662-1-git-send-email-moon.linux@yahoo.com>
-Message-ID: <1421137088.8355.1.camel@AMDC1943>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Jan 2015 09:20:02 +0100
+Subject: [PATCH 1/4] pinctrl: Broadcom Cygnus pinctrl device tree binding
+In-Reply-To: <54B01D44.5080601@broadcom.com>
+References: <rjui@broadcom.com>
+ <1417131990-17954-1-git-send-email-rjui@broadcom.com>
+ <1417131990-17954-2-git-send-email-rjui@broadcom.com>
+ <CACRpkdb5pNMbXmWGjrGpAYNLLwv6pWWOJQy0C6BLetNcStFM6A@mail.gmail.com>
+ <54B01D44.5080601@broadcom.com>
+Message-ID: <CACRpkdbW5P=w0CPYYf_gfBuD7W0WOdAYCKpTXM5MsK9mdYDc5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2015-01-13 at 00:20 +0530, Anand Moon wrote:
-> On enabling CONFIG_LOCKUP_DETECTOR the kernel to act as a watchdog
-> to detect hard and soft lockups. Enabling CONFIG_LOCKUP_DETECTOR
-> don't introduce much overhead on exyons SOC.
-> 
-> CONFIG_LOCKUP_DETECTOR is enabled on multi_v7_defconfig.
-> 
-> Changes since v3:
->  * Made commit message more clear
->  * Corrected difference between CONFIG_LOCKUP_DETECTOR and CONFIG_LOCKDEP.
-> 
-> Tested on Exynos5422 ODROID XU3 board.
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+On Fri, Jan 9, 2015 at 7:26 PM, Ray Jui <rjui@broadcom.com> wrote:
+> On 1/9/2015 2:12 AM, Linus Walleij wrote:
 
-Now it looks okay. My reviewed-by may stay on.
+>> Just use "groups" and "function" and refer to
+>> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>>
+>> Then "alt1", "alt2" etc are non-functional names of functions.
+>> Use the real function names, like "spi0" or so. This
+>> alt-business seems to be just a shortcut to make it
+>> simple, don't do that.
+>>
+>> Then you use e.g. "spi0" as a group name. I prefer you
+>> call that "spi0_grp" or something to say it is a group of
+>> pins associated with spi0, as spi0 is actually the
+>> function.
+>>
+> Hmmm, I did this by following brcm,bcm11351-pinctrl.txt:
+> - function: String. Specifies the pin mux selection. Values must be one
+> of: "alt1", "alt2", "alt3", "alt4"
+>
+> But you are right, in the pinctrl binding document it describes the
+> generic pin multiplexing nodes use "function" and "group".
 
-Best regards,
-Krzysztof
+Note "function" and "groups". Note groups is pluralis. You can
+select multiple groups for a single function.
 
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 5ef14de..64b2fe9 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -182,6 +182,7 @@ CONFIG_DETECT_HUNG_TASK=y
->  CONFIG_DEBUG_RT_MUTEXES=y
->  CONFIG_DEBUG_SPINLOCK=y
->  CONFIG_DEBUG_MUTEXES=y
-> +CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_DEBUG_INFO=y
->  CONFIG_DEBUG_USER=y
->  CONFIG_CRYPTO_SHA256=y
+> For example, the group "lcd" covers 30 pins. When I configure "lcd" to
+> alternate function 1, all 30 pins are muxed to LCD function. When
+> configured to function 2, all pins are muxed to SRAM function. Now, here
+> comes the issue, when configured to function 3, pins 1-15 and 20-30
+> become GPIO function, but pins 16-19 becomes SPI5 function. When it's
+> configured to function 4, all 30 pins become GPIO.
+
+I would split the use case in two groups for LCD and SRAM,
+and three groups for GPIO:
+"lcd_grp", "sram_grp", "gpio-1-15_grp",
+"gpio-16-19_grp", "gpio-20-30_grp", "spi5_grp"
+
+Valid combinations become
+
+function = "lcd"
+groups = "lcd_grp";
+
+function = "sram"
+groups = "sram_grp"
+
+For all GPIO only this:
+
+function = "gpio"
+groups = "gpio-1-16_grp", "gpio-16-19_grp", "gpio-20-30_grp"
+
+For a combined GPIO+SPI:
+
+function = "gpio"
+groups = "gpio-1-16_grp", "gpio-20-30_grp"
+
+function = "spi5"
+groups = "spi5_grp"
+
+The pinctrl runtile will protest if you try to combine spi5_grp
+with gpio-16-19_grp.
+
+> In some other cases, when I configure a group to other functions, there
+> could be spare pins which become unused (not brought out to the pad).
+> Or, the spare pins may also become a separate function.
+
+That's cool.
+
+> Based on the LCD example, I'd assume I would do the following for the
+> default LCD function:
+>
+> lcd_node {
+>         group = "lcd_grp";
+>         function = "lcd";
+> };
+>
+> And in the case of function 3, I would call the function "spi5" and
+> assume the rest of pins become either GPIO (or unused)?
+>
+> spi5_node {
+>         group = "lcd_grp";
+>         function = "spi5";
+> };
+
+Looks cool per above.
+
+You need some clever code in the driver to handle double-configuration
+of registers and so on, but I think it can be done.
+
+Using pin control as a GPIO backend can be a bit tricky and will need
+some testing and elaboration, but the subsystem will block collisions.
+
+Yours,
+Linus Walleij
