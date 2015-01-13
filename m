@@ -1,82 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 13 Jan 2015 10:35:24 +0100
-Subject: [RFC PATCH v2 2/4] serial: mxs-auart: Use helpers for gpio irqs
-In-Reply-To: <54B4E588.5010602@elproma.com.pl>
-References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
- <1420900366-9169-2-git-send-email-j.uzycki@elproma.com.pl>
- <20150113080817.GG22880@pengutronix.de>
- <54B4E588.5010602@elproma.com.pl>
-Message-ID: <20150113093524.GI22880@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 13 Jan 2015 10:36:00 +0100
+Subject: [PATCH RESEND] reset: sunxi: fix spinlock initialization
+In-Reply-To: <20150112221325.GE22090@quad.lixom.net>
+References: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
+ <20150112161706.GO4891@lukather> <20150112221325.GE22090@quad.lixom.net>
+Message-ID: <1421141760.4519.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Tue, Jan 13, 2015 at 10:29:44AM +0100, Janusz U?ycki wrote:
+Am Montag, den 12.01.2015, 14:13 -0800 schrieb Olof Johansson:
+> On Mon, Jan 12, 2015 at 05:17:06PM +0100, Maxime Ripard wrote:
+> > On Mon, Jan 12, 2015 at 07:54:46AM -0800, Tyler Baker wrote:
+> > > Call spin_lock_init() before the spinlocks are used, both in early init 
+> > > and probe functions preventing a lockdep splat.
+> > > 
+> > > I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+> > > when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+> > > and has been tested on a few other sunxi platforms without issue.
+> > > 
+> > > [1] http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+> > > [2] http://kernelci.org/boot/?a80-optimus
+> > > 
+> > > Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> > > Cc: <stable@vger.kernel.org>
+> > 
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> W dniu 2015-01-13 o 09:08, Uwe Kleine-K?nig pisze:
-> >Hello,
-> >
-> >On Sat, Jan 10, 2015 at 03:32:44PM +0100, Janusz Uzycki wrote:
-> >>The patch updates mxs-auart driver to use new mctrl_gpio helpers for
-> >>gpio irqs. The code is much simpler now.
-> >>
-> >>Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
-> >>---
-> >>
-> >>There is no changes since v1 (rebased only).
-> >>
-> >>---
-> >>  drivers/tty/serial/mxs-auart.c | 133 ++++-------------------------------------
-> >>  1 file changed, 13 insertions(+), 120 deletions(-)
-> >Very nice!
-> >
-> >>diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> >>index ec553f8..2ddba69 100644
-> >>--- a/drivers/tty/serial/mxs-auart.c
-> >>+++ b/drivers/tty/serial/mxs-auart.c
-> >>[...]
-> >>@@ -483,18 +458,9 @@ static void mxs_auart_enable_ms(struct uart_port *port)
-> >>  	s->ms_irq_enabled = true;
-> >>-	if (s->gpio_irq[UART_GPIO_CTS] >= 0)
-> >>-		enable_irq(s->gpio_irq[UART_GPIO_CTS]);
-> >>-	/* TODO: enable AUART_INTR_CTSMIEN otherwise */
-> >>-
-> >>-	if (s->gpio_irq[UART_GPIO_DSR] >= 0)
-> >>-		enable_irq(s->gpio_irq[UART_GPIO_DSR]);
-> >>-
-> >>-	if (s->gpio_irq[UART_GPIO_RI] >= 0)
-> >>-		enable_irq(s->gpio_irq[UART_GPIO_RI]);
-> >>-
-> >>-	if (s->gpio_irq[UART_GPIO_DCD] >= 0)
-> >>-		enable_irq(s->gpio_irq[UART_GPIO_DCD]);
-> >>+	mctrl_gpio_enable_ms(s->gpios);
-> >>+	/* TODO: enable AUART_INTR_CTSMIEN
-> >>+	 * if s->gpios->irq[UART_GPIO_CTS] == 0 */
-> >What is the problem here? For the other lines nothing needs to be done?
-> >This comment doesn't match the coding style.
+> Not entirely sure what to do with this one. You sent it to:arm at kernel.org, but
+> it should probably have gone to Philipp?
 > 
-> Right, the comment should be rather:
-> /* TODO: enable AUART_INTR_CTSMIEN
->  * if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS)) */
-I'd say:
+> We can pick it up with an ack from him though, no problem.
 
-	/*
-	 * TODO: enable AUART_INTR_CTSMIEN if CTS isn't handled by
-	 * mctrl_gpio.
-	 */
+I have applied the patch here:
 
-> In this place I marked that CTSMIEN should be switched on
-> enable/disable_ms if CTS
-> is not a gpio. The driver enables CTSMIEN forever what is wrong but
-> I can't test it
-> and I don't need it so I've just marked the fact in the comment.
-That's what I thought. You're not affected because CTS is a gpio for
-you (or not?)?  What would be the effect otherwise?
+    git://git.pengutronix.de/git/pza/linux reset/for_v3.19
 
-Best regards
-Uwe
+I was going to send a pull request tonight, but since I don't have any
+other pending fixes besides this, and you already offered to pick it up,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
