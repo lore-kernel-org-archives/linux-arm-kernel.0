@@ -1,45 +1,28 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 13 Jan 2015 14:36:18 -0700
-Subject: [PATCH] coresight: remove the unnecessary replicator property
-In-Reply-To: <1421054994-64261-1-git-send-email-xiakaixu@huawei.com>
-References: <1421054994-64261-1-git-send-email-xiakaixu@huawei.com>
-Message-ID: <CANLsYky53cirZ9K9Jrvpqh617F2AAZSWudnaB1X641w=G_p46Q@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 13 Jan 2015 16:56:57 -0500 (EST)
+Subject: [PATCH] rocker: fix harmless warning on 32-bit machines
+In-Reply-To: <4047824.AYNhYQQ6UI@wuerfel>
+References: <4047824.AYNhYQQ6UI@wuerfel>
+Message-ID: <20150113.165657.1171408376100942920.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2015 at 02:29, Kaixu Xia <xiakaixu@huawei.com> wrote:
-> Now we use the device name to identify replicator instead
-> of a unique number, so just remove it.
->
-> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
-> ---
->  Documentation/devicetree/bindings/arm/coresight.txt | 4 ----
->  1 file changed, 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index d790f49..a308935 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -38,8 +38,6 @@ its hardware characteristcs.
->           AMBA markee):
->                 - "arm,coresight-replicator"
->
-> -       * id: a unique number that will identify this replicator.
-> -
->         * port or ports: same as above.
->
->  * Optional properties for ETM/PTMs:
-> @@ -94,8 +92,6 @@ Example:
->                  * AMBA bus.  As such no need to add "arm,primecell".
->                  */
->                 compatible = "arm,coresight-replicator";
-> -               /* this will show up in debugfs as "0.replicator" */
-> -               id = <0>;
->
->                 ports {
->                         #address-cells = <1>;
-> --
-> 1.8.5.5
->
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 13 Jan 2015 15:23:52 +0100
 
-Applied - thanks.
+> The rocker driver tries to assign a pointer to a 64-bit integer
+> and then back to a pointer. This is safe on all architectures,
+> but causes a compiler warning when pointers are shorter than
+> 64-bit:
+> 
+> rocker/rocker.c: In function 'rocker_desc_cookie_ptr_get':
+> rocker/rocker.c:809:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>   return (void *) desc_info->desc->cookie;
+>          ^
+> 
+> This adds another cast to uintptr_t to tell the compiler
+> that it's safe.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Applied to net-next, thanks.
