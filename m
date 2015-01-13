@@ -1,40 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 13 Jan 2015 16:39:27 +0100
-Subject: [PATCH] clocksource: sirf: remove unused variable
-In-Reply-To: <22227544.6odKQXu0TN@wuerfel>
-References: <1599190.ZYSE4SrQSK@wuerfel> <54B52B39.1000607@linaro.org>
- <22227544.6odKQXu0TN@wuerfel>
-Message-ID: <54B53C2F.905@linaro.org>
+From: bart.tanghe@thomasmore.be (Bart Tanghe)
+Date: Tue, 13 Jan 2015 16:40:54 +0100
+Subject: [PATCH]dts: add bcm2835-pwm bindings
+In-Reply-To: <54B1556C.7070401@wwwdotorg.org>
+References: <1420471983-29945-1-git-send-email-bart.tanghe@thomasmore.be>
+ <54B1556C.7070401@wwwdotorg.org>
+Message-ID: <54B53C86.4030903@thomasmore.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2015 04:24 PM, Arnd Bergmann wrote:
-> On Tuesday 13 January 2015 15:27:05 Daniel Lezcano wrote:
->> On 01/13/2015 03:22 PM, Arnd Bergmann wrote:
->>> A recent rework of the driver left an obviously unused variable
->>> around, and now the compiler complains:
->>>
->>> clocksource/timer-marco.c: In function 'sirfsoc_marco_timer_init':
->>> clocksource/timer-marco.c:260:6: warning: unused variable 'timer_div' [-Wunused-variable]
->>>
->>> Remove it.
->>
->> Hi Arnd,
->>
->> thanks for the fix. But this has been already fixed and merged in my
->> tree [1].
->
-> Ok, thanks. For some reason it has not shown up in Linux-next yet.
-> Is this branch supposed to be part of -next?
+On 01/10/2015 05:38 PM, Stephen Warren wrote:
+> On 01/05/2015 08:33 AM, Bart Tanghe wrote:
+>> To probe the bcm2835-pwm driver properly, this dts bindings has to be added 
+>> to the bcm2835 dtsi file.
+>> In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
+>> To change the status of the gpio pins into pwm output pins, some additional 
+>> bindings has to be added but this has not to be done automatically.
+>> Is it possible to document this bindings somewhere?
+> 
+> The pinctrl bindings allow you to do this. They're documented in:
+> 
+> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> Documentation/devicetree/bindings/pinctrl/brcm,bcm2835-gpio.txt
+> 
+> pinctrl setup would typically be added to the board file (i.e.
+> arch/arm/boot/dts/bcm2835-rpi-b.dts) rather than the SoC file. I think
+> on the RPi, the pins that can generate PWM aren't dedicated to PWM by
+> the RPi board design (they could be GPIOs and probably other functions
+> too) so we probably need to leave it up to individual users to add PWM
+> configuration to their DT, if/when they use the PWM feature.
+> 
 
-Yes, I will update my next branch with these changes.
+Indeed, the pins aren't dedicated to pwm and can be used for other functions.
+Is it usefull to add  the pwm pinctrl description to 
+Documentation/devicetree/bindings/pinctrl/brcm,bcm2835-gpio.txt or is this 
+useless? 
 
-   -- Daniel
+Regards,
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Bart
