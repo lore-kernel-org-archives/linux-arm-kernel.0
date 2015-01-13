@@ -1,102 +1,68 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 13 Jan 2015 11:06:21 +0100
-Subject: [RESEND PATCH] clk: at91: keep slow clk enabled to prevent
- system hang
-In-Reply-To: <20150112234424.20842.37457@quantum>
-References: <1421075570-31200-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150112234424.20842.37457@quantum>
-Message-ID: <20150113110621.52bda165@bbrezillon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 13 Jan 2015 11:08:20 +0100
+Subject: [PATCH 0/4] ARM: shmobile: sh73a0/kzm9g: Complete multiplatform
+ support
+In-Reply-To: <20150113020818.GB21265@verge.net.au>
+References: <1420809866-4330-1-git-send-email-geert+renesas@glider.be>
+ <20150113020818.GB21265@verge.net.au>
+Message-ID: <CAMuHMdVbuM3oR1KQDzAodp_Y-aWFncPRn48-F9HmrVkGDS36RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jan 2015 15:44:24 -0800
-Mike Turquette <mturquette@linaro.org> wrote:
+Hi Simon,
 
-> Quoting Boris Brezillon (2015-01-12 07:12:50)
-> > All slow clk users are not properly requesting it (get + prepare + enable)
-> > before using it.
-> > If all users properly requesting this clock decide that they don't need it
-> > anymore (or are removed), this lead to this clock being disabled while
-> > faulty users are still requiring it, which in turn hangs the system.
-> 
-> The correct fix is for all users to claim the clock and enable it. Is
-> there a plan to implement that any time soon?
+On Tue, Jan 13, 2015 at 3:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 09, 2015 at 02:24:26PM +0100, Geert Uytterhoeven wrote:
+>>       Hi Simon, Magnus,
+>>
+>> This patch series completes the migration from kzm9g-reference (legacy
+>> DT based) to kzm9g-multiplatform (ARM multiplatform DT based with
+>> common clock framework).
+>>
+>>   - The first two patches fix Ethernet on kzm9g, by adding a Bus State
+>>     Controller node, as introduced in "[PATCH v3 0/4] drivers: bus:
+>>     Add Simple Power-Managed Bus", and moving the Ethernet node to it,
+>>   - The third path enables kzm9g support in shmobile_defconfig,
+>>   - The fourth patch removes all kzm9g-reference support, now the
+>>     sh73a0 generic multiplatform case has the same feature set
+>>     (better, it provides 16 MiB more RAM!).
+>>
+>> Thanks for applying!
+>
+> It seems to me that at the first two patches require the patchset
+> referenced above in order to work. For that reason I am holding off
 
-Yes, hopefully for the next release, but this requires identifying all
-the offending drivers, fixing them and testing all the changes.
+Yes it does.
 
-> 
-> > 
-> > Prevent slow oscillator clock from being disabled until all users are
-> > properly requesting it.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Reported-by: Bo Shen <voice.shen@atmel.com>
-> > Cc: stable at vger.kernel.org
-> > ---
-> > Hi Mike,
-> > 
-> > Sorry for the noise, but I forgot to add the LKML and LAKML in Cc.
-> > 
-> > Can you have a look at this fix and let me know if this is how you want this
-> > problem addressed ?
-> > I can also request (get + prepare + enable) the clk in the pmc probe function,
-> > so that it can never be disabled.
-> > 
-> > If you're fine with the approach, can you queue it for the next -rc ?
-> 
-> I can queue something for the next -rc, but maybe not this fix.
+> on applying this series. I am quite happy to negotiate merging
+> some or all of this series earlier than later :)
 
-Great.
+Hence please merge both the dependency and this series.
 
-> 
-> > 
-> > Best Regards,
-> > 
-> > Boris
-> > 
-> >  drivers/clk/at91/clk-slow.c | 28 ++++++++++++++++++++++++++--
-> >  1 file changed, 26 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-> > index 32f7c1b..effe3b0 100644
-> > --- a/drivers/clk/at91/clk-slow.c
-> > +++ b/drivers/clk/at91/clk-slow.c
-> > @@ -96,7 +96,19 @@ static void clk_slow_osc_unprepare(struct clk_hw *hw)
-> >         if (tmp & AT91_SCKC_OSC32BYP)
-> >                 return;
-> >  
-> > -       writel(tmp & ~AT91_SCKC_OSC32EN, sckcr);
-> > +       /*
-> > +        * FIXME: All slow clk users are not properly requesting it (get +
-> > +        * prepare + enable) before using it.
-> > +        * If all users properly requesting this clock decide that they don't
-> > +        * need it anymore (or are removed), this lead to this clock being
-> > +        * disabled while faulty users are still requiring it, which in turn
-> > +        * hangs the system.
-> > +        * Prevent this clock from being disabled until all users are properly
-> > +        * requesting it.
-> > +        * Once this is done we should re-introduce this line:
-> > +        *
-> > +        * writel(tmp & ~AT91_SCKC_OSC32EN, sckcr);
-> > +        */
-> 
-> The main problem here is that the clk prepare and enable usecounts are a
-> lie. The use counts may be zero but the clock signal is still active. I
-> think a better fix is for the clock driver to get, prepare & enable this
-> clock in its probe function as you described above. If someone stumbles
-> across this clock signal and wonders why it won't quiesce, at least the
-> debug values will be accurate.
+  1. Both sh73a0/kzm9g-multiplatform and r8a73a4/ape6evm-multiplatform
+      depend on "[PATCH v3 0/4] drivers: bus: Add Simple Power-Managed Bus",
+  2. DT PM domain for sh73a0 and r8a73a4 depends on
+      sh73a0/kzm9g-multiplatform and r8a73a4/ape6evm-multiplatform,
+  3. CONFIG_CPU_IDLE=y hangs on sh73a0 without an early timer.
+       - On kzm9g-multiplatform this can be fixed by adding an
+         arm,cortex-a9-twd-timer node, but that breaks kzm9g-reference as
+         the TWD driver requires CCF when instantiated from DT,
+       - Fixing this on kzm9g-reference requires setting
+         ".init_time = sh73a0_earlytimer_init", and also instantiating the GIC
+         from C board code, as the TWD platform device uses an hardcoded
+         interrupt number.
+         It seems simpler to let kzm9g-reference die, so this problem goes
+         away.
 
-Yep, that makes sense.
-I'll rework my patch.
+Thanks for your consideration!
 
-Thanks,
+Gr{oetje,eeting}s,
 
-Boris
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
