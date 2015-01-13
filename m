@@ -1,131 +1,111 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 13 Jan 2015 17:55:22 +0900
-Subject: [PATCHv3 1/8] devfreq: exynos: Add generic exynos memory bus
- frequency driver
-In-Reply-To: <520952065.968311421138534993.JavaMail.weblogic@epmlwas05d>
-References: <520952065.968311421138534993.JavaMail.weblogic@epmlwas05d>
-Message-ID: <54B4DD7A.504@samsung.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 13 Jan 2015 09:59:23 +0100
+Subject: [PATCH] reset: sunxi: fix spinlock initialization
+In-Reply-To: <CANMBJr5zzzjA3-zrQb0s3UxP9bfo7bjQRn_zGAyUXXvOW7httQ@mail.gmail.com>
+References: <1420678479-630-1-git-send-email-tyler.baker@linaro.org>	<54AFC2A8.1010807@st.com>	<54AFE968.4010805@st.com>	<CANMBJr5VzdvSyh4e6yk0wCznVmEgHBEi_MqdgcBpR=Nbf0=WvQ@mail.gmail.com>
+ <CANMBJr5zzzjA3-zrQb0s3UxP9bfo7bjQRn_zGAyUXXvOW7httQ@mail.gmail.com>
+Message-ID: <54B4DE6B.8020705@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Myungjoo,
+Hi Tyler,
 
-On 01/13/2015 05:42 PM, MyungJoo Ham wrote:
->>   
->>  This patch adds the generic exynos bus frequency driver for memory bus
->> with DEVFREQ framework. The Samsung Exynos SoCs have the common architecture
->> for memory bus between DRAM memory and MMC/sub IP in SoC. This driver can
->> support the memory bus frequency driver for Exynos SoCs.
+On 01/10/2015 01:22 AM, Tyler Baker wrote:
+> On 9 January 2015 at 12:44, Tyler Baker <tyler.baker@linaro.org> wrote:
+>> Hi Maxime,
 >>
->> Each memory bus block has a clock for memory bus speed and frequency
->> table which is changed according to the utilization of memory bus on runtime.
->> And then each memory bus group has the one more memory bus blocks and
->> OPP table (including frequency and voltage), regulator, devfreq-event
->> devices.
+>> On 9 January 2015 at 06:44, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+>>> With Maxime in the To: list.
+>>>
+>>>
+>>>
+>>> On 01/09/2015 12:59 PM, Maxime Coquelin wrote:
+>>>> Hi Tyler, Maxime,
+>>>>
+>>>> On 01/08/2015 01:54 AM, Tyler Baker wrote:
+>>>>> Call spin_lock_init() before the spinlocks are used, preventing a lockdep
+>>>>> splat.
+>>>>>
+>>>>> I have been observing lockdep complaining [1] during boot on my a80
+>>>>> optimus [2]
+>>>>> when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the
+>>>>> splat,
+>>>>> and has been tested on a few other sunxi platforms without issue.
+>>>>>
+>>>>> [1]
+>>>>> http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+>>>>> [2] http://kernelci.org/boot/?a80-optimus
+>>>>>
+>>>>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>>>>> ---
+>>>>> This patch was tested on 3.19.0-rc3
+>>>>>
+>>>>>    drivers/reset/reset-sunxi.c | 2 ++
+>>>>>    1 file changed, 2 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+>>>>> index eebc52c..e37250c 100644
+>>>>> --- a/drivers/reset/reset-sunxi.c
+>>>>> +++ b/drivers/reset/reset-sunxi.c
+>>>>> @@ -157,6 +157,8 @@ static int sunxi_reset_probe(struct platform_device
+>>>>> *pdev)
+>>>>>        if (IS_ERR(data->membase))
+>>>>>            return PTR_ERR(data->membase);
+>>>>>    +    spin_lock_init(&data->lock);
+>>>>> +
+>>>> Shouldn't the lock be initialized also in early init function
+>>>> (sunxi_reset_init) ?
+>> Thanks for pointing this out. It seems reasonable to me to add this
+>> for the sun6i platforms that use the early init function. Currently
+>> trying to track down a sun6i platform so I can run a few locking
+>> validation tests.
+> Olof was kind enough to volunteer his sun6i platform (colombus) and
+> provide the results. The results confirms there is a need to also
+> initialize the lock in sunxi_reset_init as Maxime C. mentioned.
+>
+> DEBUG: sunxi_reset_init()
+> DEBUG: sunxi_reset_deassert()
+> INFO: trying to register non-static key.
+> the code is fine but needs lockdep annotation.
+> turning off the locking correctness validator.
+> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.19.0-rc3-00039-gccd0de2-dirty #5
+> Hardware name: Allwinner sun6i (A31) Family
+> [<c021679c>] (unwind_backtrace) from [<c0212140>] (show_stack+0x10/0x14)
+> [<c0212140>] (show_stack) from [<c09557c4>] (dump_stack+0x8c/0x9c)
+> [<c09557c4>] (dump_stack) from [<c028293c>] (__lock_acquire+0x1ef4/0x1f00)
+> [<c028293c>] (__lock_acquire) from [<c028311c>] (lock_acquire+0x6c/0x8c)
+> [<c028311c>] (lock_acquire) from [<c095b810>] (_raw_spin_lock_irqsave+0x3c/0x50)
+> [<c095b810>] (_raw_spin_lock_irqsave) from [<c0542d80>]
+> (sunxi_reset_deassert+0x2c/0x88)
+> [<c0542d80>] (sunxi_reset_deassert) from [<c0d39a00>]
+> (sun5i_timer_init+0xc0/0x1f0)
+> [<c0d39a00>] (sun5i_timer_init) from [<c0d3897c>]
+> (clocksource_of_init+0x4c/0x8c)
+> [<c0d3897c>] (clocksource_of_init) from [<c0cf0b34>] (start_kernel+0x278/0x3c8)
+> [<c0cf0b34>] (start_kernel) from [<40208074>] (0x40208074)
+>
+> I'll go ahead and resend an updated patch and cc stable if Philipp and
+> Maxime R. they agree.
+
+Thanks for having done the test.
+I have no Allwinner HW to try.
+
+Best regards,
+Maxime
+>
+>>>> Regards,
+>>>> Maxime
+>>>>>        data->rcdev.owner = THIS_MODULE;
+>>>>>        data->rcdev.nr_resets = resource_size(res) * 32;
+>>>>>        data->rcdev.ops = &sunxi_reset_ops;
+>>>>
 >>
->> There are a little difference about the number of memory bus because each Exynos
->> SoC have the different sub-IP and different memory bus speed. In spite of this
->> difference among Exynos SoCs, we can support almost Exynos SoC by adding
->> unique data of memory bus to devicetree file.
 >>
->> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  drivers/devfreq/Kconfig          |  15 +
->>  drivers/devfreq/Makefile         |   1 +
->>  drivers/devfreq/exynos-busfreq.c | 589 +++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 605 insertions(+)
->>  create mode 100644 drivers/devfreq/exynos-busfreq.c
-> 
-> Exynos drivers are located at drivers/devfreq/exynos/
-> Please relocate/rename exynos-busfreq.c
-
-OK. I'll move it at drivers/devfreq/exynos directory.
-Do you prefer 'exynos-bus.c' instead of 'exynos-busfreq.c'?
-If you reply, I'll change it.
-
-> 
-> []
-> 
->> diff --git a/drivers/devfreq/exynos-busfreq.c b/drivers/devfreq/exynos-busfreq.c
->> new file mode 100644
->> index 0000000..b180f43
->> --- /dev/null
->> +++ b/drivers/devfreq/exynos-busfreq.c
-> 
-> []
-> 
->> +
->> +#define BUS_SATURATION_RATIO	40
-> 
-> In order to be a common driver, this should be tunable.
-> 
-> Because .dts is supposed to have hardware configuration only,
-> you may keep a table of { chip-name, saturation ratio} in this
-> driver and look up the saturation ratio based on the chip-name.
-
-OK, I'll add new property for saturation_ratio.
-
-I'll implement to use default saturation_ratio value ,
-if dt node don't include saturation_ratio property.
-
-> 
->> +#define SAFEVOLT		50000
->> +
->> +struct exynos_memory_bus_opp_info {
->> +	unsigned long rate;
->> +	unsigned long volt;
->> +};
->> +
->> +struct exynos_memory_bus_block {
->> +	struct clk *clk;
->> +	struct exynos_memory_bus_opp_info *freq_table;
->> +};
->> +
-> 
-> []
-> 
->> +#ifdef CONFIG_PM_SLEEP
->> +static int exynos_busfreq_resume(struct device *dev)
->> +{
->> +	struct exynos_memory_bus_data *data = dev_get_drvdata(dev);
->> +	int ret;
->> +
->> +	ret = exynos_busfreq_enable_edev(data);
->> +	if (ret < 0) {
->> +		dev_err(dev, "failed to enable the devfreq-event devices\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int exynos_busfreq_suspend(struct device *dev)
->> +{
->> +	struct exynos_memory_bus_data *data = dev_get_drvdata(dev);
->> +	int ret;
->> +
->> +	ret = exynos_busfreq_disable_edev(data);
->> +	if (ret < 0) {
->> +		dev_err(dev, "failed to disable the devfreq-event devices\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +#endif
-> 
-> Please disable regulator at suspend and resume it at resume.
-> 
-> You may interfere with low-power mode of corresponding voltage line,
-> which is often implemented to be activated if the regulator is
-> explicitely disabled for "alive" regulators like this one.
-
-OK, I'll modify it.
-
-Thanks for your review.
-
-Best Regards,
-Chanwoo Choi
+>> --
+>> Tyler Baker
+>> Tech Lead, LAVA
+>> Linaro.org | Open source software for ARM SoCs
+>> Follow Linaro: http://www.facebook.com/pages/Linaro
+>> http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+> Cheers,
+>
