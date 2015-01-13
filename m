@@ -1,101 +1,96 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 13 Jan 2015 12:08:37 +0100
-Subject: [PATCH v5] can: Convert to runtime_pm
-In-Reply-To: <3a3437c5c8ff48d9a45fee7e81fa8dca@BY2FFO11FD058.protection.gbl>
-References: <baf987c11c0242c2bf87b81f9396b09d@BN1BFFO11FD018.protection.gbl>
- <3a3437c5c8ff48d9a45fee7e81fa8dca@BY2FFO11FD058.protection.gbl>
-Message-ID: <54B4FCB5.6040904@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 13 Jan 2015 12:19:12 +0100
+Subject: [PATCH RESEND] dma-mapping: tidy up dma_parms default handling
+In-Reply-To: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
+References: <ffdc5455d698d2525f2d126d0adabf9418fd76b1.1418990609.git.robin.murphy@arm.com>
+Message-ID: <54B4FF30.2030607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 07:45 PM, S?ren Brinkmann wrote:
-> On Mon, 2015-01-12 at 08:34PM +0530, Kedareswara rao Appana wrote:
->> Instead of enabling/disabling clocks at several locations in the driver,
->> Use the runtime_pm framework. This consolidates the actions for runtime PM
->> In the appropriate callbacks and makes the driver more readable and mantainable.
->>
->> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
->> ---
->> Changes for v5:
->>  - Updated with the review comments.
->>    Updated the remove fuction to use runtime_pm.
->> Chnages for v4:
->>  - Updated with the review comments.
->> Changes for v3:
->>   - Converted the driver to use runtime_pm.
->> Changes for v2:
->>   - Removed the struct platform_device* from suspend/resume
->>     as suggest by Lothar.
->>
->>  drivers/net/can/xilinx_can.c |  157 ++++++++++++++++++++++++++++-------------
->>  1 files changed, 107 insertions(+), 50 deletions(-)
-> [..]
->> +static int __maybe_unused xcan_runtime_resume(struct device *dev)
->>  {
->> -	struct platform_device *pdev = dev_get_drvdata(dev);
->> -	struct net_device *ndev = platform_get_drvdata(pdev);
->> +	struct net_device *ndev = dev_get_drvdata(dev);
->>  	struct xcan_priv *priv = netdev_priv(ndev);
->>  	int ret;
->> +	u32 isr, status;
->>  
->>  	ret = clk_enable(priv->bus_clk);
->>  	if (ret) {
->> @@ -1014,15 +1030,28 @@ static int __maybe_unused xcan_resume(struct device *dev)
->>  	ret = clk_enable(priv->can_clk);
->>  	if (ret) {
->>  		dev_err(dev, "Cannot enable clock.\n");
->> -		clk_disable_unprepare(priv->bus_clk);
->> +		clk_disable(priv->bus_clk);
-> [...]
->> @@ -1173,12 +1219,23 @@ static int xcan_remove(struct platform_device *pdev)
->>  {
->>  	struct net_device *ndev = platform_get_drvdata(pdev);
->>  	struct xcan_priv *priv = netdev_priv(ndev);
->> +	int ret;
->> +
->> +	ret = pm_runtime_get_sync(&pdev->dev);
->> +	if (ret < 0) {
->> +		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
->> +				__func__, ret);
->> +		return ret;
->> +	}
->>  
->>  	if (set_reset_mode(ndev) < 0)
->>  		netdev_err(ndev, "mode resetting failed!\n");
->>  
->>  	unregister_candev(ndev);
->> +	pm_runtime_disable(&pdev->dev);
->>  	netif_napi_del(&priv->napi);
->> +	clk_disable_unprepare(priv->bus_clk);
->> +	clk_disable_unprepare(priv->can_clk);
-> 
-> Shouldn't pretty much all these occurrences of clk_disable/enable
-> disappear? This should all be handled by the runtime_pm framework now.
+Hello,
 
-We have:
-- clk_prepare_enable() in probe
-- clk_disable_unprepare() in remove
-- clk_enable() in runtime_resume
-- clk_disable() in runtime_suspend
+On 2015-01-09 17:56, Robin Murphy wrote:
+> Many DMA controllers and other devices set max_segment_size to
+> indicate their scatter-gather capability, but have no interest in
+> segment_boundary_mask. However, the existence of a dma_parms structure
+> precludes the use of any default value, leaving them as zeros (assuming
+> a properly kzalloc'ed structure). If a well-behaved IOMMU (or SWIOTLB)
+> then tries to respect this by ensuring a mapped segment does not cross
+> a zero-byte boundary, hilarity ensues.
+>
+> Since zero is a nonsensical value for either parameter, treat it as an
+> indicator for "default", as might be expected. In the process, clean up
+> a bit by replacing the bare constants with slightly more meaningful
+> macros and removing the superfluous "else" statements.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Which is, as far as I understand the right way to do it. Maybe
-Kedareswara can post the clock debug output again with this patch
-iteration. Have I missed something?
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-regards,
-Marc
+> ---
+>
+> Hi, various maintainers from Git logs ;)
+>
+> This one's a bit tricky to find a home for - I think technically it's
+> probably an IOMMU patch, but then the long-underlying problem doesn't
+> seem to have blown up anything until arm64, and my motivation is to
+> make bits of Juno work, which seems to nudge it towards arm64/arm-soc
+> territory. Could anyone suggest which tree is most appropriate?
+>
+> Thanks,
+> Robin.
+>
+>   include/linux/dma-mapping.h | 17 ++++++++++-------
+>   1 file changed, 10 insertions(+), 7 deletions(-)
+>
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index c3007cb..99ba736 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -141,7 +141,9 @@ static inline void arch_teardown_dma_ops(struct device *dev) { }
+>   
+>   static inline unsigned int dma_get_max_seg_size(struct device *dev)
+>   {
+> -	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
+> +	if (dev->dma_parms && dev->dma_parms->max_segment_size)
+> +		return dev->dma_parms->max_segment_size;
+> +	return SZ_64K;
+>   }
+>   
+>   static inline unsigned int dma_set_max_seg_size(struct device *dev,
+> @@ -150,14 +152,15 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+>   	if (dev->dma_parms) {
+>   		dev->dma_parms->max_segment_size = size;
+>   		return 0;
+> -	} else
+> -		return -EIO;
+> +	}
+> +	return -EIO;
+>   }
+>   
+>   static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>   {
+> -	return dev->dma_parms ?
+> -		dev->dma_parms->segment_boundary_mask : 0xffffffff;
+> +	if (dev->dma_parms && dev->dma_parms->segment_boundary_mask)
+> +		return dev->dma_parms->segment_boundary_mask;
+> +	return DMA_BIT_MASK(32);
+>   }
+>   
+>   static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+> @@ -165,8 +168,8 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+>   	if (dev->dma_parms) {
+>   		dev->dma_parms->segment_boundary_mask = mask;
+>   		return 0;
+> -	} else
+> -		return -EIO;
+> +	}
+> +	return -EIO;
+>   }
+>   
+>   #ifndef dma_max_pfn
+
+Best regards
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/f110ad7a/attachment.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
