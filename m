@@ -1,32 +1,35 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 13 Jan 2015 07:27:50 -0500
-Subject: [PATCH 3.19-rc2 v13 4/5] ARM: Add support for on-demand
- backtrace of other CPUs
-In-Reply-To: <54B4F52D.8010403@linaro.org>
-References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
- <1420469699-25350-1-git-send-email-daniel.thompson@linaro.org>
- <1420469699-25350-5-git-send-email-daniel.thompson@linaro.org>
- <20150105101925.64e8ecec@gandalf.local.home>
- <20150109164801.GW12302@n2100.arm.linux.org.uk>
- <20150111183700.55ea2434@gandalf.local.home>
- <54B4F52D.8010403@linaro.org>
-Message-ID: <20150113072750.432e792e@gandalf.local.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Jan 2015 12:28:53 +0000
+Subject: [PATCH] efi: rtc-efi: mark UIE as unsupported
+Message-ID: <1421152133-28506-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Jan 2015 10:36:29 +0000
-Daniel Thompson <daniel.thompson@linaro.org> wrote:
+Tools like hwclock attempt to enable the RTC update interrupt (UIE) to
+maximize the accuracy of the reported time value. The EFI rtc does not
+have interrupt capability so this is a pointless exercise to begin with,
+but the generic RTC framework ends up issuing a SetWakeupTime() Runtime
+Services call before drawing that conclusion on its own.
 
-> > We could change that hard coded 4096 to PAGE_SIZE, for those archs with
-> > bigger pages.
-> 
-> I've just updated the patchset with a couple of patches to common up the
-> printk code between arm and x86.
-> 
-> Just for the record I haven't changed the hard coded 4096 as part of
-> this. I'd be quite happy to but I didn't want to introduce any "secret"
-> changes to the code whilst the patch header claims I am just copying stuff.
+Instead, we can mark UIE as unsupported at driver probe time. The net
+result is the same, but without the spurious SetWakeupTime() call.
 
-Adding a separate patch would be fine by me.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/rtc/rtc-efi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
--- Steve
+diff --git a/drivers/rtc/rtc-efi.c b/drivers/rtc/rtc-efi.c
+index b37b0c80bd5a..cb989cd00b14 100644
+--- a/drivers/rtc/rtc-efi.c
++++ b/drivers/rtc/rtc-efi.c
+@@ -218,6 +218,7 @@ static int __init efi_rtc_probe(struct platform_device *dev)
+ 	if (IS_ERR(rtc))
+ 		return PTR_ERR(rtc);
+ 
++	rtc->uie_unsupported = 1;
+ 	platform_set_drvdata(dev, rtc);
+ 
+ 	return 0;
+-- 
+1.8.3.2
