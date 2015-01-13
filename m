@@ -1,53 +1,56 @@
-From: zlim@broadcom.com (Zi Shen Lim)
-Date: Mon, 12 Jan 2015 18:15:02 -0800
-Subject: [PATCH boot-wrapper-aarch64 2/4] psci: remove sentinel from id_table
-In-Reply-To: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
-References: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
-Message-ID: <1421115304-19580-3-git-send-email-zlim@broadcom.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 13 Jan 2015 10:15:17 +0800
+Subject: [PATCH v3 0/5] usb: atmel_usba_udc: Rework errata handling
+In-Reply-To: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1421060278-27329-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54B47FB5.8080807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tweak the limit check in find_logical_id so we can
-do away with the sentinel from id_table.
+Hi Boris,
 
-While at it, also remove unused label and fix up spacing.
+On 01/12/2015 06:57 PM, Boris Brezillon wrote:
+> Hello,
+>
+> Here is a set of patches porting existing at91sam9rl erratum handling to
+> DT and adding new code to handle at91sam9g45/9x5 erratum.
+> It also adds several compatible strings to differentiate those errata.
+>
+> These patches should be backported to 3.17 and 3.18 stable releases but
+> they do not apply cleanly on those stable branches.
+> I'll send a backport of this series once it is merged in mainline.
+>
+> Regards,
+>
+> Boris
+>
+> Changes since v2:
+> - remove UTF8 character in commit message of patch 2
+>
+> Changes since v1:
+> - cache INT_ENB value to speedup INT_ENB read operations
 
-Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
----
- psci.S | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+For the whole series, test OK on at91sam9m10g45ek board with mass 
+storage gadget, test OK on sama5d36ek with serial gadget.
 
-diff --git a/psci.S b/psci.S
-index 234493d..d045e56 100644
---- a/psci.S
-+++ b/psci.S
-@@ -69,7 +69,6 @@ vector:
- id_table:
- 	.quad CPU_IDS
- __id_end:
--	.quad MPIDR_INVALID
- 
- .equ	nr_cpus, ((__id_end - id_table) / 8)
- 
-@@ -159,17 +158,16 @@ psci_cpu_on:
-  * Clobbers x1, x2, x3
-  */
- find_logical_id:
--__find_logical_index:
- 	adr	x2, id_table
- 	mov	x1, xzr
- 1:	mov	x3, #nr_cpus	// check we haven't walked off the end of the array
- 	cmp	x1, x3
--	b.gt	3f
-+	b.ge	3f
- 	ldr	x3, [x2, x1, lsl #3]
- 	cmp	x3, x0
- 	b.eq	2f
- 	add	x1, x1, #1
--	b 1b
-+	b	1b
- 2:	mov	x0, x1
- 	ret
- 3:	mov	x0, #MPIDR_INVALID
--- 
-2.1.0
+Tested-by: Bo Shen <voice.shen@atmel.com>
+
+> Boris Brezillon (5):
+>    usb: atmel_usba_udc: Rework at91sam9rl errata handling
+>    usb: atmel_usba_udc: Add at91sam9g45 and at91sam9x5 errata handling
+>    ARM: at91/dt: update udc compatible strings
+>    usb: atmel_usba_udc: Mask status with enabled irqs
+>    usb: gadget: atmel_usba: Cache INT_ENB register value
+>
+>   .../devicetree/bindings/usb/atmel-usb.txt          |   5 +-
+>   arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
+>   arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
+>   arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
+>   arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
+>   drivers/usb/gadget/udc/atmel_usba_udc.c            | 146 +++++++++++++--------
+>   drivers/usb/gadget/udc/atmel_usba_udc.h            |   9 ++
+>   7 files changed, 111 insertions(+), 57 deletions(-)
+>
+
+Best Regards,
+Bo Shen
