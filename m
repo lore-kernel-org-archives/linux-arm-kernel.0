@@ -1,31 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Jan 2015 13:27:26 +0100
-Subject: [PATCH] Asoc: sam9x5_wm8731: depend on ARCH_AT91 instead of
- SOC_AT91SAM9X5
-Message-ID: <1421152046-20069-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 13 Jan 2015 07:27:50 -0500
+Subject: [PATCH 3.19-rc2 v13 4/5] ARM: Add support for on-demand
+ backtrace of other CPUs
+In-Reply-To: <54B4F52D.8010403@linaro.org>
+References: <1415968543-29469-1-git-send-email-daniel.thompson@linaro.org>
+ <1420469699-25350-1-git-send-email-daniel.thompson@linaro.org>
+ <1420469699-25350-5-git-send-email-daniel.thompson@linaro.org>
+ <20150105101925.64e8ecec@gandalf.local.home>
+ <20150109164801.GW12302@n2100.arm.linux.org.uk>
+ <20150111183700.55ea2434@gandalf.local.home>
+ <54B4F52D.8010403@linaro.org>
+Message-ID: <20150113072750.432e792e@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SOC_AT91SAM9X5 option is going to be removed, only depend on ARCH_AT91 like
-for the other drivers.
+On Tue, 13 Jan 2015 10:36:29 +0000
+Daniel Thompson <daniel.thompson@linaro.org> wrote:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- sound/soc/atmel/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> > We could change that hard coded 4096 to PAGE_SIZE, for those archs with
+> > bigger pages.
+> 
+> I've just updated the patchset with a couple of patches to common up the
+> printk code between arm and x86.
+> 
+> Just for the record I haven't changed the hard coded 4096 as part of
+> this. I'd be quite happy to but I didn't want to introduce any "secret"
+> changes to the code whilst the patch header claims I am just copying stuff.
 
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index fb3878312bf8..1579e994acf8 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -45,7 +45,7 @@ config SND_ATMEL_SOC_WM8904
- 
- config SND_AT91_SOC_SAM9X5_WM8731
- 	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
--	depends on ATMEL_SSC && SND_ATMEL_SOC && SOC_AT91SAM9X5
-+	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC
- 	select SND_ATMEL_SOC_SSC
- 	select SND_ATMEL_SOC_DMA
- 	select SND_SOC_WM8731
--- 
-2.1.0
+Adding a separate patch would be fine by me.
+
+-- Steve
