@@ -1,17 +1,146 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 13 Jan 2015 18:43:46 +0800
-Subject: [PATCH] ARM: imx: clk-vf610: Add clock for UART4 and UART5
-In-Reply-To: <1420551416-4537-1-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1420551416-4537-1-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <20150113104344.GA19355@dragon>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 13 Jan 2015 11:44:30 +0100
+Subject: [PATCH v2 1/3] ARM: dts: sun4i: Add dts file for Chuwi V7 CW0825
+ tablet
+Message-ID: <1421145872-17828-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 06, 2015 at 07:06:56PM +0530, Bhuvanchandra DV wrote:
-> Add support for clock gating of UART4 and UART5.
-> We use these UART's in a (not yet mainlined)
-> device tree.
-> 
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+The Chuwi V7 is an A10 (sun4i) based tablet with 1G of RAM, 16G of nand flash,
+microsd slot, 7" 1024x768 lvds ips panel, mini hdmi out, headphones out,
+stereo speakers, front & back camera and usb wifi.
 
-Applied, thanks. 
+It is clearly marked "CHUWI", "V7" and "Model: CW0825" on the back of the
+tablet.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+- Use cpp style includes
+- Use GPIO header for the GPIO flags
+- Address nodes by reference rather then by their full dt path
+---
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 99 +++++++++++++++++++++++++
+ 2 files changed, 100 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a86f232..548520f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -445,6 +445,7 @@ dtb-$(CONFIG_ARCH_STI)+= stih407-b2120.dtb \
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
++	sun4i-a10-chuwi-v7-cw0825.dtb \
+ 	sun4i-a10-cubieboard.dtb \
+ 	sun4i-a10-mini-xplus.dtb \
+ 	sun4i-a10-hackberry.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+new file mode 100644
+index 0000000..0654d30
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
+@@ -0,0 +1,99 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun4i-a10.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Chuwi V7 CW0825";
++	compatible = "chuwi,v7-cw0825", "allwinner,sun4i-a10";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		compatible = "x-powers,axp209";
++		reg = <0x34>;
++		interrupts = <0>;
++
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
+-- 
+2.1.0
