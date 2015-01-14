@@ -1,69 +1,103 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Jan 2015 08:38:46 +0900
-Subject: [PATCH] ARM: shmobile: R-Mobile: Fix DT refcount bugs in PM
- domain code
-In-Reply-To: <1421232648-15204-1-git-send-email-geert+renesas@glider.be>
-References: <1421232648-15204-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150114233845.GB10479@verge.net.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 14 Jan 2015 15:42:03 -0800
+Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add INA2xx sensors
+In-Reply-To: <54B69180.2010403@kernel.org> (Kukjin Kim's message of "Thu, 15
+ Jan 2015 00:55:44 +0900")
+References: <1421193801-24637-1-git-send-email-khilman@kernel.org>
+ <54B69180.2010403@kernel.org>
+Message-ID: <7h4mrtq69g.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 11:50:48AM +0100, Geert Uytterhoeven wrote:
-> Fix two DT refcount imbalances in the PM domain code that scans the DT
-> topology:
-> 
->   1. Add missing of_node_put() after of_find_compatible_node().
-> 
->   2. If CONFIG_OF_DYNAMIC=y:
-> 
-> 	ERROR: Bad of_node_put() on /system-controller at e6180000
-> 	<backtrace>
-> 
->      of_find_node_by_name() calls of_node_put() on its "from" parameter,
->      which must not be done on the for_each_compatible_node() iterator,
->      as it causes a zero refcount later.
->      Use of_get_child_by_name() instead to fix this.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Fixes: d7a3a10c8391fdcd ("ARM: shmobile: R-Mobile: Add DT support for PM domains")
-> in Simon's git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
-> tag renesas-dt-pm-for-v3.20
+Kukjin Kim <kgene@kernel.org> writes:
 
-Thanks.
+> On 01/14/15 09:03, Kevin Hilman wrote:
+>> From: Kevin Hilman <khilman@linaro.org>
+>> 
+>> The odroid-xu3 has 4 INA231 current sensors on board which can be
+>> accessed from the Linux via the hwmon interface.
+>> 
+>> There is one sensor for each of these power rails:
+>> 
+>> - A15 cluster: VDD_ARM
+>> - A7 cluster: VDD_KFC
+>> - GPU: VDD_G3D
+>> - memory: VDD_MEM
+>> 
+>> In addition to adding the sensors, LDO26 from the PMIC needs to be
+>> enabled because it's powering these sensor.
+>> 
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+>> 
+>>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>> index c29123c0734d..7874da20939f 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>> @@ -174,6 +174,13 @@
+>>  					regulator-always-on;
+>>  				};
+>>  
+>> +				ldo26_reg: LDO26 {
+>> +					regulator-name = "vdd_ldo26";
+>> +					regulator-min-microvolt = <3000000>;
+>> +					regulator-max-microvolt = <3000000>;
+>> +					regulator-always-on;
+>> +				};
+>> +
+>>  				buck1_reg: BUCK1 {
+>>  					regulator-name = "vdd_mif";
+>>  					regulator-min-microvolt = <800000>;
+>> @@ -257,6 +264,38 @@
+>>  		};
+>>  	};
+>>  
+>> +	i2c_0: i2c at 12C60000 {
+>> +		status = "okay";
+>> +
+>> +		/* A15 cluster: VDD_ARM */
+>> +		ina220 at 40 {
+>> +			compatible = "ti,ina230";
+>> +			reg = <0x40>;
+>> +			shunt-resistor = <10000>;
+>> +		};
+>> +
+>> +		/* memory: VDD_MEM */
+>> +		ina220 at 41 {
+>> +			compatible = "ti,ina230";
+>> +			reg = <0x41>;
+>> +			shunt-resistor = <10000>;
+>> +		};
+>> +
+>> +		/* GPU: VDD_G3D */
+>> +		ina220 at 44 {
+>> +			compatible = "ti,ina230";
+>> +			reg = <0x44>;
+>> +			shunt-resistor = <10000>;
+>> +		};
+>> +
+>> +		/* A7 cluster: VDD_KFC */
+>> +		ina220 at 45 {
+>> +			compatible = "ti,ina230";
+>> +			reg = <0x45>;
+>> +			shunt-resistor = <10000>;
+>> +		};
+>> +	};
+>> +
+>>  	i2c_2: i2c at 12C80000 {
+>>  		samsung,i2c-sda-delay = <100>;
+>>  		samsung,i2c-max-bus-freq = <66000>;
+>
+> Looks good to me and applied. To be honest, I'm not sure about the
+> values in the node of shunt-resistor though ;)
 
-As the patch above is not in the ARM SoC tree yet I have decided
-to squash this patch into it.
+I didn't measure the values, but used the values from the DTS that's
+part of the hardkernel tree.
 
-> ---
->  arch/arm/mach-shmobile/pm-rmobile.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-> index 07fb4ea4d8e94258..85a7fdd9823bc5a6 100644
-> --- a/arch/arm/mach-shmobile/pm-rmobile.c
-> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
-> @@ -270,8 +270,10 @@ static void __init get_special_pds(void)
->  
->  	/* PM domain containing Coresight-ETM */
->  	np = of_find_compatible_node(NULL, NULL, "arm,coresight-etm3x");
-> -	if (np)
-> +	if (np) {
->  		debug_pd = of_parse_phandle(np, "power-domains", 0);
-> +		of_node_put(np);
-> +	}
->  }
->  
->  static void __init put_special_pds(void)
-> @@ -363,7 +365,7 @@ static int __init rmobile_init_pm_domains(void)
->  			continue;
->  		}
->  
-> -		pmd = of_find_node_by_name(np, "pm-domains");
-> +		pmd = of_get_child_by_name(np, "pm-domains");
->  		if (!pmd) {
->  			pr_warn("%s lacks pm-domains node\n", np->full_name);
->  			continue;
-> -- 
-> 1.9.1
-> 
+Kevin
