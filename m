@@ -1,161 +1,177 @@
-From: r.peniaev@gmail.com (Roman Peniaev)
-Date: Wed, 14 Jan 2015 11:23:06 +0900
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
- <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
-Message-ID: <CACZ9PQW9aXuCd7T7ci7PmsR7uvbXtzcs6NjNJeMKAu8SF4MfiA@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 14 Jan 2015 10:32:25 +0800
+Subject: [PATCH v4 4/5] ARM: mediatek: Add EINT support to MTK pinctrl
+ driver.
+In-Reply-To: <CACRpkdb2KJbjzFgTmDvHSw7jNAExxVtU3y4_fgyn6J8hcW5OrQ@mail.gmail.com>
+References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1418772873-19747-5-git-send-email-hongzhou.yang@mediatek.com>
+ <1418807365.6443.17.camel@mtksdaap41>
+ <1420535817.17567.10.camel@mtksdaap41>
+ <CACRpkdb2KJbjzFgTmDvHSw7jNAExxVtU3y4_fgyn6J8hcW5OrQ@mail.gmail.com>
+Message-ID: <1421202745.27675.148.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 5:35 PM, Roman Peniaev <r.peniaev@gmail.com> wrote:
-> On Tue, Jan 13, 2015 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
->> On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
->>> thread_info->syscall is used only for ptrace, but syscall number
->>> is also used by syscall_get_nr and returned to userspace by the
->>> following proc file access:
->>>
->>>  $ cat /proc/self/syscall
->>>  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
->>>  ^
->>> The first number is the syscall number, currently it is zero.
->>> Patch fixes this:
->>>
->>>  $ cat /proc/self/syscall
->>>  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
->>>  ^
->>> Right, read syscall
->>
->> Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
->> the /proc code requires syscall_get_nr to work regardless of
->> TIF_SYSCALL_TRACE.
->>
->>> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> Cc: stable at vger.kernel.org
->>> ---
->>>  arch/arm/kernel/asm-offsets.c  | 1 +
->>>  arch/arm/kernel/entry-common.S | 1 +
->>>  2 files changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->>> index 2d2d608..6911bad 100644
->>> --- a/arch/arm/kernel/asm-offsets.c
->>> +++ b/arch/arm/kernel/asm-offsets.c
->>> @@ -70,6 +70,7 @@ int main(void)
->>>    DEFINE(TI_CPU,             offsetof(struct thread_info, cpu));
->>>    DEFINE(TI_CPU_DOMAIN,              offsetof(struct thread_info, cpu_domain));
->>>    DEFINE(TI_CPU_SAVE,                offsetof(struct thread_info, cpu_context));
->>> +  DEFINE(TI_SYSCALL,         offsetof(struct thread_info, syscall));
->>>    DEFINE(TI_USED_CP,         offsetof(struct thread_info, used_cp));
->>>    DEFINE(TI_TP_VALUE,                offsetof(struct thread_info, tp_value));
->>>    DEFINE(TI_FPSTATE,         offsetof(struct thread_info, fpstate));
->>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->>> index f8ccc21..89452ff 100644
->>> --- a/arch/arm/kernel/entry-common.S
->>> +++ b/arch/arm/kernel/entry-common.S
->>> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
->>>  #endif
->>>
->>>  local_restart:
->>> +     str scno, [tsk, #TI_SYSCALL]            @ set syscall number
->>>       ldr     r10, [tsk, #TI_FLAGS]           @ check for syscall tracing
->>>       stmdb   sp!, {r4, r5}                   @ push fifth and sixth args
->>
->> Do we definitely want to update scno on syscall restarting?
->
->
-> Good question.
->
-> First thing to mention is __sys_trace will trace 'restart_syscall',
-> not the real syscall we are going to restart.
->
-> E.g. in test application we do infinite poll and then send STOP and
-> CONT to this app:
->
->     test-243   [002] ...1  1792.067726: sys_enter: NR 168 (0, 0,
-> ffffffff, 0, 0, 0)
->     test-243   [002] ...1  1802.299073: sys_exit: NR 168 = -516
->     test-243   [004] ...1  1814.716264: sys_enter: NR 0 (0, 0,
-> ffffffff, 0, 0, 0)
->     test-243   [004] ...1  2183.687225: sys_exit: NR 0 = -516
->
-> the poll was restarted and trace shows that we are in restart_syscall.
->
-> Is that expected?
->
-> And the second thing is that my next patch did some tweaks in
-> 'syscall_trace_enter', where we take scno not from param we passed,
-> but from thread_info->syscall we previously set.
->
-> So, regarding your question, if I set scno only once - I will break
-> previous behavior, and __sys_trace will trace the syscall we restarted.
->
-> And I think this is what we need, because according to the
-> 'syscall_trace_enter' code we do 'secure_computing' and
-> 'audit_syscall_entry', which definitely expect original syscall, not
-> the 'restart_syscall'.
+On Tue, 2015-01-13 at 14:24 +0100, Linus Walleij wrote:
+> On Tue, Jan 6, 2015 at 10:16 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> > On Wed, 2014-12-17 at 17:09 +0800, Yingjoe Chen wrote:
+> >> On Wed, 2014-12-17 at 07:34 +0800, Hongzhou Yang wrote:
+> >> > From: Maoguang Meng <maoguang.meng@mediatek.com>
+> >> >
+> >> > MTK SoC support external interrupt(EINT) from most SoC pins.
+> >> > Add EINT support to pinctrl driver.
+> >> >
+> >> > Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
+> >> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> >>
+> >> Hi Linus,
+> >>
+> >> This patch add EINT support to the pinctrl driver. We've surveyed
+> >> GPIOLIB_IRQCHIP, but we didn't use it because:
+> >>
+> >> - Not every GPIO pin support interrupt.
+> >> - EINT use a different numbering to GPIO. eg, from the mt8135 table,
+> >> GPIO29 is EINT158. It is more nature & efficient to use EINT number as
+> >> hwirq.
+> >>
+> >> +               MTK_EINT_FUNCTION(2, 158),
+> >> +               MTK_FUNCTION(0, "GPIO29"),
+> >
+> > After further looking into this, we could use GPIOLIB_IRQCHIP if we add
+> > an extension gpiochip_irqchip_add() to accept interrupt numbers and
+> > custom .to_irq function for our SoC. We could still reuse other code
+> > GPIOLIB_IRQCHIP provide.
+> 
+> I see, and I still want to see all possibilities to centralize code
+> surveyed.
+> 
+> If I understand correctly what you actually need is a linear
+> irqdomain with "holes" (invalid offsets) in it.
+> So this is what we should design for.
+> 
+> The .to_irq() function should not really perform anything but a
+> simple lookup in the domain.
+> 
+> What you do here:
+> 
+> +static int mtk_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+> +{
+> +       const struct mtk_desc_pin *pin;
+> +       struct mtk_pinctrl *pctl = dev_get_drvdata(chip->dev);
+> +       int irq;
+> +
+> +       pin = pctl->devdata->pins + offset;
+> +       if (pin->eint.eintnum == NO_EINT_SUPPORT)
+> +               return -EINVAL;
+> +
+> +       irq = irq_find_mapping(pctl->domain, pin->eint.eintnum);
+> +       if (!irq)
+> +               return -EINVAL;
+> +
+> +       return irq;
+> +}
+> 
+> Is *avoiding* to translate some IRQs from a certain offset using
+> the domain, I think that is the wrong way to go.
 
-+Kees Cook
+Hi Linus,
 
-Moreover, I tested on x86, and behavior is the same:
-if we do restart_syscall userspace sees 0 as scnr.
-(for me it sounds strange, because as I understand userspace
-should avoid any awareness about possible syscall restart)
+Yes, it have holes and avoiding translate some gpio to irq, but it also
+using a different hwirq number to do the translate.
 
-x86:
+Let's me describe my problem more clearly. On our SoC, if a pin support
+interrupt it will have 2 different numbers for it. For examples, here's
+a partial list for the gpio and EINT number mappings on mt8135:
 
-[root at qemu-x86 ~]# ./test.x86 &
-[1] 285
-[root at qemu-x86 ~]# cat /proc/285/syscall
-168 0x0 0x0 0xffffffff 0x0 0xbf9387ac 0xbf9387b8 0xbf9386f8 0xffffe424
-[root at qemu-x86 ~]# kill -STOP 285
-[root at qemu-x86 ~]#
+   gpio  EINT
+     0     49
+     1     48
+    ...........
+    36     97
+    37     19      
+    ...........
 
-[1]+  Stopped                 ./test.x86
-[root at qemu-x86 ~]# kill -CONT 285
-[root at qemu-x86 ~]# cat /proc/285/syscall
-0 0x0 0x0 0xffffffff 0x0 0xbf9387ac 0xbf9387b8 0xbf9386f8 0xffffe424
+To control interrupt related function, we'll need EINT number to locate
+corresponding register bits. When interrupt occurs, the interrupt
+handler will know which EINT interrupt occurs. In irq_chip functions,
+only .irq_request_resources and .irq_release_resources use gpio number
+to set pinmux to EINT mode and all the others need EINT number.
 
-And getting syscall tracing on another run of this test application:
+Because EINT number is used more frequently in interrupt related
+functions, it make sense to use EINT number as hwirq instead of gpio
+number. That means irq_domain will translate EINT number to virq.
+So what mtk_gpio_to_irq actually do is translate gpio number to EINT
+number and use irq domain to translate it to virq.
 
-[root at qemu-x86 ~]# cat /sys/kernel/debug/tracing/trace | grep test.x86
-.....
-test.x86-279   [000] ...1   189.926878: sys_enter: NR 168 (0, 0,
-ffffffff, 0, bfe6824c, bfe68258)
-test.x86-279   [001] ...1   199.931406: sys_exit: NR 168 = -516
-test.x86-279   [001] ...1   203.446946: sys_enter: NR 0 (0, 0,
-ffffffff, 0, bfe6824c, bfe68258)
-test.x86-279   [000] ...1   276.294314: sys_exit: NR 0 = -516
-.....
+Below is a draft of what I have in mind. For SoC that can use gpio
+number to control irq they still use gpiochip_irqchip_add(). For SoC
+that need to use another number to control irq, like us, can use
+gpiochip_irqchip_add_with_map. We can't reuse gpiochip_to_irq or
+gpiochip_irq_reqres/relres in GPIOLIB_IRQCHIP, but we can still reuse
+others code.
 
+Let me know if this is the direction you want.
+Thanks
 
-ARM behavior is the same with these two patches:
+Joe.C
 
-sh-3.2# /tmp/test &
-[1] 178
-sh-3.2# cat /proc/178/syscall
-168 0x0 0x0 0xffffffff 0x0 0x0 0x0 0xbdcdece4 0x4220a6cc
-sh-3.2# kill -STOP 178
-sh-3.2#
+=======================
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -567,11 +567,14 @@ static void gpiochip_irqchip_remove(struct
+gpio_chip *gpiochip)
+  * the pins on the gpiochip can generate a unique IRQ. Everything else
+  * need to be open coded.
+  */
+-int gpiochip_irqchip_add(struct gpio_chip *gpiochip,
+-                        struct irq_chip *irqchip,
+-                        unsigned int first_irq,
+-                        irq_flow_handler_t handler,
+-                        unsigned int type)
++int gpiochip_irqchip_add_with_map(struct gpio_chip *gpiochip,
++                                 struct irq_chip *irqchip,
++                                 unsigned int first_irq,
++                                 irq_flow_handler_t handler,
++                                 unsigned int type,
++                                 unsigned int size,
++                                 int (*to_irq_func)(struct gpio_chip *chip,
++                                                    unsigned offset))
+ {
+        struct device_node *of_node;
+        unsigned int offset;
+@@ -604,15 +607,17 @@ int gpiochip_irqchip_add(struct gpio_chip *gpiochip,
+                gpiochip->irqchip = NULL;
+                return -EINVAL;
+        }
+-       irqchip->irq_request_resources = gpiochip_irq_reqres;
+-       irqchip->irq_release_resources = gpiochip_irq_relres;
++       if (!irqchip->irq_request_resources) {
++               irqchip->irq_request_resources = gpiochip_irq_reqres;
++               irqchip->irq_release_resources = gpiochip_irq_relres;
++       }
 
-[1]+  Stopped(SIGSTOP)        /tmp/test
-sh-3.2# cat /proc/178/syscall
-168 0x0 0x0 0xffffffff 0x0 0x0 0x0 0xbdcdece4 0x4220a6c8
-sh-3.2# kill -CONT 178
-sh-3.2# cat /proc/178/syscall
-0 0x0 0x0 0xffffffff 0x0 0x0 0x0 0xbdcdece4 0x4220a6cc
+        /*
+         * Prepare the mapping since the irqchip shall be orthogonal to
+         * any gpiochip calls. If the first_irq was zero, this is
+         * necessary to allocate descriptors for all IRQs.
+         */
+-       for (offset = 0; offset < gpiochip->ngpio; offset++) {
++       for (offset = 0; offset < size; offset++) {
+                irq_base = irq_create_mapping(gpiochip->irqdomain, offset);
+                if (offset == 0)
+                        /*
+@@ -626,6 +631,18 @@ int gpiochip_irqchip_add(struct gpio_chip *gpiochip,
 
-
---
-Roman
+        return 0;
+ }
++
++int gpiochip_irqchip_add(struct gpio_chip *gpiochip,
++                        struct irq_chip *irqchip,
++                        unsigned int first_irq,
++                        irq_flow_handler_t handler,
++                        unsigned int type)
++{
++       return gpiochip_irqchip_add_with_map(gpiochip, irqchip, first_irq,
++                                            handler, type,
++                                            gpiochip->ngpiog, piochip_to_irq);
++}
