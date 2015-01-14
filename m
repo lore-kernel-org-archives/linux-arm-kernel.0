@@ -1,39 +1,57 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jan 2015 17:21:59 +0100
-Subject: [PATCH 07/12] usb: gadget: at91_udc: Document DT clocks and
- clock-names property
+Date: Wed, 14 Jan 2015 17:21:54 +0100
+Subject: [PATCH 02/12] mfd: syscon: Add Atmel Matrix bus DT binding
+ documentation
 In-Reply-To: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421252524-24452-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421252524-24452-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-The at91_udc driver request 2 clocks, and thus need them to be defined in
-the device tree.
-Document the clocks and clock-names properties so that everybody use the
-correct names.
+The Matrix registers are provided to configure internal bus behavior on
+at91 SoCs.
+Some registers might be accessed by several drivers (e.g. to configure
+external memory bus timings), hence we declare this register set as a
+syscon device.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/usb/atmel-usb.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ .../devicetree/bindings/mfd/atmel-matrix.txt       | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
 
-diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-index bc2222ca3f2a..6007231e0adc 100644
---- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-@@ -36,6 +36,10 @@ Required properties:
-  - compatible: Should be "atmel,at91rm9200-udc"
-  - reg: Address and length of the register set for the device
-  - interrupts: Should contain macb interrupt
-+ - clocks: Should reference the peripheral and the AHB clocks
-+ - clock-names: Should contains two strings
-+		"pclk" for the peripheral clock
-+		"hclk" for the AHB clock
- 
- Optional properties:
-  - atmel,vbus-gpio: If present, specifies a gpio that needs to be
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-matrix.txt b/Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+new file mode 100644
+index 000000000000..e3ef50ca02a5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+@@ -0,0 +1,24 @@
++* Device tree bindings for Atmel Bus Matrix
++
++The Bus Matrix registers are used to configure Atmel SoCs internal bus
++behavior (master/slave priorities, undefined burst length type, ...)
++
++Required properties:
++- compatible:		Should be one of the following
++			"atmel,at91sam9260-matrix", "syscon"
++			"atmel,at91sam9261-matrix", "syscon"
++			"atmel,at91sam9263-matrix", "syscon"
++			"atmel,at91sam9rl-matrix", "syscon"
++			"atmel,at91sam9g45-matrix", "syscon"
++			"atmel,at91sam9n12-matrix", "syscon"
++			"atmel,at91sam9x5-matrix", "syscon"
++			"atmel,sama5d3-matrix", "syscon"
++- reg:			Contains offset/length value of the Bus Matrix
++			memory region.
++
++Example:
++
++matrix: matrix at ffffec00 {
++	compatible = "atmel,sama5d3-matrix", "syscon";
++	reg = <0xffffec00 0x200>;
++};
 -- 
 2.1.0
