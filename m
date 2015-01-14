@@ -1,210 +1,94 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed, 14 Jan 2015 16:47:11 +0100
-Subject: [PATCH 1/2] ARM: DT: STiH407: Add DRM dt nodes
-In-Reply-To: <1421250432-25903-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1421250432-25903-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1421250432-25903-2-git-send-email-gabriel.fernandez@linaro.org>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 15 Jan 2015 00:51:14 +0900
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <54B69072.4080607@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DRM/KMS dt nodes.
-This node can't be in stih407-family.dtsi file because in the future we
-will integrate a new stih418-b2199 board. It's a stih407 family board
-with different drm/kms dt nodes.
-That is why i created the stih407.dtsi file.
+On 01/14/15 14:33, Chanwoo Choi wrote:
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
----
- arch/arm/boot/dts/stih407-b2120.dts  |   3 +-
- arch/arm/boot/dts/stih407.dtsi       | 151 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stihxxx-b2120.dtsi |   2 +-
- 3 files changed, 153 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/stih407.dtsi
+Hi,
 
-diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-index 261d5e2..af48714 100644
---- a/arch/arm/boot/dts/stih407-b2120.dts
-+++ b/arch/arm/boot/dts/stih407-b2120.dts
-@@ -7,9 +7,8 @@
-  * published by the Free Software Foundation.
-  */
- /dts-v1/;
--#include "stih407-clock.dtsi"
--#include "stih407-family.dtsi"
- #include "stihxxx-b2120.dtsi"
-+#include "stih407.dtsi"
- / {
- 	model = "STiH407 B2120";
- 	compatible = "st,stih407-b2120", "st,stih407";
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-new file mode 100644
-index 0000000..3efa3b2
---- /dev/null
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -0,0 +1,151 @@
-+/*
-+ * Copyright (C) 2015 STMicroelectronics Limited.
-+ * Author: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
-+ */
-+#include "stih407-clock.dtsi"
-+#include "stih407-family.dtsi"
-+/ {
-+	soc {
-+		/* Display */
-+		vtg_main: sti-vtg-main at 8d02800 {
-+			compatible = "st,vtg";
-+			reg = <0x8d02800 0x200>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_NONE>;
-+		};
-+
-+		vtg_aux: sti-vtg-aux at 8d00200 {
-+			compatible = "st,vtg";
-+			reg = <0x8d00200 0x100>;
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_NONE>;
-+		};
-+
-+		sti-display-subsystem {
-+			compatible = "st,sti-display-subsystem";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			assigned-clocks	= <&clk_s_d2_quadfs 0>,
-+					  <&clk_s_d2_quadfs 0>,
-+					  <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>,
-+					  <&clk_s_d2_flexgen CLK_PIX_AUX_DISP>,
-+					  <&clk_s_d2_flexgen CLK_PIX_GDP1>,
-+					  <&clk_s_d2_flexgen CLK_PIX_GDP2>,
-+					  <&clk_s_d2_flexgen CLK_PIX_GDP3>,
-+					  <&clk_s_d2_flexgen CLK_PIX_GDP4>;
-+
-+			assigned-clock-parents = <0>,
-+						 <0>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 0>;
-+
-+			assigned-clock-rates = <297000000>, <297000000>;
-+
-+			ranges;
-+
-+			sti-compositor at 9d11000 {
-+				compatible = "st,stih407-compositor";
-+				reg = <0x9d11000 0x1000>;
-+
-+				clock-names = "compo_main",
-+					      "compo_aux",
-+					      "pix_main",
-+					      "pix_aux",
-+					      "pix_gdp1",
-+					      "pix_gdp2",
-+					      "pix_gdp3",
-+					      "pix_gdp4",
-+					      "main_parent",
-+					      "aux_parent";
-+
-+				clocks = <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-+					 <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-+					 <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>,
-+					 <&clk_s_d2_flexgen CLK_PIX_AUX_DISP>,
-+					 <&clk_s_d2_flexgen CLK_PIX_GDP1>,
-+					 <&clk_s_d2_flexgen CLK_PIX_GDP2>,
-+					 <&clk_s_d2_flexgen CLK_PIX_GDP3>,
-+					 <&clk_s_d2_flexgen CLK_PIX_GDP4>,
-+					 <&clk_s_d2_quadfs 0>,
-+					 <&clk_s_d2_quadfs 1>;
-+
-+				reset-names = "compo-main", "compo-aux";
-+				resets = <&softreset STIH407_COMPO_SOFTRESET>,
-+					 <&softreset STIH407_COMPO_SOFTRESET>;
-+				st,vtg = <&vtg_main>, <&vtg_aux>;
-+			};
-+
-+			sti-tvout at 8d08000 {
-+				compatible = "st,stih407-tvout";
-+				reg = <0x8d08000 0x1000>;
-+				reg-names = "tvout-reg";
-+				reset-names = "tvout";
-+				resets = <&softreset STIH407_HDTVOUT_SOFTRESET>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				assigned-clocks = <&clk_s_d2_flexgen CLK_PIX_HDMI>,
-+						  <&clk_s_d2_flexgen CLK_TMDS_HDMI>,
-+						  <&clk_s_d2_flexgen CLK_REF_HDMIPHY>,
-+						  <&clk_s_d0_flexgen CLK_PCM_0>,
-+						  <&clk_s_d2_flexgen CLK_PIX_HDDAC>,
-+						  <&clk_s_d2_flexgen CLK_HDDAC>;
-+
-+				assigned-clock-parents = <&clk_s_d2_quadfs 0>,
-+							 <&clk_tmdsout_hdmi>,
-+							 <&clk_s_d2_quadfs 0>,
-+							 <&clk_s_d0_quadfs 0>,
-+							 <&clk_s_d2_quadfs 0>,
-+							 <&clk_s_d2_quadfs 0>;
-+				ranges;
-+
-+				sti-hdmi at 8d04000 {
-+					compatible = "st,stih407-hdmi";
-+					reg = <0x8d04000 0x1000>;
-+					reg-names = "hdmi-reg";
-+					interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
-+					interrupt-names	= "irq";
-+					clock-names = "pix",
-+						      "tmds",
-+						      "phy",
-+						      "audio",
-+						      "main_parent",
-+						      "aux_parent";
-+
-+					clocks = <&clk_s_d2_flexgen CLK_PIX_HDMI>,
-+						 <&clk_s_d2_flexgen CLK_TMDS_HDMI>,
-+						 <&clk_s_d2_flexgen CLK_REF_HDMIPHY>,
-+						 <&clk_s_d0_flexgen CLK_PCM_0>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 1>;
-+
-+					hdmi,hpd-gpio = <&pio5 3>;
-+					reset-names = "hdmi";
-+					resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
-+					ddc = <&hdmiddc>;
-+
-+				};
-+
-+				sti-hda at 8d02000 {
-+					compatible = "st,stih407-hda";
-+					reg = <0x8d02000 0x400>, <0x92b0120 0x4>;
-+					reg-names = "hda-reg", "video-dacs-ctrl";
-+					clock-names = "pix",
-+						      "hddac",
-+						      "main_parent",
-+						      "aux_parent";
-+					clocks = <&clk_s_d2_flexgen CLK_PIX_HDDAC>,
-+						 <&clk_s_d2_flexgen CLK_HDDAC>,
-+						 <&clk_s_d2_quadfs 0>,
-+						 <&clk_s_d2_quadfs 1>;
-+				};
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 8af5282..c1d8590 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -48,7 +48,7 @@
- 		};
- 
- 		/* SSC11 to HDMI */
--		i2c at 9541000 {
-+		hdmiddc: i2c at 9541000 {
- 			status = "okay";
- 			/* HDMI V1.3a supports Standard mode only */
- 			clock-frequency = <100000>;
--- 
-1.9.1
++ Doug, Olof
+
+> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+> for Exynos 32bit SoC.
+> 
+Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+implemented it and additionally its access is faster than using memory
+mapped register called SFR for MCT...so Doug submitted patch to use MCT
+on 32bit exynos SoCs before.
+
+I know using MCT on 64bit exynos is usefulness for Power Management and
+I need to talk to relevant guys in office again. If anything, I'll let
+you know.
+
+Thanks,
+Kukjin
+
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+> This patch set is tested on 64-bit Exynos SoC. I send only this patch from
+> following patchst[1].
+> [1] https://lkml.org/lkml/2014/12/2/134
+> 
+> Changes from v2:
+> - None
+> Changes from v1:
+> - Use CONFIG_ARM instead of CONFIG_ARM64
+> 
+>  drivers/clocksource/Kconfig      | 1 -
+>  drivers/clocksource/exynos_mct.c | 4 ++++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index fc01ec2..be38119 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
+>  
+>  config CLKSRC_EXYNOS_MCT
+>  	def_bool y if ARCH_EXYNOS
+> -	depends on !ARM64
+>  	help
+>  	  Support for Multi Core Timer controller on Exynos SoCs.
+>  
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 9403061..b840ea1 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+>  	return exynos4_read_count_32();
+>  }
+>  
+> +#if defined(CONFIG_ARM)
+>  static struct delay_timer exynos4_delay_timer;
+>  
+>  static cycles_t exynos4_read_current_timer(void)
+> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+>  			 "cycles_t needs to move to 32-bit for ARM64 usage");
+>  	return exynos4_read_count_32();
+>  }
+> +#endif
+>  
+>  static void __init exynos4_clocksource_init(void)
+>  {
+>  	exynos4_mct_frc_start();
+>  
+> +#if defined(CONFIG_ARM)
+>  	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+>  	exynos4_delay_timer.freq = clk_rate;
+>  	register_current_timer_delay(&exynos4_delay_timer);
+> +#endif
+>  
+>  	if (clocksource_register_hz(&mct_frc, clk_rate))
+>  		panic("%s: can't register clocksource\n", mct_frc.name);
