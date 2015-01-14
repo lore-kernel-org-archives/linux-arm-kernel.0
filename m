@@ -1,54 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Jan 2015 17:37:57 +0100
-Subject: [PATCH v3 04/13] clk: sunxi: Add driver for A80 MMC config
- clocks/resets
-In-Reply-To: <1421113055-17867-5-git-send-email-wens@csie.org>
-References: <1421113055-17867-1-git-send-email-wens@csie.org>
- <1421113055-17867-5-git-send-email-wens@csie.org>
-Message-ID: <20150114163757.GZ4891@lukather>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 14 Jan 2015 11:25:10 -0800
+Subject: [PATCH v6 1/2] mtd: hisilicon: add a new NAND controller driver
+ for hisilicon hip04 Soc
+In-Reply-To: <54B6625F.8060607@hisilicon.com>
+References: <1421047734-30818-1-git-send-email-wangzhou1@hisilicon.com>
+ <1421047734-30818-2-git-send-email-wangzhou1@hisilicon.com>
+ <20150113035844.GJ9759@ld-irv-0074>
+ <54B6625F.8060607@hisilicon.com>
+Message-ID: <20150114192510.GY9759@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 09:37:26AM +0800, Chen-Yu Tsai wrote:
-> On the A80 SoC, the 4 mmc controllers each have a separate register
-> controlling their register access clocks and reset controls. These
-> registers in turn share a ahb clock gate and reset control.
+On Wed, Jan 14, 2015 at 08:34:39PM +0800, Zhou Wang wrote:
+> On 2015/1/13 11:58, Brian Norris wrote:
+> > On Mon, Jan 12, 2015 at 03:28:53PM +0800, Zhou Wang wrote:
+> >> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> >> +	chip->IO_ADDR_R = chip->IO_ADDR_W = devm_ioremap_resource(dev, res);
+> > 
+> > Hmm, do you really have to reuse IO_ADDR_{R,W} here? Those are only
+> > targeted for NAND systems which have a direct MMIO mapping to the NAND
+> > I/O pins. See nand_base's {read,write}_buf() and read_{byte,word}()
+> > implementations. But you override those.
 > 
-> This patch adds a platform device driver for these controls. It
-> requires both clocks and reset controls to be available, so using
-> CLK_OF_DECLARE might not be the best way.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  25 ++-
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-sun9i-mmc.c                 | 222 ++++++++++++++++++++++
->  3 files changed, 247 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 0dfd018ba47b..60b44285250d 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -57,6 +57,7 @@ Required properties:
->  	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
->  	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
->  	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
-> +	"allwinner,sun9i-a80-mmc-config-clk" - for mmc gates + resets on A80
+> There is a hardware buffer in this NAND controller, and the buffer can be
+> accessed as MMIO.
 
-It looks like it's not just a clock. How about dropping the -clk
-suffix?
+Sure.
 
-Maxime
+> IO_ADDR_R/W just indicates the base address of this buffer.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/69f80c0d/attachment.sig>
+But I was noting that IO_ADDR_{R,W} actually serve a very particular
+purpose in nand_base.c, which seems distinct from your HW buffer.
+
+> Maybe I need to use a void __iomem pointer stored in my host struct to use
+> this buffer instead of IO_ADDR_R/W as you said below here?
+
+Yes, I think that would be better.
+
+> > It's best if it's obvious if nand_base is somehow inadvertently using
+> > these pointers. So leaving them NULL is helpful.
+> > 
+> > As an alternative, you can just stash another private void __iomem
+> > pointer in you your host struct.
+
+Thanks,
+Brian
