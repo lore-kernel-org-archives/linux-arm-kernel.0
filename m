@@ -1,62 +1,69 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Wed, 14 Jan 2015 17:25:28 +0530
-Subject: [PATCH v4 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <20150112140918.GD24728@linaro.org>
-References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>
- <20150112140918.GD24728@linaro.org>
-Message-ID: <CAHM4w1=9uU+pjL8mDLaOahhSXaG3iByz1jfFn2SiugkT-sv7PQ@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 14 Jan 2015 12:56:24 +0100
+Subject: [PATCH v2 06/16] ASoC: samsung: i2s: Move clk enable to the
+ platform driver probe()
+In-Reply-To: <20150106180619.GN2634@sirena.org.uk>
+References: <1418997336-17777-1-git-send-email-s.nawrocki@samsung.com>
+ <1418997336-17777-7-git-send-email-s.nawrocki@samsung.com>
+ <20150106180619.GN2634@sirena.org.uk>
+Message-ID: <54B65968.8040404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 12, 2015 at 7:39 PM, Steve Capper <steve.capper@linaro.org> wrote:
-> On Sat, Jan 10, 2015 at 11:03:15PM -0500, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches, first
->> seen in October 2013. This version attempts to address concerns raised by
->> reviewers and also fixes problems discovered during testing, particularly during
->> SMP testing.
->>
->> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
->> and return probes(kretprobes) support for ARM64.
->>
->> The kprobes mechanism makes use of software breakpoint and single stepping
->> support available in the ARM v8 kernel.
->>
->> Changes since v2 include:
->>
->> 1) Removal of NOP padding in kprobe XOL slots. Slots are now exactly one
->> instruction long.
->> 2) Disabling of interrupts during execution in single-step mode.
->> 3) Fixing of numerous problems in instruction simulation code (mostly
->> thanks to Will Cohen).
->> 4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
->> access to kprobes through debugfs.
->> 5) kprobes is *not* enabled in defconfig.
->> 6) Numerous complaints from checkpatch have been cleaned up, although a couple
->> remain as removing the function pointer typedefs results in ugly code.
->>
->> Changes since v3 include:
->>
->> 1) Remove table-driven instruction parsing and replace with an if statement
->> calling out to old and new instruction test functions in insn.c.
->> 2) I removed the addition of orig_x0 to ptrace.h.
->> 3) Reorder the patches.
->> 4) Replace the previous interrupt disabling (from Will Cohen) with
->> an improved solution (from Steve Capper).
->
+On 06/01/15 19:06, Mark Brown wrote:
+> On Fri, Dec 19, 2014 at 02:55:26PM +0100, Sylwester Nawrocki wrote:
+>> Gating the I2S bus clock in the driver's runtime PM callbacks has
+>> currently really no effect since the clock is being enabled
+>> in the DAI's probe() and thus is permanently turned on. Now we just
+>> move the enable to the platform driver's probe(), which doesn't
+>> change the situation much. It will allow us to register a clock
+>> provider already in samsung_i2s_probe() function.
+> 
+> That doesn't sound quite right - the normal idiom for this stuff is to
+> enable on probe, mark the device as active then if runtime PM is enabled
+> it can idle the device and turn off the clock.  That way if runtime PM
+> is disabled things continue to run.  I've not checked to see if this is
+> actually happening correctly all the way through but that's what's
+> supposed to happen and means that enabling in the probe should still
+> result in working clock management.
+> 
+> It will as things currently stand be broken for the dual DAI case so
+> this is a fix for that (the dual DAI case will double enable if both
+> links are in use) but the analysis isn't quite correct.
 
-Hi David,
+I agree that the device should be additionally marked as active, however
+things will stop working unless we also do other changes to ensure
+the BUSCLK is enabled when required.
 
-If  you plan your next revision, may be  you can pick and squash
-following patches from my tree
-(https://github.com/pratyushanand/linux.git :
-ml_arm64_uprobe_devel_v2_over_kprobe_v4)
+AFAIU the clock will not be double enabled when both links are used,
+since the clk_get/clk_prepare_enable part in DAI probe() is done only
+for the primary DAI. I actually checked it with single and both links
+and the clk_enable_count is always 1 after system initialization:
 
-abb0b22be54c ARM64: Move BRK opcodes defines from kprobes.h to debug-monitors.h
-c82c2abaf751 ARM64: kprobe: Make prepare and handler function struct
-kprobe independent
-d95c226226dc ARM64: Remove definition of ARCH64_NOP_OPCODE
-e5f3310a21c4 ARM64: kprobe: Fix few instruction which is to be simulated
+# grep . /sys/kernel/debug/clk/*i2s*/clk_enable_count
 
-~Pratyush
+/sys/kernel/debug/clk/dout_i2s/clk_enable_count:0
+/sys/kernel/debug/clk/i2s0/clk_enable_count:0
+/sys/kernel/debug/clk/i2s1/clk_enable_count:0
+/sys/kernel/debug/clk/i2s2/clk_enable_count:0
+/sys/kernel/debug/clk/i2s_bus/clk_enable_count:1
+/sys/kernel/debug/clk/mout_i2s/clk_enable_count:0
+/sys/kernel/debug/clk/sclk_i2s/clk_enable_count:0
+/sys/kernel/debug/clk/sclk_i2s1/clk_enable_count:0
+/sys/kernel/debug/clk/sclk_i2s2/clk_enable_count:0
+
+I'm going to rephrase the changelog to something like:
+
+"The clk_prepare_enable() call on the "iis" clock is moved to happen
+ earlier in the DAI platform device driver's probe() callback, so the
+ I2S registers can be safely accessed through the clk API, after the clk
+ supplier is registered in the platform device probe().
+
+ After this patch the "iis" clock is kept enabled since the (primary)
+ I2S platform device probe() and until the platform device driver remove()
+ call.  This is similar to gating the clock in the snd_soc_dai probe() and
+ remove() callbacks.
+ Normally, in addition to that we should mark the device as PM runtime
+ active, so if runtime PM is enabled it can idle the device by turning off
+ the clock.  Correcting this issue is left for a separate patch series,
+ as we need to ensure the BUSCLK clock is always enabled when required."
