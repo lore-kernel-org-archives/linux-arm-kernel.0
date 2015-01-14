@@ -1,15 +1,15 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Jan 2015 10:21:27 +0100
-Subject: [PATCH] pcmcia: at91_cf: depend on !ARCH_MULTIPLATFORM
-In-Reply-To: <1421173685-21559-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421173685-21559-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B63517.9030809@atmel.com>
+Date: Wed, 14 Jan 2015 10:21:47 +0100
+Subject: [PATCH] ata: pata_at91: depend on !ARCH_MULTIPLATFORM
+In-Reply-To: <1421173517-21246-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421173517-21246-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B6352B.8050508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2015 19:28, Alexandre Belloni a ?crit :
-> Until the driver is corrected to stop including mach/at91_ramc.h and using
-> mach/io.h, it won't compile in a ARCH_MULTIPLATFORM configuration.
+Le 13/01/2015 19:25, Alexandre Belloni a ?crit :
+> Until the driver is corrected to stop using mach/at91isam9_smc.h, it won't
+> compile in a ARCH_MULTIPLATFORM configuration.
 > 
 > Suggested-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
@@ -17,21 +17,21 @@ Le 13/01/2015 19:28, Alexandre Belloni a ?crit :
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  drivers/pcmcia/Kconfig | 1 +
+>  drivers/ata/Kconfig | 1 +
 >  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-> index 910e90bf16c6..45f67c63d385 100644
-> --- a/drivers/pcmcia/Kconfig
-> +++ b/drivers/pcmcia/Kconfig
-> @@ -276,6 +276,7 @@ config BFIN_CFPCMCIA
->  config AT91_CF
->  	tristate "AT91 CompactFlash Controller"
->  	depends on PCMCIA && ARCH_AT91
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index a3a13605a9c4..5f601553b9b0 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -835,6 +835,7 @@ config PATA_AT32
+>  config PATA_AT91
+>  	tristate "PATA support for AT91SAM9260"
+>  	depends on ARM && SOC_AT91SAM9
 > +	depends on !ARCH_MULTIPLATFORM
 >  	help
->  	  Say Y here to support the CompactFlash controller on AT91 chips.
->  	  Or choose M to compile the driver as a module named "at91_cf".
+>  	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
+>  
 > 
 
 
