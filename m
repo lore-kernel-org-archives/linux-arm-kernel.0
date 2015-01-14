@@ -1,49 +1,85 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 14 Jan 2015 22:32:49 +0900
-Subject: [PATCH v4 0/2] mmc: dw_mmc: exynos: Add HS400 support
-In-Reply-To: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
-References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <54B67001.2090002@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 14 Jan 2015 14:34:48 +0100
+Subject: [PATCH v2 4/5] ARM: at91/dt: add AIC irq1 muxed peripheral id
+ definitions
+In-Reply-To: <54B66D6B.9050205@atmel.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-5-git-send-email-boris.brezillon@free-electrons.com>
+ <54B66D6B.9050205@atmel.com>
+Message-ID: <20150114143448.09d362b8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alim.
+On Wed, 14 Jan 2015 14:21:47 +0100
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-On 01/14/2015 07:30 PM, Alim Akhtar wrote:
-> This adds HS400 mode support for exynos dw_mmc host controller.
+> Le 13/01/2015 19:46, Boris Brezillon a ?crit :
+> > These ids will be used to define irqs multiplexed on the first irq line.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  .../dt-bindings/interrupt-controller/atmel-aic.h   | 22 ++++++++++++++++++++++
+> >  1 file changed, 22 insertions(+)
+> >  create mode 100644 include/dt-bindings/interrupt-controller/atmel-aic.h
+> > 
+> > diff --git a/include/dt-bindings/interrupt-controller/atmel-aic.h b/include/dt-bindings/interrupt-controller/atmel-aic.h
+> > new file mode 100644
+> > index 0000000..e14a94f
+> > --- /dev/null
+> > +++ b/include/dt-bindings/interrupt-controller/atmel-aic.h
+> > @@ -0,0 +1,22 @@
+> > +#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
+> > +#define _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
 > 
-> Currently tested on Exynos5800-peach-pi platform for HS400 mode.
-> Tested HS200 mode with this series applied, HS200 still works.
-> 
-> Appreciate testing on other exynos5/7 platform which supports emmc5.0
+> Nit.: why ARM_GIC?
 
-I will test this patch on exynos5/7 board.
+Because I copied it from the arm-gic.h header and forgot to rename
+those macros :-).
+I'll fix that.
 
-Best Regards,
-Jaehoon Chung
 > 
-> Changes in V4:
-> 	* drop the idea of changing existing binding for ciu_div as per [1]
->         * addressed comments from Jaehoon Chung [2]
-> 
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
-> [2] http://www.spinics.net/lists/devicetree/msg64373.html
-> 
-> Changes in V3:
-> 	rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
-> 
-> Seungwon Jeon (2):
->   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
->   ARM: dts: Add HS400 support for exynos5420 and exynos5800
-> 
->  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
->  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
->  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 +-
->  drivers/mmc/host/dw_mmc-exynos.c                   |  187 ++++++++++++++++----
->  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
->  drivers/mmc/host/dw_mmc.c                          |   16 +-
->  drivers/mmc/host/dw_mmc.h                          |    2 +
->  9 files changed, 212 insertions(+), 38 deletions(-)
-> 
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +
+> > +#define AIC_IRQ1_PMC		0
+> > +#define AIC_IRQ1_ST		1
+> > +#define AIC_IRQ1_PIT		1
+> > +#define AIC_IRQ1_DBGU		2
+> > +#define AIC_IRQ1_RTC		3
+> > +#define AIC_IRQ1_RTT		4
+> > +#define AIC_IRQ1_WATCHDOG	5
+> > +#define AIC_IRQ1_MC		6
+> > +#define AIC_IRQ1_SDRAMC		6
+> > +#define AIC_IRQ1_DDRSDRC	6
+> > +#define AIC_IRQ1_RSTC		7
+> > +#define AIC_IRQ1_PMERRLOC	8
+> > +#define AIC_IRQ1_PMECC		9
+
+Following up the discussion we had privately regarding these
+macros (whether we really need them or not), maybe adding a comment
+above the irqs property would be enough:
+
+	dumb_irq1_demux: dumb-irq-demux at 1 {
+		compatible = "irqchip-dumb-demux";
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+		/*
+		 * Interrupt lines:
+		 * 0: PMC
+		 * 1: PIT
+		 * 2: DBGU
+		 * 3: RTT
+		 * 4: WATCHDOG
+		 * 5: RSTC
+		 */
+		irqs = <0x3f>;
+	};
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
