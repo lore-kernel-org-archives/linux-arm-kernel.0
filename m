@@ -1,121 +1,55 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 14 Jan 2015 14:44:47 +0100
-Subject: [PATCH v3 3/7] ARM: dts: exynos4: add hdmi related nodes
-In-Reply-To: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
-References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421243091-10778-4-git-send-email-m.szyprowski@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Jan 2015 14:45:50 +0100
+Subject: [PATCH v2 3/5] ARM: at91/dt: select DUMB_IRQ_DEMUX for all at91
+ SoCs
+In-Reply-To: <1421174781-4340-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54B6730E.3060709@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds entries for HDMI, Mixer and i2c with hdmi-phy modules
-found in Exynos 4210 and 4x12 SoCs.
+Le 13/01/2015 19:46, Boris Brezillon a ?crit :
+> at91 SoCs need an dumb irq demuxer to gracefully support the fact that
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/boot/dts/exynos4.dtsi    | 40 +++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4210.dtsi |  8 ++++++++
- arch/arm/boot/dts/exynos4x12.dtsi | 11 +++++++++++
- 3 files changed, 59 insertions(+)
+"Older AT91 SoCs" please ;-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index c5dc2ef..d951647 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -38,6 +38,7 @@
- 		i2c5 = &i2c_5;
- 		i2c6 = &i2c_6;
- 		i2c7 = &i2c_7;
-+		i2c8 = &i2c_8;
- 		csis0 = &csis_0;
- 		csis1 = &csis_1;
- 		fimc0 = &fimc_0;
-@@ -544,6 +545,22 @@
- 		status = "disabled";
- 	};
- 
-+	i2c_8: i2c at 138E0000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "samsung,s3c2440-hdmiphy-i2c";
-+		reg = <0x138E0000 0x100>;
-+		interrupts = <0 93 0>;
-+		clocks = <&clock CLK_I2C_HDMI>;
-+		clock-names = "i2c";
-+		status = "disabled";
-+
-+		hdmi_i2c_phy: hdmiphy at 38 {
-+			compatible = "exynos4210-hdmiphy";
-+			reg = <0x38>;
-+		};
-+	};
-+
- 	spi_0: spi at 13920000 {
- 		compatible = "samsung,exynos4210-spi";
- 		reg = <0x13920000 0x100>;
-@@ -652,4 +669,27 @@
- 		samsung,sysreg = <&sys_reg>;
- 		status = "disabled";
- 	};
-+
-+	hdmi: hdmi at 12D00000 {
-+		compatible = "samsung,exynos4210-hdmi";
-+		reg = <0x12D00000 0x70000>;
-+		interrupts = <0 92 0>;
-+		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel", "sclk_hdmiphy",
-+			"mout_hdmi";
-+		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
-+			<&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
-+			<&clock CLK_MOUT_HDMI>;
-+		phy = <&hdmi_i2c_phy>;
-+		power-domains = <&pd_tv>;
-+		samsung,syscon-phandle = <&pmu_system_controller>;
-+		status = "disabled";
-+	};
-+
-+	mixer: mixer at 12C10000 {
-+		compatible = "samsung,exynos4210-mixer";
-+		interrupts = <0 91 0>;
-+		reg = <0x12C10000 0x2100>, <0x12c00000 0x300>;
-+		power-domains = <&pd_tv>;
-+		status = "disabled";
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 6728aaa..fc17cdf 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -193,4 +193,12 @@
- 			samsung,lcd-wb;
- 		};
- 	};
-+
-+	mixer: mixer at 12C10000 {
-+		clock-names = "mixer", "sclk_hdmi", "vp", "mout_mixer",
-+			"sclk_mixer";
-+		clocks = <&clock CLK_MIXER>, <&clock CLK_SCLK_HDMI>,
-+			<&clock CLK_VP>, <&clock CLK_MOUT_MIXER>,
-+			<&clock CLK_SCLK_MIXER>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index da8734e..e577bd0 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -283,4 +283,15 @@
- 		clock-names = "tmu_apbif";
- 		status = "disabled";
- 	};
-+
-+	hdmi: hdmi at 12D00000 {
-+		compatible = "samsung,exynos4212-hdmi";
-+	};
-+
-+	mixer: mixer at 12C10000 {
-+		compatible = "samsung,exynos4212-mixer";
-+		clock-names = "mixer", "sclk_hdmi", "vp";
-+		clocks = <&clock CLK_MIXER>, <&clock CLK_SCLK_HDMI>,
-+			<&clock CLK_VP>;
-+	};
- };
+Nit.: "an dumb demuxer" => "a virtual dumb demuxer"
+
+> irq1 is shared by several devices and a timer.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+As the newer SoCs don't need it, we can't select this option for the
+whole CONFIG_ARCH_AT91, so indeed:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  arch/arm/mach-at91/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 2395c68..8ff2c2a 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -28,6 +28,7 @@ config HAVE_AT91_H32MX
+>  config SOC_AT91SAM9
+>  	bool
+>  	select ATMEL_AIC_IRQ
+> +	select DUMB_DEMUX_IRQ
+>  	select COMMON_CLK_AT91
+>  	select CPU_ARM926T
+>  	select GENERIC_CLOCKEVENTS
+> @@ -98,6 +99,7 @@ if SOC_SAM_V4_V5
+>  config SOC_AT91RM9200
+>  	bool "AT91RM9200"
+>  	select ATMEL_AIC_IRQ
+> +	select DUMB_DEMUX_IRQ
+>  	select COMMON_CLK_AT91
+>  	select CPU_ARM920T
+>  	select GENERIC_CLOCKEVENTS
+> 
+
+
 -- 
-1.9.2
+Nicolas Ferre
