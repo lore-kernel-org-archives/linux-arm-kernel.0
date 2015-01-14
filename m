@@ -1,38 +1,30 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 14 Jan 2015 07:57:01 +0200
-Subject: [PATCH] serial: digicolor: fix sysrq handling
-In-Reply-To: <1730002.vWGOEymGdz@wuerfel>
-References: <1730002.vWGOEymGdz@wuerfel>
-Message-ID: <20150114055701.GX2481@sapphire.tkos.co.il>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 14 Jan 2015 15:03:44 +0900
+Subject: [PATCH 1/4] clk: tegra: make tegra_clocks_apply_init_table()
+ arch_initcall
+In-Reply-To: <20141216203824.22980.48872.stgit@chromeos-P9X79>
+References: <20141216203813.22980.2301.stgit@chromeos-P9X79>
+ <20141216203824.22980.48872.stgit@chromeos-P9X79>
+Message-ID: <CAAVeFu+Xg+Loh3DC3s4k0u26uiCx-9F6OmDidX+kHKgig39mHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Dec 17, 2014 at 5:38 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> From: Peter De Schrijver <pdeschrijver@nvidia.com>
+>
+> tegra_clocks_apply_init_table() needs to be called after the udelay
+> loop has been calibrated (see commit
+> 441f199a37cfd66c5dd8dd45490bd3ea6971117d ("clk: tegra: defer
+> application of init table") for why that is).  On existing Tegra SoCs
+> this was done by calling tegra_clocks_apply_init_table() from
+> tegra_dt_init(). To make this also work on ARM64, we need to change
+> this into an initcall. tegra_dt_init() is called from
+> customize_machine which is an arch_initcall. Therefore this should
+> also work on existing 32bit Tegra SoCs.
+>
+> Tested on Tegra20 (ventana), Tegra30 (beaverboard), Tegra124 (jetson TK1) and
+> Tegra132.
 
-On Tue, Jan 13, 2015 at 03:37:11PM +0100, Arnd Bergmann wrote:
-> Trying to build the digicolor-usart driver when sysrq is disabled
-> results in a compile error:
-> 
-> drivers/tty/serial/digicolor-usart.c: In function 'digicolor_uart_console_write':
-> drivers/tty/serial/digicolor-usart.c:407:33: error: 'struct uart_port' has no member named 'sysrq'
-> 
-> Like a lot of other drivers, this one requires an #ifdef to avoid
-> accessing the sysrq field here. While looking into this, I noticed
-> that the case where sysrq support is enabled is also broken, because
-> the driver fails to set the SUPPORT_SYSRQ macro.
-> 
-> This patch hopefully fixes both, but I do not hardware to test if sysrq
-> is actually working now.
-
-Unfortunately the hardware is not able to detect the BREAK condition, so it is 
-not possible to support sysrq on this hardware. I'll send a patch removing 
-sysrq reference.
-
-Thanks for build testing and reporting.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thierry, I don't think this series has ever been reviewed by us? The
+patches apply nicely on my tree and look harmless but I would rather
+leave that part to you if you don't mind.
