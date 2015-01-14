@@ -1,47 +1,83 @@
-From: bart.tanghe@thomasmore.be (Bart Tanghe)
-Date: Wed, 14 Jan 2015 09:16:31 +0100
-Subject: [PATCH]dts: add bcm2835-pwm bindings
-In-Reply-To: <54B54597.3010508@wwwdotorg.org>
-References: <1420471983-29945-1-git-send-email-bart.tanghe@thomasmore.be>
- <54B1556C.7070401@wwwdotorg.org> <54B53C86.4030903@thomasmore.be>
- <54B54597.3010508@wwwdotorg.org>
-Message-ID: <54B625DF.4030801@thomasmore.be>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 14 Jan 2015 17:17:23 +0900
+Subject: [PATCH v4 3/4] gpio: Add find GPIO base in increasing order
+In-Reply-To: <CACRpkdZccD_FM+m3US3e40LitH4OsX-8cSS_ju+C541330PdXw@mail.gmail.com>
+References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
+ <1417750722-14027-4-git-send-email-wangzhou.bry@gmail.com>
+ <CAAVeFu+Hn1Fk7PDcc4wGHFyJurX0hsW1N1prnPs2j=taGQKrKw@mail.gmail.com>
+ <CACRpkdZccD_FM+m3US3e40LitH4OsX-8cSS_ju+C541330PdXw@mail.gmail.com>
+Message-ID: <CAAVeFuJkr9mFwJq0GdbLO7EgbffvD25bjBVdXAFZubq5Sz4MZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2015 05:19 PM, Stephen Warren wrote:
-> On 01/13/2015 08:40 AM, Bart Tanghe wrote:
->> On 01/10/2015 05:38 PM, Stephen Warren wrote:
->>> On 01/05/2015 08:33 AM, Bart Tanghe wrote:
->>>> To probe the bcm2835-pwm driver properly, this dts bindings has to be added
->>>> to the bcm2835 dtsi file.
->>>> In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
->>>> To change the status of the gpio pins into pwm output pins, some additional
->>>> bindings has to be added but this has not to be done automatically.
->>>> Is it possible to document this bindings somewhere?
+On Wed, Jan 14, 2015 at 5:13 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Dec 10, 2014 at 9:51 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+>> On Fri, Dec 5, 2014 at 12:38 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
+>>> In function gpiochip_find_base, base number of a GPIO controller
+>>> is found in decreasing order. ARCH_NR_GPIOS is used to define from
+>>> which number we begin to search for base number of a GPIO controller.
 >>>
->>> The pinctrl bindings allow you to do this. They're documented in:
+>>> In fact, ARCH_NR_GPIOS brings us some multiplatform problems, like:
+>>> http://www.spinics.net/lists/devicetree/msg60433.html
 >>>
->>> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>> Documentation/devicetree/bindings/pinctrl/brcm,bcm2835-gpio.txt
->>>
->>> pinctrl setup would typically be added to the board file (i.e.
->>> arch/arm/boot/dts/bcm2835-rpi-b.dts) rather than the SoC file. I think
->>> on the RPi, the pins that can generate PWM aren't dedicated to PWM by
->>> the RPi board design (they could be GPIOs and probably other functions
->>> too) so we probably need to leave it up to individual users to add PWM
->>> configuration to their DT, if/when they use the PWM feature.
->>>
+>>> This patch adds the support to find base number of a GPIO controller
+>>> in increasing order. It will assign base number from 0.
+>>> A new dts property called gpio-number-forward must be add to the related
+>>> GPIO dts nodes if you want it works well.
 >>
->> Indeed, the pins aren't dedicated to pwm and can be used for other functions.
->> Is it usefull to add  the pwm pinctrl description to
->> Documentation/devicetree/bindings/pinctrl/brcm,bcm2835-gpio.txt or is this
->> useless?
-> 
-> As far as I can tell, that file already describes everything required to configure those pins as PWM (or indeed any pins as any function). Can you expand on what you think is missing?
-Indeed, everything is described in the file. I thought about a specific pwm pinctrl section but it's the same for i2c and spi. This will just make the file unclear. 
-No need to add documentation.
+>> Global GPIO numbers are a Linux-only concept, so your property should
+>> be named linux,gpio-number-forward.
+>>
+>> But even that way I don't think I like this idea. This just adds some
+>> more mess to how the GPIO number space is constructed, and it is
+>> already quite messy as it is. You have no guarantee over the probe
+>> order of your GPIO controllers, so they may very well be probed in a
+>> different order and end up with different base numbers anytime.
+>
+> Yup.
+>
+> The way stuff is usually forced ordered in device tree is to use
+> aliases, e.g.:
+>
+>         aliases {
+>                 serial0 = &pb1176_serial0;
+>                 serial1 = &pb1176_serial1;
+>                 serial2 = &pb1176_serial2;
+>                 serial3 = &pb1176_serial3;
+>                 serial4 = &fpga_serial;
+>         };
+>
+> By getting the alias ID with of_alias_get_id(np, "serial")
+> a certain serial port is assigned to be
+> 0, 1, 2 ...
+>
+> I think I could accept a tweak of this patch that will register
+> GPIOs beginning from 0 if and only if the alias mechanism is
+> used.
+>
+>         aliases {
+>                 gpio0 = &foo_gpio0;
+>                 gpio1 = &expander;
+>         };
+>
+>
+> The actual Linux-specific integer base will *NOT* be in the
+> device tree, but if you know how many GPIOs are on each
+> controller the number space is still stable and predictable
+> beginning from 0. If one want to keep track of the Linux
+> number space one can do so with comments in the device
+> tree or something.
+>
+>> I know we pushed back against this kind of solution in the past, but
+>> it is still more reliable than having a property that affects how the
+>> kernel's base finding function works, and will offer us a way to
+>> eventually put ARCH_NR_GPIOS and gpiochip_find_base() to rest (at the
+>> cost of backwards-compatibility, but we just cannot do without it).
+>> Linus, do you agree?
+>
+> What do you think about the above?
 
-Regards,
-
-Bart
+It would definitely help with the probe order, but unfortunately not
+with the fact that GPIO bases are allocated in decreasing order
+starting from the potentially varying ARCH_NR_GPIOS. So that alone
+will not be able to ensure stable GPIO numbers.
