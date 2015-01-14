@@ -1,47 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Jan 2015 13:38:08 +0100
-Subject: [PATCH] arm64: kill off the libgcc dependency
-In-Reply-To: <20150114114827.GH4050@arm.com>
-References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
- <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
-Message-ID: <2438951.7KFuXx85Hp@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Jan 2015 13:41:59 +0100
+Subject: [PATCH 19/26] ARM: sun7i: cubieboard2: Relicense the device tree
+ under GPLv2/X11
+In-Reply-To: <1413538728-17705-19-git-send-email-maxime.ripard@free-electrons.com>
+References: <1413538728-17705-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1413538728-17705-19-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150114124159.GT4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 January 2015 11:48:27 Will Deacon wrote:
-> On Wed, Jan 14, 2015 at 11:35:22AM +0000, Arnd Bergmann wrote:
-> > On Wednesday 14 January 2015 10:48:26 Will Deacon wrote:
-> > > On Wed, Jan 14, 2015 at 10:38:54AM +0000, Kevin Hao wrote:
-> > > > The arm64 doesn't depend on the libgcc to build the vmlinux image.
-> > > 
-> > > Yes it does; we make use of __builtin_* for our bitops, for example.
-> > > The compiler guys don't guarantee that these will be inlined.
-> > 
-> > Is that an architecture-specific statement?
+On Fri, Oct 17, 2014 at 11:38:41AM +0200, Maxime Ripard wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
 > 
-> I think the inlining guarantees apply to all architectures, but it affects
-> the arm64 kernel because we include <asm-generic/bitops/builtin-*>.
-
-Is it realistic to expect those to ever be implemented out of line?
-I would expect them to behave like assembler intrinsics, at least
-with the normal optimization level.
-
-> > The debate has been going on for ages in Linux, most architecture
-> > maintainers however decided against using libgcc and copy the functions
-> > that are actually needed into the kernel sources.
+> In order to make it easier for them to reuse our device trees, relicense our
+> device trees under a GPL/X11 dual-license.
 > 
-> What's the benefit of copying them?
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Alexander Bersenev <bay@hackerdom.ru>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Roman Byshko <rbyshko@gmail.com>
 
-You have a better control over what is included. On 32-bit architectures,
-the 64-bit division is notorious here, we really don't want to accidentally
-call the libgcc implementation but instead have our own do_div() helper.
+Applied. Thanks!
+Maxime
 
-Similarly I'd think that if we get a compiler that uses an external
-__ffs implementation, we should implement an inline assembly instead
-of taking the libgcc version.
-
-Another problem that has happened in the past is libgcc functions that
-in turn call glibc functions. To avoid that, you'd really want to build
-the kernel with -ffreestanding, but that opens another can of worms.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/bec408ee/attachment.sig>
