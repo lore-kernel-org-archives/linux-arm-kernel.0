@@ -1,79 +1,149 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 13 Jan 2015 19:47:00 -0500
-Subject: sysfs topology for arm64 cluster_id
-Message-ID: <54B5BC84.8090603@redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 13 Jan 2015 19:19:51 -0600
+Subject: [PATCH 1/7] ARM: OMAP2+: Remove unused ti81xx platform init code
+In-Reply-To: <1421190837-4692-2-git-send-email-tony@atomide.com>
+References: <1421190837-4692-1-git-send-email-tony@atomide.com>
+ <1421190837-4692-2-git-send-email-tony@atomide.com>
+Message-ID: <20150114011951.GD18523@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Folks,
+On Tue, Jan 13, 2015 at 03:13:51PM -0800, Tony Lindgren wrote:
+> The support for 81xx was never working in mainline, and it
+> will be only supported in device tree mode. Let's remove all
+> the remaining 81xx related platform code.
 
-TLDR: I would like to consider the value of adding something like
-"cluster_siblings" or similar in sysfs to describe ARM topology.
+you should probably also mention here that you're dropping unnecessary
+non-DT AM33xx support since that has never booted on legacy mode.
 
-A quick question on intended data representation in /sysfs topology
-before I ask the team on this end to go down the (wrong?) path. On ARM
-systems today, we have a hierarchical CPU topology:
+Other than that
 
-                 Socket ---- Coherent Interonnect ---- Socket
-                   |                                    |
-         Cluster0 ... ClusterN                Cluster0 ... ClusterN
-            |             |                      |             |
-      Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
-        |       |      |        |           |       |      |       |
-     T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Where we might (or might not) have threads in individual cores (a la SMT
-- it's allowed in the architecture at any rate) and we group cores
-together into units of clusters usually 2-4 cores in size (though this
-varies between implementations, some of which have different but similar
-concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
-cores). There are multiple clusters per "socket", and there might be an
-arbitrary number of sockets. We'll start to enable NUMA soon.
 
-The existing ARM architectural code understands expressing topology in
-terms of the above, but it doesn't quite map these concepts directly in
-sysfs (does not expose cluster_ids as an example). Currently, a cpu-map
-in DeviceTree can expose hierarchies (included nested clusters) and this
-is parsed at boot time to populate scheduler information, as well as the
-topology files in sysfs (if that is provided - none of the reference
-devicetrees upstream do this today, but some exist). But the cluster
-information itself isn't quite exposed (whereas other whacky
-architectural concepts such as s390 books are exposed already today).
+> Cc: Brian Hutchinson <b.hutchman@gmail.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/cclock3xxx_data.c   |  6 +-----
+>  arch/arm/mach-omap2/omap_phy_internal.c | 35 ---------------------------------
+>  arch/arm/mach-omap2/usb-musb.c          | 12 ++---------
+>  arch/arm/mach-omap2/usb.h               |  2 --
+>  4 files changed, 3 insertions(+), 52 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+> index 644ff32..e79c80b 100644
+> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
+> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+> @@ -3634,10 +3634,6 @@ int __init omap3xxx_clk_init(void)
+>  		omap_clocks_register(omap36xx_am35xx_omap3430es2plus_clks,
+>  				     ARRAY_SIZE(omap36xx_am35xx_omap3430es2plus_clks));
+>  		omap_clocks_register(omap3xxx_clks, ARRAY_SIZE(omap3xxx_clks));
+> -	} else if (soc_is_am33xx()) {
+> -		cpu_mask = RATE_IN_AM33XX;
+> -	} else if (cpu_is_ti814x()) {
+> -		cpu_mask = RATE_IN_TI814X;
+>  	} else if (cpu_is_omap34xx()) {
+>  		if (omap_rev() == OMAP3430_REV_ES1_0) {
+>  			cpu_mask = RATE_IN_3430ES1;
+> @@ -3681,7 +3677,7 @@ int __init omap3xxx_clk_init(void)
+>  	 * Lock DPLL5 -- here only until other device init code can
+>  	 * handle this
+>  	 */
+> -	if (!cpu_is_ti81xx() && (omap_rev() >= OMAP3430_REV_ES2_0))
+> +	if (omap_rev() >= OMAP3430_REV_ES2_0)
+>  		omap3_clk_lock_dpll5();
+>  
+>  	/* Avoid sleeping during omap3_core_dpll_m2_set_rate() */
+> diff --git a/arch/arm/mach-omap2/omap_phy_internal.c b/arch/arm/mach-omap2/omap_phy_internal.c
+> index 1a19fa0..8e90356 100644
+> --- a/arch/arm/mach-omap2/omap_phy_internal.c
+> +++ b/arch/arm/mach-omap2/omap_phy_internal.c
+> @@ -152,38 +152,3 @@ void am35x_set_mode(u8 musb_mode)
+>  
+>  	omap_ctrl_writel(devconf2, AM35XX_CONTROL_DEVCONF2);
+>  }
+> -
+> -void ti81xx_musb_phy_power(u8 on)
+> -{
+> -	void __iomem *scm_base = NULL;
+> -	u32 usbphycfg;
+> -
+> -	scm_base = ioremap(TI81XX_SCM_BASE, SZ_2K);
+> -	if (!scm_base) {
+> -		pr_err("system control module ioremap failed\n");
+> -		return;
+> -	}
+> -
+> -	usbphycfg = readl_relaxed(scm_base + USBCTRL0);
+> -
+> -	if (on) {
+> -		if (cpu_is_ti816x()) {
+> -			usbphycfg |= TI816X_USBPHY0_NORMAL_MODE;
+> -			usbphycfg &= ~TI816X_USBPHY_REFCLK_OSC;
+> -		} else if (cpu_is_ti814x()) {
+> -			usbphycfg &= ~(USBPHY_CM_PWRDN | USBPHY_OTG_PWRDN
+> -				| USBPHY_DPINPUT | USBPHY_DMINPUT);
+> -			usbphycfg |= (USBPHY_OTGVDET_EN | USBPHY_OTGSESSEND_EN
+> -				| USBPHY_DPOPBUFCTL | USBPHY_DMOPBUFCTL);
+> -		}
+> -	} else {
+> -		if (cpu_is_ti816x())
+> -			usbphycfg &= ~TI816X_USBPHY0_NORMAL_MODE;
+> -		else if (cpu_is_ti814x())
+> -			usbphycfg |= USBPHY_CM_PWRDN | USBPHY_OTG_PWRDN;
+> -
+> -	}
+> -	writel_relaxed(usbphycfg, scm_base + USBCTRL0);
+> -
+> -	iounmap(scm_base);
+> -}
+> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+> index bc89723..e4562b2 100644
+> --- a/arch/arm/mach-omap2/usb-musb.c
+> +++ b/arch/arm/mach-omap2/usb-musb.c
+> @@ -82,16 +82,8 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+>  	musb_plat.mode = board_data->mode;
+>  	musb_plat.extvbus = board_data->extvbus;
+>  
+> -	if (soc_is_am35xx()) {
+> -		oh_name = "am35x_otg_hs";
+> -		name = "musb-am35x";
+> -	} else if (cpu_is_ti81xx()) {
+> -		oh_name = "usb_otg_hs";
+> -		name = "musb-ti81xx";
+> -	} else {
+> -		oh_name = "usb_otg_hs";
+> -		name = "musb-omap2430";
+> -	}
+> +	oh_name = "usb_otg_hs";
+> +	name = "musb-omap2430";
+>  
+>          oh = omap_hwmod_lookup(oh_name);
+>          if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
+> diff --git a/arch/arm/mach-omap2/usb.h b/arch/arm/mach-omap2/usb.h
+> index 4ba2ae7..3395365 100644
+> --- a/arch/arm/mach-omap2/usb.h
+> +++ b/arch/arm/mach-omap2/usb.h
+> @@ -68,5 +68,3 @@ extern void am35x_musb_reset(void);
+>  extern void am35x_musb_phy_power(u8 on);
+>  extern void am35x_musb_clear_irq(void);
+>  extern void am35x_set_mode(u8 musb_mode);
+> -extern void ti81xx_musb_phy_power(u8 on);
+> -
+> -- 
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Anyway. We have a small problem with tools such as those in util-linux
-(lscpu) getting confused as a result of translating x86-isms to ARM. For
-example, the lscpu utility calculates the number of sockets using the
-following computation:
-
-nsockets = desc->ncpus / nthreads / ncores
-
-(number of sockets = total number of online processing elements /
-threads within a single core / cores within a single socket)
-
-If you're not careful, you can end up with something like:
-
-# lscpu
-Architecture:          aarch64
-Byte Order:            Little Endian
-CPU(s):                8
-On-line CPU(s) list:   0-7
-Thread(s) per core:    1
-Core(s) per socket:    2
-Socket(s):             4
-
-Now we can argue that the system in question needs an updated cpu-map
-(it'll actually be something ACPI but I'm keeping this discussion to DT
-to avoid that piece further in discussion, and you can assume I'm
-booting any test boxes in further work on this using DeviceTree prior to
-switching the result over to ACPI) but either way, util-linux is
-thinking in an x86-centric sense of what these files mean. And I think
-the existing topology/cpu-map stuff in arm64 is doing the same.
-
-Is it not a good idea to expose the cluster details directly in sysfs
-and have these utilities understand the possible extra level in the
-calculation? Or do we want to just fudge the numbers (as seems to be the
-case in some systems I am seeing) to make the x86 model add up?
-
-Let me know the preferred course...
-
-Jon.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/95f98eb0/attachment.sig>
