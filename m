@@ -1,136 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Jan 2015 10:42:56 +0000
-Subject: [PATCH 1/2] arm64: Fix overlapping VA allocations
-In-Reply-To: <20150113153448.GE16524@e104818-lin.cambridge.arm.com>
-References: <1421091408-10660-1-git-send-email-mark.rutland@arm.com>
- <1421091408-10660-2-git-send-email-mark.rutland@arm.com>
- <20150113153448.GE16524@e104818-lin.cambridge.arm.com>
-Message-ID: <20150114104256.GA12069@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 Jan 2015 10:46:10 +0000
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <54B63028.3090701@nvidia.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-9-git-send-email-will.deacon@arm.com>
+ <54B63028.3090701@nvidia.com>
+Message-ID: <20150114104610.GC4050@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 03:34:49PM +0000, Catalin Marinas wrote:
-> On Mon, Jan 12, 2015 at 07:36:47PM +0000, Mark Rutland wrote:
-> > --- a/arch/arm64/include/asm/io.h
-> > +++ b/arch/arm64/include/asm/io.h
-> > @@ -26,6 +26,7 @@
-> >  
-> >  #include <asm/byteorder.h>
-> >  #include <asm/barrier.h>
-> > +#include <asm/memory.h>
-> >  #include <asm/pgtable.h>
-> >  #include <asm/early_ioremap.h>
-> >  #include <asm/alternative.h>
-> > @@ -145,8 +146,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-> >   *  I/O port access primitives.
-> >   */
-> >  #define arch_has_dev_port()	(1)
-> > -#define IO_SPACE_LIMIT		(SZ_32M - 1)
-> > -#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
-> > +#define IO_SPACE_LIMIT		(PCI_IO_END - PCI_IO_START - 1)
-> > +#define PCI_IOBASE		((void __iomem *)PCI_IO_START)
+Hi Alex,
+
+On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
+> On 12/02/2014 01:57 AM, Will Deacon wrote:
+> > This patch plumbs the existing ARM IOMMU DMA infrastructure (which isn't
+> > actually called outside of a few drivers) into arch_setup_dma_ops, so
+> > that we can use IOMMUs for DMA transfers in a more generic fashion.
+> >
+> > Since this significantly complicates the arch_setup_dma_ops function,
+> > it is moved out of line into dma-mapping.c. If CONFIG_ARM_DMA_USE_IOMMU
+> > is not set, the iommu parameter is ignored and the normal ops are used
+> > instead.
 > 
-> I've seen at least couple of places where IO_SPACE_LIMIT is used as a
-> mark. So I would prefer it to be something like (power-of-two - 1)
-> rather than some random (size - 1).
+> A series for IOMMU support with Tegra/Nouveau ceased to work after this 
+> patch.
 
-I couldn't spot instances in core code (maybe I missed them), just
-arch/arm and arch/hexagon:
+Which series? This code shouldn't even be executed unless you start using
+of_xlate and the generic bindings.
 
-[mark at leverpostej:~/src/linux]% git grep IO_SPACE_LIMIT -- arch | grep '&'
-arch/arm/include/asm/io.h:#define __io(a)               __typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
-arch/arm/include/asm/io.h:#define __io(a)               __typesafe_io((a) & IO_SPACE_LIMIT)
-arch/hexagon/include/asm/io.h:  return readb(_IO_BASE + (port & IO_SPACE_LIMIT));
-arch/hexagon/include/asm/io.h:  return readw(_IO_BASE + (port & IO_SPACE_LIMIT));
-arch/hexagon/include/asm/io.h:  return readl(_IO_BASE + (port & IO_SPACE_LIMIT));
-arch/hexagon/include/asm/io.h:  writeb(data, _IO_BASE + (port & IO_SPACE_LIMIT));
-arch/hexagon/include/asm/io.h:  writew(data, _IO_BASE + (port & IO_SPACE_LIMIT));
-arch/hexagon/include/asm/io.h:  writel(data, _IO_BASE + (port & IO_SPACE_LIMIT));
+> The Tegra IOMMU is not registered by the time the DT is parsed, 
+> and thus all devices end up without the proper DMA ops set up because 
+> the phandle to the IOMMU cannot be resolved.
 
-Are PCI I/O addresses expected to wrap in this manner? To me it seems
-that masking addresses in this way just hides a bug if addresses are
-provided that don't fit inside the I/O space -- we'll generate an
-address inside the I/O space, but it could still be wrong.
+You might want to look at the patches posted for the exynos, renesas and ARM
+SMMUs for some hints in how to use the new API.
 
-If we do require IO_SPACE_LIMIT to function as a mask, then I think that
-we should add an explicit check to asm/io.h for that:
-
-/*
- * IO_SPACE_LIMIT needs to function as a mask.
- */
-BUILD_BUG_ON_NOT_POWER_OF_2(IO_SPACE_LIMIT + 1);
-
-That should highlight potential problems if someone updates the I/O
-space definitions in future. If core expects that IO_SPACE_LIMIT is
-usable as a mask then that should probably live in asm-generic/io.h.
-
-> > --- a/arch/arm64/include/asm/memory.h
-> > +++ b/arch/arm64/include/asm/memory.h
-> > @@ -45,7 +45,9 @@
-> >  #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
-> >  #define MODULES_END		(PAGE_OFFSET)
-> >  #define MODULES_VADDR		(MODULES_END - SZ_64M)
-> > -#define FIXADDR_TOP		(MODULES_VADDR - SZ_2M - PAGE_SIZE)
-> > +#define PCI_IO_END		(MODULES_VADDR - SZ_2M)
-> > +#define PCI_IO_START		(PCI_IO_END - SZ_32M)
-> > +#define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
-> >  #define TASK_SIZE_64		(UL(1) << VA_BITS)
+> Subsequently calling arm_iommu_create_mapping() and
+> arm_iommu_attach_device() from the driver (as I used to do until 3.18)
+> does not help since the call to set_dma_ops() has been moved out of
+> arm_iommu_attach_device(). Therefore there seems to be no way for a device
+> to gets its correct DMA ops unless the IOMMU is ready by the time the DT
+> is parsed.
 > 
-> So you could make PCI_IO_START MODULES_VADDR - SZ_16M and FIXADDR_TOP
-> just below it (or above as it was before, I don't really care).
+> Also potentially affected by this are the Rockchip DRM and OMAP3 ISP 
+> drivers, which follow the same pattern.
 
-I'd very much prefer that we have the the PCI_IO_END defintion and
-define PCI_IO_START in terms of that. That makes it easier to ensure
-that the boot-time VA space layout dump and the page table dumper agree
-with the actual VA space layout.
+I don't understand why any code currently in mainline should be affected.
+Please can you elaborate on the failure case?
 
-Are you asking for the I/O space to be shrunk to 16MB?
-
-I can drop the 2MB padding if that's what you're suggesting?
-
-> >  #ifdef CONFIG_COMPAT
-> > diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> > index cf33f33..203a6cf 100644
-> > --- a/arch/arm64/mm/dump.c
-> > +++ b/arch/arm64/mm/dump.c
-> > @@ -52,8 +52,8 @@ static struct addr_marker address_markers[] = {
-> >  	{ 0,			"vmemmap start" },
-> >  	{ 0,			"vmemmap end" },
-> >  #endif
-> > -	{ (unsigned long) PCI_IOBASE,		"PCI I/O start" },
-> > -	{ (unsigned long) PCI_IOBASE + SZ_16M,	"PCI I/O end" },
-> > +	{ PCI_IO_START,		"PCI I/O start" },
-> > +	{ PCI_IO_END,		"PCI I/O end" },
-> >  	{ FIXADDR_START,	"Fixmap start" },
-> >  	{ FIXADDR_TOP,		"Fixmap end" },
-> >  	{ MODULES_VADDR,	"Modules start" },
-> > 
-> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > index bac492c..9f2406d 100644
-> > --- a/arch/arm64/mm/init.c
-> > +++ b/arch/arm64/mm/init.c
-> > @@ -35,6 +35,7 @@
-> >  #include <linux/efi.h>
-> >  
-> >  #include <asm/fixmap.h>
-> > +#include <asm/memory.h>
-> >  #include <asm/sections.h>
-> >  #include <asm/setup.h>
-> >  #include <asm/sizes.h>
-> > @@ -291,7 +292,7 @@ void __init mem_init(void)
-> >  		  MLM((unsigned long)virt_to_page(PAGE_OFFSET),
-> >  		      (unsigned long)virt_to_page(high_memory)),
-> >  #endif
-> > -		  MLM((unsigned long)PCI_IOBASE, (unsigned long)PCI_IOBASE + SZ_16M),
-> > +		  MLM(PCI_IO_START, PCI_IO_END),
-> >  		  MLK(FIXADDR_START, FIXADDR_TOP),
-> >  		  MLM(MODULES_VADDR, MODULES_END),
-> >  		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
+> This raises the following questions:
 > 
-> If you change the order of FIX_ADDR_TOP with the PCI_IO_START, so you
-> should change the printed order as well.
+> 1) Why are arm_iommu_create_mapping() and arm_iommu_attach_device() 
+> still public since they cannot set the DMA ops and thus seem to be 
+> useless outside of arch_setup_dma_ops()?
 
-Done.
+It has callers outside of the file. I'd like to make it static, but that
+means doing some non-trivial porting of all the callers, which I'm also
+unable to test.
 
-Thanks,
-Mark.
+> 2) Say you want to use the IOMMU API in your driver, and have an iommu 
+> property in your device's DT node. If by chance your IOMMU is registered 
+> early, you will already have a mapping automatically created even before 
+> your probe function is called. Can this be avoided? Is it even safe?
+
+Currently, I think you have to either teardown the ops manually or return
+an error from of_xlate. Thierry was also looking at this sort of thing,
+so it might be worth talking to him.
+
+Will
