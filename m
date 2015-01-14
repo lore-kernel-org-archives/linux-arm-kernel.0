@@ -1,26 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jan 2015 17:44:07 +0000
-Subject: [Resend PATCH] ARM: mm: use phys_addr_t in ioremap_page functions
-In-Reply-To: <1421257452-18834-1-git-send-email-vitalya@ti.com>
-References: <1421257452-18834-1-git-send-email-vitalya@ti.com>
-Message-ID: <20150114174407.GB12302@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 14 Jan 2015 18:49:15 +0100
+Subject: [PATCH v4] Added support for pogoplug e02 (pink/gray)
+In-Reply-To: <1421210969-12446-1-git-send-email-ottxor@gentoo.org>
+References: <CAA8MNVjieDJ-dv2NNWXK=+uqrPmvtk2EiBYJGJkMugEiN2TsAw@mail.gmail.com>
+ <1421210969-12446-1-git-send-email-ottxor@gentoo.org>
+Message-ID: <20150114174915.GA389@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 12:44:12PM -0500, Vitaly Andrianov wrote:
-> On a 32 bit ARM architecture with LPAE extension physical addresses
-> cannot fit into unsigned long variable.
+On Tue, Jan 13, 2015 at 09:49:29PM -0700, Christoph Junghans wrote:
+> The pogoplug differs from the SheevaPlug only by a
+> few details, but especially in the led assignments.
+> This patch was tested under Gentoo Linux and is
+> based on dts files from Arch Linux ARM and OpenWrt.
 > 
-> This patch fixes the ioremap_page function.
+> Suggested-by: Felix Kaechele <heffer@fedoraproject.org>
+> Suggested-by: Oleg Rakhmanov <moonman.ca@gmail.com>
+> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+> ---
 > 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> Acked-by: Murali Karicheri <m-karicheri2@ti.com>
-> 
-> - Fixing the commit log and resending
+> V1: initial patch
+> V2: added GPL-2 header
+>     dropped earlyprintk from bootargs
+>     added stdout-path
+>     change leds name to scheme "devicename:colour:function"
+> V3: rebase on v3.19-rc4
+>     fixed stdout-path to be &uart0
+>     fixed compiling issue by using pin-controller
+> V4: moved ocp at f1000000 block into &uart and &pinctrl
 
-Still not happy.  Why do we even need this function which no one calls.
-Please delete it instead.
+Hi Christoph
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks for these last changes. It looks good now, and i've added it to
+mvebu/dt. So long as there are no more comments, i will pass it
+upstream soon.
+
+Thanks
+        Andrew
