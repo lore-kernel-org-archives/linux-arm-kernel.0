@@ -1,39 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Jan 2015 10:21:47 +0100
-Subject: [PATCH] ata: pata_at91: depend on !ARCH_MULTIPLATFORM
-In-Reply-To: <1421173517-21246-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421173517-21246-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B6352B.8050508@atmel.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 14 Jan 2015 10:22:05 +0100
+Subject: [PATCH] ARM: mm: Fix dma_contiguous_reserve comment
+In-Reply-To: <1420823548-37979-1-git-send-email-george_davis@mentor.com>
+References: <1420823548-37979-1-git-send-email-george_davis@mentor.com>
+Message-ID: <54B6353D.8050109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2015 19:25, Alexandre Belloni a ?crit :
-> Until the driver is corrected to stop using mach/at91isam9_smc.h, it won't
-> compile in a ARCH_MULTIPLATFORM configuration.
-> 
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hello,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 2015-01-09 18:12, George G. Davis wrote:
+> DMA contiguous allocations have been able to use highmem since commit
+> "95b0e65 ARM: mm: don't limit default CMA region only to low memory"
+> but a comment still notes the earlier "low memory" limitation.  Update
+> the comment to remove the low memory limitation and fix the
+> s/contigouos/contiguous/ typo while we're at it.
+>
+> Signed-off-by: George G. Davis <george_davis@mentor.com>
+
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
 > ---
->  drivers/ata/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> index a3a13605a9c4..5f601553b9b0 100644
-> --- a/drivers/ata/Kconfig
-> +++ b/drivers/ata/Kconfig
-> @@ -835,6 +835,7 @@ config PATA_AT32
->  config PATA_AT91
->  	tristate "PATA support for AT91SAM9260"
->  	depends on ARM && SOC_AT91SAM9
-> +	depends on !ARCH_MULTIPLATFORM
->  	help
->  	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
->  
-> 
+>   arch/arm/mm/init.c | 5 +----
+>   1 file changed, 1 insertion(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 98ad9c7..d538dc7 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -319,10 +319,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
+>   
+>   	early_init_fdt_scan_reserved_mem();
+>   
+> -	/*
+> -	 * reserve memory for DMA contigouos allocations,
+> -	 * must come from DMA area inside low memory
+> -	 */
+> +	/* reserve memory for DMA contiguous allocations */
+>   	dma_contiguous_reserve(arm_dma_limit);
+>   
+>   	arm_memblock_steal_permitted = false;
 
-
+Best regards
 -- 
-Nicolas Ferre
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
