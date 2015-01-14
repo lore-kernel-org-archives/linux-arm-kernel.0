@@ -1,37 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Jan 2015 16:23:09 +0100
-Subject: [PATCH] dma: coh901318: fix function return types build warnings
-In-Reply-To: <2760189.hGZZQd3ELS@wuerfel>
-References: <2760189.hGZZQd3ELS@wuerfel>
-Message-ID: <CACRpkdYTY4-4zqgkXoKqjizhj_nb_QhTmnT15EvewqOwkMBT-w@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 15 Jan 2015 00:27:38 +0900
+Subject: [RESEND PATCH] ARM: EXYNOS: Add exynos3250 suspend-to-ram support
+In-Reply-To: <54B3A477.8080705@samsung.com>
+References: <1420681838-4292-1-git-send-email-cw00.choi@samsung.com>
+ <54B38989.4030700@kernel.org> <54B38B24.20804@samsung.com>
+ <54B393B9.6060806@kernel.org> <54B3A477.8080705@samsung.com>
+Message-ID: <54B68AEA.7090406@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 10:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 01/12/15 19:39, Chanwoo Choi wrote:
+> Dear Kukjin,
+> 
+> On 01/12/2015 06:28 PM, Kukjin Kim wrote:
+>> On 01/12/15 17:51, Chanwoo Choi wrote:
+>>> Dear Kukjin,
+>>>
+>>> On 01/12/2015 05:44 PM, Kukjin Kim wrote:
+>>>> On 01/08/15 10:50, Chanwoo Choi wrote:
+>>>>> This patch adds the support for suspend-to-ram feature of Exynos3250 SoC.
+>>>>> Exynos3250 don't contain the L2 cache.
+>>>>>
+>>>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>> ---
+>>>>> Depend on:
+>>>>> - v3.19-rc3
+>>>>>
+>>>> Chanwoo,
+>>>>
+>>>> Can you please let me know why this is depending on v3.19-rc3?
+>>>> If I apply this on top of my tree not including some stuff between
+>>>> v3.19-rc1 and v3.19-rc3, is there a problem?
+>>>
+>>> No problem.
+>>> I'm sorry. It is my mistake about using meaning of dependency.
+>>> This patch can be applied on v3.19-rc1. I just tested it on v3.19-rc3.
+>>>
+>> OK, applied.
+> 
+> Thanks for your apply.
+> 
+> I check this patch on your git repository on following:
+> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/commit/?h=v3.20-next/update-samsung&id=e2fb3668567d0b70563cca0d1e350afd5053e4a3
+> 
+> Although this patch contains a little decription of patch,
+> applied patch don't include any description of patch.
+> 
+> If you possible, please add the description of patch.
+> 
+You're right. Maybe I've missed the contents when I applied.
 
-> A recent patch that removed coh901318_control() replaced it
-> with a number of pointers to existing functions, but those
-> unfortunately have the wrong return  type and need to be
-> changed to return an 'int' with an error value rather than
-> a 'void' to avoid these build warnings:
->
-> drivers/dma/coh901318.c:2697:32: warning: assignment from incompatible pointer type
->   base->dma_slave.device_config = coh901318_dma_set_runtimeconfig;
->                                 ^
-> drivers/dma/coh901318.c:2698:31: warning: assignment from incompatible pointer type
->   base->dma_slave.device_pause = coh901318_pause;
->                                ^
-> drivers/dma/coh901318.c:2699:32: warning: assignment from incompatible pointer type
->   base->dma_slave.device_resume = coh901318_resume
->
-> The coh901318_base_init function has the correct return type
-> already, but needs to be marked 'static' to avoid a sparse
-> warning about a missing declaration.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 6782af118b6c ("dmaengine: coh901318: Split device_control")
+I've just restored your git log with small modification.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Thanks,
+Kukjin
