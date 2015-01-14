@@ -1,23 +1,98 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 Jan 2015 12:57:51 +0100
-Subject: [PATCH v2 16/16] ARM: dts: Fix I2S1,
- I2S2 compatible for exynos4 SoCs
-In-Reply-To: <20150106181517.GQ2634@sirena.org.uk>
-References: <1418997336-17777-1-git-send-email-s.nawrocki@samsung.com>
- <1418997336-17777-17-git-send-email-s.nawrocki@samsung.com>
- <20150106181517.GQ2634@sirena.org.uk>
-Message-ID: <54B659BF.4000803@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Jan 2015 12:00:50 +0000
+Subject: [PATCH] ARM: dts: hip04: move bootwrapper to SRAM
+In-Reply-To: <54B64D07.2030005@suse.de>
+References: <54B48D5E.6050902@hisilicon.com> <9190510.INCMcmsads@wuerfel>
+ <54B4DA7E.2020602@hisilicon.com> <3703587.1qvjMFgdrL@wuerfel>
+ <54B4F350.5040007@hisilicon.com> <54B4F48B.6020206@suse.de>
+ <20150114105109.GB12069@leverpostej> <54B64D07.2030005@suse.de>
+Message-ID: <20150114120050.GF12069@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/15 19:15, Mark Brown wrote:
-> On Fri, Dec 19, 2014 at 02:55:36PM +0100, Sylwester Nawrocki wrote:
->> > I2S1, I2S2 on Exynos4 SoC series have limited functionality compared
->> > to I2S0, "samsung,s3c6410-i2s" compatible should be used for them.
->> > 
->> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> > ---
->
-> This should probably go to stable as a bug fix too.
+On Wed, Jan 14, 2015 at 11:03:35AM +0000, Alexander Graf wrote:
+> On 01/14/15 11:51, Mark Rutland wrote:
+> > On Tue, Jan 13, 2015 at 10:33:47AM +0000, Alexander Graf wrote:
+> >>
+> >> On 13.01.15 11:28, Wei Xu wrote:
+> >>>
+> >>> On 2015/1/13 17:02, Arnd Bergmann wrote:
+> >>>> On Tuesday 13 January 2015 16:42:38 Wei Xu wrote:
+> >>>>> On 2015/1/13 16:33, Arnd Bergmann wrote:
+> >>>>>> On Tuesday 13 January 2015 11:13:34 Wei Xu wrote:
+> >>>>>>> There is 8MB SRAM in hip04.
+> >>>>>>> Moving the bootwrapper into SRAM could avoid to worry about poking
+> >>>>>>> holes into DRAM memory or allocation algorithms either.
+> >>>>>>>
+> >>>>>>> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+> >>>>>>> ---
+> >>>>>>>   arch/arm/boot/dts/hip04.dtsi | 2 +-
+> >>>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>>>
+> >>>>>>> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+> >>>>>>> index 2388145..f0dfac7 100644
+> >>>>>>> --- a/arch/arm/boot/dts/hip04.dtsi
+> >>>>>>> +++ b/arch/arm/boot/dts/hip04.dtsi
+> >>>>>>> @@ -22,7 +22,7 @@
+> >>>>>>>   
+> >>>>>>>          bootwrapper {
+> >>>>>>>          compatible = "hisilicon,hip04-bootwrapper";
+> >>>>>>> -       boot-method = <0x10c00000 0x10000>, <0xe0000100 0x1000>;
+> >>>>>>> +       boot-method = <0xe00f0000 0x10000>, <0xe0000100 0x1000>;
+> >>>>>>>          };
+> >>>>> Hi Arnd,
+> >>>>>   
+> >>>>>> Is this backwards compatible with old firmware?
+> >>>>> Sorry, it is not backwards compatible.
+> >>>>> Another reason is that it could support opensuse
+> >>>>> more smoothly.
+> >>>>>
+> >>>>> I have updated the firmware and uploaded it
+> >>>>> into Linaro Hisilicon git tree last month.
+> >>>>> We will update the wiki on Linaro soon.
+> >>>>>
+> >>>>> Do you think it is OK?
+> >>> Hi Arnd,
+> >>>
+> >>>> Generally speaking it's not ok to change firmware interfaces in
+> >>>> an incompatible way. The preferred way to handle this would be
+> >>>> to have the firmware that puts the boot wrapper into a different
+> >>>> place also update this property, if at all possible.
+> >>> I very agreed with you.
+> >>>
+> >>> But before we have two kind of firmwares one is boot from SVC supporting
+> >>> PXE/NAND/SATA/GRUB booting and the other is boot from HYP just supporting NAND
+> >>> booting.
+> >>> This time we updated the firmware and made it boot from HYP supporting
+> >>> PXE/NAND/SATA/GRUB as we hoped(thanks for Alex's supporting!).
+> >>>
+> >>> Since we have to publish a new firmware I think it is a chance to
+> >>> update the dts of kernel. How do you think about it?
+> >> The main problem is that on this platform, the device tree doesn't
+> >> necessarily come from UEFI. If you boot using grub for example, you need
+> >> to manually pass in the device tree as a file in your grub
+> >> configuration, because 32bit ARM Linux doesn't have an EFI stub that
+> >> fetches it directly from EFI.
+> > For arm64, upstream GRUB can acquire a DTB from EFI by GUID and pass to
+> > a non EFI stub kernel. Is that not the case for 32-bit ARM?
+> 
+> When did that happen? At least in the code that I'm aware of, Linux 
+> acquires the DTB from EFI directly via GUID in the efi stub without 
+> involving grub.
 
-Sounds like a reasonable thing to do, I will Cc stable in next iteration.
+See grub-core/loader/arm64/linux.c. If the kernel doesn't have an EFI
+stub (e.g. if it's big-endian), GRUB will boot it as an Image rather
+than as an EFI application.  In that case GRUB will look for a DTB by
+GUID in the tables provided by EFI, and pass this to the kernel Image.
+
+> But 32bit ARM doesn't have an EFI stub and I didn't see any code in Grub 
+> for 32bit ARM fetching the DTB either. Which IMHO is ok, this is the 
+> only platform I've seen using EFI on 32bit at all anyways.
+
+Yeah, I couldn't spot DTB fetching in 32-bit GRUB either. IMO it should,
+otherwise a 32-bit filesystem with GRUB can only function one one
+platform, which goes against the major reason for anyone wanting EFI in
+the first place.
+
+Thanks,
+Mark.
