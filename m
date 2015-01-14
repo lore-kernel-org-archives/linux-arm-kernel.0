@@ -1,76 +1,76 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Wed, 14 Jan 2015 11:41:17 -0500
-Subject: sysfs topology for arm64 cluster_id
-In-Reply-To: <1514771.EWQBJle85Y@wuerfel>
-References: <54B5BC84.8090603@redhat.com> <1514771.EWQBJle85Y@wuerfel>
-Message-ID: <54B69C2D.9050202@redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 14 Jan 2015 16:31:18 +0000
+Subject: [PATCH v7 14/20] arm/arm64: KVM: add opaque private pointer to MMIO
+ data
+In-Reply-To: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
+References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1421253084-9663-15-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 06:24 AM, Arnd Bergmann wrote:
-> On Tuesday 13 January 2015 19:47:00 Jon Masters wrote:
->> Hi Folks,
->>
->> TLDR: I would like to consider the value of adding something like
->> "cluster_siblings" or similar in sysfs to describe ARM topology.
->>
->> A quick question on intended data representation in /sysfs topology
->> before I ask the team on this end to go down the (wrong?) path. On ARM
->> systems today, we have a hierarchical CPU topology:
->>
->>                   Socket ---- Coherent Interonnect ---- Socket
->>                     |                                    |
->>           Cluster0 ... ClusterN                Cluster0 ... ClusterN
->>              |             |                      |             |
->>        Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
->>          |       |      |        |           |       |      |       |
->>       T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
->>
->> Where we might (or might not) have threads in individual cores (a la SMT
->> - it's allowed in the architecture at any rate) and we group cores
->> together into units of clusters usually 2-4 cores in size (though this
->> varies between implementations, some of which have different but similar
->> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
->> cores). There are multiple clusters per "socket", and there might be an
->> arbitrary number of sockets. We'll start to enable NUMA soon.
->
-> Have you taken a look at the NUMA patches that Ganapatrao Kulkarni
-> has sent out? These encode the system-wide topology based on the model
-> from IBM Power machines.
->
-Thanks for that ptr!  I'll take a look at this code today.
+For a GICv2 there is always only one (v)CPU involved: the one that
+does the access. On a GICv3 the access to a CPU redistributor is
+memory-mapped, but not banked, so the (v)CPU affected is determined by
+looking at the MMIO address region being accessed.
+To allow passing the affected CPU into the accessors later, extend
+struct kvm_exit_mmio to add an opaque private pointer parameter.
+The current GICv2 emulation just does not use it.
 
->> Is it not a good idea to expose the cluster details directly in sysfs
->> and have these utilities understand the possible extra level in the
->> calculation? Or do we want to just fudge the numbers (as seems to be the
->> case in some systems I am seeing) to make the x86 model add up?
->>
->> Let me know the preferred course...
->
-> I like the idea of encoding the topology independent of the specific
-> levels implemented in hardware, and we could use that same model
-> that we have in DT to represent things to user space, or that
-> can directly access the "arm,associativity" properties in
-> /sys/firmware/devicetree/base, but that would not be portable to
-> ACPI based systems.
->
-> In the platform that Ganapatrao is interested in, there are no clusters,
-> but they have two levels of NUMA topology (sockets and boards), and
-> I could well imagine systems that have more than those two, or systems
-> that have multiple levels below a socket (e.g. chip, cluster, core,
-> thread) that all share the same NUMA node because they have a common
-> memory controller.
->
-> It would be nice to find a good representation for sysfs that covers
-> all of these cases, and that also shows the associativity of I/O
-> devices.
->
-Caches too (and cpu associativity to them, esp. L2)
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changelog v6...v7:
+ (none)
 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+Changelog v5...v6:
+ (none)
+
+Changelog v4...v5:
+ (add Acked-by:)
+
+Changelog v3...v4:
+- moving private parameter from each accessor into struct kvm_exit_mmio
+
+ arch/arm/include/asm/kvm_mmio.h   |    1 +
+ arch/arm64/include/asm/kvm_mmio.h |    1 +
+ virt/kvm/arm/vgic.c               |    1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
+index adcc0d7..3f83db2 100644
+--- a/arch/arm/include/asm/kvm_mmio.h
++++ b/arch/arm/include/asm/kvm_mmio.h
+@@ -37,6 +37,7 @@ struct kvm_exit_mmio {
+ 	u8		data[8];
+ 	u32		len;
+ 	bool		is_write;
++	void		*private;
+ };
+ 
+ static inline void kvm_prepare_mmio(struct kvm_run *run,
+diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
+index fc2f689..9f52beb 100644
+--- a/arch/arm64/include/asm/kvm_mmio.h
++++ b/arch/arm64/include/asm/kvm_mmio.h
+@@ -40,6 +40,7 @@ struct kvm_exit_mmio {
+ 	u8		data[8];
+ 	u32		len;
+ 	bool		is_write;
++	void		*private;
+ };
+ 
+ static inline void kvm_prepare_mmio(struct kvm_run *run,
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 0e84292..b6e17c8 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -709,6 +709,7 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
+ 
+ 	mmio32.len = 4;
+ 	mmio32.is_write = mmio->is_write;
++	mmio32.private = mmio->private;
+ 
+ 	mmio32.phys_addr = mmio->phys_addr + 4;
+ 	if (mmio->is_write)
+-- 
+1.7.9.5
