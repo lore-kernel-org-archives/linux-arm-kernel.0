@@ -1,97 +1,38 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 15 Jan 2015 00:55:44 +0900
-Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add INA2xx sensors
-In-Reply-To: <1421193801-24637-1-git-send-email-khilman@kernel.org>
-References: <1421193801-24637-1-git-send-email-khilman@kernel.org>
-Message-ID: <54B69180.2010403@kernel.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 Jan 2015 16:56:46 +0100
+Subject: [PATCH v4 0/2] mmc: dw_mmc: exynos: Add HS400 support
+In-Reply-To: <54B68CC6.1040907@kernel.org>
+References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
+ <54B67001.2090002@samsung.com> <54B68CC6.1040907@kernel.org>
+Message-ID: <CAPDyKFo0YB6UpjQXxQ9d9VhE6quur0mo=YNLdzB=xQoCE4J9xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/15 09:03, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@linaro.org>
-> 
-> The odroid-xu3 has 4 INA231 current sensors on board which can be
-> accessed from the Linux via the hwmon interface.
-> 
-> There is one sensor for each of these power rails:
-> 
-> - A15 cluster: VDD_ARM
-> - A7 cluster: VDD_KFC
-> - GPU: VDD_G3D
-> - memory: VDD_MEM
-> 
-> In addition to adding the sensors, LDO26 from the PMIC needs to be
-> enabled because it's powering these sensor.
-> 
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
-> 
->  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> index c29123c0734d..7874da20939f 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> @@ -174,6 +174,13 @@
->  					regulator-always-on;
->  				};
->  
-> +				ldo26_reg: LDO26 {
-> +					regulator-name = "vdd_ldo26";
-> +					regulator-min-microvolt = <3000000>;
-> +					regulator-max-microvolt = <3000000>;
-> +					regulator-always-on;
-> +				};
-> +
->  				buck1_reg: BUCK1 {
->  					regulator-name = "vdd_mif";
->  					regulator-min-microvolt = <800000>;
-> @@ -257,6 +264,38 @@
->  		};
->  	};
->  
-> +	i2c_0: i2c at 12C60000 {
-> +		status = "okay";
-> +
-> +		/* A15 cluster: VDD_ARM */
-> +		ina220 at 40 {
-> +			compatible = "ti,ina230";
-> +			reg = <0x40>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +
-> +		/* memory: VDD_MEM */
-> +		ina220 at 41 {
-> +			compatible = "ti,ina230";
-> +			reg = <0x41>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +
-> +		/* GPU: VDD_G3D */
-> +		ina220 at 44 {
-> +			compatible = "ti,ina230";
-> +			reg = <0x44>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +
-> +		/* A7 cluster: VDD_KFC */
-> +		ina220 at 45 {
-> +			compatible = "ti,ina230";
-> +			reg = <0x45>;
-> +			shunt-resistor = <10000>;
-> +		};
-> +	};
-> +
->  	i2c_2: i2c at 12C80000 {
->  		samsung,i2c-sda-delay = <100>;
->  		samsung,i2c-max-bus-freq = <66000>;
+On 14 January 2015 at 16:35, Kukjin Kim <kgene@kernel.org> wrote:
+> On 01/14/15 22:32, Jaehoon Chung wrote:
+>> Hi, Alim.
+>>
+>> On 01/14/2015 07:30 PM, Alim Akhtar wrote:
+>>> This adds HS400 mode support for exynos dw_mmc host controller.
+>>>
+>>> Currently tested on Exynos5800-peach-pi platform for HS400 mode.
+>>> Tested HS200 mode with this series applied, HS200 still works.
+>>>
+>>> Appreciate testing on other exynos5/7 platform which supports emmc5.0
+>>
+>> I will test this patch on exynos5/7 board.
+>>
+>
+> What's the result? :-) If it's OK, I'll take DT changes for exynos
+> stuff, I'm not sure about the driver changes though...
 
-Looks good to me and applied. To be honest, I'm not sure about the
-values in the node of shunt-resistor though ;)
+Kukjin,
 
-Thanks,
-Kukjin
+As I understand it, there is a dependency between the patches, since
+driver adds supports for new DT bindings.
+
+So, unless I am mistaken I think it would be best to take this
+complete patchset through my mmc tree. With your ack of course.
+
+Kind regards
+Uffe
