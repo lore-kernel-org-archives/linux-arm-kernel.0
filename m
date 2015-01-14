@@ -1,116 +1,52 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 15 Jan 2015 00:05:18 +0900
-Subject: [GIT PULL RE-SEND] Samsung fixes for v3.19
-In-Reply-To: <20150112221131.GC22090@quad.lixom.net>
-References: <54B38550.6010707@kernel.org>
- <20150112221131.GC22090@quad.lixom.net>
-Message-ID: <54B685AE.5080508@kernel.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 14 Jan 2015 23:04:48 +0800
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+Message-ID: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Oops, it's totally my fault and mistake. Actually my git command for
-pull-request was correct but the git tool was old version :-( because
-there are two git in my laptop, anyway sorry for that and I'm resending
-with signed tag has been created before.
+This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
 
-Please pull if you're OK with my comments on your questions below.
+updates from v6:
+  - Rebased on top of 3.19-rc4, add Mack Salter's patch to use
+    the early_ioremap after paging_init() for ACPI table mappings;
+
+  - Two patches about converting apic_id to phys_id to make it arch
+    agnostic were already merged into RC4 by Rafael.
+
+  - Split patch "Parse FADT table to get PSCI flags for PSCI init"
+    into two as Lorenzo's suggestion, also fix typo and lack of __init
+    for psci_0_2_set_functions() which is spotted by Lorenzo.
+
+  - Add Tested-by from Yijing Wang.
+
+previous version is here:
+v6: https://lkml.org/lkml/2015/1/4/40
+
+1. Why we need ACPI on ARM64?
+
+  - Grant already posted a blog about this, and stated clearly
+    why we need ACPI on ARM64:
+
+    http://www.secretlab.ca/archives/151
 
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+2. What we need to do before the arm64 ACPI core patches
+   could be merged into the kernel?
 
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+  - Al Stone posted a TODO list and updates v2 for the
+    progress we made:
+    http://www.spinics.net/lists/arm-kernel/msg390069.html
 
-are available in the git repository at:
+  - so from the progress we can see that we already finished
+    most of the items, and _OSI we got a plan to fix it, RFC
+    patch is on the way.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-fixes-3.19
 
-for you to fetch changes up to 26d13bf77b8e59adf4953577ba48e1903545bf7f:
+This patch set was tested on FVP by Fuwei, and booted ok as expected.
+(No functional change since last version)
 
-  ARM: exynos_defconfig: Enable LM90 driver (2015-01-12 17:16:32 +0900)
-
-----------------------------------------------------------------
-Samsung fixes for v3.19
-- exynos_defconfig: enable LM90 driver and display panel support
-   - HWMON
-   - SENSORS_LM90
-   - Direct Rendering Manager (DRM)
-   - DRM bridge registration and lookup framework
-   - Parade ps8622/ps8625 eDP/LVDS bridge
-   - NXP ptn3460 eDP/LVDS bridge
-   - Exynos Fully Interactive Mobile Display controller (FIMD)
-   - Panel registration and lookup framework
-   - Simple panels
-   - Backlight & LCD device support
-
-- use pmu_system_controller phandle for dp phy
-  : DP PHY requires pmu_system_controller to handle PMU reg. now
-
-----------------------------------------------------------------
-Andreas Faerber (1):
-      ARM: exynos_defconfig: Enable LM90 driver
-
-Javier Martinez Canillas (1):
-      ARM: exynos_defconfig: Enable options for display panel support
-
-Vivek Gautam (1):
-      arm: dts: Use pmu_system_controller phandle for dp phy
-
- arch/arm/boot/dts/exynos5250.dtsi |  2 +-
- arch/arm/boot/dts/exynos5420.dtsi |  4 ++--
- arch/arm/configs/exynos_defconfig | 18 +++++++++++++++++-
- 3 files changed, 20 insertions(+), 4 deletions(-)
-
-On 01/13/15 07:11, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Jan 12, 2015 at 05:26:56PM +0900, Kukjin Kim wrote:
->> Hi Arnd, Olof, Kevin
->>
->> Please pull samsung fixes for v3.19.
->>
->> Thanks,
->> Kukjin
->>
->> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>
->>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>
->> are available in the git repository at:
->>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> v3.19-samsung-fixes
->>
->> Andreas Faerber (1):
->>       ARM: exynos_defconfig: Enable LM90 driver
->>
->> Javier Martinez Canillas (1):
->>       ARM: exynos_defconfig: Enable options for display panel support
->>
->> Vivek Gautam (1):
->>       arm: dts: Use pmu_system_controller phandle for dp phy
->>
->>  arch/arm/boot/dts/exynos5250.dtsi |    2 +-
->>  arch/arm/boot/dts/exynos5420.dtsi |    4 ++--
->>  arch/arm/configs/exynos_defconfig |   18 +++++++++++++++++-
->>  3 files changed, 20 insertions(+), 4 deletions(-)
-> 
-> Please write a tag description and sign it. You used to do this, why stop?
-> 
-> Also, you're not explaining what these patches fixes. I can see the usefulness
-> in the display configuration options, but I'm less sure why 3.19 needs the LM90
-> driver if it's just for consistency?
-> 
-Yeah it could be but I think, updating defconfig would be helpful
-anytime if possible.
-
-> Finally, please explain why pmu breaks. Sounds like an incompatible binding
-> change?
-
-Yes, correct so it is required even though the change has been done in
-v3.18 not v3.19...commit a5ec59865025 (phy: exynos-dp-video: Use syscon
-support to control pmu register)
-
-Thanks,
-Kukjin
+Thanks
+Hanjun
