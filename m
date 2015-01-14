@@ -1,74 +1,38 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 14 Jan 2015 14:33:23 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for Exynos
- 64bit SoC
-Message-ID: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 14 Jan 2015 07:57:01 +0200
+Subject: [PATCH] serial: digicolor: fix sysrq handling
+In-Reply-To: <1730002.vWGOEymGdz@wuerfel>
+References: <1730002.vWGOEymGdz@wuerfel>
+Message-ID: <20150114055701.GX2481@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
-for Exynos 32bit SoC.
+Hi Arnd,
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
-This patch set is tested on 64-bit Exynos SoC. I send only this patch from
-following patchst[1].
-[1] https://lkml.org/lkml/2014/12/2/134
+On Tue, Jan 13, 2015 at 03:37:11PM +0100, Arnd Bergmann wrote:
+> Trying to build the digicolor-usart driver when sysrq is disabled
+> results in a compile error:
+> 
+> drivers/tty/serial/digicolor-usart.c: In function 'digicolor_uart_console_write':
+> drivers/tty/serial/digicolor-usart.c:407:33: error: 'struct uart_port' has no member named 'sysrq'
+> 
+> Like a lot of other drivers, this one requires an #ifdef to avoid
+> accessing the sysrq field here. While looking into this, I noticed
+> that the case where sysrq support is enabled is also broken, because
+> the driver fails to set the SUPPORT_SYSRQ macro.
+> 
+> This patch hopefully fixes both, but I do not hardware to test if sysrq
+> is actually working now.
 
-Changes from v2:
-- None
-Changes from v1:
-- Use CONFIG_ARM instead of CONFIG_ARM64
+Unfortunately the hardware is not able to detect the BREAK condition, so it is 
+not possible to support sysrq on this hardware. I'll send a patch removing 
+sysrq reference.
 
- drivers/clocksource/Kconfig      | 1 -
- drivers/clocksource/exynos_mct.c | 4 ++++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+Thanks for build testing and reporting.
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index fc01ec2..be38119 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
- 
- config CLKSRC_EXYNOS_MCT
- 	def_bool y if ARCH_EXYNOS
--	depends on !ARM64
- 	help
- 	  Support for Multi Core Timer controller on Exynos SoCs.
- 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 9403061..b840ea1 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
- 	return exynos4_read_count_32();
- }
- 
-+#if defined(CONFIG_ARM)
- static struct delay_timer exynos4_delay_timer;
- 
- static cycles_t exynos4_read_current_timer(void)
-@@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
- 			 "cycles_t needs to move to 32-bit for ARM64 usage");
- 	return exynos4_read_count_32();
- }
-+#endif
- 
- static void __init exynos4_clocksource_init(void)
- {
- 	exynos4_mct_frc_start();
- 
-+#if defined(CONFIG_ARM)
- 	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
- 	exynos4_delay_timer.freq = clk_rate;
- 	register_current_timer_delay(&exynos4_delay_timer);
-+#endif
- 
- 	if (clocksource_register_hz(&mct_frc, clk_rate))
- 		panic("%s: can't register clocksource\n", mct_frc.name);
+baruch
+
 -- 
-1.8.5.5
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
