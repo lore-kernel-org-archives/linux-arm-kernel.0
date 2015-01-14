@@ -1,90 +1,83 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 14 Jan 2015 15:03:05 -0600
-Subject: [PATCH] ARM: dts: OMAP: Add hwlock-base-id property to hwspinlock
- nodes
-Message-ID: <1421269385-51381-1-git-send-email-s-anna@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Jan 2015 22:07:34 +0100
+Subject: [PATCH 1/6] ARM: at91: pm: rework cpu detection
+In-Reply-To: <217DB987-13E3-4D5D-A9BE-D17662A19E26@jcrosoft.com>
+References: <1421097825-396-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421097825-396-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150114191412.GA14457@ns203013.ovh.net>
+ <20150114212139.0ad297eb@bbrezillon>
+ <217DB987-13E3-4D5D-A9BE-D17662A19E26@jcrosoft.com>
+Message-ID: <20150114210734.GO3843@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the generic property "hwlock-base-id" to the hwspinlock DT nodes
-on all applicable OMAP SoCS (OMAP4, OMAP5, DRA7, AM33xx and AM43xx).
-This common property is required by the hwspinlock core to be able
-to translate client locks properly. All the current OMAP SoCs only
-have a single instance of the IP, and so will use a common value of 0.
+Hi,
 
-Cc: Ohad Ben-Cohen <ohad@wizery.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-This is required for the OMAP Hwspinlock driver with the
-latest DT series,
-http://marc.info/?l=linux-omap&m=142126914027417&w=2
+(Adding Arnd in Cc)
 
- arch/arm/boot/dts/am33xx.dtsi | 1 +
- arch/arm/boot/dts/am4372.dtsi | 1 +
- arch/arm/boot/dts/dra7.dtsi   | 1 +
- arch/arm/boot/dts/omap4.dtsi  | 1 +
- arch/arm/boot/dts/omap5.dtsi  | 1 +
- 5 files changed, 5 insertions(+)
+On 15/01/2015 at 04:37:14 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> >>> -	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+> >>> -	if (cpu_is_at91rm9200())
+> >>> +	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+> >>> +
+> >>> +	if (of_machine_is_compatible("atmel,at91rm9200")) {
+> >>> +		/*
+> >>> +		 * AT91RM9200 SDRAM low-power mode cannot be used with
+> >>> +		 * self-refresh.
+> >>> +		 */
+> >>> 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> >>> -	
+> >>> +
+> >>> +		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
+> >>> +					    AT91RM9200_PMC_UDP;
+> >>> +		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
+> >>> +	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
+> >>> +		   of_machine_is_compatible("atmel,at91sam9g20") ||
+> >>> +		   of_machine_is_compatible("atmel,at91sam9261") ||
+> >>> +		   of_machine_is_compatible("atmel,at91sam9g10") ||
+> >>> +		   of_machine_is_compatible("atmel,at91sam9263")) {
+> >> nack here
+> >> 
+> >> you switch for runtime information from the SOC register store in ram to DT
+> >> 
+> >> DT is great but I do prefer to rely on the SoC register here as the whole was
+> >> also to check that the is correct
+> > 
+> > Well, cpu_is_xxx macros are defined in a mach specific header, and we're
+> > currently trying to enable multi platform support. 
+> 
+> Yes does not mean we can not move this, use the REAL hardware detected cpu is better
+> as you can check that the DT is valid for this SoC and also have fixup for a specific
+> SoC version without having to have x DT per SoC
+> 
+> > 
+> >> 
+> >> wihich is way slower
+> > 
+> > Hmm, this SoC detection has been move from the suspend path (where, as
+> > you stated, speed is a real concern) to the pm init function (which is
+> > only called once at startup), and I doubt the boot time penalty will
+> > even be noticeable?
+> 
+> except if your table is boot as quick as possible avoid useless string compare is always a good choice
+> 
+> IIRC we had in the past RFC to have the drivers compatible compare switch to HASH
+> for this purpose too
+> 
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index acd37057bca9..9ee1f44f0f4b 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -334,6 +334,7 @@
- 			compatible = "ti,omap4-hwspinlock";
- 			reg = <0x480ca000 0x1000>;
- 			ti,hwmods = "spinlock";
-+			hwlock-base-id = <0>;
- 			#hwlock-cells = <1>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index b62a1cd776cd..98eebedb1430 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -371,6 +371,7 @@
- 			compatible = "ti,omap4-hwspinlock";
- 			reg = <0x480ca000 0x1000>;
- 			ti,hwmods = "spinlock";
-+			hwlock-base-id = <0>;
- 			#hwlock-cells = <1>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 22771bc1643a..cf7ebdc95b4a 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -752,6 +752,7 @@
- 			compatible = "ti,omap4-hwspinlock";
- 			reg = <0x4a0f6000 0x1000>;
- 			ti,hwmods = "spinlock";
-+			hwlock-base-id = <0>;
- 			#hwlock-cells = <1>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 074147cebae4..77197e5454e8 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -344,6 +344,7 @@
- 			compatible = "ti,omap4-hwspinlock";
- 			reg = <0x4a0f6000 0x1000>;
- 			ti,hwmods = "spinlock";
-+			hwlock-base-id = <0>;
- 			#hwlock-cells = <1>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b321fdf42c9f..c2fc81724308 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -393,6 +393,7 @@
- 			compatible = "ti,omap4-hwspinlock";
- 			reg = <0x4a0f6000 0x1000>;
- 			ti,hwmods = "spinlock";
-+			hwlock-base-id = <0>;
- 			#hwlock-cells = <1>;
- 		};
- 
+Following a discussion with Arnd, the whole SoC detection will be remove
+which will be completely faster than mapping the dbgu registers.
+
+Also, the of_machine_is_compatible are supposed to be removed soon,
+waiting for the pm code to be reworked. What is done here is to allow us
+to go forward with switching to multiplatform and cleaning up the
+mach-at91 directory.
+
+
+I have follow up patches coming up and they already remove some of the
+of_machine_is_compatible.
+
 -- 
-2.2.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
