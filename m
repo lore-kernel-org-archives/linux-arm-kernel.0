@@ -1,50 +1,64 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 14 Jan 2015 16:22:08 +0800
-Subject: [PATCH] arm64: allow late use of early_ioremap
-In-Reply-To: <1421089778.12632.2.camel@t520.localdomain>
-References: <1421081711-1128-1-git-send-email-msalter@redhat.com>
- <20150112172534.GJ13360@arm.com> <1421089778.12632.2.camel@t520.localdomain>
-Message-ID: <54B62730.6090107@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 14 Jan 2015 09:22:35 +0100
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
+Message-ID: <20150114092235.032dc986@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Rob,
 
-On 2015?01?13? 03:09, Mark Salter wrote:
-> On Mon, 2015-01-12 at 17:25 +0000, Will Deacon wrote:
->> On Mon, Jan 12, 2015 at 04:55:11PM +0000, Mark Salter wrote:
->>> Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
->>> added a missing call to early_ioremap_reset(). This triggers a BUG if code
->>> tries using early_ioremap() after the early_ioremap_reset(). This is a
->>> problem for some ACPI code which needs short-lived temporary mappings
->>> after paging_init() but before mm_init(). This patch adds definitions for
+On Tue, 13 Jan 2015 21:26:42 -0600
+Rob Herring <robherring2@gmail.com> wrote:
 
-Minor update:
-... after paging_init() but before acpi_early_init() in start_kernel().
+> On Tue, Jan 13, 2015 at 12:46 PM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > Some interrupt controllers are multiplexing several peripheral IRQs on
+> > a single interrupt line.
+> > While this is not a problem for most IRQs (as long as all peripherals
+> > request the interrupt with IRQF_SHARED flag set), multiplexing timers and
+> > other type of peripherals will generate a WARNING (mixing IRQF_NO_SUSPEND
+> > and !IRQF_NO_SUSPEND is prohibited).
+> >
+> > Create a dumb irq demultiplexer which simply forwards interrupts to all
+> > peripherals (exactly what's happening with IRQ_SHARED) but keep a unique
+> > irq number for each peripheral, thus preventing the IRQF_NO_SUSPEND
+> > and !IRQF_NO_SUSPEND mix on a given interrupt.
+> 
+> This really seems like a work-around for how IRQF_SHARED works. It
+> seems like what is really desired is just per handler disabling.
 
-In ACPI, permanent mapping will be used after acpi_gbl_permanent_mmap
-set to 1 in acpi_early_init(), since GIC init and Arch timer init will
-be called before acpi_early_init(), early_ioremap() is still needed
-after mm_init().
+Like what I proposed here [1] ?
 
->>> the __late_set_fixmap() and __late_clear_fixmap() which avoids the BUG
->>> by allowing later use of early_ioremap().
->>>
->>> Signed-off-by: Mark Salter <msalter@redhat.com>
->>> CC: Leif Lindholm <leif.lindholm@linaro.org>
->>> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>   arch/arm64/include/asm/fixmap.h | 3 +++
->>>   1 file changed, 3 insertions(+)
->>
->> Given that we don't support ACPI on arm64 in mainline, I assume this can
->> wait until at least 3.20?
->
-> Sure. Just needs it to go in before ACPI code. And tbh, the ACPI code
-> could change and make this unneeded.
+> It is
+> fragile in that devices can deadlock the system if the drivers don't
+> disable the interrupt source before calling disable_irq.
 
-This is the best solution for now, so I need to add this patch as the 
-first one for ACPI core patch set, is it ok for you?
+Not exactly deadlock since spurious interrupt detection is implemented,
+but yes, things won't work as expected.
 
-Thanks
-Hanjun
+> But unlike
+> IRQF_SHARED, there is nothing explicit in the driver indicating it is
+> designed to work properly with a shared interrupt line.
+> 
+> I see no reason to accept this into DT either. We already can support
+> shared lines and modeling an OR gate as an interrupt controller is
+> pointless.
+
+Okay, I guess I'll let DT and irq maintainers decide what is preferable
+here (I already spent much time than I first expected to remove this
+warning in a proper way).
+
+Best Regards,
+
+Boris
+
+[1]https://lkml.org/lkml/2014/12/15/552
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
