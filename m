@@ -1,119 +1,97 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 14 Jan 2015 11:33:26 +0100
-Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
- handling
-In-Reply-To: <54B5590A.5060602@samsung.com>
-References: <1420863441-32592-1-git-send-email-m.smarduch@samsung.com>
- <20150111140003.GA2722@cbox> <54B3F5D7.4010501@samsung.com>
- <20150112174927.GM3868@cbox> <54B41ACD.6010405@samsung.com>
- <20150112194318.GA26222@cbox> <54B5590A.5060602@samsung.com>
-Message-ID: <20150114103326.GJ26222@cbox>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 14 Jan 2015 11:36:09 +0100 (CET)
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1501141110190.5526@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 09:42:34AM -0800, Mario Smarduch wrote:
-> On 01/12/2015 11:43 AM, Christoffer Dall wrote:
-> > On Mon, Jan 12, 2015 at 11:04:45AM -0800, Mario Smarduch wrote:
-> > 
-> > [...]
-> > 
-> >>>>>> @@ -1059,12 +1104,35 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>>>>>  	if (is_error_pfn(pfn))
-> >>>>>>  		return -EFAULT;
-> >>>>>>  
-> >>>>>> -	if (kvm_is_device_pfn(pfn))
-> >>>>>> +	if (kvm_is_device_pfn(pfn)) {
-> >>>>>>  		mem_type = PAGE_S2_DEVICE;
-> >>>>>> +		set_pte_flags = KVM_S2PTE_FLAG_IS_IOMAP;
-> >>>>>> +	}
-> >>>>>>  
-> >>>>>>  	spin_lock(&kvm->mmu_lock);
-> >>>>>>  	if (mmu_notifier_retry(kvm, mmu_seq))
-> >>>>>>  		goto out_unlock;
-> >>>>>> +
-> >>>>>> +	/*
-> >>>>>> +	 * When logging is enabled general page fault handling changes:
-> >>>>>> +	 * -  Writable huge pages are dissolved on a read or write fault.
-> >>>>>
-> >>>>> why dissolve huge pages on a read fault?
-> >>>>
-> >>>> What I noticed on write you would dissolve, on read you
-> >>>> rebuild THPs, flip back and forth like that, performance
-> >>>> & convergence was really bad.
-> >>>
-> >>> ah, that makes sense, we should probably indicate that reasoning
-> >>> somehow.  In fact, what threw me off was the use of the word "dissolve
-> >>> huge pages" which is not really what you're doing on a read fault, there
-> >>> you are just never adjusting to huge pages.
-> >>>
-> >>> I'm wondering why that would slow things down much though, the only cost
-> >>> would be the extra tlb invalidation and replacing the PMD on a
-> >>> subsequent write fault, but I trust your numbers nevertheless.
-> >>
-> >> If I understand correctly -
-> >> you do few writes, dissolve a huge page insert pte TLB entries,
-> >> then a read page fault installs a pmd clears the TLB cache
-> >> for that range, and it repeats over. Appears like you
-> >> need to constantly re-fault pte TLBs on writes to huge
-> >> page range.
-> > 
-> > that makes good sense, thanks for the explanation.
-> > 
-> > [...]
-> > 
-> >>>>>  	} else {
-> >>>>> +		unsigned long flags = 0;
-> >>>>>  		pte_t new_pte = pfn_pte(pfn, mem_type);
-> >>>>> +
-> >>>>>  		if (writable) {
-> >>>>>  			kvm_set_s2pte_writable(&new_pte);
-> >>>>>  			kvm_set_pfn_dirty(pfn);
-> >>>>>  		}
-> >>>>>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
-> >>>>>  					  fault_ipa_uncached);
-> >>>>> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
-> >>>>> -			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
-> >>>>> +
-> >>>>> +		if (pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE))
-> >>>>> +			flags |= KVM_S2PTE_FLAG_IS_IOMAP;
-> >>>>> +
-> >>>>> +		if (memslot_is_logging(memslot))
-> >>>>> +			flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
-> >>>> Now that it either IOMAP or LOGGING_ACTIVE do we need to acumulate flags?
-> >>>> Although we don't know if device mappings will be handled here.
-> >>>>
-> >>>
-> >>> so forget all I said about this in the past, I confused the code
-> >>> checking for !cache with the iomap flag.
-> >>>
-> >>> So, I think you can always safeful assume that stage2_get_pmd() gives you
-> >>> something valid back when you have the LOGGING flag set, because you
-> >>> always call the function with a valid cache when the LOGGING flag is
-> >>> set.  It could be worth adding the following to stage2_set_pte():
-> >>>
-> >>> VM_BUG_ON((flags & KVM_S2_FLAG_LOGGING_ACTIVE) && !cache)
-> >>
-> >> I see ok, thanks for clearing that up.
-> >>
-> >>>
-> >>> As for this code, the IOMAP flag's only effect is that we return -EFAULT
-> >>> if we are seeing an existing PTE for the faulting address.  This would
-> >>> no longer be valid if we allow logging dirty device memory pages, so we
-> >> Sorry, do you mean allow or disallow?
-> > 
-> > if we (by these patches) allow logging dirty pages for device memory,
-> > then we...
-> > 
-> >>
-> >>> really need to think about if there's any conceivable use case for this?
+On Tue, 13 Jan 2015, Rob Herring wrote:
+> On Tue, Jan 13, 2015 at 12:46 PM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > Some interrupt controllers are multiplexing several peripheral IRQs on
+> > a single interrupt line.
+> > While this is not a problem for most IRQs (as long as all peripherals
+> > request the interrupt with IRQF_SHARED flag set), multiplexing timers and
+> > other type of peripherals will generate a WARNING (mixing IRQF_NO_SUSPEND
+> > and !IRQF_NO_SUSPEND is prohibited).
+> >
+> > Create a dumb irq demultiplexer which simply forwards interrupts to all
+> > peripherals (exactly what's happening with IRQ_SHARED) but keep a unique
+> > irq number for each peripheral, thus preventing the IRQF_NO_SUSPEND
+> > and !IRQF_NO_SUSPEND mix on a given interrupt.
 > 
-> No I can't think of any use case to log Device address space.
-> 
-> So I could move forward - drop the IOMAP flag, and add the
-> VM_BUG_ON to stage2_set_pte().
-> 
-add the VM_BUG_ON, but keep the IOMAP flag as a separate thing from page
-logging (assuming we all agree they are orthogonal events), see other
-mail thread.
+> This really seems like a work-around for how IRQF_SHARED works. It
 
--Christoffer
+It's a workaround for a short coming of IRQF_SHARED.
+
+IRQF_SHARED has a massive short coming versus suspend and wakeup
+interrupts. If one of the demultiplexed interrupts is a valid wakeup
+source then we have no sane way to express this with IRQF_SHARED
+simply because the drivers need to be aware whether they run on stupid
+or well designed hardware.
+
+> seems like what is really desired is just per handler disabling. It is
+
+So you want a magic API like disable/enable_irq_action()?
+
+Certainly not.
+
+You'd open just another can of worms which will bring us abuse and
+hard to debug problems because driver writers think it's a good idea
+to use it for random purposes.
+
+Aside of that it would add another conditional into the interrupt
+delivery hotpath which is not desired either.
+
+> fragile in that devices can deadlock the system if the drivers don't
+> disable the interrupt source before calling disable_irq. But unlike
+
+Any misdesigned driver can do that for you.
+
+> IRQF_SHARED, there is nothing explicit in the driver indicating it is
+> designed to work properly with a shared interrupt line.
+
+IRQF_SHARED is a pretty bad indicator. Look at all the drivers which
+slap this flag onto request_irq() and have no single line of code
+which makes sure that the driver would ever work on a shared line.
+
+If it's just for annotational purposes, we can add a new IRQF flag,
+which is required to request such a interrupt line.
+
+> I see no reason to accept this into DT either. We already can support
+> shared lines and modeling an OR gate as an interrupt controller is
+> pointless.
+
+It's absolutely not pointless.
+
+All attempts to work around that have resulted in horrible bandaids so
+far. That's why I guided Boris to implement this dummy demultiplexing
+mechanism. It solves the problem at hand nicely without adding nasty
+hackarounds into the suspend/resume code and inflicting platform
+knowledge on multi-platform device drivers.
+
+If you have a proper solution for the problem at hand which
+
+   - avoids the demux dummy
+
+   - works straight forward with suspend/resume/wakeup
+
+   - does not add horrible new APIs
+
+   - does not add conditionals to the interrupt hotpath
+
+   - does not inflict platform knowledge about interrupt chip details
+     on drivers
+
+then I'm happy to take it.
+
+But as long as you can't come up with anything sane, the demux dummy
+is the best solution for this problem we've seen so far.
+
+Thanks,
+
+	tglx
