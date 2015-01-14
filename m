@@ -1,43 +1,43 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Wed, 14 Jan 2015 14:55:57 -0800
-Subject: [PATCH v2] ARM: config: multi_v7: Update it for Keystone defconfig
-In-Reply-To: <20150114212555.GA32756@quad.lixom.net>
-References: <1419879089-3293-1-git-send-email-santosh.shilimkar@oracle.com>
- <20141229191159.GP29379@saruman> <20150114212555.GA32756@quad.lixom.net>
-Message-ID: <54B6F3FD.9030106@oracle.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 14 Jan 2015 14:59:52 -0800
+Subject: [PATCHv7 0/2] Better page protections for arm64
+Message-ID: <1421276394-20402-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/14/2015 1:25 PM, Olof Johansson wrote:
-> On Mon, Dec 29, 2014 at 01:11:59PM -0600, Felipe Balbi wrote:
->> On Mon, Dec 29, 2014 at 10:51:29AM -0800, Santosh Shilimkar wrote:
->>> From: Grygorii Strashko <grygorii.strashko@linaro.org>
->>>
->>> Sync multi_v7_defconfig with the current keystone_defconfig with
->>> recent updates.
->>>
->>>   CONFIG_PCI_KEYSTONE=y
->>>   CONFIG_MTD_NAND_DAVINCI=y
->>>   CONFIG_I2C_DAVINCI=y
->>>   CONFIG_SPI_DAVINCI=y
->>>   CONFIG_GPIO_DAVINCI=y
->>>   CONFIG_GPIO_SYSCON=y
->>>   CONFIG_POWER_RESET_KEYSTONE=y
->>>   CONFIG_DAVINCI_WATCHDOG
->>>   CONFIG_USB_DWC3=y
->>>   CONFIG_KEYSTONE_USB_PHY=y
->>>   CONFIG_TI_AEMIF=y
->>>   CONFIG_KEYSTONE_IRQ=y
->>>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@linaro.org>
->>> Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
->>
->> Reviewed-by: Felipe Balbi <balbi@ti.com>
->
-> Thanks, applied to next/defconfig for 3.20.
->
-Thanks for picking it up.
+Happy New Year!
 
-Regards,
-Santosh
+This is v7 of the series to add stricter page protections for arm64.
+The goal is to have text be RO/X and everything else be RW/NX.
+Most of the dependent patches have now merged. This series is based
+on top of Ard's series[1] to have stable UEFI virtual mappings
+for kexec.
+
+This has been tested before and not much has changed so I've kept
+Kees' Tested-by. I think this should be approaching a point
+where it could be merged if it got a few more Tested-by but Catalin
+had a few more questions about the approach so I don't think it will
+make it this time.
+
+[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314431.html
+
+v7: Dropped the ioremap_exec addition because it's no longer needed
+with Ard's series.
+
+Laura Abbott (2):
+  arm64: use fixmap for text patching when text is RO
+  arm64: add better page protections to arm64
+
+ arch/arm64/Kconfig.debug            |  23 ++++
+ arch/arm64/include/asm/cacheflush.h |   5 +
+ arch/arm64/include/asm/fixmap.h     |   1 +
+ arch/arm64/kernel/insn.c            |  50 ++++++++-
+ arch/arm64/kernel/vmlinux.lds.S     |  17 ++-
+ arch/arm64/mm/init.c                |   1 +
+ arch/arm64/mm/mm.h                  |   2 +
+ arch/arm64/mm/mmu.c                 | 211 ++++++++++++++++++++++++++++++++----
+ 8 files changed, 283 insertions(+), 27 deletions(-)
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
