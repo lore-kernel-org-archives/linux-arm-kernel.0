@@ -1,130 +1,114 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 14 Jan 2015 16:31:06 +0000
-Subject: [PATCH v7 02/20] arm/arm64: KVM: pass down user space provided GIC
- type into vGIC code
+Date: Wed, 14 Jan 2015 16:31:24 +0000
+Subject: [PATCH v7 20/20] arm/arm64: KVM: force alignment of VGIC
+ dist/CPU/redist addresses
 In-Reply-To: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
 References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1421253084-9663-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1421253084-9663-21-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of a second emulated GIC model we need to let
-userspace specify the GIC model to use for each VM. Pass the
-userspace provided value down into the vGIC code and store it there
-to differentiate later.
+Although the GIC architecture requires us to map the MMIO regions
+only at page aligned addresses, we currently do not enforce this from
+the kernel side.
+Restrict any vGICv2 regions to be 4K aligned and any GICv3 regions
+to be 64K aligned. Document this requirement.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Changelog v6...v7:
-- only provide auto vgic init for a GICv2
+Changelog:
+ (new in v7)
 
-Changelog v5...v6:
- (add Acked-by)
+ Documentation/virtual/kvm/devices/arm-vgic.txt |    4 ++++
+ virt/kvm/arm/vgic.c                            |   16 +++++++++++++---
+ 2 files changed, 17 insertions(+), 3 deletions(-)
 
-Changelog v4...v5:
- (none)
-
-Changelog v3...v4:
- (added Acked-by)
-
- arch/arm/kvm/arm.c     |    2 +-
- include/kvm/arm_vgic.h |    7 +++++--
- virt/kvm/arm/vgic.c    |   15 +++++++++++++--
- 3 files changed, 19 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d0fadd6..dd1a689 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -821,7 +821,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	switch (ioctl) {
- 	case KVM_CREATE_IRQCHIP: {
- 		if (vgic_present)
--			return kvm_vgic_create(kvm);
-+			return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
- 		else
- 			return -ENXIO;
- 	}
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index ac4888d..525ce42 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -140,6 +140,9 @@ struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 5d4fd4b..3fb9054 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -20,20 +20,24 @@ Groups:
+     KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+       Base address in the guest physical address space of the GIC distributor
+       register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
++      This address needs to be 4K aligned and the region covers 4 KByte.
  
-+	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-+	u32			vgic_model;
-+
- 	int			nr_cpus;
- 	int			nr_irqs;
+     KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+       Base address in the guest physical address space of the GIC virtual cpu
+       interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
++      This address needs to be 4K aligned and the region covers 4 KByte.
  
-@@ -275,7 +278,7 @@ struct kvm_exit_mmio;
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
- int kvm_vgic_hyp_init(void);
- int kvm_vgic_map_resources(struct kvm *kvm);
--int kvm_vgic_create(struct kvm *kvm);
-+int kvm_vgic_create(struct kvm *kvm, u32 type);
- void kvm_vgic_destroy(struct kvm *kvm);
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
-@@ -327,7 +330,7 @@ static inline int kvm_vgic_map_resources(struct kvm *kvm)
- 	return 0;
- }
+     KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
+       Base address in the guest physical address space of the GICv3 distributor
+       register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
++      This address needs to be 64K aligned and the region covers 64 KByte.
  
--static inline int kvm_vgic_create(struct kvm *kvm)
-+static inline int kvm_vgic_create(struct kvm *kvm, u32 type)
- {
- 	return 0;
- }
+     KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
+       Base address in the guest physical address space of the GICv3
+       redistributor register mappings. There are two 64K pages for each
+       VCPU and all of the redistributor pages are contiguous.
+       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
++      This address needs to be 64K aligned.
+ 
+ 
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index c84f53df..283038e 100644
+index 184c6db..0cc6ab6 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1698,6 +1698,16 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 	int vcpu_id;
+@@ -1683,6 +1683,7 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	int type_needed;
+ 	phys_addr_t *addr_ptr, block_size;
++	phys_addr_t alignment;
  
- 	if (unlikely(!vgic_initialized(kvm))) {
-+		/*
-+		 * We only provide the automatic initialization of the VGIC
-+		 * for the legacy case of a GICv2. Any other type must
-+		 * be explicitly initialized once setup with the respective
-+		 * KVM device call.
-+		 */
-+		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2) {
-+			ret = -EBUSY;
-+			goto out;
-+		}
- 		mutex_lock(&kvm->lock);
- 		ret = vgic_init(kvm);
- 		mutex_unlock(&kvm->lock);
-@@ -1935,7 +1945,7 @@ out:
- 	return ret;
- }
+ 	mutex_lock(&kvm->lock);
+ 	switch (type) {
+@@ -1690,22 +1691,26 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+ 		addr_ptr = &vgic->vgic_dist_base;
+ 		block_size = KVM_VGIC_V2_DIST_SIZE;
++		alignment = SZ_4K;
+ 		break;
+ 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+ 		addr_ptr = &vgic->vgic_cpu_base;
+ 		block_size = KVM_VGIC_V2_CPU_SIZE;
++		alignment = SZ_4K;
+ 		break;
+ #ifdef CONFIG_ARM_GIC_V3
+ 	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+ 		addr_ptr = &vgic->vgic_dist_base;
+ 		block_size = KVM_VGIC_V3_DIST_SIZE;
++		alignment = SZ_64K;
+ 		break;
+ 	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+ 		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+ 		addr_ptr = &vgic->vgic_redist_base;
+ 		block_size = KVM_VGIC_V3_REDIST_SIZE;
++		alignment = SZ_64K;
+ 		break;
+ #endif
+ 	default:
+@@ -1718,10 +1723,15 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 		goto out;
+ 	}
  
--int kvm_vgic_create(struct kvm *kvm)
-+int kvm_vgic_create(struct kvm *kvm, u32 type)
- {
- 	int i, vcpu_lock_idx = -1, ret;
- 	struct kvm_vcpu *vcpu;
-@@ -1967,6 +1977,7 @@ int kvm_vgic_create(struct kvm *kvm)
+-	if (write)
+-		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
+-	else
++	if (write) {
++		if (!IS_ALIGNED(*addr, alignment))
++			r = -EINVAL;
++		else
++			r = vgic_ioaddr_assign(kvm, addr_ptr, *addr,
++					       block_size);
++	} else {
+ 		*addr = *addr_ptr;
++	}
  
- 	spin_lock_init(&kvm->arch.vgic.lock);
- 	kvm->arch.vgic.in_kernel = true;
-+	kvm->arch.vgic.vgic_model = type;
- 	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
- 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
- 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
-@@ -2404,7 +2415,7 @@ static void vgic_destroy(struct kvm_device *dev)
- 
- static int vgic_create(struct kvm_device *dev, u32 type)
- {
--	return kvm_vgic_create(dev->kvm);
-+	return kvm_vgic_create(dev->kvm, type);
- }
- 
- static struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+ out:
+ 	mutex_unlock(&kvm->lock);
 -- 
 1.7.9.5
