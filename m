@@ -1,175 +1,117 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 14 Jan 2015 15:10:11 -0800
-Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
- handling
-In-Reply-To: <20150114103233.GI26222@cbox>
-References: <1420863441-32592-1-git-send-email-m.smarduch@samsung.com>
- <20150111140003.GA2722@cbox> <54B3F5D7.4010501@samsung.com>
- <20150112174927.GM3868@cbox> <54B5A6E7.6090904@samsung.com>
- <20150114103233.GI26222@cbox>
-Message-ID: <54B6F753.8000101@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Jan 2015 23:10:08 +0000
+Subject: OMAP 4430 SDP: rather sick with recent kernels
+In-Reply-To: <20150114190925.GP2419@atomide.com>
+References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
+ <20150114175132.GR11502@n2100.arm.linux.org.uk>
+ <20150114190925.GP2419@atomide.com>
+Message-ID: <20150114231007.GS11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 02:32 AM, Christoffer Dall wrote:
-> On Tue, Jan 13, 2015 at 03:14:47PM -0800, Mario Smarduch wrote:
+On Wed, Jan 14, 2015 at 11:09:26AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150114 09:54]:
+> > On Wed, Dec 17, 2014 at 09:52:52AM +0000, Russell King - ARM Linux wrote:
+> > > The "combined" kernel boot follows a similar pattern, but yets a bit
+> > > further before oopsing, with ASoC DAPM code printing random bits of
+> > > kernel memory.
+> > 
+> > Note that the "combined" kernel (which is OMAP4 + Versatile Express)
+> > has for a while now also spat out this:
+> > 
+> > WARNING: CPU: 0 PID: 1 at .../linux-build/drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x218/0x2f0()
+> > 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
+> > Modules linked in:
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.19.0-rc4+ #1
+> > Hardware name: Generic OMAP4 (Flattened Device Tree)
+> > Backtrace:
+> > [<c0011bdc>] (dump_backtrace) from [<c0011e9c>] (show_stack+0x18/0x1c)
+> >  r6:c04c073e r5:00000009 r4:00000000 r3:00200040
+> > [<c0011e84>] (show_stack) from [<c0466380>] (dump_stack+0x78/0x94)
+> > [<c0466308>] (dump_stack) from [<c00379ec>] (warn_slowpath_common+0x8c/0xb8)
+> >  r4:ce461b38 r3:ce458000
+> > [<c0037960>] (warn_slowpath_common) from [<c0037abc>] (warn_slowpath_fmt+0x38/0x40)
+> >  r8:c04c06a6 r7:c04c094c r6:80080003 r5:ce54d218 r4:f8000400
+> > [<c0037a88>] (warn_slowpath_fmt) from [<c02098f8>] (l3_interrupt_handler+0x218/0x2f0)
+> >  r3:ce54ad40 r2:c04c0772
+> > [<c02096e0>] (l3_interrupt_handler) from [<c0076444>] (handle_irq_event_percpu+0x38/0x13c)
+> >  r10:ce440700 r9:c06e1c58 r8:ce5b1960 r7:00000000 r6:00000000 r5:00000013
+> >  r4:ce54f480
+> > [<c007640c>] (handle_irq_event_percpu) from [<c007658c>] (handle_irq_event+0x44/0x64)
+> >  r10:00000000 r9:ce5b1938 r8:ce5b1960 r7:00000001 r6:ce54f480 r5:ce440760
+> >  r4:ce440700
+> > [<c0076548>] (handle_irq_event) from [<c00795f4>] (handle_fasteoi_irq+0xb0/0x128)
+> >  r6:ce440760 r5:c06c5fec r4:ce440700 r3:00000000
+> > [<c0079544>] (handle_fasteoi_irq) from [<c0075d60>] (generic_handle_irq+0x28/0x38)
+> >  r6:ce408000 r5:00000000 r4:00000013 r3:c0079544
+> > [<c0075d38>] (generic_handle_irq) from [<c0075ebc>] (__handle_domain_irq+0x90/0xb8)
+> >  r4:00000000 r3:00000110
+> > [<c0075e2c>] (__handle_domain_irq) from [<c0008858>] (gic_handle_irq+0x44/0x68)
+> >  r7:ce461d0c r6:c068b34c r5:ce461cd8 r4:fa240100
+> > [<c0008814>] (gic_handle_irq) from [<c00129c4>] (__irq_svc+0x44/0x5c)
+> > Exception stack(0xce461cd8 to 0xce461d20)
+> > 1cc0:                                                       00000001 ce458508
+> > 1ce0: 00000000 00000000 60000113 ce5b1960 0000002c 00000000 ce5b1960 ce5b1938
+> > 1d00: 00000000 ce461d34 ce461cf0 ce461d20 c006d4f4 c046df64 20000113 ffffffff
+> >  r6:ffffffff r5:20000113 r4:c046df64 r3:ce458000
+> > [<c046df1c>] (_raw_spin_unlock_irqrestore) from [<c0077dd0>] (__setup_irq+0x3bc/0x4e4)
+> >  r5:c06b7c00 r4:ce5b1900
+> > [<c0077a14>] (__setup_irq) from [<c00780ec>] (setup_irq+0x50/0x90)
+> >  r10:c06ea338 r9:20000113 r8:c06ea338 r7:ce67ec00 r6:c06b7c00 r5:0000002c
+> >  r4:ce5b1900
+> > [<c007809c>] (setup_irq) from [<c0032768>] (omap_system_dma_probe+0x20c/0x2a4)
+> >  r6:ce67ec10 r5:0000002c r4:00000020 r3:00000002
+> > [<c003255c>] (omap_system_dma_probe) from [<c0298788>] (platform_drv_probe+0x50/0x98)
+> >  r10:c066d8b0 r9:00000000 r8:00000000 r7:c02971b8 r6:c06b7b94 r5:ffffffed
+> >  r4:ce67ec10
+> > [<c0298738>] (platform_drv_probe) from [<c0296fa8>] (driver_probe_device+0x13c/0x34c)
+> >  r6:00000000 r5:c06b7b94 r4:ce67ec10 r3:c0298738
+> > [<c0296e6c>] (driver_probe_device) from [<c0297230>] (__driver_attach+0x78/0x9c) r8:c0646228 r7:c02971b8 r6:c06b7b94 r5:ce67ec44 r4:ce67ec10
+> > [<c02971b8>] (__driver_attach) from [<c0295424>] (bus_for_each_dev+0x5c/0x98)
+> >  r6:c06b7b94 r5:ce461e48 r4:00000000 r3:c02971b8
+> > [<c02953c8>] (bus_for_each_dev) from [<c02969c0>] (driver_attach+0x20/0x28)
+> >  r7:00000000 r6:c06ce978 r5:ce61c100 r4:c06b7b94
+> > [<c02969a0>] (driver_attach) from [<c02965ec>] (bus_add_driver+0xf8/0x1fc)
+> > [<c02964f4>] (bus_add_driver) from [<c0297914>] (driver_register+0xa4/0xe8)
+> >  r7:c06e9040 r6:c068d0e8 r5:c068d0e8 r4:c06b7b94
+> > [<c0297870>] (driver_register) from [<c029861c>] (__platform_driver_register+0x50/0x64)
+> >  r5:c068d0e8 r4:ce621f80
+> > [<c02985cc>] (__platform_driver_register) from [<c0646240>] (omap_system_dma_init+0x18/0x20)
+> > [<c0646228>] (omap_system_dma_init) from [<c0008c44>] (do_one_initcall+0x114/0x1e0)
+> > [<c0008b30>] (do_one_initcall) from [<c0632e3c>] (kernel_init_freeable+0x110/0x1dc)
+> >  r10:c066d8b0 r9:00000000 r8:0000007d r7:c06e9040 r6:c067ddf0 r5:c066d898
+> >  r4:00000003
+> > [<c0632d2c>] (kernel_init_freeable) from [<c0460840>] (kernel_init+0x10/0xec)
+> >  r10:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c0460830 r4:00000000
+> > [<c0460830>] (kernel_init) from [<c000f0d0>] (ret_from_fork+0x14/0x24)
+> >  r4:00000000 r3:00000000
+> > ---[ end trace bcb85e0273c31888 ]---
+> > OMAP DMA hardware revision 0.0
+> > 
+> > This does not occur when booting the plain "omap4" kernel.
+> > 
+> > I thought it may be related to another error which people have been
+> > reporting, but as it's still there, I thought I should report it.
+> > 
+> > To me, this suggests that Versatile Express code may be initialising
+> > on non-Versatile Express hardware, possibly touching hardware, but
+> > it looks like it's happening within the setup_irq() called from the
+> > legacy OMAP DMA code, though it's possible that could be because
+> > Versatile Express code could be hitting some register which causes
+> > OMAP4 to later to wrong.
+> > 
+> > I think it's going to be particularly horrid to debug...
 > 
-> [...]
+> This seems like it could be a similar issue to what we were seeing on
+> omap3 where the legacy IRQ mappings went wrong without using the
+> irq_domain_add_legacy(). Maybe vexpress affects NR_IRQS or something?
 > 
->>>>>
->>>>>
->>>>> What I meant last time around concerning user_mem_abort was more
->>>>> something like this:
->>>>>
->>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->>>>> index 1dc9778..38ea58e 100644
->>>>> --- a/arch/arm/kvm/mmu.c
->>>>> +++ b/arch/arm/kvm/mmu.c
->>>>> @@ -935,7 +935,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>>>>  		return -EFAULT;
->>>>>  	}
->>>>>  
->>>>> -	if (is_vm_hugetlb_page(vma)) {
->>>>> +	/*
->>>>> +	 * Writes to pages in a memslot with logging enabled are always logged
->>>>> +	 * on a singe page-by-page basis.
->>>>> +	 */
->>>>> +	if (memslot_is_logging(memslot) && write_fault)
->>>>> +		force_pte = true;
->>>>
->>>> If it's a write you take the pte route and
->>>> dissolves huge page, if it's a read you reconstruct the
->>>> THP that seems to yield pretty bad results.
->>>
->>> ok, then remove the ' && write_fault' part of the clause.
->> Hi Christoffer,
->>  couple comments/questions.
->>
->>  setting force_pte here, disables huge pages for
->> non-writable regions.
->>
-> 
+> Also, I think we could now disable the legacy DMA init completely
+> except for omap2 and 3.
 
-Hi Christoffer,
- another round, although I'll go ahead and post another
-iteration, sorry but as you mentioned this code is
-important.
+I've added a "cat /proc/interrupts" which should reveal whether the IRQs
+have changed between the two different builds.
 
-> hmmm, by a non-writable region you mean a read-only memslot? Can you set
-> dirty page logging for such one?  That doesn't make much sense to me.
-
-Come to think of it that's  true.
-
-It's bit fuzzyy when I was looking at the API for KVM_MEM_LOG_DIRTY_PAGES,
-it appears user space needs to check if region is read-only and set region
-size to 0(qemu). I don't see any checks in kernel to disable logging if
-region is read only and we're enabling dirty page logging. API doesn't say
-anything else. You may be able to enable logging
-for read-only region if you leave region size as is.
-
-I guess this has been around for quite a while so we
-can just assume read-only slots will have logging disabled.
-
-> 
-> Note, that if you receive writable == false from gfn_to_pfn_prot() that
-> doesn't mean that the page can never be written to, it just means that
-> the current mapping of the page is not a writable one, you can call that
-> same function again later with write_fault=true, and you either get a
-> writable page back or you simply get an error.
-
-Yes that's true after studying hva_to_pfn_slow(),
-and __get_user_pages_fast(), a lot of conditions
-handled there.
-
-> 
-> [...]
-> 
->>>>>  	if (kvm_is_device_pfn(pfn))
->>>>>  		mem_type = PAGE_S2_DEVICE;
->>
->> If we're not setting the IOMAP flag do we have need
->> this, since we're forfeiting error checking later
->> in stage2_set_pte()?
->>
-> 
-> we still need this, remember the error checking is about
-> cache == NULL, not about the IOMAP flag.  I think I address this in the
-> new proposal below, but please check carefully.
-
-Ok so mmu notifier may call stage2_set_pte() with
-null cache poiner and intermediate table entries may
-not be there so stage2_get_pud() may return NULL.
-With logging on it won't happen, but just in case
-we check.
-
-And we'll continue to handle Device faults until
-further notice.
-
-> 
-> Take a look at this one:
-
-Looks good to me, concise.
-
-Thanks.
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 1dc9778..841e053 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -919,6 +919,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	pfn_t pfn;
->  	pgprot_t mem_type = PAGE_S2;
->  	bool fault_ipa_uncached;
-> +	unsigned long flags = 0;
->  
->  	write_fault = kvm_is_write_fault(vcpu);
->  	if (fault_status == FSC_PERM && !write_fault) {
-> @@ -976,8 +977,26 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	if (is_error_pfn(pfn))
->  		return -EFAULT;
->  
-> -	if (kvm_is_device_pfn(pfn))
-> +	if (kvm_is_device_pfn(pfn)) {
->  		mem_type = PAGE_S2_DEVICE;
-> +		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
-> +	} else if (memslot_is_logging(memslot)) {
-> +		/*
-> +		 * Faults on pages in a memslot with logging enabled that can
-> +		 * should not be mapped with huge pages (it introduces churn
-> +		 * and performance degradation), so force a pte mapping.
-> +		 */
-> +		force_pte = true;
-> +		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
-> +
-> +		/*
-> +		 * Only actually map the page as writable if this was a write
-> +		 * fault.
-> +		 */
-> +		if (!write_fault)
-> +			writable = false;
-> +
-> +	}
->  
->  	spin_lock(&kvm->mmu_lock);
->  	if (mmu_notifier_retry(kvm, mmu_seq))
-> @@ -1002,13 +1021,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		if (writable) {
->  			kvm_set_s2pte_writable(&new_pte);
->  			kvm_set_pfn_dirty(pfn);
-> +			mark_page_dirty(kvm, gfn);
->  		}
->  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
->  					  fault_ipa_uncached);
-> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
-> -			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
-> -	}
->  
-> +		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
-> +	}
->  
->  out_unlock:
->  	spin_unlock(&kvm->mmu_lock);
-> 
-> Thanks,
-> -Christoffer
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
