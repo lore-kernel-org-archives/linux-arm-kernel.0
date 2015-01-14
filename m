@@ -1,83 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Jan 2015 15:43:29 +0100
-Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
-In-Reply-To: <20150114150332.09fecbea@bbrezillon>
-References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>	<1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>	<54B670EA.1010800@atmel.com>
- <20150114150332.09fecbea@bbrezillon>
-Message-ID: <54B68091.7080109@atmel.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 14 Jan 2015 16:03:39 +0100
+Subject: [PATCH RFC] pinctrl: at91
+In-Reply-To: <CACRpkda9wTPcRy6nRGP08rDpHV=tRyYVuD80TeO2zFGzX+aJcg@mail.gmail.com>
+References: <CACRpkdbkUUzVVMp14szY+vGNd+d+8bL066STh_XMGud-UsFBqA@mail.gmail.com>
+ <1418637470-5839-1-git-send-email-ludovic.desroches@atmel.com>
+ <54943933.60102@atmel.com>
+ <20150106093706.GC26982@ldesroches-Latitude-E6320>
+ <CACRpkda9wTPcRy6nRGP08rDpHV=tRyYVuD80TeO2zFGzX+aJcg@mail.gmail.com>
+Message-ID: <20150114150339.GJ3625@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/01/2015 15:03, Boris Brezillon a ?crit :
-> On Wed, 14 Jan 2015 14:36:42 +0100
-> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Wed, Jan 14, 2015 at 01:26:16PM +0100, Linus Walleij wrote:
+> On Tue, Jan 6, 2015 at 10:37 AM, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
 > 
->> Le 13/01/2015 19:46, Boris Brezillon a ?crit :
->>> Some interrupt controllers are multiplexing several peripheral IRQs on
->>> a single interrupt line.
->>> While this is not a problem for most IRQs (as long as all peripherals
->>> request the interrupt with IRQF_SHARED flag set), multiplexing timers and
->>> other type of peripherals will generate a WARNING (mixing IRQF_NO_SUSPEND
->>> and !IRQF_NO_SUSPEND is prohibited).
->>>
->>> Create a dumb irq demultiplexer which simply forwards interrupts to all
->>> peripherals (exactly what's happening with IRQ_SHARED) but keep a unique
->>> irq number for each peripheral, thus preventing the IRQF_NO_SUSPEND
->>> and !IRQF_NO_SUSPEND mix on a given interrupt.
->>>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> ---
->>>  drivers/irqchip/Kconfig          |   4 ++
->>>  drivers/irqchip/Makefile         |   1 +
->>>  drivers/irqchip/irq-dumb-demux.c |  70 ++++++++++++++++++++
->>>  include/linux/irq.h              |  49 ++++++++++++++
->>>  include/linux/irqdomain.h        |   1 +
->>>  kernel/irq/Kconfig               |   5 ++
->>>  kernel/irq/Makefile              |   1 +
->>>  kernel/irq/chip.c                |  41 ++++++++++++
->>>  kernel/irq/dumb-demux-chip.c     | 140 +++++++++++++++++++++++++++++++++++++++
->>>  kernel/irq/handle.c              |  31 ++++++++-
->>>  kernel/irq/internals.h           |   3 +
->>>  11 files changed, 344 insertions(+), 2 deletions(-)
->>>  create mode 100644 drivers/irqchip/irq-dumb-demux.c
->>>  create mode 100644 kernel/irq/dumb-demux-chip.c
-
-[..]
-
->>> +static void irq_dumb_demux_mask(struct irq_data *d)
->>> +{
->>> +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
->>> +
->>> +	clear_bit(d->hwirq, &demux->unmasked);
->>> +
->>> +	if (!demux->unmasked)
->>> +		disable_irq_nosync(demux->src_irq);
->>> +}
->>> +
->>> +static void irq_dumb_demux_unmask(struct irq_data *d)
->>> +{
->>> +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
->>> +	bool enable_src_irq = !demux->unmasked;
->>
->> Why this additional "bool" unlike the other function above?
+> > Usage of of_gpiochip_add() only solves my issue about gpio but not about
+> > pinctrl stuff, I still need a patch to manage the case when we have a gap if
+> > a gpio controller is not enabled to not break the pin naming, etc.
 > 
-> Because set_bit will modify the unmasked status and we must check if it
-> is equal to 0 (in other terms, all irqs are masked) before modifying it
-> in order to know whether we should enable the src irq or not.
+> This has been the topic of many threads today.
+> I assume you are talking about keeping GPIO numbers
+> consistent.
+> 
+> - My suggestion is to add alias handling of the GPIO chips
+>   to the core so they can be probed in the right order.
 
-pfffff! ok, sorry for the noise then ;-)
+We are already using aliases but it seems to not be the perfect
+solution. For example, at the probe time, we wait for all gpio
+controllers to be probed. We fill a gpio_chips table whose position in
+this table is the alias id of the gpio controller. The at91 pinctrl driver
+is waiting for 'maximum alias id' gpio controllers. What happens if
+don't want to use a gpio controller and don't declare it or set it as
+disabled?
+
+> 
+> - For consistency in sysfs use the "names" array in
+>   struct gpio_chip so you can search for a symbolic
+>   name in sysfs and don't have to rely on fragile stuff
+>   like GPIO numbers.
+> 
+> - Partake in the development of a new GPIO ABI
+>   that does not use the global GPIO numberspace.
+
+I will have a look and bring my humble contribution if I can but I think
+this topic is far away from the fix I am sending.
+
+As you notice we can improve the at91 pinctrl driver, removing
+pinctrl_add_gpio_range() and the range computation in the driver but it
+won't solve my issue and it involves to add the gpio-range property to
+all our devices so it breaks backward compatibility with old dtb.
+
+>From my point of view, it is two distinct topics. One is a very
+important fix because our SAMA5D4 device is not booting without it. The
+other one is a proper way to manage gpio ranges but alone I don't think
+it can solve my issue.
 
 
->>> +
->>> +	set_bit(d->hwirq, &demux->unmasked);
->>> +
->>> +	if (enable_src_irq)
->>> +		enable_irq(demux->src_irq);
->>> +}
->>> +
+Regards
 
-[...]
-
-Bye,
--- 
-Nicolas Ferre
+Ludovic
