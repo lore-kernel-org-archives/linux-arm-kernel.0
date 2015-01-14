@@ -1,34 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 14 Jan 2015 11:37:18 +0100
-Subject: [PATCH v6] i2c: cadence: Check for errata condition involving
- master receive
-In-Reply-To: <1421174099-19839-1-git-send-email-harinik@xilinx.com>
-References: <1421174099-19839-1-git-send-email-harinik@xilinx.com>
-Message-ID: <20150114103718.GA2615@katana>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Wed, 14 Jan 2015 16:00:44 +0530
+Subject: [PATCH v4 0/2] mmc: dw_mmc: exynos: Add HS400 support
+Message-ID: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 12:04:59AM +0530, Harini Katakam wrote:
-> Cadence I2C controller has the following bugs:
-> - completion indication is not given to the driver at the end of
-> a read/receive transfer with HOLD bit set.
-> - Invalid read transaction are generated on the bus when HW timeout
-> condition occurs with HOLD bit set.
-> 
-> As a result of the above, if a set of messages to be transferred with
-> repeated start includes any message following a read message,
-> completion is never indicated and timeout occurs.
-> Hence a check is implemented to return -EOPNOTSUPP for such sequences.
-> 
-> Signed-off-by: Harini Katakam <harinik@xilinx.com>
-> Signed-off-by: Vishnu Motghare <vishnum@xilinx.com>
+This adds HS400 mode support for exynos dw_mmc host controller.
 
-Applied to for-next with some whitespace corrections, thanks!
+Currently tested on Exynos5800-peach-pi platform for HS400 mode.
+Tested HS200 mode with this series applied, HS200 still works.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/7ce2c64a/attachment.sig>
+Appreciate testing on other exynos5/7 platform which supports emmc5.0
+
+Changes in V4:
+	* drop the idea of changing existing binding for ciu_div as per [1]
+        * addressed comments from Jaehoon Chung [2]
+
+[1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
+[2] http://www.spinics.net/lists/devicetree/msg64373.html
+
+Changes in V3:
+	rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
+
+Seungwon Jeon (2):
+  mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+  ARM: dts: Add HS400 support for exynos5420 and exynos5800
+
+ .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 +-
+ drivers/mmc/host/dw_mmc-exynos.c                   |  187 ++++++++++++++++----
+ drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+ drivers/mmc/host/dw_mmc.c                          |   16 +-
+ drivers/mmc/host/dw_mmc.h                          |    2 +
+ 9 files changed, 212 insertions(+), 38 deletions(-)
+
+-- 
+1.7.9.5
