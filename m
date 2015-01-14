@@ -1,151 +1,60 @@
-From: yvo@apm.com (Y Vo)
-Date: Wed, 14 Jan 2015 15:27:55 +0700
-Subject: [PATCH v2 RESEND 1/3] gpio: Add APM X-Gene standby GPIO
- controller driver
-In-Reply-To: <CACRpkdZe7Huiruu-iSNU4MWaiLo_qL=QAab1crummuuVOEJ0zQ@mail.gmail.com>
-References: <1418793050-26927-1-git-send-email-yvo@apm.com>
- <1418793050-26927-2-git-send-email-yvo@apm.com>
- <CACRpkdZe7Huiruu-iSNU4MWaiLo_qL=QAab1crummuuVOEJ0zQ@mail.gmail.com>
-Message-ID: <CAL4ahLfGNc1sL-hr7bZi_pcxjz7CNHjPRSPnJf_TUCGsbweaDA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Jan 2015 09:30:30 +0100
+Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel
+ isi and ov2640 sensor
+In-Reply-To: <54B53455.9050407@atmel.com>
+References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
+ <54B53455.9050407@atmel.com>
+Message-ID: <20150114083030.GI3843@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 4:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Dec 17, 2014 at 6:10 AM, Y Vo <yvo@apm.com> wrote:
->
->> Add APM X-Gene standby GPIO controller driver.
->
-> Write something about what platform an arch this is and so
-> on, this is too terse commit message for a new driver.
->
->> Signed-off-by: Y Vo <yvo@apm.com>
-> (...)
->
->> +config GPIO_XGENE_SB
->> +       tristate "APM X-Gene GPIO standby controller support"
->> +       depends on ARCH_XGENE && OF_GPIO
->
-> select GPIO_GENERIC
-Why ?
-> see below on why.
->
->> +       help
->> +         This driver supports the GPIO block within the APM X-Gene
->> +         Standby Domain. Say yes here to enable the GPIO functionality.
->> +
->>  config GPIO_XILINX
->>         bool "Xilinx GPIO support"
->>         depends on PPC_OF || MICROBLAZE || ARCH_ZYNQ
->> diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
->> new file mode 100644
->> index 0000000..1248448
->
-> (...)
->> +++ b/drivers/gpio/gpio-xgene-sb.c
->> +#include <linux/module.h>
->> +#include <linux/io.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/of_gpio.h>
->> +#include <linux/gpio.h>
->
-> #include <linux/gpio/driver.h>
->
-> instead.
->
->> +#include <linux/of_irq.h>
->> +#include <linux/acpi.h>
-OK.
+Hi Nicolas,
 
-> OK, why?
->
->> +#include <linux/efi.h>
-I will remove.
+BTW, you can add my ack on the remaining patches (5-7).
 
-> Why?
->
->> +#include <linux/string.h>
->> +#include <linux/of_address.h>
+On 13/01/2015 at 16:05:57 +0100, Nicolas Ferre wrote :
+> Le 04/01/2015 10:02, Josh Wu a ?crit :
+> > This patch series add ISI and ov2640 support on dts files.
+> > 
+> > As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
+> > So I want to send this dt patch early for a review.
+> > 
+> > v1 -> v2:
+> >   1. add one more patch to change the pin name of ISI_MCK
+> >   2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
+> >   3. move the common chip parts of ISI node to sama5d3.dtsi.
+> > 
+> > Bo Shen (3):
+> >   ARM: at91: dts: sama5d3: split isi pinctrl
+> >   ARM: at91: dts: sama5d3: add missing pins of isi
+> >   ARM: at91: dts: sama5d3: move the isi mck pin to mb
+> > 
+> > Josh Wu (5):
+> >   ARM: at91: dts: sama5d3: add isi clock
+> >   ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
+> >   ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
+> >   ARM: at91: dts: sama5d3: add ov2640 camera sensor support
+> >   ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
+> 
+> Josh,
+> 
+> It seems that this patch doesn't show up in the series: I only received
+> up to 6/8 patches (2 missing?). Can you please send it(them?)?
+> 
+> Bye,
+> 
+> >  arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
+> >  arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
+> >  arch/arm/configs/sama5_defconfig  |  6 ++++++
+> >  3 files changed, 61 insertions(+), 9 deletions(-)
+> > 
+> 
+> 
+> -- 
+> Nicolas Ferre
 
-I will remove.
-
-> #include <linux/basic_mmio_gpio.h>
-> when you start using GENERIC_GPIO
->
->> +
->> +#define XGENE_MAX_GPIO_DS              22
->> +#define XGENE_MAX_GPIO_DS_IRQ          6
->> +
->> +#define GPIO_MASK(x)                   (1U << ((x) % 32))
->> +#define GPIO_DIR_IN                    0
->> +#define GPIO_DIR_OUT                   1
->> +
->> +#define MPA_GPIO_INT_LVL               0x0290
->> +#define MPA_GPIO_OE_ADDR               0x029c
->> +#define MPA_GPIO_OUT_ADDR              0x02a0
->> +#define MPA_GPIO_IN_ADDR               0x02a4
->> +#define MPA_GPIO_SEL_LO                        0x0294
->> +#define MPA_GPIO_SEL_HIGH              0x029c
->> +
->> +struct xgene_gpio_sb {
->> +       struct of_mm_gpio_chip mm;
->> +       u32 *irq;
->> +       u32 nirq;
->> +       spinlock_t lock; /* mutual exclusion */
->> +};
->
-> Add kerneldoc to this struct.
->
->> +static void xgene_gpio_set_bit(void __iomem *reg, u32 gpio, int val)
-> (...)
->> +static int xgene_gpio_sb_get(struct gpio_chip *gc, u32 gpio)
->
-> This looks very much like a memory-mapped standard GPIO controller,
-> use drivers/gpio/gpio-generic.c with some IRQ add-on, compare
-> to any other driver selecting GPIO_GENERIC for guidance:
-> drivers/gpio/gpio-74xx-mmio.c, gpio-dwapb.c etc.
-You mean I must rewrite to use GPIO_GENERIC follow gpio-74xx-mmio.c,
-gpio-dwapb.c ?
-
->> +static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
->> +{
->> +       struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
->> +       struct xgene_gpio_sb *chip = to_xgene_gpio_sb(mm_gc);
->> +
->> +       if (chip->irq[gpio])
->> +               return chip->irq[gpio];
->> +
->> +       return -ENXIO;
->> +}
->> +
->> +static int xgene_gpio_sb_probe(struct platform_device *pdev)
->> +{
->> +       struct of_mm_gpio_chip *mm;
->> +       struct xgene_gpio_sb *apm_gc;
->> +       u32 ret, i;
->> +       u32 default_pins[] = {0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D};
->
-> Um, pins... call these "lines" instead to avoid confusion with the pin
-> control subsystem.
-
-I will change.
-
->> +       struct resource *res;
->> +
->> +       apm_gc = devm_kzalloc(&pdev->dev, sizeof(*apm_gc), GFP_KERNEL);
->> +       if (!apm_gc)
->> +               return -ENOMEM;
->> +
->> +       mm = &apm_gc->mm;
->> +       mm->gc.direction_input = xgene_gpio_sb_dir_in;
->> +       mm->gc.direction_output = xgene_gpio_sb_dir_out;
->> +       mm->gc.get = xgene_gpio_sb_get;
->> +       mm->gc.set = xgene_gpio_sb_set;
->> +       mm->gc.to_irq = apm_gpio_sb_to_irq;
->> +       mm->gc.base = -1;
->> +       mm->gc.label = dev_name(&pdev->dev);
->
-> gc has a device tree .np node and a .dev struct device *
-> pointer, assign them here. (Also after you switch to GENERIC_GPIO.)
->
-> Yours,
-> Linus Walleij
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
