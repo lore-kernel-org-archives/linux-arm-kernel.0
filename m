@@ -1,29 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Jan 2015 12:53:07 +0100
-Subject: [PATCH] arm: mach-versatile: core: Remove unused function
-In-Reply-To: <1420303959-12898-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1420303959-12898-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <CACRpkdan1BZQnYgTdF9ctbLOPNoDwDX3Epy8Xfttd2v4-G-4Lw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Jan 2015 11:53:50 +0000
+Subject: [PATCH boot-wrapper-aarch64 0/4] psci cleanups + simple v0.2
+ implementation
+In-Reply-To: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
+References: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
+Message-ID: <20150114115349.GE12069@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 3, 2015 at 5:52 PM, Rickard Strandqvist
-<rickard_strandqvist@spectrumdigital.se> wrote:
+On Tue, Jan 13, 2015 at 02:15:00AM +0000, Zi Shen Lim wrote:
+> Hi Mark,
 
-> Remove the function versatile_leds_event() that is not used anywhere.
->
-> This was partially found by using a static code analysis program called cppcheck.
->
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+Hi,
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> The first couple patches are cleanups.
+> 
+> The third patch switches to using v0.2 function ID values for the
+> existing cpu_{on,off} implementations. This intermediate step is
+> arguably unnecessary given the next patch...
+> 
+> The fourth patch provides a simple implementation of PSCI v0.2.
+> The deviations from spec (primarily cpu_suspend not supported)
+> is noted in code comment as well as in commit log.
 
-That's right, the code was made redundant in
-commit e031cd513ec2ff661465dc1198220075719e72d1
-"ARM: mach-realview and mach-versatile: retire custom LED code"
+While I'm not opposed to implementing PSCI 0.2, the two major reasons
+for not having implemented it so far were simplicity and
+spec-compliance. Unless implementing PSCI 0.2 gains us something, I
+don't see the point in moving from PSCI 0.1. 
 
-ARM SoC folks: I suggest you apply this patch directly to your cleanup
-branch.
+I think not having any supported CPU_SUSPEND states is fine. For spec
+compliance I'm more worried by the behaviour of AFFINITY_INFO (as this
+implementation seems to ignore the lowest_affinity_level parameter), and
+the behaviour of SYSTEM_{OFF,RESET} -- I wonder if these could be
+implemented via semihosting.
 
-Yours,
-Linus Walleij
+Given that SYSTEM_OFF and SYSTEM_RESET are effectively not implemented,
+the only thing that I see we gain from this PSCI 0.2 implementation is
+AFFINITY_INFO to close a race with CPU_OFF. Is PSCI 0.2 just a
+nice-to-have feature, or is there something it provides that you
+particularly want?
+
+I occasionally need to use a new boot-wrapper with old kernels which
+only handle PSCI 0.1, so we also need to maintain compatiblity in the
+way the DT binding doc describes:
+
+psci {
+	compatible = "arm,psci-0.2", "arm,psci";
+	method = "smc";
+	cpu_on = < ... >;
+	cpu_off = < ... >;
+};
+
+Thanks,
+Mark.
+
+> 
+> Please consider merging.
+> 
+> Thanks, z
+> 
+> Zi Shen Lim (4): psci: use MPIDR_INVALID instead of -1 psci: remove
+> sentinel from id_table psci: use PSCI v0.2 function IDs psci:
+> implement PSCI v0.2
+> 
+>  Makefile.am |   4 +- psci.S      | 170
+>  ++++++++++++++++++++++++++++++++++++++++++++++++++---------- 2 files
+>  changed, 143 insertions(+), 31 deletions(-)
+> 
+> -- 2.1.0
+> 
+> 
