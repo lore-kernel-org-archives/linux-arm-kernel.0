@@ -1,53 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Jan 2015 09:13:10 +0100
-Subject: [PATCH 1/4] rtc: armada38x: Add the device tree binding
- documentation
-In-Reply-To: <87iogai8sc.fsf@natisbad.org>
+Date: Wed, 14 Jan 2015 09:14:54 +0100
+Subject: [PATCH 4/4] ARM: mvebu: add Device Tree description of RTC on
+ Armada 38x
+In-Reply-To: <874mrui8r3.fsf@natisbad.org>
 References: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>
- <1420817565-28800-2-git-send-email-gregory.clement@free-electrons.com>
- <87iogai8sc.fsf@natisbad.org>
-Message-ID: <20150114081310.GI4891@lukather>
+ <1420817565-28800-5-git-send-email-gregory.clement@free-electrons.com>
+ <874mrui8r3.fsf@natisbad.org>
+Message-ID: <20150114081454.GJ4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 12:02:27AM +0100, Arnaud Ebalard wrote:
+On Wed, Jan 14, 2015 at 12:03:12AM +0100, Arnaud Ebalard wrote:
 > Hi Gregory,
 > 
 > Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > 
-> > The Armada 38x SoCs come with a new RTC which differs from the one
-> > used in the other mvebu SoCs until now. This patch describes the
-> > binding of this RTC.
+> > The Marvell Armada 38x SoCs contains an RTC which differs from the RTC
+> > used in the other mvebu SoCs until now. This commit adds the Device
+> > Tree description of this interface at the SoC level.
 > >
 > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > > ---
-> >  .../devicetree/bindings/rtc/armada-380-rtc.txt          | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+> >  arch/arm/boot/dts/armada-38x.dtsi | 6 ++++++
+> >  1 file changed, 6 insertions(+)
 > >
-> > diff --git a/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-> > new file mode 100644
-> > index 000000000000..2c56bef9dd7e
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-> > @@ -0,0 +1,17 @@
-> > +* Real Time Clock of te Armada 38x SoCs
+> > diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> > index 04fe80d101f8..22909add8889 100644
+> > --- a/arch/arm/boot/dts/armada-38x.dtsi
+> > +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> > @@ -466,6 +466,12 @@
+> >  				clocks = <&gateclk 4>;
+> >  			};
+> >  
+> > +			rtc at 184a8 {
+> > +				compatible = "marvell,armada-380-rtc";
+> > +				reg = <0xa3800 0x20>, <0x184a0 0x0c>;
+> > +				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> > +			};
 > > +
-> > +RTC controller for the Armada 38x SoCs
-> > +
-> > +Required properties:
-> > +- compatible : Should be "marvell,armada-380-rtc"
-> > +- reg: physical base address of the controller and length of memory mapped
-> > +  region. The second entires is for the IP configuration part.
->                         ^^^^^^^
->                         entry
 > 
-> I had to read probe function to understand precisely the purpose of each
-> region, i.e. IMHO the description could be made a bit clearer.
+> Out of curiosity, why not naming the node rtc at a3800? Main argument:
+> least expectation principle when reading the .dtsi and expecting
+> increasing addresses. Or did I miss sth else?
 
-Maybe using reg-names would make it easier to understand, both in the
-documentation and the DT itself (as well as not needing to enforce a
-particular ordering of the two areas in the documentation)
+Actually, the ePAPR even states that the unit-adress must be the first
+address in reg (section 2.2.1.1 of the ePAPR 1.1)
 
 Maxime
 
@@ -61,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/2bd3c29f/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/64fb9260/attachment.sig>
