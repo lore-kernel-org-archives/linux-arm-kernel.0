@@ -1,31 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Jan 2015 15:19:12 +0100
-Subject: [PATCH v3 1/7 RESEND] PM / Domains: Add a note about power domain
- subdomains
-In-Reply-To: <1421244735-10844-1-git-send-email-m.szyprowski@samsung.com>
-References: <1421243091-10778-2-git-send-email-m.szyprowski@samsung.com>
- <1421244735-10844-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAMuHMdW62vnig3=g76mq24BgHcOqpwBh_DQK=kb=A9WaRaGR+w@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 14 Jan 2015 23:27:44 +0900
+Subject: [PATCH 1/2] pinctrl: exynos: Add AUDIO pin controller for exynos7
+In-Reply-To: <CACRpkdZopjCN_GMEPQFd_NWa0Ddocqt3aViLrZ7Yh3ui_YcBAg@mail.gmail.com>
+References: <1418994659-5222-1-git-send-email-padma.v@samsung.com>
+ <1418994659-5222-2-git-send-email-padma.v@samsung.com>
+ <CACRpkdZopjCN_GMEPQFd_NWa0Ddocqt3aViLrZ7Yh3ui_YcBAg@mail.gmail.com>
+Message-ID: <CA+Ln22GhnW5jcXdQfYaJ_aM4Wq9OHXvShHHaxLKjJi+dp6Afcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 3:12 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> This patch adds a note on defining subdomains to generic PM domain
-> binding documentation to let power domain providers use common approach
-> for defining power domain hierarchy.
+Hi Linus,
+
+2015-01-14 20:40 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Fri, Dec 19, 2014 at 2:10 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Audio IPs on Exynos7 require gpios available in AUDIO
+>> pin controller block. So adding the AUDIO pinctrl support.
+>>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> (...)
+>> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+>> @@ -181,6 +181,7 @@ Aliases for controllers compatible with "samsung,exynos7-pinctrl":
+>>  - pinctrl6: pin controller of FSYS0 block,
+>>  - pinctrl7: pin controller of FSYS1 block,
+>>  - pinctrl8: pin controller of BUS1 block,
+>> +- pinctrl9: pin controller of AUDIO block,
+>
+> This doesn't apply at all, the list has never been in the document merged
+> upstream.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I believe this patch depends on patch [1], which was mentioned in
+cover letter and which you seem to have applied two days ago. If it
+still doesn't apply, please let me know if I should collect the
+patches myself and prepare a pull request for you.
 
-Gr{oetje,eeting}s,
+[1] https://patchwork.kernel.org/patch/5467321/
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Tomasz
