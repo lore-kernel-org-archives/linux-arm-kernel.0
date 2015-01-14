@@ -1,83 +1,66 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jan 2015 22:07:34 +0100
-Subject: [PATCH 1/6] ARM: at91: pm: rework cpu detection
-In-Reply-To: <217DB987-13E3-4D5D-A9BE-D17662A19E26@jcrosoft.com>
-References: <1421097825-396-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421097825-396-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20150114191412.GA14457@ns203013.ovh.net>
- <20150114212139.0ad297eb@bbrezillon>
- <217DB987-13E3-4D5D-A9BE-D17662A19E26@jcrosoft.com>
-Message-ID: <20150114210734.GO3843@piout.net>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 14 Jan 2015 22:25:04 +0100
+Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add INA2xx sensors
+In-Reply-To: <1421193801-24637-1-git-send-email-khilman@kernel.org>
+References: <1421193801-24637-1-git-send-email-khilman@kernel.org>
+Message-ID: <1421270704.2450.138.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hey kevin,
 
-(Adding Arnd in Cc)
-
-On 15/01/2015 at 04:37:14 +0800, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> >>> -	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
-> >>> -	if (cpu_is_at91rm9200())
-> >>> +	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
-> >>> +
-> >>> +	if (of_machine_is_compatible("atmel,at91rm9200")) {
-> >>> +		/*
-> >>> +		 * AT91RM9200 SDRAM low-power mode cannot be used with
-> >>> +		 * self-refresh.
-> >>> +		 */
-> >>> 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
-> >>> -	
-> >>> +
-> >>> +		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
-> >>> +					    AT91RM9200_PMC_UDP;
-> >>> +		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
-> >>> +	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
-> >>> +		   of_machine_is_compatible("atmel,at91sam9g20") ||
-> >>> +		   of_machine_is_compatible("atmel,at91sam9261") ||
-> >>> +		   of_machine_is_compatible("atmel,at91sam9g10") ||
-> >>> +		   of_machine_is_compatible("atmel,at91sam9263")) {
-> >> nack here
-> >> 
-> >> you switch for runtime information from the SOC register store in ram to DT
-> >> 
-> >> DT is great but I do prefer to rely on the SoC register here as the whole was
-> >> also to check that the is correct
-> > 
-> > Well, cpu_is_xxx macros are defined in a mach specific header, and we're
-> > currently trying to enable multi platform support. 
+On Tue, 2015-01-13 at 16:03 -0800, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@linaro.org>
 > 
-> Yes does not mean we can not move this, use the REAL hardware detected cpu is better
-> as you can check that the DT is valid for this SoC and also have fixup for a specific
-> SoC version without having to have x DT per SoC
+> The odroid-xu3 has 4 INA231 current sensors on board which can be
+> accessed from the Linux via the hwmon interface.
 > 
-> > 
-> >> 
-> >> wihich is way slower
-> > 
-> > Hmm, this SoC detection has been move from the suspend path (where, as
-> > you stated, speed is a real concern) to the pm init function (which is
-> > only called once at startup), and I doubt the boot time penalty will
-> > even be noticeable?
+> There is one sensor for each of these power rails:
 > 
-> except if your table is boot as quick as possible avoid useless string compare is always a good choice
+> - A15 cluster: VDD_ARM
+> - A7 cluster: VDD_KFC
+> - GPU: VDD_G3D
+> - memory: VDD_MEM
 > 
-> IIRC we had in the past RFC to have the drivers compatible compare switch to HASH
-> for this purpose too
+> In addition to adding the sensors, LDO26 from the PMIC needs to be
+> enabled because it's powering these sensor.
 > 
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+> 
+>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> index c29123c0734d..7874da20939f 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> @@ -257,6 +264,38 @@
+>  		};
+>  	};
+>  
+> +	i2c_0: i2c at 12C60000 {
+> +		status = "okay";
+> +
+> +		/* A15 cluster: VDD_ARM */
+> +		ina220 at 40 {
+                   ^ ina231 at 40 ?
+> +			compatible = "ti,ina230";
 
-Following a discussion with Arnd, the whole SoC detection will be remove
-which will be completely faster than mapping the dbgu registers.
-
-Also, the of_machine_is_compatible are supposed to be removed soon,
-waiting for the pm code to be reworked. What is done here is to allow us
-to go forward with switching to multiplatform and cleaning up the
-mach-at91 directory.
-
-
-I have follow up patches coming up and they already remove some of the
-of_machine_is_compatible.
+This feels incredibly nitpicky, but would it not better to use ti,ina231
+as it's an INA231 chip not a INA230? (And add the compatibility string
+to the driver)
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/6ab1059a/attachment.bin>
