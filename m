@@ -1,59 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 Jan 2015 13:37:42 +0000
-Subject: [PATCH] arm64: kill off the libgcc dependency
-In-Reply-To: <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
-References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
- <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
- <2438951.7KFuXx85Hp@wuerfel>
- <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
-Message-ID: <20150114133742.GI4050@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Jan 2015 14:40:42 +0100
+Subject: [PATCH v2 4/5] ARM: at91/dt: add AIC irq1 muxed peripheral id
+ definitions
+In-Reply-To: <20150114143448.09d362b8@bbrezillon>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>	<1421174781-4340-5-git-send-email-boris.brezillon@free-electrons.com>	<54B66D6B.9050205@atmel.com>
+ <20150114143448.09d362b8@bbrezillon>
+Message-ID: <54B671DA.7020009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 12:52:49PM +0000, Ard Biesheuvel wrote:
-> On 14 January 2015 at 12:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 14 January 2015 11:48:27 Will Deacon wrote:
-> >> On Wed, Jan 14, 2015 at 11:35:22AM +0000, Arnd Bergmann wrote:
-> >> > On Wednesday 14 January 2015 10:48:26 Will Deacon wrote:
-> >> > > On Wed, Jan 14, 2015 at 10:38:54AM +0000, Kevin Hao wrote:
-> >> > > > The arm64 doesn't depend on the libgcc to build the vmlinux image.
-> >> > >
-> >> > > Yes it does; we make use of __builtin_* for our bitops, for example.
-> >> > > The compiler guys don't guarantee that these will be inlined.
-> >> >
-> >> > Is that an architecture-specific statement?
-> >>
-> >> I think the inlining guarantees apply to all architectures, but it affects
-> >> the arm64 kernel because we include <asm-generic/bitops/builtin-*>.
-> >
-> > Is it realistic to expect those to ever be implemented out of line?
-> > I would expect them to behave like assembler intrinsics, at least
-> > with the normal optimization level.
-> >
-> >> > The debate has been going on for ages in Linux, most architecture
-> >> > maintainers however decided against using libgcc and copy the functions
-> >> > that are actually needed into the kernel sources.
-> >>
-> >> What's the benefit of copying them?
-> >
-> > You have a better control over what is included. On 32-bit architectures,
-> > the 64-bit division is notorious here, we really don't want to accidentally
-> > call the libgcc implementation but instead have our own do_div() helper.
-> >
-> > Similarly I'd think that if we get a compiler that uses an external
-> > __ffs implementation, we should implement an inline assembly instead
-> > of taking the libgcc version.
-> >
-> > Another problem that has happened in the past is libgcc functions that
-> > in turn call glibc functions. To avoid that, you'd really want to build
-> > the kernel with -ffreestanding, but that opens another can of worms.
-> >
+Le 14/01/2015 14:34, Boris Brezillon a ?crit :
+> On Wed, 14 Jan 2015 14:21:47 +0100
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 > 
-> IMO libgcc.a cannot be used at all in the kernel, as it is not built
-> with -mgeneral-regs-only so we have no guarantee that it will leave
-> the NEON registers alone.
+>> Le 13/01/2015 19:46, Boris Brezillon a ?crit :
+>>> These ids will be used to define irqs multiplexed on the first irq line.
+>>>
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  .../dt-bindings/interrupt-controller/atmel-aic.h   | 22 ++++++++++++++++++++++
+>>>  1 file changed, 22 insertions(+)
+>>>  create mode 100644 include/dt-bindings/interrupt-controller/atmel-aic.h
+>>>
+>>> diff --git a/include/dt-bindings/interrupt-controller/atmel-aic.h b/include/dt-bindings/interrupt-controller/atmel-aic.h
+>>> new file mode 100644
+>>> index 0000000..e14a94f
+>>> --- /dev/null
+>>> +++ b/include/dt-bindings/interrupt-controller/atmel-aic.h
+>>> @@ -0,0 +1,22 @@
+>>> +#ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
+>>> +#define _DT_BINDINGS_INTERRUPT_CONTROLLER_ARM_GIC_H
+>>
+>> Nit.: why ARM_GIC?
+> 
+> Because I copied it from the arm-gic.h header and forgot to rename
+> those macros :-).
+> I'll fix that.
+> 
+>>
+>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>> +
+>>> +#define AIC_IRQ1_PMC		0
+>>> +#define AIC_IRQ1_ST		1
+>>> +#define AIC_IRQ1_PIT		1
+>>> +#define AIC_IRQ1_DBGU		2
+>>> +#define AIC_IRQ1_RTC		3
+>>> +#define AIC_IRQ1_RTT		4
+>>> +#define AIC_IRQ1_WATCHDOG	5
+>>> +#define AIC_IRQ1_MC		6
+>>> +#define AIC_IRQ1_SDRAMC		6
+>>> +#define AIC_IRQ1_DDRSDRC	6
+>>> +#define AIC_IRQ1_RSTC		7
+>>> +#define AIC_IRQ1_PMERRLOC	8
+>>> +#define AIC_IRQ1_PMECC		9
+> 
+> Following up the discussion we had privately regarding these
+> macros (whether we really need them or not), maybe adding a comment
+> above the irqs property would be enough:
+> 
+> 	dumb_irq1_demux: dumb-irq-demux at 1 {
+> 		compatible = "irqchip-dumb-demux";
+> 		interrupt-controller;
+> 		#interrupt-cells = <1>;
+> 		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+> 		/*
+> 		 * Interrupt lines:
+> 		 * 0: PMC
+> 		 * 1: PIT
+> 		 * 2: DBGU
+> 		 * 3: RTT
+> 		 * 4: WATCHDOG
+> 		 * 5: RSTC
+> 		 */
+> 		irqs = <0x3f>;
+> 	};
 
-That's a very good point. In which case, we'd need to extend this patch
-to implement the bitops that we currently rely on the __builtins for.
+Well, I tend to prefer when no additional macros are defined in DT for
+no real added value. So, this comment seems to be enough... I would vote
+for this solution ;-)
 
-Will
+Thanks, bye,
+-- 
+Nicolas Ferre
