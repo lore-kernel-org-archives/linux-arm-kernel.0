@@ -1,64 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 Jan 2015 09:00:47 +0000
-Subject: [PATCH] arm64: respect mem= for EFI
-In-Reply-To: <20141205191235.GH31222@e104818-lin.cambridge.arm.com>
-References: <1417692140-29796-1-git-send-email-mark.rutland@arm.com>
- <20141205191235.GH31222@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_P=T=WawdoSCPZ2ELSXdwb1ezdo=QcTvkH2FRahWf3Xw@mail.gmail.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 14 Jan 2015 18:00:24 +0900
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <1417453034-21379-9-git-send-email-will.deacon@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-9-git-send-email-will.deacon@arm.com>
+Message-ID: <54B63028.3090701@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 December 2014 at 19:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Dec 04, 2014 at 11:22:20AM +0000, Mark Rutland wrote:
->> Hi all,
->>
->> While trying to debug a userspace test failure, I noticed that the mem=
->> option didn't work when booting via EFI due to some unfortunate init
->> ordering.
->>
->> However, with that alone fixed (patch below) things blow up early if a
->> mem= option is passed to the kernel, because of the way we currently map
->> the EFI runtime services.
->>
->> I've given this patch a spin atop of Ard's rework of the runtime
->> services mapping [1], and that's far happier; I can boot to userspace
->> and memory is limited int he way I expect.
->>
->> Assuming people are fine with this, would this make sense to append to
->> the runtime services mapping series?
->>
->> Cheers,
->> Mark.
->>
->> [1] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/efi-for-arm64
->>
->> ---->8----
->> When booting with EFI, we acquire the EFI memory map after parsing the
->> early params. This unfortuantely renders the option useless as we call
->> memblock_enforce_memory_limit (which uses memblock_remove_range behind
->> the scenes) before we've added any memblocks. We end up removing
->> nothing, then adding all of memory later when efi_init calls
->> reserve_regions.
->>
->> Instead, we can log the limit and apply this later when we do the rest
->> of the memblock work in memblock_init, which should work regardless of
->> the presence of EFI. At the same time we may as well move the early
->> parameter into arm64's mm/init.c, close to arm64_memblock_init.
->>
->> Any memory which must be mapped (e.g. for use by EFI runtime services)
->> must be mapped explicitly reather than relying on the linear mapping,
->> which may be truncated as a result of a mem= option passed on the kernel
->> command line.
->>
->> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Leif Lindholm <leif.lindholm@linaro.org>
->> Cc: Will Deacon <will.deacon@arm.com>
+On 12/02/2014 01:57 AM, Will Deacon wrote:
+> This patch plumbs the existing ARM IOMMU DMA infrastructure (which isn't
+> actually called outside of a few drivers) into arch_setup_dma_ops, so
+> that we can use IOMMUs for DMA transfers in a more generic fashion.
 >
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Since this significantly complicates the arch_setup_dma_ops function,
+> it is moved out of line into dma-mapping.c. If CONFIG_ARM_DMA_USE_IOMMU
+> is not set, the iommu parameter is ignored and the normal ops are used
+> instead.
 
-This works fine on top of the final version of my UEFI virtmap series.
+A series for IOMMU support with Tegra/Nouveau ceased to work after this 
+patch. The Tegra IOMMU is not registered by the time the DT is parsed, 
+and thus all devices end up without the proper DMA ops set up because 
+the phandle to the IOMMU cannot be resolved. Subsequently calling 
+arm_iommu_create_mapping() and arm_iommu_attach_device() from the driver 
+(as I used to do until 3.18) does not help since the call to 
+set_dma_ops() has been moved out of arm_iommu_attach_device(). Therefore 
+there seems to be no way for a device to gets its correct DMA ops unless 
+the IOMMU is ready by the time the DT is parsed.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Also potentially affected by this are the Rockchip DRM and OMAP3 ISP 
+drivers, which follow the same pattern.
+
+This raises the following questions:
+
+1) Why are arm_iommu_create_mapping() and arm_iommu_attach_device() 
+still public since they cannot set the DMA ops and thus seem to be 
+useless outside of arch_setup_dma_ops()?
+
+2) Say you want to use the IOMMU API in your driver, and have an iommu 
+property in your device's DT node. If by chance your IOMMU is registered 
+early, you will already have a mapping automatically created even before 
+your probe function is called. Can this be avoided? Is it even safe?
+
+The issue is workarounded (at least for me) with the following patch:
+
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1961,6 +1961,7 @@ int arm_iommu_attach_device(struct device *dev,
+
+         kref_get(&mapping->kref);
+         dev->archdata.mapping = mapping;
++       set_dma_ops(dev, &iommu_ops);
+
+         pr_debug("Attached IOMMU controller to %s device.\n", 
+dev_name(dev));
+         return 0;
+
+This allows arm_iommu_create_mapping() and arm_iommu_attach_device() to 
+set the correct DMA ops when called from the driver. But it doesn't look 
+like mergeable material and I'd like to know whether there is a better 
+way to handle this, or whether I should just use the IOMMU API directly. 
+Knowing that even this might not be safe if ARM_DMA_USE_IOMMU is enabled 
+because of point 2) above.
+
+So basically I'm afraid I might not even be able to use the IOMMU safely 
+after this. Or am I missing anything?
+
+Thanks,
+Alex.
