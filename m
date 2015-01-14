@@ -1,47 +1,90 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jan 2015 00:47:59 +0100
-Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
-In-Reply-To: <20150113230956.GA15087@quad.lixom.net>
-References: <20150112224203.GL22090@quad.lixom.net>
- <1421160180-23452-1-git-send-email-nicolas.ferre@atmel.com>
- <20150113230956.GA15087@quad.lixom.net>
-Message-ID: <20150113234759.GH3843@piout.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 13 Jan 2015 16:03:21 -0800
+Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add INA2xx sensors
+Message-ID: <1421193801-24637-1-git-send-email-khilman@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+From: Kevin Hilman <khilman@linaro.org>
 
-On 13/01/2015 at 15:09:56 -0800, Olof Johansson wrote :
-> On Tue, Jan 13, 2015 at 03:43:00PM +0100, Nicolas Ferre wrote:
-> > The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
-> > options may be removed in the near future.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> > Hi Olof,
-> > 
-> > This is an attempt to match other ARM SoC families format.
-> > If you feel that the patch can be good, do not hesitate to take it yourself. I
-> > don't plan to integrate it in any of my pull-request so it can appear quickly in
-> > arm-soc and can be used by everyone.
-> 
-> Hi,
-> 
-> If you see what Peter did, he split up the rules per-SoC based on how
-> things were selectable in Kconfig. Since you seem to have the Kconfig
-> entries already, how about doing the same? That way the same information
-> w.r.t. SoC family that you have as comments isn't lost either.
-> 
+The odroid-xu3 has 4 INA231 current sensors on board which can be
+accessed from the Linux via the hwmon interface.
 
-You didn't see the patch set yet because it depends on a lot of other
-series still being discussed but after the switch to multiplatform, the
-only config option left will be SOC_AT91RM9200, SOC_AT91SAM9 (both
-under SOC_SAM_V4_V5) and SOC_SAMA5, under SOC_SAM_V7.
+There is one sensor for each of these power rails:
 
-That's our plan, unless you feel that we should keep one config option
-per SoC.
+- A15 cluster: VDD_ARM
+- A7 cluster: VDD_KFC
+- GPU: VDD_G3D
+- memory: VDD_MEM
 
+In addition to adding the sensors, LDO26 from the PMIC needs to be
+enabled because it's powering these sensor.
+
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index c29123c0734d..7874da20939f 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -174,6 +174,13 @@
+ 					regulator-always-on;
+ 				};
+ 
++				ldo26_reg: LDO26 {
++					regulator-name = "vdd_ldo26";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
++				};
++
+ 				buck1_reg: BUCK1 {
+ 					regulator-name = "vdd_mif";
+ 					regulator-min-microvolt = <800000>;
+@@ -257,6 +264,38 @@
+ 		};
+ 	};
+ 
++	i2c_0: i2c at 12C60000 {
++		status = "okay";
++
++		/* A15 cluster: VDD_ARM */
++		ina220 at 40 {
++			compatible = "ti,ina230";
++			reg = <0x40>;
++			shunt-resistor = <10000>;
++		};
++
++		/* memory: VDD_MEM */
++		ina220 at 41 {
++			compatible = "ti,ina230";
++			reg = <0x41>;
++			shunt-resistor = <10000>;
++		};
++
++		/* GPU: VDD_G3D */
++		ina220 at 44 {
++			compatible = "ti,ina230";
++			reg = <0x44>;
++			shunt-resistor = <10000>;
++		};
++
++		/* A7 cluster: VDD_KFC */
++		ina220 at 45 {
++			compatible = "ti,ina230";
++			reg = <0x45>;
++			shunt-resistor = <10000>;
++		};
++	};
++
+ 	i2c_2: i2c at 12C80000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <66000>;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.3
