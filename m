@@ -1,38 +1,106 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Jan 2015 16:56:46 +0100
-Subject: [PATCH v4 0/2] mmc: dw_mmc: exynos: Add HS400 support
-In-Reply-To: <54B68CC6.1040907@kernel.org>
-References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
- <54B67001.2090002@samsung.com> <54B68CC6.1040907@kernel.org>
-Message-ID: <CAPDyKFo0YB6UpjQXxQ9d9VhE6quur0mo=YNLdzB=xQoCE4J9xQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 14 Jan 2015 17:02:03 +0100
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <54B69072.4080607@kernel.org>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+ <54B69072.4080607@kernel.org>
+Message-ID: <54B692FB.7030703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2015 at 16:35, Kukjin Kim <kgene@kernel.org> wrote:
-> On 01/14/15 22:32, Jaehoon Chung wrote:
->> Hi, Alim.
->>
->> On 01/14/2015 07:30 PM, Alim Akhtar wrote:
->>> This adds HS400 mode support for exynos dw_mmc host controller.
->>>
->>> Currently tested on Exynos5800-peach-pi platform for HS400 mode.
->>> Tested HS200 mode with this series applied, HS200 still works.
->>>
->>> Appreciate testing on other exynos5/7 platform which supports emmc5.0
->>
->> I will test this patch on exynos5/7 board.
->>
+On 01/14/2015 04:51 PM, Kukjin Kim wrote:
+> On 01/14/15 14:33, Chanwoo Choi wrote:
 >
-> What's the result? :-) If it's OK, I'll take DT changes for exynos
-> stuff, I'm not sure about the driver changes though...
+> Hi,
+>
+> + Doug, Olof
+>
+>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+>> for Exynos 32bit SoC.
+>>
+> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+> implemented it and additionally its access is faster than using memory
+> mapped register called SFR for MCT...so Doug submitted patch to use MCT
+> on 32bit exynos SoCs before.
+>
+> I know using MCT on 64bit exynos is usefulness for Power Management and
+> I need to talk to relevant guys in office again. If anything, I'll let
+> you know.
 
-Kukjin,
+I will wait for your answer before digging more the patch.
 
-As I understand it, there is a dependency between the patches, since
-driver adds supports for new DT bindings.
+Thanks
+   -- Daniel
 
-So, unless I am mistaken I think it would be best to take this
-complete patchset through my mmc tree. With your ack of course.
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>> This patch set is tested on 64-bit Exynos SoC. I send only this patch from
+>> following patchst[1].
+>> [1] https://lkml.org/lkml/2014/12/2/134
+>>
+>> Changes from v2:
+>> - None
+>> Changes from v1:
+>> - Use CONFIG_ARM instead of CONFIG_ARM64
+>>
+>>   drivers/clocksource/Kconfig      | 1 -
+>>   drivers/clocksource/exynos_mct.c | 4 ++++
+>>   2 files changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index fc01ec2..be38119 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
+>>
+>>   config CLKSRC_EXYNOS_MCT
+>>   	def_bool y if ARCH_EXYNOS
+>> -	depends on !ARM64
+>>   	help
+>>   	  Support for Multi Core Timer controller on Exynos SoCs.
+>>
+>> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+>> index 9403061..b840ea1 100644
+>> --- a/drivers/clocksource/exynos_mct.c
+>> +++ b/drivers/clocksource/exynos_mct.c
+>> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+>>   	return exynos4_read_count_32();
+>>   }
+>>
+>> +#if defined(CONFIG_ARM)
+>>   static struct delay_timer exynos4_delay_timer;
+>>
+>>   static cycles_t exynos4_read_current_timer(void)
+>> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+>>   			 "cycles_t needs to move to 32-bit for ARM64 usage");
+>>   	return exynos4_read_count_32();
+>>   }
+>> +#endif
+>>
+>>   static void __init exynos4_clocksource_init(void)
+>>   {
+>>   	exynos4_mct_frc_start();
+>>
+>> +#if defined(CONFIG_ARM)
+>>   	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+>>   	exynos4_delay_timer.freq = clk_rate;
+>>   	register_current_timer_delay(&exynos4_delay_timer);
+>> +#endif
+>>
+>>   	if (clocksource_register_hz(&mct_frc, clk_rate))
+>>   		panic("%s: can't register clocksource\n", mct_frc.name);
 
-Kind regards
-Uffe
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
