@@ -1,67 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Jan 2015 11:43:01 -0800
-Subject: [PATCH 2/2] ARM: OMAP2+: Add dm816x hwmod support
-In-Reply-To: <1421191355-12835-3-git-send-email-tony@atomide.com>
-References: <1421191355-12835-1-git-send-email-tony@atomide.com>
- <1421191355-12835-3-git-send-email-tony@atomide.com>
-Message-ID: <20150114194301.GR2419@atomide.com>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Wed, 14 Jan 2015 14:48:56 -0500
+Subject: [PATCH] arm: mm: remove unused ioremap_page()
+Message-ID: <1421264936-9495-1-git-send-email-vitalya@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150113 15:29]:
-> Add minimal hwmod support that works at least on dm8168. This
-> is based on the code in the earlier TI CDP tree, and an earlier
-> patch by Aida Mynzhasova <aida.mynzhasova@skitlab.ru>.
-> 
-> I've set up things to work pretty much the same way as for
-> am33xx. We are basically using cm33xx.c with a different set
-> of clocks and clockdomains.
-> 
-> This code is based on the TI81XX-LINUX-PSP-04.04.00.02 patches
-> published at:
-> 
-> http://downloads.ti.com/dsps/dsps_public_sw/psp/LinuxPSP/TI81XX_04_04/04_04_00_02/index_FDS.html
-> 
-> Cc: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/Makefile               |    1 +
->  arch/arm/mach-omap2/io.c                   |    8 +-
->  arch/arm/mach-omap2/omap_hwmod.c           |    2 +-
->  arch/arm/mach-omap2/omap_hwmod.h           |    1 +
->  arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 1025 ++++++++++++++++++++++++++++
->  5 files changed, 1034 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 352873c..926bc39 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -226,6 +226,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= omap_hwmod_33xx_43xx_ipblock_data.o
->  obj-$(CONFIG_SOC_AM43XX)		+= omap_hwmod_43xx_data.o
->  obj-$(CONFIG_SOC_AM43XX)		+= omap_hwmod_33xx_43xx_interconnect_data.o
->  obj-$(CONFIG_SOC_AM43XX)		+= omap_hwmod_33xx_43xx_ipblock_data.o
-> +obj-$(CONFIG_SOC_TI81XX)		+= omap_hwmod_81xx_data.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
->  obj-$(CONFIG_SOC_OMAP5)			+= omap_hwmod_54xx_data.o
->  obj-$(CONFIG_SOC_DRA7XX)		+= omap_hwmod_7xx_data.o
+This patch removes unused ioremap_page().
 
-Looks like the Makefile needs the following addition for make randconfig
-builds to work properly.
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+---
+ arch/arm/include/asm/mach/map.h | 5 -----
+ arch/arm/mm/ioremap.c           | 8 --------
+ 2 files changed, 13 deletions(-)
 
-Regards,
-
-Tony
-
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -121,6 +121,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-prcm-4-5-common)
- obj-$(CONFIG_SOC_OMAP5)			+= $(omap-prcm-4-5-common)
- obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-prcm-4-5-common)
- am33xx-43xx-prcm-common			+= prm33xx.o cm33xx.o
-+obj-$(CONFIG_SOC_TI81XX)		+= $(am33xx-43xx-prcm-common)
- obj-$(CONFIG_SOC_AM33XX)		+= $(am33xx-43xx-prcm-common)
- obj-$(CONFIG_SOC_AM43XX)		+= $(omap-prcm-4-5-common) \
- 					   $(am33xx-43xx-prcm-common)
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index f98c7f3..be2b68e 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -52,11 +52,6 @@ static inline void debug_ll_io_init(void) {}
+ 
+ struct mem_type;
+ extern const struct mem_type *get_mem_type(unsigned int type);
+-/*
+- * external interface to remap single page with appropriate type
+- */
+-extern int ioremap_page(unsigned long virt, unsigned long phys,
+-			const struct mem_type *mtype);
+ #else
+ #define iotable_init(map,num)	do { } while (0)
+ #define vm_reserve_area_early(a,s,c)	do { } while (0)
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index d1e5ad7..c91633f 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -103,14 +103,6 @@ void __init add_static_vm_early(struct static_vm *svm)
+ 	list_add_tail(&svm->list, &curr_svm->list);
+ }
+ 
+-int ioremap_page(unsigned long virt, unsigned long phys,
+-		 const struct mem_type *mtype)
+-{
+-	return ioremap_page_range(virt, virt + PAGE_SIZE, phys,
+-				  __pgprot(mtype->prot_pte));
+-}
+-EXPORT_SYMBOL(ioremap_page);
+-
+ void __check_vmalloc_seq(struct mm_struct *mm)
+ {
+ 	unsigned int seq;
+-- 
+1.9.1
