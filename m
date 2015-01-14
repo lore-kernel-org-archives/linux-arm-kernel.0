@@ -1,53 +1,31 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 14 Jan 2015 14:23:31 -0800
-Subject: [PATCH v4 1/3] i2c: iProc: define Broadcom iProc I2C binding
+Date: Wed, 14 Jan 2015 14:23:33 -0800
+Subject: [PATCH v4 3/3] ARM: dts: add I2C device nodes for Broadcom Cygnus
 In-Reply-To: <1421274213-3544-1-git-send-email-rjui@broadcom.com>
 References: <Ray Jui <rjui@broadcom.com>
  <1421274213-3544-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1421274213-3544-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1421274213-3544-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the I2C device tree binding for Broadcom iProc family of
-SoCs
+Add I2C device nodes and its properties in bcm-cygnus.dtsi but keep
+them disabled there. Individual I2C devices can be enabled in board
+specific dts file when I2C slave devices are enabled in the future
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+ arch/arm/boot/dts/bcm-cygnus.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-new file mode 100644
-index 0000000..81f982c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-@@ -0,0 +1,37 @@
-+Broadcom iProc I2C controller
-+
-+Required properties:
-+
-+- compatible:
-+    Must be "brcm,iproc-i2c"
-+
-+- reg:
-+    Define the base and range of the I/O address space that contain the iProc
-+    I2C controller registers
-+
-+- interrupts:
-+    Should contain the I2C interrupt
-+
-+- clock-frequency:
-+    This is the I2C bus clock. Need to be either 100000 or 400000
-+
-+- #address-cells:
-+    Always 1 (for I2C addresses)
-+
-+- #size-cells:
-+    Always 0
-+
-+Example:
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 5126f9e..f7d6c1d 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -70,6 +70,26 @@
+ 		};
+ 	};
+ 
 +	i2c0: i2c at 18008000 {
 +		compatible = "brcm,iproc-i2c";
 +		reg = <0x18008000 0x100>;
@@ -55,11 +33,21 @@ index 0000000..81f982c
 +		#size-cells = <0>;
 +		interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
 +		clock-frequency = <100000>;
-+
-+		codec: wm8750 at 1a {
-+			compatible = "wlf,wm8750";
-+			reg = <0x1a>;
-+		};
++		status = "disabled";
 +	};
++
++	i2c1: i2c at 1800b000 {
++		compatible = "brcm,iproc-i2c";
++		reg = <0x1800b000 0x100>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
+ 	uart0: serial at 18020000 {
+ 		compatible = "snps,dw-apb-uart";
+ 		reg = <0x18020000 0x100>;
 -- 
 1.7.9.5
