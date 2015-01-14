@@ -1,20 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 14 Jan 2015 10:06:08 -0700
-Subject: [PATCH v3] ARM: dts: add bcm2835-pwm bindings
-In-Reply-To: <1421227134-8590-1-git-send-email-bart.tanghe@thomasmore.be>
-References: <1421227134-8590-1-git-send-email-bart.tanghe@thomasmore.be>
-Message-ID: <54B6A200.4040209@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Jan 2015 09:07:17 -0800
+Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
+ volatile
+In-Reply-To: <20150112164654.GB6525@saruman>
+References: <1419622104-25812-1-git-send-email-balbi@ti.com>
+ <1419622104-25812-2-git-send-email-balbi@ti.com>
+ <20150106173734.GL6502@saruman> <20150108162512.GC31926@saruman>
+ <20150112164654.GB6525@saruman>
+Message-ID: <20150114170716.GL2419@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 02:18 AM, Bart Tanghe wrote:
-> To probe the bcm2835-pwm driver properly, this dts bindings has to be added
-> to the bcm2835 dtsi file.
-> In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
-> ---
-> Changes in v3:
->   - node added by reg value
+* Felipe Balbi <balbi@ti.com> [150112 08:50]:
+> Hi,
+> 
+> On Thu, Jan 08, 2015 at 10:25:12AM -0600, Felipe Balbi wrote:
+> > On Tue, Jan 06, 2015 at 11:37:34AM -0600, Felipe Balbi wrote:
+> > > On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
+> > > > STATUS register can be modified by the HW, so we
+> > > > should bypass cache because of that.
+> > > > 
+> > > > In the case of INT[12] registers, they are the ones
+> > > > that actually clear the IRQ source at the time they
+> > > > are read. If we rely on the cache for them, we will
+> > > > never be able to clear the interrupt, which will cause
+> > > > our IRQ line to be disabled due to IRQ throttling.
+> > > > 
+> > > > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
+> > > > Cc: <stable@vger.kernel.org> # v3.15+
+> > > > Cc: Keerthy <j-keerthy@ti.com>
+> > > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > 
+> > > ping
+> > 
+> > another ping. Without this and the following patch TPS65218 power button
+> > driver which was already applied by Dmitry, won't work.
+> 
+> Anybody ? -rc4 is out and tps65218 is still broken because nobody has
+> acted on these two patches. All other patches which are meant for 3.20
+> merge window are applied and because of these pending, those patches
+> won't work.
 
-The pwm node still seems to be in the wrong place. Sorting by reg value, 
-it should be after i2c at 20205000 and before sdhci at 7e300000, as I 
-mentioned before.
+Lee, are you planning to pick these two drivers/mfd patches?
+
+Regards,
+
+Tony
