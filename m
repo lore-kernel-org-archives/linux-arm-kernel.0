@@ -1,94 +1,97 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 15 Jan 2015 00:51:14 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <54B69072.4080607@kernel.org>
+Date: Thu, 15 Jan 2015 00:55:44 +0900
+Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add INA2xx sensors
+In-Reply-To: <1421193801-24637-1-git-send-email-khilman@kernel.org>
+References: <1421193801-24637-1-git-send-email-khilman@kernel.org>
+Message-ID: <54B69180.2010403@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/15 14:33, Chanwoo Choi wrote:
-
-Hi,
-
-+ Doug, Olof
-
-> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
-> for Exynos 32bit SoC.
+On 01/14/15 09:03, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@linaro.org>
 > 
-Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
-on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
-including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
-implemented it and additionally its access is faster than using memory
-mapped register called SFR for MCT...so Doug submitted patch to use MCT
-on 32bit exynos SoCs before.
+> The odroid-xu3 has 4 INA231 current sensors on board which can be
+> accessed from the Linux via the hwmon interface.
+> 
+> There is one sensor for each of these power rails:
+> 
+> - A15 cluster: VDD_ARM
+> - A7 cluster: VDD_KFC
+> - GPU: VDD_G3D
+> - memory: VDD_MEM
+> 
+> In addition to adding the sensors, LDO26 from the PMIC needs to be
+> enabled because it's powering these sensor.
+> 
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
+> 
+>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> index c29123c0734d..7874da20939f 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> @@ -174,6 +174,13 @@
+>  					regulator-always-on;
+>  				};
+>  
+> +				ldo26_reg: LDO26 {
+> +					regulator-name = "vdd_ldo26";
+> +					regulator-min-microvolt = <3000000>;
+> +					regulator-max-microvolt = <3000000>;
+> +					regulator-always-on;
+> +				};
+> +
+>  				buck1_reg: BUCK1 {
+>  					regulator-name = "vdd_mif";
+>  					regulator-min-microvolt = <800000>;
+> @@ -257,6 +264,38 @@
+>  		};
+>  	};
+>  
+> +	i2c_0: i2c at 12C60000 {
+> +		status = "okay";
+> +
+> +		/* A15 cluster: VDD_ARM */
+> +		ina220 at 40 {
+> +			compatible = "ti,ina230";
+> +			reg = <0x40>;
+> +			shunt-resistor = <10000>;
+> +		};
+> +
+> +		/* memory: VDD_MEM */
+> +		ina220 at 41 {
+> +			compatible = "ti,ina230";
+> +			reg = <0x41>;
+> +			shunt-resistor = <10000>;
+> +		};
+> +
+> +		/* GPU: VDD_G3D */
+> +		ina220 at 44 {
+> +			compatible = "ti,ina230";
+> +			reg = <0x44>;
+> +			shunt-resistor = <10000>;
+> +		};
+> +
+> +		/* A7 cluster: VDD_KFC */
+> +		ina220 at 45 {
+> +			compatible = "ti,ina230";
+> +			reg = <0x45>;
+> +			shunt-resistor = <10000>;
+> +		};
+> +	};
+> +
+>  	i2c_2: i2c at 12C80000 {
+>  		samsung,i2c-sda-delay = <100>;
+>  		samsung,i2c-max-bus-freq = <66000>;
 
-I know using MCT on 64bit exynos is usefulness for Power Management and
-I need to talk to relevant guys in office again. If anything, I'll let
-you know.
+Looks good to me and applied. To be honest, I'm not sure about the
+values in the node of shunt-resistor though ;)
 
 Thanks,
 Kukjin
-
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
-> This patch set is tested on 64-bit Exynos SoC. I send only this patch from
-> following patchst[1].
-> [1] https://lkml.org/lkml/2014/12/2/134
-> 
-> Changes from v2:
-> - None
-> Changes from v1:
-> - Use CONFIG_ARM instead of CONFIG_ARM64
-> 
->  drivers/clocksource/Kconfig      | 1 -
->  drivers/clocksource/exynos_mct.c | 4 ++++
->  2 files changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index fc01ec2..be38119 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
->  
->  config CLKSRC_EXYNOS_MCT
->  	def_bool y if ARCH_EXYNOS
-> -	depends on !ARM64
->  	help
->  	  Support for Multi Core Timer controller on Exynos SoCs.
->  
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 9403061..b840ea1 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
->  	return exynos4_read_count_32();
->  }
->  
-> +#if defined(CONFIG_ARM)
->  static struct delay_timer exynos4_delay_timer;
->  
->  static cycles_t exynos4_read_current_timer(void)
-> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
->  			 "cycles_t needs to move to 32-bit for ARM64 usage");
->  	return exynos4_read_count_32();
->  }
-> +#endif
->  
->  static void __init exynos4_clocksource_init(void)
->  {
->  	exynos4_mct_frc_start();
->  
-> +#if defined(CONFIG_ARM)
->  	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
->  	exynos4_delay_timer.freq = clk_rate;
->  	register_current_timer_delay(&exynos4_delay_timer);
-> +#endif
->  
->  	if (clocksource_register_hz(&mct_frc, clk_rate))
->  		panic("%s: can't register clocksource\n", mct_frc.name);
