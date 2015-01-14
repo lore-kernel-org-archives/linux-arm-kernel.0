@@ -1,88 +1,38 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jan 2015 17:22:00 +0100
-Subject: [PATCH 08/12] usb: gadget: at91_udc: Remove non-DT handling code
+Date: Wed, 14 Jan 2015 17:22:03 +0100
+Subject: [PATCH 11/12] usb: gadget: at91_udc: Update DT binding documentation
 In-Reply-To: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421252524-24452-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421252524-24452-12-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Since non-DT board support has been removed from the at91 architecture we
-can safely remove non-DT handling code.
+Three compatible strings have been added to the at91_udc driver.
+Update the documentation accordingly.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/gadget/udc/Kconfig    |  1 +
- drivers/usb/gadget/udc/at91_udc.c | 16 ++--------------
- 2 files changed, 3 insertions(+), 14 deletions(-)
+ Documentation/devicetree/bindings/usb/atmel-usb.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
-index b8e213eb36cc..366e551aeff0 100644
---- a/drivers/usb/gadget/udc/Kconfig
-+++ b/drivers/usb/gadget/udc/Kconfig
-@@ -32,6 +32,7 @@ menu "USB Peripheral Controller"
- config USB_AT91
- 	tristate "Atmel AT91 USB Device Port"
- 	depends on ARCH_AT91
-+	depends on OF || COMPILE_TEST
- 	help
- 	   Many Atmel AT91 processors (such as the AT91RM2000) have a
- 	   full speed USB Device Port with support for five configurable
-diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-index d33f2994b7c4..be7e16037ac4 100644
---- a/drivers/usb/gadget/udc/at91_udc.c
-+++ b/drivers/usb/gadget/udc/at91_udc.c
-@@ -1710,12 +1710,6 @@ static int at91udc_probe(struct platform_device *pdev)
- 	int		retval;
- 	struct resource	*res;
+diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+index 6007231e0adc..54a81219caae 100644
+--- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
++++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+@@ -33,7 +33,11 @@ usb1: ehci at 00800000 {
+ AT91 USB device controller
  
--	if (!dev_get_platdata(dev) && !pdev->dev.of_node) {
--		/* small (so we copy it) but critical! */
--		DBG("missing platform_data\n");
--		return -ENODEV;
--	}
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENXIO;
-@@ -1728,11 +1722,7 @@ static int at91udc_probe(struct platform_device *pdev)
- 	/* init software state */
- 	udc = &controller;
- 	udc->gadget.dev.parent = dev;
--	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
--		at91udc_of_init(udc, pdev->dev.of_node);
--	else
--		memcpy(&udc->board, dev_get_platdata(dev),
--		       sizeof(struct at91_udc_data));
-+	at91udc_of_init(udc, pdev->dev.of_node);
- 	udc->pdev = pdev;
- 	udc->enabled = 0;
- 	spin_lock_init(&udc->lock);
-@@ -1968,14 +1958,12 @@ static int at91udc_resume(struct platform_device *pdev)
- #define	at91udc_resume	NULL
- #endif
- 
--#if defined(CONFIG_OF)
- static const struct of_device_id at91_udc_dt_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-udc" },
- 	{ /* sentinel */ }
- };
- 
- MODULE_DEVICE_TABLE(of, at91_udc_dt_ids);
--#endif
- 
- static struct platform_driver at91_udc_driver = {
- 	.remove		= __exit_p(at91udc_remove),
-@@ -1984,7 +1972,7 @@ static struct platform_driver at91_udc_driver = {
- 	.resume		= at91udc_resume,
- 	.driver		= {
- 		.name	= (char *) driver_name,
--		.of_match_table	= of_match_ptr(at91_udc_dt_ids),
-+		.of_match_table	= at91_udc_dt_ids,
- 	},
- };
- 
+ Required properties:
+- - compatible: Should be "atmel,at91rm9200-udc"
++ - compatible: Should be one of the following
++	       "atmel,at91rm9200-udc"
++	       "atmel,at91sam9260-udc"
++	       "atmel,at91sam9261-udc"
++	       "atmel,at91sam9263-udc"
+  - reg: Address and length of the register set for the device
+  - interrupts: Should contain macb interrupt
+  - clocks: Should reference the peripheral and the AHB clocks
 -- 
 2.1.0
