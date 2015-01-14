@@ -1,65 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Jan 2015 12:24:49 +0100
-Subject: sysfs topology for arm64 cluster_id
-In-Reply-To: <54B5BC84.8090603@redhat.com>
-References: <54B5BC84.8090603@redhat.com>
-Message-ID: <1514771.EWQBJle85Y@wuerfel>
+Date: Wed, 14 Jan 2015 12:35:22 +0100
+Subject: [PATCH] arm64: kill off the libgcc dependency
+In-Reply-To: <20150114104826.GD4050@arm.com>
+References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
+ <20150114104826.GD4050@arm.com>
+Message-ID: <3138622.1rQcFu1jAj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 January 2015 19:47:00 Jon Masters wrote:
-> Hi Folks,
+On Wednesday 14 January 2015 10:48:26 Will Deacon wrote:
+> On Wed, Jan 14, 2015 at 10:38:54AM +0000, Kevin Hao wrote:
+> > The arm64 doesn't depend on the libgcc to build the vmlinux image.
 > 
-> TLDR: I would like to consider the value of adding something like
-> "cluster_siblings" or similar in sysfs to describe ARM topology.
-> 
-> A quick question on intended data representation in /sysfs topology
-> before I ask the team on this end to go down the (wrong?) path. On ARM
-> systems today, we have a hierarchical CPU topology:
-> 
->                  Socket ---- Coherent Interonnect ---- Socket
->                    |                                    |
->          Cluster0 ... ClusterN                Cluster0 ... ClusterN
->             |             |                      |             |
->       Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
->         |       |      |        |           |       |      |       |
->      T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
-> 
-> Where we might (or might not) have threads in individual cores (a la SMT
-> - it's allowed in the architecture at any rate) and we group cores
-> together into units of clusters usually 2-4 cores in size (though this
-> varies between implementations, some of which have different but similar
-> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
-> cores). There are multiple clusters per "socket", and there might be an
-> arbitrary number of sockets. We'll start to enable NUMA soon.
+> Yes it does; we make use of __builtin_* for our bitops, for example.
+> The compiler guys don't guarantee that these will be inlined.
 
-Have you taken a look at the NUMA patches that Ganapatrao Kulkarni
-has sent out? These encode the system-wide topology based on the model
-from IBM Power machines.
+Is that an architecture-specific statement?
 
-> Is it not a good idea to expose the cluster details directly in sysfs
-> and have these utilities understand the possible extra level in the
-> calculation? Or do we want to just fudge the numbers (as seems to be the
-> case in some systems I am seeing) to make the x86 model add up?
-> 
-> Let me know the preferred course...
-
-I like the idea of encoding the topology independent of the specific
-levels implemented in hardware, and we could use that same model
-that we have in DT to represent things to user space, or that
-can directly access the "arm,associativity" properties in
-/sys/firmware/devicetree/base, but that would not be portable to
-ACPI based systems.
-
-In the platform that Ganapatrao is interested in, there are no clusters,
-but they have two levels of NUMA topology (sockets and boards), and
-I could well imagine systems that have more than those two, or systems
-that have multiple levels below a socket (e.g. chip, cluster, core,
-thread) that all share the same NUMA node because they have a common
-memory controller.
-
-It would be nice to find a good representation for sysfs that covers
-all of these cases, and that also shows the associativity of I/O
-devices.
+The debate has been going on for ages in Linux, most architecture
+maintainers however decided against using libgcc and copy the functions
+that are actually needed into the kernel sources.
 
 	Arnd
