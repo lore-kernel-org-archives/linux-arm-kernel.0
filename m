@@ -1,570 +1,128 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 14 Jan 2015 14:23:32 -0800
-Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <1421274213-3544-1-git-send-email-rjui@broadcom.com>
-References: <Ray Jui <rjui@broadcom.com>
- <1421274213-3544-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1421274213-3544-3-git-send-email-rjui@broadcom.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Jan 2015 16:24:32 -0600
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <alpine.DEB.2.11.1501141110190.5526@nanos>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
+ <alpine.DEB.2.11.1501141110190.5526@nanos>
+Message-ID: <CAL_JsqLwBvV5s531_YsA=sCE4_LG=eXTua8mh069ufRjSNFhng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial support to the Broadcom iProc I2C controller found in the
-iProc family of SoCs.
+On Wed, Jan 14, 2015 at 4:36 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Tue, 13 Jan 2015, Rob Herring wrote:
+>> On Tue, Jan 13, 2015 at 12:46 PM, Boris Brezillon
+>> <boris.brezillon@free-electrons.com> wrote:
+>> > Some interrupt controllers are multiplexing several peripheral IRQs on
+>> > a single interrupt line.
+>> > While this is not a problem for most IRQs (as long as all peripherals
+>> > request the interrupt with IRQF_SHARED flag set), multiplexing timers and
+>> > other type of peripherals will generate a WARNING (mixing IRQF_NO_SUSPEND
+>> > and !IRQF_NO_SUSPEND is prohibited).
+>> >
+>> > Create a dumb irq demultiplexer which simply forwards interrupts to all
+>> > peripherals (exactly what's happening with IRQ_SHARED) but keep a unique
+>> > irq number for each peripheral, thus preventing the IRQF_NO_SUSPEND
+>> > and !IRQF_NO_SUSPEND mix on a given interrupt.
+>>
+>> This really seems like a work-around for how IRQF_SHARED works. It
+>
+> It's a workaround for a short coming of IRQF_SHARED.
+>
+> IRQF_SHARED has a massive short coming versus suspend and wakeup
+> interrupts. If one of the demultiplexed interrupts is a valid wakeup
+> source then we have no sane way to express this with IRQF_SHARED
+> simply because the drivers need to be aware whether they run on stupid
+> or well designed hardware.
 
-The iProc I2C controller has separate internal TX and RX FIFOs, each has
-a size of 64 bytes. The iProc I2C controller supports two bus speeds
-including standard mode (100kHz) and fast mode (400kHz)
+Unfortunately, the drivers will still have to know this. They cannot
+assume that they can call disable_irq and their device irq state does
+not matter.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- drivers/i2c/busses/Kconfig         |   10 +
- drivers/i2c/busses/Makefile        |    1 +
- drivers/i2c/busses/i2c-bcm-iproc.c |  503 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 514 insertions(+)
- create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
+Perhaps we need a debug feature such that disable_irq/enable_irq are
+nops with IRQF_SHARED?
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 31e8308..af76d23 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -372,6 +372,16 @@ config I2C_BCM2835
- 	  This support is also available as a module.  If so, the module
- 	  will be called i2c-bcm2835.
- 
-+config I2C_BCM_IPROC
-+	tristate "Broadcom iProc I2C controller"
-+	depends on ARCH_BCM_IPROC || COMPILE_TEST
-+	default ARCH_BCM_IPROC
-+	help
-+	  If you say yes to this option, support will be included for the
-+	  Broadcom iProc I2C controller.
-+
-+	  If you don't know what to do here, say N.
-+
- config I2C_BCM_KONA
- 	tristate "BCM Kona I2C adapter"
- 	depends on ARCH_BCM_MOBILE
-diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-index 56388f6..d93b509 100644
---- a/drivers/i2c/busses/Makefile
-+++ b/drivers/i2c/busses/Makefile
-@@ -33,6 +33,7 @@ obj-$(CONFIG_I2C_AT91)		+= i2c-at91.o
- obj-$(CONFIG_I2C_AU1550)	+= i2c-au1550.o
- obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
- obj-$(CONFIG_I2C_BCM2835)	+= i2c-bcm2835.o
-+obj-$(CONFIG_I2C_BCM_IPROC)	+= i2c-bcm-iproc.o
- obj-$(CONFIG_I2C_BLACKFIN_TWI)	+= i2c-bfin-twi.o
- obj-$(CONFIG_I2C_CADENCE)	+= i2c-cadence.o
- obj-$(CONFIG_I2C_CBUS_GPIO)	+= i2c-cbus-gpio.o
-diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
-new file mode 100644
-index 0000000..7d9ed4e
---- /dev/null
-+++ b/drivers/i2c/busses/i2c-bcm-iproc.c
-@@ -0,0 +1,503 @@
-+/*
-+ * Copyright (C) 2014 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/sched.h>
-+#include <linux/i2c.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+
-+#define CFG_OFFSET                   0x00
-+#define CFG_RESET_SHIFT              31
-+#define CFG_EN_SHIFT                 30
-+#define CFG_M_RETRY_CNT_SHIFT        16
-+#define CFG_M_RETRY_CNT_MASK         0x0f
-+
-+#define TIM_CFG_OFFSET               0x04
-+#define TIME_CFG_MODE_400_SHIFT      31
-+
-+#define M_FIFO_CTRL_OFFSET           0x0c
-+#define M_FIFO_RX_FLUSH_SHIFT        31
-+#define M_FIFO_TX_FLUSH_SHIFT        30
-+#define M_FIFO_RX_CNT_SHIFT          16
-+#define M_FIFO_RX_CNT_MASK           0x7f
-+#define M_FIFO_RX_THLD_SHIFT         8
-+#define M_FIFO_RX_THLD_MASK          0x3f
-+
-+#define M_CMD_OFFSET                 0x30
-+#define M_CMD_START_BUSY_SHIFT       31
-+#define M_CMD_STATUS_SHIFT           25
-+#define M_CMD_STATUS_MASK            0x07
-+#define M_CMD_STATUS_SUCCESS         0x0
-+#define M_CMD_STATUS_LOST_ARB        0x1
-+#define M_CMD_STATUS_NACK_ADDR       0x2
-+#define M_CMD_STATUS_NACK_DATA       0x3
-+#define M_CMD_STATUS_TIMEOUT         0x4
-+#define M_CMD_PROTOCOL_SHIFT         9
-+#define M_CMD_PROTOCOL_MASK          0xf
-+#define M_CMD_PROTOCOL_BLK_WR        0x7
-+#define M_CMD_PROTOCOL_BLK_RD        0x8
-+#define M_CMD_PEC_SHIFT              8
-+#define M_CMD_RD_CNT_SHIFT           0
-+#define M_CMD_RD_CNT_MASK            0xff
-+
-+#define IE_OFFSET                    0x38
-+#define IE_M_RX_FIFO_FULL_SHIFT      31
-+#define IE_M_RX_THLD_SHIFT           30
-+#define IE_M_START_BUSY_SHIFT        28
-+
-+#define IS_OFFSET                    0x3c
-+#define IS_M_RX_FIFO_FULL_SHIFT      31
-+#define IS_M_RX_THLD_SHIFT           30
-+#define IS_M_START_BUSY_SHIFT        28
-+
-+#define M_TX_OFFSET                  0x40
-+#define M_TX_WR_STATUS_SHIFT         31
-+#define M_TX_DATA_SHIFT              0
-+#define M_TX_DATA_MASK               0xff
-+
-+#define M_RX_OFFSET                  0x44
-+#define M_RX_STATUS_SHIFT            30
-+#define M_RX_STATUS_MASK             0x03
-+#define M_RX_PEC_ERR_SHIFT           29
-+#define M_RX_DATA_SHIFT              0
-+#define M_RX_DATA_MASK               0xff
-+
-+#define I2C_TIMEOUT_MESC             100
-+#define M_TX_RX_FIFO_SIZE            64
-+
-+enum bus_speed_index {
-+	I2C_SPD_100K = 0,
-+	I2C_SPD_400K,
-+};
-+
-+struct bcm_iproc_i2c_dev {
-+	struct device *device;
-+	int irq;
-+
-+	void __iomem *base;
-+	struct i2c_msg *msg;
-+
-+	struct i2c_adapter adapter;
-+
-+	struct completion done;
-+};
-+
-+/*
-+ * Can be expanded in the future if more interrupt status bits are utilized
-+ */
-+#define ISR_MASK (1 << IS_M_START_BUSY_SHIFT)
-+
-+static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
-+{
-+	struct bcm_iproc_i2c_dev *iproc_i2c = data;
-+	u32 status = readl(iproc_i2c->base + IS_OFFSET);
-+
-+	status &= ISR_MASK;
-+
-+	if (!status)
-+		return IRQ_NONE;
-+
-+	writel(status, iproc_i2c->base + IS_OFFSET);
-+	complete_all(&iproc_i2c->done);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int __wait_for_bus_idle(struct bcm_iproc_i2c_dev *iproc_i2c)
-+{
-+	unsigned long timeout = jiffies + msecs_to_jiffies(I2C_TIMEOUT_MESC);
-+
-+	while (readl(iproc_i2c->base + M_CMD_OFFSET) &
-+	       (1 << M_CMD_START_BUSY_SHIFT)) {
-+		if (time_after(jiffies, timeout)) {
-+			dev_err(iproc_i2c->device,
-+				"wait for bus idle timeout\n");
-+			return -ETIMEDOUT;
-+		}
-+		cpu_relax();
-+	}
-+
-+	return 0;
-+}
-+
-+static int bcm_iproc_i2c_format_addr(struct bcm_iproc_i2c_dev *iproc_i2c,
-+				     struct i2c_msg *msg, u8 *addr)
-+{
-+
-+	if (msg->flags & I2C_M_TEN) {
-+		dev_err(iproc_i2c->device, "no support for 10-bit address\n");
-+		return -EINVAL;
-+	}
-+
-+	*addr = (msg->addr << 1);
-+
-+	if (msg->flags & I2C_M_RD)
-+		*addr |= 1;
-+
-+	return 0;
-+}
-+
-+static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *iproc_i2c)
-+{
-+	u32 val;
-+
-+	val = readl(iproc_i2c->base + M_CMD_OFFSET);
-+	val = (val >> M_CMD_STATUS_SHIFT) & M_CMD_STATUS_MASK;
-+
-+	switch (val) {
-+	case M_CMD_STATUS_SUCCESS:
-+		return 0;
-+
-+	case M_CMD_STATUS_LOST_ARB:
-+		dev_err(iproc_i2c->device, "lost bus arbitration\n");
-+		return -EREMOTEIO;
-+
-+	case M_CMD_STATUS_NACK_ADDR:
-+		dev_err(iproc_i2c->device, "NAK addr:0x%02x\n",
-+			iproc_i2c->msg->addr);
-+		return -EREMOTEIO;
-+
-+	case M_CMD_STATUS_NACK_DATA:
-+		dev_err(iproc_i2c->device, "NAK data\n");
-+		return -EREMOTEIO;
-+
-+	case M_CMD_STATUS_TIMEOUT:
-+		dev_err(iproc_i2c->device, "bus timeout\n");
-+		return -ETIMEDOUT;
-+
-+	default:
-+		dev_err(iproc_i2c->device, "unknown error code=%d\n", val);
-+		return -EREMOTEIO;
-+	}
-+
-+	return -EREMOTEIO;
-+}
-+
-+static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *iproc_i2c,
-+					 struct i2c_msg *msg)
-+{
-+	int ret, i;
-+	u8 addr;
-+	u32 val;
-+	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
-+
-+	if (msg->len < 1 || msg->len > M_TX_RX_FIFO_SIZE - 1) {
-+		dev_err(iproc_i2c->device,
-+			"supported data length is 1 - %u bytes\n",
-+			M_TX_RX_FIFO_SIZE - 1);
-+		return -EINVAL;
-+	}
-+
-+	iproc_i2c->msg = msg;
-+	ret = __wait_for_bus_idle(iproc_i2c);
-+	if (ret)
-+		return ret;
-+
-+	ret = bcm_iproc_i2c_format_addr(iproc_i2c, msg, &addr);
-+	if (ret)
-+		return ret;
-+
-+	/* load slave address into the TX FIFO */
-+	writel(addr, iproc_i2c->base + M_TX_OFFSET);
-+
-+	/* for a write transaction, load data into the TX FIFO */
-+	if (!(msg->flags & I2C_M_RD)) {
-+		for (i = 0; i < msg->len; i++) {
-+			val = msg->buf[i];
-+
-+			/* mark the last byte */
-+			if (i == msg->len - 1)
-+				val |= 1 << M_TX_WR_STATUS_SHIFT;
-+
-+			writel(val, iproc_i2c->base + M_TX_OFFSET);
-+		}
-+	}
-+
-+	/* mark as incomplete before starting the transaction */
-+	reinit_completion(&iproc_i2c->done);
-+
-+	/*
-+	 * Enable the "start busy" interrupt, which will be triggered after
-+	 * the transaction is done, i.e., the internal start_busy bit
-+	 * transitions from 1 to 0
-+	 */
-+	writel(1 << IE_M_START_BUSY_SHIFT, iproc_i2c->base + IE_OFFSET);
-+
-+	/*
-+	 * Now we can activate the transfer. For a read operation, specify the
-+	 * number of bytes to read
-+	 */
-+	val = 1 << M_CMD_START_BUSY_SHIFT;
-+	if (msg->flags & I2C_M_RD) {
-+		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
-+		       (msg->len << M_CMD_RD_CNT_SHIFT);
-+	} else {
-+		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
-+	}
-+	writel(val, iproc_i2c->base + M_CMD_OFFSET);
-+
-+	time_left = wait_for_completion_timeout(&iproc_i2c->done, time_left);
-+
-+	/* disable all interrupts */
-+	writel(0, iproc_i2c->base + IE_OFFSET);
-+
-+	if (!time_left) {
-+		dev_err(iproc_i2c->device, "transaction times out\n");
-+
-+		/* flush FIFOs */
-+		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
-+		      (1 << M_FIFO_TX_FLUSH_SHIFT);
-+		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
-+		return -EREMOTEIO;
-+	}
-+
-+	ret = bcm_iproc_i2c_check_status(iproc_i2c);
-+	if (ret) {
-+		/* flush both TX/RX FIFOs */
-+		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
-+		      (1 << M_FIFO_TX_FLUSH_SHIFT);
-+		writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
-+		return ret;
-+	}
-+
-+	/*
-+	 * For a read operation, we now need to load the data from FIFO
-+	 * into the memory buffer
-+	 */
-+	if (msg->flags & I2C_M_RD) {
-+		for (i = 0; i < msg->len; i++) {
-+			msg->buf[i] = (readl(iproc_i2c->base + M_RX_OFFSET) >>
-+				      M_RX_DATA_SHIFT) & M_RX_DATA_MASK;
-+		}
-+	}
-+
-+	dev_dbg(iproc_i2c->device, "xfer %c, addr=0x%02x, len=%d\n",
-+		(msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
-+		msg->len);
-+	dev_dbg(iproc_i2c->device, "**** data start ****\n");
-+	for (i = 0; i < msg->len; i++)
-+		dev_dbg(iproc_i2c->device, "0x%02x ",  msg->buf[i]);
-+	dev_dbg(iproc_i2c->device, "**** data end ****\n");
-+
-+	return 0;
-+}
-+
-+static int bcm_iproc_i2c_xfer(struct i2c_adapter *adapter,
-+			      struct i2c_msg msgs[], int num)
-+{
-+	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(adapter);
-+	int ret, i;
-+
-+	/* go through all messages */
-+	for (i = 0; i < num; i++) {
-+		ret = bcm_iproc_i2c_xfer_single_msg(iproc_i2c, &msgs[i]);
-+		if (ret) {
-+			dev_err(iproc_i2c->device, "xfer failed\n");
-+			return ret;
-+		}
-+	}
-+
-+	return num;
-+}
-+
-+static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
-+{
-+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-+}
-+
-+static const struct i2c_algorithm bcm_iproc_algo = {
-+	.master_xfer = bcm_iproc_i2c_xfer,
-+	.functionality = bcm_iproc_i2c_functionality,
-+};
-+
-+static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
-+{
-+	unsigned int bus_speed, speed_bit;
-+	u32 val;
-+	int ret = of_property_read_u32(iproc_i2c->device->of_node,
-+				       "clock-frequency", &bus_speed);
-+	if (ret < 0) {
-+		dev_err(iproc_i2c->device,
-+			"missing clock-frequency property\n");
-+		return -ENODEV;
-+	}
-+
-+	if (bus_speed < 100000) {
-+		dev_err(iproc_i2c->device, "%d Hz bus speed not supported\n",
-+			bus_speed);
-+		dev_err(iproc_i2c->device,
-+			"valid speeds are 100khz and 400khz\n");
-+		return -EINVAL;
-+	} else if (bus_speed < 400000) {
-+		speed_bit = 0;
-+	} else {
-+		/* bus_speed >= 400000 */
-+		speed_bit = 1;
-+	}
-+
-+	val = readl(iproc_i2c->base + TIM_CFG_OFFSET);
-+	val &= ~(1 << TIME_CFG_MODE_400_SHIFT);
-+	val |= speed_bit << TIME_CFG_MODE_400_SHIFT;
-+	writel(val, iproc_i2c->base + TIM_CFG_OFFSET);
-+
-+	dev_info(iproc_i2c->device, "bus set to %u Hz\n", bus_speed);
-+
-+	return 0;
-+}
-+
-+static int bcm_iproc_i2c_init(struct bcm_iproc_i2c_dev *iproc_i2c)
-+{
-+	u32 val;
-+
-+	/* put controller in reset */
-+	val = readl(iproc_i2c->base + CFG_OFFSET);
-+	val |= 1 << CFG_RESET_SHIFT;
-+	val &= ~(1 << CFG_EN_SHIFT);
-+	writel(val, iproc_i2c->base + CFG_OFFSET);
-+
-+	/* wait 100 usec per spec */
-+	udelay(100);
-+
-+	/* bring controller out of reset */
-+	val &= ~(1 << CFG_RESET_SHIFT);
-+	writel(val, iproc_i2c->base + CFG_OFFSET);
-+
-+	/* flush TX/RX FIFOs and set RX FIFO threshold to zero */
-+	val = (1 << M_FIFO_RX_FLUSH_SHIFT) | (1 << M_FIFO_TX_FLUSH_SHIFT);
-+	writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
-+
-+	/* disable all interrupts */
-+	writel(0, iproc_i2c->base + IE_OFFSET);
-+
-+	/* clear all pending interrupts */
-+	writel(0xffffffff, iproc_i2c->base + IS_OFFSET);
-+
-+	return 0;
-+}
-+
-+static void bcm_iproc_i2c_enable(struct bcm_iproc_i2c_dev *iproc_i2c)
-+{
-+	u32 val;
-+
-+	val = readl(iproc_i2c->base + CFG_OFFSET);
-+	val |= 1 << CFG_EN_SHIFT;
-+	writel(val, iproc_i2c->base + CFG_OFFSET);
-+}
-+
-+static void bcm_iproc_i2c_disable(struct bcm_iproc_i2c_dev *iproc_i2c)
-+{
-+	u32 val;
-+
-+	val = readl(iproc_i2c->base + CFG_OFFSET);
-+	val &= ~(1 << CFG_EN_SHIFT);
-+	writel(val, iproc_i2c->base + CFG_OFFSET);
-+}
-+
-+static int bcm_iproc_i2c_probe(struct platform_device *pdev)
-+{
-+	int irq, ret = 0;
-+	struct bcm_iproc_i2c_dev *iproc_i2c;
-+	struct i2c_adapter *adap;
-+	struct resource *res;
-+
-+	iproc_i2c = devm_kzalloc(&pdev->dev, sizeof(*iproc_i2c),
-+				 GFP_KERNEL);
-+	if (!iproc_i2c)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, iproc_i2c);
-+	iproc_i2c->device = &pdev->dev;
-+	init_completion(&iproc_i2c->done);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	iproc_i2c->base = devm_ioremap_resource(iproc_i2c->device, res);
-+	if (IS_ERR(iproc_i2c->base))
-+		return PTR_ERR(iproc_i2c->base);
-+
-+	ret = bcm_iproc_i2c_init(iproc_i2c);
-+	if (ret)
-+		return ret;
-+
-+	ret = bcm_iproc_i2c_cfg_speed(iproc_i2c);
-+	if (ret)
-+		return ret;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		dev_err(iproc_i2c->device, "no irq resource\n");
-+		return irq;
-+	}
-+	iproc_i2c->irq = irq;
-+
-+	ret = request_irq(irq, bcm_iproc_i2c_isr, 0, pdev->name, iproc_i2c);
-+	if (ret < 0) {
-+		dev_err(iproc_i2c->device, "unable to request irq %i\n", irq);
-+		return ret;
-+	}
-+
-+	bcm_iproc_i2c_enable(iproc_i2c);
-+
-+	adap = &iproc_i2c->adapter;
-+	i2c_set_adapdata(adap, iproc_i2c);
-+	strlcpy(adap->name, "Broadcom iProc I2C adapter", sizeof(adap->name));
-+	adap->algo = &bcm_iproc_algo;
-+	adap->dev.parent = &pdev->dev;
-+	adap->dev.of_node = pdev->dev.of_node;
-+
-+	ret = i2c_add_adapter(adap);
-+	if (ret) {
-+		dev_err(iproc_i2c->device, "failed to add adapter\n");
-+		free_irq(iproc_i2c->irq, iproc_i2c);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int bcm_iproc_i2c_remove(struct platform_device *pdev)
-+{
-+	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
-+
-+	i2c_del_adapter(&iproc_i2c->adapter);
-+	free_irq(iproc_i2c->irq, iproc_i2c);
-+	bcm_iproc_i2c_disable(iproc_i2c);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcm_iproc_i2c_of_match[] = {
-+	{.compatible = "brcm,iproc-i2c",},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcm_iproc_i2c_of_match);
-+
-+static struct platform_driver bcm_iproc_i2c_driver = {
-+	.driver = {
-+		.name = "bcm-iproc-i2c",
-+		.of_match_table = bcm_iproc_i2c_of_match,
-+	},
-+	.probe = bcm_iproc_i2c_probe,
-+	.remove = bcm_iproc_i2c_remove,
-+};
-+module_platform_driver(bcm_iproc_i2c_driver);
-+
-+MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
-+MODULE_DESCRIPTION("Broadcom iProc I2C Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+>> seems like what is really desired is just per handler disabling. It is
+>
+> So you want a magic API like disable/enable_irq_action()?
+>
+> Certainly not.
+
+Agreed.
+
+> You'd open just another can of worms which will bring us abuse and
+> hard to debug problems because driver writers think it's a good idea
+> to use it for random purposes.
+>
+> Aside of that it would add another conditional into the interrupt
+> delivery hotpath which is not desired either.
+>
+>> fragile in that devices can deadlock the system if the drivers don't
+>> disable the interrupt source before calling disable_irq. But unlike
+>
+> Any misdesigned driver can do that for you.
+>
+>> IRQF_SHARED, there is nothing explicit in the driver indicating it is
+>> designed to work properly with a shared interrupt line.
+>
+> IRQF_SHARED is a pretty bad indicator. Look at all the drivers which
+> slap this flag onto request_irq() and have no single line of code
+> which makes sure that the driver would ever work on a shared line.
+>
+> If it's just for annotational purposes, we can add a new IRQF flag,
+> which is required to request such a interrupt line.
+>
+>> I see no reason to accept this into DT either. We already can support
+>> shared lines and modeling an OR gate as an interrupt controller is
+>> pointless.
+>
+> It's absolutely not pointless.
+>
+> All attempts to work around that have resulted in horrible bandaids so
+> far. That's why I guided Boris to implement this dummy demultiplexing
+> mechanism. It solves the problem at hand nicely without adding nasty
+> hackarounds into the suspend/resume code and inflicting platform
+> knowledge on multi-platform device drivers.
+
+This change will break on old kernels with a new dtb. Would you be
+happy if a BIOS update required a new kernel? Fixing this for any
+platform requires a dtb update which may not be possible on some
+platforms. I don't have a problem with this breakage for 1 platform
+and the at91 guys may not care, but we'd ultimately be changing how
+all shared irqs are specified for all DT. Maybe we decide that this is
+how we want to describe things, but that needs much wider discussion
+and agreement.
+
+> If you have a proper solution for the problem at hand which
+>
+>    - avoids the demux dummy
+>
+>    - works straight forward with suspend/resume/wakeup
+>
+>    - does not add horrible new APIs
+>
+>    - does not add conditionals to the interrupt hotpath
+>
+>    - does not inflict platform knowledge about interrupt chip details
+>      on drivers
+>
+> then I'm happy to take it.
+>
+> But as long as you can't come up with anything sane, the demux dummy
+> is the best solution for this problem we've seen so far.
+
+What if during suspend you move all actions w/o IRQF_NO_SUSPEND to a
+suspended action list? This would leave only the actions with
+IRQF_NO_SUSPEND set in the active action list. The cost would be a
+pointer in irq_desc and moving the actions during suspend and resume.
+
+There are probably ways to do this demux irqchip without a DT change.
+Since we can't just move Linux irq numbers to different irq_chips
+during request_irq, we would have to parse the DT up front to find all
+shared interrupts and create a demux irqchip for them. That wouldn't
+be very efficient, but is straight-forward. Then we'd have to handle
+the translation into Linux irq numbers correctly which is probably the
+more difficult part.
+
+Rob
