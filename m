@@ -1,66 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 14 Jan 2015 09:38:22 +0100
-Subject: [PATCH 4/4] ARM: mvebu: add Device Tree description of RTC on
- Armada 38x
-In-Reply-To: <874mrui8r3.fsf@natisbad.org>
-References: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>	<1420817565-28800-5-git-send-email-gregory.clement@free-electrons.com>
- <874mrui8r3.fsf@natisbad.org>
-Message-ID: <54B62AFE.1030909@free-electrons.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 14 Jan 2015 10:40:33 +0200
+Subject: [PATCH v3 4/4] ARM: devicetree: document supported Conexant Digicolor
+ SoC
+In-Reply-To: <cover.1421219953.git.baruch@tkos.co.il>
+References: <cover.1421219953.git.baruch@tkos.co.il>
+Message-ID: <8ac384f1c15c05229d5534036a9a4000d908c0cf.1421219953.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Of the Digicolor SoCs series only CX92755 is currently supported.
 
-On 14/01/2015 00:03, Arnaud Ebalard wrote:
-> Hi Gregory,
-> 
-> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
-> 
->> The Marvell Armada 38x SoCs contains an RTC which differs from the RTC
->> used in the other mvebu SoCs until now. This commit adds the Device
->> Tree description of this interface at the SoC level.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/armada-38x.dtsi | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index 04fe80d101f8..22909add8889 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -466,6 +466,12 @@
->>  				clocks = <&gateclk 4>;
->>  			};
->>  
->> +			rtc at 184a8 {
->> +				compatible = "marvell,armada-380-rtc";
->> +				reg = <0xa3800 0x20>, <0x184a0 0x0c>;
->> +				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
->> +			};
->> +
-> 
-> Out of curiosity, why not naming the node rtc at a3800? Main argument:
-> least expectation principle when reading the .dtsi and expecting
-> increasing addresses. Or did I miss sth else?
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ Documentation/devicetree/bindings/arm/digicolor.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/digicolor.txt
 
-It was a mistake, I should have used the 0xa3800 offset to name it because
-most of the RTC registers are located here.
-
-
-Thanks,
-
-Gregory
-
-> 
-> 
->>  			sata at a8000 {
->>  				compatible = "marvell,armada-380-ahci";
->>  				reg = <0xa8000 0x2000>;
-
-
+diff --git a/Documentation/devicetree/bindings/arm/digicolor.txt b/Documentation/devicetree/bindings/arm/digicolor.txt
+new file mode 100644
+index 000000000000..658553f40b23
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/digicolor.txt
+@@ -0,0 +1,6 @@
++Conexant Digicolor Platforms Device Tree Bindings
++
++Each device tree must specify which Conexant Digicolor SoC it uses.
++Must be the following compatible string:
++
++  cnxt,cx92755
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
