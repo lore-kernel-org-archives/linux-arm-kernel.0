@@ -1,68 +1,67 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Jan 2015 11:03:44 +0000
-Subject: [PATCH boot-wrapper-aarch64 1/4] psci: use MPIDR_INVALID instead
- of -1
-In-Reply-To: <1421115304-19580-2-git-send-email-zlim@broadcom.com>
+Date: Wed, 14 Jan 2015 11:10:38 +0000
+Subject: [PATCH boot-wrapper-aarch64 2/4] psci: remove sentinel from
+ id_table
+In-Reply-To: <1421115304-19580-3-git-send-email-zlim@broadcom.com>
 References: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
- <1421115304-19580-2-git-send-email-zlim@broadcom.com>
-Message-ID: <20150114110343.GC12069@leverpostej>
+ <1421115304-19580-3-git-send-email-zlim@broadcom.com>
+Message-ID: <20150114111037.GD12069@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jan 13, 2015 at 02:15:01AM +0000, Zi Shen Lim wrote:
-> MPIDR_INVALID was already defined, so use it.
+On Tue, Jan 13, 2015 at 02:15:02AM +0000, Zi Shen Lim wrote:
+> Tweak the limit check in find_logical_id so we can
+> do away with the sentinel from id_table.
+> 
+> While at it, also remove unused label and fix up spacing.
+> 
+> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
 
-MPIDR_INVALID is meant to be an invalid MPIDR value, rather than an
-error code in the case of an invalid MPIDR.
+This looks like a nice cleanup to me.
 
-__find_logical_index is meant to return a logical CPU ID, so returning
-MPIDR_INVALID isn't quite right.
-
-I'd be happier if we used a separate macro for the logical IDs (e.g.
-ID_INVALID).
+So long as this passes build and boot testing I'll apply this shortly.
 
 Thanks,
 Mark.
 
-> 
-> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
 > ---
->  psci.S | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  psci.S | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
 > diff --git a/psci.S b/psci.S
-> index 856095b..234493d 100644
+> index 234493d..d045e56 100644
 > --- a/psci.S
 > +++ b/psci.S
-> @@ -126,7 +126,7 @@ psci_cpu_on:
->  	mov	x0, x1
+> @@ -69,7 +69,6 @@ vector:
+>  id_table:
+>  	.quad CPU_IDS
+>  __id_end:
+> -	.quad MPIDR_INVALID
 >  
->  	bl	find_logical_id
-> -	cmp	x0, #-1
-> +	cmp	x0, #MPIDR_INVALID
->  	b.eq	1f
+>  .equ	nr_cpus, ((__id_end - id_table) / 8)
 >  
->  	adr	x3, branch_table
-> @@ -172,7 +172,7 @@ __find_logical_index:
->  	b 1b
+> @@ -159,17 +158,16 @@ psci_cpu_on:
+>   * Clobbers x1, x2, x3
+>   */
+>  find_logical_id:
+> -__find_logical_index:
+>  	adr	x2, id_table
+>  	mov	x1, xzr
+>  1:	mov	x3, #nr_cpus	// check we haven't walked off the end of the array
+>  	cmp	x1, x3
+> -	b.gt	3f
+> +	b.ge	3f
+>  	ldr	x3, [x2, x1, lsl #3]
+>  	cmp	x3, x0
+>  	b.eq	2f
+>  	add	x1, x1, #1
+> -	b 1b
+> +	b	1b
 >  2:	mov	x0, x1
 >  	ret
-> -3:	mov	x0, #-1
-> +3:	mov	x0, #MPIDR_INVALID
->  	ret
->  
->  setup_vector:
-> @@ -207,7 +207,7 @@ spin:
->  	ldr	x1, =MPIDR_ID_BITS
->  	and	x0, x0, x1
->  	bl	find_logical_id
-> -	cmp	x0, #-1
-> +	cmp	x0, #MPIDR_INVALID
->  	b.eq	spin_dead
->  
->  	adr	x1, branch_table
+>  3:	mov	x0, #MPIDR_INVALID
 > -- 
 > 2.1.0
 > 
