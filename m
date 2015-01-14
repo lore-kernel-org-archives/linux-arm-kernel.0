@@ -1,63 +1,57 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 14 Jan 2015 12:12:58 +0100
-Subject: [PATCH 0/4] ARM: shmobile: Add DT support for memory controllers
-Message-ID: <1421233982-15883-1-git-send-email-geert+renesas@glider.be>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 Jan 2015 11:22:10 +0000
+Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
+In-Reply-To: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
+References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20150114112210.GF4050@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+On Tue, Jan 13, 2015 at 04:59:03PM +0000, Victor Kamensky wrote:
+> Aarch64 ELF files use mapping symbols with special names $x, $d
+> to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
+> IHI 0056B", section "4.5.4 Mapping symbols").
+> 
+> The patch filters out these symbols at load time, similar to
+> "696b97a perf symbols: Ignore mapping symbols on ARM" changes
+> done for ARM before V8.
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> Cc: Adrian Hunter <adrian.hunter@intel.com>
+> Cc: Jiri Olsa <jolsa@redhat.com>
+> Cc: Namhyung Kim <namhyung@kernel.org>
+> Cc: Avi Kivity <avi@cloudius-systems.com>
+> Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> Cc: Anton Blanchard <anton@samba.org>
+> Cc: David Ahern <dsahern@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  tools/perf/util/symbol-elf.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
+> index 06fcd1b..1e188dd 100644
+> --- a/tools/perf/util/symbol-elf.c
+> +++ b/tools/perf/util/symbol-elf.c
+> @@ -862,6 +862,14 @@ int dso__load_sym(struct dso *dso, struct map *map,
+>  			    !strcmp(elf_name, "$t"))
+>  				continue;
+>  		}
+> +		/* Reject Aarch64 ELF "mapping symbols": these aren't unique and
+> +		 * don't identify functions, so will confuse the profile
+> +		 * output: */
+> +		if (ehdr.e_machine == EM_AARCH64) {
+> +			if (!strcmp(elf_name, "$x") ||
+> +			    !strcmp(elf_name, "$d"))
+> +				continue;
+> +		}
 
-This patch series adds DT binding documentation and devices nodes to
-describe memory-controllers in R-Mobile and SH-Mobile SoCs.
+Do we need to skip $x.* and $d.* too? I doubt GCC generates them, but they
+are permitted by the ELF ABI.
 
-Currently memory controller device nodes are used only to reference PM
-domains, and prevent these PM domains from being powered down, which
-would crash the system.
-
-As such this series is a prerequisite for adding DT PM domain support to
-sh73a0 (SH-Mobile AG5) and r7a73a4 (R-Mobile APE6).
-For r8a7740 (R-Mobile A1), this wasn't a hard prerequisite for PM
-domain support, as the A4S PM domain is never turned off anyway
-because its child PM domain A3SM contains the CPU core.
-
-The patches for sh73a0 and r8a7740 have been sent before as part of
-(patches in) the series "[PATCH RFC 0/7] ARM: shmobile: sh73a0: DT PM
-domain support" (https://lkml.org/lkml/2014/11/19/404).
-
-"ARM: shmobile: r8a7740 dtsi: Add memory-controller node" depends on
-the DT R-Mobile PM Domain support for r8a7740 that's queued up in
-Simon's tree under tag renesas-dt-pm-for-v3.20, as the
-memory-controller node already contains a power-domains property.
-
-The two other dtsi patches do not add power-domains properties yet.
-These will be added when adding PM domain support for sh73a0 resp.
-r8a73a4.
-
-Thanks!
-
-Geert Uytterhoeven (4):
-  ARM: shmobile: Add DT bindings for Renesas memory controllers
-  ARM: shmobile: r8a73a4 dtsi: Add memory-controller nodes
-  ARM: shmobile: r8a7740 dtsi: Add memory-controller node
-  ARM: shmobile: sh73a0 dtsi: Add memory-controller nodes
-
- .../renesas-memory-controllers.txt                 | 44 ++++++++++++++++++++++
- arch/arm/boot/dts/r8a73a4.dtsi                     | 10 +++++
- arch/arm/boot/dts/r8a7740.dtsi                     |  6 +++
- arch/arm/boot/dts/sh73a0.dtsi                      | 16 ++++++++
- 4 files changed, 76 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
-
--- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Will
