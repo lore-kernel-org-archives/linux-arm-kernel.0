@@ -1,79 +1,55 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 14 Jan 2015 20:45:05 +0800
-Subject: [PATCH v6 1/2] mtd: hisilicon: add a new NAND controller driver
- for hisilicon hip04 Soc
-In-Reply-To: <20150113040254.GK9759@ld-irv-0074>
-References: <1421047734-30818-1-git-send-email-wangzhou1@hisilicon.com>
- <1421047734-30818-2-git-send-email-wangzhou1@hisilicon.com>
- <20150113040254.GK9759@ld-irv-0074>
-Message-ID: <54B664D1.6060508@hisilicon.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Jan 2015 12:52:49 +0000
+Subject: [PATCH] arm64: kill off the libgcc dependency
+In-Reply-To: <2438951.7KFuXx85Hp@wuerfel>
+References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
+ <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
+ <2438951.7KFuXx85Hp@wuerfel>
+Message-ID: <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/13 12:02, Brian Norris wrote:
-> One more thing:
-> 
-> On Mon, Jan 12, 2015 at 03:28:53PM +0800, Zhou Wang wrote:
->> diff --git a/drivers/mtd/nand/hisi504_nand.c b/drivers/mtd/nand/hisi504_nand.c
->> new file mode 100644
->> index 0000000..2000f21
->> --- /dev/null
->> +++ b/drivers/mtd/nand/hisi504_nand.c
-> ...
->> +static int hisi_nand_read_page_hwecc(struct mtd_info *mtd,
->> +	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
->> +{
->> +	struct hinfc_host *host = chip->priv;
->> +	int max_bitflips = 0, stat = 0, stat_max, status_ecc;
-> 
->     drivers/mtd/nand/hisi504_nand.c:547:34: warning: ?stat_max? may be used uninitialized in this function [-Wmaybe-uninitialized]
->       int max_bitflips = 0, stat = 0, stat_max, status_ecc;
+On 14 January 2015 at 12:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 14 January 2015 11:48:27 Will Deacon wrote:
+>> On Wed, Jan 14, 2015 at 11:35:22AM +0000, Arnd Bergmann wrote:
+>> > On Wednesday 14 January 2015 10:48:26 Will Deacon wrote:
+>> > > On Wed, Jan 14, 2015 at 10:38:54AM +0000, Kevin Hao wrote:
+>> > > > The arm64 doesn't depend on the libgcc to build the vmlinux image.
+>> > >
+>> > > Yes it does; we make use of __builtin_* for our bitops, for example.
+>> > > The compiler guys don't guarantee that these will be inlined.
+>> >
+>> > Is that an architecture-specific statement?
+>>
+>> I think the inlining guarantees apply to all architectures, but it affects
+>> the arm64 kernel because we include <asm-generic/bitops/builtin-*>.
+>
+> Is it realistic to expect those to ever be implemented out of line?
+> I would expect them to behave like assembler intrinsics, at least
+> with the normal optimization level.
+>
+>> > The debate has been going on for ages in Linux, most architecture
+>> > maintainers however decided against using libgcc and copy the functions
+>> > that are actually needed into the kernel sources.
+>>
+>> What's the benefit of copying them?
+>
+> You have a better control over what is included. On 32-bit architectures,
+> the 64-bit division is notorious here, we really don't want to accidentally
+> call the libgcc implementation but instead have our own do_div() helper.
+>
+> Similarly I'd think that if we get a compiler that uses an external
+> __ffs implementation, we should implement an inline assembly instead
+> of taking the libgcc version.
+>
+> Another problem that has happened in the past is libgcc functions that
+> in turn call glibc functions. To avoid that, you'd really want to build
+> the kernel with -ffreestanding, but that opens another can of worms.
+>
 
-In fact, there is no chance to run "default case" there as hisi_nfc_ecc_probe
-will check this and print error.
-I will initialize stat_max with 0 to eliminate this warning.
+IMO libgcc.a cannot be used at all in the kernel, as it is not built
+with -mgeneral-regs-only so we have no guarantee that it will leave
+the NEON registers alone.
 
->                                       ^
-> 
->> +	int stat_1, stat_2;
->> +
->> +	chip->read_buf(mtd, buf, mtd->writesize);
->> +	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
->> +
->> +	/* errors which can not be corrected by ECC */
->> +	if (host->irq_status & HINFC504_INTS_UE) {
->> +		mtd->ecc_stats.failed++;
->> +	} else if (host->irq_status & HINFC504_INTS_CE) {
->> +		/* TODO: need add other ECC modes! */
-> 
-> You may want a 'default' case that sets stat_max to zero, then.
-> 
->> +		switch (chip->ecc.strength) {
->> +		case 1:
->> +			stat = hweight8(hinfc_read(host, HINFC504_ECC_STATUS)>>
->> +						HINFC504_ECC_1_BIT_SHIFT);
->> +			stat_max = 1;
->> +			break;
->> +		case 16:
->> +			status_ecc = hinfc_read(host, HINFC504_ECC_STATUS) >>
->> +					HINFC504_ECC_16_BIT_SHIFT & 0x0fff;
->> +			stat_2 = status_ecc & 0x3f;
->> +			stat_1 = status_ecc >> 6 & 0x3f;
->> +			stat = stat_1 + stat_2;
->> +			stat_max = max_t(int, stat_1, stat_2);
->> +		}
->> +		mtd->ecc_stats.corrected += stat;
->> +		max_bitflips = max_t(int, max_bitflips, stat_max);
->> +	}
->> +	host->irq_status = 0;
->> +
->> +	return max_bitflips;
->> +}
-> 
-> Brian
-
-Thanks for your comment!
-Zhou Wang
-> 
-> .
-> 
+-- 
+Ard.
