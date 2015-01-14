@@ -1,26 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 14 Jan 2015 15:24:53 +0530
-Subject: [PATCH] arch: arm: common: edma.c:  Remove some unused functions
-In-Reply-To: <54A10868.70001@ti.com>
-References: <1417906406-5527-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <54A10868.70001@ti.com>
-Message-ID: <54B63CED.1020603@ti.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed, 14 Jan 2015 10:54:59 +0100
+Subject: [PATCH 3/3] ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic
+ (SATA, PCIe & USB3) PHY
+In-Reply-To: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1421229299-8206-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 December 2014 01:23 PM, Peter Ujfalusi wrote:
-> On 12/07/2014 12:53 AM, Rickard Strandqvist wrote:
->> Removes some functions that are not used anywhere:
->> edma_shadow0_read() edma_or_array()
->>
->> This was partially found by using a static code analysis program called cppcheck.
-> 
-> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Queuing for v3.20 through ARM-SoC.
-
-The correct prefix for ARM patches is "ARM: ". I will fix while
-applying. Please take care next time on.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4b87fd1..88dfa7e 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -459,6 +459,7 @@ CONFIG_PWM_VT8500=y
+ CONFIG_PHY_HIX5HD2_SATA=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
++CONFIG_PHY_MIPHY28LP=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_STIH407_USB=y
+-- 
+1.9.1
