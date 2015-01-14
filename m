@@ -1,72 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Jan 2015 11:53:50 +0000
-Subject: [PATCH boot-wrapper-aarch64 0/4] psci cleanups + simple v0.2
- implementation
-In-Reply-To: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
-References: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
-Message-ID: <20150114115349.GE12069@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Jan 2015 12:54:25 +0100
+Subject: [PATCH v2 1/3] dmaengine: Add support for APM X-Gene SoC DMA
+ engine driver
+In-Reply-To: <CAFd313zMoW86ZcXURrk2K+E6129L+BruOp4E0A=w0PQEcMr-Yw@mail.gmail.com>
+References: <1420628981-22774-1-git-send-email-rsahu@apm.com>
+ <1701652.4qUlzcU1j2@wuerfel>
+ <CAFd313zMoW86ZcXURrk2K+E6129L+BruOp4E0A=w0PQEcMr-Yw@mail.gmail.com>
+Message-ID: <2355599.PaLfD1Yyf4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 02:15:00AM +0000, Zi Shen Lim wrote:
-> Hi Mark,
-
-Hi,
-
-> The first couple patches are cleanups.
+On Wednesday 14 January 2015 14:56:33 Rameshwar Sahu wrote:
 > 
-> The third patch switches to using v0.2 function ID values for the
-> existing cpu_{on,off} implementations. This intermediate step is
-> arguably unnecessary given the next patch...
+> > Also add the correct dma-ranges property in the parent, or else this will
+> > fail in the future once we add proper checks to dma_set_mask.
 > 
-> The fourth patch provides a simple implementation of PSCI v0.2.
-> The deviations from spec (primarily cpu_suspend not supported)
-> is noted in code comment as well as in commit log.
+> I see arch/arm64 kernel doesn't use dma range value parsed from
+> dma-range property currently, I will check it more.
+> It doesn't use dma_pfn_offset value calculated by the dma-ranges in
+> dma mapping API.
+> dma-ranges value should test properly before adding.
+> Is there any use to add this dma-ranges properly if arch code doesn't support ??
 
-While I'm not opposed to implementing PSCI 0.2, the two major reasons
-for not having implemented it so far were simplicity and
-spec-compliance. Unless implementing PSCI 0.2 gains us something, I
-don't see the point in moving from PSCI 0.1. 
+Of course: the dt needs to describe the hardware correctly. This is
+just a bug in the current arm64 code and it will soon be fixed.
 
-I think not having any supported CPU_SUSPEND states is fine. For spec
-compliance I'm more worried by the behaviour of AFFINITY_INFO (as this
-implementation seems to ignore the lowest_affinity_level parameter), and
-the behaviour of SYSTEM_{OFF,RESET} -- I wonder if these could be
-implemented via semihosting.
-
-Given that SYSTEM_OFF and SYSTEM_RESET are effectively not implemented,
-the only thing that I see we gain from this PSCI 0.2 implementation is
-AFFINITY_INFO to close a race with CPU_OFF. Is PSCI 0.2 just a
-nice-to-have feature, or is there something it provides that you
-particularly want?
-
-I occasionally need to use a new boot-wrapper with old kernels which
-only handle PSCI 0.1, so we also need to maintain compatiblity in the
-way the DT binding doc describes:
-
-psci {
-	compatible = "arm,psci-0.2", "arm,psci";
-	method = "smc";
-	cpu_on = < ... >;
-	cpu_off = < ... >;
-};
-
-Thanks,
-Mark.
-
-> 
-> Please consider merging.
-> 
-> Thanks, z
-> 
-> Zi Shen Lim (4): psci: use MPIDR_INVALID instead of -1 psci: remove
-> sentinel from id_table psci: use PSCI v0.2 function IDs psci:
-> implement PSCI v0.2
-> 
->  Makefile.am |   4 +- psci.S      | 170
->  ++++++++++++++++++++++++++++++++++++++++++++++++++---------- 2 files
->  changed, 143 insertions(+), 31 deletions(-)
-> 
-> -- 2.1.0
-> 
-> 
+	Arnd
