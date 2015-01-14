@@ -1,46 +1,86 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 14 Jan 2015 12:05:09 +0800
-Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
- readl/writel
-In-Reply-To: <20150113143654.GG7660@katana>
-References: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
- <20150113143654.GG7660@katana>
-Message-ID: <20150114120509.0ba8267e@xhacker>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 14 Jan 2015 13:08:24 +0900
+Subject: [PATCH 0/4] ARM: shmobile: sh73a0/kzm9g: Complete multiplatform
+ support
+In-Reply-To: <CAMuHMdVbuM3oR1KQDzAodp_Y-aWFncPRn48-F9HmrVkGDS36RQ@mail.gmail.com>
+References: <1420809866-4330-1-git-send-email-geert+renesas@glider.be>
+ <20150113020818.GB21265@verge.net.au>
+ <CAMuHMdVbuM3oR1KQDzAodp_Y-aWFncPRn48-F9HmrVkGDS36RQ@mail.gmail.com>
+Message-ID: <20150114040822.GA14661@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram,
-
-On Tue, 13 Jan 2015 06:36:54 -0800
-Wolfram Sang <wsa@the-dreams.de> wrote:
-
+On Tue, Jan 13, 2015 at 11:08:20AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> On Thu, Dec 11, 2014 at 02:26:41PM +0800, Jisheng Zhang wrote:
-> > readl/writel is too expensive especially on Cortex A9 w/ outer L2 cache.
-> > This introduces i2c read/write errors on Marvell BG2/BG2Q SoCs when there
-> > are heavy L2 cache maintenance operations at the same time.
+> On Tue, Jan 13, 2015 at 3:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Jan 09, 2015 at 02:24:26PM +0100, Geert Uytterhoeven wrote:
+> >>       Hi Simon, Magnus,
+> >>
+> >> This patch series completes the migration from kzm9g-reference (legacy
+> >> DT based) to kzm9g-multiplatform (ARM multiplatform DT based with
+> >> common clock framework).
+> >>
+> >>   - The first two patches fix Ethernet on kzm9g, by adding a Bus State
+> >>     Controller node, as introduced in "[PATCH v3 0/4] drivers: bus:
+> >>     Add Simple Power-Managed Bus", and moving the Ethernet node to it,
+> >>   - The third path enables kzm9g support in shmobile_defconfig,
+> >>   - The fourth patch removes all kzm9g-reference support, now the
+> >>     sh73a0 generic multiplatform case has the same feature set
+> >>     (better, it provides 16 MiB more RAM!).
+> >>
+> >> Thanks for applying!
+> >
+> > It seems to me that at the first two patches require the patchset
+> > referenced above in order to work. For that reason I am holding off
 > 
-> Reading this again, I got a question:
+> Yes it does.
 > 
-> Really read/write errors? I would think that there is a performance
-> penalty because of the memory barriers. But errors?
-
-I dunno whether I can call the issue as error. The situation is one i2c client
-has a bit strict timing requirement. Without the patch, if there are heavy L2 cache
-maintenance operations at the same time, there may be long delay between each
-DW_IC_DATA_CMD write opeartions in i2c_dw_xfer_msg() in the DW_IC_INTR_TX_EMPTY isr.
-
-Thus about 1/300 i2c transactions may be ignored by the i2c client per my test.
-
+> > on applying this series. I am quite happy to negotiate merging
+> > some or all of this series earlier than later :)
 > 
-> > The driver does not perform DMA, so it's safe to use the relaxed version.
-> > From another side, the relaxed io accessor macros are available on all
-> > architectures now, so we can use the relaxed versions instead.
+> Hence please merge both the dependency and this series.
 > 
-> Can the designware core make use of DMA in theory?
+>   1. Both sh73a0/kzm9g-multiplatform and r8a73a4/ape6evm-multiplatform
+>       depend on "[PATCH v3 0/4] drivers: bus: Add Simple Power-Managed Bus",
+
+For some reason I assumed this would go through a different subsystem tree.
+I'm fine with taking it through my tree, if you think that is best.
+
+I am a bit worried about handling conflicts that may arise, especially from
+the first two patches in that series which re-arrange things
+alphabetically. But I see that the files in question are not updated very
+often, so I suppose we should be safe enough.
+
+
+For now I have tentatively queued up both this patchset and the
+dependency listed immediately above. Please take a look
+at the sh73a0-multiplatform-for-v3.20 and drivers-for-v3.20 branches
+and the renesas-next-20150114-v3.19-rc1 tag to see if I missed something.
+
+>   2. DT PM domain for sh73a0 and r8a73a4 depends on
+>       sh73a0/kzm9g-multiplatform and r8a73a4/ape6evm-multiplatform,
+>   3. CONFIG_CPU_IDLE=y hangs on sh73a0 without an early timer.
+>        - On kzm9g-multiplatform this can be fixed by adding an
+>          arm,cortex-a9-twd-timer node, but that breaks kzm9g-reference as
+>          the TWD driver requires CCF when instantiated from DT,
+>        - Fixing this on kzm9g-reference requires setting
+>          ".init_time = sh73a0_earlytimer_init", and also instantiating the GIC
+>          from C board code, as the TWD platform device uses an hardcoded
+>          interrupt number.
+>          It seems simpler to let kzm9g-reference die, so this problem goes
+>          away.
 > 
-
-the IP can do DMA in theory. But currently, there's no DMA support in the driver.
-
-Thanks for your review,
-Jisheng
+> Thanks for your consideration!
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
