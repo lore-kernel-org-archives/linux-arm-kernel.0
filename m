@@ -1,71 +1,80 @@
 From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Wed, 14 Jan 2015 15:02:00 +0530
-Subject: [PATCH v4 2/6] arm64: Add more test functions to insn.c
-In-Reply-To: <1420949002-3726-3-git-send-email-dave.long@linaro.org>
+Date: Wed, 14 Jan 2015 15:02:32 +0530
+Subject: [PATCH v4 4/6] arm64: Kprobes instruction simulation support
+In-Reply-To: <1420949002-3726-5-git-send-email-dave.long@linaro.org>
 References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>
- <1420949002-3726-3-git-send-email-dave.long@linaro.org>
-Message-ID: <CAHM4w1=nJVr8P-us8+E42kY9jpcWoRKWyd1ASzfsUpb-_DNPYw@mail.gmail.com>
+ <1420949002-3726-5-git-send-email-dave.long@linaro.org>
+Message-ID: <CAHM4w1n6wCUSX1QjP8EyA9zkJBZTM=6Vc32Vjm3wPuDv=FXZzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Jan 11, 2015 at 9:33 AM, David Long <dave.long@linaro.org> wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 >
-> Certain instructions are hard to execute correctly out-of-line (as in
-> kprobes).  Test functions are added to insn.[hc] to identify these.  The
-> instructions include any that use PC-relative addressing, change the PC,
-> or change interrupt masking. For efficiency and simplicity test
-> functions are also added for small collections of related instructions.
+> Add support for AArch64 instruction simulation in kprobes.
 >
+> Kprobes needs simulation of instructions that cannot be stepped
+> from different memory location, e.g.: those instructions
+> that uses PC-relative addressing. In simulation, the behaviour
+> of the instruction is implemented using a copy of pt_regs.
+>
+> Following instruction catagories are simulated:
+>  - All branching instructions(conditional, register, and immediate)
+>  - Literal access instructions(load-literal, adr/adrp)
+>
+> Conditional execution is limited to branching instructions in
+> ARM v8. If conditions at PSTATE do not match the condition fields
+> of opcode, the instruction is effectively NOP. Kprobes considers
+> this case as 'miss'.
+> changes since v3:
+> from David A. Long:
+> 1) Fix incorrect simulate_ldrsw_literal() semantics.
+> 2) Use instruction test functions instead of private parse table.
+> from Will Cohen:
+> 3) Remove PC adjustments when simulating an instruction.
+> 4) Fix displacement calculations.
+>
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: William Cohen <wcohen@redhat.com>
 > Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
->  arch/arm64/include/asm/insn.h | 21 +++++++++++++++++++--
->  arch/arm64/kernel/insn.c      | 18 ++++++++++++++++++
->  2 files changed, 37 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index e2ff32a..466afd4 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -223,8 +223,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
->  static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
->  { return (val); }
->
-> +__AARCH64_INSN_FUNCS(adr,      0x9F000000, 0x10000000)
-
-Should n't it be
-__AARCH64_INSN_FUNCS(adr_adrp,      0x1F000000, 0x10000000)
-
-So, that it also take care about adrp
-
-> +__AARCH64_INSN_FUNCS(prfm_lit, 0xFF000000, 0xD8000000)
 
 [...]
 
->
-> +bool aarch64_insn_uses_literal(u32 insn)
-> +{
-> +       /* ldr/ldrsw (literal), prfm */
+>  static bool aarch64_insn_is_steppable(u32 insn)
+>  {
+> @@ -60,6 +130,32 @@ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+>          */
+>         if (aarch64_insn_is_steppable(insn))
+>                 return INSN_GOOD;
 > +
-> +       return aarch64_insn_is_ldr_lit(insn) ||
-> +               aarch64_insn_is_ldrsw_lit(insn) ||
-
-also aarch64_insn_is_adr_adrp(insn) ||
-
-
-> +               aarch64_insn_is_prfm_lit(insn);
-> +}
+> +       asi->prepare = prepare_none;
 > +
-> +bool aarch64_insn_is_branch(u32 insn)
-> +{
-> +       /* b, bl, cb*, tb*, b.cond, br, blr */
-> +
-> +       return aarch64_insn_is_b_bl_cb_tb(insn) ||
-> +               aarch64_insn_is_br_blr(insn) ||
+> +       if (aarch64_insn_is_bcond(insn)) {
+> +               asi->prepare = prepare_bcond;
+> +               asi->handler = simulate_b_cond;
+> +       } else if (aarch64_insn_is_cb(insn)) {
+> +               asi->prepare = prepare_cbz_cbnz;
+> +               asi->handler = simulate_cbz_cbnz;
+> +       } else if (aarch64_insn_is_tb(insn)) {
+> +               asi->prepare = prepare_tbz_tbnz;
+> +               asi->handler = simulate_tbz_tbnz;
+> +       } else if (aarch64_insn_is_adr(insn))
 
-also aarch64_insn_is_ret(insn) ||
+aarch64_insn_is_adr should be modified to aarch64_insn_is_adr_adrp
 
-> +               aarch64_insn_is_bcond(insn);
-> +}
-> +
->  /*
+> +               asi->handler = simulate_adr_adrp;
+> +       else if (aarch64_insn_is_b_bl(insn))
+> +               asi->handler = simulate_b_bl;
+> +       else if (aarch64_insn_is_ldr_lit(insn))
+> +               asi->handler = simulate_ldr_literal;
+> +       else if (aarch64_insn_is_ldrsw_lit(insn))
+> +               asi->handler = simulate_ldrsw_literal;
+
+also
+
+else if (aarch64_insn_is_br_blr(insn) || aarch64_insn_is_ret(insn))
+               asi->handler = simulate_br_blr_ret;
+
+
+~Pratyush
