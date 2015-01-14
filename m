@@ -1,135 +1,195 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 14 Jan 2015 14:58:17 -0600
-Subject: [PATCH v7 0/4] hwspinlock core & omap dt support
-Message-ID: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+Date: Wed, 14 Jan 2015 14:58:21 -0600
+Subject: [PATCH v7 4/4] hwspinlock/omap: add support for dt nodes
+In-Reply-To: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+Message-ID: <1421269101-51105-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+HwSpinlock IP is present only on OMAP4 and other newer SoCs,
+which are all device-tree boot only. This patch adds the
+base support for parsing the DT nodes, and removes the code
+dealing with the traditional platform device instantiation.
 
-This is an updated version of the hwspinlock dt support series,
-rebased onto v3.19-rc3 and mainly addresses the continued discussion
-on the need to maintain a list of registered spinlock banks [1].
-I have removed this patch as per your wish, and as a result the
-burden of the spinlock validation and deferred probing is pushed
-onto the hwspinlock clients. Sorry for the delay in refreshing this
-series, hopefully this can be the last revision.
-
-Following are the main changes in v7 w.r.t v6:
-- Dropped the patch "hwspinlock/core: maintain a list of registered
-  hwspinlock banks"
-- Updated generic hwspinlock bindings to make hwlock-base-id property
-  mandatory.
-- Updated the OMAP hwspinlock binding and DT support patches to correct
-  for the mandatory hwlock-base-id property.
-- Updated the common OF helpers patch to move the of_hwspin_lock_get_base_id()
-  and of_hwspin_lock_get_num_locks() functions into the internal header,
-  these are no longer exported, but available for platform implementations.
-  of_hwspin_lock_get_id() is also simplified now.
-
-The validation logs on all the applicable OMAP SoCs are at:
-  OMAP4  - http://slexy.org/view/s21Mh1SqP8
-  OMAP5  - http://slexy.org/view/s21TYWxoKu
-  DRA74x - http://slexy.org/view/s2dQdghLPr
-  DRA72x - http://slexy.org/view/s2QajhhWYu
-  AM33xx - http://slexy.org/view/s21DvKQOpa
-  AM43xx - http://slexy.org/view/s21L3YB95Q
-
-The above logs are generated with some additional test patches staged
-here for reference,
-https://github.com/sumananna/omap-kernel/commits/hwspinlock/test/3.19-rc3-dt-v7
-
-The test branch also includes a required patch that adds the hwlock-base-id
-to all the OMAP hwspinlock DT nodes (will submit that patch separately for
-Tony to pick it up).
-
-Bjorn,
-I didn't add your Tested-by: or Reviewed-by as I have modified the
-series a bit. Care to give those once again, thanks.
-
-regards
-Suman
-
-[1] https://patchwork.kernel.org/patch/4898041/
-
+Signed-off-by: Suman Anna <s-anna@ti.com>
+[tony at atomide.com: ack for legacy file removal]
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
-v6:
-http://marc.info/?l=linux-omap&m=141055365213895&w=2
-- of_hwspin_lock_request_specific() is replaced
-  with of_hwspin_lock_get_id(). of_hwspin_lock_simple_xlate() is
-  made internal, and of_hwspin_lock_get_base_id() is added.
-- Updated the OMAP hwspinlock DT support patch to assign base-id
-  from DT if present
-- RFC patches adding the concept of reserved locks and return code
-  change convention dropped.
+v7: hwlock-base-id is no longer optional, probe will fail now
+    if property is absent.
 
-v5:
-http://marc.info/?l=linux-omap&m=139890478402807&w=2
-- Rebased v4 patches plus additional RFC patches.
-- Added back the patch to support DT-based hwlock-base-id property,
-  for registration purposes.
-- RFC patches introducing the concept of reserved locks.
-- Staged patches for converting return convention to better support
-  deferred probing of client drivers.
-
-v4:
-- The DT bindings are split into separate patches, and updated to
-  add comments about #hwlock-cells
-- Fixed a registration issue with repeated module installation and
-  removal.
-- Added a new OF helper to support #hwlock-cells in addition to the
-  previous OF functions. The OMAP adaptation patch is updated to use
-  the default translate function
-- Updated hwspinlock documentation to adjust for the structure
-  changes and the new api additions.
-- Added build support for AM335x, AM43xx and DRA7xx
-http://marc.info/?l=linux-omap&m=138965904015225&w=2
-
-v3:
-- Removed the DT property hwlock-base-id and associated OF helper
-- Added changes in core to support requesting a specific hwlock using
-  phandle + args approach
-- Revised both the common and OMAP DT bindings document
-http://marc.info/?l=linux-omap&m=138143992932197&w=2
-
-v2:
-- Added a new common DT binding documentation and OF helpers.
-- Revised OMAP DT parse support to use the new OF helper (Patch2)
-- OMAP5 hwspinlock support including the hwmod entry and DT node
-- Add AM335x support to OMAP hwspinlock driver, including a fix
-  needed in driver given that AM335 spinlock module requires s/w wakeup
-- AM335 DT node for spinlock, and a hwmod change to enable smart-idle
-  for AM335.
-- OMAP4 DT node patch is unchanged
-http://marc.info/?l=linux-omap&m=137944644112727&w=2
-
-v1:
-- Add DT parse support to OMAP hwspinlock driver
-- Add OMAP4 DT node and bindings information
-http://marc.info/?l=linux-omap&m=137823082308009&w=2
-
----
-
-Suman Anna (4):
-  Documentation: dt: add common bindings for hwspinlock
-  Documentation: dt: add the omap hwspinlock bindings document
-  hwspinlock/core: add common OF helpers
-  hwspinlock/omap: add support for dt nodes
-
- .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++
- .../devicetree/bindings/hwlock/omap-hwspinlock.txt | 28 ++++++++++
- Documentation/hwspinlock.txt                       | 25 +++++++++
- MAINTAINERS                                        |  1 -
- arch/arm/mach-omap2/Makefile                       |  3 -
- arch/arm/mach-omap2/hwspinlock.c                   | 60 --------------------
- drivers/hwspinlock/hwspinlock_core.c               | 65 ++++++++++++++++++++++
- drivers/hwspinlock/hwspinlock_internal.h           | 47 ++++++++++++++++
- drivers/hwspinlock/omap_hwspinlock.c               | 22 ++++++--
- include/linux/hwspinlock.h                         |  7 +++
- 10 files changed, 244 insertions(+), 69 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
- create mode 100644 Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
+ MAINTAINERS                          |  1 -
+ arch/arm/mach-omap2/Makefile         |  3 --
+ arch/arm/mach-omap2/hwspinlock.c     | 60 ------------------------------------
+ drivers/hwspinlock/omap_hwspinlock.c | 22 ++++++++++---
+ 4 files changed, 17 insertions(+), 69 deletions(-)
  delete mode 100644 arch/arm/mach-omap2/hwspinlock.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddb9ac8d32b3..3de03037e90a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6861,7 +6861,6 @@ M:	Ohad Ben-Cohen <ohad@wizery.com>
+ L:	linux-omap at vger.kernel.org
+ S:	Maintained
+ F:	drivers/hwspinlock/omap_hwspinlock.c
+-F:	arch/arm/mach-omap2/hwspinlock.c
+ 
+ OMAP MMC SUPPORT
+ M:	Jarkko Lavinen <jarkko.lavinen@nokia.com>
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 5d27dfdef66b..6fa36846d5b4 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -282,9 +282,6 @@ obj-y					+= $(nand-m) $(nand-y)
+ 
+ smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
+ obj-y					+= $(smsc911x-m) $(smsc911x-y)
+-ifneq ($(CONFIG_HWSPINLOCK_OMAP),)
+-obj-y					+= hwspinlock.o
+-endif
+ 
+ emac-$(CONFIG_TI_DAVINCI_EMAC)		:= am35xx-emac.o
+ obj-y					+= $(emac-m) $(emac-y)
+diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
+deleted file mode 100644
+index ef175acaeaa2..000000000000
+--- a/arch/arm/mach-omap2/hwspinlock.c
++++ /dev/null
+@@ -1,60 +0,0 @@
+-/*
+- * OMAP hardware spinlock device initialization
+- *
+- * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
+- *
+- * Contact: Simon Que <sque@ti.com>
+- *          Hari Kanigeri <h-kanigeri2@ti.com>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/err.h>
+-#include <linux/hwspinlock.h>
+-
+-#include "soc.h"
+-#include "omap_hwmod.h"
+-#include "omap_device.h"
+-
+-static struct hwspinlock_pdata omap_hwspinlock_pdata __initdata = {
+-	.base_id = 0,
+-};
+-
+-static int __init hwspinlocks_init(void)
+-{
+-	int retval = 0;
+-	struct omap_hwmod *oh;
+-	struct platform_device *pdev;
+-	const char *oh_name = "spinlock";
+-	const char *dev_name = "omap_hwspinlock";
+-
+-	/*
+-	 * Hwmod lookup will fail in case our platform doesn't support the
+-	 * hardware spinlock module, so it is safe to run this initcall
+-	 * on all omaps
+-	 */
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (oh == NULL)
+-		return -EINVAL;
+-
+-	pdev = omap_device_build(dev_name, 0, oh, &omap_hwspinlock_pdata,
+-				sizeof(struct hwspinlock_pdata));
+-	if (IS_ERR(pdev)) {
+-		pr_err("Can't build omap_device for %s:%s\n", dev_name,
+-								oh_name);
+-		retval = PTR_ERR(pdev);
+-	}
+-
+-	return retval;
+-}
+-/* early board code might need to reserve specific hwspinlock instances */
+-omap_postcore_initcall(hwspinlocks_init);
+diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
+index 47a275c6ece1..18edb3b4ab32 100644
+--- a/drivers/hwspinlock/omap_hwspinlock.c
++++ b/drivers/hwspinlock/omap_hwspinlock.c
+@@ -1,7 +1,7 @@
+ /*
+  * OMAP hardware spinlock driver
+  *
+- * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
++ * Copyright (C) 2010-2015 Texas Instruments Incorporated - http://www.ti.com
+  *
+  * Contact: Simon Que <sque@ti.com>
+  *          Hari Kanigeri <h-kanigeri2@ti.com>
+@@ -27,6 +27,7 @@
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <linux/hwspinlock.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ 
+ #include "hwspinlock_internal.h"
+@@ -80,16 +81,20 @@ static const struct hwspinlock_ops omap_hwspinlock_ops = {
+ 
+ static int omap_hwspinlock_probe(struct platform_device *pdev)
+ {
+-	struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
++	struct device_node *node = pdev->dev.of_node;
+ 	struct hwspinlock_device *bank;
+ 	struct hwspinlock *hwlock;
+ 	struct resource *res;
+ 	void __iomem *io_base;
+-	int num_locks, i, ret;
++	int num_locks, i, ret, base_id;
+ 
+-	if (!pdata)
++	if (!node)
+ 		return -ENODEV;
+ 
++	base_id = of_hwspin_lock_get_base_id(node);
++	if (base_id < 0)
++		return base_id;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res)
+ 		return -ENODEV;
+@@ -141,7 +146,7 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
+ 		hwlock->priv = io_base + LOCK_BASE_OFFSET + sizeof(u32) * i;
+ 
+ 	ret = hwspin_lock_register(bank, &pdev->dev, &omap_hwspinlock_ops,
+-						pdata->base_id, num_locks);
++						base_id, num_locks);
+ 	if (ret)
+ 		goto reg_fail;
+ 
+@@ -174,11 +179,18 @@ static int omap_hwspinlock_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id omap_hwspinlock_of_match[] = {
++	{ .compatible = "ti,omap4-hwspinlock", },
++	{ /* end */ },
++};
++MODULE_DEVICE_TABLE(of, omap_hwspinlock_of_match);
++
+ static struct platform_driver omap_hwspinlock_driver = {
+ 	.probe		= omap_hwspinlock_probe,
+ 	.remove		= omap_hwspinlock_remove,
+ 	.driver		= {
+ 		.name	= "omap_hwspinlock",
++		.of_match_table = of_match_ptr(omap_hwspinlock_of_match),
+ 	},
+ };
+ 
 -- 
 2.2.1
