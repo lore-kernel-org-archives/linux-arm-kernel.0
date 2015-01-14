@@ -1,78 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 14 Jan 2015 09:20:48 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.19
-In-Reply-To: <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
-References: <cover.1421113695.git.horms+renesas@verge.net.au>
- <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
-Message-ID: <20150114002046.GA30021@verge.net.au>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Wed, 14 Jan 2015 09:20:36 +0900
+Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
+ under GPLv2+/X11
+In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CABMQnVLga2SHjQiK+Ki_Cx0AKSE8Q-DpL2nBcKyf67PomdPr4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 09:10:08AM +0100, Geert Uytterhoeven wrote:
-> On Tue, Jan 13, 2015 at 3:13 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> >
-> > Please consider these Renesas ARM based SoC fixes for v3.19.
-> >
-> > This pull request is based on the last round of SoC updates for v3.19,
-> > Fourth Round of Renesas ARM Based SoC Updates for v3.19, tagged as
-> > renesas-soc3-for-v3.19, merged into your next/soc branch and included in
-> > v3.19-rc1.
-> >
-> > * ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
-> 
-> That's the description for the regression below.
-> Should have been: "Set .control_parent for all irqpin instances for sh73a0
-> SoC when booting using legacy C."
-> 
-> >   This fixes a long standing problem which has been present since
-> >   the sh73a0 SoC started using the INTC External IRQ pin driver.
-> >
-> >   The patch that introduced the problem is 341eb5465f67437a ("ARM:
-> >   shmobile: INTC External IRQ pin driver on sh73a0") which was included
-> >   in v3.10.
-> >
-> > * This fixes a regression in the r8a7740 SoC due to
-> >   9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
-> >   which was included in v3.18-rc2.
+Hi, Gregory.
 
-Thanks, I think the above text should have been:
+2014-12-16 0:38 GMT+09:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> Hello,
+>
+> You've been Cc'd on a relicensing patch, because at some point you
+> contributed a patch to an mvebu device tree.
+>
+> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
+> license like what was done when you submitted your patches.
+>
+> This is mostly so that other free software project licensed under a
+> BSD-like license, such as the BSD systems, can actually use our DT,
+> instead of having to rewrite them on their own.
+>
+> Such license changes require the agreement of all the contributors, so
+> it would be great, if you agree with the new licensing terms of
+> course, that you reply to the patch by giving your acked-by.
 
-* Set .control_parent for all irqpin instances for sh73a0 SoC when
-  booting using legacy C
+For all those files I've contributed to
 
-  This fixes a long standing problem which has been present since
-  the sh73a0 SoC started using the INTC External IRQ pin driver.
+Acked-by Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 
-  The patch that introduced the problem is 341eb5465f67437a ("ARM:
-  shmobile: INTC External IRQ pin driver on sh73a0") which was included
-  in v3.10.
+Best regards,
+  Nobuhiro
 
-* ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
 
-  This fixes a regression in the r8a7740 SoC due to
-  9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
-  which was included in v3.18-rc2.
-
-> > ----------------------------------------------------------------
-> > Renesas ARM Based SoC Fixes for v3.19
-> >
-> > * Set .control_parent for all irqpin instances for sh73a0 SoC when booting
-> >   using legacy C
-> > * Instantiate GIC board for r8a7740 SoC when using legacy C
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Nobuhiro Iwamatsu
+   iwamatsu at {nigauri.org / debian.org}
+   GPG ID: 40AD1FA6
