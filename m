@@ -1,72 +1,141 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 14 Jan 2015 12:05:20 -0800
-Subject: [PATCH v3 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150114075137.GL22880@pengutronix.de>
-References: <rjui@broadcom.com>
- <1418183832-24793-1-git-send-email-rjui@broadcom.com>
- <1418183832-24793-3-git-send-email-rjui@broadcom.com>
- <20150113225012.GK22880@pengutronix.de> <54B5D0F9.8030902@broadcom.com>
- <20150114075137.GL22880@pengutronix.de>
-Message-ID: <54B6CC00.3050609@broadcom.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 14 Jan 2015 21:21:39 +0100
+Subject: [PATCH 1/6] ARM: at91: pm: rework cpu detection
+In-Reply-To: <20150114191412.GA14457@ns203013.ovh.net>
+References: <1421097825-396-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421097825-396-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150114191412.GA14457@ns203013.ovh.net>
+Message-ID: <20150114212139.0ad297eb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jean-Christophe,
+
+On Wed, 14 Jan 2015 20:14:12 +0100
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+
+> On 22:23 Mon 12 Jan     , Alexandre Belloni wrote:
+> > Store SoC differences in a struct to remove cpu_is_* usage.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> >  arch/arm/mach-at91/pm.c | 54 ++++++++++++++++++++++++++++++-------------------
+> >  1 file changed, 33 insertions(+), 21 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> > index 9b15169a1c62..79aa793d1f00 100644
+> > --- a/arch/arm/mach-at91/pm.c
+> > +++ b/arch/arm/mach-at91/pm.c
+> > @@ -17,6 +17,7 @@
+> >  #include <linux/interrupt.h>
+> >  #include <linux/sysfs.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/io.h>
+> >  #include <linux/clk/at91_pmc.h>
+> > @@ -32,6 +33,11 @@
+> >  #include "generic.h"
+> >  #include "pm.h"
+> >  
+> > +static struct {
+> > +	unsigned long uhp_udp_mask;
+> > +	int memctrl;
+> > +} at91_pm_data;
+> > +
+> >  static void (*at91_pm_standby)(void);
+> >  
+> >  static int at91_pm_valid_state(suspend_state_t state)
+> > @@ -71,17 +77,9 @@ static int at91_pm_verify_clocks(void)
+> >  	scsr = at91_pmc_read(AT91_PMC_SCSR);
+> >  
+> >  	/* USB must not be using PLLB */
+> > -	if (cpu_is_at91rm9200()) {
+> > -		if ((scsr & (AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP)) != 0) {
+> > -			pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
+> > -			return 0;
+> > -		}
+> > -	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() || cpu_is_at91sam9263()
+> > -			|| cpu_is_at91sam9g20() || cpu_is_at91sam9g10()) {
+> > -		if ((scsr & (AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP)) != 0) {
+> > -			pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
+> > -			return 0;
+> > -		}
+> > +	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
+> > +		pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
+> > +		return 0;
+> >  	}
+> >  
+> >  	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
+> > @@ -149,18 +147,13 @@ static int at91_pm_enter(suspend_state_t state)
+> >  			 * turning off the main oscillator; reverse on wakeup.
+> >  			 */
+> >  			if (slow_clock) {
+> > -				int memctrl = AT91_MEMCTRL_SDRAMC;
+> > -
+> > -				if (cpu_is_at91rm9200())
+> > -					memctrl = AT91_MEMCTRL_MC;
+> > -				else if (cpu_is_at91sam9g45())
+> > -					memctrl = AT91_MEMCTRL_DDRSDR;
+> >  #ifdef CONFIG_AT91_SLOW_CLOCK
+> >  				/* copy slow_clock handler to SRAM, and call it */
+> >  				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> >  #endif
+> >  				slow_clock(at91_pmc_base, at91_ramc_base[0],
+> > -					   at91_ramc_base[1], memctrl);
+> > +					   at91_ramc_base[1],
+> > +					   at91_pm_data.memctrl);
+> >  				break;
+> >  			} else {
+> >  				pr_info("AT91: PM - no slow clock mode enabled ...\n");
+> > @@ -237,10 +230,29 @@ static int __init at91_pm_init(void)
+> >  
+> >  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+> >  
+> > -	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+> > -	if (cpu_is_at91rm9200())
+> > +	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+> > +
+> > +	if (of_machine_is_compatible("atmel,at91rm9200")) {
+> > +		/*
+> > +		 * AT91RM9200 SDRAM low-power mode cannot be used with
+> > +		 * self-refresh.
+> > +		 */
+> >  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> > -	
+> > +
+> > +		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
+> > +					    AT91RM9200_PMC_UDP;
+> > +		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
+> > +	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9g20") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9261") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9g10") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9263")) {
+> nack here
+> 
+> you switch for runtime information from the SOC register store in ram to DT
+> 
+> DT is great but I do prefer to rely on the SoC register here as the whole was
+> also to check that the is correct
+
+Well, cpu_is_xxx macros are defined in a mach specific header, and we're
+currently trying to enable multi platform support. 
+
+> 
+> wihich is way slower
+
+Hmm, this SoC detection has been move from the suspend path (where, as
+you stated, speed is a real concern) to the pm init function (which is
+only called once at startup), and I doubt the boot time penalty will
+even be noticeable...
+
+Best Regards,
+
+Boris
 
 
-On 1/13/2015 11:51 PM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Tue, Jan 13, 2015 at 06:14:17PM -0800, Ray Jui wrote:
->>>> +	irq = platform_get_irq(pdev, 0);
->>>> +	if (irq < 0) {
->>> irq == 0 should be handled as error, too.
->>>
->> Ah. I thought zero is a valid global interrupt number, and I see other
->> drivers checking against < 0 as well. Is my understanding incorrect?
-> These are wrong, too. 0 should never be a valid interrupt number. There
-> are some exceptions but mostly for historic reasons. The right handling
-> is used for example in drivers/i2c/busses/i2c-efm32.c.
-> 
-Okay. Will check against <= 0. Thanks.
-
->>>> +		dev_err(dev->device, "no irq resource\n");
->>>> +		return irq;
->>>> +	}
->> [...]
->>>> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
->>>> +{
->>>> +	struct bcm_iproc_i2c_dev *dev = platform_get_drvdata(pdev);
->>>> +
->>>> +	i2c_del_adapter(&dev->adapter);
->>>> +	bcm_iproc_i2c_disable(dev);
->>> I think you have a problem here if bcm_iproc_i2c_remove is called while
->>> an irq is still being serviced. I'm not sure how to prevent this
->>> properly for a shared interrupt.
->>>
->> Can I grab i2c_lock_adapter to ensure the bus is locked (so there's no
->> outstanding transactions or IRQs by the time we remove the adapter)? But
->> I see no I2C bus driver does this in their remove function...
-> The problem I pointed out is the reason for some driver authors not to
-> use devm_request_irq. If you use plain request_irq and the matching
-> free_irq in the .remove callback you can be sure that the irq isn't
-> running any more as soon as free_irq returns.
-> 
-Okay. Will change to use request_irq and make sure that it's freed in
-the remove function. Also, the interrupt is dedicated to the I2C
-controller, so I'll remove the IRQF_SHARED flag.
-
-> BTW, if you use vim, you can add
-> 
-> 	set cinoptions=(,:
-> 	if has("autocmd")
-> 		filetype plugin indent on
-> 	endif
-> 
-> to your .vimrc. Then while typing vim does the indention right and
-> consistent, and with the = command you can reindent.
-> 
-Wow this is excellent! Just tried and it works perfectly. Thanks a lot!!!
-
-> Best regards
-> Uwe
-> 
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
