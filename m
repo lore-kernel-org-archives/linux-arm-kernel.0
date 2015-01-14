@@ -1,102 +1,85 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Wed, 14 Jan 2015 10:46:37 -0800
-Subject: [PATCH boot-wrapper-aarch64 0/4] psci cleanups + simple v0.2
- implementation
-In-Reply-To: <20150114115349.GE12069@leverpostej>
-References: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
- <20150114115349.GE12069@leverpostej>
-Message-ID: <CABg9mcvYkX-1k3-1OrQHphL1+qLo-q5TtKySHc=OpNintT3XFg@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 15 Jan 2015 00:18:32 +0530
+Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <20150114173639.GA11844@red-moon>
+References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <3372289.4AUgcSNZN5@wuerfel>
+ <CAFpQJXUB8=XhmAn9-SPKaRHoTaTDynfD8xd-mVJOYrAwo50Rzg@mail.gmail.com>
+ <2298510.9qAQRQ2lzi@wuerfel> <20150114173639.GA11844@red-moon>
+Message-ID: <CAFpQJXXiUmK+BdQAFxV_JCuLyDSm89M7pe+enc2ZMTbuyC-T+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 3:53 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jan 13, 2015 at 02:15:00AM +0000, Zi Shen Lim wrote:
->> Hi Mark,
->
-> Hi,
->
->> The first couple patches are cleanups.
+Hi Lorenzo,
+
+On Wed, Jan 14, 2015 at 11:06 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Jan 07, 2015 at 08:18:50AM +0000, Arnd Bergmann wrote:
+>> On Wednesday 07 January 2015 12:37:51 Ganapatrao Kulkarni wrote:
+>> > Hi Arnd,
+>> >
+>> > On Wed, Jan 7, 2015 at 1:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > > On Tuesday 06 January 2015 15:04:26 Ganapatrao Kulkarni wrote:
+>> > >> On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > >> > On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
+>> > >> >> +             cpu at 00f {
+>> > >> >> +                     device_type = "cpu";
+>> > >> >> +                     compatible = "cavium,thunder", "arm,armv8";
+>> > >> >> +                     reg = <0x0 0x00f>;
+>> > >> >> +                     enable-method = "psci";
+>> > >> >> +                     arm,associativity = <0 0 0x00f>;
+>> > >> >> +             };
+>> > >> >> +             cpu at 100 {
+>> > >> >> +                     device_type = "cpu";
+>> > >> >> +                     compatible = "cavium,thunder", "arm,armv8";
+>> > >> >> +                     reg = <0x0 0x100>;
+>> > >> >> +                     enable-method = "psci";
+>> > >> >> +                     arm,associativity = <0 0 0x100>;
+>> > >> >> +             };
+>> > >> >
+>> > >> > What is the 0x100 offset in the last-level topology field? Does this have
+>> > >> > no significance to topology at all? I would expect that to be something
+>> > >> > like cluster number that is relevant to caching and should be represented
+>> > >> > as a separate level.
+>> > >>
+>> > >> i did not understand, can you please explain little more about "
+>> > >> should be represented as a separate level."
+>> > >> at present, i have put the hwid of a cpu.
+>> > >
+>> > > From what I undertand, the hwid of the CPU contains the "cluster" number in
+>> > > this bit position, so you typically have a shared L2 or L3 cache between
+>> > > all cores within a cluster, but separate caches in other clusters.
+>> > >
+>> > > If this is the case, there will be a measurable difference in performance
+>> > > between two processes sharing memory when running on the same cluster,
+>> > > or when running on different clusters on the same socket. If the
+>> > > performance difference is relevant, it should be described as a separate
+>> > > level in the associativity property.
+>> > you mean, the associativity as array of  <board> <socket> <cluster>
 >>
->> The third patch switches to using v0.2 function ID values for the
->> existing cpu_{on,off} implementations. This intermediate step is
->> arguably unnecessary given the next patch...
+>> No, that would leave out the core number, which is required to identify
+>> the individual thread. I meant adding an extra level such as
 >>
->> The fourth patch provides a simple implementation of PSCI v0.2.
->> The deviations from spec (primarily cpu_suspend not supported)
->> is noted in code comment as well as in commit log.
+>> <board> <socket> <cluster> <core>
+>>
+>> A lot of machines will leave out the <board> number because they are
+>> built with SoCs that don't have a long-distance coherency protocol.
 >
-> While I'm not opposed to implementing PSCI 0.2, the two major reasons
-> for not having implemented it so far were simplicity and
-> spec-compliance. Unless implementing PSCI 0.2 gains us something, I
-> don't see the point in moving from PSCI 0.1.
-
-I'm in full agreement here. I don't think we'd want boot-wrapper to
-become overly complicated - at some point we might as well use ARM
-Trusted Firmware.
-
+> Can't we use phandles to cpu-map nodes instead of a list of numbers (and
+> yet another topology binding description) ?
+cpu-map describes only a cpu topology.
+infact, i have tried initially(in v1 patch set) to use topology for
+the numa mapping.
+However, for numa, we need to define association of cpu, memory and IOs.
+arm,associativity is a generic node property and can be used in any dt nodes.
 >
-> I think not having any supported CPU_SUSPEND states is fine. For spec
-
-Okay :)
-
-> compliance I'm more worried by the behaviour of AFFINITY_INFO (as this
-> implementation seems to ignore the lowest_affinity_level parameter), and
-
-The simple implementation of psci_affinity_info only supports
-lowest_affinity_level==0.
-Motivation: the known user of this (arch/arm64/kernel/psci.c) only
-uses lowest_affinity_level=0.
-Do we need something more complex?
-
-> the behaviour of SYSTEM_{OFF,RESET} -- I wonder if these could be
-> implemented via semihosting.
-
-Good point. Haven't thought about that option.
-I also wonder if linux will use PSCI for these functions.
-
+> Is arm,associativity used solely to map "devices" (inclusive of caches)
+> to a set of cpus ?
 >
-> Given that SYSTEM_OFF and SYSTEM_RESET are effectively not implemented,
-> the only thing that I see we gain from this PSCI 0.2 implementation is
-> AFFINITY_INFO to close a race with CPU_OFF. Is PSCI 0.2 just a
-> nice-to-have feature, or is there something it provides that you
-> particularly want?
-
-I'm currently using this as baseline for PSCI 0.2 related work.
-I have other (non-FVP) platform-specific changes as well, but figured
-at least the generic/common portions could be shared upstream.
-
+> cpu-map misses a notion of distance between hierarchy layers, but we can
+> add to that.
 >
-> I occasionally need to use a new boot-wrapper with old kernels which
-> only handle PSCI 0.1, so we also need to maintain compatiblity in the
-> way the DT binding doc describes:
->
-> psci {
->         compatible = "arm,psci-0.2", "arm,psci";
->         method = "smc";
->         cpu_on = < ... >;
->         cpu_off = < ... >;
-> };
-
-Ok. In that case, along with the DT compatibility above, we'll also
-need patch 3.
-
->
-> Thanks,
-> Mark.
->
->>
->> Please consider merging.
->>
->> Thanks, z
->>
->> Zi Shen Lim (4): psci: use MPIDR_INVALID instead of -1 psci: remove
->> sentinel from id_table psci: use PSCI v0.2 function IDs psci:
->> implement PSCI v0.2
->>
->>  Makefile.am |   4 +- psci.S      | 170
->>  ++++++++++++++++++++++++++++++++++++++++++++++++++---------- 2 files
->>  changed, 143 insertions(+), 31 deletions(-)
->>
->> -- 2.1.0
->>
->>
+> Lorenzo
+thanks
+ganapat
