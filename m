@@ -1,74 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Jan 2015 14:14:08 -0800
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-Message-ID: <20150114221407.GS2419@atomide.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 14 Jan 2015 14:23:30 -0800
+Subject: [PATCH v4 0/3] Add I2C support to Broadcom iProc
+In-Reply-To: <Ray Jui <rjui@broadcom.com>
+References: <Ray Jui <rjui@broadcom.com>
+Message-ID: <1421274213-3544-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patchset contains the initial I2C support for Broadcom iProc family of
+SoCs.
 
-Looks like the legacy IRQ numbers are now all wrong at least for omap4
-since commit 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain.").
+The iProc I2C controller has separate internal TX and RX FIFOs, each has a
+size of 64 bytes. The iProc I2C controller supports two bus speeds including
+standard mode (100 kHz) and fast mode (400 kHz)
 
-Instead of this:
+Changes from v3:
+ - Add config dependency to COMPILE_TEST to allow the driver to be build tested
+   by other platforms
+ - Improve CPU utilization efficiency in the loop of waiting for bus to idle
+ - Add more comment in the driver to clarify the way how the "start busy"
+   interrupt is triggered from the I2C controller
+ - Fix inconsistent coding style and format
+ - Improve the bus speed validation logic in the driver
+ - Add code to free the interrupt line in driver's remove function. Also
+   change to use non-devm API to request the interrupt line
+ - Other miscellaneous improvements and fixes
 
-# cat /proc/interrupts 
-            CPU0       CPU1       
- 29:       1124        981       GIC  29  twd
- 39:          0          0       GIC  39  TWL6030-PIH
- 41:          0          0       GIC  41  l3-dbg-irq
- 42:          0          0       GIC  42  l3-app-irq
- 44:          0          0       GIC  44  DMA
- 45:       7854          0       GIC  45  omap-dma-engine
- 52:          0          0       GIC  52  gpmc
-...
+Changes from v2:
+ - Have the I2C driver default to y so it does not need to be selected from
+   ARCH_BCM_IPROC. This also helps to get rid of one patch. The driver still
+   depends on ARCH_BCM_IPROC
+ - Get rid of redundant check on resource returned by platform_get_resource
 
+Changes from v1:
+ - Fix function argument parenthesis
+ - Get rid of redundant driver owner field
 
-We now have:
+Ray Jui (3):
+  i2c: iProc: define Broadcom iProc I2C binding
+  i2c: iproc: Add Broadcom iProc I2C Driver
+  ARM: dts: add I2C device nodes for Broadcom Cygnus
 
-# cat /proc/interrupts 
-            CPU0       CPU1       
- 16:        343          0       GIC  69  gp_timer
- 17:       1160       1017       GIC  29  twd
- 18:          0          0       GIC  41  l3-dbg-irq
- 19:          1          0       GIC  42  l3-app-irq
- 22:       7850          0       GIC  45  omap-dma-engine
- 44:          0          0  4a310000.gpio  18  DMA
- 61:       2730          0  48055000.gpio   2  eth0
-223:          0          0       GIC  52  gpmc
-...
+ .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |   37 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   20 +
+ drivers/i2c/busses/Kconfig                         |   10 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-bcm-iproc.c                 |  503 ++++++++++++++++++++
+ 5 files changed, 571 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
+ create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
 
-So the DMA interrupt using the legacy mapping with something like
-irq = 12 + OMAP44XX_IRQ_GIC_START now is wrong and unfortunately
-at least omaps still have a bunch of the legacy interrupts still
-around.
-
-And that naturally produces all kinds of strange errors like:
-
-WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
-44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
-...
-[<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-[<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
-[<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
-[<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
-[<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
-...
-
-Looks like the logic changed from:
-
-if (of_property_read_u32(node, "arm,routable-irqs", &nr_routable_irqs))
-
-to just
-
-if (node)
-
-Which now causes irq_domain_add_linear() to be called instead of
-irq_domain_add_legacy(), which causes the breakage.
-
-Anybody got a sane fix in mind for the -rc series, or should we just
-revert it for now?
-
-Regards,
-
-Tony
+-- 
+1.7.9.5
