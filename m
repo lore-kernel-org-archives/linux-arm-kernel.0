@@ -1,44 +1,74 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 14 Jan 2015 00:27:30 -0500 (EST)
-Subject: [PATCH RESEND v2] net: fec: fix MDIO bus assignement for dual
- fec SoC's
-In-Reply-To: <1421191221-23095-1-git-send-email-stefan@agner.ch>
-References: <1421191221-23095-1-git-send-email-stefan@agner.ch>
-Message-ID: <20150114.002730.1449798194556067465.davem@davemloft.net>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 14 Jan 2015 14:33:23 +0900
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for Exynos
+ 64bit SoC
+Message-ID: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
-Date: Wed, 14 Jan 2015 00:20:21 +0100
+This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+for Exynos 32bit SoC.
 
-> On i.MX28, the MDIO bus is shared between the two FEC instances.
-> The driver makes sure that the second FEC uses the MDIO bus of the
-> first FEC. This is done conditionally if FEC_QUIRK_ENET_MAC is set.
-> However, in newer designs, such as Vybrid or i.MX6SX, each FEC MAC
-> has its own MDIO bus. Simply removing the quirk FEC_QUIRK_ENET_MAC
-> is not an option since other logic, triggered by this quirk, is
-> still needed.
-> 
-> Furthermore, there are board designs which use the same MDIO bus
-> for both PHY's even though the second bus would be available on the
-> SoC side. Such layout are popular since it saves pins on SoC side.
-> Due to the above quirk, those boards currently do work fine. The
-> boards in the mainline tree with such a layout are:
-> - Freescale Vybrid Tower with TWR-SER2 (vf610-twr.dts)
-> - Freescale i.MX6 SoloX SDB Board (imx6sx-sdb.dts)
-> 
-> This patch adds a new quirk FEC_QUIRK_SINGLE_MDIO for i.MX28, which
-> makes sure that the MDIO bus of the first FEC is used in any case.
-> 
-> However, the boards above do have a SoC with a MDIO bus for each FEC
-> instance. But the PHY's are not connected in a 1:1 configuration. A
-> proper device tree description is needed to allow the driver to
-> figure out where to find its PHY. This patch fixes that shortcoming
-> by adding a MDIO bus child node to the first FEC instance, along
-> with the two PHY's on that bus, and making use of the phy-handle
-> property to add a reference to the PHY's.
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+This patch set is tested on 64-bit Exynos SoC. I send only this patch from
+following patchst[1].
+[1] https://lkml.org/lkml/2014/12/2/134
 
-Applied, thanks.
+Changes from v2:
+- None
+Changes from v1:
+- Use CONFIG_ARM instead of CONFIG_ARM64
+
+ drivers/clocksource/Kconfig      | 1 -
+ drivers/clocksource/exynos_mct.c | 4 ++++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index fc01ec2..be38119 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
+ 
+ config CLKSRC_EXYNOS_MCT
+ 	def_bool y if ARCH_EXYNOS
+-	depends on !ARM64
+ 	help
+ 	  Support for Multi Core Timer controller on Exynos SoCs.
+ 
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 9403061..b840ea1 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
+ 	return exynos4_read_count_32();
+ }
+ 
++#if defined(CONFIG_ARM)
+ static struct delay_timer exynos4_delay_timer;
+ 
+ static cycles_t exynos4_read_current_timer(void)
+@@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
+ 			 "cycles_t needs to move to 32-bit for ARM64 usage");
+ 	return exynos4_read_count_32();
+ }
++#endif
+ 
+ static void __init exynos4_clocksource_init(void)
+ {
+ 	exynos4_mct_frc_start();
+ 
++#if defined(CONFIG_ARM)
+ 	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
+ 	exynos4_delay_timer.freq = clk_rate;
+ 	register_current_timer_delay(&exynos4_delay_timer);
++#endif
+ 
+ 	if (clocksource_register_hz(&mct_frc, clk_rate))
+ 		panic("%s: can't register clocksource\n", mct_frc.name);
+-- 
+1.8.5.5
