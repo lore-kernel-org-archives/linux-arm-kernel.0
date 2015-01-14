@@ -1,99 +1,78 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 14 Jan 2015 01:19:02 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <54B4ABFB.5000501@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
- <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
- <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
- <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
- <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
- <54B4ABFB.5000501@samsung.com>
-Message-ID: <54B5B5F6.3030607@collabora.co.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 14 Jan 2015 09:20:48 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v3.19
+In-Reply-To: <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
+References: <cover.1421113695.git.horms+renesas@verge.net.au>
+ <CAMuHMdU2nrftSAxZgwrT5_WP5WkeisxDkuZcAa7zH0LQyQ89jg@mail.gmail.com>
+Message-ID: <20150114002046.GA30021@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joonyoung,
-
-On 01/13/2015 06:24 AM, Joonyoung Shim wrote:
->> 
->> Yes, I was not able to trigger that by running modetest but by turning off
->> my HDMI monitor and then turning it on again. When the monitor is turned
->> on then I see a "Power domain power-domain disable failed" and the imprecise
->> external abort error.
->> 
->> I had to disable CONFIG_DRM_EXYNOS_DP in order to trigger though and that
->> is why I was not able to reproduce it before.
->> 
->> I think though that this is a separate issue of the HDMI not working since
->> power domains should be able to have many consumers devices and I see that
->> other power domains are used that way.
->> 
+On Tue, Jan 13, 2015 at 09:10:08AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Jan 13, 2015 at 3:13 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> >
+> > Please consider these Renesas ARM based SoC fixes for v3.19.
+> >
+> > This pull request is based on the last round of SoC updates for v3.19,
+> > Fourth Round of Renesas ARM Based SoC Updates for v3.19, tagged as
+> > renesas-soc3-for-v3.19, merged into your next/soc branch and included in
+> > v3.19-rc1.
+> >
+> > * ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
 > 
-> OK, we need more investigation.
->
+> That's the description for the regression below.
+> Should have been: "Set .control_parent for all irqpin instances for sh73a0
+> SoC when booting using legacy C."
+> 
+> >   This fixes a long standing problem which has been present since
+> >   the sh73a0 SoC started using the INTC External IRQ pin driver.
+> >
+> >   The patch that introduced the problem is 341eb5465f67437a ("ARM:
+> >   shmobile: INTC External IRQ pin driver on sh73a0") which was included
+> >   in v3.10.
+> >
+> > * This fixes a regression in the r8a7740 SoC due to
+> >   9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
+> >   which was included in v3.18-rc2.
 
-I dug further on this issue and found that the cause is that the exynos_mixer
-driver needs some clocks (CLK_HDMI and CLK_SCLK_HDMI) grabbed by exynos_hdmi
-to be kept enabled after hdmi_poweroff (drivers/gpu/drm/exynos/exynos_hdmi.c).
+Thanks, I think the above text should have been:
 
-Otherwise, any access to mixer device registers leads to an imprecise external
-abort error. The following change [0] to the Exynos DRM HDMI driver makes the
-issue to not happen and I can successfully execute:
+* Set .control_parent for all irqpin instances for sh73a0 SoC when
+  booting using legacy C
 
-# echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
-# echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+  This fixes a long standing problem which has been present since
+  the sh73a0 SoC started using the INTC External IRQ pin driver.
 
-Only not disabling the hdmi clock [1]: is enough but doing so makes sometimes the
-DISP1 power domain disabling fails. It doesn't seem to have side effect though
-since I also see the signal in the HDMI display to go standby and then on again.
+  The patch that introduced the problem is 341eb5465f67437a ("ARM:
+  shmobile: INTC External IRQ pin driver on sh73a0") which was included
+  in v3.10.
 
-# echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
-# echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
-[   63.089080] Power domain disp1-power-domain disable failed
-# echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
-#
+* ARM: shmobile: r8a7740: Instantiate GIC from C board code in legacy builds
 
-That error message when both clocks are not disabled on hdmi_poweroff() though.
+  This fixes a regression in the r8a7740 SoC due to
+  9a1091ef0017c40a ("irqchip: gic: Support hierarchy irq domain.")
+  which was included in v3.18-rc2.
 
-I tried different things like set parent of mixer clock to hdmi clock instead
-of aclk200_disp1 or make the Exynos DRM mixer driver to grab the hdmi clock
-from  DT and prepare_enable from mixer_poweron() but in all cases the same
-imprecise external abort error was triggered by mixer_poweron() trying to access
-the mixer registers.
-
-Any ideas?
-
-Thanks a lot and best regards,
-Javier
-
-[0]:
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 5765a161abdd..0887911cfdd5 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -2084,8 +2084,8 @@ static void hdmi_poweroff(struct exynos_drm_display *display)
- 
-        cancel_delayed_work(&hdata->hotplug_work);
- 
--       clk_disable_unprepare(res->sclk_hdmi);
--       clk_disable_unprepare(res->hdmi);
- 
-        /* reset pmu hdmiphy control bit to disable hdmiphy */
-        regmap_update_bits(hdata->pmureg, PMU_HDMI_PHY_CONTROL,
-
-
-[1]:
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 5765a161abdd..628bff96d543 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -2085,7 +2085,7 @@ static void hdmi_poweroff(struct exynos_drm_display *display)
-        cancel_delayed_work(&hdata->hotplug_work);
- 
-        clk_disable_unprepare(res->sclk_hdmi);
--       clk_disable_unprepare(res->hdmi);
- 
-        /* reset pmu hdmiphy control bit to disable hdmiphy */
-        regmap_update_bits(hdata->pmureg, PMU_HDMI_PHY_CONTROL,
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC Fixes for v3.19
+> >
+> > * Set .control_parent for all irqpin instances for sh73a0 SoC when booting
+> >   using legacy C
+> > * Instantiate GIC board for r8a7740 SoC when using legacy C
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
