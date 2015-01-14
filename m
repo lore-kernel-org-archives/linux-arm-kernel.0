@@ -1,57 +1,66 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 13 Jan 2015 19:56:42 -0600
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <alpine.DEB.2.02.1501132324150.28034@utopia.booyaka.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
- <54AA4CD4.40105@ti.com>
- <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
- <54AB9983.1040703@ti.com> <54AC1800.1020406@ti.com>
- <alpine.DEB.2.02.1501132324150.28034@utopia.booyaka.com>
-Message-ID: <54B5CCDA.4040304@ti.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 14 Jan 2015 10:04:14 +0800
+Subject: [PATCH v2 2/8] PCI/MSI: Add hooks to populate the msi_domain field
+In-Reply-To: <54B52168.3080600@arm.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+ <1420736772-11088-3-git-send-email-marc.zyngier@arm.com>
+ <54B510BA.7030202@huawei.com> <54B52168.3080600@arm.com>
+Message-ID: <54B5CE9E.4030801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+>>> +static void pci_set_msi_domain(struct pci_dev *dev)
+>>> +{
+>>> +	/*
+>>> +	 * If no domain has been set through the pcibios callback,
+>>> +	 * inherit the default from the bus device.
+>>> +	 */
+>>> +	if (!dev_get_msi_domain(&dev->dev))
+>>> +		dev_set_msi_domain(&dev->dev,
+>>> +				   dev_get_msi_domain(&dev->bus->dev));
+>>> +}
+>>
+>> Hi Marc, now we have two ways to associate the pci_dev and msi_domain, right ?
+>>
+>> 1. associate pci_dev and msi_domain in pcibios_add_device() like x86.
+>>
+>> 2. Inherit msi_domain from pci_dev->bus.
+>>
+>> My question is if all pci devices inherit msi_domain from the pci_bus,
+>> so all pci devices under same pci host bridge have the same msi_domain assigned by
+>> weak pcibios_set_phb_msi_domain(). So why not save the pci host bridge specific
+>> msi_domain in pci_host_bridge. Then pci devices could inherit the msi_domain from
+>> its pci host bridge directly, no need to involve pci bus in the assignment.
+> 
+> But then, you would end-up maintaining another msi_domain field inside
+> the pci_host bridge structure. What do you gain by doing so?
 
-On 01/13/2015 05:29 PM, Paul Walmsley wrote:
-> Hi Suman,
-> 
-> thanks for pitching in on this!
-> 
-> On Tue, 6 Jan 2015, Suman Anna wrote:
-> 
->> You have removed the return from the above block on failure. If any DT
->> entry doesn't have the reg property, this will hang the kernel boot.
->> Just remove the "reg" entry from any of the existing DT, and you will
->> run into the issue, this is what 6423d6df1440 ("ARM: OMAP2+: hwmod:
->> check for module address space during init") fixed. 
-> 
-> Seems like that's the problem that we need to track down, then.  If a 
-> hwmod has no MPU-accessible registers, it should still be possible to 
-> init the clocks for the device, etc. ...
+My original thought is holding msi_domain field inside the pci_host_bridge is
+more simple than every bus maintaining the msi_domain, but this proposal has a
+disadvantage that sometimes we must setup for every device. I checked x86 DMAR code,
+and found most DMAR would report PCIe root port device associating the msi_domain, not the EP device.
+So pcibios_add_device could only associate these bridge device msi_domain, and its children
+devices will propagate from their parent bus(get msi_domain from its bridge).
 
-Yes true, and I should have rephrased above statement a little better -
-its for modules with sysc but with no reg property to supply the base
-for the module's SYSCONFIG or SYSSTATUS registers. The commit
-6423d6df1440 has the explanation for the hang.
+So now I agree your idea, please forgive my nagging :)
+
+Thanks!
+Yijing.
 
 > 
->> Also, are you sure you want to turn the WARN into a pr_debug, it won't 
->> even show during the kernel boot log if the reg base is missing.
+> With this series, msi_domain has the nice property of always being tied
+> to a device (and struct pci_bus always has a device). We always have
+> phb->bus->dev.msi_domain within reach, and architecture code can decide
+> to override it on a per-device basis.
 > 
-> No, I'm not sure :-)  I guess it depends how many hwmods we'll have with 
-> no MPU-accessible registers.  We don't seem to have address ranges for the 
-> interconnects defined; we could fix that fairly easily.
+> What else do you need? What am I missing from your proposal?
+> 
+> Thanks,
+> 
+> 	M.
+> 
 
-The WARN_ON previously was to throw a eye-catchy print for the case
-where hwmods have sysc but no address space defined (is an error
-usually, but this is what we run into during the DT conversion of a
-device as the hwmod and DTS changes come in through separate topic
-branches).  I still think that the sysc check should be before the check
-for _HWMOD_NO_MPU_PORT, a module with sysc mandates it has an MPU port.
 
-regards
-Suman
+-- 
+Thanks!
+Yijing
