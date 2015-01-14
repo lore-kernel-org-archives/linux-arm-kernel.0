@@ -1,39 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jan 2015 16:38:00 +0000
-Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103EDAF89E198@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
- <20141113235322.GC4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
- <20141114095812.GG4042@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
- <20150108184059.GZ12302@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
- <20150109111048.GE12302@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103EDAF89E198@CNBJMBX05.corpusers.net>
-Message-ID: <20150114163800.GZ12302@n2100.arm.linux.org.uk>
+From: ddutile@redhat.com (Don Dutile)
+Date: Wed, 14 Jan 2015 11:41:17 -0500
+Subject: sysfs topology for arm64 cluster_id
+In-Reply-To: <1514771.EWQBJle85Y@wuerfel>
+References: <54B5BC84.8090603@redhat.com> <1514771.EWQBJle85Y@wuerfel>
+Message-ID: <54B69C2D.9050202@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 09, 2015 at 08:40:56PM +0800, Wang, Yalin wrote:
-> Oh, I see,
-> How about change like this:
-> +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6 && !CPU_V6K)
-> I am not sure if I also need add some older CPU types like !CPU_ARM9TDMI &&?!CPU_ARM940T ?
-> 
-> Another solution is:
-> +	select HAVE_ARCH_BITREVERSE if ((CPU_32V7M || CPU_32V7) && !CPU_32V6 && !CPU_32V5 && !CPU_32V4 && !CPU_32V4T && !CPU_32V3)
-> 
-> By the way, I am not clear about the difference between CPU_V6 and CPU_V6K, could you tell me? :)
+On 01/14/2015 06:24 AM, Arnd Bergmann wrote:
+> On Tuesday 13 January 2015 19:47:00 Jon Masters wrote:
+>> Hi Folks,
+>>
+>> TLDR: I would like to consider the value of adding something like
+>> "cluster_siblings" or similar in sysfs to describe ARM topology.
+>>
+>> A quick question on intended data representation in /sysfs topology
+>> before I ask the team on this end to go down the (wrong?) path. On ARM
+>> systems today, we have a hierarchical CPU topology:
+>>
+>>                   Socket ---- Coherent Interonnect ---- Socket
+>>                     |                                    |
+>>           Cluster0 ... ClusterN                Cluster0 ... ClusterN
+>>              |             |                      |             |
+>>        Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
+>>          |       |      |        |           |       |      |       |
+>>       T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
+>>
+>> Where we might (or might not) have threads in individual cores (a la SMT
+>> - it's allowed in the architecture at any rate) and we group cores
+>> together into units of clusters usually 2-4 cores in size (though this
+>> varies between implementations, some of which have different but similar
+>> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
+>> cores). There are multiple clusters per "socket", and there might be an
+>> arbitrary number of sockets. We'll start to enable NUMA soon.
+>
+> Have you taken a look at the NUMA patches that Ganapatrao Kulkarni
+> has sent out? These encode the system-wide topology based on the model
+> from IBM Power machines.
+>
+Thanks for that ptr!  I'll take a look at this code today.
 
-I think
+>> Is it not a good idea to expose the cluster details directly in sysfs
+>> and have these utilities understand the possible extra level in the
+>> calculation? Or do we want to just fudge the numbers (as seems to be the
+>> case in some systems I am seeing) to make the x86 model add up?
+>>
+>> Let me know the preferred course...
+>
+> I like the idea of encoding the topology independent of the specific
+> levels implemented in hardware, and we could use that same model
+> that we have in DT to represent things to user space, or that
+> can directly access the "arm,associativity" properties in
+> /sys/firmware/devicetree/base, but that would not be portable to
+> ACPI based systems.
+>
+> In the platform that Ganapatrao is interested in, there are no clusters,
+> but they have two levels of NUMA topology (sockets and boards), and
+> I could well imagine systems that have more than those two, or systems
+> that have multiple levels below a socket (e.g. chip, cluster, core,
+> thread) that all share the same NUMA node because they have a common
+> memory controller.
+>
+> It would be nice to find a good representation for sysfs that covers
+> all of these cases, and that also shows the associativity of I/O
+> devices.
+>
+Caches too (and cpu associativity to them, esp. L2)
 
-	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
-
-is sufficient - we don't support mixing pre-v6 and v6+ CPU architectures
-into a single kernel.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
