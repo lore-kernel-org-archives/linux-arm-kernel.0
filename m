@@ -1,52 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 13 Jan 2015 23:06:11 -0500 (EST)
-Subject: [PATCH net-next v12 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <1421140290-5492-4-git-send-email-dingtianhong@huawei.com>
-References: <1421140290-5492-1-git-send-email-dingtianhong@huawei.com>
- <1421140290-5492-4-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20150113.230611.375062426344934847.davem@davemloft.net>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 14 Jan 2015 12:05:09 +0800
+Subject: [PATCH] i2c: designware: use {readl|writel}_relaxed instead of
+ readl/writel
+In-Reply-To: <20150113143654.GG7660@katana>
+References: <1418279201-3886-1-git-send-email-jszhang@marvell.com>
+ <20150113143654.GG7660@katana>
+Message-ID: <20150114120509.0ba8267e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ding Tianhong <dingtianhong@huawei.com>
-Date: Tue, 13 Jan 2015 17:11:30 +0800
+Dear Wolfram,
 
-> +static int hip04_alloc_ring(struct net_device *ndev, struct device *d)
-> +{
-> +	struct hip04_priv *priv = netdev_priv(ndev);
-> +	int i;
-> +
-> +	priv->tx_desc = dma_alloc_coherent(d,
-> +			TX_DESC_NUM * sizeof(struct tx_desc),
-> +			&priv->tx_desc_dma, GFP_KERNEL);
+On Tue, 13 Jan 2015 06:36:54 -0800
+Wolfram Sang <wsa@the-dreams.de> wrote:
 
-When a function call spans multiple lines, the arguments on the
-second and subsequent lines should start at the first column
-after the openning parenthesis of the function call.
+> 
+> On Thu, Dec 11, 2014 at 02:26:41PM +0800, Jisheng Zhang wrote:
+> > readl/writel is too expensive especially on Cortex A9 w/ outer L2 cache.
+> > This introduces i2c read/write errors on Marvell BG2/BG2Q SoCs when there
+> > are heavy L2 cache maintenance operations at the same time.
+> 
+> Reading this again, I got a question:
+> 
+> Really read/write errors? I would think that there is a performance
+> penalty because of the memory barriers. But errors?
 
-If you are only using TAB characters, your indentation is likely
-to be incorrect.
+I dunno whether I can call the issue as error. The situation is one i2c client
+has a bit strict timing requirement. Without the patch, if there are heavy L2 cache
+maintenance operations at the same time, there may be long delay between each
+DW_IC_DATA_CMD write opeartions in i2c_dw_xfer_msg() in the DW_IC_INTR_TX_EMPTY isr.
 
-> +	/*
-> +	 * BQL will try to keep the TX queue as short as possible, but it can't
-> +	 * be faster than tx_coalesce_usecs, so we need a fast timeout here,
-> +	 * but also long enough to gather up enough frames to ensure we don't
-> +	 * get more interrupts than necessary.
-> +	 * 200us is enough for 16 frames of 1500 bytes at gigabit ethernet rate
-> +	 */
+Thus about 1/300 i2c transactions may be ignored by the i2c client per my test.
 
-Comments in the networking should be:
+> 
+> > The driver does not perform DMA, so it's safe to use the relaxed version.
+> > From another side, the relaxed io accessor macros are available on all
+> > architectures now, so we can use the relaxed versions instead.
+> 
+> Can the designware core make use of DMA in theory?
+> 
 
-	/* Formatted
-	 * like this.
-	 */
+the IP can do DMA in theory. But currently, there's no DMA support in the driver.
 
-> +	priv->phy_node = of_parse_phandle(node, "phy-handle", 0);
-> +	if (priv->phy_node) {
-> +		priv->phy = of_phy_connect(ndev, priv->phy_node,
-> +			&hip04_adjust_link, 0, priv->phy_mode);
-
-Please align the arguments to this function call correctly, as
-per above.
-
-Thanks.
+Thanks for your review,
+Jisheng
