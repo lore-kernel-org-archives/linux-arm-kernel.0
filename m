@@ -1,68 +1,122 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 14 Jan 2015 11:11:03 -0200
-Subject: [PATCH] ARM: dts: imx25: Fix PWM "per" clocks
-Message-ID: <1421241063-8928-1-git-send-email-festevam@gmail.com>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Wed, 14 Jan 2015 14:20:32 +0100
+Subject: [PATCH RESEND] pm: at91: Workaround DDRSDRC self-refresh bug with
+ LPDDR1 memories
+Message-ID: <1421241632-2991-1-git-send-email-peda@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+From: Peter Rosin <peda@axentia.se>
 
-Currently PWM functionality is broken on mx25 due to the wrong assignment of the
-PWM "per" clock.
+The DDRSDR controller (on the ATSAMA5D31) fails miserably to put LPDDR1
+memories in self-refresh. Force the controller to think it has DDR2
+memories during the self-refresh period, as the DDR2 self-refresh spec
+is equivalent to LPDDR1, and is correctly implemented in the controller.
 
-According to Documentation/devicetree/bindings/clock/imx25-clock.txt:
-	pwm_ipg_per		52
+Assume that the second controller has the same fault, and that other
+CPUs in the family has the same problem, but that is untested.
 
-,so update the pwm "per" to use 'pwm_ipg_per' instead of 'per10' clock.
-
-With this change PWM can work fine on mx25.
-
-Cc: <stable@vger.kernel.org> 
-Reported-by: Carlos Soto <csotoalonso@gmail.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- arch/arm/boot/dts/imx25.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-at91/pm_slowclock.S  |   43 +++++++++++++++++++++++++++++++-----
+ include/soc/at91/at91sam9_ddrsdr.h |    2 +-
+ 2 files changed, 39 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index d238676..e4d3aec 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -369,7 +369,7 @@
- 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
- 				#pwm-cells = <2>;
- 				reg = <0x53fa0000 0x4000>;
--				clocks = <&clks 106>, <&clks 36>;
-+				clocks = <&clks 106>, <&clks 52>;
- 				clock-names = "ipg", "per";
- 				interrupts = <36>;
- 			};
-@@ -388,7 +388,7 @@
- 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
- 				#pwm-cells = <2>;
- 				reg = <0x53fa8000 0x4000>;
--				clocks = <&clks 107>, <&clks 36>;
-+				clocks = <&clks 107>, <&clks 52>;
- 				clock-names = "ipg", "per";
- 				interrupts = <41>;
- 			};
-@@ -429,7 +429,7 @@
- 			pwm4: pwm at 53fc8000 {
- 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
- 				reg = <0x53fc8000 0x4000>;
--				clocks = <&clks 108>, <&clks 36>;
-+				clocks = <&clks 108>, <&clks 52>;
- 				clock-names = "ipg", "per";
- 				interrupts = <42>;
- 			};
-@@ -476,7 +476,7 @@
- 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
- 				#pwm-cells = <2>;
- 				reg = <0x53fe0000 0x4000>;
--				clocks = <&clks 105>, <&clks 36>;
-+				clocks = <&clks 105>, <&clks 52>;
- 				clock-names = "ipg", "per";
- 				interrupts = <26>;
- 			};
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 20018779bae7..63a9e0b0a17d 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -143,6 +143,16 @@ ddr_sr_enable:
+ 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+ 	bne	sdr_sr_enable
+ 
++	/* LPDDR1 --> force DDR2 mode during self-refresh */
++	ldr	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
++	str	tmp1, .saved_sam9_mdr
++	bic	tmp1, tmp1, #~AT91_DDRSDRC_MD
++	cmp	tmp1, #AT91_DDRSDRC_MD_LOW_POWER_DDR
++	ldreq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
++	biceq	tmp1, tmp1, #AT91_DDRSDRC_MD
++	orreq	tmp1, tmp1, #AT91_DDRSDRC_MD_DDR2
++	streq	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
++
+ 	/* prepare for DDRAM self-refresh mode */
+ 	ldr	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+ 	str	tmp1, .saved_sam9_lpr
+@@ -151,14 +161,26 @@ ddr_sr_enable:
+ 
+ 	/* figure out if we use the second ram controller */
+ 	cmp	ramc1, #0
+-	ldrne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+-	strne	tmp2, .saved_sam9_lpr1
+-	bicne	tmp2, #AT91_DDRSDRC_LPCB
+-	orrne	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
++	beq	ddr_no_2nd_ctrl
++
++	ldr	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
++	str	tmp2, .saved_sam9_mdr1
++	bic	tmp2, tmp2, #~AT91_DDRSDRC_MD
++	cmp	tmp2, #AT91_DDRSDRC_MD_LOW_POWER_DDR
++	ldreq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
++	biceq	tmp2, tmp2, #AT91_DDRSDRC_MD
++	orreq	tmp2, tmp2, #AT91_DDRSDRC_MD_DDR2
++	streq	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
++
++	ldr	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
++	str	tmp2, .saved_sam9_lpr1
++	bic	tmp2, #AT91_DDRSDRC_LPCB
++	orr	tmp2, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+ 
+ 	/* Enable DDRAM self-refresh mode */
++	str	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
++ddr_no_2nd_ctrl:
+ 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+-	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+ 
+ 	b	sdr_sr_done
+ 
+@@ -289,12 +311,17 @@ sdr_sr_done:
+ 	 */
+ 	cmp	memctrl, #AT91_MEMCTRL_DDRSDR
+ 	bne	sdr_en_restore
++	/* Restore MDR in case of LPDDR1 */
++	ldr	tmp1, .saved_sam9_mdr
++	str	tmp1, [sdramc, #AT91_DDRSDRC_MDR]
+ 	/* Restore LPR on AT91 with DDRAM */
+ 	ldr	tmp1, .saved_sam9_lpr
+ 	str	tmp1, [sdramc, #AT91_DDRSDRC_LPR]
+ 
+ 	/* if we use the second ram controller */
+ 	cmp	ramc1, #0
++	ldrne	tmp2, .saved_sam9_mdr1
++	strne	tmp2, [ramc1, #AT91_DDRSDRC_MDR]
+ 	ldrne	tmp2, .saved_sam9_lpr1
+ 	strne	tmp2, [ramc1, #AT91_DDRSDRC_LPR]
+ 
+@@ -328,5 +355,11 @@ ram_restored:
+ .saved_sam9_lpr1:
+ 	.word 0
+ 
++.saved_sam9_mdr:
++	.word 0
++
++.saved_sam9_mdr1:
++	.word 0
++
+ ENTRY(at91_slow_clock_sz)
+ 	.word .-at91_slow_clock
+diff --git a/include/soc/at91/at91sam9_ddrsdr.h b/include/soc/at91/at91sam9_ddrsdr.h
+index 0210797abf2e..cd2c18787833 100644
+--- a/include/soc/at91/at91sam9_ddrsdr.h
++++ b/include/soc/at91/at91sam9_ddrsdr.h
+@@ -92,7 +92,7 @@
+ #define		AT91_DDRSDRC_UPD_MR	(3 << 20)	 /* Update load mode register and extended mode register */
+ 
+ #define AT91_DDRSDRC_MDR	0x20	/* Memory Device Register */
+-#define		AT91_DDRSDRC_MD		(3 << 0)		/* Memory Device Type */
++#define		AT91_DDRSDRC_MD		(7 << 0)		/* Memory Device Type */
+ #define			AT91_DDRSDRC_MD_SDR		0
+ #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
+ #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
 -- 
-1.9.1
+1.7.10.4
