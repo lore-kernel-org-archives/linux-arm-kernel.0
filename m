@@ -1,47 +1,36 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 14 Jan 2015 13:17:08 +0100
-Subject: [PATCH v2 0/7] Fix sti drivers whcih mix reg address spaces
-In-Reply-To: <20150111.185445.1288456704842706068.davem@davemloft.net>
-References: <1420643052-4506-1-git-send-email-peter.griffin@linaro.org>
- <20150111.185445.1288456704842706068.davem@davemloft.net>
-Message-ID: <54B65E44.7060901@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Jan 2015 13:26:16 +0100
+Subject: [PATCH RFC] pinctrl: at91
+In-Reply-To: <20150106093706.GC26982@ldesroches-Latitude-E6320>
+References: <CACRpkdbkUUzVVMp14szY+vGNd+d+8bL066STh_XMGud-UsFBqA@mail.gmail.com>
+ <1418637470-5839-1-git-send-email-ludovic.desroches@atmel.com>
+ <54943933.60102@atmel.com>
+ <20150106093706.GC26982@ldesroches-Latitude-E6320>
+Message-ID: <CACRpkda9wTPcRy6nRGP08rDpHV=tRyYVuD80TeO2zFGzX+aJcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-On 01/12/2015 12:54 AM, David Miller wrote:
-> From: Peter Griffin <peter.griffin@linaro.org>
-> Date: Wed,  7 Jan 2015 15:04:05 +0000
->
->> A V2 of this old series incorporating Arnd and Lees Feedback form v1.
->>
->> Following on from Arnds comments about the picophy driver here
->> https://lkml.org/lkml/2014/11/13/161, this series fixes the
->> remaining upstreamed drivers for STI, which are mixing address spaces
->> in the reg property. We do this in a way similar to the keystone
->> and bcm7445 platforms, by having sysconfig phandle/ offset pair
->> (where only one register is required). Or phandle / integer array
->> where multiple offsets in the same bank are needed).
->>
->> This series breaks DT compatability! But the platform support
->> is WIP and only being used by the few developers who are upstreaming
->> support for it. I've made each change to the driver / dt doc / dt
->> file as a single atomic commit so the kernel will remain bisectable.
->>
->> This series then also enables the picophy driver, and adds back in
->> the ehci/ohci dt nodes for stih410 which make use of the picophy.
-> Series applied to net-next, thanks.
-Did you apply all the series to net-next?
+On Tue, Jan 6, 2015 at 10:37 AM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
 
-I need the DT patches in STi SoC tree, that will go to Linus tree via 
-arm-soc, hopefully for v3.20.
+> Usage of of_gpiochip_add() only solves my issue about gpio but not about
+> pinctrl stuff, I still need a patch to manage the case when we have a gap if
+> a gpio controller is not enabled to not break the pin naming, etc.
 
-How could we synchronize?
-Maybe I could create an immutable tag on top of STi DT branch, which is 
-based on top of v3.19-rc1,
-that you would merge in your tree?
+This has been the topic of many threads today.
+I assume you are talking about keeping GPIO numbers
+consistent.
 
-Please let me know your preferred way.
+- My suggestion is to add alias handling of the GPIO chips
+  to the core so they can be probed in the right order.
 
-Thanks,
-Maxime
+- For consistency in sysfs use the "names" array in
+  struct gpio_chip so you can search for a symbolic
+  name in sysfs and don't have to rely on fragile stuff
+  like GPIO numbers.
+
+- Partake in the development of a new GPIO ABI
+  that does not use the global GPIO numberspace.
+
+Yours,
+Linus Walleij
