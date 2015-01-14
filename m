@@ -1,222 +1,237 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 14 Jan 2015 16:31:05 +0000
-Subject: [PATCH v7 01/20] arm/arm64: KVM: rework MPIDR assignment and add
- accessors
+Date: Wed, 14 Jan 2015 16:31:21 +0000
+Subject: [PATCH v7 17/20] arm64: KVM: add SGI generation register emulation
 In-Reply-To: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
 References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1421253084-9663-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1421253084-9663-18-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The virtual MPIDR registers (containing topology information) for the
-guest are currently mapped linearily to the vcpu_id. Improve this
-mapping for arm64 by using three levels to not artificially limit the
-number of vCPUs.
-To help this, change and rename the kvm_vcpu_get_mpidr() function to
-mask off the non-affinity bits in the MPIDR register.
-Also add an accessor to later allow easier access to a vCPU with a
-given MPIDR. Use this new accessor in the PSCI emulation.
+While the generation of a (virtual) inter-processor interrupt (SGI)
+on a GICv2 works by writing to a MMIO register, GICv3 uses the system
+register ICC_SGI1R_EL1 to trigger them.
+Add a trap handler function that calls the new SGI register handler
+in the GICv3 code. As ICC_SRE_EL1.SRE at this point is still always 0,
+this will not trap yet, but will only be used later when all the data
+structures have been initialized properly.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
 Changelog v6...v7:
  (none)
 
 Changelog v5...v6:
- (add Reviewed-by:)
+- add sysreg trapping for 32-bit guests
 
 Changelog v4...v5:
- (add Reviewed-by:)
+- fix merge conflict due to 3.18.0 rebase
+- minor style changes and comments fixes
 
 Changelog v3...v4:
-- rename kvm_vcpu_get_mpidr() to kvm_vcpu_get_mpidr_aff()
-- simplify kvm_mpidr_to_vcpu()
-- fixup comment
+- moved addition of vgic_v3_dispatch_sgi() from earlier patch into here
+- move MPIDR comparison into extra function
+- use new ICC_SGI1R_ field names
+- improve readability of vgic_v3_dispatch_sgi()
+- add and refine comments
 
- arch/arm/include/asm/kvm_emulate.h   |    5 +++--
- arch/arm/include/asm/kvm_host.h      |    2 ++
- arch/arm/kvm/arm.c                   |   13 +++++++++++++
- arch/arm/kvm/psci.c                  |   17 +++++------------
- arch/arm64/include/asm/kvm_emulate.h |    5 +++--
- arch/arm64/include/asm/kvm_host.h    |    2 ++
- arch/arm64/kvm/sys_regs.c            |   13 +++++++++++--
- 7 files changed, 39 insertions(+), 18 deletions(-)
+ arch/arm64/kvm/sys_regs.c   |   27 +++++++++++
+ include/kvm/arm_vgic.h      |    1 +
+ virt/kvm/arm/vgic-v3-emul.c |  111 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 139 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 66ce176..c528615 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -23,6 +23,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/kvm_arm.h>
-+#include <asm/cputype.h>
- 
- unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-@@ -167,9 +168,9 @@ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
- }
- 
--static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
-+static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
--	return vcpu->arch.cp15[c0_MPIDR];
-+	return vcpu->arch.cp15[c0_MPIDR] & MPIDR_HWID_BITMASK;
- }
- 
- static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 254e065..a4e1155 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -234,6 +234,8 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
-+
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 2d6d910..d0fadd6 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1045,6 +1045,19 @@ static void check_kvm_target_cpu(void *ret)
- 	*(int *)ret = kvm_target_cpu();
- }
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int i;
-+
-+	mpidr &= MPIDR_HWID_BITMASK;
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (mpidr == kvm_vcpu_get_mpidr_aff(vcpu))
-+			return vcpu;
-+	}
-+	return NULL;
-+}
-+
- /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 58cb324..02fa8ef 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -22,6 +22,7 @@
- #include <asm/cputype.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_psci.h>
-+#include <asm/kvm_host.h>
- 
- /*
-  * This is an implementation of the Power State Coordination Interface
-@@ -66,25 +67,17 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
- static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- {
- 	struct kvm *kvm = source_vcpu->kvm;
--	struct kvm_vcpu *vcpu = NULL, *tmp;
-+	struct kvm_vcpu *vcpu = NULL;
- 	wait_queue_head_t *wq;
- 	unsigned long cpu_id;
- 	unsigned long context_id;
--	unsigned long mpidr;
- 	phys_addr_t target_pc;
--	int i;
- 
--	cpu_id = *vcpu_reg(source_vcpu, 1);
-+	cpu_id = *vcpu_reg(source_vcpu, 1) & MPIDR_HWID_BITMASK;
- 	if (vcpu_mode_is_32bit(source_vcpu))
- 		cpu_id &= ~((u32) 0);
- 
--	kvm_for_each_vcpu(i, tmp, kvm) {
--		mpidr = kvm_vcpu_get_mpidr(tmp);
--		if ((mpidr & MPIDR_HWID_BITMASK) == (cpu_id & MPIDR_HWID_BITMASK)) {
--			vcpu = tmp;
--			break;
--		}
--	}
-+	vcpu = kvm_mpidr_to_vcpu(kvm, cpu_id);
- 
- 	/*
- 	 * Make sure the caller requested a valid CPU and that the CPU is
-@@ -155,7 +148,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
- 	 * then ON else OFF
- 	 */
- 	kvm_for_each_vcpu(i, tmp, kvm) {
--		mpidr = kvm_vcpu_get_mpidr(tmp);
-+		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
- 		if (((mpidr & target_affinity_mask) == target_affinity) &&
- 		    !tmp->arch.pause) {
- 			return PSCI_0_2_AFFINITY_LEVEL_ON;
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 8127e45..fc3459f 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -27,6 +27,7 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
-+#include <asm/cputype.h>
- 
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
- unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-@@ -187,9 +188,9 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
- }
- 
--static inline unsigned long kvm_vcpu_get_mpidr(struct kvm_vcpu *vcpu)
-+static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
- {
--	return vcpu_sys_reg(vcpu, MPIDR_EL1);
-+	return vcpu_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
- }
- 
- static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0b7dfdb..37c4ff1 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -206,6 +206,8 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
-+
- static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 				       phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 3d7c2df..136e679 100644
+index 136e679..8c30f26 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -252,10 +252,19 @@ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- 
- static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- {
-+	u64 mpidr;
-+
- 	/*
--	 * Simply map the vcpu_id into the Aff0 field of the MPIDR.
-+	 * Map the vcpu_id into the first three affinity level fields of
-+	 * the MPIDR. We limit the number of VCPUs in level 0 due to a
-+	 * limitation to 16 CPUs in that level in the ICC_SGIxR registers
-+	 * of the GICv3 to be able to address each CPU directly when
-+	 * sending IPIs.
- 	 */
--	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1UL << 31) | (vcpu->vcpu_id & 0xff);
-+	mpidr = (vcpu->vcpu_id & 0x0f) << MPIDR_LEVEL_SHIFT(0);
-+	mpidr |= ((vcpu->vcpu_id >> 4) & 0xff) << MPIDR_LEVEL_SHIFT(1);
-+	mpidr |= ((vcpu->vcpu_id >> 12) & 0xff) << MPIDR_LEVEL_SHIFT(2);
-+	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+@@ -165,6 +165,27 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
+ 	return true;
  }
  
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
++/*
++ * Trap handler for the GICv3 SGI generation system register.
++ * Forward the request to the VGIC emulation.
++ * The cp15_64 code makes sure this automatically works
++ * for both AArch64 and AArch32 accesses.
++ */
++static bool access_gic_sgi(struct kvm_vcpu *vcpu,
++			   const struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	u64 val;
++
++	if (!p->is_write)
++		return read_from_write_only(vcpu, p);
++
++	val = *vcpu_reg(vcpu, p->Rt);
++	vgic_v3_dispatch_sgi(vcpu, val);
++
++	return true;
++}
++
+ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+ 			const struct sys_reg_params *p,
+ 			const struct sys_reg_desc *r)
+@@ -434,6 +455,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, VBAR_EL1, 0 },
+ 
++	/* ICC_SGI1R_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
++	  access_gic_sgi },
+ 	/* ICC_SRE_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
+ 	  trap_raz_wi },
+@@ -666,6 +690,8 @@ static const struct sys_reg_desc cp14_64_regs[] = {
+  * register).
+  */
+ static const struct sys_reg_desc cp15_regs[] = {
++	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
++
+ 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
+@@ -713,6 +739,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 
+ static const struct sys_reg_desc cp15_64_regs[] = {
+ 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
++	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
+ 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
+ };
+ 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 98c3016..b9b2e05 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -307,6 +307,7 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level);
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		      struct kvm_exit_mmio *mmio);
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index 8db1db5..2d2199d 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -841,6 +841,117 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+ 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+ }
+ 
++/*
++ * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
++ * generation register ICC_SGI1R_EL1) with a given VCPU.
++ * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
++ * return -1.
++ */
++static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
++{
++	unsigned long affinity;
++	int level0;
++
++	/*
++	 * Split the current VCPU's MPIDR into affinity level 0 and the
++	 * rest as this is what we have to compare against.
++	 */
++	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
++	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
++	affinity &= ~MPIDR_LEVEL_MASK;
++
++	/* bail out if the upper three levels don't match */
++	if (sgi_aff != affinity)
++		return -1;
++
++	/* Is this VCPU's bit set in the mask ? */
++	if (!(sgi_cpu_mask & BIT(level0)))
++		return -1;
++
++	return level0;
++}
++
++#define SGI_AFFINITY_LEVEL(reg, level) \
++	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
++	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
++
++/**
++ * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
++ * @vcpu: The VCPU requesting a SGI
++ * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
++ *
++ * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
++ * This will trap in sys_regs.c and call this function.
++ * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
++ * target processors as well as a bitmask of 16 Aff0 CPUs.
++ * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
++ * check for matching ones. If this bit is set, we signal all, but not the
++ * calling VCPU.
++ */
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++{
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *c_vcpu;
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	u16 target_cpus;
++	u64 mpidr;
++	int sgi, c;
++	int vcpu_id = vcpu->vcpu_id;
++	bool broadcast;
++	int updated = 0;
++
++	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
++	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
++	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
++	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
++
++	/*
++	 * We take the dist lock here, because we come from the sysregs
++	 * code path and not from the MMIO one (which already takes the lock).
++	 */
++	spin_lock(&dist->lock);
++
++	/*
++	 * We iterate over all VCPUs to find the MPIDRs matching the request.
++	 * If we have handled one CPU, we clear it's bit to detect early
++	 * if we are already finished. This avoids iterating through all
++	 * VCPUs when most of the times we just signal a single VCPU.
++	 */
++	kvm_for_each_vcpu(c, c_vcpu, kvm) {
++
++		/* Exit early if we have dealt with all requested CPUs */
++		if (!broadcast && target_cpus == 0)
++			break;
++
++		 /* Don't signal the calling VCPU */
++		if (broadcast && c == vcpu_id)
++			continue;
++
++		if (!broadcast) {
++			int level0;
++
++			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
++			if (level0 == -1)
++				continue;
++
++			/* remove this matching VCPU from the mask */
++			target_cpus &= ~BIT(level0);
++		}
++
++		/* Flag the SGI as pending */
++		vgic_dist_irq_set_pending(c_vcpu, sgi);
++		updated = 1;
++		kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
++	}
++	if (updated)
++		vgic_update_state(vcpu->kvm);
++	spin_unlock(&dist->lock);
++	if (updated)
++		vgic_kick_vcpus(vcpu->kvm);
++}
++
+ static int vgic_v3_create(struct kvm_device *dev, u32 type)
+ {
+ 	return kvm_vgic_create(dev->kvm, type);
 -- 
 1.7.9.5
