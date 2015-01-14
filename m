@@ -1,149 +1,123 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 13 Jan 2015 19:19:51 -0600
-Subject: [PATCH 1/7] ARM: OMAP2+: Remove unused ti81xx platform init code
-In-Reply-To: <1421190837-4692-2-git-send-email-tony@atomide.com>
-References: <1421190837-4692-1-git-send-email-tony@atomide.com>
- <1421190837-4692-2-git-send-email-tony@atomide.com>
-Message-ID: <20150114011951.GD18523@saruman>
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 13 Jan 2015 18:21:56 -0700
+Subject: [RFC] ACPI on arm64 TODO List
+In-Reply-To: <20150112193905.GB5281@amd>
+References: <548F9668.6080900@linaro.org> <9355623.14GfrLxEB0@wuerfel>
+ <CACxGe6vRN2Tc97=Sx05gri02goxBaHnZm30hR37q=002agFLAA@mail.gmail.com>
+ <CACxGe6sbGu53x5rsx2sWVVVVCnnFvmkQAk3Se9ZGNOXCkqpi=A@mail.gmail.com>
+ <20150112142358.GA23680@amd>
+ <CACxGe6ub0UsUNs1-2NziK_sGEtpxTjcDD+Eto3YOsNkvWxaNcw@mail.gmail.com>
+ <20150112193905.GB5281@amd>
+Message-ID: <54B5C4B4.30708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 03:13:51PM -0800, Tony Lindgren wrote:
-> The support for 81xx was never working in mainline, and it
-> will be only supported in device tree mode. Let's remove all
-> the remaining 81xx related platform code.
-
-you should probably also mention here that you're dropping unnecessary
-non-DT AM33xx support since that has never booted on legacy mode.
-
-Other than that
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/cclock3xxx_data.c   |  6 +-----
->  arch/arm/mach-omap2/omap_phy_internal.c | 35 ---------------------------------
->  arch/arm/mach-omap2/usb-musb.c          | 12 ++---------
->  arch/arm/mach-omap2/usb.h               |  2 --
->  4 files changed, 3 insertions(+), 52 deletions(-)
+On 01/12/2015 12:39 PM, Pavel Machek wrote:
+> On Mon 2015-01-12 14:41:50, Grant Likely wrote:
+>> On Mon, Jan 12, 2015 at 2:23 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>>> On Sat 2015-01-10 14:44:02, Grant Likely wrote:
+>>>> On Wed, Dec 17, 2014 at 10:26 PM, Grant Likely <grant.likely@linaro.org> wrote:
+>>>>> On Tue, Dec 16, 2014 at 11:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>>> On Monday 15 December 2014 19:18:16 Al Stone wrote:
+>>>>>>> 7. Why is ACPI required?
+>>>>>>>    * Problem:
+>>>>>>>      * arm64 maintainers still haven't been convinced that ACPI is
+>>>>>>>        necessary.
+>>>>>>>      * Why do hardware and OS vendors say ACPI is required?
+>>>>>>>    * Status: Al & Grant collecting statements from OEMs to be posted
+>>>>>>>      publicly early in the new year; firmware summit for broader
+>>>>>>>      discussion planned.
+>>>>>>
+>>>>>> I was particularly hoping to see better progress on this item. It
+>>>>>> really shouldn't be that hard to explain why someone wants this feature.
+>>>>>
+>>>>> I've written something up in as a reply on the firmware summit thread.
+>>>>> I'm going to rework it to be a standalone document and post it
+>>>>> publicly. I hope that should resolve this issue.
+>>>>
+>>>> I've posted an article on my blog, but I'm reposting it here because
+>>>> the mailing list is more conducive to discussion...
+>>>>
+>>>> http://www.secretlab.ca/archives/151
+>>>
+>>> Unfortunately, I seen the blog post before the mailing list post, so
+>>> here's reply in blog format.
+>>>
+>>> Grant Likely published article about ACPI and ARM at
+>>>
+>>> http://www.secretlab.ca/archives/151
+>>>
+>>> . He acknowledges systems with ACPI are harder to debug, but because
+>>> Microsoft says so, we have to use ACPI (basically).
+>>
+>> Please reread the blog post. Microsoft is a factor, but it is not the
+>> primary driver by any means.
 > 
-> diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-> index 644ff32..e79c80b 100644
-> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
-> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-> @@ -3634,10 +3634,6 @@ int __init omap3xxx_clk_init(void)
->  		omap_clocks_register(omap36xx_am35xx_omap3430es2plus_clks,
->  				     ARRAY_SIZE(omap36xx_am35xx_omap3430es2plus_clks));
->  		omap_clocks_register(omap3xxx_clks, ARRAY_SIZE(omap3xxx_clks));
-> -	} else if (soc_is_am33xx()) {
-> -		cpu_mask = RATE_IN_AM33XX;
-> -	} else if (cpu_is_ti814x()) {
-> -		cpu_mask = RATE_IN_TI814X;
->  	} else if (cpu_is_omap34xx()) {
->  		if (omap_rev() == OMAP3430_REV_ES1_0) {
->  			cpu_mask = RATE_IN_3430ES1;
-> @@ -3681,7 +3677,7 @@ int __init omap3xxx_clk_init(void)
->  	 * Lock DPLL5 -- here only until other device init code can
->  	 * handle this
->  	 */
-> -	if (!cpu_is_ti81xx() && (omap_rev() >= OMAP3430_REV_ES2_0))
-> +	if (omap_rev() >= OMAP3430_REV_ES2_0)
->  		omap3_clk_lock_dpll5();
->  
->  	/* Avoid sleeping during omap3_core_dpll_m2_set_rate() */
-> diff --git a/arch/arm/mach-omap2/omap_phy_internal.c b/arch/arm/mach-omap2/omap_phy_internal.c
-> index 1a19fa0..8e90356 100644
-> --- a/arch/arm/mach-omap2/omap_phy_internal.c
-> +++ b/arch/arm/mach-omap2/omap_phy_internal.c
-> @@ -152,38 +152,3 @@ void am35x_set_mode(u8 musb_mode)
->  
->  	omap_ctrl_writel(devconf2, AM35XX_CONTROL_DEVCONF2);
->  }
-> -
-> -void ti81xx_musb_phy_power(u8 on)
-> -{
-> -	void __iomem *scm_base = NULL;
-> -	u32 usbphycfg;
-> -
-> -	scm_base = ioremap(TI81XX_SCM_BASE, SZ_2K);
-> -	if (!scm_base) {
-> -		pr_err("system control module ioremap failed\n");
-> -		return;
-> -	}
-> -
-> -	usbphycfg = readl_relaxed(scm_base + USBCTRL0);
-> -
-> -	if (on) {
-> -		if (cpu_is_ti816x()) {
-> -			usbphycfg |= TI816X_USBPHY0_NORMAL_MODE;
-> -			usbphycfg &= ~TI816X_USBPHY_REFCLK_OSC;
-> -		} else if (cpu_is_ti814x()) {
-> -			usbphycfg &= ~(USBPHY_CM_PWRDN | USBPHY_OTG_PWRDN
-> -				| USBPHY_DPINPUT | USBPHY_DMINPUT);
-> -			usbphycfg |= (USBPHY_OTGVDET_EN | USBPHY_OTGSESSEND_EN
-> -				| USBPHY_DPOPBUFCTL | USBPHY_DMOPBUFCTL);
-> -		}
-> -	} else {
-> -		if (cpu_is_ti816x())
-> -			usbphycfg &= ~TI816X_USBPHY0_NORMAL_MODE;
-> -		else if (cpu_is_ti814x())
-> -			usbphycfg |= USBPHY_CM_PWRDN | USBPHY_OTG_PWRDN;
-> -
-> -	}
-> -	writel_relaxed(usbphycfg, scm_base + USBCTRL0);
-> -
-> -	iounmap(scm_base);
-> -}
-> diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-> index bc89723..e4562b2 100644
-> --- a/arch/arm/mach-omap2/usb-musb.c
-> +++ b/arch/arm/mach-omap2/usb-musb.c
-> @@ -82,16 +82,8 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
->  	musb_plat.mode = board_data->mode;
->  	musb_plat.extvbus = board_data->extvbus;
->  
-> -	if (soc_is_am35xx()) {
-> -		oh_name = "am35x_otg_hs";
-> -		name = "musb-am35x";
-> -	} else if (cpu_is_ti81xx()) {
-> -		oh_name = "usb_otg_hs";
-> -		name = "musb-ti81xx";
-> -	} else {
-> -		oh_name = "usb_otg_hs";
-> -		name = "musb-omap2430";
-> -	}
-> +	oh_name = "usb_otg_hs";
-> +	name = "musb-omap2430";
->  
->          oh = omap_hwmod_lookup(oh_name);
->          if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
-> diff --git a/arch/arm/mach-omap2/usb.h b/arch/arm/mach-omap2/usb.h
-> index 4ba2ae7..3395365 100644
-> --- a/arch/arm/mach-omap2/usb.h
-> +++ b/arch/arm/mach-omap2/usb.h
-> @@ -68,5 +68,3 @@ extern void am35x_musb_reset(void);
->  extern void am35x_musb_phy_power(u8 on);
->  extern void am35x_musb_clear_irq(void);
->  extern void am35x_set_mode(u8 musb_mode);
-> -extern void ti81xx_musb_phy_power(u8 on);
-> -
-> -- 
-> 2.1.4
+> Ok, so what is the primary reason? As far as I could tell it is
+> "Microsoft wants ACPI" and "hardware people want Microsoft" and
+> "fragmentation is bad so we do ACPI" (1) (and maybe "someone at RedHat
+> says they want ACPI" -- but RedHat people should really speak for
+> themselves.)
+
+I have to say I found this statement fascinating.
+
+I have been seconded to Linaro from Red Hat for over two years now,
+working on getting ACPI running, first as a prototype on an ARMv7 box,
+then on ARMv8.  I have been working with Grant since very early on when
+some of us first started talking about ARM servers in the enterprise
+market, and what sorts of standards, if any, would be needed to build an
+ecosystem.
+
+This is the first time in at least two years that I have had someone
+ask for Red Hat to speak up about ACPI on ARM servers; it's usually
+quite the opposite, as in "will you Red Hat folks please shut up about
+this already?" :).
+
+For all the reasons Grant has already mentioned, my Customers need to
+have ACPI on ARM servers for them to be successful in their business.
+I view my job as providing what my Customers need to be successful.
+So, here I am.  I want ACPI on ARMv8 for my Customers.
+
+> You snipped quite a lot of reasons why ACPI is inferior that were
+> below this line in email.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 									Pavel
+> 
+> (1) ignoring fact that it causes fragmentation between servers and phones.
+> 
+
+I see this very differently.  This is a "fact" only when viewed from
+the perspective of having two different technologies that can do very
+similar things.
+
+In my opinion, the issue is that these are two very, very different
+markets; technologies are only relevant as the tools to be used to be
+successful in those markets.
+
+Just on a surface level, phones are expected to be completely replaced
+every 18 months or less -- new hardware, new version of the OS, new
+everything. That's the driving force in the market.
+
+A server does not change that quickly; it is probable that the hardware
+will change, but it is unlikely to change at that speed.  It can take
+18 months just for some of the certification testing needed for new
+hardware or software.  Further, everything from the kernel on up is
+expected to be stable for a long time -- as long as 25 years, in some
+cases I have worked on.  "New" can be a bad word in this environment.
+
+Best I can tell, I need different tool sets to do well in each of these
+environments -- one that allows me to move quickly for phones, and one
+that allows me to carefully control change for servers.  I personally
+don't see that as fragmentation, but as using the right tool for the
+job.  If I'm building a phone, I want the speed and flexibility of DT.
+If I'm building a server, I want the long term stability of ACPI.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150113/95f98eb0/attachment.sig>
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
