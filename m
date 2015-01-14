@@ -1,128 +1,219 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Jan 2015 12:51:14 -0800
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
- <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
-Message-ID: <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 14 Jan 2015 21:55:39 +0100
+Subject: [PATCH v2 2/5] drivers/rtc/rtc-armada38x: Add a new RTC driver
+ for recent mvebu SoCs
+References: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421257155-3379-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <871tmxrsj8.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 12:35 AM, Roman Peniaev <r.peniaev@gmail.com> wrote:
-> On Tue, Jan 13, 2015 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
->> On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
->>> thread_info->syscall is used only for ptrace, but syscall number
->>> is also used by syscall_get_nr and returned to userspace by the
->>> following proc file access:
->>>
->>>  $ cat /proc/self/syscall
->>>  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
->>>  ^
->>> The first number is the syscall number, currently it is zero.
->>> Patch fixes this:
->>>
->>>  $ cat /proc/self/syscall
->>>  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
->>>  ^
->>> Right, read syscall
->>
->> Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
->> the /proc code requires syscall_get_nr to work regardless of
->> TIF_SYSCALL_TRACE.
->>
->>> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> Cc: stable at vger.kernel.org
->>> ---
->>>  arch/arm/kernel/asm-offsets.c  | 1 +
->>>  arch/arm/kernel/entry-common.S | 1 +
->>>  2 files changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->>> index 2d2d608..6911bad 100644
->>> --- a/arch/arm/kernel/asm-offsets.c
->>> +++ b/arch/arm/kernel/asm-offsets.c
->>> @@ -70,6 +70,7 @@ int main(void)
->>>    DEFINE(TI_CPU,             offsetof(struct thread_info, cpu));
->>>    DEFINE(TI_CPU_DOMAIN,              offsetof(struct thread_info, cpu_domain));
->>>    DEFINE(TI_CPU_SAVE,                offsetof(struct thread_info, cpu_context));
->>> +  DEFINE(TI_SYSCALL,         offsetof(struct thread_info, syscall));
->>>    DEFINE(TI_USED_CP,         offsetof(struct thread_info, used_cp));
->>>    DEFINE(TI_TP_VALUE,                offsetof(struct thread_info, tp_value));
->>>    DEFINE(TI_FPSTATE,         offsetof(struct thread_info, fpstate));
->>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->>> index f8ccc21..89452ff 100644
->>> --- a/arch/arm/kernel/entry-common.S
->>> +++ b/arch/arm/kernel/entry-common.S
->>> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
->>>  #endif
->>>
->>>  local_restart:
->>> +     str scno, [tsk, #TI_SYSCALL]            @ set syscall number
->>>       ldr     r10, [tsk, #TI_FLAGS]           @ check for syscall tracing
->>>       stmdb   sp!, {r4, r5}                   @ push fifth and sixth args
->>
->> Do we definitely want to update scno on syscall restarting?
->
->
-> Good question.
->
-> First thing to mention is __sys_trace will trace 'restart_syscall',
-> not the real syscall we are going to restart.
->
-> E.g. in test application we do infinite poll and then send STOP and
-> CONT to this app:
->
->     test-243   [002] ...1  1792.067726: sys_enter: NR 168 (0, 0,
-> ffffffff, 0, 0, 0)
->     test-243   [002] ...1  1802.299073: sys_exit: NR 168 = -516
->     test-243   [004] ...1  1814.716264: sys_enter: NR 0 (0, 0,
-> ffffffff, 0, 0, 0)
->     test-243   [004] ...1  2183.687225: sys_exit: NR 0 = -516
->
-> the poll was restarted and trace shows that we are in restart_syscall.
->
-> Is that expected?
->
-> And the second thing is that my next patch did some tweaks in
-> 'syscall_trace_enter', where we take scno not from param we passed,
-> but from thread_info->syscall we previously set.
->
-> So, regarding your question, if I set scno only once - I will break
-> previous behavior, and __sys_trace will trace the syscall we restarted.
->
-> And I think this is what we need, because according to the
-> 'syscall_trace_enter' code we do 'secure_computing' and
-> 'audit_syscall_entry', which definitely expect original syscall, not
-> the 'restart_syscall'.
+Hi Gregory,
 
-Seccomp expects to see the __NR_restart_syscall syscall, since it
-interposes the syscall entry points.
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
--Kees
-
+> The new mvebu SoCs come with a new RTC driver. This patch adds the
+> support for this new IP which is currently found in the Armada 38x
+> SoCs.
 >
+> This RTC provides two alarms, but only the first one is used in the
+> driver. The RTC also allows using periodic interrupts.
 >
-> --
-> Roman
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/rtc/Kconfig         |  10 ++
+>  drivers/rtc/Makefile        |   1 +
+>  drivers/rtc/rtc-armada38x.c | 319 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 330 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-armada38x.c
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index f15cddfeb897..de42ebd4b626 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1269,6 +1269,16 @@ config RTC_DRV_MV
+>  	  This driver can also be built as a module. If so, the module
+>  	  will be called rtc-mv.
+>  
+> +config RTC_DRV_ARMADA38X
+> +	tristate "Armada 38x Marvell SoC RTC"
+> +	depends on ARCH_MVEBU
+> +	help
+> +	  If you say yes here you will get support for the in-chip RTC
+> +	  that can be found in the Armada 38x Marvell's SoC device
+> +
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called armada38x-rtc.
+> +
+>  config RTC_DRV_PS3
+>  	tristate "PS3 RTC"
+>  	depends on PPC_PS3
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+> index c8ef3e1e6ccd..03fe5629c464 100644
+> --- a/drivers/rtc/Makefile
+> +++ b/drivers/rtc/Makefile
+> @@ -24,6 +24,7 @@ obj-$(CONFIG_RTC_DRV_88PM860X)  += rtc-88pm860x.o
+>  obj-$(CONFIG_RTC_DRV_88PM80X)	+= rtc-88pm80x.o
+>  obj-$(CONFIG_RTC_DRV_AB3100)	+= rtc-ab3100.o
+>  obj-$(CONFIG_RTC_DRV_AB8500)	+= rtc-ab8500.o
+> +obj-$(CONFIG_RTC_DRV_ARMADA38X)	+= rtc-armada38x.o
+>  obj-$(CONFIG_RTC_DRV_AS3722)	+= rtc-as3722.o
+>  obj-$(CONFIG_RTC_DRV_AT32AP700X)+= rtc-at32ap700x.o
+>  obj-$(CONFIG_RTC_DRV_AT91RM9200)+= rtc-at91rm9200.o
+> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+> new file mode 100644
+> index 000000000000..30bae27e828c
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-armada38x.c
+> @@ -0,0 +1,319 @@
+> +/*
+> + * RTC driver for the Armada 38x Marvell SoCs
+> + *
+> + * Copyright (C) 2015 Marvell
+> + *
+> + * Gregory Clement <gregory.clement@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License, or (at your option) any later version.
+> + *
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtc.h>
+> +
+> +#define RTC_STATUS	    0x0
+> +#define RTC_STATUS_ALARM1	    BIT(0)
+> +#define RTC_STATUS_ALARM2	    BIT(1)
+> +#define RTC_IRQ1_CONF	    0x4
+> +#define RTC_IRQ1_AL_EN		    BIT(0)
+> +#define RTC_IRQ1_FREQ_EN	    BIT(1)
+> +#define RTC_IRQ1_FREQ_1HZ	    BIT(2)
+> +#define RTC_TIME	    0xC
+> +#define RTC_ALARM1	    0x10
+> +
+> +#define SOC_RTC_INTERRUPT   0x8
+> +#define SOC_RTC_ALARM1		BIT(0)
+> +#define SOC_RTC_ALARM2		BIT(1)
+> +#define SOC_RTC_ALARM1_MASK	BIT(2)
+> +#define SOC_RTC_ALARM2_MASK	BIT(3)
+> +
+> +struct armada38x_rtc {
+> +	struct rtc_device   *rtc_dev;
+> +	void __iomem	    *regs;
+> +	void __iomem	    *regs_soc;
+> +	spinlock_t	    lock;
+> +	int		    irq;
+> +};
+> +
+> +/*
+> + * According to the datasheet, we need to wait for 5us only between
+> + * two consecutive writes
+> + */
+> +static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
+> +{
+> +	writel(val, rtc->regs + offset);
+> +	udelay(5);
+> +}
+
+The thing I do not get is how you can guarantee that an undelayed
+writel() in a function will not be followed less than 5?s later by
+another writel() in another function. For instance:
+
+  1) a call to set_alarm() followed by a call to alarm_irq_enable().
+  2) some writel() or even rtc_udelayed_write() w/ sth asynchronous
+    occuring like your interrupt handler just after that.
+
+I guess it may be possible to make assumptions on the fact that the
+amount of code before a writel() or rtc_udelayed_write() may prevent
+such scenario but it's difficult to tell, all the more w/ a spinlock
+before the writel() in irq_enable().
+
+Considering the description of the bug, why not doing the following:
+
+ 1) implement rtc_delayed_write() a bit differently:
+
+    static inline void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
+    {
+	udelay(5);
+	writel(val, rtc->regs + offset);
+    }
+
+ 2) remove all writel() in the driver and use rtc_delayed_write()
+    everywhere.
+
+All writes being under the protection of your spinlock, this will
+guarantee the 5?s delay in all cases.
 
 
+> +static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+> +	unsigned long time, time_check, flags;
+> +
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	time = readl(rtc->regs + RTC_TIME);
+> +	/*
+> +	 * WA for failing time set attempts. As stated in HW ERRATA if
+> +	 * more than one second between two time reads is detected
+> +	 * then read once again.
+> +	 */
+> +	time_check = readl(rtc->regs + RTC_TIME);
+> +	if ((time_check - time) > 1)
+> +		time_check = readl(rtc->regs + RTC_TIME);
+> +
+> +	spin_unlock_irqrestore(&rtc->lock, flags);
+> +
+> +	rtc_time_to_tm(time_check, tm);
+> +
+> +	return 0;
+> +}
+> +
+> +static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +	unsigned long time, flags;
+> +
+> +	ret = rtc_tm_to_time(tm, &time);
+> +
+> +	if (ret)
+> +		goto out;
+> +	/*
+> +	 * Setting the RTC time not always succeeds. According to the
+> +	 * errata we need to first write on the status register and
+> +	 * then wait for 100ms before writing to the time register to be
+> +	 * sure that the data will be taken into account.
+> +	 */
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	writel(0, rtc->regs + RTC_STATUS);
+> +
+> +	spin_unlock_irqrestore(&rtc->lock, flags);
+> +
+> +	msleep(100);
+> +
+> +	spin_lock_irqsave(&rtc->lock, flags);
+> +
+> +	writel(time, rtc->regs + RTC_TIME);
 
--- 
-Kees Cook
-Chrome OS Security
+probably not critical (it's rtc clock and not system clock) but you still
+introduce a 100ms shift when setting time here.
+
+As for the two writel() not being done w/o releasing the spinlock, it
+looks a bit weird but it seems it's ok for other functions manipulating
+RTC_STATUS reg. 
+
+Nonetheless, in the reverse direction, if a writel() occurs somewhere
+(e.g. in the alarm irq handler) during your msleep(), you may do your
+final writel() w/o having enforced the expected 100ms delay.
+
+
+> [SNIP]
+>
