@@ -1,34 +1,54 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 14 Jan 2015 13:11:19 +0100
-Subject: [PATCH v2 1/6] PM / Domains: R-Mobile SYSC: Document SH-Mobile AG5
- (sh73a0) binding
+Date: Wed, 14 Jan 2015 13:11:24 +0100
+Subject: [PATCH v2 6/6] drivers: sh: Disable PM runtime for multi-platform
+ sh73a0 with genpd
 In-Reply-To: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
 References: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1421237484-16847-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1421237484-16847-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SH-Mobile AG5 (sh73a0) can be handled by the existing bindings.
+If the default PM domain using PM_CLK is used for PM runtime, the real PM
+domain(s) cannot be registered from DT later.
+
+Hence do not enable it when running a multi-platform kernel with genpd
+support on an sh73a0. The R-Mobile PM domain driver will take care of
+PM runtime management of the module clocks.
+
+The default PM domain is still needed for:
+  - platforms without genpd support,
+  - the legacy (non-DT) case, where genpd may take over later, except
+    for the C5 "always on" PM domain.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
   - No changes
 ---
- Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/sh/pm_runtime.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-index 2460476808e9333e..cc3b1f0a9b1a2b75 100644
---- a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-+++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-@@ -12,6 +12,7 @@ Required properties:
- 	      fallback.
- 	      Examples with soctypes are:
- 		- "renesas,sysc-r8a7740" (R-Mobile A1)
-+		- "renesas,sysc-sh73a0" (SH-Mobile AG5)
- - reg: Two address start and address range blocks for the device:
-          - The first block refers to the normally accessible registers,
-          - the second block refers to the registers protected by the HPB
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index cd4c293f0dd0d375..6b16a67ba618b793 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -83,6 +83,7 @@ static int __init sh_pm_runtime_init(void)
+ 		    !of_machine_is_compatible("renesas,r8a73a4") &&
+ #ifndef CONFIG_PM_GENERIC_DOMAINS_OF
+ 		    !of_machine_is_compatible("renesas,r8a7740") &&
++		    !of_machine_is_compatible("renesas,sh73a0") &&
+ #endif
+ 		    !of_machine_is_compatible("renesas,r8a7778") &&
+ 		    !of_machine_is_compatible("renesas,r8a7779") &&
+@@ -91,8 +92,7 @@ static int __init sh_pm_runtime_init(void)
+ 		    !of_machine_is_compatible("renesas,r8a7792") &&
+ 		    !of_machine_is_compatible("renesas,r8a7793") &&
+ 		    !of_machine_is_compatible("renesas,r8a7794") &&
+-		    !of_machine_is_compatible("renesas,sh7372") &&
+-		    !of_machine_is_compatible("renesas,sh73a0"))
++		    !of_machine_is_compatible("renesas,sh7372"))
+ 			return 0;
+ 	}
+ 
 -- 
 1.9.1
