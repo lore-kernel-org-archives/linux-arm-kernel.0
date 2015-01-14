@@ -1,52 +1,44 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 14 Jan 2015 23:04:48 +0800
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-Message-ID: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+Date: Wed, 14 Jan 2015 23:04:49 +0800
+Subject: [PATCH v7 01/17] arm64: allow late use of early_ioremap
+In-Reply-To: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1421247905-3749-2-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Mark Salter <msalter@redhat.com>
 
-This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+Commit 0e63ea48b4d8 (arm64/efi: add missing call to early_ioremap_reset())
+added a missing call to early_ioremap_reset(). This triggers a BUG if code
+tries using early_ioremap() after the early_ioremap_reset(). This is a
+problem for some ACPI code which needs short-lived temporary mappings
+after paging_init() but before acpi_early_init() in start_kernel(). This
+patch adds definitions for the __late_set_fixmap() and __late_clear_fixmap()
+which avoids the BUG by allowing later use of early_ioremap().
 
-updates from v6:
-  - Rebased on top of 3.19-rc4, add Mack Salter's patch to use
-    the early_ioremap after paging_init() for ACPI table mappings;
+Signed-off-by: Mark Salter <msalter@redhat.com>
+CC: Leif Lindholm <leif.lindholm@linaro.org>
+CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+[hj: update the change log]
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/arm64/include/asm/fixmap.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-  - Two patches about converting apic_id to phys_id to make it arch
-    agnostic were already merged into RC4 by Rafael.
-
-  - Split patch "Parse FADT table to get PSCI flags for PSCI init"
-    into two as Lorenzo's suggestion, also fix typo and lack of __init
-    for psci_0_2_set_functions() which is spotted by Lorenzo.
-
-  - Add Tested-by from Yijing Wang.
-
-previous version is here:
-v6: https://lkml.org/lkml/2015/1/4/40
-
-1. Why we need ACPI on ARM64?
-
-  - Grant already posted a blog about this, and stated clearly
-    why we need ACPI on ARM64:
-
-    http://www.secretlab.ca/archives/151
-
-
-2. What we need to do before the arm64 ACPI core patches
-   could be merged into the kernel?
-
-  - Al Stone posted a TODO list and updates v2 for the
-    progress we made:
-    http://www.spinics.net/lists/arm-kernel/msg390069.html
-
-  - so from the progress we can see that we already finished
-    most of the items, and _OSI we got a plan to fix it, RFC
-    patch is on the way.
-
-
-This patch set was tested on FVP by Fuwei, and booted ok as expected.
-(No functional change since last version)
-
-Thanks
-Hanjun
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 9ef6eca..e629c70 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -61,6 +61,9 @@ void __init early_fixmap_init(void);
+ 
+ #define __early_set_fixmap __set_fixmap
+ 
++#define __late_set_fixmap __set_fixmap
++#define __late_clear_fixmap(idx) __set_fixmap((idx), 0, FIXMAP_PAGE_CLEAR)
++
+ extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+ 
+ #include <asm-generic/fixmap.h>
+-- 
+1.9.1
