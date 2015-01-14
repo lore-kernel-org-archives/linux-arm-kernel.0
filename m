@@ -1,23 +1,134 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 14 Jan 2015 15:59:07 +0530
-Subject: [PATCH] arch: arm: mach-davinci: serial.c: Cleaning up function
- that are not used anywhere
-In-Reply-To: <1417558120-26540-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-References: <1417558120-26540-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
-Message-ID: <54B644F3.2000906@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 14 Jan 2015 11:32:33 +0100
+Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
+ handling
+In-Reply-To: <54B5A6E7.6090904@samsung.com>
+References: <1420863441-32592-1-git-send-email-m.smarduch@samsung.com>
+ <20150111140003.GA2722@cbox> <54B3F5D7.4010501@samsung.com>
+ <20150112174927.GM3868@cbox> <54B5A6E7.6090904@samsung.com>
+Message-ID: <20150114103233.GI26222@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 December 2014 03:38 AM, Rickard Strandqvist wrote:
-> Remove function serial_read_reg() that is not used anywhere.
-> 
-> This was partially found by using a static code analysis program called cppcheck.
-> 
-> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+On Tue, Jan 13, 2015 at 03:14:47PM -0800, Mario Smarduch wrote:
 
-Queuing for v3.20 with subject updated to:
+[...]
 
-"ARM: davinci: serial.c: remove unused serial_read_reg()"
+> >>>
+> >>>
+> >>> What I meant last time around concerning user_mem_abort was more
+> >>> something like this:
+> >>>
+> >>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >>> index 1dc9778..38ea58e 100644
+> >>> --- a/arch/arm/kvm/mmu.c
+> >>> +++ b/arch/arm/kvm/mmu.c
+> >>> @@ -935,7 +935,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>  		return -EFAULT;
+> >>>  	}
+> >>>  
+> >>> -	if (is_vm_hugetlb_page(vma)) {
+> >>> +	/*
+> >>> +	 * Writes to pages in a memslot with logging enabled are always logged
+> >>> +	 * on a singe page-by-page basis.
+> >>> +	 */
+> >>> +	if (memslot_is_logging(memslot) && write_fault)
+> >>> +		force_pte = true;
+> >>
+> >> If it's a write you take the pte route and
+> >> dissolves huge page, if it's a read you reconstruct the
+> >> THP that seems to yield pretty bad results.
+> > 
+> > ok, then remove the ' && write_fault' part of the clause.
+> Hi Christoffer,
+>  couple comments/questions.
+> 
+>  setting force_pte here, disables huge pages for
+> non-writable regions.
+> 
+
+hmmm, by a non-writable region you mean a read-only memslot? Can you set
+dirty page logging for such one?  That doesn't make much sense to me.
+
+Note, that if you receive writable == false from gfn_to_pfn_prot() that
+doesn't mean that the page can never be written to, it just means that
+the current mapping of the page is not a writable one, you can call that
+same function again later with write_fault=true, and you either get a
+writable page back or you simply get an error.
+
+[...]
+
+> >>>  	if (kvm_is_device_pfn(pfn))
+> >>>  		mem_type = PAGE_S2_DEVICE;
+> 
+> If we're not setting the IOMAP flag do we have need
+> this, since we're forfeiting error checking later
+> in stage2_set_pte()?
+> 
+
+we still need this, remember the error checking is about
+cache == NULL, not about the IOMAP flag.  I think I address this in the
+new proposal below, but please check carefully.
+
+Take a look at this one:
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 1dc9778..841e053 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -919,6 +919,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 	bool fault_ipa_uncached;
++	unsigned long flags = 0;
+ 
+ 	write_fault = kvm_is_write_fault(vcpu);
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -976,8 +977,26 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (is_error_pfn(pfn))
+ 		return -EFAULT;
+ 
+-	if (kvm_is_device_pfn(pfn))
++	if (kvm_is_device_pfn(pfn)) {
+ 		mem_type = PAGE_S2_DEVICE;
++		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
++	} else if (memslot_is_logging(memslot)) {
++		/*
++		 * Faults on pages in a memslot with logging enabled that can
++		 * should not be mapped with huge pages (it introduces churn
++		 * and performance degradation), so force a pte mapping.
++		 */
++		force_pte = true;
++		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
++
++		/*
++		 * Only actually map the page as writable if this was a write
++		 * fault.
++		 */
++		if (!write_fault)
++			writable = false;
++
++	}
+ 
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+@@ -1002,13 +1021,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		if (writable) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
++			mark_page_dirty(kvm, gfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+ 					  fault_ipa_uncached);
+-		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+-			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
+-	}
+ 
++		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
++	}
+ 
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
 
 Thanks,
-Sekhar
+-Christoffer
