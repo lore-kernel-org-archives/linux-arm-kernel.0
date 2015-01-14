@@ -1,17 +1,19 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 14 Jan 2015 15:42:03 -0800
+Date: Wed, 14 Jan 2015 15:44:39 -0800
 Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: add INA2xx sensors
-In-Reply-To: <54B69180.2010403@kernel.org> (Kukjin Kim's message of "Thu, 15
- Jan 2015 00:55:44 +0900")
+In-Reply-To: <1421270704.2450.138.camel@collabora.co.uk> (Sjoerd Simons's
+ message of "Wed, 14 Jan 2015 22:25:04 +0100")
 References: <1421193801-24637-1-git-send-email-khilman@kernel.org>
- <54B69180.2010403@kernel.org>
-Message-ID: <7h4mrtq69g.fsf@linaro.org>
+ <1421270704.2450.138.camel@collabora.co.uk>
+Message-ID: <7hy4p5orko.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim <kgene@kernel.org> writes:
+Sjoerd Simons <sjoerd.simons@collabora.co.uk> writes:
 
-> On 01/14/15 09:03, Kevin Hilman wrote:
+> Hey kevin,
+>
+> On Tue, 2015-01-13 at 16:03 -0800, Kevin Hilman wrote:
 >> From: Kevin Hilman <khilman@linaro.org>
 >> 
 >> The odroid-xu3 has 4 INA231 current sensors on board which can be
@@ -40,20 +42,6 @@ Kukjin Kim <kgene@kernel.org> writes:
 >> index c29123c0734d..7874da20939f 100644
 >> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
 >> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> @@ -174,6 +174,13 @@
->>  					regulator-always-on;
->>  				};
->>  
->> +				ldo26_reg: LDO26 {
->> +					regulator-name = "vdd_ldo26";
->> +					regulator-min-microvolt = <3000000>;
->> +					regulator-max-microvolt = <3000000>;
->> +					regulator-always-on;
->> +				};
->> +
->>  				buck1_reg: BUCK1 {
->>  					regulator-name = "vdd_mif";
->>  					regulator-min-microvolt = <800000>;
 >> @@ -257,6 +264,38 @@
 >>  		};
 >>  	};
@@ -63,41 +51,17 @@ Kukjin Kim <kgene@kernel.org> writes:
 >> +
 >> +		/* A15 cluster: VDD_ARM */
 >> +		ina220 at 40 {
+>                    ^ ina231 at 40 ?
 >> +			compatible = "ti,ina230";
->> +			reg = <0x40>;
->> +			shunt-resistor = <10000>;
->> +		};
->> +
->> +		/* memory: VDD_MEM */
->> +		ina220 at 41 {
->> +			compatible = "ti,ina230";
->> +			reg = <0x41>;
->> +			shunt-resistor = <10000>;
->> +		};
->> +
->> +		/* GPU: VDD_G3D */
->> +		ina220 at 44 {
->> +			compatible = "ti,ina230";
->> +			reg = <0x44>;
->> +			shunt-resistor = <10000>;
->> +		};
->> +
->> +		/* A7 cluster: VDD_KFC */
->> +		ina220 at 45 {
->> +			compatible = "ti,ina230";
->> +			reg = <0x45>;
->> +			shunt-resistor = <10000>;
->> +		};
->> +	};
->> +
->>  	i2c_2: i2c at 12C80000 {
->>  		samsung,i2c-sda-delay = <100>;
->>  		samsung,i2c-max-bus-freq = <66000>;
 >
-> Looks good to me and applied. To be honest, I'm not sure about the
-> values in the node of shunt-resistor though ;)
+> This feels incredibly nitpicky, but would it not better to use ti,ina231
+> as it's an INA231 chip not a INA230? (And add the compatibility string
+> to the driver)
 
-I didn't measure the values, but used the values from the DTS that's
-part of the hardkernel tree.
+Hmm, you're right.  Until recently, I thought these were INA230s, but
+squinted enough at the schematic yesterday to notice they were marked as
+INA231, so updated the changelog, but not the DTS.
+
+Will re-spin with a compatible string update to the driver.
 
 Kevin
