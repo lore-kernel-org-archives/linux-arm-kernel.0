@@ -1,81 +1,173 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 14 Jan 2015 08:20:48 +0100
-Subject: [PATCH] ARM: BCM5301X: Drop unused poll-interval from gpio-keys
-Message-ID: <1421220049-12175-1-git-send-email-zajec5@gmail.com>
+Date: Wed, 14 Jan 2015 08:20:49 +0100
+Subject: [PATCH] ARM: BCM5301X: Add LEDs for Buffalo devices
+In-Reply-To: <1421220049-12175-1-git-send-email-zajec5@gmail.com>
+References: <1421220049-12175-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1421220049-12175-2-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was accidentally left (& copied & pasted all around) from our
-experiments with gpio-keys-polled.
-
 Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 ---
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 1 -
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 1 -
- arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     | 1 -
- arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 1 -
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 1 -
- 5 files changed, 5 deletions(-)
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 67 ++++++++++++++++++++++
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 67 ++++++++++++++++++++++
+ 2 files changed, 134 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index 5fc0fae..13d51a9 100644
+index 13d51a9..b359c1e 100644
 --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
 +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -27,7 +27,6 @@
+@@ -23,6 +23,73 @@
+ 		reg = <0x00000000 0x08000000>;
+ 	};
+ 
++	spi {
++		compatible = "spi-gpio";
++		num-chipselects = <1>;
++		gpio-sck = <&chipcommon 7 0>;
++		gpio-mosi = <&chipcommon 4 0>;
++		cs-gpios = <&chipcommon 6 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		hc595: gpio_spi at 0 {
++			compatible = "fairchild,74hc595";
++			reg = <0>;
++			registers-number = <1>;
++			spi-max-frequency = <100000>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		power0 {
++			label = "bcm53xx:red:power";
++			gpios = <&hc595 1 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		power1 {
++			label = "bcm53xx:white:power";
++			gpios = <&hc595 2 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		router0 {
++			label = "bcm53xx:blue:router";
++			gpios = <&hc595 3 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		router1 {
++			label = "bcm53xx:amber:router";
++			gpios = <&hc595 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan {
++			label = "bcm53xx:blue:wan";
++			gpios = <&hc595 5 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		wireless0 {
++			label = "bcm53xx:blue:wireless";
++			gpios = <&hc595 6 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wireless1 {
++			label = "bcm53xx:amber:wireless";
++			gpios = <&hc595 7 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
+ 	gpio-keys {
  		compatible = "gpio-keys";
  		#address-cells = <1>;
- 		#size-cells = <0>;
--		poll-interval = <200>;
- 
- 		restart {
- 			label = "Reset";
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index 4ed7de1..f18c9d9 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -71,7 +71,6 @@
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		poll-interval = <200>;
- 
- 		wps {
- 			label = "WPS";
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-index 12fc2a01..3991042 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-@@ -61,7 +61,6 @@
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		poll-interval = <200>;
- 
- 		wps {
- 			label = "WPS";
-diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-index fb76378..0ee85ea 100644
---- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-+++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-@@ -61,7 +61,6 @@
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		poll-interval = <200>;
- 
- 		restart {
- 			label = "Reset";
 diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-index bbb414f..e23dbbf 100644
+index e23dbbf..db9131e 100644
 --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
 +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-@@ -27,7 +27,6 @@
+@@ -23,6 +23,73 @@
+ 		reg = <0x00000000 0x08000000>;
+ 	};
+ 
++	spi {
++		compatible = "spi-gpio";
++		num-chipselects = <1>;
++		gpio-sck = <&chipcommon 7 0>;
++		gpio-mosi = <&chipcommon 4 0>;
++		cs-gpios = <&chipcommon 6 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		hc595: gpio_spi at 0 {
++			compatible = "fairchild,74hc595";
++			reg = <0>;
++			registers-number = <1>;
++			spi-max-frequency = <100000>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		power0 {
++			label = "bcm53xx:green:power";
++			gpios = <&hc595 1 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		power1 {
++			label = "bcm53xx:red:power";
++			gpios = <&hc595 2 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		router0 {
++			label = "bcm53xx:green:router";
++			gpios = <&hc595 3 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		router1 {
++			label = "bcm53xx:amber:router";
++			gpios = <&hc595 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan {
++			label = "bcm53xx:green:wan";
++			gpios = <&hc595 5 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		wireless0 {
++			label = "bcm53xx:green:wireless";
++			gpios = <&hc595 6 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wireless1 {
++			label = "bcm53xx:amber:wireless";
++			gpios = <&hc595 7 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
+ 	gpio-keys {
  		compatible = "gpio-keys";
  		#address-cells = <1>;
- 		#size-cells = <0>;
--		poll-interval = <200>;
- 
- 		aoss {
- 			label = "AOSS";
 -- 
 1.8.4.5
