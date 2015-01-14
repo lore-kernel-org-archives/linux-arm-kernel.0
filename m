@@ -1,66 +1,62 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 14 Jan 2015 09:33:53 +0100
-Subject: [PATCH 1/4] rtc: armada38x: Add the device tree binding
- documentation
-In-Reply-To: <87iogai8sc.fsf@natisbad.org>
-References: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>	<1420817565-28800-2-git-send-email-gregory.clement@free-electrons.com>
- <87iogai8sc.fsf@natisbad.org>
-Message-ID: <54B629F1.7060605@free-electrons.com>
+Date: Wed, 14 Jan 2015 09:38:22 +0100
+Subject: [PATCH 4/4] ARM: mvebu: add Device Tree description of RTC on
+ Armada 38x
+In-Reply-To: <874mrui8r3.fsf@natisbad.org>
+References: <1420817565-28800-1-git-send-email-gregory.clement@free-electrons.com>	<1420817565-28800-5-git-send-email-gregory.clement@free-electrons.com>
+ <874mrui8r3.fsf@natisbad.org>
+Message-ID: <54B62AFE.1030909@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnaud,
 
-First, thanks for your extensive review.
-
-On 14/01/2015 00:02, Arnaud Ebalard wrote:
+On 14/01/2015 00:03, Arnaud Ebalard wrote:
 > Hi Gregory,
 > 
 > Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 > 
->> The Armada 38x SoCs come with a new RTC which differs from the one
->> used in the other mvebu SoCs until now. This patch describes the
->> binding of this RTC.
+>> The Marvell Armada 38x SoCs contains an RTC which differs from the RTC
+>> used in the other mvebu SoCs until now. This commit adds the Device
+>> Tree description of this interface at the SoC level.
 >>
 >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 >> ---
->>  .../devicetree/bindings/rtc/armada-380-rtc.txt          | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+>>  arch/arm/boot/dts/armada-38x.dtsi | 6 ++++++
+>>  1 file changed, 6 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
->> new file mode 100644
->> index 000000000000..2c56bef9dd7e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
->> @@ -0,0 +1,17 @@
->> +* Real Time Clock of te Armada 38x SoCs
+>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+>> index 04fe80d101f8..22909add8889 100644
+>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>> @@ -466,6 +466,12 @@
+>>  				clocks = <&gateclk 4>;
+>>  			};
+>>  
+>> +			rtc at 184a8 {
+>> +				compatible = "marvell,armada-380-rtc";
+>> +				reg = <0xa3800 0x20>, <0x184a0 0x0c>;
+>> +				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+>> +			};
 >> +
->> +RTC controller for the Armada 38x SoCs
->> +
->> +Required properties:
->> +- compatible : Should be "marvell,armada-380-rtc"
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region. The second entires is for the IP configuration part.
->                         ^^^^^^^
->                         entry
 > 
-> I had to read probe function to understand precisely the purpose of each
-> region, i.e. IMHO the description could be made a bit clearer.
+> Out of curiosity, why not naming the node rtc at a3800? Main argument:
+> least expectation principle when reading the .dtsi and expecting
+> increasing addresses. Or did I miss sth else?
 
-Right, and as suggested by Maxime I will use reg-names
+It was a mistake, I should have used the 0xa3800 offset to name it because
+most of the RTC registers are located here.
+
+
+Thanks,
+
+Gregory
 
 > 
->> +- interrupts: IRQ line for the RTC.
->>
->> +
->> +Example:
->> +
->> +rtc at 184a8 {
->> +	compatible = "marvell,armada-380-rtc";
->> +	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
->> +	interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
->> +};
+> 
+>>  			sata at a8000 {
+>>  				compatible = "marvell,armada-380-ahci";
+>>  				reg = <0xa8000 0x2000>;
 
 
 -- 
