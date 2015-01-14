@@ -1,123 +1,39 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 14 Jan 2015 15:02:17 -0800
-Subject: [PATCH] ARM: clk: add clk-asm9260 driver
-In-Reply-To: <1420707567-22760-2-git-send-email-linux@rempel-privat.de>
-References: <1417187120-23659-1-git-send-email-linux@rempel-privat.de>
- <1420707567-22760-1-git-send-email-linux@rempel-privat.de>
- <1420707567-22760-2-git-send-email-linux@rempel-privat.de>
-Message-ID: <20150114230217.22722.88458@quantum>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 14 Jan 2015 15:04:05 -0800
+Subject: [PATCH] ARM: ARM_KERNMEM_PERMS only works with MMU enabled
+In-Reply-To: <1976703.4VfV2sWda0@wuerfel>
+References: <1976703.4VfV2sWda0@wuerfel>
+Message-ID: <54B6F5E5.7060202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Oleksij Rempel (2015-01-08 00:59:27)
-> diff --git a/drivers/clk/clk-asm9260.c b/drivers/clk/clk-asm9260.c
-> new file mode 100644
-> index 0000000..6b1c220
-> --- /dev/null
-> +++ b/drivers/clk/clk-asm9260.c
+On 1/13/2015 6:14 AM, Arnd Bergmann wrote:
+> The recently added ARM_KERNMEM_PERMS feature works by manipulating
+> the kernel page tables, which obviously requires an MMU. Trying
+> to enable this feature when the MMU is disabled results in a lot
+> of compile errors in mm/init.c, so let's add a Kconfig dependency
+> to avoid that case.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index eaaf196fe4e1..0051cd924fb1 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1010,6 +1010,7 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>
+>   config ARM_KERNMEM_PERMS
+>   	bool "Restrict kernel memory permissions"
+> +	depends on MMU
+>   	help
+>   	  If this is set, kernel memory other than kernel text (and rodata)
+>   	  will be made non-executable. The tradeoff is that each region is
+>
+>
 
-<snip>
+Acked-by: Laura Abbott <lauraa@codeaurora.org>
 
-> +static const char *clk_names[] = {
-> +       [REFCLK]        = "oscillator",
-> +       [SYSPLL]        = "pll",
-> +       [I2S0_MCLK]     = "i2s0_mclk",
-> +       [I2S1_MCLK]     = "i2s1_mclk",
-> +       [RTC_OSC]       = "rtc_osc",
-> +       [USB_PLL]       = "usb_pll",
-> +};
-
-Why keep this list of names? Only clk_names[REFCLK] is used below and it
-is overwritten by the name supplied by DT.
-
-<snip>
-
-> +static void __init asm9260_acc_init(struct device_node *np)
-> +{
-> +       struct clk *clk;
-> +       u32 rate;
-> +       int n;
-> +       u32 accuracy = 0;
-> +
-> +       base = of_io_request_and_map(np, 0, np->name);
-> +       if (!base)
-> +               panic("%s: unable to map resource", np->name);
-> +
-> +       /* register pll */
-> +       rate = (ioread32(base + HW_SYSPLLCTRL) & 0xffff) * 1000000;
-> +
-> +       clk_names[REFCLK] = of_clk_get_parent_name(np, 0);
-> +       accuracy = clk_get_accuracy(__clk_lookup(clk_names[REFCLK]));
-> +       clk = clk_register_fixed_rate_with_accuracy(NULL, clk_names[SYSPLL],
-> +                       clk_names[REFCLK], 0, rate, accuracy);
-
-This is different. Why do the PLLs inherit REFCLKs accuracy? Please see
-__clk_recalc_accuracies in drivers/clk/clk.c if you haven't already. We
-propagate accuracy through the clock tree already.
-
-> +
-> +       if (IS_ERR(clk))
-> +               panic("%s: can't register REFCLK. Check DT!", np->name);
-> +
-> +       for (n = 0; n < ARRAY_SIZE(asm9260_mux_clks); n++) {
-> +               const struct asm9260_mux_clock *mc = &asm9260_mux_clks[n];
-> +
-> +               mc->parent_names[0] = clk_names[REFCLK];
-> +               clk = clk_register_mux_table(NULL, mc->name, mc->parent_names,
-> +                               mc->num_parents, mc->flags, base + mc->offset,
-> +                               0, mc->mask, 0, mc->table, &asm9260_clk_lock);
-> +       }
-> +
-> +       /* clock mux gate cells */
-> +       for (n = 0; n < ARRAY_SIZE(asm9260_mux_gates); n++) {
-> +               const struct asm9260_gate_data *gd = &asm9260_mux_gates[n];
-> +
-> +               clk = clk_register_gate(NULL, gd->name,
-> +                       gd->parent_name, gd->flags | CLK_SET_RATE_PARENT,
-> +                       base + gd->reg, gd->bit_idx, 0, &asm9260_clk_lock);
-> +       }
-> +
-> +       /* clock div cells */
-> +       for (n = 0; n < ARRAY_SIZE(asm9260_div_clks); n++) {
-> +               const struct asm9260_div_clk *dc = &asm9260_div_clks[n];
-> +
-> +               clks[dc->idx] = clk_register_divider(NULL, dc->name,
-> +                               dc->parent_name, CLK_SET_RATE_PARENT,
-> +                               base + dc->reg, 0, 8, CLK_DIVIDER_ONE_BASED,
-> +                               &asm9260_clk_lock);
-> +       }
-> +
-> +       /* clock ahb gate cells */
-> +       for (n = 0; n < ARRAY_SIZE(asm9260_ahb_gates); n++) {
-> +               const struct asm9260_gate_data *gd = &asm9260_ahb_gates[n];
-> +
-> +               clks[gd->idx] = clk_register_gate(NULL, gd->name,
-> +                               gd->parent_name, gd->flags, base + gd->reg,
-> +                               gd->bit_idx, 0, &asm9260_clk_lock);
-> +       }
-> +
-> +       /* check for errors on leaf clocks */
-> +       for (n = 0; n < MAX_CLKS; n++) {
-> +               if (!IS_ERR(clks[n]))
-> +                       continue;
-> +
-> +               pr_err("%s: Unable to register leaf clock %d\n",
-> +                               np->full_name, n);
-> +               goto fail;
-> +       }
-> +
-> +       /* register clk-provider */
-> +       clk_data.clks = clks;
-> +       clk_data.clk_num = MAX_CLKS;
-> +       of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> +       return;
-> +fail:
-> +       iounmap(base);
-> +}
-> +CLK_OF_DECLARE(asm9260_acc, "alphascale,asm9260-clock-controller",
-> +               asm9260_acc_init);
-
-Where is the DT binding definition for this clock provider?
-
-Thanks,
-Mike
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
