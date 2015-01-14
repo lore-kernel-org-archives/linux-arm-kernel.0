@@ -1,111 +1,53 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 15 Jan 2015 01:19:17 +0900
-Subject: [PATCH] ARM: EXYNOS: enable 4 cores secondary cpu up for
- exynos5440
-In-Reply-To: <CACVXFVMWJa3rg45s2CmC_Oz=eO5Oxa+s0PEUjKdYhRqeYu73Hw@mail.gmail.com>
-References: <1356980980-3387-1-git-send-email-kgene.kim@samsung.com>
- <CACVXFVMWJa3rg45s2CmC_Oz=eO5Oxa+s0PEUjKdYhRqeYu73Hw@mail.gmail.com>
-Message-ID: <54B69705.1010902@kernel.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Jan 2015 17:21:52 +0100
+Subject: [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <20150111135615.3326d803@bbrezillon>
+References: <1417639455-17410-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150111135615.3326d803@bbrezillon>
+Message-ID: <20150114162152.GL3843@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/15 11:31, Ming Lei wrote:
-> Hi Kukjin,
-> 
-Hi Ming Lei,
 
-Sorry for late response.
+Hi,
 
-> On Tue, Jan 1, 2013 at 3:09 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> No need to check power on/off with pmu control to support hotplug
->> in/out on exynos5440. And this patch enables 4 cores on exynos5440.
+On 11/01/2015 at 13:56:15 +0100, Boris Brezillon wrote :
+> Hi Lee,
 > 
-> Without this patch, oops will be triggered during kernel booting on
-> exynos5440, so could this one be pushed out?
+> On Wed,  3 Dec 2014 21:44:04 +0100
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 > 
-Yeah, I know exynos5440 requires this at least kernel boot but something
-like soc_is_xxx should be updated with others in these days...so I need
-some time for this.
+> > The EBI (External Bus Interface) is used to access external peripherals
+> > (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> > Each device is assigned a CS line and an address range and can have its
+> > own configuration (timings, access mode, bus width, ...).
+> > This driver provides a generic DT binding to configure a device according
+> > to its requirements.
+> > For specific device controllers (like the NAND one) the SMC timings
+> > should be configured by the controller driver through the matrix and
+> > smc syscon regmaps.
+> > 
+> > The first 4 patches introduce 2 syscon devices needed to configure the
+> > EBI bus, patch 5 and 6 adds support for the EBI bus, and the remaining
+> > patches declares the EBI related nodes in sama5d3 dts[i] files.
+> 
+> Can you take the first 4 patches of this series (adding 2 syscon
+> devices and their associated bindings doc) for 3.20 ?
+> Alexandre has worked on multi platform support for Atmel SoCs and his
+> work depends on these two syscon devices.
+> 
+> Let me know if you want me to send to send a new series containing only
+> those 4 commits.
+> 
 
-Thanks,
-Kukjin
+Actually, because of other series depending on it and because you
+already acked them, Nicolas wants to take those 4 patches through the
+AT91 tree, unless you have any reason to take them through your tree.
 
-> Thanks,
-> Ming Lei
-> 
->>
->> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->> ---
->>  arch/arm/mach-exynos/platsmp.c |   37 ++++++++++++++++++++++---------------
->>  1 file changed, 22 insertions(+), 15 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
->> index c5c840e..495a501 100644
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -40,6 +40,8 @@ static inline void __iomem *cpu_boot_reg_base(void)
->>  {
->>         if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
->>                 return S5P_INFORM5;
->> +       else if (soc_is_exynos5440())
->> +               return (S5P_VA_CHIPID + 0x560);
->>         return S5P_VA_SYSRAM;
->>  }
->>
->> @@ -116,27 +118,30 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
->>          */
->>         write_pen_release(phys_cpu);
->>
->> -       if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
->> -               __raw_writel(S5P_CORE_LOCAL_PWR_EN,
->> -                            S5P_ARM_CORE1_CONFIGURATION);
->> +       if (!soc_is_exynos5440()) {
->> +               if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
->> +                       __raw_writel(S5P_CORE_LOCAL_PWR_EN,
->> +                                    S5P_ARM_CORE1_CONFIGURATION);
->>
->> -               timeout = 10;
->> +                       timeout = 10;
->>
->> -               /* wait max 10 ms until cpu1 is on */
->> -               while ((__raw_readl(S5P_ARM_CORE1_STATUS)
->> -                       & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
->> -                       if (timeout-- == 0)
->> -                               break;
->> +                       /* wait max 10 ms until cpu1 is on */
->> +                       while ((__raw_readl(S5P_ARM_CORE1_STATUS)
->> +                               & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
->> +                               if (timeout-- == 0)
->> +                                       break;
->>
->> -                       mdelay(1);
->> -               }
->> +                               mdelay(1);
->> +                       }
->>
->> -               if (timeout == 0) {
->> -                       printk(KERN_ERR "cpu1 power enable failed");
->> -                       spin_unlock(&boot_lock);
->> -                       return -ETIMEDOUT;
->> +                       if (timeout == 0) {
->> +                               printk(KERN_ERR "cpu1 power enable failed");
->> +                               spin_unlock(&boot_lock);
->> +                               return -ETIMEDOUT;
->> +                       }
->>                 }
->>         }
->> +
->>         /*
->>          * Send the secondary CPU a soft interrupt, thereby causing
->>          * the boot monitor to read the system wide flags register,
->> @@ -178,6 +183,8 @@ static void __init exynos_smp_init_cpus(void)
->>
->>         if (soc_is_exynos5250())
->>                 ncores = 2;
->> +       else if (soc_is_exynos5440())
->> +               ncores = 4;
->>         else
->>                 ncores = scu_base ? scu_get_core_count(scu_base) : 1;
->>
->> --
->> 1.7.10.4
+Sorry for the noise.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
