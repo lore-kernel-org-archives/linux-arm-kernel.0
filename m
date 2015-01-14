@@ -1,48 +1,38 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Wed, 14 Jan 2015 12:22:34 -0500
-Subject: [PATCH] ARM: mm: use phys_addr_t in __arm_ioremap functions
-Message-ID: <1421256154-18514-1-git-send-email-vitalya@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Jan 2015 09:19:09 -0800
+Subject: [PATCH 1/7] ARM: OMAP2+: Remove unused ti81xx platform init code
+In-Reply-To: <20150114011951.GD18523@saruman>
+References: <1421190837-4692-1-git-send-email-tony@atomide.com>
+ <1421190837-4692-2-git-send-email-tony@atomide.com>
+ <20150114011951.GD18523@saruman>
+Message-ID: <20150114171909.GM2419@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a 32 bit ARM architecture with LPAE extension physical addresses
-cannot fit into unsigned long variable.
+* Felipe Balbi <balbi@ti.com> [150113 17:23]:
+> On Tue, Jan 13, 2015 at 03:13:51PM -0800, Tony Lindgren wrote:
+> > The support for 81xx was never working in mainline, and it
+> > will be only supported in device tree mode. Let's remove all
+> > the remaining 81xx related platform code.
+> 
+> you should probably also mention here that you're dropping unnecessary
+> non-DT AM33xx support since that has never booted on legacy mode.
+> 
+> Other than that
+> 
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-This patch fixes the ioremap_page, __map_ioremap_pfn_caller,
-__arm_ioremap and __arm_ioremap_exec functions.
+Thanks, the 81xx legacy booting support already got removed, these
+are just left overs I noticed.
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Acked-by: Murali Karicheri <m-karicheri2@ti.com>
----
- arch/arm/include/asm/mach/map.h | 2 +-
- arch/arm/mm/ioremap.c           | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+I've updated the description with the following:
 
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index 2fe141f..836f006 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -52,7 +52,7 @@ extern const struct mem_type *get_mem_type(unsigned int type);
- /*
-  * external interface to remap single page with appropriate type
-  */
--extern int ioremap_page(unsigned long virt, unsigned long phys,
-+extern int ioremap_page(unsigned long virt, phys_addr_t phys,
- 			const struct mem_type *mtype);
- #else
- #define iotable_init(map,num)	do { } while (0)
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index f123d6e..e0fe50f 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -103,7 +103,7 @@ void __init add_static_vm_early(struct static_vm *svm)
- 	list_add_tail(&svm->list, &curr_svm->list);
- }
- 
--int ioremap_page(unsigned long virt, unsigned long phys,
-+int ioremap_page(unsigned long virt, phys_addr_t phys,
- 		 const struct mem_type *mtype)
- {
- 	return ioremap_page_range(virt, virt + PAGE_SIZE, phys,
--- 
-1.9.1
+The support for 81xx was never working in mainline, and the
+broken legacy booting support has been removed. There are
+patches coming to make 81xx boot with device tree, and for
+that we won't need any of this legacy platform code, so let's
+just remove it.
+
+Regards,
+
+Tony 
