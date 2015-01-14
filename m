@@ -1,57 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 Jan 2015 11:22:10 +0000
-Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
-In-Reply-To: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
-References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20150114112210.GF4050@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Jan 2015 12:24:49 +0100
+Subject: sysfs topology for arm64 cluster_id
+In-Reply-To: <54B5BC84.8090603@redhat.com>
+References: <54B5BC84.8090603@redhat.com>
+Message-ID: <1514771.EWQBJle85Y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 04:59:03PM +0000, Victor Kamensky wrote:
-> Aarch64 ELF files use mapping symbols with special names $x, $d
-> to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
-> IHI 0056B", section "4.5.4 Mapping symbols").
+On Tuesday 13 January 2015 19:47:00 Jon Masters wrote:
+> Hi Folks,
 > 
-> The patch filters out these symbols at load time, similar to
-> "696b97a perf symbols: Ignore mapping symbols on ARM" changes
-> done for ARM before V8.
+> TLDR: I would like to consider the value of adding something like
+> "cluster_siblings" or similar in sysfs to describe ARM topology.
 > 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> Cc: Adrian Hunter <adrian.hunter@intel.com>
-> Cc: Jiri Olsa <jolsa@redhat.com>
-> Cc: Namhyung Kim <namhyung@kernel.org>
-> Cc: Avi Kivity <avi@cloudius-systems.com>
-> Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-> Cc: Anton Blanchard <anton@samba.org>
-> Cc: David Ahern <dsahern@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> ---
->  tools/perf/util/symbol-elf.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> A quick question on intended data representation in /sysfs topology
+> before I ask the team on this end to go down the (wrong?) path. On ARM
+> systems today, we have a hierarchical CPU topology:
 > 
-> diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
-> index 06fcd1b..1e188dd 100644
-> --- a/tools/perf/util/symbol-elf.c
-> +++ b/tools/perf/util/symbol-elf.c
-> @@ -862,6 +862,14 @@ int dso__load_sym(struct dso *dso, struct map *map,
->  			    !strcmp(elf_name, "$t"))
->  				continue;
->  		}
-> +		/* Reject Aarch64 ELF "mapping symbols": these aren't unique and
-> +		 * don't identify functions, so will confuse the profile
-> +		 * output: */
-> +		if (ehdr.e_machine == EM_AARCH64) {
-> +			if (!strcmp(elf_name, "$x") ||
-> +			    !strcmp(elf_name, "$d"))
-> +				continue;
-> +		}
+>                  Socket ---- Coherent Interonnect ---- Socket
+>                    |                                    |
+>          Cluster0 ... ClusterN                Cluster0 ... ClusterN
+>             |             |                      |             |
+>       Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
+>         |       |      |        |           |       |      |       |
+>      T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
+> 
+> Where we might (or might not) have threads in individual cores (a la SMT
+> - it's allowed in the architecture at any rate) and we group cores
+> together into units of clusters usually 2-4 cores in size (though this
+> varies between implementations, some of which have different but similar
+> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
+> cores). There are multiple clusters per "socket", and there might be an
+> arbitrary number of sockets. We'll start to enable NUMA soon.
 
-Do we need to skip $x.* and $d.* too? I doubt GCC generates them, but they
-are permitted by the ELF ABI.
+Have you taken a look at the NUMA patches that Ganapatrao Kulkarni
+has sent out? These encode the system-wide topology based on the model
+from IBM Power machines.
 
-Will
+> Is it not a good idea to expose the cluster details directly in sysfs
+> and have these utilities understand the possible extra level in the
+> calculation? Or do we want to just fudge the numbers (as seems to be the
+> case in some systems I am seeing) to make the x86 model add up?
+> 
+> Let me know the preferred course...
+
+I like the idea of encoding the topology independent of the specific
+levels implemented in hardware, and we could use that same model
+that we have in DT to represent things to user space, or that
+can directly access the "arm,associativity" properties in
+/sys/firmware/devicetree/base, but that would not be portable to
+ACPI based systems.
+
+In the platform that Ganapatrao is interested in, there are no clusters,
+but they have two levels of NUMA topology (sockets and boards), and
+I could well imagine systems that have more than those two, or systems
+that have multiple levels below a socket (e.g. chip, cluster, core,
+thread) that all share the same NUMA node because they have a common
+memory controller.
+
+It would be nice to find a good representation for sysfs that covers
+all of these cases, and that also shows the associativity of I/O
+devices.
+
+	Arnd
