@@ -1,41 +1,57 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 14 Jan 2015 09:46:30 +0800
-Subject: [PATCH] Asoc: sam9x5_wm8731: depend on ARCH_AT91 instead of
- SOC_AT91SAM9X5
-In-Reply-To: <1421152046-20069-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421152046-20069-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B5CA76.3060608@atmel.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 13 Jan 2015 19:56:42 -0600
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
+ without sysc
+In-Reply-To: <alpine.DEB.2.02.1501132324150.28034@utopia.booyaka.com>
+References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
+ <5492F84E.7020706@ti.com>
+ <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
+ <54AA4CD4.40105@ti.com>
+ <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
+ <54AB9983.1040703@ti.com> <54AC1800.1020406@ti.com>
+ <alpine.DEB.2.02.1501132324150.28034@utopia.booyaka.com>
+Message-ID: <54B5CCDA.4040304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre Belloni,
+Hi Paul,
 
-On 01/13/2015 08:27 PM, Alexandre Belloni wrote:
-> The SOC_AT91SAM9X5 option is going to be removed, only depend on ARCH_AT91 like
-> for the other drivers.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 01/13/2015 05:29 PM, Paul Walmsley wrote:
+> Hi Suman,
+> 
+> thanks for pitching in on this!
+> 
+> On Tue, 6 Jan 2015, Suman Anna wrote:
+> 
+>> You have removed the return from the above block on failure. If any DT
+>> entry doesn't have the reg property, this will hang the kernel boot.
+>> Just remove the "reg" entry from any of the existing DT, and you will
+>> run into the issue, this is what 6423d6df1440 ("ARM: OMAP2+: hwmod:
+>> check for module address space during init") fixed. 
+> 
+> Seems like that's the problem that we need to track down, then.  If a 
+> hwmod has no MPU-accessible registers, it should still be possible to 
+> init the clocks for the device, etc. ...
 
-Acked-by: Bo Shen <voice.shen@atmel.com>
+Yes true, and I should have rephrased above statement a little better -
+its for modules with sysc but with no reg property to supply the base
+for the module's SYSCONFIG or SYSSTATUS registers. The commit
+6423d6df1440 has the explanation for the hang.
 
-> ---
->   sound/soc/atmel/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-> index fb3878312bf8..1579e994acf8 100644
-> --- a/sound/soc/atmel/Kconfig
-> +++ b/sound/soc/atmel/Kconfig
-> @@ -45,7 +45,7 @@ config SND_ATMEL_SOC_WM8904
->
->   config SND_AT91_SOC_SAM9X5_WM8731
->   	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
-> -	depends on ATMEL_SSC && SND_ATMEL_SOC && SOC_AT91SAM9X5
-> +	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC
->   	select SND_ATMEL_SOC_SSC
->   	select SND_ATMEL_SOC_DMA
->   	select SND_SOC_WM8731
->
+> 
+>> Also, are you sure you want to turn the WARN into a pr_debug, it won't 
+>> even show during the kernel boot log if the reg base is missing.
+> 
+> No, I'm not sure :-)  I guess it depends how many hwmods we'll have with 
+> no MPU-accessible registers.  We don't seem to have address ranges for the 
+> interconnects defined; we could fix that fairly easily.
 
-Best Regards
-Bo Shen
+The WARN_ON previously was to throw a eye-catchy print for the case
+where hwmods have sysc but no address space defined (is an error
+usually, but this is what we run into during the DT conversion of a
+device as the hwmod and DTS changes come in through separate topic
+branches).  I still think that the sysc check should be before the check
+for _HWMOD_NO_MPU_PORT, a module with sysc mandates it has an MPU port.
+
+regards
+Suman
