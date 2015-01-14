@@ -1,237 +1,234 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 14 Jan 2015 16:31:21 +0000
-Subject: [PATCH v7 17/20] arm64: KVM: add SGI generation register emulation
+Date: Wed, 14 Jan 2015 16:31:22 +0000
+Subject: [PATCH v7 18/20] arm/arm64: KVM: enable kernel side of GICv3 emulation
 In-Reply-To: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
 References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1421253084-9663-18-git-send-email-andre.przywara@arm.com>
+Message-ID: <1421253084-9663-19-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the generation of a (virtual) inter-processor interrupt (SGI)
-on a GICv2 works by writing to a MMIO register, GICv3 uses the system
-register ICC_SGI1R_EL1 to trigger them.
-Add a trap handler function that calls the new SGI register handler
-in the GICv3 code. As ICC_SRE_EL1.SRE at this point is still always 0,
-this will not trap yet, but will only be used later when all the data
-structures have been initialized properly.
+With all the necessary GICv3 emulation code in place, we can now
+connect the code to the GICv3 backend in the kernel.
+The LR register handling is different depending on the emulated GIC
+model, so provide different implementations for each.
+Also allow non-v2-compatible GICv3 implementations (which don't
+provide MMIO regions for the virtual CPU interface in the DT), but
+restrict those hosts to support GICv3 guests only.
+If the device tree provides a GICv2 compatible GICV resource entry,
+but that one is faulty, just disable the GICv2 emulation and let the
+user use at least the GICv3 emulation for guests.
+To provide proper support for the legacy KVM_CREATE_IRQCHIP ioctl,
+note virtual GICv2 compatibility in struct vgic_params and use it
+on creating a VGICv2.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v6...v7:
- (none)
+- introduce can_emulate_gicv2 to check KVM_CREATE_IRQCHIP
+- adapt to new prototype of vgic_vx_init_emulation
 
 Changelog v5...v6:
-- add sysreg trapping for 32-bit guests
+- allow GICv3 emulation in case of invalid GICv2 DT compat entries
+- use new kvm_check_device_type()
 
 Changelog v4...v5:
-- fix merge conflict due to 3.18.0 rebase
-- minor style changes and comments fixes
+- minor whitespace and comments fixes
 
 Changelog v3...v4:
-- moved addition of vgic_v3_dispatch_sgi() from earlier patch into here
-- move MPIDR comparison into extra function
-- use new ICC_SGI1R_ field names
-- improve readability of vgic_v3_dispatch_sgi()
-- add and refine comments
+- handle differences between GICv2-on-v3 and GICv3-on-v3 in existing functions
+- remove init_*_emul() functions
+- remove max_vcpus setting (done in earlier patches now)
+- adapt to new vgic_v<n>_init_emulation behaviour
 
- arch/arm64/kvm/sys_regs.c   |   27 +++++++++++
- include/kvm/arm_vgic.h      |    1 +
- virt/kvm/arm/vgic-v3-emul.c |  111 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 139 insertions(+)
+ include/kvm/arm_vgic.h |    2 ++
+ virt/kvm/arm/vgic-v2.c |    1 +
+ virt/kvm/arm/vgic-v3.c |   76 ++++++++++++++++++++++++++++++++----------------
+ virt/kvm/arm/vgic.c    |   14 +++++++++
+ 4 files changed, 68 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 136e679..8c30f26 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -165,6 +165,27 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
-+/*
-+ * Trap handler for the GICv3 SGI generation system register.
-+ * Forward the request to the VGIC emulation.
-+ * The cp15_64 code makes sure this automatically works
-+ * for both AArch64 and AArch32 accesses.
-+ */
-+static bool access_gic_sgi(struct kvm_vcpu *vcpu,
-+			   const struct sys_reg_params *p,
-+			   const struct sys_reg_desc *r)
-+{
-+	u64 val;
-+
-+	if (!p->is_write)
-+		return read_from_write_only(vcpu, p);
-+
-+	val = *vcpu_reg(vcpu, p->Rt);
-+	vgic_v3_dispatch_sgi(vcpu, val);
-+
-+	return true;
-+}
-+
- static bool trap_raz_wi(struct kvm_vcpu *vcpu,
- 			const struct sys_reg_params *p,
- 			const struct sys_reg_desc *r)
-@@ -434,6 +455,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
- 	  NULL, reset_val, VBAR_EL1, 0 },
- 
-+	/* ICC_SGI1R_EL1 */
-+	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
-+	  access_gic_sgi },
- 	/* ICC_SRE_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
- 	  trap_raz_wi },
-@@ -666,6 +690,8 @@ static const struct sys_reg_desc cp14_64_regs[] = {
-  * register).
-  */
- static const struct sys_reg_desc cp15_regs[] = {
-+	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
-+
- 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
- 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
- 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
-@@ -713,6 +739,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 
- static const struct sys_reg_desc cp15_64_regs[] = {
- 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
-+	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
- 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
- };
- 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 98c3016..b9b2e05 100644
+index b9b2e05..39039d5 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -307,6 +307,7 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level);
-+void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		      struct kvm_exit_mmio *mmio);
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index 8db1db5..2d2199d 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -841,6 +841,117 @@ void vgic_v3_init_emulation(struct kvm *kvm)
- 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
- }
+@@ -134,6 +134,8 @@ struct vgic_params {
+ 	/* Virtual control interface base address */
+ 	void __iomem	*vctrl_base;
+ 	int		max_gic_vcpus;
++	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
++	bool		can_emulate_gicv2;
+ };
  
-+/*
-+ * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
-+ * generation register ICC_SGI1R_EL1) with a given VCPU.
-+ * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
-+ * return -1.
-+ */
-+static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
-+{
-+	unsigned long affinity;
-+	int level0;
+ struct vgic_vm_ops {
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index e8b82b2..a0a7b5d 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -229,6 +229,7 @@ int vgic_v2_probe(struct device_node *vgic_node,
+ 		goto out_unmap;
+ 	}
+ 
++	vgic->can_emulate_gicv2 = true;
+ 	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
+ 
+ 	vgic->vcpu_base = vcpu_res.start;
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index 5249048..3a62d8a 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -34,6 +34,7 @@
+ #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+ #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+ #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
++#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+ 
+ /*
+  * LRs are stored in reverse order in memory. make sure we index them
+@@ -48,12 +49,17 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 	struct vgic_lr lr_desc;
+ 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+ 
+-	lr_desc.irq	= val & GICH_LR_VIRTUALID;
+-	if (lr_desc.irq <= 15)
+-		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
+ 	else
+-		lr_desc.source = 0;
+-	lr_desc.state	= 0;
++		lr_desc.irq = val & GICH_LR_VIRTUALID;
 +
-+	/*
-+	 * Split the current VCPU's MPIDR into affinity level 0 and the
-+	 * rest as this is what we have to compare against.
-+	 */
-+	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
-+	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
-+	affinity &= ~MPIDR_LEVEL_MASK;
++	lr_desc.source = 0;
++	if (lr_desc.irq <= 15 &&
++	    vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
++		lr_desc.source = (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
 +
-+	/* bail out if the upper three levels don't match */
-+	if (sgi_aff != affinity)
-+		return -1;
-+
-+	/* Is this VCPU's bit set in the mask ? */
-+	if (!(sgi_cpu_mask & BIT(level0)))
-+		return -1;
-+
-+	return level0;
-+}
-+
-+#define SGI_AFFINITY_LEVEL(reg, level) \
-+	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
-+	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
-+
-+/**
-+ * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
-+ * @vcpu: The VCPU requesting a SGI
-+ * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
-+ *
-+ * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
-+ * This will trap in sys_regs.c and call this function.
-+ * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
-+ * target processors as well as a bitmask of 16 Aff0 CPUs.
-+ * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
-+ * check for matching ones. If this bit is set, we signal all, but not the
-+ * calling VCPU.
-+ */
-+void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
-+{
-+	struct kvm *kvm = vcpu->kvm;
-+	struct kvm_vcpu *c_vcpu;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	u16 target_cpus;
-+	u64 mpidr;
-+	int sgi, c;
-+	int vcpu_id = vcpu->vcpu_id;
-+	bool broadcast;
-+	int updated = 0;
-+
-+	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
-+	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
-+	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
-+	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
-+	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
-+	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
-+
-+	/*
-+	 * We take the dist lock here, because we come from the sysregs
-+	 * code path and not from the MMIO one (which already takes the lock).
-+	 */
-+	spin_lock(&dist->lock);
-+
-+	/*
-+	 * We iterate over all VCPUs to find the MPIDRs matching the request.
-+	 * If we have handled one CPU, we clear it's bit to detect early
-+	 * if we are already finished. This avoids iterating through all
-+	 * VCPUs when most of the times we just signal a single VCPU.
-+	 */
-+	kvm_for_each_vcpu(c, c_vcpu, kvm) {
-+
-+		/* Exit early if we have dealt with all requested CPUs */
-+		if (!broadcast && target_cpus == 0)
-+			break;
-+
-+		 /* Don't signal the calling VCPU */
-+		if (broadcast && c == vcpu_id)
-+			continue;
-+
-+		if (!broadcast) {
-+			int level0;
-+
-+			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
-+			if (level0 == -1)
-+				continue;
-+
-+			/* remove this matching VCPU from the mask */
-+			target_cpus &= ~BIT(level0);
-+		}
-+
-+		/* Flag the SGI as pending */
-+		vgic_dist_irq_set_pending(c_vcpu, sgi);
-+		updated = 1;
-+		kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
-+	}
-+	if (updated)
-+		vgic_update_state(vcpu->kvm);
-+	spin_unlock(&dist->lock);
-+	if (updated)
-+		vgic_kick_vcpus(vcpu->kvm);
-+}
-+
- static int vgic_v3_create(struct kvm_device *dev, u32 type)
++	lr_desc.state = 0;
+ 
+ 	if (val & ICH_LR_PENDING_BIT)
+ 		lr_desc.state |= LR_STATE_PENDING;
+@@ -68,8 +74,20 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+ 			   struct vgic_lr lr_desc)
  {
- 	return kvm_vgic_create(dev->kvm, type);
+-	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
+-		      lr_desc.irq);
++	u64 lr_val;
++
++	lr_val = lr_desc.irq;
++
++	/*
++	 * Currently all guest IRQs are Group1, as Group0 would result
++	 * in a FIQ in the guest, which it wouldn't expect.
++	 * Eventually we want to make this configurable, so we may revisit
++	 * this in the future.
++	 */
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		lr_val |= ICH_LR_GROUP;
++	else
++		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
+ 
+ 	if (lr_desc.state & LR_STATE_PENDING)
+ 		lr_val |= ICH_LR_PENDING_BIT;
+@@ -154,7 +172,15 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 	 */
+ 	vgic_v3->vgic_vmcr = 0;
+ 
+-	vgic_v3->vgic_sre = 0;
++	/*
++	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
++	 * way, so we force SRE to 1 to demonstrate this to the guest.
++	 * This goes with the spec allowing the value to be RAO/WI.
++	 */
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
++	else
++		vgic_v3->vgic_sre = 0;
+ 
+ 	/* Get the show on the road... */
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+@@ -209,34 +235,34 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 	 * maximum of 16 list registers. Just ignore bit 4...
+ 	 */
+ 	vgic->nr_lr = (ich_vtr_el2 & 0xf) + 1;
++	vgic->can_emulate_gicv2 = false;
+ 
+ 	if (of_property_read_u32(vgic_node, "#redistributor-regions", &gicv_idx))
+ 		gicv_idx = 1;
+ 
+ 	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
+ 	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
+-		kvm_err("Cannot obtain GICV region\n");
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+-	if (!PAGE_ALIGNED(vcpu_res.start)) {
+-		kvm_err("GICV physical address 0x%llx not page aligned\n",
++		kvm_info("GICv3: no GICV resource entry\n");
++		vgic->vcpu_base = 0;
++	} else if (!PAGE_ALIGNED(vcpu_res.start)) {
++		pr_warn("GICV physical address 0x%llx not page aligned\n",
+ 			(unsigned long long)vcpu_res.start);
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+-	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+-		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
++		vgic->vcpu_base = 0;
++	} else if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
++		pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+ 			(unsigned long long)resource_size(&vcpu_res),
+ 			PAGE_SIZE);
+-		ret = -ENXIO;
+-		goto out;
++		vgic->vcpu_base = 0;
++	} else {
++		vgic->vcpu_base = vcpu_res.start;
++		vgic->can_emulate_gicv2 = true;
++		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++					KVM_DEV_TYPE_ARM_VGIC_V2);
+ 	}
+-	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (vgic->vcpu_base == 0)
++		kvm_info("disabling GICv2 emulation\n");
++	kvm_register_device_ops(&kvm_arm_vgic_v3_ops, KVM_DEV_TYPE_ARM_VGIC_V3);
+ 
+-	vgic->vcpu_base = vcpu_res.start;
+ 	vgic->vctrl_base = NULL;
+ 	vgic->type = VGIC_V3;
+ 	vgic->max_gic_vcpus = KVM_MAX_VCPUS;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 6d23e57..2efba82 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1550,6 +1550,11 @@ static int init_vgic_model(struct kvm *kvm, int type)
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+ 		vgic_v2_init_emulation(kvm);
+ 		break;
++#ifdef CONFIG_ARM_GIC_V3
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
++		vgic_v3_init_emulation(kvm);
++		break;
++#endif
+ 	default:
+ 		return -ENODEV;
+ 	}
+@@ -1573,6 +1578,15 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	}
+ 
+ 	/*
++	 * This function is also called by the KVM_CREATE_IRQCHIP handler,
++	 * which had no chance yet to check the availability of the GICv2
++	 * emulation. So check this here again. KVM_CREATE_DEVICE does
++	 * the proper checks already.
++	 */
++	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 && !vgic->can_emulate_gicv2)
++		return -ENODEV;
++
++	/*
+ 	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
+ 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
+ 	 * that no other VCPUs are run while we create the vgic.
 -- 
 1.7.9.5
