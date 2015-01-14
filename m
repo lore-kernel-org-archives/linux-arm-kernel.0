@@ -1,73 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 14 Jan 2015 12:35:56 +0100
-Subject: [PATCH 2/2] ARM: mediatek: dts: Add uart to mt6592
-In-Reply-To: <1421235356-6631-1-git-send-email-matthias.bgg@gmail.com>
-References: <1421235356-6631-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1421235356-6631-2-git-send-email-matthias.bgg@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Jan 2015 12:40:58 +0100
+Subject: [PATCH 1/2] pinctrl: exynos: Add AUDIO pin controller for exynos7
+In-Reply-To: <1418994659-5222-2-git-send-email-padma.v@samsung.com>
+References: <1418994659-5222-1-git-send-email-padma.v@samsung.com>
+ <1418994659-5222-2-git-send-email-padma.v@samsung.com>
+Message-ID: <CACRpkdZopjCN_GMEPQFd_NWa0Ddocqt3aViLrZ7Yh3ui_YcBAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the uart ports and the uart clock to Mediateks
-mt6592 SoC.
+On Fri, Dec 19, 2014 at 2:10 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/boot/dts/mt6592.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+> Audio IPs on Exynos7 require gpios available in AUDIO
+> pin controller block. So adding the AUDIO pinctrl support.
+>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+(...)
+> --- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+> @@ -181,6 +181,7 @@ Aliases for controllers compatible with "samsung,exynos7-pinctrl":
+>  - pinctrl6: pin controller of FSYS0 block,
+>  - pinctrl7: pin controller of FSYS1 block,
+>  - pinctrl8: pin controller of BUS1 block,
+> +- pinctrl9: pin controller of AUDIO block,
 
-diff --git a/arch/arm/boot/dts/mt6592.dtsi b/arch/arm/boot/dts/mt6592.dtsi
-index 67c8174..c69201f 100644
---- a/arch/arm/boot/dts/mt6592.dtsi
-+++ b/arch/arm/boot/dts/mt6592.dtsi
-@@ -78,6 +78,12 @@
- 		#clock-cells = <0>;
- 	};
- 
-+	uart_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
- 	timer: timer at 10008000 {
- 		compatible = "mediatek,mt6577-timer";
- 		reg = <0x10008000 0x80>;
-@@ -102,4 +108,36 @@
- 		reg = <0x10211000 0x1000>,
- 		      <0x10212000 0x1000>;
- 	};
-+
-+	uart0: serial at 11002000 {
-+		compatible = "mediatek,mt6577-uart";
-+		reg = <0x11002000 0x400>;
-+		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		status = "disabled";
-+	};
-+
-+	uart1: serial at 11003000 {
-+		compatible = "mediatek,mt6577-uart";
-+		reg = <0x11003000 0x400>;
-+		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		status = "disabled";
-+	};
-+
-+	uart2: serial at 11004000 {
-+		compatible = "mediatek,mt6577-uart";
-+		reg = <0x11004000 0x400>;
-+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		status = "disabled";
-+	};
-+
-+	uart3: serial at 11005000 {
-+		compatible = "mediatek,mt6577-uart";
-+		reg = <0x11005000 0x400>;
-+		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		status = "disabled";
-+	};
- };
--- 
-1.9.1
+This doesn't apply at all, the list has never been in the document merged
+upstream.
+
+Please prepare this patch rebased on a *CLEAN* upstream tree
+and resend.
+
+Include Tomasz ACK on your repost.
+
+Yours,
+Linus Walleij
