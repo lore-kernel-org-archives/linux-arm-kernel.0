@@ -1,104 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Jan 2015 09:27:36 -0800
-Subject: [PATCH 2/7] ARM: OMAP2+: Fix error handling for
- omap2_clk_enable_init_clocks
-In-Reply-To: <20150114012148.GE18523@saruman>
-References: <1421190837-4692-1-git-send-email-tony@atomide.com>
- <1421190837-4692-3-git-send-email-tony@atomide.com>
- <20150114012148.GE18523@saruman>
-Message-ID: <20150114172736.GN2419@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 14 Jan 2015 17:36:39 +0000
+Subject: [RFC PATCH v3 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <2298510.9qAQRQ2lzi@wuerfel>
+References: <1420011208-7051-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <3372289.4AUgcSNZN5@wuerfel>
+ <CAFpQJXUB8=XhmAn9-SPKaRHoTaTDynfD8xd-mVJOYrAwo50Rzg@mail.gmail.com>
+ <2298510.9qAQRQ2lzi@wuerfel>
+Message-ID: <20150114173639.GA11844@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150113 17:25]:
-> On Tue, Jan 13, 2015 at 03:13:52PM -0800, Tony Lindgren wrote:
-> > We need to check if we got the clock before trying to do anything
-> > with it. Otherwise we will get something like this:
+On Wed, Jan 07, 2015 at 08:18:50AM +0000, Arnd Bergmann wrote:
+> On Wednesday 07 January 2015 12:37:51 Ganapatrao Kulkarni wrote:
+> > Hi Arnd,
 > > 
-> > Unable to handle kernel paging request at virtual address fffffffe
-> > ...
-> > [<c04bef78>] (clk_prepare) from [<c00338a4>] (omap2_clk_enable_init_clocks+0x50/0x8)
-> > [<c00338a4>] (omap2_clk_enable_init_clocks) from [<c0876838>] (dm816x_dt_clk_init+0)
-> > ...
-> > 
-> > Let's add check for the clock and WARN if the init clock was not
-> > found.
-> > 
-> > Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > On Wed, Jan 7, 2015 at 1:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Tuesday 06 January 2015 15:04:26 Ganapatrao Kulkarni wrote:
+> > >> On Sat, Jan 3, 2015 at 2:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >> > On Wednesday 31 December 2014 13:03:27 Ganapatrao Kulkarni wrote:
+> > >> >> +             cpu at 00f {
+> > >> >> +                     device_type = "cpu";
+> > >> >> +                     compatible = "cavium,thunder", "arm,armv8";
+> > >> >> +                     reg = <0x0 0x00f>;
+> > >> >> +                     enable-method = "psci";
+> > >> >> +                     arm,associativity = <0 0 0x00f>;
+> > >> >> +             };
+> > >> >> +             cpu at 100 {
+> > >> >> +                     device_type = "cpu";
+> > >> >> +                     compatible = "cavium,thunder", "arm,armv8";
+> > >> >> +                     reg = <0x0 0x100>;
+> > >> >> +                     enable-method = "psci";
+> > >> >> +                     arm,associativity = <0 0 0x100>;
+> > >> >> +             };
+> > >> >
+> > >> > What is the 0x100 offset in the last-level topology field? Does this have
+> > >> > no significance to topology at all? I would expect that to be something
+> > >> > like cluster number that is relevant to caching and should be represented
+> > >> > as a separate level.
+> > >>
+> > >> i did not understand, can you please explain little more about "
+> > >> should be represented as a separate level."
+> > >> at present, i have put the hwid of a cpu.
+> > >
+> > > From what I undertand, the hwid of the CPU contains the "cluster" number in
+> > > this bit position, so you typically have a shared L2 or L3 cache between
+> > > all cores within a cluster, but separate caches in other clusters.
+> > >
+> > > If this is the case, there will be a measurable difference in performance
+> > > between two processes sharing memory when running on the same cluster,
+> > > or when running on different clusters on the same socket. If the
+> > > performance difference is relevant, it should be described as a separate
+> > > level in the associativity property.
+> > you mean, the associativity as array of  <board> <socket> <cluster>
 > 
-> Just one minor nit below, other than that:
+> No, that would leave out the core number, which is required to identify
+> the individual thread. I meant adding an extra level such as
 > 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> <board> <socket> <cluster> <core>
 > 
-> > ---
-> >  arch/arm/mach-omap2/clock.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-> > index 6ad5b4d..89a0732 100644
-> > --- a/arch/arm/mach-omap2/clock.c
-> > +++ b/arch/arm/mach-omap2/clock.c
-> > @@ -620,6 +620,11 @@ void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks)
-> >  
-> >  	for (i = 0; i < num_clocks; i++) {
-> >  		init_clk = clk_get(NULL, clk_names[i]);
-> > +		if (IS_ERR(init_clk)) {
-> > +			WARN(1, "omap clock: could not find init clock %s\n",
-> > +			     clk_names[i]);
-> 
-> you can combine the if with the WARN():
-> 
-> 		if (WARN(IS_ERR(init_clk), "could not find init clock %s\n",
-> 			clk_names[i]))
-> 
-> not that I also removed that "omap clock" prefix because WARN() will
-> print the file name anyway.
-> 
-> > +			continue;
-> > +		}
-> >  		clk_prepare_enable(init_clk);
-> >  	}
-> >  }
+> A lot of machines will leave out the <board> number because they are
+> built with SoCs that don't have a long-distance coherency protocol.
 
-Sure makes sense to me. Updated patch below.
+Can't we use phandles to cpu-map nodes instead of a list of numbers (and
+yet another topology binding description) ?
 
-Regards,
+Is arm,associativity used solely to map "devices" (inclusive of caches)
+to a set of cpus ?
 
-Tony
+cpu-map misses a notion of distance between hierarchy layers, but we can
+add to that.
 
-8< -------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 22 Dec 2014 08:19:07 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix error handling for omap2_clk_enable_init_clocks
-
-We need to check if we got the clock before trying to do anything
-with it. Otherwise we will get something like this:
-
-Unable to handle kernel paging request at virtual address fffffffe
-...
-[<c04bef78>] (clk_prepare) from [<c00338a4>] (omap2_clk_enable_init_clocks+0x50/0x8)
-[<c00338a4>] (omap2_clk_enable_init_clocks) from [<c0876838>] (dm816x_dt_clk_init+0)
-...
-
-Let's add check for the clock and WARN if the init clock was not
-found.
-
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -620,6 +620,9 @@ void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks)
- 
- 	for (i = 0; i < num_clocks; i++) {
- 		init_clk = clk_get(NULL, clk_names[i]);
-+		if (WARN(IS_ERR(init_clk), "could not find init clock %s\n",
-+				clk_names[i]))
-+			continue;
- 		clk_prepare_enable(init_clk);
- 	}
- }
+Lorenzo
