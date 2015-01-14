@@ -1,50 +1,49 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 14 Jan 2015 21:25:54 +0800
-Subject: [GIT PULL] CSR new atlas7 machine,
- and delete old marco machine for 3.20
-Message-ID: <CAGsJ_4z=SOxGAcr_2BizVUvxY8NOx1swpHoSJVCPJ5xn7dh6vQ@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 14 Jan 2015 22:32:49 +0900
+Subject: [PATCH v4 0/2] mmc: dw_mmc: exynos: Add HS400 support
+In-Reply-To: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
+References: <1421231446-4776-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <54B67001.2090002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Hi, Alim.
 
-The following changes since commit 98898ee43a94375cf814b86fb7f485c39fb2c072:
+On 01/14/2015 07:30 PM, Alim Akhtar wrote:
+> This adds HS400 mode support for exynos dw_mmc host controller.
+> 
+> Currently tested on Exynos5800-peach-pi platform for HS400 mode.
+> Tested HS200 mode with this series applied, HS200 still works.
+> 
+> Appreciate testing on other exynos5/7 platform which supports emmc5.0
 
-  ARM: sirf: add two debug ports for CSRatlas7 SoC (2015-01-14 20:56:09 +0800)
+I will test this patch on exynos5/7 board.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-tags/new-atlas7mach-for-3.20
-
-for you to fetch changes up to 031a1a58513801a319f45f6ac1233605b13aefd2:
-
-  ARM: sirf: add Atlas7 machine support (2015-01-14 21:09:24 +0800)
-
-----------------------------------------------------------------
-drop CSR Marco machine and add Atlas7 new machine
-
-This is the init support for CSR Atlas7 new SoC. Old Marco has never
-shipped to customers and been dropped.
-
-----------------------------------------------------------------
-Barry Song (3):
-      ARM: sirf: drop Marco support in reset controller module
-      ARM: sirf: drop Marco machine
-      ARM: sirf: move to debug_ll_io_init and drop map_io
-
-Zhiwu Song (2):
-      ARM: sirf: move platsmp to support Atlas7 SoC
-      ARM: sirf: add Atlas7 machine support
-
- arch/arm/mach-prima2/Kconfig    |   22 +++++++++--------
- arch/arm/mach-prima2/Makefile   |    1 -
- arch/arm/mach-prima2/common.c   |   22 ++++-------------
- arch/arm/mach-prima2/lluart.c   |   33 -------------------------
- arch/arm/mach-prima2/platsmp.c  |   52 ++++++++++-----------------------------
- arch/arm/mach-prima2/rstc.c     |   41 +++++++++---------------------
- arch/arm/mach-prima2/rtciobrg.c |    1 -
- 7 files changed, 42 insertions(+), 130 deletions(-)
- delete mode 100644 arch/arm/mach-prima2/lluart.c
-
--barry
+Best Regards,
+Jaehoon Chung
+> 
+> Changes in V4:
+> 	* drop the idea of changing existing binding for ciu_div as per [1]
+>         * addressed comments from Jaehoon Chung [2]
+> 
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg40923.html
+> [2] http://www.spinics.net/lists/devicetree/msg64373.html
+> 
+> Changes in V3:
+> 	rebased on ulf's next (commit: 607b448 mmc: core: Make tuning block patterns static)
+> 
+> Seungwon Jeon (2):
+>   mmc: dw_mmc: exynos: Support eMMC's HS400 mode
+>   ARM: dts: Add HS400 support for exynos5420 and exynos5800
+> 
+>  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    7 +
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |    7 +
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |    4 +-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 +-
+>  drivers/mmc/host/dw_mmc-exynos.c                   |  187 ++++++++++++++++----
+>  drivers/mmc/host/dw_mmc-exynos.h                   |   19 +-
+>  drivers/mmc/host/dw_mmc.c                          |   16 +-
+>  drivers/mmc/host/dw_mmc.h                          |    2 +
+>  9 files changed, 212 insertions(+), 38 deletions(-)
+> 
