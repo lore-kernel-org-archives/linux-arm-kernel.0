@@ -1,59 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Jan 2015 20:30:08 +0100
-Subject: [PATCH v3 4/9] ARM: dts: sun7i: cubieboard2: add axp209
- regulator nodes
-In-Reply-To: <CAGb2v65=Jfr56Yb2udNVy=shA9+AOPK9yjHTAOJZ7TFh5idTHA@mail.gmail.com>
-References: <1421037249-28461-1-git-send-email-wens@csie.org>
- <1421037249-28461-5-git-send-email-wens@csie.org>
- <20150112090603.GE4891@lukather>
- <CAGb2v66r6EG2F1-=Gaig7ZW58Z1KteQ5nDPfW5niisv7dCjY0Q@mail.gmail.com>
- <20150113094036.GR4891@lukather>
- <CAGb2v65=Jfr56Yb2udNVy=shA9+AOPK9yjHTAOJZ7TFh5idTHA@mail.gmail.com>
-Message-ID: <20150114193008.GD4891@lukather>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 14 Jan 2015 11:42:53 -0800
+Subject: [PATCH v10] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <20141216094527.GC6580@arm.com> (Will Deacon's message of "Tue,
+ 16 Dec 2014 09:45:27 +0000")
+References: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
+ <20141216094527.GC6580@arm.com>
+Message-ID: <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 06:30:51PM +0800, Chen-Yu Tsai wrote:
-> >> You could probably chain the regulators in the DT via xxx-supply
-> >> if it helps. But beyond that, it is hard to do anything meaningful
-> >> at this point. Modeling them as fixed regulators beyond our control
-> >> is simpler. We also do not have an IPSOUT regulator for the AXP.
-> >>
-> >> > Eventually, I think we would be able to remove
-> >> > sunxi-common-regulators.dtsi, or at least, expose the proper regulator
-> >> > hierarchy.
-> >>
-> >> The USB and SATA regulators are just GPIO enabled switches (MOSFETs)
-> >> or current limiters. I think these will always exist because of the
-> >> reference designs. Or do you want to move them back into the board
-> >> dts files? FWIW, I like it the way it is now. Not that I don't like
-> >> it to be accurate.
-> >
-> > At least providing the right hierarchy at the board level would be
-> > great. Adding the -supply property to all our fixed regulators
-> > wouldn't take too much code, and would be enough to model properly the
-> > regulator trees.
-> 
-> These are all unrelated to axp209. You'd end up with
-> 
->     vin-supply = <&reg_vcc5v>;
-> 
-> for the usb and sata power regulators. You could put these
-> in sunxi-common-regulators, and override them for boards
-> that actually have something controllable.
+On Tue, Dec 16 2014 at 01:45:27 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Dec 15, 2014 at 11:47:23PM +0000, Mitchel Humpherys wrote:
+>> From: Matt Wagantall <mattw@codeaurora.org>
+>> 
+>> It is sometimes necessary to poll a memory-mapped register until its value
+>> satisfies some condition. Introduce a family of convenience macros that do
+>> this. Tight-looping, sleeping, and timing out can all be accomplished using
+>> these macros.
+>> 
+>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> Cc: Robert Elliott <elliott@hp.com>
+>> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+>> ---
+>> v9..10:
+>>   - Actually added the comments mentioned in v8..v9 (doh!)
+>> 
+>> v8..v9:
+>>   - Added note in comments about max sleep time (Rob Elliott)
+>> 
+>> v7..v8:
+>>   - sorted helper macros by size (b, w, l, q)
+>>   - removed some of the more esoteric (or flat-out bogus) helper macros
+>> 
+>> This patch was originally part of a series [1] for adding support for IOMMU
+>> address translations through an ARM SMMU hardware register.  The other
+>> patch in the series (the one that actually uses these macros and implements
+>> said hardware address translations) was Ack'd by the driver maintainer
+>> there (Will Deacon) so I've pulled this patch out to avoid resending an
+>> already Ack'd patch over and over again.
+>> 
+>> In short, please see [1] for previous discussion and the first user of
+>> these macros.
+>> 
+>> Will also acked this patch in [2].  I didn't retain his Ack here because I
+>> added to the macro comments.
+>
+> You can keep the ack, it still looks good to me and I'm not really fussed
+> about the comments.
+>
+> Will
 
-Ok. Fine then.
+This hasn't gotten any further comments.  Would someone be willing to
+take it?
 
-Maxime
+Joerg, maybe you could take this through the IOMMU tree since the first
+user is an IOMMU driver?  Currently we can't move [1] forward because of
+this dependency...
+
+[1] http://thread.gmane.org/gmane.linux.kernel.iommu/7837
+
+
+-Mitch
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/387122b6/attachment.sig>
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
