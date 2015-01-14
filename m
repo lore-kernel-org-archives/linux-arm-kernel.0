@@ -1,121 +1,256 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Wed, 14 Jan 2015 11:07:13 -0500
-Subject: sysfs topology for arm64 cluster_id
-In-Reply-To: <54B5BC84.8090603@redhat.com>
-References: <54B5BC84.8090603@redhat.com>
-Message-ID: <54B69431.8090702@redhat.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Jan 2015 17:10:26 +0100
+Subject: [RFC PATCH v2 3/4] serial: at91: Use helpers for gpio irqs
+In-Reply-To: <CACQ1gAjS4TG82VzphC5Hd44SekJv8M322x7dvf91m-n-VqN_=A@mail.gmail.com>
+References: <1420900366-9169-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1420900366-9169-3-git-send-email-j.uzycki@elproma.com.pl>
+ <CACQ1gAjS4TG82VzphC5Hd44SekJv8M322x7dvf91m-n-VqN_=A@mail.gmail.com>
+Message-ID: <54B694F2.7010507@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2015 07:47 PM, Jon Masters wrote:
-> Hi Folks,
->
-> TLDR: I would like to consider the value of adding something like
-> "cluster_siblings" or similar in sysfs to describe ARM topology.
->
-> A quick question on intended data representation in /sysfs topology
-> before I ask the team on this end to go down the (wrong?) path. On ARM
-> systems today, we have a hierarchical CPU topology:
->
->                   Socket ---- Coherent Interonnect ---- Socket
->                     |                                    |
->           Cluster0 ... ClusterN                Cluster0 ... ClusterN
->              |             |                      |             |
->        Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
->          |       |      |        |           |       |      |       |
->       T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
->
-> Where we might (or might not) have threads in individual cores (a la SMT
-> - it's allowed in the architecture at any rate) and we group cores
-> together into units of clusters usually 2-4 cores in size (though this
-> varies between implementations, some of which have different but similar
-> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
-> cores). There are multiple clusters per "socket", and there might be an
-> arbitrary number of sockets. We'll start to enable NUMA soon.
->
-> The existing ARM architectural code understands expressing topology in
-> terms of the above, but it doesn't quite map these concepts directly in
-> sysfs (does not expose cluster_ids as an example). Currently, a cpu-map
-> in DeviceTree can expose hierarchies (included nested clusters) and this
-> is parsed at boot time to populate scheduler information, as well as the
-> topology files in sysfs (if that is provided - none of the reference
-> devicetrees upstream do this today, but some exist). But the cluster
-> information itself isn't quite exposed (whereas other whacky
-> architectural concepts such as s390 books are exposed already today).
->
-> Anyway. We have a small problem with tools such as those in util-linux
-> (lscpu) getting confused as a result of translating x86-isms to ARM. For
-> example, the lscpu utility calculates the number of sockets using the
-> following computation:
->
-> nsockets = desc->ncpus / nthreads / ncores
->
-> (number of sockets = total number of online processing elements /
-> threads within a single core / cores within a single socket)
->
-> If you're not careful, you can end up with something like:
->
-> # lscpu
-> Architecture:          aarch64
-> Byte Order:            Little Endian
-> CPU(s):                8
-> On-line CPU(s) list:   0-7
-> Thread(s) per core:    1
-> Core(s) per socket:    2
-> Socket(s):             4
->
-Basically, in the top-most diagram, lscpu (& hwloc) are equating Cluster<N>
-as socket<N>.  I'm curious what the sysfs numa info will be interpreted
-as when/if that is turned on for arm64.
+Le 13/01/2015 17:08, Richard Genoud a ?crit :
+> 2015-01-10 15:32 GMT+01:00 Janusz Uzycki <j.uzycki@elproma.com.pl>:
+>> The patch updates atmel_serial driver to use new mctrl_gpio helpers for
+>> gpio irqs. The code is simpler now.
+>>
+>> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+>> ---
+>>
+>> The patch exists since v2.
+>> Compile-test only - please test it on real hardware.
+>>
+>> ---
+>>  drivers/tty/serial/atmel_serial.c | 123 +++++++-------------------------------
+>>  1 file changed, 20 insertions(+), 103 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 4d848a2..a59a892 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -168,7 +168,6 @@ struct atmel_uart_port {
+>>         struct circ_buf         rx_ring;
+>>
+>>         struct mctrl_gpios      *gpios;
+>> -       int                     gpio_irq[UART_GPIO_MAX];
+>>         unsigned int            tx_done_mask;
+>>         bool                    ms_irq_enabled;
+>>         bool                    is_usart;       /* usart or uart */
+>> @@ -499,24 +498,18 @@ static void atmel_enable_ms(struct uart_port *port)
+>>
+>>         atmel_port->ms_irq_enabled = true;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_CTS] >= 0)
+>> -               enable_irq(atmel_port->gpio_irq[UART_GPIO_CTS]);
+>> -       else
+>> +       mctrl_gpio_enable_ms(atmel_port->gpios);
+>> +
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS))
+>>                 ier |= ATMEL_US_CTSIC;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_DSR] >= 0)
+>> -               enable_irq(atmel_port->gpio_irq[UART_GPIO_DSR]);
+>> -       else
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_DSR))
+>>                 ier |= ATMEL_US_DSRIC;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_RI] >= 0)
+>> -               enable_irq(atmel_port->gpio_irq[UART_GPIO_RI]);
+>> -       else
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_RI))
+>>                 ier |= ATMEL_US_RIIC;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_DCD] >= 0)
+>> -               enable_irq(atmel_port->gpio_irq[UART_GPIO_DCD]);
+>> -       else
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_DCD))
+>>                 ier |= ATMEL_US_DCDIC;
+>>
+>>         UART_PUT_IER(port, ier);
+>> @@ -538,24 +531,18 @@ static void atmel_disable_ms(struct uart_port *port)
+>>
+>>         atmel_port->ms_irq_enabled = false;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_CTS] >= 0)
+>> -               disable_irq(atmel_port->gpio_irq[UART_GPIO_CTS]);
+>> -       else
+>> +       mctrl_gpio_disable_ms(atmel_port->gpios);
+>> +
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_CTS))
+>>                 idr |= ATMEL_US_CTSIC;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_DSR] >= 0)
+>> -               disable_irq(atmel_port->gpio_irq[UART_GPIO_DSR]);
+>> -       else
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_DSR))
+>>                 idr |= ATMEL_US_DSRIC;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_RI] >= 0)
+>> -               disable_irq(atmel_port->gpio_irq[UART_GPIO_RI]);
+>> -       else
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_RI))
+>>                 idr |= ATMEL_US_RIIC;
+>>
+>> -       if (atmel_port->gpio_irq[UART_GPIO_DCD] >= 0)
+>> -               disable_irq(atmel_port->gpio_irq[UART_GPIO_DCD]);
+>> -       else
+>> +       if (!mctrl_gpio_is_gpio(atmel_port->gpios, UART_GPIO_DCD))
+>>                 idr |= ATMEL_US_DCDIC;
+>>
+>>         UART_PUT_IDR(port, idr);
+>> @@ -1161,31 +1148,11 @@ atmel_handle_status(struct uart_port *port, unsigned int pending,
+>>  static irqreturn_t atmel_interrupt(int irq, void *dev_id)
+>>  {
+>>         struct uart_port *port = dev_id;
+>> -       struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>>         unsigned int status, pending, pass_counter = 0;
+>> -       bool gpio_handled = false;
+>>
+>>         do {
+>>                 status = atmel_get_lines_status(port);
+>>                 pending = status & UART_GET_IMR(port);
+>> -               if (!gpio_handled) {
+>> -                       /*
+>> -                        * Dealing with GPIO interrupt
+>> -                        */
+>> -                       if (irq == atmel_port->gpio_irq[UART_GPIO_CTS])
+>> -                               pending |= ATMEL_US_CTSIC;
+>> -
+>> -                       if (irq == atmel_port->gpio_irq[UART_GPIO_DSR])
+>> -                               pending |= ATMEL_US_DSRIC;
+>> -
+>> -                       if (irq == atmel_port->gpio_irq[UART_GPIO_RI])
+>> -                               pending |= ATMEL_US_RIIC;
+>> -
+>> -                       if (irq == atmel_port->gpio_irq[UART_GPIO_DCD])
+>> -                               pending |= ATMEL_US_DCDIC;
+>> -
+>> -                       gpio_handled = true;
+>> -               }
+>>                 if (!pending)
+>>                         break;
+>>
+>> @@ -1665,45 +1632,6 @@ static void atmel_get_ip_name(struct uart_port *port)
+>>         }
+>>  }
+>>
+>> -static void atmel_free_gpio_irq(struct uart_port *port)
+>> -{
+>> -       struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>> -       enum mctrl_gpio_idx i;
+>> -
+>> -       for (i = 0; i < UART_GPIO_MAX; i++)
+>> -               if (atmel_port->gpio_irq[i] >= 0)
+>> -                       free_irq(atmel_port->gpio_irq[i], port);
+>> -}
+>> -
+>> -static int atmel_request_gpio_irq(struct uart_port *port)
+>> -{
+>> -       struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>> -       int *irq = atmel_port->gpio_irq;
+>> -       enum mctrl_gpio_idx i;
+>> -       int err = 0;
+>> -
+>> -       for (i = 0; (i < UART_GPIO_MAX) && !err; i++) {
+>> -               if (irq[i] < 0)
+>> -                       continue;
+>> -
+>> -               irq_set_status_flags(irq[i], IRQ_NOAUTOEN);
+>> -               err = request_irq(irq[i], atmel_interrupt, IRQ_TYPE_EDGE_BOTH,
+>> -                                 "atmel_serial", port);
+>> -               if (err)
+>> -                       dev_err(port->dev, "atmel_startup - Can't get %d irq\n",
+>> -                               irq[i]);
+>> -       }
+>> -
+>> -       /*
+>> -        * If something went wrong, rollback.
+>> -        */
+>> -       while (err && (--i >= 0))
+>> -               if (irq[i] >= 0)
+>> -                       free_irq(irq[i], port);
+>> -
+>> -       return err;
+>> -}
+>> -
+>>  /*
+>>   * Perform initialization and enable port for reception
+>>   */
+>> @@ -1735,7 +1663,7 @@ static int atmel_startup(struct uart_port *port)
+>>         /*
+>>          * Get the GPIO lines IRQ
+>>          */
+>> -       retval = atmel_request_gpio_irq(port);
+>> +       retval = mctrl_gpio_request_irqs(atmel_port->gpios);
+>>         if (retval)
+>>                 goto free_irq;
+>>
+>> @@ -1872,7 +1800,7 @@ static void atmel_shutdown(struct uart_port *port)
+>>          * Free the interrupts
+>>          */
+>>         free_irq(port->irq, port);
+>> -       atmel_free_gpio_irq(port);
+>> +       mctrl_gpio_free_irqs(atmel_port->gpios);
+>>
+>>         atmel_port->ms_irq_enabled = false;
+>>
+>> @@ -2501,24 +2429,13 @@ static int atmel_serial_resume(struct platform_device *pdev)
+>>  #define atmel_serial_resume NULL
+>>  #endif
+>>
+>> -static int atmel_init_gpios(struct atmel_uart_port *p, struct device *dev)
+>> +static bool atmel_init_gpios(struct atmel_uart_port *p)
+>>  {
+>> -       enum mctrl_gpio_idx i;
+>> -       struct gpio_desc *gpiod;
+>> -
+>> -       p->gpios = mctrl_gpio_init(dev, 0);
+>> +       p->gpios = mctrl_gpio_init_dt(&p->uart, 0);
+>>         if (IS_ERR_OR_NULL(p->gpios))
+>> -               return -1;
+>> +               return false;
+>>
+>> -       for (i = 0; i < UART_GPIO_MAX; i++) {
+>> -               gpiod = mctrl_gpio_to_gpiod(p->gpios, i);
+>> -               if (gpiod && (gpiod_get_direction(gpiod) == GPIOF_DIR_IN))
+>> -                       p->gpio_irq[i] = gpiod_to_irq(gpiod);
+>> -               else
+>> -                       p->gpio_irq[i] = -EINVAL;
+>> -       }
+>> -
+>> -       return 0;
+>> +       return true;
+>>  }
+>>
+>>  static int atmel_serial_probe(struct platform_device *pdev)
+>> @@ -2558,8 +2475,8 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>>         port->backup_imr = 0;
+>>         port->uart.line = ret;
+>>
+>> -       ret = atmel_init_gpios(port, &pdev->dev);
+>> -       if (ret < 0)
+>> +       port->uart.dev = &pdev->dev;
+>> +       if (!atmel_init_gpios(port))
+>>                 dev_err(&pdev->dev, "%s",
+>>                         "Failed to initialize GPIOs. The serial port may not work as expected");
+>>
+>> --
+>> 1.7.11.3
+>>
+> 
+> It's ok, no regression found in atmel-serial.
+> Tested on an at91sam9g35, full duplex between 2 serial ports at 57600
+> (one with CTS/RTS handled by the controller, the other with CTS/RTS
+> handled via GPIO).
+> 
+> Tested-by: Richard Genoud <richard.genoud@gmail.com>
 
-> Now we can argue that the system in question needs an updated cpu-map
-> (it'll actually be something ACPI but I'm keeping this discussion to DT
-> to avoid that piece further in discussion, and you can assume I'm
-> booting any test boxes in further work on this using DeviceTree prior to
-> switching the result over to ACPI) but either way, util-linux is
-> thinking in an x86-centric sense of what these files mean. And I think
-> the existing topology/cpu-map stuff in arm64 is doing the same.
->
-The above values are extracted from the MPIDR:Affx fields and is currently
-independent of DT & ACPI.
-The Aff1 field is the 'cluster-id' and is being used to associated cpu's (via cpu masks)
-to siblings. lscpu & hwloc associate cpu-nums & siblings to sockets via the above
-calculation, which doesn't quite show how siblings enter the equation
-       ncores = CPU_COUNT_S(setsize, core_siblings) / nthreads;
+Richard,
 
-Note: in the arm(32) tree, what was 'socket-id' is 'cluster-id' in arm64;
-       I believe this 'mapping' (backporting/association) is one root problem
-       in the arch/arm64/kernel/topology.c code.
+Thanks a lot for having tested this series.
+On my side, it seems good so:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Now, a simple, yet requiring lots of fun, cross-architecture testing, would
-be to change lscpu to use the sysfs physical_package_id to get Socket correct.  Yet,
-that won't fix the above 'Core(s) per socket' because that's being created
-via the sibling masks, which are generated from the cluster-id.
-This change would require arm(64) to implement DT & ACPI methods to
-extract pcpu's to sockets (missing at the moment).
-
-And modifying the cluster-id and/or the siblings masks creates non-topology
-(non-lscpu, non-hwloc) issues like breaking gic init code paths which use
-the cluster-id information as well. ... some 'empirical data' to note
-if anyone thinks it's just a topology-presentation issue.
-
-> Is it not a good idea to expose the cluster details directly in sysfs
-> and have these utilities understand the possible extra level in the
-> calculation? Or do we want to just fudge the numbers (as seems to be the
-> case in some systems I am seeing) to make the x86 model add up?
->
-Short-term, I'm trying to develop a reasonable 'fudge' for lscpu & hwloc,
-that doesn't impact the (proper) operation of the gic code.
-I haven't dug deep enough yet, but this also requires a check on how
-the scheduler associates cpu-cache-sibling associativity when selecting
-optimal cpu to schedule threads on.
-
-> Let me know the preferred course...
->
-> Jon.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Bye,
+-- 
+Nicolas Ferre
