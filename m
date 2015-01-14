@@ -1,47 +1,35 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 14 Jan 2015 11:25:10 -0800
-Subject: [PATCH v6 1/2] mtd: hisilicon: add a new NAND controller driver
- for hisilicon hip04 Soc
-In-Reply-To: <54B6625F.8060607@hisilicon.com>
-References: <1421047734-30818-1-git-send-email-wangzhou1@hisilicon.com>
- <1421047734-30818-2-git-send-email-wangzhou1@hisilicon.com>
- <20150113035844.GJ9759@ld-irv-0074>
- <54B6625F.8060607@hisilicon.com>
-Message-ID: <20150114192510.GY9759@ld-irv-0074>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Jan 2015 17:39:59 +0100
+Subject: [PATCH v3 07/13] ARM: dts: sunxi: Use label to reference pio in
+ sunxi-common-regulators
+In-Reply-To: <1421113055-17867-8-git-send-email-wens@csie.org>
+References: <1421113055-17867-1-git-send-email-wens@csie.org>
+ <1421113055-17867-8-git-send-email-wens@csie.org>
+Message-ID: <20150114163959.GB4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 08:34:39PM +0800, Zhou Wang wrote:
-> On 2015/1/13 11:58, Brian Norris wrote:
-> > On Mon, Jan 12, 2015 at 03:28:53PM +0800, Zhou Wang wrote:
-> >> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> >> +	chip->IO_ADDR_R = chip->IO_ADDR_W = devm_ioremap_resource(dev, res);
-> > 
-> > Hmm, do you really have to reuse IO_ADDR_{R,W} here? Those are only
-> > targeted for NAND systems which have a direct MMIO mapping to the NAND
-> > I/O pins. See nand_base's {read,write}_buf() and read_{byte,word}()
-> > implementations. But you override those.
+On Tue, Jan 13, 2015 at 09:37:29AM +0800, Chen-Yu Tsai wrote:
+> Use the label to reference the pin controller node, so that we can use
+> sunxi-common-regulators with sunxi families that don't share the same
+> address space mappings, such as sun9i.
 > 
-> There is a hardware buffer in this NAND controller, and the buffer can be
-> accessed as MMIO.
+> This patch is mostly space changes due to the reduction of node parents.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Sure.
+Applied, thanks!
 
-> IO_ADDR_R/W just indicates the base address of this buffer.
+Maxime
 
-But I was noting that IO_ADDR_{R,W} actually serve a very particular
-purpose in nand_base.c, which seems distinct from your HW buffer.
-
-> Maybe I need to use a void __iomem pointer stored in my host struct to use
-> this buffer instead of IO_ADDR_R/W as you said below here?
-
-Yes, I think that would be better.
-
-> > It's best if it's obvious if nand_base is somehow inadvertently using
-> > these pointers. So leaving them NULL is helpful.
-> > 
-> > As an alternative, you can just stash another private void __iomem
-> > pointer in you your host struct.
-
-Thanks,
-Brian
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/70e595aa/attachment.sig>
