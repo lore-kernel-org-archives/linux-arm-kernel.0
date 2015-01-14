@@ -1,108 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Jan 2015 11:04:57 +0100
-Subject: [GIT PULL] drm: Add Atmel HLCDC driver
-In-Reply-To: <20150109160342.715d3592@bbrezillon>
-References: <20150109160342.715d3592@bbrezillon>
-Message-ID: <54B63F49.8070504@atmel.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 14 Jan 2015 11:08:06 +0100
+Subject: [PATCH v2 0/3] pinctrl: at91: allow disabled gpio controllers
+Message-ID: <1421230089-1418-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/01/2015 16:03, Boris Brezillon a wrote :
-> Dave, Thierry,
+Hi Linus,
 
-Dave and Thierry,
+I have updated the previous version. I have tried to follow your advice but it
+doesn't seem to be the best solution in my case.
 
-Is it possible for you to consider this pull-request? We would like to
-see it appearing as soon as possible in linux-next.
+You told me to use gpiochip_add_pingroup_range() instead of
+pinctrl_add_gpio_range(). I agree that is the proper way to manage a gap but it
+only solves my issue on gpio side but not on muxing side. I still need some
+fixes. Moreover it involves to add the gpio-ranges property so to update our
+dtsi files so it will break backward compatibility.
 
-Furthermore, we are pretty excited to see this long awaited driver
-running on our AT91 SoCs with a Mainline kernel. We missed several
-kernel releases and as everything seems accepted and well aligned now,
-we are looking forward being reassured by an inclusion of this code in
-the DRM git tree.
+By the way, I would like to be co-maintainer on this driver as it seems the
+maintainer is not very active at the moment.
 
-Thanks, bye.
-  Nicolas.
+Regards
 
+Ludovic
 
-> Here is the pull request for the Atmel HLCDC driver and its
-> dependencies (some modifications to drm/core and drm/panel to define
-> output bus format).
-> 
-> I'm sending a pull request for this driver for several reasons:
-> 
->  * The patch series has been around for 6 months (initial version here
->    [3]), and has seen 9 iterations, taking into account comments made
->    by reviewers.
-> 
->  * It has received several Tested-by by various users/developers.
-> 
->  * It has been Reviewed-by Rob Clark.
-> 
->  * There has been no comment whatsoever since more than a month (see
->    [1] and [2] for the last modified version of these series).
-> 
-> I'll be happy to take comments into account if any. But if there are no
-> more comments, please merge for 3.20.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> [1]https://lkml.org/lkml/2014/12/1/717
-> [2]http://thread.gmane.org/gmane.comp.video.dri.devel/118700
-> [3]https://lkml.org/lkml/2014/6/9/487
-> 
-> The following changes since commit c93546a5e32bd788c22aefa072385f3784551c13:
-> 
->   Merge tag 'topic/atomic-core-2015-01-05' of git://anongit.freedesktop.org/drm-intel into drm-next (2015-01-09 09:22:40 +1000)
-> 
-> are available in the git repository at:
-> 
-> 
->   https://github.com/bbrezillon/linux-at91.git tags/atmel-hlcdc-drm-3.20
-> 
-> for you to fetch changes up to e7f6614add3dc7776abd803be7cbe96b6254b3f5:
-> 
->   drm: add DT bindings documentation for atmel-hlcdc-dc driver (2015-01-09 14:55:08 +0100)
-> 
-> ----------------------------------------------------------------
-> Boris Brezillon (5):
->       drm: add bus_formats and num_bus_formats fields to drm_display_info
->       drm: panel: simple-panel: add support for bus_format retrieval
->       drm: panel: simple-panel: add bus format information for foxlink panel
->       drm: add Atmel HLCDC Display Controller support
->       drm: add DT bindings documentation for atmel-hlcdc-dc driver
-> 
->  .../devicetree/bindings/drm/atmel/hlcdc-dc.txt     |  53 ++
->  drivers/gpu/drm/Kconfig                            |   2 +
->  drivers/gpu/drm/Makefile                           |   1 +
->  drivers/gpu/drm/atmel-hlcdc/Kconfig                |  11 +
->  drivers/gpu/drm/atmel-hlcdc/Makefile               |   7 +
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 406 ++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c       | 579 ++++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       | 213 +++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c    | 667 ++++++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h    | 398 ++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 319 ++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c    | 856 +++++++++++++++++++++
->  drivers/gpu/drm/drm_crtc.c                         |  35 +
->  drivers/gpu/drm/panel/panel-simple.c               |   6 +
->  include/drm/drm_crtc.h                             |   8 +
->  15 files changed, 3561 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> 
-> 
+Ludovic Desroches (3):
+  pinctrl: at91: allow disabled pio controllers
+  ARM: at91/dt: sama5d4: add pioD controller
+  MAINTAINERS: add maintainer for pinctrl-at91
 
+ MAINTAINERS                    |  1 +
+ arch/arm/boot/dts/sama5d4.dtsi | 13 +++++++++++++
+ drivers/pinctrl/pinctrl-at91.c | 30 ++++++++++++++++++++++--------
+ 3 files changed, 36 insertions(+), 8 deletions(-)
 
 -- 
-Nicolas Ferre
+2.2.0
