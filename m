@@ -1,194 +1,271 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Jan 2015 17:29:40 +0800
-Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
- references
-In-Reply-To: <54B62CC8.5010403@redhat.com>
-References: <1421123484-21387-1-git-send-email-wens@csie.org>
- <20150113154415.GY4891@lukather>
- <CAGb2v67sQyNcFQgvm60TUzjp3QBusckvP2i_xkj-eLRZubkALA@mail.gmail.com>
- <20150113162053.GZ4891@lukather> <54B61AD3.2040407@redhat.com>
- <CAGb2v65jZZJoG3z+9Vc460X3kvogwLDze_Jx4pS-xuR=84GBVQ@mail.gmail.com>
- <54B62CC8.5010403@redhat.com>
-Message-ID: <CAGb2v65pFDWnucdP-_fX+JzdWSx9maWCkzc_z1jFcnt=GMxfqA@mail.gmail.com>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Wed, 14 Jan 2015 15:00:47 +0530
+Subject: [PATCH v4 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <1420949002-3726-4-git-send-email-dave.long@linaro.org>
+References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>
+ <1420949002-3726-4-git-send-email-dave.long@linaro.org>
+Message-ID: <CAHM4w1no=A1kTxN26znXD42USzO+ByHWHy76F2UMnmXhPKH0kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 4:46 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
->
-> On 14-01-15 09:41, Chen-Yu Tsai wrote:
->>
->> On Wed, Jan 14, 2015 at 3:29 PM, Hans de Goede <hdegoede@redhat.com>
->> wrote:
->>>
->>> Hi,
->>>
->>>
->>> On 13-01-15 17:20, Maxime Ripard wrote:
->>>>
->>>>
->>>> On Tue, Jan 13, 2015 at 11:54:21PM +0800, Chen-Yu Tsai wrote:
->>>>>
->>>>>
->>>>> On Tue, Jan 13, 2015 at 11:44 PM, Maxime Ripard
->>>>> <maxime.ripard@free-electrons.com> wrote:
->>>>>>
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> On Tue, Jan 13, 2015 at 12:31:24PM +0800, Chen-Yu Tsai wrote:
->>>>>>>
->>>>>>>
->>>>>>> Using label references is preferred when override settings from the
->>>>>>> included dtsi.
->>>>>>>
->>>>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>>>>> ---
->>>>>>>
->>>>>>> My AXP221 series touches this file. I thought I'd convert it first.
->>>>>>>
->>>>>>> This looks like a lot of changes. But if you filter out all the
->>>>>>> indentation changes, it's just the opening lines for each node.
->>>>>>>
->>>>>>> ---
->>>>>>>    arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181
->>>>>>> ++++++++++++++--------------
->>>>>>>    1 file changed, 88 insertions(+), 93 deletions(-)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->>>>>>> b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->>>>>>> index ebd5f7854b1b..97dbaeb76416 100644
->>>>>>> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->>>>>>> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->>>>>>> @@ -61,101 +61,96 @@
->>>>>>>         chosen {
->>>>>>>                 bootargs = "earlyprintk console=ttyS0,115200";
->>>>>>>         };
->>>>>>> +};
->>>>>>> +
->>>>>>> +&mmc0 {
->>>>>>> +     pinctrl-names = "default";
->>>>>>> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
->>>>>>> +     vmmc-supply = <&reg_vcc3v0>;
->>>>>>> +     bus-width = <4>;
->>>>>>> +     cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
->>>>>>> +     cd-inverted;
->>>>>>> +     status = "okay";
->>>>>>> +};
->>>>>>> +
->>>>>>> +&usbphy {
->>>>>>> +     usb1_vbus-supply = <&reg_usb1_vbus>;
->>>>>>> +     status = "okay";
->>>>>>> +};
->>>>>>> +
->>>>>>> +&ehci0 {
->>>>>>> +     status = "okay";
->>>>>>> +};
->>>>>>> +
->>>>>>> +&ohci0 {
->>>>>>> +     status = "okay";
->>>>>>> +};
->>>>>>> +
->>>>>>> +&pio {
->>>>>>> +     mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
->>>>>>> +             allwinner,pins = "PA8";
->>>>>>> +             allwinner,function = "gpio_in";
->>>>>>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->>>>>>> +             allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->>>>>>> +     };
->>>>>>> +};
->>>>>>> +
->>>>>>> +&mmc0_pins_a {
->>>>>>> +     /* external pull-ups missing for some pins */
->>>>>>> +     allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->>>>>>> +};
->>>>>>> +
->>>>>>> +&usb1_vbus_pin_a {
->>>>>>> +     /* different pin from sunxi-common-regulators */
->>>>>>> +     allwinner,pins = "PH24";
->>>>>>> +};
->>>>>>> +
->>>>>>> +&uart0 {
->>>>>>> +     pinctrl-names = "default";
->>>>>>> +     pinctrl-0 = <&uart0_pins_a>;
->>>>>>> +     status = "okay";
->>>>>>> +};
->>>>>>> +
->>>>>>> +&i2c0 {
->>>>>>> +     pinctrl-names = "default";
->>>>>>> +     pinctrl-0 = <&i2c0_pins_a>;
->>>>>>> +     /* pull-ups and devices require AXP221 DLDO3 */
->>>>>>> +     status = "failed";
->>>>>>> +};
->>>>>>
->>>>>>
->>>>>>
->>>>>> I think we should define a convention about how to sort these nodes
->>>>>> before we actually start merging some of it.
->>>>>>
->>>>>> This of course also apply to the other patches doing that, hence why
->>>>>> Hans is CC'd.
->>>>>>
->>>>>> I guess sorting them by label alphabetical order would make
->>>>>> sense. What do you think?
->>>>>
->>>>>
->>>>>
->>>>> I'm currently using the ordering from the dtsi, which is based
->>>>> on address. Even if it's not visible, if you're creating the
->>>>> dts by looking at the dtsi and enabling the devices available,
->>>>> that's the order you add them by, so it kind of makes sense.
->>>
->>>
->>>
->>> Right, that is what I'm doing too.
->>>
->>>> I know you're doing just that, and that it makes some kind of sense
->>>> whenever you convert an old DTS to the label based syntax, but
->>>> whenever you create a new one, it's a bit harder to get it right.
->>>>
->>>> And the fact that Hans didn't follow that convention illustrate that
->>>> very well.
->>>
->>>
->>>
->>> Erm, that is not true, I did follow that convention as my 2 new
->>> dts files started in the old format too, and I simply re-indented
->>> most nodes.
->>
->>
->> I think it also makes sense for new boards as well. One would look
->> at the dtsi to know what devices on the soc are available, and
->> copy the ones that can be used.
->>
->> But the ordering does make adding new devices with new drivers
->> a bit problematic. It is easy to place new nodes in the wrong
->> place.
->>
->>>> I guess a sorting logic internal to the DTS itself would be much
->>>> easier to understand and follow, hence why I suggested the
->>>> alphabetical order: it just stands out without any external reference.
->>>
->>>
->>>
->>> If we agree on this, we also need to think about what to do with new
->>> board specific powersupplies, as those need to be in the root node,
->>> if you look at the bananapro dts from the v2 patch you will see what
->>> I mean.
->>
->>
->> How about the root node at the top? With the board description, chosen,
->> aliases (if any), and then the _new_ regulators (sorted by name)?
->>
->> One can then easily identify which are board specific, and which are
->> more or less generic.
->
->
-> Sure, that works for me, what about the leds section, also in the
-> root node at the top? Before or after regulators ?
+Hi Dave,
 
-Before the regulators? Because a) L comes before R and  b) this
-is what's currently done in our dts files.
+On Sun, Jan 11, 2015 at 9:33 AM, David Long <dave.long@linaro.org> wrote:
+> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>
+> Add support for basic kernel probes(kprobes) and jump probes
+> (jprobes) for ARM64.
+>
+> Kprobes will utilize software breakpoint and single step debug
+> exceptions supported on ARM v8.
+>
+> Software breakpoint is placed at the probe address to trap the
+> kernel execution into kprobe handler.
+>
+> ARM v8 supports single stepping to be enabled while exception return
+> (ERET) with next PC in exception return address (ELR_EL1). The
+> kprobe handler prepares an executable memory slot for out-of-line
+> execution with a copy of the original instruction being probed, and
+> enables single stepping from the instruction slot. With this scheme,
+> the instruction is executed with the exact same register context
+> 'except PC' that points to instruction slot.
+>
+> Debug mask(PSTATE.D) is enabled only when single stepping a recursive
+> kprobe, e.g.: during kprobes reenter so that probed instruction can be
+> single stepped within the kprobe handler -exception- context.
+> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
+> any further re-entry is prevented by not calling handlers and the case
+> counted as a missed kprobe).
+>
+> Single stepping from slot has a drawback on PC-relative accesses
+> like branching and symbolic literals access as offset from new PC
+> (slot address) may not be ensured to fit in immediate value of
+> opcode. Such instructions needs simulation, so reject
+> probing such instructions.
+>
+> Instructions generating exceptions or cpu mode change are rejected,
+> and not allowed to insert probe for these instructions.
+>
+> Instructions using Exclusive Monitor are rejected too.
+>
+> System instructions are mostly enabled for stepping, except MSR
+> immediate that updates "daif" flags in PSTATE, which are not safe
+> for probing.
+>
+> Changes since v3:
+> from David Long:
+> 1) Removed unnecessary addtion of NOP after out-of-line instruction.
+> 2) Replaced table-driven instruction parsing with calls to external
+>    test functions.
+> from Steve Capper:
+> 3) Disable local irq while executing out of line instruction.
+>
+> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm64/Kconfig                |   1 +
+>  arch/arm64/include/asm/kprobes.h  |  60 +++++
+>  arch/arm64/include/asm/probes.h   |  50 ++++
+>  arch/arm64/include/asm/ptrace.h   |   3 +-
+>  arch/arm64/kernel/Makefile        |   1 +
+>  arch/arm64/kernel/kprobes-arm64.c |  65 +++++
+>  arch/arm64/kernel/kprobes-arm64.h |  28 ++
+>  arch/arm64/kernel/kprobes.c       | 551 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/kprobes.h       |  30 +++
+>  arch/arm64/kernel/vmlinux.lds.S   |   1 +
+>  10 files changed, 789 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/include/asm/kprobes.h
+>  create mode 100644 arch/arm64/include/asm/probes.h
+>  create mode 100644 arch/arm64/kernel/kprobes-arm64.c
+>  create mode 100644 arch/arm64/kernel/kprobes-arm64.h
+>  create mode 100644 arch/arm64/kernel/kprobes.c
+>  create mode 100644 arch/arm64/kernel/kprobes.h
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 12b3fd6..b3f61ba 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -67,6 +67,7 @@ config ARM64
+>         select HAVE_REGS_AND_STACK_ACCESS_API
+>         select HAVE_RCU_TABLE_FREE
+>         select HAVE_SYSCALL_TRACEPOINTS
+> +       select HAVE_KPROBES if !XIP_KERNEL
+>         select IRQ_DOMAIN
+>         select MODULES_USE_ELF_RELA
+>         select NO_BOOTMEM
+> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+> new file mode 100644
+> index 0000000..b35d3b9
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/kprobes.h
+> @@ -0,0 +1,60 @@
+> +/*
+> + * arch/arm64/include/asm/kprobes.h
+> + *
+> + * Copyright (C) 2013 Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + */
+> +
+> +#ifndef _ARM_KPROBES_H
+> +#define _ARM_KPROBES_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/ptrace.h>
+> +#include <linux/percpu.h>
+> +
+> +#define __ARCH_WANT_KPROBES_INSN_SLOT
+> +#define MAX_INSN_SIZE                  1
+> +#define MAX_STACK_SIZE                 128
+> +
+> +#define flush_insn_slot(p)             do { } while (0)
+> +#define kretprobe_blacklist_size       0
+> +
+> +#include <asm/probes.h>
+> +
+> +struct prev_kprobe {
+> +       struct kprobe *kp;
+> +       unsigned int status;
+> +};
+> +
+> +/* Single step context for kprobe */
+> +struct kprobe_step_ctx {
+> +#define KPROBES_STEP_NONE      0x0
+> +#define KPROBES_STEP_PENDING   0x1
+> +       unsigned long ss_status;
+> +       unsigned long match_addr;
+> +};
+> +
+> +/* per-cpu kprobe control block */
+> +struct kprobe_ctlblk {
+> +       unsigned int kprobe_status;
+> +       unsigned long saved_irqflag;
+> +       struct prev_kprobe prev_kprobe;
+> +       struct kprobe_step_ctx ss_ctx;
+> +       struct pt_regs jprobe_saved_regs;
+> +       char jprobes_stack[MAX_STACK_SIZE];
+> +};
+> +
+> +void arch_remove_kprobe(struct kprobe *);
+> +int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+> +int kprobe_exceptions_notify(struct notifier_block *self,
+> +                            unsigned long val, void *data);
+> +
+> +#endif /* _ARM_KPROBES_H */
+> diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
+> new file mode 100644
+> index 0000000..9dba74d
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/probes.h
+> @@ -0,0 +1,50 @@
+> +/*
+> + * arch/arm64/include/asm/probes.h
+> + *
+> + * Copyright (C) 2013 Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + */
+> +#ifndef _ARM_PROBES_H
+> +#define _ARM_PROBES_H
+> +
+> +struct kprobe;
+> +struct arch_specific_insn;
+> +
+> +typedef u32 kprobe_opcode_t;
+> +typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
+> +typedef unsigned long
+> +(kprobes_condition_check_t)(struct kprobe *p, struct pt_regs *);
 
-ChenYu
+Can we make kprobes_condition_check_t as struct kprobe indepedent, so
+that it is usable by uprobe as
+well..
+
+ typedef unsigned long
+(kprobes_condition_check_t)(u32 opcode, struct arch_specific_insn *asi,
+               struct pt_regs *);
+
+
+> +typedef void
+> +(kprobes_prepare_t)(struct kprobe *, struct arch_specific_insn *);
+
+Similarly,
+
+ typedef void
+(kprobes_prepare_t)(u32 insn, struct arch_specific_insn *);
+
+> +typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
+> +
+> +enum pc_restore_type {
+> +       NO_RESTORE,
+> +       RESTORE_PC,
+> +};
+> +
+
+[...]
+
+> +static bool aarch64_insn_is_steppable(u32 insn)
+> +{
+> +       if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
+> +               if (aarch64_insn_is_branch(insn))
+> +                       return false;
+> +
+> +               /* modification of daif creates issues */
+> +               if (aarch64_insn_is_msr_daif(insn))
+> +                       return false;
+> +
+> +               if (aarch64_insn_is_hint(insn))
+> +                       return aarch64_insn_is_nop(insn);
+> +
+> +               return true;
+> +       }
+> +
+> +       if (aarch64_insn_uses_literal(insn))
+> +               return false;
+> +
+> +       if (aarch64_insn_is_exclusive(insn))
+> +               return false;
+> +
+> +       return true;
+
+Default true return may not be a good idea until we are sure that we
+are returning false for all possible
+simulation and rejection cases. In my opinion, its better to return
+true only for steppable and false for
+all remaining.
+
+> +}
+
+[...]
+
+> +#ifndef _ARM_KERNEL_KPROBES_H
+> +#define _ARM_KERNEL_KPROBES_H
+> +
+> +/* BRK opcodes with ESR encoding  */
+> +#define BRK64_ESR_MASK         0xFFFF
+> +#define BRK64_ESR_KPROBES      0x0004
+> +#define BRK64_OPCODE_KPROBES   0xD4200080      /* "brk 0x4" */
+
+As will deacon suggested, these can be moved to debug-monitor.h and
+then uprobe can also add
+its defines there only.
+
+> +#define ARCH64_NOP_OPCODE      0xD503201F
+
+It is not being used, so can be removed.
+
+~Pratyush
