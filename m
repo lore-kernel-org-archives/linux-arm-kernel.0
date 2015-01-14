@@ -1,73 +1,63 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 14 Jan 2015 12:12:59 +0100
-Subject: [PATCH 1/4] ARM: shmobile: Add DT bindings for Renesas memory
- controllers
-In-Reply-To: <1421233982-15883-1-git-send-email-geert+renesas@glider.be>
-References: <1421233982-15883-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1421233982-15883-2-git-send-email-geert+renesas@glider.be>
+Date: Wed, 14 Jan 2015 12:12:58 +0100
+Subject: [PATCH 0/4] ARM: shmobile: Add DT support for memory controllers
+Message-ID: <1421233982-15883-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for Renesas R-Mobile and SH-Mobile memory controllers.
+	Hi Simon, Magnus,
+
+This patch series adds DT binding documentation and devices nodes to
+describe memory-controllers in R-Mobile and SH-Mobile SoCs.
+
 Currently memory controller device nodes are used only to reference PM
 domains, and prevent these PM domains from being powered down, which
 would crash the system.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
+As such this series is a prerequisite for adding DT PM domain support to
+sh73a0 (SH-Mobile AG5) and r7a73a4 (R-Mobile APE6).
+For r8a7740 (R-Mobile A1), this wasn't a hard prerequisite for PM
+domain support, as the A4S PM domain is never turned off anyway
+because its child PM domain A3SM contains the CPU core.
+
+The patches for sh73a0 and r8a7740 have been sent before as part of
+(patches in) the series "[PATCH RFC 0/7] ARM: shmobile: sh73a0: DT PM
+domain support" (https://lkml.org/lkml/2014/11/19/404).
+
+"ARM: shmobile: r8a7740 dtsi: Add memory-controller node" depends on
+the DT R-Mobile PM Domain support for r8a7740 that's queued up in
+Simon's tree under tag renesas-dt-pm-for-v3.20, as the
+memory-controller node already contains a power-domains property.
+
+The two other dtsi patches do not add power-domains properties yet.
+These will be added when adding PM domain support for sh73a0 resp.
+r8a73a4.
+
+Thanks!
+
+Geert Uytterhoeven (4):
+  ARM: shmobile: Add DT bindings for Renesas memory controllers
+  ARM: shmobile: r8a73a4 dtsi: Add memory-controller nodes
+  ARM: shmobile: r8a7740 dtsi: Add memory-controller node
+  ARM: shmobile: sh73a0 dtsi: Add memory-controller nodes
+
  .../renesas-memory-controllers.txt                 | 44 ++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 10 +++++
+ arch/arm/boot/dts/r8a7740.dtsi                     |  6 +++
+ arch/arm/boot/dts/sh73a0.dtsi                      | 16 ++++++++
+ 4 files changed, 76 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt b/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
-new file mode 100644
-index 0000000000000000..c64b7925cd0924e8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/renesas-memory-controllers.txt
-@@ -0,0 +1,44 @@
-+DT bindings for Renesas R-Mobile and SH-Mobile memory controllers
-+=================================================================
-+
-+Renesas R-Mobile and SH-Mobile SoCs contain one or more memory controllers.
-+These memory controllers differ from one SoC variant to another, and are called
-+by different names ("DDR Bus Controller (DBSC)", "DDR3 Bus State Controller
-+(DBSC3)", "SDRAM Bus State Controller (SBSC)").
-+
-+Currently memory controller device nodes are used only to reference PM
-+domains, and prevent these PM domains from being powered down, which would
-+crash the system.
-+
-+As there exist no actual drivers for these controllers yet, these bindings
-+should be considered EXPERIMENTAL for now.
-+
-+Required properties:
-+  - compatible: Must be one of the following SoC-specific values:
-+		  - "renesas,dbsc-r8a73a4" (R-Mobile APE6)
-+		  - "renesas,dbsc3-r8a7740" (R-Mobile A1)
-+		  - "renesas,sbsc-sh73a0" (SH-Mobile AG5)
-+  - reg: Must contain the base address and length of the memory controller's
-+	 registers.
-+
-+Optional properties:
-+  - interrupts: Must contain a list of interrupt specifiers for memory
-+		controller interrupts, if available.
-+  - interrupts-names: Must contain a list of interrupt names corresponding to
-+		      the interrupts in the interrupts property, if available.
-+		      Valid interrupt names are:
-+			- "sec" (secure interrupt)
-+			- "temp" (normal (temperature) interrupt)
-+  - power-domains: Must contain a reference to the PM domain that the memory
-+		   controller belongs to, if available.
-+
-+Example:
-+
-+	sbsc1: memory-controller at fe400000 {
-+		compatible = "renesas,sbsc-sh73a0";
-+		reg = <0xfe400000 0x400>;
-+		interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 36 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "sec", "temp";
-+		power-domains = <&pd_a4bc0>;
-+	};
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
