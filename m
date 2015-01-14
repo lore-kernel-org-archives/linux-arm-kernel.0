@@ -1,49 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Jan 2015 09:07:17 -0800
-Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
- volatile
-In-Reply-To: <20150112164654.GB6525@saruman>
-References: <1419622104-25812-1-git-send-email-balbi@ti.com>
- <1419622104-25812-2-git-send-email-balbi@ti.com>
- <20150106173734.GL6502@saruman> <20150108162512.GC31926@saruman>
- <20150112164654.GB6525@saruman>
-Message-ID: <20150114170716.GL2419@atomide.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 14 Jan 2015 12:18:39 -0500
+Subject: sysfs topology for arm64 cluster_id
+In-Reply-To: <20150114170045.GC21115@leverpostej>
+References: <54B5BC84.8090603@redhat.com> <20150114170045.GC21115@leverpostej>
+Message-ID: <54B6A4EF.7020501@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150112 08:50]:
-> Hi,
+On 01/14/2015 12:00 PM, Mark Rutland wrote:
+> On Wed, Jan 14, 2015 at 12:47:00AM +0000, Jon Masters wrote:
+>> Hi Folks,
+>>
+>> TLDR: I would like to consider the value of adding something like
+>> "cluster_siblings" or similar in sysfs to describe ARM topology.
+>>
+>> A quick question on intended data representation in /sysfs topology
+>> before I ask the team on this end to go down the (wrong?) path. On ARM
+>> systems today, we have a hierarchical CPU topology:
+>>
+>>                  Socket ---- Coherent Interonnect ---- Socket
+>>                    |                                    |
+>>          Cluster0 ... ClusterN                Cluster0 ... ClusterN
+>>             |             |                      |             |
+>>       Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
+>>         |       |      |        |           |       |      |       |
+>>      T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
+>>
+>> Where we might (or might not) have threads in individual cores (a la SMT
+>> - it's allowed in the architecture at any rate) and we group cores
+>> together into units of clusters usually 2-4 cores in size (though this
+>> varies between implementations, some of which have different but similar
+>> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
+>> cores). There are multiple clusters per "socket", and there might be an
+>> arbitrary number of sockets. We'll start to enable NUMA soon.
 > 
-> On Thu, Jan 08, 2015 at 10:25:12AM -0600, Felipe Balbi wrote:
-> > On Tue, Jan 06, 2015 at 11:37:34AM -0600, Felipe Balbi wrote:
-> > > On Fri, Dec 26, 2014 at 01:28:20PM -0600, Felipe Balbi wrote:
-> > > > STATUS register can be modified by the HW, so we
-> > > > should bypass cache because of that.
-> > > > 
-> > > > In the case of INT[12] registers, they are the ones
-> > > > that actually clear the IRQ source at the time they
-> > > > are read. If we rely on the cache for them, we will
-> > > > never be able to clear the interrupt, which will cause
-> > > > our IRQ line to be disabled due to IRQ throttling.
-> > > > 
-> > > > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
-> > > > Cc: <stable@vger.kernel.org> # v3.15+
-> > > > Cc: Keerthy <j-keerthy@ti.com>
-> > > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > 
-> > > ping
-> > 
-> > another ping. Without this and the following patch TPS65218 power button
-> > driver which was already applied by Dmitry, won't work.
-> 
-> Anybody ? -rc4 is out and tps65218 is still broken because nobody has
-> acted on these two patches. All other patches which are meant for 3.20
-> merge window are applied and because of these pending, those patches
-> won't work.
+> I have a slight disagreement with the diagram above.
 
-Lee, are you planning to pick these two drivers/mfd patches?
+Thanks for the clarification - note that I was *explicitly not* saying
+that the MPIDR Affinity bits sufficiently described the system :) Nor do
+I think cpu-map does cover everything we want today.
 
-Regards,
+> The MPIDR_EL1.Aff* fields and the cpu-map bindings currently only
+> describe the hierarchy, without any information on the relative
+> weighting between levels, and without any mapping to HW concepts such as
+> sockets. What these happen to map to is specific to a particular system,
+> and the hierarchy may be carved up in a number of possible ways
+> (including "virtual" clusters). There are also 24 RES0 bits that could
+> potentially become additional Aff fields we may need to describe in
+> future.
 
-Tony
+> "socket", "package", etc are meaningless unless the system provides a
+> mapping of Aff levels to these. We can't guess how the HW is actually
+> organised.
+
+The replies I got from you and Arnd gel with my thinking that we want
+something generic enough in Linux to handle this in a non-architectural
+way (real topology, not just hierarchies). That should also cover the
+kind of cluster-like stuff e.g. AMD with NUMA on HT on a single socket
+and other stuff. So...it sounds like we need "something" to add to our
+understanding of hierarchy, and that "something" is in sysfs. A proposal
+needs to be derived (I think Don will followup since he is keen to poke
+at this). We'll go back to the ACPI ASWG folks to add whatever is
+missing to future ACPI bindings after that discussion.
+
+Jon.
