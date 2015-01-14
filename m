@@ -1,158 +1,138 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Jan 2015 04:37:14 +0800
-Subject: [PATCH 1/6] ARM: at91: pm: rework cpu detection
-In-Reply-To: <20150114212139.0ad297eb@bbrezillon>
-References: <1421097825-396-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421097825-396-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20150114191412.GA14457@ns203013.ovh.net>
- <20150114212139.0ad297eb@bbrezillon>
-Message-ID: <217DB987-13E3-4D5D-A9BE-D17662A19E26@jcrosoft.com>
+Date: Wed, 14 Jan 2015 21:45:12 +0100
+Subject: [PATCH 1/2] pinctrl: at91: allow disabled gpio controllers
+In-Reply-To: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1417193367-12422-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150114204512.GB14457@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17:49 Fri 28 Nov     , Ludovic Desroches wrote:
+> This patch allows to have gpio controller with status set to disabled.
+> 
+> gpio_banks represents all the gpio banks available on the device whereas
+> nbanks represents the gpio banks used. Having a disabled gpio controller
+> involves that nbanks value is lower than gpio_banks and that some
+> pointers in the gpio_chips array are NULL. This patch deals with these
+> specific cases.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+> 
+> Hi,
+> 
+> Without this patch, pinctrl is broken on sama5d4 because pinctrl-at91 doesn't
+> support unused gpio bank.
 
-> On Jan 15, 2015, at 4:21 AM, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> 
-> Hi Jean-Christophe,
-> 
-> On Wed, 14 Jan 2015 20:14:12 +0100
-> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> 
->> On 22:23 Mon 12 Jan     , Alexandre Belloni wrote:
->>> Store SoC differences in a struct to remove cpu_is_* usage.
->>> 
->>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> ---
->>> arch/arm/mach-at91/pm.c | 54 ++++++++++++++++++++++++++++++-------------------
->>> 1 file changed, 33 insertions(+), 21 deletions(-)
->>> 
->>> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
->>> index 9b15169a1c62..79aa793d1f00 100644
->>> --- a/arch/arm/mach-at91/pm.c
->>> +++ b/arch/arm/mach-at91/pm.c
->>> @@ -17,6 +17,7 @@
->>> #include <linux/interrupt.h>
->>> #include <linux/sysfs.h>
->>> #include <linux/module.h>
->>> +#include <linux/of.h>
->>> #include <linux/platform_device.h>
->>> #include <linux/io.h>
->>> #include <linux/clk/at91_pmc.h>
->>> @@ -32,6 +33,11 @@
->>> #include "generic.h"
->>> #include "pm.h"
->>> 
->>> +static struct {
->>> +	unsigned long uhp_udp_mask;
->>> +	int memctrl;
->>> +} at91_pm_data;
->>> +
->>> static void (*at91_pm_standby)(void);
->>> 
->>> static int at91_pm_valid_state(suspend_state_t state)
->>> @@ -71,17 +77,9 @@ static int at91_pm_verify_clocks(void)
->>> 	scsr = at91_pmc_read(AT91_PMC_SCSR);
->>> 
->>> 	/* USB must not be using PLLB */
->>> -	if (cpu_is_at91rm9200()) {
->>> -		if ((scsr & (AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP)) != 0) {
->>> -			pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
->>> -			return 0;
->>> -		}
->>> -	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() || cpu_is_at91sam9263()
->>> -			|| cpu_is_at91sam9g20() || cpu_is_at91sam9g10()) {
->>> -		if ((scsr & (AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP)) != 0) {
->>> -			pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
->>> -			return 0;
->>> -		}
->>> +	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
->>> +		pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
->>> +		return 0;
->>> 	}
->>> 
->>> 	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
->>> @@ -149,18 +147,13 @@ static int at91_pm_enter(suspend_state_t state)
->>> 			 * turning off the main oscillator; reverse on wakeup.
->>> 			 */
->>> 			if (slow_clock) {
->>> -				int memctrl = AT91_MEMCTRL_SDRAMC;
->>> -
->>> -				if (cpu_is_at91rm9200())
->>> -					memctrl = AT91_MEMCTRL_MC;
->>> -				else if (cpu_is_at91sam9g45())
->>> -					memctrl = AT91_MEMCTRL_DDRSDR;
->>> #ifdef CONFIG_AT91_SLOW_CLOCK
->>> 				/* copy slow_clock handler to SRAM, and call it */
->>> 				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
->>> #endif
->>> 				slow_clock(at91_pmc_base, at91_ramc_base[0],
->>> -					   at91_ramc_base[1], memctrl);
->>> +					   at91_ramc_base[1],
->>> +					   at91_pm_data.memctrl);
->>> 				break;
->>> 			} else {
->>> 				pr_info("AT91: PM - no slow clock mode enabled ...\n");
->>> @@ -237,10 +230,29 @@ static int __init at91_pm_init(void)
->>> 
->>> 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
->>> 
->>> -	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
->>> -	if (cpu_is_at91rm9200())
->>> +	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
->>> +
->>> +	if (of_machine_is_compatible("atmel,at91rm9200")) {
->>> +		/*
->>> +		 * AT91RM9200 SDRAM low-power mode cannot be used with
->>> +		 * self-refresh.
->>> +		 */
->>> 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
->>> -	
->>> +
->>> +		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
->>> +					    AT91RM9200_PMC_UDP;
->>> +		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
->>> +	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
->>> +		   of_machine_is_compatible("atmel,at91sam9g20") ||
->>> +		   of_machine_is_compatible("atmel,at91sam9261") ||
->>> +		   of_machine_is_compatible("atmel,at91sam9g10") ||
->>> +		   of_machine_is_compatible("atmel,at91sam9263")) {
->> nack here
->> 
->> you switch for runtime information from the SOC register store in ram to DT
->> 
->> DT is great but I do prefer to rely on the SoC register here as the whole was
->> also to check that the is correct
-> 
-> Well, cpu_is_xxx macros are defined in a mach specific header, and we're
-> currently trying to enable multi platform support. 
+the problem is different
 
-Yes does not mean we can not move this, use the REAL hardware detected cpu is better
-as you can check that the DT is valid for this SoC and also have fixup for a specific
-SoC version without having to have x DT per SoC
+The current code does support this partially
+
+but need to have few by using gpio_banks for the pinctrl part instead of
+info->banks
+as we already known the last enabled bank
 
 > 
->> 
->> wihich is way slower
 > 
-> Hmm, this SoC detection has been move from the suspend path (where, as
-> you stated, speed is a real concern) to the pm init function (which is
-> only called once at startup), and I doubt the boot time penalty will
-> even be noticeable?
+>  drivers/pinctrl/pinctrl-at91.c | 30 ++++++++++++++++++------------
+>  1 file changed, 18 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 94643bb..95ae122 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -981,7 +981,8 @@ static void at91_pinctrl_child_count(struct at91_pinctrl *info,
+>  
+>  	for_each_child_of_node(np, child) {
+>  		if (of_device_is_compatible(child, gpio_compat)) {
+> -			info->nbanks++;
+> +			if (of_device_is_available(child))
+> +				info->nbanks++;
+>  		} else {
+>  			info->nfunctions++;
+>  			info->ngroups += of_get_child_count(child);
+> @@ -1003,11 +1004,11 @@ static int at91_pinctrl_mux_mask(struct at91_pinctrl *info,
+>  	}
+>  
+>  	size /= sizeof(*list);
+> -	if (!size || size % info->nbanks) {
+> +	if (!size || size % gpio_banks) {
+>  		dev_err(info->dev, "wrong mux mask array should be by %d\n", info->nbanks);
+>  		return -EINVAL;
+>  	}
+> -	info->nmux = size / info->nbanks;
+> +	info->nmux = size / gpio_banks;
+>  
+>  	info->mux_mask = devm_kzalloc(info->dev, sizeof(u32) * size, GFP_KERNEL);
+>  	if (!info->mux_mask) {
+> @@ -1185,7 +1186,7 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  {
+>  	struct at91_pinctrl *info;
+>  	struct pinctrl_pin_desc *pdesc;
+> -	int ret, i, j, k;
+> +	int ret, i, j, k, ngpio_chips_enabled = 0;
+>  
+>  	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+>  	if (!info)
+> @@ -1200,12 +1201,14 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  	 * to obtain references to the struct gpio_chip * for them, and we
+>  	 * need this to proceed.
+>  	 */
+> -	for (i = 0; i < info->nbanks; i++) {
+> -		if (!gpio_chips[i]) {
+> -			dev_warn(&pdev->dev, "GPIO chip %d not registered yet\n", i);
+> -			devm_kfree(&pdev->dev, info);
+> -			return -EPROBE_DEFER;
+> -		}
+> +	for (i = 0; i < gpio_banks; i++) {
+> +		if (gpio_chips[i])
+> +			ngpio_chips_enabled++;
+> +	}
+> +	if (ngpio_chips_enabled < info->nbanks) {
+> +		dev_warn(&pdev->dev, "All GPIO chips are not registered yet\n");
+> +		devm_kfree(&pdev->dev, info);
+> +		return -EPROBE_DEFER;
+>  	}
+>  
+>  	at91_pinctrl_desc.name = dev_name(&pdev->dev);
+> @@ -1234,8 +1237,9 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* We will handle a range of GPIO pins */
+> -	for (i = 0; i < info->nbanks; i++)
+> -		pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+> +	for (i = 0; i < gpio_banks; i++)
+> +		if (gpio_chips[i])
+> +			pinctrl_add_gpio_range(info->pctl, &gpio_chips[i]->range);
+>  
+>  	dev_info(&pdev->dev, "initialized AT91 pinctrl driver\n");
+>  
+> @@ -1681,6 +1685,8 @@ static void at91_gpio_probe_fixup(void)
+>  
+>  	for (i = 0; i < gpio_banks; i++) {
+>  		at91_gpio = gpio_chips[i];
+> +		if (!at91_gpio)
+> +			continue;
 
-except if your table is boot as quick as possible avoid useless string compare is always a good choice
+here Nack
 
-IIRC we had in the past RFC to have the drivers compatible compare switch to HASH
-for this purpose too
+as if you disable ANY of the bank that use pioc you break the IRQ support
+
+attached a patch we the idea how to handle the current issue
+only compiled not tested (too late here)
 
 Best Regards,
 J.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> 
+>  
+>  		/*
+>  		 * GPIO controller are grouped on some SoC:
 > -- 
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> 2.0.3
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-pinctrl-at91-allow-to-have-disable-gpio-bank.patch
+Type: text/x-diff
+Size: 7649 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/b2a3e16e/attachment-0001.bin>
