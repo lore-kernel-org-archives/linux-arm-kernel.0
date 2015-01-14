@@ -1,72 +1,67 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 14 Jan 2015 11:42:53 -0800
-Subject: [PATCH v10] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <20141216094527.GC6580@arm.com> (Will Deacon's message of "Tue,
- 16 Dec 2014 09:45:27 +0000")
-References: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
- <20141216094527.GC6580@arm.com>
-Message-ID: <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Jan 2015 11:43:01 -0800
+Subject: [PATCH 2/2] ARM: OMAP2+: Add dm816x hwmod support
+In-Reply-To: <1421191355-12835-3-git-send-email-tony@atomide.com>
+References: <1421191355-12835-1-git-send-email-tony@atomide.com>
+ <1421191355-12835-3-git-send-email-tony@atomide.com>
+Message-ID: <20150114194301.GR2419@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16 2014 at 01:45:27 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Dec 15, 2014 at 11:47:23PM +0000, Mitchel Humpherys wrote:
->> From: Matt Wagantall <mattw@codeaurora.org>
->> 
->> It is sometimes necessary to poll a memory-mapped register until its value
->> satisfies some condition. Introduce a family of convenience macros that do
->> this. Tight-looping, sleeping, and timing out can all be accomplished using
->> these macros.
->> 
->> Cc: Thierry Reding <thierry.reding@gmail.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Andrew Morton <akpm@linux-foundation.org>
->> Cc: Robert Elliott <elliott@hp.com>
->> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
->> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
->> ---
->> v9..10:
->>   - Actually added the comments mentioned in v8..v9 (doh!)
->> 
->> v8..v9:
->>   - Added note in comments about max sleep time (Rob Elliott)
->> 
->> v7..v8:
->>   - sorted helper macros by size (b, w, l, q)
->>   - removed some of the more esoteric (or flat-out bogus) helper macros
->> 
->> This patch was originally part of a series [1] for adding support for IOMMU
->> address translations through an ARM SMMU hardware register.  The other
->> patch in the series (the one that actually uses these macros and implements
->> said hardware address translations) was Ack'd by the driver maintainer
->> there (Will Deacon) so I've pulled this patch out to avoid resending an
->> already Ack'd patch over and over again.
->> 
->> In short, please see [1] for previous discussion and the first user of
->> these macros.
->> 
->> Will also acked this patch in [2].  I didn't retain his Ack here because I
->> added to the macro comments.
->
-> You can keep the ack, it still looks good to me and I'm not really fussed
-> about the comments.
->
-> Will
+* Tony Lindgren <tony@atomide.com> [150113 15:29]:
+> Add minimal hwmod support that works at least on dm8168. This
+> is based on the code in the earlier TI CDP tree, and an earlier
+> patch by Aida Mynzhasova <aida.mynzhasova@skitlab.ru>.
+> 
+> I've set up things to work pretty much the same way as for
+> am33xx. We are basically using cm33xx.c with a different set
+> of clocks and clockdomains.
+> 
+> This code is based on the TI81XX-LINUX-PSP-04.04.00.02 patches
+> published at:
+> 
+> http://downloads.ti.com/dsps/dsps_public_sw/psp/LinuxPSP/TI81XX_04_04/04_04_00_02/index_FDS.html
+> 
+> Cc: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
+> Cc: Brian Hutchinson <b.hutchman@gmail.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/Makefile               |    1 +
+>  arch/arm/mach-omap2/io.c                   |    8 +-
+>  arch/arm/mach-omap2/omap_hwmod.c           |    2 +-
+>  arch/arm/mach-omap2/omap_hwmod.h           |    1 +
+>  arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 1025 ++++++++++++++++++++++++++++
+>  5 files changed, 1034 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 352873c..926bc39 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -226,6 +226,7 @@ obj-$(CONFIG_SOC_AM33XX)		+= omap_hwmod_33xx_43xx_ipblock_data.o
+>  obj-$(CONFIG_SOC_AM43XX)		+= omap_hwmod_43xx_data.o
+>  obj-$(CONFIG_SOC_AM43XX)		+= omap_hwmod_33xx_43xx_interconnect_data.o
+>  obj-$(CONFIG_SOC_AM43XX)		+= omap_hwmod_33xx_43xx_ipblock_data.o
+> +obj-$(CONFIG_SOC_TI81XX)		+= omap_hwmod_81xx_data.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
+>  obj-$(CONFIG_SOC_OMAP5)			+= omap_hwmod_54xx_data.o
+>  obj-$(CONFIG_SOC_DRA7XX)		+= omap_hwmod_7xx_data.o
 
-This hasn't gotten any further comments.  Would someone be willing to
-take it?
+Looks like the Makefile needs the following addition for make randconfig
+builds to work properly.
 
-Joerg, maybe you could take this through the IOMMU tree since the first
-user is an IOMMU driver?  Currently we can't move [1] forward because of
-this dependency...
+Regards,
 
-[1] http://thread.gmane.org/gmane.linux.kernel.iommu/7837
+Tony
 
-
--Mitch
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -121,6 +121,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-prcm-4-5-common)
+ obj-$(CONFIG_SOC_OMAP5)			+= $(omap-prcm-4-5-common)
+ obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-prcm-4-5-common)
+ am33xx-43xx-prcm-common			+= prm33xx.o cm33xx.o
++obj-$(CONFIG_SOC_TI81XX)		+= $(am33xx-43xx-prcm-common)
+ obj-$(CONFIG_SOC_AM33XX)		+= $(am33xx-43xx-prcm-common)
+ obj-$(CONFIG_SOC_AM43XX)		+= $(omap-prcm-4-5-common) \
+ 					   $(am33xx-43xx-prcm-common)
