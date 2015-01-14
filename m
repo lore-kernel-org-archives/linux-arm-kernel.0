@@ -1,122 +1,136 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 14 Jan 2015 14:26:37 +0200
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods
- without sysc
-In-Reply-To: <alpine.DEB.2.02.1501132345220.28034@utopia.booyaka.com>
-References: <1418917790-1791-1-git-send-email-rogerq@ti.com>
- <5492F84E.7020706@ti.com>
- <alpine.DEB.2.02.1501020654050.27058@utopia.booyaka.com>
- <54AA4CD4.40105@ti.com>
- <alpine.DEB.2.02.1501060202540.28771@utopia.booyaka.com>
- <54AD166C.9060507@ti.com>
- <alpine.DEB.2.02.1501132345220.28034@utopia.booyaka.com>
-Message-ID: <54B6607D.5040107@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 14 Jan 2015 12:33:53 +0000
+Subject: [PATCH v6 18/20] KVM: introduce kvm_check_device_type()
+In-Reply-To: <54B3BF16.2080105@arm.com>
+References: <1420804478-17354-1-git-send-email-andre.przywara@arm.com>
+ <1420804478-17354-19-git-send-email-andre.przywara@arm.com>
+ <20150109123345.GR21092@cbox> <54AFDAD2.7010505@arm.com>
+ <20150111152239.GD21444@cbox> <54B3BF16.2080105@arm.com>
+Message-ID: <54B66231.4030607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/15 01:46, Paul Walmsley wrote:
-> On Wed, 7 Jan 2015, Roger Quadros wrote:
-> 
->>> From: Paul Walmsley <paul@pwsan.com>
->>> Date: Mon, 5 Jan 2015 15:49:57 -0700
->>> Subject: [PATCH] Only skip ioremap() if IP block does not have OCP header
->>>  registers. Experimental.
->>>
->>> ---
->>>  arch/arm/mach-omap2/omap_hwmod.c | 33 +++++++++++++++++++++------------
->>>  1 file changed, 21 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->>> index cbb908dc5cf0..03df8833d399 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->>> @@ -1938,6 +1938,8 @@ static int _reset(struct omap_hwmod *oh)
->>>  	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
->>>  
->>>  	if (oh->class->reset) {
->>> +		WARN(!oh->_mpu_rt_va, "Attempt to call custom reset with no MPU register target ioremapped: %s",
->>> +		     oh->name);
->>
->> Not part of $subject.
-> 
-> Hmm, how do you mean?  If we skip the ioremap(), wouldn't you like to know 
-> before some custom reset code gets called that pretty much always depends 
-> on the ioremap() succeeding? :-)
+Hi Christoffer,
 
-Ah yes. you are right.
+so far I am done with all the changes requested except this
+kvm_check_device_type() issue. It would be great if we could come to a
+conclusion for this one soon so I can push the new version out.
+(see below for more rationale)
+...
 
+On 12/01/15 12:33, Andre Przywara wrote:
+> Hej Christoffer,
 > 
->>>  		r = oh->class->reset(oh);
->>>  	} else {
->>>  		if (oh->rst_lines_cnt > 0) {
->>> @@ -2358,15 +2360,19 @@ static int of_dev_hwmod_lookup(struct device_node *np,
->>>  }
->>>  
->>>  /**
->>> - * _init_mpu_rt_base - populate the virtual address for a hwmod
->>> + * _init_mpu_rt_base - populate the MPU port and virtual address
->>>   * @oh: struct omap_hwmod * to locate the virtual address
->>>   * @data: (unused, caller should pass NULL)
->>>   * @index: index of the reg entry iospace in device tree
->>>   * @np: struct device_node * of the IP block's device node in the DT data
->>>   *
->>> - * Cache the virtual address used by the MPU to access this IP block's
->>> - * registers.  This address is needed early so the OCP registers that
->>> - * are part of the device's address space can be ioremapped properly.
->>> + * Cache the interconnect target port and the virtual address used by
->>> + * the MPU to access this IP block's registers.  The address is needed
->>> + * early so the OCP registers that are part of the device's address
->>> + * space can be ioremapped properly.  The presence or absence of the
->>> + * interconnect target port also indicates whether the hwmod code
->>> + * should wait for the IP block to indicate readiness after it is
->>> + * enabled.
->>>   *
->>>   * Returns 0 on success, -EINVAL if an invalid hwmod is passed, and
->>>   * -ENXIO on absent or invalid register target address space.
->>> @@ -2385,6 +2391,13 @@ static int __init _init_mpu_rt_base(struct omap_hwmod *oh, void *data,
->>>  	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
->>>  		return -ENXIO;
->>>  
->>> +	/*
->>> +	 * If there's no need for the hwmod code to read or write to
->>> +	 * the IP block registers, bail out early before the ioremap()
->>> +	 */
->>> +	if (!oh->class->sysc)
->>> +		return 0;
->>> +
->>>  	mem = _find_mpu_rt_addr_space(oh);
->>>  	if (!mem) {
->>>  		pr_debug("omap_hwmod: %s: no MPU register target found\n",
->>> @@ -2451,14 +2464,10 @@ static int __init _init(struct omap_hwmod *oh, void *data)
->>>  				oh->name, np->name);
->>>  	}
->>>  
->>> -	if (oh->class->sysc) {
->>> -		r = _init_mpu_rt_base(oh, NULL, index, np);
->>> -		if (r < 0) {
->>> -			WARN(1, "omap_hwmod: %s: doesn't have mpu register target base\n",
->>> -			     oh->name);
->>> -			return 0;
->>> -		}
->>> -	}
->>> +	r = _init_mpu_rt_base(oh, NULL, index, np);
->>> +	if (r < 0)
->>> +		pr_debug("omap_hwmod: %s: doesn't have mpu register target base\n",
->>> +			 oh->name);
->>
->> This is the real piece that fixes the issue.
->>
->>>  
->>>  	r = _init_clocks(oh, NULL);
->>>  	if (r < 0) {
+> On 11/01/15 15:22, Christoffer Dall wrote:
+>> On Fri, Jan 09, 2015 at 01:42:42PM +0000, Andre Przywara wrote:
+>>> Hi Christoffer,
 >>>
+>>> On 09/01/15 12:33, Christoffer Dall wrote:
+>>>> On Fri, Jan 09, 2015 at 11:54:36AM +0000, Andre Przywara wrote:
+>>>>> While we can easily register and unregister KVM devices, there is
+>>>>> currently no easy way of checking whether a device has been
+>>>>> registered.
+>>>>> Introduce kvm_check_device_type() for that purpose and use it in two
+>>>>> existing functions. Also change the return code for an invalid
+>>>>> type number from ENOSPC to EINVAL.
+>>>>> This function will be later used by another patch set to check
+>>>>> whether a KVM_CREATE_IRQCHIP ioctl is valid.
+>>>>
+>>>> I feel like this is misguided and the vgic should be able to figure this
+>>>> stuff out internally.  Did you have code for this approach somewhere
+>>>> that I can take a look at?
+>>>
+>>> I pushed my WIP patch on top of the kvm-gicv3/v6 tree.
+>>> Given how that looks I reckoned the generic solution would be more
+>>> preferable.
+>>> Basically we internally decide in the _probe function whether we support
+>>> GICv2 emulation or not, which is mostly driven by device tree
+>>> properties. So at the moment I just register the GIC_V2 KVM device or
+>>> not. Now with the "vgic internal" solution I misuse the GICV address
+>>> base as a hint of the GICv2 emulation availability. Alternatively I have
+>>> to introduce a new variable to mirror what the KVM device array already
+>>> holds, which seems kind of exerted to me.
+>>> Besides that I am not sure if the GICV address hint will always be a
+>>> reliable indicator and what we will do if there will be another GIC
+>>> model to be emulated in the future (maybe we need that for the ITS
+>>> emulation already?)
 >>
->> I've tested this patch on am43x-gp-evm, and it seems to fix the issue 
->> although with some unpleasant warning messages.
+>> I don't think it looks that bad.
+>>
+>> Only your gicv3 and gicv2 code files know what they are capable of
+>> emulating, how you choose to store this state internally in those files
+>> is a somewhat orthogonal discussion from using the kvm device API.
 > 
-> Could you paste those in?
+> Well, the point is that the emulation capability is a hardware property
+> and thus the knowledge is actually in the host part of the VGIC (so in
+> vgic-v3.c and vgic-v2.c). From here we "communicate" the capability to
+> userland by registering the respective VGIC KVM devices only. Since the
+> emulation part of the VGIC lives in different files (vgic.c and
+> vgic-vx-emul.c) we would need some kind of export to them, too. I found
+> that it would be cleaner to just re-use what we already have with the
+> KVM devices.
 > 
-I can't reproduce what I saw earlier. Sorry for the noise.
+>> Using the KVM device api is just another way of storing and exposing the
+>> information globally (you take registering the device types as an
+>> indication of the state).
+>>
+>> Finally, I don't even think you ned the can_emulate function, I think
+>> you should just return an error from init_vgic_model (which happens to
+>> collide with my suggestion on making those functions a void function in
+>> one of the previous patches) and you're done.
+> 
+> I think I checked this before and since the init_vgic_model()
+> implementations are in vgic-vx-emul.c we don't know the hardware
+> capability anymore and would need some kind of variable holding that
+> information (which lead me to re-using the KVM device knowledge). But I
+> will re-check if there is an easy fix in here.
 
-cheers,
--roger
+So since we only see this problem with the legacy KVM_CREATE_IRQCHIP
+ioctl, we could just introduce a can_emulate_gicv2 flag into vgic_params
+which holds the capability of emulating a GICv2. Any potential future
+VGIC models will be handled by KVM_CREATE_DEVICE only anyway, so we are
+covered with this.
+I now check that flag in kvm_vgic_create() when a GICv2 emulation is
+requested. This function is directly called by the KVM_CREATE_IRQCHIP
+handler, so the connection should be clear (and is commented).
+That works and is not too ugly, only to me it looks a bit like a kludge
+to avoid the KVM device check.
+
+If you are roughly OK with this approach, I will send out a v7 with that
+one.
+
+Cheers,
+Andre.
+
+>>>
+>>> So I prefer the more generic solution.
+>>> Let me know what you think, I can as well drop 18/20 and merge the above
+>>> mentioned patch.
+>>>
+>>>> I forget: Are we still requiring KVM_CREATE_IRQCHIP for VGICv3 or are we
+>>>> just relying on users to use KVM_CREATE_DEVICE for anything in the
+>>>> future?
+>>>
+>>> Since KVM_CREATE_IRQCHIP does not take an argument, we cannot use it for
+>>> GICv3. So GICv3 mandates KVM_CREATE_DEVICE. We need userspace
+>>> adjustments for GICv3 anyway, so that's not a problem.
+>>
+>> ok, so KVM_CREATE_IRQCHIP is a direct alias for KVM_CREATE_DEVICE(GIC_V2)
+>> and is deprecated for GICv3?  If so, we should probably update the
+>> documentation to indicate the KVM_CREATE_IRQCHIP creates a GICv2 and
+>> should not be used for any other in-kernel GIC versions.
+> 
+> What about the following wording in api.txt:
+> -----
+> On ARM/arm64, a GICv2 is created. Any other VGIC versions require the
+> usage of KVM_CREATE_DEVICE (which can and should also be used to create
+> a virtual GICv2).
+> -----
+> 
+> In fact both QEMU and kvmtool currently try KVM_CREATE_DEVICE first even
+> for a VGICv2 on a GICv2 and only fall back to KVM_CREATE_IRQCHIP if that
+> fails (to support older kernels).
+> 
+> Cheers,
+> Andre.
+> 
