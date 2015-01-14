@@ -1,67 +1,76 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 15 Jan 2015 00:15:06 +0100
-Subject: [PATCHv3 1/2] leds: tlc59116: Document binding for the TI 16 Channel
- i2c LED driver
-In-Reply-To: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
-References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1421277308-3477-2-git-send-email-andrew@lunn.ch>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 15 Jan 2015 08:34:12 +0900
+Subject: [PATCH 0/4] ARM: shmobile: sh73a0/kzm9g: Complete multiplatform
+ support
+In-Reply-To: <CAMuHMdVBh+TntyXCDT0y=Bnntrh4Pu66vxPJ00o=Zi8+WwCvVA@mail.gmail.com>
+References: <1420809866-4330-1-git-send-email-geert+renesas@glider.be>
+ <20150113020818.GB21265@verge.net.au>
+ <CAMuHMdVbuM3oR1KQDzAodp_Y-aWFncPRn48-F9HmrVkGDS36RQ@mail.gmail.com>
+ <20150114040822.GA14661@verge.net.au>
+ <CAMuHMdVBh+TntyXCDT0y=Bnntrh4Pu66vxPJ00o=Zi8+WwCvVA@mail.gmail.com>
+Message-ID: <20150114233408.GA10479@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the binding for the TLC59116 LED driver.
+On Wed, Jan 14, 2015 at 11:03:42AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Jan 14, 2015 at 5:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Jan 13, 2015 at 11:08:20AM +0100, Geert Uytterhoeven wrote:
+> >> On Tue, Jan 13, 2015 at 3:08 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Fri, Jan 09, 2015 at 02:24:26PM +0100, Geert Uytterhoeven wrote:
+> >> >> This patch series completes the migration from kzm9g-reference (legacy
+> >> >> DT based) to kzm9g-multiplatform (ARM multiplatform DT based with
+> >> >> common clock framework).
+> >> >>
+> >> >>   - The first two patches fix Ethernet on kzm9g, by adding a Bus State
+> >> >>     Controller node, as introduced in "[PATCH v3 0/4] drivers: bus:
+> >> >>     Add Simple Power-Managed Bus", and moving the Ethernet node to it,
+> >> >>   - The third path enables kzm9g support in shmobile_defconfig,
+> >> >>   - The fourth patch removes all kzm9g-reference support, now the
+> >> >>     sh73a0 generic multiplatform case has the same feature set
+> >> >>     (better, it provides 16 MiB more RAM!).
+> >> >>
+> >> >> Thanks for applying!
+> >> >
+> >> > It seems to me that at the first two patches require the patchset
+> >> > referenced above in order to work. For that reason I am holding off
+> >>
+> >> Yes it does.
+> >>
+> >> > on applying this series. I am quite happy to negotiate merging
+> >> > some or all of this series earlier than later :)
+> >>
+> >> Hence please merge both the dependency and this series.
+> >>
+> >>   1. Both sh73a0/kzm9g-multiplatform and r8a73a4/ape6evm-multiplatform
+> >>       depend on "[PATCH v3 0/4] drivers: bus: Add Simple Power-Managed Bus",
+> >
+> > For some reason I assumed this would go through a different subsystem tree.
+> > I'm fine with taking it through my tree, if you think that is best.
+> 
+> There's no maintainer for drivers/bus/, and as kzm9g-multiplatform depends on
+> it, your tree looks fine to me.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Matthew.Fatheree at belkin.com
----
- .../devicetree/bindings/leds/leds-tlc59116.txt     | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/leds-tlc59116.txt
+On closer examination I also see that there is no drivers/bus/ maintainer.
+So yes, I agree we should be fine.
 
-diff --git a/Documentation/devicetree/bindings/leds/leds-tlc59116.txt b/Documentation/devicetree/bindings/leds/leds-tlc59116.txt
-new file mode 100644
-index 000000000000..45c2123774d3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/leds/leds-tlc59116.txt
-@@ -0,0 +1,40 @@
-+LEDs connected to tcl59116
-+
-+Required properties
-+- compatible: should be "ti,tlc59116"
-+- #address-cells: must be 1
-+- #size-cells: must be 0
-+- reg: typically 0x68
-+
-+Each led is represented as a sub-node of the ti,,tlc59116.
-+See Documentation/devicetree/bindings/leds/common.txt
-+
-+LED sub-node properties:
-+- reg: number of LED line, 0 to 15
-+- label: (optional) name of LED
-+- linux,default-trigger : (optional)
-+
-+Examples:
-+
-+tlc59116 at 68 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	compatible = "ti,tlc59116";
-+	reg = <0x68>;
-+
-+	wan at 0 {
-+		label = "wrt1900ac:amber:wan";
-+		reg = <0x0>;
-+	};
-+
-+	2g at 2 {
-+		label = "wrt1900ac:white:2g";
-+		reg = <0x2>;
-+	};
-+
-+	alive at 9 {
-+		label = "wrt1900ac:green:alive";
-+		reg = <0x9>;
-+		linux,default_trigger = "heartbeat";
-+	};
-+};
--- 
-2.1.4
+> > I am a bit worried about handling conflicts that may arise, especially from
+> > the first two patches in that series which re-arrange things
+> > alphabetically. But I see that the files in question are not updated very
+> > often, so I suppose we should be safe enough.
+> 
+> Indeed.
+> 
+> > For now I have tentatively queued up both this patchset and the
+> > dependency listed immediately above. Please take a look
+> > at the sh73a0-multiplatform-for-v3.20 and drivers-for-v3.20 branches
+> > and the renesas-next-20150114-v3.19-rc1 tag to see if I missed something.
+> 
+> Thanks, looks fine!
+
+Great, thanks for checking.
+
+My plan is to send pull-requests for those branches once they
+have sat in next for a little bit. By my calculations that should be early
+next week.
