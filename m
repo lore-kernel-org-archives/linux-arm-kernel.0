@@ -1,83 +1,248 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 Jan 2015 19:42:38 +0100
-Subject: [PATCH V3 11/15] ASoC: samsung: i2s: Add clk provider DT binding
- documentation
+Date: Wed, 14 Jan 2015 19:42:36 +0100
+Subject: [PATCH V3 09/15] ASoC: samsung: i2s: Protect more registers with a
+ spinlock
 In-Reply-To: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
 References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1421260962-16892-12-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1421260962-16892-10-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new DT properties required for the I2S device node to be referred
-as a clock provider and corresponding clock indices definition is added.
+Ensure the I2SMOD, I2SPSR registers, which are also exposed through
+clk API are only accessed with the i2s->spinlock spinlock held.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- .../devicetree/bindings/sound/samsung-i2s.txt      |   22 ++++++++++++++++++++
- include/dt-bindings/sound/samsung-i2s.h            |    8 +++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 include/dt-bindings/sound/samsung-i2s.h
+ sound/soc/samsung/i2s.c |   81 +++++++++++++++++++++++++++++------------------
+ 1 file changed, 51 insertions(+), 30 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-index d188296..09e0e18 100644
---- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-@@ -33,6 +33,25 @@ Required SoC Specific Properties:
-   "iis" is the i2s bus clock and i2s_opclk0, i2s_opclk1 are sources of the root
-   clk. i2s0 has internal mux to select the source of root clk and i2s1 and i2s2
-   doesn't have any such mux.
-+- #clock-cells: should be 1, this property must be present if the I2S device
-+  is a clock provider in terms of the common clock bindings, described in
-+  ../clock/clock-bindings.txt.
-+- clock-output-names: from the common clock bindings, names of the CDCLK
-+  I2S output clocks, suggested values are "i2s_cdclk0", "i2s_cdclk1",
-+  "i2s_cdclk3" for the I2S0, I2S1, I2S2 devices recpectively.
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 20cc51f..05fc2f0 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -472,17 +472,22 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+ {
+ 	struct i2s_dai *i2s = to_info(dai);
+ 	struct i2s_dai *other = get_other_dai(i2s);
+-	u32 mod = readl(i2s->addr + I2SMOD);
+ 	const struct samsung_i2s_variant_regs *i2s_regs = i2s->variant_regs;
+ 	unsigned int cdcon_mask = 1 << i2s_regs->cdclkcon_off;
+ 	unsigned int rsrc_mask = 1 << i2s_regs->rclksrc_off;
++	u32 mod, mask, val = 0;
 +
-+There are following clocks available at the I2S device nodes:
-+ CLK_I2S_CDCLK    - the CDCLK (CODECLKO) gate clock,
-+ CLK_I2S_RCLK_PSR - the RCLK prescaler divider clock (corresponding to the
-+		    IISPSR register),
-+ CLK_I2S_RCLK_SRC - the RCLKSRC mux clock (corresponding to RCLKSRC bit in
-+		    IISMOD register).
-+
-+Refer to the SoC datasheet for availability of the above clocks.
-+The CLK_I2S_RCLK_PSR and CLK_I2S_RCLK_SRC clocks are usually only available
-+in the IIS Multi Audio Interface (I2S0).
-+Note: Old DTs may not have the #clock-cells, clock-output-names properties
-+and then not use the I2S node as a clock supplier.
++	spin_lock(i2s->lock);
++	mod = readl(i2s->addr + I2SMOD);
++	spin_unlock(i2s->lock);
  
- Optional SoC Specific Properties:
+ 	switch (clk_id) {
+ 	case SAMSUNG_I2S_OPCLK:
+-		mod &= ~MOD_OPCLK_MASK;
+-		mod |= dir;
++		mask = MOD_OPCLK_MASK;
++		val = dir;
+ 		break;
+ 	case SAMSUNG_I2S_CDCLK:
++		mask = 1 << i2s_regs->cdclkcon_off;
+ 		/* Shouldn't matter in GATING(CLOCK_IN) mode */
+ 		if (dir == SND_SOC_CLOCK_IN)
+ 			rfs = 0;
+@@ -499,15 +504,15 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+ 		}
  
-@@ -41,6 +60,7 @@ Optional SoC Specific Properties:
- - pinctrl-0: Should specify pin control groups used for this controller.
- - pinctrl-names: Should contain only one value - "default".
+ 		if (dir == SND_SOC_CLOCK_IN)
+-			mod |= 1 << i2s_regs->cdclkcon_off;
+-		else
+-			mod &= ~(1 << i2s_regs->cdclkcon_off);
++			val = 1 << i2s_regs->cdclkcon_off;
  
-+
- Example:
+ 		i2s->rfs = rfs;
+ 		break;
  
- i2s0: i2s at 03830000 {
-@@ -54,6 +74,8 @@ i2s0: i2s at 03830000 {
- 		<&clock_audss EXYNOS_I2S_BUS>,
- 		<&clock_audss EXYNOS_SCLK_I2S>;
- 	clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+	#clock-cells;
-+	clock-output-names = "i2s_cdclk0";
- 	samsung,idma-addr = <0x03000000>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2s0_bus>;
-diff --git a/include/dt-bindings/sound/samsung-i2s.h b/include/dt-bindings/sound/samsung-i2s.h
-new file mode 100644
-index 0000000..0c69818d
---- /dev/null
-+++ b/include/dt-bindings/sound/samsung-i2s.h
-@@ -0,0 +1,8 @@
-+#ifndef _DT_BINDINGS_SAMSUNG_I2S_H
-+#define _DT_BINDINGS_SAMSUNG_I2S_H
+ 	case SAMSUNG_I2S_RCLKSRC_0: /* clock corrsponding to IISMOD[10] := 0 */
+ 	case SAMSUNG_I2S_RCLKSRC_1: /* clock corrsponding to IISMOD[10] := 1 */
++		mask = 1 << i2s_regs->rclksrc_off;
 +
-+#define CLK_I2S_CDCLK		0
-+#define CLK_I2S_RCLK_SRC	1
-+#define CLK_I2S_RCLK_PSR	2
+ 		if ((i2s->quirks & QUIRK_NO_MUXPSR)
+ 				|| (clk_id == SAMSUNG_I2S_RCLKSRC_0))
+ 			clk_id = 0;
+@@ -557,18 +562,19 @@ static int i2s_set_sysclk(struct snd_soc_dai *dai,
+ 			return 0;
+ 		}
+ 
+-		if (clk_id == 0)
+-			mod &= ~(1 << i2s_regs->rclksrc_off);
+-		else
+-			mod |= 1 << i2s_regs->rclksrc_off;
+-
++		if (clk_id == 1)
++			val = 1 << i2s_regs->rclksrc_off;
+ 		break;
+ 	default:
+ 		dev_err(&i2s->pdev->dev, "We don't serve that!\n");
+ 		return -EINVAL;
+ 	}
+ 
++	spin_lock(i2s->lock);
++	mod = readl(i2s->addr + I2SMOD);
++	mod = (mod & ~mask) | val;
+ 	writel(mod, i2s->addr + I2SMOD);
++	spin_unlock(i2s->lock);
+ 
+ 	return 0;
+ }
+@@ -577,9 +583,8 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
+ 	unsigned int fmt)
+ {
+ 	struct i2s_dai *i2s = to_info(dai);
+-	u32 mod = readl(i2s->addr + I2SMOD);
+ 	int lrp_shift, sdf_shift, sdf_mask, lrp_rlow, mod_slave;
+-	u32 tmp = 0;
++	u32 mod, tmp = 0;
+ 
+ 	lrp_shift = i2s->variant_regs->lrp_off;
+ 	sdf_shift = i2s->variant_regs->sdf_off;
+@@ -639,12 +644,15 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
+ 		return -EINVAL;
+ 	}
+ 
++	spin_lock(i2s->lock);
++	mod = readl(i2s->addr + I2SMOD);
+ 	/*
+ 	 * Don't change the I2S mode if any controller is active on this
+ 	 * channel.
+ 	 */
+ 	if (any_active(i2s) &&
+ 		((mod & (sdf_mask | lrp_rlow | mod_slave)) != tmp)) {
++		spin_unlock(i2s->lock);
+ 		dev_err(&i2s->pdev->dev,
+ 				"%s:%d Other DAI busy\n", __func__, __LINE__);
+ 		return -EAGAIN;
+@@ -653,6 +661,7 @@ static int i2s_set_fmt(struct snd_soc_dai *dai,
+ 	mod &= ~(sdf_mask | lrp_rlow | mod_slave);
+ 	mod |= tmp;
+ 	writel(mod, i2s->addr + I2SMOD);
++	spin_unlock(i2s->lock);
+ 
+ 	return 0;
+ }
+@@ -661,16 +670,16 @@ static int i2s_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
+ {
+ 	struct i2s_dai *i2s = to_info(dai);
+-	u32 mod = readl(i2s->addr + I2SMOD);
++	u32 mod, mask = 0, val = 0;
+ 
+ 	if (!is_secondary(i2s))
+-		mod &= ~(MOD_DC2_EN | MOD_DC1_EN);
++		mask |= (MOD_DC2_EN | MOD_DC1_EN);
+ 
+ 	switch (params_channels(params)) {
+ 	case 6:
+-		mod |= MOD_DC2_EN;
++		val |= MOD_DC2_EN;
+ 	case 4:
+-		mod |= MOD_DC1_EN;
++		val |= MOD_DC1_EN;
+ 		break;
+ 	case 2:
+ 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+@@ -692,44 +701,49 @@ static int i2s_hw_params(struct snd_pcm_substream *substream,
+ 	}
+ 
+ 	if (is_secondary(i2s))
+-		mod &= ~MOD_BLCS_MASK;
++		mask |= MOD_BLCS_MASK;
+ 	else
+-		mod &= ~MOD_BLCP_MASK;
++		mask |= MOD_BLCP_MASK;
+ 
+ 	if (is_manager(i2s))
+-		mod &= ~MOD_BLC_MASK;
++		mask |= MOD_BLC_MASK;
+ 
+ 	switch (params_width(params)) {
+ 	case 8:
+ 		if (is_secondary(i2s))
+-			mod |= MOD_BLCS_8BIT;
++			val |= MOD_BLCS_8BIT;
+ 		else
+-			mod |= MOD_BLCP_8BIT;
++			val |= MOD_BLCP_8BIT;
+ 		if (is_manager(i2s))
+-			mod |= MOD_BLC_8BIT;
++			val |= MOD_BLC_8BIT;
+ 		break;
+ 	case 16:
+ 		if (is_secondary(i2s))
+-			mod |= MOD_BLCS_16BIT;
++			val |= MOD_BLCS_16BIT;
+ 		else
+-			mod |= MOD_BLCP_16BIT;
++			val |= MOD_BLCP_16BIT;
+ 		if (is_manager(i2s))
+-			mod |= MOD_BLC_16BIT;
++			val |= MOD_BLC_16BIT;
+ 		break;
+ 	case 24:
+ 		if (is_secondary(i2s))
+-			mod |= MOD_BLCS_24BIT;
++			val |= MOD_BLCS_24BIT;
+ 		else
+-			mod |= MOD_BLCP_24BIT;
++			val |= MOD_BLCP_24BIT;
+ 		if (is_manager(i2s))
+-			mod |= MOD_BLC_24BIT;
++			val |= MOD_BLC_24BIT;
+ 		break;
+ 	default:
+ 		dev_err(&i2s->pdev->dev, "Format(%d) not supported\n",
+ 				params_format(params));
+ 		return -EINVAL;
+ 	}
 +
-+#endif /* _DT_BINDINGS_SAMSUNG_I2S_H */
++	spin_lock(i2s->lock);
++	mod = readl(i2s->addr + I2SMOD);
++	mod = (mod & ~mask) | val;
+ 	writel(mod, i2s->addr + I2SMOD);
++	spin_unlock(i2s->lock);
+ 
+ 	samsung_asoc_init_dma_data(dai, &i2s->dma_playback, &i2s->dma_capture);
+ 
+@@ -979,6 +993,7 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct i2s_dai *i2s = to_info(dai);
+ 	struct i2s_dai *other = get_other_dai(i2s);
++	unsigned long flags;
+ 
+ 	if (is_secondary(i2s)) { /* If this is probe on the secondary DAI */
+ 		samsung_asoc_init_dma_data(dai, &other->sec_dai->dma_playback,
+@@ -999,11 +1014,14 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
+ 	i2s->rfs = 0;
+ 	i2s->bfs = 0;
+ 	i2s->rclk_srcrate = 0;
++
++	spin_lock_irqsave(i2s->lock, flags);
+ 	i2s_txctrl(i2s, 0);
+ 	i2s_rxctrl(i2s, 0);
+ 	i2s_fifo(i2s, FIC_TXFLUSH);
+ 	i2s_fifo(other, FIC_TXFLUSH);
+ 	i2s_fifo(i2s, FIC_RXFLUSH);
++	spin_unlock_irqrestore(i2s->lock, flags);
+ 
+ 	/* Gate CDCLK by default */
+ 	if (!is_opened(other))
+@@ -1018,8 +1036,11 @@ static int samsung_i2s_dai_remove(struct snd_soc_dai *dai)
+ 	struct i2s_dai *i2s = snd_soc_dai_get_drvdata(dai);
+ 
+ 	if (!is_secondary(i2s)) {
+-		if (i2s->quirks & QUIRK_NEED_RSTCLR)
++		if (i2s->quirks & QUIRK_NEED_RSTCLR) {
++			spin_lock(i2s->lock);
+ 			writel(0, i2s->addr + I2SCON);
++			spin_unlock(i2s->lock);
++		}
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.9.5
