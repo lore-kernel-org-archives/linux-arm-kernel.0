@@ -1,45 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Jan 2015 13:53:48 -0600
-Subject: [PATCH v2 1/3] of/platform: teardown DMA mappings on device
- destruction
-In-Reply-To: <1421262803-21003-2-git-send-email-will.deacon@arm.com>
-References: <1421262803-21003-1-git-send-email-will.deacon@arm.com>
- <1421262803-21003-2-git-send-email-will.deacon@arm.com>
-Message-ID: <CAL_Jsq+9N2AP-emVWx+t6djDjp3KXSJ+bP+r5=uShAOwxxt5Ug@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Jan 2015 19:54:52 +0000
+Subject: [PATCH V3 13/15] ARM: dts: Exynos4 and Odroid X2/U3 sound device
+ nodes update
+In-Reply-To: <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
+References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
+ <1421260962-16892-14-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20150114195452.GM3043@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 1:13 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Now that we can create and attach to IOMMU domains via of_dma_configure,
-> make sure we give the architecture a chance to tear them down when a
-> platform or amba device is destroyed.
->
-> Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Wed, Jan 14, 2015 at 07:42:40PM +0100, Sylwester Nawrocki wrote:
+> Clock related properties are added to the Exynos4 I2S device nodes
+> so they can be referred to as clock providers. Missing i2s_opclk1
+> clock is added to the I2S0 node and clock properties are added
+> to the MAX98090 codec node to allow it to control/read frequency
+> of the MCLK clock directly.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-> ---
->  drivers/of/platform.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 5b33c6a21807..3f61d668ded7 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -526,6 +526,7 @@ static int of_platform_device_destroy(struct device *dev, void *data)
->                 amba_device_unregister(to_amba_device(dev));
->  #endif
->
-> +       of_dma_deconfigure(dev);
->         of_node_clear_flag(dev->of_node, OF_POPULATED);
->         of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
->         return 0;
-> --
-> 2.1.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Sorry, I should've said - I applied the ASoC patches, not these.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/29480a38/attachment.sig>
