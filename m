@@ -1,41 +1,46 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Wed, 14 Jan 2015 09:20:36 +0900
-Subject: [PATCH 00/27] ARM: mvebu: armada-*: Relicense the device tree
- under GPLv2+/X11
-In-Reply-To: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1418657915-22775-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CABMQnVLga2SHjQiK+Ki_Cx0AKSE8Q-DpL2nBcKyf67PomdPr4w@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 14 Jan 2015 01:24:01 +0100
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <54B5B5F6.3030607@collabora.co.uk>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk> <54818768.3080303@samsung.com>
+ <CABxcv=n=eNqbyBbOk1Wb87tCnnLZAJQurmCdeTOSqMZMbNaSHw@mail.gmail.com>
+ <54AC93E0.8010705@samsung.com> <54ACFD69.1020500@collabora.co.uk>
+ <54AD0293.70909@samsung.com> <54AEB384.2040005@collabora.co.uk>
+ <54B36C5A.6050109@samsung.com> <54B3F1B7.7090307@collabora.co.uk>
+ <54B4ABFB.5000501@samsung.com> <54B5B5F6.3030607@collabora.co.uk>
+Message-ID: <54B5B721.4070309@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Gregory.
+On 01/14/2015 01:19 AM, Javier Martinez Canillas wrote:
+> 
+> I dug further on this issue and found that the cause is that the exynos_mixer
+> driver needs some clocks (CLK_HDMI and CLK_SCLK_HDMI) grabbed by exynos_hdmi
+> to be kept enabled after hdmi_poweroff (drivers/gpu/drm/exynos/exynos_hdmi.c).
+> 
+> Otherwise, any access to mixer device registers leads to an imprecise external
+> abort error. The following change [0] to the Exynos DRM HDMI driver makes the
+> issue to not happen and I can successfully execute:
+> 
+> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+> 
+> Only not disabling the hdmi clock [1]: is enough but doing so makes sometimes the
+> DISP1 power domain disabling fails. It doesn't seem to have side effect though
+> since I also see the signal in the HDMI display to go standby and then on again.
+> 
+> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+> # echo 1 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+> [   63.089080] Power domain disp1-power-domain disable failed
+> # echo 0 > /sys/devices/platform/exynos-drm/graphics/fb0/blank
+> #
+> 
+> That error message when both clocks are not disabled on hdmi_poweroff() though.
+> 
 
-2014-12-16 0:38 GMT+09:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hello,
->
-> You've been Cc'd on a relicensing patch, because at some point you
-> contributed a patch to an mvebu device tree.
->
-> We're currently moving toward a GPL/X11 dual-license, instead of a GPL
-> license like what was done when you submitted your patches.
->
-> This is mostly so that other free software project licensed under a
-> BSD-like license, such as the BSD systems, can actually use our DT,
-> instead of having to rewrite them on their own.
->
-> Such license changes require the agreement of all the contributors, so
-> it would be great, if you agree with the new licensing terms of
-> course, that you reply to the patch by giving your acked-by.
-
-For all those files I've contributed to
-
-Acked-by Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+This should be: "That error message is not shown when both clocks are disabled".
 
 Best regards,
-  Nobuhiro
-
-
--- 
-Nobuhiro Iwamatsu
-   iwamatsu at {nigauri.org / debian.org}
-   GPG ID: 40AD1FA6
+Javier
