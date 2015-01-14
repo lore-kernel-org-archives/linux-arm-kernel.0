@@ -1,50 +1,30 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 14 Jan 2015 18:39:11 +0100
-Subject: [PATCH v2 1/5] rtc: armada38x: Add the device tree binding
- documentation
+Date: Wed, 14 Jan 2015 18:39:13 +0100
+Subject: [PATCH v2 3/5] MAINTAINERS: Add the RTC driver for the Armada38x
 In-Reply-To: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421257155-3379-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1421257155-3379-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 38x SoCs come with a new RTC which differs from the one
-used in the other mvebu SoCs until now. This patch describes the
-binding of this RTC.
+Put it in the mvebu entry.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../devicetree/bindings/rtc/armada-380-rtc.txt     | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-new file mode 100644
-index 000000000000..5a58aa94cfc7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-@@ -0,0 +1,22 @@
-+* Real Time Clock of te Armada 38x SoCs
-+
-+RTC controller for the Armada 38x SoCs
-+
-+Required properties:
-+- compatible : Should be "marvell,armada-380-rtc"
-+- reg: physical base address of the controller and length of memory
-+  mapped region, associated to the reg-name "rtc". The other entry is
-+  related to the interrupt control from the SoC, associated to the
-+  reg-name "soc-interrupt".
-+- reg-names: names of the mapped memory regions listed in regs
-+    property in the same order: "rtc" and "soc-int".
-+- interrupts: IRQ line for the RTC.
-+
-+Example:
-+
-+rtc at a3800 {
-+	compatible = "marvell,armada-380-rtc";
-+	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
-+	reg-names = "rtc", "soc-int";
-+	interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddb9ac8d32b3..393f158a64e8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1157,6 +1157,7 @@ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-mvebu/
++F:	drivers/rtc/armada38x-rtc
+ 
+ ARM/Marvell Berlin SoC support
+ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 -- 
 1.9.1
