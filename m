@@ -1,67 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Jan 2015 14:39:26 +0000
-Subject: [PATCH] arm64: kill off the libgcc dependency
-In-Reply-To: <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
-References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
- <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
- <2438951.7KFuXx85Hp@wuerfel>
- <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
-Message-ID: <20150114143926.GY12302@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Jan 2015 15:43:29 +0100
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <20150114150332.09fecbea@bbrezillon>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>	<1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>	<54B670EA.1010800@atmel.com>
+ <20150114150332.09fecbea@bbrezillon>
+Message-ID: <54B68091.7080109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 12:52:49PM +0000, Ard Biesheuvel wrote:
-> On 14 January 2015 at 12:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> > You have a better control over what is included. On 32-bit architectures,
-> > the 64-bit division is notorious here, we really don't want to accidentally
-> > call the libgcc implementation but instead have our own do_div() helper.
-> >
-> > Similarly I'd think that if we get a compiler that uses an external
-> > __ffs implementation, we should implement an inline assembly instead
-> > of taking the libgcc version.
-> >
-> > Another problem that has happened in the past is libgcc functions that
-> > in turn call glibc functions. To avoid that, you'd really want to build
-> > the kernel with -ffreestanding, but that opens another can of worms.
-> >
+Le 14/01/2015 15:03, Boris Brezillon a ?crit :
+> On Wed, 14 Jan 2015 14:36:42 +0100
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 > 
-> IMO libgcc.a cannot be used at all in the kernel, as it is not built
-> with -mgeneral-regs-only so we have no guarantee that it will leave
-> the NEON registers alone.
+>> Le 13/01/2015 19:46, Boris Brezillon a ?crit :
+>>> Some interrupt controllers are multiplexing several peripheral IRQs on
+>>> a single interrupt line.
+>>> While this is not a problem for most IRQs (as long as all peripherals
+>>> request the interrupt with IRQF_SHARED flag set), multiplexing timers and
+>>> other type of peripherals will generate a WARNING (mixing IRQF_NO_SUSPEND
+>>> and !IRQF_NO_SUSPEND is prohibited).
+>>>
+>>> Create a dumb irq demultiplexer which simply forwards interrupts to all
+>>> peripherals (exactly what's happening with IRQ_SHARED) but keep a unique
+>>> irq number for each peripheral, thus preventing the IRQF_NO_SUSPEND
+>>> and !IRQF_NO_SUSPEND mix on a given interrupt.
+>>>
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>> ---
+>>>  drivers/irqchip/Kconfig          |   4 ++
+>>>  drivers/irqchip/Makefile         |   1 +
+>>>  drivers/irqchip/irq-dumb-demux.c |  70 ++++++++++++++++++++
+>>>  include/linux/irq.h              |  49 ++++++++++++++
+>>>  include/linux/irqdomain.h        |   1 +
+>>>  kernel/irq/Kconfig               |   5 ++
+>>>  kernel/irq/Makefile              |   1 +
+>>>  kernel/irq/chip.c                |  41 ++++++++++++
+>>>  kernel/irq/dumb-demux-chip.c     | 140 +++++++++++++++++++++++++++++++++++++++
+>>>  kernel/irq/handle.c              |  31 ++++++++-
+>>>  kernel/irq/internals.h           |   3 +
+>>>  11 files changed, 344 insertions(+), 2 deletions(-)
+>>>  create mode 100644 drivers/irqchip/irq-dumb-demux.c
+>>>  create mode 100644 kernel/irq/dumb-demux-chip.c
 
-It's actually exactly issues like this which have prompted the kernel to
-use its own libgcc on many architectures.
+[..]
 
-Not only is it what Arnd says above, but it's also to do with making sure
-that we know what goes into the kernel is sane.
+>>> +static void irq_dumb_demux_mask(struct irq_data *d)
+>>> +{
+>>> +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
+>>> +
+>>> +	clear_bit(d->hwirq, &demux->unmasked);
+>>> +
+>>> +	if (!demux->unmasked)
+>>> +		disable_irq_nosync(demux->src_irq);
+>>> +}
+>>> +
+>>> +static void irq_dumb_demux_unmask(struct irq_data *d)
+>>> +{
+>>> +	struct irq_chip_dumb_demux *demux = irq_data_get_irq_chip_data(d);
+>>> +	bool enable_src_irq = !demux->unmasked;
+>>
+>> Why this additional "bool" unlike the other function above?
+> 
+> Because set_bit will modify the unmasked status and we must check if it
+> is equal to 0 (in other terms, all irqs are masked) before modifying it
+> in order to know whether we should enable the src irq or not.
 
-Although libgcc is part of the compiler, libgcc is built with the
-expectation that it will be running in userland - it expects to link
-to a libc.  That's why you can't build libgcc without having the glibc
-headers around.
+pfffff! ok, sorry for the noise then ;-)
 
-For example, on ARM, libgcc.a may contain calls to __div0, and it may
-provide its own __div0 implementation, which invokes various Linux
-system calls.
 
-Various functions reference _GLOBAL_OFFSET_TABLE_ which we don't want
-to have in the kernel.
+>>> +
+>>> +	set_bit(d->hwirq, &demux->unmasked);
+>>> +
+>>> +	if (enable_src_irq)
+>>> +		enable_irq(demux->src_irq);
+>>> +}
+>>> +
 
-Depending on how the compiler was built, libgcc.a may be built for
-ARMv4, ARMv5, ARMv6 or ARMv7, and may not be appropriate for linking
-with the kernel.  (Eg, you wouldn't want to try to link an ARMv7
-libgcc.a in an ARMv5 kernel - and we /really/ don't want the mess
-of having different toolchains for different ARM arch versions.)
+[...]
 
-It may also drag in the userspace exception unwind support.
-
-Meanwhile, having the kernel build the compiler support functions that
-it needs ensures that (a) we know what compiler support functions are
-being used, (b) we know the implementation of those support functions
-are sane for use in the kernel, (c) we can build them with appropriate
-compiler flags for best performance, and (d) we remove an unnecessary
-dependency on the build toolchain.
-
+Bye,
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
