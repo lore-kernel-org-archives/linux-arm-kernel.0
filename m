@@ -1,53 +1,194 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Wed, 14 Jan 2015 14:56:33 +0530
-Subject: [PATCH v2 1/3] dmaengine: Add support for APM X-Gene SoC DMA
- engine driver
-In-Reply-To: <1701652.4qUlzcU1j2@wuerfel>
-References: <1420628981-22774-1-git-send-email-rsahu@apm.com>
- <1420628981-22774-2-git-send-email-rsahu@apm.com>
- <CAFd313xp5rZZZSSKk-DDTC4ccY9ZucGgmWrc9oG-TiK2FMBS1g@mail.gmail.com>
- <1701652.4qUlzcU1j2@wuerfel>
-Message-ID: <CAFd313zMoW86ZcXURrk2K+E6129L+BruOp4E0A=w0PQEcMr-Yw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 14 Jan 2015 17:29:40 +0800
+Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
+ references
+In-Reply-To: <54B62CC8.5010403@redhat.com>
+References: <1421123484-21387-1-git-send-email-wens@csie.org>
+ <20150113154415.GY4891@lukather>
+ <CAGb2v67sQyNcFQgvm60TUzjp3QBusckvP2i_xkj-eLRZubkALA@mail.gmail.com>
+ <20150113162053.GZ4891@lukather> <54B61AD3.2040407@redhat.com>
+ <CAGb2v65jZZJoG3z+9Vc460X3kvogwLDze_Jx4pS-xuR=84GBVQ@mail.gmail.com>
+ <54B62CC8.5010403@redhat.com>
+Message-ID: <CAGb2v65pFDWnucdP-_fX+JzdWSx9maWCkzc_z1jFcnt=GMxfqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-
-
-
-
-Thanks,
-with regards,
-Ram
-
-
-On Tue, Jan 13, 2015 at 12:25 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 12 January 2015 14:40:09 Rameshwar Sahu wrote:
->> > +
->> > +       dma_set_mask_and_coherent(&pdev->dev,
->> > +                                 (sizeof(dma_addr_t) == sizeof(u64)) ?
->> > +                                 DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
->> > +
+On Wed, Jan 14, 2015 at 4:46 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 14-01-15 09:41, Chen-Yu Tsai wrote:
 >>
+>> On Wed, Jan 14, 2015 at 3:29 PM, Hans de Goede <hdegoede@redhat.com>
+>> wrote:
+>>>
+>>> Hi,
+>>>
+>>>
+>>> On 13-01-15 17:20, Maxime Ripard wrote:
+>>>>
+>>>>
+>>>> On Tue, Jan 13, 2015 at 11:54:21PM +0800, Chen-Yu Tsai wrote:
+>>>>>
+>>>>>
+>>>>> On Tue, Jan 13, 2015 at 11:44 PM, Maxime Ripard
+>>>>> <maxime.ripard@free-electrons.com> wrote:
+>>>>>>
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Tue, Jan 13, 2015 at 12:31:24PM +0800, Chen-Yu Tsai wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> Using label references is preferred when override settings from the
+>>>>>>> included dtsi.
+>>>>>>>
+>>>>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>>>>>> ---
+>>>>>>>
+>>>>>>> My AXP221 series touches this file. I thought I'd convert it first.
+>>>>>>>
+>>>>>>> This looks like a lot of changes. But if you filter out all the
+>>>>>>> indentation changes, it's just the opening lines for each node.
+>>>>>>>
+>>>>>>> ---
+>>>>>>>    arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181
+>>>>>>> ++++++++++++++--------------
+>>>>>>>    1 file changed, 88 insertions(+), 93 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>> b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>> index ebd5f7854b1b..97dbaeb76416 100644
+>>>>>>> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>> @@ -61,101 +61,96 @@
+>>>>>>>         chosen {
+>>>>>>>                 bootargs = "earlyprintk console=ttyS0,115200";
+>>>>>>>         };
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&mmc0 {
+>>>>>>> +     pinctrl-names = "default";
+>>>>>>> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+>>>>>>> +     vmmc-supply = <&reg_vcc3v0>;
+>>>>>>> +     bus-width = <4>;
+>>>>>>> +     cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+>>>>>>> +     cd-inverted;
+>>>>>>> +     status = "okay";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&usbphy {
+>>>>>>> +     usb1_vbus-supply = <&reg_usb1_vbus>;
+>>>>>>> +     status = "okay";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&ehci0 {
+>>>>>>> +     status = "okay";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&ohci0 {
+>>>>>>> +     status = "okay";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&pio {
+>>>>>>> +     mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
+>>>>>>> +             allwinner,pins = "PA8";
+>>>>>>> +             allwinner,function = "gpio_in";
+>>>>>>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>>>>> +             allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>>>> +     };
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&mmc0_pins_a {
+>>>>>>> +     /* external pull-ups missing for some pins */
+>>>>>>> +     allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&usb1_vbus_pin_a {
+>>>>>>> +     /* different pin from sunxi-common-regulators */
+>>>>>>> +     allwinner,pins = "PH24";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&uart0 {
+>>>>>>> +     pinctrl-names = "default";
+>>>>>>> +     pinctrl-0 = <&uart0_pins_a>;
+>>>>>>> +     status = "okay";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&i2c0 {
+>>>>>>> +     pinctrl-names = "default";
+>>>>>>> +     pinctrl-0 = <&i2c0_pins_a>;
+>>>>>>> +     /* pull-ups and devices require AXP221 DLDO3 */
+>>>>>>> +     status = "failed";
+>>>>>>> +};
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> I think we should define a convention about how to sort these nodes
+>>>>>> before we actually start merging some of it.
+>>>>>>
+>>>>>> This of course also apply to the other patches doing that, hence why
+>>>>>> Hans is CC'd.
+>>>>>>
+>>>>>> I guess sorting them by label alphabetical order would make
+>>>>>> sense. What do you think?
+>>>>>
+>>>>>
+>>>>>
+>>>>> I'm currently using the ordering from the dtsi, which is based
+>>>>> on address. Even if it's not visible, if you're creating the
+>>>>> dts by looking at the dtsi and enabling the devices available,
+>>>>> that's the order you add them by, so it kind of makes sense.
+>>>
+>>>
+>>>
+>>> Right, that is what I'm doing too.
+>>>
+>>>> I know you're doing just that, and that it makes some kind of sense
+>>>> whenever you convert an old DTS to the label based syntax, but
+>>>> whenever you create a new one, it's a bit harder to get it right.
+>>>>
+>>>> And the fact that Hans didn't follow that convention illustrate that
+>>>> very well.
+>>>
+>>>
+>>>
+>>> Erm, that is not true, I did follow that convention as my 2 new
+>>> dts files started in the old format too, and I simply re-indented
+>>> most nodes.
+>>
+>>
+>> I think it also makes sense for new boards as well. One would look
+>> at the dtsi to know what devices on the soc are available, and
+>> copy the ones that can be used.
+>>
+>> But the ordering does make adding new devices with new drivers
+>> a bit problematic. It is easy to place new nodes in the wrong
+>> place.
+>>
+>>>> I guess a sorting logic internal to the DTS itself would be much
+>>>> easier to understand and follow, hence why I suggested the
+>>>> alphabetical order: it just stands out without any external reference.
+>>>
+>>>
+>>>
+>>> If we agree on this, we also need to think about what to do with new
+>>> board specific powersupplies, as those need to be in the root node,
+>>> if you look at the bananapro dts from the v2 patch you will see what
+>>> I mean.
+>>
+>>
+>> How about the root node at the top? With the board description, chosen,
+>> aliases (if any), and then the _new_ regulators (sorted by name)?
+>>
+>> One can then easily identify which are board specific, and which are
+>> more or less generic.
 >
-> I commented on this on v1 already: always set the device specific mask here,
-> it's independent of the CPU architecture, but do check the return value.
 >
-Got it, I will set first 64 bit dma mask here  due to device support
-64 bit address dma operations, and fall down to 32 - bit in case
-failure with 64 bit.
+> Sure, that works for me, what about the leds section, also in the
+> root node at the top? Before or after regulators ?
 
+Before the regulators? Because a) L comes before R and  b) this
+is what's currently done in our dts files.
 
-> Also add the correct dma-ranges property in the parent, or else this will
-> fail in the future once we add proper checks to dma_set_mask.
-
-I see arch/arm64 kernel doesn't use dma range value parsed from
-dma-range property currently, I will check it more.
-It doesn't use dma_pfn_offset value calculated by the dma-ranges in
-dma mapping API.
-dma-ranges value should test properly before adding.
-Is there any use to add this dma-ranges properly if arch code doesn't support ??
-
->
->         Arnd
+ChenYu
