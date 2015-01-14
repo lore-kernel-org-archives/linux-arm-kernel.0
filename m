@@ -1,50 +1,39 @@
-From: bart.tanghe@thomasmore.be (Bart Tanghe)
-Date: Wed, 14 Jan 2015 10:18:54 +0100
-Subject: [PATCH v3] ARM: dts: add bcm2835-pwm bindings
-Message-ID: <1421227134-8590-1-git-send-email-bart.tanghe@thomasmore.be>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Jan 2015 10:21:27 +0100
+Subject: [PATCH] pcmcia: at91_cf: depend on !ARCH_MULTIPLATFORM
+In-Reply-To: <1421173685-21559-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421173685-21559-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B63517.9030809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To probe the bcm2835-pwm driver properly, this dts bindings has to be added 
-to the bcm2835 dtsi file.
-In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
----
-Changes in v3:
- - node added by reg value
+Le 13/01/2015 19:28, Alexandre Belloni a ?crit :
+> Until the driver is corrected to stop including mach/at91_ramc.h and using
+> mach/io.h, it won't compile in a ARCH_MULTIPLATFORM configuration.
+> 
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Bart Tanghe <bart.tanghe@thomasmore.be>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 3342cb1..ba76bb4 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -146,6 +147,14 @@
- 			interrupts = <1 9>;
- 		};
- 
-+		pwm: pwm at 7e20e000 {
-+			compatible = "brcm,bcm2835-pwm";
-+			reg = <0x7e20c000 0x28>;
-+			clocks = <&clk_pwm>;
-+			#pwm-cells = <2>;
-+			status = "disabled";
-+		};
-+
- 		arm-pmu {
- 			compatible = "arm,arm1176-pmu";
- 		};
-@@ -179,5 +188,13 @@
- 			clock-output-names = "spi";
- 			clock-frequency = <250000000>;
- 		};
-+
-+		clk_pwm: clock at 3 {
-+			compatible = "fixed-clock";
-+			reg = <3>;
-+			#clock-cells = <0>;
-+			clock-output-names = "pwm";
-+			clock-frequency = <9200000>;
-+		};
- 	};
- };
+> ---
+>  drivers/pcmcia/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+> index 910e90bf16c6..45f67c63d385 100644
+> --- a/drivers/pcmcia/Kconfig
+> +++ b/drivers/pcmcia/Kconfig
+> @@ -276,6 +276,7 @@ config BFIN_CFPCMCIA
+>  config AT91_CF
+>  	tristate "AT91 CompactFlash Controller"
+>  	depends on PCMCIA && ARCH_AT91
+> +	depends on !ARCH_MULTIPLATFORM
+>  	help
+>  	  Say Y here to support the CompactFlash controller on AT91 chips.
+>  	  Or choose M to compile the driver as a module named "at91_cf".
+> 
+
+
+-- 
+Nicolas Ferre
