@@ -1,128 +1,112 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 14 Jan 2015 23:04:52 +0800
-Subject: [PATCH v7 04/17] ARM64 / ACPI: Introduce early_param for "acpi" and
- pass acpi=force to enable ACPI
-In-Reply-To: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1421247905-3749-5-git-send-email-hanjun.guo@linaro.org>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 15 Jan 2015 00:07:16 +0900
+Subject: [GIT PULL RE-SEND] Samsung exynos7 updates for v3.20
+In-Reply-To: <54B38628.5090902@kernel.org>
+References: <54B38628.5090902@kernel.org>
+Message-ID: <54B68624.8000706@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+Hi,
 
-Introduce one early parameters "off" and "force" for "acpi", acpi=off
-will be the default behavior for ARM64, so introduce acpi=force to
-enable ACPI on ARM64.
+Sorry, I'm resending this pull-request because of missing signed-tag.
 
-Disable ACPI before early parameters parsed, and enable it to pass
-"acpi=force" if people want use ACPI on ARM64. This ensures DT be
-the prefer one if ACPI table and DT both are provided at this moment.
+Please pull. If any problems, please let me know.
 
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Yijing Wang <wangyijing@huawei.com>
-Signed-off-by: Al Stone <al.stone@linaro.org>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- Documentation/kernel-parameters.txt |  3 ++-
- arch/arm64/include/asm/acpi.h       |  9 +++++++++
- arch/arm64/kernel/acpi.c            | 17 +++++++++++++++++
- arch/arm64/kernel/setup.c           |  3 +++
- 4 files changed, 31 insertions(+), 1 deletion(-)
+Thanks,
+Kukjin
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 4df73da..4adfd50 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
- bytes respectively. Such letter suffixes can also be entirely omitted.
- 
- 
--	acpi=		[HW,ACPI,X86]
-+	acpi=		[HW,ACPI,X86,ARM64]
- 			Advanced Configuration and Power Interface
- 			Format: { force | off | strict | noirq | rsdt }
- 			force -- enable ACPI if default was off
-@@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 				strictly ACPI specification compliant.
- 			rsdt -- prefer RSDT over (default) XSDT
- 			copy_dsdt -- copy DSDT to memory
-+			For ARM64, ONLY "acpi=off" or "acpi=force" are available
- 
- 			See also Documentation/power/runtime_pm.txt, pci=noacpi
- 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 8b837ab..496c33b 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -26,6 +26,13 @@ static inline void disable_acpi(void)
- 	acpi_noirq = 1;
- }
- 
-+static inline void enable_acpi(void)
-+{
-+	acpi_disabled = 0;
-+	acpi_pci_disabled = 0;
-+	acpi_noirq = 0;
-+}
-+
- /*
-  * It's used from ACPI core in kdump to boot UP system with SMP kernel,
-  * with this check the ACPI core will not override the CPU index
-@@ -40,6 +47,8 @@ static inline bool acpi_has_cpu_in_madt(void)
- 
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- 
-+#else
-+static inline void disable_acpi(void) { }
- #endif /* CONFIG_ACPI */
- 
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 9252f72..39a1655 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,3 +67,20 @@ void __init acpi_boot_table_init(void)
- 	if (acpi_table_init())
- 		disable_acpi();
- }
-+
-+static int __init parse_acpi(char *arg)
-+{
-+	if (!arg)
-+		return -EINVAL;
-+
-+	/* "acpi=off" disables both ACPI table parsing and interpreter */
-+	if (strcmp(arg, "off") == 0)
-+		disable_acpi();
-+	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
-+		enable_acpi();
-+	else
-+		return -EINVAL;	/* Core will print when we return error */
-+
-+	return 0;
-+}
-+early_param("acpi", parse_acpi);
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 726b019..4580ed3 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -62,6 +62,7 @@
- #include <asm/memblock.h>
- #include <asm/psci.h>
- #include <asm/efi.h>
-+#include <asm/acpi.h>
- 
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
-@@ -388,6 +389,8 @@ void __init setup_arch(char **cmdline_p)
- 	early_fixmap_init();
- 	early_ioremap_init();
- 
-+	disable_acpi();
-+
- 	parse_early_param();
- 
- 	/*
--- 
-1.9.1
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-dt-64
+
+for you to fetch changes up to 6f56eef1f9aba3747c811780a4768618167d5c97:
+
+  arm64: Enable ARMv8 based exynos7 SoC support (2014-12-23 00:19:08 +0900)
+
+----------------------------------------------------------------
+Samsung arch/arm64 DT updates for v3.19
+
+- to support ARMv8 based exynos7 SoC
+  : add initial device tree for pinctrl, PMU, mmc, i2c, rtc,
+    watchdog, and adc nodes for exynos7 SoC and exynos7 based
+    espresso board.
+
+----------------------------------------------------------------
+Abhilash Kesavan (2):
+      arm64: dts: Add PMU DT node for exynos7 SoC
+      arm64: dts: Add nodes for mmc, i2c, rtc, watchdog, adc on exynos7
+
+Alim Akhtar (1):
+      arm64: Enable ARMv8 based exynos7 SoC support
+
+Naveen Krishna Ch (2):
+      arm64: dts: Add initial device tree support for exynos7
+      arm64: dts: Add initial pinctrl support to exynos7
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
+ arch/arm64/Kconfig                                 |  17 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/exynos/Makefile                |   5 +
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  84 +++
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 588
++++++++++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            | 530
++++++++++++++++++++
+ 7 files changed, 1226 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/Makefile
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
+
+
+On 01/12/15 17:30, Kukjin Kim wrote:
+> Hi again,
+> 
+> Please pull arm64 based exynos7 stuff for v3.20 and as you know I've
+> tried this in 3.19 but couldn't because of some dependencies like clk.
+> Now all of dependencies already resolved so this should be fine for v3.20.
+> 
+> If any problems, please kindly let me know.
+> 
+> Thanks,
+> Kukjin
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.20-next/dt-samsung-64
+> 
+> Abhilash Kesavan (2):
+>       arm64: dts: Add PMU DT node for exynos7 SoC
+>       arm64: dts: Add nodes for mmc, i2c, rtc, watchdog, adc on exynos7
+> 
+> Alim Akhtar (1):
+>       arm64: Enable ARMv8 based exynos7 SoC support
+> 
+> Naveen Krishna Ch (2):
+>       arm64: dts: Add initial device tree support for exynos7
+>       arm64: dts: Add initial pinctrl support to exynos7
+> 
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>  arch/arm64/Kconfig                                 |   17 +
+>  arch/arm64/boot/dts/Makefile                       |    1 +
+>  arch/arm64/boot/dts/exynos/Makefile                |    5 +
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |   84 +++
+>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    |  588
+> ++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi            |  530
+> ++++++++++++++++++
+>  7 files changed, 1226 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/exynos/Makefile
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
