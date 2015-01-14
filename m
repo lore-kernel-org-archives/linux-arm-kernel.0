@@ -1,76 +1,108 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Jan 2015 11:03:42 +0100
-Subject: [PATCH 0/4] ARM: shmobile: sh73a0/kzm9g: Complete multiplatform
- support
-In-Reply-To: <20150114040822.GA14661@verge.net.au>
-References: <1420809866-4330-1-git-send-email-geert+renesas@glider.be>
- <20150113020818.GB21265@verge.net.au>
- <CAMuHMdVbuM3oR1KQDzAodp_Y-aWFncPRn48-F9HmrVkGDS36RQ@mail.gmail.com>
- <20150114040822.GA14661@verge.net.au>
-Message-ID: <CAMuHMdVBh+TntyXCDT0y=Bnntrh4Pu66vxPJ00o=Zi8+WwCvVA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Jan 2015 11:04:57 +0100
+Subject: [GIT PULL] drm: Add Atmel HLCDC driver
+In-Reply-To: <20150109160342.715d3592@bbrezillon>
+References: <20150109160342.715d3592@bbrezillon>
+Message-ID: <54B63F49.8070504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Le 09/01/2015 16:03, Boris Brezillon a wrote :
+> Dave, Thierry,
 
-On Wed, Jan 14, 2015 at 5:08 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Jan 13, 2015 at 11:08:20AM +0100, Geert Uytterhoeven wrote:
->> On Tue, Jan 13, 2015 at 3:08 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Fri, Jan 09, 2015 at 02:24:26PM +0100, Geert Uytterhoeven wrote:
->> >> This patch series completes the migration from kzm9g-reference (legacy
->> >> DT based) to kzm9g-multiplatform (ARM multiplatform DT based with
->> >> common clock framework).
->> >>
->> >>   - The first two patches fix Ethernet on kzm9g, by adding a Bus State
->> >>     Controller node, as introduced in "[PATCH v3 0/4] drivers: bus:
->> >>     Add Simple Power-Managed Bus", and moving the Ethernet node to it,
->> >>   - The third path enables kzm9g support in shmobile_defconfig,
->> >>   - The fourth patch removes all kzm9g-reference support, now the
->> >>     sh73a0 generic multiplatform case has the same feature set
->> >>     (better, it provides 16 MiB more RAM!).
->> >>
->> >> Thanks for applying!
->> >
->> > It seems to me that at the first two patches require the patchset
->> > referenced above in order to work. For that reason I am holding off
->>
->> Yes it does.
->>
->> > on applying this series. I am quite happy to negotiate merging
->> > some or all of this series earlier than later :)
->>
->> Hence please merge both the dependency and this series.
->>
->>   1. Both sh73a0/kzm9g-multiplatform and r8a73a4/ape6evm-multiplatform
->>       depend on "[PATCH v3 0/4] drivers: bus: Add Simple Power-Managed Bus",
->
-> For some reason I assumed this would go through a different subsystem tree.
-> I'm fine with taking it through my tree, if you think that is best.
+Dave and Thierry,
 
-There's no maintainer for drivers/bus/, and as kzm9g-multiplatform depends on
-it, your tree looks fine to me.
+Is it possible for you to consider this pull-request? We would like to
+see it appearing as soon as possible in linux-next.
 
-> I am a bit worried about handling conflicts that may arise, especially from
-> the first two patches in that series which re-arrange things
-> alphabetically. But I see that the files in question are not updated very
-> often, so I suppose we should be safe enough.
+Furthermore, we are pretty excited to see this long awaited driver
+running on our AT91 SoCs with a Mainline kernel. We missed several
+kernel releases and as everything seems accepted and well aligned now,
+we are looking forward being reassured by an inclusion of this code in
+the DRM git tree.
 
-Indeed.
+Thanks, bye.
+  Nicolas.
 
-> For now I have tentatively queued up both this patchset and the
-> dependency listed immediately above. Please take a look
-> at the sh73a0-multiplatform-for-v3.20 and drivers-for-v3.20 branches
-> and the renesas-next-20150114-v3.19-rc1 tag to see if I missed something.
 
-Thanks, looks fine!
+> Here is the pull request for the Atmel HLCDC driver and its
+> dependencies (some modifications to drm/core and drm/panel to define
+> output bus format).
+> 
+> I'm sending a pull request for this driver for several reasons:
+> 
+>  * The patch series has been around for 6 months (initial version here
+>    [3]), and has seen 9 iterations, taking into account comments made
+>    by reviewers.
+> 
+>  * It has received several Tested-by by various users/developers.
+> 
+>  * It has been Reviewed-by Rob Clark.
+> 
+>  * There has been no comment whatsoever since more than a month (see
+>    [1] and [2] for the last modified version of these series).
+> 
+> I'll be happy to take comments into account if any. But if there are no
+> more comments, please merge for 3.20.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> [1]https://lkml.org/lkml/2014/12/1/717
+> [2]http://thread.gmane.org/gmane.comp.video.dri.devel/118700
+> [3]https://lkml.org/lkml/2014/6/9/487
+> 
+> The following changes since commit c93546a5e32bd788c22aefa072385f3784551c13:
+> 
+>   Merge tag 'topic/atomic-core-2015-01-05' of git://anongit.freedesktop.org/drm-intel into drm-next (2015-01-09 09:22:40 +1000)
+> 
+> are available in the git repository at:
+> 
+> 
+>   https://github.com/bbrezillon/linux-at91.git tags/atmel-hlcdc-drm-3.20
+> 
+> for you to fetch changes up to e7f6614add3dc7776abd803be7cbe96b6254b3f5:
+> 
+>   drm: add DT bindings documentation for atmel-hlcdc-dc driver (2015-01-09 14:55:08 +0100)
+> 
+> ----------------------------------------------------------------
+> Boris Brezillon (5):
+>       drm: add bus_formats and num_bus_formats fields to drm_display_info
+>       drm: panel: simple-panel: add support for bus_format retrieval
+>       drm: panel: simple-panel: add bus format information for foxlink panel
+>       drm: add Atmel HLCDC Display Controller support
+>       drm: add DT bindings documentation for atmel-hlcdc-dc driver
+> 
+>  .../devicetree/bindings/drm/atmel/hlcdc-dc.txt     |  53 ++
+>  drivers/gpu/drm/Kconfig                            |   2 +
+>  drivers/gpu/drm/Makefile                           |   1 +
+>  drivers/gpu/drm/atmel-hlcdc/Kconfig                |  11 +
+>  drivers/gpu/drm/atmel-hlcdc/Makefile               |   7 +
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 406 ++++++++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c       | 579 ++++++++++++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       | 213 +++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c    | 667 ++++++++++++++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h    | 398 ++++++++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 319 ++++++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c    | 856 +++++++++++++++++++++
+>  drivers/gpu/drm/drm_crtc.c                         |  35 +
+>  drivers/gpu/drm/panel/panel-simple.c               |   6 +
+>  include/drm/drm_crtc.h                             |   8 +
+>  15 files changed, 3561 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/atmel/hlcdc-dc.txt
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+>  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> 
+> 
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Nicolas Ferre
