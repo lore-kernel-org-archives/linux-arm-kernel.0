@@ -1,54 +1,52 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 14 Jan 2015 11:50:46 +0800
-Subject: [PATCH] mtd: atmel_nand: return max bitflips in all sectors in
- pmecc_correction()
-Message-ID: <1421207446-16973-1-git-send-email-josh.wu@atmel.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 13 Jan 2015 23:06:11 -0500 (EST)
+Subject: [PATCH net-next v12 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1421140290-5492-4-git-send-email-dingtianhong@huawei.com>
+References: <1421140290-5492-1-git-send-email-dingtianhong@huawei.com>
+ <1421140290-5492-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20150113.230611.375062426344934847.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel_nand_pmecc_read_page() will return the total bitflips in this
-page. This is incorrect.
+From: Ding Tianhong <dingtianhong@huawei.com>
+Date: Tue, 13 Jan 2015 17:11:30 +0800
 
-As one nand page includes multiple ecc sectors, that will cause the
-returned total bitflips exceed ecc capablity.
+> +static int hip04_alloc_ring(struct net_device *ndev, struct device *d)
+> +{
+> +	struct hip04_priv *priv = netdev_priv(ndev);
+> +	int i;
+> +
+> +	priv->tx_desc = dma_alloc_coherent(d,
+> +			TX_DESC_NUM * sizeof(struct tx_desc),
+> +			&priv->tx_desc_dma, GFP_KERNEL);
 
-So this patch will make pmecc_correct() return the max bitflips of all
-sectors in the page. That also makes atmel_nand_pmecc_read_page() return
-the max bitflips.
+When a function call spans multiple lines, the arguments on the
+second and subsequent lines should start at the first column
+after the openning parenthesis of the function call.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/mtd/nand/atmel_nand.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+If you are only using TAB characters, your indentation is likely
+to be incorrect.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index a345e7b..7346d16 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -847,7 +847,7 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
- 	struct atmel_nand_host *host = nand_chip->priv;
- 	int i, err_nbr;
- 	uint8_t *buf_pos;
--	int total_err = 0;
-+	int max_bitflips = 0;
- 
- 	for (i = 0; i < nand_chip->ecc.total; i++)
- 		if (ecc[i] != 0xff)
-@@ -874,13 +874,13 @@ normal_check:
- 				pmecc_correct_data(mtd, buf_pos, ecc, i,
- 					nand_chip->ecc.bytes, err_nbr);
- 				mtd->ecc_stats.corrected += err_nbr;
--				total_err += err_nbr;
-+				max_bitflips = max_t(int, max_bitflips, err_nbr);
- 			}
- 		}
- 		pmecc_stat >>= 1;
- 	}
- 
--	return total_err;
-+	return max_bitflips;
- }
- 
- static void pmecc_enable(struct atmel_nand_host *host, int ecc_op)
--- 
-1.9.1
+> +	/*
+> +	 * BQL will try to keep the TX queue as short as possible, but it can't
+> +	 * be faster than tx_coalesce_usecs, so we need a fast timeout here,
+> +	 * but also long enough to gather up enough frames to ensure we don't
+> +	 * get more interrupts than necessary.
+> +	 * 200us is enough for 16 frames of 1500 bytes at gigabit ethernet rate
+> +	 */
+
+Comments in the networking should be:
+
+	/* Formatted
+	 * like this.
+	 */
+
+> +	priv->phy_node = of_parse_phandle(node, "phy-handle", 0);
+> +	if (priv->phy_node) {
+> +		priv->phy = of_phy_connect(ndev, priv->phy_node,
+> +			&hip04_adjust_link, 0, priv->phy_mode);
+
+Please align the arguments to this function call correctly, as
+per above.
+
+Thanks.
