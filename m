@@ -1,79 +1,67 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 14 Jan 2015 14:44:44 +0100
-Subject: [PATCH v3 0/7] Enable HDMI support on Exynos platforms
-Message-ID: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 14 Jan 2015 14:44:45 +0100
+Subject: [PATCH v3 1/7] PM / Domains: Add a note about power domain subdomains
+In-Reply-To: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
+References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421243091-10778-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds a note on defining subdomains to generic PM domain
+binding documentation to let power domain providers use common approach
+for defining power domain hierarchy.
 
-This is yet another approach to submit patches, which enables HDMI
-support for two Exynos based platforms: UniversalC210 and Odroid X2/U3.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ .../devicetree/bindings/power/power_domain.txt     | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-Beside DTS changes, this patchset adds parent domain support for Exynos
-PM domains. This was the most controversial patch in the previous
-attempts, but I hope I fixes all reported issues and made it really
-generic. For more details see individual patches.
-
-The patchset is based on my previous patch:
-'ARM: DTS: Exynos: convert to generic power domain bindings'
-(http://www.spinics.net/lists/linux-samsung-soc/msg40584.html)
-and requires 2 patches that have been merged to v3.19-rc4:
-'clk: samsung: exynos4: set parent of sclk_hdmiphy to hdmi'
-(commit df019a5c0f7083001cb694f44821ca506425bda2) and
-'PM / Domains: Export of_genpd_get_from_provider function'
-(commit 7496fcbe8a643097efc061160e1c3b65ee2fa350).
-
-Regards
-Marek Szyprowski
-
-
-Changelog:
-
-v3:
-- added a note on defining subdomains to generic PM domain binding
-  documentation (requested by Ulf Hansson)
-
-v2: (http://www.spinics.net/lists/linux-samsung-soc/msg40980.html)
-- rewrote subdomains patch according to suggestions from Geert
-  Uytterhoeven and Amit Daniel Kachhap.
-
-v1 resend: (http://www.spinics.net/lists/linux-samsung-soc/msg39428.html)
-- added handling of generic 'power-domains' binding in subdomains
-
-v1: (http://www.spinics.net/lists/linux-samsung-soc/msg38914.html)
-- resolved power domain on/off issue with 'clk: samsung: exynos4: set
-  parent of mixer gate clock to hdmi' patch
-
-v0: (http://www.spinics.net/lists/linux-samsung-soc/msg33498.html)
-- first attempt, used 'always on' power domains hack
-
-
-Patch summary:
-
-Andrzej Hajda (1):
-  ARM: dts: exynos5250: add display power domain
-
-Marek Szyprowski (5):
-  PM / Domains: Add a note about power domain subdomains
-  ARM: Exynos: add support for sub-power domains
-  ARM: dts: exynos4: add hdmi related nodes
-  ARM: dts: exynos4: add dependency between TV and LCD0 power domains
-  ARM: dts: exynos4412-odroid: enable hdmi support
-
-Tomasz Stanislawski (1):
-  ARM: dts: exynos4210-universal_c210: enable hdmi support
-
- .../bindings/arm/exynos/power_domain.txt           |  2 +
- .../devicetree/bindings/power/power_domain.txt     | 29 +++++++++++
- arch/arm/boot/dts/exynos4.dtsi                     | 41 ++++++++++++++++
- arch/arm/boot/dts/exynos4210-universal_c210.dts    | 57 ++++++++++++++++++++++
- arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 44 +++++++++++++++++
- arch/arm/boot/dts/exynos4x12.dtsi                  | 11 +++++
- arch/arm/boot/dts/exynos5250.dtsi                  | 10 ++++
- arch/arm/mach-exynos/pm_domains.c                  | 28 +++++++++++
- 9 files changed, 230 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 98c1667..eeea45b 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -19,6 +19,16 @@ Required properties:
+    providing multiple PM domains (e.g. power controllers), but can be any value
+    as specified by device tree binding documentation of particular provider.
+ 
++Optional properties:
++ - power-domains : A phandle and PM domain specifier as defined by bindings of
++                   the power controller specified by phandle.
++   Some power domains might be powered from other power domain (or have
++   other hardware specific dependency). For representing such dependency
++   a standard PM domain consumer binging is used. When provided, all domains
++   created by the given provider should be a subdomain of the domain
++   specified by this binding. More details about power domain specifier is
++   available in the the next section.
++
+ Example:
+ 
+ 	power: power-controller at 12340000 {
+@@ -30,6 +40,25 @@ Example:
+ The node above defines a power controller that is a PM domain provider and
+ expects one cell as its phandle argument.
+ 
++Example 2:
++
++	parent: power-controller at 12340000 {
++		compatible = "foo,power-controller";
++		reg = <0x12340000 0x1000>;
++		#power-domain-cells = <1>;
++	};
++
++	child: power-controller at 12340000 {
++		compatible = "foo,power-controller";
++		reg = <0x12341000 0x1000>;
++		power-domains = <&parent 0>;
++		#power-domain-cells = <1>;
++	};
++
++The nodes above defines two power controllers: 'parent' and 'child'.
++Domains created by 'child' power controller are subdomains of '0' power
++domain provided by 'parent' power controller.
++
+ ==PM domain consumers==
+ 
+ Required properties:
 -- 
 1.9.2
