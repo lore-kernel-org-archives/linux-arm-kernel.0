@@ -1,422 +1,155 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jan 2015 17:22:02 +0100
-Subject: [PATCH 10/12] usb: gadget: at91_udc: Rework for multi-platform kernel
- support
-In-Reply-To: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421252524-24452-11-git-send-email-alexandre.belloni@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 14 Jan 2015 16:31:15 +0000
+Subject: [PATCH v7 11/20] arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
+In-Reply-To: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
+References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1421253084-9663-12-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+vgic_set_attr() and vgic_get_attr() contain both code specific for
+the emulated GIC as well as code for the userland facing, generic
+part of the GIC.
+Split the guest GIC facing code of from the generic part to allow
+easier splitting later.
 
-cpu_is_at91xxx are a set of macros defined in mach/cpu.h and are here used
-to detect the SoC we are booting on.
-Use compatible string + a caps structure to replace those cpu_is_xxx tests.
-
-Remove all mach and asm headers (which are now unused).
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- drivers/usb/gadget/udc/at91_udc.c | 288 ++++++++++++++++++++++++++++----------
- drivers/usb/gadget/udc/at91_udc.h |   7 +
- 2 files changed, 218 insertions(+), 77 deletions(-)
+Changelog v6...v7:
+ (none)
 
-diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-index 4dba2c65dfd4..c0abb9bc76a9 100644
---- a/drivers/usb/gadget/udc/at91_udc.c
-+++ b/drivers/usb/gadget/udc/at91_udc.c
-@@ -31,16 +31,9 @@
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_data/atmel.h>
--
--#include <asm/byteorder.h>
--#include <mach/hardware.h>
--#include <asm/io.h>
--#include <asm/irq.h>
--#include <asm/gpio.h>
--
--#include <mach/cpu.h>
--#include <mach/at91sam9261_matrix.h>
--#include <mach/at91_matrix.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/atmel-matrix.h>
+Changelog v5...v6:
+ (none)
+
+Changelog v4...v5:
+ (add Reviewed-by:)
+
+Changelog v3...v4:
+ (none)
+
+ virt/kvm/arm/vgic.c |   78 +++++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 54 insertions(+), 24 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 7589e2c..06073fa 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -2440,7 +2440,8 @@ out:
+ 	return ret;
+ }
  
- #include "at91_udc.h"
- 
-@@ -915,8 +908,6 @@ static void clk_off(struct at91_udc *udc)
-  */
- static void pullup(struct at91_udc *udc, int is_on)
+-static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++static int vgic_set_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
  {
--	int	active = !udc->board.pullup_active_low;
--
- 	if (!udc->enabled || !udc->vbus)
- 		is_on = 0;
- 	DBG("%sactive\n", is_on ? "" : "in");
-@@ -925,40 +916,15 @@ static void pullup(struct at91_udc *udc, int is_on)
- 		clk_on(udc);
- 		at91_udp_write(udc, AT91_UDP_ICR, AT91_UDP_RXRSM);
- 		at91_udp_write(udc, AT91_UDP_TXVC, 0);
--		if (cpu_is_at91rm9200())
--			gpio_set_value(udc->board.pullup_pin, active);
--		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
--			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
--
--			txvc |= AT91_UDP_TXVC_PUON;
--			at91_udp_write(udc, AT91_UDP_TXVC, txvc);
--		} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
--			u32	usbpucr;
--
--			usbpucr = at91_matrix_read(AT91_MATRIX_USBPUCR);
--			usbpucr |= AT91_MATRIX_USBPUCR_PUON;
--			at91_matrix_write(AT91_MATRIX_USBPUCR, usbpucr);
--		}
- 	} else {
- 		stop_activity(udc);
- 		at91_udp_write(udc, AT91_UDP_IDR, AT91_UDP_RXRSM);
- 		at91_udp_write(udc, AT91_UDP_TXVC, AT91_UDP_TXVC_TXVDIS);
--		if (cpu_is_at91rm9200())
--			gpio_set_value(udc->board.pullup_pin, !active);
--		else if (cpu_is_at91sam9260() || cpu_is_at91sam9263() || cpu_is_at91sam9g20()) {
--			u32	txvc = at91_udp_read(udc, AT91_UDP_TXVC);
--
--			txvc &= ~AT91_UDP_TXVC_PUON;
--			at91_udp_write(udc, AT91_UDP_TXVC, txvc);
--		} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
--			u32	usbpucr;
--
--			usbpucr = at91_matrix_read(AT91_MATRIX_USBPUCR);
--			usbpucr &= ~AT91_MATRIX_USBPUCR_PUON;
--			at91_matrix_write(AT91_MATRIX_USBPUCR, usbpucr);
--		}
- 		clk_off(udc);
+ 	int r;
+ 
+@@ -2456,17 +2457,6 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
+ 		return (r == -ENODEV) ? -ENXIO : r;
  	}
-+
-+	if (udc->caps && udc->caps->pullup)
-+		udc->caps->pullup(udc, is_on);
+-
+-	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+-	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
+-		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+-		u32 reg;
+-
+-		if (get_user(reg, uaddr))
+-			return -EFAULT;
+-
+-		return vgic_attr_regs_access(dev, attr, &reg, true);
+-	}
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 val;
+@@ -2510,7 +2500,33 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 	return -ENXIO;
  }
  
- /* vbus is here!  turn everything on that's ready */
-@@ -1683,12 +1649,202 @@ static void at91udc_shutdown(struct platform_device *dev)
- 	spin_unlock_irqrestore(&udc->lock, flags);
- }
- 
--static void at91udc_of_init(struct at91_udc *udc,
--				     struct device_node *np)
-+static int at91rm9200_udc_init(struct at91_udc *udc)
+-static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
 +{
-+	struct at91_ep *ep;
 +	int ret;
-+	int i;
 +
-+	for (i = 0; i < NUM_ENDPOINTS; i++) {
-+		ep = &udc->ep[i];
-+
-+		switch (i) {
-+		case 0:
-+		case 3:
-+			ep->maxpacket = 8;
-+			break;
-+		case 1 ... 2:
-+			ep->maxpacket = 64;
-+			break;
-+		case 4 ... 5:
-+			ep->maxpacket = 256;
-+			break;
-+		}
-+	}
-+
-+	if (!gpio_is_valid(udc->board.pullup_pin)) {
-+		DBG("no D+ pullup?\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = devm_gpio_request(&udc->pdev->dev, udc->board.pullup_pin,
-+				"udc_pullup");
-+	if (ret) {
-+		DBG("D+ pullup is busy\n");
++	ret = vgic_set_common_attr(dev, attr);
++	if (ret != -ENXIO)
 +		return ret;
++
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++		u32 reg;
++
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		return vgic_attr_regs_access(dev, attr, &reg, true);
 +	}
 +
-+	gpio_direction_output(udc->board.pullup_pin,
-+			      udc->board.pullup_active_low);
-+
-+	return 0;
-+}
-+
-+static void at91rm9200_udc_pullup(struct at91_udc *udc, int is_on)
-+{
-+	int active = !udc->board.pullup_active_low;
-+
-+	if (is_on)
-+		gpio_set_value(udc->board.pullup_pin, active);
-+	else
-+		gpio_set_value(udc->board.pullup_pin, !active);
-+}
-+
-+static const struct at91_udc_caps at91rm9200_udc_caps = {
-+	.init = at91rm9200_udc_init,
-+	.pullup = at91rm9200_udc_pullup,
-+};
-+
-+static int at91sam9260_udc_init(struct at91_udc *udc)
-+{
-+	struct at91_ep *ep;
-+	int i;
-+
-+	for (i = 0; i < NUM_ENDPOINTS; i++) {
-+		ep = &udc->ep[i];
-+
-+		switch (i) {
-+		case 0 ... 3:
-+			ep->maxpacket = 64;
-+			break;
-+		case 4 ... 5:
-+			ep->maxpacket = 512;
-+			break;
-+		}
 +	}
 +
-+	return 0;
++	return -ENXIO;
 +}
 +
-+static void at91sam9260_udc_pullup(struct at91_udc *udc, int is_on)
-+{
-+	u32 txvc = at91_udp_read(udc, AT91_UDP_TXVC);
-+
-+	if (is_on)
-+		txvc |= AT91_UDP_TXVC_PUON;
-+	else
-+		txvc &= ~AT91_UDP_TXVC_PUON;
-+
-+	at91_udp_write(udc, AT91_UDP_TXVC, txvc);
-+}
-+
-+static const struct at91_udc_caps at91sam9260_udc_caps = {
-+	.init = at91sam9260_udc_init,
-+	.pullup = at91sam9260_udc_pullup,
-+};
-+
-+static int at91sam9261_udc_init(struct at91_udc *udc)
-+{
-+	struct at91_ep *ep;
-+	int i;
-+
-+	for (i = 0; i < NUM_ENDPOINTS; i++) {
-+		ep = &udc->ep[i];
-+
-+		switch (i) {
-+		case 0:
-+			ep->maxpacket = 8;
-+			break;
-+		case 1 ... 3:
-+			ep->maxpacket = 64;
-+			break;
-+		case 4 ... 5:
-+			ep->maxpacket = 256;
-+			break;
-+		}
-+	}
-+
-+	udc->matrix = syscon_regmap_lookup_by_phandle(udc->pdev->dev.of_node,
-+						      "atmel,matrix");
-+	if (IS_ERR(udc->matrix))
-+		return PTR_ERR(udc->matrix);
-+
-+	return 0;
-+}
-+
-+static void at91sam9261_udc_pullup(struct at91_udc *udc, int is_on)
-+{
-+	u32 usbpucr = 0;
-+
-+	if (is_on)
-+		usbpucr = AT91_MATRIX_USBPUCR_PUON;
-+
-+	regmap_update_bits(udc->matrix, AT91SAM9261_MATRIX_USBPUCR,
-+			   AT91_MATRIX_USBPUCR_PUON, usbpucr);
-+}
-+
-+static const struct at91_udc_caps at91sam9261_udc_caps = {
-+	.init = at91sam9261_udc_init,
-+	.pullup = at91sam9261_udc_pullup,
-+};
-+
-+static int at91sam9263_udc_init(struct at91_udc *udc)
-+{
-+	struct at91_ep *ep;
-+	int i;
-+
-+	for (i = 0; i < NUM_ENDPOINTS; i++) {
-+		ep = &udc->ep[i];
-+
-+		switch (i) {
-+		case 0:
-+		case 1:
-+		case 2:
-+		case 3:
-+			ep->maxpacket = 64;
-+			break;
-+		case 4:
-+		case 5:
-+			ep->maxpacket = 256;
-+			break;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct at91_udc_caps at91sam9263_udc_caps = {
-+	.init = at91sam9263_udc_init,
-+	.pullup = at91sam9260_udc_pullup,
-+};
-+
-+static const struct of_device_id at91_udc_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91rm9200-udc",
-+		.data = &at91rm9200_udc_caps,
-+	},
-+	{
-+		.compatible = "atmel,at91sam9260-udc",
-+		.data = &at91sam9260_udc_caps,
-+	},
-+	{
-+		.compatible = "atmel,at91sam9261-udc",
-+		.data = &at91sam9261_udc_caps,
-+	},
-+	{
-+		.compatible = "atmel,at91sam9263-udc",
-+		.data = &at91sam9263_udc_caps,
-+	},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, at91_udc_dt_ids);
-+
-+static void at91udc_of_init(struct at91_udc *udc, struct device_node *np)
++static int vgic_get_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
  {
- 	struct at91_udc_data *board = &udc->board;
--	u32 val;
-+	const struct of_device_id *match;
- 	enum of_gpio_flags flags;
-+	u32 val;
+ 	int r = -ENXIO;
  
- 	if (of_property_read_u32(np, "atmel,vbus-polled", &val) == 0)
- 		board->vbus_polled = 1;
-@@ -1701,6 +1857,10 @@ static void at91udc_of_init(struct at91_udc *udc,
- 						  &flags);
- 
- 	board->pullup_active_low = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
+@@ -2528,27 +2544,41 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 			return -EFAULT;
+ 		break;
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
 +
-+	match = of_match_node(at91_udc_dt_ids, np);
-+	if (match)
-+		udc->caps = match->data;
++		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
++		break;
++	}
++
++	}
++
++	return r;
++}
++
++static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
++{
++	int ret;
++
++	ret = vgic_get_common_attr(dev, attr);
++	if (ret != -ENXIO)
++		return ret;
+ 
++	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 reg = 0;
+ 
+-		r = vgic_attr_regs_access(dev, attr, &reg, false);
+-		if (r)
+-			return r;
+-		r = put_user(reg, uaddr);
+-		break;
+-	}
+-	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+-		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+-		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
+-		break;
++		ret = vgic_attr_regs_access(dev, attr, &reg, false);
++		if (ret)
++			return ret;
++		return put_user(reg, uaddr);
+ 	}
+ 
+ 	}
+ 
+-	return r;
++	return -ENXIO;
  }
  
- static int at91udc_probe(struct platform_device *pdev)
-@@ -1709,6 +1869,8 @@ static int at91udc_probe(struct platform_device *pdev)
- 	struct at91_udc	*udc;
- 	int		retval;
- 	struct resource	*res;
-+	struct at91_ep	*ep;
-+	int		i;
- 
- 	/* init software state */
- 	udc = &controller;
-@@ -1718,40 +1880,19 @@ static int at91udc_probe(struct platform_device *pdev)
- 	udc->enabled = 0;
- 	spin_lock_init(&udc->lock);
- 
--	/* rm9200 needs manual D+ pullup; off by default */
--	if (cpu_is_at91rm9200()) {
--		if (!gpio_is_valid(udc->board.pullup_pin)) {
--			DBG("no D+ pullup?\n");
--			return -ENODEV;
--		}
--		retval = devm_gpio_request(dev, udc->board.pullup_pin,
--					   "udc_pullup");
--		if (retval) {
--			DBG("D+ pullup is busy\n");
--			return retval;
--		}
--		gpio_direction_output(udc->board.pullup_pin,
--				udc->board.pullup_active_low);
--	}
- 
--	/* newer chips have more FIFO memory than rm9200 */
--	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
--		udc->ep[0].maxpacket = 64;
--		udc->ep[3].maxpacket = 64;
--		udc->ep[4].maxpacket = 512;
--		udc->ep[5].maxpacket = 512;
--	} else if (cpu_is_at91sam9261() || cpu_is_at91sam9g10()) {
--		udc->ep[3].maxpacket = 64;
--	} else if (cpu_is_at91sam9263()) {
--		udc->ep[0].maxpacket = 64;
--		udc->ep[3].maxpacket = 64;
--	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	udc->udp_baseaddr = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(udc->udp_baseaddr))
- 		return PTR_ERR(udc->udp_baseaddr);
- 
-+	if (udc->caps && udc->caps->init) {
-+		retval = udc->caps->init(udc);
-+		if (retval)
-+			return retval;
-+	}
-+
- 	udc_reinit(udc);
- 
- 	/* get interface and function clocks */
-@@ -1920,13 +2061,6 @@ static int at91udc_resume(struct platform_device *pdev)
- #define	at91udc_resume	NULL
- #endif
- 
--static const struct of_device_id at91_udc_dt_ids[] = {
--	{ .compatible = "atmel,at91rm9200-udc" },
--	{ /* sentinel */ }
--};
--
--MODULE_DEVICE_TABLE(of, at91_udc_dt_ids);
--
- static struct platform_driver at91_udc_driver = {
- 	.remove		= __exit_p(at91udc_remove),
- 	.shutdown	= at91udc_shutdown,
-diff --git a/drivers/usb/gadget/udc/at91_udc.h b/drivers/usb/gadget/udc/at91_udc.h
-index e647d1c2ada4..4fc0daa6587f 100644
---- a/drivers/usb/gadget/udc/at91_udc.h
-+++ b/drivers/usb/gadget/udc/at91_udc.h
-@@ -107,6 +107,11 @@ struct at91_ep {
- 	unsigned			fifo_bank:1;
- };
- 
-+struct at91_udc_caps {
-+	int (*init)(struct at91_udc *udc);
-+	void (*pullup)(struct at91_udc *udc, int is_on);
-+};
-+
- /*
-  * driver is non-SMP, and just blocks IRQs whenever it needs
-  * access protection for chip registers or driver state
-@@ -115,6 +120,7 @@ struct at91_udc {
- 	struct usb_gadget		gadget;
- 	struct at91_ep			ep[NUM_ENDPOINTS];
- 	struct usb_gadget_driver	*driver;
-+	const struct at91_udc_caps	*caps;
- 	unsigned			vbus:1;
- 	unsigned			enabled:1;
- 	unsigned			clocked:1;
-@@ -134,6 +140,7 @@ struct at91_udc {
- 	spinlock_t			lock;
- 	struct timer_list		vbus_timer;
- 	struct work_struct		vbus_timer_work;
-+	struct regmap			*matrix;
- };
- 
- static inline struct at91_udc *to_udc(struct usb_gadget *g)
+ static int vgic_has_attr_regs(const struct mmio_range *ranges,
 -- 
-2.1.0
+1.7.9.5
