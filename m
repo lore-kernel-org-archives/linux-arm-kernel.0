@@ -1,52 +1,25 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Wed, 14 Jan 2015 14:48:56 -0500
-Subject: [PATCH] arm: mm: remove unused ioremap_page()
-Message-ID: <1421264936-9495-1-git-send-email-vitalya@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Jan 2015 19:49:24 +0000
+Subject: [PATCH V3 00/15] ASoC: samsung: Add clk provider for I2S
+ internal clocks
+In-Reply-To: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
+References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20150114194924.GJ3043@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes unused ioremap_page().
+On Wed, Jan 14, 2015 at 07:42:27PM +0100, Sylwester Nawrocki wrote:
+> This series is an attempt to resolve the CDCLK clock gating issue on Odroid
+> X2/U3 as reported by Daniel Drake [1], by exposing the CDCLK gate clock
+> (and the two other clocks) through clk API. The upside is we can switch
+> Odroid X2/U3 to the simple-card, once the CDCLK clock is taken care of by
+> the clk core and DT.
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
----
- arch/arm/include/asm/mach/map.h | 5 -----
- arch/arm/mm/ioremap.c           | 8 --------
- 2 files changed, 13 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index f98c7f3..be2b68e 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -52,11 +52,6 @@ static inline void debug_ll_io_init(void) {}
- 
- struct mem_type;
- extern const struct mem_type *get_mem_type(unsigned int type);
--/*
-- * external interface to remap single page with appropriate type
-- */
--extern int ioremap_page(unsigned long virt, unsigned long phys,
--			const struct mem_type *mtype);
- #else
- #define iotable_init(map,num)	do { } while (0)
- #define vm_reserve_area_early(a,s,c)	do { } while (0)
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index d1e5ad7..c91633f 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -103,14 +103,6 @@ void __init add_static_vm_early(struct static_vm *svm)
- 	list_add_tail(&svm->list, &curr_svm->list);
- }
- 
--int ioremap_page(unsigned long virt, unsigned long phys,
--		 const struct mem_type *mtype)
--{
--	return ioremap_page_range(virt, virt + PAGE_SIZE, phys,
--				  __pgprot(mtype->prot_pte));
--}
--EXPORT_SYMBOL(ioremap_page);
--
- void __check_vmalloc_seq(struct mm_struct *mm)
- {
- 	unsigned int seq;
--- 
-1.9.1
+Applied all, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/9f0e4b9f/attachment.sig>
