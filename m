@@ -1,55 +1,74 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 14 Jan 2015 14:16:15 -0800
-Subject: [RFC PATCH 0/2] clk: rockchip: leave npll for DCLK_VOP0(HDMI) only
-In-Reply-To: <3353483.Eif0pChkY5@phil>
-References: <1416236138-11010-1-git-send-email-kever.yang@rock-chips.com>
- <3353483.Eif0pChkY5@phil>
-Message-ID: <20150114221615.22722.24878@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Jan 2015 14:14:08 -0800
+Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
+Message-ID: <20150114221407.GS2419@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2015-01-08 14:30:01)
-> Hi Kever,
-> 
-> Am Montag, 17. November 2014, 22:55:36 schrieb Kever Yang:
-> > To support all kinds of frequency requirement for HDMI on rk3288,
-> > we need a PLL that can change rate at run time.
-> > 
-> > There are some discussion before at [0], I think we can just leave
-> > the npll for HDMI(DCLK_VOP0) used to make it simple.
-> > 
-> > Comments are welcome.
-> 
-> I think I said it in private somewhere already, but just so it's also 
-> available publically:
-> 
-> I don't think customizing/limiting the clock usage like this will fly, 
-> especially as this would require each and every rk3288 board to use vop0 for 
-> hdmi and vop1 for other stuff.
-> 
-> With the new rk3288 Firefly devboard this concern already becomes reality. 
-> There a vga converter is connected to VOP0, which leaves only vop1 for hdmi if 
-> one wants to support the vga connection.
-> 
-> 
-> From our discussion about this problem I remember that the missing clock 
-> frequencies only affected more esotheric screen resolutions, so personally I'm 
-> not this much concerned an would like to wait till we find a better solution to 
-> the problem.
+Hi all,
 
-Ack. We shouldn't have to limit the possible hardware configurations in
-software just to keep things simple. This points to a deficiency in the
-clock framework. This is a common concern: how to change a clock
-frequency for one user without exploding all of the other users.
+Looks like the legacy IRQ numbers are now all wrong at least for omap4
+since commit 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain.").
 
-Do you think Tomeu's constraints API[0] might be a step in the right
-direction for you?
+Instead of this:
 
-[0] http://lkml.kernel.org/r/<1421071809-17402-3-git-send-email-tomeu.vizoso@collabora.com>
+# cat /proc/interrupts 
+            CPU0       CPU1       
+ 29:       1124        981       GIC  29  twd
+ 39:          0          0       GIC  39  TWL6030-PIH
+ 41:          0          0       GIC  41  l3-dbg-irq
+ 42:          0          0       GIC  42  l3-app-irq
+ 44:          0          0       GIC  44  DMA
+ 45:       7854          0       GIC  45  omap-dma-engine
+ 52:          0          0       GIC  52  gpmc
+...
+
+
+We now have:
+
+# cat /proc/interrupts 
+            CPU0       CPU1       
+ 16:        343          0       GIC  69  gp_timer
+ 17:       1160       1017       GIC  29  twd
+ 18:          0          0       GIC  41  l3-dbg-irq
+ 19:          1          0       GIC  42  l3-app-irq
+ 22:       7850          0       GIC  45  omap-dma-engine
+ 44:          0          0  4a310000.gpio  18  DMA
+ 61:       2730          0  48055000.gpio   2  eth0
+223:          0          0       GIC  52  gpmc
+...
+
+So the DMA interrupt using the legacy mapping with something like
+irq = 12 + OMAP44XX_IRQ_GIC_START now is wrong and unfortunately
+at least omaps still have a bunch of the legacy interrupts still
+around.
+
+And that naturally produces all kinds of strange errors like:
+
+WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
+44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
+...
+[<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+[<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
+[<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
+[<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
+[<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
+...
+
+Looks like the logic changed from:
+
+if (of_property_read_u32(node, "arm,routable-irqs", &nr_routable_irqs))
+
+to just
+
+if (node)
+
+Which now causes irq_domain_add_linear() to be called instead of
+irq_domain_add_legacy(), which causes the breakage.
+
+Anybody got a sane fix in mind for the -rc series, or should we just
+revert it for now?
 
 Regards,
-Mike
 
-> 
-> 
-> Heiko
+Tony
