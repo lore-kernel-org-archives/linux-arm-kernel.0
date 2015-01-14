@@ -1,99 +1,517 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 14 Jan 2015 08:42:11 +0100
-Subject: Including empty regulator nodes in axp209.dtsi is a BAD idea
-In-Reply-To: <20150113164606.GA4891@lukather>
-References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
-Message-ID: <54B61DD3.6010105@redhat.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 14 Jan 2015 15:43:39 +0800
+Subject: [PATCH 2/2] cpufreq: add cpufreq driver for Mediatek MT8173 SoC
+In-Reply-To: <1420797291-15972-3-git-send-email-pi-cheng.chen@linaro.org>
+References: <1420797291-15972-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1420797291-15972-3-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <1421221419.31355.123.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 Hi,
 
-On 13-01-15 17:46, Maxime Ripard wrote:
-> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
->> Hi ChenYu, Maxime,
->>
->> During the review of a few dts files for new boards Maxime asked me to use
->> axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
->> boards using the axp209 pmic.
->>
->> But axp209.dtsi includes empty regulator nodes, e.g. :
->>
->>                  reg_dcdc3: dcdc3 {
->>                          regulator-name = "dcdc3";
->>                  };
->>
->> This is a BAD idea, the presence of these empty nodes causes the
->> axp20x-regulator driver to actually register regulators for them,
->> and then on late_init the regulator subsys turns them off, since
->> they have absolutely no constraints set (nor users registered)
->> and the regulator subsys assumes that when devicetree is used their
->> is always a compete set of constraints and that thus turning them
->> off is safe.
->>
->> So when I switched to using axp209.dtsi for the bananapro.dts,
->> and booted the bananapro this is the last message I got from the
->> kernel while booting:
->>
->> [    2.314014] dcdc3: disabling
->>
->> And away went our DRAM power-supply, oops.
->>
->> So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
->> should contain reasonable constraints (eg the operating range
->> from the datasheet)
->
-> Indeed.
->
->> and an always-on property.
->
-> I disagree. The regulator disabling is a feature, and how the board is
-> wired is, well, up to the board.
+On Fri, 2015-01-09 at 17:54 +0800, pi-cheng.chen wrote:
+> When doing DVFS on MT8173 SoC, 2 rules should be followed to make sure the
+> SoC works properly:
+> 1. When doing frequency scaling of CPUs, the clock source should be switched
+>    to another PLL, then switched back to the orignal until it's stable.
+> 2. When doing voltage scaling of CA57 cluster, Vproc and Vsram need to be
+>    controlled concurrently and 2 limitations should be followed:
+>    a. Vsram > Vproc
+>    b. Vsram - Vproc < 200 mV
 
-And here I was thinking you wanted to reduce the amount of boilerplate
-in our dts files ..
+It seems to me this is not much different then other mtk big little
+SoCs. Is it possible to aim to support both mt8173 & mt8135 with this
+driver?
 
-IOW I disagree with your disagreeing all boards we know of have dcdc2
-wired to Vcpu and dcdc3 wired to Vddr, so not having this in the dtsi
-will lead to a lot of extra boilerplate in each dts file. We're not
-talking about our main dtsi file here, if we ever encounter a board
-which is wired in a different way, then its dts can simply not use
-axp209.dtsi and instead define the nodes itself, it needs to do that
-anyways if we do include the standard CPU and DDR constrains in the
-dtsi since those will not make sense either in that case.
+> To address these needs, we reuse cpufreq-dt but do voltage scaling in the
+> cpufreq notifier.
+> 
+> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+> ---
+>  drivers/cpufreq/Kconfig.arm      |   6 +
+>  drivers/cpufreq/Makefile         |   1 +
+>  drivers/cpufreq/mt8173-cpufreq.c | 459 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 466 insertions(+)
+>  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
+> 
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 0f9a2c3..97ed7dd 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -255,3 +255,9 @@ config ARM_PXA2xx_CPUFREQ
+>  	  This add the CPUFreq driver support for Intel PXA2xx SOCs.
+>  
+>  	  If in doubt, say N.
+> +
+> +config ARM_MT8173_CPUFREQ
+> +	bool "Mediatek MT8173 CPUFreq support"
+> +	depends on ARCH_MEDIATEK && CPUFREQ_DT && REGULATOR
+> +	help
+> +	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index b3ca7b0..67b7f17 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -76,6 +76,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+>  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+>  obj-$(CONFIG_ARM_TEGRA_CPUFREQ)		+= tegra-cpufreq.o
+>  obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
+> +obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
+>  
+>  ##################################################################################
+>  # PowerPC platform drivers
+> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+> new file mode 100644
+> index 0000000..b578c10
+> --- /dev/null
+> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+> @@ -0,0 +1,459 @@
+> +/*
+> +* Copyright (c) 2015 Linaro.
+> +* Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> +*
+> +* This program is free software; you can redistribute it and/or modify
+> +* it under the terms of the GNU General Public License version 2 as
+> +* published by the Free Software Foundation.
+> +*
+> +* This program is distributed in the hope that it will be useful,
+> +* but WITHOUT ANY WARRANTY; without even the implied warranty of
+> +* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> +* GNU General Public License for more details.
+> +*/
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/cpufreq-dt.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/slab.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/cpu.h>
+> +#include <linux/pm_opp.h>
+> +
+> +#define CPUCLK_MUX_ARMPLL	0x1
+> +#define CPUCLK_MUX_MAINPLL	0x2
+> +#define VOLT_SHIFT_LIMIT	150000
+> +
+> +enum {
+> +	LITTLE_CLUSTER = 0,
+> +	BIG_CLUSTER,
+> +	NR_CLUSTERS
+> +};
+> +
+> +static struct cluster_dvfs_info {
+> +	int cpu;
+> +	struct cpumask cpus;
+> +	struct device *cpu_dev;
+> +	struct regulator *proc_reg;
+> +	struct regulator *sram_reg;
+> +	int inter_volt;
+> +	u32 volt_tol;
+> +} *dvfs_info;
+> +
+> +static unsigned long mainpll_freq;
+> +static void __iomem *clk_mux_regs;
+> +static spinlock_t lock;
+> +
+> +static void cpuclk_mux_set(int cluster, u32 sel)
+> +{
+> +	u32 val;
+> +	u32 mask = 0x3;
+> +
+> +	if (cluster == BIG_CLUSTER) {
+> +		mask <<= 2;
+> +		sel <<= 2;
+> +	}
+> +
+> +	spin_lock(&lock);
+> +
+> +	val = readl(clk_mux_regs);
+> +	val = (val & ~mask) | sel;
+> +	writel(val, clk_mux_regs);
+> +
+> +	spin_unlock(&lock);
+> +}
+> +
+> +static int mt8173_cpufreq_voltage_step(struct cluster_dvfs_info *dvfs,
+> +				       unsigned long old_vproc,
+> +				       unsigned long new_vproc)
+> +{
+> +	int cur_vsram, cur_vproc, target_volt, tol;
+> +
+> +	if (old_vproc > new_vproc) {
+> +		while (1) {
+> +			cur_vsram = regulator_get_voltage(dvfs->sram_reg);
+> +			if (cur_vsram - new_vproc < VOLT_SHIFT_LIMIT &&
+> +			    cur_vsram > new_vproc) {
+> +				tol = new_vproc * dvfs->volt_tol / 100;
+> +				regulator_set_voltage_tol(dvfs->proc_reg,
+> +							  new_vproc, tol);
+> +				break;
+> +			}
+> +
+> +			target_volt = cur_vsram - VOLT_SHIFT_LIMIT;
+> +			tol = target_volt * dvfs->volt_tol / 100;
 
-> If an always-on property is needed, then it's in the DTS, not in the
-> AXP DTSI.
->
->> The ldo-s are trickier, since we simply do not know how those
->> are used, I think ldo2 is used for Avcc on most boards, so it
->> too should be always on, since almost any board will have some
->> analog parts on it (be it the ir receiver, lradc, rtp, lvds, vga,
->> or analog audio in/out). Assuming that we're willing to assume
->> that ldo2 is used this way, we should give it matching constraints
->> and always mark it always-on.
->
-> Ideally, all the drivers that have a analogic component should have a
-> reference to the regulator they use. But again, at the board
-> level. And more realistically, putting always-on should also happen at
-> the board level.
->
->> As for ldo3 - 5 I've no idea when / for what these are used, but
->> if we do not know it is better to just leave them be then to turn
->> them off IMHO, so we should remove the nodes for these from axp209.dtsi
->>
->> Anyways sorting this all out is going to take some time, so I'm
->> not going to use axp209.dtsi in dts files for new boards for now.
->
-> I'm afraid it's an "all or nothing" situation.
+I don't quite get the logic for tol calculation here. What's the
+expected value for volt_tol? Care to explain?
 
-No it is not, the PMIC is a mfd, and we can use some of its functions
-fine without actually loading the regulator bits. This is already
-done on most boards with the axp209, even without touching the regulators
-it is nice to have the axp209 mfd driver loaded so that we get support
-for the powerbutton, and support for poweroff, esp. the latter is quite
-nice to have.
+> +			regulator_set_voltage_tol(dvfs->proc_reg, target_volt,
+> +						  tol);
+> +
+> +			cur_vproc = regulator_get_voltage(dvfs->proc_reg);
+> +			target_volt = cur_vproc + 1;
+> +			tol = target_volt * dvfs->volt_tol / 100;
+> +			regulator_set_voltage_tol(dvfs->sram_reg, target_volt,
+> +						  tol);
+> +		}
+> +	} else if (old_vproc < new_vproc) {
+> +		while (1) {
+> +			cur_vsram = regulator_get_voltage(dvfs->sram_reg);
+> +			if (cur_vsram - new_vproc < VOLT_SHIFT_LIMIT &&
+> +			    cur_vsram > new_vproc) {
+> +				tol = new_vproc * dvfs->volt_tol / 100;
+> +				regulator_set_voltage_tol(dvfs->proc_reg,
+> +							  new_vproc, tol);
+> +				break;
+> +			}
+> +
+> +			cur_vproc = regulator_get_voltage(dvfs->proc_reg);
+> +			target_volt = cur_vproc + VOLT_SHIFT_LIMIT;
+> +			tol = target_volt * dvfs->volt_tol / 100;
+> +			regulator_set_voltage_tol(dvfs->sram_reg, target_volt,
+> +						  tol);
+> +
+> +			if (new_vproc - cur_vproc > VOLT_SHIFT_LIMIT) {
+> +				cur_vsram = regulator_get_voltage(
+> +							dvfs->sram_reg);
+> +				target_volt = cur_vsram - 1;
+> +				tol = target_volt * dvfs->volt_tol / 100;
+> +				regulator_set_voltage_tol(dvfs->proc_reg,
+> +							  target_volt, tol);
+> +			}
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int get_opp_voltage(struct device *dev, unsigned long freq_hz)
+> +{
+> +	struct dev_pm_opp *opp;
+> +	int volt;
+> +
+> +	rcu_read_lock();
+> +	opp = dev_pm_opp_find_freq_ceil(dev, &freq_hz);
+> +	if (IS_ERR(opp)) {
+> +		rcu_read_unlock();
+> +		pr_err("%s: failed to find OPP for %lu\n", __func__, freq_hz);
+> +		return PTR_ERR(opp);
+> +	}
+> +	volt = dev_pm_opp_get_voltage(opp);
+> +	rcu_read_unlock();
+> +
+> +	return volt;
+> +}
+> +
+> +static int mt8173_cpufreq_get_intermediate_voltage(int cluster)
+> +{
+> +	struct cluster_dvfs_info *dvfs = &dvfs_info[cluster];
+> +
+> +	if (dvfs->inter_volt == 0)
+> +		dvfs->inter_volt = get_opp_voltage(dvfs->cpu_dev,
+> +						   mainpll_freq);
+> +
+> +	return dvfs->inter_volt;
+> +}
+> +
+> +static void mt8173_cpufreq_set_voltage(int cluster, int old_volt, int new_volt)
+> +{
+> +	struct cluster_dvfs_info *dvfs = &dvfs_info[cluster];
+> +	int ret = 0;
+> +
+> +	if (cluster == LITTLE_CLUSTER) {
+> +		int tol;
+> +
+> +		tol = new_volt * dvfs->volt_tol / 100;
+> +		ret = regulator_set_voltage_tol(dvfs->proc_reg, new_volt, tol);
+> +	} else {
+> +		ret = mt8173_cpufreq_voltage_step(dvfs, old_volt, new_volt);
+> +	}
+> +
+> +	if (ret)
+> +		pr_err("%s: cluster%d failed to scale voltage (%dmV to %dmV)",
+> +		       __func__, cluster, old_volt, new_volt);
+> +}
 
-Regards,
+It seems the only reason to check if it is a BIG or LITTLE cluster is to
+control vsram correctly. If we assume we need to do the control whenever
+sram_reg exists, we can drop all the BIG/LITTLE cluster check. I think
+this will make code looks more compact and generic.
 
-Hans
+> +
+> +static int mt8173_cpufreq_notify(struct notifier_block *nb,
+> +				 unsigned long action, void *data)
+> +{
+> +	struct cpufreq_freqs *freqs = data;
+> +	struct cluster_dvfs_info *dvfs;
+> +	unsigned long old_volt, new_volt, inter_volt;
+> +	int cluster;
+> +
+> +	if (freqs->cpu == dvfs_info[BIG_CLUSTER].cpu)
+> +		cluster = BIG_CLUSTER;
+> +	else if (freqs->cpu == dvfs_info[LITTLE_CLUSTER].cpu)
+> +		cluster = LITTLE_CLUSTER;
+> +	else
+> +		return NOTIFY_DONE;
+> +
+> +	dvfs = &dvfs_info[cluster];
+> +
+> +	old_volt = regulator_get_voltage(dvfs->proc_reg);
+> +
+> +	new_volt = get_opp_voltage(dvfs->cpu_dev, freqs->new * 1000);
+> +	inter_volt = mt8173_cpufreq_get_intermediate_voltage(cluster);
+
+This is only used in PRECHANGE, please move this inside the if.
+
+> +
+> +	if (action == CPUFREQ_PRECHANGE) {
+> +		if (old_volt < inter_volt || old_volt < new_volt) {
+> +			new_volt = inter_volt > new_volt ?
+> +				   inter_volt : new_volt;
+> +			mt8173_cpufreq_set_voltage(cluster, old_volt,
+> +						   new_volt);
+> +		}
+> +
+> +		cpuclk_mux_set(cluster, CPUCLK_MUX_MAINPLL);
+> +	} else if (action == CPUFREQ_POSTCHANGE) {
+> +		cpuclk_mux_set(cluster, CPUCLK_MUX_ARMPLL);
+> +
+> +		if (new_volt < old_volt)
+> +			mt8173_cpufreq_set_voltage(cluster, old_volt,
+> +						   new_volt);
+> +	}
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block mt8173_cpufreq_nb = {
+> +	.notifier_call = mt8173_cpufreq_notify,
+> +};
+> +
+> +static struct cpufreq_dt_platform_data *pd;
+
+Please drop this global variable. You can return it from
+cpufreq_dt_pdata_init and pass to all the function need it.
+
+> +
+> +static int cpu_in_domain_list(struct list_head *domain_list, int cpu)
+> +{
+> +	struct list_head *node;
+> +
+> +	list_for_each(node, domain_list) {
+> +		struct cpufreq_cpu_domain *domain;
+> +
+> +		domain = container_of(node, struct cpufreq_cpu_domain, node);
+> +		if (cpumask_test_cpu(cpu, &domain->cpus))
+> +			return 1;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void cpufreq_dt_pdata_release(void)
+> +{
+> +	if (!pd)
+> +		return;
+> +
+> +	if (!list_empty(&pd->domain_list)) {
+> +		struct list_head *node, *tmp;
+> +		struct cpufreq_cpu_domain *domain;
+> +
+> +		list_for_each_safe(node, tmp, &pd->domain_list) {
+> +			list_del(node);
+> +			domain = container_of(node, struct cpufreq_cpu_domain,
+> +					      node);
+> +			kfree(domain);
+> +		}
+> +	}
+> +
+> +	kfree(pd);
+> +}
+> +
+> +static int cpufreq_dt_pdata_init(void)
+> +{
+> +	int cpu;
+> +
+> +	pd = kmalloc(sizeof(*pd), GFP_KERNEL);
+> +	if (!pd)
+> +		return -ENOMEM;
+> +
+> +	pd->independent_clocks = 1,
+> +	INIT_LIST_HEAD(&pd->domain_list);
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		struct cpufreq_cpu_domain *new_domain;
+> +
+> +		if (cpu_in_domain_list(&pd->domain_list, cpu))
+> +			continue;
+> +
+> +		new_domain = kzalloc(sizeof(*new_domain), GFP_KERNEL);
+> +		if (!new_domain) {
+> +			cpufreq_dt_pdata_release();
+> +			return -ENOMEM;
+> +		}
+> +
+> +		cpumask_copy(&new_domain->cpus,
+> +			     &cpu_topology[cpu].core_sibling);
+> +		list_add(&new_domain->node, &pd->domain_list);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void mt8173_cpufreq_dvfs_info_release(void)
+> +{
+> +	int i;
+> +
+> +	if (!dvfs_info)
+> +		return;
+> +
+> +	for (i = 0; i < NR_CLUSTERS; ++i) {
+> +		struct cluster_dvfs_info *dvfs = &dvfs_info[i];
+> +
+> +		if (!IS_ERR_OR_NULL(dvfs->proc_reg))
+> +			regulator_put(dvfs->proc_reg);
+> +
+> +		if (!IS_ERR_OR_NULL(dvfs->sram_reg))
+> +			regulator_put(dvfs->sram_reg);
+> +	}
+> +
+> +	if (clk_mux_regs)
+> +		iounmap(clk_mux_regs);
+> +}
+> +
+> +static int mt8173_cpufreq_dvfs_info_init(void)
+> +{
+> +	struct list_head *node;
+> +	struct device_node *np;
+> +	struct clk *mainpll;
+> +	int i, ret;
+> +
+> +	dvfs_info = kzalloc(sizeof(*dvfs) * NR_CLUSTERS, GFP_KERNEL);
+> +	if (!dvfs_info)
+> +		return -ENOMEM;
+> +
+> +	list_for_each(node, &pd->domain_list) {
+> +		struct cpufreq_cpu_domain *domain = container_of(
+> +					node, struct cpufreq_cpu_domain, node);
+> +		int cpu = cpumask_next(0, &domain->cpus);
+> +
+> +		np = of_get_cpu_node(cpu, NULL);
+> +
+> +		if (of_property_match_string(np, "compatible",
+> +					     "arm,cortex-a53") >= 0)
+> +			cpumask_copy(&dvfs_info[LITTLE_CLUSTER].cpus,
+> +				     &domain->cpus);
+> +		else if (of_property_match_string(np, "compatible",
+> +						  "arm,cortex-a57") >= 0)
+> +			cpumask_copy(&dvfs_info[BIG_CLUSTER].cpus,
+> +				     &domain->cpus);
+> +		else {
+> +			of_node_put(np);
+> +			pr_err("%s: unknown CPU core\n", __func__);
+> +			return -EINVAL;
+> +		}
+> +
+> +		of_node_put(np);
+> +	}
+
+It seems you hardcode the match CPU here to know which is big/little
+cluster. If we still need this information, should we add this to
+topology, maybe something similar to capacity in arm topology, instead
+of coding here?
+
+> +
+> +	for (i = 0; i < NR_CLUSTERS; i++) {
+> +		struct cluster_dvfs_info *dvfs = &dvfs_info[i];
+> +		int cpu;
+> +
+> +		for_each_cpu_mask(cpu, dvfs->cpus) {
+> +			struct device_node *np;
+> +
+> +			dvfs->cpu_dev = get_cpu_device(cpu);
+> +			dvfs->proc_reg = regulator_get(dvfs->cpu_dev, "proc");
+> +			if (IS_ERR(dvfs->proc_reg))
+> +				continue;
+> +
+> +			dvfs->cpu = cpu;
+> +			dvfs->sram_reg = regulator_get(dvfs->cpu_dev, "sram");
+> +
+> +			np = of_node_get(dvfs->cpu_dev->of_node);
+> +			of_property_read_u32(np, "voltage-tolerance",
+> +					     &dvfs->volt_tol);
+> +			of_node_put(np);
+> +			break;
+> +		}
+> +
+> +		if (IS_ERR(dvfs->proc_reg)) {
+> +			pr_err("%s: no proc regulator for cluster %d\n",
+> +			       __func__, i);
+> +			ret = -ENODEV;
+> +			goto dvfs_info_release;
+> +		}
+> +
+> +		if (IS_ERR(dvfs->sram_reg) && BIG_CLUSTER == i) {
+> +			pr_err("%s: no sram regulator for cluster %d\n",
+> +			       __func__, i);
+> +			ret = -ENODEV;
+> +			goto dvfs_info_release;
+> +		}
+> +	}
+> +
+> +	mainpll = __clk_lookup("mainpll");
+> +	if (!mainpll) {
+> +		pr_err("failed to get mainpll clk\n");
+> +		ret = -ENOENT;
+> +		goto dvfs_info_release;
+> +	}
+> +	mainpll_freq = clk_get_rate(mainpll);
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "mediatek,mt8173-infrasys");
+> +	if (!np) {
+> +		pr_err("failed to find clock mux registers\n");
+> +		ret = -ENODEV;
+> +		goto dvfs_info_release;
+> +	}
+> +
+> +	clk_mux_regs = of_iomap(np, 0);
+> +	if (!clk_mux_regs) {
+> +		pr_err("failed to map clock mux registers\n");
+> +		ret = -EFAULT;
+> +		goto dvfs_info_release;
+> +	}
+> +	of_node_put(np);
+
+This is already used by mt8173 clock driver, and you are directly
+accessing it registers to control clock mux. I think you should add
+these 2 clk to clock driver and use clk API to control it. Also you can
+drop the lock init below if you do this.
+
+Joe.C
+
+> +
+> +	spin_lock_init(&lock);
+> +
+> +	return 0;
+> +
+> +dvfs_info_release:
+> +	mt8173_cpufreq_dvfs_info_release();
+> +	return ret;
+> +}
