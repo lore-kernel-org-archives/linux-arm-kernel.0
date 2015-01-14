@@ -1,29 +1,44 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Wed, 14 Jan 2015 12:56:31 -0500
-Subject: [Resend PATCH] ARM: mm: use phys_addr_t in ioremap_page functions
-In-Reply-To: <20150114174407.GB12302@n2100.arm.linux.org.uk>
-References: <1421257452-18834-1-git-send-email-vitalya@ti.com>
- <20150114174407.GB12302@n2100.arm.linux.org.uk>
-Message-ID: <54B6ADCF.1090403@ti.com>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Wed, 14 Jan 2015 10:24:18 -0800
+Subject: [PATCH boot-wrapper-aarch64 1/4] psci: use MPIDR_INVALID instead
+ of -1
+In-Reply-To: <20150114110343.GC12069@leverpostej>
+References: <1421115304-19580-1-git-send-email-zlim@broadcom.com>
+ <1421115304-19580-2-git-send-email-zlim@broadcom.com>
+ <20150114110343.GC12069@leverpostej>
+Message-ID: <CABg9mcsP_P4YoPoDjt+KP=6YZRAXE4jKSVuHvTU5Tsvggst=Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-
-On 01/14/2015 12:44 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 14, 2015 at 12:44:12PM -0500, Vitaly Andrianov wrote:
->> On a 32 bit ARM architecture with LPAE extension physical addresses
->> cannot fit into unsigned long variable.
->>
->> This patch fixes the ioremap_page function.
->>
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> Acked-by: Murali Karicheri <m-karicheri2@ti.com>
->>
->> - Fixing the commit log and resending
+On Wed, Jan 14, 2015 at 3:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> Still not happy.  Why do we even need this function which no one calls.
-> Please delete it instead.
+> On Tue, Jan 13, 2015 at 02:15:01AM +0000, Zi Shen Lim wrote:
+>> MPIDR_INVALID was already defined, so use it.
 >
+> MPIDR_INVALID is meant to be an invalid MPIDR value, rather than an
+> error code in the case of an invalid MPIDR.
+>
+> __find_logical_index is meant to return a logical CPU ID, so returning
+> MPIDR_INVALID isn't quite right.
+>
+> I'd be happier if we used a separate macro for the logical IDs (e.g.
+> ID_INVALID).
 
-Thanks for the reply. I'll delete the function.
+I follow your argument here.
+
+I guess I should've reordered patches 1 and 2.
+In patch 2, following removal of the sentinel, MPIDR_INVALID is no
+longer found in id_table itself.
+So MPIDR_INVALID is indeed the "ID_INVALID" you're suggesting.
+
+Are you comfortable with this repurposing of MPIDR_INVALID?
+Now, MPIDR_INVALID (-1) is consistently used as return value of
+find_logical_id for an invalid/unknown MPIDR.
+
+>
+> Thanks,
+> Mark.
+>
