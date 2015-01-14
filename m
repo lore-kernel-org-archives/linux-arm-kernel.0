@@ -1,50 +1,48 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 Jan 2015 19:42:34 +0100
-Subject: [PATCH V3 07/15] ASoC: samsung: i2s: Remove an unneeded goto usage
+Date: Wed, 14 Jan 2015 19:42:37 +0100
+Subject: [PATCH V3 10/15] ASoC: samsung: odroidx2: Handle I2S CDCLK clock
+ conditionally
 In-Reply-To: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
 References: <1421260962-16892-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1421260962-16892-8-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1421260962-16892-11-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of this goto seems unjustified, use if/else statement instead.
+In order to support old DTs we check the codec device node if it
+contains "clocks" property and only if it doesn't (which indicates
+an old DT) we proceed with enabling the CDCLK clock by means of
+the set_sysclk() callback.  For new DTs which use the common clock
+bindings for CDCLK that clock is supposed to be handled outside
+the sound machine driver.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- sound/soc/samsung/i2s.c |   17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ sound/soc/samsung/odroidx2_max98090.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index cab2a2a..2bac719 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -979,19 +979,18 @@ static int samsung_i2s_dai_probe(struct snd_soc_dai *dai)
- 	if (is_secondary(i2s)) { /* If this is probe on the secondary DAI */
- 		samsung_asoc_init_dma_data(dai, &other->sec_dai->dma_playback,
- 					   NULL);
--		goto probe_exit;
--	}
--
--	samsung_asoc_init_dma_data(dai, &i2s->dma_playback, &i2s->dma_capture);
-+	} else {
-+		samsung_asoc_init_dma_data(dai, &i2s->dma_playback,
-+					   &i2s->dma_capture);
+diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
+index fa4f1d2..596f118 100644
+--- a/sound/soc/samsung/odroidx2_max98090.c
++++ b/sound/soc/samsung/odroidx2_max98090.c
+@@ -21,6 +21,8 @@ struct odroidx2_drv_data {
+ /* The I2S CDCLK output clock frequency for the MAX98090 codec */
+ #define MAX98090_MCLK 19200000
  
--	if (i2s->quirks & QUIRK_NEED_RSTCLR)
--		writel(CON_RSTCLR, i2s->addr + I2SCON);
-+		if (i2s->quirks & QUIRK_NEED_RSTCLR)
-+			writel(CON_RSTCLR, i2s->addr + I2SCON);
++static struct snd_soc_dai_link odroidx2_dai[];
++
+ static int odroidx2_late_probe(struct snd_soc_card *card)
+ {
+ 	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
+@@ -29,7 +31,9 @@ static int odroidx2_late_probe(struct snd_soc_card *card)
  
--	if (i2s->quirks & QUIRK_SUPPORTS_IDMA)
--		idma_reg_addr_init(i2s->addr,
-+		if (i2s->quirks & QUIRK_SUPPORTS_IDMA)
-+			idma_reg_addr_init(i2s->addr,
- 					i2s->sec_dai->idma_playback.dma_addr);
-+	}
+ 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
+ 						SND_SOC_CLOCK_IN);
+-	if (ret < 0)
++
++	if (ret < 0 || of_find_property(odroidx2_dai[0].codec_of_node,
++					"clocks", NULL))
+ 		return ret;
  
--probe_exit:
- 	/* Reset any constraint on RFS and BFS */
- 	i2s->rfs = 0;
- 	i2s->bfs = 0;
+ 	/* Set the cpu DAI configuration in order to use CDCLK */
 -- 
 1.7.9.5
