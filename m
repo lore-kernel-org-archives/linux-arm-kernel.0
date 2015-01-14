@@ -1,80 +1,31 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Wed, 14 Jan 2015 15:02:32 +0530
-Subject: [PATCH v4 4/6] arm64: Kprobes instruction simulation support
-In-Reply-To: <1420949002-3726-5-git-send-email-dave.long@linaro.org>
-References: <1420949002-3726-1-git-send-email-dave.long@linaro.org>
- <1420949002-3726-5-git-send-email-dave.long@linaro.org>
-Message-ID: <CAHM4w1n6wCUSX1QjP8EyA9zkJBZTM=6Vc32Vjm3wPuDv=FXZzw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Jan 2015 10:35:29 +0100
+Subject: [PATCH 1/5] ARM: sa1100: split irq handling for low GPIOs
+In-Reply-To: <1419242740-20219-1-git-send-email-dbaryshkov@gmail.com>
+References: <1419242740-20219-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <CACRpkdavZdZuYxLW-i4BJM0hFqt73n7AhrSzUynBsuDNj5HKGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 9:33 AM, David Long <dave.long@linaro.org> wrote:
-> From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+On Mon, Dec 22, 2014 at 11:05 AM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+
+> Low GPIO pins use an interrupt in SC interrupts space. However it's
+> possible to handle them as if all the GPIO interrupts are instead tied
+> to single GPIO handler, which later decodes GEDR register and
+> chain-calls next IRQ handler. So split first 11 interrupts into system
+> part (IRQ_GPIO0_SC - IRQ_GPIO10_SC) which work exactly like the rest of
+> system controller interrupts and real GPIO interrupts
+> (IRQ_GPIO0..IRQ_GPIO10). A single handler sa1100_gpio_handler then
+> decodes and calls next handler.
 >
-> Add support for AArch64 instruction simulation in kprobes.
->
-> Kprobes needs simulation of instructions that cannot be stepped
-> from different memory location, e.g.: those instructions
-> that uses PC-relative addressing. In simulation, the behaviour
-> of the instruction is implemented using a copy of pt_regs.
->
-> Following instruction catagories are simulated:
->  - All branching instructions(conditional, register, and immediate)
->  - Literal access instructions(load-literal, adr/adrp)
->
-> Conditional execution is limited to branching instructions in
-> ARM v8. If conditions at PSTATE do not match the condition fields
-> of opcode, the instruction is effectively NOP. Kprobes considers
-> this case as 'miss'.
-> changes since v3:
-> from David A. Long:
-> 1) Fix incorrect simulate_ldrsw_literal() semantics.
-> 2) Use instruction test functions instead of private parse table.
-> from Will Cohen:
-> 3) Remove PC adjustments when simulating an instruction.
-> 4) Fix displacement calculations.
->
-> Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-[...]
+I applied all 5 patches and tested on the Compaq iPAQ H3600
+with some GPIO lines with IRQs and all work as before.
 
->  static bool aarch64_insn_is_steppable(u32 insn)
->  {
-> @@ -60,6 +130,32 @@ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
->          */
->         if (aarch64_insn_is_steppable(insn))
->                 return INSN_GOOD;
-> +
-> +       asi->prepare = prepare_none;
-> +
-> +       if (aarch64_insn_is_bcond(insn)) {
-> +               asi->prepare = prepare_bcond;
-> +               asi->handler = simulate_b_cond;
-> +       } else if (aarch64_insn_is_cb(insn)) {
-> +               asi->prepare = prepare_cbz_cbnz;
-> +               asi->handler = simulate_cbz_cbnz;
-> +       } else if (aarch64_insn_is_tb(insn)) {
-> +               asi->prepare = prepare_tbz_tbnz;
-> +               asi->handler = simulate_tbz_tbnz;
-> +       } else if (aarch64_insn_is_adr(insn))
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+for all 5 patches.
 
-aarch64_insn_is_adr should be modified to aarch64_insn_is_adr_adrp
-
-> +               asi->handler = simulate_adr_adrp;
-> +       else if (aarch64_insn_is_b_bl(insn))
-> +               asi->handler = simulate_b_bl;
-> +       else if (aarch64_insn_is_ldr_lit(insn))
-> +               asi->handler = simulate_ldr_literal;
-> +       else if (aarch64_insn_is_ldrsw_lit(insn))
-> +               asi->handler = simulate_ldrsw_literal;
-
-also
-
-else if (aarch64_insn_is_br_blr(insn) || aarch64_insn_is_ret(insn))
-               asi->handler = simulate_br_blr_ret;
-
-
-~Pratyush
+Yours,
+Linus Walleij
