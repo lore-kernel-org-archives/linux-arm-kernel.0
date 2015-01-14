@@ -1,21 +1,16 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 14 Jan 2015 16:31:13 +0000
-Subject: [PATCH v7 09/20] arm/arm64: KVM: make the value of ICC_SRE_EL1 a
- per-VM variable
+Date: Wed, 14 Jan 2015 16:31:07 +0000
+Subject: [PATCH v7 03/20] arm/arm64: KVM: refactor vgic_handle_mmio() function
 In-Reply-To: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
 References: <1421253084-9663-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1421253084-9663-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <1421253084-9663-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ICC_SRE_EL1 is a system register allowing msr/mrs accesses to the
-GIC CPU interface for EL1 (guests). Currently we force it to 0, but
-for proper GICv3 support we have to allow guests to use it (depending
-on their selected virtual GIC model).
-So add ICC_SRE_EL1 to the list of saved/restored registers on a
-world switch, but actually disallow a guest to change it by only
-restoring a fixed, once-initialized value.
-This value depends on the GIC model userland has chosen for a guest.
+Currently we only need to deal with one MMIO region for the GIC
+emulation (the GICv2 distributor), but we soon need to extend this.
+Refactor the existing code to allow easier addition of different
+ranges without code duplication.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
@@ -31,104 +26,120 @@ Changelog v4...v5:
  (none)
 
 Changelog v3...v4:
-- initialize variable on declaration
+- simplify is_in_range()
+ (added Reviewed-by:)
 
- arch/arm64/kernel/asm-offsets.c |    1 +
- arch/arm64/kvm/vgic-v3-switch.S |   14 +++++++++-----
- include/kvm/arm_vgic.h          |    1 +
- virt/kvm/arm/vgic-v3.c          |    8 ++++++--
- 4 files changed, 17 insertions(+), 7 deletions(-)
+ virt/kvm/arm/vgic.c |   73 +++++++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 53 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 9a9fce0..9d34486 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -140,6 +140,7 @@ int main(void)
-   DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
-   DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
-   DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
-+  DEFINE(VGIC_V3_CPU_SRE,	offsetof(struct vgic_cpu, vgic_v3.vgic_sre));
-   DEFINE(VGIC_V3_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_hcr));
-   DEFINE(VGIC_V3_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v3.vgic_vmcr));
-   DEFINE(VGIC_V3_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v3.vgic_misr));
-diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
-index d160469..617a012 100644
---- a/arch/arm64/kvm/vgic-v3-switch.S
-+++ b/arch/arm64/kvm/vgic-v3-switch.S
-@@ -148,17 +148,18 @@
-  * x0: Register pointing to VCPU struct
-  */
- .macro	restore_vgic_v3_state
--	// Disable SRE_EL1 access. Necessary, otherwise
--	// ICH_VMCR_EL2.VFIQEn becomes one, and FIQ happens...
--	msr_s	ICC_SRE_EL1, xzr
--	isb
--
- 	// Compute the address of struct vgic_cpu
- 	add	x3, x0, #VCPU_VGIC_CPU
- 
- 	// Restore all interesting registers
- 	ldr	w4, [x3, #VGIC_V3_CPU_HCR]
- 	ldr	w5, [x3, #VGIC_V3_CPU_VMCR]
-+	ldr	w25, [x3, #VGIC_V3_CPU_SRE]
-+
-+	msr_s	ICC_SRE_EL1, x25
-+
-+	// make sure SRE is valid before writing the other registers
-+	isb
- 
- 	msr_s	ICH_HCR_EL2, x4
- 	msr_s	ICH_VMCR_EL2, x5
-@@ -244,9 +245,12 @@
- 	dsb	sy
- 
- 	// Prevent the guest from touching the GIC system registers
-+	// if SRE isn't enabled for GICv3 emulation
-+	cbnz	x25, 1f
- 	mrs_s	x5, ICC_SRE_EL2
- 	and	x5, x5, #~ICC_SRE_EL2_ENABLE
- 	msr_s	ICC_SRE_EL2, x5
-+1:
- .endm
- 
- ENTRY(__save_vgic_v3_state)
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 1c0e9db..ff04afd 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -245,6 +245,7 @@ struct vgic_v3_cpu_if {
- #ifdef CONFIG_ARM_GIC_V3
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
-+	u32		vgic_sre;	/* Restored only, change ignored */
- 	u32		vgic_misr;	/* Saved only */
- 	u32		vgic_eisr;	/* Saved only */
- 	u32		vgic_elrsr;	/* Saved only */
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index ea39bad..5249048 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -145,15 +145,19 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 
- static void vgic_v3_enable(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-+
- 	/*
- 	 * By forcing VMCR to zero, the GIC will restore the binary
- 	 * points to their reset values. Anything else resets to zero
- 	 * anyway.
- 	 */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = 0;
-+	vgic_v3->vgic_vmcr = 0;
-+
-+	vgic_v3->vgic_sre = 0;
- 
- 	/* Get the show on the road... */
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_hcr = ICH_HCR_EN;
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 283038e..b5aa821 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1034,36 +1034,27 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
  }
  
- static const struct vgic_ops vgic_v3_ops = {
+ /**
+- * vgic_handle_mmio - handle an in-kernel MMIO access
++ * vgic_handle_mmio_range - handle an in-kernel MMIO access
+  * @vcpu:	pointer to the vcpu performing the access
+  * @run:	pointer to the kvm_run structure
+  * @mmio:	pointer to the data describing the access
++ * @ranges:	array of MMIO ranges in a given region
++ * @mmio_base:	base address of that region
+  *
+- * returns true if the MMIO access has been performed in kernel space,
+- * and false if it needs to be emulated in user space.
++ * returns true if the MMIO access could be performed
+  */
+-bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-		      struct kvm_exit_mmio *mmio)
++static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
++			    struct kvm_exit_mmio *mmio,
++			    const struct mmio_range *ranges,
++			    unsigned long mmio_base)
+ {
+ 	const struct mmio_range *range;
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+-	unsigned long base = dist->vgic_dist_base;
+ 	bool updated_state;
+ 	unsigned long offset;
+ 
+-	if (!irqchip_in_kernel(vcpu->kvm) ||
+-	    mmio->phys_addr < base ||
+-	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
+-		return false;
+-
+-	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
+-	if (mmio->len > 4) {
+-		kvm_inject_dabt(vcpu, mmio->phys_addr);
+-		return true;
+-	}
+-
+-	offset = mmio->phys_addr - base;
+-	range = find_matching_range(vgic_dist_ranges, mmio, offset);
++	offset = mmio->phys_addr - mmio_base;
++	range = find_matching_range(ranges, mmio, offset);
+ 	if (unlikely(!range || !range->handle_mmio)) {
+ 		pr_warn("Unhandled access %d %08llx %d\n",
+ 			mmio->is_write, mmio->phys_addr, mmio->len);
+@@ -1071,7 +1062,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	}
+ 
+ 	spin_lock(&vcpu->kvm->arch.vgic.lock);
+-	offset = mmio->phys_addr - range->base - base;
++	offset -= range->base;
+ 	if (vgic_validate_access(dist, range, offset)) {
+ 		updated_state = range->handle_mmio(vcpu, mmio, offset);
+ 	} else {
+@@ -1089,6 +1080,48 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	return true;
+ }
+ 
++static inline bool is_in_range(phys_addr_t addr, unsigned long len,
++			       phys_addr_t baseaddr, unsigned long size)
++{
++	return (addr >= baseaddr) && (addr + len <= baseaddr + size);
++}
++
++static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
++				struct kvm_exit_mmio *mmio)
++{
++	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
++
++	if (!is_in_range(mmio->phys_addr, mmio->len, base,
++			 KVM_VGIC_V2_DIST_SIZE))
++		return false;
++
++	/* GICv2 does not support accesses wider than 32 bits */
++	if (mmio->len > 4) {
++		kvm_inject_dabt(vcpu, mmio->phys_addr);
++		return true;
++	}
++
++	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
++}
++
++/**
++ * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
++ * @vcpu:      pointer to the vcpu performing the access
++ * @run:       pointer to the kvm_run structure
++ * @mmio:      pointer to the data describing the access
++ *
++ * returns true if the MMIO access has been performed in kernel space,
++ * and false if it needs to be emulated in user space.
++ */
++bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		      struct kvm_exit_mmio *mmio)
++{
++	if (!irqchip_in_kernel(vcpu->kvm))
++		return false;
++
++	return vgic_v2_handle_mmio(vcpu, run, mmio);
++}
++
+ static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+ {
+ 	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
 -- 
 1.7.9.5
