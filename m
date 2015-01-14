@@ -1,71 +1,47 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 14 Jan 2015 18:00:24 +0900
-Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <1417453034-21379-9-git-send-email-will.deacon@arm.com>
-References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
- <1417453034-21379-9-git-send-email-will.deacon@arm.com>
-Message-ID: <54B63028.3090701@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Jan 2015 10:05:08 +0100
+Subject: [PATCH] ARM: dts: re-fromat AT91 part to match other entries
+In-Reply-To: <20150113234759.GH3843@piout.net>
+References: <20150112224203.GL22090@quad.lixom.net>
+ <20150113230956.GA15087@quad.lixom.net> <20150113234759.GH3843@piout.net>
+Message-ID: <2263559.r5MiMeqJt6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2014 01:57 AM, Will Deacon wrote:
-> This patch plumbs the existing ARM IOMMU DMA infrastructure (which isn't
-> actually called outside of a few drivers) into arch_setup_dma_ops, so
-> that we can use IOMMUs for DMA transfers in a more generic fashion.
->
-> Since this significantly complicates the arch_setup_dma_ops function,
-> it is moved out of line into dma-mapping.c. If CONFIG_ARM_DMA_USE_IOMMU
-> is not set, the iommu parameter is ignored and the normal ops are used
-> instead.
+On Wednesday 14 January 2015 00:47:59 Alexandre Belloni wrote:
+> 
+> On 13/01/2015 at 15:09:56 -0800, Olof Johansson wrote :
+> > On Tue, Jan 13, 2015 at 03:43:00PM +0100, Nicolas Ferre wrote:
+> > > The entries are separated as ARM V4/V5 and ARM V7 as some other per-SoC config
+> > > options may be removed in the near future.
+> > > 
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > ---
+> > > Hi Olof,
+> > > 
+> > > This is an attempt to match other ARM SoC families format.
+> > > If you feel that the patch can be good, do not hesitate to take it yourself. I
+> > > don't plan to integrate it in any of my pull-request so it can appear quickly in
+> > > arm-soc and can be used by everyone.
+> > 
+> > Hi,
+> > 
+> > If you see what Peter did, he split up the rules per-SoC based on how
+> > things were selectable in Kconfig. Since you seem to have the Kconfig
+> > entries already, how about doing the same? That way the same information
+> > w.r.t. SoC family that you have as comments isn't lost either.
+> > 
+> 
+> You didn't see the patch set yet because it depends on a lot of other
+> series still being discussed but after the switch to multiplatform, the
+> only config option left will be SOC_AT91RM9200, SOC_AT91SAM9 (both
+> under SOC_SAM_V4_V5) and SOC_SAMA5, under SOC_SAM_V7.
+> 
+> That's our plan, unless you feel that we should keep one config option
+> per SoC.
 
-A series for IOMMU support with Tegra/Nouveau ceased to work after this 
-patch. The Tegra IOMMU is not registered by the time the DT is parsed, 
-and thus all devices end up without the proper DMA ops set up because 
-the phandle to the IOMMU cannot be resolved. Subsequently calling 
-arm_iommu_create_mapping() and arm_iommu_attach_device() from the driver 
-(as I used to do until 3.18) does not help since the call to 
-set_dma_ops() has been moved out of arm_iommu_attach_device(). Therefore 
-there seems to be no way for a device to gets its correct DMA ops unless 
-the IOMMU is ready by the time the DT is parsed.
+With the patches that I prepared last year, all of AT91SAM9 becomes
+one small file, so there really isn't any need to have separate Kconfig
+options.
 
-Also potentially affected by this are the Rockchip DRM and OMAP3 ISP 
-drivers, which follow the same pattern.
-
-This raises the following questions:
-
-1) Why are arm_iommu_create_mapping() and arm_iommu_attach_device() 
-still public since they cannot set the DMA ops and thus seem to be 
-useless outside of arch_setup_dma_ops()?
-
-2) Say you want to use the IOMMU API in your driver, and have an iommu 
-property in your device's DT node. If by chance your IOMMU is registered 
-early, you will already have a mapping automatically created even before 
-your probe function is called. Can this be avoided? Is it even safe?
-
-The issue is workarounded (at least for me) with the following patch:
-
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1961,6 +1961,7 @@ int arm_iommu_attach_device(struct device *dev,
-
-         kref_get(&mapping->kref);
-         dev->archdata.mapping = mapping;
-+       set_dma_ops(dev, &iommu_ops);
-
-         pr_debug("Attached IOMMU controller to %s device.\n", 
-dev_name(dev));
-         return 0;
-
-This allows arm_iommu_create_mapping() and arm_iommu_attach_device() to 
-set the correct DMA ops when called from the driver. But it doesn't look 
-like mergeable material and I'd like to know whether there is a better 
-way to handle this, or whether I should just use the IOMMU API directly. 
-Knowing that even this might not be safe if ARM_DMA_USE_IOMMU is enabled 
-because of point 2) above.
-
-So basically I'm afraid I might not even be able to use the IOMMU safely 
-after this. Or am I missing anything?
-
-Thanks,
-Alex.
+	Arnd
