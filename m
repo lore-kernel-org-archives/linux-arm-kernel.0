@@ -1,55 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 Jan 2015 12:52:49 +0000
-Subject: [PATCH] arm64: kill off the libgcc dependency
-In-Reply-To: <2438951.7KFuXx85Hp@wuerfel>
-References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
- <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
- <2438951.7KFuXx85Hp@wuerfel>
-Message-ID: <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Jan 2015 14:01:39 +0100
+Subject: [PATCH 3/3] gpio: sx150x: add dts support for sx150x driver
+In-Reply-To: <CAGsJ_4xrTt1+6E-VhGb7PMY_6PHVK-e1nhip1SUHmWJcL4fQGg@mail.gmail.com>
+References: <1417695130-5712-1-git-send-email-21cnbao@gmail.com>
+ <1417695130-5712-3-git-send-email-21cnbao@gmail.com>
+ <CACRpkdaeSpvS=k6F-hjyQfGDZdWgckwRjvYwhnQk1NnAhKLJJw@mail.gmail.com>
+ <CAGsJ_4xrTt1+6E-VhGb7PMY_6PHVK-e1nhip1SUHmWJcL4fQGg@mail.gmail.com>
+Message-ID: <CACRpkdbhoOWMCtrRw9fgD1PeF69TsMwzWspivY0cW_k8qR0saQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2015 at 12:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 14 January 2015 11:48:27 Will Deacon wrote:
->> On Wed, Jan 14, 2015 at 11:35:22AM +0000, Arnd Bergmann wrote:
->> > On Wednesday 14 January 2015 10:48:26 Will Deacon wrote:
->> > > On Wed, Jan 14, 2015 at 10:38:54AM +0000, Kevin Hao wrote:
->> > > > The arm64 doesn't depend on the libgcc to build the vmlinux image.
->> > >
->> > > Yes it does; we make use of __builtin_* for our bitops, for example.
->> > > The compiler guys don't guarantee that these will be inlined.
->> >
->> > Is that an architecture-specific statement?
->>
->> I think the inlining guarantees apply to all architectures, but it affects
->> the arm64 kernel because we include <asm-generic/bitops/builtin-*>.
->
-> Is it realistic to expect those to ever be implemented out of line?
-> I would expect them to behave like assembler intrinsics, at least
-> with the normal optimization level.
->
->> > The debate has been going on for ages in Linux, most architecture
->> > maintainers however decided against using libgcc and copy the functions
->> > that are actually needed into the kernel sources.
->>
->> What's the benefit of copying them?
->
-> You have a better control over what is included. On 32-bit architectures,
-> the 64-bit division is notorious here, we really don't want to accidentally
-> call the libgcc implementation but instead have our own do_div() helper.
->
-> Similarly I'd think that if we get a compiler that uses an external
-> __ffs implementation, we should implement an inline assembly instead
-> of taking the libgcc version.
->
-> Another problem that has happened in the past is libgcc functions that
-> in turn call glibc functions. To avoid that, you'd really want to build
-> the kernel with -ffreestanding, but that opens another can of worms.
->
+On Fri, Jan 9, 2015 at 7:02 PM, Barry Song <21cnbao@gmail.com> wrote:
+> 2015-01-09 18:02 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
 
-IMO libgcc.a cannot be used at all in the kernel, as it is not built
-with -mgeneral-regs-only so we have no guarantee that it will leave
-the NEON registers alone.
+>> Maybe I'm overzealous so that this would require implenenting
+>> a whole lot of pin control stuff and move the driver to drivers/pinctrl,
+>> but I won't let it go without a discussion first.
+>
+> my suggestion is we split this patch into two, the first one adds the
+> basic gpio dt support, then we consider the pin configuration issue.
 
--- 
-Ard.
+OK.
+
+Yours,
+Linus Walleij
