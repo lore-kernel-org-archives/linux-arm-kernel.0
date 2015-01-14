@@ -1,60 +1,89 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 14 Jan 2015 09:30:30 +0100
-Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel
- isi and ov2640 sensor
-In-Reply-To: <54B53455.9050407@atmel.com>
-References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
- <54B53455.9050407@atmel.com>
-Message-ID: <20150114083030.GI3843@piout.net>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 14 Jan 2015 09:31:30 +0100
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <alpine.DEB.2.11.1501132153210.5526@nanos>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
+ <alpine.DEB.2.11.1501132153210.5526@nanos>
+Message-ID: <20150114093130.3923a89a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Thomas,
 
-BTW, you can add my ack on the remaining patches (5-7).
+On Tue, 13 Jan 2015 22:00:55 +0100 (CET)
+Thomas Gleixner <tglx@linutronix.de> wrote:
 
-On 13/01/2015 at 16:05:57 +0100, Nicolas Ferre wrote :
-> Le 04/01/2015 10:02, Josh Wu a ?crit :
-> > This patch series add ISI and ov2640 support on dts files.
-> > 
-> > As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
-> > So I want to send this dt patch early for a review.
-> > 
-> > v1 -> v2:
-> >   1. add one more patch to change the pin name of ISI_MCK
-> >   2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
-> >   3. move the common chip parts of ISI node to sama5d3.dtsi.
-> > 
-> > Bo Shen (3):
-> >   ARM: at91: dts: sama5d3: split isi pinctrl
-> >   ARM: at91: dts: sama5d3: add missing pins of isi
-> >   ARM: at91: dts: sama5d3: move the isi mck pin to mb
-> > 
-> > Josh Wu (5):
-> >   ARM: at91: dts: sama5d3: add isi clock
-> >   ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
-> >   ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
-> >   ARM: at91: dts: sama5d3: add ov2640 camera sensor support
-> >   ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
+> On Tue, 13 Jan 2015, Boris Brezillon wrote:
+> > +	ret = irq_set_handler_data(irq, demux);
+> > +	if (ret) {
+> > +		pr_err("Failed to assign handler data\n");
+> > +		goto err_free_domain;
+> > +	}
+> > +
+> > +	irq_set_chained_handler(irq, irq_dumb_demux_handler);
+> > +
+> > +	/*
+> > +	 * Disable the src irq (automatically enabled by
+> > +	 * irq_set_chained_handler) to prevent irqs from happening while
+> > +	 * nobody requested any of the demuxed irqs.
+> > +	 */
+> > +	disable_irq(irq);
 > 
-> Josh,
+> We rather prevent the startup of the irq line right away.
+
+Yep, the comment was here to draw the attention, since I wasn't sure
+modifying core code was the best solution.
+Anyway I agree that keeping the src_irq disabled when registering the
+chained handler is better than doing it afterwards.
+
 > 
-> It seems that this patch doesn't show up in the series: I only received
-> up to 6/8 patches (2 missing?). Can you please send it(them?)?
+> enum {
+>      IRQ_CHAINED_NONE,
+>      IRQ_CHAINED_STARTUP,
+>      IRQ_CHAINED_NOSTARTUP,
+> };
 > 
-> Bye,
+> -__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
+> -                  const char *name);
+> +__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int chained_mode,
+> +                  const char *name);
 > 
-> >  arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
-> >  arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
-> >  arch/arm/configs/sama5_defconfig  |  6 ++++++
-> >  3 files changed, 61 insertions(+), 9 deletions(-)
-> > 
+> {
+> ....
+>         if (handle != handle_bad_irq && chained_mode) {
+>                 irq_settings_set_noprobe(desc);
+>                 irq_settings_set_norequest(desc);
+>                 irq_settings_set_nothread(desc);
+> -               irq_startup(desc, true);
+> +               if (chained_mode == IRQ_CHAINED_STARTUP)
+> +                       irq_startup(desc, true);
+> 	}
+> ....
+> }
 > 
-> 
-> -- 
-> Nicolas Ferre
+> Hmm?
+
+I'm fine with this approach, with a static inline helper:
+
+static inline void
+irq_set_chained_handler_nostartup(unsigned int irq,
+				  irq_flow_handler_t handle)
+{
+	__irq_set_handler(irq, handle, IRQ_CHAINED_NOSTARTUP, NULL);
+}
+
+Anyway, I'll wait a clear decision regarding which approach should be
+taken (see my answer to Rob) before sending a new version.
+
+Thanks for your reviews.
+
+Best Regards,
+
+Boris
+
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
