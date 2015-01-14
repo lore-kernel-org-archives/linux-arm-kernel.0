@@ -1,40 +1,49 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 14 Jan 2015 12:13:01 +0100
-Subject: [PATCH 3/4] ARM: shmobile: r8a7740 dtsi: Add memory-controller node
+Date: Wed, 14 Jan 2015 12:13:02 +0100
+Subject: [PATCH 4/4] ARM: shmobile: sh73a0 dtsi: Add memory-controller nodes
 In-Reply-To: <1421233982-15883-1-git-send-email-geert+renesas@glider.be>
 References: <1421233982-15883-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1421233982-15883-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1421233982-15883-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the DDR3 Bus State Controller (DBSC3).
-The DBSC3 is located in the A4S PM domain, which must not be powered
-down, else the system will crash.
+Add device nodes for the two SDRAM Bus State Controllers.
+The SBSCs are located in the A4BC0 resp. A4BC1 PM domains, which must
+not be powered down, else the system will crash.
 
-This has no visible effect for now, as A4S was never turned off anyway
-because its child PM domain A3SM contains the CPU core.
+References to the A4BC0 and A4BC1 PM domains will be added later.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sh73a0.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 52f2cf4b84d3ccb4..8a092605d641f7d4 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -37,6 +37,12 @@
- 		      <0xc2000000 0x1000>;
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 46954ac26dd9fb41..8d9c2ce593745b1f 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -43,6 +43,22 @@
+ 		      <0xf0000100 0x100>;
  	};
  
-+	dbsc3: memory-controller at fe400000 {
-+		compatible = "renesas,dbsc3-r8a7740";
++	sbsc2: memory-controller at fb400000 {
++		compatible = "renesas,sbsc-sh73a0";
++		reg = <0xfb400000 0x400>;
++		interrupts = <0 37 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 38 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "sec", "temp";
++	};
++
++	sbsc1: memory-controller at fe400000 {
++		compatible = "renesas,sbsc-sh73a0";
 +		reg = <0xfe400000 0x400>;
-+		power-domains = <&pd_a4s>;
++		interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 36 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "sec", "temp";
 +	};
 +
  	pmu {
  		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 1.9.1
