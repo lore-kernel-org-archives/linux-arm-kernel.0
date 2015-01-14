@@ -1,61 +1,82 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Jan 2015 14:02:06 +0100
-Subject: [PATCH V2 0/4] mmc: core: Add support for MMC power sequences
-Message-ID: <1421240530-7971-1-git-send-email-ulf.hansson@linaro.org>
+Date: Wed, 14 Jan 2015 14:02:08 +0100
+Subject: [PATCH V2 2/4] mmc: pwrseq: Document DT bindings for the simple MMC
+ power sequence
+In-Reply-To: <1421240530-7971-1-git-send-email-ulf.hansson@linaro.org>
+References: <1421240530-7971-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1421240530-7971-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The simple MMC power sequence provider, intends to supports a set of
+common properties between SOC designs. It thus enables us to re-use the
+same provider for several SOCs.
+
+In this initial step, let's add the top level description of the MMC
+power sequence and describe the compatible string for the simple MMC
+power sequence provider.
+
+Following patches will step by step add support for new properties to
+the simple MMC power sequence provider.
+
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
 Changes in v2:
-	Fixed comments from Russell King:
-	- Renamed pwrseq callbacks and corresponding interface functions.
-	- Move the call to the previous namned ->power_on() callback, to the
-	  end of mmc_power_up() to get consistent behavior.
+	- None.
 
-
-This is yet another try to solve the issues of dealing with power sequences for
-the MMC subsystem. The latest attempt, see link below, took a generic approach
-by adding a new top level driver layer. That's was rejected by several reasons.
-http://lwn.net/Articles/602855/
-
-This time the approach is focused to fix the issues for MMC only.
-
-To give a short background, SOCs may specify a specific MMC power sequence. To
-successfully detect an (e)MMC/SD/SDIO card, that power sequence must be followed
-while initializing the card.
-
-To be able to handle these SOC specific power sequences, we add a MMC power
-sequence interface, which helps the mmc core to deal with such.
-
-A MMC power sequence provider then implements a set of callbacks from the above
-mentioned interface. The provider has a corresponding DT compatibility string
-and relies on CONFIG_OF to be set to find it's various resourses, like for
-example a GPIO reset.
-
-The mmc core will from mmc_of_parse() try find a "mmc-pwrseq" DT node and then
-call the corresponding MMC power sequence provider's initialization function.
-
-
-Ulf Hansson (4):
-  mmc: core: Initial support for MMC power sequences
-  mmc: pwrseq: Document DT bindings for the simple MMC power sequence
-  mmc: pwrseq: Initial support for the simple MMC power sequence
-    provider
-  mmc: pwrseq_simple: Add support for a reset GPIO pin
-
- .../devicetree/bindings/mmc/mmc,pwrseq-simple.txt  |  23 +++++
- Documentation/devicetree/bindings/mmc/mmc.txt      |   5 +
- drivers/mmc/core/Makefile                          |   2 +-
- drivers/mmc/core/core.c                            |   7 ++
- drivers/mmc/core/host.c                            |   4 +-
- drivers/mmc/core/pwrseq.c                          | 109 +++++++++++++++++++++
- drivers/mmc/core/pwrseq.h                          |  42 ++++++++
- drivers/mmc/core/pwrseq_simple.c                   |  86 ++++++++++++++++
- include/linux/mmc/host.h                           |   2 +
- 9 files changed, 278 insertions(+), 2 deletions(-)
+---
+ .../devicetree/bindings/mmc/mmc,pwrseq-simple.txt      | 18 ++++++++++++++++++
+ Documentation/devicetree/bindings/mmc/mmc.txt          |  5 +++++
+ 2 files changed, 23 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
- create mode 100644 drivers/mmc/core/pwrseq.c
- create mode 100644 drivers/mmc/core/pwrseq.h
- create mode 100644 drivers/mmc/core/pwrseq_simple.c
 
+diff --git a/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
+new file mode 100644
+index 0000000..e1b7f9c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
+@@ -0,0 +1,18 @@
++* The simple MMC power sequence provider
++
++System on chip designs may specify a specific MMC power sequence. To
++successfully detect an (e)MMC/SD/SDIO card, that power sequence must be
++maintained while initializing the card.
++
++The simple MMC power sequence provider, intends to supports a set of common
++properties between SOC designs. It thus enables us to re-use the same provider
++for several SOC designs.
++
++Required properties:
++- compatible : contains "mmc,pwrseq-simple".
++
++Example:
++
++	sdhci0_pwrseq {
++		compatible = "mmc,pwrseq-simple";
++	}
+diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+index bac1311..b12de1e 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+@@ -64,6 +64,10 @@ Optional SDIO properties:
+ - keep-power-in-suspend: Preserves card power during a suspend/resume cycle
+ - enable-sdio-wakeup: Enables wake up of host system on SDIO IRQ assertion
+ 
++Optional MMC power sequence:
++- mmc-pwrseq: phandle to the MMC power sequence node. See "mmc,pwrseq-*"
++	for documentation of MMC power sequence bindings.
++
+ 
+ Use of Function subnodes
+ ------------------------
+@@ -101,6 +105,7 @@ sdhci at ab000000 {
+ 	max-frequency = <50000000>;
+ 	keep-power-in-suspend;
+ 	enable-sdio-wakeup;
++	mmc-pwrseq = <&sdhci0_pwrseq>
+ }
+ 
+ Example with sdio function subnode:
 -- 
 1.9.1
