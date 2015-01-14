@@ -1,106 +1,121 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 14 Jan 2015 17:02:03 +0100
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <54B69072.4080607@kernel.org>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org>
-Message-ID: <54B692FB.7030703@linaro.org>
+From: ddutile@redhat.com (Don Dutile)
+Date: Wed, 14 Jan 2015 11:07:13 -0500
+Subject: sysfs topology for arm64 cluster_id
+In-Reply-To: <54B5BC84.8090603@redhat.com>
+References: <54B5BC84.8090603@redhat.com>
+Message-ID: <54B69431.8090702@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 04:51 PM, Kukjin Kim wrote:
-> On 01/14/15 14:33, Chanwoo Choi wrote:
+On 01/13/2015 07:47 PM, Jon Masters wrote:
+> Hi Folks,
 >
-> Hi,
+> TLDR: I would like to consider the value of adding something like
+> "cluster_siblings" or similar in sysfs to describe ARM topology.
 >
-> + Doug, Olof
+> A quick question on intended data representation in /sysfs topology
+> before I ask the team on this end to go down the (wrong?) path. On ARM
+> systems today, we have a hierarchical CPU topology:
 >
->> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
->> for Exynos 32bit SoC.
->>
-> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
-> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
-> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
-> implemented it and additionally its access is faster than using memory
-> mapped register called SFR for MCT...so Doug submitted patch to use MCT
-> on 32bit exynos SoCs before.
+>                   Socket ---- Coherent Interonnect ---- Socket
+>                     |                                    |
+>           Cluster0 ... ClusterN                Cluster0 ... ClusterN
+>              |             |                      |             |
+>        Core0...CoreN  Core0...CoreN        Core0...CoreN  Core0...CoreN
+>          |       |      |        |           |       |      |       |
+>       T0..TN  T0..Tn  T0..TN  T0..TN       T0..TN T0..TN  T0..TN  T0..TN
 >
-> I know using MCT on 64bit exynos is usefulness for Power Management and
-> I need to talk to relevant guys in office again. If anything, I'll let
-> you know.
+> Where we might (or might not) have threads in individual cores (a la SMT
+> - it's allowed in the architecture at any rate) and we group cores
+> together into units of clusters usually 2-4 cores in size (though this
+> varies between implementations, some of which have different but similar
+> concepts, such as AppliedMicro Potenza PMDs CPU complexes of dual
+> cores). There are multiple clusters per "socket", and there might be an
+> arbitrary number of sockets. We'll start to enable NUMA soon.
+>
+> The existing ARM architectural code understands expressing topology in
+> terms of the above, but it doesn't quite map these concepts directly in
+> sysfs (does not expose cluster_ids as an example). Currently, a cpu-map
+> in DeviceTree can expose hierarchies (included nested clusters) and this
+> is parsed at boot time to populate scheduler information, as well as the
+> topology files in sysfs (if that is provided - none of the reference
+> devicetrees upstream do this today, but some exist). But the cluster
+> information itself isn't quite exposed (whereas other whacky
+> architectural concepts such as s390 books are exposed already today).
+>
+> Anyway. We have a small problem with tools such as those in util-linux
+> (lscpu) getting confused as a result of translating x86-isms to ARM. For
+> example, the lscpu utility calculates the number of sockets using the
+> following computation:
+>
+> nsockets = desc->ncpus / nthreads / ncores
+>
+> (number of sockets = total number of online processing elements /
+> threads within a single core / cores within a single socket)
+>
+> If you're not careful, you can end up with something like:
+>
+> # lscpu
+> Architecture:          aarch64
+> Byte Order:            Little Endian
+> CPU(s):                8
+> On-line CPU(s) list:   0-7
+> Thread(s) per core:    1
+> Core(s) per socket:    2
+> Socket(s):             4
+>
+Basically, in the top-most diagram, lscpu (& hwloc) are equating Cluster<N>
+as socket<N>.  I'm curious what the sysfs numa info will be interpreted
+as when/if that is turned on for arm64.
 
-I will wait for your answer before digging more the patch.
+> Now we can argue that the system in question needs an updated cpu-map
+> (it'll actually be something ACPI but I'm keeping this discussion to DT
+> to avoid that piece further in discussion, and you can assume I'm
+> booting any test boxes in further work on this using DeviceTree prior to
+> switching the result over to ACPI) but either way, util-linux is
+> thinking in an x86-centric sense of what these files mean. And I think
+> the existing topology/cpu-map stuff in arm64 is doing the same.
+>
+The above values are extracted from the MPIDR:Affx fields and is currently
+independent of DT & ACPI.
+The Aff1 field is the 'cluster-id' and is being used to associated cpu's (via cpu masks)
+to siblings. lscpu & hwloc associate cpu-nums & siblings to sockets via the above
+calculation, which doesn't quite show how siblings enter the equation
+       ncores = CPU_COUNT_S(setsize, core_siblings) / nthreads;
 
-Thanks
-   -- Daniel
+Note: in the arm(32) tree, what was 'socket-id' is 'cluster-id' in arm64;
+       I believe this 'mapping' (backporting/association) is one root problem
+       in the arch/arm64/kernel/topology.c code.
 
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->> This patch set is tested on 64-bit Exynos SoC. I send only this patch from
->> following patchst[1].
->> [1] https://lkml.org/lkml/2014/12/2/134
->>
->> Changes from v2:
->> - None
->> Changes from v1:
->> - Use CONFIG_ARM instead of CONFIG_ARM64
->>
->>   drivers/clocksource/Kconfig      | 1 -
->>   drivers/clocksource/exynos_mct.c | 4 ++++
->>   2 files changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index fc01ec2..be38119 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
->>
->>   config CLKSRC_EXYNOS_MCT
->>   	def_bool y if ARCH_EXYNOS
->> -	depends on !ARM64
->>   	help
->>   	  Support for Multi Core Timer controller on Exynos SoCs.
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 9403061..b840ea1 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
->>   	return exynos4_read_count_32();
->>   }
->>
->> +#if defined(CONFIG_ARM)
->>   static struct delay_timer exynos4_delay_timer;
->>
->>   static cycles_t exynos4_read_current_timer(void)
->> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
->>   			 "cycles_t needs to move to 32-bit for ARM64 usage");
->>   	return exynos4_read_count_32();
->>   }
->> +#endif
->>
->>   static void __init exynos4_clocksource_init(void)
->>   {
->>   	exynos4_mct_frc_start();
->>
->> +#if defined(CONFIG_ARM)
->>   	exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
->>   	exynos4_delay_timer.freq = clk_rate;
->>   	register_current_timer_delay(&exynos4_delay_timer);
->> +#endif
->>
->>   	if (clocksource_register_hz(&mct_frc, clk_rate))
->>   		panic("%s: can't register clocksource\n", mct_frc.name);
+Now, a simple, yet requiring lots of fun, cross-architecture testing, would
+be to change lscpu to use the sysfs physical_package_id to get Socket correct.  Yet,
+that won't fix the above 'Core(s) per socket' because that's being created
+via the sibling masks, which are generated from the cluster-id.
+This change would require arm(64) to implement DT & ACPI methods to
+extract pcpu's to sockets (missing at the moment).
 
+And modifying the cluster-id and/or the siblings masks creates non-topology
+(non-lscpu, non-hwloc) issues like breaking gic init code paths which use
+the cluster-id information as well. ... some 'empirical data' to note
+if anyone thinks it's just a topology-presentation issue.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> Is it not a good idea to expose the cluster details directly in sysfs
+> and have these utilities understand the possible extra level in the
+> calculation? Or do we want to just fudge the numbers (as seems to be the
+> case in some systems I am seeing) to make the x86 model add up?
+>
+Short-term, I'm trying to develop a reasonable 'fudge' for lscpu & hwloc,
+that doesn't impact the (proper) operation of the gic code.
+I haven't dug deep enough yet, but this also requires a check on how
+the scheduler associates cpu-cache-sibling associativity when selecting
+optimal cpu to schedule threads on.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Let me know the preferred course...
+>
+> Jon.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
