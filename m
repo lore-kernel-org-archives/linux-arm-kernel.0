@@ -1,86 +1,54 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 14 Jan 2015 11:26:55 +0800
-Subject: [GIT PULL]Hisilicon hip01 soc and development board updates for
- 3.20
-In-Reply-To: <20150113232304.GG15087@quad.lixom.net>
-References: <54B38E24.6040901@hisilicon.com>
- <20150113232304.GG15087@quad.lixom.net>
-Message-ID: <54B5E1FF.6090301@hisilicon.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 14 Jan 2015 11:50:46 +0800
+Subject: [PATCH] mtd: atmel_nand: return max bitflips in all sectors in
+ pmecc_correction()
+Message-ID: <1421207446-16973-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+atmel_nand_pmecc_read_page() will return the total bitflips in this
+page. This is incorrect.
 
+As one nand page includes multiple ecc sectors, that will cause the
+returned total bitflips exceed ecc capablity.
 
-On 2015/1/14 7:23, Olof Johansson wrote:
-> Hi,
-> 
-> This is very close to inclusion, can I just ask you to make a few tweaks?
-> 
-> On Mon, Jan 12, 2015 at 05:04:36PM +0800, Wei Xu wrote:
->> Hi Arnd, Hi Olof, Hi Kevin, 
->>
->> Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
->> Thanks!
->>
->> Best Regards,
->> Wei
->>
->> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
->>
->>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
->>
->> are available in the git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20
->>
->> for you to fetch changes up to 3a1d691f244b54f59958e2294779ddc6905b1d8f:
->>
->>   ARM: hisi: enable smp for HiP01 (2015-01-12 15:48:16 +0800)
->>
->> ----------------------------------------------------------------
->> ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
->>
->> - Add hip01 debug UART
->> - Add hip01 DT_MACHINE and ARCH_HIP01 configure item
->> - Add dts for Hisilicon hip01-ca9x2 board
->> - Enable ARCH_HIP01 in the hisi_defconfig and multi_v7_defconfig
->> - Add a common smp_prepares_cpus function
->> - Rename hix5hd2_secondary_startup to hisi_secondary_startup
->> - Enable smp for hip01
->>
->> ----------------------------------------------------------------
->> Wang Long (7):
->>       ARM: debug: add HiP01 debug uart
->>       ARM: hisi: enable HiP01 SoC
->>       ARM: dts: Add hip01-ca9x2 dts file
->>       ARM: config: enable ARCH_HIP01
+So this patch will make pmecc_correct() return the max bitflips of all
+sectors in the page. That also makes atmel_nand_pmecc_read_page() return
+the max bitflips.
 
-Hi Olof, 
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> Please split this patch out (at least the multi_v7 piece) and send it
-> separately. You can send it just as a patch instead of as a single-patch pull
-> request and we'll apply it directly.
-
-OK.
-I will ask Wang Long to send a separate patch about multi_v7 part.
-
->>       ARM: hisi: add a common smp_prepares_cpus function
-> 
-> This is just a rename, and the patch below calls it a rename -- you should do
-> that here too.
-
-OK.
-I will change it in the next version of pull request.
-Thanks!
-
-Best Regards,
-Wei
-
-> 
-> Thanks!
-> 
-> 
-> -Olof
-> 
-> .
-> 
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index a345e7b..7346d16 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -847,7 +847,7 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
+ 	struct atmel_nand_host *host = nand_chip->priv;
+ 	int i, err_nbr;
+ 	uint8_t *buf_pos;
+-	int total_err = 0;
++	int max_bitflips = 0;
+ 
+ 	for (i = 0; i < nand_chip->ecc.total; i++)
+ 		if (ecc[i] != 0xff)
+@@ -874,13 +874,13 @@ normal_check:
+ 				pmecc_correct_data(mtd, buf_pos, ecc, i,
+ 					nand_chip->ecc.bytes, err_nbr);
+ 				mtd->ecc_stats.corrected += err_nbr;
+-				total_err += err_nbr;
++				max_bitflips = max_t(int, max_bitflips, err_nbr);
+ 			}
+ 		}
+ 		pmecc_stat >>= 1;
+ 	}
+ 
+-	return total_err;
++	return max_bitflips;
+ }
+ 
+ static void pmecc_enable(struct atmel_nand_host *host, int ecc_op)
+-- 
+1.9.1
