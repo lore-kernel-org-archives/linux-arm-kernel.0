@@ -1,69 +1,114 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 14 Jan 2015 12:22:20 +0800
-Subject: [PATCH net-next v12 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <20150113.230611.375062426344934847.davem@davemloft.net>
-References: <1421140290-5492-1-git-send-email-dingtianhong@huawei.com>	<1421140290-5492-4-git-send-email-dingtianhong@huawei.com>
- <20150113.230611.375062426344934847.davem@davemloft.net>
-Message-ID: <54B5EEFC.5020902@huawei.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Wed, 14 Jan 2015 09:58:32 +0530
+Subject: [RFC PATCH 0/6] ARM64: KVM: PMU infrastructure support
+In-Reply-To: <20150111191131.GC3868@cbox>
+References: <20141121114950.GB3401@cbox>
+ <CAAhSdy3-+5T0sOEGHLtHbPQJ+3hXdZxL=695dq7PJ2J0qmVbTg@mail.gmail.com>
+ <20141124143753.GO3401@cbox>
+ <CAAhSdy0+Z8o6dx=Bq+Ep7ybQpTpj+QNJm4oJbKa8yCM7WS8oxg@mail.gmail.com>
+ <20141125134239.GI31297@cbox>
+ <CAAhSdy32G+-BVQk-=dWjfM1S-cytGavp4qq942m=3y7HUudguw@mail.gmail.com>
+ <5476FFAF.2010601@arm.com>
+ <CAAhSdy3US4H9DZLDmwawR6D22GUpQ8H5NqrZ8XvYJjhsnPzzRQ@mail.gmail.com>
+ <547705BF.5040609@arm.com>
+ <CAAhSdy32-MsRORQ9j3YfH4Fn7xCEEFV5O7D43sYbXZCsF4VgaQ@mail.gmail.com>
+ <20150111191131.GC3868@cbox>
+Message-ID: <CAAhSdy0WB4OXsaLFeZwwsn5QYwyPkJbqAXE9rZn4v7KWpwCkag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/14 12:06, David Miller wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
-> Date: Tue, 13 Jan 2015 17:11:30 +0800
-> 
->> +static int hip04_alloc_ring(struct net_device *ndev, struct device *d)
->> +{
->> +	struct hip04_priv *priv = netdev_priv(ndev);
->> +	int i;
->> +
->> +	priv->tx_desc = dma_alloc_coherent(d,
->> +			TX_DESC_NUM * sizeof(struct tx_desc),
->> +			&priv->tx_desc_dma, GFP_KERNEL);
-> 
-> When a function call spans multiple lines, the arguments on the
-> second and subsequent lines should start at the first column
-> after the openning parenthesis of the function call.
-> 
-> If you are only using TAB characters, your indentation is likely
-> to be incorrect.
-> 
+On Mon, Jan 12, 2015 at 12:41 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Tue, Dec 30, 2014 at 11:19:13AM +0530, Anup Patel wrote:
+>> (dropping previous conversation for easy reading)
+>>
+>> Hi Marc/Christoffer,
+>>
+>> I tried implementing PMU context-switch via C code
+>> in EL1 mode and in atomic context with irqs disabled.
+>> The context switch itself works perfectly fine but
+>> irq forwarding is not clean for PMU irq.
+>>
+>> I found another issue that is GIC only samples irq
+>> lines if they are enabled. This means for using
+>> irq forwarding we will need to ensure that host PMU
+>> irq is enabled.  The arch_timer code does this by
+>> doing request_irq() for host virtual timer interrupt.
+>> For PMU, we can either enable/disable host PMU
+>> irq in context switch or we need to do have shared
+>> irq handler between kvm pmu and host kernel pmu.
+>
+> could we simply require the host PMU driver to request the IRQ and have
+> the driver inject the corresponding IRQ to the VM via a mechanism
+> similar to VFIO using an eventfd and irqfds etc.?
+>
+> (I haven't quite thought through if there's a way for the host PMU
+> driver to distinguish between an IRQ for itself and one for the guest,
+> though).
+>
+> It does feel like we will need some sort of communication/coordination
+> between the host PMU driver and KVM...
+>
+>>
+>> I have rethinked about our discussion so far. I
+>> understand that we need KVM PMU virtualization
+>> to meet following criteria:
+>> 1. No modification in host PMU driver
+>
+> is this really a strict requirement?  one of the advantages of KVM
+> should be that the rest of the kernel should be supportive of KVM.
+>
+>> 2. No modification in guest PMU driver
+>> 3. No mask/unmask dance for sharing host PMU irq
+>> 4. Clean way to avoid infinite VM exits due to
+>> PMU interrupt
+>>
+>> I have discovered new approach which is as follows:
+>> 1. Context switch PMU in atomic context (i.e. local_irq_disable())
+>> 2. Ensure that host PMU irq is disabled when entering guest
+>> mode and re-enable host PMU irq when exiting guest mode if
+>> it was enabled previously.
+>
+> How does this look like software-engineering wise?  Would you be looking
+> up the IRQ number from the DT in the KVM code again?  How does KVM then
+> synchronize with the host PMU driver so they're not both requesting the
+> same IRQ at the same time?
+>
+>> This is to avoid infinite VM exits
+>> due to PMU interrupt because as-per new approach we
+>> don't mask the PMU irq via PMINTENSET_EL1 register.
+>> 3. Inject virtual PMU irq at time of entering guest mode if PMU
+>> overflow register is non-zero (i.e. PMOVSSET_EL0) in atomic
+>> context (i.e. local_irq_disable()).
+>>
+>> The only limitation of this new approach is that virtual PMU irq
+>> is injected at time of entering guest mode. This means guest
+>> will receive virtual PMU  interrupt with little delay after actual
+>> interrupt occurred.
+>
+> it may never receive it in the case of a tickless configuration AFAICT,
+> so this doesn't sound like the right approach.
 
-Sorry for the mistake.
+The PMU interrupts are not similar to arch_timer interrupts. In fact,
+they are overflow interrupts on event counters. The PMU events
+of Guest VCPU are only counted when Guest VCPU is running.
+If the Guest VCPU is scheduled out or we are in Host mode then
+then PMU events are counted for Host or other Guest whoever is
+running currently.
 
->> +	/*
->> +	 * BQL will try to keep the TX queue as short as possible, but it can't
->> +	 * be faster than tx_coalesce_usecs, so we need a fast timeout here,
->> +	 * but also long enough to gather up enough frames to ensure we don't
->> +	 * get more interrupts than necessary.
->> +	 * 200us is enough for 16 frames of 1500 bytes at gigabit ethernet rate
->> +	 */
-> 
-> Comments in the networking should be:
-> 
-> 	/* Formatted
-> 	 * like this.
-> 	 */
-> 
+In my view, this does not break tickless guest.
 
-yes.
->> +	priv->phy_node = of_parse_phandle(node, "phy-handle", 0);
->> +	if (priv->phy_node) {
->> +		priv->phy = of_phy_connect(ndev, priv->phy_node,
->> +			&hip04_adjust_link, 0, priv->phy_mode);
-> 
-> Please align the arguments to this function call correctly, as
-> per above.
-> 
-Ok, I will check them again.
+Also, the above fact applies irrespective to the approach we take
+for PMU virtualization.
 
-Ding
+Regards,
+Anup
 
-> Thanks.
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+>
+>> The PMU interrupts are only overflow events
+>> and generally not used in any timing critical applications. If we
+>> can live with this limitation then this can be a good approach
+>> for KVM PMU virtualization.
+>>
+> Thanks,
+> -Christoffer
