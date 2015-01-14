@@ -1,43 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 Jan 2015 20:22:52 +0100
-Subject: [PATCH v2 1/5] rtc: armada38x: Add the device tree binding
- documentation
-In-Reply-To: <1421257155-3379-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>
- <1421257155-3379-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150114202252.457d328e@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 14 Jan 2015 17:30:46 +0100
+Subject: [PATCH v3 03/13] ARM: dts: sun9i: Add mmc module clock nodes for
+ A80
+In-Reply-To: <1421113055-17867-4-git-send-email-wens@csie.org>
+References: <1421113055-17867-1-git-send-email-wens@csie.org>
+ <1421113055-17867-4-git-send-email-wens@csie.org>
+Message-ID: <20150114163046.GX4891@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On Tue, Jan 13, 2015 at 09:37:25AM +0800, Chen-Yu Tsai wrote:
+> The mmc module clocks are A80 specific module 0 (storage) type clocks.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-On Wed, 14 Jan 2015 18:39:11 +0100, Gregory CLEMENT wrote:
+Applied, thanks!
 
-> +Required properties:
-> +- compatible : Should be "marvell,armada-380-rtc"
-> +- reg: physical base address of the controller and length of memory
-> +  mapped region, associated to the reg-name "rtc". The other entry is
-> +  related to the interrupt control from the SoC, associated to the
-> +  reg-name "soc-interrupt".
+Maxime
 
-soc-interrupt or...
-
-> +- reg-names: names of the mapped memory regions listed in regs
-> +    property in the same order: "rtc" and "soc-int".
-
-soc-int ?
-
-> +rtc at a3800 {
-> +	compatible = "marvell,armada-380-rtc";
-> +	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
-
-Any reason to use <0x184A0 0xC> instead of <0x184A8 0x4> ? According to
-the datasheet, there is only this 184A8 register for RTC stuff.
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/35f45742/attachment.sig>
