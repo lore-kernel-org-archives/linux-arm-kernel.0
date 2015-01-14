@@ -1,21 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Jan 2015 14:07:44 +0100
-Subject: [PATCH] pinctrl: sirf: drop marco support
-In-Reply-To: <1420984601-3773-1-git-send-email-21cnbao@gmail.com>
-References: <1420984601-3773-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdZYh0ckefJVUoVVxZKc5N2GmkTKq_5MykZaHuUDjkG=XQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 Jan 2015 11:11:03 -0200
+Subject: [PATCH] ARM: dts: imx25: Fix PWM "per" clocks
+Message-ID: <1421241063-8928-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 2:56 PM, Barry Song <21cnbao@gmail.com> wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> From: Barry Song <Baohua.Song@csr.com>
->
-> marco chip has been dropped, clear its support.
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Currently PWM functionality is broken on mx25 due to the wrong assignment of the
+PWM "per" clock.
 
-Patch applied.
+According to Documentation/devicetree/bindings/clock/imx25-clock.txt:
+	pwm_ipg_per		52
 
-Yours,
-Linus Walleij
+,so update the pwm "per" to use 'pwm_ipg_per' instead of 'per10' clock.
+
+With this change PWM can work fine on mx25.
+
+Cc: <stable@vger.kernel.org> 
+Reported-by: Carlos Soto <csotoalonso@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx25.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index d238676..e4d3aec 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -369,7 +369,7 @@
+ 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
+ 				#pwm-cells = <2>;
+ 				reg = <0x53fa0000 0x4000>;
+-				clocks = <&clks 106>, <&clks 36>;
++				clocks = <&clks 106>, <&clks 52>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <36>;
+ 			};
+@@ -388,7 +388,7 @@
+ 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
+ 				#pwm-cells = <2>;
+ 				reg = <0x53fa8000 0x4000>;
+-				clocks = <&clks 107>, <&clks 36>;
++				clocks = <&clks 107>, <&clks 52>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <41>;
+ 			};
+@@ -429,7 +429,7 @@
+ 			pwm4: pwm at 53fc8000 {
+ 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
+ 				reg = <0x53fc8000 0x4000>;
+-				clocks = <&clks 108>, <&clks 36>;
++				clocks = <&clks 108>, <&clks 52>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <42>;
+ 			};
+@@ -476,7 +476,7 @@
+ 				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
+ 				#pwm-cells = <2>;
+ 				reg = <0x53fe0000 0x4000>;
+-				clocks = <&clks 105>, <&clks 36>;
++				clocks = <&clks 105>, <&clks 52>;
+ 				clock-names = "ipg", "per";
+ 				interrupts = <26>;
+ 			};
+-- 
+1.9.1
