@@ -1,37 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Jan 2015 10:46:36 +0100
-Subject: [PATCH v3 0/4] clk: sunxi: mmc: Last bits of phase handling
-In-Reply-To: <1421006457-23631-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1421006457-23631-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150114094636.GO4891@lukather>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 14 Jan 2015 15:21:03 +0530
+Subject: [PATCH 0/3] ARM: edma: Correct header file usage
+In-Reply-To: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1417084891-17990-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <54B63C07.9010301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 11, 2015 at 09:00:53PM +0100, Maxime Ripard wrote:
+On Thursday 27 November 2014 04:11 PM, Peter Ujfalusi wrote:
 > Hi,
 > 
-> These are the last patches of the serie converting the custom phase
-> API to the proper common clock framework API.
-> 
-> These patches have already been discussed in length, only the patch 1
-> is new and should ease the handling of our MMC clocks.
-> 
-> Thanks,
-> Maxime
+> The linux/platform_data/edma.h file was used for API definition as well, which
+> is not correct since the header should only contain platform data related
+> structures, defines, etc.
 
-Merged the 4 patches with Mike's Acked-by on the first one.
+I would like to queue this series through ARM-SoC for v3.20 with Mark's
+and Ulf's acks added. I know its not the complete clean-up everyone
+wanted to see but I also know Peter working on doing the complete
+clean-up as well. So we are firmly on the path to removing
+arch/arm/common/edma.c.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150114/f1a071d2/attachment.sig>
+Thanks,
+Sekhar
