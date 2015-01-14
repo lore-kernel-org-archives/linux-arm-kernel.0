@@ -1,54 +1,74 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 14 Jan 2015 10:48:21 +0800
-Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel
- isi and ov2640 sensor
-In-Reply-To: <54B53455.9050407@atmel.com>
-References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
- <54B53455.9050407@atmel.com>
-Message-ID: <54B5D8F5.6000800@atmel.com>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Wed, 14 Jan 2015 11:53:42 +0900
+Subject: [PATCH v2] ARM: mm: fix size rounding-down of arm_add_memory()
+ function
+In-Reply-To: <CAKv+Gu8QSSC32VVwBzSiDL_3t_dd=2Oa+Xp5r8mtDrGBW9E0ow@mail.gmail.com>
+References: <1419218249-5744-1-git-send-email-yamada.m@jp.panasonic.com>
+ <CAKv+Gu8QSSC32VVwBzSiDL_3t_dd=2Oa+Xp5r8mtDrGBW9E0ow@mail.gmail.com>
+Message-ID: <20150114115342.70FB.AA925319@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/13/2015 11:05 PM, Nicolas Ferre wrote:
-> Le 04/01/2015 10:02, Josh Wu a ?crit :
->> This patch series add ISI and ov2640 support on dts files.
->>
->> As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
->> So I want to send this dt patch early for a review.
->>
->> v1 -> v2:
->>    1. add one more patch to change the pin name of ISI_MCK
->>    2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
->>    3. move the common chip parts of ISI node to sama5d3.dtsi.
->>
->> Bo Shen (3):
->>    ARM: at91: dts: sama5d3: split isi pinctrl
->>    ARM: at91: dts: sama5d3: add missing pins of isi
->>    ARM: at91: dts: sama5d3: move the isi mck pin to mb
->>
->> Josh Wu (5):
->>    ARM: at91: dts: sama5d3: add isi clock
->>    ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
->>    ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
->>    ARM: at91: dts: sama5d3: add ov2640 camera sensor support
->>    ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
-> Josh,
->
-> It seems that this patch doesn't show up in the series: I only received
-> up to 6/8 patches (2 missing?). Can you please send it(them?)?
+Hello Russell King,
 
-Thanks you, Nicolas. I am not aware that.
-I just sent out the missing 7/8, 8/8 patches right now.
+Could you apply this patch for arm_add_memory() fix, please ?
 
-Best Regards,
-Josh Wu
 
->
-> Bye,
->
->>   arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
->>   arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
->>   arch/arm/configs/sama5_defconfig  |  6 ++++++
->>   3 files changed, 61 insertions(+), 9 deletions(-)
->>
->
+Thanks,
+Masahiro Yamada
+
+
+On Mon, 22 Dec 2014 10:09:32 +0100
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+
+> On 22 December 2014 at 04:17, Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+> > The current rounding of "size" is wrong:
+> >
+> >  - If "start" is sufficiently near the next page boundary, "size"
+> >    is decremented by more than enough and the last page is lost.
+> >
+> >  - If "size" is sufficiently small, it is wrapped around and gets
+> >    a bogus value.
+> >
+> > Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> > Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> 
+> > ---
+> >
+> > Changes in v2:
+> >  - Avoid wrap around of "size"
+> >
+> >  arch/arm/kernel/setup.c | 7 +++++--
+> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index f9c8639..d13f185 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -657,10 +657,13 @@ int __init arm_add_memory(u64 start, u64 size)
+> >
+> >         /*
+> >          * Ensure that start/size are aligned to a page boundary.
+> > -        * Size is appropriately rounded down, start is rounded up.
+> > +        * Size is rounded down, start is rounded up.
+> >          */
+> > -       size -= start & ~PAGE_MASK;
+> >         aligned_start = PAGE_ALIGN(start);
+> > +       if (aligned_start > start + size)
+> > +               size = 0;
+> > +       else
+> > +               size -= aligned_start - start;
+> >
+> >  #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
+> >         if (aligned_start > ULONG_MAX) {
+> > --
+> > 1.9.1
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
