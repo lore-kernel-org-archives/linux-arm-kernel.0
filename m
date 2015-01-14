@@ -1,671 +1,161 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 13 Jan 2015 18:14:17 -0800
-Subject: [PATCH v3 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150113225012.GK22880@pengutronix.de>
-References: <rjui@broadcom.com>
- <1418183832-24793-1-git-send-email-rjui@broadcom.com>
- <1418183832-24793-3-git-send-email-rjui@broadcom.com>
- <20150113225012.GK22880@pengutronix.de>
-Message-ID: <54B5D0F9.8030902@broadcom.com>
+From: r.peniaev@gmail.com (Roman Peniaev)
+Date: Wed, 14 Jan 2015 11:23:06 +0900
+Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
+ thread_info->syscall
+In-Reply-To: <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
+References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
+ <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
+ <20150112183955.GO13360@arm.com>
+ <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
+Message-ID: <CACZ9PQW9aXuCd7T7ci7PmsR7uvbXtzcs6NjNJeMKAu8SF4MfiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 1/13/2015 2:50 PM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Tue, Dec 09, 2014 at 07:57:11PM -0800, Ray Jui wrote:
->> Add initial support to the Broadcom iProc I2C controller found in the
->> iProc family of SoCs.
+On Tue, Jan 13, 2015 at 5:35 PM, Roman Peniaev <r.peniaev@gmail.com> wrote:
+> On Tue, Jan 13, 2015 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Sun, Jan 11, 2015 at 02:32:30PM +0000, Roman Pen wrote:
+>>> thread_info->syscall is used only for ptrace, but syscall number
+>>> is also used by syscall_get_nr and returned to userspace by the
+>>> following proc file access:
+>>>
+>>>  $ cat /proc/self/syscall
+>>>  0 0x3 0xbe928bd8 0x1000 0x0 0xac9e0 0x3 0xbe928bb4 0xb6f5dfbc
+>>>  ^
+>>> The first number is the syscall number, currently it is zero.
+>>> Patch fixes this:
+>>>
+>>>  $ cat /proc/self/syscall
+>>>  3 0x3 0xbefc7bd8 0x1000 0x0 0xac9e0 0x3 0xbefc7bb4 0xb6e82fbc
+>>>  ^
+>>> Right, read syscall
 >>
->> The iProc I2C controller has separate internal TX and RX FIFOs, each has
->> a size of 64 bytes. The iProc I2C controller supports two bus speeds
->> including standard mode (100kHz) and fast mode (400kHz)
+>> Yes, it seems that despite requiring CONFIG_HAVE_ARCH_TRACEHOOK,
+>> the /proc code requires syscall_get_nr to work regardless of
+>> TIF_SYSCALL_TRACE.
 >>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> ---
->>  drivers/i2c/busses/Kconfig         |   10 +
->>  drivers/i2c/busses/Makefile        |    1 +
->>  drivers/i2c/busses/i2c-bcm-iproc.c |  500 ++++++++++++++++++++++++++++++++++++
->>  3 files changed, 511 insertions(+)
->>  create mode 100644 drivers/i2c/busses/i2c-bcm-iproc.c
+>>> Signed-off-by: Roman Pen <r.peniaev@gmail.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>> Cc: Sekhar Nori <nsekhar@ti.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> Cc: stable at vger.kernel.org
+>>> ---
+>>>  arch/arm/kernel/asm-offsets.c  | 1 +
+>>>  arch/arm/kernel/entry-common.S | 1 +
+>>>  2 files changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+>>> index 2d2d608..6911bad 100644
+>>> --- a/arch/arm/kernel/asm-offsets.c
+>>> +++ b/arch/arm/kernel/asm-offsets.c
+>>> @@ -70,6 +70,7 @@ int main(void)
+>>>    DEFINE(TI_CPU,             offsetof(struct thread_info, cpu));
+>>>    DEFINE(TI_CPU_DOMAIN,              offsetof(struct thread_info, cpu_domain));
+>>>    DEFINE(TI_CPU_SAVE,                offsetof(struct thread_info, cpu_context));
+>>> +  DEFINE(TI_SYSCALL,         offsetof(struct thread_info, syscall));
+>>>    DEFINE(TI_USED_CP,         offsetof(struct thread_info, used_cp));
+>>>    DEFINE(TI_TP_VALUE,                offsetof(struct thread_info, tp_value));
+>>>    DEFINE(TI_FPSTATE,         offsetof(struct thread_info, fpstate));
+>>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+>>> index f8ccc21..89452ff 100644
+>>> --- a/arch/arm/kernel/entry-common.S
+>>> +++ b/arch/arm/kernel/entry-common.S
+>>> @@ -189,6 +189,7 @@ ENTRY(vector_swi)
+>>>  #endif
+>>>
+>>>  local_restart:
+>>> +     str scno, [tsk, #TI_SYSCALL]            @ set syscall number
+>>>       ldr     r10, [tsk, #TI_FLAGS]           @ check for syscall tracing
+>>>       stmdb   sp!, {r4, r5}                   @ push fifth and sixth args
 >>
->> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
->> index c1351d9..df21366 100644
->> --- a/drivers/i2c/busses/Kconfig
->> +++ b/drivers/i2c/busses/Kconfig
->> @@ -372,6 +372,16 @@ config I2C_BCM2835
->>  	  This support is also available as a module.  If so, the module
->>  	  will be called i2c-bcm2835.
->>  
->> +config I2C_BCM_IPROC
->> +	tristate "Broadcom iProc I2C controller"
->> +	depends on ARCH_BCM_IPROC
->> +	default y
-> It would be nice to have the following here to improve compile coverage
-> testing:
-> 
-> 	depends on ARCH_BCM_IPROC || COMPILE_TEST
-> 	default ARCH_BCM_IPROC
-> 
-Sure will do!
+>> Do we definitely want to update scno on syscall restarting?
+>
+>
+> Good question.
+>
+> First thing to mention is __sys_trace will trace 'restart_syscall',
+> not the real syscall we are going to restart.
+>
+> E.g. in test application we do infinite poll and then send STOP and
+> CONT to this app:
+>
+>     test-243   [002] ...1  1792.067726: sys_enter: NR 168 (0, 0,
+> ffffffff, 0, 0, 0)
+>     test-243   [002] ...1  1802.299073: sys_exit: NR 168 = -516
+>     test-243   [004] ...1  1814.716264: sys_enter: NR 0 (0, 0,
+> ffffffff, 0, 0, 0)
+>     test-243   [004] ...1  2183.687225: sys_exit: NR 0 = -516
+>
+> the poll was restarted and trace shows that we are in restart_syscall.
+>
+> Is that expected?
+>
+> And the second thing is that my next patch did some tweaks in
+> 'syscall_trace_enter', where we take scno not from param we passed,
+> but from thread_info->syscall we previously set.
+>
+> So, regarding your question, if I set scno only once - I will break
+> previous behavior, and __sys_trace will trace the syscall we restarted.
+>
+> And I think this is what we need, because according to the
+> 'syscall_trace_enter' code we do 'secure_computing' and
+> 'audit_syscall_entry', which definitely expect original syscall, not
+> the 'restart_syscall'.
 
->> +	help
->> +	  If you say yes to this option, support will be included for the
->> +	  Broadcom iProc I2C controller.
->> +
->> +	  If you don't know what to do here, say N.
->> +
->>  config I2C_BCM_KONA
->>  	tristate "BCM Kona I2C adapter"
->>  	depends on ARCH_BCM_MOBILE
->> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
->> index 5e6c822..216e7be 100644
->> --- a/drivers/i2c/busses/Makefile
->> +++ b/drivers/i2c/busses/Makefile
->> @@ -33,6 +33,7 @@ obj-$(CONFIG_I2C_AT91)		+= i2c-at91.o
->>  obj-$(CONFIG_I2C_AU1550)	+= i2c-au1550.o
->>  obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
->>  obj-$(CONFIG_I2C_BCM2835)	+= i2c-bcm2835.o
->> +obj-$(CONFIG_I2C_BCM_IPROC)	+= i2c-bcm-iproc.o
->>  obj-$(CONFIG_I2C_BLACKFIN_TWI)	+= i2c-bfin-twi.o
->>  obj-$(CONFIG_I2C_CADENCE)	+= i2c-cadence.o
->>  obj-$(CONFIG_I2C_CBUS_GPIO)	+= i2c-cbus-gpio.o
->> diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
->> new file mode 100644
->> index 0000000..35ac497
->> --- /dev/null
->> +++ b/drivers/i2c/busses/i2c-bcm-iproc.c
->> @@ -0,0 +1,500 @@
->> +/*
->> + * Copyright (C) 2014 Broadcom Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/device.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/sched.h>
->> +#include <linux/i2c.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/clk.h>
->> +#include <linux/io.h>
->> +#include <linux/slab.h>
->> +#include <linux/delay.h>
->> +
->> +#define CFG_OFFSET                   0x00
->> +#define CFG_RESET_SHIFT              31
->> +#define CFG_EN_SHIFT                 30
->> +#define CFG_M_RETRY_CNT_SHIFT        16
->> +#define CFG_M_RETRY_CNT_MASK         0x0f
->> +
->> +#define TIM_CFG_OFFSET               0x04
->> +#define TIME_CFG_MODE_400_SHIFT      31
->> +
->> +#define M_FIFO_CTRL_OFFSET           0x0c
->> +#define M_FIFO_RX_FLUSH_SHIFT        31
->> +#define M_FIFO_TX_FLUSH_SHIFT        30
->> +#define M_FIFO_RX_CNT_SHIFT          16
->> +#define M_FIFO_RX_CNT_MASK           0x7f
->> +#define M_FIFO_RX_THLD_SHIFT         8
->> +#define M_FIFO_RX_THLD_MASK          0x3f
->> +
->> +#define M_CMD_OFFSET                 0x30
->> +#define M_CMD_START_BUSY_SHIFT       31
->> +#define M_CMD_STATUS_SHIFT           25
->> +#define M_CMD_STATUS_MASK            0x07
->> +#define M_CMD_STATUS_SUCCESS         0x0
->> +#define M_CMD_STATUS_LOST_ARB        0x1
->> +#define M_CMD_STATUS_NACK_ADDR       0x2
->> +#define M_CMD_STATUS_NACK_DATA       0x3
->> +#define M_CMD_STATUS_TIMEOUT         0x4
->> +#define M_CMD_PROTOCOL_SHIFT         9
->> +#define M_CMD_PROTOCOL_MASK          0xf
->> +#define M_CMD_PROTOCOL_BLK_WR        0x7
->> +#define M_CMD_PROTOCOL_BLK_RD        0x8
->> +#define M_CMD_PEC_SHIFT              8
->> +#define M_CMD_RD_CNT_SHIFT           0
->> +#define M_CMD_RD_CNT_MASK            0xff
->> +
->> +#define IE_OFFSET                    0x38
->> +#define IE_M_RX_FIFO_FULL_SHIFT      31
->> +#define IE_M_RX_THLD_SHIFT           30
->> +#define IE_M_START_BUSY_SHIFT        28
->> +
->> +#define IS_OFFSET                    0x3c
->> +#define IS_M_RX_FIFO_FULL_SHIFT      31
->> +#define IS_M_RX_THLD_SHIFT           30
->> +#define IS_M_START_BUSY_SHIFT        28
->> +
->> +#define M_TX_OFFSET                  0x40
->> +#define M_TX_WR_STATUS_SHIFT         31
->> +#define M_TX_DATA_SHIFT              0
->> +#define M_TX_DATA_MASK               0xff
->> +
->> +#define M_RX_OFFSET                  0x44
->> +#define M_RX_STATUS_SHIFT            30
->> +#define M_RX_STATUS_MASK             0x03
->> +#define M_RX_PEC_ERR_SHIFT           29
->> +#define M_RX_DATA_SHIFT              0
->> +#define M_RX_DATA_MASK               0xff
->> +
->> +#define I2C_TIMEOUT_MESC             100
->> +#define M_TX_RX_FIFO_SIZE            64
->> +
->> +enum bus_speed_index {
->> +	I2C_SPD_100K = 0,
->> +	I2C_SPD_400K,
->> +};
->> +
->> +struct bcm_iproc_i2c_dev {
->> +	struct device *device;
->> +
->> +	void __iomem *base;
->> +	struct i2c_msg *msg;
->> +
->> +	struct i2c_adapter adapter;
->> +
->> +	struct completion done;
->> +};
->> +
->> +/*
->> + * Can be expanded in the future if more interrupt status bits are utilized
->> + */
->> +#define ISR_MASK (1 << IS_M_START_BUSY_SHIFT)
->> +
->> +static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
->> +{
->> +	struct bcm_iproc_i2c_dev *dev = data;
->> +	u32 status = readl(dev->base + IS_OFFSET);
->> +
->> +	status &= ISR_MASK;
->> +
->> +	if (!status)
->> +		return IRQ_NONE;
->> +
->> +	writel(status, dev->base + IS_OFFSET);
->> +	complete_all(&dev->done);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int __wait_for_bus_idle(struct bcm_iproc_i2c_dev *dev)
->> +{
->> +	unsigned long timeout = jiffies + msecs_to_jiffies(I2C_TIMEOUT_MESC);
->> +
->> +	while (readl(dev->base + M_CMD_OFFSET) &
->> +			(1 << M_CMD_START_BUSY_SHIFT)) {
->> +		if (time_after(jiffies, timeout)) {
->> +			dev_err(dev->device, "wait for bus idle timeout\n");
->> +			return -ETIMEDOUT;
->> +		}
-> Add a call to cpu_relax here. Do you really need a tight loop here?
-> 
-Yes, thanks!
++Kees Cook
 
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int bcm_iproc_i2c_format_addr(struct bcm_iproc_i2c_dev *dev,
->> +				     struct i2c_msg *msg, u8 *addr)
->> +{
->> +
->> +	if (msg->flags & I2C_M_TEN) {
->> +		dev_err(dev->device, "no support for 10-bit address\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	*addr = (msg->addr << 1) & 0xfe;
-> I don't see what difference the & 0xfe makes. I think you can drop that.
-> 
-Yeah just see this now. Thanks!
+Moreover, I tested on x86, and behavior is the same:
+if we do restart_syscall userspace sees 0 as scnr.
+(for me it sounds strange, because as I understand userspace
+should avoid any awareness about possible syscall restart)
 
->> +
->> +	if (msg->flags & I2C_M_RD)
->> +		*addr |= 1;
->> +
->> +	return 0;
->> +}
->> +
->> +static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *dev)
->> +{
->> +	u32 val;
->> +
->> +	val = readl(dev->base + M_CMD_OFFSET);
->> +	val = (val >> M_CMD_STATUS_SHIFT) & M_CMD_STATUS_MASK;
->> +
->> +	switch (val) {
->> +	case M_CMD_STATUS_SUCCESS:
->> +		return 0;
->> +
->> +	case M_CMD_STATUS_LOST_ARB:
->> +		dev_err(dev->device, "lost bus arbitration\n");
-> I wouldn't dev_err that, only dev_dbg. I'm not sure how usual the errors
-> for the next two cases is, maybe degrade them to dev_dbg, too?
-> 
-These errors are rare, and it's nice to keep them at the dev_err level
-so the user will be more aware.
+x86:
 
->> +		return -EREMOTEIO;
->> +
->> +	case M_CMD_STATUS_NACK_ADDR:
->> +		dev_err(dev->device, "NAK addr:0x%02x\n", dev->msg->addr);
->> +		return -EREMOTEIO;
->> +
->> +	case M_CMD_STATUS_NACK_DATA:
->> +		dev_err(dev->device, "NAK data\n");
->> +		return -EREMOTEIO;
->> +
->> +	case M_CMD_STATUS_TIMEOUT:
->> +		dev_err(dev->device, "bus timeout\n");
->> +		return -ETIMEDOUT;
->> +
->> +	default:
->> +		dev_err(dev->device, "unknown error code=%d\n", val);
->> +		return -EREMOTEIO;
->> +	}
->> +
->> +	return -EREMOTEIO;
->> +}
->> +
->> +static int bcm_iproc_i2c_xfer_single_msg(struct bcm_iproc_i2c_dev *dev,
->> +					 struct i2c_msg *msg)
->> +{
->> +	int ret, i;
->> +	u8 addr;
->> +	u32 val;
->> +	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT_MESC);
->> +
->> +	if (msg->len < 1 || msg->len > M_TX_RX_FIFO_SIZE - 1) {
->> +		dev_err(dev->device,
->> +			"supported data length is 1 - %u bytes\n",
->> +				M_TX_RX_FIFO_SIZE - 1);
->> +		return -EINVAL;
->> +	}
->> +
->> +	dev->msg = msg;
->> +	ret = __wait_for_bus_idle(dev);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = bcm_iproc_i2c_format_addr(dev, msg, &addr);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/* load slave address into the TX FIFO */
->> +	writel(addr, dev->base + M_TX_OFFSET);
->> +
->> +	/* for a write transaction, load data into the TX FIFO */
->> +	if (!(msg->flags & I2C_M_RD)) {
->> +		for (i = 0; i < msg->len; i++) {
->> +			val = msg->buf[i];
->> +
->> +			/* mark the last byte */
->> +			if (i == msg->len - 1)
->> +				val |= 1 << M_TX_WR_STATUS_SHIFT;
->> +
->> +			writel(val, dev->base + M_TX_OFFSET);
->> +		}
->> +	}
->> +
->> +	/* mark as incomplete before starting the transaction */
->> +	reinit_completion(&dev->done);
->> +
->> +	/*
->> +	 * Enable the "start busy" interrupt, which will be triggered after
->> +	 * the transaction is done
-> This sound's wrong. I'd expect "start busy" to trigger as soon as the
-> controller gets hold of the bus.
-> 
-Okay maybe the naming is misleading. But this is the real name used in
-the register description from the datasheet. I'll add more comment in
-the code to make it more clear.
+[root at qemu-x86 ~]# ./test.x86 &
+[1] 285
+[root at qemu-x86 ~]# cat /proc/285/syscall
+168 0x0 0x0 0xffffffff 0x0 0xbf9387ac 0xbf9387b8 0xbf9386f8 0xffffe424
+[root at qemu-x86 ~]# kill -STOP 285
+[root at qemu-x86 ~]#
 
-Basically this enables the interrupt that triggers when the controller
-internal start_busy bit transitions from 1 to 0, i.e., after a
-transaction finishes. The interrupt won't be triggered when a new
-transaction starts since it causes the start_busy bit to transit from 0
-to 1.
+[1]+  Stopped                 ./test.x86
+[root at qemu-x86 ~]# kill -CONT 285
+[root at qemu-x86 ~]# cat /proc/285/syscall
+0 0x0 0x0 0xffffffff 0x0 0xbf9387ac 0xbf9387b8 0xbf9386f8 0xffffe424
 
->> +	 */
->> +	writel(1 << IE_M_START_BUSY_SHIFT, dev->base + IE_OFFSET);
->> +
->> +	/*
->> +	 * Now we can activate the transfer. For a read operation, specify the
->> +	 * number of bytes to read
->> +	 */
->> +	val = 1 << M_CMD_START_BUSY_SHIFT;
->> +	if (msg->flags & I2C_M_RD) {
->> +		val |= (M_CMD_PROTOCOL_BLK_RD << M_CMD_PROTOCOL_SHIFT) |
->> +			(msg->len << M_CMD_RD_CNT_SHIFT);
->> +	} else {
->> +		val |= (M_CMD_PROTOCOL_BLK_WR << M_CMD_PROTOCOL_SHIFT);
->> +	}
->> +	writel(val, dev->base + M_CMD_OFFSET);
->> +
->> +	time_left = wait_for_completion_timeout(&dev->done, time_left);
->> +
->> +	/* disable all interrupts */
->> +	writel(0, dev->base + IE_OFFSET);
->> +
->> +	if (!time_left) {
->> +		dev_err(dev->device, "transaction times out\n");
->> +
->> +		/* flush FIFOs */
->> +		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
->> +			(1 << M_FIFO_TX_FLUSH_SHIFT);
->> +		writel(val, dev->base + M_FIFO_CTRL_OFFSET);
->> +		return -EREMOTEIO;
->> +	}
->> +
->> +	ret = bcm_iproc_i2c_check_status(dev);
->> +	if (ret) {
->> +		/* flush both TX/RX FIFOs */
->> +		val = (1 << M_FIFO_RX_FLUSH_SHIFT) |
->> +			(1 << M_FIFO_TX_FLUSH_SHIFT);
->> +		writel(val, dev->base + M_FIFO_CTRL_OFFSET);
->> +		return ret;
->> +	}
->> +
->> +	/*
->> +	 * For a read operation, we now need to load the data from FIFO
->> +	 * into the memory buffer
->> +	 */
->> +	if (msg->flags & I2C_M_RD) {
->> +		for (i = 0; i < msg->len; i++) {
->> +			msg->buf[i] = (readl(dev->base + M_RX_OFFSET) >>
->> +					M_RX_DATA_SHIFT) & M_RX_DATA_MASK;
->> +		}
->> +	}
->> +
->> +	dev_dbg(dev->device, "xfer %c, addr=0x%02x, len=%d\n",
->> +			(msg->flags & I2C_M_RD) ? 'R' : 'W', msg->addr,
->> +			msg->len);
->> +	dev_dbg(dev->device, "**** data start ****\n");
->> +	for (i = 0; i < msg->len; i++)
->> +		dev_dbg(dev->device, "0x%02x ",  msg->buf[i]);
->> +	dev_dbg(dev->device, "**** data end ****\n");
->> +
->> +	return 0;
->> +}
->> +
->> +static int bcm_iproc_i2c_xfer(struct i2c_adapter *adapter,
->> +			      struct i2c_msg msgs[], int num)
->> +{
->> +	struct bcm_iproc_i2c_dev *dev = i2c_get_adapdata(adapter);
->> +	int ret, i;
->> +
->> +	/* go through all messages */
->> +	for (i = 0; i < num; i++) {
->> +		ret = bcm_iproc_i2c_xfer_single_msg(dev, &msgs[i]);
->> +		if (ret) {
->> +			dev_err(dev->device, "xfer failed\n");
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	return num;
->> +}
->> +
->> +static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
->> +{
->> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
->> +}
->> +
->> +static const struct i2c_algorithm bcm_iproc_algo = {
->> +	.master_xfer = bcm_iproc_i2c_xfer,
->> +	.functionality = bcm_iproc_i2c_functionality,
->> +};
->> +
->> +static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *dev)
->> +{
->> +	unsigned int bus_speed, speed_bit;
->> +	u32 val;
->> +	int ret = of_property_read_u32(dev->device->of_node, "clock-frequency",
->> +				       &bus_speed);
-> Inconsistent coding style. At most other places you use 2 tabs to indent
-> a continued line. (Well you use this style for breaks in function
-> declarations. Using the same style for both cases would be nice.)
-> 
-Will try to use this style for both continued lines and function
-declarations. Thanks!
+And getting syscall tracing on another run of this test application:
 
->> +	if (ret < 0) {
->> +		dev_err(dev->device, "missing clock-frequency property\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	switch (bus_speed) {
->> +	case 100000:
->> +		speed_bit = 0;
->> +		break;
->> +	case 400000:
->> +		speed_bit = 1;
->> +		break;
->> +	default:
->> +		dev_err(dev->device, "%d Hz bus speed not supported\n",
->> +				bus_speed);
->> +		dev_err(dev->device, "valid speeds are 100khz and 400khz\n");
->> +		return -EINVAL;
->> +	}
-> I'd be more graceful here:
-> 
-> 	if (bus_speed < 100000)
-> 		error_out;
-> 	else if (bus_speed < 400000)
-> 		speed_bit = 0;
-> 	else
-> 		/* >= 400000 */
-> 		speed_bit = 1;
-> 
-Okay I can do that. Thanks.
+[root at qemu-x86 ~]# cat /sys/kernel/debug/tracing/trace | grep test.x86
+.....
+test.x86-279   [000] ...1   189.926878: sys_enter: NR 168 (0, 0,
+ffffffff, 0, bfe6824c, bfe68258)
+test.x86-279   [001] ...1   199.931406: sys_exit: NR 168 = -516
+test.x86-279   [001] ...1   203.446946: sys_enter: NR 0 (0, 0,
+ffffffff, 0, bfe6824c, bfe68258)
+test.x86-279   [000] ...1   276.294314: sys_exit: NR 0 = -516
+.....
 
->> +
->> +	val = readl(dev->base + TIM_CFG_OFFSET);
->> +	val &= ~(1 << TIME_CFG_MODE_400_SHIFT);
->> +	val |= speed_bit << TIME_CFG_MODE_400_SHIFT;
->> +	writel(val, dev->base + TIM_CFG_OFFSET);
->> +
->> +	dev_info(dev->device, "bus set to %u Hz\n", bus_speed);
->> +
->> +	return 0;
->> +}
->> +
->> +static int bcm_iproc_i2c_init(struct bcm_iproc_i2c_dev *dev)
->> +{
->> +	u32 val;
->> +
->> +	/* put controller in reset */
->> +	val = readl(dev->base + CFG_OFFSET);
->> +	val |= 1 << CFG_RESET_SHIFT;
->> +	val &= ~(1 << CFG_EN_SHIFT);
->> +	writel(val, dev->base + CFG_OFFSET);
->> +
->> +	/* wait 100 usec per spec */
->> +	udelay(100);
->> +
->> +	/* bring controller out of reset */
->> +	val = readl(dev->base + CFG_OFFSET);
-> Is it necessary to reread the register value here?
-> 
-I guess not, since there's no one else modifies this register. Will get
-rid of the redundant read here. Thanks!
 
->> +	val &= ~(1 << CFG_RESET_SHIFT);
->> +	writel(val, dev->base + CFG_OFFSET);
->> +
->> +	/* flush TX/RX FIFOs and set RX FIFO threshold to zero */
->> +	val = (1 << M_FIFO_RX_FLUSH_SHIFT) | (1 << M_FIFO_TX_FLUSH_SHIFT);
->> +	writel(val, dev->base + M_FIFO_CTRL_OFFSET);
->> +
->> +	/* disable all interrupts */
->> +	val = 0;
->> +	writel(val, dev->base + IE_OFFSET);
-> writel(0, dev->base + IE_OFFSET);
-> 
-Right.
+ARM behavior is the same with these two patches:
 
->> +	/* clear all pending interrupts */
->> +	val = readl(dev->base + IS_OFFSET);
->> +	writel(val, dev->base + IS_OFFSET);
-> writel(0xffffffff, dev->base + IS_OFFSET); ??
-> 
-Yes, better.
+sh-3.2# /tmp/test &
+[1] 178
+sh-3.2# cat /proc/178/syscall
+168 0x0 0x0 0xffffffff 0x0 0x0 0x0 0xbdcdece4 0x4220a6cc
+sh-3.2# kill -STOP 178
+sh-3.2#
 
->> +
->> +	return 0;
->> +}
->> +
->> +static void bcm_iproc_i2c_enable(struct bcm_iproc_i2c_dev *dev)
->> +{
->> +	u32 val;
->> +
->> +	val = readl(dev->base + CFG_OFFSET);
->> +	val |= 1 << CFG_EN_SHIFT;
->> +	writel(val, dev->base + CFG_OFFSET);
->> +}
->> +
->> +static void bcm_iproc_i2c_disable(struct bcm_iproc_i2c_dev *dev)
->> +{
->> +	u32 val;
->> +
->> +	val = readl(dev->base + CFG_OFFSET);
->> +	val &= ~(1 << CFG_EN_SHIFT);
->> +	writel(val, dev->base + CFG_OFFSET);
->> +}
->> +
->> +static int bcm_iproc_i2c_probe(struct platform_device *pdev)
->> +{
->> +	int irq, ret = 0;
->> +	struct bcm_iproc_i2c_dev *dev;
-> "dev" is a misleading name here. I'd call this
-> 
-> 	bcm_iproc_i2c_ddata *ddata;
-> 
-I will change it to iproc_i2c;
+[1]+  Stopped(SIGSTOP)        /tmp/test
+sh-3.2# cat /proc/178/syscall
+168 0x0 0x0 0xffffffff 0x0 0x0 0x0 0xbdcdece4 0x4220a6c8
+sh-3.2# kill -CONT 178
+sh-3.2# cat /proc/178/syscall
+0 0x0 0x0 0xffffffff 0x0 0x0 0x0 0xbdcdece4 0x4220a6cc
 
->> +	struct i2c_adapter *adap;
->> +	struct resource *res;
->> +
->> +	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
->> +	if (!dev)
->> +		return -ENOMEM;
->> +
->> +	platform_set_drvdata(pdev, dev);
->> +	dev->device = &pdev->dev;
->> +	init_completion(&dev->done);
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	dev->base = devm_ioremap_resource(dev->device, res);
->> +	if (IS_ERR(dev->base))
->> +		return -ENOMEM;
-> 		return PTR_ERR(dev->base);
-> 
-Okay. Thanks.
 
->> +
->> +	ret = bcm_iproc_i2c_init(dev);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = bcm_iproc_i2c_cfg_speed(dev);
->> +	if (ret)
->> +		return ret;
->> +
->> +	irq = platform_get_irq(pdev, 0);
->> +	if (irq < 0) {
-> irq == 0 should be handled as error, too.
-> 
-Ah. I thought zero is a valid global interrupt number, and I see other
-drivers checking against < 0 as well. Is my understanding incorrect?
-
->> +		dev_err(dev->device, "no irq resource\n");
->> +		return irq;
->> +	}
->> +
->> +	ret = devm_request_irq(&pdev->dev, irq, bcm_iproc_i2c_isr,
->> +			IRQF_SHARED, pdev->name, dev);
->> +	if (ret) {
->> +		dev_err(dev->device, "unable to request irq %i\n", irq);
->> +		return ret;
->> +	}
->> +
->> +	bcm_iproc_i2c_enable(dev);
->> +
->> +	adap = &dev->adapter;
->> +	i2c_set_adapdata(adap, dev);
->> +	strlcpy(adap->name, "Broadcom iProc I2C adapter", sizeof(adap->name));
->> +	adap->algo = &bcm_iproc_algo;
->> +	adap->dev.parent = &pdev->dev;
->> +	adap->dev.of_node = pdev->dev.of_node;
->> +
->> +	ret = i2c_add_adapter(adap);
->> +	if (ret) {
->> +		dev_err(dev->device, "failed to add adapter\n");
->> +		return ret;
->> +	}
->> +
->> +	dev_info(dev->device, "device registered successfully\n");
-> This just clutters the boot log. Please remove.
-> 
-Okay.
-
->> +
->> +	return 0;
->> +}
->> +
->> +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
->> +{
->> +	struct bcm_iproc_i2c_dev *dev = platform_get_drvdata(pdev);
->> +
->> +	i2c_del_adapter(&dev->adapter);
->> +	bcm_iproc_i2c_disable(dev);
-> I think you have a problem here if bcm_iproc_i2c_remove is called while
-> an irq is still being serviced. I'm not sure how to prevent this
-> properly for a shared interrupt.
-> 
-Can I grab i2c_lock_adapter to ensure the bus is locked (so there's no
-outstanding transactions or IRQs by the time we remove the adapter)? But
-I see no I2C bus driver does this in their remove function...
-
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct of_device_id bcm_iproc_i2c_of_match[] = {
->> +	{.compatible = "brcm,iproc-i2c",},
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, bcm_iproc_i2c_of_match);
->> +
->> +static struct platform_driver bcm_iproc_i2c_driver = {
->> +	.driver = {
->> +		   .name = "bcm-iproc-i2c",
->> +		   .of_match_table = bcm_iproc_i2c_of_match,
->> +		   },
-> Inconsistent indention.
-> 
-Sorry. Will fix.
-
->> +	.probe = bcm_iproc_i2c_probe,
->> +	.remove = bcm_iproc_i2c_remove,
->> +};
->> +module_platform_driver(bcm_iproc_i2c_driver);
->> +
->> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
->> +MODULE_DESCRIPTION("Broadcom iProc I2C Driver");
->> +MODULE_LICENSE("GPL v2");
-> 
+--
+Roman
