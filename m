@@ -1,50 +1,50 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 14 Jan 2015 21:33:21 +0000
-Subject: [PATCH RESEND] pm: at91: Workaround DDRSDRC self-refresh bug
- with LPDDR1 memories
-In-Reply-To: <54B69DAB.8010303@atmel.com>
-References: <1421241632-2991-1-git-send-email-peda@lysator.liu.se>
- <54B69DAB.8010303@atmel.com>
-Message-ID: <018060d2585f4e5480b1bdd39a56e70c@EMAIL.axentia.se>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 14 Jan 2015 16:04:03 -0600
+Subject: [GIT PULL] qcom SoC changes for v3.18
+In-Reply-To: <4AF7ABD3-EC90-47B8-96F3-B0AC396C52CC@codeaurora.org>
+References: <A246CCDC-948C-429E-9FC5-934D317EB9D4@codeaurora.org>
+ <201410011641.44037.arnd@arndb.de>
+ <4AF7ABD3-EC90-47B8-96F3-B0AC396C52CC@codeaurora.org>
+Message-ID: <20150114220403.GA32295@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre wrote:
-> Le 14/01/2015 14:20, Peter Rosin a ?crit :
-> > From: Peter Rosin <peda@axentia.se>
-> >
-> > The DDRSDR controller (on the ATSAMA5D31) fails miserably to put
-> > LPDDR1 memories in self-refresh. Force the controller to think it has
-> > DDR2 memories during the self-refresh period, as the DDR2 self-refresh
-> > spec is equivalent to LPDDR1, and is correctly implemented in the
-> controller.
-> >
-> > Assume that the second controller has the same fault, and that other
-> > CPUs in the family has the same problem, but that is untested.
-> >
-> > Signed-off-by: Peter Rosin <peda@axentia.se>
+On Wed, Oct 15, 2014 at 10:18:30AM +0200, Kumar Gala wrote:
 > 
-> I've just verified your code and the scope of this issue and your
-> implementation makes perfect sense.
+> On Oct 1, 2014, at 4:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > On Monday 22 September 2014, Kumar Gala wrote:
+> >> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> >> 
+> >>  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> >> 
+> >> are available in the git repository at:
+> >> 
+> >>  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.18
+> >> 
+> >> for you to fetch changes up to 525fbb55947177cdae507b0d292f43c2c9a75a47:
+> >> 
+> >>  ARM: qcom: Move scm-boot files to drivers/soc and include/soc (2014-09-18 18:14:01 -0500)
+> >> 
+> >> ----------------------------------------------------------------
+> >> Qualcomm ARM Based SoC Updates for v3.18
+> >> 
+> >> * Moved scm support into drivers/soc/qcom (allows for use by drivers)
+> >> * Various bug fixes and minor feature additions to scm code
+> >> * Added big-endian support to debug MSM uart
+> > 
+> > Pulled it into next/late now. This means we're not sending it together with the
+> > other pull requests to Linus. We'll see how things go during the first week
+> > and may or may not send it in the second week of the merge window depending
+> > on that.
+> > 
+> > 	Arnd
 > 
-> Peter,
-> Thanks for your patch. You will probably see it appearing in 3.20 or 3.21.
+> Any update if you guys will end up sending this to linus for 3.18 or not?
 
-Great!
+Where are we on this set of changes?  Have they been queued up again?
 
-> Wenyou,
-> Can you please integrate the patch from Peter in your current rework of the
-> PM routines (keeping his authorship of course)?
-> Please tell me if I can help with this.
-
-To be 100% honest with credits, I should perhaps have mentioned that I
-received an unconditional proof-of-concept patch from Atmel support
-(Case 00007347). I'm not certain who wrote that patch, but the only thing
-that has survived is the idea to temporarily use DDR2 mode and the trivial
-change of the register field width in the header file. So, I do not feel too
-dishonest by claiming authorship...
-
-Cheers,
-Peter
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
