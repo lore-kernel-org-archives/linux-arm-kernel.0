@@ -1,127 +1,63 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 14 Jan 2015 16:55:57 -0800
-Subject: [PATCHv0 2/3] rtc: Add support for Abracon
- AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC chip
-In-Reply-To: <1ae63ab80cfb39305884bd0c2648a420ba3bc0a5.1421045942.git.arno@natisbad.org>
-References: <cover.1421045942.git.arno@natisbad.org>
- <1ae63ab80cfb39305884bd0c2648a420ba3bc0a5.1421045942.git.arno@natisbad.org>
-Message-ID: <20150114165557.d44c5752.akpm@linux-foundation.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 14 Jan 2015 16:59:38 -0800
+Subject: [PATCH 1/3] input: tsc2007: Add pre-calibration, flipping and
+ rotation
+In-Reply-To: <CAAfyv36bD9ZratOzr7FkeQde8k-K9XjEjH9gkntm9qewD-cH9g@mail.gmail.com>
+References: <1412108254-19234-1-git-send-email-marek@goldelico.com>
+ <1412108254-19234-2-git-send-email-marek@goldelico.com>
+ <CAAfyv36bD9ZratOzr7FkeQde8k-K9XjEjH9gkntm9qewD-cH9g@mail.gmail.com>
+Message-ID: <20150115005938.GB9134@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Jan 2015 09:16:36 +0100 Arnaud Ebalard <arno@natisbad.org> wrote:
-
-> This patch adds support for Abracon AB-RTCMC-32.768kHz-B5ZE-S3
-> RTC/Calendar module w/ I2C interface.
+On Sat, Jan 10, 2015 at 03:15:39PM +0100, Belisko Marek wrote:
+> Ping for input maintainer. DT changes was acked. Thanks.
 > 
-> This supports includes RTC time reading and setting, Alarm (1 minute
-> accuracy) reading and setting, and battery low detection. The device
-> also supports frequency adjustment and two timers but those features
-> are currently not implemented in this driver. Due to alarm accuracy
-> limitation (and current lack of timer support in the driver), UIE
-> mode is not supported.
-> 
-> ...
->
-> +static int abb5zes3_probe(struct i2c_client *client,
-> +			  const struct i2c_device_id *id)
-> +{
-> +	struct device *dev = &client->dev;
-> +	struct abb5zes3_rtc_data *data;
-> +	struct regmap *regmap;
-> +	int ret;
-> +
-> +	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C |
-> +				     I2C_FUNC_SMBUS_BYTE_DATA |
-> +				     I2C_FUNC_SMBUS_I2C_BLOCK))
-> +		return -ENODEV;
-> +
-> +	regmap = devm_regmap_init_i2c(client, &abb5zes3_rtc_regmap_config);
-> +	if (IS_ERR(regmap)) {
-> +		ret = PTR_ERR(regmap);
-> +		dev_err(dev, "%s: regmap allocation failed: %d\n",
-> +			__func__, ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = abb5zes3_i2c_validate_chip(regmap);
-> +	if (ret)
-> +		return ret;
-> +
-> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	mutex_init(&data->lock);
-> +	data->regmap = regmap;
-> +	dev_set_drvdata(dev, data);
-> +
-> +	ret = abb5zes3_rtc_check_setup(dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (client->irq > 0) {
-> +		ret = devm_request_threaded_irq(dev, client->irq, NULL,
-> +						_abb5zes3_rtc_interrupt,
-> +						IRQF_SHARED|IRQF_ONESHOT,
-> +						DRV_NAME, client);
-> +		if (!ret) {
-> +			device_init_wakeup(dev, true);
-> +			data->irq = client->irq;
-> +			dev_dbg(dev, "%s: irq %d used by RTC\n", __func__,
-> +				client->irq);
-> +		} else {
-> +			dev_err(dev, "%s: irq %d unavailable (%d)\n",
-> +				__func__, client->irq, ret);
-> +		}
-> +	}
-> +
-> +	data->rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops,
-> +					     THIS_MODULE);
-> +	ret = PTR_ERR_OR_ZERO(data->rtc);
+> On Tue, Sep 30, 2014 at 10:17 PM, Marek Belisko <marek@goldelico.com> wrote:
+> > This patch adds new parameters that allow to address typical hardware
+> > design differences: touch screens may be wired or oriented differently
+> > (portrait or landscape). And usually the active area of the touch is a
+> > little larger than the active area of the LCD. This results in the touch
+> > coordinates that have some significant deviation from LCD coordinates.
+> > Usually this is addressed in user space by a calibration tool (e.g. tslib
+> > or xinput-calibrator) but some systems don't have these tools or require
+> > that the screen is already roughly calibrated (e.g. Replicant) to operate
+> > the device until a better calibration can be done. And, some systems
+> > react very strangely if the touch event stream reports coordinates
+> > outside of the active area.
+> >
+> > This makes it necessry to be able to configure:
+> > 1. swapping x and y wires (coordinate values)
+> > 2. flipping of x (left - right) or y (top - bottom) or even both
+> > 3. define an active area so that an uncalibrated screen already
+> > roughly matches the LCD to be useful.
+> > 4. clip reported coordinates to the active area.
+> >
+> > If none of the new parameters is defined (in DT) or set in a board file,
+> > the driver behaves the same as without this patch.
+> >
+> > Author (1&2): H. Nikolaus Schaller <hns@goldelico.com>
+> > Author (3&4): Paul Kocialkowski <contact@paulk.fr>
+> >
+> > Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 
-If devm_request_threaded_irq() returned an error, we just wiped that
-out here.  I'd suggest consistently adding a few "return ret;"
-statements in this function.
+OK, I was hesitant of adding these as normally we have tslib to perform
+the conversion, but maybe it is time to allow it in the kernel and
+standardize users. However, this seems like a general issue and we
+should:
 
-Something like this?
+1. Perform conversion in input core rather than individual drivers. I
+think we should allocate a new bitmaps for some transformations and have
+the code do X/Y flip/clip of the coordinates.
 
---- a/drivers/rtc/rtc-ab-b5ze-s3.c~rtc-add-support-for-abracon-ab-rtcmc-32768khz-b5ze-s3-i2c-rtc-chip-fix
-+++ a/drivers/rtc/rtc-ab-b5ze-s3.c
-@@ -695,6 +695,7 @@ static int abb5zes3_probe(struct i2c_cli
- 		} else {
- 			dev_err(dev, "%s: irq %d unavailable (%d)\n",
- 				__func__, client->irq, ret);
-+			return ret;
- 		}
- 	}
- 
-@@ -704,7 +705,7 @@ static int abb5zes3_probe(struct i2c_cli
- 	if (ret) {
- 		dev_err(dev, "%s: unable to register RTC device (%d)\n",
- 			__func__, ret);
--		device_init_wakeup(dev, false);
-+		goto err;
- 	}
- 
- 	/*
-@@ -718,12 +719,17 @@ static int abb5zes3_probe(struct i2c_cli
- 	/* Enable battery low detection interrupt if battery not already low */
- 	if (!data->battery_low && data->irq) {
- 		ret = _abb5zes3_rtc_battery_low_irq_enable(regmap, true);
--		if (ret)
-+		if (ret) {
- 			dev_err(dev, "%s: enabling battery low interrupt "
- 				"generation failed (%d)\n", __func__, ret);
-+			goto err;
-+		}
- 	}
- 
- 	return ret;
-+err:
-+	device_init_wakeup(dev, false);
-+	return ret;
- }
- 
- static int abb5zes3_remove(struct i2c_client *client)
-_
+2. Standardize on bindings. We already have of-touchscreen.c doing
+rudimentary parsing, we shoudl look into extending it rather than
+creating myriad of driver-specific bindings.
+
+Also, do we need swap and flip or do we simply need rotation (like the
+proposed Broadcom iproc driver has)?
+
+Thanks.
+
+-- 
+Dmitry
