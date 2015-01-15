@@ -1,91 +1,228 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Jan 2015 13:34:04 +0000
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <CAGTfZH0SQRyTMTmge6x2fXFBdVwtgJ_wcxK36mFrf6ZNPBn85w@mail.gmail.com>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
- <54B7024C.4020407@samsung.com> <20150115112938.GB16217@leverpostej>
- <CAGTfZH0Ve+icxc6FpMJhfNMRMqQASrcUmnrZw-6sYQz8rabC_A@mail.gmail.com>
- <CAGTfZH0SQRyTMTmge6x2fXFBdVwtgJ_wcxK36mFrf6ZNPBn85w@mail.gmail.com>
-Message-ID: <20150115133404.GF16217@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Jan 2015 13:42:57 +0000
+Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
+In-Reply-To: <20150114221407.GS2419@atomide.com> (Tony Lindgren's message of
+ "Wed, 14 Jan 2015 22:14:08 +0000")
+References: <20150114221407.GS2419@atomide.com>
+Message-ID: <8761c8i2hq.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 12:52:38PM +0000, Chanwoo Choi wrote:
-> On Thu, Jan 15, 2015 at 9:46 PM, Chanwoo Choi <cwchoi00@gmail.com> wrote:
-> > Hi Mark,
-> >
-> > On Thu, Jan 15, 2015 at 8:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> On Wed, Jan 14, 2015 at 11:57:00PM +0000, Chanwoo Choi wrote:
-> >>> Hi Kukjin,
-> >>>
-> >>> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
-> >>> > On 01/14/2015 04:51 PM, Kukjin Kim wrote:
-> >>> >> On 01/14/15 14:33, Chanwoo Choi wrote:
-> >>> >>
-> >>> >> Hi,
-> >>> >>
-> >>> >> + Doug, Olof
-> >>> >>
-> >>> >>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
-> >>> >>> for Exynos 32bit SoC.
-> >>> >>>
-> >>> >> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
-> >>> >> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
-> >>> >> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
-> >>> >> implemented it and additionally its access is faster than using memory
-> >>> >> mapped register called SFR for MCT...so Doug submitted patch to use MCT
-> >>> >> on 32bit exynos SoCs before.
-> >>>
-> >>> I know arch_timer. As you comment, ARCH timer would be used for system timer for ARMv8.
-> >>> But, Exynos5433/Exynos7 (ARMv8) include MCT (Multi-Core Timer) IP. I checked it on
-> >>> Exynos5433/EXynos7 User-manaual and tested it.
-> >>>
-> >>> I think that exynos_mct.c should support the Exynos 64-bit SoC
-> >>> because Exynos5433/Exynos7 include already MCT (Multi-Core Timer) IP.
-> >>>
-> >>> Also, I have a problem to verify ARCH timer on Exynos SoC. Exynos User-manual never includes
-> >>> the detailed information about for ARCH timer(e.g, clock for ARCH timer). I knew that
-> >>> I can get the document of ARCH timer for ARM official site but I think it is insufficient
-> >>> to implement ARCH timer on Exynos SoC.
-> >>
-> >> What do you mean by "insufficient to implement ARCH timer"?
-> >
-> > As I knew, timer must need the source clock. The clock for ARCH timer
-> > has dependency on Exynos SoC, But I cannot find
-> 
-> I'm so sorry about this mistake. I pressed the send button before
-> completing reply.
-> 
-> As I knew, timer must need the source clock. The clock for ARCH timer
-> has dependency on Exynos SoC, But I cannot find the clock information
-> for ARCH timer on Exynos SoC user-manual.
-> 
-> When I tried to use ARCH timer on Exynos3250, It is not working. We
-> can check this ARCH timer issue of Exynos3250
-> on following patch[1]:
-> [1] http://www.spinics.net/lists/arm-kernel/msg322943.html
+On Wed, Jan 14 2015 at 10:14:08 pm GMT, Tony Lindgren <tony@atomide.com> wrote:
+> Hi all,
+>
+> Looks like the legacy IRQ numbers are now all wrong at least for omap4
+> since commit 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain.").
+>
+> Instead of this:
+>
+> # cat /proc/interrupts 
+>             CPU0       CPU1       
+>  29:       1124        981       GIC  29  twd
+>  39:          0          0       GIC  39  TWL6030-PIH
+>  41:          0          0       GIC  41  l3-dbg-irq
+>  42:          0          0       GIC  42  l3-app-irq
+>  44:          0          0       GIC  44  DMA
+>  45:       7854          0       GIC  45  omap-dma-engine
+>  52:          0          0       GIC  52  gpmc
+> ...
+>
+>
+> We now have:
+>
+> # cat /proc/interrupts 
+>             CPU0       CPU1       
+>  16:        343          0       GIC  69  gp_timer
+>  17:       1160       1017       GIC  29  twd
+>  18:          0          0       GIC  41  l3-dbg-irq
+>  19:          1          0       GIC  42  l3-app-irq
+>  22:       7850          0       GIC  45  omap-dma-engine
+>  44:          0          0  4a310000.gpio  18  DMA
+>  61:       2730          0  48055000.gpio   2  eth0
+> 223:          0          0       GIC  52  gpmc
+> ...
+>
+> So the DMA interrupt using the legacy mapping with something like
+> irq = 12 + OMAP44XX_IRQ_GIC_START now is wrong and unfortunately
+> at least omaps still have a bunch of the legacy interrupts still
+> around.
 
-Hmm. That is annoying. Your boot code should have been initialising this
-already.
+Holy crap. How much of this do we have hanging around?
 
-> >> The architected timer is mandatory in ARMv8, and required by the arm64
-> >> kernel.
-> >>
-> >> Additional timers may be requried if you want to put all CPUs into low
-> >> power states where the timer logic may be disabled and/or lose state,
-> >> but regardless the architected timers are necessary.
-> 
-> I agree that ARCH timer is mandatory.
-> 
-> I just think that existing exynos-mct.c driver should support the Exynos5/7 SoC
-> because released Exynos5/7 SoC includes already MCT IP for system timer.
+> And that naturally produces all kinds of strange errors like:
+>
+> WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
+> 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
+> ...
+> [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+> [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
+> [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
+> [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
+> [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
+> ...
+>
+> Looks like the logic changed from:
+>
+> if (of_property_read_u32(node, "arm,routable-irqs", &nr_routable_irqs))
+>
+> to just
+>
+> if (node)
+>
+> Which now causes irq_domain_add_linear() to be called instead of
+> irq_domain_add_legacy(), which causes the breakage.
+>
+> Anybody got a sane fix in mind for the -rc series, or should we just
+> revert it for now?
 
-I'm not opposed to the MCT. My only concern is that a configured and
-enabled architected timer is mandated by the boot protocol, and is a
-prerequisite for a functioning kernel. Your initial response made it
-sound like you expected the MCT alone to be sufficient.
+Reverting it is going to kill other platforms, and I'd rather have a
+workaround, short of fixing it for good (which seems ambitious at -rc4).
 
-Thanks,
-Mark.
+How about something along these lines:
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 377eea8..b664494 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -211,6 +211,7 @@ extern struct device *omap2_get_iva_device(void);
+ extern struct device *omap2_get_l3_device(void);
+ extern struct device *omap4_get_dsp_device(void);
+ 
++unsigned int omap4_xlate_irq(unsigned int hwirq);
+ void omap_gic_of_init(void);
+ 
+ #ifdef CONFIG_CACHE_L2X0
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index b7cb44a..cc30e49 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -256,6 +256,38 @@ static int __init omap4_sar_ram_init(void)
+ }
+ omap_early_initcall(omap4_sar_ram_init);
+ 
++static struct of_device_id gic_match[] = {
++	{ .compatible = "arm,cortex-a9-gic", },
++	{ .compatible = "arm,cortex-a15-gic", },
++	{ },
++};
++
++static struct device_node *gic_node;
++
++unsigned int omap4_xlate_irq(unsigned int hwirq)
++{
++	struct of_phandle_args irq_data;
++	unsigned int irq;
++
++	if (!gic_node)
++		gic_node = of_find_matching_node(NULL, gic_match);
++
++	if (WARN_ON(!gic_node))
++		return hwirq;
++
++	irq_data.np = gic_node;
++	irq_data.args_count = 3;
++	irq_data.args[0] = 0;
++	irq_data.args[1] = hwirq - OMAP44XX_IRQ_GIC_START;
++	irq_data.args[2] = IRQ_TYPE_LEVEL_HIGH;
++
++	irq = irq_create_of_mapping(&irq_data);
++	if (WARN_ON(!irq))
++		irq = hwirq;
++
++	return irq;
++}
++
+ void __init omap_gic_of_init(void)
+ {
+ 	struct device_node *np;
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index cbb908d..9025fff 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3534,9 +3534,15 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
+ 
+ 	mpu_irqs_cnt = _count_mpu_irqs(oh);
+ 	for (i = 0; i < mpu_irqs_cnt; i++) {
++		unsigned int irq;
++
++		if (oh->xlate_irq)
++			irq = oh->xlate_irq((oh->mpu_irqs + i)->irq);
++		else
++			irq = (oh->mpu_irqs + i)->irq;
+ 		(res + r)->name = (oh->mpu_irqs + i)->name;
+-		(res + r)->start = (oh->mpu_irqs + i)->irq;
+-		(res + r)->end = (oh->mpu_irqs + i)->irq;
++		(res + r)->start = irq;
++		(res + r)->end = irq;
+ 		(res + r)->flags = IORESOURCE_IRQ;
+ 		r++;
+ 	}
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index 35ca6ef..5b42faf 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -676,6 +676,7 @@ struct omap_hwmod {
+ 	spinlock_t			_lock;
+ 	struct list_head		node;
+ 	struct omap_hwmod_ocp_if	*_mpu_port;
++	unsigned int			(*xlate_irq)(unsigned int);
+ 	u16				flags;
+ 	u8				mpu_rt_idx;
+ 	u8				response_lat;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index c314b3c..f5e68a7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -479,6 +479,7 @@ static struct omap_hwmod omap44xx_dma_system_hwmod = {
+ 	.class		= &omap44xx_dma_hwmod_class,
+ 	.clkdm_name	= "l3_dma_clkdm",
+ 	.mpu_irqs	= omap44xx_dma_system_irqs,
++	.xlate_irq	= omap4_xlate_irq,
+ 	.main_clk	= "l3_div_ck",
+ 	.prcm = {
+ 		.omap4 = {
+@@ -640,6 +641,7 @@ static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
+ 	.class		= &omap44xx_dispc_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
+ 	.mpu_irqs	= omap44xx_dss_dispc_irqs,
++	.xlate_irq	= omap4_xlate_irq,
+ 	.sdma_reqs	= omap44xx_dss_dispc_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+@@ -693,6 +695,7 @@ static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
+ 	.class		= &omap44xx_dsi_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
+ 	.mpu_irqs	= omap44xx_dss_dsi1_irqs,
++	.xlate_irq	= omap4_xlate_irq,
+ 	.sdma_reqs	= omap44xx_dss_dsi1_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+@@ -726,6 +729,7 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
+ 	.class		= &omap44xx_dsi_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
+ 	.mpu_irqs	= omap44xx_dss_dsi2_irqs,
++	.xlate_irq	= omap4_xlate_irq,
+ 	.sdma_reqs	= omap44xx_dss_dsi2_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+@@ -784,6 +788,7 @@ static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
+ 	 */
+ 	.flags		= HWMOD_SWSUP_SIDLE,
+ 	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
++	.xlate_irq	= omap4_xlate_irq,
+ 	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
+ 	.main_clk	= "dss_48mhz_clk",
+ 	.prcm = {
+
+It seems to make my Panda-ES happy enough, but there is of course some
+more to fix (prm44xx.c and twl_common.c). OMAP5 can be worked around the
+same way.
+
+Of course, this is in no way a proper fix, but I suppose the OMAP DT is
+still missing a few bits...
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
