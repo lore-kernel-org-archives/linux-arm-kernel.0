@@ -1,47 +1,38 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 15 Jan 2015 16:38:37 -0500
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54B831C9.3060700@redhat.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <54B831C9.3060700@redhat.com>
-Message-ID: <54B8335D.304@redhat.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 15 Jan 2015 22:48:37 +0100
+Subject: [PATCH v4 2/5] drivers/rtc/rtc-armada38x: Add a new RTC driver
+ for recent mvebu SoCs
+In-Reply-To: <1421342601-20384-3-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Thu, 15 Jan 2015 18:23:18 +0100")
+References: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421342601-20384-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87egqv7m16.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 04:31 PM, Al Stone wrote:
-> On 01/15/2015 11:23 AM, Catalin Marinas wrote:
->> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
->>> On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
->>>
->>> I'll get right to the point: Can we please have this series queued up
->>> for v3.20?
->> [snip ... ]
-> 
->>> 5. Platform support patches need verification and review
->>>    * ACPI core works on at least the Foundation model, Juno, APM
->>> Mustang, and AMD Seattle
->>>    * There still are driver patches being discussed. See Al's summary
->>> for details
->>>    * As I argued above, the state of driver patches isn't going to be
->>
->> We are still lacking here. To quote Al, "First version for AMD Seattle
->> has been posted to the public linaro-acpi mailing list for initial
->> review". Sorry but I don't follow linaro-acpi list. I don't know what's
->> in those patches and I can't tell which subsystems they touch, whether
->> maintainers agree with them. So in conclusion, I'm not confident the
->> arm64 hardware ACPI story looks that great yet.
->>  
-> 
-> This is solely my fault -- too much time on processes, email, and
-> documentation, not enough time on the Seattle patches.  And not
-> enough Seattles to go around for someone else to pick up the slack.
+Hi Gregory,
 
-As an aside: a few of us have discretely assisted in ensuring that the
-right folks have access to hardware platforms over the past few months.
-If one of the upstream maintainers does not have v8 hardware and doing
-so will unblock progress please get in touch off list.
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
-Jon.
+> The new mvebu SoCs come with a new RTC driver. This patch adds the
+> support for this new IP which is currently found in the Armada 38x
+> SoCs.
+>
+> This RTC provides two alarms, but only the first one is used in the
+> driver. The RTC also allows using periodic interrupts.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/rtc/Kconfig         |  10 ++
+>  drivers/rtc/Makefile        |   1 +
+>  drivers/rtc/rtc-armada38x.c | 320 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 331 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-armada38x.c
+
+FWIW:
+
+Reviewed-by: Arnaud Ebalard <arno@natisbad.org>
+
+Cheers,
+
+a+
