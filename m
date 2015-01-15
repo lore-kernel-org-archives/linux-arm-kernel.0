@@ -1,55 +1,70 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 15 Jan 2015 13:07:05 +0100
-Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <20150115084119.GN22880@pengutronix.de>
-References: <rjui@broadcom.com>
- <1421274213-3544-1-git-send-email-rjui@broadcom.com>
- <1421274213-3544-3-git-send-email-rjui@broadcom.com>
- <20150115084119.GN22880@pengutronix.de>
-Message-ID: <20150115120704.GB2549@katana>
+From: haokexin@gmail.com (Kevin Hao)
+Date: Thu, 15 Jan 2015 20:07:33 +0800
+Subject: [PATCH v2] arm64: kill off the libgcc dependency
+Message-ID: <1421323653-27214-1-git-send-email-haokexin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The arm64 kernel builds fine without the libgcc. Actually it should not
+be used at all in the kernel. The following are the reasons indicated
+by Russell King:
+  Although libgcc is part of the compiler, libgcc is built with the
+  expectation that it will be running in userland - it expects to link
+  to a libc.  That's why you can't build libgcc without having the glibc
+  headers around.
 
-> > +	iproc_i2c->msg = msg;
-> Can it happen that iproc_i2c->msg still holds an uncompleted message
-> here or is this serialized by the core? Wolfram? Either here something
+  For example, on ARM, libgcc.a may contain calls to __div0, and it may
+  provide its own __div0 implementation, which invokes various Linux
+  system calls.
 
-We have per-adapter locks serializing transfers, if you mean that?
+  Various functions reference _GLOBAL_OFFSET_TABLE_ which we don't want
+  to have in the kernel.
 
-> > +static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
-> > +{
-> > +	unsigned int bus_speed, speed_bit;
-> > +	u32 val;
-> > +	int ret = of_property_read_u32(iproc_i2c->device->of_node,
-> > +				       "clock-frequency", &bus_speed);
-> > +	if (ret < 0) {
-> > +		dev_err(iproc_i2c->device,
-> > +			"missing clock-frequency property\n");
-> > +		return -ENODEV;
-> Is a missing property the only situation where of_property_read_u32
-> returns an error? Would it be sane to default to 100 kHz?
+  Depending on how the compiler was built, libgcc.a may be built for
+  ARMv4, ARMv5, ARMv6 or ARMv7, and may not be appropriate for linking
+  with the kernel.  (Eg, you wouldn't want to try to link an ARMv7
+  libgcc.a in an ARMv5 kernel - and we /really/ don't want the mess
+  of having different toolchains for different ARM arch versions.)
 
-Default of 100kHz instead of -ENODEV sounds very reasonable.
+  It may also drag in the userspace exception unwind support.
 
-> > +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
-> > +{
-> > +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
-> > +
-> > +	i2c_del_adapter(&iproc_i2c->adapter);
-> You need to free the irq before i2c_del_adapter.
+  Meanwhile, having the kernel build the compiler support functions that
+  it needs ensures that (a) we know what compiler support functions are
+  being used, (b) we know the implementation of those support functions
+  are sane for use in the kernel, (c) we can build them with appropriate
+  compiler flags for best performance, and (d) we remove an unnecessary
+  dependency on the build toolchain.
 
-One could also keep using devm_request_irq and disable all interrupts
-sources here?
+Signed-off-by: Kevin Hao <haokexin@gmail.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+v2:
+  - Update the commit log.
+  - Add ack from Will.
 
-Thanks for the reviews, Uwe!
+ arch/arm64/Makefile | 3 ---
+ 1 file changed, 3 deletions(-)
 
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/a47a65af/attachment.sig>
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 1c43cec971b5..a20c28348be4 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -15,8 +15,6 @@ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
+ OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+ GZFLAGS		:=-9
+ 
+-LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
+-
+ KBUILD_DEFCONFIG := defconfig
+ 
+ KBUILD_CFLAGS	+= -mgeneral-regs-only
+@@ -50,7 +48,6 @@ core-$(CONFIG_KVM) += arch/arm64/kvm/
+ core-$(CONFIG_XEN) += arch/arm64/xen/
+ core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+-libs-y		+= $(LIBGCC)
+ libs-$(CONFIG_EFI_STUB) += drivers/firmware/efi/libstub/
+ 
+ # Default target when executing plain make
+-- 
+1.9.3
