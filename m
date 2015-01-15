@@ -1,60 +1,127 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 15 Jan 2015 11:38:40 +1100
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-Message-ID: <20150115113840.71ab0a39@canb.auug.org.au>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 14 Jan 2015 16:55:57 -0800
+Subject: [PATCHv0 2/3] rtc: Add support for Abracon
+ AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC chip
+In-Reply-To: <1ae63ab80cfb39305884bd0c2648a420ba3bc0a5.1421045942.git.arno@natisbad.org>
+References: <cover.1421045942.git.arno@natisbad.org>
+ <1ae63ab80cfb39305884bd0c2648a420ba3bc0a5.1421045942.git.arno@natisbad.org>
+Message-ID: <20150114165557.d44c5752.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, 12 Jan 2015 09:16:36 +0100 Arnaud Ebalard <arno@natisbad.org> wrote:
 
-Today's linux-next merge of the renesas tree got a conflict in
-arch/arm/boot/dts/Makefile between commit cb612390e546 ("ARM: dts: Only
-build dtb if associated Arch and/or SoC is enabled") from the arm-soc
-tree and commits 9ccba8abd0a7 ("ARM: shmobile: kzm9g: Build DTS for
-Multiplatform") and 93c9f0228a3d ("ARM: shmobile: kzm9g-reference:
-Remove board C code and DT file") from the renesas tree.
+> This patch adds support for Abracon AB-RTCMC-32.768kHz-B5ZE-S3
+> RTC/Calendar module w/ I2C interface.
+> 
+> This supports includes RTC time reading and setting, Alarm (1 minute
+> accuracy) reading and setting, and battery low detection. The device
+> also supports frequency adjustment and two timers but those features
+> are currently not implemented in this driver. Due to alarm accuracy
+> limitation (and current lack of timer support in the driver), UIE
+> mode is not supported.
+> 
+> ...
+>
+> +static int abb5zes3_probe(struct i2c_client *client,
+> +			  const struct i2c_device_id *id)
+> +{
+> +	struct device *dev = &client->dev;
+> +	struct abb5zes3_rtc_data *data;
+> +	struct regmap *regmap;
+> +	int ret;
+> +
+> +	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C |
+> +				     I2C_FUNC_SMBUS_BYTE_DATA |
+> +				     I2C_FUNC_SMBUS_I2C_BLOCK))
+> +		return -ENODEV;
+> +
+> +	regmap = devm_regmap_init_i2c(client, &abb5zes3_rtc_regmap_config);
+> +	if (IS_ERR(regmap)) {
+> +		ret = PTR_ERR(regmap);
+> +		dev_err(dev, "%s: regmap allocation failed: %d\n",
+> +			__func__, ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = abb5zes3_i2c_validate_chip(regmap);
+> +	if (ret)
+> +		return ret;
+> +
+> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	mutex_init(&data->lock);
+> +	data->regmap = regmap;
+> +	dev_set_drvdata(dev, data);
+> +
+> +	ret = abb5zes3_rtc_check_setup(dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (client->irq > 0) {
+> +		ret = devm_request_threaded_irq(dev, client->irq, NULL,
+> +						_abb5zes3_rtc_interrupt,
+> +						IRQF_SHARED|IRQF_ONESHOT,
+> +						DRV_NAME, client);
+> +		if (!ret) {
+> +			device_init_wakeup(dev, true);
+> +			data->irq = client->irq;
+> +			dev_dbg(dev, "%s: irq %d used by RTC\n", __func__,
+> +				client->irq);
+> +		} else {
+> +			dev_err(dev, "%s: irq %d unavailable (%d)\n",
+> +				__func__, client->irq, ret);
+> +		}
+> +	}
+> +
+> +	data->rtc = devm_rtc_device_register(dev, DRV_NAME, &rtc_ops,
+> +					     THIS_MODULE);
+> +	ret = PTR_ERR_OR_ZERO(data->rtc);
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+If devm_request_threaded_irq() returned an error, we just wiped that
+out here.  I'd suggest consistently adding a few "return ret;"
+statements in this function.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Something like this?
 
-diff --cc arch/arm/boot/dts/Makefile
-index 95fed8145ac9,be6e2607da88..000000000000
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@@ -466,10 -411,8 +466,9 @@@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += 
-  	r8a7778-bockw-reference.dtb \
-  	r8a7779-marzen.dtb \
-  	sh7372-mackerel.dtb \
-- 	sh73a0-kzm9g.dtb \
-- 	sh73a0-kzm9g-reference.dtb
-+ 	sh73a0-kzm9g.dtb
- -dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- +dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- +	emev2-kzm9d.dtb \
-  	r7s72100-genmai.dtb \
-  	r8a73a4-ape6evm.dtb \
-  	r8a7740-armadillo800eva.dtb \
-@@@ -477,9 -420,9 +476,10 @@@
-  	r8a7790-lager.dtb \
-  	r8a7791-henninger.dtb \
-  	r8a7791-koelsch.dtb \
-- 	r8a7794-alt.dtb
-+ 	r8a7794-alt.dtb \
-+ 	sh73a0-kzm9g.dtb
- -dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- +dtb-$(CONFIG_ARCH_SOCFPGA) += \
- +	socfpga_arria5_socdk.dtb \
-  	socfpga_arria10_socdk.dtb \
-  	socfpga_cyclone5_socdk.dtb \
-  	socfpga_cyclone5_sockit.dtb \
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/c8f91cb9/attachment.sig>
+--- a/drivers/rtc/rtc-ab-b5ze-s3.c~rtc-add-support-for-abracon-ab-rtcmc-32768khz-b5ze-s3-i2c-rtc-chip-fix
++++ a/drivers/rtc/rtc-ab-b5ze-s3.c
+@@ -695,6 +695,7 @@ static int abb5zes3_probe(struct i2c_cli
+ 		} else {
+ 			dev_err(dev, "%s: irq %d unavailable (%d)\n",
+ 				__func__, client->irq, ret);
++			return ret;
+ 		}
+ 	}
+ 
+@@ -704,7 +705,7 @@ static int abb5zes3_probe(struct i2c_cli
+ 	if (ret) {
+ 		dev_err(dev, "%s: unable to register RTC device (%d)\n",
+ 			__func__, ret);
+-		device_init_wakeup(dev, false);
++		goto err;
+ 	}
+ 
+ 	/*
+@@ -718,12 +719,17 @@ static int abb5zes3_probe(struct i2c_cli
+ 	/* Enable battery low detection interrupt if battery not already low */
+ 	if (!data->battery_low && data->irq) {
+ 		ret = _abb5zes3_rtc_battery_low_irq_enable(regmap, true);
+-		if (ret)
++		if (ret) {
+ 			dev_err(dev, "%s: enabling battery low interrupt "
+ 				"generation failed (%d)\n", __func__, ret);
++			goto err;
++		}
+ 	}
+ 
+ 	return ret;
++err:
++	device_init_wakeup(dev, false);
++	return ret;
+ }
+ 
+ static int abb5zes3_remove(struct i2c_client *client)
+_
