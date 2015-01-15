@@ -1,30 +1,18 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 18:23:19 +0100
-Subject: [PATCH v4 3/5] MAINTAINERS: Add the RTC driver for the Armada38x
-In-Reply-To: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421342601-20384-4-git-send-email-gregory.clement@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 Jan 2015 10:25:11 -0700
+Subject: [PATCH v2 02/11] ARM: tegra: Use the generated pinmux data
+In-Reply-To: <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <54B7F7F7.1020202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put it in the mvebu entry.
+On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
+> Google has submitted a board config for the pinmux programming of the
+> Nyan Big board. Use the whole of it as it's generated to make it easier
+> to update as the configuration gets fixed in the future.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddb9ac8d32b3..393f158a64e8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1157,6 +1157,7 @@ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-mvebu/
-+F:	drivers/rtc/armada38x-rtc
- 
- ARM/Marvell Berlin SoC support
- M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
--- 
-1.9.1
+Submitted to where? I assume you mean tegra-pinmux-scripts. I don't see 
+a Nyan/Nyan-big configuration there yet. IIRC (and I might not) one was 
+posted, but there were some review comments that aren't yet addressed?
