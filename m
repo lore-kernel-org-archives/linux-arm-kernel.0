@@ -1,32 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 18:23:21 +0100
-Subject: [PATCH v4 5/5] ARM: mvebu: enable Armada 38x RTC driver in
- mvebu_v7_defconfig
-In-Reply-To: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421342601-20384-6-git-send-email-gregory.clement@free-electrons.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Thu, 15 Jan 2015 18:24:29 +0100
+Subject: RFC on cpufreq implementation
+Message-ID: <54B7F7CD.7030903@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Armada 38x RTC driver has been pushed, let's enable it in
-mvebu_v7_defconfig.
+Hello,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+This is a follow-up to my previous thread.
+"How many frequencies would cpufreq optimally like to manage?"
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 627accea72fb..2400b9f52403 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -112,6 +112,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
-+CONFIG_RTC_DRV_ARMADA38X=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
- # CONFIG_IOMMU_SUPPORT is not set
--- 
-1.9.1
+As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
+based SoC (namely Tango4 from Sigma Designs). I'd like to get
+some feedback on the cpufreq driver I wrote for that platform.
+
+I decided to expose only a small subset of frequencies (namely
+{999,500,333,111} MHz) because, in my tests, the ondemand gov
+chose mostly min and max, and the intermediate frequencies not
+so much; so I figured "2 intermediate freqs" is good enough.
+(I'm ready to hear otherwise.)
+
+I tried to use as much generic framework as possible, but I've
+read about the clk framework, and it looks to be an even greater
+generalization. Are new platforms encouraged to use that, rather
+than provide a cpufreq driver? Does it work when voltage scaling
+comes in play? (This SoC doesn't have it, but the next will.)
+
+I'm also wondering how cpufreq and cpuidle interact? Is one a
+subset of the other? Are they orthogonal?
+
+Regards.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: cpufreq.c
+Type: text/x-csrc
+Size: 2317 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/f2c475b8/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: temp.h
+Type: text/x-chdr
+Size: 466 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/f2c475b8/attachment-0001.bin>
