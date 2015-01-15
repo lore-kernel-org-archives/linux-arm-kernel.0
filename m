@@ -1,213 +1,244 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 23:16:45 +0100
-Subject: [PATCH 1/5] ARM: at91: switch to multiplatform
+Date: Thu, 15 Jan 2015 23:16:47 +0100
+Subject: [PATCH 3/5] ARM: at91: remove unused uncompress.h
 In-Reply-To: <1421360209-15852-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421360209-15852-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421360209-15852-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421360209-15852-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch AT91 to multiplatform as all SoCs are properly handled.
+Following the switch to multiplatform, uncompress.h is not used anymore. Remove
+it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/Kconfig            |  13 -----
- arch/arm/mach-at91/Kconfig  | 114 +++++++++++++++++++++++---------------------
- arch/arm/mach-at91/Makefile |   2 +
- 3 files changed, 62 insertions(+), 67 deletions(-)
+ arch/arm/mach-at91/include/mach/uncompress.h | 218 ---------------------------
+ 1 file changed, 218 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/uncompress.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 97d07ed60a0b..178266237422 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -354,19 +354,6 @@ config ARCH_VERSATILE
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
--config ARCH_AT91
--	bool "Atmel AT91"
--	select ARCH_REQUIRE_GPIOLIB
--	select CLKDEV_LOOKUP
--	select IRQ_DOMAIN
--	select NEED_MACH_IO_H if PCCARD
--	select PINCTRL
--	select PINCTRL_AT91
--	select USE_OF
--	help
--	  This enables support for systems based on Atmel
--	  AT91RM9200, AT91SAM9 and SAMA5 processors.
+diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
+deleted file mode 100644
+index 4ebb609369e3..000000000000
+--- a/arch/arm/mach-at91/include/mach/uncompress.h
++++ /dev/null
+@@ -1,218 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/uncompress.h
+- *
+- * Copyright (C) 2003 SAN People
+- * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
 -
- config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c6740e359a44..f787e9a320bc 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -1,51 +1,19 @@
--if ARCH_AT91
+-#ifndef __ASM_ARCH_UNCOMPRESS_H
+-#define __ASM_ARCH_UNCOMPRESS_H
 -
--config HAVE_AT91_UTMI
--	bool
+-#include <linux/io.h>
+-#include <linux/atmel_serial.h>
+-#include <mach/hardware.h>
 -
--config HAVE_AT91_USB_CLK
--	bool
+-#include <mach/at91_dbgu.h>
+-#include <mach/cpu.h>
 -
--config COMMON_CLK_AT91
--	bool
--	select COMMON_CLK
+-void __iomem *at91_uart;
 -
--config HAVE_AT91_SMD
--	bool
+-static const u32 uarts_rm9200[] = {
+-	AT91_BASE_DBGU0,
+-	AT91RM9200_BASE_US0,
+-	AT91RM9200_BASE_US1,
+-	AT91RM9200_BASE_US2,
+-	AT91RM9200_BASE_US3,
+-	0,
+-};
 -
--config HAVE_AT91_H32MX
--	bool
+-static const u32 uarts_sam9260[] = {
+-	AT91_BASE_DBGU0,
+-	AT91SAM9260_BASE_US0,
+-	AT91SAM9260_BASE_US1,
+-	AT91SAM9260_BASE_US2,
+-	AT91SAM9260_BASE_US3,
+-	AT91SAM9260_BASE_US4,
+-	AT91SAM9260_BASE_US5,
+-	0,
+-};
 -
--config SOC_SAMA5
-+config ARCH_AT91
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+	select IRQ_DOMAIN
-+	select NEED_MACH_IO_H if PCCARD
-+	select PINCTRL
-+	select PINCTRL_AT91
-+	select USE_OF
- 	bool
--	select ATMEL_AIC5_IRQ
--	select COMMON_CLK_AT91
--	select CPU_V7
--	select GENERIC_CLOCKEVENTS
--	select MEMORY
--	select ATMEL_SDRAMC
--	select PHYLIB if NETDEVICES
+-static const u32 uarts_sam9261[] = {
+-	AT91_BASE_DBGU0,
+-	AT91SAM9261_BASE_US0,
+-	AT91SAM9261_BASE_US1,
+-	AT91SAM9261_BASE_US2,
+-	0,
+-};
 -
--menu "Atmel AT91 System-on-Chip"
- 
--choice
+-static const u32 uarts_sam9263[] = {
+-	AT91_BASE_DBGU1,
+-	AT91SAM9263_BASE_US0,
+-	AT91SAM9263_BASE_US1,
+-	AT91SAM9263_BASE_US2,
+-	0,
+-};
 -
--	prompt "Core type"
+-static const u32 uarts_sam9g45[] = {
+-	AT91_BASE_DBGU1,
+-	AT91SAM9G45_BASE_US0,
+-	AT91SAM9G45_BASE_US1,
+-	AT91SAM9G45_BASE_US2,
+-	AT91SAM9G45_BASE_US3,
+-	0,
+-};
 -
--config SOC_SAM_V4_V5
--	bool "ARM9 AT91SAM9/AT91RM9200"
-+menuconfig SOC_SAM_V7
-+	bool "Atmel SAMA5" if ARCH_MULTI_V7
-+	select ARCH_AT91
- 	help
--	  Select this if you are using one of Atmel's AT91SAM9 or
--	  AT91RM9200 SoC.
+-static const u32 uarts_sam9rl[] = {
+-	AT91_BASE_DBGU0,
+-	AT91SAM9RL_BASE_US0,
+-	AT91SAM9RL_BASE_US1,
+-	AT91SAM9RL_BASE_US2,
+-	AT91SAM9RL_BASE_US3,
+-	0,
+-};
 -
--config SOC_SAM_V7
--	bool "Cortex A5"
--	help
--	  Select this if you are using one of Atmel's SAMA5D3 SoC.
+-static const u32 uarts_sam9x5[] = {
+-	AT91_BASE_DBGU0,
+-	AT91SAM9X5_BASE_USART0,
+-	AT91SAM9X5_BASE_USART1,
+-	AT91SAM9X5_BASE_USART2,
+-	0,
+-};
 -
--endchoice
+-static const u32 uarts_sama5d3[] = {
+-	AT91_BASE_DBGU1,
+-	SAMA5D3_BASE_USART0,
+-	SAMA5D3_BASE_USART1,
+-	SAMA5D3_BASE_USART2,
+-	SAMA5D3_BASE_USART3,
+-	0,
+-};
 -
--comment "Atmel AT91 Processor"
-+	  This enables support for systems based on Atmel
-+	  SAMA5D3 or SAMA5D4 SoCs.
- 
- if SOC_SAM_V7
- config SOC_SAMA5D3
-@@ -72,11 +40,19 @@ config SOC_SAMA5D4
- 	select HAVE_AT91_H32MX
- 	help
- 	  Select this if you are using one of Atmel's SAMA5D4 family SoC.
--endif
-+endif # SOC_SAM_V7
-+
-+
-+menuconfig SOC_SAM_V4_V5
-+	bool "Atmel ARM9 AT91SAM9/AT91RM9200" if ARCH_MULTI_V4_V5
-+	select ARCH_AT91
-+	help
-+	  Select this if you are using one of Atmel's AT91SAM9 or
-+	  AT91RM9200 SoC.
- 
- if SOC_SAM_V4_V5
- config SOC_AT91RM9200
--	bool "AT91RM9200"
-+	bool "AT91RM9200" if ARCH_MULTI_V4T
- 	select ATMEL_AIC_IRQ
- 	select COMMON_CLK_AT91
- 	select CPU_ARM920T
-@@ -84,7 +60,7 @@ config SOC_AT91RM9200
- 	select HAVE_AT91_USB_CLK
- 
- config SOC_AT91SAM9
--	bool "AT91SAM9"
-+	bool "AT91SAM9" if ARCH_MULTI_V5
- 	select ATMEL_AIC_IRQ
- 	select ATMEL_SDRAMC
- 	select COMMON_CLK_AT91
-@@ -115,6 +91,36 @@ config SOC_AT91SAM9
- 	    AT91SAM9XE
- endif # SOC_SAM_V4_V5
- 
-+if ARCH_AT91
-+
-+config HAVE_AT91_UTMI
-+	bool
-+
-+config HAVE_AT91_USB_CLK
-+	bool
-+
-+config COMMON_CLK_AT91
-+	bool
-+	select COMMON_CLK
-+
-+config HAVE_AT91_SMD
-+	bool
-+
-+config HAVE_AT91_H32MX
-+	bool
-+
-+config SOC_SAMA5
-+	bool
-+	select ATMEL_AIC5_IRQ
-+	select COMMON_CLK_AT91
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select MEMORY
-+	select ATMEL_SDRAMC
-+	select PHYLIB if NETDEVICES
-+
-+menu "Atmel AT91 common options"
-+
- comment "AT91 Feature Selections"
- 
- config AT91_SLOW_CLOCK
-@@ -132,12 +138,12 @@ config AT91_SLOW_CLOCK
- 	  need to be completely re-initialized.
- 
- config AT91_TIMER_HZ
--       int "Kernel HZ (jiffies per second)"
--       range 32 1024
--       depends on ARCH_AT91
--       default "128" if SOC_AT91RM9200
--       default "100"
--       help
-+	int "Kernel HZ (jiffies per second)"
-+	range 32 1024
-+	depends on ARCH_AT91
-+	default "128" if SOC_AT91RM9200
-+	default "100"
-+	help
- 	  On AT91rm9200 chips where you're using a system clock derived
- 	  from the 32768 Hz hardware clock, this tick rate should divide
- 	  it exactly: use a power-of-two value, such as 128 or 256, to
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index be26bb8c9a9a..a6a02f3c3219 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -1,6 +1,8 @@
- #
- # Makefile for the linux kernel.
- #
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
-+asflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
- 
- obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
- 
+-static const u32 uarts_sama5d4[] = {
+-	AT91_BASE_DBGU2,
+-	SAMA5D4_BASE_USART3,
+-	0,
+-};
+-
+-static inline const u32* decomp_soc_detect(void __iomem *dbgu_base)
+-{
+-	u32 cidr, socid;
+-
+-	cidr = __raw_readl(dbgu_base + AT91_DBGU_CIDR);
+-	socid = cidr & ~AT91_CIDR_VERSION;
+-
+-	switch (socid) {
+-	case ARCH_ID_AT91RM9200:
+-		return uarts_rm9200;
+-
+-	case ARCH_ID_AT91SAM9G20:
+-	case ARCH_ID_AT91SAM9260:
+-		return uarts_sam9260;
+-
+-	case ARCH_ID_AT91SAM9261:
+-		return uarts_sam9261;
+-
+-	case ARCH_ID_AT91SAM9263:
+-		return uarts_sam9263;
+-
+-	case ARCH_ID_AT91SAM9G45:
+-		return uarts_sam9g45;
+-
+-	case ARCH_ID_AT91SAM9RL64:
+-		return uarts_sam9rl;
+-
+-	case ARCH_ID_AT91SAM9N12:
+-	case ARCH_ID_AT91SAM9X5:
+-		return uarts_sam9x5;
+-
+-	case ARCH_ID_SAMA5:
+-		cidr = __raw_readl(dbgu_base + AT91_DBGU_EXID);
+-		if (cidr & ARCH_EXID_SAMA5D3)
+-			return uarts_sama5d3;
+-		else if (cidr & ARCH_EXID_SAMA5D4)
+-			return uarts_sama5d4;
+-
+-		break;
+-	}
+-
+-	/* at91sam9g10 */
+-	if ((cidr & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
+-		return uarts_sam9261;
+-	}
+-	/* at91sam9xe */
+-	else if ((cidr & AT91_CIDR_ARCH) == ARCH_FAMILY_AT91SAM9XE) {
+-		return uarts_sam9260;
+-	}
+-
+-	return NULL;
+-}
+-
+-static inline void arch_decomp_setup(void)
+-{
+-	int i = 0;
+-	const u32* usarts;
+-
+-	usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU0);
+-	if (!usarts)
+-		usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU1);
+-	if (!usarts)
+-		usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU2);
+-	if (!usarts) {
+-		at91_uart = NULL;
+-		return;
+-	}
+-
+-	do {
+-		/* physical address */
+-		at91_uart = (void __iomem *)usarts[i];
+-
+-		if (__raw_readl(at91_uart + ATMEL_US_BRGR))
+-			return;
+-		i++;
+-	} while (usarts[i]);
+-
+-	at91_uart = NULL;
+-}
+-
+-/*
+- * The following code assumes the serial port has already been
+- * initialized by the bootloader.  If you didn't setup a port in
+- * your bootloader then nothing will appear (which might be desired).
+- *
+- * This does not append a newline
+- */
+-static void putc(int c)
+-{
+-	if (!at91_uart)
+-		return;
+-
+-	while (!(__raw_readl(at91_uart + ATMEL_US_CSR) & ATMEL_US_TXRDY))
+-		barrier();
+-	__raw_writel(c, at91_uart + ATMEL_US_THR);
+-}
+-
+-static inline void flush(void)
+-{
+-	if (!at91_uart)
+-		return;
+-
+-	/* wait for transmission to complete */
+-	while (!(__raw_readl(at91_uart + ATMEL_US_CSR) & ATMEL_US_TXEMPTY))
+-		barrier();
+-}
+-
+-#endif
 -- 
 2.1.0
