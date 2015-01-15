@@ -1,30 +1,34 @@
 From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 15 Jan 2015 12:47:03 -0600
-Subject: [PATCH v7 07/17] ARM64 / ACPI: Disable ACPI if FADT revision
- is less than 5.1
-In-Reply-To: <1421247905-3749-8-git-send-email-hanjun.guo@linaro.org>
+Date: Thu, 15 Jan 2015 12:47:23 -0600
+Subject: [PATCH v7 08/17] ARM64 / ACPI: Get PSCI flags in FADT for PSCI
+ init
+In-Reply-To: <1421247905-3749-9-git-send-email-hanjun.guo@linaro.org>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54B80B27.2050605@redhat.com>
+ <1421247905-3749-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <54B80B3B.8060303@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/14/2015 09:04 AM, Hanjun Guo wrote:
-> FADT Major.Minor version was introduced in ACPI 5.1, it is the same
-> as ACPI version.
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 >
-> In ACPI 5.1, some major gaps are fixed for ARM, such as updates in
-> MADT table for GIC and SMP init, without those updates, we can not
-> get the MPIDR for SMP init, and GICv2/3 related init information, so
-> we can't boot arm64 ACPI properly with table versions predating 5.1.
+> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+> the former signals to the OS that the firmware is PSCI compliant.
+> The latter selects the appropriate conduit for PSCI calls by
+> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+> (SMC).
 >
-> If firmware provides ACPI tables with ACPI version less than 5.1,
-> OS will be messed up with those information and have no way to init
-> smp and GIC, so disable ACPI if we get an FADT table with version
-> less that 5.1.
+> FADT table contains such information in ACPI 5.1, FADT table was
+> parsed in ACPI table init and copy to struct acpi_gbl_FADT, so
+> use the flags in struct acpi_gbl_FADT for PSCI init.
+>
+> Since ACPI 5.1 doesn't support self defined PSCI function IDs,
+> which means that only PSCI 0.2+ is supported in ACPI.
 >
 > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
 Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
