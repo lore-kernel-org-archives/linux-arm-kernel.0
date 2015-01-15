@@ -1,33 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 14 Jan 2015 17:29:49 -0800
-Subject: [PATCH] arm: mach-versatile: core: Remove unused function
-In-Reply-To: <CACRpkdan1BZQnYgTdF9ctbLOPNoDwDX3Epy8Xfttd2v4-G-4Lw@mail.gmail.com>
-References: <1420303959-12898-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
- <CACRpkdan1BZQnYgTdF9ctbLOPNoDwDX3Epy8Xfttd2v4-G-4Lw@mail.gmail.com>
-Message-ID: <20150115012949.GF32756@quad.lixom.net>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 15 Jan 2015 05:45:08 +0400
+Subject: [PATCH v2 2/3] usb: phy: add lubbock phy driver
+In-Reply-To: <54B4B6F2.9040404@ti.com>
+References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
+ <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
+ <20150108165834.GH31926@saruman>
+ <CALT56yOaX0EQbbFSXiFK=uqSpCwv4pQsU4QFMSmSoTstq2d7zw@mail.gmail.com>
+ <20150112215159.GM2858@saruman> <54B4B6F2.9040404@ti.com>
+Message-ID: <CALT56yO343mP2tDjC+GkV6uLUYdf2npnneNEK_UHuJJXD16gKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 12:53:07PM +0100, Linus Walleij wrote:
-> On Sat, Jan 3, 2015 at 5:52 PM, Rickard Strandqvist
-> <rickard_strandqvist@spectrumdigital.se> wrote:
-> 
-> > Remove the function versatile_leds_event() that is not used anywhere.
-> >
-> > This was partially found by using a static code analysis program called cppcheck.
-> >
-> > Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
-> 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> That's right, the code was made redundant in
-> commit e031cd513ec2ff661465dc1198220075719e72d1
-> "ARM: mach-realview and mach-versatile: retire custom LED code"
-> 
-> ARM SoC folks: I suggest you apply this patch directly to your cleanup
-> branch.
+Hello,
 
-Thanks, applied with a minor tweak to the patch subject.
+2015-01-13 9:10 GMT+03:00 Kishon Vijay Abraham I <kishon@ti.com>:
+> Hi,
+>
+> On Tuesday 13 January 2015 03:21 AM, Felipe Balbi wrote:
+>> On Sun, Jan 11, 2015 at 10:44:59PM +0400, Dmitry Eremin-Solenikov wrote:
+>>> Hello,
+>>>
+>>> 2015-01-08 19:58 GMT+03:00 Felipe Balbi <balbi@ti.com>:
+>>>> On Sun, Nov 30, 2014 at 01:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
+>>>>> Extract lubbock-specific code from pxa25x_udc driver. As a bonus, phy
+>>>>> driver determines connector/VBUS status by reading CPLD register. Also
+>>>>> it uses a work to call into udc stack, instead of pinging vbus session
+>>>>> right from irq handler.
+>>>>>
+>>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>>> ---
+>>>>>  drivers/usb/phy/Kconfig       |  10 ++
+>>>>>  drivers/usb/phy/Makefile      |   1 +
+>>>>
+>>>> new phy drivers under drivers/phy only, sorry.
+>>>
+>>> Hmm. How do drivers/phy drivers coordinate with usb gadget subsystem?
+>>> I see none of them calling usb_gadget_vbus_connect/disconnect().
+>>
+>> I'll leave that to Kishon, since he wrote drivers/phy. Kishon, any
+>> hints?
+>
+> Extcon framework can be used to detect the connector status. So the PHY driver
+> should register with the extcon framework if it has the capability to determine
+> the connector status and the gadget driver should register with the extcon
+> framework if it has to receive the connector status.
 
+If I understand correctly, this means the whole usb gadget/otg subsystem needs
+to be redesigned/refactored to support extconn drivers. Is it planned already?
+Can we still submit drivers to an old usb-phy subsystem as 'new phy' subsystem
+does not provide us necessary integration with usb-gadget subsystem?
 
--Olof
+>
+> I'm not sure if we should be adding these extcon APIs inside the PHY framework
+> itself as all PHYs might not have the capability to detect the connector status.
+
+In fact I have several devices for which I had to implement a simple usb-phy
+that is able to control D+ pullup, but isn't able to detect VBUS presense
+and thus has to assume that the device is always connected.
+
+-- 
+With best wishes
+Dmitry
