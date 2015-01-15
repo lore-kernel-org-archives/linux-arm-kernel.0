@@ -1,19 +1,37 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 15 Jan 2015 19:33:20 +0100
-Subject: [PATCH] ARM: SAMSUNG: remove unused DMA infrastructure
-In-Reply-To: <2398692.KpvgzHd6no@wuerfel>
-References: <2398692.KpvgzHd6no@wuerfel>
-Message-ID: <1857858.copsapeGJt@phil>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 15 Jan 2015 18:35:03 +0000
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <1421136128.27675.58.camel@mtksdaap41>
+References: <cover.1421086706.git.robin.murphy@arm.com>
+ <1421136128.27675.58.camel@mtksdaap41>
+Message-ID: <54B80857.7060407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 15. Januar 2015, 16:16:03 schrieb Arnd Bergmann:
-> Everything uses dmaengine now, so there is no reason to
-> keep this around any longer. Thanks to everyone who was involved
-> in moving the users over to use the dmaengine APIs.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 13/01/15 08:02, Yingjoe Chen wrote:
+> On Mon, 2015-01-12 at 20:48 +0000, Robin Murphy wrote:
+>> Hi all,
+>>
+>> Whilst it's a long way off perfect, this has reached the point of being
+>> functional and stable enough to be useful, so here it is. The core
+>> consists of the meat of the arch/arm implementation modified to remove
+>> the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
+>> allocator instead of the bitmap-based one. For that, this series depends
+>> on my "Genericise the IOVA allocator" series posted earlier[1].
+>
+> Hi Robin,
+>
+> We'd to give it a try. Do you have a public git tree contains both
+> series?
+>
+> Joe.C
 
-very nice to see this finished :-)
+Now that the server seems to be properly accessible again, I've made a 
+branch with both series available here:
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+   git://linux-arm.org/linux-rm iommu/dma
+
+Note that in the current state it also depends on having the ARM SMMU 
+driver selected in the config, due to an oversight on my part :(
+
+Robin.
