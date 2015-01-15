@@ -1,43 +1,27 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 15 Jan 2015 17:12:21 +0100
-Subject: [PATCH v2 09/11] ARM: tegra: Use pwrseq-simple for the wifi in Nyan
-In-Reply-To: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1421338359-27467-10-git-send-email-tomeu.vizoso@collabora.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Jan 2015 17:16:01 +0100
+Subject: [PATCH v2 RESEND 2/3] Documentation: gpio: Add APM X-Gene standby
+ GPIO controller DTS binding
+In-Reply-To: <CAL4ahLfcMsu2i2efiwq96a3YD4dChBEuJeEnQ7tsZH6et8H=sw@mail.gmail.com>
+References: <1418793050-26927-1-git-send-email-yvo@apm.com>
+ <1418793050-26927-3-git-send-email-yvo@apm.com>
+ <CACRpkdbcdf7Ub9uYbeqUe1La1dnVeWCxK8N7=iVZuBtuKHFHFA@mail.gmail.com>
+ <CAL4ahLfcMsu2i2efiwq96a3YD4dChBEuJeEnQ7tsZH6et8H=sw@mail.gmail.com>
+Message-ID: <CACRpkdaQWf6jOFkX1Lq0NWm_wfxw1NuajOwpJwA5_sZ8CdAa4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nyan boards have a Marvell 88w8897 wifi card connected through SDIO
-that need the reset line to be hold active for several milliseconds.
+On Tue, Jan 13, 2015 at 10:41 AM, Y Vo <yvo@apm.com> wrote:
+> Yes, exactly 6 interrupts. As I describe before:
+> - There are 22 GPIO_DSs.
+> - Only 6 GPIO_DSs from 0x08..0xD which supports interrupts
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- arch/arm/boot/dts/tegra124-nyan.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+What I'm saying is that you need to describe this in the binding
+document itself.
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index 25bbcbe..dbaf261f 100644
---- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-+++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -365,11 +365,19 @@
- 		status = "okay";
- 	};
- 
-+	sdhci0_pwrseq: sdhci0_pwrseq {
-+		compatible = "mmc,pwrseq-simple";
-+
-+                reset-gpios = <&gpio TEGRA_GPIO(X, 7) GPIO_ACTIVE_LOW>;
-+                delay = <20>; /* ms */
-+	};
-+
- 	sdhci at 0,700b0000 { /* WiFi/BT on this bus */
- 		status = "okay";
- 		bus-width = <4>;
- 		no-1-8-v;
- 		non-removable;
-+		mmc-pwrseq = <&sdhci0_pwrseq>;
- 	};
- 
- 	sdhci at 0,700b0400 { /* SD Card on this bus */
--- 
-1.9.3
+If you described it somewhere else doesn't count.
+
+So update the patch.
+
+Yours,
+Linus Walleij
