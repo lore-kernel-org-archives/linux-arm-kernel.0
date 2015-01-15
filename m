@@ -1,91 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 15 Jan 2015 10:52:59 +0100
-Subject: [PATCH v3 2/7] ARM: Exynos: add support for sub-power domains
-In-Reply-To: <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
-References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
- <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54B78DFB.9010305@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Jan 2015 10:53:46 +0100
+Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
+References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
+ <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1456101.oYxGUWa027@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello All,
-
-I'm sorry for missing some CC: in this patch, when I posted v3 to 
-mailing list.
-It looks that CC: lines got lost after git am + git format-patch.
-
-Ulf, could you also ack this patch, so Kukjin can finally merge the whole
-series to Samsung kernel tree?
-
-
-On 2015-01-14 14:44, Marek Szyprowski wrote:
-> This patch adds support for making one power domain a sub-domain of
-> other domain. This is useful for modeling power dependences for devices
-> like TV Mixer or Camera ISP, which needs to have more than one power
-> domain enabled to be operational.
->
-> Based on previous work by Amit Daniel Kachhap <amit.daniel@samsung.com>.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->   .../bindings/arm/exynos/power_domain.txt           |  2 ++
->   arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++++++++++++++
->   2 files changed, 30 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> index f4445e5..1e09703 100644
-> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> @@ -22,6 +22,8 @@ Optional Properties:
->   	- pclkN, clkN: Pairs of parent of input clock and input clock to the
->   		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
->   		are supported currently.
-> +- power-domains: phandle pointing to the parent power domain, for more details
-> +		 see Documentation/devicetree/bindings/power/power_domain.txt
->   
->   Node of a device using power domains must have a power-domains property
->   defined with a phandle to respective power domain.
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 20f2671..37266a8 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -161,6 +161,34 @@ no_clk:
->   		of_genpd_add_provider_simple(np, &pd->pd);
->   	}
->   
-> +	/* Assign the child power domains to their parents */
-> +	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
-> +		struct generic_pm_domain *child_domain, *parent_domain;
-> +		struct of_phandle_args args;
+On Wednesday 14 January 2015 14:34:14 Ding Tianhong wrote:
+> +static int hip04_set_coalesce(struct net_device *netdev,
+> +                             struct ethtool_coalesce *ec)
+> +{
+> +       struct hip04_priv *priv = netdev_priv(netdev);
 > +
-> +		args.np = np;
-> +		args.args_count = 0;
-> +		child_domain = of_genpd_get_from_provider(&args);
-> +		if (!child_domain)
-> +			continue;
+> +       /* Check not supported parameters  */
+> +       if ((ec->rx_max_coalesced_frames) || (ec->rx_coalesce_usecs_irq) ||
+> +           (ec->rx_max_coalesced_frames_irq) || (ec->tx_coalesce_usecs_irq) ||
+> +           (ec->use_adaptive_rx_coalesce) || (ec->use_adaptive_tx_coalesce) ||
+> +           (ec->pkt_rate_low) || (ec->rx_coalesce_usecs_low) ||
+> +           (ec->rx_max_coalesced_frames_low) || (ec->tx_coalesce_usecs_high) ||
+> +           (ec->tx_max_coalesced_frames_low) || (ec->pkt_rate_high) ||
+> +           (ec->tx_coalesce_usecs_low) || (ec->rx_coalesce_usecs_high) ||
+> +           (ec->rx_max_coalesced_frames_high) || (ec->rx_coalesce_usecs) ||
+> +           (ec->tx_max_coalesced_frames_irq) ||
+> +           (ec->stats_block_coalesce_usecs) ||
+> +           (ec->tx_max_coalesced_frames_high) || (ec->rate_sample_interval))
+> +               return -EOPNOTSUPP;
 > +
-> +		if (of_parse_phandle_with_args(np, "power-domains",
-> +					 "#power-domain-cells", 0, &args) != 0)
-> +			continue;
+> +       if ((ec->tx_coalesce_usecs > HIP04_MAX_TX_COALESCE_USECS ||
+> +            ec->tx_coalesce_usecs < HIP04_MIN_TX_COALESCE_USECS) ||
+> +           (ec->tx_max_coalesced_frames > HIP04_MAX_TX_COALESCE_FRAMES ||
+> +            ec->tx_max_coalesced_frames < HIP04_MIN_TX_COALESCE_FRAMES))
+> +               return -EINVAL;
 > +
-> +		parent_domain = of_genpd_get_from_provider(&args);
-> +		if (!parent_domain)
-> +			continue;
+> +       priv->tx_coalesce_usecs = ec->tx_coalesce_usecs;
+> +       priv->tx_coalesce_frames = ec->tx_max_coalesced_frames;
 > +
-> +		if (pm_genpd_add_subdomain(parent_domain, child_domain))
-> +			pr_warn("%s failed to add subdomain: %s\n",
-> +				parent_domain->name, child_domain->name);
-> +		else
-> +			pr_info("%s has as child subdomain: %s.\n",
-> +				parent_domain->name, child_domain->name);
-> +		of_node_put(np);
-> +	}
-> +
->   	return 0;
->   }
->   arch_initcall(exynos4_pm_init_power_domain);
+> +       return 0;
+> +}
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+I just looked at this again and noticed that you fail to actually use the
+tx_coalesce_usecs value anywhere, since you don't call hrtimer_set_expires_range()
+any more.
+
+Also, I guess it would be nice use the rx_coalesce_usecs_low and
+tx_coalesce_usecs_high numbers instead of just a single number, as
+hrtimer_set_expires_range takes two values already. Just do something
+like 
+
+	hrtimer_set_expires_range(&priv->tx_coalesce_timer,
+				   priv->rx_coalesce_usecs_low,
+				   priv->rx_coalesce_usecs_high -
+				   priv->rx_coalesce_usecs_low);
+
+and make sure the 'low' value is smaller than the 'high' one.
+
+> +       priv->tx_coalesce_frames = TX_DESC_NUM * 3 / 4;
+> +       priv->tx_coalesce_usecs = 200;
+
+Related, instead of putting the raw numbers here, how about
+adding the defaults along with the other macros we talked about:
+
+#define HIP04_MAX_TX_COALESCE_USECS		10000
+#define HIP04_MIN_TX_COALESCE_USECS		1
+#define HIP04_MAX_TX_COALESCE_FRAMES		(TX_DESC_NUM - 1)
+#define HIP04_MIN_TX_COALESCE_FRAMES		1
+
+#define HIP04_DEFAULT_TX_COALESCE_USECS_LOW	80
+#define HIP04_DEFAULT_TX_COALESCE_USECS_HIGH	200
+#define HIP04_DEFAULT_TX_COALESCE_FRAMES	(TX_DESC_NUM / 2)
+
+	Arnd
