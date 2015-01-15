@@ -1,27 +1,57 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 15 Jan 2015 15:24:33 +0100
-Subject: [PATCH 3/4] clk: samsung: exynos7: add clocks for audio block
-In-Reply-To: <CAAgF-Bf-p7idwX+C+Z56AaRKrHA=2yn5eZiQKJAYU3mq-ej=uw@mail.gmail.com>
-References: <1418995427-7712-1-git-send-email-padma.v@samsung.com>
- <1418995427-7712-4-git-send-email-padma.v@samsung.com>
- <CAFp+6iEJ48tbec7VqWYmdN-Zb-7zB+xUWaECd5EFZO1eMxEpVA@mail.gmail.com>
- <CAAgF-Bf-p7idwX+C+Z56AaRKrHA=2yn5eZiQKJAYU3mq-ej=uw@mail.gmail.com>
-Message-ID: <54B7CDA1.2050504@samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 15 Jan 2015 15:25:36 +0100
+Subject: [PATCH 0/4] Drop legacy support for omap3517
+In-Reply-To: <20150113204219.GJ2419@atomide.com>
+References: <1421171865-5209-1-git-send-email-tony@atomide.com>
+ <10549142.7lWnPtPtZG@wuerfel> <20150113204219.GJ2419@atomide.com>
+Message-ID: <20150115142536.GC512@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 15/01/15 06:49, Padma Venkat wrote:
-> I posted patches after re-basing on your tree and after incorporating
-> all comments from Vivek.
-> Below is the link
-> http://www.spinics.net/lists/linux-samsung-soc/msg40992.html
+On Tue, Jan 13, 2015 at 12:42:20PM -0800, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [150113 12:27]:
+> > On Tuesday 13 January 2015 09:57:41 Tony Lindgren wrote:
+> > > 
+> > > It seems we can now drop omap3517 legacy booting support to get
+> > > a bit closer to making all of omap3 boot in device tree only mode.
+> > > 
+> > > All these boards have at least minimal support for booting with
+> > > device tree, and pretty much anything supported with the legacy
+> > > board files can be configured also for device tree based booting
+> > > if not done already.
+> > 
+> > Ah, very nice.
+> > 
+> > Just out of curiosity, what are the remaining showstoppers for
+> > the 3430 and 3530 based boards?
 > 
-> Can you pick the patches?
+> Not much really. We're now printing a warning to get a people to
+> upgrade their systems. So with some boards we need to wait a while.
+> 
+> Then here are the remaining items that I'm aware of:
+> 
+> - A regression at least on some n900 with appended DTB not booting
+>   properly any longer reported by Pali
+> 
+> - A regression where the legacy ATAGs don't seem to get properly
+>   translated by the uncompress code for atag_rev at least reported
+>   by Pali
+> 
+> - A few missing .dts files for devkit8000, omap3logic, omap3stalker,
+>   omap3pandora and omap3touchbook
+> 
+> Pali and Sebastian probably know best of any other remaining
+> issues to drop n900 legacy booting.
 
-Sure, I'm not forgetting it. I've updated the exynos7 branch with your
-v2 patches.
+Apart from the bugs there is only one feature-wise regression when
+the system is booted via DT, which is the accelerometer. I will
+(re)send patches for that in the next days.
 
-Thanks!
-Sylwester
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/86546acf/attachment.sig>
