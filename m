@@ -1,90 +1,87 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 15 Jan 2015 10:50:50 +0900
-Subject: [PATCH v4 2/9] devfreq: exynos: Add documentation for generic exynos
- memory bus frequency driver
+Date: Thu, 15 Jan 2015 10:50:53 +0900
+Subject: [PATCH v4 5/9] ARM: dts: Add memory bus node for Exynos4x12
 In-Reply-To: <1421286657-4720-1-git-send-email-cw00.choi@samsung.com>
 References: <1421286657-4720-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1421286657-4720-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1421286657-4720-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation for generic exynos memory bus frequency
-driver.
+This patch adds the memory bus node for Exynos4x12 SoC. Exynos4x12 SoC has
+two memory bus to translate data between DRAM and eMMC/sub-IPs.
 
-Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Following list specifies the detailed relation between memory bus clock and DMC
+IP in MIF (Memory Interface) block:
+- DMC/ACP clock : DMC (Dynamic Memory Controller)
+
+Following list specifies the detailed relation between memory bus clock and
+sub-IPs in INT (Internal) block:
+- ACLK100 clock : PERIL/PERIR/MFC(PCLK)
+- ACLK160 clock : CAM/TV/LCD
+- ACLK133 clock : FSYS
+- GDL/GDR clock : leftbus/rightbus
+- SCLK_MFC clock : MFC
+
 Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Acked-by: Myungjoo Ham <myungjoo.ham@samsung.com>
 ---
- .../devicetree/bindings/devfreq/exynos-bus.txt     | 188 +++++++++++++++++++++
- 1 file changed, 188 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+ arch/arm/boot/dts/exynos4x12.dtsi | 121 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 121 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-new file mode 100644
-index 0000000..6323dcf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-@@ -0,0 +1,188 @@
-+
-+* Generic Exynos Memory Bus device
-+
-+The Samsung Exynos SoCs have many memory buses for data transfer between DRAM
-+memory and MMC/sub-IP in SoC. Almost Exynos SoCs have the common architecture
-+for memory buses. Generally, Exynos SoC express the memory bus by using memory
-+bus group and block. The memory bus group has one more memory bus blocks and
-+OPP table (including frequency and voltage for DVFS), regulator, devfreq-event
-+devices. Each memory bus block has a clock for own memory bus speen and
-+frequency table for DVFS. There are a little different among Exynos SoCs
-+because each Exynos SoC has the different sub-IP and differnt memory bus.
-+So, this difference should be specified in devicetree file.
-+
-+Required properties for memory bus group:
-+- compatible: Should be "samsung,exynos-memory-bus".
-+- operating-points: the OPP table including frequency/voltage information to
-+                  support DVFS (Dynamic Voltage/Frequency Scaling) feature.
-+- devfreq-events: the devfreq-event device to monitor the curret state of
-+                  memory bus group.
-+- vdd-mem-supply: the regulator to provide memory bus group with the voltage.
-+
-+Optional properties for memory bus group:
-+- exynos,saturation-ratio: the percentage value which is used to calibrate
-+                   the memory performance count againt memory cycle count.
-+
-+Required properties for memory bus block:
-+- clock-names : the name of clock used by the memory bus, "memory-bus".
-+- clocks : phandles for clock specified in "clock-names" property.
-+- #clock-cells: should be 1.
-+- frequency: the frequency table to support DVFS feature.
-+
-+Example1 : Memory bus group/block in exynos3250.dtsi are listed below.
-+	Exynos3250 has two memory bus group (MIF, INT group). MIF (Memory
-+	Interface) memory bus group includes one memory bus block between
-+	DRAM and eMMC. Also, INT (Internal) memory bus group includes eight
-+	memory bus blocks which support each sub-IP between DRAM and sub-IP.
-+
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 93b7040..44f6272 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -31,6 +31,127 @@
+ 		mshc0 = &mshc_0;
+ 	};
+ 
 +	memory_bus_mif: memory_bus at 0 {
 +		compatible = "samsung,exynos-memory-bus";
 +
 +		operating-points = <
-+			400000 875000
-+			200000 800000
-+			133000 800000
-+			100000 800000
-+			50000  800000>;
++			400000 1100000
++			200000 1000000
++			160000 950000
++			133000 950000
++			100000 950000>;
 +		status = "disabled";
 +
 +		blocks {
 +			dmc_block: memory_bus_block1 {
-+				clocks = <&cmu_dmc CLK_DIV_DMC>;
++				clocks = <&clock CLK_DIV_DMC>;
 +				clock-names = "memory-bus";
 +				frequency = <
 +					400000
 +					200000
++					160000
 +					133000
-+					100000
-+					50000>;
++					100000>;
++			};
++
++			acp_block: memory_bus_block2 {
++				clocks = <&clock CLK_DIV_ACP>;
++				clock-names = "memory-bus";
++				frequency = <
++					200000
++					160000
++					133000
++					133000
++					100000>;
++			};
++
++			c2c_block: memory_bus_block3 {
++				clocks = <&clock CLK_DIV_C2C>;
++				clock-names = "memory-bus";
++				frequency = <
++					400000
++					200000
++					160000
++					133000
++					100000>;
 +			};
 +		};
 +	};
@@ -93,127 +90,78 @@ index 0000000..6323dcf
 +		compatible = "samsung,exynos-memory-bus";
 +
 +		operating-points = <
-+			400000 950000
-+			200000 950000
++			200000 1000000
++			160000 950000
 +			133000 925000
-+			100000 850000
-+			80000  850000
-+			50000  850000>;
++			100000 900000>;
 +
 +		status = "disabled";
 +
 +		blocks {
 +			peri_block: memory_bus_block1 {
-+				clocks = <&cmu CLK_DIV_ACLK_100>;
++				clocks = <&clock CLK_ACLK100>;
 +				clock-names = "memory-bus";
 +				frequency = <
 +					100000
 +					100000
 +					100000
-+					100000
-+					50000
-+					50000>;
++					100000>;
 +			};
 +
-+			display_block: memory_bus_block2 {
-+				clocks = <&cmu CLK_DIV_ACLK_160>;
++			fsys_block: memory_bus_block2 {
++				clocks = <&clock CLK_ACLK133>;
++				clock-names = "memory-bus";
++				frequency = <
++					133000
++					133000
++					100000
++					100000>;
++			};
++
++			display_block: memory_bus_block3 {
++				clocks = <&clock CLK_ACLK160>;
++				clock-names = "memory-bus";
++				frequency = <
++					160000
++					160000
++					133000
++					100000>;
++			};
++
++			leftbus_block: memory_bus_block4 {
++				clocks = <&clock CLK_DIV_GDL>;
 +				clock-names = "memory-bus";
 +				frequency = <
 +					200000
 +					160000
-+					100000
-+					80000
-+					80000
-+					50000>;
-+			};
-+
-+			isp_block: memory_bus_block3 {
-+				clocks = <&cmu CLK_DIV_ACLK_200>;
-+				clock-names = "memory-bus";
-+				frequency = <
-+					200000
-+					200000
-+					100000
-+					80000
-+					50000
-+					50000>;
-+			};
-+
-+			gps_block: memory_bus_block4 {
-+				clocks = <&cmu CLK_DIV_ACLK_266>;
-+				clock-names = "memory-bus";
-+				frequency = <
-+					300000
-+					200000
 +					133000
-+					100000
-+					50000
-+					50000>;
-+			};
-+
-+			mcuisp_block: memory_bus_block5 {
-+				clocks = <&cmu CLK_DIV_ACLK_400_MCUISP>;
-+				clock-names = "memory-bus";
-+				frequency = <
-+					400000
-+					200000
-+					50000
-+					50000
-+					50000
-+					50000>;
-+			};
-+
-+			leftbus_block: memory_bus_block6 {
-+				clocks = <&cmu CLK_DIV_GDL>;
-+				clock-names = "memory-bus";
-+				frequency = <
-+					200000
-+					200000
-+					133000
-+					100000
-+					100000
 +					100000>;
 +			};
 +
-+			rightbus_block: memory_bus_block7 {
-+				clocks = <&cmu CLK_DIV_GDR>;
++			rightbus_block: memory_bus_block5 {
++				clocks = <&clock CLK_DIV_GDR>;
 +				clock-names = "memory-bus";
 +				frequency = <
 +					200000
-+					200000
++					160000
 +					133000
-+					100000
-+					100000
 +					100000>;
 +			};
 +
-+			mfc_block: memory_bus_block8 {
-+				clocks = <&cmu CLK_SCLK_MFC>;
++			mfc_block: memory_bus_block6 {
++				clocks = <&clock CLK_SCLK_MFC>;
 +				clock-names = "memory-bus";
 +				frequency = <
 +					200000
-+					200000
-+					200000
++					160000
 +					133000
-+					100000
-+					80000>;
++					100000>;
 +			};
 +		};
 +	};
 +
-+Example2 : Usage case to handle the frequency/voltage of memory bus on runtime
-+	in exynos3250-rinato.dts are listed below.
-+
-+	&memory_bus_mif {
-+		devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+		vdd-mem-supply = <&buck1_reg>;
-+		status = "okay";
-+	};
-+
-+	&memory_bus_int {
-+		devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+		vdd-mem-supply = <&buck3_reg>;
-+		status = "okay";
-+	};
+ 	sysram at 02020000 {
+ 		compatible = "mmio-sram";
+ 		reg = <0x02020000 0x40000>;
 -- 
 1.8.5.5
