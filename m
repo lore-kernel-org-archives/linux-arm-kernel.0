@@ -1,185 +1,249 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 14 Jan 2015 18:51:06 -0800
-Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
-In-Reply-To: <20150115000305.GC12302@n2100.arm.linux.org.uk>
-References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
- <20150114112210.GF4050@arm.com>
- <CAA3XUr2KUyafcnUggN7=xGNGSeRkkRtYtxZmwm4UC8sRCGup3g@mail.gmail.com>
- <20150115000305.GC12302@n2100.arm.linux.org.uk>
-Message-ID: <CAA3XUr2ej57VxAF1D3tbhjcVFtgyvHWKQxMiTBJ9RcmYCUHekQ@mail.gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Wed, 14 Jan 2015 18:51:50 -0800
+Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
+ handling
+Message-ID: <1421290310-22212-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2015 at 16:03, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jan 14, 2015 at 10:38:38AM -0800, Victor Kamensky wrote:
->> >From fed6caab410ddcaf487ff23a3908eca129e50b89 Mon Sep 17 00:00:00 2001
->> From: Victor Kamensky <victor.kamensky@linaro.org>
->> Date: Wed, 14 Jan 2015 07:42:41 -0800
->> Subject: [PATCH 3/3] perf symbols: improve abi compliance in arm mapping
->>  symbols handling
->>
->> Both Arm and Aarch64 ELF ABI allow mapping symbols be in from
->> either "$d" or "$d.<any>". But current code that handles mapping
->> symbols only deals with the first, dollar character and a single
->> letter, case.
->>
->> The patch adds handling of the second case with period
->> followed by any characters.
->>
->> Suggested-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->
-> I wonder if it would make more sense to re-use the "is_arm_mapping_symbol"
-> thing which we have in kernel/module.c and scripts/kallsyms.c - it
-> seems silly to re-invent code which we already have to detect these
-> symbols.
+This patch adds support for 2nd stage page fault handling while dirty page
+logging. On huge page faults, huge pages are dissolved to normal pages, and
+rebuilding of 2nd stage huge pages is blocked. In case migration is
+canceled this restriction is removed and huge pages may be rebuilt again.
 
-Thanks for pointing this out. I did not know about
-"is_arm_mapping_symbol" function.
-
-Do you suggest we copy one of those functions into tools/perf?
-Since tools/perf is separate user-land utility I don't see easy way
-how can we reuse those directly.
-
-Also those functions check for mapping symbols
-seems to be more efficient that one I come with, for example
-one from scripts/kallsyms.c
-
-static inline int is_arm_mapping_symbol(const char *str)
-{
-    return str[0] == '$' && strchr("axtd", str[1])
-           && (str[2] == '\0' || str[2] == '.');
-}
-
-But it seems that they are somewhat accurate: because they bundle
-EM_ARM and EM_AARCH64 into one case. According to ABIs
-for EM_ARM we have $a, $t, $d, $a.<any>, $t.<any>, $d.<any>;
-and for EM_AARCH64 we have $x, $d, $x.<any>, $d.<any>.
-
-How about the following two variants of the patch. It follows the same
-mapping handling logic as in other 3 copies of is_arm_mapping_symbol
-function in kernel, but it still separate copy in tools/perf code. Personally I
-prefer variant 1, but I am fine with variant 2 too, because practically it
-will be OK.
-
-Variant 1 (as addition to this patch, as above):
-
->From e08d348bd72d406d8939993d266729d805577c4b Mon Sep 17 00:00:00 2001
-From: Victor Kamensky <victor.kamensky@linaro.org>
-Date: Wed, 14 Jan 2015 07:42:41 -0800
-Subject: [PATCH 3/3] perf symbols: improve abi compliance in arm mapping
- symbols handling
-
-Both Arm and Aarch64 ELF ABI allow mapping symbols be in from
-either "$d" or "$d.<any>". But current code that handles mapping
-symbols only deals with the first, dollar character and a single
-letter, case.
-
-The patch adds handling of the second case with period
-followed by any characters.
-
-Suggested-by: Russell King <linux@arm.linux.org.uk>
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- tools/perf/util/symbol-elf.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
-index 1e188dd..a038c98 100644
---- a/tools/perf/util/symbol-elf.c
-+++ b/tools/perf/util/symbol-elf.c
-@@ -857,17 +857,16 @@ int dso__load_sym(struct dso *dso, struct map *map,
-          * don't identify functions, so will confuse the profile
-          * output: */
-         if (ehdr.e_machine == EM_ARM) {
--            if (!strcmp(elf_name, "$a") ||
--                !strcmp(elf_name, "$d") ||
--                !strcmp(elf_name, "$t"))
-+                        if (elf_name[0] == '$' && strchr("adt", elf_name[1])
-+                        && (elf_name[2] == '\0' || elf_name[2] == '.'))
-                 continue;
-         }
-         /* Reject Aarch64 ELF "mapping symbols": these aren't unique and
-          * don't identify functions, so will confuse the profile
-          * output: */
-         if (ehdr.e_machine == EM_AARCH64) {
--            if (!strcmp(elf_name, "$x") ||
--                !strcmp(elf_name, "$d"))
-+                        if (elf_name[0] == '$' && strchr("dx", elf_name[1])
-+                        && (elf_name[2] == '\0' || elf_name[2] == '.'))
-                 continue;
-         }
+change Log since last RESEND v2 --> v3:
+- Handle read faults to writable regions properly
+- Along with Christoffers suggestions optimized user_mem_abor() while logging
+- Fix enable of dirty page logging to Device memory - reject request 
 
--- 
-1.9.3
+Change Log since last RESEND v1 --> v2:
+- Disallow dirty page logging of IO region - fail for initial write protect
+  and disable logging code in 2nd stage page fault handler.
+- Fixed auto spell correction errors
 
-Variant 2 instead of patch posted with current subject:
-
- From c8d08ebddc61203daf21b17c891c26c1d08e14f1 Mon Sep 17 00:00:00 2001
-From: Victor Kamensky <victor.kamensky@linaro.org>
-Date: Mon, 12 Jan 2015 14:13:36 -0800
-Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
-
-Aarch64 ELF files use mapping symbols with special names $x, $d
-to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
-IHI 0056B", section "4.5.4 Mapping symbols").
-
-The patch filters out these symbols at load time, similar to
-"696b97a perf symbols: Ignore mapping symbols on ARM" changes
-done for ARM before V8.
-
-Also added handling of mapping symbols that has format
-"$d.<any>" and similar for both cases.
-
-Note we are not making difference between EM_ARM and
-EM_AARCH64 mapping symbols instead code handles superset
-of both.
-
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Adrian Hunter <adrian.hunter@intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Avi Kivity <avi@cloudius-systems.com>
-Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-Cc: Anton Blanchard <anton@samba.org>
-Cc: David Ahern <dsahern@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Dave Martin <Dave.Martin@arm.com>
+Change Log RESEND v0 --> v1:
+- fixed bug exposed by new generic __get_user_pages_fast(), when region is 
+  writable, prevent write protection of pte on read fault
+- Removed marking entire huge page dirty on initial access
+- don't dissolve huge pages of non-writable regions
+- Made updates based on Christoffers comments
+  - renamed logging status function to memslot_is_logging()
+  - changed few values to bool from longs
+  - streamlined user_mem_abort() to eliminate extra conditional checks
 ---
- tools/perf/util/symbol-elf.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/kvm/mmu.c |   97 +++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 88 insertions(+), 9 deletions(-)
 
-diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
-index 06fcd1b..b2eb0f9 100644
---- a/tools/perf/util/symbol-elf.c
-+++ b/tools/perf/util/symbol-elf.c
-@@ -856,10 +856,9 @@ int dso__load_sym(struct dso *dso, struct map *map,
-         /* Reject ARM ELF "mapping symbols": these aren't unique and
-          * don't identify functions, so will confuse the profile
-          * output: */
--        if (ehdr.e_machine == EM_ARM) {
--            if (!strcmp(elf_name, "$a") ||
--                !strcmp(elf_name, "$d") ||
--                !strcmp(elf_name, "$t"))
-+        if (ehdr.e_machine == EM_ARM || ehdr.e_machine == EM_AARCH64) {
-+                        if (elf_name[0] == '$' && strchr("adtx", elf_name[1])
-+                        && (elf_name[2] == '\0' || elf_name[2] == '.'))
-                 continue;
-         }
-
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 73d506f..2e494ac 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
+ #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ #define kvm_pud_huge(_x)	pud_huge(_x)
+ 
++#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
++#define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
++
++static bool memslot_is_logging(struct kvm_memory_slot *memslot)
++{
++#ifdef CONFIG_ARM
++	return !!memslot->dirty_bitmap;
++#else
++	return false;
++#endif
++}
++
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	/*
+@@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+ }
+ 
++/**
++ * stage2_dissolve_pmd() - clear and flush huge PMD entry
++ * @kvm:	pointer to kvm structure.
++ * @addr:	IPA
++ * @pmd:	pmd pointer for IPA
++ *
++ * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
++ * pages in the range dirty.
++ */
++static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
++{
++	if (!kvm_pmd_huge(*pmd))
++		return;
++
++	pmd_clear(pmd);
++	kvm_tlb_flush_vmid_ipa(kvm, addr);
++	put_page(virt_to_page(pmd));
++}
++
+ static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+ 				  int min, int max)
+ {
+@@ -703,10 +734,15 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ }
+ 
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+-			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
++			  phys_addr_t addr, const pte_t *new_pte,
++			  unsigned long flags)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte, old_pte;
++	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
++	bool logging_active = flags & KVM_S2_FLAG_LOGGING_ACTIVE;
++
++	VM_BUG_ON(logging_active && !cache);
+ 
+ 	/* Create stage-2 page table mapping - Levels 0 and 1 */
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+@@ -718,6 +754,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 		return 0;
+ 	}
+ 
++	/*
++	 * While dirty page logging - dissolve huge PMD, then continue on to
++	 * allocate page.
++	 */
++	if (logging_active)
++		stage2_dissolve_pmd(kvm, addr, pmd);
++
+ 	/* Create stage-2 page mappings - Level 2 */
+ 	if (pmd_none(*pmd)) {
+ 		if (!cache)
+@@ -774,7 +817,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 		if (ret)
+ 			goto out;
+ 		spin_lock(&kvm->mmu_lock);
+-		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
++		ret = stage2_set_pte(kvm, &cache, addr, &pte,
++						KVM_S2PTE_FLAG_IS_IOMAP);
+ 		spin_unlock(&kvm->mmu_lock);
+ 		if (ret)
+ 			goto out;
+@@ -1002,6 +1046,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 	bool fault_ipa_uncached;
++	bool logging_active = memslot_is_logging(memslot);
++	unsigned long flags = 0;
+ 
+ 	write_fault = kvm_is_write_fault(vcpu);
+ 	if (fault_status == FSC_PERM && !write_fault) {
+@@ -1018,7 +1064,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
+-	if (is_vm_hugetlb_page(vma)) {
++	if (is_vm_hugetlb_page(vma) && !logging_active) {
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
+@@ -1059,12 +1105,30 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (is_error_pfn(pfn))
+ 		return -EFAULT;
+ 
+-	if (kvm_is_device_pfn(pfn))
++	if (kvm_is_device_pfn(pfn)) {
+ 		mem_type = PAGE_S2_DEVICE;
++		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
++	} else if (logging_active) {
++		/*
++		 * Faults on pages in a memslot with logging enabled
++		 * should not be mapped with huge pages (it introduces churn
++		 * and performance degradation), so force a pte mapping.
++		 */
++		force_pte = true;
++		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
++
++		/*
++		 * Only actually map the page as writable if this was a write
++		 * fault.
++		 */
++		if (!write_fault)
++			writable = false;
++	}
+ 
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (mmu_notifier_retry(kvm, mmu_seq))
+ 		goto out_unlock;
++
+ 	if (!hugetlb && !force_pte)
+ 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+ 
+@@ -1082,17 +1146,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
++
+ 		if (writable) {
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
++			mark_page_dirty(kvm, gfn);
+ 		}
+ 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+ 					  fault_ipa_uncached);
+-		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+-			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
++		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+ 	}
+ 
+-
+ out_unlock:
+ 	spin_unlock(&kvm->mmu_lock);
+ 	kvm_release_pfn_clean(pfn);
+@@ -1242,7 +1306,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
+-	stage2_set_pte(kvm, NULL, gpa, pte, false);
++	/*
++	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
++	 * flag clear because MMU notifiers will have unmapped a huge PMD before
++	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
++	 * therefore stage2_set_pte() never needs to clear out a huge PMD
++	 * through this calling path.
++	 */
++	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+ }
+ 
+ 
+@@ -1396,7 +1467,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 	bool writable = !(mem->flags & KVM_MEM_READONLY);
+ 	int ret = 0;
+ 
+-	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
++	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
++			change != KVM_MR_FLAGS_ONLY)
+ 		return 0;
+ 
+ 	/*
+@@ -1447,6 +1519,10 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
+ 					 vm_start - vma->vm_start;
+ 
++			/* IO region dirty page logging not allowed */
++			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
++				return -EINVAL;
++
+ 			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+ 						    vm_end - vm_start,
+ 						    writable);
+@@ -1456,6 +1532,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+ 		hva = vm_end;
+ 	} while (hva < reg_end);
+ 
++	if (change == KVM_MR_FLAGS_ONLY)
++		return ret;
++
+ 	spin_lock(&kvm->mmu_lock);
+ 	if (ret)
+ 		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
 -- 
-1.9.3
-
-Thanks,
-Victor
-
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+1.7.9.5
