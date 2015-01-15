@@ -1,91 +1,132 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 15 Jan 2015 17:05:53 +0100
-Subject: [PATCH v3 6/8] clocksource: atmel-st: properly initialize driver
-In-Reply-To: <1421077023-30954-7-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-7-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B7E561.8090008@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 15 Jan 2015 16:06:35 +0000
+Subject: [PATCH 5/9] dts: versatile: add sysregs nodes
+In-Reply-To: <CAL_JsqKBLx03E1w0NMH8CH+Pm_L8yQvnR6VTTDxqnpOwAoDhXg@mail.gmail.com>
+References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
+ <1419967718-26909-6-git-send-email-robherring2@gmail.com>
+ <CACRpkdbinR3Uvi5zZmQJFxJgnWfvE6JZouMVxxRRGVtMNXkBQQ@mail.gmail.com>
+ <CAL_JsqKBLx03E1w0NMH8CH+Pm_L8yQvnR6VTTDxqnpOwAoDhXg@mail.gmail.com>
+Message-ID: <20150115160635.GA1576@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 04:37 PM, Alexandre Belloni wrote:
-> Use clocksource_of_init to initialize the system timer instead of relying on a
-> custom function.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Thu, Jan 08, 2015 at 11:53:15PM +0000, Rob Herring wrote:
+> Adding VExpress maintainers...
+> 
+> On Thu, Jan 8, 2015 at 1:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+> >
+> >> From: Rob Herring <robh@kernel.org>
+> >>
+> >> The Versatile boards have the same sysregs as other ARM Ltd boards. Add
+> >> the nodes in preparation to enable support for 24MHz counter as
+> >> sched_clock and MMC card detect and write protect support.
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >>  arch/arm/boot/dts/versatile-ab.dts | 23 +++++++++++++++++++++++
+> >>  1 file changed, 23 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+> >> index 27d0d9c..62f04b0 100644
+> >> --- a/arch/arm/boot/dts/versatile-ab.dts
+> >> +++ b/arch/arm/boot/dts/versatile-ab.dts
+> >> @@ -252,6 +252,29 @@
+> >>                         #size-cells = <1>;
+> >>                         ranges = <0 0x10000000 0x10000>;
+> >>
+> >> +                       sysreg at 0 {
+> >> +                               compatible = "arm,vexpress-sysreg";
+> >
+> > vexpress? No...
+> 
+> Compatible with yes. Should perhaps be '"arm,versatile-sysreg",
+> "arm,vexpress-sysreg"' instead. Kind of backwards, as really the
+> versatile came first, but it would work. Or we just need another match
+> entry in the kernel.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+versatile and vexpress sys registers are not compatible, so they should
+not be treated as such.
 
-> ---
->   arch/arm/mach-at91/board-dt-rm9200.c | 7 -------
->   arch/arm/mach-at91/generic.h         | 3 ---
->   drivers/clocksource/timer-atmel-st.c | 4 +++-
->   3 files changed, 3 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
-> index 76dfe8f9af50..d9a45f49c208 100644
-> --- a/arch/arm/mach-at91/board-dt-rm9200.c
-> +++ b/arch/arm/mach-at91/board-dt-rm9200.c
-> @@ -24,19 +24,12 @@
->
->   #include "generic.h"
->
-> -static void __init at91rm9200_dt_timer_init(void)
-> -{
-> -	of_clk_init(NULL);
-> -	at91rm9200_timer_init();
-> -}
-> -
->   static const char *at91rm9200_dt_board_compat[] __initdata = {
->   	"atmel,at91rm9200",
->   	NULL
->   };
->
->   DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
-> -	.init_time      = at91rm9200_dt_timer_init,
->   	.map_io		= at91_map_io,
->   	.init_early	= at91rm9200_dt_initialize,
->   	.dt_compat	= at91rm9200_dt_board_compat,
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-> index d53324210adf..fc12f3d4b93c 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -29,9 +29,6 @@ extern void __init at91_dt_initialize(void);
->   extern void __init at91_sysirq_mask_rtc(u32 rtc_base);
->   extern void __init at91_sysirq_mask_rtt(u32 rtt_base);
->
-> - /* Timer */
-> -extern void at91rm9200_timer_init(void);
-> -
->   /* idle */
->   extern void at91sam9_idle(void);
->
-> diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-> index 522583d6cc78..ed0267f1c892 100644
-> --- a/drivers/clocksource/timer-atmel-st.c
-> +++ b/drivers/clocksource/timer-atmel-st.c
-> @@ -232,7 +232,7 @@ err:
->   /*
->    * ST (system timer) module supports both clockevents and clocksource.
->    */
-> -void __init at91rm9200_timer_init(void)
-> +static void __init atmel_st_timer_init(struct device_node *node)
->   {
->   	/* For device tree enabled device: initialize here */
->   	of_at91rm9200_st_init();
-> @@ -261,3 +261,5 @@ void __init at91rm9200_timer_init(void)
->
->   	arm_pm_restart = at91rm9200_restart;
->   }
-> +CLOCKSOURCE_OF_DECLARE(atmel_st_timer, "atmel,at91rm9200-st",
-> +		       atmel_st_timer_init);
->
+Actually, versatile regs are not managed by a single entity driver
+in the kernel, so basically I really think you should not leave
 
+"arm,vexpress-sysreg"
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+in the compatible list.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> I copied this whole chunk as is from VExpress and verified these sub
+> nodes are all the same hence why it is here.
+> 
+> > compatible = "syscon";
+> 
+> maybe? VExpress is missing that then...
+
+vexpress-sysreg is more than a "syscon" interface, so we can't match
+on it, it would be wrong.
+
+> 
+> >> +                               reg = <0x00000 0x1000>;
+> >> +
+> >> +                               v2m_led_gpios: sys_led at 08 {
+> >> +                                       compatible = "arm,vexpress-sysreg,sys_led";
+> >> +                                       gpio-controller;
+> >> +                                       #gpio-cells = <2>;
+> >> +                               };
+> >
+> > These are not GPIOs. These are LED registers really.
+> 
+> A register bit that controls an i/o signal sounds like a GPIO to me.
+
+To me too. I agree that definining a gpio-controller for every possible
+gpio pin would soon get unwieldy, but hey, the choice made for vexpress
+leds makes perfect sense to me, after all they are gpio signals
+connected to leds, and there is a driver for that in the kernel:
+
+drivers/leds/leds-gpio.c
+
+we could move this stuff to syscon-leds, but honestly I think is one of those
+things we could argue forever about that.
+
+> > see how to use LEDs from drivers/leds/leds-syscon.c and bindings.
+> > example in:
+> > arch/arm/boot/dts/integrator.dtsi
+> >
+> > Very straight-forward I think.
+> 
+> So we have 2 implementations and bindings for roughly the same hardware? Great!
+
+See above.
+
+> >> +                               v2m_mmc_gpios: sys_mci at 48 {
+> >> +                                       compatible = "arm,vexpress-sysreg,sys_mci";
+> >> +                                       gpio-controller;
+> >> +                                       #gpio-cells = <2>;
+> >> +                               };
+> >> +
+> >> +                               v2m_flash_gpios: sys_flash at 4c {
+> >> +                                       compatible = "arm,vexpress-sysreg,sys_flash";
+> >> +                                       gpio-controller;
+> >> +                                       #gpio-cells = <2>;
+> >> +                               };
+> >
+> > I don't have drivers for these "gpio controllers" and I don't think they are
+> > GPIOs either, since they are not general purpose at all.
+> 
+> They are only general purpose until you connect the i/o lines to
+> something. But yes, if we went around making every misc internal
+> control line in SOCs a 1-bit GPIO controller that would be pretty
+> crazy.
+> 
+> Anyway, most of this is not actually used ATM on Versatile, but it is
+> present in VExpress. I added it only for sched_clock. We need to
+> resolve this with VExpress platforms, but it's already in use for MMC
+> and LEDs.
+
+I did not get what you meant here, in particular which bits you want us
+to fix/change/update on vexpress.
+
+Thanks,
+Lorenzo
