@@ -1,40 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 15 Jan 2015 20:31:59 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150115200437.GF24989@titan.lakedaemon.net>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <20150115190220.GF3043@sirena.org.uk>
- <20150115200437.GF24989@titan.lakedaemon.net>
-Message-ID: <20150115203159.GG3043@sirena.org.uk>
+From: b08248@gmail.com (Stuart Yoder)
+Date: Thu, 15 Jan 2015 14:35:31 -0600
+Subject: [PATCH v2 1/8] device core: Introduce per-device MSI domain
+ pointer
+In-Reply-To: <1420736772-11088-2-git-send-email-marc.zyngier@arm.com>
+References: <1420736772-11088-1-git-send-email-marc.zyngier@arm.com>
+ <1420736772-11088-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CALRxmdDVUoYNg3QC0LdvKmCz9x4nzE9+TDiV9K9OH=Gxk-Cd9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 03:04:37PM -0500, Jason Cooper wrote:
-> On Thu, Jan 15, 2015 at 07:02:20PM +0000, Mark Brown wrote:
+On Thu, Jan 8, 2015 at 11:06 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> As MSI-type features are creeping into non-PCI devices, it is
+> starting to make sense to give our struct device some form of
+> support for this, by allowing a pointer to an MSI irq domain to
+> be set/retrieved.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/device.h | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index fb50673..ec4cee5 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -690,6 +690,7 @@ struct acpi_dev_node {
+>   *             along with subsystem-level and driver-level callbacks.
+>   * @pins:      For device pin management.
+>   *             See Documentation/pinctrl.txt for details.
+> + * @msi_domain: The generic MSI domain this device is using.
+>   * @numa_node: NUMA node this device is close to.
+>   * @dma_mask:  Dma mask (if dma'ble device).
+>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+> @@ -750,6 +751,9 @@ struct device {
+>         struct dev_pm_info      power;
+>         struct dev_pm_domain    *pm_domain;
+>
+> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> +       struct irq_domain       *msi_domain; /* MSI domain device uses */
+> +#endif
 
-> > There's probably a bit of a process problem here - these patches are all
-> > being posted as part of big and apparently controversial threads with
-> > subject lines in the form "ARM / ACPI:" so people could be forgiven for
-> > just not even reading the e-mails enough to notice changes to their
-> > subsystems.  Is it worth posting those patches separately more directly
-> > to the relevant maintainers?
+This is not a comment on this patch specifically, but a question about other
+MSI specific fields that might be needed in struct device.
 
-> I think it's beneficial to post the entire series as one thread, but to
-> change the subject line of each patch to adequately reflect the affected
-> subsystem.
+Currently the generic MSI domain handling has hardcoded assumptions
+that devices are PCI-- see the for_each_msi_entry() iterator in msi.h:
 
-Just changing the subject lines to be more suitable would help, but
-given the painful thread it's probably worth going the extra step if
-the lack of these reviews is a causing problems - I know that even with
-a suitable subject line if I'm busy then I'm fairly likely to zone out
-something in the middle a big series that doesn't seem to be going
-anywhere.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/6ef3c64a/attachment.sig>
+  #define dev_to_msi_list(dev)            (&to_pci_dev((dev))->msi_list)
+
+  #define for_each_msi_entry(desc, dev)   \
+        list_for_each_entry((desc), dev_to_msi_list((dev)), list)
+
+One approach would be to move the msi_list out of pci_dev and put
+it in struct device, so all devices can have an msi_list.
+
+The other approach would be to keep msi_list in a bus specific
+device struct, and then dev_to_msi_list() would need to be
+implemented as a bus specific callback of some kind.
+
+The above hardcoded PCI assumption isn't going to work.   Wanted to
+see if there is any advice in which direction to go.
+
+Thanks,
+Stuart Yoder
