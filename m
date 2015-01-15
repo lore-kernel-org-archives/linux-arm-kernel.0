@@ -1,53 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 15 Jan 2015 11:05:01 +0100
-Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
- registers memory region
-In-Reply-To: <54B78F73.9000504@atmel.com>
-References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>
- <20150115094527.3fde882a@bbrezillon> <54B78F73.9000504@atmel.com>
-Message-ID: <20150115110501.53b4584c@bbrezillon>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 15 Jan 2015 13:09:30 +0300
+Subject: [PATCH 1/5] ARM: sa1100: add platform functions to handle PWER
+ settings
+Message-ID: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+PWER settings logically belongs neither to GPIO nor to system IRQ code.
+Add special functions to handle PWER (for GPIO and for system IRQs)
+from platform code.
 
-On Thu, 15 Jan 2015 17:59:15 +0800
-Josh Wu <josh.wu@atmel.com> wrote:
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-sa1100/generic.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-> Hi? Boris
-> 
-> Thanks for the review.
-> 
-> On 1/15/2015 4:45 PM, Boris Brezillon wrote:
-> > Hi Josh,
-> >
-> > On Thu, 15 Jan 2015 15:08:03 +0800
-> > Josh Wu <josh.wu@atmel.com> wrote:
-> >
-> >> To get NFC status, we need to read the NFC command registers, which is a
-> >> 256M memory mapping address. To check the status, you just read such
-> >> address from NFC command registers.
-> >> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
-> >> (bit 27 is set to 1) of the NFC command register.
-> >> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
-> >> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
-> > Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
-> > representing the same thing.
-> yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is 
-> also refer to NFC_BUSY of HSMC_SR.
-> 
-> > If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
-> > to check the status [1] and drop the last bit in the NFC Command
-> > Resgiters range.
-> Thank you. your code works (just need some typo change).
-> I want to send [1] code with your signed-off and my acked to mtd list.
-> Is it okay for you?
-
-Sure, no problem.
-
-
-
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 40e0d86..022e451 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -416,3 +416,24 @@ void sa1110_mb_enable(void)
+ 	local_irq_restore(flags);
+ }
+ 
++int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
++{
++	if (on)
++		PWER |= BIT(gpio);
++	else
++		PWER &= ~BIT(gpio);
++
++	return 0;
++}
++
++int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
++{
++	if (BIT(irq) != IC_RTCAlrm)
++		return -EINVAL;
++
++	if (on)
++		PWER |= PWER_RTC;
++	else
++		PWER &= ~PWER_RTC;
++	return 0;
++}
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.4
