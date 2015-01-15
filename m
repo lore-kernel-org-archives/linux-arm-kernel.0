@@ -1,49 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 15 Jan 2015 21:29:10 +0100
-Subject: [PATCH] ARM: efm32: update defconfig
-Message-ID: <1421353750-8525-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 15 Jan 2015 20:31:59 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150115200437.GF24989@titan.lakedaemon.net>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <20150115190220.GF3043@sirena.org.uk>
+ <20150115200437.GF24989@titan.lakedaemon.net>
+Message-ID: <20150115203159.GG3043@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable i2c driver for efm32. The other two changes are just results from
-oldconfig after commits
- - 08b964ff3c51 (ARM: 8198/1: make kuser helpers depend on MMU)
- - 8357041a69b3 (of: remove /proc/device-tree)
+On Thu, Jan 15, 2015 at 03:04:37PM -0500, Jason Cooper wrote:
+> On Thu, Jan 15, 2015 at 07:02:20PM +0000, Mark Brown wrote:
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/configs/efm32_defconfig | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> > There's probably a bit of a process problem here - these patches are all
+> > being posted as part of big and apparently controversial threads with
+> > subject lines in the form "ARM / ACPI:" so people could be forgiven for
+> > just not even reading the e-mails enough to notice changes to their
+> > subsystems.  Is it worth posting those patches separately more directly
+> > to the relevant maintainers?
 
-diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
-index f59fffb3d0c6..c4c17e3a8e1a 100644
---- a/arch/arm/configs/efm32_defconfig
-+++ b/arch/arm/configs/efm32_defconfig
-@@ -17,7 +17,6 @@ CONFIG_EMBEDDED=y
- # CONFIG_IOSCHED_CFQ is not set
- # CONFIG_MMU is not set
- CONFIG_ARCH_EFM32=y
--# CONFIG_KUSER_HELPERS is not set
- CONFIG_SET_MEM_PARAM=y
- CONFIG_DRAM_BASE=0x88000000
- CONFIG_DRAM_SIZE=0x00400000
-@@ -49,7 +48,6 @@ CONFIG_MTD=y
- CONFIG_MTD_BLOCK_RO=y
- CONFIG_MTD_ROM=y
- CONFIG_MTD_UCLINUX=y
--CONFIG_PROC_DEVICETREE=y
- # CONFIG_BLK_DEV is not set
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_ARC is not set
-@@ -78,6 +76,9 @@ CONFIG_SERIAL_NONSTANDARD=y
- CONFIG_SERIAL_EFM32_UART=y
- CONFIG_SERIAL_EFM32_UART_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+# CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_EFM32=y
- CONFIG_SPI=y
- CONFIG_SPI_EFM32=y
- CONFIG_GPIO_SYSFS=y
--- 
-2.1.4
+> I think it's beneficial to post the entire series as one thread, but to
+> change the subject line of each patch to adequately reflect the affected
+> subsystem.
+
+Just changing the subject lines to be more suitable would help, but
+given the painful thread it's probably worth going the extra step if
+the lack of these reviews is a causing problems - I know that even with
+a suitable subject line if I'm busy then I'm fairly likely to zone out
+something in the middle a big series that doesn't seem to be going
+anywhere.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/6ef3c64a/attachment.sig>
