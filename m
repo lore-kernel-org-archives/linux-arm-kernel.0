@@ -1,59 +1,41 @@
-From: haokexin@gmail.com (Kevin Hao)
-Date: Thu, 15 Jan 2015 15:09:26 +0800
-Subject: [PATCH] arm64: kill off the libgcc dependency
-In-Reply-To: <20150114143926.GY12302@n2100.arm.linux.org.uk>
-References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
- <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
- <2438951.7KFuXx85Hp@wuerfel>
- <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
- <20150114143926.GY12302@n2100.arm.linux.org.uk>
-Message-ID: <20150115070925.GB23621@pek-khao-d1.corp.ad.wrs.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 15 Jan 2015 08:33:23 +0100
+Subject: [PATCH] Build a uImage with dtb already appended
+In-Reply-To: <CAOesGMh8ZXt4fbw-AKOVWTQ8X5bVC8gEOhDFLroOYt+S43xBrA@mail.gmail.com>
+References: <20110802143148.21599.22870.stgit@ponder>
+ <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
+ <CAOesGMh8ZXt4fbw-AKOVWTQ8X5bVC8gEOhDFLroOYt+S43xBrA@mail.gmail.com>
+Message-ID: <20150115073323.GB32460@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 02:39:26PM +0000, Russell King - ARM Linux wrote:
-> It's actually exactly issues like this which have prompted the kernel to
-> use its own libgcc on many architectures.
-> 
-> Not only is it what Arnd says above, but it's also to do with making sure
-> that we know what goes into the kernel is sane.
-> 
-> Although libgcc is part of the compiler, libgcc is built with the
-> expectation that it will be running in userland - it expects to link
-> to a libc.  That's why you can't build libgcc without having the glibc
-> headers around.
-> 
-> For example, on ARM, libgcc.a may contain calls to __div0, and it may
-> provide its own __div0 implementation, which invokes various Linux
-> system calls.
-> 
-> Various functions reference _GLOBAL_OFFSET_TABLE_ which we don't want
-> to have in the kernel.
-> 
-> Depending on how the compiler was built, libgcc.a may be built for
-> ARMv4, ARMv5, ARMv6 or ARMv7, and may not be appropriate for linking
-> with the kernel.  (Eg, you wouldn't want to try to link an ARMv7
-> libgcc.a in an ARMv5 kernel - and we /really/ don't want the mess
-> of having different toolchains for different ARM arch versions.)
-> 
-> It may also drag in the userspace exception unwind support.
-> 
-> Meanwhile, having the kernel build the compiler support functions that
-> it needs ensures that (a) we know what compiler support functions are
-> being used, (b) we know the implementation of those support functions
-> are sane for use in the kernel, (c) we can build them with appropriate
-> compiler flags for best performance, and (d) we remove an unnecessary
-> dependency on the build toolchain.
+Hi Olof,
 
-Thanks Russell for the detailed explanation. I will put this into the
-commit log.
+On Wed, Jan 14, 2015 at 06:31:48PM -0800, Olof Johansson wrote:
+> On Wed, Jan 14, 2015 at 6:08 PM, Christoph Junghans <ottxor@gentoo.org> wrote:
+> > Add new targets to build zImage and uImage with DTB appended (i.e. make
+> > 'uImage-dtb.am335x-bone' or 'make zImage-dtb.omap3-evm').
+> >
+> > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> > Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+> > ---
+> >
+> > I don't know why this never got merged, but I think it is still useful.
+> 
+> Maybe the patch description on the first version of the patch is a hint?
+> 
+> https://lkml.org/lkml/2011/8/2/200
+> 
+> In general, we're moving away from generating custom images straight
+> out of the kernel build system. You should make that part of your
+> installation scripts or similar instead.
+
+FWIW, I *do* find this useful. My build scripts have to differ between
+x86 and ARM only because of dtb. I would love to see this patch merged,
+and anyway I'll add it to my own tree because it will simplify my build
+process.
 
 Thanks,
-Kevin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/aafd24dc/attachment.sig>
+Willy
