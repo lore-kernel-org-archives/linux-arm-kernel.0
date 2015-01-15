@@ -1,67 +1,99 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 15 Jan 2015 10:51:58 -0500
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <CACxGe6tjiE6u8i-1PHYzX2cOhxJkYN3cV9mqhCHRSMRdOQRfzg@mail.gmail.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <1797489.PjmKzBFdQA@wuerfel>
- <20150106112000.GA8829@e104818-lin.cambridge.arm.com>
- <3538097.dWBy3R9lty@wuerfel>
- <CACxGe6tjiE6u8i-1PHYzX2cOhxJkYN3cV9mqhCHRSMRdOQRfzg@mail.gmail.com>
-Message-ID: <54B7E21E.2000901@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Jan 2015 16:51:56 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 05/13] ARM: dts: sun9i: Add
+ clock-indices property for bus gate clocks
+In-Reply-To: <CAGb2v65g-HMH5ezGd29SxSNCA6J5H6Q1X1H3rLKh0=nqdHDgMA@mail.gmail.com>
+References: <1421113055-17867-1-git-send-email-wens@csie.org>
+ <1421113055-17867-6-git-send-email-wens@csie.org>
+ <20150114163351.GY4891@lukather>
+ <CAGb2v64brc_2c5Jz2=BzfCpwiwBQgGf=SLD2ib+taOYUgicekA@mail.gmail.com>
+ <20150115152026.GA1135@lukather>
+ <CAGb2v65g-HMH5ezGd29SxSNCA6J5H6Q1X1H3rLKh0=nqdHDgMA@mail.gmail.com>
+Message-ID: <20150115155156.GA1837@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 09:10 AM, Grant Likely wrote:
-> On Tue, Jan 6, 2015 at 1:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 06 January 2015 11:20:01 Catalin Marinas wrote:
->>> On Mon, Jan 05, 2015 at 08:16:30PM +0000, Arnd Bergmann wrote:
->>>> On Monday 05 January 2015 13:13:02 Catalin Marinas wrote:
->>>>>> since passing no DT tables to OS but
->>>>>> acpi=force is missing is a corner case, we can do a follow up patch to
->>>>>> fix that, does it make sense?
->>>>>
->>>>> Not entirely. Why would no dtb and no acpi=force be a corner case? I
->>>>> thought this should be the default when only ACPI tables are passed, no
->>>>> need for an additional acpi=force argument.
->>>>
->>>> We don't really support the case of only ACPI tables for now. The expectation
->>>> is that you always have working DT support, at least for the next few years
->>>> as ACPI features are ramping up, and without acpi=force it should not try
->>>> to use ACPI at all.
->>>
->>> So if both DT and ACPI are present, just use DT unless acpi=force is
->>> passed. So far I think we agree but what I want to avoid is always
->>> mandating acpi=force even when the DT tables are missing (in the long
->>> run).
->>>
->>> Now, what's preventing a vendor firmware from providing only ACPI
->>> tables? Do we enforce it in some way (arm-acpi.txt, kernel warning etc.)
->>> that both DT and ACPI are supported, or at least that dts files are
->>> merged in the kernel first?
->>
->> We have no way of enforcing what a board vendor ships, so if they want
->> to have ACPI-only machines for MS Windows, they just won't work by
->> default on Linux. Once ACPI support is mature enough, we can also
->> have a whitelist or a different default for using it automatically
->> when no DT is present.
->>
->> For drivers merged upstream, I would insist that every driver merged
->> for an ARM64 platform has a documented DT binding that is used in the
->> driver.
+On Thu, Jan 15, 2015 at 11:35:42PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Jan 15, 2015 at 11:20 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Thu, Jan 15, 2015 at 10:24:04AM +0800, Chen-Yu Tsai wrote:
+> >> On Thu, Jan 15, 2015 at 12:33 AM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Tue, Jan 13, 2015 at 09:37:27AM +0800, Chen-Yu Tsai wrote:
+> >> >> of_clk_get_parent_name() uses the clock-indices property to resolve
+> >> >> clock phandle arguments in case that the argument index does not
+> >> >> match the clock-output-names sequence.
+> >> >>
+> >> >> This is the case on sunxi, where we use the actual bit index as the
+> >> >> argument to the phandle. Add the clock-indices property so that
+> >> >> of_clk_get_parent_name() resolves the names correctly.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >
+> >> > Applied. Are the mask in the clock driver still of any use now? I
+> >> > don't think they are, and if we're going that way, I'd rather have
+> >> > them removed from the driver.
+> >>
+> >> Yes they are still passed through factors_data, for mux_clk_ops to
+> >> know about the width of the mux, which is 3 bits on older SoCs vs
+> >> 4 bits on sun9i.
+> >
+> > Erm.... These are gates. They are not muxable and are not handled
+> > through clk-factors, so I'm not sure how it is relevant :)
 > 
-> That's a dumb rule. It will result in untested DT code paths being
-> thrown into drivers just too meet the rules rather than on whether or
-> not they will actually be used. It's fine to allow driver authors to
-> only implement the ACPI code path if that is what they are working
-> with. We can *always* add a DT path to the driver when it is needed.
+> Sorry. I jumped to the mux mask stuff. Yes the gate masks are still
+> used, and the gates are still referenced by the bit offset.
+> 
+> As described in the commit message, clock-indices is used by
+> of_clk_get_parent_name() to match the index used in the phandle
+> to the correct name in clock-names.
+> 
+> Take apb1 for example:
+> 
+>                        clock-indices = <0>, <1>, <2>, <3>, <4>,
+>                                        <16>, <17>, <18>, <19>, <20>, <21>;
+>                        clock-output-names = "apb1_i2c0", "apb1_i2c1",
+>                                        "apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
+>                                        "apb1_uart0", "apb1_uart1", ...
+> 
+> If we have "clocks = <&apb1 16>;" in some device, and we call
+> of_clk_get_parent_name() on said clock, it would try to get
+> clock_output_names[16], which obviously is the wrong one.
+> 
+> With clock-indices, of_clk_get_parent_name first looks at
+> that array, finds an entry matching 16, then uses the
+> index of the matching entry to get the name from
+> clock-output-names.
 
-It gets worse. There *will* be large numbers of ACPI only ARM servers
-landing over the coming year. Not only would DT code be untested, but
-insisting on keeping e.g. a DSDT and DT in sync is never going to work
-anyway. Already we have early stage servers that contain a DT used for
-bringup that is subsequently not being updated as often as the ACPI
-tables (those systems are now booting exclusively in labs with ACPI).
-Eventually, I am going to push for the DT data to be removed from these
-systems rather than have out of date unmaintained DT data in firmware.
+Yeah, I know what it does, and we do agree on the fact that it's
+needed.
 
-Jon.
+> So, we are still using the gate bitmask to declare valid
+> clock gates. The sunxi driver does not use clock-indices
+> directly. Nor do I think it was intended to be used by
+> clock drivers directly.
+
+However, the gate bitmask itself carries exactly the same information
+than clock-indices. It's the exact same list of numbers, just with two
+different ways of defining it.
+
+If we go with clock-indices, which is the right solution, then we can
+just drop the other one.
+
+I actually started to do just this last evening. A31 boots without any
+gates bit mask but the USB clocks one so far, I intend on converting
+the others as well.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/7b35f4af/attachment.sig>
