@@ -1,248 +1,127 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 15 Jan 2015 17:40:37 +0100
-Subject: [PATCH v3 7/8] clocksource: atmel-st: use syscon/regmap
-In-Reply-To: <1421077023-30954-8-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-8-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B7ED85.2090700@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jan 2015 16:42:14 +0000
+Subject: [PATCH RESEND] arm64: respect mem= for EFI
+Message-ID: <1421340134-3206-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 04:37 PM, Alexandre Belloni wrote:
-> The register range from the system timer is also used by the watchdog driver.
-> Use a regmap to handle concurrent accesses.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->   drivers/clocksource/timer-atmel-st.c | 103 +++++++++++++----------------------
->   1 file changed, 39 insertions(+), 64 deletions(-)
->
-> diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-> index ed0267f1c892..557389306be5 100644
-> --- a/drivers/clocksource/timer-atmel-st.c
-> +++ b/drivers/clocksource/timer-atmel-st.c
-> @@ -24,20 +24,20 @@
->   #include <linux/irq.h>
->   #include <linux/clockchips.h>
->   #include <linux/export.h>
-> -#include <linux/of.h>
-> -#include <linux/of_address.h>
-> +#include <linux/mfd/atmel-st.h>
-> +#include <linux/mfd/syscon.h>
->   #include <linux/of_irq.h>
-> +#include <linux/regmap.h>
->
->   #include <asm/mach/time.h>
->   #include <asm/system_misc.h>
->
-> -#include <mach/at91_st.h>
-> -#include <mach/hardware.h>
-> -
->   static unsigned long last_crtr;
->   static u32 irqmask;
->   static struct clock_event_device clkevt;
-> +static struct regmap *regmap_st;
->
-> +#define AT91_SLOW_CLOCK		32768 /* DT compatibility */
->   #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
->
->   /*
-> @@ -47,11 +47,11 @@ static struct clock_event_device clkevt;
->    */
->   static inline unsigned long read_CRTR(void)
->   {
-> -	unsigned long x1, x2;
-> +	unsigned int x1, x2;
->
-> -	x1 = at91_st_read(AT91_ST_CRTR);
-> +	regmap_read(regmap_st, AT91_ST_CRTR, &x1);
->   	do {
-> -		x2 = at91_st_read(AT91_ST_CRTR);
-> +		regmap_read(regmap_st, AT91_ST_CRTR, &x2);
->   		if (x1 == x2)
->   			break;
->   		x1 = x2;
-> @@ -64,7 +64,10 @@ static inline unsigned long read_CRTR(void)
->    */
->   static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
->   {
-> -	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
-> +	u32 sr;
-> +
-> +	regmap_read(regmap_st, AT91_ST_SR, &sr);
-> +	sr &= irqmask;
->
->   	/*
->   	 * irqs should be disabled here, but as the irq is shared they are only
-> @@ -97,7 +100,7 @@ static struct irqaction at91rm9200_timer_irq = {
->   	.name		= "at91_tick",
->   	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
->   	.handler	= at91rm9200_timer_interrupt,
-> -	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
-> +	.irq		= 0,
->   };
->
->   static cycle_t read_clk32k(struct clocksource *cs)
-> @@ -116,23 +119,25 @@ static struct clocksource clk32k = {
->   static void
->   clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
->   {
-> +	unsigned int val;
-> +
->   	/* Disable and flush pending timer interrupts */
-> -	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
-> -	at91_st_read(AT91_ST_SR);
-> +	regmap_write(regmap_st, AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
-> +	regmap_read(regmap_st, AT91_ST_SR, &val);
->
->   	last_crtr = read_CRTR();
->   	switch (mode) {
->   	case CLOCK_EVT_MODE_PERIODIC:
->   		/* PIT for periodic irqs; fixed rate of 1/HZ */
->   		irqmask = AT91_ST_PITS;
-> -		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
-> +		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
->   		break;
->   	case CLOCK_EVT_MODE_ONESHOT:
->   		/* ALM for oneshot irqs, set by next_event()
->   		 * before 32 seconds have passed
->   		 */
->   		irqmask = AT91_ST_ALMS;
-> -		at91_st_write(AT91_ST_RTAR, last_crtr);
-> +		regmap_write(regmap_st, AT91_ST_RTAR, last_crtr);
->   		break;
->   	case CLOCK_EVT_MODE_SHUTDOWN:
->   	case CLOCK_EVT_MODE_UNUSED:
-> @@ -140,7 +145,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
->   		irqmask = 0;
->   		break;
->   	}
-> -	at91_st_write(AT91_ST_IER, irqmask);
-> +	regmap_write(regmap_st, AT91_ST_IER, irqmask);
->   }
->
->   static int
-> @@ -148,6 +153,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
->   {
->   	u32		alm;
->   	int		status = 0;
-> +	unsigned int	val;
->
->   	BUG_ON(delta < 2);
->
-> @@ -163,12 +169,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
->   	alm = read_CRTR();
->
->   	/* Cancel any pending alarm; flush any pending IRQ */
-> -	at91_st_write(AT91_ST_RTAR, alm);
-> -	at91_st_read(AT91_ST_SR);
-> +	regmap_write(regmap_st, AT91_ST_RTAR, alm);
-> +	regmap_read(regmap_st, AT91_ST_SR, &val);
->
->   	/* Schedule alarm by writing RTAR. */
->   	alm += delta;
-> -	at91_st_write(AT91_ST_RTAR, alm);
-> +	regmap_write(regmap_st, AT91_ST_RTAR, alm);
->
->   	return status;
->   }
-> @@ -186,47 +192,8 @@ static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
->   	/*
->   	 * Perform a hardware reset with the use of the Watchdog timer.
->   	 */
-> -	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> -}
-> -
-> -void __iomem *at91_st_base;
-> -EXPORT_SYMBOL_GPL(at91_st_base);
-> -
-> -static struct of_device_id at91rm9200_st_timer_ids[] = {
-> -	{ .compatible = "atmel,at91rm9200-st" },
-> -	{ /* sentinel */ }
-> -};
-> -
-> -static int __init of_at91rm9200_st_init(void)
-> -{
-> -	struct device_node *np;
-> -	int ret;
-> -
-> -	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
-> -	if (!np)
-> -		goto err;
-> -
-> -	at91_st_base = of_iomap(np, 0);
-> -	if (!at91_st_base)
-> -		goto node_err;
-> -
-> -	/* Get the interrupts property */
-> -	ret = irq_of_parse_and_map(np, 0);
-> -	if (!ret)
-> -		goto ioremap_err;
-> -	at91rm9200_timer_irq.irq = ret;
-> -
-> -	of_node_put(np);
-> -
-> -	return 0;
-> -
-> -ioremap_err:
-> -	iounmap(at91_st_base);
-> -node_err:
-> -	of_node_put(np);
-> -err:
-> -	return -EINVAL;
-> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
->   }
->
->   /*
-> @@ -234,13 +201,21 @@ err:
->    */
->   static void __init atmel_st_timer_init(struct device_node *node)
->   {
-> -	/* For device tree enabled device: initialize here */
-> -	of_at91rm9200_st_init();
-> +	unsigned int val;
-> +
-> +	regmap_st = syscon_node_to_regmap(node);
-> +	if (IS_ERR(regmap_st))
-> +		panic(pr_fmt("Unable to get regmap\n"));
+I posted this back in December [1], but due to some dependence on Ard's EFI
+series it wasn't picked up. Now that's in the arm64 for-next/core branch, it
+would be nice if this could be picked up along with Ard's failed remap handling
+patch [2].
 
-Is it possible to get ride of those panics ? IIRC, we discussed to not 
-panic when a timer was not initialized in case there is a definition for 
-another one.
+I've given this a run on Juno with mem=128m, which seems to work:
 
->
->   	/* Disable all timer interrupts, and clear any pending ones */
-> -	at91_st_write(AT91_ST_IDR,
-> +	regmap_write(regmap_st, AT91_ST_IDR,
->   		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
-> -	at91_st_read(AT91_ST_SR);
-> +	regmap_read(regmap_st, AT91_ST_SR, &val);
-> +
-> +	/* Get the interrupts property */
-> +	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
-> +	if (!at91rm9200_timer_irq.irq)
-> +		panic(pr_fmt("Unable to get IRQ from DT\n"));
->
->   	/* Make IRQs happen for the system timer */
->   	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
-> @@ -249,7 +224,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
->   	 * directly for the clocksource and all clockevents, after adjusting
->   	 * its prescaler from the 1 Hz default.
->   	 */
-> -	at91_st_write(AT91_ST_RTMR, 1);
-> +	regmap_write(regmap_st, AT91_ST_RTMR, 1);
->
->   	/* Setup timer clockevent, with minimum of two ticks (important!!) */
->   	clkevt.cpumask = cpumask_of(0);
->
+nanook at localhost:~$ head /proc/meminfo 
+MemTotal:         106624 kB
+MemFree:           59572 kB
+MemAvailable:      73228 kB
+Buffers:               0 kB
+Cached:            15796 kB
+SwapCached:            0 kB
+Active:            19624 kB
+Inactive:           7796 kB
+Active(anon):      11648 kB
+Inactive(anon):       88 kB
 
+Thanks,
+Mark.
 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308633.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316540.html
+
+---->8----
+When booting with EFI, we acquire the EFI memory map after parsing the
+early params. This unfortuantely renders the option useless as we call
+memblock_enforce_memory_limit (which uses memblock_remove_range behind
+the scenes) before we've added any memblocks. We end up removing
+nothing, then adding all of memory later when efi_init calls
+reserve_regions.
+
+Instead, we can log the limit and apply this later when we do the rest
+of the memblock work in memblock_init, which should work regardless of
+the presence of EFI. At the same time we may as well move the early
+parameter into arm64's mm/init.c, close to arm64_memblock_init.
+
+Any memory which must be mapped (e.g. for use by EFI runtime services)
+must be mapped explicitly reather than relying on the linear mapping,
+which may be truncated as a result of a mem= option passed on the kernel
+command line.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/setup.c | 19 -------------------
+ arch/arm64/mm/init.c      | 19 +++++++++++++++++++
+ 2 files changed, 19 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 199d1b7..207413f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -322,25 +322,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
+ }
+ 
+-/*
+- * Limit the memory size that was specified via FDT.
+- */
+-static int __init early_mem(char *p)
+-{
+-	phys_addr_t limit;
+-
+-	if (!p)
+-		return 1;
+-
+-	limit = memparse(p, &p) & PAGE_MASK;
+-	pr_notice("Memory limited to %lldMB\n", limit >> 20);
+-
+-	memblock_enforce_memory_limit(limit);
+-
+-	return 0;
+-}
+-early_param("mem", early_mem);
+-
+ static void __init request_standard_resources(void)
+ {
+ 	struct memblock_region *region;
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index bac492c..11c7b70 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -136,10 +136,29 @@ static void arm64_memory_present(void)
+ }
+ #endif
+ 
++static phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
++
++/*
++ * Limit the memory size that was specified via FDT.
++ */
++static int __init early_mem(char *p)
++{
++	if (!p)
++		return 1;
++
++	memory_limit = memparse(p, &p) & PAGE_MASK;
++	pr_notice("Memory limited to %lldMB\n", memory_limit >> 20);
++
++	return 0;
++}
++early_param("mem", early_mem);
++
+ void __init arm64_memblock_init(void)
+ {
+ 	phys_addr_t dma_phys_limit = 0;
+ 
++	memblock_enforce_memory_limit(memory_limit);
++
+ 	/*
+ 	 * Register the kernel text, kernel data, initrd, and initial
+ 	 * pagetables with memblock.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
