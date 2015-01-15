@@ -1,47 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Jan 2015 17:28:44 +0000
-Subject: [PATCH v3 13/21] ARM: omap: convert wakeupgen to stacked domains
-In-Reply-To: <20150115170443.GF18552@atomide.com>
-References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
- <1421087187-26988-14-git-send-email-marc.zyngier@arm.com>
- <20150114222814.GU2419@atomide.com>
- <871tmwi0d6.fsf@approximate.cambridge.arm.com>
- <20150115144016.GA19920@kahuna>
- <87sifcgksy.fsf@approximate.cambridge.arm.com>
- <20150115170443.GF18552@atomide.com>
-Message-ID: <54B7F8CC.3070901@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Jan 2015 18:30:12 +0100
+Subject: [PATCH v4 4/5] ARM: mediatek: Add EINT support to MTK pinctrl
+ driver.
+In-Reply-To: <1421202745.27675.148.camel@mtksdaap41>
+References: <1418772873-19747-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1418772873-19747-5-git-send-email-hongzhou.yang@mediatek.com>
+ <1418807365.6443.17.camel@mtksdaap41>
+ <1420535817.17567.10.camel@mtksdaap41>
+ <CACRpkdb2KJbjzFgTmDvHSw7jNAExxVtU3y4_fgyn6J8hcW5OrQ@mail.gmail.com>
+ <1421202745.27675.148.camel@mtksdaap41>
+Message-ID: <CACRpkdY7_A_rORDvDrGtV0aa6mJGj=Sr-k=KVGu_=0et-gNpiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/15 17:04, Tony Lindgren wrote:
-> * Marc Zyngier <marc.zyngier@arm.com> [150115 06:53]:
->> On Thu, Jan 15 2015 at  2:40:16 pm GMT, Nishanth Menon <nm@ti.com> wrote:
->>> On 14:28-20150115, Marc Zyngier wrote:
->>>> Assuming the workaround I posted earlier works, the OMAP/DRA7 part of
->>>> this series is going to require some rework too (I need to know where
->>>> these legacy interrupts are attached: crossbar, WUGEN, or GIC?).
->>>>
->>> crossbar will never work with legacy static interrupts anyways - since
->>> there was never a static interrupt possible - I believe we had removed
->>> all the legacy hardcoded interrupt definitions for DRA7. ideally, they
->>> should all be dt only now.
->>
->> Yes, I guessed as much after looking at the DRA7XX hwmod.
->>
->> So only OMAP4/5 is b0rken at the moment. I can probably work around it
->> as I did in this example patch, just by changing the compatible strings
->> for the xlate callback. Very ugly.
-> 
-> For the -rc, it seems the wakeupen still needs a fix as based on grepping
-> for OMAP44XX_IRQ_GIC_START. Got any great ideas for that?
+On Wed, Jan 14, 2015 at 3:32 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
 
-I think this one is fine. It computes the SPI number based on the hwirq
-coming from the GIC. That direction is completely unaffected by the
-linear domain stuff. It is only when you try to use a hardware IRQ as a
-Linux IRQ that you run into trouble.
+> Let's me describe my problem more clearly. On our SoC, if a pin support
+> interrupt it will have 2 different numbers for it. For examples, here's
+> a partial list for the gpio and EINT number mappings on mt8135:
+>
+>    gpio  EINT
+>      0     49
+>      1     48
+>     ...........
+>     36     97
+>     37     19
+>     ...........
+>
+> To control interrupt related function, we'll need EINT number to locate
+> corresponding register bits. When interrupt occurs, the interrupt
+> handler will know which EINT interrupt occurs. In irq_chip functions,
+> only .irq_request_resources and .irq_release_resources use gpio number
+> to set pinmux to EINT mode and all the others need EINT number.
+>
+> Because EINT number is used more frequently in interrupt related
+> functions, it make sense to use EINT number as hwirq instead of gpio
+> number. That means irq_domain will translate EINT number to virq.
+> So what mtk_gpio_to_irq actually do is translate gpio number to EINT
+> number and use irq domain to translate it to virq.
 
-Thanks,
+But the EINT is not a hardware number is it?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+That sounds like an abuse of the irqdomain framework.
+
+The purpose of that code is to map hardware IRQs to Linux
+IRQs nothing else.
+
+This sounds more like mapping a Linux IRQ (the EINT) to
+another Linux IRQ (whatever the irqdomain allocates for
+you).
+
+Since the EINTs are already Linux IRQs, these should be used
+directly.
+
+I would solve this by just having some cross-reference table
+for mapping GPIOs to EINTs without involving the irqdomain
+at all.
+
+struct eint_map {
+    int gpio_offset;
+    int eint;
+};
+
+But also check with the irqdomain people.
+
+Yours,
+Linus Walleij
