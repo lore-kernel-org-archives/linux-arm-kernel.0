@@ -1,48 +1,43 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 15 Jan 2015 13:09:30 +0300
-Subject: [PATCH 1/5] ARM: sa1100: add platform functions to handle PWER
- settings
-Message-ID: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
+Date: Thu, 15 Jan 2015 13:09:31 +0300
+Subject: [PATCH 2/5] ARM: sa1100: use sa11x0_sc_set_wake() in irq driver
+In-Reply-To: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
+References: <1421316574-10022-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1421316574-10022-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWER settings logically belongs neither to GPIO nor to system IRQ code.
-Add special functions to handle PWER (for GPIO and for system IRQs)
-from platform code.
+Use new function controlling PWER register in IRQ driver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-sa1100/generic.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/mach-sa1100/irq.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 40e0d86..022e451 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -416,3 +416,24 @@ void sa1110_mb_enable(void)
- 	local_irq_restore(flags);
+diff --git a/arch/arm/mach-sa1100/irq.c b/arch/arm/mach-sa1100/irq.c
+index 65aebfa..7a5aa56 100644
+--- a/arch/arm/mach-sa1100/irq.c
++++ b/arch/arm/mach-sa1100/irq.c
+@@ -40,19 +40,9 @@ static void sa1100_unmask_irq(struct irq_data *d)
+ 	ICMR |= BIT(d->hwirq);
  }
  
-+int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
-+{
-+	if (on)
-+		PWER |= BIT(gpio);
-+	else
-+		PWER &= ~BIT(gpio);
-+
-+	return 0;
-+}
-+
-+int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
-+{
-+	if (BIT(irq) != IC_RTCAlrm)
-+		return -EINVAL;
-+
-+	if (on)
-+		PWER |= PWER_RTC;
-+	else
-+		PWER &= ~PWER_RTC;
-+	return 0;
-+}
+-/*
+- * Apart form GPIOs, only the RTC alarm can be a wakeup event.
+- */
+ static int sa1100_set_wake(struct irq_data *d, unsigned int on)
+ {
+-	if (BIT(d->hwirq) == IC_RTCAlrm) {
+-		if (on)
+-			PWER |= PWER_RTC;
+-		else
+-			PWER &= ~PWER_RTC;
+-		return 0;
+-	}
+-	return -EINVAL;
++	return sa11x0_sc_set_wake(d->hwirq, on);
+ }
+ 
+ static struct irq_chip sa1100_normal_chip = {
 -- 
 2.1.4
