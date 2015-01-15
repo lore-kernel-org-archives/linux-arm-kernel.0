@@ -1,130 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 15 Jan 2015 08:16:10 +0800
-Subject: [PATCH v2] gpio: sx150x: add dts support for sx150x driver
-Message-ID: <1421280970-5740-1-git-send-email-21cnbao@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Jan 2015 15:12:02 +0000
+Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
+In-Reply-To: <CAMJs5B-Ybrf7GQ+u70Z8bDCh7uHTwwCQa6Q3dh2BoL5qaUtOUA@mail.gmail.com>
+References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
+ <20150112194440.GB26222@cbox> <20150115124251.GE16217@leverpostej>
+ <CAMJs5B-Ybrf7GQ+u70Z8bDCh7uHTwwCQa6Q3dh2BoL5qaUtOUA@mail.gmail.com>
+Message-ID: <20150115151202.GC2329@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Chen <Wei.Chen@csr.com>
+On Thu, Jan 15, 2015 at 01:08:00PM +0000, Christoffer Dall wrote:
+> On Thu, Jan 15, 2015 at 1:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Jan 12, 2015 at 07:44:40PM +0000, Christoffer Dall wrote:
+> >> On Mon, Jan 12, 2015 at 04:45:13PM +0000, Mark Rutland wrote:
+> >> > Currently we have two sets of macros used for ESR_ELx handling, one used
+> >> > by core arm64 code and the other used by KVM. These differ slightly in
+> >> > naming convention and style of definition.
+> >> >
+> >> > This patch series introduces and migrates all users to a common set of
+> >> > macros for ESR_ELx handling, preventing further drift.
+> >> >
+> >> > Additionally this series adds exception class decoding when reporting
+> >> > exceptions, saving deveopers from having to perform tedious mental
+> >> > arithmetic to figure out what the likely cause of an unexpected
+> >> > exception was.
+> >> >
+> >> > Since v1 [1]:
+> >> > * Reorder patches to maintain KVM bisectability.
+> >> > * Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
+> >> > * Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of
+> >> >   kvm_vcpu_dabt_get_as.
+> >> > * Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
+> >> >   list.
+> >> >
+> >> For the series:
+> >>
+> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>
+> >> I also tested this with KVM on APM XGene and Juno with UEFI+Linux as a
+> >> guest.
+> >
+> > Thanks, Christoffer. It's much appreciated.
+> >
+> > Catalin, Christoffer, do you have a preferred path for merging this?
+> > Should this go through the arm64 or KVM tree as a whole?
+>
+> Would make sense to merge it as whole.
 
-Current sx150x gpio expander driver doesn't support
-DTS. Now we added dts support for this driver.
+Indeed.
 
-Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- .../devicetree/bindings/gpio/gpio-sx150x.txt       | 40 ++++++++++++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- drivers/gpio/gpio-sx150x.c                         | 17 ++++++++-
- 3 files changed, 57 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sx150x.txt
+> I don't care which path, let's
+> just minimize conflicts. For big things, I have GICv3, dirty page
+> logging, and Marc's fixes, but they shouldn't touch much of the same
+> code (maybe the same files, but I don't think the same lines), so it's
+> up to you Catalin?
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-sx150x.txt b/Documentation/devicetree/bindings/gpio/gpio-sx150x.txt
-new file mode 100644
-index 0000000..ba2bb84
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-sx150x.txt
-@@ -0,0 +1,40 @@
-+SEMTECH SX150x GPIO expander bindings
-+
-+
-+Required properties:
-+
-+- compatible: should be "semtech,sx1506q",
-+			"semtech,sx1508q",
-+			"semtech,sx1509q".
-+
-+- reg: The I2C slave address for this device.
-+
-+- interrupt-parent: phandle of the parent interrupt controller.
-+
-+- interrupts: Interrupt specifier for the controllers interrupt.
-+
-+- #gpio-cells: Should be 2. The first cell is the GPIO number and the
-+		second cell is used to specify optional parameters:
-+		bit 0: polarity (0: normal, 1: inverted)
-+
-+- gpio-controller: Marks the device as a GPIO controller.
-+
-+- interrupt-controller: Marks the device as a interrupt controller.
-+
-+The GPIO expander can optionally be used as an interrupt controller, in
-+which case it uses the default two cell specifier as described in
-+Documentation/devicetree/bindings/interrupt-controller/interrupts.txt.
-+
-+Example:
-+
-+	i2c_gpio_expander at 20{
-+		#gpio-cells = <2>;
-+		#interrupt-cells = <2>;
-+		compatible = "semtech,sx1506q";
-+		reg = <0x20>;
-+		interrupt-parent = <&gpio_1>;
-+		interrupts = <16 0>;
-+
-+		gpio-controller;
-+		interrupt-controller;
-+	};
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index b1df0ad..ce751cb 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -141,6 +141,7 @@ sandisk	Sandisk Corporation
- sbs	Smart Battery System
- schindler	Schindler
- seagate	Seagate Technology PLC
-+semtech	Semtech Corporation
- sil	Silicon Image
- silabs	Silicon Laboratories
- simtek
-diff --git a/drivers/gpio/gpio-sx150x.c b/drivers/gpio/gpio-sx150x.c
-index b32fb38..1343745 100644
---- a/drivers/gpio/gpio-sx150x.c
-+++ b/drivers/gpio/gpio-sx150x.c
-@@ -23,6 +23,11 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- #include <linux/i2c/sx150x.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_device.h>
- 
- #define NO_UPDATE_PENDING	-1
- 
-@@ -147,6 +152,13 @@ static const struct i2c_device_id sx150x_id[] = {
- };
- MODULE_DEVICE_TABLE(i2c, sx150x_id);
- 
-+static const struct of_device_id sx150x_dt_id[] = {
-+	{ .compatible = "semtech,sx1508q" },
-+	{ .compatible = "semtech,sx1509q" },
-+	{ .compatible = "semtech,sx1506q" },
-+	{},
-+};
-+
- static s32 sx150x_i2c_write(struct i2c_client *client, u8 reg, u8 val)
- {
- 	s32 err = i2c_smbus_write_byte_data(client, reg, val);
-@@ -472,6 +484,8 @@ static void sx150x_init_chip(struct sx150x_chip *chip,
- 	chip->gpio_chip.base             = pdata->gpio_base;
- 	chip->gpio_chip.can_sleep        = true;
- 	chip->gpio_chip.ngpio            = chip->dev_cfg->ngpios;
-+	chip->gpio_chip.of_node          = client->dev.of_node;
-+	chip->gpio_chip.of_gpio_n_cells  = 2;
- 	if (pdata->oscio_is_gpo)
- 		++chip->gpio_chip.ngpio;
- 
-@@ -666,7 +680,8 @@ static int sx150x_remove(struct i2c_client *client)
- static struct i2c_driver sx150x_driver = {
- 	.driver = {
- 		.name = "sx150x",
--		.owner = THIS_MODULE
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(sx150x_dt_id),
- 	},
- 	.probe    = sx150x_probe,
- 	.remove   = sx150x_remove,
+I don't have a strong preference but since Christoffer doesn't have one
+either, I'll merge them via the arm64 tree (there are 4 arm64 patches vs
+3 kvm ones ;)).
+
 -- 
-1.9.1
+Catalin
