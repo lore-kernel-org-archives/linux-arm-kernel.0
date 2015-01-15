@@ -1,246 +1,78 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 15:59:28 +0100
-Subject: [PATCH v2 5/8] ARM: at91: remove useless map_io
-In-Reply-To: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421333971-7581-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Thu, 15 Jan 2015 16:04:14 +0100
+Subject: [PATCH 1/3] input: tsc2007: Add pre-calibration,
+ flipping and rotation
+In-Reply-To: <20150115143855.GD512@earth.universe>
+References: <1412108254-19234-1-git-send-email-marek@goldelico.com>
+ <1412108254-19234-2-git-send-email-marek@goldelico.com>
+ <CAAfyv36bD9ZratOzr7FkeQde8k-K9XjEjH9gkntm9qewD-cH9g@mail.gmail.com>
+ <20150115005938.GB9134@dtor-ws>
+ <0F9A17C1-9B01-4EE9-BE98-266B8FC02B84@goldelico.com>
+ <20150115143855.GD512@earth.universe>
+Message-ID: <2C4E66DD-1764-4DCA-A58A-78A6986EF7F1@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the SRAM is initialized by the mmio-sram driver, .map_io is useless.
-remove it.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91rm9200.c  |  6 ------
- arch/arm/mach-at91/at91sam9260.c | 27 ---------------------------
- arch/arm/mach-at91/at91sam9261.c |  9 ---------
- arch/arm/mach-at91/at91sam9263.c |  7 -------
- arch/arm/mach-at91/at91sam9g45.c |  7 -------
- arch/arm/mach-at91/at91sam9n12.c |  6 ------
- arch/arm/mach-at91/at91sam9rl.c  | 18 ------------------
- arch/arm/mach-at91/at91sam9x5.c  |  6 ------
- arch/arm/mach-at91/sama5d3.c     |  6 ------
- 9 files changed, 92 deletions(-)
+Am 15.01.2015 um 15:38 schrieb Sebastian Reichel <sre@kernel.org>:
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index b52916947535..fc7c26138037 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -42,11 +42,6 @@ static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
- /* --------------------------------------------------------------------
-  *  AT91RM9200 processor initialization
-  * -------------------------------------------------------------------- */
--static void __init at91rm9200_map_io(void)
--{
--	/* Map peripherals */
--	at91_init_sram(0, AT91RM9200_SRAM_BASE, AT91RM9200_SRAM_SIZE);
--}
- 
- static void __init at91rm9200_initialize(void)
- {
-@@ -56,6 +51,5 @@ static void __init at91rm9200_initialize(void)
- 
- 
- AT91_SOC_START(at91rm9200)
--	.map_io = at91rm9200_map_io,
- 	.init = at91rm9200_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 34e2abe82ae4..ab9841c8b0d5 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -22,38 +22,11 @@
-  *  AT91SAM9260 processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init at91sam9xe_map_io(void)
--{
--	unsigned long sram_size;
--
--	switch (at91_soc_initdata.cidr & AT91_CIDR_SRAMSIZ) {
--		case AT91_CIDR_SRAMSIZ_32K:
--			sram_size = 2 * SZ_16K;
--			break;
--		case AT91_CIDR_SRAMSIZ_16K:
--		default:
--			sram_size = SZ_16K;
--	}
--
--	at91_init_sram(0, AT91SAM9XE_SRAM_BASE, sram_size);
--}
--
--static void __init at91sam9260_map_io(void)
--{
--	if (cpu_is_at91sam9xe())
--		at91sam9xe_map_io();
--	else if (cpu_is_at91sam9g20())
--		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
--	else
--		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
--}
--
- static void __init at91sam9260_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- }
- 
- AT91_SOC_START(at91sam9260)
--	.map_io = at91sam9260_map_io,
- 	.init = at91sam9260_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 47878b849975..2029096b93fa 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -21,20 +21,11 @@
-  *  AT91SAM9261 processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init at91sam9261_map_io(void)
--{
--	if (cpu_is_at91sam9g10())
--		at91_init_sram(0, AT91SAM9G10_SRAM_BASE, AT91SAM9G10_SRAM_SIZE);
--	else
--		at91_init_sram(0, AT91SAM9261_SRAM_BASE, AT91SAM9261_SRAM_SIZE);
--}
--
- static void __init at91sam9261_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- }
- 
- AT91_SOC_START(at91sam9261)
--	.map_io = at91sam9261_map_io,
- 	.init = at91sam9261_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index aabcb66145d0..1fe672a05513 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -20,18 +20,11 @@
-  *  AT91SAM9263 processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init at91sam9263_map_io(void)
--{
--	at91_init_sram(0, AT91SAM9263_SRAM0_BASE, AT91SAM9263_SRAM0_SIZE);
--	at91_init_sram(1, AT91SAM9263_SRAM1_BASE, AT91SAM9263_SRAM1_SIZE);
--}
--
- static void __init at91sam9263_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- }
- 
- AT91_SOC_START(at91sam9263)
--	.map_io = at91sam9263_map_io,
- 	.init = at91sam9263_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index b044dbcc0dcc..f3130501fa75 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -20,18 +20,11 @@
- /* --------------------------------------------------------------------
-  *  AT91SAM9G45 processor initialization
-  * -------------------------------------------------------------------- */
--
--static void __init at91sam9g45_map_io(void)
--{
--	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
--}
--
- static void __init at91sam9g45_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- }
- 
- AT91_SOC_START(at91sam9g45)
--	.map_io = at91sam9g45_map_io,
- 	.init = at91sam9g45_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 0135f868ea4f..b5ea69a3eaf6 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -16,11 +16,5 @@
-  *  AT91SAM9N12 processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init at91sam9n12_map_io(void)
--{
--	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
--}
--
- AT91_SOC_START(at91sam9n12)
--	.map_io = at91sam9n12_map_io,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 7d303c132032..dab3c0d47f96 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -22,29 +22,11 @@
-  *  AT91SAM9RL processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init at91sam9rl_map_io(void)
--{
--	unsigned long sram_size;
--
--	switch (at91_soc_initdata.cidr & AT91_CIDR_SRAMSIZ) {
--		case AT91_CIDR_SRAMSIZ_32K:
--			sram_size = 2 * SZ_16K;
--			break;
--		case AT91_CIDR_SRAMSIZ_16K:
--		default:
--			sram_size = SZ_16K;
--	}
--
--	/* Map SRAM */
--	at91_init_sram(0, AT91SAM9RL_SRAM_BASE, sram_size);
--}
--
- static void __init at91sam9rl_initialize(void)
- {
- 	arm_pm_idle = at91sam9_idle;
- }
- 
- AT91_SOC_START(at91sam9rl)
--	.map_io = at91sam9rl_map_io,
- 	.init = at91sam9rl_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index aa17520ccb0a..7b60a529db01 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -16,11 +16,5 @@
-  *  AT91SAM9x5 processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init at91sam9x5_map_io(void)
--{
--	at91_init_sram(0, AT91SAM9X5_SRAM_BASE, AT91SAM9X5_SRAM_SIZE);
--}
--
- AT91_SOC_START(at91sam9x5)
--	.map_io = at91sam9x5_map_io,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index ae58feada72b..b7c64ca7107f 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -25,11 +25,5 @@
-  *  AT91SAM9x5 processor initialization
-  * -------------------------------------------------------------------- */
- 
--static void __init sama5d3_map_io(void)
--{
--	at91_init_sram(0, SAMA5D3_SRAM_BASE, SAMA5D3_SRAM_SIZE);
--}
--
- AT91_SOC_START(sama5d3)
--	.map_io = sama5d3_map_io,
- AT91_SOC_END
--- 
-2.1.0
+> Hi,
+> 
+> On Thu, Jan 15, 2015 at 08:36:44AM +0100, Dr. H. Nikolaus Schaller wrote:
+>>> 1. Perform conversion in input core rather than individual drivers. I
+>>> think we should allocate a new bitmaps for some transformations and have
+>>> the code do X/Y flip/clip of the coordinates.
+>> 
+>> Do you have a suggestion where this should be (I have no clue how
+>> the input system works or is structured - we just know how to extend a
+>> driver that uses it)?
+>> 
+>>> 2. Standardize on bindings. We already have of-touchscreen.c doing
+>>> rudimentary parsing, we shoudl look into extending it rather than
+>>> creating myriad of driver-specific bindings.
+>> 
+>> Ok, looks reasonable.
+> 
+> Documentation is in 
+> 
+> Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
+> 
+>>> Also, do we need swap and flip or do we simply need rotation (like the
+>>> proposed Broadcom iproc driver has)?
+>> 
+>> Well, since the DT should describe hardware, there are 3 sets of wires which
+>> can have a cross-over: X+ and X-, Y+ and Y-, X and Y.
+>> 
+>> So IMHO hardware has no ?rotation?, just crossover of wires. Rotation is an
+>> interpretation of the result of these connections in combination with some
+>> panel the touch is glued to and should therefore not be represented in the DT.
+>> 
+>> As a result we have proposed a scheme without explicit rotation. We specify what
+>> coordinates X- and X+ should report at their ends (min, max) because the DT
+>> programmer has to specify them anyways. Flipping is a result of defining these
+>> coordinates in an ascending or descending way. Only swapping of the X and Y
+>> wires can?t be implicitly defined so it has its own property. So the scheme we
+>> have proposed tries to optimize the efforts needed to adapt new boards and write
+>> DTs and focus the DT on hardware description.
+>> 
+>> As a bonus we also specify the min and max value to be reported for the touch
+>> pressure (Z axis) using the same basic principle.
+>> 
+>> And it is a pure add-on on top of the existing driver so that it attempts not
+>> to break existing device trees.
+> 
+> from what I can see there are no in-tree-users using any of the
+> new properties.
+
+Not yet. But our [patch 2/3] of this series defines the DT entry for the GTA04 devices:
+
+https://lkml.org/lkml/2014/9/30/663
+
+> 
+>> Maybe could you accept it as a first step for this specific driver (and let?s do
+>> the big standardization work later on)?
+> 
+> That does not work, since you create an ABI.
+
+Hm. I don?t understand what you mean with creating an ABI?
