@@ -1,27 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Jan 2015 17:16:01 +0100
-Subject: [PATCH v2 RESEND 2/3] Documentation: gpio: Add APM X-Gene standby
- GPIO controller DTS binding
-In-Reply-To: <CAL4ahLfcMsu2i2efiwq96a3YD4dChBEuJeEnQ7tsZH6et8H=sw@mail.gmail.com>
-References: <1418793050-26927-1-git-send-email-yvo@apm.com>
- <1418793050-26927-3-git-send-email-yvo@apm.com>
- <CACRpkdbcdf7Ub9uYbeqUe1La1dnVeWCxK8N7=iVZuBtuKHFHFA@mail.gmail.com>
- <CAL4ahLfcMsu2i2efiwq96a3YD4dChBEuJeEnQ7tsZH6et8H=sw@mail.gmail.com>
-Message-ID: <CACRpkdaQWf6jOFkX1Lq0NWm_wfxw1NuajOwpJwA5_sZ8CdAa4Q@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 15 Jan 2015 17:17:11 +0100
+Subject: [PATCH v3 4/8] ARM: at91: time: move the system timer driver
+ to drivers/clocksource
+In-Reply-To: <1421077023-30954-5-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421077023-30954-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B7E807.4050301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 10:41 AM, Y Vo <yvo@apm.com> wrote:
-> Yes, exactly 6 interrupts. As I describe before:
-> - There are 22 GPIO_DSs.
-> - Only 6 GPIO_DSs from 0x08..0xD which supports interrupts
+On 01/12/2015 04:36 PM, Alexandre Belloni wrote:
+> Import at91rm9200_time.c from mach-at91 as timer-atmel-st.c. Further cleanup is
+> required to get rid of the mach-at91 headers.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-What I'm saying is that you need to describe this in the binding
-document itself.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-If you described it somewhere else doesn't count.
+> ---
+>   arch/arm/mach-at91/Makefile                                           | 2 +-
+>   drivers/clocksource/Kconfig                                           | 4 ++++
+>   drivers/clocksource/Makefile                                          | 1 +
+>   .../at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c         | 0
+>   4 files changed, 6 insertions(+), 1 deletion(-)
+>   rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (100%)
+>
+> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+> index 7b6424d40764..5d1ee3a6f115 100644
+> --- a/arch/arm/mach-at91/Makefile
+> +++ b/arch/arm/mach-at91/Makefile
+> @@ -7,7 +7,7 @@ obj-y		:= setup.o sysirq_mask.o
+>   obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+>
+>   # CPU-specific support
+> -obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
+> +obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
+>   obj-$(CONFIG_SOC_AT91SAM9260)	+= at91sam9260.o
+>   obj-$(CONFIG_SOC_AT91SAM9261)	+= at91sam9261.o
+>   obj-$(CONFIG_SOC_AT91SAM9263)	+= at91sam9263.o
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index fc01ec27d3c8..ebc6dd77136e 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -128,6 +128,10 @@ config ATMEL_PIT
+>   	select CLKSRC_OF if OF
+>   	def_bool SOC_AT91SAM9 || SOC_SAMA5
+>
+> +config ATMEL_ST
+> +	select CLKSRC_OF if OF
+> +	def_bool SOC_AT91RM9200
+> +
+>   config CLKSRC_METAG_GENERIC
+>   	def_bool y if METAG
+>   	help
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 94d90b24b56b..b7380ded4e4c 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -1,5 +1,6 @@
+>   obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
+>   obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+> +obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+>   obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
+>   obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
+>   obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
+> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/drivers/clocksource/timer-atmel-st.c
+> similarity index 100%
+> rename from arch/arm/mach-at91/at91rm9200_time.c
+> rename to drivers/clocksource/timer-atmel-st.c
+>
 
-So update the patch.
 
-Yours,
-Linus Walleij
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
