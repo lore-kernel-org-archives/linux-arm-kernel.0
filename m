@@ -1,75 +1,115 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Jan 2015 07:28:39 -0800
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-In-Reply-To: <20150115105035.GU11502@n2100.arm.linux.org.uk>
-References: <20150114221407.GS2419@atomide.com>
- <20150115105035.GU11502@n2100.arm.linux.org.uk>
-Message-ID: <20150115152838.GB18552@atomide.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 15 Jan 2015 16:31:55 +0100
+Subject: [PATCH v2 0/5] ARM: KVM: Enable the ioeventfd capability of KVM
+ on ARM
+In-Reply-To: <CADDJ2=M2UjsV0U9cFiRoKghWSckWje+h6M-XQ-0dqPrH3BXp1A@mail.gmail.com>
+References: <20141207093641.17563.84226.stgit@i3820>
+ <54B440D0.6090707@linaro.org>
+ <CADDJ2=M2UjsV0U9cFiRoKghWSckWje+h6M-XQ-0dqPrH3BXp1A@mail.gmail.com>
+Message-ID: <54B7DD6B.1060002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150115 02:53]:
-> On Wed, Jan 14, 2015 at 02:14:08PM -0800, Tony Lindgren wrote:
-> > Hi all,
-> > 
-> > Looks like the legacy IRQ numbers are now all wrong at least for omap4
-> > since commit 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain.").
-> > 
-> > Instead of this:
-> > 
-> > # cat /proc/interrupts 
-> >             CPU0       CPU1       
-> >  29:       1124        981       GIC  29  twd
-> >  39:          0          0       GIC  39  TWL6030-PIH
-> >  41:          0          0       GIC  41  l3-dbg-irq
-> >  42:          0          0       GIC  42  l3-app-irq
-> >  44:          0          0       GIC  44  DMA
-> >  45:       7854          0       GIC  45  omap-dma-engine
-> >  52:          0          0       GIC  52  gpmc
-> > ...
-> > 
-> > 
-> > We now have:
-> > 
-> > # cat /proc/interrupts 
-> >             CPU0       CPU1       
-> >  16:        343          0       GIC  69  gp_timer
-> >  17:       1160       1017       GIC  29  twd
-> >  18:          0          0       GIC  41  l3-dbg-irq
-> >  19:          1          0       GIC  42  l3-app-irq
-> >  22:       7850          0       GIC  45  omap-dma-engine
-> >  44:          0          0  4a310000.gpio  18  DMA
-> >  61:       2730          0  48055000.gpio   2  eth0
-> > 223:          0          0       GIC  52  gpmc
-> > ...
-> > 
-> > So the DMA interrupt using the legacy mapping with something like
-> > irq = 12 + OMAP44XX_IRQ_GIC_START now is wrong and unfortunately
-> > at least omaps still have a bunch of the legacy interrupts still
-> > around.
-> > 
-> > And that naturally produces all kinds of strange errors like:
-> > 
-> > WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x214/0x340()
-> > 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4CFG (Idle): Data Access in Supervisor mode during Functional access
-> > ...
-> > [<c05f21e4>] (__irq_svc) from [<c05f1974>] (_raw_spin_unlock_irqrestore+0x34/0x44)
-> > [<c05f1974>] (_raw_spin_unlock_irqrestore) from [<c00914a8>] (__setup_irq+0x244/0x530)
-> > [<c00914a8>] (__setup_irq) from [<c00917d4>] (setup_irq+0x40/0x8c)
-> > [<c00917d4>] (setup_irq) from [<c0039c8c>] (omap_system_dma_probe+0x1d4/0x2b4)
-> > [<c0039c8c>] (omap_system_dma_probe) from [<c03b2200>] (platform_drv_probe+0x44/0xa4)
-> > ...
+On 01/15/2015 04:25 PM, Nikolay Nikolaev wrote:
 > 
-> I don't think we've proven a link there.  While you're right that it
-> causes the wrong interrupt to be claimed, I have two kernels here,
-> both claim the same interrupt, one which is multi-platform and issues
-> that strange warning, and one which targets only OMAP4 which doesn't.
 > 
-> There's something else going on which causes the bus errors which we
-> haven't found.
+> On Mon, Jan 12, 2015 at 11:46 PM, Eric Auger <eric.auger@linaro.org
+> <mailto:eric.auger@linaro.org>> wrote:
+> 
+>     Hi Nikolay,
+> 
+>     looks good to me overall. A rebase on Christoffer's vgic init series
+> 
+> is there a tree where these patches are published?
+Hi Nikolay,
 
-I think it gets triggered if you enable PREEMPT.
+Yes Andre's kvm-gicv3/v7 branch on https://github.com/apritzel/linux.git
+seems to contain all those.
 
-Regards,
+Best Regards
 
-Tony
+Eric
+> 
+> regards,
+> Nikolay Nikolaev 
+> 
+>     and
+>     Andre's v6 series will help in reviewing & testing.
+> 
+>     Best Regards
+> 
+>     Eric
+> 
+>     On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
+>     > The IOEVENTFD KVM capability is a prerequisite for vhost support.
+>     >
+>     > This series enables the ioeventfd KVM capability on ARM.
+>     >
+>     > The implementation routes MMIO access in the IO abort handler to
+>     the KVM IO bus.
+>     > If there is already a registered ioeventfd handler for this
+>     address, the file
+>     > descriptor will be triggered.
+>     >
+>     > We extended the KVM IO bus API to expose the VCPU struct pointer.
+>     Now the VGIC
+>     > MMIO access is done through this API. For this to operate the VGIC
+>     registers a
+>     > kvm_io_device which represents the whole dist MMIO region.
+>     >
+>     > The patches are implemented on top of the latest Andre's vGICv3
+>     work from here:
+>     >
+>     http://www.linux-arm.org/git?p=linux-ap.git;a=shortlog;h=refs/heads/kvm-gicv3/v4
+>     >
+>     > The code was tested on Dual Cortex-A15 Exynos5250 (ARM Chromebook).
+>     > ARM64 build was verified, but not run on actual HW.
+>     >
+>     > Changes since v1:
+>     >  - fixed x86 compilation
+>     >  - GICv3/GICv3 dist base selection
+>     >  - added vgic_unregister_kvm_io_dev to free the iodev resources
+>     >  - enable eventfd on ARM64
+>     >
+>     > ---
+>     >
+>     > Nikolay Nikolaev (5):
+>     >       KVM: Redesign kvm_io_bus_ API to pass VCPU structure to the
+>     callbacks.
+>     >       KVM: ARM: on IO mem abort - route the call to KVM MMIO bus
+>     >       KVM: ARM VGIC add kvm_io_bus_ frontend
+>     >       ARM/ARM64: enable linking against eventfd
+>     >       ARM: enable KVM_CAP_IOEVENTFD
+>     >
+>     >
+>     >  arch/arm/kvm/Kconfig       |    1
+>     >  arch/arm/kvm/Makefile      |    2 -
+>     >  arch/arm/kvm/arm.c         |    3 +
+>     >  arch/arm/kvm/mmio.c        |   32 +++++++++++
+>     >  arch/arm64/kvm/Kconfig     |    1
+>     >  arch/arm64/kvm/Makefile    |    2 -
+>     >  arch/ia64/kvm/kvm-ia64.c   |    4 +
+>     >  arch/powerpc/kvm/mpic.c    |   10 ++-
+>     >  arch/powerpc/kvm/powerpc.c |    4 +
+>     >  arch/s390/kvm/diag.c       |    2 -
+>     >  arch/x86/kvm/i8254.c       |   14 +++--
+>     >  arch/x86/kvm/i8259.c       |   12 ++--
+>     >  arch/x86/kvm/lapic.c       |    4 +
+>     >  arch/x86/kvm/vmx.c         |    2 -
+>     >  arch/x86/kvm/x86.c         |   13 ++---
+>     >  include/kvm/arm_vgic.h     |    3 -
+>     >  include/linux/kvm_host.h   |   10 ++-
+>     >  virt/kvm/arm/vgic.c        |  127
+>     +++++++++++++++++++++++++++++++++++++++++---
+>     >  virt/kvm/coalesced_mmio.c  |    5 +-
+>     >  virt/kvm/eventfd.c         |    4 +
+>     >  virt/kvm/ioapic.c          |    8 +--
+>     >  virt/kvm/iodev.h           |   23 +++++---
+>     >  virt/kvm/kvm_main.c        |   32 ++++++-----
+>     >  23 files changed, 237 insertions(+), 81 deletions(-)
+>     >
+>     > --
+>     > Signature
+>     >
+> 
+> 
