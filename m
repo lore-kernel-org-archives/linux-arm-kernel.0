@@ -1,44 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Jan 2015 17:52:31 +0100
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <54B7E21E.2000901@redhat.com>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6tjiE6u8i-1PHYzX2cOhxJkYN3cV9mqhCHRSMRdOQRfzg@mail.gmail.com>
- <54B7E21E.2000901@redhat.com>
-Message-ID: <2277974.2klgILPa2Q@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 15 Jan 2015 14:54:24 -0200
+Subject: [PATCH 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <20150108130003.GE4928@dragon>
+References: <1420559265-7333-1-git-send-email-p.zabel@pengutronix.de>
+ <1420559265-7333-3-git-send-email-p.zabel@pengutronix.de>
+ <20150108130003.GE4928@dragon>
+Message-ID: <CAOMZO5DB1QSg4G9mnWbS_ypQabFaJ8z-a4sR3Cj5cnq75atRKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 January 2015 10:51:58 Jon Masters wrote:
-> On 01/15/2015 09:10 AM, Grant Likely wrote:
-> > On Tue, Jan 6, 2015 at 1:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> For drivers merged upstream, I would insist that every driver merged
-> >> for an ARM64 platform has a documented DT binding that is used in the
-> >> driver.
-> > 
-> > That's a dumb rule. It will result in untested DT code paths being
-> > thrown into drivers just too meet the rules rather than on whether or
-> > not they will actually be used. It's fine to allow driver authors to
-> > only implement the ACPI code path if that is what they are working
-> > with. We can *always* add a DT path to the driver when it is needed.
-> 
-> It gets worse. There *will* be large numbers of ACPI only ARM servers
-> landing over the coming year. Not only would DT code be untested, but
-> insisting on keeping e.g. a DSDT and DT in sync is never going to work
-> anyway. Already we have early stage servers that contain a DT used for
-> bringup that is subsequently not being updated as often as the ACPI
-> tables (those systems are now booting exclusively in labs with ACPI).
-> Eventually, I am going to push for the DT data to be removed from these
-> systems rather than have out of date unmaintained DT data in firmware.
+Hi Shawn,
 
-We will of course be able to relax the rule once ACPI has stabilized on
-ARM64. At the moment, we haven't even agreed on how to represent basic
-devices, so things are in flux and there is no way for a BIOS writer
-to ship an image that we will guarantee to support in the long run.
+On Thu, Jan 8, 2015 at 11:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-At some point after we are reasonably sure we are able to keep supporting
-all existing systems that are working with that kernel, we can take
-support for new systems without having DT by default, and also support
-booting those without acpi=force, which is related to this question.
+> Before I start reviewing the patch, I would like to know if there is a
+> formal errata for this issue, including the bug description, recommended
+> workaround, and affected i.MX6 variants etc.
 
-	Arnd
+The latest mx6 reference manual available on the web shows the LDB
+clock gate in the correct position now.
+
+It also adds the following note:
+
+"NOTE: This clock path is not controlled by a clock gate (CG). For
+proper clock switching procedures refer to the Clock Switching
+Multiplexers section."
+
+There is no formal errata available.
+
+Please consider reviewing this series, as it addresses a real problem
+that affect many users.
+
+Thanks,
+
+Fabio Estevam
