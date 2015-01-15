@@ -1,74 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Jan 2015 08:54:54 -0800
-Subject: [PATCH] arm: boot: dts: dra7: enable dwc3 suspend PHY quirk
-In-Reply-To: <1421336283-17904-1-git-send-email-balbi@ti.com>
-References: <1421336283-17904-1-git-send-email-balbi@ti.com>
-Message-ID: <20150115165454.GE18552@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jan 2015 16:58:26 +0000
+Subject: [PATCH V2 2/4] mmc: pwrseq: Document DT bindings for the simple
+ MMC power sequence
+In-Reply-To: <1421240530-7971-3-git-send-email-ulf.hansson@linaro.org>
+References: <1421240530-7971-1-git-send-email-ulf.hansson@linaro.org>
+ <1421240530-7971-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20150115165825.GL16217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150115 07:42]:
-> Whenever Suspend PHY bit is set on DRA7x devices,
-> USB will not work due to Set EP Configuration command
-> always failing.
+Hi Ulf,
+
+On Wed, Jan 14, 2015 at 01:02:08PM +0000, Ulf Hansson wrote:
+> The simple MMC power sequence provider, intends to supports a set of
+> common properties between SOC designs. It thus enables us to re-use the
+> same provider for several SOCs.
 > 
-> This was only found after a recent commit 2164a47 (usb:
-> dwc3: set SUSPHY bit for all cores, which will be merged
-> for v3.19) added a missing *required* step to dwc3
-> initialization. Synopsys Databook requires that we enable
-> Suspend PHY bit after initialization but that, unfortunately,
-> breaks DRA7x.
+> In this initial step, let's add the top level description of the MMC
+> power sequence and describe the compatible string for the simple MMC
+> power sequence provider.
 > 
-> Note that the same regression was already patched for AM437x.
+> Following patches will step by step add support for new properties to
+> the simple MMC power sequence provider.
 > 
-> Reported-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
 > 
-> Tony, this fixes a regression with v3.19
-
-OK applying into omap-for-v3.19/fixes thanks.
-
-Tony
- 
->  arch/arm/boot/dts/dra7.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Changes in v2:
+> 	- None.
 > 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 22771bc1643a..63f8b007bdc5 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -1257,6 +1257,8 @@
->  				tx-fifo-resize;
->  				maximum-speed = "super-speed";
->  				dr_mode = "otg";
-> +				snps,dis_u3_susphy_quirk;
-> +				snps,dis_u2_susphy_quirk;
->  			};
->  		};
+> ---
+>  .../devicetree/bindings/mmc/mmc,pwrseq-simple.txt      | 18 ++++++++++++++++++
+>  Documentation/devicetree/bindings/mmc/mmc.txt          |  5 +++++
+>  2 files changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
+> new file mode 100644
+> index 0000000..e1b7f9c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
+> @@ -0,0 +1,18 @@
+> +* The simple MMC power sequence provider
+> +
+> +System on chip designs may specify a specific MMC power sequence. To
+> +successfully detect an (e)MMC/SD/SDIO card, that power sequence must be
+> +maintained while initializing the card.
+> +
+> +The simple MMC power sequence provider, intends to supports a set of common
+> +properties between SOC designs. It thus enables us to re-use the same provider
+> +for several SOC designs.
+> +
+> +Required properties:
+> +- compatible : contains "mmc,pwrseq-simple".
+
+Nit: "mmc" is not a vendor prefix.
+
+> +
+> +Example:
+> +
+> +	sdhci0_pwrseq {
+> +		compatible = "mmc,pwrseq-simple";
+> +	}
+
+I'm a little confused here. What specific sequence is described by this
+node? We don't appear to have referred to any resources used as part of
+that sequence, and the description above only mentions that there could
+be a specific sequence, not what that sequence is.
+
+So I don't think this makes sense on its own, and should probably be
+folded with patches adding the initial support for the resources used as
+part of the sequence (e.g. the GPIOs added in a later patch).
+
+Thanks,
+Mark.
+
+> diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+> index bac1311..b12de1e 100644
+> --- a/Documentation/devicetree/bindings/mmc/mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+> @@ -64,6 +64,10 @@ Optional SDIO properties:
+>  - keep-power-in-suspend: Preserves card power during a suspend/resume cycle
+>  - enable-sdio-wakeup: Enables wake up of host system on SDIO IRQ assertion
 >  
-> @@ -1278,6 +1280,8 @@
->  				tx-fifo-resize;
->  				maximum-speed = "high-speed";
->  				dr_mode = "otg";
-> +				snps,dis_u3_susphy_quirk;
-> +				snps,dis_u2_susphy_quirk;
->  			};
->  		};
+> +Optional MMC power sequence:
+> +- mmc-pwrseq: phandle to the MMC power sequence node. See "mmc,pwrseq-*"
+> +	for documentation of MMC power sequence bindings.
+> +
 >  
-> @@ -1299,6 +1303,8 @@
->  				tx-fifo-resize;
->  				maximum-speed = "high-speed";
->  				dr_mode = "otg";
-> +				snps,dis_u3_susphy_quirk;
-> +				snps,dis_u2_susphy_quirk;
->  			};
->  		};
+>  Use of Function subnodes
+>  ------------------------
+> @@ -101,6 +105,7 @@ sdhci at ab000000 {
+>  	max-frequency = <50000000>;
+>  	keep-power-in-suspend;
+>  	enable-sdio-wakeup;
+> +	mmc-pwrseq = <&sdhci0_pwrseq>
+>  }
 >  
+>  Example with sdio function subnode:
 > -- 
-> 2.2.0
+> 1.9.1
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
