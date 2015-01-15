@@ -1,38 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Jan 2015 09:04:43 -0800
-Subject: [PATCH v3 13/21] ARM: omap: convert wakeupgen to stacked domains
-In-Reply-To: <87sifcgksy.fsf@approximate.cambridge.arm.com>
-References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
- <1421087187-26988-14-git-send-email-marc.zyngier@arm.com>
- <20150114222814.GU2419@atomide.com>
- <871tmwi0d6.fsf@approximate.cambridge.arm.com>
- <20150115144016.GA19920@kahuna>
- <87sifcgksy.fsf@approximate.cambridge.arm.com>
-Message-ID: <20150115170443.GF18552@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 18:09:42 +0100
+Subject: [GIT PULL] at91: defconfig for 3.20 #1
+Message-ID: <1421341782-14355-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [150115 06:53]:
-> On Thu, Jan 15 2015 at  2:40:16 pm GMT, Nishanth Menon <nm@ti.com> wrote:
-> > On 14:28-20150115, Marc Zyngier wrote:
-> >> Assuming the workaround I posted earlier works, the OMAP/DRA7 part of
-> >> this series is going to require some rework too (I need to know where
-> >> these legacy interrupts are attached: crossbar, WUGEN, or GIC?).
-> >> 
-> > crossbar will never work with legacy static interrupts anyways - since
-> > there was never a static interrupt possible - I believe we had removed
-> > all the legacy hardcoded interrupt definitions for DRA7. ideally, they
-> > should all be dt only now.
-> 
-> Yes, I guessed as much after looking at the DRA7XX hwmod.
-> 
-> So only OMAP4/5 is b0rken at the moment. I can probably work around it
-> as I did in this example patch, just by changing the compatible strings
-> for the xlate callback. Very ugly.
+Arnd, Olof, Kevin,
 
-For the -rc, it seems the wakeupen still needs a fix as based on grepping
-for OMAP44XX_IRQ_GIC_START. Got any great ideas for that?
+A little defconfig update. If you want me to collect more patches before
+sending you a more substantial one, let me know.
 
-Regards,
+Thanks, bye,
 
-Tony
+The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
+
+  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
+
+for you to fetch changes up to a1b282911b47a522f150eb715fb037628c5173fe:
+
+  ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig (2015-01-15 16:28:23 +0100)
+
+----------------------------------------------------------------
+First batch of defconfig update for 3.20:
+- we remove DEBUG_LL from sama5 defconfig as all SoC are not compatible
+- enable ISI and selected sensors
+
+----------------------------------------------------------------
+Josh Wu (1):
+      ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
+
+Maxime Ripard (1):
+      ARM: at91/config: sama5: Remove DEBUG_LL
+
+ arch/arm/configs/sama5_defconfig | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+-- 
+Nicolas Ferre
