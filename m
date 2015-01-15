@@ -1,117 +1,94 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Jan 2015 22:46:24 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 05/13] ARM: dts: sun9i: Add
- clock-indices property for bus gate clocks
-In-Reply-To: <CAGb2v67x=NP8SX9bLqvKg-=-TM4EwU3fNppaxo0HP7fO=gDGjw@mail.gmail.com>
-References: <1421113055-17867-1-git-send-email-wens@csie.org>
- <1421113055-17867-6-git-send-email-wens@csie.org>
- <20150114163351.GY4891@lukather>
- <CAGb2v64brc_2c5Jz2=BzfCpwiwBQgGf=SLD2ib+taOYUgicekA@mail.gmail.com>
- <20150115152026.GA1135@lukather>
- <CAGb2v65g-HMH5ezGd29SxSNCA6J5H6Q1X1H3rLKh0=nqdHDgMA@mail.gmail.com>
- <20150115155156.GA1837@lukather>
- <CAGb2v67x=NP8SX9bLqvKg-=-TM4EwU3fNppaxo0HP7fO=gDGjw@mail.gmail.com>
-Message-ID: <20150115214624.GA5567@lukather>
+Date: Thu, 15 Jan 2015 22:51:20 +0100
+Subject: [linux-sunxi] Re: Including empty regulator nodes in axp209.dtsi
+ is a BAD idea
+In-Reply-To: <CAGb2v66Go1z-V8spwHvLHQC1R=vgDsk1nQ6iZWTsy+OMF1kK0w@mail.gmail.com>
+References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
+ <5312007.HNApKlEIe7@x64.localnet>
+ <CAGb2v66Go1z-V8spwHvLHQC1R=vgDsk1nQ6iZWTsy+OMF1kK0w@mail.gmail.com>
+Message-ID: <20150115215120.GB5567@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:09:01AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jan 15, 2015 at 11:51 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Jan 15, 2015 at 11:35:42PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Jan 15, 2015 at 11:20 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > On Thu, Jan 15, 2015 at 10:24:04AM +0800, Chen-Yu Tsai wrote:
-> >> >> On Thu, Jan 15, 2015 at 12:33 AM, Maxime Ripard
-> >> >> <maxime.ripard@free-electrons.com> wrote:
-> >> >> > On Tue, Jan 13, 2015 at 09:37:27AM +0800, Chen-Yu Tsai wrote:
-> >> >> >> of_clk_get_parent_name() uses the clock-indices property to resolve
-> >> >> >> clock phandle arguments in case that the argument index does not
-> >> >> >> match the clock-output-names sequence.
-> >> >> >>
-> >> >> >> This is the case on sunxi, where we use the actual bit index as the
-> >> >> >> argument to the phandle. Add the clock-indices property so that
-> >> >> >> of_clk_get_parent_name() resolves the names correctly.
-> >> >> >>
-> >> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >> >
-> >> >> > Applied. Are the mask in the clock driver still of any use now? I
-> >> >> > don't think they are, and if we're going that way, I'd rather have
-> >> >> > them removed from the driver.
-> >> >>
-> >> >> Yes they are still passed through factors_data, for mux_clk_ops to
-> >> >> know about the width of the mux, which is 3 bits on older SoCs vs
-> >> >> 4 bits on sun9i.
+On Fri, Jan 16, 2015 at 12:48:53AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Jan 14, 2015 at 6:18 PM, Lars Doelle <lars.doelle@on-line.de> wrote:
+> > On Tuesday, January 13, 2015 17:46:06 Maxime Ripard wrote:
+> >> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
+> >> > Hi ChenYu, Maxime,
 > >> >
-> >> > Erm.... These are gates. They are not muxable and are not handled
-> >> > through clk-factors, so I'm not sure how it is relevant :)
+> >> > During the review of a few dts files for new boards Maxime asked me to use
+> >> > axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
+> >> > boards using the axp209 pmic.
+> >> >
+> >> > But axp209.dtsi includes empty regulator nodes, e.g. :
+> >> >
+> >> >                 reg_dcdc3: dcdc3 {
+> >> >                         regulator-name = "dcdc3";
+> >> >                 };
+> >> >
+> >> > This is a BAD idea, the presence of these empty nodes causes the
+> >> > axp20x-regulator driver to actually register regulators for them,
+> >> > and then on late_init the regulator subsys turns them off, since
+> >> > they have absolutely no constraints set (nor users registered)
+> >> > and the regulator subsys assumes that when devicetree is used their
+> >> > is always a compete set of constraints and that thus turning them
+> >> > off is safe.
+> >> >
+> >> > So when I switched to using axp209.dtsi for the bananapro.dts,
+> >> > and booted the bananapro this is the last message I got from the
+> >> > kernel while booting:
+> >> >
+> >> > [    2.314014] dcdc3: disabling
+> >> >
+> >> > And away went our DRAM power-supply, oops.
+> >> >
+> >> > So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
+> >> > should contain reasonable constraints (eg the operating range
+> >> > from the datasheet)
 > >>
-> >> Sorry. I jumped to the mux mask stuff. Yes the gate masks are still
-> >> used, and the gates are still referenced by the bit offset.
-> >>
-> >> As described in the commit message, clock-indices is used by
-> >> of_clk_get_parent_name() to match the index used in the phandle
-> >> to the correct name in clock-names.
-> >>
-> >> Take apb1 for example:
-> >>
-> >>                        clock-indices = <0>, <1>, <2>, <3>, <4>,
-> >>                                        <16>, <17>, <18>, <19>, <20>, <21>;
-> >>                        clock-output-names = "apb1_i2c0", "apb1_i2c1",
-> >>                                        "apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
-> >>                                        "apb1_uart0", "apb1_uart1", ...
-> >>
-> >> If we have "clocks = <&apb1 16>;" in some device, and we call
-> >> of_clk_get_parent_name() on said clock, it would try to get
-> >> clock_output_names[16], which obviously is the wrong one.
-> >>
-> >> With clock-indices, of_clk_get_parent_name first looks at
-> >> that array, finds an entry matching 16, then uses the
-> >> index of the matching entry to get the name from
-> >> clock-output-names.
+> >> Indeed.
 > >
-> > Yeah, I know what it does, and we do agree on the fact that it's
-> > needed.
+> > It is very unclear to me, what to with this dtsi as it is.
 > >
-> >> So, we are still using the gate bitmask to declare valid
-> >> clock gates. The sunxi driver does not use clock-indices
-> >> directly. Nor do I think it was intended to be used by
-> >> clock drivers directly.
+> > Wrt. axp209, I have a specification like in sun7i-a20-olinuxino-lime2.dts.
+> > If I include this dtsi, what does it help or how is it supposed to be of any
+> > use?
 > >
-> > However, the gate bitmask itself carries exactly the same information
-> > than clock-indices. It's the exact same list of numbers, just with two
-> > different ways of defining it.
+> > In particular, the following section
 > >
-> > If we go with clock-indices, which is the right solution, then we can
-> > just drop the other one.
+> > |                       axp209: pmic at 34 {
+> > |                               compatible = "x-powers,axp209";
+> > |                               reg = <0x34>;
+> > |                               interrupt-parent = <&nmi_intc>;
+> > |                               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 > >
-> > I actually started to do just this last evening. A31 boots without any
-> > gates bit mask but the USB clocks one so far, I intend on converting
-> > the others as well.
+> > |                               interrupt-controller;
+> > |                               #interrupt-cells = <1>;
+> >
+> > |                               acin-supply = <&reg_axp_ipsout>;
+> > |                               vin2-supply = <&reg_axp_ipsout>;
+> > |                               vin3-supply = <&reg_axp_ipsout>;
+> > |                               ldo24in-supply = <&reg_axp_ipsout>;
+> > |                               ldo3in-supply = <&reg_axp_ipsout>;
 > 
-> So as I understand, you want to replace the masks in the clock drivers
-> with clock-indices in the dt. Is this correct? This potentially makes
-> the gates clock driver very generic, which is nice.
+> We should not be using reg_axp_ipsout, as it is an unregulated supply,
+> and can be left out.
 
-Yeah, the only thing that is not are the clocks protected, which will
-depend on the compatible.
+Can it? Doesn't the regulator driver need to know the input voltage?
 
-> I only see drivers/clk/shmobile/clk-mstp.c using it this way though.
-> Didn't we have this for sun6i-apb0-gates at one time?
+> > would be needed anyway as it is not in sun7i-a20.dtsi, followed by the
+> > regulators, to switch them on. Now a dtsi would make sense, if it shortens
+> > the device specific information.
+> >
+> > Should not the section above together with the full regulators be in axp209.dtsi
+> > and only the regulators be mentioned in the boards dts, to switch them on? Isn't
+> > this stuff that should be included in sun7i-a20.dtsi anyway, somehow?
+> 
+> It is entirely possible to make a board without using the PMIC, as Olimex
+> has demonstrated. sun7i-a20 only describes the common SoC bits.
 
-I don't think we did. Or at least, it was never merged.
+Or even with a different PMIC.
 
-And since this property was introduced for shmobile iirc, I don't find
-it very surprising :)
-
-> I'm not against it. Just want to make sure everyone agrees, and we
-> can work who and how we're going about this.
-
-I did most of the work tonight, for all the sun7i, sun8i and sun9i
-SoCs. sun6i work, I'll test sun9i, but I'll need some tests from you
-for the A23 if it's ok :)
-
-Thanks!
 Maxime
 
 -- 
@@ -124,4 +101,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/7cd3e7b6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/64737d75/attachment.sig>
