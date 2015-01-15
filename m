@@ -1,47 +1,119 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 15 Jan 2015 14:51:10 +0100
-Subject: [PATCH] ARM: dts: Fix CLK_UART_ISP_SCLK clock assignment in
- exynos4x12.dtsi
-Message-ID: <1421329871-18819-1-git-send-email-s.nawrocki@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jan 2015 13:52:01 +0000
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <1421269101-51105-2-git-send-email-s-anna@ti.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+Message-ID: <20150115135201.GG16217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assign proper FIMC-IS UART gate clock in the device DT node and not
-use the SRC_MASK gate. This fixes regression introduced in commit
-a37c82a3b3c0910019abfd22a97be1f ("clk: samsung: exynos4: Remove
-SRC_MASK_ISP gates").
+On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
+> This patch adds the generic common bindings used to represent
+> a hwlock device and use/request locks in a device-tree build.
+> 
+> All the platform-specific hwlock driver implementations need the
+> number of locks and associated base id for registering the locks
+> present within the device with the driver core. This base id
+> needs to be unique across multiple IP instances of a hwspinlock
+> device, so that each hwlock can be represented uniquely in a
+> system.
+> 
+> The number of locks is represented by 'hwlock-num-locks' property,
+> and the base id is represented by the 'hwlock-base-id' property.
+> The args specifier length is dependent on each vendor-specific
+> implementation and is represented through the '#hwlock-cells'
+> property. Client users need to use the property 'hwlocks' for
+> requesting specific lock(s).
+> 
+> Note that the document is named hwlock.txt deliberately to keep
+> it a bit more generic.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+> v7: Revised binding info for hwlock-base-id, it is mandatory now
+> 
+>  .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> new file mode 100644
+> index 000000000000..8de7aaf878f9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+> @@ -0,0 +1,55 @@
+> +Generic hwlock bindings
+> +=======================
+> +
+> +Generic bindings that are common to all the hwlock platform specific driver
+> +implementations.
+> +
+> +The validity and need of these common properties may vary from one platform
+> +implementation to another. The platform specific bindings should explicitly
+> +state if an optional property is used. Please also look through the individual
+> +platform specific hwlock binding documentations for identifying the applicable
+> +properties.
+> +
+> +Common properties:
+> +- #hwlock-cells:	Specifies the number of cells needed to represent a
+> +			specific lock. This property is mandatory for all
+> +			platform implementations.
+> +- hwlock-num-locks:	Number of locks present in a hwlock device. This
+> +			property is needed on hwlock devices, where the number
+> +			of supported locks within a hwlock device cannot be
+> +			read from a register.
+> +- hwlock-base-id:	An unique base Id for the locks for a particular hwlock
+> +			device. This property is mandatory for all platform
+> +			implementations.
 
-Without this change exynos4 fimc-is driver fails to probe with an
-error log:
+This property makes no sense. The ID encoded in the hwlock cells is
+relative to the instance (identified by phandle), not global. So the DT
+has no global ID space.
 
-[    1.842447] ERROR: could not get clock /camera/fimc-is at 12000000:uart(13)
-[    1.848529] exynos4-fimc-is 12000000.fimc-is: failed to get clock: uart
-[    1.855275] exynos4-fimc-is: probe of 12000000.fimc-is failed with error -2
+Why do you think you need this?
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-
-Kukjin, could you take this patch into your tree ? I have been applying it
-for several kernel releases now to get the Exynos4 FIMC driver even passing
-probing.
+The definition here isn't sufficient, and the example is incomplete
+(lacking provider nodes and hence this property), which is unhelpful.
 
 Thanks,
-Sylwester
- arch/arm/boot/dts/exynos4x12.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Mark.
 
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 93b7040..86e1800 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -225,7 +225,7 @@
- 				 <&clock CLK_DIV_ISP0>,<&clock CLK_DIV_ISP1>,
- 				 <&clock CLK_DIV_MCUISP0>,
- 				 <&clock CLK_DIV_MCUISP1>,
--				 <&clock CLK_SCLK_UART_ISP>,
-+				 <&clock CLK_UART_ISP_SCLK>,
- 				 <&clock CLK_ACLK200>, <&clock CLK_DIV_ACLK200>,
- 				 <&clock CLK_ACLK400_MCUISP>,
- 				 <&clock CLK_DIV_ACLK400_MCUISP>;
---
-1.7.9.5
+> +
+> +Hwlock Users:
+> +=============
+> +
+> +Nodes that require specific hwlock(s) should specify them using the property
+> +"hwlocks", each containing a phandle to the hwlock node and an args specifier
+> +value as indicated by #hwlock-cells. Multiple hwlocks can be requested using
+> +an array of the phandle and hwlock number specifier tuple.
+> +
+> +1. Example of a node using a single specific hwlock:
+> +
+> +The following example has a node requesting a hwlock in the bank defined by
+> +the node hwlock1. hwlock1 is a hwlock provider with an argument specifier
+> +of length 1.
+> +
+> +	node {
+> +		...
+> +		hwlocks = <&hwlock1 2>;
+> +		...
+> +	};
+> +
+> +2. Example of a node using multiple specific hwlocks:
+> +
+> +The following example has a node requesting two hwlocks, a hwlock within
+> +the hwlock device node 'hwlock1' with #hwlock-cells value of 1, and another
+> +hwlock within the hwlock device node 'hwlock2' with #hwlock-cells value of 2.
+> +
+> +	node {
+> +		...
+> +		hwlocks = <&hwlock1 2>, <&hwlock2 0 3>;
+> +		...
+> +	};
+> -- 
+> 2.2.1
+> 
+> 
