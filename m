@@ -1,115 +1,74 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 15 Jan 2015 16:31:55 +0100
-Subject: [PATCH v2 0/5] ARM: KVM: Enable the ioeventfd capability of KVM
- on ARM
-In-Reply-To: <CADDJ2=M2UjsV0U9cFiRoKghWSckWje+h6M-XQ-0dqPrH3BXp1A@mail.gmail.com>
-References: <20141207093641.17563.84226.stgit@i3820>
- <54B440D0.6090707@linaro.org>
- <CADDJ2=M2UjsV0U9cFiRoKghWSckWje+h6M-XQ-0dqPrH3BXp1A@mail.gmail.com>
-Message-ID: <54B7DD6B.1060002@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Jan 2015 23:35:42 +0800
+Subject: [linux-sunxi] Re: [PATCH v3 05/13] ARM: dts: sun9i: Add
+ clock-indices property for bus gate clocks
+In-Reply-To: <20150115152026.GA1135@lukather>
+References: <1421113055-17867-1-git-send-email-wens@csie.org>
+ <1421113055-17867-6-git-send-email-wens@csie.org>
+ <20150114163351.GY4891@lukather>
+ <CAGb2v64brc_2c5Jz2=BzfCpwiwBQgGf=SLD2ib+taOYUgicekA@mail.gmail.com>
+ <20150115152026.GA1135@lukather>
+Message-ID: <CAGb2v65g-HMH5ezGd29SxSNCA6J5H6Q1X1H3rLKh0=nqdHDgMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 04:25 PM, Nikolay Nikolaev wrote:
-> 
-> 
-> On Mon, Jan 12, 2015 at 11:46 PM, Eric Auger <eric.auger@linaro.org
-> <mailto:eric.auger@linaro.org>> wrote:
-> 
->     Hi Nikolay,
-> 
->     looks good to me overall. A rebase on Christoffer's vgic init series
-> 
-> is there a tree where these patches are published?
-Hi Nikolay,
+On Thu, Jan 15, 2015 at 11:20 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Jan 15, 2015 at 10:24:04AM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Jan 15, 2015 at 12:33 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Tue, Jan 13, 2015 at 09:37:27AM +0800, Chen-Yu Tsai wrote:
+>> >> of_clk_get_parent_name() uses the clock-indices property to resolve
+>> >> clock phandle arguments in case that the argument index does not
+>> >> match the clock-output-names sequence.
+>> >>
+>> >> This is the case on sunxi, where we use the actual bit index as the
+>> >> argument to the phandle. Add the clock-indices property so that
+>> >> of_clk_get_parent_name() resolves the names correctly.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >
+>> > Applied. Are the mask in the clock driver still of any use now? I
+>> > don't think they are, and if we're going that way, I'd rather have
+>> > them removed from the driver.
+>>
+>> Yes they are still passed through factors_data, for mux_clk_ops to
+>> know about the width of the mux, which is 3 bits on older SoCs vs
+>> 4 bits on sun9i.
+>
+> Erm.... These are gates. They are not muxable and are not handled
+> through clk-factors, so I'm not sure how it is relevant :)
 
-Yes Andre's kvm-gicv3/v7 branch on https://github.com/apritzel/linux.git
-seems to contain all those.
+Sorry. I jumped to the mux mask stuff. Yes the gate masks are still
+used, and the gates are still referenced by the bit offset.
 
-Best Regards
+As described in the commit message, clock-indices is used by
+of_clk_get_parent_name() to match the index used in the phandle
+to the correct name in clock-names.
 
-Eric
-> 
-> regards,
-> Nikolay Nikolaev 
-> 
->     and
->     Andre's v6 series will help in reviewing & testing.
-> 
->     Best Regards
-> 
->     Eric
-> 
->     On 12/07/2014 10:37 AM, Nikolay Nikolaev wrote:
->     > The IOEVENTFD KVM capability is a prerequisite for vhost support.
->     >
->     > This series enables the ioeventfd KVM capability on ARM.
->     >
->     > The implementation routes MMIO access in the IO abort handler to
->     the KVM IO bus.
->     > If there is already a registered ioeventfd handler for this
->     address, the file
->     > descriptor will be triggered.
->     >
->     > We extended the KVM IO bus API to expose the VCPU struct pointer.
->     Now the VGIC
->     > MMIO access is done through this API. For this to operate the VGIC
->     registers a
->     > kvm_io_device which represents the whole dist MMIO region.
->     >
->     > The patches are implemented on top of the latest Andre's vGICv3
->     work from here:
->     >
->     http://www.linux-arm.org/git?p=linux-ap.git;a=shortlog;h=refs/heads/kvm-gicv3/v4
->     >
->     > The code was tested on Dual Cortex-A15 Exynos5250 (ARM Chromebook).
->     > ARM64 build was verified, but not run on actual HW.
->     >
->     > Changes since v1:
->     >  - fixed x86 compilation
->     >  - GICv3/GICv3 dist base selection
->     >  - added vgic_unregister_kvm_io_dev to free the iodev resources
->     >  - enable eventfd on ARM64
->     >
->     > ---
->     >
->     > Nikolay Nikolaev (5):
->     >       KVM: Redesign kvm_io_bus_ API to pass VCPU structure to the
->     callbacks.
->     >       KVM: ARM: on IO mem abort - route the call to KVM MMIO bus
->     >       KVM: ARM VGIC add kvm_io_bus_ frontend
->     >       ARM/ARM64: enable linking against eventfd
->     >       ARM: enable KVM_CAP_IOEVENTFD
->     >
->     >
->     >  arch/arm/kvm/Kconfig       |    1
->     >  arch/arm/kvm/Makefile      |    2 -
->     >  arch/arm/kvm/arm.c         |    3 +
->     >  arch/arm/kvm/mmio.c        |   32 +++++++++++
->     >  arch/arm64/kvm/Kconfig     |    1
->     >  arch/arm64/kvm/Makefile    |    2 -
->     >  arch/ia64/kvm/kvm-ia64.c   |    4 +
->     >  arch/powerpc/kvm/mpic.c    |   10 ++-
->     >  arch/powerpc/kvm/powerpc.c |    4 +
->     >  arch/s390/kvm/diag.c       |    2 -
->     >  arch/x86/kvm/i8254.c       |   14 +++--
->     >  arch/x86/kvm/i8259.c       |   12 ++--
->     >  arch/x86/kvm/lapic.c       |    4 +
->     >  arch/x86/kvm/vmx.c         |    2 -
->     >  arch/x86/kvm/x86.c         |   13 ++---
->     >  include/kvm/arm_vgic.h     |    3 -
->     >  include/linux/kvm_host.h   |   10 ++-
->     >  virt/kvm/arm/vgic.c        |  127
->     +++++++++++++++++++++++++++++++++++++++++---
->     >  virt/kvm/coalesced_mmio.c  |    5 +-
->     >  virt/kvm/eventfd.c         |    4 +
->     >  virt/kvm/ioapic.c          |    8 +--
->     >  virt/kvm/iodev.h           |   23 +++++---
->     >  virt/kvm/kvm_main.c        |   32 ++++++-----
->     >  23 files changed, 237 insertions(+), 81 deletions(-)
->     >
->     > --
->     > Signature
->     >
-> 
-> 
+Take apb1 for example:
+
+                       clock-indices = <0>, <1>, <2>, <3>, <4>,
+                                       <16>, <17>, <18>, <19>, <20>, <21>;
+                       clock-output-names = "apb1_i2c0", "apb1_i2c1",
+                                       "apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
+                                       "apb1_uart0", "apb1_uart1", ...
+
+If we have "clocks = <&apb1 16>;" in some device, and we call
+of_clk_get_parent_name() on said clock, it would try to get
+clock_output_names[16], which obviously is the wrong one.
+
+With clock-indices, of_clk_get_parent_name first looks at
+that array, finds an entry matching 16, then uses the
+index of the matching entry to get the name from
+clock-output-names.
+
+So, we are still using the gate bitmask to declare valid
+clock gates. The sunxi driver does not use clock-indices
+directly. Nor do I think it was intended to be used by
+clock drivers directly.
+
+Hope this clears things up.
+
+
+ChenYu
