@@ -1,34 +1,43 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Thu, 15 Jan 2015 09:02:23 +0100
-Subject: [PATCHv0 2/3] rtc: Add support for Abracon
- AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC chip
-In-Reply-To: <20150114170343.6f8d807a.akpm@linux-foundation.org> (Andrew
- Morton's message of "Wed, 14 Jan 2015 17:03:43 -0800")
-References: <cover.1421045942.git.arno@natisbad.org>
- <1ae63ab80cfb39305884bd0c2648a420ba3bc0a5.1421045942.git.arno@natisbad.org>
- <20150114165557.d44c5752.akpm@linux-foundation.org>
- <20150114170343.6f8d807a.akpm@linux-foundation.org>
-Message-ID: <87h9vsqxo0.fsf@natisbad.org>
+From: xiakaixu@huawei.com (Kaixu Xia)
+Date: Thu, 15 Jan 2015 15:54:19 +0800
+Subject: [PATCH] coresight: remove the extra spaces
+Message-ID: <1421308459-71865-1-git-send-email-xiakaixu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+There are some extra spaces, so just remove them from these lines.
 
-Andrew Morton <akpm@linux-foundation.org> writes:
+Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
+---
+ drivers/coresight/coresight-etb10.c | 2 +-
+ drivers/coresight/coresight.c       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> On Wed, 14 Jan 2015 16:55:57 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
->
->> Something like this?
->
-> Leading to changes in [3/3].  Please have a think about where we should
-> be calling device_init_wakeup(dev, false) on the error recovery path.
->
-> Let me know if I should just drop it all and await a v2...
-
-I'll work on a v2 to handle your comments and suggestions. I will also
-take into account the other comment I got regarding the use of "abracon"
-instead of "abcn" as vendor prefix for Abracon Corporation.
-
-Thanks for the review.
-
-a+
+diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
+index c922d4a..d0529b5 100644
+--- a/drivers/coresight/coresight-etb10.c
++++ b/drivers/coresight/coresight-etb10.c
+@@ -454,7 +454,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (ret)
+ 		return ret;
+ 
+-	drvdata->buffer_depth =  etb_get_buffer_depth(drvdata);
++	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
+ 	clk_disable_unprepare(drvdata->clk);
+ 
+ 	if (drvdata->buffer_depth < 0)
+diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
+index 11968b7..0de0c39 100644
+--- a/drivers/coresight/coresight.c
++++ b/drivers/coresight/coresight.c
+@@ -498,7 +498,7 @@ static int coresight_orphan_match(struct device *dev, void *data)
+ 	 * Circle throuch all the connection of that component.  If we find
+ 	 * an orphan connection whose name matches @csdev, link it.
+ 	 */
+-	for (i = 0; i < i_csdev->nr_outport; i++)	{
++	for (i = 0; i < i_csdev->nr_outport; i++) {
+ 		conn = &i_csdev->conns[i];
+ 
+ 		/* We have found at least one orphan connection */
+-- 
+1.8.5.5
