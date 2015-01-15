@@ -1,117 +1,91 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 10:51:44 +0100
-Subject: [PATCH v2 2/5] drivers/rtc/rtc-armada38x: Add a new RTC driver
- for recent mvebu SoCs
-In-Reply-To: <871tmxrsj8.fsf@natisbad.org>
-References: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>	<1421257155-3379-3-git-send-email-gregory.clement@free-electrons.com>
- <871tmxrsj8.fsf@natisbad.org>
-Message-ID: <54B78DB0.5050808@free-electrons.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 15 Jan 2015 10:52:59 +0100
+Subject: [PATCH v3 2/7] ARM: Exynos: add support for sub-power domains
+In-Reply-To: <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
+References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
+ <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <54B78DFB.9010305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
-[...]
+Hello All,
 
->> +/*
->> + * According to the datasheet, we need to wait for 5us only between
->> + * two consecutive writes
->> + */
->> +static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
->> +{
->> +	writel(val, rtc->regs + offset);
->> +	udelay(5);
->> +}
-> 
-> The thing I do not get is how you can guarantee that an undelayed
-> writel() in a function will not be followed less than 5?s later by
-> another writel() in another function. For instance:
-> 
->   1) a call to set_alarm() followed by a call to alarm_irq_enable().
->   2) some writel() or even rtc_udelayed_write() w/ sth asynchronous
->     occuring like your interrupt handler just after that.
-> 
-> I guess it may be possible to make assumptions on the fact that the
-> amount of code before a writel() or rtc_udelayed_write() may prevent
-> such scenario but it's difficult to tell, all the more w/ a spinlock
-> before the writel() in irq_enable().
-> 
-> Considering the description of the bug, why not doing the following:
-> 
->  1) implement rtc_delayed_write() a bit differently:
-> 
->     static inline void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
->     {
-> 	udelay(5);
-> 	writel(val, rtc->regs + offset);
->     }
-> 
->  2) remove all writel() in the driver and use rtc_delayed_write()
->     everywhere.
-> 
-> All writes being under the protection of your spinlock, this will
-> guarantee the 5?s delay in all cases.
+I'm sorry for missing some CC: in this patch, when I posted v3 to 
+mailing list.
+It looks that CC: lines got lost after git am + git format-patch.
 
-You're right. I tried avoiding loosing microseconds here and there, but there
-is too many case where it can fail. So let's us it everywhere.
-
-[...]
-
->> +static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
->> +{
->> +	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
->> +	int ret = 0;
->> +	unsigned long time, flags;
->> +
->> +	ret = rtc_tm_to_time(tm, &time);
->> +
->> +	if (ret)
->> +		goto out;
->> +	/*
->> +	 * Setting the RTC time not always succeeds. According to the
->> +	 * errata we need to first write on the status register and
->> +	 * then wait for 100ms before writing to the time register to be
->> +	 * sure that the data will be taken into account.
->> +	 */
->> +	spin_lock_irqsave(&rtc->lock, flags);
->> +
->> +	writel(0, rtc->regs + RTC_STATUS);
->> +
->> +	spin_unlock_irqrestore(&rtc->lock, flags);
->> +
->> +	msleep(100);
->> +
->> +	spin_lock_irqsave(&rtc->lock, flags);
->> +
->> +	writel(time, rtc->regs + RTC_TIME);
-> 
-> probably not critical (it's rtc clock and not system clock) but you still
-> introduce a 100ms shift when setting time here.
-
-I am aware of this shift but the granularity is the second, so we can't do
-better, we have to deal with the limitation of the hardware. :(
-
-> 
-> As for the two writel() not being done w/o releasing the spinlock, it
-> looks a bit weird but it seems it's ok for other functions manipulating
-> RTC_STATUS reg. 
-> 
-> Nonetheless, in the reverse direction, if a writel() occurs somewhere
-> (e.g. in the alarm irq handler) during your msleep(), you may do your
-> final writel() w/o having enforced the expected 100ms delay.
-
-Actually I don't know if it is problematic if a writel occur in an other register
-during the 100ms. I still wait for an answer for it.
+Ulf, could you also ack this patch, so Kukjin can finally merge the whole
+series to Samsung kernel tree?
 
 
-Thanks,
+On 2015-01-14 14:44, Marek Szyprowski wrote:
+> This patch adds support for making one power domain a sub-domain of
+> other domain. This is useful for modeling power dependences for devices
+> like TV Mixer or Camera ISP, which needs to have more than one power
+> domain enabled to be operational.
+>
+> Based on previous work by Amit Daniel Kachhap <amit.daniel@samsung.com>.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>   .../bindings/arm/exynos/power_domain.txt           |  2 ++
+>   arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++++++++++++++
+>   2 files changed, 30 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> index f4445e5..1e09703 100644
+> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> @@ -22,6 +22,8 @@ Optional Properties:
+>   	- pclkN, clkN: Pairs of parent of input clock and input clock to the
+>   		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+>   		are supported currently.
+> +- power-domains: phandle pointing to the parent power domain, for more details
+> +		 see Documentation/devicetree/bindings/power/power_domain.txt
+>   
+>   Node of a device using power domains must have a power-domains property
+>   defined with a phandle to respective power domain.
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 20f2671..37266a8 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -161,6 +161,34 @@ no_clk:
+>   		of_genpd_add_provider_simple(np, &pd->pd);
+>   	}
+>   
+> +	/* Assign the child power domains to their parents */
+> +	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+> +		struct generic_pm_domain *child_domain, *parent_domain;
+> +		struct of_phandle_args args;
+> +
+> +		args.np = np;
+> +		args.args_count = 0;
+> +		child_domain = of_genpd_get_from_provider(&args);
+> +		if (!child_domain)
+> +			continue;
+> +
+> +		if (of_parse_phandle_with_args(np, "power-domains",
+> +					 "#power-domain-cells", 0, &args) != 0)
+> +			continue;
+> +
+> +		parent_domain = of_genpd_get_from_provider(&args);
+> +		if (!parent_domain)
+> +			continue;
+> +
+> +		if (pm_genpd_add_subdomain(parent_domain, child_domain))
+> +			pr_warn("%s failed to add subdomain: %s\n",
+> +				parent_domain->name, child_domain->name);
+> +		else
+> +			pr_info("%s has as child subdomain: %s.\n",
+> +				parent_domain->name, child_domain->name);
+> +		of_node_put(np);
+> +	}
+> +
+>   	return 0;
+>   }
+>   arch_initcall(exynos4_pm_init_power_domain);
 
-Gregory
-
-
-
-
+Best regards
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
