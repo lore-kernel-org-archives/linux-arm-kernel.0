@@ -1,33 +1,102 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Thu, 15 Jan 2015 16:57:37 -0500
-Subject: [PATCH] block:Remove no longer needed fix me comment in the function,
- ace_probe for the file, xsysace.c
-Message-ID: <1421359057-21789-1-git-send-email-xerofoify@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Jan 2015 22:58:03 +0100
+Subject: [PATCH 00/17] AT91 cleanup for 3.20 #3
+Message-ID: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the no longer needed fix me comment for hardcoding the variable
-bus_width to the marco,ACE_BUS_WIDTH_16 as unless checked by a if statement
-inside the function,ace_probe for 8 bit mode the bus width must be 16 bit
-for this particular function.
+This patch sets is based on AT91 cleanup for 3.20 #2. it goes further in the
+cleanup.
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- drivers/block/xsysace.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It merges board-dt ans soc files, ending up with only at91rm9200.c, at91sam9.c,
+sama5d3.c and sama5d4.c.
 
-diff --git a/drivers/block/xsysace.c b/drivers/block/xsysace.c
-index c4328d9..1b807ed 100644
---- a/drivers/block/xsysace.c
-+++ b/drivers/block/xsysace.c
-@@ -1152,7 +1152,7 @@ static void ace_free(struct device *dev)
- static int ace_probe(struct platform_device *dev)
- {
- 	resource_size_t physaddr = 0;
--	int bus_width = ACE_BUS_WIDTH_16; /* FIXME: should not be hard coded */
-+	int bus_width = ACE_BUS_WIDTH_16;
- 	u32 id = dev->id;
- 	int irq = 0;
- 	int i;
+It merges all the SOC_AT91SAM9xxx config option under SOC_AT91SAM9.
+
+It also removes unused headers.
+
+There is also one fix regarding arm_pm_idle for sam9n12 and sam9g45.
+
+Alexandre Belloni (15):
+  ARM: at91:remove unused mach/system_rev.h
+  ARM: at91: fix sam9n12 and sam9x5 arm_pm_idle
+  ARM: at91: sam9: set arm_pm_idle from sam9_dt_device_init
+  ARM: at91: remove unused at91_ioremap_matrix and header
+  ARM: at91: remove unused _matrix.h headers
+  ARM: at91: stop using HAVE_AT91_DBGUx
+  ARM: at91: pm: remove warning to remove SOC_AT91SAM9263 usage
+  ARM: at91: merge SOC_AT91SAM9xxx
+  ARM: at91: remove at91_boot_soc
+  ARM: at91: rework initialization for rm9200 based boards
+  ARM: at91: rework initialization for sam9 based boards
+  ARM: at91: rework initialization for sama5 based boards
+  ARM: at91: remove old setup
+  ARM: at91: mark const init data with __initconst instead of __initdata
+  ARM: at91: remove at91_dt_initialize
+
+Arnd Bergmann (2):
+  ARM: at91: merge at91rm9200 files
+  ARM: at91: move sama5 specific code into per-soc files
+
+ arch/arm/Kconfig.debug                             |   6 +-
+ arch/arm/configs/at91_dt_defconfig                 |  10 +-
+ arch/arm/mach-at91/Kconfig                         | 111 ++----
+ arch/arm/mach-at91/Makefile                        |  17 +-
+ arch/arm/mach-at91/at91rm9200.c                    |  49 ++-
+ arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} |  21 +-
+ arch/arm/mach-at91/at91sam9260.c                   |  32 --
+ arch/arm/mach-at91/at91sam9261.c                   |  31 --
+ arch/arm/mach-at91/at91sam9263.c                   |  30 --
+ arch/arm/mach-at91/at91sam9g45.c                   |  30 --
+ arch/arm/mach-at91/at91sam9n12.c                   |  20 -
+ arch/arm/mach-at91/at91sam9rl.c                    |  32 --
+ arch/arm/mach-at91/at91sam9x5.c                    |  20 -
+ arch/arm/mach-at91/board-dt-rm9200.c               |  54 ---
+ arch/arm/mach-at91/board-dt-sama5.c                |  60 ---
+ arch/arm/mach-at91/generic.h                       |  11 -
+ arch/arm/mach-at91/include/mach/at91_dbgu.h        |  63 ----
+ arch/arm/mach-at91/include/mach/at91_matrix.h      |  23 --
+ arch/arm/mach-at91/include/mach/at91_ramc.h        |   6 -
+ .../mach-at91/include/mach/at91sam9260_matrix.h    |  80 ----
+ .../mach-at91/include/mach/at91sam9261_matrix.h    |  64 ----
+ .../mach-at91/include/mach/at91sam9263_matrix.h    | 129 -------
+ arch/arm/mach-at91/include/mach/at91sam9_smc.h     |   2 -
+ .../mach-at91/include/mach/at91sam9g45_matrix.h    | 153 --------
+ .../mach-at91/include/mach/at91sam9n12_matrix.h    |  53 ---
+ .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |  96 -----
+ .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |  53 ---
+ arch/arm/mach-at91/include/mach/cpu.h              | 240 ------------
+ arch/arm/mach-at91/include/mach/system_rev.h       |  27 --
+ arch/arm/mach-at91/pm.c                            |  48 ++-
+ arch/arm/mach-at91/pm_slowclock.S                  |   9 -
+ arch/arm/mach-at91/sama5d3.c                       |  31 +-
+ arch/arm/mach-at91/sama5d4.c                       |  35 +-
+ arch/arm/mach-at91/setup.c                         | 407 ---------------------
+ arch/arm/mach-at91/soc.h                           |  77 ----
+ 35 files changed, 151 insertions(+), 1979 deletions(-)
+ rename arch/arm/mach-at91/{board-dt-sam9.c => at91sam9.c} (71%)
+ delete mode 100644 arch/arm/mach-at91/at91sam9260.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9261.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9263.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9n12.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9rl.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9x5.c
+ delete mode 100644 arch/arm/mach-at91/board-dt-rm9200.c
+ delete mode 100644 arch/arm/mach-at91/board-dt-sama5.c
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_dbgu.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/cpu.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/system_rev.h
+ delete mode 100644 arch/arm/mach-at91/setup.c
+ delete mode 100644 arch/arm/mach-at91/soc.h
+
 -- 
 2.1.0
