@@ -1,31 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Jan 2015 20:54:49 +0100
-Subject: [PATCH v2] ARM: dts: sun6i: Convert hummingbird a31 dts to label
- references
-In-Reply-To: <1421337015-4669-1-git-send-email-wens@csie.org>
-References: <1421337015-4669-1-git-send-email-wens@csie.org>
-Message-ID: <20150115195449.GB1837@lukather>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 15 Jan 2015 15:04:37 -0500
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150115190220.GF3043@sirena.org.uk>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <20150115190220.GF3043@sirena.org.uk>
+Message-ID: <20150115200437.GF24989@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 11:50:15PM +0800, Chen-Yu Tsai wrote:
-> Using label references is preferred when override settings from the
-> included dtsi.
+On Thu, Jan 15, 2015 at 07:02:20PM +0000, Mark Brown wrote:
+> On Thu, Jan 15, 2015 at 06:23:47PM +0000, Catalin Marinas wrote:
+> > On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > I'll get right to the point: Can we please have this series queued up
+> > > for v3.20?
+> 
+> > Before you even ask for this, please look at the patches and realise
+> > that there is a complete lack of Reviewed-by tags on the code (well,
+> > apart from trivial Kconfig changes). In addition, the series touches on
+> > other subsystems like clocksource, irqchip, acpi and I don't see any
+> > acks from the corresponding maintainers. So even if I wanted to merge
+> > the series, there is no way it can be done without additional
+> > reviews/acks. On the document (last patch), I'd like to see a statement
+> 
+> There's probably a bit of a process problem here - these patches are all
+> being posted as part of big and apparently controversial threads with
+> subject lines in the form "ARM / ACPI:" so people could be forgiven for
+> just not even reading the e-mails enough to notice changes to their
+> subsystems.  Is it worth posting those patches separately more directly
+> to the relevant maintainers?
 
-Applied, thanks!
+I think it's beneficial to post the entire series as one thread, but to
+change the subject line of each patch to adequately reflect the affected
+subsystem.
 
-Maxime
+thx,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/2d0494c1/attachment.sig>
+Jason.
