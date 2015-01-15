@@ -1,77 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Jan 2015 15:09:52 +0100
-Subject: [PATCH 0/7] AT91 cleanup for 3.20 #1
-In-Reply-To: <20150112202603.6a7b691d@bbrezillon>
-References: <1421088136-10172-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150112202603.6a7b691d@bbrezillon>
-Message-ID: <54B7CA30.1010806@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Jan 2015 15:09:35 +0100
+Subject: [PATCH v4 1/4] ata: libahci: Clean-up the
+ ahci_platform_en/disable_phys functions
+In-Reply-To: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1421330978-9694-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/01/2015 20:26, Boris Brezillon a ?crit :
-> Hi Alexandre,
-> 
-> On Mon, 12 Jan 2015 19:42:09 +0100
-> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
->> Hi,
->>
->> This patch set cleans a lot of remaining header, config options and functions
->> that are not used anymore since the switch to DT only.
->>
->> Patch 5 is moving mach/debug-macro.S to include/debug/at91.S to prepare the
->> upcoming switch to multiplatform.
->>
-> 
-> Thanks for those cleanup changes.
-> 
-> To the whole series:
-> 
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+The phy_ functions handle the NULL pointer case, so there is no need
+to skip them if there is a NULL pointer. Moreover, after the error
+label there is already no check on the pointer. This patch removes the
+unnecessary tests and brings some consistency.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/ata/libahci_platform.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-With the change noted in patch 6/7, all queued on at91-3.20-at91. Thanks.
-
-
->> Alexandre Belloni (7):
->>   ARM: at91: remove unused mach/memory.h
->>   ARM: at91: remove useless config MACH_AT91RM9200_DT
->>   ARM: at91: remove useless config MACH_AT91SAM9_DT
->>   ARM: at91: remove useless at91_sysirq_mask_rtx
->>   ARM: at91: move debug-macro.S into the common space
->>   ARM: at91: remove useless at91rm9200_dt_initialize()
->>   ARM: at91: remove useless at91rm9200_set_type()
->>
->>  MAINTAINERS                                        |  1 +
->>  arch/arm/Kconfig.debug                             |  9 ++-
->>  .../mach/debug-macro.S => include/debug/at91.S}    | 19 +++---
->>  arch/arm/mach-at91/Kconfig                         |  8 ---
->>  arch/arm/mach-at91/Makefile                        |  6 +-
->>  arch/arm/mach-at91/at91sam9260.c                   |  2 -
->>  arch/arm/mach-at91/at91sam9261.c                   |  2 -
->>  arch/arm/mach-at91/at91sam9263.c                   |  3 -
->>  arch/arm/mach-at91/at91sam9g45.c                   |  3 -
->>  arch/arm/mach-at91/at91sam9n12.c                   |  6 --
->>  arch/arm/mach-at91/at91sam9rl.c                    |  3 -
->>  arch/arm/mach-at91/at91sam9x5.c                    | 10 ---
->>  arch/arm/mach-at91/board-dt-rm9200.c               |  2 +-
->>  arch/arm/mach-at91/generic.h                       |  6 --
->>  arch/arm/mach-at91/include/mach/at91_rtt.h         | 35 ----------
->>  arch/arm/mach-at91/include/mach/memory.h           | 26 --------
->>  arch/arm/mach-at91/sama5d3.c                       |  6 --
->>  arch/arm/mach-at91/setup.c                         | 18 ------
->>  arch/arm/mach-at91/sysirq_mask.c                   | 75 ----------------------
->>  19 files changed, 23 insertions(+), 217 deletions(-)
->>  rename arch/arm/{mach-at91/include/mach/debug-macro.S => include/debug/at91.S} (68%)
->>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_rtt.h
->>  delete mode 100644 arch/arm/mach-at91/include/mach/memory.h
->>  delete mode 100644 arch/arm/mach-at91/sysirq_mask.c
->>
-> 
-> 
-> 
-
-
+diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+index 0b03f9056692..a147aaadca85 100644
+--- a/drivers/ata/libahci_platform.c
++++ b/drivers/ata/libahci_platform.c
+@@ -54,9 +54,6 @@ static int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
+ 	int rc, i;
+ 
+ 	for (i = 0; i < hpriv->nports; i++) {
+-		if (!hpriv->phys[i])
+-			continue;
+-
+ 		rc = phy_init(hpriv->phys[i]);
+ 		if (rc)
+ 			goto disable_phys;
+@@ -89,9 +86,6 @@ static void ahci_platform_disable_phys(struct ahci_host_priv *hpriv)
+ 	int i;
+ 
+ 	for (i = 0; i < hpriv->nports; i++) {
+-		if (!hpriv->phys[i])
+-			continue;
+-
+ 		phy_power_off(hpriv->phys[i]);
+ 		phy_exit(hpriv->phys[i]);
+ 	}
 -- 
-Nicolas Ferre
+1.9.1
