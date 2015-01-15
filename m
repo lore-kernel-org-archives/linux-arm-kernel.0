@@ -1,91 +1,34 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 15 Jan 2015 17:59:15 +0800
-Subject: [PATCH] ARM: at91: dts: sama5d3/sama5d4: reduce NFC command
- registers memory region
-In-Reply-To: <20150115094527.3fde882a@bbrezillon>
-References: <1421305683-8739-1-git-send-email-josh.wu@atmel.com>
- <20150115094527.3fde882a@bbrezillon>
-Message-ID: <54B78F73.9000504@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Jan 2015 09:59:19 +0000
+Subject: [PATCH] arm64: kill off the libgcc dependency
+In-Reply-To: <20150115070730.GA23621@pek-khao-d1.corp.ad.wrs.com>
+References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
+ <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
+ <2438951.7KFuXx85Hp@wuerfel>
+ <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
+ <20150114133742.GI4050@arm.com>
+ <20150115070730.GA23621@pek-khao-d1.corp.ad.wrs.com>
+Message-ID: <20150115095918.GA23475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi? Boris
+On Thu, Jan 15, 2015 at 07:07:30AM +0000, Kevin Hao wrote:
+> On Wed, Jan 14, 2015 at 01:37:42PM +0000, Will Deacon wrote:
+> > On Wed, Jan 14, 2015 at 12:52:49PM +0000, Ard Biesheuvel wrote:
+> > > IMO libgcc.a cannot be used at all in the kernel, as it is not built
+> > > with -mgeneral-regs-only so we have no guarantee that it will leave
+> > > the NEON registers alone.
+> > 
+> > That's a very good point. In which case, we'd need to extend this patch
+> > to implement the bitops that we currently rely on the __builtins for.
+> 
+> Sorry, I am not sure I get what you mean. These builtin functions for bitops
+> are not implemented in the libgcc, they are inlined in compiler. So why do
+> we need to reimplement these bitops when removing the link with libgcc?
 
-Thanks for the review.
+I'm just relaying what the tools guys told us. Namely, that they don't
+guarantee that they are inlined and could generate a branch to a libgcc
+function. As Ard says, they could also use fpsimd registers, so whether
+or not they are inlined is moot anyway.
 
-On 1/15/2015 4:45 PM, Boris Brezillon wrote:
-> Hi Josh,
->
-> On Thu, 15 Jan 2015 15:08:03 +0800
-> Josh Wu <josh.wu@atmel.com> wrote:
->
->> To get NFC status, we need to read the NFC command registers, which is a
->> 256M memory mapping address. To check the status, you just read such
->> address from NFC command registers.
->> For example, to check NFCBUSY (bit 27), you need to read 0x08000000
->> (bit 27 is set to 1) of the NFC command register.
->> If you want to check NFCBUSY (bit 27) and NFCWR (bit 26) in same time,
->> you need to read 0x0c000000 (bit 27 and bit 26 are set to 1).
-> Are NFCBUSY and NFCWR found in NFCDATA_STATUS and those found in HSMC_SR
-> representing the same thing.
-yes. it is. I just check with IP team. The NFCBUSY of NFCDATA_STATUS is 
-also refer to NFC_BUSY of HSMC_SR.
-
-> If they are, I think you can just use HSMC_SR instead of NFCDATA_STATUS
-> to check the status [1] and drop the last bit in the NFC Command
-> Resgiters range.
-Thank you. your code works (just need some typo change).
-I want to send [1] code with your signed-off and my acked to mtd list.
-Is it okay for you?
-
->
->> But mapping such huge memory address only for multiple NFC status check
->> is not very economic.
->>
->> The economic way is we check the NFC status one bit a time, then we don't
->> have to mapping such huge address.
->>
->> Now we reduce the memory mapping from 256M to 128M+4 (include 0x08000000),
->> the only difference is NFCBUSY (bit 27) status. You cannot check NFCBUSY
->> bit with other NFC status bit.
->>
->> Since current atmel_nand driver check the NFCBUSY status without combine
->> other bits, so this change (reduce 256M to 128M+4) will not be harmful.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>
->> ---
->>
->>   arch/arm/boot/dts/sama5d3.dtsi | 2 +-
->>   arch/arm/boot/dts/sama5d4.dtsi | 2 +-
->>   2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
->> index d701ddd..d243732 100644
->> --- a/arch/arm/boot/dts/sama5d3.dtsi
->> +++ b/arch/arm/boot/dts/sama5d3.dtsi
->> @@ -1426,7 +1426,7 @@
->>   				#address-cells = <1>;
->>   				#size-cells = <1>;
->>   				reg = <
->> -					0x70000000 0x10000000	/* NFC Command Registers */
->> +					0x70000000 0x08000004	/* NFC Command Registers */
-> This would give the following range:
->
-> 					0x70000000 0x08000000
-This is also right if we apply above code change.
-
-So after above patch for mtd list is accepted I'll send out the dts 
-changes patch.
-
->
->
-> Best Regards,
->
-> Boris
->
-> [1]http://code.bulix.org/2noozv-87724
->
->
-Best Regards,
-Josh Wu
+Will
