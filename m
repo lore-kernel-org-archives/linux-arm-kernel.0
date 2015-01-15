@@ -1,131 +1,99 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 15 Jan 2015 17:19:08 +0100
-Subject: [PATCH 3/3] ARM: dts: rockchip: add dts for ChipSPARK Rayeager
- PX2 board
-In-Reply-To: <1421289659-16627-4-git-send-email-naobsd@gmail.com>
-References: <1421289659-16627-1-git-send-email-naobsd@gmail.com>
- <1421289659-16627-4-git-send-email-naobsd@gmail.com>
-Message-ID: <2706590.Kkspa3JYVn@phil>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Jan 2015 08:20:23 -0800
+Subject: [PATCH] ARM: OMAP: Work around hardcoded interrupts
+In-Reply-To: <1421335212-4115-1-git-send-email-marc.zyngier@arm.com>
+References: <1421335212-4115-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150115162022.GD18552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-again, please add a small commit message and reorder nodes as described in the 
-previous patch, some more stuff inline
-
-Am Donnerstag, 15. Januar 2015, 11:40:59 schrieb FUKAUMI Naoki:
-> Signed-off-by: FUKAUMI Naoki <naobsd@gmail.com>
-> ---
-
-[...]
-
-> +
-> +	vsys: vsys-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vsys";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	vcc_otg: usb-otg-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&otg_drv>;
-> +		regulator-name = "vcc_otg";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-
-missing vin-supply
-
-> +	};
-> +
-> +	vcc_host: usb-host-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&host_drv>;
-> +		regulator-name = "host-pwr";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-
-missing vin-supply
-
-> +	};
-> +
-> +	vcc_sata: sata-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sata_pwr>;
-> +		regulator-name = "usb_5v";
-
-why is it named "usb_5v"?
-
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-
-missing vin-supply
-
-> +	};
-> +
-
-[...]
-
-> +&emmc {
-> +	broken-cd;
-> +	bus-width = <8>;
-> +	cap-mmc-highspeed;
-> +	disable-wp;
-> +	non-removable;
-> +	num-slots = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
-> +	status = "okay";
-> +	vmmc-supply = <&vcc_emmc>;
-> +	vqmmc-supply = <&vcc_emmc>;
-
-I checked the public schematics and surprisingly this is actually correct ... 
-but still very strange :-)
-
+* Marc Zyngier <marc.zyngier@arm.com> [150115 07:24]:
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -256,6 +256,38 @@ static int __init omap4_sar_ram_init(void)
+>  }
+>  omap_early_initcall(omap4_sar_ram_init);
+>  
+> +static struct of_device_id gic_match[] = {
+> +	{ .compatible = "arm,cortex-a9-gic", },
+> +	{ .compatible = "arm,cortex-a15-gic", },
+> +	{ },
 > +};
-
-[...]
-
-> +&i2c0 {
-> +	status = "okay";
-> +	clock-frequency = <400000>;
 > +
-> +	ak8963: ak8963 at d {
-
-please use two chars for the address, i.e. ak8963 at 0d, same for the reg below
-
-> +		compatible = "asahi-kasei,ak8975";
-> +		reg = <0xd>;
-> +		interrupt-parent = <&gpio4>;
-> +		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&comp_int>;
-> +	};
+> +static struct device_node *gic_node;
 > +
-> +	mma8452: mma8452 at 1d {
-> +		compatible = "fsl,mma8452";
-> +		reg = <0x1d>;
-> +		interrupt-parent = <&gpio4>;
-> +		interrupts = <16 IRQ_TYPE_EDGE_RISING>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&gsensor_int>;
-> +	};
-> +};
+> +unsigned int omap4_xlate_irq(unsigned int hwirq)
+> +{
+> +	struct of_phandle_args irq_data;
+> +	unsigned int irq;
+> +
+> +	if (!gic_node)
+> +		gic_node = of_find_matching_node(NULL, gic_match);
+> +
+> +	if (WARN_ON(!gic_node))
+> +		return hwirq;
+> +
+> +	irq_data.np = gic_node;
+> +	irq_data.args_count = 3;
+> +	irq_data.args[0] = 0;
+> +	irq_data.args[1] = hwirq - OMAP44XX_IRQ_GIC_START;
+> +	irq_data.args[2] = IRQ_TYPE_LEVEL_HIGH;
+> +
+> +	irq = irq_create_of_mapping(&irq_data);
+> +	if (WARN_ON(!irq))
+> +		irq = hwirq;
+> +
+> +	return irq;
+> +}
+> +
+>  void __init omap_gic_of_init(void)
+>  {
+>  	struct device_node *np;
 
+Thanks for the quick fix, this is is fine with me as long as we
+don't have other legacy users. At least I did not find any other
+legacy users based on a quick grep.
 
-Heiko
+> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+> @@ -288,6 +288,7 @@ static struct omap_hwmod omap54xx_dma_system_hwmod = {
+>  	.class		= &omap54xx_dma_hwmod_class,
+>  	.clkdm_name	= "dma_clkdm",
+>  	.mpu_irqs	= omap54xx_dma_system_irqs,
+> +	.xlate_irq	= omap4_xlate_irq,
+>  	.main_clk	= "l3_iclk_div",
+>  	.prcm = {
+>  		.omap4 = {
+
+We could now drop the legacy DMA init completely for omap4 and later.
+But that would require patching the legacy DMA for the exported
+functions.. So probably not doable for the -rc series and does not
+solve the issue with other legacy IRQ users.
+
+> --- a/arch/arm/mach-omap2/twl-common.c
+> +++ b/arch/arm/mach-omap2/twl-common.c
+> @@ -71,9 +71,12 @@ void __init omap4_pmic_init(const char *pmic_type,
+>  		    struct i2c_board_info *devices, int nr_devices)
+>  {
+>  	/* PMIC part*/
+> +	unsigned int irq;
+> +
+>  	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+>  	omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
+> -	omap_pmic_init(1, 400, pmic_type, 7 + OMAP44XX_IRQ_GIC_START, pmic_data);
+> +	irq = omap4_xlate_irq(7 + OMAP44XX_IRQ_GIC_START);
+> +	omap_pmic_init(1, 400, pmic_type, irq, pmic_data);
+>  
+>  	/* Register additional devices on i2c1 bus if needed */
+>  	if (devices)
+
+FYI, I posted a patch yesterday to drop the legacy init code
+for twl6040 as the legacy omap4_pmic_init() is no longer used.
+No need to change this patch though.
+
+So unless somebody has better ideas for the fix for -rc series,
+I'll queue this with the twl6040 code removal patch.
+
+Regards,
+
+Tony
