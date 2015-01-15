@@ -1,58 +1,33 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 15 Jan 2015 09:27:14 +0800
-Subject: [PATCH v6 1/2] mtd: hisilicon: add a new NAND controller driver
- for hisilicon hip04 Soc
-In-Reply-To: <20150114192510.GY9759@ld-irv-0074>
-References: <1421047734-30818-1-git-send-email-wangzhou1@hisilicon.com>
- <1421047734-30818-2-git-send-email-wangzhou1@hisilicon.com>
- <20150113035844.GJ9759@ld-irv-0074> <54B6625F.8060607@hisilicon.com>
- <20150114192510.GY9759@ld-irv-0074>
-Message-ID: <54B71772.9080601@hisilicon.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Jan 2015 17:29:49 -0800
+Subject: [PATCH] arm: mach-versatile: core: Remove unused function
+In-Reply-To: <CACRpkdan1BZQnYgTdF9ctbLOPNoDwDX3Epy8Xfttd2v4-G-4Lw@mail.gmail.com>
+References: <1420303959-12898-1-git-send-email-rickard_strandqvist@spectrumdigital.se>
+ <CACRpkdan1BZQnYgTdF9ctbLOPNoDwDX3Epy8Xfttd2v4-G-4Lw@mail.gmail.com>
+Message-ID: <20150115012949.GF32756@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/15 3:25, Brian Norris wrote:
-> On Wed, Jan 14, 2015 at 08:34:39PM +0800, Zhou Wang wrote:
->> On 2015/1/13 11:58, Brian Norris wrote:
->>> On Mon, Jan 12, 2015 at 03:28:53PM +0800, Zhou Wang wrote:
->>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->>>> +	chip->IO_ADDR_R = chip->IO_ADDR_W = devm_ioremap_resource(dev, res);
->>>
->>> Hmm, do you really have to reuse IO_ADDR_{R,W} here? Those are only
->>> targeted for NAND systems which have a direct MMIO mapping to the NAND
->>> I/O pins. See nand_base's {read,write}_buf() and read_{byte,word}()
->>> implementations. But you override those.
->>
->> There is a hardware buffer in this NAND controller, and the buffer can be
->> accessed as MMIO.
+On Wed, Jan 14, 2015 at 12:53:07PM +0100, Linus Walleij wrote:
+> On Sat, Jan 3, 2015 at 5:52 PM, Rickard Strandqvist
+> <rickard_strandqvist@spectrumdigital.se> wrote:
 > 
-> Sure.
+> > Remove the function versatile_leds_event() that is not used anywhere.
+> >
+> > This was partially found by using a static code analysis program called cppcheck.
+> >
+> > Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
 > 
->> IO_ADDR_R/W just indicates the base address of this buffer.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> But I was noting that IO_ADDR_{R,W} actually serve a very particular
-> purpose in nand_base.c, which seems distinct from your HW buffer.
+> That's right, the code was made redundant in
+> commit e031cd513ec2ff661465dc1198220075719e72d1
+> "ARM: mach-realview and mach-versatile: retire custom LED code"
 > 
->> Maybe I need to use a void __iomem pointer stored in my host struct to use
->> this buffer instead of IO_ADDR_R/W as you said below here?
-> 
-> Yes, I think that would be better.
+> ARM SoC folks: I suggest you apply this patch directly to your cleanup
+> branch.
 
-OK, I will do as this in next version, Thanks!
+Thanks, applied with a minor tweak to the patch subject.
 
-> 
->>> It's best if it's obvious if nand_base is somehow inadvertently using
->>> these pointers. So leaving them NULL is helpful.
->>>
->>> As an alternative, you can just stash another private void __iomem
->>> pointer in you your host struct.
-> 
-> Thanks,
-> Brian
 
-Thanks for your reply!
-Zhou Wang
-
-> 
-> .
-> 
+-Olof
