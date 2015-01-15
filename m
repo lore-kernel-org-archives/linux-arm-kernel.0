@@ -1,482 +1,267 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 11:50:24 +0100
-Subject: [PATCH v3 3/4] ata: libahci: Allow using multiple regulators
-In-Reply-To: <54B77E57.7060708@redhat.com>
-References: <1421158953-2957-1-git-send-email-gregory.clement@free-electrons.com>
- <1421158953-2957-4-git-send-email-gregory.clement@free-electrons.com>
- <54B77E57.7060708@redhat.com>
-Message-ID: <54B79B70.5000703@free-electrons.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Jan 2015 11:55:39 +0100
+Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
+ handling
+In-Reply-To: <1421290310-22212-1-git-send-email-m.smarduch@samsung.com>
+References: <1421290310-22212-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20150115105539.GO26222@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Wed, Jan 14, 2015 at 06:51:50PM -0800, Mario Smarduch wrote:
+> This patch adds support for 2nd stage page fault handling while dirty page
+> logging. On huge page faults, huge pages are dissolved to normal pages, and
+> rebuilding of 2nd stage huge pages is blocked. In case migration is
+> canceled this restriction is removed and huge pages may be rebuilt again.
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+> 
+> change Log since last RESEND v2 --> v3:
+> - Handle read faults to writable regions properly
+> - Along with Christoffers suggestions optimized user_mem_abor() while logging
+> - Fix enable of dirty page logging to Device memory - reject request 
+> 
+> Change Log since last RESEND v1 --> v2:
+> - Disallow dirty page logging of IO region - fail for initial write protect
+>   and disable logging code in 2nd stage page fault handler.
+> - Fixed auto spell correction errors
+> 
+> Change Log RESEND v0 --> v1:
+> - fixed bug exposed by new generic __get_user_pages_fast(), when region is 
+>   writable, prevent write protection of pte on read fault
+> - Removed marking entire huge page dirty on initial access
+> - don't dissolve huge pages of non-writable regions
+> - Made updates based on Christoffers comments
+>   - renamed logging status function to memslot_is_logging()
+>   - changed few values to bool from longs
+>   - streamlined user_mem_abort() to eliminate extra conditional checks
+> ---
+>  arch/arm/kvm/mmu.c |   97 +++++++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 88 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 73d506f..2e494ac 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
+>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>  #define kvm_pud_huge(_x)	pud_huge(_x)
+>  
+> +#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
+> +#define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
+> +
+> +static bool memslot_is_logging(struct kvm_memory_slot *memslot)
+> +{
+> +#ifdef CONFIG_ARM
+> +	return !!memslot->dirty_bitmap;
 
-On 15/01/2015 09:46, Hans de Goede wrote:
-> Hi,
-> 
-> On 13-01-15 15:22, Gregory CLEMENT wrote:
->> The current implementation of the libahci allows using multiple PHYs
->> but not multiple regulators. This patch adds the support of multiple
->> regulators. Until now it was mandatory to have a PHY under a subnode,
->> now a port subnode can contain either a regulator or a PHY (or both).
->>
->> In order to be able to asociate a port with a regulator the port are
->> now a platform device in the device tree case.
->>
->> There was only one driver which used directly the regulator field of
->> the ahci_host_priv structure. To preserve the bisectability the change
->> in the ahci_imx driver was done in the same patch.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Looks good, still needs one more (small) revision though, see comments
-> inline.
+change this to:
+return memslot->dirty_bitmap && !(mem->flags & KVM_MEM_READONLY)
 
-OK I will take care of it
+with the semantics that we only care about logging writes to the dirty
+bitmap for things that will ever actually be written to.
 
-Thanks,
-
-Gregory
-
-> 
->> ---
->>   drivers/ata/ahci.h             |   2 +-
->>   drivers/ata/ahci_imx.c         |  14 +--
->>   drivers/ata/libahci_platform.c | 227 +++++++++++++++++++++++++++++------------
->>   include/linux/ahci_platform.h  |   2 +
->>   4 files changed, 170 insertions(+), 75 deletions(-)
->>
->> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
->> index 40f0e34f17af..275358ae0b3f 100644
->> --- a/drivers/ata/ahci.h
->> +++ b/drivers/ata/ahci.h
->> @@ -333,7 +333,7 @@ struct ahci_host_priv {
->>   	u32			em_msg_type;	/* EM message type */
->>   	bool			got_runtime_pm; /* Did we do pm_runtime_get? */
->>   	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
->> -	struct regulator	*target_pwr;	/* Optional */
->> +	struct regulator	**target_pwrs;	/* Optional */
->>   	/*
->>   	 * If platform uses PHYs. There is a 1:1 relation between the port number and
->>   	 * the PHY position in this array.
->> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
->> index 35d51c59a370..41632e57d46f 100644
->> --- a/drivers/ata/ahci_imx.c
->> +++ b/drivers/ata/ahci_imx.c
->> @@ -221,11 +221,9 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
->>   	if (imxpriv->no_device)
->>   		return 0;
->>
->> -	if (hpriv->target_pwr) {
->> -		ret = regulator_enable(hpriv->target_pwr);
->> -		if (ret)
->> -			return ret;
->> -	}
->> +	ret = ahci_platform_enable_regulators(hpriv);
->> +	if (ret)
->> +		return ret;
->>
->>   	ret = clk_prepare_enable(imxpriv->sata_ref_clk);
->>   	if (ret < 0)
->> @@ -270,8 +268,7 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
->>   disable_clk:
->>   	clk_disable_unprepare(imxpriv->sata_ref_clk);
->>   disable_regulator:
->> -	if (hpriv->target_pwr)
->> -		regulator_disable(hpriv->target_pwr);
->> +	ahci_platform_disable_regulators(hpriv);
->>
->>   	return ret;
->>   }
->> @@ -291,8 +288,7 @@ static void imx_sata_disable(struct ahci_host_priv *hpriv)
->>
->>   	clk_disable_unprepare(imxpriv->sata_ref_clk);
->>
->> -	if (hpriv->target_pwr)
->> -		regulator_disable(hpriv->target_pwr);
->> +	ahci_platform_disable_regulators(hpriv);
->>   }
->>
->>   static void ahci_imx_error_handler(struct ata_port *ap)
->> diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
->> index a147aaadca85..1db968ef6ff8 100644
->> --- a/drivers/ata/libahci_platform.c
->> +++ b/drivers/ata/libahci_platform.c
->> @@ -24,6 +24,7 @@
->>   #include <linux/ahci_platform.h>
->>   #include <linux/phy/phy.h>
->>   #include <linux/pm_runtime.h>
->> +#include <linux/of_platform.h>
->>   #include "ahci.h"
->>
->>   static void ahci_host_stop(struct ata_host *host);
->> @@ -138,6 +139,59 @@ void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
->>   EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
->>
->>   /**
->> + * ahci_platform_enable_regulators - Enable regulators
->> + * @hpriv: host private area to store config values
->> + *
->> + * This function enables all the regulators found in
->> + * hpriv->target_pwrs, if any.  If a regulator fails to be enabled, it
->> + * disables all the regulators already enabled in reverse order and
->> + * returns an error.
->> + *
->> + * RETURNS:
->> + * 0 on success otherwise a negative error code
->> + */
->> +int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
->> +{
->> +	int rc, i;
->> +
->> +	for (i = 0; i < hpriv->nports; i++) {
->> +		if (!hpriv->target_pwrs[i])
->> +			continue;
->> +
->> +		rc = regulator_enable(hpriv->target_pwrs[i]);
->> +		if (rc)
->> +			goto disable_target_pwrs;
->> +	}
->> +
->> +	return 0;
->> +
->> +disable_target_pwrs:
->> +	while (--i >= 0)
->> +		if (hpriv->target_pwrs[i])
->> +			regulator_disable(hpriv->target_pwrs[i]);
->> +
->> +	return rc;
->> +}
->> +EXPORT_SYMBOL_GPL(ahci_platform_enable_regulators);
->> +
->> +/**
->> + * ahci_platform_disable_regulators - Disable regulators
->> + * @hpriv: host private area to store config values
->> + *
->> + * This function disables all regulators found in hpriv->target_pwrs.
->> + */
->> +void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < hpriv->nports; i++) {
->> +		if (!hpriv->target_pwrs[i])
->> +			continue;
->> +		regulator_disable(hpriv->target_pwrs[i]);
->> +	}
->> +}
->> +EXPORT_SYMBOL_GPL(ahci_platform_disable_regulators);
->> +/**
->>    * ahci_platform_enable_resources - Enable platform resources
->>    * @hpriv: host private area to store config values
->>    *
->> @@ -157,11 +211,9 @@ int ahci_platform_enable_resources(struct ahci_host_priv *hpriv)
->>   {
->>   	int rc;
->>
->> -	if (hpriv->target_pwr) {
->> -		rc = regulator_enable(hpriv->target_pwr);
->> -		if (rc)
->> -			return rc;
->> -	}
->> +	rc = ahci_platform_enable_regulators(hpriv);
->> +	if (rc)
->> +		return rc;
->>
->>   	rc = ahci_platform_enable_clks(hpriv);
->>   	if (rc)
->> @@ -177,8 +229,8 @@ disable_clks:
->>   	ahci_platform_disable_clks(hpriv);
->>
->>   disable_regulator:
->> -	if (hpriv->target_pwr)
->> -		regulator_disable(hpriv->target_pwr);
->> +	ahci_platform_disable_regulators(hpriv);
->> +
->>   	return rc;
->>   }
->>   EXPORT_SYMBOL_GPL(ahci_platform_enable_resources);
->> @@ -199,8 +251,7 @@ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
->>
->>   	ahci_platform_disable_clks(hpriv);
->>
->> -	if (hpriv->target_pwr)
->> -		regulator_disable(hpriv->target_pwr);
->> +	ahci_platform_disable_regulators(hpriv);
->>   }
->>   EXPORT_SYMBOL_GPL(ahci_platform_disable_resources);
->>
->> @@ -218,6 +269,59 @@ static void ahci_platform_put_resources(struct device *dev, void *res)
->>   		clk_put(hpriv->clks[c]);
->>   }
->>
->> +static int ahci_platform_get_phy(struct ahci_host_priv *hpriv, u32 port,
->> +				struct device *dev, struct device_node *node)
->> +{
->> +	int rc;
->> +
->> +	hpriv->phys[port] = devm_of_phy_get(dev, node, NULL);
->> +
->> +	if (!IS_ERR(hpriv->phys[port]))
->> +		return 0;
->> +
->> +	rc = PTR_ERR(hpriv->phys[port]);
->> +	switch (rc) {
->> +	case -ENOSYS:
->> +		/* No PHY support. Check if PHY is required. */
->> +		if (of_find_property(node, "phys", NULL)) {
->> +			dev_err(dev,
->> +				"couldn't get PHY in node %s: ENOSYS\n",
->> +				node->name);
->> +			break;
->> +		}
->> +	case -ENODEV:
->> +		/* continue normally */
->> +		hpriv->phys[port] = NULL;
->> +		rc = 0;
->> +		break;
->> +
->> +	default:
->> +		dev_err(dev,
->> +			"couldn't get PHY in node %s: %d\n",
->> +			node->name, rc);
->> +
->> +		break;
->> +	}
->> +
->> +	return rc;
->> +}
->> +
->> +static int ahci_platform_get_regulator(struct ahci_host_priv *hpriv, u32 port,
->> +				struct device *dev)
->> +{
->> +	struct regulator *target_pwr;
->> +	int rc = 0;
->> +
->> +	target_pwr = devm_regulator_get_optional(dev, "target");
-> 
-> As you've already found out the devm framework does not work for freeing
-> things which are tied to the child node devices, so it is better to
-> use the non devm function here, the devm variant just adds overhead
-> (extra malloc under the hood), without buying us anything here.
-> 
->> +
->> +	if (!IS_ERR(target_pwr))
->> +		hpriv->target_pwrs[port] = target_pwr;
->> +	else
->> +		rc = PTR_ERR(target_pwr);
->> +
->> +	return rc;
->> +}
->> +
->>   /**
->>    * ahci_platform_get_resources - Get platform resources
->>    * @pdev: platform device to get resources for
-> 
-> 
-> You're not modifying ahci_platform_put_resources to put the regulators here,
-> since the regulators may now be bound to the platfrom-devs for the child nodes,
-> they will not get cleaned up by the devm framework on driver unbind, as the
-> driver is only bound to the main device and thus the devm framework only
-> cleans up resources attached to the main device.
-> 
-> So you need to modify ahci_platform_put_resources to explicitly put the
-> reference to the regulators.
-> 
-> Note since ahci_platform_put_resources gets called during probe errors too,
-> you need to check hpriv->target_pwrs before you deref it as it may be NULL!
-> 
-> Please also add a comment to ahci_platform_put_resources why the regulators
-> cannot be devm managed.
-> 
->> @@ -240,7 +344,7 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->>   	struct ahci_host_priv *hpriv;
->>   	struct clk *clk;
->>   	struct device_node *child;
->> -	int i, enabled_ports = 0, rc = -ENOMEM;
->> +	int i, sz, enabled_ports = 0, rc = -ENOMEM, child_nodes;
->>   	u32 mask_port_map = 0;
->>
->>   	if (!devres_open_group(dev, NULL, GFP_KERNEL))
->> @@ -261,14 +365,6 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->>   		goto err_out;
->>   	}
->>
->> -	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
->> -	if (IS_ERR(hpriv->target_pwr)) {
->> -		rc = PTR_ERR(hpriv->target_pwr);
->> -		if (rc == -EPROBE_DEFER)
->> -			goto err_out;
->> -		hpriv->target_pwr = NULL;
->> -	}
->> -
->>   	for (i = 0; i < AHCI_MAX_CLKS; i++) {
->>   		/*
->>   		 * For now we must use clk_get(dev, NULL) for the first clock,
->> @@ -290,19 +386,33 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->>   		hpriv->clks[i] = clk;
->>   	}
->>
->> -	hpriv->nports = of_get_child_count(dev->of_node);
->> +	hpriv->nports = child_nodes = of_get_child_count(dev->of_node);
->>
->> -	if (hpriv->nports) {
->> -		hpriv->phys = devm_kzalloc(dev,
->> -					   hpriv->nports * sizeof(*hpriv->phys),
->> -					   GFP_KERNEL);
->> -		if (!hpriv->phys) {
->> -			rc = -ENOMEM;
->> -			goto err_out;
->> -		}
->> +	/*
->> +	 * If no sub-node was found, we still need to set nports to
->> +	 * one in order to be able to use the
->> +	 * ahci_platform_[en|dis]able_[phys|regulators] functions.
->> +	 */
->> +	if (!child_nodes)
->> +		hpriv->nports = 1;
->> +
->> +	sz = hpriv->nports * sizeof(*hpriv->phys);
->> +	hpriv->phys = devm_kzalloc(dev, sz, GFP_KERNEL);
->> +	if (!hpriv->phys) {
->> +		rc = -ENOMEM;
->> +		goto err_out;
->> +	}
->> +	sz = hpriv->nports * sizeof(*hpriv->target_pwrs);
->> +	hpriv->target_pwrs = devm_kzalloc(dev, sz, GFP_KERNEL);
->> +	if (!hpriv->target_pwrs) {
->> +		rc = -ENOMEM;
->> +		goto err_out;
->> +	}
->>
->> +	if (child_nodes) {
->>   		for_each_child_of_node(dev->of_node, child) {
->>   			u32 port;
->> +			struct platform_device *port_dev;
->>
->>   			if (!of_device_is_available(child))
->>   				continue;
->> @@ -316,17 +426,20 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->>   				dev_warn(dev, "invalid port number %d\n", port);
->>   				continue;
->>   			}
->> -
->>   			mask_port_map |= BIT(port);
->>
->> -			hpriv->phys[port] = devm_of_phy_get(dev, child, NULL);
->> -			if (IS_ERR(hpriv->phys[port])) {
->> -				rc = PTR_ERR(hpriv->phys[port]);
->> -				dev_err(dev,
->> -					"couldn't get PHY in node %s: %d\n",
->> -					child->name, rc);
->> +			of_platform_device_create(child, NULL, NULL);
->> +
->> +			port_dev = of_find_device_by_node(child);
-> 
-> This call can fail, you need to error check it before dereferencing the port_dev
-> pointer below.
-> 
->> +
->> +			rc = ahci_platform_get_regulator(hpriv, port,
->> +							&port_dev->dev);
->> +			if (rc == -EPROBE_DEFER)
->> +				goto err_out;
->> +
->> +			rc = ahci_platform_get_phy(hpriv, port, dev, child);
->> +			if (rc)
->>   				goto err_out;
->> -			}
->>
->>   			enabled_ports++;
->>   		}
->> @@ -343,38 +456,14 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->>   		 * If no sub-node was found, keep this for device tree
->>   		 * compatibility
->>   		 */
->> -		struct phy *phy = devm_phy_get(dev, "sata-phy");
->> -		if (!IS_ERR(phy)) {
->> -			hpriv->phys = devm_kzalloc(dev, sizeof(*hpriv->phys),
->> -						   GFP_KERNEL);
->> -			if (!hpriv->phys) {
->> -				rc = -ENOMEM;
->> -				goto err_out;
->> -			}
->> -
->> -			hpriv->phys[0] = phy;
->> -			hpriv->nports = 1;
->> -		} else {
->> -			rc = PTR_ERR(phy);
->> -			switch (rc) {
->> -				case -ENOSYS:
->> -					/* No PHY support. Check if PHY is required. */
->> -					if (of_find_property(dev->of_node, "phys", NULL)) {
->> -						dev_err(dev, "couldn't get sata-phy: ENOSYS\n");
->> -						goto err_out;
->> -					}
->> -				case -ENODEV:
->> -					/* continue normally */
->> -					hpriv->phys = NULL;
->> -					break;
->> -
->> -				default:
->> -					goto err_out;
->> +		rc = ahci_platform_get_phy(hpriv, 0, dev, dev->of_node);
->> +		if (rc)
->> +			goto err_out;
->>
->> -			}
->> -		}
->> +		rc = ahci_platform_get_regulator(hpriv, 0, dev);
->> +		if (rc == -EPROBE_DEFER)
->> +			goto err_out;
->>   	}
->> -
->>   	pm_runtime_enable(dev);
->>   	pm_runtime_get_sync(dev);
->>   	hpriv->got_runtime_pm = true;
->> @@ -383,6 +472,14 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev)
->>   	return hpriv;
->>
->>   err_out:
->> +	/*
->> +	 * In case of a deferred probe, previous regulators may have
->> +	 * been already get, so put them to be able to get them again
->> +	 * in the next probe.
->> +	 */
->> +	for (i = 0; i < hpriv->nports; i++)
->> +		if (hpriv->target_pwrs[i])
->> +			devm_regulator_put(hpriv->target_pwrs[i]);
-> 
-> Once you've added the regulator_put calls to ahci_platform_put_resources
-> you can drop this as the devres_release_group() call will call
-> ahci_platform_put_resources().
-> 
->>   	devres_release_group(dev, NULL);
->>   	return ERR_PTR(rc);
->>   }
->> diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
->> index 642d6ae4030c..f65b33809170 100644
->> --- a/include/linux/ahci_platform.h
->> +++ b/include/linux/ahci_platform.h
->> @@ -24,6 +24,8 @@ struct platform_device;
->>
->>   int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
->>   void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
->> +int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv);
->> +void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv);
->>   int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
->>   void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
->>   struct ahci_host_priv *ahci_platform_get_resources(
->>
-> 
-> Regards,
-> 
-> Hans
+> +#else
+> +	return false;
+> +#endif
+> +}
+> +
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  {
+>  	/*
+> @@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
+>  }
+>  
+> +/**
+> + * stage2_dissolve_pmd() - clear and flush huge PMD entry
+> + * @kvm:	pointer to kvm structure.
+> + * @addr:	IPA
+> + * @pmd:	pmd pointer for IPA
+> + *
+> + * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
+> + * pages in the range dirty.
+> + */
+> +static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
+> +{
+> +	if (!kvm_pmd_huge(*pmd))
+> +		return;
+> +
+> +	pmd_clear(pmd);
+> +	kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +	put_page(virt_to_page(pmd));
+> +}
+> +
+>  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+>  				  int min, int max)
+>  {
+> @@ -703,10 +734,15 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>  }
+>  
+>  static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> -			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
+> +			  phys_addr_t addr, const pte_t *new_pte,
+> +			  unsigned long flags)
+>  {
+>  	pmd_t *pmd;
+>  	pte_t *pte, old_pte;
+> +	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
+> +	bool logging_active = flags & KVM_S2_FLAG_LOGGING_ACTIVE;
+> +
+> +	VM_BUG_ON(logging_active && !cache);
+>  
+>  	/* Create stage-2 page table mapping - Levels 0 and 1 */
+>  	pmd = stage2_get_pmd(kvm, cache, addr);
+> @@ -718,6 +754,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>  		return 0;
+>  	}
+>  
+> +	/*
+> +	 * While dirty page logging - dissolve huge PMD, then continue on to
+> +	 * allocate page.
+> +	 */
+> +	if (logging_active)
+> +		stage2_dissolve_pmd(kvm, addr, pmd);
+> +
+>  	/* Create stage-2 page mappings - Level 2 */
+>  	if (pmd_none(*pmd)) {
+>  		if (!cache)
+> @@ -774,7 +817,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>  		if (ret)
+>  			goto out;
+>  		spin_lock(&kvm->mmu_lock);
+> -		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
+> +		ret = stage2_set_pte(kvm, &cache, addr, &pte,
+> +						KVM_S2PTE_FLAG_IS_IOMAP);
+>  		spin_unlock(&kvm->mmu_lock);
+>  		if (ret)
+>  			goto out;
+> @@ -1002,6 +1046,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	pfn_t pfn;
+>  	pgprot_t mem_type = PAGE_S2;
+>  	bool fault_ipa_uncached;
+> +	bool logging_active = memslot_is_logging(memslot);
+> +	unsigned long flags = 0;
+>  
+>  	write_fault = kvm_is_write_fault(vcpu);
+>  	if (fault_status == FSC_PERM && !write_fault) {
+> @@ -1018,7 +1064,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		return -EFAULT;
+>  	}
+>  
+> -	if (is_vm_hugetlb_page(vma)) {
+> +	if (is_vm_hugetlb_page(vma) && !logging_active) {
+>  		hugetlb = true;
+>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>  	} else {
+> @@ -1059,12 +1105,30 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	if (is_error_pfn(pfn))
+>  		return -EFAULT;
+>  
+> -	if (kvm_is_device_pfn(pfn))
+> +	if (kvm_is_device_pfn(pfn)) {
+>  		mem_type = PAGE_S2_DEVICE;
+> +		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
+> +	} else if (logging_active) {
+> +		/*
+> +		 * Faults on pages in a memslot with logging enabled
+> +		 * should not be mapped with huge pages (it introduces churn
+> +		 * and performance degradation), so force a pte mapping.
+> +		 */
+> +		force_pte = true;
+> +		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
+> +
+> +		/*
+> +		 * Only actually map the page as writable if this was a write
+> +		 * fault.
+> +		 */
+> +		if (!write_fault)
+> +			writable = false;
+> +	}
+>  
+>  	spin_lock(&kvm->mmu_lock);
+>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>  		goto out_unlock;
+> +
+>  	if (!hugetlb && !force_pte)
+>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>  
+> @@ -1082,17 +1146,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+>  	} else {
+>  		pte_t new_pte = pfn_pte(pfn, mem_type);
+> +
+>  		if (writable) {
+>  			kvm_set_s2pte_writable(&new_pte);
+>  			kvm_set_pfn_dirty(pfn);
+> +			mark_page_dirty(kvm, gfn);
+>  		}
+>  		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
+>  					  fault_ipa_uncached);
+> -		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
+> -			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
+> +		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+>  	}
+>  
+> -
+>  out_unlock:
+>  	spin_unlock(&kvm->mmu_lock);
+>  	kvm_release_pfn_clean(pfn);
+> @@ -1242,7 +1306,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>  {
+>  	pte_t *pte = (pte_t *)data;
+>  
+> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
+> +	/*
+> +	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
+> +	 * flag clear because MMU notifiers will have unmapped a huge PMD before
+> +	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
+> +	 * therefore stage2_set_pte() never needs to clear out a huge PMD
+> +	 * through this calling path.
+> +	 */
+> +	stage2_set_pte(kvm, NULL, gpa, pte, 0);
+>  }
+>  
+>  
+> @@ -1396,7 +1467,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>  	bool writable = !(mem->flags & KVM_MEM_READONLY);
+>  	int ret = 0;
+>  
+> -	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
+> +	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
+> +			change != KVM_MR_FLAGS_ONLY)
+>  		return 0;
+>  
+>  	/*
+> @@ -1447,6 +1519,10 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>  			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
+>  					 vm_start - vma->vm_start;
+>  
+> +			/* IO region dirty page logging not allowed */
+> +			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
+> +				return -EINVAL;
+> +
+>  			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+>  						    vm_end - vm_start,
+>  						    writable);
+> @@ -1456,6 +1532,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>  		hva = vm_end;
+>  	} while (hva < reg_end);
+>  
+> +	if (change == KVM_MR_FLAGS_ONLY)
+> +		return ret;
+> +
+>  	spin_lock(&kvm->mmu_lock);
+>  	if (ret)
+>  		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
+> -- 
+> 1.7.9.5
 > 
 
+besides the final nit, this looks good!
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Send out a new complete series, and I'll test it and we may be just in
+time for the next merge window.
+
+-Christoffer
