@@ -1,57 +1,158 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 15 Jan 2015 15:25:36 +0100
-Subject: [PATCH 0/4] Drop legacy support for omap3517
-In-Reply-To: <20150113204219.GJ2419@atomide.com>
-References: <1421171865-5209-1-git-send-email-tony@atomide.com>
- <10549142.7lWnPtPtZG@wuerfel> <20150113204219.GJ2419@atomide.com>
-Message-ID: <20150115142536.GC512@earth.universe>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 15:27:00 +0100
+Subject: [PATCH] ARM: at91/Documentation: add a README for Atmel SoCs
+In-Reply-To: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1420809631-26923-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <54B7CE34.6090500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 12:42:20PM -0800, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [150113 12:27]:
-> > On Tuesday 13 January 2015 09:57:41 Tony Lindgren wrote:
-> > > 
-> > > It seems we can now drop omap3517 legacy booting support to get
-> > > a bit closer to making all of omap3 boot in device tree only mode.
-> > > 
-> > > All these boards have at least minimal support for booting with
-> > > device tree, and pretty much anything supported with the legacy
-> > > board files can be configured also for device tree based booting
-> > > if not done already.
-> > 
-> > Ah, very nice.
-> > 
-> > Just out of curiosity, what are the remaining showstoppers for
-> > the 3430 and 3530 based boards?
+Le 09/01/2015 14:20, Nicolas Ferre a ?crit :
+> Add a README file to describe Atmel SoCs (aka AT91) support in Mainline Linux:
+> - SoC list + datasheet web links
+> - Basic but useful information
+> - Device Tree conventions and Work In Progress statement.
 > 
-> Not much really. We're now printing a warning to get a people to
-> upgrade their systems. So with some boards we need to wait a while.
-> 
-> Then here are the remaining items that I'm aware of:
-> 
-> - A regression at least on some n900 with appended DTB not booting
->   properly any longer reported by Pali
-> 
-> - A regression where the legacy ATAGs don't seem to get properly
->   translated by the uncompress code for atag_rev at least reported
->   by Pali
-> 
-> - A few missing .dts files for devkit8000, omap3logic, omap3stalker,
->   omap3pandora and omap3touchbook
-> 
-> Pali and Sebastian probably know best of any other remaining
-> issues to drop n900 legacy booting.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: ARM Maintainers <arm@kernel.org>
 
-Apart from the bugs there is only one feature-wise regression when
-the system is booted via DT, which is the accelerometer. I will
-(re)send patches for that in the next days.
+With corrections by Alexandre and myself, pushed in at91-3.20-cleanup
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/86546acf/attachment.sig>
+Bye.
+
+> ---
+>  Documentation/arm/Atmel/README | 120 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 120 insertions(+)
+>  create mode 100644 Documentation/arm/Atmel/README
+> 
+> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
+> new file mode 100644
+> index 000000000000..538f8a556277
+> --- /dev/null
+> +++ b/Documentation/arm/Atmel/README
+> @@ -0,0 +1,120 @@
+> +ARM Atmel SoCs (aka AT91)
+> +=========================
+> +
+> +
+> +Introduction
+> +------------
+> +This document gives useful information about the ARM Atmel SoCs that are
+> +currently supported in Linux Mainline (you know, the one on kernel.org).
+> +
+> +It is important to note that the Atmel | SMART ARM-based MPU product line is
+> +historically named "AT91" or "at91" throughout the Linux kernel development
+> +process even if this product prefix has completely disappeared from the
+> +official Atmel product name. Anyway, files, directories, git trees,
+> +git branches/tags and email subject always contain this "at91" sub-string.
+> +
+> +
+> +AT91 SoCs
+> +---------
+> +Documentation and detailled datasheet for each product are available on
+> +the Atmel website: http://www.atmel.com.
+> +
+> +  Flavors:
+> +    * ARM 920 based SoC
+> +      - at91rm9200
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc1768.pdf
+> +
+> +    * ARM 926 based SoCs
+> +      - at91sam9260
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6221.pdf
+> +
+> +      - at91sam9261
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6062.pdf
+> +
+> +      - at91sam9263
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel_6249_32-bit-ARM926EJ-S-Microcontroller_SAM9263_Datasheet.pdf
+> +
+> +      - at91sam9rl
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6289.pdf
+> +
+> +      - at91sam9g20
+> +        + Datasheet
+> +          http://www.atmel.com/Images/doc6384.pdf
+> +
+> +      - at91sam9g45 family
+> +        - at91sam9g45
+> +        - at91sam9g46
+> +        - at91sam9m10
+> +        - at91sam9m11 (device superset)
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel-6437-32-bit-ARM926-Embedded-Microprocessor-SAM9M11_Datasheet.pdf
+> +
+> +      - at91sam9x5 family (aka "The 5 series")
+> +        - at91sam9g15
+> +        - at91sam9g25
+> +        - at91sam9g35
+> +        - at91sam9x25
+> +        - at91sam9x35
+> +        + Datasheet (can be considered as covering the whole family)
+> +          http://www.atmel.com/Images/Atmel_11055_32-bit-ARM926EJ-S-Microcontroller_SAM9X35_Datasheet.pdf
+> +
+> +      - at91sam9n12
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel_11063_32-bit-ARM926EJ-S-Microcontroller_SAM9N12CN11CN12_Datasheet.pdf
+> +
+> +    * ARM Cortex-A5 based SoCs
+> +      - sama5d3 family
+> +        - sama5d31
+> +        - sama5d33
+> +        - sama5d34
+> +        - sama5d35
+> +        - sama5d36 (device superset)
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel-11121-32-bit-Cortex-A5-Microcontroller-SAMA5D3_Datasheet.pdf
+> +
+> +    * ARM Cortex-A5 + NEON based SoCs
+> +      - sama5d4 family
+> +        - sama5d41
+> +        - sama5d42
+> +        - sama5d43
+> +        - sama5d44 (device superset)
+> +        + Datasheet
+> +          http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
+> +
+> +
+> +Linux kernel information
+> +------------------------
+> +Linux kernel mach directory: arch/arm/mach-at91
+> +MAINTAINERS entry is: "ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES"
+> +
+> +
+> +Device Tree for AT91 SoCs and boards
+> +------------------------------------
+> +All AT91 SoCs are converted to Device Tree. Since Linux 3.19, these products
+> +must use this method to boot the Linux kernel.
+> +
+> +Work In Progress statement:
+> +Device Tree files and Device Tree bindings that apply to AT91 SoCs and boards are
+> +considered as "Unstable". To be completely clear, any at91 binding can change at
+> +any time. So, be sure to use a Device Tree Binary and a Kernel Image generated from
+> +the same source tree.
+> +Please refer to the Documentation/devicetree/bindings/ABI.txt file for a
+> +definition of a "Stable" binding/ABI.
+> +This statement will be removed by AT91 MAINTAINERS when appropriated.
+> +
+> +Naming conventions and best practice:
+> +- SoCs Device Tree Source Include files are named after the official name of
+> +  the product (at91sam9g20.dtsi or sama5d33.dtsi for instance).
+> +- Device Tree Source Include files (.dtsi) are used to collect common nodes that can be
+> +  shared across SoCs or boards (sama5d3.dtsi or at91sam9x5cm.dtsi for instance).
+> +  When collecting nodes for a particular peripheral or topic, the identifier have to
+> +  be placed at the end of the file name, separated with a "_" (at91sam9x5_can.dtsi
+> +  or sama5d3_gmac.dtsi for example).
+> +- board Device Tree Source files (.dts) are prefixed by the string "at91-" so
+> +  that they can be identified easily. Note that the sama5d3[13456]ek.dts files
+> +  are an historical exception to this rule.
+> 
+
+
+-- 
+Nicolas Ferre
