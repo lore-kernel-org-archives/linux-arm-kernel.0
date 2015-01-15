@@ -1,77 +1,34 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Thu, 15 Jan 2015 11:19:21 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <54B7132A.6030803@gmail.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
- <1419028015.25129.14.camel@perches.com> <5494AEB8.8060606@broadcom.com>
- <54B7132A.6030803@gmail.com>
-Message-ID: <54B812B9.3040400@broadcom.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Jan 2015 20:47:29 +0100
+Subject: [PATCH v2 0/5] ARM: KVM: Enable the ioeventfd capability of KVM
+ on ARM
+In-Reply-To: <54B7DD6B.1060002@linaro.org>
+References: <20141207093641.17563.84226.stgit@i3820>
+ <54B440D0.6090707@linaro.org>
+ <CADDJ2=M2UjsV0U9cFiRoKghWSckWje+h6M-XQ-0dqPrH3BXp1A@mail.gmail.com>
+ <54B7DD6B.1060002@linaro.org>
+Message-ID: <20150115194729.GZ26222@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-01-14 05:08 PM, Florian Fainelli wrote:
-> On 19/12/14 15:03, Jonathan Richardson wrote:
->> On 14-12-19 02:26 PM, Joe Perches wrote:
->>> On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
->>>> Add initial version of the Broadcom touchscreen driver.
->>>
->>> more trivia:
->>>
->>>> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
->>> []
->>>> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
->>>> +{
->>>> +	u32 val;
->>> []
->>>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
->>>> +		if (val < 0 || val > 255) {
->>>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
->>>> +			return -EINVAL;
->>>> +		}
->>>> +		priv->cfg_params.debounce_timeout = val;
+On Thu, Jan 15, 2015 at 04:31:55PM +0100, Eric Auger wrote:
+> On 01/15/2015 04:25 PM, Nikolay Nikolaev wrote:
+> > 
+> > 
+> > On Mon, Jan 12, 2015 at 11:46 PM, Eric Auger <eric.auger@linaro.org
+> > <mailto:eric.auger@linaro.org>> wrote:
+> > 
+> >     Hi Nikolay,
+> > 
+> >     looks good to me overall. A rebase on Christoffer's vgic init series
+> > 
+> > is there a tree where these patches are published?
+> Hi Nikolay,
 > 
-> BTW, common practice for DT properties is to use a dash instead of an
-> underscore for multi-worded properties.
+> Yes Andre's kvm-gicv3/v7 branch on https://github.com/apritzel/linux.git
+> seems to contain all those.
+> 
+Probably be good to wait until these are in kvmarm/next along with the
+dirty page logging stuff and rebase on that.
 
-ts-rotation is done that way already so I'll change the others to be
-consistent. Thanks.
-
-> 
->>>
->>> Doesn't the compiler generate a warning message
->>> about an impossible "unsigned < 0" test for all
->>> of these "val < 0" uses?
->>>
->>
->> Actually no it doesn't. The gcc output shows that neither -Wtype-limits
->> nor -Wextra are used to compile that file. I assume this is because
->> there would be just too many warnings.
->>
->>
->>>> +	}
->>>> +
->>>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
->>>> +		if (val < 0 || val > 11) {
->>> []
->>>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
->>>> +		if (val < 0 || val > 255) {
->>> []
->>>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
->>>> +		if (val < 0 || val > 8) {
->>> []
->>>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
->>>> +		if (val < 0 || val > 31) {
->>>
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> 
+-Christoffer
