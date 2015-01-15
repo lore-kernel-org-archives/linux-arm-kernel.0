@@ -1,83 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Jan 2015 17:52:18 +0100
-Subject: [GIT PULL] at91: dt for 3.20 #1
-Message-ID: <1421340738-13487-1-git-send-email-nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Jan 2015 17:52:31 +0100
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54B7E21E.2000901@redhat.com>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6tjiE6u8i-1PHYzX2cOhxJkYN3cV9mqhCHRSMRdOQRfzg@mail.gmail.com>
+ <54B7E21E.2000901@redhat.com>
+Message-ID: <2277974.2klgILPa2Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Thursday 15 January 2015 10:51:58 Jon Masters wrote:
+> On 01/15/2015 09:10 AM, Grant Likely wrote:
+> > On Tue, Jan 6, 2015 at 1:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> For drivers merged upstream, I would insist that every driver merged
+> >> for an ARM64 platform has a documented DT binding that is used in the
+> >> driver.
+> > 
+> > That's a dumb rule. It will result in untested DT code paths being
+> > thrown into drivers just too meet the rules rather than on whether or
+> > not they will actually be used. It's fine to allow driver authors to
+> > only implement the ACPI code path if that is what they are working
+> > with. We can *always* add a DT path to the driver when it is needed.
+> 
+> It gets worse. There *will* be large numbers of ACPI only ARM servers
+> landing over the coming year. Not only would DT code be untested, but
+> insisting on keeping e.g. a DSDT and DT in sync is never going to work
+> anyway. Already we have early stage servers that contain a DT used for
+> bringup that is subsequently not being updated as often as the ACPI
+> tables (those systems are now booting exclusively in labs with ACPI).
+> Eventually, I am going to push for the DT data to be removed from these
+> systems rather than have out of date unmaintained DT data in firmware.
 
-Some Device Tree updates for 3.20. There is no dependency for this material as
-the drivers are already updated or not needed (syscon).
+We will of course be able to relax the rule once ACPI has stabilized on
+ARM64. At the moment, we haven't even agreed on how to represent basic
+devices, so things are in flux and there is no way for a BIOS writer
+to ship an image that we will guarantee to support in the long run.
 
-Thanks, best regards,
+At some point after we are reasonably sure we are able to keep supporting
+all existing systems that are working with that kernel, we can take
+support for new systems without having DT by default, and also support
+booting those without acpi=force, which is related to this question.
 
-The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
-
-  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to 4dd32e6d24932b0b0327d3a8ce526a56446e9b98:
-
-  ARM: at91: dts: sama5d3: add ov2640 camera sensor support (2015-01-15 16:14:27 +0100)
-
-----------------------------------------------------------------
-First batch of DT changes for 3.20:
-- little typo and a LED declared
-- addition of the Special Function Registers (SFR) + its binding
-- RTC & SRAM nodes
-- the at91sam9xe has its own .dtsi now. Not combined with at91sam9260 anymore
-- addition of the Image Sensor Interface (ISI) DT part and supported sensors
-
-----------------------------------------------------------------
-Alexander Stein (1):
-      ARM: at91/dt: sam9263: Fix typo: ac91_clk -> ac97_clk
-
-Alexandre Belloni (9):
-      ARM: at91: Add Special Function Registers binding documentation
-      ARM: at91: sama5d3: Add SFR
-      ARM: at91: sama5d4: Add SFR
-      ARM: at91/dt: at91sam9n12: Add RTC node
-      ARM: at91/dt: rm9200: add RTC node
-      ARM: at91/dt: at91rm9200ek: enable RTC
-      ARM: at91/dt: add SRAM nodes
-      ARM: at91/dt: Add a dtsi for at91sam9xe
-      ARM: at91/dt: ethernut5: use at91sam9xe.dtsi
-
-Bo Shen (3):
-      ARM: at91: dts: sama5d3: split isi pinctrl
-      ARM: at91: dts: sama5d3: add missing pins of isi
-      ARM: at91: dts: sama5d3: move the isi mck pin to mb
-
-Josh Wu (5):
-      ARM: at91/dt: sama5d3: enable D2 as the heartbeat LED
-      ARM: at91: dts: sama5d3: add isi clock
-      ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
-      ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
-      ARM: at91: dts: sama5d3: add ov2640 camera sensor support
-
- .../devicetree/bindings/arm/atmel-at91.txt         | 17 ++++++
- arch/arm/boot/dts/at91rm9200.dtsi                  | 12 +++++
- arch/arm/boot/dts/at91rm9200ek.dts                 |  4 ++
- arch/arm/boot/dts/at91sam9260.dtsi                 |  5 ++
- arch/arm/boot/dts/at91sam9261.dtsi                 |  5 ++
- arch/arm/boot/dts/at91sam9263.dtsi                 | 12 ++++-
- arch/arm/boot/dts/at91sam9g20.dtsi                 |  9 ++++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  7 ++-
- arch/arm/boot/dts/at91sam9n12.dtsi                 | 12 +++++
- arch/arm/boot/dts/at91sam9rl.dtsi                  |  5 ++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  5 ++
- arch/arm/boot/dts/at91sam9xe.dtsi                  | 60 ++++++++++++++++++++++
- arch/arm/boot/dts/ethernut5.dts                    |  2 +-
- arch/arm/boot/dts/sama5d3.dtsi                     | 34 ++++++++++--
- arch/arm/boot/dts/sama5d3xcm.dtsi                  |  1 +
- arch/arm/boot/dts/sama5d3xmb.dtsi                  | 40 +++++++++++++--
- arch/arm/boot/dts/sama5d4.dtsi                     | 10 ++++
- 17 files changed, 227 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9xe.dtsi
-
--- 
-Nicolas Ferre
+	Arnd
