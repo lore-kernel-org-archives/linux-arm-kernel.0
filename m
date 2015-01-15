@@ -1,47 +1,51 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 15:09:35 +0100
-Subject: [PATCH v4 1/4] ata: libahci: Clean-up the
- ahci_platform_en/disable_phys functions
+Date: Thu, 15 Jan 2015 15:09:36 +0100
+Subject: [PATCH v4 2/4] Documentation: bindings: Add the regulator property to
+ the sub-nodes AHCI bindings
 In-Reply-To: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421330978-9694-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1421330978-9694-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy_ functions handle the NULL pointer case, so there is no need
-to skip them if there is a NULL pointer. Moreover, after the error
-label there is already no check on the pointer. This patch removes the
-unnecessary tests and brings some consistency.
+It is now possible to use a regulator property for each port of the
+AHCI controller.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/ata/libahci_platform.c | 6 ------
- 1 file changed, 6 deletions(-)
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index 0b03f9056692..a147aaadca85 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -54,9 +54,6 @@ static int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
- 	int rc, i;
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 4ab09f2202d4..c2340eeeb97f 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -37,9 +37,10 @@ Required properties when using sub-nodes:
  
- 	for (i = 0; i < hpriv->nports; i++) {
--		if (!hpriv->phys[i])
--			continue;
--
- 		rc = phy_init(hpriv->phys[i]);
- 		if (rc)
- 			goto disable_phys;
-@@ -89,9 +86,6 @@ static void ahci_platform_disable_phys(struct ahci_host_priv *hpriv)
- 	int i;
  
- 	for (i = 0; i < hpriv->nports; i++) {
--		if (!hpriv->phys[i])
--			continue;
+ Sub-nodes required properties:
+-- reg               : the port number
+-- phys              : reference to the SATA PHY node
 -
- 		phy_power_off(hpriv->phys[i]);
- 		phy_exit(hpriv->phys[i]);
- 	}
++- reg		    : the port number
++And at least one of the following properties:
++- phys		    : reference to the SATA PHY node
++- target-supply    : regulator for SATA target power
+ 
+ Examples:
+         sata at ffe08000 {
+@@ -68,10 +69,12 @@ With sub-nodes:
+ 		sata0: sata-port at 0 {
+ 			reg = <0>;
+ 			phys = <&sata_phy 0>;
++			target-supply = <&reg_sata0>;
+ 		};
+ 
+ 		sata1: sata-port at 1 {
+ 			reg = <1>;
+ 			phys = <&sata_phy 1>;
++			target-supply = <&reg_sata1>;;
+ 		};
+ 	};
 -- 
 1.9.1
