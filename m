@@ -1,18 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 Jan 2015 10:25:11 -0700
-Subject: [PATCH v2 02/11] ARM: tegra: Use the generated pinmux data
-In-Reply-To: <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
-References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
- <1421338359-27467-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <54B7F7F7.1020202@wwwdotorg.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Jan 2015 18:23:21 +0100
+Subject: [PATCH v4 5/5] ARM: mvebu: enable Armada 38x RTC driver in
+ mvebu_v7_defconfig
+In-Reply-To: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1421342601-20384-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1421342601-20384-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 09:12 AM, Tomeu Vizoso wrote:
-> Google has submitted a board config for the pinmux programming of the
-> Nyan Big board. Use the whole of it as it's generated to make it easier
-> to update as the configuration gets fixed in the future.
+Now that the Armada 38x RTC driver has been pushed, let's enable it in
+mvebu_v7_defconfig.
 
-Submitted to where? I assume you mean tegra-pinmux-scripts. I don't see 
-a Nyan/Nyan-big configuration there yet. IIRC (and I might not) one was 
-posted, but there were some review comments that aren't yet addressed?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index 627accea72fb..2400b9f52403 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -112,6 +112,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_MV=y
++CONFIG_RTC_DRV_ARMADA38X=y
+ CONFIG_DMADEVICES=y
+ CONFIG_MV_XOR=y
+ # CONFIG_IOMMU_SUPPORT is not set
+-- 
+1.9.1
