@@ -1,63 +1,173 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 15 Jan 2015 05:45:08 +0400
-Subject: [PATCH v2 2/3] usb: phy: add lubbock phy driver
-In-Reply-To: <54B4B6F2.9040404@ti.com>
-References: <1417298525-5587-1-git-send-email-dbaryshkov@gmail.com>
- <1417298525-5587-3-git-send-email-dbaryshkov@gmail.com>
- <20150108165834.GH31926@saruman>
- <CALT56yOaX0EQbbFSXiFK=uqSpCwv4pQsU4QFMSmSoTstq2d7zw@mail.gmail.com>
- <20150112215159.GM2858@saruman> <54B4B6F2.9040404@ti.com>
-Message-ID: <CALT56yO343mP2tDjC+GkV6uLUYdf2npnneNEK_UHuJJXD16gKQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 15 Jan 2015 10:50:51 +0900
+Subject: [PATCH v4 3/9] ARM: dts: Add memory bus node for Exynos3250
+In-Reply-To: <1421286657-4720-1-git-send-email-cw00.choi@samsung.com>
+References: <1421286657-4720-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1421286657-4720-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds the memory bus node for Exynos3250 SoC. Exynos3250 has
+following memory buses to translate data between DRAM and eMMC/sub-IPs.
 
-2015-01-13 9:10 GMT+03:00 Kishon Vijay Abraham I <kishon@ti.com>:
-> Hi,
->
-> On Tuesday 13 January 2015 03:21 AM, Felipe Balbi wrote:
->> On Sun, Jan 11, 2015 at 10:44:59PM +0400, Dmitry Eremin-Solenikov wrote:
->>> Hello,
->>>
->>> 2015-01-08 19:58 GMT+03:00 Felipe Balbi <balbi@ti.com>:
->>>> On Sun, Nov 30, 2014 at 01:02:04AM +0300, Dmitry Eremin-Solenikov wrote:
->>>>> Extract lubbock-specific code from pxa25x_udc driver. As a bonus, phy
->>>>> driver determines connector/VBUS status by reading CPLD register. Also
->>>>> it uses a work to call into udc stack, instead of pinging vbus session
->>>>> right from irq handler.
->>>>>
->>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>>>> ---
->>>>>  drivers/usb/phy/Kconfig       |  10 ++
->>>>>  drivers/usb/phy/Makefile      |   1 +
->>>>
->>>> new phy drivers under drivers/phy only, sorry.
->>>
->>> Hmm. How do drivers/phy drivers coordinate with usb gadget subsystem?
->>> I see none of them calling usb_gadget_vbus_connect/disconnect().
->>
->> I'll leave that to Kishon, since he wrote drivers/phy. Kishon, any
->> hints?
->
-> Extcon framework can be used to detect the connector status. So the PHY driver
-> should register with the extcon framework if it has the capability to determine
-> the connector status and the gadget driver should register with the extcon
-> framework if it has to receive the connector status.
+Following list specifies the detailed relation between memory bus clock and DMC
+IP in MIF (Memory Interface) block:
+- DMC clock : DMC (Dynamic Memory Controller)
 
-If I understand correctly, this means the whole usb gadget/otg subsystem needs
-to be redesigned/refactored to support extconn drivers. Is it planned already?
-Can we still submit drivers to an old usb-phy subsystem as 'new phy' subsystem
-does not provide us necessary integration with usb-gadget subsystem?
+Following list specifies the detailed relation between memory bus clock and
+sub-IPs in INT (Internal) block:
+- ACLK100 clock : PERIL
+- ACLK160 clock : LCD0
+- ACLK200 clock : FSYS
+- ACLK266 clock : ISP
+- GDL/GDR clock : leftbus/rightbus
+- SCLK_MFC clock : MFC
 
->
-> I'm not sure if we should be adding these extcon APIs inside the PHY framework
-> itself as all PHYs might not have the capability to detect the connector status.
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Myungjoo Ham <myungjoo.ham@samsung.com>
+---
+ arch/arm/boot/dts/exynos3250.dtsi | 125 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 125 insertions(+)
 
-In fact I have several devices for which I had to implement a simple usb-phy
-that is able to control D+ pullup, but isn't able to detect VBUS presense
-and thus has to assume that the device is always connected.
-
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 9ed1260..3eaed53 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -99,6 +99,131 @@
+ 			};
+ 		};
+ 
++		memory_bus_mif: memory_bus at 0 {
++			compatible = "samsung,exynos-memory-bus";
++
++			operating-points = <
++				400000 875000
++				200000 800000
++				133000 800000
++				100000 800000
++				50000  800000>;
++			status = "disabled";
++
++			blocks {
++				dmc_block: memory_bus_block1 {
++					clocks = <&cmu_dmc CLK_DIV_DMC>;
++					clock-names = "memory-bus";
++					frequency = <
++						400000
++						200000
++						133000
++						100000
++						50000>;
++				};
++			};
++		};
++
++		memory_bus_int: memory_bus at 1 {
++			compatible = "samsung,exynos-memory-bus";
++
++			operating-points = <
++				400000 950000
++				200000 950000
++				133000 925000
++				100000 850000
++				80000  850000
++				50000  850000>;
++
++			status = "disabled";
++
++			blocks {
++				peril_block: memory_bus_block1 {
++					clocks = <&cmu CLK_DIV_ACLK_100>;
++					clock-names = "memory-bus";
++					frequency = <
++						100000
++						100000
++						100000
++						100000
++						50000
++						50000>;
++				};
++
++				lcd0_block: memory_bus_block2 {
++					clocks = <&cmu CLK_DIV_ACLK_160>;
++					clock-names = "memory-bus";
++					frequency = <
++						200000
++						160000
++						100000
++						80000
++						80000
++						50000>;
++				};
++
++				fsys_block: memory_bus_block3 {
++					clocks = <&cmu CLK_DIV_ACLK_200>;
++					clock-names = "memory-bus";
++					frequency = <
++						200000
++						200000
++						100000
++						80000
++						50000
++						50000>;
++				};
++
++				isp_block: memory_bus_block4 {
++					clocks = <&cmu CLK_DIV_ACLK_266>;
++					clock-names = "memory-bus";
++					frequency = <
++						300000
++						200000
++						133000
++						100000
++						50000
++						50000>;
++				};
++
++				leftbus_block: memory_bus_block5 {
++					clocks = <&cmu CLK_DIV_GDL>;
++					clock-names = "memory-bus";
++					frequency = <
++						200000
++						200000
++						133000
++						100000
++						100000
++						100000>;
++				};
++
++				rightbus_block: memory_bus_block6 {
++					clocks = <&cmu CLK_DIV_GDR>;
++					clock-names = "memory-bus";
++					frequency = <
++						200000
++						200000
++						133000
++						100000
++						100000
++						100000>;
++				};
++
++				mfc_block: memory_bus_block7 {
++					clocks = <&cmu CLK_SCLK_MFC>;
++					clock-names = "memory-bus";
++					frequency = <
++						200000
++						200000
++						200000
++						133000
++						100000
++						80000>;
++				};
++			};
++		};
++
+ 		sysram at 02020000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0x02020000 0x40000>;
 -- 
-With best wishes
-Dmitry
+1.8.5.5
