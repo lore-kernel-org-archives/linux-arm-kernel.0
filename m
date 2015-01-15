@@ -1,127 +1,82 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Jan 2015 16:42:14 +0000
-Subject: [PATCH RESEND] arm64: respect mem= for EFI
-Message-ID: <1421340134-3206-1-git-send-email-mark.rutland@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 17:42:50 +0100
+Subject: [GIT PULL] at91: cleanup for 3.20 #1
+Message-ID: <1421340170-13241-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I posted this back in December [1], but due to some dependence on Ard's EFI
-series it wasn't picked up. Now that's in the arm64 for-next/core branch, it
-would be nice if this could be picked up along with Ard's failed remap handling
-patch [2].
+Arnd, Olof, Kevin,
 
-I've given this a run on Juno with mem=128m, which seems to work:
+Some AT91 cleanup for 3.20, but definitively, more to come soon.
 
-nanook at localhost:~$ head /proc/meminfo 
-MemTotal:         106624 kB
-MemFree:           59572 kB
-MemAvailable:      73228 kB
-Buffers:               0 kB
-Cached:            15796 kB
-SwapCached:            0 kB
-Active:            19624 kB
-Inactive:           7796 kB
-Active(anon):      11648 kB
-Inactive(anon):       88 kB
+Thanks, best regards,
 
-Thanks,
-Mark.
+The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/308633.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316540.html
+  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
 
----->8----
-When booting with EFI, we acquire the EFI memory map after parsing the
-early params. This unfortuantely renders the option useless as we call
-memblock_enforce_memory_limit (which uses memblock_remove_range behind
-the scenes) before we've added any memblocks. We end up removing
-nothing, then adding all of memory later when efi_init calls
-reserve_regions.
+are available in the git repository at:
 
-Instead, we can log the limit and apply this later when we do the rest
-of the memblock work in memblock_init, which should work regardless of
-the presence of EFI. At the same time we may as well move the early
-parameter into arm64's mm/init.c, close to arm64_memblock_init.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup
 
-Any memory which must be mapped (e.g. for use by EFI runtime services)
-must be mapped explicitly reather than relying on the linear mapping,
-which may be truncated as a result of a mem= option passed on the kernel
-command line.
+for you to fetch changes up to bd87373229e3e8b1a2a42b9eeed4c60fd4418ec6:
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/setup.c | 19 -------------------
- arch/arm64/mm/init.c      | 19 +++++++++++++++++++
- 2 files changed, 19 insertions(+), 19 deletions(-)
+  ARM: at91: remove useless at91rm9200_set_type() (2015-01-15 15:24:06 +0100)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 199d1b7..207413f 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -322,25 +322,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
- 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
- }
- 
--/*
-- * Limit the memory size that was specified via FDT.
-- */
--static int __init early_mem(char *p)
--{
--	phys_addr_t limit;
--
--	if (!p)
--		return 1;
--
--	limit = memparse(p, &p) & PAGE_MASK;
--	pr_notice("Memory limited to %lldMB\n", limit >> 20);
--
--	memblock_enforce_memory_limit(limit);
--
--	return 0;
--}
--early_param("mem", early_mem);
--
- static void __init request_standard_resources(void)
- {
- 	struct memblock_region *region;
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index bac492c..11c7b70 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -136,10 +136,29 @@ static void arm64_memory_present(void)
- }
- #endif
- 
-+static phys_addr_t memory_limit = (phys_addr_t)ULLONG_MAX;
-+
-+/*
-+ * Limit the memory size that was specified via FDT.
-+ */
-+static int __init early_mem(char *p)
-+{
-+	if (!p)
-+		return 1;
-+
-+	memory_limit = memparse(p, &p) & PAGE_MASK;
-+	pr_notice("Memory limited to %lldMB\n", memory_limit >> 20);
-+
-+	return 0;
-+}
-+early_param("mem", early_mem);
-+
- void __init arm64_memblock_init(void)
- {
- 	phys_addr_t dma_phys_limit = 0;
- 
-+	memblock_enforce_memory_limit(memory_limit);
-+
- 	/*
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
+----------------------------------------------------------------
+First batch of cleanup for 3.20:
+- Documentation for AT91 SoC
+- Config options, files and functions removal to continue the big !DT
+  cleanup done in 3.19
+- move of debug-macro.S to its usual location
+
+----------------------------------------------------------------
+Alexandre Belloni (7):
+      ARM: at91: remove unused mach/memory.h
+      ARM: at91: remove useless config MACH_AT91RM9200_DT
+      ARM: at91: remove useless config MACH_AT91SAM9_DT
+      ARM: at91: remove useless at91_sysirq_mask_rtx
+      ARM: at91: move debug-macro.S into the common space
+      ARM: at91: remove useless at91rm9200_dt_initialize()
+      ARM: at91: remove useless at91rm9200_set_type()
+
+Boris Brezillon (1):
+      ARM: at91: remove useless header file includes
+
+Nicolas Ferre (3):
+      ARM: at91/Documentation: add a README for Atmel SoCs
+      rtc: at91/Kconfig: remove useless options
+      ARM: at91: remove unneeded header file
+
+ Documentation/arm/Atmel/README                     | 124 +++++++++++++++++++++
+ MAINTAINERS                                        |   1 +
+ arch/arm/Kconfig.debug                             |   9 +-
+ .../mach/debug-macro.S => include/debug/at91.S}    |  19 ++--
+ arch/arm/mach-at91/Kconfig                         |   8 --
+ arch/arm/mach-at91/Makefile                        |   6 +-
+ arch/arm/mach-at91/at91sam9260.c                   |   2 -
+ arch/arm/mach-at91/at91sam9261.c                   |   2 -
+ arch/arm/mach-at91/at91sam9263.c                   |   3 -
+ arch/arm/mach-at91/at91sam9g45.c                   |   4 -
+ arch/arm/mach-at91/at91sam9n12.c                   |   6 -
+ arch/arm/mach-at91/at91sam9rl.c                    |   4 -
+ arch/arm/mach-at91/at91sam9x5.c                    |  10 --
+ arch/arm/mach-at91/board-dt-rm9200.c               |   2 +-
+ arch/arm/mach-at91/generic.h                       |   6 -
+ arch/arm/mach-at91/include/mach/at91_pio.h         |  80 -------------
+ arch/arm/mach-at91/include/mach/at91_rtt.h         |  35 ------
+ arch/arm/mach-at91/include/mach/memory.h           |  26 -----
+ arch/arm/mach-at91/sama5d3.c                       |   6 -
+ arch/arm/mach-at91/setup.c                         |  18 ---
+ arch/arm/mach-at91/sysirq_mask.c                   |  75 -------------
+ drivers/rtc/Kconfig                                |  28 -----
+ 22 files changed, 147 insertions(+), 327 deletions(-)
+ create mode 100644 Documentation/arm/Atmel/README
+ rename arch/arm/{mach-at91/include/mach/debug-macro.S => include/debug/at91.S} (68%)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_pio.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_rtt.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/memory.h
+ delete mode 100644 arch/arm/mach-at91/sysirq_mask.c
+
 -- 
-1.9.1
+Nicolas Ferre
