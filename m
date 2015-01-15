@@ -1,54 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Jan 2015 14:28:53 +0000
-Subject: [PATCH v3 13/21] ARM: omap: convert wakeupgen to stacked domains
-In-Reply-To: <20150114222814.GU2419@atomide.com> (Tony Lindgren's message of
- "Wed, 14 Jan 2015 22:28:14 +0000")
-References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
- <1421087187-26988-14-git-send-email-marc.zyngier@arm.com>
- <20150114222814.GU2419@atomide.com>
-Message-ID: <871tmwi0d6.fsf@approximate.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 15:34:12 +0100
+Subject: [PATCH v3 0/6] AT91 DT for 3.20 #1
+In-Reply-To: <1421172746-18727-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421172746-18727-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B7CFE4.3060603@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14 2015 at 10:28:14 pm GMT, Tony Lindgren <tony@atomide.com> wrote:
-> * Marc Zyngier <marc.zyngier@arm.com> [150112 10:30]:
->> OMAP4/5 has been (ab)using the gic_arch_extn to provide
->> wakeup from suspend, and it makes a lot of sense to convert
->> this code to use stacked domains instead.
->> 
->> This patch does just this, updating the DT files to actually
->> reflect what the HW provides.
->> 
->> BIG FAT WARNING: because the DTs were so far lying by not
->> exposing the WUGEN HW block, kernels with this patch applied
->> won't have any suspend-resume facility when booted with old DTs,
->> and old kernels with updated DTs won't even boot.
->> 
->> On a platform with this patch applied, the system looks like
->> this:
->> 
->> root at bacon-fat:~# cat /proc/interrupts
->>             CPU0       CPU1
->>  16:          0          0     WUGEN  37  gp_timer
->>  19:     233799     155916       GIC  27  arch_timer
->>  23:          0          0     WUGEN   9  l3-dbg-irq
->>  24:          1          0     WUGEN  10  l3-app-irq
->>  27:        282          0     WUGEN  13  omap-dma-engine
->>  44:          0          0  4ae10000.gpio  13  DMA
->
-> FYI, the legacy irq numbers are now all wrong since commit
-> 9a1091ef0017 ("irqchip: gic: Support hierarchy irq domain.").
->
-> Started a separate thread "Regression with legacy IRQ numbers
-> caused by 9a1091ef0017" on it, will give these a try once
-> that's sorted out.
+Le 13/01/2015 19:12, Alexandre Belloni a ?crit :
+> This series enables RTC on the at91sam9n12 and at91rm9200.
+> It also adds nodes for the SRAM availabe on at91 SoCs.
+> 
+> Finally it adds a dtsi for the at91sam9xe and uses it for the ethernut5 dts.
+> 
+> Changes in v3:
+>  - corrected the 9260 and 9g20 reg properties of the SRAM node
+> 
+> Changes in v2:
+>  - remove the 9x5 errata for the n12 rtc
+> 
+> Alexandre Belloni (6):
+>   ARM: at91/dt: at91sam9n12: Add RTC node
+>   ARM: at91/dt: rm9200: add RTC node
+>   ARM: at91/dt: at91rm9200ek: enable RTC
+>   ARM: at91/dt: add SRAM nodes
+>   ARM: at91/dt: Add a dtsi for at91sam9xe
+>   ARM: at91/dt: ethernut5: use at91sam9xe.dtsi
 
-Assuming the workaround I posted earlier works, the OMAP/DRA7 part of
-this series is going to require some rework too (I need to know where
-these legacy interrupts are attached: crossbar, WUGEN, or GIC?).
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks,
+With the corrected at91sam9rl sram size (0x10000), whole series stacked
+on top of at91-3.20-dt.
 
-        M.
+Thanks.
+
+
+>  .../devicetree/bindings/arm/atmel-at91.txt         |  1 +
+>  arch/arm/boot/dts/at91rm9200.dtsi                  | 12 +++++
+>  arch/arm/boot/dts/at91rm9200ek.dts                 |  4 ++
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |  5 ++
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |  5 ++
+>  arch/arm/boot/dts/at91sam9263.dtsi                 | 10 ++++
+>  arch/arm/boot/dts/at91sam9g20.dtsi                 |  9 ++++
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |  7 ++-
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 | 12 +++++
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |  5 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |  5 ++
+>  arch/arm/boot/dts/at91sam9xe.dtsi                  | 60 ++++++++++++++++++++++
+>  arch/arm/boot/dts/ethernut5.dts                    |  2 +-
+>  arch/arm/boot/dts/sama5d3.dtsi                     |  5 ++
+>  arch/arm/boot/dts/sama5d4.dtsi                     |  5 ++
+>  15 files changed, 144 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91sam9xe.dtsi
+> 
+
+
 -- 
-Jazz is not dead. It just smells funny.
+Nicolas Ferre
