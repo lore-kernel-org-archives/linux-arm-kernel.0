@@ -1,29 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jan 2015 11:52:57 +0000
-Subject: [PATCH] ARM64: kernel: add support for cpu cache information
-In-Reply-To: <1420713754-13734-1-git-send-email-sudeep.holla@arm.com>
-References: <1420713754-13734-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150115115257.GA2329@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 15 Jan 2015 11:54:25 +0000
+Subject: [PATCH v2 1/3] ASoC: codecs: wm8904: add dt ids table
+In-Reply-To: <1418614273-2303-1-git-send-email-voice.shen@atmel.com>
+References: <1418614273-2303-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20150115115425.GX3043@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 10:42:34AM +0000, Sudeep Holla wrote:
-> This patch adds support for cacheinfo on ARM64.
-> 
-> On ARMv8, the cache hierarchy can be identified through Cache Level ID
-> (CLIDR) register while the cache geometry is provided by Cache Size ID
-> (CCSIDR) register.
-> 
-> Since the architecture doesn't provide any way of detecting the cpus
-> sharing particular cache, device tree is used for the same purpose.
-> 
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+On Mon, Dec 15, 2014 at 11:31:11AM +0800, Bo Shen wrote:
 
-Thanks Sudeep. I'll queue this for 3.20.
+> +#ifdef CONFIG_OF
+> +static enum wm8904_type wm8904_data = WM8904;
+> +static enum wm8904_type wm8912_data = WM8912;
+> +
+> +static const struct of_device_id wm8904_of_match[] = {
+> +	{
+> +		.compatible = "wlf,wm8904",
+> +		.data = &wm8904_data,
 
--- 
-Catalin
+Does this end up in the i2c_driver_id driver data or do we need some
+extra code when devtype is assigned to check for an of_node and look at
+the DT data instead?  That certainly used to be the case...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/3e474574/attachment.sig>
