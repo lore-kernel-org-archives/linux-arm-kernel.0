@@ -1,26 +1,24 @@
-From: bart.tanghe@thomasmore.be (Bart Tanghe)
-Date: Thu, 15 Jan 2015 13:29:34 +0100
-Subject: [PATCH v3] ARM: dts: add bcm2835-pwm bindings
-In-Reply-To: <54B6A200.4040209@wwwdotorg.org>
-References: <1421227134-8590-1-git-send-email-bart.tanghe@thomasmore.be>
- <54B6A200.4040209@wwwdotorg.org>
-Message-ID: <54B7B2AE.3020309@thomasmore.be>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Jan 2015 13:30:13 +0100
+Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <54B796A3.7040200@huawei.com>
+References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
+ <1421253246.11734.17.camel@edumazet-glaptop2.roam.corp.google.com>
+ <54B796A3.7040200@huawei.com>
+Message-ID: <1848773.hOchPbb3Eb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm really sorry. I've used the wrong source. I make v4.
-
-Regards,
-
-Bart
-
-On 01/14/2015 06:06 PM, Stephen Warren wrote:
-> On 01/14/2015 02:18 AM, Bart Tanghe wrote:
->> To probe the bcm2835-pwm driver properly, this dts bindings has to be added
->> to the bcm2835 dtsi file.
->> In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding.
->> ---
->> Changes in v3:
->>   - node added by reg value
+On Thursday 15 January 2015 18:29:55 Ding Tianhong wrote:
 > 
-> The pwm node still seems to be in the wrong place. Sorting by reg value, it should be after i2c at 20205000 and before sdhci at 7e300000, as I mentioned before.
+> Yes, thanks, fix them later.
+
+Please note that now that as v13 has now shown up in net-next, I guess
+all other patches need to be based on top of what is already merged,
+and address one issue at a time.
+
+There is one more issue I saw during build testing, which is the
+lack of a MODULE_LICENSE  statement for the main driver, although
+there is one in the mdio driver.
+
+	Arnd
