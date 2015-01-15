@@ -1,106 +1,70 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 15 Jan 2015 17:39:05 +0100
-Subject: [PATCH v3 5/8] ARM: at91: move the restart function to the system
- timer driver
-In-Reply-To: <1421077023-30954-6-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B7ED29.9060700@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jan 2015 16:40:11 +0000
+Subject: [PATCH] arm64/efi: handle potential failure to remap memory map
+In-Reply-To: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150115164010.GK16217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 04:37 PM, Alexandre Belloni wrote:
-> Restarting on an at91rm9200 is handled by using the system timer. Move that
-> function to the system timer driver.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Thu, Jan 15, 2015 at 12:01:06PM +0000, Ard Biesheuvel wrote:
+> When remapping the UEFI memory map using ioremap_cache(), we
+> have to deal with potential failure. Note that, even if the
+> common case is for ioremap_cache() to return the existing linear
+> mapping of the memory map, we cannot rely on that to be always the
+> case, e.g., in the presence of a mem= kernel parameter.
+> 
+> At the same time, remove a stale comment and move the memmap code
+> together.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+This should probably be picked up before my mem= patch, which I will be
+resending shortly. I'll mention that when posting.
+
+I guess Catalin should pick this up given the other portions are in the
+arm64 tree, and this falls under arch/arm64.
+
+Thanks,
+Mark.
+
 > ---
->   arch/arm/mach-at91/at91rm9200.c      | 11 -----------
->   drivers/clocksource/timer-atmel-st.c | 12 ++++++++++++
->   2 files changed, 12 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> index b52916947535..4ea889cd6091 100644
-> --- a/arch/arm/mach-at91/at91rm9200.c
-> +++ b/arch/arm/mach-at91/at91rm9200.c
-> @@ -15,7 +15,6 @@
->
->   #include <asm/mach/map.h>
->   #include <asm/system_misc.h>
-> -#include <mach/at91_st.h>
->   #include <mach/hardware.h>
->
->   #include "soc.h"
-> @@ -30,15 +29,6 @@ static void at91rm9200_idle(void)
->   	at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
->   }
->
-> -static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
-> -{
-> -	/*
-> -	 * Perform a hardware reset with the use of the Watchdog timer.
-> -	 */
-> -	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> -}
+>  arch/arm64/kernel/efi.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index a98415b5979c..c9cb0fbe7aa4 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -229,19 +229,21 @@ static int __init arm64_enable_runtime_services(void)
+>  		return -1;
+>  	}
+>  
+> -	mapsize = memmap.map_end - memmap.map;
 > -
->   /* --------------------------------------------------------------------
->    *  AT91RM9200 processor initialization
->    * -------------------------------------------------------------------- */
-> @@ -51,7 +41,6 @@ static void __init at91rm9200_map_io(void)
->   static void __init at91rm9200_initialize(void)
->   {
->   	arm_pm_idle = at91rm9200_idle;
-> -	arm_pm_restart = at91rm9200_restart;
->   }
->
->
-> diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-> index 51761f8927b7..522583d6cc78 100644
-> --- a/drivers/clocksource/timer-atmel-st.c
-> +++ b/drivers/clocksource/timer-atmel-st.c
-> @@ -29,6 +29,7 @@
->   #include <linux/of_irq.h>
->
->   #include <asm/mach/time.h>
-> +#include <asm/system_misc.h>
->
->   #include <mach/at91_st.h>
->   #include <mach/hardware.h>
-> @@ -180,6 +181,15 @@ static struct clock_event_device clkevt = {
->   	.set_mode	= clkevt32k_mode,
->   };
->
-> +static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> +	/*
-> +	 * Perform a hardware reset with the use of the Watchdog timer.
-> +	 */
-> +	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> +	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> +}
+>  	if (efi_runtime_disabled()) {
+>  		pr_info("EFI runtime services will be disabled.\n");
+>  		return -1;
+>  	}
+>  
+>  	pr_info("Remapping and enabling EFI services.\n");
+> -	/* replace early memmap mapping with permanent mapping */
 > +
->   void __iomem *at91_st_base;
->   EXPORT_SYMBOL_GPL(at91_st_base);
->
-> @@ -248,4 +258,6 @@ void __init at91rm9200_timer_init(void)
->
->   	/* register clocksource */
->   	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
-> +
-> +	arm_pm_restart = at91rm9200_restart;
->   }
-
-Mmh, I can't clearly explain why but I have a problem with that.
-
-Can you explain why restart code falls in the clockevents driver ?
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> +	mapsize = memmap.map_end - memmap.map;
+>  	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+>  						   mapsize);
+> +	if (!memmap.map) {
+> +		pr_err("Failed to remap EFI memory map\n");
+> +		return -1;
+> +	}
+>  	memmap.map_end = memmap.map + mapsize;
+> -
+>  	efi.memmap = &memmap;
+>  
+>  	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+> -- 
+> 1.8.3.2
+> 
+> 
