@@ -1,90 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 15 Jan 2015 08:42:23 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <20150115135556.GH16217@leverpostej>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
-Message-ID: <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Jan 2015 14:43:35 +0000
+Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
+In-Reply-To: <2776397.iNGHcrIBZz@wuerfel> (Arnd Bergmann's message of "Thu, 15
+ Jan 2015 14:27:56 +0000")
+References: <20150114221407.GS2419@atomide.com>
+ <8761c8i2hq.fsf@approximate.cambridge.arm.com>
+ <2776397.iNGHcrIBZz@wuerfel>
+Message-ID: <87wq4ogl48.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 7:55 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jan 15, 2015 at 01:52:01PM +0000, Mark Rutland wrote:
->> On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
->> > This patch adds the generic common bindings used to represent
->> > a hwlock device and use/request locks in a device-tree build.
->> >
->> > All the platform-specific hwlock driver implementations need the
->> > number of locks and associated base id for registering the locks
->> > present within the device with the driver core. This base id
->> > needs to be unique across multiple IP instances of a hwspinlock
->> > device, so that each hwlock can be represented uniquely in a
->> > system.
->> >
->> > The number of locks is represented by 'hwlock-num-locks' property,
->> > and the base id is represented by the 'hwlock-base-id' property.
->> > The args specifier length is dependent on each vendor-specific
->> > implementation and is represented through the '#hwlock-cells'
->> > property. Client users need to use the property 'hwlocks' for
->> > requesting specific lock(s).
->> >
->> > Note that the document is named hwlock.txt deliberately to keep
->> > it a bit more generic.
->> >
->> > Cc: Rob Herring <robh+dt@kernel.org>
->> > Signed-off-by: Suman Anna <s-anna@ti.com>
->> > ---
->> > v7: Revised binding info for hwlock-base-id, it is mandatory now
->> >
->> >  .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++++++
->> >  1 file changed, 55 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
->> > new file mode 100644
->> > index 000000000000..8de7aaf878f9
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
->> > @@ -0,0 +1,55 @@
->> > +Generic hwlock bindings
->> > +=======================
->> > +
->> > +Generic bindings that are common to all the hwlock platform specific driver
->> > +implementations.
->> > +
->> > +The validity and need of these common properties may vary from one platform
->> > +implementation to another. The platform specific bindings should explicitly
->> > +state if an optional property is used. Please also look through the individual
->> > +platform specific hwlock binding documentations for identifying the applicable
->> > +properties.
->> > +
->> > +Common properties:
->> > +- #hwlock-cells:   Specifies the number of cells needed to represent a
->> > +                   specific lock. This property is mandatory for all
->> > +                   platform implementations.
->> > +- hwlock-num-locks:        Number of locks present in a hwlock device. This
->> > +                   property is needed on hwlock devices, where the number
->> > +                   of supported locks within a hwlock device cannot be
->> > +                   read from a register.
->> > +- hwlock-base-id:  An unique base Id for the locks for a particular hwlock
->> > +                   device. This property is mandatory for all platform
->> > +                   implementations.
->>
->> This property makes no sense. The ID encoded in the hwlock cells is
->> relative to the instance (identified by phandle), not global. So the DT
->> has no global ID space.
->>
->> Why do you think you need this?
+On Thu, Jan 15 2015 at  2:27:56 pm GMT, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 15 January 2015 13:42:57 Marc Zyngier wrote:
+>> Of course, this is in no way a proper fix, but I suppose the OMAP DT is
+>> still missing a few bits...
 >
-> Having looked at the way this proeprty is used, NAK.
+> I must be missing something here, but all the interrupts are listed
+> correctly in the DT, so what is the omap_hwmod_irq_info actually
+> achieving on omap4 and omap5?
 >
-> If you need to carve up a Linux-internal ID space, do that dynamically.
-> There is no need for this property.
+> Would it work if we just remove the incorrect copy of the resource
+> and use the one that comes from DT?
 
-Better yet, don't create a Linux ID space for this. Everywhere we have
-one, we want to get rid of it.
+By the look of it, omap_hwmod_irq_info serves multiple purposes:
+- low level configuration (pads, probably more stuff)
+- interrupt description for some drivers, using resources.
 
-Rob
+It should be fairly easy to do the latter, but the former looks more
+tricky (it would push the pad configuration down to the drivers, which
+is avoided at the moment).
+
+Probably there is a workable strategy, but my knowledge about OMAP is
+close to *nothing*...
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
