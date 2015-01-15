@@ -1,63 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Jan 2015 15:12:02 +0000
-Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
-In-Reply-To: <CAMJs5B-Ybrf7GQ+u70Z8bDCh7uHTwwCQa6Q3dh2BoL5qaUtOUA@mail.gmail.com>
-References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
- <20150112194440.GB26222@cbox> <20150115124251.GE16217@leverpostej>
- <CAMJs5B-Ybrf7GQ+u70Z8bDCh7uHTwwCQa6Q3dh2BoL5qaUtOUA@mail.gmail.com>
-Message-ID: <20150115151202.GC2329@e104818-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 16:16:25 +0100
+Subject: [PATCH v2 0/8] ARM: at91: dts: sama5d3: add dt support for atmel
+ isi and ov2640 sensor
+In-Reply-To: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
+References: <1420362153-500-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <54B7D9C9.5090001@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 01:08:00PM +0000, Christoffer Dall wrote:
-> On Thu, Jan 15, 2015 at 1:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Jan 12, 2015 at 07:44:40PM +0000, Christoffer Dall wrote:
-> >> On Mon, Jan 12, 2015 at 04:45:13PM +0000, Mark Rutland wrote:
-> >> > Currently we have two sets of macros used for ESR_ELx handling, one used
-> >> > by core arm64 code and the other used by KVM. These differ slightly in
-> >> > naming convention and style of definition.
-> >> >
-> >> > This patch series introduces and migrates all users to a common set of
-> >> > macros for ESR_ELx handling, preventing further drift.
-> >> >
-> >> > Additionally this series adds exception class decoding when reporting
-> >> > exceptions, saving deveopers from having to perform tedious mental
-> >> > arithmetic to figure out what the likely cause of an unexpected
-> >> > exception was.
-> >> >
-> >> > Since v1 [1]:
-> >> > * Reorder patches to maintain KVM bisectability.
-> >> > * Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
-> >> > * Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of
-> >> >   kvm_vcpu_dabt_get_as.
-> >> > * Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
-> >> >   list.
-> >> >
-> >> For the series:
-> >>
-> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>
-> >> I also tested this with KVM on APM XGene and Juno with UEFI+Linux as a
-> >> guest.
-> >
-> > Thanks, Christoffer. It's much appreciated.
-> >
-> > Catalin, Christoffer, do you have a preferred path for merging this?
-> > Should this go through the arm64 or KVM tree as a whole?
->
-> Would make sense to merge it as whole.
+Le 04/01/2015 10:02, Josh Wu a ?crit :
+> This patch series add ISI and ov2640 support on dts files.
+> 
+> As the ov2640 driver dt is still in review. The patch is in: https://patchwork.linuxtv.org/patch/27554/
+> So I want to send this dt patch early for a review.
+> 
+> v1 -> v2:
+>   1. add one more patch to change the pin name of ISI_MCK
+>   2. rewrite the commit [4/8] ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}.
+>   3. move the common chip parts of ISI node to sama5d3.dtsi.
+> 
+> Bo Shen (3):
+>   ARM: at91: dts: sama5d3: split isi pinctrl
+>   ARM: at91: dts: sama5d3: add missing pins of isi
+>   ARM: at91: dts: sama5d3: move the isi mck pin to mb
+> 
+> Josh Wu (5):
+>   ARM: at91: dts: sama5d3: add isi clock
+>   ARM: at91: dts: sama5d3: change name of pinctrl_isi_{power,reset}
+>   ARM: at91: dts: sama5d3: change name of pinctrl of ISI_MCK
+>   ARM: at91: dts: sama5d3: add ov2640 camera sensor support
+>   ARM: at91: sama5: enable atmel-isi and ov2640 in defconfig
 
-Indeed.
+The whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> I don't care which path, let's
-> just minimize conflicts. For big things, I have GICv3, dirty page
-> logging, and Marc's fixes, but they shouldn't touch much of the same
-> code (maybe the same files, but I don't think the same lines), so it's
-> up to you Catalin?
+stacked on top of at91-3.20-dt.
+The defconfig update on his side on at91-3.20-defconfig
 
-I don't have a strong preference but since Christoffer doesn't have one
-either, I'll merge them via the arm64 tree (there are 4 arm64 patches vs
-3 kvm ones ;)).
+Bye,
+
+>  arch/arm/boot/dts/sama5d3.dtsi    | 24 ++++++++++++++++++-----
+>  arch/arm/boot/dts/sama5d3xmb.dtsi | 40 +++++++++++++++++++++++++++++++++++----
+>  arch/arm/configs/sama5_defconfig  |  6 ++++++
+>  3 files changed, 61 insertions(+), 9 deletions(-)
+> 
+
 
 -- 
-Catalin
+Nicolas Ferre
