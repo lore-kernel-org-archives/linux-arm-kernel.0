@@ -1,73 +1,32 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 14 Jan 2015 17:08:58 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <5494AEB8.8060606@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
- <1419028015.25129.14.camel@perches.com> <5494AEB8.8060606@broadcom.com>
-Message-ID: <54B7132A.6030803@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Jan 2015 17:10:56 -0800
+Subject: [GIT PULL] mvebu: SoC for 3.20
+In-Reply-To: <20150113144812.GA13100@lunn.ch>
+References: <20150113144812.GA13100@lunn.ch>
+Message-ID: <20150115011056.GB32756@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/12/14 15:03, Jonathan Richardson wrote:
-> On 14-12-19 02:26 PM, Joe Perches wrote:
->> On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
->>> Add initial version of the Broadcom touchscreen driver.
->>
->> more trivia:
->>
->>> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
->> []
->>> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
->>> +{
->>> +	u32 val;
->> []
->>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
->>> +		if (val < 0 || val > 255) {
->>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
->>> +			return -EINVAL;
->>> +		}
->>> +		priv->cfg_params.debounce_timeout = val;
+On Tue, Jan 13, 2015 at 03:48:12PM +0100, Andrew Lunn wrote:
+> Hi Olof
+> 
+> Here is the first pull request for SoC for mvebu for v3.20.
+> 
+>      Andrew
+> 
+> The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+> 
+>   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.20
+> 
+> for you to fetch changes up to c6574542149dede8093e326d2c358ba447e30f33:
+> 
+>   ARM: mvebu: Update the SoC ID and revision definitions (2015-01-09 09:22:53 -0600)
 
-BTW, common practice for DT properties is to use a dash instead of an
-underscore for multi-worded properties.
-
->>
->> Doesn't the compiler generate a warning message
->> about an impossible "unsigned < 0" test for all
->> of these "val < 0" uses?
->>
-> 
-> Actually no it doesn't. The gcc output shows that neither -Wtype-limits
-> nor -Wextra are used to compile that file. I assume this is because
-> there would be just too many warnings.
-> 
-> 
->>> +	}
->>> +
->>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
->>> +		if (val < 0 || val > 11) {
->> []
->>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
->>> +		if (val < 0 || val > 255) {
->> []
->>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
->>> +		if (val < 0 || val > 8) {
->> []
->>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
->>> +		if (val < 0 || val > 31) {
->>
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Merged, thanks.
 
 
--- 
-Florian
+-Olof
