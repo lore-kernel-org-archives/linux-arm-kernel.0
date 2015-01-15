@@ -1,87 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 16 Jan 2015 00:48:53 +0800
-Subject: [linux-sunxi] Re: Including empty regulator nodes in axp209.dtsi
- is a BAD idea
-In-Reply-To: <5312007.HNApKlEIe7@x64.localnet>
-References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
- <5312007.HNApKlEIe7@x64.localnet>
-Message-ID: <CAGb2v66Go1z-V8spwHvLHQC1R=vgDsk1nQ6iZWTsy+OMF1kK0w@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 15 Jan 2015 11:50:47 -0500
+Subject: [PATCH] arm64/efi: handle potential failure to remap memory map
+In-Reply-To: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1421340647.22837.2.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 6:18 PM, Lars Doelle <lars.doelle@on-line.de> wrote:
-> On Tuesday, January 13, 2015 17:46:06 Maxime Ripard wrote:
->> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
->> > Hi ChenYu, Maxime,
->> >
->> > During the review of a few dts files for new boards Maxime asked me to use
->> > axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
->> > boards using the axp209 pmic.
->> >
->> > But axp209.dtsi includes empty regulator nodes, e.g. :
->> >
->> >                 reg_dcdc3: dcdc3 {
->> >                         regulator-name = "dcdc3";
->> >                 };
->> >
->> > This is a BAD idea, the presence of these empty nodes causes the
->> > axp20x-regulator driver to actually register regulators for them,
->> > and then on late_init the regulator subsys turns them off, since
->> > they have absolutely no constraints set (nor users registered)
->> > and the regulator subsys assumes that when devicetree is used their
->> > is always a compete set of constraints and that thus turning them
->> > off is safe.
->> >
->> > So when I switched to using axp209.dtsi for the bananapro.dts,
->> > and booted the bananapro this is the last message I got from the
->> > kernel while booting:
->> >
->> > [    2.314014] dcdc3: disabling
->> >
->> > And away went our DRAM power-supply, oops.
->> >
->> > So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
->> > should contain reasonable constraints (eg the operating range
->> > from the datasheet)
->>
->> Indeed.
->
-> It is very unclear to me, what to with this dtsi as it is.
->
-> Wrt. axp209, I have a specification like in sun7i-a20-olinuxino-lime2.dts.
-> If I include this dtsi, what does it help or how is it supposed to be of any
-> use?
->
-> In particular, the following section
->
-> |                       axp209: pmic at 34 {
-> |                               compatible = "x-powers,axp209";
-> |                               reg = <0x34>;
-> |                               interrupt-parent = <&nmi_intc>;
-> |                               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->
-> |                               interrupt-controller;
-> |                               #interrupt-cells = <1>;
->
-> |                               acin-supply = <&reg_axp_ipsout>;
-> |                               vin2-supply = <&reg_axp_ipsout>;
-> |                               vin3-supply = <&reg_axp_ipsout>;
-> |                               ldo24in-supply = <&reg_axp_ipsout>;
-> |                               ldo3in-supply = <&reg_axp_ipsout>;
+On Thu, 2015-01-15 at 12:01 +0000, Ard Biesheuvel wrote:
+> When remapping the UEFI memory map using ioremap_cache(), we
+> have to deal with potential failure. Note that, even if the
+> common case is for ioremap_cache() to return the existing linear
+> mapping of the memory map, we cannot rely on that to be always the
+> case, e.g., in the presence of a mem= kernel parameter.
+> 
+> At the same time, remove a stale comment and move the memmap code
+> together.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index a98415b5979c..c9cb0fbe7aa4 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -229,19 +229,21 @@ static int __init arm64_enable_runtime_services(void)
+>  		return -1;
+>  	}
+>  
+> -	mapsize = memmap.map_end - memmap.map;
+> -
+>  	if (efi_runtime_disabled()) {
+>  		pr_info("EFI runtime services will be disabled.\n");
+>  		return -1;
+>  	}
+>  
+>  	pr_info("Remapping and enabling EFI services.\n");
+> -	/* replace early memmap mapping with permanent mapping */
+> +
+> +	mapsize = memmap.map_end - memmap.map;
+>  	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+>  						   mapsize);
+> +	if (!memmap.map) {
+> +		pr_err("Failed to remap EFI memory map\n");
+> +		return -1;
+> +	}
+>  	memmap.map_end = memmap.map + mapsize;
+> -
+>  	efi.memmap = &memmap;
+>  
+>  	efi.systab = (__force void *)ioremap_cache(efi_system_table,
 
-We should not be using reg_axp_ipsout, as it is an unregulated supply,
-and can be left out.
+Somewhat unrelated but we should unmap memmap.map if the efi.systab
+mapping fails.
 
->
-> would be needed anyway as it is not in sun7i-a20.dtsi, followed by the
-> regulators, to switch them on. Now a dtsi would make sense, if it shortens
-> the device specific information.
->
-> Should not the section above together with the full regulators be in axp209.dtsi
-> and only the regulators be mentioned in the boards dts, to switch them on? Isn't
-> this stuff that should be included in sun7i-a20.dtsi anyway, somehow?
-
-It is entirely possible to make a board without using the PMIC, as Olimex
-has demonstrated. sun7i-a20 only describes the common SoC bits.
-
-ChenYu
+Acked-by: Mark Salter <msalter@redhat.com>
