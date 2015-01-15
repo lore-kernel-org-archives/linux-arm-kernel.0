@@ -1,38 +1,117 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Jan 2015 14:43:35 +0000
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-In-Reply-To: <2776397.iNGHcrIBZz@wuerfel> (Arnd Bergmann's message of "Thu, 15
- Jan 2015 14:27:56 +0000")
-References: <20150114221407.GS2419@atomide.com>
- <8761c8i2hq.fsf@approximate.cambridge.arm.com>
- <2776397.iNGHcrIBZz@wuerfel>
-Message-ID: <87wq4ogl48.fsf@approximate.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 15 Jan 2015 15:47:43 +0100
+Subject: [PATCH v7 0/4] irqfd support for arm/arm64
+Message-ID: <1421333267-15287-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15 2015 at  2:27:56 pm GMT, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 15 January 2015 13:42:57 Marc Zyngier wrote:
->> Of course, this is in no way a proper fix, but I suppose the OMAP DT is
->> still missing a few bits...
->
-> I must be missing something here, but all the interrupts are listed
-> correctly in the DT, so what is the omap_hwmod_irq_info actually
-> achieving on omap4 and omap5?
->
-> Would it work if we just remove the incorrect copy of the resource
-> and use the one that comes from DT?
+This patch series enables irqfd on arm and arm64.
 
-By the look of it, omap_hwmod_irq_info serves multiple purposes:
-- low level configuration (pads, probably more stuff)
-- interrupt description for some drivers, using resources.
+Irqfd framework enables to inject a virtual IRQ into a guest upon an
+eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
+a kvm_irqfd struct that associates a VM, an eventfd, a virtual IRQ number
+(aka. the gsi). When an actor signals the eventfd (typically a VFIO
+platform driver), the kvm irqfd subsystem injects the gsi into the VM.
 
-It should be fairly easy to do the latter, but the former looks more
-tricky (it would push the pad configuration down to the drivers, which
-is avoided at the moment).
+Resamplefd also is supported for level sensitive interrupts, ie. the
+user can provide another eventfd that is triggered when the completion
+of the virtual IRQ (gsi) is detected by the GIC.
 
-Probably there is a workable strategy, but my knowledge about OMAP is
-close to *nothing*...
+The gsi must correspond to a shared peripheral interrupt (SPI), ie the
+GIC interrupt ID is gsi + 32.
 
-	M.
+The rationale behind not supporting PPI irqfd injection is that
+any device using a PPI would be a private-to-the-CPU device (timer for
+instance), so its state would have to be context-switched along with the
+VCPU and would require in-kernel wiring anyhow. It is not a relevant use
+case for irqfds.
+
+This patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
+
+No IRQ routing table is used, enabling to remove CONFIG_HAVE_KVM_IRQCHIP
+
+The ARM virtual interrupt controller, the VGIC, is dynamically
+instantiated. The user-space may attempt to assign an irqfd before
+the virtual interrupt controller is ready. For that reason a
+check is added in the generic irqfd code to test whether the virtual
+interrupt controller is ready.
+
+This work was tested with Calxeda Midway xgmac main interrupt with
+qemu-system-arm and QEMU VFIO platform device. Also irqfd was proven
+functional on several vhost-net prototypes.
+
+Available on ssh://git.linaro.org/people/eric.auger/linux.git
+branch irqfd_v7_stdalone_official_release
+
+v6 -> v7:
+- kvm_arch_intc_initialized call introduced in first patch file
+  related to kvm_arch_intc_initialized (generic part)
+- add Christoffer's acks
+
+v5 -> v6:
+- take into account Christoffer's comments:
+  - rename macro and function enabling to check the state of virtual
+    interrupt controller (kvm_arch_intc_initialized)
+  - kvm_arch_intc_initialized is declared in kvm_host.h whatever the
+    archi support.
+  - squash v5 patch files 3 & 4
+  - KVM_CAP_IRQFD support depends on vgic_present
+  - add Christoffer's Reviewed-by on last patch file
+
+v4 -> v5:
+- add the capability to check whether vgic is initialized when
+  assigning an irqfd.  objective is to avoid injecting IRQ before
+  this vgic is ready: this corresponds to new patch files 2, 3, 4.
+- do not specifically handle early virtual IRQ injections in
+  kvm_set_irq.  In case of injection when vgic is not yet ready,
+  simply return an error.  User-space now has means to force vgic
+  init and get notified if irqfd assign takes place too early.
+- squash [PATCH v4 2/3] KVM: arm: add irqfd support and
+         [PATCH v4 3/3] KVM: arm64: add irqfd support
+- add Acked-by's in KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
+- some comment rewording in vgic
+
+v3 -> v4:
+- rebase on 3.18rc5
+- vgic dynamic instantiation brought new challenges:
+  handling of irqfd injection when vgic is not ready
+- unset of CONFIG_HAVE_KVM_IRQCHIP in a separate patch
+- add arm64 enable
+- vgic.c style modifications according to Christoffer comments
+
+v2 -> v3:
+- removal of irq.h from eventfd.c put in a separate patch to increase
+  visibility
+- properly expose KVM_CAP_IRQFD capability in arm.c
+- remove CONFIG_HAVE_KVM_IRQCHIP meaningfull only if irq_comm.c is used
+
+v1 -> v2:
+- rebase on 3.17rc1
+- move of the dist unlock in process_maintenance
+- remove of dist lock in __kvm_vgic_sync_hwstate
+- rewording of the commit message (add resamplefd reference)
+- remove irq.h
+
+Eric Auger (4):
+  KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
+  KVM: introduce kvm_arch_intc_initialized and use it in irqfd
+  KVM: arm/arm64: implement kvm_arch_intc_initialized
+  KVM: arm/arm64: add irqfd support
+
+ Documentation/virtual/kvm/api.txt |  6 +++-
+ arch/arm/include/asm/kvm_host.h   |  2 ++
+ arch/arm/include/uapi/asm/kvm.h   |  3 ++
+ arch/arm/kvm/Kconfig              |  4 +--
+ arch/arm/kvm/Makefile             |  2 +-
+ arch/arm/kvm/arm.c                | 10 +++++++
+ arch/arm64/include/asm/kvm_host.h |  2 ++
+ arch/arm64/include/uapi/asm/kvm.h |  3 ++
+ arch/arm64/kvm/Kconfig            |  3 +-
+ arch/arm64/kvm/Makefile           |  2 +-
+ include/linux/kvm_host.h          | 14 +++++++++
+ virt/kvm/arm/vgic.c               | 63 ++++++++++++++++++++++++++++++++++++---
+ virt/kvm/eventfd.c                |  3 ++
+ 13 files changed, 107 insertions(+), 10 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
