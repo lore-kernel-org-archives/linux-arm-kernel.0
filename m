@@ -1,85 +1,241 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Jan 2015 13:55:56 +0000
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <20150115135201.GG16217@leverpostej>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
-Message-ID: <20150115135556.GH16217@leverpostej>
+From: gregory.hermant@calao-systems.com (Gregory Hermant)
+Date: Thu, 15 Jan 2015 15:09:35 +0100
+Subject: =?UTF-8?q?=5BPATCH=5D=20add=20dt=20support=20for=20the=20haba-knx-lite=20controller?=
+Message-ID: <1421330975-19824-1-git-send-email-gregory.hermant@calao-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 01:52:01PM +0000, Mark Rutland wrote:
-> On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
-> > This patch adds the generic common bindings used to represent
-> > a hwlock device and use/request locks in a device-tree build.
-> > 
-> > All the platform-specific hwlock driver implementations need the
-> > number of locks and associated base id for registering the locks
-> > present within the device with the driver core. This base id
-> > needs to be unique across multiple IP instances of a hwspinlock
-> > device, so that each hwlock can be represented uniquely in a
-> > system.
-> > 
-> > The number of locks is represented by 'hwlock-num-locks' property,
-> > and the base id is represented by the 'hwlock-base-id' property.
-> > The args specifier length is dependent on each vendor-specific
-> > implementation and is represented through the '#hwlock-cells'
-> > property. Client users need to use the property 'hwlocks' for
-> > requesting specific lock(s).
-> > 
-> > Note that the document is named hwlock.txt deliberately to keep
-> > it a bit more generic.
-> > 
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> > ---
-> > v7: Revised binding info for hwlock-base-id, it is mandatory now
-> > 
-> >  .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++++++
-> >  1 file changed, 55 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> > new file mode 100644
-> > index 000000000000..8de7aaf878f9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> > @@ -0,0 +1,55 @@
-> > +Generic hwlock bindings
-> > +=======================
-> > +
-> > +Generic bindings that are common to all the hwlock platform specific driver
-> > +implementations.
-> > +
-> > +The validity and need of these common properties may vary from one platform
-> > +implementation to another. The platform specific bindings should explicitly
-> > +state if an optional property is used. Please also look through the individual
-> > +platform specific hwlock binding documentations for identifying the applicable
-> > +properties.
-> > +
-> > +Common properties:
-> > +- #hwlock-cells:	Specifies the number of cells needed to represent a
-> > +			specific lock. This property is mandatory for all
-> > +			platform implementations.
-> > +- hwlock-num-locks:	Number of locks present in a hwlock device. This
-> > +			property is needed on hwlock devices, where the number
-> > +			of supported locks within a hwlock device cannot be
-> > +			read from a register.
-> > +- hwlock-base-id:	An unique base Id for the locks for a particular hwlock
-> > +			device. This property is mandatory for all platform
-> > +			implementations.
-> 
-> This property makes no sense. The ID encoded in the hwlock cells is
-> relative to the instance (identified by phandle), not global. So the DT
-> has no global ID space.
-> 
-> Why do you think you need this?
 
-Having looked at the way this proeprty is used, NAK.
+Signed-off-by: Gregory Hermant <gregory.hermant@calao-systems.com>
+---
+ arch/arm/boot/dts/Makefile          |    1 +
+ arch/arm/boot/dts/haba_knx_lite.dts |  206 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 207 insertions(+)
+ create mode 100644 arch/arm/boot/dts/haba_knx_lite.dts
 
-If you need to carve up a Linux-internal ID space, do that dynamically.
-There is no need for this property.
-
-Mark.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 38c89ca..80fe6cd 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_AT91) += at91-foxg20.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek.dtb
+ dtb-$(CONFIG_ARCH_AT91) += at91sam9g20ek_2mmc.dtb
+ dtb-$(CONFIG_ARCH_AT91) += kizbox.dtb
++dtb-$(CONFIG_ARCH_AT91) += haba_knx_lite.dtb
+ dtb-$(CONFIG_ARCH_AT91) += tny_a9g20.dtb
+ dtb-$(CONFIG_ARCH_AT91) += usb_a9g20.dtb
+ dtb-$(CONFIG_ARCH_AT91) += usb_a9g20_lpw.dtb
+diff --git a/arch/arm/boot/dts/haba_knx_lite.dts b/arch/arm/boot/dts/haba_knx_lite.dts
+new file mode 100644
+index 0000000..7769a71
+--- /dev/null
++++ b/arch/arm/boot/dts/haba_knx_lite.dts
+@@ -0,0 +1,206 @@
++/*
++ * haba_knx_lite.dts - Device Tree file for Calao HABA-KNX-LITE board
++ *
++ *  Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *  Copyright (C) 2014 Gr?gory Hermant <gregory.hermant@calao-systems.com>
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++/dts-v1/;
++#include "at91sam9g20.dtsi"
++
++/ {
++	model = "Calao HABA KNX LITE";
++	compatible = "calao,haba-knx-lite", "atmel,at91sam9g20", "atmel,at91sam9";
++
++	chosen {
++		bootargs = "mem=128M console=ttyS0,115200 root=/dev/mtdblock6 rw rootfstype=ubifs";
++	};
++
++	memory {
++		reg = <0x20000000 0x8000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <12000000>;
++		};
++	};
++
++	ahb {
++		apb {
++			usart0: serial at fffb0000 {
++				pinctrl-0 =
++					<&pinctrl_usart0
++					 &pinctrl_usart0_rts
++					 &pinctrl_usart0_cts
++					 &pinctrl_usart0_dtr_dsr
++					 &pinctrl_usart0_dcd
++					 &pinctrl_usart0_ri>;
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				pinctrl-0 =
++					<&pinctrl_usart1
++					 &pinctrl_usart1_rts
++					 &pinctrl_usart1_cts>;
++				status = "okay";
++			};
++
++			uart0: serial at fffd4000 {
++				pinctrl-0 = <&pinctrl_uart0>;
++				status = "okay";
++			};
++
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			macb0: ethernet at fffc4000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioB 2 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++			};
++
++			spi0: spi at fffc8000 {
++				status = "okay";
++				cs-gpios = <&pioA 3 0>, <&pioA 4 0>, <&pioA 27 1>;
++
++				flash: m25p80 at 0 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "sst,sst25vf016b";
++					reg = <0>;
++					spi-max-frequency = <40000000>;
++					m25p,fast-read;
++				};
++
++				mmc-slot at 2 {
++					compatible = "mmc-spi-slot";
++					reg = <2>;
++					voltage-ranges = <3200 3400>;
++					spi-max-frequency = <25000000>;
++					interrupt-parent = <&pioB>;
++					interrupts = <0 IRQ_TYPE_EDGE_BOTH>;
++				};
++			};
++
++			shdwc at fffffd10 {
++				atmel,wakeup-mode = "low";
++				atmel,wakeup-counter = <10>;
++				atmel,wakeup-rtt-timer;
++			};
++
++	};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++
++			at91bootstrap at 0 {
++				label = "at91bootstrap";
++				reg = <0x0 0x20000>;
++			};
++
++			barebox at 20000 {
++				label = "barebox";
++				reg = <0x20000 0x40000>;
++			};
++
++			bareboxenv at 60000 {
++				label = "bareboxenv";
++				reg = <0x60000 0x20000>;
++			};
++
++			bareboxenv2 at 80000 {
++				label = "bareboxenv2";
++				reg = <0x80000 0x20000>;
++			};
++
++			oftree at 80000 {
++				label = "oftree";
++				reg = <0xa0000 0x20000>;
++			};
++
++			kernel at a0000 {
++				label = "kernel";
++				reg = <0xc0000 0x400000>;
++			};
++
++			rootfs at 4a0000 {
++				label = "rootfs";
++				reg = <0x4c0000 0x7800000>;
++			};
++
++			data at 7ca0000 {
++				label = "data";
++				reg = <0x7cc0000 0x8340000>;
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		user_led {
++			label = "user_led";
++			gpios = <&pioA 28 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		user_pb {
++			label = "user_pb";
++			gpios = <&pioC 3 GPIO_ACTIVE_LOW>;
++			linux,code = <28>;
++			gpio-key,wakeup;
++		};
++	};
++
++	i2c at 0 {
++		status = "okay";
++
++		eeprom at 50 {
++			compatible = "microchip,24c02";
++			reg = <0x50>;
++		};
++
++		rv3029c2 at 56 {
++			compatible = "rv3029c2";
++			reg = <0x56>;
++		};
++	};
++
++};
++
+-- 
+1.7.9.5
