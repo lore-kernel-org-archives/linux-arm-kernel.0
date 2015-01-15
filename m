@@ -1,60 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Jan 2015 16:23:10 -0800
-Subject: [PATCH v3 4/4] pinctrl: qcom: Add support for reset for apq8064
-In-Reply-To: <CAOZdJXXZ3RH1zOGcz1L58d9DV_LSZtUxYVKe6ssM71nyhnbMyg@mail.gmail.com>
-References: <1409322659-17693-1-git-send-email-pramod.gurav@smartplayin.com>	<1409322659-17693-5-git-send-email-pramod.gurav@smartplayin.com>	<CAOZdJXXRgrYUEcX4f5zRuKgX-Dtbpvf-SV4-8rjuohv3=0NJhQ@mail.gmail.com>	<54B6FF75.70500@codeaurora.org>
- <CAOZdJXXZ3RH1zOGcz1L58d9DV_LSZtUxYVKe6ssM71nyhnbMyg@mail.gmail.com>
-Message-ID: <54B7086E.7060807@codeaurora.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 15 Jan 2015 11:38:40 +1100
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+Message-ID: <20150115113840.71ab0a39@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 03:54 PM, Timur Tabi wrote:
-> On Wed, Jan 14, 2015 at 5:44 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> I think so. Can you send a patch? Plus it would be nice to move i = 0 in
->> the for loop at the same time.
-> Sadly, Qualcomm policy makes that very cumbersome for me.  I won't be
-> able to send a patch any time soon.
->
+Hi Simon,
 
-Hm... we'll have to figure out that part. Anyway here's the patch.
+Today's linux-next merge of the renesas tree got a conflict in
+arch/arm/boot/dts/Makefile between commit cb612390e546 ("ARM: dts: Only
+build dtb if associated Arch and/or SoC is enabled") from the arm-soc
+tree and commits 9ccba8abd0a7 ("ARM: shmobile: kzm9g: Build DTS for
+Multiplatform") and 93c9f0228a3d ("ARM: shmobile: kzm9g-reference:
+Remove board C code and DT file") from the renesas tree.
 
----8<----
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] pinctrl: qcom: Don't iterate past end of function array
-
-Timur reports that this code crashes if nfunctions is 0. Fix the
-loop iteration to only consider valid elements of the functions
-array.
-
-Reported-by: Timur Tabi <timur@codeaurora.org>
-Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-Cc: Andy Gross <agross@codeaurora.org>
-Fixes: 327455817a92 "pinctrl: qcom: Add support for reset for apq8064"
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-msm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index e730935fa457..ed7017df065d 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -865,10 +865,10 @@ static int msm_ps_hold_restart(struct notifier_block *nb, unsigned long action,
- 
- static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
- {
--	int i = 0;
-+	int i;
- 	const struct msm_function *func = pctrl->soc->functions;
- 
--	for (; i <= pctrl->soc->nfunctions; i++)
-+	for (i = 0; i < pctrl->soc->nfunctions; i++)
- 		if (!strcmp(func[i].name, "ps_hold")) {
- 			pctrl->restart_nb.notifier_call = msm_ps_hold_restart;
- 			pctrl->restart_nb.priority = 128;
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/Makefile
+index 95fed8145ac9,be6e2607da88..000000000000
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@@ -466,10 -411,8 +466,9 @@@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += 
+  	r8a7778-bockw-reference.dtb \
+  	r8a7779-marzen.dtb \
+  	sh7372-mackerel.dtb \
+- 	sh73a0-kzm9g.dtb \
+- 	sh73a0-kzm9g-reference.dtb
++ 	sh73a0-kzm9g.dtb
+ -dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ +dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ +	emev2-kzm9d.dtb \
+  	r7s72100-genmai.dtb \
+  	r8a73a4-ape6evm.dtb \
+  	r8a7740-armadillo800eva.dtb \
+@@@ -477,9 -420,9 +476,10 @@@
+  	r8a7790-lager.dtb \
+  	r8a7791-henninger.dtb \
+  	r8a7791-koelsch.dtb \
+- 	r8a7794-alt.dtb
++ 	r8a7794-alt.dtb \
++ 	sh73a0-kzm9g.dtb
+ -dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ +dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ +	socfpga_arria5_socdk.dtb \
+  	socfpga_arria10_socdk.dtb \
+  	socfpga_cyclone5_socdk.dtb \
+  	socfpga_cyclone5_sockit.dtb \
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/c8f91cb9/attachment.sig>
