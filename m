@@ -1,104 +1,51 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Jan 2015 12:06:15 +0100
-Subject: [PATCH v6 3/4] KVM: arm/arm64: implement
- kvm_arch_intc_initialized and use it in irqfd
-In-Reply-To: <1421170420-30617-4-git-send-email-eric.auger@linaro.org>
-References: <1421170420-30617-1-git-send-email-eric.auger@linaro.org>
- <1421170420-30617-4-git-send-email-eric.auger@linaro.org>
-Message-ID: <20150115110615.GQ26222@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Jan 2015 11:12:17 +0000
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <20150115082843.GB30799@ulmo>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <1417453034-21379-9-git-send-email-will.deacon@arm.com>
+ <54B63028.3090701@nvidia.com> <20150114104610.GC4050@arm.com>
+ <20150115082843.GB30799@ulmo>
+Message-ID: <20150115111211.GF23475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 06:33:39PM +0100, Eric Auger wrote:
-> On arm/arm64 the VGIC is dynamically instantiated and it is useful
-> to expose its state, especially for irqfd setup.
+On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
+> On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
+> > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
+> [...]
+> > > 2) Say you want to use the IOMMU API in your driver, and have an iommu 
+> > > property in your device's DT node. If by chance your IOMMU is registered 
+> > > early, you will already have a mapping automatically created even before 
+> > > your probe function is called. Can this be avoided? Is it even safe?
+> > 
+> > Currently, I think you have to either teardown the ops manually or return
+> > an error from of_xlate. Thierry was also looking at this sort of thing,
+> > so it might be worth talking to him.
 > 
-> This patch defines __KVM_HAVE_ARCH_INTC_INITIALIZED and
-> implements kvm_arch_intc_initialized.
-> 
-> The new function can now be used by irqfd to check whether the
-> virtual interrupt controller is ready on KVM_IRQFD request. If not,
-> KVM_IRQFD returns -EAGAIN
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> 
-> v5 -> v6:
-> - remove kvm_arch_intc_initialized declaration from
->   architecture specific kvm_host.h since it is now in
->   generic kvm_host.h
-> - squash v5 patch files 3 & 4
-> ---
->  arch/arm/include/asm/kvm_host.h   | 2 ++
->  arch/arm/kvm/arm.c                | 5 +++++
->  arch/arm64/include/asm/kvm_host.h | 2 ++
->  virt/kvm/eventfd.c                | 3 +++
->  4 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 254e065..8f87259 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -27,6 +27,8 @@
->  #include <asm/fpstate.h>
->  #include <kvm/arm_arch_timer.h>
->  
-> +#define __KVM_HAVE_ARCH_INTC_INITIALIZED
-> +
->  #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->  #else
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 2d6d910..9c905b4 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -454,6 +454,11 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->  	return 0;
->  }
->  
-> +bool kvm_arch_intc_initialized(struct kvm *kvm)
-> +{
-> +	return vgic_initialized(kvm);
-> +}
-> +
->  static void vcpu_pause(struct kvm_vcpu *vcpu)
->  {
->  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 0b7dfdb..dfb6135 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -28,6 +28,8 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
->  
-> +#define __KVM_HAVE_ARCH_INTC_INITIALIZED
-> +
->  #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->  #else
-> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-> index 148b239..fc5f43e 100644
-> --- a/virt/kvm/eventfd.c
-> +++ b/virt/kvm/eventfd.c
-> @@ -311,6 +311,9 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
->  	unsigned int events;
->  	int idx;
->  
-> +	if (!kvm_arch_intc_initialized(kvm))
-> +		return -EAGAIN;
-> +
+> I already explained in earlier threads why I think this is a bad idea.
+> It's completely unnatural for any driver to manually tear down something
+> that it didn't want set up in the first place. It also means that you
+> have to carefully audit any users of these IOMMU APIs to make sure that
+> they do tear down. That doesn't sound like a good incremental approach,
+> as evidenced by the breakage that Alex and Heiko have encountered.
 
-I think this hunk should go in patch 2 instead, split up the generic and
-arch-specific parts.
+Well, perhaps we hide that behind a get_iommu API or something. We *do*
+need this manual teardown step to support things like VFIO, so it makes
+sense to reuse it for other users too imo.
 
->  	irqfd = kzalloc(sizeof(*irqfd), GFP_KERNEL);
->  	if (!irqfd)
->  		return -ENOMEM;
-> -- 
-> 1.9.1
-> 
-Assuming you fix that:
+> The solution for me has been to completely side-step the issue and not
+> register the IOMMU with the new mechanism at all. That is, there's no
+> .of_xlate() implementation, which means that the ARM DMA API glue won't
+> try to be smart and use the IOMMU in ways it's not meant to be used.
+> This has several advantages, such as that I can also use the regular
+> driver model for suspend/resume of the IOMMU, and I get to enjoy the
+> benefits of devres in the IOMMU driver. Probe ordering is still a tiny
+> issue, but we can easily solve that using explicit initcall ordering
+> (which really isn't any worse than IOMMU_OF_DECLARE()).
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+That's a pity. I'd much rather extend what we currently have to satisfy
+your use-case. Ho-hum.
+
+Will
