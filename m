@@ -1,80 +1,131 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 15 Jan 2015 17:17:11 +0100
-Subject: [PATCH v3 4/8] ARM: at91: time: move the system timer driver
- to drivers/clocksource
-In-Reply-To: <1421077023-30954-5-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-5-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B7E807.4050301@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 15 Jan 2015 17:19:08 +0100
+Subject: [PATCH 3/3] ARM: dts: rockchip: add dts for ChipSPARK Rayeager
+ PX2 board
+In-Reply-To: <1421289659-16627-4-git-send-email-naobsd@gmail.com>
+References: <1421289659-16627-1-git-send-email-naobsd@gmail.com>
+ <1421289659-16627-4-git-send-email-naobsd@gmail.com>
+Message-ID: <2706590.Kkspa3JYVn@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 04:36 PM, Alexandre Belloni wrote:
-> Import at91rm9200_time.c from mach-at91 as timer-atmel-st.c. Further cleanup is
-> required to get rid of the mach-at91 headers.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Hi,
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+again, please add a small commit message and reorder nodes as described in the 
+previous patch, some more stuff inline
 
+Am Donnerstag, 15. Januar 2015, 11:40:59 schrieb FUKAUMI Naoki:
+> Signed-off-by: FUKAUMI Naoki <naobsd@gmail.com>
 > ---
->   arch/arm/mach-at91/Makefile                                           | 2 +-
->   drivers/clocksource/Kconfig                                           | 4 ++++
->   drivers/clocksource/Makefile                                          | 1 +
->   .../at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c         | 0
->   4 files changed, 6 insertions(+), 1 deletion(-)
->   rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (100%)
->
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 7b6424d40764..5d1ee3a6f115 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -7,7 +7,7 @@ obj-y		:= setup.o sysirq_mask.o
->   obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
->
->   # CPU-specific support
-> -obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
-> +obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
->   obj-$(CONFIG_SOC_AT91SAM9260)	+= at91sam9260.o
->   obj-$(CONFIG_SOC_AT91SAM9261)	+= at91sam9261.o
->   obj-$(CONFIG_SOC_AT91SAM9263)	+= at91sam9263.o
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index fc01ec27d3c8..ebc6dd77136e 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -128,6 +128,10 @@ config ATMEL_PIT
->   	select CLKSRC_OF if OF
->   	def_bool SOC_AT91SAM9 || SOC_SAMA5
->
-> +config ATMEL_ST
-> +	select CLKSRC_OF if OF
-> +	def_bool SOC_AT91RM9200
+
+[...]
+
 > +
->   config CLKSRC_METAG_GENERIC
->   	def_bool y if METAG
->   	help
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 94d90b24b56b..b7380ded4e4c 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -1,5 +1,6 @@
->   obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
->   obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
-> +obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
->   obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
->   obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
->   obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/drivers/clocksource/timer-atmel-st.c
-> similarity index 100%
-> rename from arch/arm/mach-at91/at91rm9200_time.c
-> rename to drivers/clocksource/timer-atmel-st.c
->
+> +	vsys: vsys-regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vsys";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	vcc_otg: usb-otg-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&otg_drv>;
+> +		regulator-name = "vcc_otg";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+
+missing vin-supply
+
+> +	};
+> +
+> +	vcc_host: usb-host-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&host_drv>;
+> +		regulator-name = "host-pwr";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+
+missing vin-supply
+
+> +	};
+> +
+> +	vcc_sata: sata-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sata_pwr>;
+> +		regulator-name = "usb_5v";
+
+why is it named "usb_5v"?
+
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+
+missing vin-supply
+
+> +	};
+> +
+
+[...]
+
+> +&emmc {
+> +	broken-cd;
+> +	bus-width = <8>;
+> +	cap-mmc-highspeed;
+> +	disable-wp;
+> +	non-removable;
+> +	num-slots = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
+> +	status = "okay";
+> +	vmmc-supply = <&vcc_emmc>;
+> +	vqmmc-supply = <&vcc_emmc>;
+
+I checked the public schematics and surprisingly this is actually correct ... 
+but still very strange :-)
+
+> +};
+
+[...]
+
+> +&i2c0 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	ak8963: ak8963 at d {
+
+please use two chars for the address, i.e. ak8963 at 0d, same for the reg below
+
+> +		compatible = "asahi-kasei,ak8975";
+> +		reg = <0xd>;
+> +		interrupt-parent = <&gpio4>;
+> +		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&comp_int>;
+> +	};
+> +
+> +	mma8452: mma8452 at 1d {
+> +		compatible = "fsl,mma8452";
+> +		reg = <0x1d>;
+> +		interrupt-parent = <&gpio4>;
+> +		interrupts = <16 IRQ_TYPE_EDGE_RISING>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&gsensor_int>;
+> +	};
+> +};
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Heiko
