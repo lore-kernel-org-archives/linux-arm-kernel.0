@@ -1,121 +1,175 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 15 Jan 2015 10:32:23 +0100
-Subject: [PATCH v2 0/6] ARM: shmobile: sh73a0: DT PM domain support
-In-Reply-To: <20150114235302.GC10479@verge.net.au>
-References: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
- <20150114235302.GC10479@verge.net.au>
-Message-ID: <CAMuHMdVANePZ-fLzaLCEOm0vHR735C=u5_fDa4Uywi_P5ggjBg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 10:44:29 +0100
+Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
+In-Reply-To: <20150114235516.7a1a5844@bbrezillon>
+References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>	<1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>	<CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>	<alpine.DEB.2.11.1501141110190.5526@nanos>	<CAL_JsqLwBvV5s531_YsA=sCE4_LG=eXTua8mh069ufRjSNFhng@mail.gmail.com>
+ <20150114235516.7a1a5844@bbrezillon>
+Message-ID: <54B78BFD.3000707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Thu, Jan 15, 2015 at 12:53 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Jan 14, 2015 at 01:11:18PM +0100, Geert Uytterhoeven wrote:
->> This patch series enables DT support for PM domains on the Renesas
->> SH-Mobile AG5 (sh73a0) SoC.
+Le 14/01/2015 23:55, Boris Brezillon a ?crit :
+> Hi Rob,
+> 
+> On Wed, 14 Jan 2015 16:24:32 -0600
+> Rob Herring <robherring2@gmail.com> wrote:
+> 
+>> On Wed, Jan 14, 2015 at 4:36 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>> On Tue, 13 Jan 2015, Rob Herring wrote:
+>>>> On Tue, Jan 13, 2015 at 12:46 PM, Boris Brezillon
+>>>> <boris.brezillon@free-electrons.com> wrote:
+>>>>> Some interrupt controllers are multiplexing several peripheral IRQs on
+>>>>> a single interrupt line.
+>>>>> While this is not a problem for most IRQs (as long as all peripherals
+>>>>> request the interrupt with IRQF_SHARED flag set), multiplexing timers and
+>>>>> other type of peripherals will generate a WARNING (mixing IRQF_NO_SUSPEND
+>>>>> and !IRQF_NO_SUSPEND is prohibited).
+>>>>>
+>>>>> Create a dumb irq demultiplexer which simply forwards interrupts to all
+>>>>> peripherals (exactly what's happening with IRQ_SHARED) but keep a unique
+>>>>> irq number for each peripheral, thus preventing the IRQF_NO_SUSPEND
+>>>>> and !IRQF_NO_SUSPEND mix on a given interrupt.
+>>>>
+>>>> This really seems like a work-around for how IRQF_SHARED works. It
+>>>
+>>> It's a workaround for a short coming of IRQF_SHARED.
+>>>
+>>> IRQF_SHARED has a massive short coming versus suspend and wakeup
+>>> interrupts. If one of the demultiplexed interrupts is a valid wakeup
+>>> source then we have no sane way to express this with IRQF_SHARED
+>>> simply because the drivers need to be aware whether they run on stupid
+>>> or well designed hardware.
 >>
->> This series builds further on the DT PM Domain support for R-Mobile A1
->> (r8a7740).  Due to the similarity of the SYSC System-Controller on the
->> various SH-Mobile/R-Mobile SoCs, and the abstraction of PM domains in
->> DT, the same driver can handle sh73a0 after some small modifications,
->> without changing the DT bindings.
+>> Unfortunately, the drivers will still have to know this. They cannot
+>> assume that they can call disable_irq and their device irq state does
+>> not matter.
 >>
->> Compared to r8a7740, the only significant change is the move of the
->> memory-controller(s) to separate PM domains on sh73a0 (and also on
->> R-Mobile APE6 (r8a73a4)). Hence a provision must be made to not turn off
->> these PM domains inadvertently, cfr. the series "[PATCH 0/4] ARM:
->> shmobile: Add DT support for memory controllers" I've just sent.
+>> Perhaps we need a debug feature such that disable_irq/enable_irq are
+>> nops with IRQF_SHARED?
 >>
->> This series has been sent before, as part of the series "[PATCH RFC
->> 0/7] ARM: shmobile: sh73a0: DT PM domain support"
->> (https://lkml.org/lkml/2014/11/19/404).
->> Changes since v1 (more detailed changelogs in the individual patches):
->>   - Factored out addition of the memory-controller in a separate
->>     series.
+>>>> seems like what is really desired is just per handler disabling. It is
+>>>
+>>> So you want a magic API like disable/enable_irq_action()?
+>>>
+>>> Certainly not.
 >>
->> Dependencies:
->>   1. Patches 1-4 (DT binding doc, C code) depend on:
->>        a. The R-Mobile DT PM Domain work for r8a7740, queued in tag
->>           renesas-dt-pm-for-v3.20 of Simon's repository,
->
-> In response to a request from Olof renesas-dt-pm-for-v3.20 has been
-> withdrawn and the patches split between the soc-for-v3.20 and dt-for-v3.20
-> branches. I am assuming that the patches that 1-4 depend on are
-> now all in the soc-for-v3.20 branch. Could you check?
+>> Agreed.
+>>
+>>> You'd open just another can of worms which will bring us abuse and
+>>> hard to debug problems because driver writers think it's a good idea
+>>> to use it for random purposes.
+>>>
+>>> Aside of that it would add another conditional into the interrupt
+>>> delivery hotpath which is not desired either.
+>>>
+>>>> fragile in that devices can deadlock the system if the drivers don't
+>>>> disable the interrupt source before calling disable_irq. But unlike
+>>>
+>>> Any misdesigned driver can do that for you.
+>>>
+>>>> IRQF_SHARED, there is nothing explicit in the driver indicating it is
+>>>> designed to work properly with a shared interrupt line.
+>>>
+>>> IRQF_SHARED is a pretty bad indicator. Look at all the drivers which
+>>> slap this flag onto request_irq() and have no single line of code
+>>> which makes sure that the driver would ever work on a shared line.
+>>>
+>>> If it's just for annotational purposes, we can add a new IRQF flag,
+>>> which is required to request such a interrupt line.
+>>>
+>>>> I see no reason to accept this into DT either. We already can support
+>>>> shared lines and modeling an OR gate as an interrupt controller is
+>>>> pointless.
+>>>
+>>> It's absolutely not pointless.
+>>>
+>>> All attempts to work around that have resulted in horrible bandaids so
+>>> far. That's why I guided Boris to implement this dummy demultiplexing
+>>> mechanism. It solves the problem at hand nicely without adding nasty
+>>> hackarounds into the suspend/resume code and inflicting platform
+>>> knowledge on multi-platform device drivers.
+>>
+>> This change will break on old kernels with a new dtb. Would you be
+>> happy if a BIOS update required a new kernel? Fixing this for any
+>> platform requires a dtb update which may not be possible on some
+>> platforms. I don't have a problem with this breakage for 1 platform
+>> and the at91 guys may not care, but we'd ultimately be changing how
+>> all shared irqs are specified for all DT. Maybe we decide that this is
+>> how we want to describe things, but that needs much wider discussion
+>> and agreement.
+> 
+> I tried really hard on finding a DT representation that would not break
+> the DT ABI, but didn't find any easy solution.
+> How about keeping all platforms with the shared irq pattern, except for
+> those that really have an irq line shared by a timer and several other
+> devices (not sure yet, but at91 seems to be the only impacted platform
+> so far).
+> 
+>>
+>>> If you have a proper solution for the problem at hand which
+>>>
+>>>    - avoids the demux dummy
+>>>
+>>>    - works straight forward with suspend/resume/wakeup
+>>>
+>>>    - does not add horrible new APIs
+>>>
+>>>    - does not add conditionals to the interrupt hotpath
+>>>
+>>>    - does not inflict platform knowledge about interrupt chip details
+>>>      on drivers
+>>>
+>>> then I'm happy to take it.
+>>>
+>>> But as long as you can't come up with anything sane, the demux dummy
+>>> is the best solution for this problem we've seen so far.
+>>
+>> What if during suspend you move all actions w/o IRQF_NO_SUSPEND to a
+>> suspended action list? This would leave only the actions with
+>> IRQF_NO_SUSPEND set in the active action list. The cost would be a
+>> pointer in irq_desc and moving the actions during suspend and resume.
+> 
+> That really looks like what I suggested here [1].
+> 
+>>
+>> There are probably ways to do this demux irqchip without a DT change.
+>> Since we can't just move Linux irq numbers to different irq_chips
+>> during request_irq, we would have to parse the DT up front to find all
+>> shared interrupts and create a demux irqchip for them. That wouldn't
+>> be very efficient, but is straight-forward. Then we'd have to handle
+>> the translation into Linux irq numbers correctly which is probably the
+>> more difficult part.
+> 
+> I'm really interested in seeing how you would do this.
 
-OK, soc-for-v3.20 now.
+Well, it really looks like a ping-pong game and Boris tried hard to
+explore both options. I suspect that he already made his best to solve
+this problem.
+In the meantime, we begin to see people using our (old, badly designed,
+okay-okay) hardware and have the surprise of hitting this warning on
+Mainline kernel. As we have several set of timers, they may even not be
+affected by the core issue by selecting a timer which doesn't have a
+shared interrupt line.
 
->>        b. "ARM: shmobile: R-Mobile: Fix DT refcount bugs in PM domain
->>          code"
->>          (http://www.spinics.net/lists/arm-kernel/msg391084.html),
->
-> FWIW, I have squashed that patch into the patch that adds the problem
-> and the result is in the soc-for-v3.20. I will to push that result
-> a little later today.
+I mean, we discovered this when it was already written (in linux-next
+actually) and tried to address the issue quickly. But now, we urgently
+need a solution or a temporary workaround and Boris wrote two. I have
+the feeling that we have to move on by selecting one. Clearly, if the
+only issue remaining is that one solution may cause DT changes for AT91,
+well, we can cope with this and accept it.
 
-Thanks!
+If we don't come to a conclusion quickly, maybe we would have to
+consider removing this warning while we are working on the issue:
+believe me, it's frightening and sometimes even inappropriate when
+people select a different set of timers for their clocksource/clockevent
+after boot time.
 
->>   2. Patch 5 (dtsi) depends on:
->>        a. The multiplatform work for sh73a0, queued in branch
->>           sh73a0-multiplatform-for-v3.20 of Simon's repository,
->>        b. Series "[PATCH 0/4] ARM: shmobile: Add DT support for memory
->>           controllers"
->>         (http://marc.info/?l=linux-sh&m=142123399414888).
->
-> This may be awkward to get into v3.20 unless we can adopt a looser approach
-> to the dependencies.
->
-> To that end I suggest that it could be queued up in the branch that has the
-> multiplatform work (a) but not the memory controller work (b) as the latter
-> seems to more naturally fit into the dt branch. What I am hoping that such
-> an approach would lead to code that compiles and boots in both branches.
-> And that new functionality becomes available when the branched are combined
-> (e.g. in v3.20-rcX).
+Best regards,
 
-"ARM: shmobile: sh73a0 dtsi: Add PM domain support" relies on the clocks
-properties already being present on all device nodes (incl. the Bus State
-Controller), hence it depends on sh73a0-multiplatform-for-v3.20.
-"ARM: shmobile: sh73a0 dtsi: Add PM domain support" adds a power-domains
-property to the memory-controller node, so it depends on that, too.
 
-Leaving the memory-controller part out makes it unbootable, as the
-memory-controller will be powered down when PM domains become
-activated. Yes, hardware power domains are even more fun than (common)
-clocks when trying to split the commits across multiple branches ;-)
+> [1]https://lkml.org/lkml/2014/12/15/551
+> 
 
-> If this is not possible then I can merge the pre-requisites and put
-> patch 5 on top. But I feel that the ARM SoC maintainers would prefer
-> that I didn't do that unless it is absolutely necessary.
 
-Merging dt-for-v3.20 into sh73a0-multiplatform-for-v3.20 before applying
-patch 5 seems like the only sensible solution.
-
-As soon as that gets combined with soc-for-v3.20, the PM domains are
-activated, and patch 6 can be applied.
-
-> In case you are wondering: branch gymnastics are not my favourite pass time :^)
->
->>   3. Patch 6 (drivers/sh) depends on all of the above.
->
-> That part is clear enough :)
->
-> My intention here is to send a pull request to Linus for this change
-> once all the other patches have hit his tree. With a bit of luck that
-> would be around v3.20-rc2.
-
-OK, that would be appied to sh-drivers-for-v3.20, right?
-
-Thanks a lot!
-My local patch queue has shrunk considerably during the last few days...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Nicolas Ferre
