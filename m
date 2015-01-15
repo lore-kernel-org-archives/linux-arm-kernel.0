@@ -1,38 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 15 Jan 2015 09:41:32 +0100
-Subject: [PATCH 0/3] ARM: dts: Regulator changes and fuel gauge for
- exynos4412-trats2
-Message-ID: <1421311295-18960-1-git-send-email-k.kozlowski@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 15 Jan 2015 09:44:24 +0100
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+In-Reply-To: <20150115113840.71ab0a39@canb.auug.org.au>
+References: <20150115113840.71ab0a39@canb.auug.org.au>
+Message-ID: <CAMuHMdVjtVfTQyqMZYeXiPCMoeyxxUv-ikxRvM3uw9FCGTQ+BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Thu, Jan 15, 2015 at 1:38 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Today's linux-next merge of the renesas tree got a conflict in
+> arch/arm/boot/dts/Makefile between commit cb612390e546 ("ARM: dts: Only
+> build dtb if associated Arch and/or SoC is enabled") from the arm-soc
+> tree and commits 9ccba8abd0a7 ("ARM: shmobile: kzm9g: Build DTS for
+> Multiplatform") and 93c9f0228a3d ("ARM: shmobile: kzm9g-reference:
+> Remove board C code and DT file") from the renesas tree.
+>
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
+Your resolution is correct.
 
-I grouped into one patchset already posted patches for Trats2 board:
-1. Fuel gauge:
-   https://lkml.org/lkml/2015/1/7/167
-2. Suspend configuration for max77686 regulators:
-   https://lkml.org/lkml/2014/10/29/262
-3. GPIO control for max77686 regulators:
-   https://lkml.org/lkml/2015/1/5/230
+Gr{oetje,eeting}s,
 
+                        Geert
 
-The necessary changes in max77686 regulator driver were already
-applied by Mark Brown.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (3):
-  ARM: dts: exynos4412-trats2: Add Maxim 77693 fuel gauge node
-  ARM: dts: exynos4412-trats2: Add suspend configuration for max77686
-    regulators
-  ARM: dts: exynos4412-trats: Switch max77686 regulators to GPIO control
-
- arch/arm/boot/dts/exynos4412-trats2.dts | 115 ++++++++++++++++++--------------
- 1 file changed, 65 insertions(+), 50 deletions(-)
-
--- 
-1.9.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
