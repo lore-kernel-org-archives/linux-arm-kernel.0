@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 14 Jan 2015 17:10:56 -0800
-Subject: [GIT PULL] mvebu: SoC for 3.20
-In-Reply-To: <20150113144812.GA13100@lunn.ch>
-References: <20150113144812.GA13100@lunn.ch>
-Message-ID: <20150115011056.GB32756@quad.lixom.net>
+Date: Wed, 14 Jan 2015 17:12:10 -0800
+Subject: [GIT PULL] mvebu: defconfig for v3.20
+In-Reply-To: <20150113145006.GB13100@lunn.ch>
+References: <20150113145006.GB13100@lunn.ch>
+Message-ID: <20150115011210.GC32756@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 13, 2015 at 03:48:12PM +0100, Andrew Lunn wrote:
-> Hi Olof
+On Tue, Jan 13, 2015 at 03:50:06PM +0100, Andrew Lunn wrote:
+> Hi Olof, Arnd
 > 
-> Here is the first pull request for SoC for mvebu for v3.20.
+> Here is the first pull request for defconfig for mvebu for v3.20.
 > 
 >      Andrew
 > 
@@ -20,11 +20,20 @@ On Tue, Jan 13, 2015 at 03:48:12PM +0100, Andrew Lunn wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.20
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.20
 > 
-> for you to fetch changes up to c6574542149dede8093e326d2c358ba447e30f33:
+> for you to fetch changes up to e42dcfbba1f0ab3050a7c550a4119e2945553042:
 > 
->   ARM: mvebu: Update the SoC ID and revision definitions (2015-01-09 09:22:53 -0600)
+>   ARM: mvebu: enable CPUFREQ_DT in mvebu_v7_defconfig (2014-12-21 07:00:26 -0600)
+> 
+> ----------------------------------------------------------------
+> mvebu defconfig changes for v3.20
+> 
+> - enable CPUFREQ_DT in mvebu_v7_defconfig
+> 
+> ----------------------------------------------------------------
+> Thomas Petazzoni (1):
+>       ARM: mvebu: enable CPUFREQ_DT in mvebu_v7_defconfig
 
 Merged, thanks.
 
