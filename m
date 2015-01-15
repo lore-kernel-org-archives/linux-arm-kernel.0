@@ -1,51 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Jan 2015 10:29:30 +0800
-Subject: [PATCH v3 04/13] clk: sunxi: Add driver for A80 MMC config
- clocks/resets
-In-Reply-To: <20150114163757.GZ4891@lukather>
-References: <1421113055-17867-1-git-send-email-wens@csie.org>
- <1421113055-17867-5-git-send-email-wens@csie.org>
- <20150114163757.GZ4891@lukather>
-Message-ID: <CAGb2v65YDB9kJ+ZL2+jYMy2a+WGmt=O+71a=a6+oUPjx2fj40A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 14 Jan 2015 18:31:48 -0800
+Subject: [PATCH] Build a uImage with dtb already appended
+In-Reply-To: <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
+References: <20110802143148.21599.22870.stgit@ponder>
+ <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
+Message-ID: <CAOesGMh8ZXt4fbw-AKOVWTQ8X5bVC8gEOhDFLroOYt+S43xBrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 12:37 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jan 13, 2015 at 09:37:26AM +0800, Chen-Yu Tsai wrote:
->> On the A80 SoC, the 4 mmc controllers each have a separate register
->> controlling their register access clocks and reset controls. These
->> registers in turn share a ahb clock gate and reset control.
->>
->> This patch adds a platform device driver for these controls. It
->> requires both clocks and reset controls to be available, so using
->> CLK_OF_DECLARE might not be the best way.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  25 ++-
->>  drivers/clk/sunxi/Makefile                        |   1 +
->>  drivers/clk/sunxi/clk-sun9i-mmc.c                 | 222 ++++++++++++++++++++++
->>  3 files changed, 247 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/clk/sunxi/clk-sun9i-mmc.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index 0dfd018ba47b..60b44285250d 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -57,6 +57,7 @@ Required properties:
->>       "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
->>       "allwinner,sun4i-a10-mmc-clk" - for the MMC clock
->>       "allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
->> +     "allwinner,sun9i-a80-mmc-config-clk" - for mmc gates + resets on A80
+On Wed, Jan 14, 2015 at 6:08 PM, Christoph Junghans <ottxor@gentoo.org> wrote:
+> Add new targets to build zImage and uImage with DTB appended (i.e. make
+> 'uImage-dtb.am335x-bone' or 'make zImage-dtb.omap3-evm').
 >
-> It looks like it's not just a clock. How about dropping the -clk
-> suffix?
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+> ---
+>
+> I don't know why this never got merged, but I think it is still useful.
 
-It is like *-usb-clk, which has clock gates and reset controls.
-mmc-config has additional clock input gate and master reset
-control upstream.
+Maybe the patch description on the first version of the patch is a hint?
 
-IMO, it is a leaf clock control unit.
+https://lkml.org/lkml/2011/8/2/200
 
-ChenYu
+In general, we're moving away from generating custom images straight
+out of the kernel build system. You should make that part of your
+installation scripts or similar instead.
+
+
+-Olof
