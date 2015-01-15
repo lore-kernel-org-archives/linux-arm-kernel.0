@@ -1,45 +1,77 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 15 Jan 2015 09:14:23 +0100
-Subject: [PATCH 2/2] clk: exynos-audss: Fix memory leak on driver unbind or
- probe failure
-In-Reply-To: <20150114222504.22722.49023@quantum>
-References: <1420451561-12360-1-git-send-email-k.kozlowski@samsung.com>
- <1420451561-12360-2-git-send-email-k.kozlowski@samsung.com>
- <54AEF541.1090700@codeaurora.org> <20150114222504.22722.49023@quantum>
-Message-ID: <1421309663.12511.2.camel@AMDC1943>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Jan 2015 09:20:05 +0100
+Subject: [RFC 0/3] mmc: Add dynamic frequency scaling
+In-Reply-To: <1421054585-9032-1-git-send-email-k.kozlowski@samsung.com>
+References: <1421054585-9032-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAPDyKFpGiaDJ3zjCSSbcia6iLS2+FLBRjGAheQAzvFsAkJax+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2015-01-14 at 14:25 -0800, Mike Turquette wrote:
-> Quoting Stephen Boyd (2015-01-08 13:23:13)
-> > On 01/05/2015 01:52 AM, Krzysztof Kozlowski wrote:
-> > > The memory allocated by basic clock divider/gate/mux (struct clk_gate,
-> > > clk_divider and clk_mux) was leaking. During driver unbind or probe
-> > > failure the driver only unregistered the clocks.
-> > >
-> > > Use clk_unregister_{gate,divider,mux} to release all resources.
-> > >
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > >
-> > 
-> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> I've applied both patches to clk-next. Krzysztof, let me know if you
-> would prefer to take the audss patch through the samsung clock branch
-> instead (to include it in a later pull request).
++ Mike, Stephen (Clock maintainers)
 
-Thanks! I'm fine with applying them to clk-next.
+On 12 January 2015 at 10:23, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Hi,
+>
+>
+> I would like to hear some comments about idea of scaling MMC clock
+> frequency. The basic idea is to lower the clock when device is
+> completely idle or not busy enough.
 
-Best regards,
-Krzysztof
+We already have host drivers that implements runtime PM support.
+Typically that would mean the clock will be gated once the device
+becomes runtime PM suspended.
 
+Why should we decrease the frequency of an already gated clock?
 
-> 
-> Regards,
-> Mike
-> 
-> > 
-> > -- 
-> > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> > a Linux Foundation Collaborative Project
-> > 
+I think this boils done to how DVFS transitions can be triggered from
+the clock drivers, right?
+
+Currently the clock framework supports this through clock rate change
+notifiers. Should we have clock notifiers for clk_prepare|unprepare()
+as well? I do remember that someone posted patches for that a while
+ago, but those were rejected.
+
+Mike, Stephen - comments?
+
+Kind regards
+Uffe
+
+>
+> The patchset adds MMC card as a devfreq device and uses simple_ondemand
+> as governor. In idle this gave benefits (less energy consumed during
+> idle):
+> 1. Trats2 (Exynos4412): 2.6%
+> 2. Rinato (Exynos3250): 1%
+>
+> but (especially on Rinato) it had impact on performance (probably
+> because ondemand triggering a little to late). What is interesting
+> manually changing the clock (without this patchset) gave slightly
+> bigger benefits. Maybe the devfreq introduces noticeable overhead?
+>
+>
+> Comments are welcomed. Maybe on other platforms this has bigger impact?
+>
+> Best regards,
+> Krzysztof
+>
+>
+> Krzysztof Kozlowski (3):
+>   mmc: Add dynamic frequency scaling
+>   ARM: dts: Specify MSHC realistic clocks and use frequency scaling
+>   ARM: dts: Use frequency scaling for MSHC
+>
+>  Documentation/devicetree/bindings/mmc/mmc.txt |   2 +
+>  arch/arm/boot/dts/exynos3250-rinato.dts       |   1 +
+>  arch/arm/boot/dts/exynos4412-trats2.dts       |   4 +-
+>  drivers/mmc/card/block.c                      | 247 ++++++++++++++++++++++++++
+>  drivers/mmc/core/Kconfig                      |  16 ++
+>  drivers/mmc/core/core.h                       |   1 -
+>  drivers/mmc/core/host.c                       |   2 +
+>  include/linux/mmc/card.h                      |   8 +
+>  include/linux/mmc/host.h                      |   3 +
+>  9 files changed, 282 insertions(+), 2 deletions(-)
+>
+> --
+> 1.9.1
+>
