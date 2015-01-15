@@ -1,34 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Jan 2015 14:50:21 +0000
-Subject: [PATCH v3 13/21] ARM: omap: convert wakeupgen to stacked domains
-In-Reply-To: <20150115144016.GA19920@kahuna> (Nishanth Menon's message of
- "Thu, 15 Jan 2015 14:40:16 +0000")
-References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
- <1421087187-26988-14-git-send-email-marc.zyngier@arm.com>
- <20150114222814.GU2419@atomide.com>
- <871tmwi0d6.fsf@approximate.cambridge.arm.com>
- <20150115144016.GA19920@kahuna>
-Message-ID: <87sifcgksy.fsf@approximate.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Jan 2015 15:59:23 +0100
+Subject: [PATCH v2 0/8] AT91 cleanup for 3.20 #2
+Message-ID: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15 2015 at  2:40:16 pm GMT, Nishanth Menon <nm@ti.com> wrote:
-> On 14:28-20150115, Marc Zyngier wrote:
->> Assuming the workaround I posted earlier works, the OMAP/DRA7 part of
->> this series is going to require some rework too (I need to know where
->> these legacy interrupts are attached: crossbar, WUGEN, or GIC?).
->> 
-> crossbar will never work with legacy static interrupts anyways - since
-> there was never a static interrupt possible - I believe we had removed
-> all the legacy hardcoded interrupt definitions for DRA7. ideally, they
-> should all be dt only now.
+This patch sets is based on AT91 cleanup for 3.20 #1
+and depends on AT91 DT for 3.20 #1 because it uses the added SRAM nodes.
 
-Yes, I guessed as much after looking at the DRA7XX hwmod.
+The first two patches rework the pm code to get rid of cpu_is_xxx (they will be
+dropped soon) and use the SRAM from the genpool instead of relying on the remap
+done by at91_init_sram.
 
-So only OMAP4/5 is b0rken at the moment. I can probably work around it
-as I did in this example patch, just by changing the compatible strings
-for the xlate callback. Very ugly.
+The 3rd and 4th patches a reworking the pm code further to move at91_pm_init in
+the .init_machine of the SoCs instead of arch_initcall, to get ready for
+multiplatform.
 
-	M.
+Then the following patches get rid of at91_init_sram, taking .map_io for almost
+all SoCs but the sama5d4 (more cleanups coming soon for that part).
+
+The final patch moves at91rm9200_idle to clk/at91/pmc.c and allows to almost
+empty arch/arm/mach-at91/at91rm9200.c (It is actually empty once "Atmel System
+Timer cleanups" is applied).
+
+Changes in v2:
+ - added patch 3 and 4 to remove the calls to of_machine_is_compatible()
+
+Alexandre Belloni (8):
+  ARM: at91: pm: rework cpu detection
+  ARM: at91: pm: use the mmio-sram pool to access SRAM
+  ARM: at91: pm: add UDP and UHP checks to newer SoCs
+  ARM: at91: pm: prepare for multiplatform
+  ARM: at91: remove useless map_io
+  ARM: at91: sama5d4: remove useless call to at91_init_sram
+  ARM: at91: remove unused at91_init_sram
+  ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
+
+ arch/arm/mach-at91/Kconfig           |   1 +
+ arch/arm/mach-at91/at91rm9200.c      |  15 -----
+ arch/arm/mach-at91/at91sam9260.c     |  27 ---------
+ arch/arm/mach-at91/at91sam9261.c     |   9 ---
+ arch/arm/mach-at91/at91sam9263.c     |   7 ---
+ arch/arm/mach-at91/at91sam9g45.c     |   7 ---
+ arch/arm/mach-at91/at91sam9n12.c     |   6 --
+ arch/arm/mach-at91/at91sam9rl.c      |  18 ------
+ arch/arm/mach-at91/at91sam9x5.c      |   6 --
+ arch/arm/mach-at91/board-dt-rm9200.c |  11 ++++
+ arch/arm/mach-at91/board-dt-sam9.c   |  27 +++++++++
+ arch/arm/mach-at91/board-dt-sama5.c  |   1 +
+ arch/arm/mach-at91/generic.h         |  15 ++++-
+ arch/arm/mach-at91/pm.c              | 110 ++++++++++++++++++++++++++---------
+ arch/arm/mach-at91/sama5d3.c         |   6 --
+ arch/arm/mach-at91/sama5d4.c         |   1 -
+ arch/arm/mach-at91/setup.c           |  20 -------
+ drivers/clk/at91/pmc.c               |   9 +++
+ 18 files changed, 146 insertions(+), 150 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny.
+2.1.0
