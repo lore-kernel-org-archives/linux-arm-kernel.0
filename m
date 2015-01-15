@@ -1,56 +1,38 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 15 Jan 2015 13:58:44 -0500
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 15 Jan 2015 19:02:20 +0000
 Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+In-Reply-To: <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54B80DE4.5060902@redhat.com>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+Message-ID: <20150115190220.GF3043@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 10:04 AM, Hanjun Guo wrote:
-> Hi,
-> 
-> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
-> 
-> updates from v6:
->   - Rebased on top of 3.19-rc4, add Mack Salter's patch to use
->     the early_ioremap after paging_init() for ACPI table mappings;
-> 
->   - Two patches about converting apic_id to phys_id to make it arch
->     agnostic were already merged into RC4 by Rafael.
-> 
->   - Split patch "Parse FADT table to get PSCI flags for PSCI init"
->     into two as Lorenzo's suggestion, also fix typo and lack of __init
->     for psci_0_2_set_functions() which is spotted by Lorenzo.
-> 
->   - Add Tested-by from Yijing Wang.
-> 
-> previous version is here:
-> v6: https://lkml.org/lkml/2015/1/4/40
-> 
-> 1. Why we need ACPI on ARM64?
-> 
->   - Grant already posted a blog about this, and stated clearly
->     why we need ACPI on ARM64:
-> 
->     http://www.secretlab.ca/archives/151
-> 
-> 
-> 2. What we need to do before the arm64 ACPI core patches
->    could be merged into the kernel?
-> 
->   - Al Stone posted a TODO list and updates v2 for the
->     progress we made:
->     http://www.spinics.net/lists/arm-kernel/msg390069.html
-> 
->   - so from the progress we can see that we already finished
->     most of the items, and _OSI we got a plan to fix it, RFC
->     patch is on the way.
-> 
-> 
-> This patch set was tested on FVP by Fuwei, and booted ok as expected.
-> (No functional change since last version)
+On Thu, Jan 15, 2015 at 06:23:47PM +0000, Catalin Marinas wrote:
+> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
 
-For the entire series:
+> > I'll get right to the point: Can we please have this series queued up
+> > for v3.20?
 
-Tested-by: Jon Masters <jcm@redhat.com>
+> Before you even ask for this, please look at the patches and realise
+> that there is a complete lack of Reviewed-by tags on the code (well,
+> apart from trivial Kconfig changes). In addition, the series touches on
+> other subsystems like clocksource, irqchip, acpi and I don't see any
+> acks from the corresponding maintainers. So even if I wanted to merge
+> the series, there is no way it can be done without additional
+> reviews/acks. On the document (last patch), I'd like to see a statement
+
+There's probably a bit of a process problem here - these patches are all
+being posted as part of big and apparently controversial threads with
+subject lines in the form "ARM / ACPI:" so people could be forgiven for
+just not even reading the e-mails enough to notice changes to their
+subsystems.  Is it worth posting those patches separately more directly
+to the relevant maintainers?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/45669d98/attachment.sig>
