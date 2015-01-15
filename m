@@ -1,119 +1,57 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 15 Jan 2015 08:57:00 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <54B692FB.7030703@linaro.org>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
-Message-ID: <54B7024C.4020407@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 15 Jan 2015 09:01:12 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC sh73a0 CCF Updates for v3.20
+In-Reply-To: <CAMuHMdUbDh8H8ruhuoX9rzEufT3X8gJxx9RNR3ruF8yxMDoSbw@mail.gmail.com>
+References: <cover.1419809955.git.horms+renesas@verge.net.au>
+ <20150112223415.GJ22090@quad.lixom.net>
+ <20150113003823.GC27284@verge.net.au>
+ <CAMuHMdUgfKQtbjB81_bw8XLGL_zrwNxWt32f7v52KOdb7bNo5A@mail.gmail.com>
+ <20150114002923.GB30021@verge.net.au>
+ <CAMuHMdUbDh8H8ruhuoX9rzEufT3X8gJxx9RNR3ruF8yxMDoSbw@mail.gmail.com>
+Message-ID: <20150115000111.GA19024@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
-> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
->> On 01/14/15 14:33, Chanwoo Choi wrote:
->>
->> Hi,
->>
->> + Doug, Olof
->>
->>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
->>> for Exynos 32bit SoC.
->>>
->> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
->> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
->> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
->> implemented it and additionally its access is faster than using memory
->> mapped register called SFR for MCT...so Doug submitted patch to use MCT
->> on 32bit exynos SoCs before.
-
-I know arch_timer. As you comment, ARCH timer would be used for system timer for ARMv8.
-But, Exynos5433/Exynos7 (ARMv8) include MCT (Multi-Core Timer) IP. I checked it on
-Exynos5433/EXynos7 User-manaual and tested it.
-
-I think that exynos_mct.c should support the Exynos 64-bit SoC
-because Exynos5433/Exynos7 include already MCT (Multi-Core Timer) IP.
-
-Also, I have a problem to verify ARCH timer on Exynos SoC. Exynos User-manual never includes
-the detailed information about for ARCH timer(e.g, clock for ARCH timer). I knew that
-I can get the document of ARCH timer for ARM official site but I think it is insufficient
-to implement ARCH timer on Exynos SoC. 
-
-Best Regards,
-Chanwoo Choi
-
->>
->> I know using MCT on 64bit exynos is usefulness for Power Management and
->> I need to talk to relevant guys in office again. If anything, I'll let
->> you know.
+On Wed, Jan 14, 2015 at 11:02:04AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> I will wait for your answer before digging more the patch.
+> On Wed, Jan 14, 2015 at 1:29 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > Thanks. The motivation for this branch arrangement was indeed
+> >> > the atomic switch over.
+> >>
+> >> Please correct me if I'm wrong, but IMHO there's no atomicity needed here,
+> >> as this won't be used until sh73a0 multi-platform support is in.
+> >
+> > Ok, it seems that I was slightly mistaken. But we are working towards
+> > multi-platform support for v3.20, right?
 > 
-> Thanks
->   -- Daniel
+> Yes we are ;-)
 > 
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> ---
->>> This patch set is tested on 64-bit Exynos SoC. I send only this patch from
->>> following patchst[1].
->>> [1] https://lkml.org/lkml/2014/12/2/134
->>>
->>> Changes from v2:
->>> - None
->>> Changes from v1:
->>> - Use CONFIG_ARM instead of CONFIG_ARM64
->>>
->>>   drivers/clocksource/Kconfig      | 1 -
->>>   drivers/clocksource/exynos_mct.c | 4 ++++
->>>   2 files changed, 4 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>> index fc01ec2..be38119 100644
->>> --- a/drivers/clocksource/Kconfig
->>> +++ b/drivers/clocksource/Kconfig
->>> @@ -135,7 +135,6 @@ config CLKSRC_METAG_GENERIC
->>>
->>>   config CLKSRC_EXYNOS_MCT
->>>       def_bool y if ARCH_EXYNOS
->>> -    depends on !ARM64
->>>       help
->>>         Support for Multi Core Timer controller on Exynos SoCs.
->>>
->>> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->>> index 9403061..b840ea1 100644
->>> --- a/drivers/clocksource/exynos_mct.c
->>> +++ b/drivers/clocksource/exynos_mct.c
->>> @@ -223,6 +223,7 @@ static u64 notrace exynos4_read_sched_clock(void)
->>>       return exynos4_read_count_32();
->>>   }
->>>
->>> +#if defined(CONFIG_ARM)
->>>   static struct delay_timer exynos4_delay_timer;
->>>
->>>   static cycles_t exynos4_read_current_timer(void)
->>> @@ -231,14 +232,17 @@ static cycles_t exynos4_read_current_timer(void)
->>>                "cycles_t needs to move to 32-bit for ARM64 usage");
->>>       return exynos4_read_count_32();
->>>   }
->>> +#endif
->>>
->>>   static void __init exynos4_clocksource_init(void)
->>>   {
->>>       exynos4_mct_frc_start();
->>>
->>> +#if defined(CONFIG_ARM)
->>>       exynos4_delay_timer.read_current_timer = &exynos4_read_current_timer;
->>>       exynos4_delay_timer.freq = clk_rate;
->>>       register_current_timer_delay(&exynos4_delay_timer);
->>> +#endif
->>>
->>>       if (clocksource_register_hz(&mct_frc, clk_rate))
->>>           panic("%s: can't register clocksource\n", mct_frc.name);
+> > Could you take a moment to look at what is currently queued up in
+> > the sh73a0-multiplatform-for-v3.20 branch, which is based on this
+> > pull-request and see if you think any re-arrangement of that branch
+> > is in order.
 > 
+> You already have drivers-for-v3.20 as a separate branch this depends on.
+> The remaining commits are mostly DTS, except for (1)
 > 
+>     ARM: shmobile: sh73a0: Introduce generic setup callback
+>     ARM: shmobile: sh73a0: Add Multiplatform support
+> 
+> and (1)
+> 
+>     ARM: shmobile: kzm9g-reference: Remove board C code and DT file
+> 
+> (1) could be done in an SoC support code branch, as (codewise) it's independent
+> from the rest.
+> (2) could be done in a board removal branch, but it's only a single commit.
+> 
+> >From a functionality point of view, (1) (and all the rest in the branch) is a
+> dependency of (2), though.
+> 
+> So if no one complains, I'd leave it as-is. Splitting it up is not
+> gonna makes things
+> simpler when I submit my next series ;-)
+
+Thanks, for looking into this.
+I am inclined to leave things as is as you suggest.
