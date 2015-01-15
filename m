@@ -1,24 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Jan 2015 13:30:13 +0100
-Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <54B796A3.7040200@huawei.com>
-References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
- <1421253246.11734.17.camel@edumazet-glaptop2.roam.corp.google.com>
- <54B796A3.7040200@huawei.com>
-Message-ID: <1848773.hOchPbb3Eb@wuerfel>
+From: bart.tanghe@thomasmore.be (Bart Tanghe)
+Date: Thu, 15 Jan 2015 13:33:10 +0100
+Subject: [PATCH v4] ARM: dts: add bcm2835-pwm bindings
+Message-ID: <1421325190-7648-1-git-send-email-bart.tanghe@thomasmore.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 January 2015 18:29:55 Ding Tianhong wrote:
-> 
-> Yes, thanks, fix them later.
+To probe the bcm2835-pwm driver properly, this dts bindings has to be added 
+to the bcm2835 dtsi file.
+In expectation of a bcm2835 clock driver, I've added fixed-clock clock binding. 
+---
+Changes in v4:
+ - node added by reg value  
 
-Please note that now that as v13 has now shown up in net-next, I guess
-all other patches need to be based on top of what is already merged,
-and address one issue at a time.
+Signed-off-by: Bart Tanghe <bart.tanghe@thomasmore.be>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-There is one more issue I saw during build testing, which is the
-lack of a MODULE_LICENSE  statement for the main driver, although
-there is one in the mdio driver.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 3342cb1..e8a0f13 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -122,6 +123,14 @@
+ 			status = "disabled";
+ 		};
+ 
++                pwm: pwm at 7e20c000 {
++                        compatible = "brcm,bcm2835-pwm";
++                        reg = <0x7e20c000 0x28>;
++                        clocks = <&clk_pwm>;
++                        #pwm-cells = <2>;
++                        status = "disabled";
++                };
++
+ 		sdhci: sdhci at 7e300000 {
+ 			compatible = "brcm,bcm2835-sdhci";
+ 			reg = <0x7e300000 0x100>;
+@@ -179,5 +188,13 @@
+ 			clock-output-names = "spi";
+ 			clock-frequency = <250000000>;
+ 		};
++
++		clk_pwm: clock at 3 {
++			compatible = "fixed-clock";
++			reg = <3>;
++			#clock-cells = <0>;
++			clock-output-names = "pwm";
++			clock-frequency = <9200000>;
++		};
+ 	};
+ };
