@@ -1,83 +1,91 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Jan 2015 14:30:53 +0100
-Subject: [PATCH 00/12] Atmel matrix, SMC and UDC rework
-In-Reply-To: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421252524-24452-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B7C10D.1090008@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jan 2015 13:34:04 +0000
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <CAGTfZH0SQRyTMTmge6x2fXFBdVwtgJ_wcxK36mFrf6ZNPBn85w@mail.gmail.com>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+ <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
+ <54B7024C.4020407@samsung.com> <20150115112938.GB16217@leverpostej>
+ <CAGTfZH0Ve+icxc6FpMJhfNMRMqQASrcUmnrZw-6sYQz8rabC_A@mail.gmail.com>
+ <CAGTfZH0SQRyTMTmge6x2fXFBdVwtgJ_wcxK36mFrf6ZNPBn85w@mail.gmail.com>
+Message-ID: <20150115133404.GF16217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/01/2015 17:21, Alexandre Belloni a ?crit :
-> Hi Felipe,
+On Thu, Jan 15, 2015 at 12:52:38PM +0000, Chanwoo Choi wrote:
+> On Thu, Jan 15, 2015 at 9:46 PM, Chanwoo Choi <cwchoi00@gmail.com> wrote:
+> > Hi Mark,
+> >
+> > On Thu, Jan 15, 2015 at 8:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> On Wed, Jan 14, 2015 at 11:57:00PM +0000, Chanwoo Choi wrote:
+> >>> Hi Kukjin,
+> >>>
+> >>> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
+> >>> > On 01/14/2015 04:51 PM, Kukjin Kim wrote:
+> >>> >> On 01/14/15 14:33, Chanwoo Choi wrote:
+> >>> >>
+> >>> >> Hi,
+> >>> >>
+> >>> >> + Doug, Olof
+> >>> >>
+> >>> >>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+> >>> >>> for Exynos 32bit SoC.
+> >>> >>>
+> >>> >> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+> >>> >> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+> >>> >> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+> >>> >> implemented it and additionally its access is faster than using memory
+> >>> >> mapped register called SFR for MCT...so Doug submitted patch to use MCT
+> >>> >> on 32bit exynos SoCs before.
+> >>>
+> >>> I know arch_timer. As you comment, ARCH timer would be used for system timer for ARMv8.
+> >>> But, Exynos5433/Exynos7 (ARMv8) include MCT (Multi-Core Timer) IP. I checked it on
+> >>> Exynos5433/EXynos7 User-manaual and tested it.
+> >>>
+> >>> I think that exynos_mct.c should support the Exynos 64-bit SoC
+> >>> because Exynos5433/Exynos7 include already MCT (Multi-Core Timer) IP.
+> >>>
+> >>> Also, I have a problem to verify ARCH timer on Exynos SoC. Exynos User-manual never includes
+> >>> the detailed information about for ARCH timer(e.g, clock for ARCH timer). I knew that
+> >>> I can get the document of ARCH timer for ARM official site but I think it is insufficient
+> >>> to implement ARCH timer on Exynos SoC.
+> >>
+> >> What do you mean by "insufficient to implement ARCH timer"?
+> >
+> > As I knew, timer must need the source clock. The clock for ARCH timer
+> > has dependency on Exynos SoC, But I cannot find
 > 
-> The following series replace the previous series sent by Boris named:
->  - [PATCH v5 00/11] memory: add Atmel EBI (External Bus Interface) driver
->  - [PATCH 00/11] usb: gadget: at91_udc: Rework for multi-platform support
+> I'm so sorry about this mistake. I pressed the send button before
+> completing reply.
 > 
-> The patches I left out are less urgent and will be resent later, probably for
-> 3.21.
+> As I knew, timer must need the source clock. The clock for ARCH timer
+> has dependency on Exynos SoC, But I cannot find the clock information
+> for ARCH timer on Exynos SoC user-manual.
 > 
-> Because of the dependancy between the syscon addition and the at91_udc series,
-> this can go through the AT91 tree if you giv your ack on the udc patches.
+> When I tried to use ARCH timer on Exynos3250, It is not working. We
+> can check this ARCH timer issue of Exynos3250
+> on following patch[1]:
+> [1] http://www.spinics.net/lists/arm-kernel/msg322943.html
+
+Hmm. That is annoying. Your boot code should have been initialising this
+already.
+
+> >> The architected timer is mandatory in ARMv8, and required by the arm64
+> >> kernel.
+> >>
+> >> Additional timers may be requried if you want to put all CPUs into low
+> >> power states where the timer logic may be disabled and/or lose state,
+> >> but regardless the architected timers are necessary.
 > 
-> The first 4 patches introduce 2 syscon devices needed to configure the
-> matrix and SMC.
-> The following patches rework the at91_udc driver to prepare at91 for
-> multi-platform support.
+> I agree that ARCH timer is mandatory.
 > 
-> It also include several fixes:
->  - fix clock names to be consistent with other USB drivers
->  - document clocks and clock-names properties in atmel-usb DT bindings doc
-> 
-> and some cleanup changes:
->  - remove useless usb_clk
->  - allocate at91_udc instance instead of using the statically defined one
->  - simplify the probe and remove functions by using devm_ helpers
->  - remove !DT specific code
-> 
-> Changes from the previous series:
->  - rebased on 3.19-rc1
->
-> Boris Brezillon (12):
->   mfd: syscon: Add atmel-matrix registers definition
->   mfd: syscon: Add Atmel Matrix bus DT binding documentation
->   mfd: syscon: Add atmel-smc registers definition
->   mfd: syscon: Add Atmel SMC binding doc
+> I just think that existing exynos-mct.c driver should support the Exynos5/7 SoC
+> because released Exynos5/7 SoC includes already MCT IP for system timer.
 
-I already acknowledged these 4 patches as part of another series.
+I'm not opposed to the MCT. My only concern is that a configured and
+enabled architected timer is mandated by the boot protocol, and is a
+prerequisite for a functioning kernel. Your initial response made it
+sound like you expected the MCT alone to be sufficient.
 
->   usb: gadget: at91_udc: Fix clock names
->   usb: gadget: at91_udc: Drop uclk clock
->   usb: gadget: at91_udc: Document DT clocks and clock-names property
->   usb: gadget: at91_udc: Remove non-DT handling code
->   usb: gadget: at91_udc: Simplify probe and remove functions
->   usb: gadget: at91_udc: Rework for multi-platform kernel support
->   usb: gadget: at91_udc: Update DT binding documentation
->   usb: gadget: at91_udc: Allocate udc instance
-
-I'm fine with all this:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Great, I plan to add them all to the at91-3.20-drivers branch now.
-
-Thanks, best regards.
-
-
->  .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
->  .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
->  .../devicetree/bindings/usb/atmel-usb.txt          |  10 +-
->  drivers/usb/gadget/udc/Kconfig                     |   1 +
->  drivers/usb/gadget/udc/at91_udc.c                  | 525 +++++++++++----------
->  drivers/usb/gadget/udc/at91_udc.h                  |   9 +-
->  include/linux/mfd/syscon/atmel-matrix.h            | 117 +++++
->  include/linux/mfd/syscon/atmel-smc.h               | 173 +++++++
->  8 files changed, 623 insertions(+), 255 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
->  create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
->  create mode 100644 include/linux/mfd/syscon/atmel-smc.h
-> 
-
-
--- 
-Nicolas Ferre
+Thanks,
+Mark.
