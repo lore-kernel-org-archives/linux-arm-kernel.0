@@ -1,46 +1,120 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 15 Jan 2015 13:49:52 -0600
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54B819E0.1050508@redhat.com>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Thu, 15 Jan 2015 11:51:38 -0800
+Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <20150115060713.GA2694@dtor-ws>
+References: <jonathar@broadcom.com>
+ <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
+ <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
+ <20150115010256.GC9134@dtor-ws> <54B753C7.6000006@broadcom.com>
+ <20150115060713.GA2694@dtor-ws>
+Message-ID: <54B81A4A.9020905@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2015 09:04 AM, Hanjun Guo wrote:
-> Hi,
->
-> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+Hi Dmitry,
 
-> 1. Why we need ACPI on ARM64?
->
->    - Grant already posted a blog about this, and stated clearly
->      why we need ACPI on ARM64:
->
->      http://www.secretlab.ca/archives/151
->
->
-> 2. What we need to do before the arm64 ACPI core patches
->     could be merged into the kernel?
->
->    - Al Stone posted a TODO list and updates v2 for the
->      progress we made:
->      http://www.spinics.net/lists/arm-kernel/msg390069.html
->
->    - so from the progress we can see that we already finished
->      most of the items, and _OSI we got a plan to fix it, RFC
->      patch is on the way.
->
->
-> This patch set was tested on FVP by Fuwei, and booted ok as expected.
-> (No functional change since last version)
+On 15-01-14 10:07 PM, Dmitry Torokhov wrote:
+> On Wed, Jan 14, 2015 at 09:44:39PM -0800, Scott Branden wrote:
+>> On 15-01-14 05:02 PM, Dmitry Torokhov wrote:
+>>> Hi Jonathan,
+>>>
+>>> On Fri, Dec 19, 2014 at 02:17:49PM -0800, Jonathan Richardson wrote:
+>>>> +	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
+>>>> +		if (val < 1 || val > 256) {
+>>>> +			dev_err(dev, "scanning_period must be [1-256]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.scanning_period = val;
+>>>> +	}
+>>>> +
+>>>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
+>>>> +		if (val < 0 || val > 255) {
+>>>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.debounce_timeout = val;
+>>>> +	}
+>>>> +
+>>>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
+>>>> +		if (val < 0 || val > 11) {
+>>>> +			dev_err(dev, "settling_timeout must be [0-11]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.settling_timeout = val;
+>>>> +	}
+>>>> +
+>>>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
+>>>> +		if (val < 0 || val > 255) {
+>>>> +			dev_err(dev, "touch_timeout must be [0-255]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.touch_timeout = val;
+>>>> +	}
+>>>> +
+>>>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
+>>>> +		if (val < 0 || val > 8) {
+>>>> +			dev_err(dev, "average_data must be [0-8]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.average_data = val;
+>>>> +	}
+>>>> +
+>>>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
+>>>> +		if (val < 0 || val > 31) {
+>>>> +			dev_err(dev, "fifo_threshold must be [0-31]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.fifo_threshold = val;
+>>>> +	}
+>>>
+>>> I think these are dveice specific and thus should have "brcm," prefix.
+>> I'm confused as to why we need the brcm prefix?  Other device tree
+>> bindings we have for other drivers do not need such prefix.
+> 
+> Properties that are not standard on the system (reg, interrupts,
+> clkocks, etc) or subsystem level customarily carry the vendor prefix so
+> that they do not clash with newly added global or subsystem properties.
+> 
+>>  Is this
+>> convention documented somewhere?
+> 
+> Not sure. I glanced through Documentation/devicetree and do not see it
+> spelled out. Device tree overlords, what say you?
 
-For what it's worth, I applied these to the latest 3.19-rc4 kernel
-and booted that on an APM X-Gene and on pre-release AMD hardware.
-I then ran a couple of stress tests such as kernel compiles and
-filesystem stressers on the systems.
+Let me know. I haven't seen this before either. I will change the
+entries to use dashes though instead of underscores but will wait until
+these other issues are decided on before sending out another patch.
 
-I posted my tested-bys to the individual patches but Al Stone
-recommended I say how the testing was done.
+> 
+>>>
+>>>> +
+>>>> +	priv->ts_rotation = TS_ROTATION_0;
+>>>> +	if (of_property_read_u32(np, "ts-rotation", &val) >= 0) {
+>>>> +		priv->ts_rotation = val;
+>>>> +		dev_dbg(dev, "ts rotation [%d] degrees\n",
+>>>> +			90 * priv->ts_rotation);
+>>>> +	}
+>>>
+>>> This I am not quite sure about - if we want rotation or swap+invert. You
+>>> are CCed on another email (tsc2007) that talks about need of generic
+>>> touchscreen transforms in input core/of bindings.
+>> Does such generic binding exist today?  If not, I would like to go
+>> with this implementation and update to the new binding if/when it
+>> exists?
+> 
+> Not yet but there several people interested. I think we have enough time
+> till 3.20 to hash it out properly.
 
---Mark Langsdorf
+I think the rotation is simpler personally. Everyone would understand
+rotation refers to how it's oriented but I'm not sure everyone would
+immediately know how it is wired. Let me know what is decided and I'll
+make any changes required.
+
+Thanks,
+Jon
+
+
+> 
+> Thanks.
+> 
