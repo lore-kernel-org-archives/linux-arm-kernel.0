@@ -1,53 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Jan 2015 12:01:06 +0000
-Subject: [PATCH] arm64/efi: handle potential failure to remap memory map
-Message-ID: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 15 Jan 2015 13:07:05 +0100
+Subject: [PATCH v4 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
+In-Reply-To: <20150115084119.GN22880@pengutronix.de>
+References: <rjui@broadcom.com>
+ <1421274213-3544-1-git-send-email-rjui@broadcom.com>
+ <1421274213-3544-3-git-send-email-rjui@broadcom.com>
+ <20150115084119.GN22880@pengutronix.de>
+Message-ID: <20150115120704.GB2549@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When remapping the UEFI memory map using ioremap_cache(), we
-have to deal with potential failure. Note that, even if the
-common case is for ioremap_cache() to return the existing linear
-mapping of the memory map, we cannot rely on that to be always the
-case, e.g., in the presence of a mem= kernel parameter.
 
-At the same time, remove a stale comment and move the memmap code
-together.
+> > +	iproc_i2c->msg = msg;
+> Can it happen that iproc_i2c->msg still holds an uncompleted message
+> here or is this serialized by the core? Wolfram? Either here something
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+We have per-adapter locks serializing transfers, if you mean that?
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index a98415b5979c..c9cb0fbe7aa4 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -229,19 +229,21 @@ static int __init arm64_enable_runtime_services(void)
- 		return -1;
- 	}
- 
--	mapsize = memmap.map_end - memmap.map;
--
- 	if (efi_runtime_disabled()) {
- 		pr_info("EFI runtime services will be disabled.\n");
- 		return -1;
- 	}
- 
- 	pr_info("Remapping and enabling EFI services.\n");
--	/* replace early memmap mapping with permanent mapping */
-+
-+	mapsize = memmap.map_end - memmap.map;
- 	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
- 						   mapsize);
-+	if (!memmap.map) {
-+		pr_err("Failed to remap EFI memory map\n");
-+		return -1;
-+	}
- 	memmap.map_end = memmap.map + mapsize;
--
- 	efi.memmap = &memmap;
- 
- 	efi.systab = (__force void *)ioremap_cache(efi_system_table,
--- 
-1.8.3.2
+> > +static int bcm_iproc_i2c_cfg_speed(struct bcm_iproc_i2c_dev *iproc_i2c)
+> > +{
+> > +	unsigned int bus_speed, speed_bit;
+> > +	u32 val;
+> > +	int ret = of_property_read_u32(iproc_i2c->device->of_node,
+> > +				       "clock-frequency", &bus_speed);
+> > +	if (ret < 0) {
+> > +		dev_err(iproc_i2c->device,
+> > +			"missing clock-frequency property\n");
+> > +		return -ENODEV;
+> Is a missing property the only situation where of_property_read_u32
+> returns an error? Would it be sane to default to 100 kHz?
+
+Default of 100kHz instead of -ENODEV sounds very reasonable.
+
+> > +static int bcm_iproc_i2c_remove(struct platform_device *pdev)
+> > +{
+> > +	struct bcm_iproc_i2c_dev *iproc_i2c = platform_get_drvdata(pdev);
+> > +
+> > +	i2c_del_adapter(&iproc_i2c->adapter);
+> You need to free the irq before i2c_del_adapter.
+
+One could also keep using devm_request_irq and disable all interrupts
+sources here?
+
+Thanks for the reviews, Uwe!
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/a47a65af/attachment.sig>
