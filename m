@@ -1,37 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Jan 2015 18:35:03 +0000
-Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <1421136128.27675.58.camel@mtksdaap41>
-References: <cover.1421086706.git.robin.murphy@arm.com>
- <1421136128.27675.58.camel@mtksdaap41>
-Message-ID: <54B80857.7060407@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 15 Jan 2015 10:37:41 -0800
+Subject: [PATCH RESEND] reset: sunxi: fix spinlock initialization
+In-Reply-To: <1421141760.4519.5.camel@pengutronix.de> (Philipp Zabel's message
+ of "Tue, 13 Jan 2015 10:36:00 +0100")
+References: <1421078086-27946-1-git-send-email-tyler.baker@linaro.org>
+ <20150112161706.GO4891@lukather>
+ <20150112221325.GE22090@quad.lixom.net>
+ <1421141760.4519.5.camel@pengutronix.de>
+Message-ID: <7hd26fopoq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/15 08:02, Yingjoe Chen wrote:
-> On Mon, 2015-01-12 at 20:48 +0000, Robin Murphy wrote:
->> Hi all,
->>
->> Whilst it's a long way off perfect, this has reached the point of being
->> functional and stable enough to be useful, so here it is. The core
->> consists of the meat of the arch/arm implementation modified to remove
->> the assumption of PAGE_SIZE pages and ported over to the Intel IOVA
->> allocator instead of the bitmap-based one. For that, this series depends
->> on my "Genericise the IOVA allocator" series posted earlier[1].
+Philipp Zabel <p.zabel@pengutronix.de> writes:
+
+> Hi,
 >
-> Hi Robin,
+> Am Montag, den 12.01.2015, 14:13 -0800 schrieb Olof Johansson:
+>> On Mon, Jan 12, 2015 at 05:17:06PM +0100, Maxime Ripard wrote:
+>> > On Mon, Jan 12, 2015 at 07:54:46AM -0800, Tyler Baker wrote:
+>> > > Call spin_lock_init() before the spinlocks are used, both in early init 
+>> > > and probe functions preventing a lockdep splat.
+>> > > 
+>> > > I have been observing lockdep complaining [1] during boot on my a80 optimus [2]
+>> > > when CONFIG_PROVE_LOCKING has been enabled. This patch resolves the splat,
+>> > > and has been tested on a few other sunxi platforms without issue.
+>> > > 
+>> > > [1]
+>> > > http://storage.kernelci.org/next/next-20150107/arm-multi_v7_defconfig+CONFIG_PROVE_LOCKING=y/lab-tbaker/boot-sun9i-a80-optimus.html
+>> > > [2] http://kernelci.org/boot/?a80-optimus
+>> > > 
+>> > > Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>> > > Cc: <stable@vger.kernel.org>
+>> > 
+>> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> 
+>> Not entirely sure what to do with this one. You sent it to:arm at kernel.org, but
+>> it should probably have gone to Philipp?
+>> 
+>> We can pick it up with an ack from him though, no problem.
 >
-> We'd to give it a try. Do you have a public git tree contains both
-> series?
+> I have applied the patch here:
 >
-> Joe.C
+>     git://git.pengutronix.de/git/pza/linux reset/for_v3.19
+>
+> I was going to send a pull request tonight, but since I don't have any
+> other pending fixes besides this, and you already offered to pick it up,
+>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Now that the server seems to be properly accessible again, I've made a 
-branch with both series available here:
+Applied to arm-soc/fixes with ack from Philipp.
 
-   git://linux-arm.org/linux-rm iommu/dma
+Thanks,
 
-Note that in the current state it also depends on having the ARM SMMU 
-driver selected in the config, due to an oversight on my part :(
-
-Robin.
+Kevin
