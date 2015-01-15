@@ -1,77 +1,53 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 22:58:17 +0100
-Subject: [PATCH 14/17] ARM: at91: rework initialization for sama5 based boards
+Date: Thu, 15 Jan 2015 22:58:19 +0100
+Subject: [PATCH 16/17] ARM: at91: mark const init data with __initconst
+ instead of __initdata
 In-Reply-To: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421359100-8930-15-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421359100-8930-17-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed useless .map_io for sama5d3 and .init_early by moving
-at91_dt_initialize() to sama5*_dt_device_init()
+As long as there is no other non-const variable marked __initdata in the
+same compilation unit it doesn't hurt. If there were one however
+compilation would fail with
+
+	error: $variablename causes a section type conflict
+
+because a section containing const variables is marked read only and so
+cannot contain non-const variables.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/sama5d3.c | 9 ++-------
- arch/arm/mach-at91/sama5d4.c | 3 ++-
- 2 files changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/mach-at91/at91rm9200.c | 2 +-
+ arch/arm/mach-at91/at91sam9.c   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-at91/sama5d3.c b/arch/arm/mach-at91/sama5d3.c
-index 6f73a34cb7e4..752d1612ff1f 100644
---- a/arch/arm/mach-at91/sama5d3.c
-+++ b/arch/arm/mach-at91/sama5d3.c
-@@ -7,20 +7,17 @@
-  * Licensed under GPLv2 or later.
-  */
- 
--#include <linux/init.h>
- #include <linux/of_platform.h>
- 
- #include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--
--#include <mach/sama5d3.h>
--#include <mach/cpu.h>
- 
- #include "generic.h"
- 
- static void __init sama5_dt_device_init(void)
- {
- 	at91_sam9260_pm_init();
-+	at91_dt_initialize();
-+
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index 6992cc9ce902..a1d1e63fb405 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -46,7 +46,7 @@ static void __init rm9200_dt_device_init(void)
  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
  
-@@ -31,8 +28,6 @@ static const char *sama5_dt_board_compat[] __initconst = {
- 
- DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
- 	/* Maintainer: Atmel */
--	.map_io		= at91_map_io,
--	.init_early	= at91_dt_initialize,
- 	.init_machine	= sama5_dt_device_init,
- 	.dt_compat	= sama5_dt_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-at91/sama5d4.c b/arch/arm/mach-at91/sama5d4.c
-index 87c71afedb57..2f1ee08dc49f 100644
---- a/arch/arm/mach-at91/sama5d4.c
-+++ b/arch/arm/mach-at91/sama5d4.c
-@@ -52,6 +52,8 @@ static void __init sama5d4_map_io(void)
- static void __init sama5d4_dt_device_init(void)
- {
- 	at91_sam9260_pm_init();
-+	at91_dt_initialize();
-+
+-static const char *at91rm9200_dt_board_compat[] __initdata = {
++static const char *at91rm9200_dt_board_compat[] __initconst = {
+ 	"atmel,at91rm9200",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
+index 8b890644d6f0..0aeabcf4ddb8 100644
+--- a/arch/arm/mach-at91/at91sam9.c
++++ b/arch/arm/mach-at91/at91sam9.c
+@@ -24,7 +24,7 @@ static void __init sam9_dt_device_init(void)
  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
  
-@@ -63,7 +65,6 @@ static const char *sama5_alt_dt_board_compat[] __initconst = {
- DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5 (Device Tree)")
- 	/* Maintainer: Atmel */
- 	.map_io		= sama5d4_map_io,
--	.init_early	= at91_dt_initialize,
- 	.init_machine	= sama5d4_dt_device_init,
- 	.dt_compat	= sama5_alt_dt_board_compat,
- 	.l2c_aux_mask	= ~0UL,
+-static const char *at91_dt_board_compat[] __initdata = {
++static const char *at91_dt_board_compat[] __initconst = {
+ 	"atmel,at91sam9",
+ 	NULL
+ };
 -- 
 2.1.0
