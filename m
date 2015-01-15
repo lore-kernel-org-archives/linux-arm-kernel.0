@@ -1,95 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 12:52:09 +0100
-Subject: [PATCH] clocksource: timer-atmel-pit: don't suspend/resume if
- unused
-In-Reply-To: <54B7A767.9000205@linaro.org>
-References: <1418911523-28492-1-git-send-email-nicolas.ferre@atmel.com>
- <54B3D450.7050405@atmel.com> <54B3D88C.80702@linaro.org>
- <alpine.DEB.2.11.1501131143250.17382@nanos>
- <54B7A767.9000205@linaro.org>
-Message-ID: <20150115115209.GS3843@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Jan 2015 11:52:57 +0000
+Subject: [PATCH] ARM64: kernel: add support for cpu cache information
+In-Reply-To: <1420713754-13734-1-git-send-email-sudeep.holla@arm.com>
+References: <1420713754-13734-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150115115257.GA2329@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 08, 2015 at 10:42:34AM +0000, Sudeep Holla wrote:
+> This patch adds support for cacheinfo on ARM64.
+> 
+> On ARMv8, the cache hierarchy can be identified through Cache Level ID
+> (CLIDR) register while the cache geometry is provided by Cache Size ID
+> (CCSIDR) register.
+> 
+> Since the architecture doesn't provide any way of detecting the cpus
+> sharing particular cache, device tree is used for the same purpose.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-I'll do it but only if you review my other series :)
-
-On 15/01/2015 at 12:41:27 +0100, Daniel Lezcano wrote :
-> On 01/13/2015 11:47 AM, Thomas Gleixner wrote:
-> >On Mon, 12 Jan 2015, Daniel Lezcano wrote:
-> >
-> >>On 01/12/2015 03:04 PM, Nicolas Ferre wrote:
-> >>>Le 18/12/2014 15:05, Nicolas Ferre a ?crit :
-> >>>>From: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> >>>>
-> >>>>Waiting for PIT to stop counting takes a long time:
-> >>>>    1/(Master clock/prescaler/PIVR)
-> >>>>= 1/(133 MHz     /16       /2^20)
-> >>>>= 126 ms
-> >>>>
-> >>>>Up to 126 ms if master clock is set to 133 MHz, skipping suspend/resume
-> >>>>of the unused PIT device reduce (suspend time + resume time) from ~140 ms
-> >>>>to ~17 ms.
-> >>>>
-> >>>>Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> >>>>[nicolas.ferre at atmel.com: move to newer clocksource driver]
-> >>>>Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>>Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >>>>---
-> >>>>Hi Sylvain,
-> >>>>
-> >>>>I re-worked (and "Acked") your patch so it can be applied on the newer
-> >>>>Mainline
-> >>>>kernels. Beware, I changed the "subject line" as well. The PIT driver
-> >>>>moved
-> >>>>recently (3.18).
-> >>>>
-> >>>>Daniel,
-> >>>>Can you take this patch in your tree?
-> >>>
-> >>>Hi Daniel,
-> >>>
-> >>>Anything prevents this patch from being merged (aka ping ;-))?
-> >>
-> >>[Cc'ed tglx].
-> >>
-> >>Hi Nico,
-> >>
-> >>thanks for the head up.
-> >>
-> >>Nothing prevents it but I am wondering if this change shouldn't be in the
-> >>generic framework (kernel/time/clocksource.c and kernel/time/clockevents.c),
-> >>so all drivers will benefit this change ?
-> >
-> >Indeed. There is no point in calling suspend/resume for unused
-> >clockevents. They should be stopped and disabled already.
-> 
-> Hi Nico,
-> 
-> are you planning to do the change in the generic framework ?
-> 
-> Thanks
->   -- Daniel
-> 
-> >Now with clocksources this might be different. We have no explicit
-> >state for this, but its trivial to add one at least for those
-> >clocksources which have enable/disable callbacks. For the other ones
-> >not so much.
-> 
-> 
-> 
-> 
-> 
-> -- 
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-> 
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
-> 
+Thanks Sudeep. I'll queue this for 3.20.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
