@@ -1,70 +1,248 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Jan 2015 16:40:11 +0000
-Subject: [PATCH] arm64/efi: handle potential failure to remap memory map
-In-Reply-To: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150115164010.GK16217@leverpostej>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 15 Jan 2015 17:40:37 +0100
+Subject: [PATCH v3 7/8] clocksource: atmel-st: use syscon/regmap
+In-Reply-To: <1421077023-30954-8-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421077023-30954-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B7ED85.2090700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 12:01:06PM +0000, Ard Biesheuvel wrote:
-> When remapping the UEFI memory map using ioremap_cache(), we
-> have to deal with potential failure. Note that, even if the
-> common case is for ioremap_cache() to return the existing linear
-> mapping of the memory map, we cannot rely on that to be always the
-> case, e.g., in the presence of a mem= kernel parameter.
-> 
-> At the same time, remove a stale comment and move the memmap code
-> together.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-This should probably be picked up before my mem= patch, which I will be
-resending shortly. I'll mention that when posting.
-
-I guess Catalin should pick this up given the other portions are in the
-arm64 tree, and this falls under arch/arm64.
-
-Thanks,
-Mark.
-
+On 01/12/2015 04:37 PM, Alexandre Belloni wrote:
+> The register range from the system timer is also used by the watchdog driver.
+> Use a regmap to handle concurrent accesses.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->  arch/arm64/kernel/efi.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index a98415b5979c..c9cb0fbe7aa4 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -229,19 +229,21 @@ static int __init arm64_enable_runtime_services(void)
->  		return -1;
->  	}
->  
-> -	mapsize = memmap.map_end - memmap.map;
+>   drivers/clocksource/timer-atmel-st.c | 103 +++++++++++++----------------------
+>   1 file changed, 39 insertions(+), 64 deletions(-)
+>
+> diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
+> index ed0267f1c892..557389306be5 100644
+> --- a/drivers/clocksource/timer-atmel-st.c
+> +++ b/drivers/clocksource/timer-atmel-st.c
+> @@ -24,20 +24,20 @@
+>   #include <linux/irq.h>
+>   #include <linux/clockchips.h>
+>   #include <linux/export.h>
+> -#include <linux/of.h>
+> -#include <linux/of_address.h>
+> +#include <linux/mfd/atmel-st.h>
+> +#include <linux/mfd/syscon.h>
+>   #include <linux/of_irq.h>
+> +#include <linux/regmap.h>
+>
+>   #include <asm/mach/time.h>
+>   #include <asm/system_misc.h>
+>
+> -#include <mach/at91_st.h>
+> -#include <mach/hardware.h>
 > -
->  	if (efi_runtime_disabled()) {
->  		pr_info("EFI runtime services will be disabled.\n");
->  		return -1;
->  	}
->  
->  	pr_info("Remapping and enabling EFI services.\n");
-> -	/* replace early memmap mapping with permanent mapping */
+>   static unsigned long last_crtr;
+>   static u32 irqmask;
+>   static struct clock_event_device clkevt;
+> +static struct regmap *regmap_st;
+>
+> +#define AT91_SLOW_CLOCK		32768 /* DT compatibility */
+>   #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
+>
+>   /*
+> @@ -47,11 +47,11 @@ static struct clock_event_device clkevt;
+>    */
+>   static inline unsigned long read_CRTR(void)
+>   {
+> -	unsigned long x1, x2;
+> +	unsigned int x1, x2;
+>
+> -	x1 = at91_st_read(AT91_ST_CRTR);
+> +	regmap_read(regmap_st, AT91_ST_CRTR, &x1);
+>   	do {
+> -		x2 = at91_st_read(AT91_ST_CRTR);
+> +		regmap_read(regmap_st, AT91_ST_CRTR, &x2);
+>   		if (x1 == x2)
+>   			break;
+>   		x1 = x2;
+> @@ -64,7 +64,10 @@ static inline unsigned long read_CRTR(void)
+>    */
+>   static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+>   {
+> -	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
+> +	u32 sr;
 > +
-> +	mapsize = memmap.map_end - memmap.map;
->  	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
->  						   mapsize);
-> +	if (!memmap.map) {
-> +		pr_err("Failed to remap EFI memory map\n");
-> +		return -1;
-> +	}
->  	memmap.map_end = memmap.map + mapsize;
+> +	regmap_read(regmap_st, AT91_ST_SR, &sr);
+> +	sr &= irqmask;
+>
+>   	/*
+>   	 * irqs should be disabled here, but as the irq is shared they are only
+> @@ -97,7 +100,7 @@ static struct irqaction at91rm9200_timer_irq = {
+>   	.name		= "at91_tick",
+>   	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+>   	.handler	= at91rm9200_timer_interrupt,
+> -	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+> +	.irq		= 0,
+>   };
+>
+>   static cycle_t read_clk32k(struct clocksource *cs)
+> @@ -116,23 +119,25 @@ static struct clocksource clk32k = {
+>   static void
+>   clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+>   {
+> +	unsigned int val;
+> +
+>   	/* Disable and flush pending timer interrupts */
+> -	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
+> -	at91_st_read(AT91_ST_SR);
+> +	regmap_write(regmap_st, AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
+> +	regmap_read(regmap_st, AT91_ST_SR, &val);
+>
+>   	last_crtr = read_CRTR();
+>   	switch (mode) {
+>   	case CLOCK_EVT_MODE_PERIODIC:
+>   		/* PIT for periodic irqs; fixed rate of 1/HZ */
+>   		irqmask = AT91_ST_PITS;
+> -		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
+> +		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
+>   		break;
+>   	case CLOCK_EVT_MODE_ONESHOT:
+>   		/* ALM for oneshot irqs, set by next_event()
+>   		 * before 32 seconds have passed
+>   		 */
+>   		irqmask = AT91_ST_ALMS;
+> -		at91_st_write(AT91_ST_RTAR, last_crtr);
+> +		regmap_write(regmap_st, AT91_ST_RTAR, last_crtr);
+>   		break;
+>   	case CLOCK_EVT_MODE_SHUTDOWN:
+>   	case CLOCK_EVT_MODE_UNUSED:
+> @@ -140,7 +145,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+>   		irqmask = 0;
+>   		break;
+>   	}
+> -	at91_st_write(AT91_ST_IER, irqmask);
+> +	regmap_write(regmap_st, AT91_ST_IER, irqmask);
+>   }
+>
+>   static int
+> @@ -148,6 +153,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+>   {
+>   	u32		alm;
+>   	int		status = 0;
+> +	unsigned int	val;
+>
+>   	BUG_ON(delta < 2);
+>
+> @@ -163,12 +169,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+>   	alm = read_CRTR();
+>
+>   	/* Cancel any pending alarm; flush any pending IRQ */
+> -	at91_st_write(AT91_ST_RTAR, alm);
+> -	at91_st_read(AT91_ST_SR);
+> +	regmap_write(regmap_st, AT91_ST_RTAR, alm);
+> +	regmap_read(regmap_st, AT91_ST_SR, &val);
+>
+>   	/* Schedule alarm by writing RTAR. */
+>   	alm += delta;
+> -	at91_st_write(AT91_ST_RTAR, alm);
+> +	regmap_write(regmap_st, AT91_ST_RTAR, alm);
+>
+>   	return status;
+>   }
+> @@ -186,47 +192,8 @@ static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
+>   	/*
+>   	 * Perform a hardware reset with the use of the Watchdog timer.
+>   	 */
+> -	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
+> -	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
+> -}
 > -
->  	efi.memmap = &memmap;
->  
->  	efi.systab = (__force void *)ioremap_cache(efi_system_table,
-> -- 
-> 1.8.3.2
-> 
-> 
+> -void __iomem *at91_st_base;
+> -EXPORT_SYMBOL_GPL(at91_st_base);
+> -
+> -static struct of_device_id at91rm9200_st_timer_ids[] = {
+> -	{ .compatible = "atmel,at91rm9200-st" },
+> -	{ /* sentinel */ }
+> -};
+> -
+> -static int __init of_at91rm9200_st_init(void)
+> -{
+> -	struct device_node *np;
+> -	int ret;
+> -
+> -	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
+> -	if (!np)
+> -		goto err;
+> -
+> -	at91_st_base = of_iomap(np, 0);
+> -	if (!at91_st_base)
+> -		goto node_err;
+> -
+> -	/* Get the interrupts property */
+> -	ret = irq_of_parse_and_map(np, 0);
+> -	if (!ret)
+> -		goto ioremap_err;
+> -	at91rm9200_timer_irq.irq = ret;
+> -
+> -	of_node_put(np);
+> -
+> -	return 0;
+> -
+> -ioremap_err:
+> -	iounmap(at91_st_base);
+> -node_err:
+> -	of_node_put(np);
+> -err:
+> -	return -EINVAL;
+> +	regmap_write(regmap_st, AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
+> +	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+>   }
+>
+>   /*
+> @@ -234,13 +201,21 @@ err:
+>    */
+>   static void __init atmel_st_timer_init(struct device_node *node)
+>   {
+> -	/* For device tree enabled device: initialize here */
+> -	of_at91rm9200_st_init();
+> +	unsigned int val;
+> +
+> +	regmap_st = syscon_node_to_regmap(node);
+> +	if (IS_ERR(regmap_st))
+> +		panic(pr_fmt("Unable to get regmap\n"));
+
+Is it possible to get ride of those panics ? IIRC, we discussed to not 
+panic when a timer was not initialized in case there is a definition for 
+another one.
+
+>
+>   	/* Disable all timer interrupts, and clear any pending ones */
+> -	at91_st_write(AT91_ST_IDR,
+> +	regmap_write(regmap_st, AT91_ST_IDR,
+>   		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
+> -	at91_st_read(AT91_ST_SR);
+> +	regmap_read(regmap_st, AT91_ST_SR, &val);
+> +
+> +	/* Get the interrupts property */
+> +	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
+> +	if (!at91rm9200_timer_irq.irq)
+> +		panic(pr_fmt("Unable to get IRQ from DT\n"));
+>
+>   	/* Make IRQs happen for the system timer */
+>   	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
+> @@ -249,7 +224,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
+>   	 * directly for the clocksource and all clockevents, after adjusting
+>   	 * its prescaler from the 1 Hz default.
+>   	 */
+> -	at91_st_write(AT91_ST_RTMR, 1);
+> +	regmap_write(regmap_st, AT91_ST_RTMR, 1);
+>
+>   	/* Setup timer clockevent, with minimum of two ticks (important!!) */
+>   	clkevt.cpumask = cpumask_of(0);
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
