@@ -1,132 +1,102 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Jan 2015 16:06:35 +0000
-Subject: [PATCH 5/9] dts: versatile: add sysregs nodes
-In-Reply-To: <CAL_JsqKBLx03E1w0NMH8CH+Pm_L8yQvnR6VTTDxqnpOwAoDhXg@mail.gmail.com>
-References: <1419967718-26909-1-git-send-email-robherring2@gmail.com>
- <1419967718-26909-6-git-send-email-robherring2@gmail.com>
- <CACRpkdbinR3Uvi5zZmQJFxJgnWfvE6JZouMVxxRRGVtMNXkBQQ@mail.gmail.com>
- <CAL_JsqKBLx03E1w0NMH8CH+Pm_L8yQvnR6VTTDxqnpOwAoDhXg@mail.gmail.com>
-Message-ID: <20150115160635.GA1576@red-moon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 16 Jan 2015 00:09:01 +0800
+Subject: [linux-sunxi] Re: [PATCH v3 05/13] ARM: dts: sun9i: Add
+ clock-indices property for bus gate clocks
+In-Reply-To: <20150115155156.GA1837@lukather>
+References: <1421113055-17867-1-git-send-email-wens@csie.org>
+ <1421113055-17867-6-git-send-email-wens@csie.org>
+ <20150114163351.GY4891@lukather>
+ <CAGb2v64brc_2c5Jz2=BzfCpwiwBQgGf=SLD2ib+taOYUgicekA@mail.gmail.com>
+ <20150115152026.GA1135@lukather>
+ <CAGb2v65g-HMH5ezGd29SxSNCA6J5H6Q1X1H3rLKh0=nqdHDgMA@mail.gmail.com>
+ <20150115155156.GA1837@lukather>
+Message-ID: <CAGb2v67x=NP8SX9bLqvKg-=-TM4EwU3fNppaxo0HP7fO=gDGjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 08, 2015 at 11:53:15PM +0000, Rob Herring wrote:
-> Adding VExpress maintainers...
-> 
-> On Thu, Jan 8, 2015 at 1:44 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Tue, Dec 30, 2014 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
-> >
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> The Versatile boards have the same sysregs as other ARM Ltd boards. Add
-> >> the nodes in preparation to enable support for 24MHz counter as
-> >> sched_clock and MMC card detect and write protect support.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >>  arch/arm/boot/dts/versatile-ab.dts | 23 +++++++++++++++++++++++
-> >>  1 file changed, 23 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-> >> index 27d0d9c..62f04b0 100644
-> >> --- a/arch/arm/boot/dts/versatile-ab.dts
-> >> +++ b/arch/arm/boot/dts/versatile-ab.dts
-> >> @@ -252,6 +252,29 @@
-> >>                         #size-cells = <1>;
-> >>                         ranges = <0 0x10000000 0x10000>;
-> >>
-> >> +                       sysreg at 0 {
-> >> +                               compatible = "arm,vexpress-sysreg";
-> >
-> > vexpress? No...
-> 
-> Compatible with yes. Should perhaps be '"arm,versatile-sysreg",
-> "arm,vexpress-sysreg"' instead. Kind of backwards, as really the
-> versatile came first, but it would work. Or we just need another match
-> entry in the kernel.
+On Thu, Jan 15, 2015 at 11:51 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Jan 15, 2015 at 11:35:42PM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Jan 15, 2015 at 11:20 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Thu, Jan 15, 2015 at 10:24:04AM +0800, Chen-Yu Tsai wrote:
+>> >> On Thu, Jan 15, 2015 at 12:33 AM, Maxime Ripard
+>> >> <maxime.ripard@free-electrons.com> wrote:
+>> >> > On Tue, Jan 13, 2015 at 09:37:27AM +0800, Chen-Yu Tsai wrote:
+>> >> >> of_clk_get_parent_name() uses the clock-indices property to resolve
+>> >> >> clock phandle arguments in case that the argument index does not
+>> >> >> match the clock-output-names sequence.
+>> >> >>
+>> >> >> This is the case on sunxi, where we use the actual bit index as the
+>> >> >> argument to the phandle. Add the clock-indices property so that
+>> >> >> of_clk_get_parent_name() resolves the names correctly.
+>> >> >>
+>> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >> >
+>> >> > Applied. Are the mask in the clock driver still of any use now? I
+>> >> > don't think they are, and if we're going that way, I'd rather have
+>> >> > them removed from the driver.
+>> >>
+>> >> Yes they are still passed through factors_data, for mux_clk_ops to
+>> >> know about the width of the mux, which is 3 bits on older SoCs vs
+>> >> 4 bits on sun9i.
+>> >
+>> > Erm.... These are gates. They are not muxable and are not handled
+>> > through clk-factors, so I'm not sure how it is relevant :)
+>>
+>> Sorry. I jumped to the mux mask stuff. Yes the gate masks are still
+>> used, and the gates are still referenced by the bit offset.
+>>
+>> As described in the commit message, clock-indices is used by
+>> of_clk_get_parent_name() to match the index used in the phandle
+>> to the correct name in clock-names.
+>>
+>> Take apb1 for example:
+>>
+>>                        clock-indices = <0>, <1>, <2>, <3>, <4>,
+>>                                        <16>, <17>, <18>, <19>, <20>, <21>;
+>>                        clock-output-names = "apb1_i2c0", "apb1_i2c1",
+>>                                        "apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
+>>                                        "apb1_uart0", "apb1_uart1", ...
+>>
+>> If we have "clocks = <&apb1 16>;" in some device, and we call
+>> of_clk_get_parent_name() on said clock, it would try to get
+>> clock_output_names[16], which obviously is the wrong one.
+>>
+>> With clock-indices, of_clk_get_parent_name first looks at
+>> that array, finds an entry matching 16, then uses the
+>> index of the matching entry to get the name from
+>> clock-output-names.
+>
+> Yeah, I know what it does, and we do agree on the fact that it's
+> needed.
+>
+>> So, we are still using the gate bitmask to declare valid
+>> clock gates. The sunxi driver does not use clock-indices
+>> directly. Nor do I think it was intended to be used by
+>> clock drivers directly.
+>
+> However, the gate bitmask itself carries exactly the same information
+> than clock-indices. It's the exact same list of numbers, just with two
+> different ways of defining it.
+>
+> If we go with clock-indices, which is the right solution, then we can
+> just drop the other one.
+>
+> I actually started to do just this last evening. A31 boots without any
+> gates bit mask but the USB clocks one so far, I intend on converting
+> the others as well.
 
-versatile and vexpress sys registers are not compatible, so they should
-not be treated as such.
+So as I understand, you want to replace the masks in the clock drivers
+with clock-indices in the dt. Is this correct? This potentially makes
+the gates clock driver very generic, which is nice.
 
-Actually, versatile regs are not managed by a single entity driver
-in the kernel, so basically I really think you should not leave
+I only see drivers/clk/shmobile/clk-mstp.c using it this way though.
+Didn't we have this for sun6i-apb0-gates at one time?
 
-"arm,vexpress-sysreg"
+I'm not against it. Just want to make sure everyone agrees, and we
+can work who and how we're going about this.
 
-in the compatible list.
 
-> I copied this whole chunk as is from VExpress and verified these sub
-> nodes are all the same hence why it is here.
-> 
-> > compatible = "syscon";
-> 
-> maybe? VExpress is missing that then...
-
-vexpress-sysreg is more than a "syscon" interface, so we can't match
-on it, it would be wrong.
-
-> 
-> >> +                               reg = <0x00000 0x1000>;
-> >> +
-> >> +                               v2m_led_gpios: sys_led at 08 {
-> >> +                                       compatible = "arm,vexpress-sysreg,sys_led";
-> >> +                                       gpio-controller;
-> >> +                                       #gpio-cells = <2>;
-> >> +                               };
-> >
-> > These are not GPIOs. These are LED registers really.
-> 
-> A register bit that controls an i/o signal sounds like a GPIO to me.
-
-To me too. I agree that definining a gpio-controller for every possible
-gpio pin would soon get unwieldy, but hey, the choice made for vexpress
-leds makes perfect sense to me, after all they are gpio signals
-connected to leds, and there is a driver for that in the kernel:
-
-drivers/leds/leds-gpio.c
-
-we could move this stuff to syscon-leds, but honestly I think is one of those
-things we could argue forever about that.
-
-> > see how to use LEDs from drivers/leds/leds-syscon.c and bindings.
-> > example in:
-> > arch/arm/boot/dts/integrator.dtsi
-> >
-> > Very straight-forward I think.
-> 
-> So we have 2 implementations and bindings for roughly the same hardware? Great!
-
-See above.
-
-> >> +                               v2m_mmc_gpios: sys_mci at 48 {
-> >> +                                       compatible = "arm,vexpress-sysreg,sys_mci";
-> >> +                                       gpio-controller;
-> >> +                                       #gpio-cells = <2>;
-> >> +                               };
-> >> +
-> >> +                               v2m_flash_gpios: sys_flash at 4c {
-> >> +                                       compatible = "arm,vexpress-sysreg,sys_flash";
-> >> +                                       gpio-controller;
-> >> +                                       #gpio-cells = <2>;
-> >> +                               };
-> >
-> > I don't have drivers for these "gpio controllers" and I don't think they are
-> > GPIOs either, since they are not general purpose at all.
-> 
-> They are only general purpose until you connect the i/o lines to
-> something. But yes, if we went around making every misc internal
-> control line in SOCs a 1-bit GPIO controller that would be pretty
-> crazy.
-> 
-> Anyway, most of this is not actually used ATM on Versatile, but it is
-> present in VExpress. I added it only for sched_clock. We need to
-> resolve this with VExpress platforms, but it's already in use for MMC
-> and LEDs.
-
-I did not get what you meant here, in particular which bits you want us
-to fix/change/update on vexpress.
-
-Thanks,
-Lorenzo
+Thanks
+ChenYu
