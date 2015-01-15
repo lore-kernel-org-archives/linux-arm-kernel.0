@@ -1,52 +1,87 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 22:58:07 +0100
-Subject: [PATCH 04/17] ARM: at91: fix sam9n12 and sam9x5 arm_pm_idle
+Date: Thu, 15 Jan 2015 22:58:09 +0100
+Subject: [PATCH 06/17] ARM: at91: remove unused at91_ioremap_matrix and header
 In-Reply-To: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421359100-8930-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421359100-8930-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421359100-8930-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sam9n12 and sam9x5 don't set arm_pm_idle because of an oversight, fix that.
+at91_ioremap_matrix and the at91_matrix.h header are not used anymore, remove
+them.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-at91/at91sam9n12.c | 5 +++++
- arch/arm/mach-at91/at91sam9x5.c  | 6 ++++++
- 2 files changed, 11 insertions(+)
+ arch/arm/mach-at91/generic.h                  |  4 ----
+ arch/arm/mach-at91/include/mach/at91_matrix.h | 23 -----------------------
+ arch/arm/mach-at91/setup.c                    | 10 ----------
+ 3 files changed, 37 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
 
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index b5ea69a3eaf6..276b8f0e4183 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -15,6 +15,11 @@
- /* --------------------------------------------------------------------
-  *  AT91SAM9N12 processor initialization
-  * -------------------------------------------------------------------- */
-+static void __init at91sam9n12_initialize(void)
-+{
-+	arm_pm_idle = at91sam9_idle;
-+}
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 44fc725edcf1..1e60faec2eba 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -28,10 +28,6 @@ extern void at91rm9200_timer_init(void);
+ extern void at91rm9200_idle(void);
+ extern void at91sam9_idle(void);
  
- AT91_SOC_START(at91sam9n12)
-+	.init = at91sam9n12_initialize,
- AT91_SOC_END
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 7b60a529db01..7b6fb1bca505 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -16,5 +16,11 @@
-  *  AT91SAM9x5 processor initialization
-  * -------------------------------------------------------------------- */
+-/* Matrix */
+-extern void at91_ioremap_matrix(u32 base_addr);
+-
+-
+ #ifdef CONFIG_PM
+ extern void __init at91_rm9200_pm_init(void);
+ extern void __init at91_sam9260_pm_init(void);
+diff --git a/arch/arm/mach-at91/include/mach/at91_matrix.h b/arch/arm/mach-at91/include/mach/at91_matrix.h
+deleted file mode 100644
+index f8996c954131..000000000000
+--- a/arch/arm/mach-at91/include/mach/at91_matrix.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * Under GPLv2
+- */
+-
+-#ifndef __MACH_AT91_MATRIX_H__
+-#define __MACH_AT91_MATRIX_H__
+-
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_matrix_base;
+-
+-#define at91_matrix_read(field) \
+-	__raw_readl(at91_matrix_base + field)
+-
+-#define at91_matrix_write(field, value) \
+-	__raw_writel(value, at91_matrix_base + field)
+-
+-#else
+-.extern at91_matrix_base
+-#endif
+-
+-#endif /* __MACH_AT91_MATRIX_H__ */
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 4c184285d38f..88649dee830e 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -351,16 +351,6 @@ void __init at91_alt_map_io(void)
+ 		at91_boot_soc.map_io();
+ }
  
-+static void __init at91sam9x5_initialize(void)
-+{
-+	arm_pm_idle = at91sam9_idle;
-+}
-+
- AT91_SOC_START(at91sam9x5)
-+	.init = at91sam9x5_initialize,
- AT91_SOC_END
+-void __iomem *at91_matrix_base;
+-EXPORT_SYMBOL_GPL(at91_matrix_base);
+-
+-void __init at91_ioremap_matrix(u32 base_addr)
+-{
+-	at91_matrix_base = ioremap(base_addr, 512);
+-	if (!at91_matrix_base)
+-		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+-}
+-
+ static struct of_device_id ramc_ids[] = {
+ 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
+ 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
 -- 
 2.1.0
