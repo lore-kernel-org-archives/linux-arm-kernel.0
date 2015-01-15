@@ -1,55 +1,52 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 15 Jan 2015 20:56:21 +0800
-Subject: [PATCH net-next v13 0/3] add hisilicon hip04 ethernet driver
-In-Reply-To: <54B7B4E7.8030108@suse.de>
-References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
- <54B642B4.8010807@suse.de> <54B77C43.6010200@huawei.com>
- <14674609.dERhba4yMV@wuerfel> <54B7B4E7.8030108@suse.de>
-Message-ID: <54B7B8F5.6060808@huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 15 Jan 2015 14:08:00 +0100
+Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
+In-Reply-To: <20150115124251.GE16217@leverpostej>
+References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
+ <20150112194440.GB26222@cbox> <20150115124251.GE16217@leverpostej>
+Message-ID: <CAMJs5B-Ybrf7GQ+u70Z8bDCh7uHTwwCQa6Q3dh2BoL5qaUtOUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/1/15 20:39, Alexander Graf wrote:
-> 
-> 
-> On 15.01.15 10:42, Arnd Bergmann wrote:
->> On Thursday 15 January 2015 16:37:23 Ding Tianhong wrote:
->>> On 2015/1/14 18:19, Alexander Graf wrote:
->>>>
->>>> >From a 10000 feet perspective it looks like two problems to me
->>>>
->>>>   1) Allocation failure doesn't get handled properly somewhere
+On Thu, Jan 15, 2015 at 1:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Jan 12, 2015 at 07:44:40PM +0000, Christoffer Dall wrote:
+>> On Mon, Jan 12, 2015 at 04:45:13PM +0000, Mark Rutland wrote:
+>> > Currently we have two sets of macros used for ESR_ELx handling, one used
+>> > by core arm64 code and the other used by KVM. These differ slightly in
+>> > naming convention and style of definition.
+>> >
+>> > This patch series introduces and migrates all users to a common set of
+>> > macros for ESR_ELx handling, preventing further drift.
+>> >
+>> > Additionally this series adds exception class decoding when reporting
+>> > exceptions, saving deveopers from having to perform tedious mental
+>> > arithmetic to figure out what the likely cause of an unexpected
+>> > exception was.
+>> >
+>> > Since v1 [1]:
+>> > * Reorder patches to maintain KVM bisectability.
+>> > * Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
+>> > * Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of
+>> >   kvm_vcpu_dabt_get_as.
+>> > * Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
+>> >   list.
+>> >
+>> For the series:
 >>
->> This is the bug that Eric pointed out as well.
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 >>
->>>>   2) We fail to allocate with order=0 - I don't see why
->>
->> GFP_ATOMIC. When allocating from a the napi poll function in softirq
->> context, you have to use nonblocking allocations, which occasionally
->> fail. This should not cause any harm other than dropped packets.
->>
->>> is it easy to repetition this bug? how big is your memory on your board,
->>> is it happened in your previous hip04 driver?
->>
->> It should be independent of memory size, but may be more likely if you
->> don't have swap space configured.
-> 
-> With the previous driver I was unable to get this far - I ended up in
-> random memory corruption and had a ~90% packet loss after about an hour
-> of uptime.
-> 
-> I'm not sure whether it's easy to reproduce, I merely started up a few
-> VMs, did some disk I/O and started to compile QEMU in the background ;).
-> 
-> I'll happily give your follow up patch that's going to fix the memory
-> allocation problems a try though.
-> 
-Thanks for your work, I am sure we could make it much more better:)
+>> I also tested this with KVM on APM XGene and Juno with UEFI+Linux as a
+>> guest.
+>
+> Thanks, Christoffer. It's much appreciated.
+>
+> Catalin, Christoffer, do you have a preferred path for merging this?
+> Should this go through the arm64 or KVM tree as a whole?
+>
+Would make sense to merge it as whole.  I don't care which path, let's
+just minimize conflicts. For big things, I have GICv3, dirty page
+logging, and Marc's fixes, but they shouldn't touch much of the same
+code (maybe the same files, but I don't think the same lines), so it's
+up to you Catalin?
 
-Ding
-
-> 
-> Alex
-> 
-> .
-> 
+-Christoffer
