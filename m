@@ -1,105 +1,117 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Thu, 15 Jan 2015 10:45:32 +0100
-Subject: [PATCH] ARM: clk: add clk-asm9260 driver
-In-Reply-To: <20150114230217.22722.88458@quantum>
-References: <1417187120-23659-1-git-send-email-linux@rempel-privat.de>
- <1420707567-22760-1-git-send-email-linux@rempel-privat.de>
- <1420707567-22760-2-git-send-email-linux@rempel-privat.de>
- <20150114230217.22722.88458@quantum>
-Message-ID: <54B78C3C.1080109@rempel-privat.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Jan 2015 10:51:44 +0100
+Subject: [PATCH v2 2/5] drivers/rtc/rtc-armada38x: Add a new RTC driver
+ for recent mvebu SoCs
+In-Reply-To: <871tmxrsj8.fsf@natisbad.org>
+References: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>	<1421257155-3379-3-git-send-email-gregory.clement@free-electrons.com>
+ <871tmxrsj8.fsf@natisbad.org>
+Message-ID: <54B78DB0.5050808@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.01.2015 um 00:02 schrieb Mike Turquette:
-> Quoting Oleksij Rempel (2015-01-08 00:59:27)
->> diff --git a/drivers/clk/clk-asm9260.c b/drivers/clk/clk-asm9260.c
->> new file mode 100644
->> index 0000000..6b1c220
->> --- /dev/null
->> +++ b/drivers/clk/clk-asm9260.c
-> 
-> <snip>
-> 
->> +static const char *clk_names[] = {
->> +       [REFCLK]        = "oscillator",
->> +       [SYSPLL]        = "pll",
->> +       [I2S0_MCLK]     = "i2s0_mclk",
->> +       [I2S1_MCLK]     = "i2s1_mclk",
->> +       [RTC_OSC]       = "rtc_osc",
->> +       [USB_PLL]       = "usb_pll",
->> +};
-> 
-> Why keep this list of names? Only clk_names[REFCLK] is used below and it
-> is overwritten by the name supplied by DT.
+Hi Arnaud,
+[...]
 
-Ok.
-
-> <snip>
-> 
->> +static void __init asm9260_acc_init(struct device_node *np)
+>> +/*
+>> + * According to the datasheet, we need to wait for 5us only between
+>> + * two consecutive writes
+>> + */
+>> +static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
 >> +{
->> +       struct clk *clk;
->> +       u32 rate;
->> +       int n;
->> +       u32 accuracy = 0;
->> +
->> +       base = of_io_request_and_map(np, 0, np->name);
->> +       if (!base)
->> +               panic("%s: unable to map resource", np->name);
->> +
->> +       /* register pll */
->> +       rate = (ioread32(base + HW_SYSPLLCTRL) & 0xffff) * 1000000;
->> +
->> +       clk_names[REFCLK] = of_clk_get_parent_name(np, 0);
->> +       accuracy = clk_get_accuracy(__clk_lookup(clk_names[REFCLK]));
->> +       clk = clk_register_fixed_rate_with_accuracy(NULL, clk_names[SYSPLL],
->> +                       clk_names[REFCLK], 0, rate, accuracy);
-> 
-> This is different. Why do the PLLs inherit REFCLKs accuracy? Please see
-> __clk_recalc_accuracies in drivers/clk/clk.c if you haven't already. We
-> propagate accuracy through the clock tree already.
-
-clk_register_fixed_rate overwrite accuracy to 0. If i use
-clk_register_fixed_rate, then half of my clocks has accuracy = 0.
-
->> +
->> +       if (IS_ERR(clk))
->> +               panic("%s: can't register REFCLK. Check DT!", np->name);
->> +
-
-<snip>
-
->> +
->> +       /* register clk-provider */
->> +       clk_data.clks = clks;
->> +       clk_data.clk_num = MAX_CLKS;
->> +       of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->> +       return;
->> +fail:
->> +       iounmap(base);
+>> +	writel(val, rtc->regs + offset);
+>> +	udelay(5);
 >> +}
->> +CLK_OF_DECLARE(asm9260_acc, "alphascale,asm9260-clock-controller",
->> +               asm9260_acc_init);
 > 
-> Where is the DT binding definition for this clock provider?
+> The thing I do not get is how you can guarantee that an undelayed
+> writel() in a function will not be followed less than 5?s later by
+> another writel() in another function. For instance:
 > 
-> Thanks,
-> Mike
+>   1) a call to set_alarm() followed by a call to alarm_irq_enable().
+>   2) some writel() or even rtc_udelayed_write() w/ sth asynchronous
+>     occuring like your interrupt handler just after that.
 > 
+> I guess it may be possible to make assumptions on the fact that the
+> amount of code before a writel() or rtc_udelayed_write() may prevent
+> such scenario but it's difficult to tell, all the more w/ a spinlock
+> before the writel() in irq_enable().
+> 
+> Considering the description of the bug, why not doing the following:
+> 
+>  1) implement rtc_delayed_write() a bit differently:
+> 
+>     static inline void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
+>     {
+> 	udelay(5);
+> 	writel(val, rtc->regs + offset);
+>     }
+> 
+>  2) remove all writel() in the driver and use rtc_delayed_write()
+>     everywhere.
+> 
+> All writes being under the protection of your spinlock, this will
+> guarantee the 5?s delay in all cases.
 
-do you mean this patch?
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/293147.html
-(probably not last version)
-Should i resend it to you?
+You're right. I tried avoiding loosing microseconds here and there, but there
+is too many case where it can fail. So let's us it everywhere.
+
+[...]
+
+>> +static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
+>> +{
+>> +	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+>> +	int ret = 0;
+>> +	unsigned long time, flags;
+>> +
+>> +	ret = rtc_tm_to_time(tm, &time);
+>> +
+>> +	if (ret)
+>> +		goto out;
+>> +	/*
+>> +	 * Setting the RTC time not always succeeds. According to the
+>> +	 * errata we need to first write on the status register and
+>> +	 * then wait for 100ms before writing to the time register to be
+>> +	 * sure that the data will be taken into account.
+>> +	 */
+>> +	spin_lock_irqsave(&rtc->lock, flags);
+>> +
+>> +	writel(0, rtc->regs + RTC_STATUS);
+>> +
+>> +	spin_unlock_irqrestore(&rtc->lock, flags);
+>> +
+>> +	msleep(100);
+>> +
+>> +	spin_lock_irqsave(&rtc->lock, flags);
+>> +
+>> +	writel(time, rtc->regs + RTC_TIME);
+> 
+> probably not critical (it's rtc clock and not system clock) but you still
+> introduce a 100ms shift when setting time here.
+
+I am aware of this shift but the granularity is the second, so we can't do
+better, we have to deal with the limitation of the hardware. :(
+
+> 
+> As for the two writel() not being done w/o releasing the spinlock, it
+> looks a bit weird but it seems it's ok for other functions manipulating
+> RTC_STATUS reg. 
+> 
+> Nonetheless, in the reverse direction, if a writel() occurs somewhere
+> (e.g. in the alarm irq handler) during your msleep(), you may do your
+> final writel() w/o having enforced the expected 100ms delay.
+
+Actually I don't know if it is problematic if a writel occur in an other register
+during the 100ms. I still wait for an answer for it.
+
+
+Thanks,
+
+Gregory
+
+
+
 
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/922f2d38/attachment.sig>
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
