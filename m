@@ -1,494 +1,185 @@
-From: naobsd@gmail.com (FUKAUMI Naoki)
-Date: Thu, 15 Jan 2015 11:40:59 +0900
-Subject: [PATCH 3/3] ARM: dts: rockchip: add dts for ChipSPARK Rayeager PX2
- board
-In-Reply-To: <1421289659-16627-1-git-send-email-naobsd@gmail.com>
-References: <1421289659-16627-1-git-send-email-naobsd@gmail.com>
-Message-ID: <1421289659-16627-4-git-send-email-naobsd@gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 14 Jan 2015 18:51:06 -0800
+Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
+In-Reply-To: <20150115000305.GC12302@n2100.arm.linux.org.uk>
+References: <1421168344-5363-1-git-send-email-victor.kamensky@linaro.org>
+ <20150114112210.GF4050@arm.com>
+ <CAA3XUr2KUyafcnUggN7=xGNGSeRkkRtYtxZmwm4UC8sRCGup3g@mail.gmail.com>
+ <20150115000305.GC12302@n2100.arm.linux.org.uk>
+Message-ID: <CAA3XUr2ej57VxAF1D3tbhjcVFtgyvHWKQxMiTBJ9RcmYCUHekQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: FUKAUMI Naoki <naobsd@gmail.com>
----
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/rk3066a-rayeager.dts | 457 +++++++++++++++++++++++++++++++++
- 2 files changed, 458 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-rayeager.dts
+On 14 January 2015 at 16:03, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 14, 2015 at 10:38:38AM -0800, Victor Kamensky wrote:
+>> >From fed6caab410ddcaf487ff23a3908eca129e50b89 Mon Sep 17 00:00:00 2001
+>> From: Victor Kamensky <victor.kamensky@linaro.org>
+>> Date: Wed, 14 Jan 2015 07:42:41 -0800
+>> Subject: [PATCH 3/3] perf symbols: improve abi compliance in arm mapping
+>>  symbols handling
+>>
+>> Both Arm and Aarch64 ELF ABI allow mapping symbols be in from
+>> either "$d" or "$d.<any>". But current code that handles mapping
+>> symbols only deals with the first, dollar character and a single
+>> letter, case.
+>>
+>> The patch adds handling of the second case with period
+>> followed by any characters.
+>>
+>> Suggested-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>
+> I wonder if it would make more sense to re-use the "is_arm_mapping_symbol"
+> thing which we have in kernel/module.c and scripts/kallsyms.c - it
+> seems silly to re-invent code which we already have to detect these
+> symbols.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fb03a2b..4c56746 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -445,6 +445,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3066a-bqcurie2.dtb \
- 	rk3066a-marsboard.dtb \
-+	rk3066a-rayeager.dtb \
- 	rk3188-radxarock.dtb \
- 	rk3288-evb-act8846.dtb \
- 	rk3288-evb-rk808.dtb \
-diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
-new file mode 100644
-index 0000000..729a039
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
-@@ -0,0 +1,457 @@
-+/*
-+ * Copyright (c) 2014, 2015 FUKAUMI Naoki <naobsd@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3066a.dtsi"
-+
-+/ {
-+	model = "Rayeager PX2";
-+	compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
-+
-+	memory {
-+		reg = <0x60000000 0x40000000>;
-+	};
-+
-+	ir: ir-receiver {
-+		compatible = "gpio-ir-receiver";
-+		gpios = <&gpio6 1 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ir_int>;
-+	};
-+
-+	keys: gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		button at 0 {
-+			gpio-key,wakeup = <1>;
-+			gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
-+			label = "GPIO Power";
-+			linux,code = <116>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pwr_key>;
-+		};
-+	};
-+
-+	vsys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vsys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vcc_otg: usb-otg-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&otg_drv>;
-+		regulator-name = "vcc_otg";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_host: usb-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_drv>;
-+		regulator-name = "host-pwr";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_sata: sata-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sata_pwr>;
-+		regulator-name = "usb_5v";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_emmc: emmc-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "emmc_vccq";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		vin-supply = <&vsys>;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_arm>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>, <&uart0_rts>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&usb_host {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hub_rst>, <&sata_reset>;
-+	status = "okay";
-+};
-+
-+&emac {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
-+
-+	phy = <&phy0>;
-+	phy-supply = <&vcc_rmii>;
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&mmc0 {
-+	bus-width = <4>;
-+	disable-wp;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_sd>;
-+};
-+
-+&mmc1 {
-+	broken-cd;
-+	bus-width = <4>;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd1_clk>, <&sd1_cmd>, <&sd1_bus4>;
-+	status = "okay";
-+	vmmc-supply = <&vccio_wl>;
-+};
-+
-+&emmc {
-+	broken-cd;
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_emmc>;
-+	vqmmc-supply = <&vcc_emmc>;
-+};
-+
-+&pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
-+	keys {
-+		pwr_key: pwr-key {
-+			rockchip,pins = <6 2 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <6 1 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	usb_otg {
-+		otg_drv: otg-drv {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	usb_host {
-+		host_drv: host-drv {
-+			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+
-+		hub_rst: hub-rst {
-+			rockchip,pins = <1 31 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+
-+		sata_pwr: sata-pwr {
-+			rockchip,pins = <4 22 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+
-+		sata_reset: sata-reset {
-+			rockchip,pins = <0 13 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+
-+	emac {
-+		rmii_rst: rmii-rst {
-+			rockchip,pins = <1 30 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+
-+	mmc {
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <3 7 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	ak8963 {
-+		comp_int: comp-int {
-+			rockchip,pins = <4 17 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	mma8452 {
-+		gsensor_int: gsensor-int {
-+			rockchip,pins = <4 16 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	tps {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <6 4 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+
-+		pwr_hold: pwr-hold {
-+			rockchip,pins = <6 8 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	ak8963: ak8963 at d {
-+		compatible = "asahi-kasei,ak8975";
-+		reg = <0xd>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&comp_int>;
-+	};
-+
-+	mma8452: mma8452 at 1d {
-+		compatible = "fsl,mma8452";
-+		reg = <0x1d>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <16 IRQ_TYPE_EDGE_RISING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gsensor_int>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tps: tps at 2d {
-+		reg = <0x2d>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>, <&pwr_hold>;
-+
-+		vcc1-supply = <&vsys>;
-+		vcc2-supply = <&vsys>;
-+		vcc3-supply = <&vsys>;
-+		vcc4-supply = <&vsys>;
-+		vcc5-supply = <&vcc_io>;
-+		vcc6-supply = <&vcc_io>;
-+		vcc7-supply = <&vsys>;
-+		vccio-supply = <&vsys>;
-+
-+		regulators {
-+			vcc_rtc: regulator at 0 {
-+				regulator-name = "vcc_rtc";
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: regulator at 1 {
-+				regulator-name = "vcc_io";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_arm: regulator at 2 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			vcc_ddr: regulator at 3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			vcc18: regulator at 5 {
-+				regulator-name = "vcc18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_11: regulator at 6 {
-+				regulator-name = "vdd_11";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_25: regulator at 7 {
-+				regulator-name = "vcc_25";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_wl: regulator at 8 {
-+				regulator-name = "vccio_wl";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			vcc25_hdmi: regulator at 9 {
-+				regulator-name = "vcc25_hdmi";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+			};
-+
-+			vcca_33: regulator at 10 {
-+				regulator-name = "vcca_33";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vcc_rmii: regulator at 11 {
-+				regulator-name = "vcc_rmii";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vcc28_cif: regulator at 12 {
-+				regulator-name = "vcc28_cif";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+			};
-+		};
-+	};
-+};
-+
-+#include "tps65910.dtsi"
-+
-+&pwm1 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_xfer>, <&uart3_cts>, <&uart3_rts>;
-+	status = "okay";
-+};
-+
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vcc_25>;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+};
+Thanks for pointing this out. I did not know about
+"is_arm_mapping_symbol" function.
+
+Do you suggest we copy one of those functions into tools/perf?
+Since tools/perf is separate user-land utility I don't see easy way
+how can we reuse those directly.
+
+Also those functions check for mapping symbols
+seems to be more efficient that one I come with, for example
+one from scripts/kallsyms.c
+
+static inline int is_arm_mapping_symbol(const char *str)
+{
+    return str[0] == '$' && strchr("axtd", str[1])
+           && (str[2] == '\0' || str[2] == '.');
+}
+
+But it seems that they are somewhat accurate: because they bundle
+EM_ARM and EM_AARCH64 into one case. According to ABIs
+for EM_ARM we have $a, $t, $d, $a.<any>, $t.<any>, $d.<any>;
+and for EM_AARCH64 we have $x, $d, $x.<any>, $d.<any>.
+
+How about the following two variants of the patch. It follows the same
+mapping handling logic as in other 3 copies of is_arm_mapping_symbol
+function in kernel, but it still separate copy in tools/perf code. Personally I
+prefer variant 1, but I am fine with variant 2 too, because practically it
+will be OK.
+
+Variant 1 (as addition to this patch, as above):
+
+>From e08d348bd72d406d8939993d266729d805577c4b Mon Sep 17 00:00:00 2001
+From: Victor Kamensky <victor.kamensky@linaro.org>
+Date: Wed, 14 Jan 2015 07:42:41 -0800
+Subject: [PATCH 3/3] perf symbols: improve abi compliance in arm mapping
+ symbols handling
+
+Both Arm and Aarch64 ELF ABI allow mapping symbols be in from
+either "$d" or "$d.<any>". But current code that handles mapping
+symbols only deals with the first, dollar character and a single
+letter, case.
+
+The patch adds handling of the second case with period
+followed by any characters.
+
+Suggested-by: Russell King <linux@arm.linux.org.uk>
+Suggested-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+---
+ tools/perf/util/symbol-elf.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
+index 1e188dd..a038c98 100644
+--- a/tools/perf/util/symbol-elf.c
++++ b/tools/perf/util/symbol-elf.c
+@@ -857,17 +857,16 @@ int dso__load_sym(struct dso *dso, struct map *map,
+          * don't identify functions, so will confuse the profile
+          * output: */
+         if (ehdr.e_machine == EM_ARM) {
+-            if (!strcmp(elf_name, "$a") ||
+-                !strcmp(elf_name, "$d") ||
+-                !strcmp(elf_name, "$t"))
++                        if (elf_name[0] == '$' && strchr("adt", elf_name[1])
++                        && (elf_name[2] == '\0' || elf_name[2] == '.'))
+                 continue;
+         }
+         /* Reject Aarch64 ELF "mapping symbols": these aren't unique and
+          * don't identify functions, so will confuse the profile
+          * output: */
+         if (ehdr.e_machine == EM_AARCH64) {
+-            if (!strcmp(elf_name, "$x") ||
+-                !strcmp(elf_name, "$d"))
++                        if (elf_name[0] == '$' && strchr("dx", elf_name[1])
++                        && (elf_name[2] == '\0' || elf_name[2] == '.'))
+                 continue;
+         }
+
 -- 
-2.2.2
+1.9.3
+
+Variant 2 instead of patch posted with current subject:
+
+ From c8d08ebddc61203daf21b17c891c26c1d08e14f1 Mon Sep 17 00:00:00 2001
+From: Victor Kamensky <victor.kamensky@linaro.org>
+Date: Mon, 12 Jan 2015 14:13:36 -0800
+Subject: [PATCH 1/2] perf symbols: Ignore mapping symbols on aarch64
+
+Aarch64 ELF files use mapping symbols with special names $x, $d
+to identify regions of Aarch64 code (see Aarch64 ELF ABI - "ARM
+IHI 0056B", section "4.5.4 Mapping symbols").
+
+The patch filters out these symbols at load time, similar to
+"696b97a perf symbols: Ignore mapping symbols on ARM" changes
+done for ARM before V8.
+
+Also added handling of mapping symbols that has format
+"$d.<any>" and similar for both cases.
+
+Note we are not making difference between EM_ARM and
+EM_AARCH64 mapping symbols instead code handles superset
+of both.
+
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Avi Kivity <avi@cloudius-systems.com>
+Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: David Ahern <dsahern@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Dave Martin <Dave.Martin@arm.com>
+---
+ tools/perf/util/symbol-elf.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/tools/perf/util/symbol-elf.c b/tools/perf/util/symbol-elf.c
+index 06fcd1b..b2eb0f9 100644
+--- a/tools/perf/util/symbol-elf.c
++++ b/tools/perf/util/symbol-elf.c
+@@ -856,10 +856,9 @@ int dso__load_sym(struct dso *dso, struct map *map,
+         /* Reject ARM ELF "mapping symbols": these aren't unique and
+          * don't identify functions, so will confuse the profile
+          * output: */
+-        if (ehdr.e_machine == EM_ARM) {
+-            if (!strcmp(elf_name, "$a") ||
+-                !strcmp(elf_name, "$d") ||
+-                !strcmp(elf_name, "$t"))
++        if (ehdr.e_machine == EM_ARM || ehdr.e_machine == EM_AARCH64) {
++                        if (elf_name[0] == '$' && strchr("adtx", elf_name[1])
++                        && (elf_name[2] == '\0' || elf_name[2] == '.'))
+                 continue;
+         }
+
+-- 
+1.9.3
+
+Thanks,
+Victor
+
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
