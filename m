@@ -1,60 +1,103 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 15:59:23 +0100
-Subject: [PATCH v2 0/8] AT91 cleanup for 3.20 #2
-Message-ID: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 15 Jan 2015 15:59:25 +0100
+Subject: [PATCH v2 2/8] ARM: at91: pm: use the mmio-sram pool to access SRAM
+In-Reply-To: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421333971-7581-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets is based on AT91 cleanup for 3.20 #1
-and depends on AT91 DT for 3.20 #1 because it uses the added SRAM nodes.
+Now that the SRAM is part of a genpool, use it to allocate memory to use for the
+slowclock implementation.
 
-The first two patches rework the pm code to get rid of cpu_is_xxx (they will be
-dropped soon) and use the SRAM from the genpool instead of relying on the remap
-done by at91_init_sram.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/Kconfig |  1 +
+ arch/arm/mach-at91/pm.c    | 46 +++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 46 insertions(+), 1 deletion(-)
 
-The 3rd and 4th patches a reworking the pm code further to move at91_pm_init in
-the .init_machine of the SoCs instead of arch_initcall, to get ready for
-multiplatform.
-
-Then the following patches get rid of at91_init_sram, taking .map_io for almost
-all SoCs but the sama5d4 (more cleanups coming soon for that part).
-
-The final patch moves at91rm9200_idle to clk/at91/pmc.c and allows to almost
-empty arch/arm/mach-at91/at91rm9200.c (It is actually empty once "Atmel System
-Timer cleanups" is applied).
-
-Changes in v2:
- - added patch 3 and 4 to remove the calls to of_machine_is_compatible()
-
-Alexandre Belloni (8):
-  ARM: at91: pm: rework cpu detection
-  ARM: at91: pm: use the mmio-sram pool to access SRAM
-  ARM: at91: pm: add UDP and UHP checks to newer SoCs
-  ARM: at91: pm: prepare for multiplatform
-  ARM: at91: remove useless map_io
-  ARM: at91: sama5d4: remove useless call to at91_init_sram
-  ARM: at91: remove unused at91_init_sram
-  ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
-
- arch/arm/mach-at91/Kconfig           |   1 +
- arch/arm/mach-at91/at91rm9200.c      |  15 -----
- arch/arm/mach-at91/at91sam9260.c     |  27 ---------
- arch/arm/mach-at91/at91sam9261.c     |   9 ---
- arch/arm/mach-at91/at91sam9263.c     |   7 ---
- arch/arm/mach-at91/at91sam9g45.c     |   7 ---
- arch/arm/mach-at91/at91sam9n12.c     |   6 --
- arch/arm/mach-at91/at91sam9rl.c      |  18 ------
- arch/arm/mach-at91/at91sam9x5.c      |   6 --
- arch/arm/mach-at91/board-dt-rm9200.c |  11 ++++
- arch/arm/mach-at91/board-dt-sam9.c   |  27 +++++++++
- arch/arm/mach-at91/board-dt-sama5.c  |   1 +
- arch/arm/mach-at91/generic.h         |  15 ++++-
- arch/arm/mach-at91/pm.c              | 110 ++++++++++++++++++++++++++---------
- arch/arm/mach-at91/sama5d3.c         |   6 --
- arch/arm/mach-at91/sama5d4.c         |   1 -
- arch/arm/mach-at91/setup.c           |  20 -------
- drivers/clk/at91/pmc.c               |   9 +++
- 18 files changed, 146 insertions(+), 150 deletions(-)
-
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index cec0fb5d621a..b7dcef50db23 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -178,6 +178,7 @@ comment "AT91 Feature Selections"
+ 
+ config AT91_SLOW_CLOCK
+ 	bool "Suspend-to-RAM disables main oscillator"
++	select SRAM
+ 	depends on SUSPEND
+ 	help
+ 	  Select this if you want Suspend-to-RAM to save the most power
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 79aa793d1f00..515791edcc60 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -14,10 +14,12 @@
+ #include <linux/suspend.h>
+ #include <linux/sched.h>
+ #include <linux/proc_fs.h>
++#include <linux/genalloc.h>
+ #include <linux/interrupt.h>
+ #include <linux/sysfs.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk/at91_pmc.h>
+@@ -222,10 +224,52 @@ void at91_pm_set_standby(void (*at91_standby)(void))
+ 	}
+ }
+ 
++#ifdef CONFIG_AT91_SLOW_CLOCK
++static void __init at91_pm_sram_init(void)
++{
++	struct gen_pool *sram_pool;
++	phys_addr_t sram_pbase;
++	unsigned long sram_base;
++	struct device_node *node;
++	struct platform_device *pdev;
++
++	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
++	if (!node) {
++		pr_warn("%s: failed to find sram node!\n", __func__);
++		return;
++	}
++
++	pdev = of_find_device_by_node(node);
++	if (!pdev) {
++		pr_warn("%s: failed to find sram device!\n", __func__);
++		goto put_node;
++	}
++
++	sram_pool = dev_get_gen_pool(&pdev->dev);
++	if (!sram_pool) {
++		pr_warn("%s: sram pool unavailable!\n", __func__);
++		goto put_node;
++	}
++
++	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
++	if (!sram_base) {
++		pr_warn("%s: unable to alloc ocram!\n", __func__);
++		goto put_node;
++	}
++
++	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
++	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz, false);
++
++put_node:
++	of_node_put(node);
++}
++#endif
++
++
+ static int __init at91_pm_init(void)
+ {
+ #ifdef CONFIG_AT91_SLOW_CLOCK
+-	slow_clock = (void *) (AT91_IO_VIRT_BASE - at91_slow_clock_sz);
++	at91_pm_sram_init();
+ #endif
+ 
+ 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
 -- 
 2.1.0
