@@ -1,429 +1,79 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 15 Jan 2015 15:23:09 -0600
-Subject: [PATCH 2/4] ARM: dts: Add basic dm816x device tree configuration
-In-Reply-To: <1421192272-20754-3-git-send-email-tony@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-3-git-send-email-tony@atomide.com>
-Message-ID: <54B82FBD.4040103@ti.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 15 Jan 2015 22:29:58 +0100
+Subject: [PATCHv1 0/3] rtc: Abracon AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC chip
+ support
+Message-ID: <cover.1421356414.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Andrew, 
 
-On 01/13/2015 05:37 PM, Tony Lindgren wrote:
-> Similar to other omap variants, let's add dm816x support.
-> 
-> Note that this is based on generated data from the
-> TI81XX-LINUX-PSP-04.04.00.02 patches published at:
-> 
-> http://downloads.ti.com/dsps/dsps_public_sw/psp/LinuxPSP/TI81XX_04_04/04_04_00_02/index_FDS.html
-> 
-> I've verified the basic functionality, but have not been
-> able to test all the devices on dm8168-evm.
-> 
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/boot/dts/dm816x.dtsi | 374 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 374 insertions(+)
->  create mode 100644 arch/arm/boot/dts/dm816x.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
-> new file mode 100644
-> index 0000000..7d575ac
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/dm816x.dtsi
-> @@ -0,0 +1,374 @@
-> +/*
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +#include "skeleton.dtsi"
-> +
-> +/ {
-> +	compatible = "ti,dm816";
-> +	interrupt-parent = <&intc>;
-> +
-> +	aliases {
-> +		i2c0 = &i2c1;
-> +		i2c1 = &i2c2;
-> +		serial0 = &uart1;
-> +		serial1 = &uart2;
-> +		serial2 = &uart3;
-> +		ethernet0 = &eth0;
-> +		ethernet1 = &eth1;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a8";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +		};
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,cortex-a8-pmu";
-> +		interrupts = <3>;
-> +	};
-> +
-> +	/*
-> +	 * The soc node represents the soc top level view. It is used for IPs
-> +	 * that are not memory mapped in the MPU view or for the MPU itself.
-> +	 */
-> +	soc {
-> +		compatible = "ti,omap-infra";
-> +		mpu {
-> +			compatible = "ti,omap3-mpu";
-> +			ti,hwmods = "mpu";
-> +		};
-> +	};
-> +
-> +	/*
-> +	 * XXX: Use a flat representation of the dm816x interconnect.
-> +	 * The real dm816x interconnect network is quite complex. Since
-> +	 * it will not bring real advantage to represent that in DT
-> +	 * for the moment, just use a fake OCP bus entry to represent
-> +	 * the whole bus hierarchy.
-> +	 */
-> +	ocp {
-> +		compatible = "ti,omap3-l3-smx", "simple-bus";
-> +		reg = <0x44000000 0x10000>;
-> +		interrupts = <9 10>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		ti,hwmods = "l3_main";
-> +
-> +		prcm: prcm at 48180000 {
-> +			compatible = "ti,dm816-prcm";
-> +			reg = <0x48180000 0x4000>;
-> +
-> +			prcm_clocks: clocks {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +			};
-> +
-> +			prcm_clockdomains: clockdomains {
-> +			};
-> +		};
-> +
-> +		scrm: scrm at 48140000 {
-> +			compatible = "ti,dm816-scrm";
-> +			reg = <0x48140000 0x21000>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 0x48140000 0x21000>;
-> +
-> +			scrm_clocks: clocks {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +			};
-> +
-> +			scrm_clockdomains: clockdomains {
-> +			};
-> +		};
-> +
-> +		cm: syscon at 44e10000 {
-> +			compatible = "ti,am33xx-controlmodule", "syscon";
-> +			reg = <0x44e10000 0x800>;
-> +		};
-> +
-> +		edma: edma at 49000000 {
-> +			compatible = "ti,edma3";
-> +			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2", "tptc3";
-> +			reg =   <0x49000000 0x10000>,
-> +			        <0x44e10f90 0x40>;
-> +			interrupts = <12 13 14>;
-> +			#dma-cells = <1>;
-> +		};
-> +
-> +		elm: elm at 48080000 {
-> +			compatible = "ti,816-elm";
-> +			ti,hwmods = "elm";
-> +			reg = <0x48080000 0x2000>;
-> +			interrupts = <4>;
-> +		};
-> +
-> +		gpio1: gpio at 48032000 {
-> +			compatible = "ti,omap3-gpio";
-> +			ti,hwmods = "gpio1";
-> +			reg = <0x48032000 0x1000>;
-> +			interrupts = <97>;
-> +		};
-> +
-> +		gpio2: gpio at 4804c000 {
-> +			compatible = "ti,omap3-gpio";
-> +			ti,hwmods = "gpio2";
-> +			reg = <0x4804c000 0x1000>;
-> +			interrupts = <99>;
-> +		};
-> +
-> +		gpmc: gpmc at 50000000 {
-> +			compatible = "ti,am3352-gpmc";
-> +			ti,hwmods = "gpmc";
-> +			reg = <0x50000000 0x2000>;
-> +			#address-cells = <2>;
-> +			#size-cells = <1>;
-> +			interrupts = <100>;
-> +			gpmc,num-cs = <6>;
-> +			gpmc,num-waitpins = <2>;
-> +		};
-> +
-> +		i2c1: i2c at 48028000 {
-> +			compatible = "ti,omap4-i2c";
-> +			ti,hwmods = "i2c1";
-> +			reg = <0x48028000 0x1000>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			interrupts = <70>;
-> +			dmas = <&edma 58 &edma 59>;
-> +			dma-names = "tx", "rx";
-> +		};
-> +
-> +		i2c2: i2c at 4802a000 {
-> +			compatible = "ti,omap4-i2c";
-> +			ti,hwmods = "i2c2";
-> +			reg = <0x4802a000 0x1000>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			interrupts = <71>;
-> +			dmas = <&edma 60 &edma 61>;
-> +			dma-names = "tx", "rx";
-> +		};
-> +
-> +		intc: interrupt-controller at 48200000 {
-> +			compatible = "ti,dm816-intc";
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +			reg = <0x48200000 0x1000>;
-> +		};
-> +
-> +		mailbox: mailbox at 480c8000 {
-> +			compatible = "ti,omap3-mailbox";
+I fixed unhandled error case for devm_request_threaded_irq() and came w/
+a simple solution to get a single return path in probe function:
 
-The Mailbox IP is actually more like that of OMAP4, so the correct one
-would be "ti,omap4-mailbox"
+   err:
+   	if (ret && data && data->irq)
+   		device_init_wakeup(dev, false);
+   	return ret;
+   }
 
-> +			reg = <0x480c8000 0x2000>;
-> +			interrupts = <77>;
-> +			ti,hwmods = "mailbox";
-> +			ti,mbox-num-users = <4>;
-> +			ti,mbox-num-fifos = <8>;
-This should be 12
+  
+Changes since v0:
+  - fixed unhandled error case for devm_request_threaded_irq()
+  - enforced a common error return path in _probe()
 
-> +			mbox_wkupm3: wkup_m3 {
-> +				ti,mbox-tx = <0 0 0>;
-> +				ti,mbox-rx = <0 0 3>;
-> +			};
+For those who missed v0:
 
-This may have been copied from AM335, so is incorrect. You are better
-off starting with one for DSP instead of above, below are taken from the
-corresponding SysLink release associated with above PSP release
-			mbox_dsp: mbox_dsp {
-				ti,mbox-tx = <3 0 0>;
-				ti,mbox-rx = <0 0 0>;
-			};
+This series adds support for Abracon AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC 
+chip. Unlike many RTC chips, it includes an internal oscillator which 
+spares room on the PCB. It also has some interesting features, like 
+battery low detection (which the driver in this series supports). The 
+only small "limitation" (mainly due to what RTC subsystem expects from 
+RTC chips) is the fact that its alarm is accurate to the second. This 
+series provides a solution (described below) for that limitation using 
+another mechanism of the chip. 
 
-regards
-Suman
+I decided to split support between three different patches for 
+this v0: 
 
-> +		};
-> +
-> +		mdio: mdio at 4a100800 {
-> +			compatible = "ti,davinci_mdio";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x4a100800 0x100>;
-> +			ti,hwmods = "davinci_mdio";
-> +			bus_freq = <1000000>;
-> +			phy0: ethernet-phy at 0 {
-> +				reg = <1>;
-> +			};
-> +			phy1: ethernet-phy at 1 {
-> +				reg = <2>;
-> +			};
-> +		};
-> +
-> +		eth0: ethernet at 4a100000 {
-> +			compatible = "ti,dm816-emac";
-> +			ti,hwmods = "emac0";
-> +			reg = <0x4a100000 0x800
-> +			       0x4a100900 0x3700>;
-> +			clocks = <&sysclk24_ck>;
-> +			ti,davinci-ctrl-reg-offset = <0>;
-> +			ti,davinci-ctrl-mod-reg-offset = <0x900>;
-> +			ti,davinci-ctrl-ram-offset = <0x2000>;
-> +			ti,davinci-ctrl-ram-size = <0x2000>;
-> +			interrupts = <40 41 42 43>;
-> +			phy-handle = <&phy0>;
-> +		};
-> +
-> +		eth1: ethernet at 4a120000 {
-> +			compatible = "ti,dm816-emac";
-> +			ti,hwmods = "emac1";
-> +			reg = <0x4a120000 0x4000>;
-> +			clocks = <&sysclk24_ck>;
-> +			ti,davinci-ctrl-reg-offset = <0>;
-> +			ti,davinci-ctrl-mod-reg-offset = <0x900>;
-> +			ti,davinci-ctrl-ram-offset = <0x2000>;
-> +			ti,davinci-ctrl-ram-size = <0x2000>;
-> +			interrupts = <44 45 46 47>;
-> +			phy-handle = <&phy1>;
-> +		};
-> +
-> +		mcspi1: spi at 48030000 {
-> +			compatible = "ti,omap3-mcspi";
-> +			reg = <0x48030000 0x2000>;
-> +			interrupts = <65>;
-> +			ti,spi-num-cs = <2>;
-> +			ti,hwmods = "mcspi1";
-> +			dmas = <&edma 16 &edma 17
-> +				&edma 18 &edma 19>;
-> +			dma-names = "tx0", "rx0", "tx1", "rx1";
-> +		};
-> +
-> +		mmc1: mmc at 48060000 {
-> +			compatible = "ti,omap4-hsmmc";
-> +			reg = <0x48060000 0x11000>;
-> +			ti,hwmods = "mmc1";
-> +			interrupts = <64>;
-> +			dmas = <&edma 24 &edma 25>;
-> +			dma-names = "tx", "rx";
-> +		};
-> +
-> +		timer1: timer at 4802e000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x4802e000 0x2000>;
-> +			interrupts = <67>;
-> +			ti,hwmods = "timer1";
-> +			ti,timer-alwon;
-> +		};
-> +
-> +		timer2: timer at 48040000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x48040000 0x2000>;
-> +			interrupts = <68>;
-> +			ti,hwmods = "timer2";
-> +		};
-> +
-> +		timer3: timer at 48042000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x48042000 0x2000>;
-> +			interrupts = <69>;
-> +			ti,hwmods = "timer3";
-> +		};
-> +
-> +		timer4: timer at 48044000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x48044000 0x2000>;
-> +			interrupts = <92>;
-> +			ti,hwmods = "timer4";
-> +		};
-> +
-> +		timer5: timer at 48046000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x48046000 0x2000>;
-> +			interrupts = <93>;
-> +			ti,hwmods = "timer5";
-> +		};
-> +
-> +		timer6: timer at 48048000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x48048000 0x2000>;
-> +			interrupts = <94>;
-> +			ti,hwmods = "timer6";
-> +		};
-> +
-> +		timer7: timer at 4804a000 {
-> +			compatible = "ti,dm816-timer";
-> +			reg = <0x4804a000 0x2000>;
-> +			interrupts = <95>;
-> +			ti,hwmods = "timer7";
-> +		};
-> +
-> +		uart1: uart at 48020000 {
-> +			compatible = "ti,omap3-uart";
-> +			ti,hwmods = "uart1";
-> +			reg = <0x48020000 0x2000>;
-> +			clock-frequency = <48000000>;
-> +			interrupts = <72>;
-> +			dmas = <&edma 26 &edma 27>;
-> +			dma-names = "tx", "rx";
-> +		};
-> +
-> +		uart2: uart at 48022000 {
-> +			compatible = "ti,omap3-uart";
-> +			ti,hwmods = "uart2";
-> +			reg = <0x48022000 0x2000>;
-> +			clock-frequency = <48000000>;
-> +			interrupts = <73>;
-> +			dmas = <&edma 28 &edma 29>;
-> +			dma-names = "tx", "rx";
-> +		};
-> +
-> +		uart3: uart at 48024000 {
-> +			compatible = "ti,omap3-uart";
-> +			ti,hwmods = "uart3";
-> +			reg = <0x48024000 0x2000>;
-> +			clock-frequency = <48000000>;
-> +			interrupts = <74>;
-> +			dmas = <&edma 30 &edma 31>;
-> +			dma-names = "tx", "rx";
-> +		};
-> +
-> +		/* NOTE: USB needs a transceiver driver for phys to work */
-> +		usb: usb_otg_hs at 47401000 {
-> +			compatible = "ti,am33xx-usb";
-> +			reg = <0x47401000 0x400000>;
-> +			ranges;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ti,hwmods = "usb_otg_hs";
-> +
-> +			usb0: usb at 47401000 {
-> +				compatible = "ti,musb-am33xx";
-> +				reg = <0x47401400 0x400
-> +				       0x47401000 0x200>;
-> +				reg-names = "mc", "control";
-> +				interrupts = <18>;
-> +				interrupt-names = "mc";
-> +				dr_mode = "otg";
-> +				mentor,multipoint = <1>;
-> +				mentor,num-eps = <16>;
-> +				mentor,ram-bits = <12>;
-> +				mentor,power = <500>;
-> +			};
-> +
-> +			usb1: usb at 47401800 {
-> +				compatible = "ti,musb-am33xx";
-> +				status = "disabled";
-> +				reg = <0x47401c00 0x400
-> +				       0x47401800 0x200>;
-> +				reg-names = "mc", "control";
-> +				interrupts = <19>;
-> +				interrupt-names = "mc";
-> +				dr_mode = "otg";
-> +				mentor,multipoint = <1>;
-> +				mentor,num-eps = <16>;
-> +				mentor,ram-bits = <12>;
-> +				mentor,power = <500>;
-> +			};
-> +		};
-> +
-> +		wd_timer2: wd_timer at 480c2000 {
-> +			compatible = "ti,omap3-wdt";
-> +			ti,hwmods = "wd_timer";
-> +			reg = <0x480c2000 0x1000>;
-> +			interrupts = <0>;
-> +		};
-> +	};
-> +};
-> +
-> 
+- Patch 1/3: it simply references Abracon Corporation in vendor-prefixes 
+  documentation file. As Abracon has no NASDAQ ticker symbol; I have 
+  decided to use "abcn" (I initially started my work w/ "ab" but later 
+  changed for "abcn" which looked more meaningful) 
+- Patch 2/3: it adds initial support for the chip and provides the 
+  ability to read/write time and also read/write alarm. As the alarm 
+  the chip provides is accurate to the minute, the support provided 
+  by this patch also has this limitation (e.g. UIE mode is not 
+  supported). 
+- Patch 3/3: the chip supports a watchdog timer which can be used to 
+  extend the alarm mechanism in patch 2/3 in order to provide support 
+  for alarms under one minute (e.g. support UIE mode). In practice, 
+  the logic I implemented is to use the watchdog timer for alarms which 
+  are at most 4 minutes in the future and use the common alarm mechanism 
+  for alarms which are set to larger values. With that additional patch 
+  the device fully passes the rtctest.c program. 
+
+I decided to split the driver between two patches (2 and 3 of 3) in 
+order to ease review: patch 2 should be pretty straightforward to read 
+for someone familiar w/ RTC subsystem. Patch 3 only extends what is in 
+patch 2 regarding alarms. If you prefer a single patch in a v1, do not 
+hesitate to ask. 
+
+The set currently applies on top of 3.19-rc4 but I can rebase it against 
+something else if you prefer. 
+
+Arnaud Ebalard (3):
+  of: add vendor prefix for Abracon Corporation
+  rtc: Add support for Abracon AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC chip
+  rtc: rtc-ab-b5ze-s3: Add sub-minute alarm support
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |    1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ drivers/rtc/Kconfig                                |   11 +
+ drivers/rtc/Makefile                               |    1 +
+ drivers/rtc/rtc-ab-b5ze-s3.c                       | 1035 ++++++++++++++++++++
+ 5 files changed, 1049 insertions(+)
+ create mode 100644 drivers/rtc/rtc-ab-b5ze-s3.c
+
+-- 
+2.1.1
