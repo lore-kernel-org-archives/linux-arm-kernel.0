@@ -1,124 +1,100 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 15 Jan 2015 16:26:20 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 15 Jan 2015 17:29:24 +0100
+Subject: [PATCH v3 8/8] ARM: at91: remove useless include
+In-Reply-To: <1421077023-30954-9-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421077023-30954-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B7EAE4.3020107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> Hi,
+On 01/12/2015 04:37 PM, Alexandre Belloni wrote:
+> Both drivers using the system timer are now converted to an MFD. mach/at91_st.h
+> is now useless.
 >
-> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Hi Catalin and Will,
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-I'll get right to the point: Can we please have this series queued up
-for v3.20? I really think we've hit the point where it is more
-valuable to merge it (or at least prepare to merge it) rather than
-keeping it out of mainline.
+> ---
+>   arch/arm/mach-at91/include/mach/at91_st.h | 61 -------------------------------
+>   1 file changed, 61 deletions(-)
+>   delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
+>
+> diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
+> deleted file mode 100644
+> index 67fdbd13c3ed..000000000000
+> --- a/arch/arm/mach-at91/include/mach/at91_st.h
+> +++ /dev/null
+> @@ -1,61 +0,0 @@
+> -/*
+> - * arch/arm/mach-at91/include/mach/at91_st.h
+> - *
+> - * Copyright (C) 2005 Ivan Kokshaysky
+> - * Copyright (C) SAN People
+> - *
+> - * System Timer (ST) - System peripherals registers.
+> - * Based on AT91RM9200 datasheet revision E.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -
+> -#ifndef AT91_ST_H
+> -#define AT91_ST_H
+> -
+> -#ifndef __ASSEMBLY__
+> -extern void __iomem *at91_st_base;
+> -
+> -#define at91_st_read(field) \
+> -	__raw_readl(at91_st_base + field)
+> -
+> -#define at91_st_write(field, value) \
+> -	__raw_writel(value, at91_st_base + field)
+> -#else
+> -.extern at91_st_base
+> -#endif
+> -
+> -#define	AT91_ST_CR		0x00			/* Control Register */
+> -#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
+> -
+> -#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
+> -#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
+> -
+> -#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
+> -#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
+> -#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
+> -#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
+> -
+> -#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
+> -#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
+> -
+> -#define	AT91_ST_SR		0x10			/* Status Register */
+> -#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
+> -#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
+> -#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
+> -#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
+> -
+> -#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
+> -#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
+> -#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
+> -
+> -#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
+> -#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
+> -
+> -#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
+> -#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
+> -
+> -#endif
+>
 
-First, I think we've agreed that the patches themselves are fine. The
-remaining objections are based on maturity and whether or not we can
-handle long term support. At this point, for all of the items on Al's
-ACPI todo list, we've either got solutions for the problems, or solid
-plans on how it is going to get solved (I'll go through each item one
-by one at the end of this email). I won't claim that list is
-exhaustive though. Please shout if there are new issues that need to
-be added.
 
-Second, real platforms using ACPI are showing up in various places.
-Platforms are available from both APM and AMD. Huawei have spoken up
-with test results that the patches boot on their unreleased platform
-(Huawei needs GICv3 extensions, but otherwise it works). The
-commercial products that are being built right now are being built
-around these patches. Fedora Rawhide has picked them up also.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Continuing to keep the patches out I think is having the opposite
-effect from what is desired. Catalin, you've told me a few times that
-saying "no" is the only leverage you have to keeping crap drivers out
-of the kernel until things mature, and by extension influence how
-firmware gets implemented. However, as far as drivers are concerned,
-there is nothing stopping maintainers from picking up ACPI drivers for
-ARM hardware regardless of whether or not the core ARM code is merged.
-If a driver depends on CONFIG_ACPI, and if the code seems to look
-good, there is nothing preventing it from being merged. There are
-already ARM related ACPI patches going into mainline.
-
-For example: https://lkml.org/lkml/2014/12/25/120
-
-Instead, keeping these patches out means that hardware is getting
-developed and tested against Fedora, early access RHEL and Linaro
-kernels. It means that we're abdicating on any influence mainline has
-over how those platforms are developed. The longer these patches stay
-out of mainline, the greater the potential for delta between what is
-in the vendor kernels and what we accept into mainline.
-
-The other concern may be keeping crap out of the core ARM code, but I
-really don't think that will be an issue. The two of you still have
-complete control over arch/arm64 and I fully expect crap code will be
-aggressively NAKed whether or not it is ACPI related. All that merging
-this series does is lays down a foundation of functionality on the
-stuff we are pretty confident is correct. It keeps the delta between
-mainline and the development code small and restricted to only the
-bits that are still in flux.
-
-Finally, keeping them out has the practical effect of causing extra
-work to continually rebase them, while potentially running into new
-conflicts and bugs, for little if any real benefit. Whereas getting
-them into linux-next starts giving us some feedback on conflicts with
-other things that are being queued up for mainline. Not to mention
-reviewer fatigue having to go over the same set of patches again and
-again.
-
-Right now we're at -rc4. We'll be at -rc5 this weekend, and quite
-possibly have a new merge window right at the start of Connect.
-Queuing these patches up now isn't even a 100% commitment for you to
-ask Linus to pull them. We can have further discussions at Connect. If
-you're still not satisfied then drop them out again for another cycle.
-However, if they aren't queued up now, then we're looking at mid-June
-before they show up in a mainline kernel release.
-
-As promised earlier, I said that I'd go through the todo list items.
-Here they are with discussion:
-1. Define how Aarch64 OS identifies itself to firmware
-- We've pretty much settled on dropping the _OSI interface entirely,
-which is trivial to do. All of the current platforms can adapt to
-this. There are still some discussions around _OSC, but given that
-this is the first release there isn't anything for the platform to
-differentiate on regarding features. This isn't going to affect
-current platforms, but rather will be important with the release of
-the next version of the ACPI spec. It shouldn't affect our ability to
-merge core support
-
-2. Linux must choose DT booting by default when offered both ACPI and
-   * Status: DONE, but being revisited for possible algorithmic change
-
-3. Linux UEFI/ACPI testing tools must be made available
-   * Done. We're implementing more tests of course, but that is expected.
-
-4. Set clear expectations for those providing ACPI for use with Linux
-   * We have a document that covers what we know so far, and will
-continue to expand it. Also talking with the SBBR folks to move
-relevant requirements into the SBBR doc.
-
-5. Platform support patches need verification and review
-   * ACPI core works on at least the Foundation model, Juno, APM
-Mustang, and AMD Seattle
-   * There still are driver patches being discussed. See Al's summary
-for details
-   * As I argued above, the state of driver patches isn't going to be
-
-6. How does the kernel handle_DSD usage?
-While important, these issues are separate from whether or not to
-merge the core aarch64 code. This work was defined and driven by Intel
-for their embedded platforms, and it is already in mainline. Keeping
-aarch64 support out isn't going to prevent drivers using it from being
-merged. I don't think this should be a reason for blocking this
-series.
-
-7. Why is ACPI required?
-I hope I've addressed this[1], but discussion continues.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg389955.html
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
