@@ -1,57 +1,53 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 15 Jan 2015 12:59:57 +0100
-Subject: [PATCH v3 2/3] i2c: iproc: Add Broadcom iProc I2C Driver
-In-Reply-To: <54B5D0F9.8030902@broadcom.com>
-References: <rjui@broadcom.com>
- <1418183832-24793-1-git-send-email-rjui@broadcom.com>
- <1418183832-24793-3-git-send-email-rjui@broadcom.com>
- <20150113225012.GK22880@pengutronix.de>
- <54B5D0F9.8030902@broadcom.com>
-Message-ID: <20150115115957.GA2549@katana>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Jan 2015 12:01:06 +0000
+Subject: [PATCH] arm64/efi: handle potential failure to remap memory map
+Message-ID: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> +	case M_CMD_STATUS_LOST_ARB:
-> >> +		dev_err(dev->device, "lost bus arbitration\n");
-> > I wouldn't dev_err that, only dev_dbg. I'm not sure how usual the errors
-> > for the next two cases is, maybe degrade them to dev_dbg, too?
-> > 
-> These errors are rare, and it's nice to keep them at the dev_err level
-> so the user will be more aware.
+When remapping the UEFI memory map using ioremap_cache(), we
+have to deal with potential failure. Note that, even if the
+common case is for ioremap_cache() to return the existing linear
+mapping of the memory map, we cannot rely on that to be always the
+case, e.g., in the presence of a mem= kernel parameter.
 
-This is wrong. Arbitration lost and NACK is pretty standard stuff on an
-I2C bus. User doesn't need to know about it, it is just noise in the
-logs. Timeout is different, you can report that (although I should
-probably move such a message into the core). Please also use the proper
-errno codes defined in Documentation/i2c/fault-codes. They should be
-distinct enough to drop the messages.
+At the same time, remove a stale comment and move the memmap code
+together.
 
-> 
-> >> +		return -EREMOTEIO;
-> >> +
-> >> +	case M_CMD_STATUS_NACK_ADDR:
-> >> +		dev_err(dev->device, "NAK addr:0x%02x\n", dev->msg->addr);
-> >> +		return -EREMOTEIO;
-> >> +
-> >> +	case M_CMD_STATUS_NACK_DATA:
-> >> +		dev_err(dev->device, "NAK data\n");
-> >> +		return -EREMOTEIO;
-> >> +
-> >> +	case M_CMD_STATUS_TIMEOUT:
-> >> +		dev_err(dev->device, "bus timeout\n");
-> >> +		return -ETIMEDOUT;
-> >> +
-> >> +	default:
-> >> +		dev_err(dev->device, "unknown error code=%d\n", val);
-> >> +		return -EREMOTEIO;
-> >> +	}
-> >> +
-> >> +	return -EREMOTEIO;
-> >> +}
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/bb1f03f7/attachment.sig>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index a98415b5979c..c9cb0fbe7aa4 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -229,19 +229,21 @@ static int __init arm64_enable_runtime_services(void)
+ 		return -1;
+ 	}
+ 
+-	mapsize = memmap.map_end - memmap.map;
+-
+ 	if (efi_runtime_disabled()) {
+ 		pr_info("EFI runtime services will be disabled.\n");
+ 		return -1;
+ 	}
+ 
+ 	pr_info("Remapping and enabling EFI services.\n");
+-	/* replace early memmap mapping with permanent mapping */
++
++	mapsize = memmap.map_end - memmap.map;
+ 	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+ 						   mapsize);
++	if (!memmap.map) {
++		pr_err("Failed to remap EFI memory map\n");
++		return -1;
++	}
+ 	memmap.map_end = memmap.map + mapsize;
+-
+ 	efi.memmap = &memmap;
+ 
+ 	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+-- 
+1.8.3.2
