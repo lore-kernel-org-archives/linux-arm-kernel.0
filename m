@@ -1,114 +1,86 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 14 Jan 2015 20:39:02 -0800
-Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
-References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>
- <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1421296742.25598.3.camel@perches.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Wed, 14 Jan 2015 21:44:39 -0800
+Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <20150115010256.GC9134@dtor-ws>
+References: <jonathar@broadcom.com>
+ <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
+ <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
+ <20150115010256.GC9134@dtor-ws>
+Message-ID: <54B753C7.6000006@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-01-14 at 14:34 +0800, Ding Tianhong wrote:
-> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
-> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
-
-Mostly trivial comments:
-
-> +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
-
-[]
-
-> +#define GMAC_MAX_PKT_LEN		1516
-
-[]
-
-> +static int hip04_rx_poll(struct napi_struct *napi, int budget)
-> +{
-[]
-> +	while (cnt && !last) {
-[]
-> +		desc = (struct rx_desc *)skb->data;
-> +		len = be16_to_cpu(desc->pkt_len);
-> +		err = be32_to_cpu(desc->pkt_err);
-> +
-> +		if (0 == len) {
-> +			dev_kfree_skb_any(skb);
-> +			last = true;
-> +		} else if ((err & RX_PKT_ERR) || (len >= GMAC_MAX_PKT_LEN)) {
-
-Is this ">=" correct?  Maybe it should be ">" ?
-
-[]
-
-> +static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
-> +{
-> +	struct net_device *ndev = (struct net_device *)dev_id;
-
-Unnecessary cast of void *
-
-[]
-
-> +static int hip04_set_coalesce(struct net_device *netdev,
-> +			      struct ethtool_coalesce *ec)
-> +{
-> +	struct hip04_priv *priv = netdev_priv(netdev);
-> +
-> +	/* Check not supported parameters  */
-> +	if ((ec->rx_max_coalesced_frames) || (ec->rx_coalesce_usecs_irq) ||
-> +	    (ec->rx_max_coalesced_frames_irq) || (ec->tx_coalesce_usecs_irq) ||
-> +	    (ec->use_adaptive_rx_coalesce) || (ec->use_adaptive_tx_coalesce) ||
-> +	    (ec->pkt_rate_low) || (ec->rx_coalesce_usecs_low) ||
-> +	    (ec->rx_max_coalesced_frames_low) || (ec->tx_coalesce_usecs_high) ||
-> +	    (ec->tx_max_coalesced_frames_low) || (ec->pkt_rate_high) ||
-> +	    (ec->tx_coalesce_usecs_low) || (ec->rx_coalesce_usecs_high) ||
-> +	    (ec->rx_max_coalesced_frames_high) || (ec->rx_coalesce_usecs) ||
-> +	    (ec->tx_max_coalesced_frames_irq) ||
-> +	    (ec->stats_block_coalesce_usecs) ||
-> +	    (ec->tx_max_coalesced_frames_high) || (ec->rate_sample_interval))
-> +		return -EOPNOTSUPP;
-
-Rather than a somewhat haphazard mix of these values, 
-this might be simpler to read as something like:
-
-	/* Check not supported parameters  */
-	if (ec->pkt_rate_low ||
-	    ec->pkt_rate_high ||
-
-	    ec->use_adaptive_rx_coalesce ||
-	    ec->rx_coalesce_usecs ||
-	    ec->rx_coalesce_usecs_low ||
-	    ec->rx_coalesce_usecs_high ||
-	    ec->rx_coalesce_usecs_irq ||
-	    ec->rx_max_coalesced_frames ||
-	    ec->rx_max_coalesced_frames_low ||
-	    ec->rx_max_coalesced_frames_high ||
-	    ec->rx_max_coalesced_frames_irq ||
-	    
-	    ec->use_adaptive_tx_coalesce ||
-	    ec->tx_coalesce_usecs_low ||
-	    ec->tx_coalesce_usecs_high ||
-	    ec->tx_max_coalesced_frames_low ||
-	    ec->tx_max_coalesced_frames_high ||
-	    ec->tx_max_coalesced_frames_irq ||
-
-	    ec->stats_block_coalesce_usecs ||
-	    ec->rate_sample_interval)
-		return -EOPNOTSUPP;
-
-
-> +static void hip04_free_ring(struct net_device *ndev, struct device *d)
-> +{
-> +	struct hip04_priv *priv = netdev_priv(ndev);
-> +	int i;
-> +
-> +	for (i = 0; i < RX_DESC_NUM; i++)
-> +		if (priv->rx_buf[i])
-> +			put_page(virt_to_head_page(priv->rx_buf[i]));
-
-It's generally nicer to use braces around
-for loops with single ifs.
-
-> +
-> +	for (i = 0; i < TX_DESC_NUM; i++)
-> +		if (priv->tx_skb[i])
-> +			dev_kfree_skb_any(priv->tx_skb[i]);
+On 15-01-14 05:02 PM, Dmitry Torokhov wrote:
+> Hi Jonathan,
+>
+> On Fri, Dec 19, 2014 at 02:17:49PM -0800, Jonathan Richardson wrote:
+>> +	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
+>> +		if (val < 1 || val > 256) {
+>> +			dev_err(dev, "scanning_period must be [1-256]\n");
+>> +			return -EINVAL;
+>> +		}
+>> +		priv->cfg_params.scanning_period = val;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
+>> +		if (val < 0 || val > 255) {
+>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
+>> +			return -EINVAL;
+>> +		}
+>> +		priv->cfg_params.debounce_timeout = val;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
+>> +		if (val < 0 || val > 11) {
+>> +			dev_err(dev, "settling_timeout must be [0-11]\n");
+>> +			return -EINVAL;
+>> +		}
+>> +		priv->cfg_params.settling_timeout = val;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
+>> +		if (val < 0 || val > 255) {
+>> +			dev_err(dev, "touch_timeout must be [0-255]\n");
+>> +			return -EINVAL;
+>> +		}
+>> +		priv->cfg_params.touch_timeout = val;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
+>> +		if (val < 0 || val > 8) {
+>> +			dev_err(dev, "average_data must be [0-8]\n");
+>> +			return -EINVAL;
+>> +		}
+>> +		priv->cfg_params.average_data = val;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
+>> +		if (val < 0 || val > 31) {
+>> +			dev_err(dev, "fifo_threshold must be [0-31]\n");
+>> +			return -EINVAL;
+>> +		}
+>> +		priv->cfg_params.fifo_threshold = val;
+>> +	}
+>
+> I think these are dveice specific and thus should have "brcm," prefix.
+I'm confused as to why we need the brcm prefix?  Other device tree 
+bindings we have for other drivers do not need such prefix.  Is this 
+convention documented somewhere?
+>
+>> +
+>> +	priv->ts_rotation = TS_ROTATION_0;
+>> +	if (of_property_read_u32(np, "ts-rotation", &val) >= 0) {
+>> +		priv->ts_rotation = val;
+>> +		dev_dbg(dev, "ts rotation [%d] degrees\n",
+>> +			90 * priv->ts_rotation);
+>> +	}
+>
+> This I am not quite sure about - if we want rotation or swap+invert. You
+> are CCed on another email (tsc2007) that talks about need of generic
+> touchscreen transforms in input core/of bindings.
+Does such generic binding exist today?  If not, I would like to go with 
+this implementation and update to the new binding if/when it exists?
+>
+> Thanks.
+>
