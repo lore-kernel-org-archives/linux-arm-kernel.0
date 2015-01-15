@@ -1,459 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Jan 2015 14:59:16 -0800
-Subject: [PATCH 2/4] ARM: dts: Add basic dm816x device tree configuration
-In-Reply-To: <54B82FBD.4040103@ti.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-3-git-send-email-tony@atomide.com>
- <54B82FBD.4040103@ti.com>
-Message-ID: <20150115225916.GJ18552@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 16 Jan 2015 01:18:21 +0200
+Subject: [PATCH v6 8/8] arm: dma-mapping: plumb our iommu mapping ops into
+ arch_setup_dma_ops
+In-Reply-To: <20150115111211.GF23475@arm.com>
+References: <1417453034-21379-1-git-send-email-will.deacon@arm.com>
+ <20150115082843.GB30799@ulmo> <20150115111211.GF23475@arm.com>
+Message-ID: <2804479.ZFl06ysk3j@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150115 13:26]:
-> On 01/13/2015 05:37 PM, Tony Lindgren wrote:
-> > +
-> > +		mailbox: mailbox at 480c8000 {
-> > +			compatible = "ti,omap3-mailbox";
+On Thursday 15 January 2015 11:12:17 Will Deacon wrote:
+> On Thu, Jan 15, 2015 at 08:28:44AM +0000, Thierry Reding wrote:
+> > On Wed, Jan 14, 2015 at 10:46:10AM +0000, Will Deacon wrote:
+> > > On Wed, Jan 14, 2015 at 09:00:24AM +0000, Alexandre Courbot wrote:
+> > [...]
+> > 
+> >>> 2) Say you want to use the IOMMU API in your driver, and have an iommu
+> >>> property in your device's DT node. If by chance your IOMMU is
+> >>> registered early, you will already have a mapping automatically
+> >>> created even before your probe function is called. Can this be
+> >>> avoided? Is it even safe?
+> >> 
+> >> Currently, I think you have to either teardown the ops manually or
+> >> return an error from of_xlate. Thierry was also looking at this sort of
+> >> thing, so it might be worth talking to him.
+> > 
+> > I already explained in earlier threads why I think this is a bad idea.
+> > It's completely unnatural for any driver to manually tear down something
+> > that it didn't want set up in the first place. It also means that you
+> > have to carefully audit any users of these IOMMU APIs to make sure that
+> > they do tear down. That doesn't sound like a good incremental approach,
+> > as evidenced by the breakage that Alex and Heiko have encountered.
 > 
-> The Mailbox IP is actually more like that of OMAP4, so the correct one
-> would be "ti,omap4-mailbox"
+> Well, perhaps we hide that behind a get_iommu API or something. We *do*
+> need this manual teardown step to support things like VFIO, so it makes
+> sense to reuse it for other users too imo.
 > 
-> > +			reg = <0x480c8000 0x2000>;
-> > +			interrupts = <77>;
-> > +			ti,hwmods = "mailbox";
-> > +			ti,mbox-num-users = <4>;
-> > +			ti,mbox-num-fifos = <8>;
-> This should be 12
+> > The solution for me has been to completely side-step the issue and not
+> > register the IOMMU with the new mechanism at all. That is, there's no
+> > .of_xlate() implementation, which means that the ARM DMA API glue won't
+> > try to be smart and use the IOMMU in ways it's not meant to be used.
+
+That will break when someone will want to use the same IOMMU type for devices 
+that use the DMA mapping API to hide the IOMMU. That might not be the case for 
+your IOMMU today, but it's pretty fragile, we need to fix it.
+
+> > This has several advantages, such as that I can also use the regular
+> > driver model for suspend/resume of the IOMMU, and I get to enjoy the
+> > benefits of devres in the IOMMU driver. Probe ordering is still a tiny
+> > issue, but we can easily solve that using explicit initcall ordering
+> > (which really isn't any worse than IOMMU_OF_DECLARE()).
 > 
-> > +			mbox_wkupm3: wkup_m3 {
-> > +				ti,mbox-tx = <0 0 0>;
-> > +				ti,mbox-rx = <0 0 3>;
-> > +			};
-> 
-> This may have been copied from AM335, so is incorrect. You are better
-> off starting with one for DSP instead of above, below are taken from the
-> corresponding SysLink release associated with above PSP release
-> 			mbox_dsp: mbox_dsp {
-> 				ti,mbox-tx = <3 0 0>;
-> 				ti,mbox-rx = <0 0 0>;
-> 			};
+> That's a pity. I'd much rather extend what we currently have to satisfy
+> your use-case. Ho-hum.
 
-Thanks for checking it! Yes I just copied the entry from am33xx.dtsi
-and forgot to even check it.
+Assuming we want the IOMMU to be handled transparently for the majority of 
+devices I only see two ways to fix this,
 
-The IO ranges, interrupts and dma channels I generated with printk
-from a booted PSP kernel so those should be mostly correct. But
-everything else is prone to cut and paste type errors.
+The first way is to create a default DMA mapping unconditionally and let 
+drivers that can't live with it tear it down. That's what is implemented 
+today.
 
-For reference, the devices I've confirmed to work so far are:
+The second way is to implement a mechanism to let drivers signal that they 
+want to handle DMA mappings themselves. As the mappings need in the general 
+case to be created before the probe function is called we can't signal this by 
+calling a function in probe(). A new flag field for struct device_driver is a 
+possible solution. This would however require delaying the creation of DMA 
+mappings until right before probe time. Attaching to the IOMMU could be pushed 
+to right before probe() as well, which would have the added benefit of making 
+IOMMU driver implementable as real platform drivers.
 
-- intc
-- timers
-- gpmc
-- i2c
-- ethernet and mdio
-- mmc
-- edma
-- uart
-
-Updated patch below with the mailbox fixed.
-
+-- 
 Regards,
 
-Tony
-
-8< ----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 14 Jan 2015 17:45:22 -0800
-Subject: [PATCH] ARM: dts: Add basic dm816x device tree configuration
-
-Similar to other omap variants, let's add dm816x support.
-
-Note that this is based on generated data from the
-TI81XX-LINUX-PSP-04.04.00.02 patches published at:
-
-http://downloads.ti.com/dsps/dsps_public_sw/psp/LinuxPSP/TI81XX_04_04/04_04_00_02/index_FDS.html
-
-I've verified the basic functionality, but have not been
-able to test all the devices on dm8168-evm.
-
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- /dev/null
-+++ b/arch/arm/boot/dts/dm816x.dtsi
-@@ -0,0 +1,374 @@
-+/*
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "ti,dm816";
-+	interrupt-parent = <&intc>;
-+
-+	aliases {
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		ethernet0 = &eth0;
-+		ethernet1 = &eth1;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			compatible = "arm,cortex-a8";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a8-pmu";
-+		interrupts = <3>;
-+	};
-+
-+	/*
-+	 * The soc node represents the soc top level view. It is used for IPs
-+	 * that are not memory mapped in the MPU view or for the MPU itself.
-+	 */
-+	soc {
-+		compatible = "ti,omap-infra";
-+		mpu {
-+			compatible = "ti,omap3-mpu";
-+			ti,hwmods = "mpu";
-+		};
-+	};
-+
-+	/*
-+	 * XXX: Use a flat representation of the dm816x interconnect.
-+	 * The real dm816x interconnect network is quite complex. Since
-+	 * it will not bring real advantage to represent that in DT
-+	 * for the moment, just use a fake OCP bus entry to represent
-+	 * the whole bus hierarchy.
-+	 */
-+	ocp {
-+		compatible = "ti,omap3-l3-smx", "simple-bus";
-+		reg = <0x44000000 0x10000>;
-+		interrupts = <9 10>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		ti,hwmods = "l3_main";
-+
-+		prcm: prcm at 48180000 {
-+			compatible = "ti,dm816-prcm";
-+			reg = <0x48180000 0x4000>;
-+
-+			prcm_clocks: clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			prcm_clockdomains: clockdomains {
-+			};
-+		};
-+
-+		scrm: scrm at 48140000 {
-+			compatible = "ti,dm816-scrm";
-+			reg = <0x48140000 0x21000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x48140000 0x21000>;
-+
-+			scrm_clocks: clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			scrm_clockdomains: clockdomains {
-+			};
-+		};
-+
-+		cm: syscon at 44e10000 {
-+			compatible = "ti,am33xx-controlmodule", "syscon";
-+			reg = <0x44e10000 0x800>;
-+		};
-+
-+		edma: edma at 49000000 {
-+			compatible = "ti,edma3";
-+			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2", "tptc3";
-+			reg =   <0x49000000 0x10000>,
-+			        <0x44e10f90 0x40>;
-+			interrupts = <12 13 14>;
-+			#dma-cells = <1>;
-+		};
-+
-+		elm: elm at 48080000 {
-+			compatible = "ti,816-elm";
-+			ti,hwmods = "elm";
-+			reg = <0x48080000 0x2000>;
-+			interrupts = <4>;
-+		};
-+
-+		gpio1: gpio at 48032000 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio1";
-+			reg = <0x48032000 0x1000>;
-+			interrupts = <97>;
-+		};
-+
-+		gpio2: gpio at 4804c000 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio2";
-+			reg = <0x4804c000 0x1000>;
-+			interrupts = <99>;
-+		};
-+
-+		gpmc: gpmc at 50000000 {
-+			compatible = "ti,am3352-gpmc";
-+			ti,hwmods = "gpmc";
-+			reg = <0x50000000 0x2000>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			interrupts = <100>;
-+			gpmc,num-cs = <6>;
-+			gpmc,num-waitpins = <2>;
-+		};
-+
-+		i2c1: i2c at 48028000 {
-+			compatible = "ti,omap4-i2c";
-+			ti,hwmods = "i2c1";
-+			reg = <0x48028000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <70>;
-+			dmas = <&edma 58 &edma 59>;
-+			dma-names = "tx", "rx";
-+		};
-+
-+		i2c2: i2c at 4802a000 {
-+			compatible = "ti,omap4-i2c";
-+			ti,hwmods = "i2c2";
-+			reg = <0x4802a000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <71>;
-+			dmas = <&edma 60 &edma 61>;
-+			dma-names = "tx", "rx";
-+		};
-+
-+		intc: interrupt-controller at 48200000 {
-+			compatible = "ti,dm816-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x48200000 0x1000>;
-+		};
-+
-+		mailbox: mailbox at 480c8000 {
-+			compatible = "ti,omap4-mailbox";
-+			reg = <0x480c8000 0x2000>;
-+			interrupts = <77>;
-+			ti,hwmods = "mailbox";
-+			ti,mbox-num-users = <4>;
-+			ti,mbox-num-fifos = <12>;
-+			mbox_dsp: mbox_dsp {
-+				ti,mbox-tx = <3 0 0>;
-+				ti,mbox-rx = <0 0 0>;
-+			};
-+		};
-+
-+		mdio: mdio at 4a100800 {
-+			compatible = "ti,davinci_mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x4a100800 0x100>;
-+			ti,hwmods = "davinci_mdio";
-+			bus_freq = <1000000>;
-+			phy0: ethernet-phy at 0 {
-+				reg = <1>;
-+			};
-+			phy1: ethernet-phy at 1 {
-+				reg = <2>;
-+			};
-+		};
-+
-+		eth0: ethernet at 4a100000 {
-+			compatible = "ti,dm816-emac";
-+			ti,hwmods = "emac0";
-+			reg = <0x4a100000 0x800
-+			       0x4a100900 0x3700>;
-+			clocks = <&sysclk24_ck>;
-+			ti,davinci-ctrl-reg-offset = <0>;
-+			ti,davinci-ctrl-mod-reg-offset = <0x900>;
-+			ti,davinci-ctrl-ram-offset = <0x2000>;
-+			ti,davinci-ctrl-ram-size = <0x2000>;
-+			interrupts = <40 41 42 43>;
-+			phy-handle = <&phy0>;
-+		};
-+
-+		eth1: ethernet at 4a120000 {
-+			compatible = "ti,dm816-emac";
-+			ti,hwmods = "emac1";
-+			reg = <0x4a120000 0x4000>;
-+			clocks = <&sysclk24_ck>;
-+			ti,davinci-ctrl-reg-offset = <0>;
-+			ti,davinci-ctrl-mod-reg-offset = <0x900>;
-+			ti,davinci-ctrl-ram-offset = <0x2000>;
-+			ti,davinci-ctrl-ram-size = <0x2000>;
-+			interrupts = <44 45 46 47>;
-+			phy-handle = <&phy1>;
-+		};
-+
-+		mcspi1: spi at 48030000 {
-+			compatible = "ti,omap3-mcspi";
-+			reg = <0x48030000 0x2000>;
-+			interrupts = <65>;
-+			ti,spi-num-cs = <2>;
-+			ti,hwmods = "mcspi1";
-+			dmas = <&edma 16 &edma 17
-+				&edma 18 &edma 19>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
-+		};
-+
-+		mmc1: mmc at 48060000 {
-+			compatible = "ti,omap4-hsmmc";
-+			reg = <0x48060000 0x11000>;
-+			ti,hwmods = "mmc1";
-+			interrupts = <64>;
-+			dmas = <&edma 24 &edma 25>;
-+			dma-names = "tx", "rx";
-+		};
-+
-+		timer1: timer at 4802e000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x4802e000 0x2000>;
-+			interrupts = <67>;
-+			ti,hwmods = "timer1";
-+			ti,timer-alwon;
-+		};
-+
-+		timer2: timer at 48040000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x48040000 0x2000>;
-+			interrupts = <68>;
-+			ti,hwmods = "timer2";
-+		};
-+
-+		timer3: timer at 48042000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x48042000 0x2000>;
-+			interrupts = <69>;
-+			ti,hwmods = "timer3";
-+		};
-+
-+		timer4: timer at 48044000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x48044000 0x2000>;
-+			interrupts = <92>;
-+			ti,hwmods = "timer4";
-+		};
-+
-+		timer5: timer at 48046000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x48046000 0x2000>;
-+			interrupts = <93>;
-+			ti,hwmods = "timer5";
-+		};
-+
-+		timer6: timer at 48048000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x48048000 0x2000>;
-+			interrupts = <94>;
-+			ti,hwmods = "timer6";
-+		};
-+
-+		timer7: timer at 4804a000 {
-+			compatible = "ti,dm816-timer";
-+			reg = <0x4804a000 0x2000>;
-+			interrupts = <95>;
-+			ti,hwmods = "timer7";
-+		};
-+
-+		uart1: uart at 48020000 {
-+			compatible = "ti,omap3-uart";
-+			ti,hwmods = "uart1";
-+			reg = <0x48020000 0x2000>;
-+			clock-frequency = <48000000>;
-+			interrupts = <72>;
-+			dmas = <&edma 26 &edma 27>;
-+			dma-names = "tx", "rx";
-+		};
-+
-+		uart2: uart at 48022000 {
-+			compatible = "ti,omap3-uart";
-+			ti,hwmods = "uart2";
-+			reg = <0x48022000 0x2000>;
-+			clock-frequency = <48000000>;
-+			interrupts = <73>;
-+			dmas = <&edma 28 &edma 29>;
-+			dma-names = "tx", "rx";
-+		};
-+
-+		uart3: uart at 48024000 {
-+			compatible = "ti,omap3-uart";
-+			ti,hwmods = "uart3";
-+			reg = <0x48024000 0x2000>;
-+			clock-frequency = <48000000>;
-+			interrupts = <74>;
-+			dmas = <&edma 30 &edma 31>;
-+			dma-names = "tx", "rx";
-+		};
-+
-+		/* NOTE: USB needs a transceiver driver for phys to work */
-+		usb: usb_otg_hs at 47401000 {
-+			compatible = "ti,am33xx-usb";
-+			reg = <0x47401000 0x400000>;
-+			ranges;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ti,hwmods = "usb_otg_hs";
-+
-+			usb0: usb at 47401000 {
-+				compatible = "ti,musb-am33xx";
-+				reg = <0x47401400 0x400
-+				       0x47401000 0x200>;
-+				reg-names = "mc", "control";
-+				interrupts = <18>;
-+				interrupt-names = "mc";
-+				dr_mode = "otg";
-+				mentor,multipoint = <1>;
-+				mentor,num-eps = <16>;
-+				mentor,ram-bits = <12>;
-+				mentor,power = <500>;
-+			};
-+
-+			usb1: usb at 47401800 {
-+				compatible = "ti,musb-am33xx";
-+				status = "disabled";
-+				reg = <0x47401c00 0x400
-+				       0x47401800 0x200>;
-+				reg-names = "mc", "control";
-+				interrupts = <19>;
-+				interrupt-names = "mc";
-+				dr_mode = "otg";
-+				mentor,multipoint = <1>;
-+				mentor,num-eps = <16>;
-+				mentor,ram-bits = <12>;
-+				mentor,power = <500>;
-+			};
-+		};
-+
-+		wd_timer2: wd_timer at 480c2000 {
-+			compatible = "ti,omap3-wdt";
-+			ti,hwmods = "wd_timer";
-+			reg = <0x480c2000 0x1000>;
-+			interrupts = <0>;
-+		};
-+	};
-+};
-+
+Laurent Pinchart
