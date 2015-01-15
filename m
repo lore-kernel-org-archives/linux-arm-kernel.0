@@ -1,66 +1,47 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Thu, 15 Jan 2015 15:33:00 -0600
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 15 Jan 2015 16:38:37 -0500
 Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+In-Reply-To: <54B831C9.3060700@redhat.com>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54B8320C.5090201@amd.com>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <54B831C9.3060700@redhat.com>
+Message-ID: <54B8335D.304@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/14/2015 9:04 AM, Hanjun Guo wrote:
-> Hi,
->
-> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
->
-> updates from v6:
->    - Rebased on top of 3.19-rc4, add Mack Salter's patch to use
->      the early_ioremap after paging_init() for ACPI table mappings;
->
->    - Two patches about converting apic_id to phys_id to make it arch
->      agnostic were already merged into RC4 by Rafael.
->
->    - Split patch "Parse FADT table to get PSCI flags for PSCI init"
->      into two as Lorenzo's suggestion, also fix typo and lack of __init
->      for psci_0_2_set_functions() which is spotted by Lorenzo.
->
->    - Add Tested-by from Yijing Wang.
->
-> previous version is here:
-> v6: https://lkml.org/lkml/2015/1/4/40
->
-> 1. Why we need ACPI on ARM64?
->
->    - Grant already posted a blog about this, and stated clearly
->      why we need ACPI on ARM64:
->
->      http://www.secretlab.ca/archives/151
->
->
-> 2. What we need to do before the arm64 ACPI core patches
->     could be merged into the kernel?
->
->    - Al Stone posted a TODO list and updates v2 for the
->      progress we made:
->      http://www.spinics.net/lists/arm-kernel/msg390069.html
->
->    - so from the progress we can see that we already finished
->      most of the items, and _OSI we got a plan to fix it, RFC
->      patch is on the way.
->
->
-> This patch set was tested on FVP by Fuwei, and booted ok as expected.
-> (No functional change since last version)
->
-> Thanks
-> Hanjun
->
+On 01/15/2015 04:31 PM, Al Stone wrote:
+> On 01/15/2015 11:23 AM, Catalin Marinas wrote:
+>> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
+>>> On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+>>>
+>>> I'll get right to the point: Can we please have this series queued up
+>>> for v3.20?
+>> [snip ... ]
+> 
+>>> 5. Platform support patches need verification and review
+>>>    * ACPI core works on at least the Foundation model, Juno, APM
+>>> Mustang, and AMD Seattle
+>>>    * There still are driver patches being discussed. See Al's summary
+>>> for details
+>>>    * As I argued above, the state of driver patches isn't going to be
+>>
+>> We are still lacking here. To quote Al, "First version for AMD Seattle
+>> has been posted to the public linaro-acpi mailing list for initial
+>> review". Sorry but I don't follow linaro-acpi list. I don't know what's
+>> in those patches and I can't tell which subsystems they touch, whether
+>> maintainers agree with them. So in conclusion, I'm not confident the
+>> arm64 hardware ACPI story looks that great yet.
+>>  
+> 
+> This is solely my fault -- too much time on processes, email, and
+> documentation, not enough time on the Seattle patches.  And not
+> enough Seattles to go around for someone else to pick up the slack.
 
-The V7 patch series has also been re-tested on AMD Seattle server 
-platform along with the "Introduce ACPI support for ahci_platform 
-driver" patch series here (https://lkml.org/lkml/2015/1/5/662).
+As an aside: a few of us have discretely assisted in ensuring that the
+right folks have access to hardware platforms over the past few months.
+If one of the upstream maintainers does not have v8 hardware and doing
+so will unblock progress please get in touch off list.
 
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-
-Thanks,
-
-Suravee
+Jon.
