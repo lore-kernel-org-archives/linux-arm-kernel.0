@@ -1,130 +1,222 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 15 Jan 2015 08:53:54 +0000
-Subject: [PATCH 2/6] ARM: at91: pm: use the mmio-sram pool to access SRAM
-In-Reply-To: <1421097825-396-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421097825-396-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421097825-396-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFCDFFBB@penmbx01>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 15 Jan 2015 09:57:17 +0100
+Subject: [PATCH] ARM: dts: sun6i: Convert hummingbird a31 dts to label
+ references
+In-Reply-To: <20150114194635.GF4891@lukather>
+References: <1421123484-21387-1-git-send-email-wens@csie.org>
+ <20150113154415.GY4891@lukather>
+ <CAGb2v67sQyNcFQgvm60TUzjp3QBusckvP2i_xkj-eLRZubkALA@mail.gmail.com>
+ <20150113162053.GZ4891@lukather> <54B61AD3.2040407@redhat.com>
+ <CAGb2v65jZZJoG3z+9Vc460X3kvogwLDze_Jx4pS-xuR=84GBVQ@mail.gmail.com>
+ <54B62CC8.5010403@redhat.com>
+ <CAGb2v65pFDWnucdP-_fX+JzdWSx9maWCkzc_z1jFcnt=GMxfqA@mail.gmail.com>
+ <54B6421C.3030303@redhat.com> <20150114194635.GF4891@lukather>
+Message-ID: <54B780ED.8070101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre
+Hi,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
-> Behalf Of Alexandre Belloni
-> Sent: Tuesday, January 13, 2015 5:24 AM
-> To: Ferre, Nicolas
-> Cc: Boris Brezillon; Alexandre Belloni; Jean-Christophe Plagniol-Villard; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH 2/6] ARM: at91: pm: use the mmio-sram pool to access SRAM
-> 
-> Now that the SRAM is part of a genpool, use it to allocate memory to use for the
-> slowclock implementation.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/mach-at91/Kconfig |  1 +
->  arch/arm/mach-at91/pm.c    | 46
-> +++++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 46 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig index
-> cec0fb5d621a..b7dcef50db23 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -178,6 +178,7 @@ comment "AT91 Feature Selections"
-> 
->  config AT91_SLOW_CLOCK
->  	bool "Suspend-to-RAM disables main oscillator"
-> +	select SRAM
-Can we move it under config ARCH_AT91 or other place?
+On 14-01-15 20:46, Maxime Ripard wrote:
+> On Wed, Jan 14, 2015 at 11:17:00AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 14-01-15 10:29, Chen-Yu Tsai wrote:
+>>> On Wed, Jan 14, 2015 at 4:46 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> Hi,
+>>>>
+>>>>
+>>>> On 14-01-15 09:41, Chen-Yu Tsai wrote:
+>>>>>
+>>>>> On Wed, Jan 14, 2015 at 3:29 PM, Hans de Goede <hdegoede@redhat.com>
+>>>>> wrote:
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>>
+>>>>>> On 13-01-15 17:20, Maxime Ripard wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> On Tue, Jan 13, 2015 at 11:54:21PM +0800, Chen-Yu Tsai wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> On Tue, Jan 13, 2015 at 11:44 PM, Maxime Ripard
+>>>>>>>> <maxime.ripard@free-electrons.com> wrote:
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Hi,
+>>>>>>>>>
+>>>>>>>>> On Tue, Jan 13, 2015 at 12:31:24PM +0800, Chen-Yu Tsai wrote:
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> Using label references is preferred when override settings from the
+>>>>>>>>>> included dtsi.
+>>>>>>>>>>
+>>>>>>>>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>>>>>>>>> ---
+>>>>>>>>>>
+>>>>>>>>>> My AXP221 series touches this file. I thought I'd convert it first.
+>>>>>>>>>>
+>>>>>>>>>> This looks like a lot of changes. But if you filter out all the
+>>>>>>>>>> indentation changes, it's just the opening lines for each node.
+>>>>>>>>>>
+>>>>>>>>>> ---
+>>>>>>>>>>     arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 181
+>>>>>>>>>> ++++++++++++++--------------
+>>>>>>>>>>     1 file changed, 88 insertions(+), 93 deletions(-)
+>>>>>>>>>>
+>>>>>>>>>> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>>>>> b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>>>>> index ebd5f7854b1b..97dbaeb76416 100644
+>>>>>>>>>> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>>>>> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>>>>>>>>>> @@ -61,101 +61,96 @@
+>>>>>>>>>>          chosen {
+>>>>>>>>>>                  bootargs = "earlyprintk console=ttyS0,115200";
+>>>>>>>>>>          };
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&mmc0 {
+>>>>>>>>>> +     pinctrl-names = "default";
+>>>>>>>>>> +     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+>>>>>>>>>> +     vmmc-supply = <&reg_vcc3v0>;
+>>>>>>>>>> +     bus-width = <4>;
+>>>>>>>>>> +     cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+>>>>>>>>>> +     cd-inverted;
+>>>>>>>>>> +     status = "okay";
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&usbphy {
+>>>>>>>>>> +     usb1_vbus-supply = <&reg_usb1_vbus>;
+>>>>>>>>>> +     status = "okay";
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&ehci0 {
+>>>>>>>>>> +     status = "okay";
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&ohci0 {
+>>>>>>>>>> +     status = "okay";
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&pio {
+>>>>>>>>>> +     mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
+>>>>>>>>>> +             allwinner,pins = "PA8";
+>>>>>>>>>> +             allwinner,function = "gpio_in";
+>>>>>>>>>> +             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>>>>>>>> +             allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>>>>>>> +     };
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&mmc0_pins_a {
+>>>>>>>>>> +     /* external pull-ups missing for some pins */
+>>>>>>>>>> +     allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&usb1_vbus_pin_a {
+>>>>>>>>>> +     /* different pin from sunxi-common-regulators */
+>>>>>>>>>> +     allwinner,pins = "PH24";
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&uart0 {
+>>>>>>>>>> +     pinctrl-names = "default";
+>>>>>>>>>> +     pinctrl-0 = <&uart0_pins_a>;
+>>>>>>>>>> +     status = "okay";
+>>>>>>>>>> +};
+>>>>>>>>>> +
+>>>>>>>>>> +&i2c0 {
+>>>>>>>>>> +     pinctrl-names = "default";
+>>>>>>>>>> +     pinctrl-0 = <&i2c0_pins_a>;
+>>>>>>>>>> +     /* pull-ups and devices require AXP221 DLDO3 */
+>>>>>>>>>> +     status = "failed";
+>>>>>>>>>> +};
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> I think we should define a convention about how to sort these nodes
+>>>>>>>>> before we actually start merging some of it.
+>>>>>>>>>
+>>>>>>>>> This of course also apply to the other patches doing that, hence why
+>>>>>>>>> Hans is CC'd.
+>>>>>>>>>
+>>>>>>>>> I guess sorting them by label alphabetical order would make
+>>>>>>>>> sense. What do you think?
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> I'm currently using the ordering from the dtsi, which is based
+>>>>>>>> on address. Even if it's not visible, if you're creating the
+>>>>>>>> dts by looking at the dtsi and enabling the devices available,
+>>>>>>>> that's the order you add them by, so it kind of makes sense.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Right, that is what I'm doing too.
+>>>>>>
+>>>>>>> I know you're doing just that, and that it makes some kind of sense
+>>>>>>> whenever you convert an old DTS to the label based syntax, but
+>>>>>>> whenever you create a new one, it's a bit harder to get it right.
+>>>>>>>
+>>>>>>> And the fact that Hans didn't follow that convention illustrate that
+>>>>>>> very well.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Erm, that is not true, I did follow that convention as my 2 new
+>>>>>> dts files started in the old format too, and I simply re-indented
+>>>>>> most nodes.
+>>>>>
+>>>>>
+>>>>> I think it also makes sense for new boards as well. One would look
+>>>>> at the dtsi to know what devices on the soc are available, and
+>>>>> copy the ones that can be used.
+>>>>>
+>>>>> But the ordering does make adding new devices with new drivers
+>>>>> a bit problematic. It is easy to place new nodes in the wrong
+>>>>> place.
+>>>>>
+>>>>>>> I guess a sorting logic internal to the DTS itself would be much
+>>>>>>> easier to understand and follow, hence why I suggested the
+>>>>>>> alphabetical order: it just stands out without any external reference.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> If we agree on this, we also need to think about what to do with new
+>>>>>> board specific powersupplies, as those need to be in the root node,
+>>>>>> if you look at the bananapro dts from the v2 patch you will see what
+>>>>>> I mean.
+>>>>>
+>>>>>
+>>>>> How about the root node at the top? With the board description, chosen,
+>>>>> aliases (if any), and then the _new_ regulators (sorted by name)?
+>>>>>
+>>>>> One can then easily identify which are board specific, and which are
+>>>>> more or less generic.
+>>>>
+>>>>
+>>>> Sure, that works for me, what about the leds section, also in the
+>>>> root node at the top? Before or after regulators ?
+>>>
+>>> Before the regulators? Because a) L comes before R and  b) this
+>>> is what's currently done in our dts files.
+>>
+>> OK, Maxime, do you agree ?
+>
+> See, we're getting to the alphabetical order :)
+>
+> I don't what your workflow is, but usually I start from a close DTS,
+> never from a DTSI.
+>
+> We will indeed still have the root node with the leds, regulators,
+> buttons, any board-specific platform driver actually. It indeed makes
+> sense to place that on top.
+>
+> And if we're going to have an alphabetical order within that node,
+> won't it be weird if we have what looks like a random one below?
 
-It may be used for other purposes, more than pm. I thinks
+Ok, so I'll respin my recent set with 2 board additions to follow
+this scheme.
 
->  	depends on SUSPEND
->  	help
->  	  Select this if you want Suspend-to-RAM to save the most power diff --git
-> a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> 79aa793d1f00..515791edcc60 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -14,10 +14,12 @@
->  #include <linux/suspend.h>
->  #include <linux/sched.h>
->  #include <linux/proc_fs.h>
-> +#include <linux/genalloc.h>
->  #include <linux/interrupt.h>
->  #include <linux/sysfs.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/clk/at91_pmc.h>
-> @@ -222,10 +224,52 @@ void at91_pm_set_standby(void (*at91_standby)(void))
->  	}
->  }
-> 
-> +#ifdef CONFIG_AT91_SLOW_CLOCK
-> +static void __init at91_pm_sram_init(void) {
-> +	struct gen_pool *sram_pool;
-> +	phys_addr_t sram_pbase;
-> +	unsigned long sram_base;
-> +	struct device_node *node;
-> +	struct platform_device *pdev;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
-> +	if (!node) {
-> +		pr_warn("%s: failed to find sram node!\n", __func__);
-> +		return;
-> +	}
-> +
-> +	pdev = of_find_device_by_node(node);
-> +	if (!pdev) {
-> +		pr_warn("%s: failed to find sram device!\n", __func__);
-> +		goto put_node;
-> +	}
-> +
-> +	sram_pool = dev_get_gen_pool(&pdev->dev);
-> +	if (!sram_pool) {
-> +		pr_warn("%s: sram pool unavailable!\n", __func__);
-> +		goto put_node;
-> +	}
-> +
-> +	sram_base = gen_pool_alloc(sram_pool, at91_slow_clock_sz);
-> +	if (!sram_base) {
-> +		pr_warn("%s: unable to alloc ocram!\n", __func__);
-> +		goto put_node;
-> +	}
-> +
-> +	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
-> +	slow_clock = __arm_ioremap_exec(sram_pbase, at91_slow_clock_sz,
-> +false);
-> +
-> +put_node:
-> +	of_node_put(node);
-> +}
-> +#endif
-> +
-> +
->  static int __init at91_pm_init(void)
->  {
->  #ifdef CONFIG_AT91_SLOW_CLOCK
-> -	slow_clock = (void *) (AT91_IO_VIRT_BASE - at91_slow_clock_sz);
-> +	at91_pm_sram_init();
->  #endif
-> 
->  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock
-> mode)" : ""));
-> --
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
 
-Best Regards,
-Wenyou Yang
+Hans
