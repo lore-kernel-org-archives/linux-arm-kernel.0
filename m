@@ -1,57 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 08:50:07 +0100
-Subject: [PATCH v2 1/5] rtc: armada38x: Add the device tree binding
- documentation
-In-Reply-To: <20150114202252.457d328e@free-electrons.com>
-References: <1421257155-3379-1-git-send-email-gregory.clement@free-electrons.com>	<1421257155-3379-2-git-send-email-gregory.clement@free-electrons.com>
- <20150114202252.457d328e@free-electrons.com>
-Message-ID: <54B7712F.2090509@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Jan 2015 08:56:46 +0100
+Subject: [PATCH] i.MX6-SabreAuto: EIM: pull PAD_EIM_D18 low for NOR probe
+In-Reply-To: <20150115000334.GA9759@ld-irv-0074>
+References: <1421278609-8446-1-git-send-email-alison_chaiken@mentor.com>
+ <20150115000334.GA9759@ld-irv-0074>
+Message-ID: <20150115075646.GM23940@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, Jan 14, 2015 at 04:03:34PM -0800, Brian Norris wrote:
+> + linux-arm-kernel, maintainers, devicetree
+> 
+> Shawn, Sascha: should this driver be listed under the Freescale IMX
+> MAINTAINERS entry?
 
-On 14/01/2015 20:22, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Wed, 14 Jan 2015 18:39:11 +0100, Gregory CLEMENT wrote:
-> 
->> +Required properties:
->> +- compatible : Should be "marvell,armada-380-rtc"
->> +- reg: physical base address of the controller and length of memory
->> +  mapped region, associated to the reg-name "rtc". The other entry is
->> +  related to the interrupt control from the SoC, associated to the
->> +  reg-name "soc-interrupt".
-> 
-> soc-interrupt or...
-
-I changed all the name from soc-interrupt to soc-int except here.
-I will fix it.
+This driver is purely i.MX, so yes, that would be good.
 
 > 
->> +- reg-names: names of the mapped memory regions listed in regs
->> +    property in the same order: "rtc" and "soc-int".
+> On Wed, Jan 14, 2015 at 03:36:49PM -0800, alison at she-devel.com wrote:
+> > From: Alison Chaiken <alison_chaiken@mentor.com>
+> > 
+> > PAD_EIM_D18 must be pulled low at boot in order for the parallel NOR
+> > connected to the EIM switch to probe properly.  Otherwise
+> > cfi_qry_present() may return "U-V-]" rather than "Q-R-Y" if the
+> > PAD_EIM_D18 is high.  Add a nor-gpios property to the nor node in the
+> > SabreAuto device-tree and add a function to the imx-weim probe to set
+> > GPIO5 to drive the pad.
+> > 
+> > Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
+> > ---
+> >  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |  1 +
+> >  drivers/bus/imx-weim.c                   | 43 ++++++++++++++++++++++++++++++++
+> >  2 files changed, 44 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > index 009abd6..dd5e3bc 100644
+> > --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > @@ -454,5 +454,6 @@
+> >  		bank-width = <2>;
+> >  		fsl,weim-cs-timing = <0x00620081 0x00000001 0x1c022000
+> >  				0x0000c000 0x1404a38e 0x00000000>;
+> > +		nor-gpios = <&gpio5 4 GPIO_ACTIVE_LOW>;
 > 
-> soc-int ?
+> Such a binding needs to be documented. Also, if it's going to be named
+> generically like that, it needs to be generically useful and supported
+> under MTD code, not platform-specific bus code.
 > 
->> +rtc at a3800 {
->> +	compatible = "marvell,armada-380-rtc";
->> +	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
-> 
-> Any reason to use <0x184A0 0xC> instead of <0x184A8 0x4> ? According to
-> the datasheet, there is only this 184A8 register for RTC stuff.
+> So what pin is this, exactly? A write-protect pin? An address pin? A
+> toaster control, where the toaster is keeping the flash too hot?
 
-Yes but according to the code I saw there were other registers related to the RTC
-from 0x184A0. Even if we don't use them now I prefer having an accurate mapping from
-the beginning for avoiding using negative offset as we needed to do in the past.
+Yeah, the gpio should probably be named after the input pin on the flash
+where it's connected to. Otherwise people just use this property for any
+GPIO they need to put in a certain direction.
 
-Thanks,
-
-Gregory
-
+Sascha
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
