@@ -1,131 +1,81 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Jan 2015 11:20:32 +0100
-Subject: [PATCH RESEND v15 07/10] KVM: arm: page logging 2nd stage fault
- handling
-In-Reply-To: <54B6F753.8000101@samsung.com>
-References: <1420863441-32592-1-git-send-email-m.smarduch@samsung.com>
- <20150111140003.GA2722@cbox> <54B3F5D7.4010501@samsung.com>
- <20150112174927.GM3868@cbox> <54B5A6E7.6090904@samsung.com>
- <20150114103233.GI26222@cbox> <54B6F753.8000101@samsung.com>
-Message-ID: <20150115102032.GN26222@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Jan 2015 10:25:11 +0000
+Subject: [PATCH v10] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
+References: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
+ <20141216094527.GC6580@arm.com>
+ <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20150115102511.GB23475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 03:10:11PM -0800, Mario Smarduch wrote:
-> On 01/14/2015 02:32 AM, Christoffer Dall wrote:
-> > On Tue, Jan 13, 2015 at 03:14:47PM -0800, Mario Smarduch wrote:
-> > 
-> > [...]
-> > 
-> >>>>>
-> >>>>>
-> >>>>> What I meant last time around concerning user_mem_abort was more
-> >>>>> something like this:
-> >>>>>
-> >>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >>>>> index 1dc9778..38ea58e 100644
-> >>>>> --- a/arch/arm/kvm/mmu.c
-> >>>>> +++ b/arch/arm/kvm/mmu.c
-> >>>>> @@ -935,7 +935,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>>>>  		return -EFAULT;
-> >>>>>  	}
-> >>>>>  
-> >>>>> -	if (is_vm_hugetlb_page(vma)) {
-> >>>>> +	/*
-> >>>>> +	 * Writes to pages in a memslot with logging enabled are always logged
-> >>>>> +	 * on a singe page-by-page basis.
-> >>>>> +	 */
-> >>>>> +	if (memslot_is_logging(memslot) && write_fault)
-> >>>>> +		force_pte = true;
-> >>>>
-> >>>> If it's a write you take the pte route and
-> >>>> dissolves huge page, if it's a read you reconstruct the
-> >>>> THP that seems to yield pretty bad results.
-> >>>
-> >>> ok, then remove the ' && write_fault' part of the clause.
-> >> Hi Christoffer,
-> >>  couple comments/questions.
-> >>
-> >>  setting force_pte here, disables huge pages for
-> >> non-writable regions.
-> >>
-> > 
+On Wed, Jan 14, 2015 at 07:42:53PM +0000, Mitchel Humpherys wrote:
+> On Tue, Dec 16 2014 at 01:45:27 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Dec 15, 2014 at 11:47:23PM +0000, Mitchel Humpherys wrote:
+> >> From: Matt Wagantall <mattw@codeaurora.org>
+> >> 
+> >> It is sometimes necessary to poll a memory-mapped register until its value
+> >> satisfies some condition. Introduce a family of convenience macros that do
+> >> this. Tight-looping, sleeping, and timing out can all be accomplished using
+> >> these macros.
+> >> 
+> >> Cc: Thierry Reding <thierry.reding@gmail.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Andrew Morton <akpm@linux-foundation.org>
+> >> Cc: Robert Elliott <elliott@hp.com>
+> >> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+> >> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> >> ---
+> >> v9..10:
+> >>   - Actually added the comments mentioned in v8..v9 (doh!)
+> >> 
+> >> v8..v9:
+> >>   - Added note in comments about max sleep time (Rob Elliott)
+> >> 
+> >> v7..v8:
+> >>   - sorted helper macros by size (b, w, l, q)
+> >>   - removed some of the more esoteric (or flat-out bogus) helper macros
+> >> 
+> >> This patch was originally part of a series [1] for adding support for IOMMU
+> >> address translations through an ARM SMMU hardware register.  The other
+> >> patch in the series (the one that actually uses these macros and implements
+> >> said hardware address translations) was Ack'd by the driver maintainer
+> >> there (Will Deacon) so I've pulled this patch out to avoid resending an
+> >> already Ack'd patch over and over again.
+> >> 
+> >> In short, please see [1] for previous discussion and the first user of
+> >> these macros.
+> >> 
+> >> Will also acked this patch in [2].  I didn't retain his Ack here because I
+> >> added to the macro comments.
+> >
+> > You can keep the ack, it still looks good to me and I'm not really fussed
+> > about the comments.
+> >
+> > Will
 > 
-> Hi Christoffer,
->  another round, although I'll go ahead and post another
-> iteration, sorry but as you mentioned this code is
-> important.
-> 
-> > hmmm, by a non-writable region you mean a read-only memslot? Can you set
-> > dirty page logging for such one?  That doesn't make much sense to me.
-> 
-> Come to think of it that's  true.
-> 
-> It's bit fuzzyy when I was looking at the API for KVM_MEM_LOG_DIRTY_PAGES,
-> it appears user space needs to check if region is read-only and set region
-> size to 0(qemu). I don't see any checks in kernel to disable logging if
-> region is read only and we're enabling dirty page logging. API doesn't say
-> anything else. You may be able to enable logging
-> for read-only region if you leave region size as is.
-> 
-> I guess this has been around for quite a while so we
-> can just assume read-only slots will have logging disabled.
-> 
+> This hasn't gotten any further comments.  Would someone be willing to
+> take it?
 
-I'm a bit confused, IIUC we don't make any explicit checks in the code
-right now, so either there is some generic code that never sets the
-logging flag on a read-only memregion or you can change the
-implementation of memslot_is_logging() to return false if the memslot is
-read-only.
+If you get an Ack from any of Arnd/Joerg/akpm then I'm happy to take it via
+the arm-smmu pull (along with the patch making use of it).
 
-> > 
-> > Note, that if you receive writable == false from gfn_to_pfn_prot() that
-> > doesn't mean that the page can never be written to, it just means that
-> > the current mapping of the page is not a writable one, you can call that
-> > same function again later with write_fault=true, and you either get a
-> > writable page back or you simply get an error.
-> 
-> Yes that's true after studying hva_to_pfn_slow(),
-> and __get_user_pages_fast(), a lot of conditions
-> handled there.
-> 
-> > 
-> > [...]
-> > 
-> >>>>>  	if (kvm_is_device_pfn(pfn))
-> >>>>>  		mem_type = PAGE_S2_DEVICE;
-> >>
-> >> If we're not setting the IOMAP flag do we have need
-> >> this, since we're forfeiting error checking later
-> >> in stage2_set_pte()?
-> >>
-> > 
-> > we still need this, remember the error checking is about
-> > cache == NULL, not about the IOMAP flag.  I think I address this in the
-> > new proposal below, but please check carefully.
-> 
-> Ok so mmu notifier may call stage2_set_pte() with
-> null cache poiner and intermediate table entries may
-> not be there so stage2_get_pud() may return NULL.
-> With logging on it won't happen, but just in case
-> we check.
+Joerg, would you be ok with that?
 
-yes, to easily catch programming errors in the future, that's why if you
-make it a VM_BUG_ON the check won't be compiled unless you have kernel
-memory debugging enabled.
+Will
 
+> Joerg, maybe you could take this through the IOMMU tree since the first
+> user is an IOMMU driver?  Currently we can't move [1] forward because of
+> this dependency...
 > 
-> And we'll continue to handle Device faults until
-> further notice.
+> [1] http://thread.gmane.org/gmane.linux.kernel.iommu/7837
 > 
-
-yes.
-
-> > 
-> > Take a look at this one:
 > 
-> Looks good to me, concise.
+> -Mitch
 > 
-
-Thanks,
--Christoffer
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
