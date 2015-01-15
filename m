@@ -1,60 +1,60 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 14 Jan 2015 16:13:40 -0800
-Subject: [PATCH 1/2] MAINTAINERS: update brcmstb entries
-In-Reply-To: <54595FED.6000409@gmail.com>
-References: <1414521895-12667-1-git-send-email-f.fainelli@gmail.com>
- <1414521895-12667-2-git-send-email-f.fainelli@gmail.com>
- <20141104204514.GA5908@quad.lixom.net> <545957A5.6010802@gmail.com>
- <CACxGe6s5rCUM_QQ-Da-AOKBbb4tUEJ_rcKU9frdEDDprYND3Tw@mail.gmail.com>
- <54595FED.6000409@gmail.com>
-Message-ID: <CAN8TOE_uHUFuyofTYFzWioB7TkCqx2sLYk2bbrV06EKOMvzYRg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 14 Jan 2015 16:23:10 -0800
+Subject: [PATCH v3 4/4] pinctrl: qcom: Add support for reset for apq8064
+In-Reply-To: <CAOZdJXXZ3RH1zOGcz1L58d9DV_LSZtUxYVKe6ssM71nyhnbMyg@mail.gmail.com>
+References: <1409322659-17693-1-git-send-email-pramod.gurav@smartplayin.com>	<1409322659-17693-5-git-send-email-pramod.gurav@smartplayin.com>	<CAOZdJXXRgrYUEcX4f5zRuKgX-Dtbpvf-SV4-8rjuohv3=0NJhQ@mail.gmail.com>	<54B6FF75.70500@codeaurora.org>
+ <CAOZdJXXZ3RH1zOGcz1L58d9DV_LSZtUxYVKe6ssM71nyhnbMyg@mail.gmail.com>
+Message-ID: <54B7086E.7060807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since I found this in my inbox during garbage collection...
-
-On Tue, Nov 4, 2014 at 3:23 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 11/04/2014 02:56 PM, Grant Likely wrote:
->> On Tue, Nov 4, 2014 at 10:48 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>> On 11/04/2014 12:45 PM, Olof Johansson wrote:
->>>> On Tue, Oct 28, 2014 at 11:44:54AM -0700, Florian Fainelli wrote:
->>>>> Remove Marc Carino from the brcmstb maintainers list and add Gregory
->>>>> Fong and myself as new maintainers for the brcmstb platform.
->>>>>
->>>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>>>> ---
->>>>>  MAINTAINERS | 3 ++-
->>>>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/MAINTAINERS b/MAINTAINERS
->>>>> index dab92a78d1d5..33a8b31e03f0 100644
->>>>> --- a/MAINTAINERS
->>>>> +++ b/MAINTAINERS
->>>>> @@ -2093,8 +2093,9 @@ F:     arch/arm/mach-bcm/bcm63xx.c
->>>>>  F:  arch/arm/include/debug/bcm63xx.S
->>>>>
->>>>>  BROADCOM BCM7XXX ARM ARCHITECTURE
->>>>> -M:  Marc Carino <marc.ceeeee@gmail.com>
->>>>>  M:  Brian Norris <computersforpeace@gmail.com>
->>>>> +M:  Gregory Fong <gregory.0xf0@gmail.com>
->>>>> +M:  Florian Fainelli <f.fainelli@gmail.com>
->>>>
->>>> You're removing Marc here, but I don't see an ack from him, nor has
->>>> he been cc:d on the patch. It's common practice for people to agree to
->>>> being removed. Can you please make sure we get an ack from him on this,
->>>> maybe by reposting and cc:ing him?
->>>
->>> Marc is no longer with Broadcom, do you still want him to ack this?
->>
->> Yes, absolutely. Maintainership is entrusted to an individual, not
->> their employer. We've had many situations where someone has continued
->> to maintain a platform even after changing employment. So, yes, there
->> needs to be an ack from Marc.
+On 01/14/2015 03:54 PM, Timur Tabi wrote:
+> On Wed, Jan 14, 2015 at 5:44 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> I think so. Can you send a patch? Plus it would be nice to move i = 0 in
+>> the for loop at the same time.
+> Sadly, Qualcomm policy makes that very cumbersome for me.  I won't be
+> able to send a patch any time soon.
 >
-> He is CC'd, now. Marc, please Ack this if you are okay with the change.
 
-Can we add a "Not-nacked-by" tag and proceed? Marc is obviously not
-involved here any more. I figure removing expired maintainers should
-be a little easier than removing SCOTUS judges.
+Hm... we'll have to figure out that part. Anyway here's the patch.
 
-Brian
+---8<----
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] pinctrl: qcom: Don't iterate past end of function array
+
+Timur reports that this code crashes if nfunctions is 0. Fix the
+loop iteration to only consider valid elements of the functions
+array.
+
+Reported-by: Timur Tabi <timur@codeaurora.org>
+Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
+Cc: Andy Gross <agross@codeaurora.org>
+Fixes: 327455817a92 "pinctrl: qcom: Add support for reset for apq8064"
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/pinctrl/qcom/pinctrl-msm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index e730935fa457..ed7017df065d 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -865,10 +865,10 @@ static int msm_ps_hold_restart(struct notifier_block *nb, unsigned long action,
+ 
+ static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
+ {
+-	int i = 0;
++	int i;
+ 	const struct msm_function *func = pctrl->soc->functions;
+ 
+-	for (; i <= pctrl->soc->nfunctions; i++)
++	for (i = 0; i < pctrl->soc->nfunctions; i++)
+ 		if (!strcmp(func[i].name, "ps_hold")) {
+ 			pctrl->restart_nb.notifier_call = msm_ps_hold_restart;
+ 			pctrl->restart_nb.priority = 128;
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
