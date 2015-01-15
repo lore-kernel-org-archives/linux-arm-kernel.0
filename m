@@ -1,117 +1,213 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 15:59:24 +0100
-Subject: [PATCH v2 1/8] ARM: at91: pm: rework cpu detection
+Date: Thu, 15 Jan 2015 15:59:27 +0100
+Subject: [PATCH v2 4/8] ARM: at91: pm: prepare for multiplatform
 In-Reply-To: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421333971-7581-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421333971-7581-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Store SoC differences in a struct to remove cpu_is_* usage.
+Split at91_pm_init() in three variants that are called by the respective SoCs
+.init_machine. This allows to remove the of_machine_is_compatible() calls and
+move at91_pm_init() out of arch_initcall() which is required for multiplatform.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 54 ++++++++++++++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 21 deletions(-)
+ arch/arm/mach-at91/board-dt-rm9200.c | 11 ++++++++
+ arch/arm/mach-at91/board-dt-sam9.c   | 27 ++++++++++++++++++++
+ arch/arm/mach-at91/board-dt-sama5.c  |  1 +
+ arch/arm/mach-at91/generic.h         | 12 +++++++++
+ arch/arm/mach-at91/pm.c              | 49 ++++++++++++++++++++----------------
+ 5 files changed, 79 insertions(+), 21 deletions(-)
 
+diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+index a15ab6f8de00..5f82a65153e1 100644
+--- a/arch/arm/mach-at91/board-dt-rm9200.c
++++ b/arch/arm/mach-at91/board-dt-rm9200.c
+@@ -14,6 +14,7 @@
+ #include <linux/gpio.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ #include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
+@@ -30,6 +31,15 @@ static void __init at91rm9200_dt_timer_init(void)
+ 	at91rm9200_timer_init();
+ }
+ 
++static void __init rm9200_dt_device_init(void)
++{
++	at91_rm9200_pm_init();
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++
++
+ static const char *at91rm9200_dt_board_compat[] __initdata = {
+ 	"atmel,at91rm9200",
+ 	NULL
+@@ -39,5 +49,6 @@ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+ 	.init_time      = at91rm9200_dt_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.init_early	= at91_dt_initialize,
++	.init_machine	= rm9200_dt_device_init,
+ 	.dt_compat	= at91rm9200_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-dt-sam9.c b/arch/arm/mach-at91/board-dt-sam9.c
+index f99246aa9b38..0fe1ced608c5 100644
+--- a/arch/arm/mach-at91/board-dt-sam9.c
++++ b/arch/arm/mach-at91/board-dt-sam9.c
+@@ -13,6 +13,7 @@
+ #include <linux/gpio.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ #include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
+@@ -23,6 +24,12 @@
+ 
+ #include "generic.h"
+ 
++static void __init sam9_dt_device_init(void)
++{
++	at91_sam9260_pm_init();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static const char *at91_dt_board_compat[] __initdata = {
+ 	"atmel,at91sam9",
+ 	NULL
+@@ -32,5 +39,25 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
+ 	/* Maintainer: Atmel */
+ 	.map_io		= at91_map_io,
+ 	.init_early	= at91_dt_initialize,
++	.init_machine	= sam9_dt_device_init,
+ 	.dt_compat	= at91_dt_board_compat,
+ MACHINE_END
++
++static void __init sam9g45_dt_device_init(void)
++{
++	at91_sam9g45_pm_init();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char *at91_9g45_board_compat[] __initconst = {
++	"atmel,at91sam9g45",
++	NULL
++};
++
++DT_MACHINE_START(at91sam9g45_dt, "Atmel AT91SAM9G45")
++	/* Maintainer: Atmel */
++	.map_io		= at91_map_io,
++	.init_early	= at91_dt_initialize,
++	.init_machine	= sam9g45_dt_device_init,
++	.dt_compat	= at91_9g45_board_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index 8fb9ef5333f1..44d372a22a29 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -28,6 +28,7 @@
+ 
+ static void __init sama5_dt_device_init(void)
+ {
++	at91_sam9260_pm_init();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 54f3837a0a4d..fae7a703813c 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -31,4 +31,16 @@ extern void at91sam9_idle(void);
+ 
+ /* Matrix */
+ extern void at91_ioremap_matrix(u32 base_addr);
++
++
++#ifdef CONFIG_PM
++extern void __init at91_rm9200_pm_init(void);
++extern void __init at91_sam9260_pm_init(void);
++extern void __init at91_sam9g45_pm_init(void);
++#else
++void __init at91_rm9200_pm_init(void) { }
++void __init at91_sam9260_pm_init(void) { }
++void __init at91_sam9g45_pm_init(void) { }
++#endif
++
+ #endif /* _AT91_GENERIC_H */
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 9b15169a1c62..79aa793d1f00 100644
+index 71cc845263dc..778f11132b31 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -17,6 +17,7 @@
- #include <linux/interrupt.h>
- #include <linux/sysfs.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/clk/at91_pmc.h>
-@@ -32,6 +33,11 @@
- #include "generic.h"
- #include "pm.h"
- 
-+static struct {
-+	unsigned long uhp_udp_mask;
-+	int memctrl;
-+} at91_pm_data;
-+
- static void (*at91_pm_standby)(void);
- 
- static int at91_pm_valid_state(suspend_state_t state)
-@@ -71,17 +77,9 @@ static int at91_pm_verify_clocks(void)
- 	scsr = at91_pmc_read(AT91_PMC_SCSR);
- 
- 	/* USB must not be using PLLB */
--	if (cpu_is_at91rm9200()) {
--		if ((scsr & (AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP)) != 0) {
--			pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
--			return 0;
--		}
--	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() || cpu_is_at91sam9263()
--			|| cpu_is_at91sam9g20() || cpu_is_at91sam9g10()) {
--		if ((scsr & (AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP)) != 0) {
--			pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
--			return 0;
--		}
-+	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
-+		pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
-+		return 0;
- 	}
- 
- 	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
-@@ -149,18 +147,13 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * turning off the main oscillator; reverse on wakeup.
- 			 */
- 			if (slow_clock) {
--				int memctrl = AT91_MEMCTRL_SDRAMC;
--
--				if (cpu_is_at91rm9200())
--					memctrl = AT91_MEMCTRL_MC;
--				else if (cpu_is_at91sam9g45())
--					memctrl = AT91_MEMCTRL_DDRSDR;
- #ifdef CONFIG_AT91_SLOW_CLOCK
- 				/* copy slow_clock handler to SRAM, and call it */
- 				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+@@ -266,7 +266,7 @@ put_node:
  #endif
- 				slow_clock(at91_pmc_base, at91_ramc_base[0],
--					   at91_ramc_base[1], memctrl);
-+					   at91_ramc_base[1],
-+					   at91_pm_data.memctrl);
- 				break;
- 			} else {
- 				pr_info("AT91: PM - no slow clock mode enabled ...\n");
-@@ -237,10 +230,29 @@ static int __init at91_pm_init(void)
+ 
+ 
+-static int __init at91_pm_init(void)
++static void __init at91_pm_init(void)
+ {
+ #ifdef CONFIG_AT91_SLOW_CLOCK
+ 	at91_pm_sram_init();
+@@ -274,29 +274,36 @@ static int __init at91_pm_init(void)
  
  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
  
--	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
--	if (cpu_is_at91rm9200())
-+	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
-+
-+	if (of_machine_is_compatible("atmel,at91rm9200")) {
-+		/*
-+		 * AT91RM9200 SDRAM low-power mode cannot be used with
-+		 * self-refresh.
-+		 */
- 		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
--	
-+
-+		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
-+					    AT91RM9200_PMC_UDP;
-+		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
-+	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
-+		   of_machine_is_compatible("atmel,at91sam9g20") ||
-+		   of_machine_is_compatible("atmel,at91sam9261") ||
-+		   of_machine_is_compatible("atmel,at91sam9g10") ||
-+		   of_machine_is_compatible("atmel,at91sam9263")) {
-+		at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP |
-+					    AT91SAM926x_PMC_UDP;
-+	} else if (of_machine_is_compatible("atmel,at91sam9g45")) {
-+		at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
-+	}
-+
+-	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+-	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
+-
+-	if (of_machine_is_compatible("atmel,at91rm9200")) {
+-		/*
+-		 * AT91RM9200 SDRAM low-power mode cannot be used with
+-		 * self-refresh.
+-		 */
+-		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+-
+-		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
+-					    AT91RM9200_PMC_UDP;
+-		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
+-	} else if (of_machine_is_compatible("atmel,at91sam9g45")) {
+-		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP;
+-		at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+-	}
+-
  	if (at91_cpuidle_device.dev.platform_data)
  		platform_device_register(&at91_cpuidle_device);
  
+ 	suspend_set_ops(&at91_pm_ops);
++}
+ 
+-	return 0;
++void __init at91_rm9200_pm_init(void)
++{
++	/*
++	 * AT91RM9200 SDRAM low-power mode cannot be used with self-refresh.
++	 */
++	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
++
++	at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP;
++	at91_pm_data.memctrl = AT91_MEMCTRL_MC;
++
++	at91_pm_init();
++}
++
++void __init at91_sam9260_pm_init(void)
++{
++	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
++	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
++	return at91_pm_init();
+ }
+-arch_initcall(at91_pm_init);
++
++void __init at91_sam9g45_pm_init(void)
++{
++	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
++	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
++	return at91_pm_init();
++}
++
 -- 
 2.1.0
