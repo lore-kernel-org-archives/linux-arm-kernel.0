@@ -1,43 +1,46 @@
-From: xiakaixu@huawei.com (Kaixu Xia)
-Date: Thu, 15 Jan 2015 15:54:19 +0800
-Subject: [PATCH] coresight: remove the extra spaces
-Message-ID: <1421308459-71865-1-git-send-email-xiakaixu@huawei.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 15 Jan 2015 09:04:05 +0100
+Subject: [PATCH RESEND v3 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM
+ bindings
+In-Reply-To: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
+Message-ID: <1421309046-22452-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some extra spaces, so just remove them from these lines.
+Add binding documentation for Miscellaneous System Control Module
+found in Freescale Vybrid SoC's.
 
-Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/coresight/coresight-etb10.c | 2 +-
- drivers/coresight/coresight.c       | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ .../bindings/arm/freescale/fsl,vf610-mscm.txt         | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
 
-diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
-index c922d4a..d0529b5 100644
---- a/drivers/coresight/coresight-etb10.c
-+++ b/drivers/coresight/coresight-etb10.c
-@@ -454,7 +454,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (ret)
- 		return ret;
- 
--	drvdata->buffer_depth =  etb_get_buffer_depth(drvdata);
-+	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
- 	clk_disable_unprepare(drvdata->clk);
- 
- 	if (drvdata->buffer_depth < 0)
-diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
-index 11968b7..0de0c39 100644
---- a/drivers/coresight/coresight.c
-+++ b/drivers/coresight/coresight.c
-@@ -498,7 +498,7 @@ static int coresight_orphan_match(struct device *dev, void *data)
- 	 * Circle throuch all the connection of that component.  If we find
- 	 * an orphan connection whose name matches @csdev, link it.
- 	 */
--	for (i = 0; i < i_csdev->nr_outport; i++)	{
-+	for (i = 0; i < i_csdev->nr_outport; i++) {
- 		conn = &i_csdev->conns[i];
- 
- 		/* We have found at least one orphan connection */
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+new file mode 100644
+index 0000000..e051b88
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+@@ -0,0 +1,19 @@
++Freescale Vybrid Miscellaneous System Control Module
++
++The MSCM IP contains Access Control and TrustZone Security hardware,
++CPU Configuration registers and Interrupt Router control.
++
++Required properties:
++- compatible : "fsl,vf610-mscm", "syscon"
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Two cells, interrupt number and flags (IRQ type)
++- reg : the register range of the MSCM module
++
++Example:
++	mscm: mscm at 40001000 {
++		compatible = "fsl,vf610-mscm", "syscon";
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&intc>;
++		reg = <0x40001000 0x1000>;
++	}
 -- 
-1.8.5.5
+2.2.1
