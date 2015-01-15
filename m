@@ -1,32 +1,37 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 11:47:06 +0100
-Subject: [PATCH v3 5/5] ARM: mvebu: enable Armada 38x RTC driver in
- mvebu_v7_defconfig
-In-Reply-To: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421318826-27268-6-git-send-email-gregory.clement@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Jan 2015 10:48:32 +0000
+Subject: OMAP 4430 SDP: rather sick with recent kernels
+In-Reply-To: <20150114231007.GS11502@n2100.arm.linux.org.uk>
+References: <20141217095252.GH11502@n2100.arm.linux.org.uk>
+ <20150114175132.GR11502@n2100.arm.linux.org.uk>
+ <20150114190925.GP2419@atomide.com>
+ <20150114231007.GS11502@n2100.arm.linux.org.uk>
+Message-ID: <20150115104832.GT11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Armada 38x RTC driver has been pushed, let's enable it in
-mvebu_v7_defconfig.
+On Wed, Jan 14, 2015 at 11:10:08PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 14, 2015 at 11:09:26AM -0800, Tony Lindgren wrote:
+> > This seems like it could be a similar issue to what we were seeing on
+> > omap3 where the legacy IRQ mappings went wrong without using the
+> > irq_domain_add_legacy(). Maybe vexpress affects NR_IRQS or something?
+> > 
+> > Also, I think we could now disable the legacy DMA init completely
+> > except for omap2 and 3.
+> 
+> I've added a "cat /proc/interrupts" which should reveal whether the IRQs
+> have changed between the two different builds.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Okay, both omap4 and combined kernels indicate that the legacy DMA gets
+the same interrupt:
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 627accea72fb..2400b9f52403 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -112,6 +112,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
-+CONFIG_RTC_DRV_ARMADA38X=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
- # CONFIG_IOMMU_SUPPORT is not set
+ 44:          0          0  4a310000.gpio  18  DMA
+
+so that can't be the issue as the combined kernel spits out the warning,
+but the omap4 kernel doesn't.  Something else is going on which causes
+this; the hint that it's got something to do with this is just a symptom
+of some other problem.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
