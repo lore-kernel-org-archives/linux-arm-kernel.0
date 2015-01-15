@@ -1,65 +1,77 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Jan 2015 20:16:11 +0100
-Subject: [PATCHv2 0/7] arm64/kvm: common ESR_ELx definitions and decoding
-In-Reply-To: <20150115151202.GC2329@e104818-lin.cambridge.arm.com>
-References: <1421081120-7694-1-git-send-email-mark.rutland@arm.com>
- <20150112194440.GB26222@cbox> <20150115124251.GE16217@leverpostej>
- <CAMJs5B-Ybrf7GQ+u70Z8bDCh7uHTwwCQa6Q3dh2BoL5qaUtOUA@mail.gmail.com>
- <20150115151202.GC2329@e104818-lin.cambridge.arm.com>
-Message-ID: <CAMJs5B-Kp1Qs4RcySHUKBD=nb04vjfcxm=Sa5m1GECwFEU8W=g@mail.gmail.com>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Thu, 15 Jan 2015 11:19:21 -0800
+Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <54B7132A.6030803@gmail.com>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
+ <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
+ <1419028015.25129.14.camel@perches.com> <5494AEB8.8060606@broadcom.com>
+ <54B7132A.6030803@gmail.com>
+Message-ID: <54B812B9.3040400@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 4:12 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Jan 15, 2015 at 01:08:00PM +0000, Christoffer Dall wrote:
->> On Thu, Jan 15, 2015 at 1:42 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Mon, Jan 12, 2015 at 07:44:40PM +0000, Christoffer Dall wrote:
->> >> On Mon, Jan 12, 2015 at 04:45:13PM +0000, Mark Rutland wrote:
->> >> > Currently we have two sets of macros used for ESR_ELx handling, one used
->> >> > by core arm64 code and the other used by KVM. These differ slightly in
->> >> > naming convention and style of definition.
->> >> >
->> >> > This patch series introduces and migrates all users to a common set of
->> >> > macros for ESR_ELx handling, preventing further drift.
->> >> >
->> >> > Additionally this series adds exception class decoding when reporting
->> >> > exceptions, saving deveopers from having to perform tedious mental
->> >> > arithmetic to figure out what the likely cause of an unexpected
->> >> > exception was.
->> >> >
->> >> > Since v1 [1]:
->> >> > * Reorder patches to maintain KVM bisectability.
->> >> > * Fix bad definitions (ESR_ELx_SAS and ESR_ELx_FSC_PERM).
->> >> > * Introcuce ESR_ELx_SAS_SHIFT and undo bad rework of
->> >> >   kvm_vcpu_dabt_get_as.
->> >> > * Make "Unallocated EC" comments consistent in ESR_ELx_EC_* definition
->> >> >   list.
->> >> >
->> >> For the series:
->> >>
->> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->> >>
->> >> I also tested this with KVM on APM XGene and Juno with UEFI+Linux as a
->> >> guest.
->> >
->> > Thanks, Christoffer. It's much appreciated.
->> >
->> > Catalin, Christoffer, do you have a preferred path for merging this?
->> > Should this go through the arm64 or KVM tree as a whole?
+On 15-01-14 05:08 PM, Florian Fainelli wrote:
+> On 19/12/14 15:03, Jonathan Richardson wrote:
+>> On 14-12-19 02:26 PM, Joe Perches wrote:
+>>> On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
+>>>> Add initial version of the Broadcom touchscreen driver.
+>>>
+>>> more trivia:
+>>>
+>>>> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
+>>> []
+>>>> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
+>>>> +{
+>>>> +	u32 val;
+>>> []
+>>>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
+>>>> +		if (val < 0 || val > 255) {
+>>>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
+>>>> +			return -EINVAL;
+>>>> +		}
+>>>> +		priv->cfg_params.debounce_timeout = val;
+> 
+> BTW, common practice for DT properties is to use a dash instead of an
+> underscore for multi-worded properties.
+
+ts-rotation is done that way already so I'll change the others to be
+consistent. Thanks.
+
+> 
+>>>
+>>> Doesn't the compiler generate a warning message
+>>> about an impossible "unsigned < 0" test for all
+>>> of these "val < 0" uses?
+>>>
 >>
->> Would make sense to merge it as whole.
->
-> Indeed.
->
->> I don't care which path, let's
->> just minimize conflicts. For big things, I have GICv3, dirty page
->> logging, and Marc's fixes, but they shouldn't touch much of the same
->> code (maybe the same files, but I don't think the same lines), so it's
->> up to you Catalin?
->
-> I don't have a strong preference but since Christoffer doesn't have one
-> either, I'll merge them via the arm64 tree (there are 4 arm64 patches vs
-> 3 kvm ones ;)).
->
-great, thanks!
+>> Actually no it doesn't. The gcc output shows that neither -Wtype-limits
+>> nor -Wextra are used to compile that file. I assume this is because
+>> there would be just too many warnings.
+>>
+>>
+>>>> +	}
+>>>> +
+>>>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
+>>>> +		if (val < 0 || val > 11) {
+>>> []
+>>>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
+>>>> +		if (val < 0 || val > 255) {
+>>> []
+>>>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
+>>>> +		if (val < 0 || val > 8) {
+>>> []
+>>>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
+>>>> +		if (val < 0 || val > 31) {
+>>>
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> 
