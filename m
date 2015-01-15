@@ -1,51 +1,40 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 15 Jan 2015 18:45:53 +0800
-Subject: [PATCH] mtd: atmel_nand: check NFC busy flag by HSMC_SR instead of
- NFC cmd regs
-Message-ID: <1421318753-14960-1-git-send-email-josh.wu@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Jan 2015 10:45:14 +0000
+Subject: [PATCH] Build a uImage with dtb already appended
+In-Reply-To: <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
+References: <20110802143148.21599.22870.stgit@ponder>
+ <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
+Message-ID: <20150115104514.GD12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the driver read NFC command registers to get NFC busy flag.
-Actually this flag also can be get by reading HSMC_SR register.
+On Wed, Jan 14, 2015 at 07:08:13PM -0700, Christoph Junghans wrote:
+> Add new targets to build zImage and uImage with DTB appended (i.e. make
+> 'uImage-dtb.am335x-bone' or 'make zImage-dtb.omap3-evm').
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
+> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
+> ---
+> 
+> I don't know why this never got merged, but I think it is still useful.
 
-Use the read NFC command registers need mapping a huge memory region.
-To save the mapped memory region, we change to check NFC busy flag by
-reading HSMC_SR register.
+What do you do about supplying the load address argument to mkimage,
+which is highly platform specific?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Josh Wu <josh.wu@atmel.com>
----
+This may be useful if you want to create one uImage for one platform,
+but it's not useful in other cases.
 
- drivers/mtd/nand/atmel_nand.c     | 3 +--
- drivers/mtd/nand/atmel_nand_nfc.h | 1 +
- 2 files changed, 2 insertions(+), 2 deletions(-)
+However, in general, I don't want to augment the u-boot crap that we
+already have in the kernel; it's too inflexible.  You're much better
+off taking the zImage and DTB, combining them yourself, and then
+_if_ you insist on using the u-boot legacy format, running mkimage.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 3853597..125330b 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -1699,8 +1699,7 @@ static int nfc_send_command(struct atmel_nand_host *host,
- 		cmd, addr, cycle0);
- 
- 	timeout = jiffies + msecs_to_jiffies(NFC_TIME_OUT_MS);
--	while (nfc_cmd_readl(NFCADDR_CMD_NFCBUSY, host->nfc->base_cmd_regs)
--			& NFCADDR_CMD_NFCBUSY) {
-+	while (nfc_readl(host->nfc->hsmc_regs, SR) & NFC_SR_BUSY) {
- 		if (time_after(jiffies, timeout)) {
- 			dev_err(host->dev,
- 				"Time out to wait CMD_NFCBUSY ready!\n");
-diff --git a/drivers/mtd/nand/atmel_nand_nfc.h b/drivers/mtd/nand/atmel_nand_nfc.h
-index 85b8ca6..4d5d262 100644
---- a/drivers/mtd/nand/atmel_nand_nfc.h
-+++ b/drivers/mtd/nand/atmel_nand_nfc.h
-@@ -35,6 +35,7 @@
- #define		NFC_CTRL_DISABLE	(1 << 1)
- 
- #define ATMEL_HSMC_NFC_SR	0x08		/* NFC Status Register */
-+#define		NFC_SR_BUSY		(1 << 8)
- #define		NFC_SR_XFR_DONE		(1 << 16)
- #define		NFC_SR_CMD_DONE		(1 << 17)
- #define		NFC_SR_DTOE		(1 << 20)
+The alternative is to move forward with your uboot skills, and see
+whether your uboot supports loading the fdt and use bootz with the
+zImage instead of bootm.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
