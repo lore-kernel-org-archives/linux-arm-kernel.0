@@ -1,46 +1,62 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 15 Jan 2015 09:04:05 +0100
-Subject: [PATCH RESEND v3 2/3] irqchip: vf610-mscm: dt-bindings: add MSCM
- bindings
-In-Reply-To: <1421309046-22452-1-git-send-email-stefan@agner.ch>
-References: <1421309046-22452-1-git-send-email-stefan@agner.ch>
-Message-ID: <1421309046-22452-3-git-send-email-stefan@agner.ch>
+Date: Thu, 15 Jan 2015 09:04:03 +0100
+Subject: [PATCH RESEND v3 0/3] irqchip: vf610-mscm: add support for MSCM
+ interrupt router
+Message-ID: <1421309046-22452-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for Miscellaneous System Control Module
-found in Freescale Vybrid SoC's.
+Splitted out version of the MSCM driver. My first driver based on the
+routeable domain support and was part of the Vybrid Cortex-M4 support
+patchset.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../bindings/arm/freescale/fsl,vf610-mscm.txt         | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+So far the MSCM interrupt router was initialized by the boot loader
+and configured all interrupts for the Cortex-A5 CPU. There are two
+use cases where a proper driver is necessary:
+- To run Linux on the Cortex-M4. When the kernel is running on the
+  non-preconfigured CPU, the interrupt router need to be configured
+  properly.
+- To support deeper sleep modes: LPSTOP clears the interrupt router
+  configuration, hence a driver needs to restore the configuration
+  on resume.
+I created a seperate patchset for that driver which hopefully makes
+it easier to get it into mergeable state.
+
+Since I identified some registers likely to be used by other drivers
+(e.g. CPU ID or the CPU Generate Interrupt Register) I also added
+the "syscon" compatible string to make the registers available for
+other drivers in case needed.
+
+This resend version of this patchset is rebased on v3.19-rc4.
+
+Changes since v2
+- Use two cell layout for MSCM interrupt router
+- Move peripheral interrupt properties to base device tree vfxxx.dtsi
+- Use generic two cell xlate (irq_domain_xlate_twocell)
+- Add syscon to compatible string
+- Remove some line breaks for better readability
+
+Changes since v1 (part of Vybrid Cortex-M4 support)
+- Rewrite with irqdomain hierarchy
+- Implemented as proper irqchip and move to driver/irqchip/
+- Doesn't work on Cortex-M4 anymore (NVIC as parent is not yet
+  implemented)
+
+Stefan Agner (3):
+  irqchip: vf610-mscm: add support for MSCM interrupt router
+  irqchip: vf610-mscm: dt-bindings: add MSCM bindings
+  ARM: dts: vf610: add Miscellaneous System Control Module (MSCM)
+
+ .../bindings/arm/freescale/fsl,vf610-mscm.txt      |  19 +++
+ arch/arm/boot/dts/vf500.dtsi                       | 128 +-------------
+ arch/arm/boot/dts/vfxxx.dtsi                       |  42 +++++
+ arch/arm/mach-imx/Kconfig                          |   1 +
+ drivers/irqchip/Kconfig                            |  11 ++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-vf610-mscm.c                   | 186 +++++++++++++++++++++
+ 7 files changed, 264 insertions(+), 124 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
+ create mode 100644 drivers/irqchip/irq-vf610-mscm.c
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
-new file mode 100644
-index 0000000..e051b88
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-mscm.txt
-@@ -0,0 +1,19 @@
-+Freescale Vybrid Miscellaneous System Control Module
-+
-+The MSCM IP contains Access Control and TrustZone Security hardware,
-+CPU Configuration registers and Interrupt Router control.
-+
-+Required properties:
-+- compatible : "fsl,vf610-mscm", "syscon"
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Two cells, interrupt number and flags (IRQ type)
-+- reg : the register range of the MSCM module
-+
-+Example:
-+	mscm: mscm at 40001000 {
-+		compatible = "fsl,vf610-mscm", "syscon";
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		interrupt-parent = <&intc>;
-+		reg = <0x40001000 0x1000>;
-+	}
 -- 
 2.2.1
