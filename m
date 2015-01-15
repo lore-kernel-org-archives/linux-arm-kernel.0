@@ -1,81 +1,126 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Jan 2015 10:25:11 +0000
-Subject: [PATCH v10] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
-References: <1418687243-16395-1-git-send-email-mitchelh@codeaurora.org>
- <20141216094527.GC6580@arm.com>
- <vnkwtwztp2rm.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20150115102511.GB23475@arm.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 15 Jan 2015 18:28:42 +0800
+Subject: [PATCH net-next v13 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <1421296742.25598.3.camel@perches.com>
+References: <1421217254-12008-1-git-send-email-dingtianhong@huawei.com>	
+ <1421217254-12008-4-git-send-email-dingtianhong@huawei.com>
+ <1421296742.25598.3.camel@perches.com>
+Message-ID: <54B7965A.5050507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 07:42:53PM +0000, Mitchel Humpherys wrote:
-> On Tue, Dec 16 2014 at 01:45:27 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Dec 15, 2014 at 11:47:23PM +0000, Mitchel Humpherys wrote:
-> >> From: Matt Wagantall <mattw@codeaurora.org>
-> >> 
-> >> It is sometimes necessary to poll a memory-mapped register until its value
-> >> satisfies some condition. Introduce a family of convenience macros that do
-> >> this. Tight-looping, sleeping, and timing out can all be accomplished using
-> >> these macros.
-> >> 
-> >> Cc: Thierry Reding <thierry.reding@gmail.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Andrew Morton <akpm@linux-foundation.org>
-> >> Cc: Robert Elliott <elliott@hp.com>
-> >> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
-> >> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> >> ---
-> >> v9..10:
-> >>   - Actually added the comments mentioned in v8..v9 (doh!)
-> >> 
-> >> v8..v9:
-> >>   - Added note in comments about max sleep time (Rob Elliott)
-> >> 
-> >> v7..v8:
-> >>   - sorted helper macros by size (b, w, l, q)
-> >>   - removed some of the more esoteric (or flat-out bogus) helper macros
-> >> 
-> >> This patch was originally part of a series [1] for adding support for IOMMU
-> >> address translations through an ARM SMMU hardware register.  The other
-> >> patch in the series (the one that actually uses these macros and implements
-> >> said hardware address translations) was Ack'd by the driver maintainer
-> >> there (Will Deacon) so I've pulled this patch out to avoid resending an
-> >> already Ack'd patch over and over again.
-> >> 
-> >> In short, please see [1] for previous discussion and the first user of
-> >> these macros.
-> >> 
-> >> Will also acked this patch in [2].  I didn't retain his Ack here because I
-> >> added to the macro comments.
-> >
-> > You can keep the ack, it still looks good to me and I'm not really fussed
-> > about the comments.
-> >
-> > Will
+On 2015/1/15 12:39, Joe Perches wrote:
+> On Wed, 2015-01-14 at 14:34 +0800, Ding Tianhong wrote:
+>> Support Hisilicon hip04 ethernet driver, including 100M / 1000M controller.
+>> The controller has no tx done interrupt, reclaim xmitted buffer in the poll.
 > 
-> This hasn't gotten any further comments.  Would someone be willing to
-> take it?
+> Mostly trivial comments:
+> 
+>> +++ b/drivers/net/ethernet/hisilicon/hip04_eth.c
+> 
+> []
+> 
+>> +#define GMAC_MAX_PKT_LEN		1516
+> 
+> []
+> 
+>> +static int hip04_rx_poll(struct napi_struct *napi, int budget)
+>> +{
+> []
+>> +	while (cnt && !last) {
+> []
+>> +		desc = (struct rx_desc *)skb->data;
+>> +		len = be16_to_cpu(desc->pkt_len);
+>> +		err = be32_to_cpu(desc->pkt_err);
+>> +
+>> +		if (0 == len) {
+>> +			dev_kfree_skb_any(skb);
+>> +			last = true;
+>> +		} else if ((err & RX_PKT_ERR) || (len >= GMAC_MAX_PKT_LEN)) {
+> 
+> Is this ">=" correct?  Maybe it should be ">" ?
+> 
+> []
+> 
+>> +static irqreturn_t hip04_mac_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct net_device *ndev = (struct net_device *)dev_id;
+> 
+> Unnecessary cast of void *
+> 
+> []
+> 
+>> +static int hip04_set_coalesce(struct net_device *netdev,
+>> +			      struct ethtool_coalesce *ec)
+>> +{
+>> +	struct hip04_priv *priv = netdev_priv(netdev);
+>> +
+>> +	/* Check not supported parameters  */
+>> +	if ((ec->rx_max_coalesced_frames) || (ec->rx_coalesce_usecs_irq) ||
+>> +	    (ec->rx_max_coalesced_frames_irq) || (ec->tx_coalesce_usecs_irq) ||
+>> +	    (ec->use_adaptive_rx_coalesce) || (ec->use_adaptive_tx_coalesce) ||
+>> +	    (ec->pkt_rate_low) || (ec->rx_coalesce_usecs_low) ||
+>> +	    (ec->rx_max_coalesced_frames_low) || (ec->tx_coalesce_usecs_high) ||
+>> +	    (ec->tx_max_coalesced_frames_low) || (ec->pkt_rate_high) ||
+>> +	    (ec->tx_coalesce_usecs_low) || (ec->rx_coalesce_usecs_high) ||
+>> +	    (ec->rx_max_coalesced_frames_high) || (ec->rx_coalesce_usecs) ||
+>> +	    (ec->tx_max_coalesced_frames_irq) ||
+>> +	    (ec->stats_block_coalesce_usecs) ||
+>> +	    (ec->tx_max_coalesced_frames_high) || (ec->rate_sample_interval))
+>> +		return -EOPNOTSUPP;
+> 
+> Rather than a somewhat haphazard mix of these values, 
+> this might be simpler to read as something like:
+> 
+> 	/* Check not supported parameters  */
+> 	if (ec->pkt_rate_low ||
+> 	    ec->pkt_rate_high ||
+> 
+> 	    ec->use_adaptive_rx_coalesce ||
+> 	    ec->rx_coalesce_usecs ||
+> 	    ec->rx_coalesce_usecs_low ||
+> 	    ec->rx_coalesce_usecs_high ||
+> 	    ec->rx_coalesce_usecs_irq ||
+> 	    ec->rx_max_coalesced_frames ||
+> 	    ec->rx_max_coalesced_frames_low ||
+> 	    ec->rx_max_coalesced_frames_high ||
+> 	    ec->rx_max_coalesced_frames_irq ||
+> 	    
+> 	    ec->use_adaptive_tx_coalesce ||
+> 	    ec->tx_coalesce_usecs_low ||
+> 	    ec->tx_coalesce_usecs_high ||
+> 	    ec->tx_max_coalesced_frames_low ||
+> 	    ec->tx_max_coalesced_frames_high ||
+> 	    ec->tx_max_coalesced_frames_irq ||
+> 
+> 	    ec->stats_block_coalesce_usecs ||
+> 	    ec->rate_sample_interval)
+> 		return -EOPNOTSUPP;
+> 
+> 
+>> +static void hip04_free_ring(struct net_device *ndev, struct device *d)
+>> +{
+>> +	struct hip04_priv *priv = netdev_priv(ndev);
+>> +	int i;
+>> +
+>> +	for (i = 0; i < RX_DESC_NUM; i++)
+>> +		if (priv->rx_buf[i])
+>> +			put_page(virt_to_head_page(priv->rx_buf[i]));
+> 
+> It's generally nicer to use braces around
+> for loops with single ifs.
+> 
+>> +
+>> +	for (i = 0; i < TX_DESC_NUM; i++)
+>> +		if (priv->tx_skb[i])
+>> +			dev_kfree_skb_any(priv->tx_skb[i]);
+> 
+> 
+> 
 
-If you get an Ack from any of Arnd/Joerg/akpm then I'm happy to take it via
-the arm-smmu pull (along with the patch making use of it).
+OK, fix them later, thanks.
 
-Joerg, would you be ok with that?
+Ding
 
-Will
-
-> Joerg, maybe you could take this through the IOMMU tree since the first
-> user is an IOMMU driver?  Currently we can't move [1] forward because of
-> this dependency...
-> 
-> [1] http://thread.gmane.org/gmane.linux.kernel.iommu/7837
-> 
-> 
-> -Mitch
-> 
-> -- 
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> .
 > 
