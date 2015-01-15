@@ -1,68 +1,49 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Thu, 15 Jan 2015 21:46:32 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
- Exynos 64bit SoC
-In-Reply-To: <20150115112938.GB16217@leverpostej>
-References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
- <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
- <54B7024C.4020407@samsung.com> <20150115112938.GB16217@leverpostej>
-Message-ID: <CAGTfZH0Ve+icxc6FpMJhfNMRMqQASrcUmnrZw-6sYQz8rabC_A@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 15 Jan 2015 13:47:29 +0100
+Subject: [PATCH] ARM: zynq: DT: Fix binding for cadence WDT
+Message-ID: <0c27264afa3356979d803d53d329458039f64485.1421326047.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Based on:
+"devicetree: Add Cadence WDT devicetree bindings documentation"
+(sha1: 191891c0378f44aec8e06e889a08d0b76fe6c5cb)
 
-On Thu, Jan 15, 2015 at 8:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 14, 2015 at 11:57:00PM +0000, Chanwoo Choi wrote:
->> Hi Kukjin,
->>
->> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
->> > On 01/14/2015 04:51 PM, Kukjin Kim wrote:
->> >> On 01/14/15 14:33, Chanwoo Choi wrote:
->> >>
->> >> Hi,
->> >>
->> >> + Doug, Olof
->> >>
->> >>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
->> >>> for Exynos 32bit SoC.
->> >>>
->> >> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
->> >> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
->> >> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
->> >> implemented it and additionally its access is faster than using memory
->> >> mapped register called SFR for MCT...so Doug submitted patch to use MCT
->> >> on 32bit exynos SoCs before.
->>
->> I know arch_timer. As you comment, ARCH timer would be used for system timer for ARMv8.
->> But, Exynos5433/Exynos7 (ARMv8) include MCT (Multi-Core Timer) IP. I checked it on
->> Exynos5433/EXynos7 User-manaual and tested it.
->>
->> I think that exynos_mct.c should support the Exynos 64-bit SoC
->> because Exynos5433/Exynos7 include already MCT (Multi-Core Timer) IP.
->>
->> Also, I have a problem to verify ARCH timer on Exynos SoC. Exynos User-manual never includes
->> the detailed information about for ARCH timer(e.g, clock for ARCH timer). I knew that
->> I can get the document of ARCH timer for ARM official site but I think it is insufficient
->> to implement ARCH timer on Exynos SoC.
->
-> What do you mean by "insufficient to implement ARCH timer"?
+- compatible string is cdns,wdt-r1p2
+- remove device_type property
+- remove int reset property (reset-on-timeout is bool)
 
-As I knew, timer must need the source clock. The clock for ARCH timer
-has dependency on Exynos SoC, But I cannot find
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
->
-> The architected timer is mandatory in ARMv8, and required by the arm64
-> kernel.
->
-> Additional timers may be requried if you want to put all CPUs into low
-> power states where the timer logic may be disabled and/or lose state,
-> but regardless the architected timers are necessary.
->
-> Thanks,
-> Mark.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/boot/dts/zynq-7000.dtsi | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index c9b9722c0c59..a5cd2eda3edf 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -342,12 +342,10 @@
+
+ 		watchdog0: watchdog at f8005000 {
+ 			clocks = <&clkc 45>;
+-			compatible = "xlnx,zynq-wdt-r1p2";
+-			device_type = "watchdog";
++			compatible = "cdns,wdt-r1p2";
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <0 9 1>;
+ 			reg = <0xf8005000 0x1000>;
+-			reset = <0>;
+ 			timeout-sec = <10>;
+ 		};
+ 	};
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/0671054d/attachment.sig>
