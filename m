@@ -1,43 +1,103 @@
-From: renjithg@tataelxsi.co.in (Renjith G)
-Date: Thu, 15 Jan 2015 11:32:08 +0530
-Subject: Linux kernel boot up on ARMv7l based board - failed
-In-Reply-To: <54B4CBFA.70006@tataelxsi.co.in>
-References: <54B4CBFA.70006@tataelxsi.co.in>
-Message-ID: <54B757E0.6080300@tataelxsi.co.in>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 14 Jan 2015 22:07:13 -0800
+Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <54B753C7.6000006@broadcom.com>
+References: <jonathar@broadcom.com>
+ <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
+ <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
+ <20150115010256.GC9134@dtor-ws> <54B753C7.6000006@broadcom.com>
+Message-ID: <20150115060713.GA2694@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, A gentle reminder in case it is missed earlier.
+On Wed, Jan 14, 2015 at 09:44:39PM -0800, Scott Branden wrote:
+> On 15-01-14 05:02 PM, Dmitry Torokhov wrote:
+> >Hi Jonathan,
+> >
+> >On Fri, Dec 19, 2014 at 02:17:49PM -0800, Jonathan Richardson wrote:
+> >>+	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
+> >>+		if (val < 1 || val > 256) {
+> >>+			dev_err(dev, "scanning_period must be [1-256]\n");
+> >>+			return -EINVAL;
+> >>+		}
+> >>+		priv->cfg_params.scanning_period = val;
+> >>+	}
+> >>+
+> >>+	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
+> >>+		if (val < 0 || val > 255) {
+> >>+			dev_err(dev, "debounce_timeout must be [0-255]\n");
+> >>+			return -EINVAL;
+> >>+		}
+> >>+		priv->cfg_params.debounce_timeout = val;
+> >>+	}
+> >>+
+> >>+	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
+> >>+		if (val < 0 || val > 11) {
+> >>+			dev_err(dev, "settling_timeout must be [0-11]\n");
+> >>+			return -EINVAL;
+> >>+		}
+> >>+		priv->cfg_params.settling_timeout = val;
+> >>+	}
+> >>+
+> >>+	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
+> >>+		if (val < 0 || val > 255) {
+> >>+			dev_err(dev, "touch_timeout must be [0-255]\n");
+> >>+			return -EINVAL;
+> >>+		}
+> >>+		priv->cfg_params.touch_timeout = val;
+> >>+	}
+> >>+
+> >>+	if (of_property_read_u32(np, "average_data", &val) >= 0) {
+> >>+		if (val < 0 || val > 8) {
+> >>+			dev_err(dev, "average_data must be [0-8]\n");
+> >>+			return -EINVAL;
+> >>+		}
+> >>+		priv->cfg_params.average_data = val;
+> >>+	}
+> >>+
+> >>+	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
+> >>+		if (val < 0 || val > 31) {
+> >>+			dev_err(dev, "fifo_threshold must be [0-31]\n");
+> >>+			return -EINVAL;
+> >>+		}
+> >>+		priv->cfg_params.fifo_threshold = val;
+> >>+	}
+> >
+> >I think these are dveice specific and thus should have "brcm," prefix.
+> I'm confused as to why we need the brcm prefix?  Other device tree
+> bindings we have for other drivers do not need such prefix.
 
-On 1/13/2015 1:10 PM, Renjith G wrote:
-> Hello,
->
-> I have an R-Car H2 development board (Lager) from Renesas and it was 
-> correctly running with Linux Kernel 3.4.81-ltsi till last week.
->
-> But unfortunately now, During boot up the kernel hangs and shows till 
-> "Starting kernel....."
->
-> I have enabled earlyprintk and here is the code flow till freeze point.
-> 1. It is reaching till '/arch/arm/mm/mmu.c' in function 
-> 'devicemaps_init()' and then it calls 'local_flush_tlb_all()'
-> 2. The 'local_flush_tlb_all()' is defined in 
-> '/arch/arm/include/asm/tlbflush.h' and from there it calls 
-> 'tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", zero);'
-> 3. The above call hangs and hence not returning, so it the boot up hangs.
->
-> Do you have any suggestions?
->
-> Is this due to any board failure? If so, is there any ways I can tweak 
-> it?
->
-> I see in step 2, executes some co-processor specific instructions and 
-> the board has ARM CA9 , ARM CA15 and SH4A processors mentioned in the 
-> reference manual and I am not so sure.
->
-> Expecting your reply.
->
-> Many kind regards,
-> /renjith_g
-> .
->
+Properties that are not standard on the system (reg, interrupts,
+clkocks, etc) or subsystem level customarily carry the vendor prefix so
+that they do not clash with newly added global or subsystem properties.
+
+>  Is this
+> convention documented somewhere?
+
+Not sure. I glanced through Documentation/devicetree and do not see it
+spelled out. Device tree overlords, what say you?
+
+> >
+> >>+
+> >>+	priv->ts_rotation = TS_ROTATION_0;
+> >>+	if (of_property_read_u32(np, "ts-rotation", &val) >= 0) {
+> >>+		priv->ts_rotation = val;
+> >>+		dev_dbg(dev, "ts rotation [%d] degrees\n",
+> >>+			90 * priv->ts_rotation);
+> >>+	}
+> >
+> >This I am not quite sure about - if we want rotation or swap+invert. You
+> >are CCed on another email (tsc2007) that talks about need of generic
+> >touchscreen transforms in input core/of bindings.
+> Does such generic binding exist today?  If not, I would like to go
+> with this implementation and update to the new binding if/when it
+> exists?
+
+Not yet but there several people interested. I think we have enough time
+till 3.20 to hash it out properly.
+
+Thanks.
+
+-- 
+Dmitry
