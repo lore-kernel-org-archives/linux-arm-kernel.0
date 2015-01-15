@@ -1,50 +1,56 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 11:47:02 +0100
-Subject: [PATCH v3 1/5] rtc: armada38x: Add the device tree binding
- documentation
-In-Reply-To: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421318826-27268-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu, 15 Jan 2015 11:47:01 +0100
+Subject: [PATCH v3 0/5] Add a new RTC driver for recent mvebu SoCs
+Message-ID: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 38x SoCs come with a new RTC which differs from the one
-used in the other mvebu SoCs until now. This patch describes the
-binding of this RTC.
+Hi,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../devicetree/bindings/rtc/armada-380-rtc.txt     | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+The Marvell Armada 38x SoCs contains an RTC which differs from the RTC
+used in the other mvebu SoCs until now. This third version of the
+patch set adds support for this new IP and enable it in the Device
+Tree of the Armada 38x SoC.
+
+Thanks,
+
+Gr??gory
+
+Changelog
+v2 -> v3:
+
+- Fixed the reg-names description in the dt binding documentation
+- Used the delayed version of the writel in everyplace.
+
+v1 -> v2:
+
+- Used reg-names to identify the registers in the device tree
+- Changed the space into tab in the MAINTAINERS file
+- Emphasized that the 5s wait was only needed between two consecutive
+  writes
+- Reduced the wait in the set_time function, 100ms were enough
+- If no interrupt was available, then disable the alarm related
+  functions
+- Fixed the critical sections
+- Updated the mvebu_v7_defconfig by enabling the new RTC support
+
+Gregory CLEMENT (5):
+  rtc: armada38x: Add the device tree binding documentation
+  drivers/rtc/rtc-armada38x: Add a new RTC driver for recent mvebu SoCs
+  MAINTAINERS: Add the RTC driver for the Armada38x
+  ARM: mvebu: add Device Tree description of RTC on Armada 38x
+  ARM: mvebu: enable Armada 38x RTC driver in mvebu_v7_defconfig
+
+ .../devicetree/bindings/rtc/armada-380-rtc.txt     |  22 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |   7 +
+ arch/arm/configs/mvebu_v7_defconfig                |   1 +
+ drivers/rtc/Kconfig                                |  10 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-armada38x.c                        | 319 +++++++++++++++++++++
+ 7 files changed, 361 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+ create mode 100644 drivers/rtc/rtc-armada38x.c
 
-diff --git a/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-new file mode 100644
-index 000000000000..e6fe29bda608
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
-@@ -0,0 +1,22 @@
-+* Real Time Clock of the Armada 38x SoCs
-+
-+RTC controller for the Armada 38x SoCs
-+
-+Required properties:
-+- compatible : Should be "marvell,armada-380-rtc"
-+- reg: physical base address of the controller and length of memory
-+  mapped region, associated to the reg-name "rtc". The other entry is
-+  related to the interrupt control from the SoC, associated to the
-+  reg-name "soc-int".
-+- reg-names: names of the mapped memory regions listed in reg property
-+    in the same order: "rtc" and "soc-int".
-+- interrupts: IRQ line for the RTC.
-+
-+Example:
-+
-+rtc at a3800 {
-+	compatible = "marvell,armada-380-rtc";
-+	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
-+	reg-names = "rtc", "soc-int";
-+	interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+};
 -- 
 1.9.1
