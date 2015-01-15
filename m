@@ -1,97 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 15 Jan 2015 09:40:55 -0600
-Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
-In-Reply-To: <alpine.DEB.2.11.1501151003430.5526@nanos>
-References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
- <alpine.DEB.2.11.1501141110190.5526@nanos>
- <CAL_JsqLwBvV5s531_YsA=sCE4_LG=eXTua8mh069ufRjSNFhng@mail.gmail.com>
- <alpine.DEB.2.11.1501151003430.5526@nanos>
-Message-ID: <CAL_JsqLCkU0TA5YCa2h+NyaXxG2vDpGSaNqveAr9XcnFDfuRXA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Jan 2015 07:37:48 -0800
+Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
+In-Reply-To: <87wq4ogl48.fsf@approximate.cambridge.arm.com>
+References: <20150114221407.GS2419@atomide.com>
+ <8761c8i2hq.fsf@approximate.cambridge.arm.com>
+ <2776397.iNGHcrIBZz@wuerfel>
+ <87wq4ogl48.fsf@approximate.cambridge.arm.com>
+Message-ID: <20150115153746.GC18552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 3:11 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Wed, 14 Jan 2015, Rob Herring wrote:
->> On Wed, Jan 14, 2015 at 4:36 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> > All attempts to work around that have resulted in horrible bandaids so
->> > far. That's why I guided Boris to implement this dummy demultiplexing
->> > mechanism. It solves the problem at hand nicely without adding nasty
->> > hackarounds into the suspend/resume code and inflicting platform
->> > knowledge on multi-platform device drivers.
->>
->> This change will break on old kernels with a new dtb. Would you be
->> happy if a BIOS update required a new kernel? Fixing this for any
->> platform requires a dtb update which may not be possible on some
->> platforms. I don't have a problem with this breakage for 1 platform
->> and the at91 guys may not care, but we'd ultimately be changing how
->> all shared irqs are specified for all DT. Maybe we decide that this is
->> how we want to describe things, but that needs much wider discussion
->> and agreement.
->
-> We do not change shared interrupts in any way. We provide an
-> alternative mechanism for braindead hardware. And if the at91 folks
-> are fine with the DT change, then it's their decision. Nothing forces
-> this on everyone.
+* Marc Zyngier <marc.zyngier@arm.com> [150115 06:46]:
+> On Thu, Jan 15 2015 at  2:27:56 pm GMT, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 15 January 2015 13:42:57 Marc Zyngier wrote:
+> >> Of course, this is in no way a proper fix, but I suppose the OMAP DT is
+> >> still missing a few bits...
+> >
+> > I must be missing something here, but all the interrupts are listed
+> > correctly in the DT, so what is the omap_hwmod_irq_info actually
+> > achieving on omap4 and omap5?
+> >
+> > Would it work if we just remove the incorrect copy of the resource
+> > and use the one that comes from DT?
+> 
+> By the look of it, omap_hwmod_irq_info serves multiple purposes:
+> - low level configuration (pads, probably more stuff)
 
-We are changing how shared interrupts are described in DT. We don't
-need 2 ways to describe them. We could say this is only for AT91 and
-continue to describe shared interrupts as has been done forever. Then
-the next platform that hits this problem will have to go thru the same
-ABI breakage. Or we change DT practices to describe all shared
-interrupts with a demux node. Given the way DTs are incrementally
-created, it is not something we can check with review or tools, so we
-will still have the same ABI breakage problem.
+The muxing is only done for omap3 in legacy booting mode.
 
->> > If you have a proper solution for the problem at hand which
->> >
->> >    - avoids the demux dummy
->> >
->> >    - works straight forward with suspend/resume/wakeup
->> >
->> >    - does not add horrible new APIs
->> >
->> >    - does not add conditionals to the interrupt hotpath
->> >
->> >    - does not inflict platform knowledge about interrupt chip details
->> >      on drivers
->> >
->> > then I'm happy to take it.
->> >
->> > But as long as you can't come up with anything sane, the demux dummy
->> > is the best solution for this problem we've seen so far.
->>
->> What if during suspend you move all actions w/o IRQF_NO_SUSPEND to a
->> suspended action list? This would leave only the actions with
->> IRQF_NO_SUSPEND set in the active action list. The cost would be a
->> pointer in irq_desc and moving the actions during suspend and resume.
->
-> That's exactly what we want NOT. Because it prevents us to do proper
-> sanity checks for IRQF_NO_SUSPEND. We've been there and I rejected it
-> for that very reason.
->
->> There are probably ways to do this demux irqchip without a DT change.
->
-> What's the problem with a DT change for a single platform, if the
-> maintainers are willing to take it and deal with the fallout?
+> - interrupt description for some drivers, using resources.
 
-What's the solution for a platform that an ABI break is not okay and
-can't deal with the fallout?
+That's still used to create legacy platform_device entries on omap4
+for legacy DMA, DSS, PRM. The twl6040 entries are already unused
+and I have a patch queued to remove them.
+ 
+> It should be fairly easy to do the latter, but the former looks more
+> tricky (it would push the pad configuration down to the drivers, which
+> is avoided at the moment).
 
-> And in case of AT91 the new kernel will simply work with the old DT
-> and just emit the same warning vs. the IRQF_NO_SUSPEND mismatch. Older
-> kernels won't work with a new DT, but that's about it.
->
-> Aside of that, I'm quite amused about your DT update worries. DTs
-> break with every kernel version on very popular platforms in very
-> weird and subtle ways.
+The pad configuration is already done with pinctrl-single.
+ 
+> Probably there is a workable strategy, but my knowledge about OMAP is
+> close to *nothing*...
 
-Someone has to. It is a problem that we need to get better at
-preventing. It's an ABI. I don't think I need to explain what that
-means.
+I have a feeling this might bite other platforms too and we just have
+not noticed it yet..
 
-Certainly there are folks who would just prefer DT to be a kernel data
-structure so we don't have to worry about this ABI nonsense.
+Regards,
 
-Rob
+Tony
