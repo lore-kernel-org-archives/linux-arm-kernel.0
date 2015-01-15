@@ -1,102 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Jan 2015 11:21:00 +0000
-Subject: [PATCHv7 1/2] arm64: use fixmap for text patching
-In-Reply-To: <1421276394-20402-2-git-send-email-lauraa@codeaurora.org>
-References: <1421276394-20402-1-git-send-email-lauraa@codeaurora.org>
- <1421276394-20402-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20150115112100.GA16217@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Jan 2015 11:21:25 +0000
+Subject: [PATCH] arm64: kill off the libgcc dependency
+In-Reply-To: <20150115095918.GA23475@arm.com>
+References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
+ <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
+ <2438951.7KFuXx85Hp@wuerfel>
+ <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
+ <20150114133742.GI4050@arm.com>
+ <20150115070730.GA23621@pek-khao-d1.corp.ad.wrs.com>
+ <20150115095918.GA23475@arm.com>
+Message-ID: <CAKv+Gu9Bp8-GARnuVkA0yehdMVS7X6ONv-OJvxHpAHzZH-LHMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 10:59:53PM +0000, Laura Abbott wrote:
-> When kernel text is marked as read only, it cannot be modified directly.
-> Use a fixmap to modify the text instead in a similar manner to
-> x86 and arm.
-> 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Tested-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
-> v7: Dropped early code path. Now using fixmap unconditionally for all patching.
-> ---
->  arch/arm64/include/asm/fixmap.h |  1 +
->  arch/arm64/kernel/insn.c        | 45 ++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 45 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-> index 9ef6eca..defa0ff9 100644
-> --- a/arch/arm64/include/asm/fixmap.h
-> +++ b/arch/arm64/include/asm/fixmap.h
-> @@ -49,6 +49,7 @@ enum fixed_addresses {
->  
->  	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
->  	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
-> +	FIX_TEXT_POKE0,
->  	__end_of_fixed_addresses
->  };
->  
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 7e9327a..df630f2 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -19,12 +19,15 @@
->  #include <linux/bitops.h>
->  #include <linux/compiler.h>
->  #include <linux/kernel.h>
-> +#include <linux/mm.h>
->  #include <linux/smp.h>
-> +#include <linux/spinlock.h>
->  #include <linux/stop_machine.h>
+On 15 January 2015 at 09:59, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jan 15, 2015 at 07:07:30AM +0000, Kevin Hao wrote:
+>> On Wed, Jan 14, 2015 at 01:37:42PM +0000, Will Deacon wrote:
+>> > On Wed, Jan 14, 2015 at 12:52:49PM +0000, Ard Biesheuvel wrote:
+>> > > IMO libgcc.a cannot be used at all in the kernel, as it is not built
+>> > > with -mgeneral-regs-only so we have no guarantee that it will leave
+>> > > the NEON registers alone.
+>> >
+>> > That's a very good point. In which case, we'd need to extend this patch
+>> > to implement the bitops that we currently rely on the __builtins for.
+>>
+>> Sorry, I am not sure I get what you mean. These builtin functions for bitops
+>> are not implemented in the libgcc, they are inlined in compiler. So why do
+>> we need to reimplement these bitops when removing the link with libgcc?
+>
+> I'm just relaying what the tools guys told us. Namely, that they don't
+> guarantee that they are inlined and could generate a branch to a libgcc
+> function. As Ard says, they could also use fpsimd registers, so whether
+> or not they are inlined is moot anyway.
+>
 
-We also need <linux/types.h> for uintptr_t below (or we could just use
-unsigned long). Currently we seem to be getting that via a transitive
-include, but it's best not to rely on that.
+Which builtins are you referring to, exactly?
 
->  #include <linux/uaccess.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/debug-monitors.h>
-> +#include <asm/fixmap.h>
->  #include <asm/insn.h>
->  
->  #define AARCH64_INSN_SF_BIT	BIT(31)
-> @@ -72,6 +75,29 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
->  	}
->  }
->  
-> +static DEFINE_SPINLOCK(patch_lock);
-> +
-> +static void __kprobes *patch_map(void *addr, int fixmap)
-> +{
-> +	unsigned long uintaddr = (uintptr_t) addr;
-> +	bool module = !core_kernel_text(uintaddr);
-> +	struct page *page;
-> +
-> +	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-> +		page = vmalloc_to_page(addr);
-> +	else
-> +		page = virt_to_page(addr);
-> +
+~/linux-2.6$ git grep __builtin arch/arm64
+arch/arm64/kernel/module.c:
+__builtin_return_address(0));
+arch/arm64/kernel/return_address.c:     frame.fp = (unsigned
+long)__builtin_frame_address(0);
+arch/arm64/kernel/stacktrace.c:         frame.fp = (unsigned
+long)__builtin_frame_address(0);
+arch/arm64/kernel/traps.c:              frame.fp = (unsigned
+long)__builtin_frame_address(0);
+arch/arm64/mm/ioremap.c:
+__builtin_return_address(0));
+arch/arm64/mm/ioremap.c:
+__builtin_return_address(0));
 
-It looks like vmalloc_to_page may return NULL if a mapping isn't active
-for the provided address. If that happens page_to_phys would generate a
-bogus physical address, and that could lead to SErrors or other pain.
+none of which would ever require library support, as far as I can
+judge, and the arm64 kernel builds fine with -fno-builtin added (i.e.,
+builtins can only be invoked explicitly using their __builtin- alias)
+and libgcc.a removed.
 
-I think we should have a BUG_ON(!page) here to catch that happening
-early (along with an include for <linux/bug.h> at the top).
-
-> +
-> +	set_fixmap(fixmap, page_to_phys(page));
-> +
-> +	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-> +}
-
-Other than the above, this looks good to me. I've messed around with
-static keys with this applied and didn't spot anything unexpected. So
-with the above changes (I've tested with and without):
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+-- 
+Ard.
