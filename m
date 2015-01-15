@@ -1,90 +1,121 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Jan 2015 10:26:45 +0100
-Subject: [PATCH v2 1/5] irqchip: add dumb demultiplexer implementation
-In-Reply-To: <alpine.DEB.2.11.1501151003430.5526@nanos>
-References: <1421174781-4340-1-git-send-email-boris.brezillon@free-electrons.com>
- <1421174781-4340-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAL_JsqJ5DSo6jmAuHPDdV6pMca8BVbg5V-GZ5=2qu96_QYXMtQ@mail.gmail.com>
- <alpine.DEB.2.11.1501141110190.5526@nanos>
- <CAL_JsqLwBvV5s531_YsA=sCE4_LG=eXTua8mh069ufRjSNFhng@mail.gmail.com>
- <alpine.DEB.2.11.1501151003430.5526@nanos>
-Message-ID: <54B787D5.9070408@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 15 Jan 2015 10:32:23 +0100
+Subject: [PATCH v2 0/6] ARM: shmobile: sh73a0: DT PM domain support
+In-Reply-To: <20150114235302.GC10479@verge.net.au>
+References: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
+ <20150114235302.GC10479@verge.net.au>
+Message-ID: <CAMuHMdVANePZ-fLzaLCEOm0vHR735C=u5_fDa4Uywi_P5ggjBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/01/2015 10:11, Thomas Gleixner a ?crit :
-> On Wed, 14 Jan 2015, Rob Herring wrote:
->> On Wed, Jan 14, 2015 at 4:36 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
->>> All attempts to work around that have resulted in horrible bandaids so
->>> far. That's why I guided Boris to implement this dummy demultiplexing
->>> mechanism. It solves the problem at hand nicely without adding nasty
->>> hackarounds into the suspend/resume code and inflicting platform
->>> knowledge on multi-platform device drivers.
+Hi Simon,
+
+On Thu, Jan 15, 2015 at 12:53 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jan 14, 2015 at 01:11:18PM +0100, Geert Uytterhoeven wrote:
+>> This patch series enables DT support for PM domains on the Renesas
+>> SH-Mobile AG5 (sh73a0) SoC.
 >>
->> This change will break on old kernels with a new dtb. Would you be
->> happy if a BIOS update required a new kernel? Fixing this for any
->> platform requires a dtb update which may not be possible on some
->> platforms. I don't have a problem with this breakage for 1 platform
->> and the at91 guys may not care, but we'd ultimately be changing how
->> all shared irqs are specified for all DT. Maybe we decide that this is
->> how we want to describe things, but that needs much wider discussion
->> and agreement.
-> 
-> We do not change shared interrupts in any way. We provide an
-> alternative mechanism for braindead hardware. And if the at91 folks
-
-Let me add subtle details: "Old braindead hardware, with possibility to
-use alternative set of timers which doesn't have shared interrupt lines" ;-)
-
-> are fine with the DT change, then it's their decision. Nothing forces
-> this on everyone.
-
-Yes I do agree to change DT.
-
->>> If you have a proper solution for the problem at hand which
->>>
->>>    - avoids the demux dummy
->>>
->>>    - works straight forward with suspend/resume/wakeup
->>>
->>>    - does not add horrible new APIs
->>>
->>>    - does not add conditionals to the interrupt hotpath
->>>
->>>    - does not inflict platform knowledge about interrupt chip details
->>>      on drivers
->>>
->>> then I'm happy to take it.
->>>
->>> But as long as you can't come up with anything sane, the demux dummy
->>> is the best solution for this problem we've seen so far.
+>> This series builds further on the DT PM Domain support for R-Mobile A1
+>> (r8a7740).  Due to the similarity of the SYSC System-Controller on the
+>> various SH-Mobile/R-Mobile SoCs, and the abstraction of PM domains in
+>> DT, the same driver can handle sh73a0 after some small modifications,
+>> without changing the DT bindings.
 >>
->> What if during suspend you move all actions w/o IRQF_NO_SUSPEND to a
->> suspended action list? This would leave only the actions with
->> IRQF_NO_SUSPEND set in the active action list. The cost would be a
->> pointer in irq_desc and moving the actions during suspend and resume.
-> 
-> That's exactly what we want NOT. Because it prevents us to do proper
-> sanity checks for IRQF_NO_SUSPEND. We've been there and I rejected it
-> for that very reason.
->  
->> There are probably ways to do this demux irqchip without a DT change.
-> 
-> What's the problem with a DT change for a single platform, if the
-> maintainers are willing to take it and deal with the fallout?
-> 
-> And in case of AT91 the new kernel will simply work with the old DT
-> and just emit the same warning vs. the IRQF_NO_SUSPEND mismatch. Older
-> kernels won't work with a new DT, but that's about it.
-> 
-> Aside of that, I'm quite amused about your DT update worries. DTs
-> break with every kernel version on very popular platforms in very
-> weird and subtle ways.
+>> Compared to r8a7740, the only significant change is the move of the
+>> memory-controller(s) to separate PM domains on sh73a0 (and also on
+>> R-Mobile APE6 (r8a73a4)). Hence a provision must be made to not turn off
+>> these PM domains inadvertently, cfr. the series "[PATCH 0/4] ARM:
+>> shmobile: Add DT support for memory controllers" I've just sent.
+>>
+>> This series has been sent before, as part of the series "[PATCH RFC
+>> 0/7] ARM: shmobile: sh73a0: DT PM domain support"
+>> (https://lkml.org/lkml/2014/11/19/404).
+>> Changes since v1 (more detailed changelogs in the individual patches):
+>>   - Factored out addition of the memory-controller in a separate
+>>     series.
+>>
+>> Dependencies:
+>>   1. Patches 1-4 (DT binding doc, C code) depend on:
+>>        a. The R-Mobile DT PM Domain work for r8a7740, queued in tag
+>>           renesas-dt-pm-for-v3.20 of Simon's repository,
+>
+> In response to a request from Olof renesas-dt-pm-for-v3.20 has been
+> withdrawn and the patches split between the soc-for-v3.20 and dt-for-v3.20
+> branches. I am assuming that the patches that 1-4 depend on are
+> now all in the soc-for-v3.20 branch. Could you check?
 
-DT on AT91 is a Work In Progress (for 3.5 years) and the facts have told
-us that DT updates were absolutely necessary. So, for now, I agree to
-change DT as far as AT91 is concerned.
+OK, soc-for-v3.20 now.
 
-Bye,
--- 
-Nicolas Ferre
+>>        b. "ARM: shmobile: R-Mobile: Fix DT refcount bugs in PM domain
+>>          code"
+>>          (http://www.spinics.net/lists/arm-kernel/msg391084.html),
+>
+> FWIW, I have squashed that patch into the patch that adds the problem
+> and the result is in the soc-for-v3.20. I will to push that result
+> a little later today.
+
+Thanks!
+
+>>   2. Patch 5 (dtsi) depends on:
+>>        a. The multiplatform work for sh73a0, queued in branch
+>>           sh73a0-multiplatform-for-v3.20 of Simon's repository,
+>>        b. Series "[PATCH 0/4] ARM: shmobile: Add DT support for memory
+>>           controllers"
+>>         (http://marc.info/?l=linux-sh&m=142123399414888).
+>
+> This may be awkward to get into v3.20 unless we can adopt a looser approach
+> to the dependencies.
+>
+> To that end I suggest that it could be queued up in the branch that has the
+> multiplatform work (a) but not the memory controller work (b) as the latter
+> seems to more naturally fit into the dt branch. What I am hoping that such
+> an approach would lead to code that compiles and boots in both branches.
+> And that new functionality becomes available when the branched are combined
+> (e.g. in v3.20-rcX).
+
+"ARM: shmobile: sh73a0 dtsi: Add PM domain support" relies on the clocks
+properties already being present on all device nodes (incl. the Bus State
+Controller), hence it depends on sh73a0-multiplatform-for-v3.20.
+"ARM: shmobile: sh73a0 dtsi: Add PM domain support" adds a power-domains
+property to the memory-controller node, so it depends on that, too.
+
+Leaving the memory-controller part out makes it unbootable, as the
+memory-controller will be powered down when PM domains become
+activated. Yes, hardware power domains are even more fun than (common)
+clocks when trying to split the commits across multiple branches ;-)
+
+> If this is not possible then I can merge the pre-requisites and put
+> patch 5 on top. But I feel that the ARM SoC maintainers would prefer
+> that I didn't do that unless it is absolutely necessary.
+
+Merging dt-for-v3.20 into sh73a0-multiplatform-for-v3.20 before applying
+patch 5 seems like the only sensible solution.
+
+As soon as that gets combined with soc-for-v3.20, the PM domains are
+activated, and patch 6 can be applied.
+
+> In case you are wondering: branch gymnastics are not my favourite pass time :^)
+>
+>>   3. Patch 6 (drivers/sh) depends on all of the above.
+>
+> That part is clear enough :)
+>
+> My intention here is to send a pull request to Linus for this change
+> once all the other patches have hit his tree. With a bit of luck that
+> would be around v3.20-rc2.
+
+OK, that would be appied to sh-drivers-for-v3.20, right?
+
+Thanks a lot!
+My local patch queue has shrunk considerably during the last few days...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
