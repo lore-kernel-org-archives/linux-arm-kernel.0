@@ -1,81 +1,111 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 14 Jan 2015 17:02:56 -0800
-Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
- touchscreen driver
-In-Reply-To: <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
-References: <jonathar@broadcom.com>
- <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
- <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
-Message-ID: <20150115010256.GC9134@dtor-ws>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 14 Jan 2015 17:03:43 -0800
+Subject: [PATCHv0 2/3] rtc: Add support for Abracon
+ AB-RTCMC-32.768kHz-B5ZE-S3 I2C RTC chip
+In-Reply-To: <20150114165557.d44c5752.akpm@linux-foundation.org>
+References: <cover.1421045942.git.arno@natisbad.org>
+ <1ae63ab80cfb39305884bd0c2648a420ba3bc0a5.1421045942.git.arno@natisbad.org>
+ <20150114165557.d44c5752.akpm@linux-foundation.org>
+Message-ID: <20150114170343.6f8d807a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+On Wed, 14 Jan 2015 16:55:57 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
 
-On Fri, Dec 19, 2014 at 02:17:49PM -0800, Jonathan Richardson wrote:
-> +	if (of_property_read_u32(np, "scanning_period", &val) >= 0) {
-> +		if (val < 1 || val > 256) {
-> +			dev_err(dev, "scanning_period must be [1-256]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.scanning_period = val;
-> +	}
-> +
-> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
-> +		if (val < 0 || val > 255) {
-> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.debounce_timeout = val;
-> +	}
-> +
-> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
-> +		if (val < 0 || val > 11) {
-> +			dev_err(dev, "settling_timeout must be [0-11]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.settling_timeout = val;
-> +	}
-> +
-> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
-> +		if (val < 0 || val > 255) {
-> +			dev_err(dev, "touch_timeout must be [0-255]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.touch_timeout = val;
-> +	}
-> +
-> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
-> +		if (val < 0 || val > 8) {
-> +			dev_err(dev, "average_data must be [0-8]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.average_data = val;
-> +	}
-> +
-> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
-> +		if (val < 0 || val > 31) {
-> +			dev_err(dev, "fifo_threshold must be [0-31]\n");
-> +			return -EINVAL;
-> +		}
-> +		priv->cfg_params.fifo_threshold = val;
-> +	}
+> Something like this?
 
-I think these are dveice specific and thus should have "brcm," prefix.
+Leading to changes in [3/3].  Please have a think about where we should
+be calling device_init_wakeup(dev, false) on the error recovery path.
 
-> +
-> +	priv->ts_rotation = TS_ROTATION_0;
-> +	if (of_property_read_u32(np, "ts-rotation", &val) >= 0) {
-> +		priv->ts_rotation = val;
-> +		dev_dbg(dev, "ts rotation [%d] degrees\n",
-> +			90 * priv->ts_rotation);
-> +	}
+Let me know if I should just drop it all and await a v2...
 
-This I am not quite sure about - if we want rotation or swap+invert. You
-are CCed on another email (tsc2007) that talks about need of generic
-touchscreen transforms in input core/of bindings.
 
-Thanks.
-
--- 
-Dmitry
+@@ -655,24 +896,28 @@ static int abb5zes3_probe(struct i2c_cli
+ 
+ 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C |
+ 				     I2C_FUNC_SMBUS_BYTE_DATA |
+-				     I2C_FUNC_SMBUS_I2C_BLOCK))
+-		return -ENODEV;
++				     I2C_FUNC_SMBUS_I2C_BLOCK)) {
++		ret = -ENODEV;
++		goto out;
++	}
+ 
+ 	regmap = devm_regmap_init_i2c(client, &abb5zes3_rtc_regmap_config);
+ 	if (IS_ERR(regmap)) {
+ 		ret = PTR_ERR(regmap);
+ 		dev_err(dev, "%s: regmap allocation failed: %d\n",
+ 			__func__, ret);
+-		return ret;
++		goto out;
+ 	}
+ 
+ 	ret = abb5zes3_i2c_validate_chip(regmap);
+ 	if (ret)
+-		return ret;
++		goto out;
+ 
+ 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+-	if (!data)
+-		return -ENOMEM;
++	if (!data) {
++		ret = -ENOMEM;
++		goto out;
++	}
+ 
+ 	mutex_init(&data->lock);
+ 	data->regmap = regmap;
+@@ -680,7 +925,7 @@ static int abb5zes3_probe(struct i2c_cli
+ 
+ 	ret = abb5zes3_rtc_check_setup(dev);
+ 	if (ret)
+-		return ret;
++		goto out;
+ 
+ 	if (client->irq > 0) {
+ 		ret = devm_request_threaded_irq(dev, client->irq, NULL,
+@@ -695,7 +940,7 @@ static int abb5zes3_probe(struct i2c_cli
+ 		} else {
+ 			dev_err(dev, "%s: irq %d unavailable (%d)\n",
+ 				__func__, client->irq, ret);
+-			return ret;
++			goto out;
+ 		}
+ 	}
+ 
+@@ -705,29 +950,23 @@ static int abb5zes3_probe(struct i2c_cli
+ 	if (ret) {
+ 		dev_err(dev, "%s: unable to register RTC device (%d)\n",
+ 			__func__, ret);
+-		goto err;
++		goto out_deinit_wakeup;
+ 	}
+ 
+-	/*
+-	 * AB-B5Z5E only supports a coarse granularity alarm (one minute
+-	 * resolution up to one month) so we cannot support UIE mode
+-	 * using the device's alarm. Note it should be feasible to support
+-	 * such a feature using one of the two timers the device provides.
+-	 */
+-	data->rtc->uie_unsupported = 1;
+-
+ 	/* Enable battery low detection interrupt if battery not already low */
+ 	if (!data->battery_low && data->irq) {
+ 		ret = _abb5zes3_rtc_battery_low_irq_enable(regmap, true);
+ 		if (ret) {
+ 			dev_err(dev, "%s: enabling battery low interrupt "
+ 				"generation failed (%d)\n", __func__, ret);
+-			goto err;
++			goto out_deinit_wakeup;
+ 		}
+ 	}
+ 
++out:
+ 	return ret;
+-err:
++
++out_deinit_wakeup:
+ 	device_init_wakeup(dev, false);
+ 	return ret;
+ }
+_
