@@ -1,89 +1,43 @@
-From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
-Date: Thu, 15 Jan 2015 17:14:38 +0100
-Subject: [PATCH 1/3] input: tsc2007: Add pre-calibration,
- flipping and rotation
-In-Reply-To: <20150115143855.GD512@earth.universe>
-References: <1412108254-19234-1-git-send-email-marek@goldelico.com>
- <1412108254-19234-2-git-send-email-marek@goldelico.com>
- <CAAfyv36bD9ZratOzr7FkeQde8k-K9XjEjH9gkntm9qewD-cH9g@mail.gmail.com>
- <20150115005938.GB9134@dtor-ws>
- <0F9A17C1-9B01-4EE9-BE98-266B8FC02B84@goldelico.com>
- <20150115143855.GD512@earth.universe>
-Message-ID: <8B08216C-13DD-40D8-9BA9-060F1C18A018@goldelico.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 15 Jan 2015 17:12:21 +0100
+Subject: [PATCH v2 09/11] ARM: tegra: Use pwrseq-simple for the wifi in Nyan
+In-Reply-To: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1421338359-27467-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1421338359-27467-10-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Nyan boards have a Marvell 88w8897 wifi card connected through SDIO
+that need the reset line to be hold active for several milliseconds.
 
-Am 15.01.2015 um 15:38 schrieb Sebastian Reichel <sre@kernel.org>:
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ arch/arm/boot/dts/tegra124-nyan.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> Hi,
-> 
-> On Thu, Jan 15, 2015 at 08:36:44AM +0100, Dr. H. Nikolaus Schaller wrote:
->>> 1. Perform conversion in input core rather than individual drivers. I
->>> think we should allocate a new bitmaps for some transformations and have
->>> the code do X/Y flip/clip of the coordinates.
->> 
->> Do you have a suggestion where this should be (I have no clue how
->> the input system works or is structured - we just know how to extend a
->> driver that uses it)?
->> 
->>> 2. Standardize on bindings. We already have of-touchscreen.c doing
->>> rudimentary parsing, we shoudl look into extending it rather than
->>> creating myriad of driver-specific bindings.
->> 
->> Ok, looks reasonable.
-> 
-> Documentation is in 
-> 
-> Documentation/devicetree/bindings/input/touchscreen/touchscreen.txt
-
-I did look into it now. Unfortunately, it does not fit well into my view of how bindings
-should be. They should describe hardware (as we are told for many other kernel
-subsystems).
-
-Pixels and resolutions are IMHO related to the screen it is glued on - and that is
-quite independent.
-
-So I don?t see how they do describe the different ways the touch screen can be
-wired to a tsc2007 controller.
-
-Please can you add minimum and maximum properties for us?
-
-Then, inverted-x and inverted-y is redundant because it is the same as having
-an expected higher value from the ADC for the minimum coordinate and a lower
-for the maximum.
-
-> 
->>> Also, do we need swap and flip or do we simply need rotation (like the
->>> proposed Broadcom iproc driver has)?
->> 
->> Well, since the DT should describe hardware, there are 3 sets of wires which
->> can have a cross-over: X+ and X-, Y+ and Y-, X and Y.
->> 
->> So IMHO hardware has no ?rotation?, just crossover of wires. Rotation is an
->> interpretation of the result of these connections in combination with some
->> panel the touch is glued to and should therefore not be represented in the DT.
->> 
->> As a result we have proposed a scheme without explicit rotation. We specify what
->> coordinates X- and X+ should report at their ends (min, max) because the DT
->> programmer has to specify them anyways. Flipping is a result of defining these
->> coordinates in an ascending or descending way. Only swapping of the X and Y
->> wires can?t be implicitly defined so it has its own property. So the scheme we
->> have proposed tries to optimize the efforts needed to adapt new boards and write
->> DTs and focus the DT on hardware description.
->> 
->> As a bonus we also specify the min and max value to be reported for the touch
->> pressure (Z axis) using the same basic principle.
->> 
->> And it is a pure add-on on top of the existing driver so that it attempts not
->> to break existing device trees.
-> 
-> from what I can see there are no in-tree-users using any of the
-> new properties.
-> 
->> Maybe could you accept it as a first step for this specific driver (and let?s do
->> the big standardization work later on)?
-> 
-> That does not work, since you create an ABI.
-> 
-> -- Sebastian
+diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
+index 25bbcbe..dbaf261f 100644
+--- a/arch/arm/boot/dts/tegra124-nyan.dtsi
++++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+@@ -365,11 +365,19 @@
+ 		status = "okay";
+ 	};
+ 
++	sdhci0_pwrseq: sdhci0_pwrseq {
++		compatible = "mmc,pwrseq-simple";
++
++                reset-gpios = <&gpio TEGRA_GPIO(X, 7) GPIO_ACTIVE_LOW>;
++                delay = <20>; /* ms */
++	};
++
+ 	sdhci at 0,700b0000 { /* WiFi/BT on this bus */
+ 		status = "okay";
+ 		bus-width = <4>;
+ 		no-1-8-v;
+ 		non-removable;
++		mmc-pwrseq = <&sdhci0_pwrseq>;
+ 	};
+ 
+ 	sdhci at 0,700b0400 { /* SD Card on this bus */
+-- 
+1.9.3
