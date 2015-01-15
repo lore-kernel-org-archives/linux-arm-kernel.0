@@ -1,47 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 15 Jan 2015 18:00:33 +0000
-Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <2277974.2klgILPa2Q@wuerfel>
-References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6tjiE6u8i-1PHYzX2cOhxJkYN3cV9mqhCHRSMRdOQRfzg@mail.gmail.com>
- <54B7E21E.2000901@redhat.com> <2277974.2klgILPa2Q@wuerfel>
-Message-ID: <20150115180033.GE3043@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Jan 2015 10:12:19 -0800
+Subject: [PATCH v3 13/21] ARM: omap: convert wakeupgen to stacked domains
+In-Reply-To: <20150115175701.GG18552@atomide.com>
+References: <1421087187-26988-1-git-send-email-marc.zyngier@arm.com>
+ <1421087187-26988-14-git-send-email-marc.zyngier@arm.com>
+ <20150114222814.GU2419@atomide.com>
+ <871tmwi0d6.fsf@approximate.cambridge.arm.com>
+ <20150115144016.GA19920@kahuna>
+ <87sifcgksy.fsf@approximate.cambridge.arm.com>
+ <20150115170443.GF18552@atomide.com> <54B7F8CC.3070901@arm.com>
+ <20150115175701.GG18552@atomide.com>
+Message-ID: <20150115181219.GH18552@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 05:52:31PM +0100, Arnd Bergmann wrote:
-> On Thursday 15 January 2015 10:51:58 Jon Masters wrote:
+* Tony Lindgren <tony@atomide.com> [150115 10:04]:
+> * Marc Zyngier <marc.zyngier@arm.com> [150115 09:31]:
+> > On 15/01/15 17:04, Tony Lindgren wrote:
+> > > * Marc Zyngier <marc.zyngier@arm.com> [150115 06:53]:
+> > >> On Thu, Jan 15 2015 at  2:40:16 pm GMT, Nishanth Menon <nm@ti.com> wrote:
+> > >>> On 14:28-20150115, Marc Zyngier wrote:
+> > >>>> Assuming the workaround I posted earlier works, the OMAP/DRA7 part of
+> > >>>> this series is going to require some rework too (I need to know where
+> > >>>> these legacy interrupts are attached: crossbar, WUGEN, or GIC?).
+> > >>>>
+> > >>> crossbar will never work with legacy static interrupts anyways - since
+> > >>> there was never a static interrupt possible - I believe we had removed
+> > >>> all the legacy hardcoded interrupt definitions for DRA7. ideally, they
+> > >>> should all be dt only now.
+> > >>
+> > >> Yes, I guessed as much after looking at the DRA7XX hwmod.
+> > >>
+> > >> So only OMAP4/5 is b0rken at the moment. I can probably work around it
+> > >> as I did in this example patch, just by changing the compatible strings
+> > >> for the xlate callback. Very ugly.
+> > > 
+> > > For the -rc, it seems the wakeupen still needs a fix as based on grepping
+> > > for OMAP44XX_IRQ_GIC_START. Got any great ideas for that?
+> > 
+> > I think this one is fine. It computes the SPI number based on the hwirq
+> > coming from the GIC. That direction is completely unaffected by the
+> > linear domain stuff. It is only when you try to use a hardware IRQ as a
+> > Linux IRQ that you run into trouble.
+> 
+> Yes OK that makes sense.
 
-> > It gets worse. There *will* be large numbers of ACPI only ARM servers
-> > landing over the coming year. Not only would DT code be untested, but
-> > insisting on keeping e.g. a DSDT and DT in sync is never going to work
-> > anyway. Already we have early stage servers that contain a DT used for
-> > bringup that is subsequently not being updated as often as the ACPI
-> > tables (those systems are now booting exclusively in labs with ACPI).
-> > Eventually, I am going to push for the DT data to be removed from these
-> > systems rather than have out of date unmaintained DT data in firmware.
+And suspend and resume seem to work with your fix.
 
-> We will of course be able to relax the rule once ACPI has stabilized on
-> ARM64. At the moment, we haven't even agreed on how to represent basic
-> devices, so things are in flux and there is no way for a BIOS writer
-> to ship an image that we will guarantee to support in the long run.
+FYI, to test suspend and resume with wakeups from the serial console,
+the uart wakeup events need to be enabled under sys:
 
-> At some point after we are reasonably sure we are able to keep supporting
-> all existing systems that are working with that kernel, we can take
-> support for new systems without having DT by default, and also support
-> booting those without acpi=force, which is related to this question.
+#!/bin/bash
 
-Speaking with my subsystem maintainer hat on (admittedly not subsystems
-affected too much by ARM servers so take this with a pinch of salt) this
-just sounds like it's making more work for me - it means having to force
-people to write DT code and bindings which I'm then going to have to
-review and none of us really care about.  Realistically I'm just going
-to take the code if a lack of a DT binding is the only option, I suspect
-others will be similar.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/bdc29ddd/attachment.sig>
+uarts=$(find /sys/class/tty/tty[SO]*/power/ -type d 2>/dev/null)
+for uart in $uarts; do
+        echo enabled > $uart/wakeup 2>&1
+done
+
+And after that suspending with echo mem > /sys/power/state should wake
+to a serial interrupt.
+
+Regards,
+
+Tony
