@@ -1,59 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Jan 2015 11:21:25 +0000
-Subject: [PATCH] arm64: kill off the libgcc dependency
-In-Reply-To: <20150115095918.GA23475@arm.com>
-References: <1421231934-31720-1-git-send-email-haokexin@gmail.com>
- <3138622.1rQcFu1jAj@wuerfel> <20150114114827.GH4050@arm.com>
- <2438951.7KFuXx85Hp@wuerfel>
- <CAKv+Gu-E=0Fm7woFSWcdBLfmxB+5diGtO91c2zy-t2M1_NTNeg@mail.gmail.com>
- <20150114133742.GI4050@arm.com>
- <20150115070730.GA23621@pek-khao-d1.corp.ad.wrs.com>
- <20150115095918.GA23475@arm.com>
-Message-ID: <CAKv+Gu9Bp8-GARnuVkA0yehdMVS7X6ONv-OJvxHpAHzZH-LHMQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Jan 2015 11:29:38 +0000
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <54B7024C.4020407@samsung.com>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+ <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
+ <54B7024C.4020407@samsung.com>
+Message-ID: <20150115112938.GB16217@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2015 at 09:59, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Jan 15, 2015 at 07:07:30AM +0000, Kevin Hao wrote:
->> On Wed, Jan 14, 2015 at 01:37:42PM +0000, Will Deacon wrote:
->> > On Wed, Jan 14, 2015 at 12:52:49PM +0000, Ard Biesheuvel wrote:
->> > > IMO libgcc.a cannot be used at all in the kernel, as it is not built
->> > > with -mgeneral-regs-only so we have no guarantee that it will leave
->> > > the NEON registers alone.
->> >
->> > That's a very good point. In which case, we'd need to extend this patch
->> > to implement the bitops that we currently rely on the __builtins for.
->>
->> Sorry, I am not sure I get what you mean. These builtin functions for bitops
->> are not implemented in the libgcc, they are inlined in compiler. So why do
->> we need to reimplement these bitops when removing the link with libgcc?
->
-> I'm just relaying what the tools guys told us. Namely, that they don't
-> guarantee that they are inlined and could generate a branch to a libgcc
-> function. As Ard says, they could also use fpsimd registers, so whether
-> or not they are inlined is moot anyway.
->
+On Wed, Jan 14, 2015 at 11:57:00PM +0000, Chanwoo Choi wrote:
+> Hi Kukjin,
+> 
+> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
+> > On 01/14/2015 04:51 PM, Kukjin Kim wrote:
+> >> On 01/14/15 14:33, Chanwoo Choi wrote:
+> >>
+> >> Hi,
+> >>
+> >> + Doug, Olof
+> >>
+> >>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+> >>> for Exynos 32bit SoC.
+> >>>
+> >> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+> >> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+> >> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+> >> implemented it and additionally its access is faster than using memory
+> >> mapped register called SFR for MCT...so Doug submitted patch to use MCT
+> >> on 32bit exynos SoCs before.
+> 
+> I know arch_timer. As you comment, ARCH timer would be used for system timer for ARMv8.
+> But, Exynos5433/Exynos7 (ARMv8) include MCT (Multi-Core Timer) IP. I checked it on
+> Exynos5433/EXynos7 User-manaual and tested it.
+> 
+> I think that exynos_mct.c should support the Exynos 64-bit SoC
+> because Exynos5433/Exynos7 include already MCT (Multi-Core Timer) IP.
+> 
+> Also, I have a problem to verify ARCH timer on Exynos SoC. Exynos User-manual never includes
+> the detailed information about for ARCH timer(e.g, clock for ARCH timer). I knew that
+> I can get the document of ARCH timer for ARM official site but I think it is insufficient
+> to implement ARCH timer on Exynos SoC. 
 
-Which builtins are you referring to, exactly?
+What do you mean by "insufficient to implement ARCH timer"?
 
-~/linux-2.6$ git grep __builtin arch/arm64
-arch/arm64/kernel/module.c:
-__builtin_return_address(0));
-arch/arm64/kernel/return_address.c:     frame.fp = (unsigned
-long)__builtin_frame_address(0);
-arch/arm64/kernel/stacktrace.c:         frame.fp = (unsigned
-long)__builtin_frame_address(0);
-arch/arm64/kernel/traps.c:              frame.fp = (unsigned
-long)__builtin_frame_address(0);
-arch/arm64/mm/ioremap.c:
-__builtin_return_address(0));
-arch/arm64/mm/ioremap.c:
-__builtin_return_address(0));
+The architected timer is mandatory in ARMv8, and required by the arm64
+kernel.
 
-none of which would ever require library support, as far as I can
-judge, and the arm64 kernel builds fine with -fno-builtin added (i.e.,
-builtins can only be invoked explicitly using their __builtin- alias)
-and libgcc.a removed.
+Additional timers may be requried if you want to put all CPUs into low
+power states where the timer logic may be disabled and/or lose state,
+but regardless the architected timers are necessary.
 
--- 
-Ard.
+Thanks,
+Mark.
