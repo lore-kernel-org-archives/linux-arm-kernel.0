@@ -1,40 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Jan 2015 10:45:14 +0000
-Subject: [PATCH] Build a uImage with dtb already appended
-In-Reply-To: <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
-References: <20110802143148.21599.22870.stgit@ponder>
- <1421287693-23383-1-git-send-email-ottxor@gentoo.org>
-Message-ID: <20150115104514.GD12302@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Jan 2015 11:47:02 +0100
+Subject: [PATCH v3 1/5] rtc: armada38x: Add the device tree binding
+ documentation
+In-Reply-To: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1421318826-27268-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1421318826-27268-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 07:08:13PM -0700, Christoph Junghans wrote:
-> Add new targets to build zImage and uImage with DTB appended (i.e. make
-> 'uImage-dtb.am335x-bone' or 'make zImage-dtb.omap3-evm').
-> 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Domenico Andreoli <domenico.andreoli@linux.com>
-> Signed-off-by: Christoph Junghans <ottxor@gentoo.org>
-> ---
-> 
-> I don't know why this never got merged, but I think it is still useful.
+The Armada 38x SoCs come with a new RTC which differs from the one
+used in the other mvebu SoCs until now. This patch describes the
+binding of this RTC.
 
-What do you do about supplying the load address argument to mkimage,
-which is highly platform specific?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/rtc/armada-380-rtc.txt     | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
 
-This may be useful if you want to create one uImage for one platform,
-but it's not useful in other cases.
-
-However, in general, I don't want to augment the u-boot crap that we
-already have in the kernel; it's too inflexible.  You're much better
-off taking the zImage and DTB, combining them yourself, and then
-_if_ you insist on using the u-boot legacy format, running mkimage.
-
-The alternative is to move forward with your uboot skills, and see
-whether your uboot supports loading the fdt and use bootz with the
-zImage instead of bootm.
-
+diff --git a/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+new file mode 100644
+index 000000000000..e6fe29bda608
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/armada-380-rtc.txt
+@@ -0,0 +1,22 @@
++* Real Time Clock of the Armada 38x SoCs
++
++RTC controller for the Armada 38x SoCs
++
++Required properties:
++- compatible : Should be "marvell,armada-380-rtc"
++- reg: physical base address of the controller and length of memory
++  mapped region, associated to the reg-name "rtc". The other entry is
++  related to the interrupt control from the SoC, associated to the
++  reg-name "soc-int".
++- reg-names: names of the mapped memory regions listed in reg property
++    in the same order: "rtc" and "soc-int".
++- interrupts: IRQ line for the RTC.
++
++Example:
++
++rtc at a3800 {
++	compatible = "marvell,armada-380-rtc";
++	reg = <0xa3800 0x20>, <0x184a0 0x0c>;
++	reg-names = "rtc", "soc-int";
++	interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++};
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
