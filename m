@@ -1,64 +1,34 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 15 Jan 2015 10:19:23 +0800
-Subject: [GIT PULL v2]Hisilicon hip01 soc and development board updates for
- 3.20
-Message-ID: <54B723AB.7080506@hisilicon.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Jan 2015 10:24:04 +0800
+Subject: [PATCH v3 05/13] ARM: dts: sun9i: Add clock-indices property for
+ bus gate clocks
+In-Reply-To: <20150114163351.GY4891@lukather>
+References: <1421113055-17867-1-git-send-email-wens@csie.org>
+ <1421113055-17867-6-git-send-email-wens@csie.org>
+ <20150114163351.GY4891@lukather>
+Message-ID: <CAGb2v64brc_2c5Jz2=BzfCpwiwBQgGf=SLD2ib+taOYUgicekA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin, 
+On Thu, Jan 15, 2015 at 12:33 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jan 13, 2015 at 09:37:27AM +0800, Chen-Yu Tsai wrote:
+>> of_clk_get_parent_name() uses the clock-indices property to resolve
+>> clock phandle arguments in case that the argument index does not
+>> match the clock-output-names sequence.
+>>
+>> This is the case on sunxi, where we use the actual bit index as the
+>> argument to the phandle. Add the clock-indices property so that
+>> of_clk_get_parent_name() resolves the names correctly.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Applied. Are the mask in the clock driver still of any use now? I
+> don't think they are, and if we're going that way, I'd rather have
+> them removed from the driver.
 
-Could you please help to merge the pull request of hisilicon hip01 soc for 3.20. 
-Thanks!
+Yes they are still passed through factors_data, for mux_clk_ops to
+know about the width of the mux, which is 3 bits on older SoCs vs
+4 bits on sun9i.
 
-Best Regards,
-Wei
-
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
-
-  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hip01-for-3.20-v2
-
-for you to fetch changes up to 27040189cb050cbe52a81c0e6aeb552872aa0736:
-
-  ARM: hisi: enable smp for HiP01 (2015-01-15 09:59:51 +0800)
-
-----------------------------------------------------------------
-ARM: mach-hisi: Hisilicon hip01 soc and development board updates for 3.20
-
-- Add hip01 debug UART
-- Add hip01 DT_MACHINE and ARCH_HIP01 configure item
-- Add dts for Hisilicon hip01-ca9x2 board
-- Enable ARCH_HIP01 in the hisi_defconfig
-- Rename hix5hd2_smp_prepare_cpus to hisi_common_smp_prepare_cpus
-- Rename hix5hd2_secondary_startup to hisi_secondary_startup
-- Enable smp for hip01
-
-----------------------------------------------------------------
-Wang Long (7):
-      ARM: debug: add HiP01 debug uart
-      ARM: hisi: enable HiP01 SoC
-      ARM: dts: Add hip01-ca9x2 dts file
-      ARM: config: enable ARCH_HIP01
-      ARM: hisi: rename smp_prepares_cpus function
-      ARM: hisi: rename secondary_startup function
-      ARM: hisi: enable smp for HiP01
-
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  25 +++++++++++++++++++++++++
- arch/arm/Kconfig.debug                                        |  10 ++++++++++
- arch/arm/boot/dts/Makefile                                    |   1 +
- arch/arm/boot/dts/hip01-ca9x2.dts                             |  51 ++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/hip01.dtsi                                  | 110 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/configs/hisi_defconfig                               |   1 +
- arch/arm/mach-hisi/Kconfig                                    |   8 ++++++++
- arch/arm/mach-hisi/core.h                                     |   5 ++++-
- arch/arm/mach-hisi/headsmp.S                                  |   2 +-
- arch/arm/mach-hisi/hisilicon.c                                |  10 ++++++++++
- arch/arm/mach-hisi/hotplug.c                                  |  31 +++++++++++++++++++++++++++++++
- arch/arm/mach-hisi/platsmp.c                                  |  56 ++++++++++++++++++++++++++++++++++++++++++++++++++++---
- 12 files changed, 305 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/hip01-ca9x2.dts
- create mode 100644 arch/arm/boot/dts/hip01.dtsi
+ChenYu
