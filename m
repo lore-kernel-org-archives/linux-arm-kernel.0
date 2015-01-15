@@ -1,115 +1,64 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Jan 2015 18:01:34 +0100
-Subject: [PATCH v3 5/8] ARM: at91: move the restart function to the
- system timer driver
-In-Reply-To: <54B7ED29.9060700@linaro.org>
-References: <1421077023-30954-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421077023-30954-6-git-send-email-alexandre.belloni@free-electrons.com>
- <54B7ED29.9060700@linaro.org>
-Message-ID: <20150115170134.GU3843@piout.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Jan 2015 18:02:30 +0100
+Subject: [GIT PULL] at91: drivers for 3.20 #1
+Message-ID: <1421341350-13936-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arnd, Olof, Kevin,
 
-On 15/01/2015 at 17:39:05 +0100, Daniel Lezcano wrote :
-> On 01/12/2015 04:37 PM, Alexandre Belloni wrote:
-> >Restarting on an at91rm9200 is handled by using the system timer. Move that
-> >function to the system timer driver.
-> >
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> >---
-> >  arch/arm/mach-at91/at91rm9200.c      | 11 -----------
-> >  drivers/clocksource/timer-atmel-st.c | 12 ++++++++++++
-> >  2 files changed, 12 insertions(+), 11 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> >index b52916947535..4ea889cd6091 100644
-> >--- a/arch/arm/mach-at91/at91rm9200.c
-> >+++ b/arch/arm/mach-at91/at91rm9200.c
-> >@@ -15,7 +15,6 @@
-> >
-> >  #include <asm/mach/map.h>
-> >  #include <asm/system_misc.h>
-> >-#include <mach/at91_st.h>
-> >  #include <mach/hardware.h>
-> >
-> >  #include "soc.h"
-> >@@ -30,15 +29,6 @@ static void at91rm9200_idle(void)
-> >  	at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
-> >  }
-> >
-> >-static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
-> >-{
-> >-	/*
-> >-	 * Perform a hardware reset with the use of the Watchdog timer.
-> >-	 */
-> >-	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> >-	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> >-}
-> >-
-> >  /* --------------------------------------------------------------------
-> >   *  AT91RM9200 processor initialization
-> >   * -------------------------------------------------------------------- */
-> >@@ -51,7 +41,6 @@ static void __init at91rm9200_map_io(void)
-> >  static void __init at91rm9200_initialize(void)
-> >  {
-> >  	arm_pm_idle = at91rm9200_idle;
-> >-	arm_pm_restart = at91rm9200_restart;
-> >  }
-> >
-> >
-> >diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-> >index 51761f8927b7..522583d6cc78 100644
-> >--- a/drivers/clocksource/timer-atmel-st.c
-> >+++ b/drivers/clocksource/timer-atmel-st.c
-> >@@ -29,6 +29,7 @@
-> >  #include <linux/of_irq.h>
-> >
-> >  #include <asm/mach/time.h>
-> >+#include <asm/system_misc.h>
-> >
-> >  #include <mach/at91_st.h>
-> >  #include <mach/hardware.h>
-> >@@ -180,6 +181,15 @@ static struct clock_event_device clkevt = {
-> >  	.set_mode	= clkevt32k_mode,
-> >  };
-> >
-> >+static void at91rm9200_restart(enum reboot_mode reboot_mode, const char *cmd)
-> >+{
-> >+	/*
-> >+	 * Perform a hardware reset with the use of the Watchdog timer.
-> >+	 */
-> >+	at91_st_write(AT91_ST_WDMR, AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-> >+	at91_st_write(AT91_ST_CR, AT91_ST_WDRST);
-> >+}
-> >+
-> >  void __iomem *at91_st_base;
-> >  EXPORT_SYMBOL_GPL(at91_st_base);
-> >
-> >@@ -248,4 +258,6 @@ void __init at91rm9200_timer_init(void)
-> >
-> >  	/* register clocksource */
-> >  	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
-> >+
-> >+	arm_pm_restart = at91rm9200_restart;
-> >  }
-> 
-> Mmh, I can't clearly explain why but I have a problem with that.
-> 
-> Can you explain why restart code falls in the clockevents driver ?
-> 
-> 
+This is a pull-request about AT91 drivers for 3.20. We took the USB gadget part
+with us as it depends on the Matrix syscon part. There is no dependency anyway.
 
-That is a temporary location before getting rid of it by writing a
-proper reset driver that will use the same syscon.
+Thanks, best regards,
 
-The main goal is to remove mach/at91_st.h and direct accesses to the
-system timer registers.
+The following changes since commit eaa27f34e91a14cdceed26ed6c6793ec1d186115:
 
+  linux 3.19-rc4 (2015-01-11 12:44:53 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-drivers
+
+for you to fetch changes up to a5514d142e7f5cff8e02a6fb4cfcb3e301c0eb59:
+
+  usb: gadget: at91_udc: Allocate udc instance (2015-01-15 14:53:23 +0100)
+
+----------------------------------------------------------------
+First batch of drivers changes for 3.20:
+- Internal AHB bus matrix (Matrix) and Static Memory Controller (SMC) are now
+  mfd/syscon drivers.
+- USB gadget full speed (at91_udc): fixes, simplification and multi-platform awareness
+  DT enhancement.
+
+----------------------------------------------------------------
+Boris Brezillon (12):
+      mfd: syscon: Add atmel-matrix registers definition
+      mfd: syscon: Add Atmel Matrix bus DT binding documentation
+      mfd: syscon: Add atmel-smc registers definition
+      mfd: syscon: Add Atmel SMC binding doc
+      usb: gadget: at91_udc: Fix clock names
+      usb: gadget: at91_udc: Drop uclk clock
+      usb: gadget: at91_udc: Document DT clocks and clock-names property
+      usb: gadget: at91_udc: Remove non-DT handling code
+      usb: gadget: at91_udc: Simplify probe and remove functions
+      usb: gadget: at91_udc: Rework for multi-platform kernel support
+      usb: gadget: at91_udc: Update DT binding documentation
+      usb: gadget: at91_udc: Allocate udc instance
+
+ .../devicetree/bindings/mfd/atmel-matrix.txt       |  24 +
+ .../devicetree/bindings/mfd/atmel-smc.txt          |  19 +
+ .../devicetree/bindings/usb/atmel-usb.txt          |  10 +-
+ drivers/usb/gadget/udc/Kconfig                     |   1 +
+ drivers/usb/gadget/udc/at91_udc.c                  | 525 +++++++++++----------
+ drivers/usb/gadget/udc/at91_udc.h                  |   9 +-
+ include/linux/mfd/syscon/atmel-matrix.h            | 117 +++++
+ include/linux/mfd/syscon/atmel-smc.h               | 173 +++++++
+ 8 files changed, 623 insertions(+), 255 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-smc.txt
+ create mode 100644 include/linux/mfd/syscon/atmel-matrix.h
+ create mode 100644 include/linux/mfd/syscon/atmel-smc.h
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nicolas Ferre
