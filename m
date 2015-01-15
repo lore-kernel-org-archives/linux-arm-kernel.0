@@ -1,51 +1,56 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Jan 2015 15:09:36 +0100
-Subject: [PATCH v4 2/4] Documentation: bindings: Add the regulator property to
- the sub-nodes AHCI bindings
-In-Reply-To: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1421330978-9694-3-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu, 15 Jan 2015 15:09:34 +0100
+Subject: [PATCH v4 0/4] ata: libahci: Allow using a regulator for each port
+Message-ID: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is now possible to use a regulator property for each port of the
-AHCI controller.
+The current implementation of the libahci allows using one PHY per
+port but we still have one single regulator for the whole
+controller. This series adds the support of multiple regulators.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+This is the forth version of the series.
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 4ab09f2202d4..c2340eeeb97f 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -37,9 +37,10 @@ Required properties when using sub-nodes:
- 
- 
- Sub-nodes required properties:
--- reg               : the port number
--- phys              : reference to the SATA PHY node
--
-+- reg		    : the port number
-+And at least one of the following properties:
-+- phys		    : reference to the SATA PHY node
-+- target-supply    : regulator for SATA target power
- 
- Examples:
-         sata at ffe08000 {
-@@ -68,10 +69,12 @@ With sub-nodes:
- 		sata0: sata-port at 0 {
- 			reg = <0>;
- 			phys = <&sata_phy 0>;
-+			target-supply = <&reg_sata0>;
- 		};
- 
- 		sata1: sata-port at 1 {
- 			reg = <1>;
- 			phys = <&sata_phy 1>;
-+			target-supply = <&reg_sata1>;;
- 		};
- 	};
+The improvement of this version is the use of
+ahci_platform_put_resources to put the reference to the regulators.
+
+Thanks,
+
+Gr??gory
+
+Changelog:
+
+ v3 -> v4
+- Moved putting the reference to the regulators into the
+  ahci_platform_put_resources function.
+- Tested the port_dev pointer before dereferencing.
+
+ v2 -> v3:
+- put back the regulator inside the sub-node ports
+- made the ports platform devices when the device tree is used
+- released the regulator in case of error in the probe function
+
+ v1 -> v2:
+- Kept the case when no child node are present under the ahci node
+- Fix the test done under the label disable_target_pwrs
+- No more use an of_ version of the regulator framework and instead
+  associate each regulator of a port with an unique name.
+- Added the acked-by on the clean-up patch
+
+Gregory CLEMENT (4):
+  ata: libahci: Clean-up the ahci_platform_en/disable_phys functions
+  Documentation: bindings: Add the regulator property to the sub-nodes
+    AHCI bindings
+  ata: libahci: Allow using multiple regulators
+  ARM: mvebu: Armada 385 GP: Add regulators to the SATA port
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |   9 +-
+ arch/arm/boot/dts/armada-388-gp.dts                | 126 +++++++++++
+ drivers/ata/ahci.h                                 |   2 +-
+ drivers/ata/ahci_imx.c                             |  14 +-
+ drivers/ata/libahci_platform.c                     | 236 ++++++++++++++-------
+ include/linux/ahci_platform.h                      |   2 +
+ 6 files changed, 305 insertions(+), 84 deletions(-)
+
 -- 
 1.9.1
