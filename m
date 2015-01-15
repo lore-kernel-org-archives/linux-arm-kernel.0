@@ -1,156 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Jan 2015 23:04:38 +0100
-Subject: Including empty regulator nodes in axp209.dtsi is a BAD idea
-In-Reply-To: <CAGb2v67uGV2HBKciRVGhf-vb7K=whruiaUvv8L7Lqz=8=kBnQQ@mail.gmail.com>
-References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
- <54B61DD3.6010105@redhat.com>
- <CAGb2v67uGV2HBKciRVGhf-vb7K=whruiaUvv8L7Lqz=8=kBnQQ@mail.gmail.com>
-Message-ID: <20150115220438.GD5567@lukather>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Jan 2015 23:16:48 +0100
+Subject: [PATCH 4/5] ARM: at91: sama5d4: copy defines to SoC file
+In-Reply-To: <1421360209-15852-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421360209-15852-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1421360209-15852-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:54:58AM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Wed, Jan 14, 2015 at 3:42 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> > Hi,
-> >
-> >
-> > On 13-01-15 17:46, Maxime Ripard wrote:
-> >>
-> >> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
-> >>>
-> >>> Hi ChenYu, Maxime,
-> >>>
-> >>> During the review of a few dts files for new boards Maxime asked me to
-> >>> use
-> >>> axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
-> >>> boards using the axp209 pmic.
-> >>>
-> >>> But axp209.dtsi includes empty regulator nodes, e.g. :
-> >>>
-> >>>                  reg_dcdc3: dcdc3 {
-> >>>                          regulator-name = "dcdc3";
-> >>>                  };
-> >>>
-> >>> This is a BAD idea, the presence of these empty nodes causes the
-> >>> axp20x-regulator driver to actually register regulators for them,
-> >>> and then on late_init the regulator subsys turns them off, since
-> >>> they have absolutely no constraints set (nor users registered)
-> >>> and the regulator subsys assumes that when devicetree is used their
-> >>> is always a compete set of constraints and that thus turning them
-> >>> off is safe.
-> >>>
-> >>> So when I switched to using axp209.dtsi for the bananapro.dts,
-> >>> and booted the bananapro this is the last message I got from the
-> >>> kernel while booting:
-> >>>
-> >>> [    2.314014] dcdc3: disabling
-> >>>
-> >>> And away went our DRAM power-supply, oops.
-> >>>
-> >>> So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
-> >>> should contain reasonable constraints (eg the operating range
-> >>> from the datasheet)
-> >>
-> >>
-> >> Indeed.
-> >>
-> >>> and an always-on property.
-> >>
-> >>
-> >> I disagree. The regulator disabling is a feature, and how the board is
-> >> wired is, well, up to the board.
-> >
-> >
-> > And here I was thinking you wanted to reduce the amount of boilerplate
-> > in our dts files ..
-> >
-> > IOW I disagree with your disagreeing all boards we know of have dcdc2
-> > wired to Vcpu and dcdc3 wired to Vddr, so not having this in the dtsi
-> > will lead to a lot of extra boilerplate in each dts file. We're not
-> > talking about our main dtsi file here, if we ever encounter a board
-> > which is wired in a different way, then its dts can simply not use
-> > axp209.dtsi and instead define the nodes itself, it needs to do that
-> > anyways if we do include the standard CPU and DDR constrains in the
-> > dtsi since those will not make sense either in that case.
-> 
-> I think Maxime is only disagreeing to the "always-on" part. And I
-> somewhat agree with him, but on a technical level. It doesn't seem
-> possible to negate at the board level the "always-on" set in the dtsi,
-> or it is not obvious to me how to do so. With properties with values
-> you just set a new value. How do you "unset" a boolean flag?
+Copy the defines to the SoC file to remove the need for the header.
+The header has to stay for now because on mach/uncompress.h
 
-You don't, but Hans suggestion was to not use the DTSI then and define
-the nodes yourself in your DTS.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/sama5d4.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-Another solution would be if this case comes up at some point to just
-push the always-on constraints to the boards, but assume for now that
-all boards will want it to be always on.
-
-> As for the constraints, I think we can agree that everyone will use
-> the reference design if they choose to include the PMIC on a board.
-
-I'm not sure to get what you mean here. The PMIC has constraints of
-its own (the min/max voltage it can deliver), and boards will have
-some too (ie the min/max voltage the components can handle). So I
-guess we will end up with constraints defined at both levels.
-
-> >> If an always-on property is needed, then it's in the DTS, not in the
-> >> AXP DTSI.
-> >>
-> >>> The ldo-s are trickier, since we simply do not know how those
-> >>> are used, I think ldo2 is used for Avcc on most boards, so it
-> >>> too should be always on, since almost any board will have some
-> >>> analog parts on it (be it the ir receiver, lradc, rtp, lvds, vga,
-> >>> or analog audio in/out). Assuming that we're willing to assume
-> >>> that ldo2 is used this way, we should give it matching constraints
-> >>> and always mark it always-on.
-> >>
-> >>
-> >> Ideally, all the drivers that have a analogic component should have a
-> >> reference to the regulator they use. But again, at the board
-> >> level. And more realistically, putting always-on should also happen at
-> >> the board level.
-> >>
-> >>> As for ldo3 - 5 I've no idea when / for what these are used, but
-> >>> if we do not know it is better to just leave them be then to turn
-> >>> them off IMHO, so we should remove the nodes for these from axp209.dtsi
-> >>>
-> >>> Anyways sorting this all out is going to take some time, so I'm
-> >>> not going to use axp209.dtsi in dts files for new boards for now.
-> >>
-> >>
-> >> I'm afraid it's an "all or nothing" situation.
-> >
-> >
-> > No it is not, the PMIC is a mfd, and we can use some of its functions
-> > fine without actually loading the regulator bits. This is already
-> > done on most boards with the axp209, even without touching the regulators
-> > it is nice to have the axp209 mfd driver loaded so that we get support
-> > for the powerbutton, and support for poweroff, esp. the latter is quite
-> > nice to have.
-> 
-> I agree that a) the PMIC is an mfd, and b) we can use other bits without
-> loading the regulator bits. But if adding the regulator bits results in
-> some sort of crash or issue, just because some regulator got turned off,
-> it seems to me that the dt is not accurately describing the hardware.
-
-Yeah, that's kind of the same argument than the one we had with
-simplefb clocks. So I guess we can agree that we can allow the MFD
-part alone to work, but if regulator support is introduced, then *all*
-regulators must be described accurately.
-
-Maxime
-
+diff --git a/arch/arm/mach-at91/sama5d4.c b/arch/arm/mach-at91/sama5d4.c
+index 2ec43ee3f440..56d67d620764 100644
+--- a/arch/arm/mach-at91/sama5d4.c
++++ b/arch/arm/mach-at91/sama5d4.c
+@@ -12,11 +12,21 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+-#include <mach/sama5d4.h>
+ #include <mach/hardware.h>
+ 
+ #include "generic.h"
+ 
++/*
++ * User Peripheral physical base addresses.
++ */
++#define SAMA5D4_BASE_USART3	0xfc00c000 /* (USART3 non-secure) Base Address */
++#define SAMA5D4_BASE_PMC	0xf0018000 /* (PMC) Base Address */
++#define SAMA5D4_BASE_MPDDRC	0xf0010000 /* (MPDDRC) Base Address */
++#define SAMA5D4_BASE_PIOD	0xfc068000 /* (PIOD) Base Address */
++
++/* Some other peripherals */
++#define SAMA5D4_BASE_SYS2	SAMA5D4_BASE_PIOD
++
+ static struct map_desc at91_io_desc[] __initdata = {
+ 	{
+ 	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_MPDDRC),
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150115/a6ded79f/attachment.sig>
+2.1.0
