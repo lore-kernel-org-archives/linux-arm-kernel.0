@@ -1,92 +1,73 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 14 Jan 2015 17:08:09 -0800
-Subject: [PATCH v2] ARM: dts: exynos5422-odroidxu3: add on-board INA231 sensors
-Message-ID: <1421284089-421-1-git-send-email-khilman@kernel.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 14 Jan 2015 17:08:58 -0800
+Subject: [PATCH v2 1/2] Input: touchscreen-iproc: Add Broadcom iProc
+ touchscreen driver
+In-Reply-To: <5494AEB8.8060606@broadcom.com>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1419027470-7969-1-git-send-email-jonathar@broadcom.com>
+ <1419027470-7969-2-git-send-email-jonathar@broadcom.com>
+ <1419028015.25129.14.camel@perches.com> <5494AEB8.8060606@broadcom.com>
+Message-ID: <54B7132A.6030803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@linaro.org>
+On 19/12/14 15:03, Jonathan Richardson wrote:
+> On 14-12-19 02:26 PM, Joe Perches wrote:
+>> On Fri, 2014-12-19 at 14:17 -0800, Jonathan Richardson wrote:
+>>> Add initial version of the Broadcom touchscreen driver.
+>>
+>> more trivia:
+>>
+>>> diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
+>> []
+>>> +static int get_tsc_config(struct device_node *np, struct iproc_ts_priv *priv)
+>>> +{
+>>> +	u32 val;
+>> []
+>>> +	if (of_property_read_u32(np, "debounce_timeout", &val) >= 0) {
+>>> +		if (val < 0 || val > 255) {
+>>> +			dev_err(dev, "debounce_timeout must be [0-255]\n");
+>>> +			return -EINVAL;
+>>> +		}
+>>> +		priv->cfg_params.debounce_timeout = val;
 
-The odroid-xu3 has 4 INA231 current sensors on board which can be
-accessed from the Linux via the hwmon interface.
+BTW, common practice for DT properties is to use a dash instead of an
+underscore for multi-worded properties.
 
-There is one sensor for each of these power rails:
+>>
+>> Doesn't the compiler generate a warning message
+>> about an impossible "unsigned < 0" test for all
+>> of these "val < 0" uses?
+>>
+> 
+> Actually no it doesn't. The gcc output shows that neither -Wtype-limits
+> nor -Wextra are used to compile that file. I assume this is because
+> there would be just too many warnings.
+> 
+> 
+>>> +	}
+>>> +
+>>> +	if (of_property_read_u32(np, "settling_timeout", &val) >= 0) {
+>>> +		if (val < 0 || val > 11) {
+>> []
+>>> +	if (of_property_read_u32(np, "touch_timeout", &val) >= 0) {
+>>> +		if (val < 0 || val > 255) {
+>> []
+>>> +	if (of_property_read_u32(np, "average_data", &val) >= 0) {
+>>> +		if (val < 0 || val > 8) {
+>> []
+>>> +	if (of_property_read_u32(np, "fifo_threshold", &val) >= 0) {
+>>> +		if (val < 0 || val > 31) {
+>>
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-- A15 cluster: VDD_ARM
-- A7 cluster: VDD_KFC
-- GPU: VDD_G3D
-- memory: VDD_MEM
 
-In addition to adding the sensors, LDO26 from the PMIC needs to be
-enabled because it's powering these sensor.
-
-Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-v2: use "ti,ina231" as compatible string.
-
-Applies on top of "ARM: dts: Add dts file for odroid XU3 board" from Sjoerd Simons.
-
- arch/arm/boot/dts/exynos5422-odroidxu3.dts | 39 ++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index c29123c0734d..50353d023225 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -174,6 +174,13 @@
- 					regulator-always-on;
- 				};
- 
-+				ldo26_reg: LDO26 {
-+					regulator-name = "vdd_ldo26";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
- 				buck1_reg: BUCK1 {
- 					regulator-name = "vdd_mif";
- 					regulator-min-microvolt = <800000>;
-@@ -257,6 +264,38 @@
- 		};
- 	};
- 
-+	i2c_0: i2c at 12C60000 {
-+		status = "okay";
-+
-+		/* A15 cluster: VDD_ARM */
-+		ina231 at 40 {
-+			compatible = "ti,ina231";
-+			reg = <0x40>;
-+			shunt-resistor = <10000>;
-+		};
-+
-+		/* memory: VDD_MEM */
-+		ina231 at 41 {
-+			compatible = "ti,ina231";
-+			reg = <0x41>;
-+			shunt-resistor = <10000>;
-+		};
-+
-+		/* GPU: VDD_G3D */
-+		ina231 at 44 {
-+			compatible = "ti,ina231";
-+			reg = <0x44>;
-+			shunt-resistor = <10000>;
-+		};
-+
-+		/* A7 cluster: VDD_KFC */
-+		ina231 at 45 {
-+			compatible = "ti,ina231";
-+			reg = <0x45>;
-+			shunt-resistor = <10000>;
-+		};
-+	};
-+
- 	i2c_2: i2c at 12C80000 {
- 		samsung,i2c-sda-delay = <100>;
- 		samsung,i2c-max-bus-freq = <66000>;
 -- 
-2.1.3
+Florian
