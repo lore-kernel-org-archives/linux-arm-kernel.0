@@ -1,68 +1,36 @@
-From: andre.przywara@arm.com (=?windows-1252?Q?Andr=E9_Przywara?=)
-Date: Fri, 16 Jan 2015 09:34:40 +0000
-Subject: [PATCH v7 1/4] KVM: arm/arm64: unset CONFIG_HAVE_KVM_IRQCHIP
-In-Reply-To: <1421333267-15287-2-git-send-email-eric.auger@linaro.org>
-References: <1421333267-15287-1-git-send-email-eric.auger@linaro.org>
- <1421333267-15287-2-git-send-email-eric.auger@linaro.org>
-Message-ID: <54B8DB30.2070206@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 10:34:34 +0100
+Subject: [PATCH 09/28] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <1421372666-12288-10-git-send-email-wangyijing@huawei.com>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <1421372666-12288-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <11966423.5s0rO0b8cE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 02:47 PM, Eric Auger wrote:
-> CONFIG_HAVE_KVM_IRQCHIP is needed to support IRQ routing (along
-> with irq_comm.c and irqchip.c usage). This is not the case for
-> arm/arm64 currently.
+On Friday 16 January 2015 09:44:07 Yijing Wang wrote:
+> We want to make a generic pci_host_bridge, then we could
+> place common PCI infos like domain number in it. Ripping
+> out pci_host_bridge creation from pci_create_root_bus()
+> make code more better readability. Further more, we could
+> use the generic pci_host_bridge to hold host bridge specific
+> operations like pcibios_root_bridge_prepare().
 > 
-> This patch unsets the flag for both arm and arm64.
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Given it's current usage in the kernel HAVE_KVM_IRQCHIP seems to be
-grossly misnamed these days, but that's certainly not the duty of this
-patch to solve. So:
+I assume this patch is doing the right thing, but the description
+above doesn't really tell me enough to be sure.
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+This is supposed to be transparent to the callers, right? If
+so, please mention it explicitly in the text.
 
-Cheers,
-Andre.
+Also you don't explain what the list of host bridges is
+used for. Maybe you can split this out into a separate patch
+so you have one patch that just moves code from one file
+to the other but no functional changes, and a second patch
+that exports pci_create_host_bridge and introduces the list,
+with an explanation of what it is used for.
 
-> ---
->  arch/arm/kvm/Kconfig   | 2 --
->  arch/arm64/kvm/Kconfig | 1 -
->  2 files changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 466bd29..9f581b1 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -55,7 +55,6 @@ config KVM_ARM_MAX_VCPUS
->  config KVM_ARM_VGIC
->  	bool "KVM support for Virtual GIC"
->  	depends on KVM_ARM_HOST && OF
-> -	select HAVE_KVM_IRQCHIP
->  	default y
->  	---help---
->  	  Adds support for a hardware assisted, in-kernel GIC emulation.
-> @@ -63,7 +62,6 @@ config KVM_ARM_VGIC
->  config KVM_ARM_TIMER
->  	bool "KVM support for Architected Timers"
->  	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
-> -	select HAVE_KVM_IRQCHIP
->  	default y
->  	---help---
->  	  Adds support for the Architected Timers in virtual machines
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index 8ba85e9..279e1a0 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -50,7 +50,6 @@ config KVM_ARM_MAX_VCPUS
->  config KVM_ARM_VGIC
->  	bool
->  	depends on KVM_ARM_HOST && OF
-> -	select HAVE_KVM_IRQCHIP
->  	---help---
->  	  Adds support for a hardware assisted, in-kernel GIC emulation.
->  
-> 
+	Arnd
