@@ -1,83 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jan 2015 17:22:23 +0000
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-In-Reply-To: <20150116164105.GL18552@atomide.com>
-References: <20150114221407.GS2419@atomide.com>
- <20150115105035.GU11502@n2100.arm.linux.org.uk>
- <20150115152838.GB18552@atomide.com>
- <20150115171924.GV11502@n2100.arm.linux.org.uk>
- <20150116162119.GK18552@atomide.com>
- <20150116163019.GW11502@n2100.arm.linux.org.uk>
- <20150116164105.GL18552@atomide.com>
-Message-ID: <20150116172223.GX11502@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Jan 2015 18:25:41 +0100
+Subject: [GIT PULL] at91: cleanup for 3.20 #2
+Message-ID: <1421429141-5405-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 08:41:06AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150116 08:33]:
-> > I would still like to understand /why/ enabling preempt causes the error.
-> > Changing the preempt configuration really should not change what happens
-> > on the bus.  (Think about it.)  It's an indication that there is some
-> > other error present.
-> 
-> We have a wrong irq number caused by $subject. And the wrong irq
-> gets triggered before the dma hardware is configured during dma
-> init. And then we get the invalid access error from omap_l3_noc.
+Arnd, Olof, Kevin,
 
-... which should happen whether or not preempt is enabled, which is
-really my point.
+This is another cleanup pull-request for AT91. This one depends on the Device
+Tree material that I posted yesterday, so I merged the at91-dt tag just before
+stacking up Alexandre's patches. This dependency is needed to make sure that
+SRAM gets initialized before using it.
+More cleanup will come soon to reach multi-platform.
 
-We know tha the wrong IRQ gets requested by the driver - and that wrong
-IRQ is requested whether or not we have preempt enabled.  Yet we get
-the warning whether or not preempt is enabled.
+Thanks, best regards,
 
-The DMA handler is not registered as a threaded handler, so it's not
-depending on a context switch to execute omap2_dma_irq_handler().
+The following changes since commit eca6f17253f33313eeb3020d0634a60d10f650c4:
 
-Another reason why I don't agree with your explanation is that by the
-time setup_irq() is called, we have already poked at the DMA hardware
-several times - omap_clear_dma() and omap2_disable_irq_lch() will have
-been called for each DMA channel - and both will write to the hardware.
+  Merge tag 'at91-dt' into at91-3.20-cleanup (2015-01-16 17:18:34 +0100)
 
-What's more is that the only things left after setup_irq() has been
-called is to possibly reserve the first two DMA channels and print
-the DMA message (via show_dma_caps).  So I see nothing after setup_irq()
-which would "finish" any unfinished hardware initialisation.
+are available in the git repository at:
 
-The final reason I don't agree is that I've put a printk() in
-omap2_dma_irq_handler(), and this does not trigger.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup2
 
-So, I think this has nothing to do with the DMA hardware /at all/,
-but more to do with the GPIO code, and it suggests that the GPIO code
-publishes IRQs before it is safe for those IRQs to be used.
+for you to fetch changes up to 29ee506d0d56f6d39cc237de2512f9cb5629cbf7:
 
-Maybe it has to do with omap_gpio_irq_handler() being called... added
-printk(), nope, that's not called either.  So it's not an IRQ which
-gets triggered at all.
+  ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c (2015-01-16 18:08:42 +0100)
 
-What is called are (in order):
+----------------------------------------------------------------
+Second batch of cleanup for 3.20:
+- By reworking the PM code, we can remove the AT91 more specific initialization
+- We are using DT for SRAM initialization now, so we can remove its explicit
+  mapping
+- The PMC clock driver now hosts IDLE function for at91rm9200 with other
+  SoCs ones.
 
-omap_gpio_unmask_irq()
-omap_set_gpio_irqenable()
-omap_enable_gpio_irqbank()
+----------------------------------------------------------------
+Alexandre Belloni (8):
+      ARM: at91: pm: rework cpu detection
+      ARM: at91: pm: use the mmio-sram pool to access SRAM
+      ARM: at91: pm: add UDP and UHP checks to newer SoCs
+      ARM: at91: pm: prepare for multiplatform
+      ARM: at91: remove useless map_io
+      ARM: at91: sama5d4: remove useless call to at91_init_sram
+      ARM: at91: remove unused at91_init_sram
+      ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
 
-and this reveals where the problem is, especially when you then add
-instrumentation into the runtime PM functions - and this reveals that
-when a GPIO IRQ is requested, these functions are called while the
-GPIO is runtime suspended.
-
-_That_ is where the *real* problem lies - requesting a GPIO interrupt
-results in the kernel touching possibly runtime-suspended hardware.
-
-The reason it happens with preempt is that preempt introduces scheduling
-points during the kernel boot which would not otherwise be there (with
-preempt disabled, you have to hit an explicit context switch due to
-contention on some lock or a wait in order for some other thread to run.)
-
-So, the GPIO driver really needs fixing - and I'd suggest fixing it
-first, before fixing the DMA problem, because the DMA problem allows
-us to see the GPIO problem.
+ arch/arm/mach-at91/Kconfig           |   1 +
+ arch/arm/mach-at91/at91rm9200.c      |  15 -----
+ arch/arm/mach-at91/at91sam9260.c     |  27 ---------
+ arch/arm/mach-at91/at91sam9261.c     |   9 ---
+ arch/arm/mach-at91/at91sam9263.c     |   7 ---
+ arch/arm/mach-at91/at91sam9g45.c     |   7 ---
+ arch/arm/mach-at91/at91sam9n12.c     |   6 --
+ arch/arm/mach-at91/at91sam9rl.c      |  18 ------
+ arch/arm/mach-at91/at91sam9x5.c      |   6 --
+ arch/arm/mach-at91/board-dt-rm9200.c |  11 ++++
+ arch/arm/mach-at91/board-dt-sam9.c   |  27 +++++++++
+ arch/arm/mach-at91/board-dt-sama5.c  |   1 +
+ arch/arm/mach-at91/generic.h         |  15 ++++-
+ arch/arm/mach-at91/pm.c              | 109 ++++++++++++++++++++++++++---------
+ arch/arm/mach-at91/sama5d3.c         |   6 --
+ arch/arm/mach-at91/sama5d4.c         |   1 -
+ arch/arm/mach-at91/setup.c           |  20 -------
+ drivers/clk/at91/pmc.c               |   9 +++
+ 18 files changed, 145 insertions(+), 150 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
