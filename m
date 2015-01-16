@@ -1,54 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jan 2015 15:34:51 +0000
-Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
- SATA port
-In-Reply-To: <54B91FB4.5080707@free-electrons.com>
-References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
- <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
- <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
- <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
- <54B91FB4.5080707@free-electrons.com>
-Message-ID: <20150116153451.GA3856@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jan 2015 15:35:06 +0000
+Subject: [PATCH] arm64: uapi: expose our struct ucontext to the uapi
+ headers
+In-Reply-To: <1730317.ngMhCvdNtF@wuerfel>
+References: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
+ <20150116144737.GB10230@localhost> <1730317.ngMhCvdNtF@wuerfel>
+Message-ID: <20150116153505.GH13634@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:27:00PM +0100, Gregory CLEMENT wrote:
-> On 16/01/2015 13:37, Mark Brown wrote:
+On Fri, Jan 16, 2015 at 03:26:15PM +0000, Arnd Bergmann wrote:
+> On Friday 16 January 2015 14:47:38 Catalin Marinas wrote:
+> > However,
+> > with the uapi headers change and maybe some additional commits, we end
+> > up copying the uapi/asm-generic/ucontext.h to usr/include/asm/ in the
+> > exported headers which differs from the arch ucontext.h as the latter
+> > was never split in uapi/non-uapi parts (it wasn't in the
+> > arch/arm/include/Kbuild).
+> 
+> Are you sure? When I look at the build/usr/include/asm directory, I
+> only see wrappers like this one
+> 
+> #include <asm-generic/auxvec.h>  // inside usr/include/asm/auxvec.h
+> 
+> and the include/uapi/asm-generic/auxvec.h gets copied to usr/asm-generic/auxvec.h
+> 
+> However, I don't see this wrapper done for the arm or arm64 version
+> of ucontext.h: we get a copy of the generic file in usr/include/asm/ucontext.h
+> but no wrapper for it because arch/arm*/include/uapi/asm/Kbuild does not
+> list ucontext.h.
 
-> > regulator-always-on is a bit fuzzy for suspend, if the regulator has
-> > suspend control it'll kick in - it's really about the Linux refcounting
-> > while it's running.  What's more concerning here is that the quick
-> > sample of the regulators flagged as always on like the above that I
-> > looked at in the patch don't seem to have any enable control in the DT
-> > so this will have absolutely no effect.
+I think you are right, maybe I just got confused with
+usr/include/asm-generic/ucontext.h which doesn't matter as user space
+should not include it.
 
-> Actually the reg_sata[0-4] are controlled by gpio, so there is a mean
-> to enable/disable them. For the reg_5v_sata[0-4] and reg_12v_sata[0-4]
-> they depend on their respective reg_sata and I just propagated the
-> regulator-always-on, this was maybe a mistake.
-
-It certainly makes everything confusing if you have control related
-stuff on regulators that are not directly controllable.
-
-> >> It is probably a good idea to use regulator-boot-on and
-> >> then test things this way, and if that works use
-> >> regulator-boot-on.
-
-> > No, it's unlikely that boot-on makes sense here - it's there for cases
-> > where we can't read back the hardware state at power on.  Generally
-> > drivers should work regardless of the initial state of the regulator
-> > (and modular drivers will actually break if they try to rely on boot-on
-> > since we clean up unused regulators at boot).
-
-> As pointed by Hans my concern here was be sure that during boot the disk
-> are not power off. In this case which property would be accurate?
-
-None, the core won't do anything with the regulator until the end of
-init anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/291ff5cd/attachment.sig>
+-- 
+Catalin
