@@ -1,28 +1,52 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 16 Jan 2015 16:31:07 +0100
-Subject: [PATCH v3 3/3] MAINTAINERS: add maintainer for pinctrl-at91
-In-Reply-To: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1421422267-2934-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1421422267-2934-4-git-send-email-ludovic.desroches@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Jan 2015 15:33:20 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <2198633.UpIyI82Yon@wuerfel>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <54B9240A.7060003@amd.com> <20150116145545.GR7091@arm.com>
+ <2198633.UpIyI82Yon@wuerfel>
+Message-ID: <20150116153320.GU7091@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+On Fri, Jan 16, 2015 at 03:14:13PM +0000, Arnd Bergmann wrote:
+> On Friday 16 January 2015 14:55:45 Will Deacon wrote:
+> > On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
+> > > I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
+> > > drivers that I'm about to submit upstream with the V7 patch series
+> > > on the AMD Seattle server platform. There does not appear to be support
+> > > for the _CCA attribute in this patch series. The amd-xgbe driver will
+> > > setup the device domain and cache attributes based on the presence of
+> > > this attribute, but it requires the arch support to assign the proper
+> > > DMA operations in order for it to all work correctly.
+> > > 
+> > > Overriding the _CCA attribute in the driver, I was able to successfully
+> > > test the driver and this patch series.
+> > 
+> > Hopefully this will all be addressed when the IORT parts of ACPI have
+> > settled down (the current proposal allows for these attributes to be
+> > described as well as their interaction with things like IOMMUs).
+> > 
+> > In the meantime, are you falling back to non-coherent DMA? If so, what
+> > attributes have you settled on? We need to be really careful not to
+> > corrupt data during cache invalidatation when mapping a non-coherent
+> > buffer for the CPU.
+> 
+> I think in case of ACPI we should use cache-coherent as the default,
+> as this is what all servers will use for DMA masters.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3589d67..455630d 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7406,6 +7406,7 @@ F:	include/linux/pinctrl/
- 
- PIN CONTROLLER - ATMEL AT91
- M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-+M:	Ludovic Desroches <ludovic.desroches@atmel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	drivers/pinctrl/pinctrl-at91.*
--- 
-2.2.0
+I don't agree. The dma-coherent we have for device-tree isn't nearly
+expressive enough for the kind of things we want to describe and there's
+no reason to make the same mistake in ACPI, especially as it *is* being
+addressed by IORT. If we run with _CCA, then we're going to be stuck
+supporting something that isn't fit for purpose and which will likely be
+abused to describe both fixed features of the system and software
+configuration preferences. It also opens up a can of worms if we have to
+support a mixture of _CCA and IORT in the future.
+
+Or are you suggesting that we ignore _CCA and just assume cache-coherency?
+In that case, how do we support systems that aren't cache coherent, where
+not being cache coherent includes devices that require either device or
+IOMMU configuration to enable cacheable transactions?
+
+Will
