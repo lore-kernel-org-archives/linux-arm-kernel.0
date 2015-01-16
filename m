@@ -1,93 +1,181 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 16 Jan 2015 13:47:50 +0100
-Subject: [PATCH v3 2/7] ARM: Exynos: add support for sub-power domains
-In-Reply-To: <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
-References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
- <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFpOvUBcEfk_DM_r83b2DLNgQv6stMrOhEj0gAMu2R3_2g@mail.gmail.com>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Fri, 16 Jan 2015 20:49:20 +0800
+Subject: [PATCH v5 3/5] arm64: dts: Add support for Spreadtrum SC9836 SoC
+ in dts and Makefile
+In-Reply-To: <20150116103558.GD21809@leverpostej>
+References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-4-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150116103558.GD21809@leverpostej>
+Message-ID: <CA+H2tpGPKc8Gu=s+d4PnO=Wp_Uv=o338hxj_1opPRkZ3KZH+rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2015 at 14:44, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> This patch adds support for making one power domain a sub-domain of
-> other domain. This is useful for modeling power dependences for devices
-> like TV Mixer or Camera ISP, which needs to have more than one power
-> domain enabled to be operational.
->
-> Based on previous work by Amit Daniel Kachhap <amit.daniel@samsung.com>
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Hi, Mark,
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Jan 16, 2015 at 6:35 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jan 16, 2015 at 10:00:09AM +0000, Chunyan Zhang wrote:
+>> From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+>>
+>> Adds the device tree support for Spreadtrum SC9836 SoC which is based on
+>> Sharkl64 platform.
+>>
+>> Sharkl64 platform contains the common nodes of Spreadtrum's arm64-based SoCs.
+>>
+>> Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+>> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> ---
+>>  arch/arm64/boot/dts/Makefile                  |    1 +
+>>  arch/arm64/boot/dts/sprd/Makefile             |    5 ++
+>>  arch/arm64/boot/dts/sprd/sc9836-openphone.dts |   49 +++++++++++++++++
+>>  arch/arm64/boot/dts/sprd/sc9836.dtsi          |   73 +++++++++++++++++++++++++
+>>  arch/arm64/boot/dts/sprd/sharkl64.dtsi        |   67 +++++++++++++++++++++++
+>>  5 files changed, 195 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/sprd/Makefile
+>>  create mode 100644 arch/arm64/boot/dts/sprd/sc9836-openphone.dts
+>>  create mode 100644 arch/arm64/boot/dts/sprd/sc9836.dtsi
+>>  create mode 100644 arch/arm64/boot/dts/sprd/sharkl64.dtsi
+>
+> [...]
+>
+>> +     cpus {
+>> +             #address-cells = <2>;
+>> +             #size-cells = <0>;
+>> +
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a53", "arm,armv8";
+>> +                     reg = <0x0 0x0>;
+>> +                     enable-method = "psci";
+>> +             };
+>> +
+>> +             cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a53", "arm,armv8";
+>> +                     reg = <0x0 0x1>;
+>> +                     enable-method = "psci";
+>> +             };
+>> +
+>> +             cpu at 2 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a53", "arm,armv8";
+>> +                     reg = <0x0 0x2>;
+>> +                     enable-method = "psci";
+>> +             };
+>> +
+>> +             cpu at 3 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a53", "arm,armv8";
+>> +                     reg = <0x0 0x3>;
+>> +                     enable-method = "psci";
+>> +             };
+>> +     };
+>
+> Just to check, all CPUs may be hotplugged off and on, yes?
+>
 
-I also had a look at the other patches in this patchset from a PM
-domain DT point of view. They looks good.
+Yes, I have tested with them successfully by looking into
+`/proc/interrupts` and `top` except CPU0.
 
-Kind regards
-Uffe
+> Including CPU0?
+>
 
-> ---
->  .../bindings/arm/exynos/power_domain.txt           |  2 ++
->  arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++++++++++++++
->  2 files changed, 30 insertions(+)
+ It returns "status busy" after I type the command below.
+
+
+> How is your implementation tested?
 >
-> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> index f4445e5..1e09703 100644
-> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-> @@ -22,6 +22,8 @@ Optional Properties:
->         - pclkN, clkN: Pairs of parent of input clock and input clock to the
->                 devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
->                 are supported currently.
-> +- power-domains: phandle pointing to the parent power domain, for more details
-> +                see Documentation/devicetree/bindings/power/power_domain.txt
+I build kernel image with 3.19-rc1 + this patchset and run into console.
+I use `echo 0 > /sys/devices/system/cpu[0-3]/online`
+
+BTW, I run these on a real phone of sc9836 not fast-model as before.
+
+> You boot CPUs at EL2?
 >
->  Node of a device using power domains must have a power-domains property
->  defined with a phandle to respective power domain.
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 20f2671..37266a8 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -161,6 +161,34 @@ no_clk:
->                 of_genpd_add_provider_simple(np, &pd->pd);
->         }
+
+Yes, I have confirmed this when working around the BUG() in
+arch_counter_get_cntpct() introduced from 3.19.
+
+>> +
+>> +     gic: interrupt-controller at 12001000 {
+>> +             compatible = "arm,gic-400";
+>> +             #interrupt-cells = <3>;
+>> +             interrupt-controller;
+>> +             reg = <0 0x12001000 0 0x1000>,
+>> +                   <0 0x12002000 0 0x2000>,
+>> +                   <0 0x12004000 0 0x2000>,
+>> +                   <0 0x12006000 0 0x2000>;
+>> +     };
 >
-> +       /* Assign the child power domains to their parents */
-> +       for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
-> +               struct generic_pm_domain *child_domain, *parent_domain;
-> +               struct of_phandle_args args;
-> +
-> +               args.np = np;
-> +               args.args_count = 0;
-> +               child_domain = of_genpd_get_from_provider(&args);
-> +               if (!child_domain)
-> +                       continue;
-> +
-> +               if (of_parse_phandle_with_args(np, "power-domains",
-> +                                        "#power-domain-cells", 0, &args) != 0)
-> +                       continue;
-> +
-> +               parent_domain = of_genpd_get_from_provider(&args);
-> +               if (!parent_domain)
-> +                       continue;
-> +
-> +               if (pm_genpd_add_subdomain(parent_domain, child_domain))
-> +                       pr_warn("%s failed to add subdomain: %s\n",
-> +                               parent_domain->name, child_domain->name);
-> +               else
-> +                       pr_info("%s has as child subdomain: %s.\n",
-> +                               parent_domain->name, child_domain->name);
-> +               of_node_put(np);
-> +       }
-> +
->         return 0;
->  }
->  arch_initcall(exynos4_pm_init_power_domain);
-> --
-> 1.9.2
+> You're missing the maintenance interrupt here.
 >
+
+Do you mean to declare SGI like this ?
+
+" interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)> "
+
+> [...]
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> diff --git a/arch/arm64/boot/dts/sprd/sharkl64.dtsi b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
+>> new file mode 100644
+>> index 0000000..b08989d
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/sprd/sharkl64.dtsi
+>> @@ -0,0 +1,67 @@
+>> +/*
+>> + * Spreadtrum Sharkl64 platform DTS file
+>> + *
+>> + * Copyright (C) 2014, Spreadtrum Communications Inc.
+>> + *
+>> + * This file is licensed under a dual GPLv2 or X11 license.
+>> + */
+>> +
+>> +/ {
+>> +     interrupt-parent = <&gic>;
+>> +     #address-cells = <2>;
+>> +     #size-cells = <2>;
+>> +
+>> +     soc {
+>> +             compatible = "simple-bus";
+>> +             reg = <0x0 0x0 0x0 0x80000000>;
+>
+> What is this reg for? It's not required by simple-bus.
+>
+
+It's added by me.
+I want to tell people the register range of what the bus covers, not
+for any drivers use.
+for this example, It starts from address 0 to 0x80000000.
+Because Spreadtrum chip is very large with a lots of registers and matrix buses.
+
+
+> If you want to encode that this covers a particular portion of the
+> address space, do so with the ranges proeprty.
+
+But I look up the ePAPER who says "The ranges property provides a
+means of defining a mapping or translation...".
+The bus here is flat-memory for all.
+
+>
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +             ranges;
+>> +
+>> +             ap_apb: apb at 70000000 {
+>> +                     compatible = "simple-bus";
+>> +                     reg = <0x0 0x70000000 0x0 0x10000000>;
+>
+> Likewise here.
+>
+
+This initial patch is picked up from a very big dt file.
+There are several apb buses in this chip.
+So I use apb at starting-address to separate them.
+But I remember another rule that the @address needs to equal  first
+address in property reg array.
+Do I have to delete @7000000 as well if i delete reg line?
+
+    Orson
+
+> Thanks,
+> Mark.
