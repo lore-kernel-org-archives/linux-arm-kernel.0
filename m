@@ -1,64 +1,70 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 16 Jan 2015 18:49:00 +0530
-Subject: [PATCH 0/3] Enable myphy28lp support
-In-Reply-To: <54B904C3.1080002@st.com>
-References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
- <54B8FC56.8080400@st.com> <54B904C3.1080002@st.com>
-Message-ID: <54B90FC4.2020604@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Jan 2015 13:52:14 +0000
+Subject: [PATCH] arm64: uapi: expose our struct ucontext to the uapi headers
+Message-ID: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+arm64 defines its own ucontext structure which is incompatible with the
+struct defined (and exposed to userspace by) the asm-generic headers.
 
-On Friday 16 January 2015 06:02 PM, Maxime Coquelin wrote:
-> 
-> On 01/16/2015 12:56 PM, Maxime Coquelin wrote:
->> Hi Gabriel,
->>
->>     For the series:
->> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
->>
->>     Kishon, could you take care of adding PHY driver patch for v3.20?
-> Hi Kishon,
-> 
->     Don't apply the patch, since we have 2 other PHY driver patches, I will
-> send you a pull request.
+glibc carries its own struct definition that is compatible with the
+arm64 definition, but we should expose our format in the uapi headers in
+case other libraries want to make use of the ucontext pushed as part of
+an arm64 sigframe.
 
-Send me as patches if that is okay.
+This patch moves the arm64 asm/ucontext.h to the uapi headers, along
+with the necessary #include of linux/types.h.
 
-Thanks
-Kishon
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marcus Shawcroft <marcus.shawcroft@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-> 
-> Best regards,
-> Maxime
-> 
-> 
->>
->> Thanks,
->> Maxime
->> On 01/14/2015 10:54 AM, Gabriel FERNANDEZ wrote:
->>> The goal of this series is to enable the support of MiPHY28lp Generic PHY.
->>>
->>> The first patch is to update miphy28lp phy driver to access sysconfig register
->>> offsets via syscfg dt property. It's based on Arnds review comments here
->>> https://lkml.org/lkml/2014/11/13/161
->>> I have updated the miphy28lp phy driver same way as Peter's implementation.
->>>
->>> Gabriel Fernandez (3):
->>>    phy: miphy28lp: Pass sysconfig register offsets via syscfg dt
->>>      property.
->>>    ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
->>>    ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
->>>      USB3) PHY
->>>
->>>   .../devicetree/bindings/phy/phy-miphy28lp.txt      | 43 ++++++---------
->>>   arch/arm/boot/dts/stih407-family.dtsi              | 53 +++++++++++++++++++
->>>   arch/arm/boot/dts/stihxxx-b2120.dtsi               | 11 ++++
->>>   arch/arm/configs/multi_v7_defconfig                |  1 +
->>>   drivers/phy/phy-miphy28lp.c                        | 61
->>> ++++++++++++----------
->>>   5 files changed, 113 insertions(+), 56 deletions(-)
->>>
->>
-> 
+I think we also need something similar for arch/arm/ unless we decide
+that exposing the incorrect asm-generic header is harmless.
+
+ arch/arm64/include/uapi/asm/Kbuild           | 1 +
+ arch/arm64/include/{ => uapi}/asm/ucontext.h | 8 +++++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+ rename arch/arm64/include/{ => uapi}/asm/ucontext.h (88%)
+
+diff --git a/arch/arm64/include/uapi/asm/Kbuild b/arch/arm64/include/uapi/asm/Kbuild
+index 942376d37d22..825b0fe51c2b 100644
+--- a/arch/arm64/include/uapi/asm/Kbuild
++++ b/arch/arm64/include/uapi/asm/Kbuild
+@@ -18,4 +18,5 @@ header-y += siginfo.h
+ header-y += signal.h
+ header-y += stat.h
+ header-y += statfs.h
++header-y += ucontext.h
+ header-y += unistd.h
+diff --git a/arch/arm64/include/asm/ucontext.h b/arch/arm64/include/uapi/asm/ucontext.h
+similarity index 88%
+rename from arch/arm64/include/asm/ucontext.h
+rename to arch/arm64/include/uapi/asm/ucontext.h
+index 42e04c877428..791de8e89e35 100644
+--- a/arch/arm64/include/asm/ucontext.h
++++ b/arch/arm64/include/uapi/asm/ucontext.h
+@@ -13,8 +13,10 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+-#ifndef __ASM_UCONTEXT_H
+-#define __ASM_UCONTEXT_H
++#ifndef _UAPI__ASM_UCONTEXT_H
++#define _UAPI__ASM_UCONTEXT_H
++
++#include <linux/types.h>
+ 
+ struct ucontext {
+ 	unsigned long	  uc_flags;
+@@ -27,4 +29,4 @@ struct ucontext {
+ 	struct sigcontext uc_mcontext;
+ };
+ 
+-#endif /* __ASM_UCONTEXT_H */
++#endif /* _UAPI__ASM_UCONTEXT_H */
+-- 
+2.1.4
