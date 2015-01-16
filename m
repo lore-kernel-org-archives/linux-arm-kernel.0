@@ -1,75 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Jan 2015 18:11:23 +0100
-Subject: [PATCH v2 0/8] AT91 cleanup for 3.20 #2
-In-Reply-To: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <54B9463B.2020304@atmel.com>
+From: naobsd@gmail.com (FUKAUMI Naoki)
+Date: Sat, 17 Jan 2015 02:11:53 +0900
+Subject: [PATCH v2 0/3] add support for Firefly-RK3288 and Rayeager PX2 boards
+Message-ID: <1421428316-26008-1-git-send-email-naobsd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/01/2015 15:59, Alexandre Belloni a ?crit :
-> This patch sets is based on AT91 cleanup for 3.20 #1
-> and depends on AT91 DT for 3.20 #1 because it uses the added SRAM nodes.
-> 
-> The first two patches rework the pm code to get rid of cpu_is_xxx (they will be
-> dropped soon) and use the SRAM from the genpool instead of relying on the remap
-> done by at91_init_sram.
-> 
-> The 3rd and 4th patches a reworking the pm code further to move at91_pm_init in
-> the .init_machine of the SoCs instead of arch_initcall, to get ready for
-> multiplatform.
-> 
-> Then the following patches get rid of at91_init_sram, taking .map_io for almost
-> all SoCs but the sama5d4 (more cleanups coming soon for that part).
-> 
-> The final patch moves at91rm9200_idle to clk/at91/pmc.c and allows to almost
-> empty arch/arm/mach-at91/at91rm9200.c (It is actually empty once "Atmel System
-> Timer cleanups" is applied).
-> 
-> Changes in v2:
->  - added patch 3 and 4 to remove the calls to of_machine_is_compatible()
-> 
-> Alexandre Belloni (8):
->   ARM: at91: pm: rework cpu detection
->   ARM: at91: pm: use the mmio-sram pool to access SRAM
->   ARM: at91: pm: add UDP and UHP checks to newer SoCs
->   ARM: at91: pm: prepare for multiplatform
->   ARM: at91: remove useless map_io
->   ARM: at91: sama5d4: remove useless call to at91_init_sram
->   ARM: at91: remove unused at91_init_sram
->   ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
+This series adds support for following Rockchip SoC based boards.
 
-Okay for the whole series. I'm looking forward including the upcoming
-one as well.
+ - Firefly, Firefly-RK3288 (both beta and mass production version)
+ - ChipSPARK, Rayeager PX2
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Changes in v2:
+- use own compatible property for Firefly-RK3288 beta version
+- remove disabled tsadc node
+- add missing vin-supply
+- use two chars for i2c address
+- fix ordering for the nodes without address element
+- add commit messages
 
-All stacked on top of at91-3.20-cleanup.
+FUKAUMI Naoki (3):
+  dt-bindings: add vendor prefix and root compatible property for
+    Rockchip boards
+  ARM: dts: rockchip: add dts for Firefly Firefly-RK3288 boards
+  ARM: dts: rockchip: add dts for ChipSPARK Rayeager PX2 board
 
-Thanks, bye.
-
-
->  arch/arm/mach-at91/Kconfig           |   1 +
->  arch/arm/mach-at91/at91rm9200.c      |  15 -----
->  arch/arm/mach-at91/at91sam9260.c     |  27 ---------
->  arch/arm/mach-at91/at91sam9261.c     |   9 ---
->  arch/arm/mach-at91/at91sam9263.c     |   7 ---
->  arch/arm/mach-at91/at91sam9g45.c     |   7 ---
->  arch/arm/mach-at91/at91sam9n12.c     |   6 --
->  arch/arm/mach-at91/at91sam9rl.c      |  18 ------
->  arch/arm/mach-at91/at91sam9x5.c      |   6 --
->  arch/arm/mach-at91/board-dt-rm9200.c |  11 ++++
->  arch/arm/mach-at91/board-dt-sam9.c   |  27 +++++++++
->  arch/arm/mach-at91/board-dt-sama5.c  |   1 +
->  arch/arm/mach-at91/generic.h         |  15 ++++-
->  arch/arm/mach-at91/pm.c              | 110 ++++++++++++++++++++++++++---------
->  arch/arm/mach-at91/sama5d3.c         |   6 --
->  arch/arm/mach-at91/sama5d4.c         |   1 -
->  arch/arm/mach-at91/setup.c           |  20 -------
->  drivers/clk/at91/pmc.c               |   9 +++
->  18 files changed, 146 insertions(+), 150 deletions(-)
-> 
-
+ Documentation/devicetree/bindings/arm/rockchip.txt |  10 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   5 +-
+ arch/arm/boot/dts/rk3066a-rayeager.dts             | 470 ++++++++++++++++++++
+ arch/arm/boot/dts/rk3288-firefly-beta.dts          |  71 +++
+ arch/arm/boot/dts/rk3288-firefly.dts               |  71 +++
+ arch/arm/boot/dts/rk3288-firefly.dtsi              | 490 +++++++++++++++++++++
+ 7 files changed, 1118 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk3066a-rayeager.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly-beta.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly.dts
+ create mode 100644 arch/arm/boot/dts/rk3288-firefly.dtsi
 
 -- 
-Nicolas Ferre
+2.2.2
