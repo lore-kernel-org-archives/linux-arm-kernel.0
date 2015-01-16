@@ -1,46 +1,56 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 16 Jan 2015 13:50:08 +0800
-Subject: [RFC 01/11] i2c: add quirk structure to describe adapter flaws
-In-Reply-To: <1420824103-24169-2-git-send-email-wsa@the-dreams.de>
-References: <1420824103-24169-1-git-send-email-wsa@the-dreams.de>
- <1420824103-24169-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <1421387408.9323.10.camel@mtksdaap41>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 16 Jan 2015 08:09:00 +0200
+Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
+ hwspinlock
+In-Reply-To: <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
+ <1421269101-51105-2-git-send-email-s-anna@ti.com>
+ <20150115135201.GG16217@leverpostej>
+ <20150115135556.GH16217@leverpostej>
+ <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
+Message-ID: <CAK=WgbYQ=BbinqJ5fsw2Y+FKdy=nasLsw9mX8pw6S_o3owy9-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Thu, Jan 15, 2015 at 4:42 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Thu, Jan 15, 2015 at 7:55 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Thu, Jan 15, 2015 at 01:52:01PM +0000, Mark Rutland wrote:
+>>> On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
+>>> > +- hwlock-base-id:  An unique base Id for the locks for a particular hwlock
+>>> > +                   device. This property is mandatory for all platform
+>>> > +                   implementations.
+>>>
+>>> This property makes no sense. The ID encoded in the hwlock cells is
+>>> relative to the instance (identified by phandle), not global. So the DT
+>>> has no global ID space.
+>>>
+>>> Why do you think you need this?
+>>
+>> Having looked at the way this proeprty is used, NAK.
+>>
+>> If you need to carve up a Linux-internal ID space, do that dynamically.
+>> There is no need for this property.
+>
+> Better yet, don't create a Linux ID space for this. Everywhere we have
+> one, we want to get rid of it.
 
-On Fri, 2015-01-09 at 18:21 +0100, Wolfram Sang wrote:
->  
-> + */
-> +struct i2c_adapter_quirks {
-> +	u64 flags;
-> +	int max_num_msgs;
-> +	u16 max_write_len;
-> +	u16 max_read_len;
-> +	u16 max_comb_write_len;
-> +	u16 max_comb_read_len;
-> +};
-> +
-> +#define I2C_ADAPTER_QUIRK_COMB_WRITE_FIRST	BIT(0)
-> +#define I2C_ADAPTER_QUIRK_COMB_READ_SECOND	BIT(1)
-> +#define I2C_ADAPTER_QUIRK_COMB_WRITE_THEN_READ	(I2C_ADAPTER_QUIRK_COMB_WRITE_FIRST | \
-> +						I2C_ADAPTER_QUIRK_COMB_READ_SECOND)
-> +
->  /*
->   * i2c_adapter is the structure used to identify a physical i2c bus along
->   * with the access algorithms necessary to access it.
-> @@ -472,6 +506,7 @@ struct i2c_adapter {
->  	struct list_head userspace_clients;
->  
->  	struct i2c_bus_recovery_info *bus_recovery_info;
-> +	struct i2c_adapter_quirks *quirks;
->  };
->  #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
->  
+Rob, Mark,
 
-I suggest to add const.
-	const struct i2c_adapter_quirks *quirks;
+The hwlock is a basic hardware primitive that allow synchronization
+between different processors in the system, which may be running Linux
+as well as other operating systems, and may have no other means of
+communication.
 
-also, in i2c-core.c, should modify:
-	const struct i2c_adapter_quirks *q = adap->quirks;
+The hwlock id numbers are predefined, global and static across the
+entire system: Linux may boot well after other operating systems are
+already running and using these hwlocks to communicate, and therefore,
+in order to use these hardware devices, it must not enumerate them
+differently than the rest of the system.
+
+Given that these id numbers are global, system-wide, static and
+predefined, where Linux may just be one user of them, please
+reconsider the approach as implemented by Suman, or suggest an
+alternative one you may prefer.
+
+Thanks,
+Ohad.
