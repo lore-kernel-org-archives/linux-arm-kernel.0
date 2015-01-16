@@ -1,41 +1,53 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 16 Jan 2015 09:17:45 +0800
-Subject: [PATCH v2 1/3] ASoC: codecs: wm8904: add dt ids table
-In-Reply-To: <20150115115425.GX3043@sirena.org.uk>
-References: <1418614273-2303-1-git-send-email-voice.shen@atmel.com>
- <20150115115425.GX3043@sirena.org.uk>
-Message-ID: <54B866B9.8000900@atmel.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 16 Jan 2015 09:42:23 +0800
+Subject: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+In-Reply-To: <20150114163800.GZ12302@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103E010D18273@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E010D18275@CNBJMBX05.corpusers.net>
+ <20141113235322.GC4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E010D1829B@CNBJMBX05.corpusers.net>
+ <20141114095812.GG4042@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103E688B313C6@CNBJMBX05.corpusers.net>
+ <20150108184059.GZ12302@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E195@CNBJMBX05.corpusers.net>
+ <20150109111048.GE12302@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103EDAF89E198@CNBJMBX05.corpusers.net>
+ <20150114163800.GZ12302@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103EDAF89E1B0@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Thursday, January 15, 2015 12:38 AM
+> To: Wang, Yalin
+> Cc: 'Ard Biesheuvel'; 'Will Deacon'; 'linux-kernel at vger.kernel.org';
+> 'akinobu.mita at gmail.com'; 'linux-mm at kvack.org'; 'Joe Perches'; 'linux-arm-
+> kernel at lists.infradead.org'
+> Subject: Re: [RFC V6 2/3] arm:add bitrev.h file to support rbit instruction
+> 
+> On Fri, Jan 09, 2015 at 08:40:56PM +0800, Wang, Yalin wrote:
+> > Oh, I see,
+> > How about change like this:
+> > +	select HAVE_ARCH_BITREVERSE if ((CPU_V7M || CPU_V7) && !CPU_V6 &&
+> > +!CPU_V6K)
+> > I am not sure if I also need add some older CPU types like !CPU_ARM9TDMI
+> &&?!CPU_ARM940T ?
+> >
+> > Another solution is:
+> > +	select HAVE_ARCH_BITREVERSE if ((CPU_32V7M || CPU_32V7) && !CPU_32V6
+> > +&& !CPU_32V5 && !CPU_32V4 && !CPU_32V4T && !CPU_32V3)
+> >
+> > By the way, I am not clear about the difference between CPU_V6 and
+> > CPU_V6K, could you tell me? :)
+> 
+> I think
+> 
+> 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+> 
+> is sufficient - we don't support mixing pre-v6 and v6+ CPU architectures
+> into a single kernel.
+> 
+Ok, I will re-send a patch. 
 
-On 01/15/2015 07:54 PM, Mark Brown wrote:
-> On Mon, Dec 15, 2014 at 11:31:11AM +0800, Bo Shen wrote:
->
->> +#ifdef CONFIG_OF
->> +static enum wm8904_type wm8904_data = WM8904;
->> +static enum wm8904_type wm8912_data = WM8912;
->> +
->> +static const struct of_device_id wm8904_of_match[] = {
->> +	{
->> +		.compatible = "wlf,wm8904",
->> +		.data = &wm8904_data,
->
-> Does this end up in the i2c_driver_id driver data or do we need some
-> extra code when devtype is assigned to check for an of_node and look at
-> the DT data instead?  That certainly used to be the case...
-
-At the beginning I think as the same as you, and also add the code to 
-get the data as I do in <drivers/misc/atmel-ssc.c>. However, as I 
-remember, I2C seems only use the compatible string after the comma, that 
-means only for "wlf,wm8904", it uses "wm8904" to match. So, I remove all 
-the code I added, and just keep these, and it can get the device type 
-correctly.
-
-So, when I submit the patch and keep the code as simple as possible.
-
-Thanks.
-
-Best Regards,
-Bo Shen
+Thanks
