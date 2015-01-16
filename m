@@ -1,93 +1,46 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 16 Jan 2015 13:54:46 +0000
-Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <54B8F2E3.80306@arm.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
- <54B8F2E3.80306@arm.com>
-Message-ID: <CACxGe6tBb8L8upS3zenZbrOc_c0E=MA=DqLjkSezEbregaAaaA@mail.gmail.com>
+From: mpeg.blue@free.fr (Mason)
+Date: Fri, 16 Jan 2015 15:00:14 +0100
+Subject: RFC on cpufreq implementation
+In-Reply-To: <54B8F19F.8060108@free.fr>
+References: <54B7F7CD.7030903@free.fr> <1421399293.11224.7.camel@AMDC1943>
+ <54B8F19F.8060108@free.fr>
+Message-ID: <54B9196E.1030302@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 11:15 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 14/01/15 15:05, Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>
->> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->> parse GIC related subtables, collect CPU interface and distributor
->> addresses and call driver initialization function (which is hardware
->> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>
->> NOTE: This commit allow to initialize GICv1/2 basic functionality.
->> GICv2 vitalization extension, GICv3/4 and ITS are considered as next
->> steps.
+On 16/01/2015 12:10, Mason wrote:
+
+> I didn't find where WFI is called :-(
 >
-> And so is GICv2m, apparently (see below).
+> In kernel/cpu/idle.c (file seems to have been removed in 3.15)
+> cpu_idle_loop() calls arch_cpu_idle()
+> http://lxr.free-electrons.com/source/kernel/cpu/idle.c?v=3.14#L98
 >
->>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Tested-by: Yijing Wang <wangyijing@huawei.com>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->> +     /*
->> +      * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->> +      * as default IRQ domain to allow for GSI registration and GSI to IRQ
->> +      * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->> +      */
->> +     gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+> In arch/kernel/process.c
+> http://lxr.free-electrons.com/source/arch/arm/kernel/process.c?v=3.14#L173
+> /*
+>   * Called from the core idle loop.
+>   */
+> void arch_cpu_idle(void)
+> {
+>      if (cpuidle_idle_call())
+>          default_idle();
+> }
 >
-> I assume you never tried to port the GICv2m driver to ACPI, right?
-> Because the above code actively prevents the GIC domain to be defined as
-> a stacked domain, making it impossible for the v2m widget to be
-> implemented on top of GIC. But maybe legacy interrupts are enough?
-
-It's sufficient for what is supported right now, and easily changed in
-a patch series to add GICv2m support. This shouldn't be a blocking
-issue as it isn't actively dangerous. It is merely limited, and that
-is okay.
-
->> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
->>  void __init irqchip_init(void)
->>  {
->>       of_irq_init(__irqchip_of_table);
->> +
->> +     acpi_gic_init();
+> default_idle calls cpu_do_idle (by default), a macro for cpu_v7_do_idle
+> which executes dsb+wfi, BUT...
 >
-> Have you realised that this file is probably compiled on multiple
-> architecture, none of which particularly cares about ACPI or the GIC?
-> This is (still) very ugly.
-
-"very ugly?" That's overstating things a bit. We may quibble about the
-name, but we're just talking about a setup hook function that may or
-may not be implemented. How about we put acpi_irq_init() here and make
-it an inline macro that directly calls acpi_gic_init() when ACPI is
-enabled on AARCH64? Then the function can be extended by architectures
-as needed, and default to an empty inline otherwise. When (if) we have
-more than one hook that needs to be called from it, then we can
-refactor it to be more like of_irq_init().
-
-As for other architectures calling this function, but not caring about
-ACPI, I believe it was your suggestion to put it here!  :-)
-
-On Mon, 01 Sep 2014 18:35:18 +0100^M, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 01/09/14 15:57, Hanjun Guo wrote:
-> > @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
-> >  void __init init_IRQ(void)
-> >  {
-> >     irqchip_init();
-> > +
-> > +   if (!handle_arch_irq)
-> > +           acpi_gic_init();
-> > +
+> ifndef CONFIG_CPU_IDLE then
+> static inline int cpuidle_idle_call(void) { return -ENODEV; }
 >
-> Why isn't this called from irqchip_init? It would seem like the logical
-> spot to probe an interrupt controller.
+> Does that mean I MUST define CONFIG_CPU_IDLE if I want the idle
+> loop to call wfi (to save power), even if I don't have a cpuidle
+> driver?
 
-What has been done here isn't an unusual choice. We've got stuff all
-over the kernel that may or may not be implemented depending on what
-the architecture supports. If the function call is renamed to
-acpi_init_irq(), are you content?
+For the record, I read the code wrong.
 
-g.
+cpuidle_idle_call() always returns -ENODEV, so the test
+"if (cpuidle_idle_call())" is always true, and we always
+call default_idle() and everything works as expected.
+
+Sorry for the noise.
