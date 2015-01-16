@@ -1,229 +1,106 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 15 Jan 2015 15:58:58 -0800
-Subject: [PATCH v16 07/10] KVM: arm: page logging 2nd stage fault handling
-In-Reply-To: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
-References: <1421366341-26012-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1421366341-26012-8-git-send-email-m.smarduch@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 16 Jan 2015 09:03:05 +0900
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: Add the support for
+ Exynos 64bit SoC
+In-Reply-To: <20150115133404.GF16217@leverpostej>
+References: <1421213603-5020-1-git-send-email-cw00.choi@samsung.com>
+ <54B69072.4080607@kernel.org> <54B692FB.7030703@linaro.org>
+ <54B7024C.4020407@samsung.com> <20150115112938.GB16217@leverpostej>
+ <CAGTfZH0Ve+icxc6FpMJhfNMRMqQASrcUmnrZw-6sYQz8rabC_A@mail.gmail.com>
+ <CAGTfZH0SQRyTMTmge6x2fXFBdVwtgJ_wcxK36mFrf6ZNPBn85w@mail.gmail.com>
+ <20150115133404.GF16217@leverpostej>
+Message-ID: <54B85539.7090908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for 2nd stage page fault handling while dirty page
-logging. On huge page faults, huge pages are dissolved to normal pages, and
-rebuilding of 2nd stage huge pages is blocked. In case migration is
-canceled this restriction is removed and huge pages may be rebuilt again.
+On 01/15/2015 10:34 PM, Mark Rutland wrote:
+> On Thu, Jan 15, 2015 at 12:52:38PM +0000, Chanwoo Choi wrote:
+>> On Thu, Jan 15, 2015 at 9:46 PM, Chanwoo Choi <cwchoi00@gmail.com> wrote:
+>>> Hi Mark,
+>>>
+>>> On Thu, Jan 15, 2015 at 8:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> On Wed, Jan 14, 2015 at 11:57:00PM +0000, Chanwoo Choi wrote:
+>>>>> Hi Kukjin,
+>>>>>
+>>>>> On 01/15/2015 01:02 AM, Daniel Lezcano wrote:
+>>>>>> On 01/14/2015 04:51 PM, Kukjin Kim wrote:
+>>>>>>> On 01/14/15 14:33, Chanwoo Choi wrote:
+>>>>>>>
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> + Doug, Olof
+>>>>>>>
+>>>>>>>> This patch adds the support for Exynos 64bit SoC. The delay_timer is only used
+>>>>>>>> for Exynos 32bit SoC.
+>>>>>>>>
+>>>>>>> Yes, the Exynos MCT(Multi-Core Timer) is 64bit timer and it is available
+>>>>>>> on 64bit exynos SoC such as exynos7. But basically ARMv8 architecture is
+>>>>>>> including ARM ARCH timer (ARM Generic Timer) and exynos7 also has
+>>>>>>> implemented it and additionally its access is faster than using memory
+>>>>>>> mapped register called SFR for MCT...so Doug submitted patch to use MCT
+>>>>>>> on 32bit exynos SoCs before.
+>>>>>
+>>>>> I know arch_timer. As you comment, ARCH timer would be used for system timer for ARMv8.
+>>>>> But, Exynos5433/Exynos7 (ARMv8) include MCT (Multi-Core Timer) IP. I checked it on
+>>>>> Exynos5433/EXynos7 User-manaual and tested it.
+>>>>>
+>>>>> I think that exynos_mct.c should support the Exynos 64-bit SoC
+>>>>> because Exynos5433/Exynos7 include already MCT (Multi-Core Timer) IP.
+>>>>>
+>>>>> Also, I have a problem to verify ARCH timer on Exynos SoC. Exynos User-manual never includes
+>>>>> the detailed information about for ARCH timer(e.g, clock for ARCH timer). I knew that
+>>>>> I can get the document of ARCH timer for ARM official site but I think it is insufficient
+>>>>> to implement ARCH timer on Exynos SoC.
+>>>>
+>>>> What do you mean by "insufficient to implement ARCH timer"?
+>>>
+>>> As I knew, timer must need the source clock. The clock for ARCH timer
+>>> has dependency on Exynos SoC, But I cannot find
+>>
+>> I'm so sorry about this mistake. I pressed the send button before
+>> completing reply.
+>>
+>> As I knew, timer must need the source clock. The clock for ARCH timer
+>> has dependency on Exynos SoC, But I cannot find the clock information
+>> for ARCH timer on Exynos SoC user-manual.
+>>
+>> When I tried to use ARCH timer on Exynos3250, It is not working. We
+>> can check this ARCH timer issue of Exynos3250
+>> on following patch[1]:
+>> [1] http://www.spinics.net/lists/arm-kernel/msg322943.html
+> 
+> Hmm. That is annoying. Your boot code should have been initialising this
+> already.
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/mmu.c |   97 +++++++++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 88 insertions(+), 9 deletions(-)
+Right, 
+I want to resolve the issue for Exynos3250 but I don't have any information.
+Maybe this issue should be fixed by the architector of Exynos SoC or any samsung
+developer who can contact the information of ARCH timer.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 73d506f..ea6b13e 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -47,6 +47,18 @@ static phys_addr_t hyp_idmap_vector;
- #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
- #define kvm_pud_huge(_x)	pud_huge(_x)
- 
-+#define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
-+#define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
-+
-+static bool memslot_is_logging(struct kvm_memory_slot *memslot)
-+{
-+#ifdef CONFIG_ARM
-+	return memslot->dirty_bitmap && !(memslot->flags & KVM_MEM_READONLY);
-+#else
-+	return false;
-+#endif
-+}
-+
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	/*
-@@ -59,6 +71,25 @@ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 		kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, kvm, ipa);
- }
- 
-+/**
-+ * stage2_dissolve_pmd() - clear and flush huge PMD entry
-+ * @kvm:	pointer to kvm structure.
-+ * @addr:	IPA
-+ * @pmd:	pmd pointer for IPA
-+ *
-+ * Function clears a PMD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-+ * pages in the range dirty.
-+ */
-+static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
-+{
-+	if (!kvm_pmd_huge(*pmd))
-+		return;
-+
-+	pmd_clear(pmd);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	put_page(virt_to_page(pmd));
-+}
-+
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
-@@ -703,10 +734,15 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- }
- 
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
--			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
-+			  phys_addr_t addr, const pte_t *new_pte,
-+			  unsigned long flags)
- {
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
-+	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-+	bool logging_active = flags & KVM_S2_FLAG_LOGGING_ACTIVE;
-+
-+	VM_BUG_ON(logging_active && !cache);
- 
- 	/* Create stage-2 page table mapping - Levels 0 and 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
-@@ -718,6 +754,13 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		return 0;
- 	}
- 
-+	/*
-+	 * While dirty page logging - dissolve huge PMD, then continue on to
-+	 * allocate page.
-+	 */
-+	if (logging_active)
-+		stage2_dissolve_pmd(kvm, addr, pmd);
-+
- 	/* Create stage-2 page mappings - Level 2 */
- 	if (pmd_none(*pmd)) {
- 		if (!cache)
-@@ -774,7 +817,8 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
--		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
-+		ret = stage2_set_pte(kvm, &cache, addr, &pte,
-+						KVM_S2PTE_FLAG_IS_IOMAP);
- 		spin_unlock(&kvm->mmu_lock);
- 		if (ret)
- 			goto out;
-@@ -1002,6 +1046,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	pfn_t pfn;
- 	pgprot_t mem_type = PAGE_S2;
- 	bool fault_ipa_uncached;
-+	bool logging_active = memslot_is_logging(memslot);
-+	unsigned long flags = 0;
- 
- 	write_fault = kvm_is_write_fault(vcpu);
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -1018,7 +1064,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		return -EFAULT;
- 	}
- 
--	if (is_vm_hugetlb_page(vma)) {
-+	if (is_vm_hugetlb_page(vma) && !logging_active) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
-@@ -1059,12 +1105,30 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_error_pfn(pfn))
- 		return -EFAULT;
- 
--	if (kvm_is_device_pfn(pfn))
-+	if (kvm_is_device_pfn(pfn)) {
- 		mem_type = PAGE_S2_DEVICE;
-+		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
-+	} else if (logging_active) {
-+		/*
-+		 * Faults on pages in a memslot with logging enabled
-+		 * should not be mapped with huge pages (it introduces churn
-+		 * and performance degradation), so force a pte mapping.
-+		 */
-+		force_pte = true;
-+		flags |= KVM_S2_FLAG_LOGGING_ACTIVE;
-+
-+		/*
-+		 * Only actually map the page as writable if this was a write
-+		 * fault.
-+		 */
-+		if (!write_fault)
-+			writable = false;
-+	}
- 
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
-+
- 	if (!hugetlb && !force_pte)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
-@@ -1082,17 +1146,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, mem_type);
-+
- 		if (writable) {
- 			kvm_set_s2pte_writable(&new_pte);
- 			kvm_set_pfn_dirty(pfn);
-+			mark_page_dirty(kvm, gfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE,
- 					  fault_ipa_uncached);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte,
--			pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
- 	}
- 
--
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
- 	kvm_release_pfn_clean(pfn);
-@@ -1242,7 +1306,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
- {
- 	pte_t *pte = (pte_t *)data;
- 
--	stage2_set_pte(kvm, NULL, gpa, pte, false);
-+	/*
-+	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
-+	 * flag clear because MMU notifiers will have unmapped a huge PMD before
-+	 * calling ->change_pte() (which in turn calls kvm_set_spte_hva()) and
-+	 * therefore stage2_set_pte() never needs to clear out a huge PMD
-+	 * through this calling path.
-+	 */
-+	stage2_set_pte(kvm, NULL, gpa, pte, 0);
- }
- 
- 
-@@ -1396,7 +1467,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 	bool writable = !(mem->flags & KVM_MEM_READONLY);
- 	int ret = 0;
- 
--	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE)
-+	if (change != KVM_MR_CREATE && change != KVM_MR_MOVE &&
-+			change != KVM_MR_FLAGS_ONLY)
- 		return 0;
- 
- 	/*
-@@ -1447,6 +1519,10 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
- 					 vm_start - vma->vm_start;
- 
-+			/* IO region dirty page logging not allowed */
-+			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
-+				return -EINVAL;
-+
- 			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
- 						    vm_end - vm_start,
- 						    writable);
-@@ -1456,6 +1532,9 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 		hva = vm_end;
- 	} while (hva < reg_end);
- 
-+	if (change == KVM_MR_FLAGS_ONLY)
-+		return ret;
-+
- 	spin_lock(&kvm->mmu_lock);
- 	if (ret)
- 		unmap_stage2_range(kvm, mem->guest_phys_addr, mem->memory_size);
--- 
-1.7.9.5
+> 
+>>>> The architected timer is mandatory in ARMv8, and required by the arm64
+>>>> kernel.
+>>>>
+>>>> Additional timers may be requried if you want to put all CPUs into low
+>>>> power states where the timer logic may be disabled and/or lose state,
+>>>> but regardless the architected timers are necessary.
+>>
+>> I agree that ARCH timer is mandatory.
+>>
+>> I just think that existing exynos-mct.c driver should support the Exynos5/7 SoC
+>> because released Exynos5/7 SoC includes already MCT IP for system timer.
+> 
+> I'm not opposed to the MCT. My only concern is that a configured and
+> enabled architected timer is mandated by the boot protocol, and is a
+> prerequisite for a functioning kernel. 
+
+Thanks for your opinion.
+As I replyed on previous mail, I agree that ARCH timer is necessary.
+
+Your initial response made it
+> sound like you expected the MCT alone to be sufficient.
+
+I didn't mean it.
+
+Best Regards,
+Chanwoo Choi
