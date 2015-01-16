@@ -1,68 +1,28 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Jan 2015 10:13:05 +0100
-Subject: [PATCH v4 11/18] iommu: exynos: remove useless device_add/remove
- callbacks
-In-Reply-To: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421399592-7482-12-git-send-email-m.szyprowski@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Jan 2015 10:17:52 +0100
+Subject: [RFC 0/2] clocksource: don't suspend/resume when unused
+Message-ID: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver doesn't need to do anything important in device add/remove
-callbacks, because initialization will be done from device-tree specific
-callbacks added later. IOMMU groups created by current code were never
-used.
+Hi,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/iommu/exynos-iommu.c | 28 ----------------------------
- 1 file changed, 28 deletions(-)
+This is a quite naive implementation to track whether a cloccksource is enabled.
+I chose not to add a member in struct clocksource and use a flag instead.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index e62cb96a742c..e40e699423a6 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1055,32 +1055,6 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 	return phys;
- }
- 
--static int exynos_iommu_add_device(struct device *dev)
--{
--	struct iommu_group *group;
--	int ret;
--
--	group = iommu_group_get(dev);
--
--	if (!group) {
--		group = iommu_group_alloc();
--		if (IS_ERR(group)) {
--			dev_err(dev, "Failed to allocate IOMMU group\n");
--			return PTR_ERR(group);
--		}
--	}
--
--	ret = iommu_group_add_device(group, dev);
--	iommu_group_put(group);
--
--	return ret;
--}
--
--static void exynos_iommu_remove_device(struct device *dev)
--{
--	iommu_group_remove_device(dev);
--}
--
- static const struct iommu_ops exynos_iommu_ops = {
- 	.domain_init = exynos_iommu_domain_init,
- 	.domain_destroy = exynos_iommu_domain_destroy,
-@@ -1090,8 +1064,6 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.unmap = exynos_iommu_unmap,
- 	.map_sg = default_iommu_map_sg,
- 	.iova_to_phys = exynos_iommu_iova_to_phys,
--	.add_device = exynos_iommu_add_device,
--	.remove_device = exynos_iommu_remove_device,
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
- 
+I found that timekeeping.c is the only consumer for clocksource and I converted
+it to use clocksource_enable and clocksource_disable.
+
+Regards,
+
+Alexandre Belloni (2):
+  clocksource: track usage
+  clocksource: don't suspend/resume when unused
+
+ include/linux/clocksource.h |  4 ++++
+ kernel/time/clocksource.c   | 30 ++++++++++++++++++++++++++++--
+ kernel/time/timekeeping.c   |  8 +++-----
+ 3 files changed, 35 insertions(+), 7 deletions(-)
+
 -- 
-1.9.2
+2.1.0
