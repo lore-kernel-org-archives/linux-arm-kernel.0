@@ -1,91 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Jan 2015 09:29:06 -0800
-Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
-In-Reply-To: <20150116172223.GX11502@n2100.arm.linux.org.uk>
-References: <20150114221407.GS2419@atomide.com>
- <20150115105035.GU11502@n2100.arm.linux.org.uk>
- <20150115152838.GB18552@atomide.com>
- <20150115171924.GV11502@n2100.arm.linux.org.uk>
- <20150116162119.GK18552@atomide.com>
- <20150116163019.GW11502@n2100.arm.linux.org.uk>
- <20150116164105.GL18552@atomide.com>
- <20150116172223.GX11502@n2100.arm.linux.org.uk>
-Message-ID: <20150116172905.GM18552@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 17:34:40 +0000
+Subject: [PATCH 10/10] drivers: PL011: add support for the ARM SBSA
+ generic UART
+In-Reply-To: <1421428986-11300-11-git-send-email-andre.przywara@arm.com>
+References: <1421428986-11300-1-git-send-email-andre.przywara@arm.com>
+ <1421428986-11300-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150116173440.GI32155@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150116 09:25]:
-> On Fri, Jan 16, 2015 at 08:41:06AM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150116 08:33]:
-> > > I would still like to understand /why/ enabling preempt causes the error.
-> > > Changing the preempt configuration really should not change what happens
-> > > on the bus.  (Think about it.)  It's an indication that there is some
-> > > other error present.
-> > 
-> > We have a wrong irq number caused by $subject. And the wrong irq
-> > gets triggered before the dma hardware is configured during dma
-> > init. And then we get the invalid access error from omap_l3_noc.
+On Fri, Jan 16, 2015 at 05:23:06PM +0000, Andre Przywara wrote:
+> The ARM Server Base System Architecture[1] document describes a
+> generic UART which is a subset of the PL011 UART.
+> It lacks DMA support, baud rate control and modem status line
+> control, among other things.
+> The idea is to move the UART initialization and setup into the
+> firmware (which does this job today already) and let the kernel just
+> use the UART for sending and receiving characters.
+> We use the recent refactoring the build a new struct uart_ops
+> variable which points to some new functions avoiding access to the
+> missing registers. We reuse as much existing PL011 code as possible.
 > 
-> ... which should happen whether or not preempt is enabled, which is
-> really my point.
+> In contrast to the PL011 the SBSA UART does not define any AMBA or
+> PrimeCell relations, so we go a pretty generic probe function
+> which only uses platform device functions.
+> A DT binding is provided, but other systems can easily attach to it,
+> too (hint, hint!).
 > 
-> We know tha the wrong IRQ gets requested by the driver - and that wrong
-> IRQ is requested whether or not we have preempt enabled.  Yet we get
-> the warning whether or not preempt is enabled.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 ++
+>  drivers/tty/serial/amba-pl011.c                    |  154 ++++++++++++++++++++
+>  2 files changed, 163 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
 > 
-> The DMA handler is not registered as a threaded handler, so it's not
-> depending on a context switch to execute omap2_dma_irq_handler().
-> 
-> Another reason why I don't agree with your explanation is that by the
-> time setup_irq() is called, we have already poked at the DMA hardware
-> several times - omap_clear_dma() and omap2_disable_irq_lch() will have
-> been called for each DMA channel - and both will write to the hardware.
-> 
-> What's more is that the only things left after setup_irq() has been
-> called is to possibly reserve the first two DMA channels and print
-> the DMA message (via show_dma_caps).  So I see nothing after setup_irq()
-> which would "finish" any unfinished hardware initialisation.
-> 
-> The final reason I don't agree is that I've put a printk() in
-> omap2_dma_irq_handler(), and this does not trigger.
+> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> new file mode 100644
+> index 0000000..21d211f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> @@ -0,0 +1,9 @@
+> +* ARM SBSA defined generic UART
+> +This UART uses a subset of the PL011 registers and consequently lives
+> +in the PL011 driver. It's baudrate and other communication parameters
+> +cannot be adjusted at runtime, so it lacks a clock specifier here.
+> +
+> +Required properties:
+> +- compatible: must be "arm,sbsa-uart"
+> +- reg: exactly one register range
+> +- interrupts: exactly one interrupt specifier
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index a1c929f..596e641 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -101,6 +101,14 @@ static struct vendor_data vendor_arm = {
+>  	.get_fifosize		= get_fifosize_arm,
+>  };
+>  
+> +static struct vendor_data vendor_sbsa = {
+> +	.oversampling		= false,
+> +	.dma_threshold		= false,
+> +	.cts_event_workaround	= false,
+> +	.always_enabled		= true,
+> +	.fixed_options		= "115200n8",
+> +};
 
-Oh, yes that blows my theory completely then.
- 
-> So, I think this has nothing to do with the DMA hardware /at all/,
-> but more to do with the GPIO code, and it suggests that the GPIO code
-> publishes IRQs before it is safe for those IRQs to be used.
-> 
-> Maybe it has to do with omap_gpio_irq_handler() being called... added
-> printk(), nope, that's not called either.  So it's not an IRQ which
-> gets triggered at all.
-> 
-> What is called are (in order):
-> 
-> omap_gpio_unmask_irq()
-> omap_set_gpio_irqenable()
-> omap_enable_gpio_irqbank()
-> 
-> and this reveals where the problem is, especially when you then add
-> instrumentation into the runtime PM functions - and this reveals that
-> when a GPIO IRQ is requested, these functions are called while the
-> GPIO is runtime suspended.
-> 
-> _That_ is where the *real* problem lies - requesting a GPIO interrupt
-> results in the kernel touching possibly runtime-suspended hardware.
-> 
-> The reason it happens with preempt is that preempt introduces scheduling
-> points during the kernel boot which would not otherwise be there (with
-> preempt disabled, you have to hit an explicit context switch due to
-> contention on some lock or a wait in order for some other thread to run.)
+Is this configuration mandated by the SBSA? If so, please mandate it in
+the binding document.
 
-OK makes sense.
- 
-> So, the GPIO driver really needs fixing - and I'd suggest fixing it
-> first, before fixing the DMA problem, because the DMA problem allows
-> us to see the GPIO problem.
+If the rate and so on are not mandated, they should probably be
+described by the binding so software has a chance of getting the real
+configuration details.
 
-Yes we need to fix that.
-
-Regards,
-
-Tony
+Thanks,
+Mark.
