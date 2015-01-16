@@ -1,70 +1,93 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Jan 2015 13:52:14 +0000
-Subject: [PATCH] arm64: uapi: expose our struct ucontext to the uapi headers
-Message-ID: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 16 Jan 2015 13:54:46 +0000
+Subject: [PATCH v7 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <54B8F2E3.80306@arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <1421247905-3749-14-git-send-email-hanjun.guo@linaro.org>
+ <54B8F2E3.80306@arm.com>
+Message-ID: <CACxGe6tBb8L8upS3zenZbrOc_c0E=MA=DqLjkSezEbregaAaaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 defines its own ucontext structure which is incompatible with the
-struct defined (and exposed to userspace by) the asm-generic headers.
+On Fri, Jan 16, 2015 at 11:15 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 14/01/15 15:05, Hanjun Guo wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+>> parse GIC related subtables, collect CPU interface and distributor
+>> addresses and call driver initialization function (which is hardware
+>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+>>
+>> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+>> GICv2 vitalization extension, GICv3/4 and ITS are considered as next
+>> steps.
+>
+> And so is GICv2m, apparently (see below).
+>
+>>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Yijing Wang <wangyijing@huawei.com>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>> +     /*
+>> +      * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+>> +      * as default IRQ domain to allow for GSI registration and GSI to IRQ
+>> +      * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+>> +      */
+>> +     gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+>
+> I assume you never tried to port the GICv2m driver to ACPI, right?
+> Because the above code actively prevents the GIC domain to be defined as
+> a stacked domain, making it impossible for the v2m widget to be
+> implemented on top of GIC. But maybe legacy interrupts are enough?
 
-glibc carries its own struct definition that is compatible with the
-arm64 definition, but we should expose our format in the uapi headers in
-case other libraries want to make use of the ucontext pushed as part of
-an arm64 sigframe.
+It's sufficient for what is supported right now, and easily changed in
+a patch series to add GICv2m support. This shouldn't be a blocking
+issue as it isn't actively dangerous. It is merely limited, and that
+is okay.
 
-This patch moves the arm64 asm/ucontext.h to the uapi headers, along
-with the necessary #include of linux/types.h.
+>> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+>>  void __init irqchip_init(void)
+>>  {
+>>       of_irq_init(__irqchip_of_table);
+>> +
+>> +     acpi_gic_init();
+>
+> Have you realised that this file is probably compiled on multiple
+> architecture, none of which particularly cares about ACPI or the GIC?
+> This is (still) very ugly.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marcus Shawcroft <marcus.shawcroft@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+"very ugly?" That's overstating things a bit. We may quibble about the
+name, but we're just talking about a setup hook function that may or
+may not be implemented. How about we put acpi_irq_init() here and make
+it an inline macro that directly calls acpi_gic_init() when ACPI is
+enabled on AARCH64? Then the function can be extended by architectures
+as needed, and default to an empty inline otherwise. When (if) we have
+more than one hook that needs to be called from it, then we can
+refactor it to be more like of_irq_init().
 
-I think we also need something similar for arch/arm/ unless we decide
-that exposing the incorrect asm-generic header is harmless.
+As for other architectures calling this function, but not caring about
+ACPI, I believe it was your suggestion to put it here!  :-)
 
- arch/arm64/include/uapi/asm/Kbuild           | 1 +
- arch/arm64/include/{ => uapi}/asm/ucontext.h | 8 +++++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
- rename arch/arm64/include/{ => uapi}/asm/ucontext.h (88%)
+On Mon, 01 Sep 2014 18:35:18 +0100^M, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 01/09/14 15:57, Hanjun Guo wrote:
+> > @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+> >  void __init init_IRQ(void)
+> >  {
+> >     irqchip_init();
+> > +
+> > +   if (!handle_arch_irq)
+> > +           acpi_gic_init();
+> > +
+>
+> Why isn't this called from irqchip_init? It would seem like the logical
+> spot to probe an interrupt controller.
 
-diff --git a/arch/arm64/include/uapi/asm/Kbuild b/arch/arm64/include/uapi/asm/Kbuild
-index 942376d37d22..825b0fe51c2b 100644
---- a/arch/arm64/include/uapi/asm/Kbuild
-+++ b/arch/arm64/include/uapi/asm/Kbuild
-@@ -18,4 +18,5 @@ header-y += siginfo.h
- header-y += signal.h
- header-y += stat.h
- header-y += statfs.h
-+header-y += ucontext.h
- header-y += unistd.h
-diff --git a/arch/arm64/include/asm/ucontext.h b/arch/arm64/include/uapi/asm/ucontext.h
-similarity index 88%
-rename from arch/arm64/include/asm/ucontext.h
-rename to arch/arm64/include/uapi/asm/ucontext.h
-index 42e04c877428..791de8e89e35 100644
---- a/arch/arm64/include/asm/ucontext.h
-+++ b/arch/arm64/include/uapi/asm/ucontext.h
-@@ -13,8 +13,10 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
--#ifndef __ASM_UCONTEXT_H
--#define __ASM_UCONTEXT_H
-+#ifndef _UAPI__ASM_UCONTEXT_H
-+#define _UAPI__ASM_UCONTEXT_H
-+
-+#include <linux/types.h>
- 
- struct ucontext {
- 	unsigned long	  uc_flags;
-@@ -27,4 +29,4 @@ struct ucontext {
- 	struct sigcontext uc_mcontext;
- };
- 
--#endif /* __ASM_UCONTEXT_H */
-+#endif /* _UAPI__ASM_UCONTEXT_H */
--- 
-2.1.4
+What has been done here isn't an unusual choice. We've got stuff all
+over the kernel that may or may not be implemented depending on what
+the architecture supports. If the function call is renamed to
+acpi_init_irq(), are you content?
+
+g.
