@@ -1,56 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Jan 2015 16:22:44 +0000
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <54B8FD49.2060503@redhat.com>
-References: <20150108162312.GO11583@arm.com> <54AEBE45.9080203@redhat.com>
- <20150109154635.GG11258@arm.com> <54B00C39.1070809@redhat.com>
- <20150112173005.GK13360@arm.com> <54B4BF4C.2030009@redhat.com>
- <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
- <54B55B95.1070402@redhat.com> <54B7EF3C.8060909@redhat.com>
- <54B8FD49.2060503@redhat.com>
-Message-ID: <20150116162244.GA7091@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jan 2015 16:23:35 +0000
+Subject: [PATCH] arm64/efi: handle potential failure to remap memory map
+In-Reply-To: <20150115164010.GK16217@leverpostej>
+References: <1421323266-30973-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150115164010.GK16217@leverpostej>
+Message-ID: <20150116162334.GJ13634@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:00:09PM +0000, Pratyush Anand wrote:
-> On Thursday 15 January 2015 10:17 PM, Pratyush Anand wrote:
-> > On Tuesday 13 January 2015 11:23 PM, Pratyush Anand wrote:
-> >> I will still try to find some way to capture enable_dbg macro path.H
-> >
-> > I did instrumented debug tap points at all the location from where
-> > enable_debug macro is called(see attached debug patch). But, I do not
-> > see that, execution reaches to any of those tap points between el0_dbg
-> > and el1_dbg, and tap points debug log also confirms that el1_dbg is
-> > raised before el0_dbg is returned.
+On Thu, Jan 15, 2015 at 04:40:11PM +0000, Mark Rutland wrote:
+> On Thu, Jan 15, 2015 at 12:01:06PM +0000, Ard Biesheuvel wrote:
+> > When remapping the UEFI memory map using ioremap_cache(), we
+> > have to deal with potential failure. Note that, even if the
+> > common case is for ioremap_cache() to return the existing linear
+> > mapping of the memory map, we cannot rely on that to be always the
+> > case, e.g., in the presence of a mem= kernel parameter.
+> > 
+> > At the same time, remove a stale comment and move the memmap code
+> > together.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> Probably we all missed this, ARMv8 specs is very clear about it. In 
-> section "D2.1 About debug exceptions" it says:
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 > 
-> Software Breakpoint Instruction exceptions cannot be masked. The PE 
-> takes Software Breakpoint Instruction exceptions regardless of both of 
-> the following:
-> ? The current Exception level.
-> ? The current Security state.
-
-Ah, of course, I completely forgot you were using software breakpoints!
-
-> So, reception of el1_dbg while executing el0_dbg seems perfectly normal 
-> to me. If you agree then I am back with the original query which I asked 
-> in the beginning of the 
-> thread,(http://permalink.gmane.org/gmane.linux.ports.arm.kernel/383672) 
-> ie how can instruction_pointer be wrong when second el1_dbg is called 
-> recursively(as follows).
+> This should probably be picked up before my mem= patch, which I will be
+> resending shortly. I'll mention that when posting.
 > 
-> [1]-> el0_dbg (After executing BRK instruction by user)
-> [2]	-> el1_dbg (when uprobe break handler at [1] executes BRK instruction)
-> 		(At the end of this ELR_EL1 is programmed with fffffdfffc000004)
-> [3]		-> el1_dbg (when kprobe break handler at [2] enables single stepping)
-> 		(Here ELR_EL1 was found fffffe0000092470).So When this el1_dbg was 
-> received, then regs->pc  values are not same what was programmed in 
-> ELR_EL1 at the return of [2].
+> I guess Catalin should pick this up given the other portions are in the
+> arm64 tree, and this falls under arch/arm64.
 
-Perhaps you're not removing the BRK instruction properly, and so you try to
-single-step a trapping instruction and end up stepping into the exception?
+I picked both up. Thanks.
 
-Will
+-- 
+Catalin
