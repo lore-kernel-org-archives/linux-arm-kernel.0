@@ -1,33 +1,114 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 16 Jan 2015 11:39:13 +0000 (UTC)
-Subject: [PATCH] soc: tegra: Add Tegra132 SoC to the DT list of Tegra SoCs
-Message-ID: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 16 Jan 2015 12:43:15 +0100
+Subject: RFC on cpufreq implementation
+In-Reply-To: <54B8F19F.8060108@free.fr>
+References: <54B7F7CD.7030903@free.fr> <1421399293.11224.7.camel@AMDC1943>
+ <54B8F19F.8060108@free.fr>
+Message-ID: <1421408595.7058.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On pi?, 2015-01-16 at 12:10 +0100, Mason wrote:
+> On 16/01/2015 10:08, Krzysztof Kozlowski wrote:
+> 
+> > On 2015-01-15 at 18:24 +0100, Mason wrote:
+> >  
+> >> This is a follow-up to my previous thread.
+> >> "How many frequencies would cpufreq optimally like to manage?"
+> >> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
+> >>
+> >> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
+> >> based SoC (namely Tango4 from Sigma Designs). I'd like to get
+> >> some feedback on the cpufreq driver I wrote for that platform.
+> >>
+> >> I decided to expose only a small subset of frequencies (namely
+> >> {999,500,333,111} MHz) because, in my tests, the ondemand gov
+> >> chose mostly min and max, and the intermediate frequencies not
+> >> so much; so I figured "2 intermediate freqs" is good enough.
+> >> (I'm ready to hear otherwise.)
+> 
+> I'll take a closer look at other drivers, but I'd like to hear
+> opinions on the subject.
+> 
+> >> I tried to use as much generic framework as possible, but I've
+> >> read about the clk framework, and it looks to be an even greater
+> >> generalization. Are new platforms encouraged to use that, rather
+> >> than provide a cpufreq driver? Does it work when voltage scaling
+> >> comes in play? (This SoC doesn't have it, but the next will.)
+> >
+> > The clock framework generalizes clocks, not cpufreq. Ideally you should
+> > use clock framework in cpufreq driver. So instead manually setting
+> > divider just do something like:
+> >
+> > ret = clk_set_rate(cpu_clk, freq_exact);
+> > if (ret) {
+> > 	dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+> > 	return ret;
+> > }
+> 
+> I will give clk a closer look.
+> 
+> > For voltage scaling you should use regulator framework.
+> 
+> OK. I'm also interested in frequency-throttling when temperatures
+> rise beyond specific thresholds. What subsystem ties sensors and
+> cpufreq together?
 
-Add "nvidia,tegra132" as a compatible string that denotes a Tegra SoC.
+I believe thermal.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Paul Walmsley <pwalmsley@nvidia.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Alexandre Courbot <gnurou@gmail.com>
----
- drivers/soc/tegra/common.c | 1 +
- 1 file changed, 1 insertion(+)
+> 
+> > Actually I think existing cpufreq-dt could serve your purpose. Why don't
+> > you try it? Or look at it and use as an example.
+> 
+> Will do. I've heard of device tree, but know nothing about it.
 
-diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
-index a71cb74..a952986 100644
---- a/drivers/soc/tegra/common.c
-+++ b/drivers/soc/tegra/common.c
-@@ -15,6 +15,7 @@ static const struct of_device_id tegra_machine_match[] = {
- 	{ .compatible = "nvidia,tegra30", },
- 	{ .compatible = "nvidia,tegra114", },
- 	{ .compatible = "nvidia,tegra124", },
-+	{ .compatible = "nvidia,tegra132", },
- 	{ }
- };
- 
--- 
-2.0.0.GIT
+Indeed it is driver meant to be used with Device Tree but beside DT code
+it nicely shows how to scale the frequency CPU. If you don't use DT then
+you can use only the set_target() as starting point.
+
+On 3.14 the "cpufreq-dt" could be called "cpufreq-cpu0".
+
+> 
+> >> I'm also wondering how cpufreq and cpuidle interact? Is one a
+> >> subset of the other? Are they orthogonal?
+> >
+> > cpuidle and cpufreq are different subsystems. They don't interact, yet.
+> > There are efforts to combine scheduler, cpufreq and cpuidle but this is
+> > future. If your SoC has some deeper low power states than developing
+> > cpuidle driver makes sense. If not - WFI will be used.
+> 
+> AFAIU, there are no deeper power states on the Cortex-A9.
+> 
+> I didn't find where WFI is called :-(
+> 
+> In kernel/cpu/idle.c (file seems to have been removed in 3.15)
+> cpu_idle_loop() calls arch_cpu_idle()
+> http://lxr.free-electrons.com/source/kernel/cpu/idle.c?v=3.14#L98
+> 
+> In arch/kernel/process.c
+> http://lxr.free-electrons.com/source/arch/arm/kernel/process.c?v=3.14#L173
+> /*
+>   * Called from the core idle loop.
+>   */
+> void arch_cpu_idle(void)
+> {
+> 	if (cpuidle_idle_call())
+> 		default_idle();
+> }
+> 
+> default_idle calls cpu_do_idle (by default), a macro for cpu_v7_do_idle
+> which executes dsb+wfi, BUT...
+> 
+> ifndef CONFIG_CPU_IDLE then
+> static inline int cpuidle_idle_call(void) { return -ENODEV; }
+> 
+> Does that mean I MUST define CONFIG_CPU_IDLE if I want the idle
+> loop to call wfi (to save power), even if I don't have a cpuidle
+> driver?
+
+On current kernels you don't have to. But on 3.14... seems yes.
+
+Best regards,
+Krzysztof
+> 
+> Regards.
