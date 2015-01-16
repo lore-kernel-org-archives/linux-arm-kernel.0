@@ -1,144 +1,90 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 16 Jan 2015 10:41:13 -0600
-Subject: [PATCH v5 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <CAL_JsqJg=BtanmR_rhYthCUhKbErs8viZ7MMMXr-PmPjUV4BRQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Jan 2015 16:44:34 +0000
+Subject: [PATCH 2/3] arm64: Consolidate hotplug notifier for instruction
+ emulation
+In-Reply-To: <20150116163254.GC32155@leverpostej>
+References: <1421325366-13263-1-git-send-email-suzuki.poulose@arm.com>
+ <1421325366-13263-3-git-send-email-suzuki.poulose@arm.com>
+ <20150116160730.GY7091@arm.com>
+ <20150116163254.GC32155@leverpostej>
+Message-ID: <20150116164433.GB7091@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 4:00 AM, Chunyan Zhang
-<chunyan.zhang@spreadtrum.com> wrote:
-> Add a full sc9836-uart driver for SC9836 SoC which is based on the
-> spreadtrum sharkl64 platform.
-> This driver also support earlycon.
-> This patch also replaced the spaces between the macros and their
-> values with the tabs in serial_core.h
->
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
-> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
-> ---
->  drivers/tty/serial/Kconfig       |   18 +
->  drivers/tty/serial/Makefile      |    1 +
->  drivers/tty/serial/sprd_serial.c |  772 ++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/serial_core.h |    3 +
->  4 files changed, 794 insertions(+)
->  create mode 100644 drivers/tty/serial/sprd_serial.c
->
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index c79b43c..969d3cd 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1577,6 +1577,24 @@ config SERIAL_MEN_Z135
->           This driver can also be build as a module. If so, the module will be called
->           men_z135_uart.ko
->
-> +config SERIAL_SPRD
-> +       tristate "Support for SPRD serial"
+On Fri, Jan 16, 2015 at 04:32:54PM +0000, Mark Rutland wrote:
+> On Fri, Jan 16, 2015 at 04:07:30PM +0000, Will Deacon wrote:
+> > On Thu, Jan 15, 2015 at 12:36:05PM +0000, Suzuki K. Poulose wrote:
+> > > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> > > 
+> > > As of now each insn_emulation has a cpu hotplug notifier that
+> > > enables/disables the CPU feature bit for the functionality. This
+> > > patch re-arranges the code, such that there is only one notifier
+> > > that runs through the list of registered emulation hooks and runs
+> > > their corresponding set_hw_mode.
+> > > 
+> > > We do nothing when a CPU is dying as we will set the appropriate bits
+> > > as it comes back online based on the state of the hooks.
+> > > 
+> > > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > ---
+> > >  Documentation/arm64/legacy_instructions.txt |    4 +
+> > >  arch/arm64/include/asm/cpufeature.h         |    2 +
+> > >  arch/arm64/kernel/armv8_deprecated.c        |  113 +++++++++++++++------------
+> > >  3 files changed, 69 insertions(+), 50 deletions(-)
+> > > 
+> > > diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
+> > > index a3b3da2..0a4dc26 100644
+> > > --- a/Documentation/arm64/legacy_instructions.txt
+> > > +++ b/Documentation/arm64/legacy_instructions.txt
+> > > @@ -27,6 +27,10 @@ behaviours and the corresponding values of the sysctl nodes -
+> > >    instructions. Using hardware execution generally provides better
+> > >    performance, but at the loss of ability to gather runtime statistics
+> > >    about the use of the deprecated instructions.
+> > > +  Note: Emulation of a deprecated instruction depends on the availability
+> > > +  of the feature on all the active CPUs. In case of CPU hotplug, if a new
+> > > +  CPU doesn't support a feature, it could result in the abortion of the
+> > > +  hotplug operation.
+> > 
+> > Is this true? We should be able to *emulate* the instruction anywhere,
+> > it's the "hardware execution" setting that needs CPU support.
+> 
+> Not quite. In ARMv8 there are three possible cases for endianness
+> support:
+> 
+> (a) Mixed endian support at all levels
+>     ID_AA64MMFR0_EL1.BigEnd == 0b0001
+>     ID_AA64MMFR0_EL1.BigEnd0 == 0b0000 (RES0, invalid)
+> 
+> (b) Mixed endian support at EL0 only
+>     ID_AA64MMFR0_EL1.BigEnd == 0b0000
+>     ID_AA64MMFR0_EL1.BigEnd0 == 0b0001
+>     SCTLR_EL1.EE has a fixed value
+> 
+> (c) No mixed endian support at all
+>     ID_AA64MMFR0_EL1.BigEnd == 0b0000
+>     ID_AA64MMFR0_EL1.BigEnd0 == 0b0000
+>     SCTLR_EL1.{EE,E0E} have fixed values
+> 
+> We can emulate setend in cases (a) and (b), but not (c) unless we
+> trapped every single instruction that could access memory. I don't think
+> that's feasible.
+> 
+> Also fun in case (c) is that the kernel may not be able to run on all
+> CPUs (consider a BE kernel where some CPUs are fixed to LE at EL1).
+> 
+> I hope no-one builds a system where CPUs are mismatched w.r.t.
+> endianness support.
 
-Can the menu text spell out Spreadtrum. What SPRD means is not obvious.
+Agreed, the problem here is all down to the wording.
+Documentation/arm64/legacy_instructions.txt isn't specific to SETEND
+emulation and saying "Emulation of a deprecated instruction depends on the
+availability of the feature on all the active CPUs." as a blanket statement
+doesn't make a lot of sense in isolation. It's certainly not the case for
+SWP and CP15 barriers, for example.
 
-> +       depends on ARCH_SPRD
-> +       select SERIAL_CORE
-> +       help
-> +         This enables the driver for the Spreadtrum's serial.
-> +
-> +config SERIAL_SPRD_CONSOLE
-> +       bool "SPRD UART console support"
+With SETEND, we have requirements on mixed-endian support for the emulation.
+Fine, but let's not muddy the waters around the general CPU requirements
+for deprecated instruction emulation.
 
-Same here.
-
-> +       depends on SERIAL_SPRD=y
-> +       select SERIAL_CORE_CONSOLE
-> +       select SERIAL_EARLYCON
-> +       help
-> +         Support for early debug console using Spreadtrum's serial. This enables
-> +         the console before standard serial driver is probed. This is enabled
-> +         with "earlycon" on the kernel command line. The console is
-> +         enabled when early_param is processed.
-> +
->  endmenu
->
->  config SERIAL_MCTRL_GPIO
-> diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-> index 9a548ac..4801aca 100644
-> --- a/drivers/tty/serial/Makefile
-> +++ b/drivers/tty/serial/Makefile
-> @@ -93,6 +93,7 @@ obj-$(CONFIG_SERIAL_ARC)      += arc_uart.o
->  obj-$(CONFIG_SERIAL_RP2)       += rp2.o
->  obj-$(CONFIG_SERIAL_FSL_LPUART)        += fsl_lpuart.o
->  obj-$(CONFIG_SERIAL_MEN_Z135)  += men_z135_uart.o
-> +obj-$(CONFIG_SERIAL_SPRD) += sprd_serial.o
->
->  # GPIOLIB helpers for modem control lines
->  obj-$(CONFIG_SERIAL_MCTRL_GPIO)        += serial_mctrl_gpio.o
-> diff --git a/drivers/tty/serial/sprd_serial.c b/drivers/tty/serial/sprd_serial.c
-> new file mode 100644
-> index 0000000..81839e4
-> --- /dev/null
-> +++ b/drivers/tty/serial/sprd_serial.c
-> @@ -0,0 +1,772 @@
-> +/*
-> + * Copyright (C) 2012 Spreadtrum Communications Inc.
-
-This is unchanged in 3 years?
-
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/console.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/ioport.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/serial.h>
-> +#include <linux/slab.h>
-> +#include <linux/tty.h>
-> +#include <linux/tty_flip.h>
-> +
-> +/* device name */
-> +#define UART_NR_MAX            8
-> +#define SPRD_TTY_NAME          "ttySPX"
-
-We really want to get away from per SOC serial names and use ttyS for
-serial port /dev names. There's issues switching existing drivers
-because this creates an ABI, so we can only have new drivers follow
-this.
-
-[...]
-
-> +static struct platform_driver sprd_platform_driver = {
-> +       .probe          = sprd_probe,
-> +       .remove         = sprd_remove,
-> +       .driver         = {
-> +               .name   = "sprd_serial",
-> +               .of_match_table = of_match_ptr(serial_ids),
-> +               .pm     = &sprd_pm_ops,
-> +       },
-> +};
-> +
-> +static int __init sprd_serial_init(void)
-> +{
-> +       int ret = 0;
-> +
-> +       ret = uart_register_driver(&sprd_uart_driver);
-
-This can be done in probe now. Then you can use module_platform_driver().
-
-Rob
+Will
