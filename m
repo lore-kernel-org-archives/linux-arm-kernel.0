@@ -1,24 +1,37 @@
-From: andre.przywara@arm.com (=?windows-1252?Q?Andr=E9_Przywara?=)
-Date: Fri, 16 Jan 2015 09:36:00 +0000
-Subject: [PATCH v7 3/4] KVM: arm/arm64: implement kvm_arch_intc_initialized
-In-Reply-To: <1421333267-15287-4-git-send-email-eric.auger@linaro.org>
-References: <1421333267-15287-1-git-send-email-eric.auger@linaro.org>
- <1421333267-15287-4-git-send-email-eric.auger@linaro.org>
-Message-ID: <54B8DB80.50202@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 10:35:30 +0100
+Subject: [PATCH 11/28] PCI: Introduce pci_host_bridge_ops to setup host
+ bridge
+In-Reply-To: <1443278.UW4hQ0rXtr@wuerfel>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <1421372666-12288-12-git-send-email-wangyijing@huawei.com>
+ <1443278.UW4hQ0rXtr@wuerfel>
+Message-ID: <3832604.lYie7PXiOd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2015 02:47 PM, Eric Auger wrote:
-> On arm/arm64 the VGIC is dynamically instantiated and it is useful
-> to expose its state, especially for irqfd setup.
+On Friday 16 January 2015 10:23:11 Arnd Bergmann wrote:
+> On Friday 16 January 2015 09:44:09 Yijing Wang wrote:
+> > @@ -2064,7 +2073,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
+> >  {
+> >         struct pci_host_bridge *host;
+> >  
+> > -       host = pci_create_host_bridge(parent, db, resources, sysdata);
+> > +       host = pci_create_host_bridge(parent, db, resources, sysdata, NULL);
+> >         if (!host)
+> >                 return NULL;
+> >  
+> > 
 > 
-> This patch defines __KVM_HAVE_ARCH_INTC_INITIALIZED and
-> implements kvm_arch_intc_initialized.
+> Same comment as for patch 10: If we leave this out of the pci_create_host_bridge
+> argument but set it later, ?e interface becomes simpler for callers that
+> don't have custom pci_host_bridge_ops.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> This would break your phb_prepare() callback, but I assume a host driver
+> can just make a direct function call before entering pci_create_host_bridge
+> for this. Let me know if I'm missing something here.
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+I've read the later patches now that explain why it's needed, so nevermind
+my comment above.
 
-Cheers,
-Andre.
+	Arnd
