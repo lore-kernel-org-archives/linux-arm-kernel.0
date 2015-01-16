@@ -1,116 +1,106 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 16 Jan 2015 10:13:33 +0100
-Subject: [PATCH V2 2/4] mmc: pwrseq: Document DT bindings for the simple
- MMC power sequence
-In-Reply-To: <20150116075308.3f4e250a@notabene.brown>
-References: <1421240530-7971-1-git-send-email-ulf.hansson@linaro.org>
- <1421240530-7971-3-git-send-email-ulf.hansson@linaro.org>
- <20150115165825.GL16217@leverpostej>
- <20150116075308.3f4e250a@notabene.brown>
-Message-ID: <CAPDyKFrzkzHF3AJ7n4Uh8kQr-zdhLCqdxOtgXpxtRWj6=0h+2w@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 16 Jan 2015 10:12:54 +0100
+Subject: [PATCH v4 00/18] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+Message-ID: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2015 at 19:53, NeilBrown <neilb@suse.de> wrote:
-> On Thu, 15 Jan 2015 16:58:26 +0000 Mark Rutland <mark.rutland@arm.com> wrote:
->
->> Hi Ulf,
->>
->> On Wed, Jan 14, 2015 at 01:02:08PM +0000, Ulf Hansson wrote:
->> > The simple MMC power sequence provider, intends to supports a set of
->> > common properties between SOC designs. It thus enables us to re-use the
->> > same provider for several SOCs.
->> >
->> > In this initial step, let's add the top level description of the MMC
->> > power sequence and describe the compatible string for the simple MMC
->> > power sequence provider.
->> >
->> > Following patches will step by step add support for new properties to
->> > the simple MMC power sequence provider.
->> >
->> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> > ---
->> >
->> > Changes in v2:
->> >     - None.
->> >
->> > ---
->> >  .../devicetree/bindings/mmc/mmc,pwrseq-simple.txt      | 18 ++++++++++++++++++
->> >  Documentation/devicetree/bindings/mmc/mmc.txt          |  5 +++++
->> >  2 files changed, 23 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
->> > new file mode 100644
->> > index 0000000..e1b7f9c
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/mmc/mmc,pwrseq-simple.txt
->> > @@ -0,0 +1,18 @@
->> > +* The simple MMC power sequence provider
->> > +
->> > +System on chip designs may specify a specific MMC power sequence. To
->> > +successfully detect an (e)MMC/SD/SDIO card, that power sequence must be
->> > +maintained while initializing the card.
->> > +
->> > +The simple MMC power sequence provider, intends to supports a set of common
->> > +properties between SOC designs. It thus enables us to re-use the same provider
->> > +for several SOC designs.
->> > +
->> > +Required properties:
->> > +- compatible : contains "mmc,pwrseq-simple".
->>
->> Nit: "mmc" is not a vendor prefix.
->>
->> > +
->> > +Example:
->> > +
->> > +   sdhci0_pwrseq {
->> > +           compatible = "mmc,pwrseq-simple";
->> > +   }
->>
->> I'm a little confused here. What specific sequence is described by this
->> node? We don't appear to have referred to any resources used as part of
->> that sequence, and the description above only mentions that there could
->> be a specific sequence, not what that sequence is.
->>
->> So I don't think this makes sense on its own, and should probably be
->> folded with patches adding the initial support for the resources used as
->> part of the sequence (e.g. the GPIOs added in a later patch).
->>
->
-> I guess I assumed that this "simple" referred to the current behaviour, which
-> includes some of vmmc-supply, vqmmc-supply, vmmc_aux-supply and pbias-supply
-> being switched at "appropriate" times.
->
-> Would it make sense to bring all of these explicitly under the "pwrseq"
-> umbrella, leaving the current behaviour only when no pwrseq node is provided?
+Hello Everyone,
 
-In principle there is nothing that prevents us from following your
-suggestion. But why should we?
+This is yet another attempt to get Exynos SYSMMU driver with integrated
+with IOMMU & DMA-mapping subsystems. The main change from previous
+version is a rebase onto latest v3.19-rc4 kernel base, which includes
+"automatic DMA configuration for IOMMU masters" patches developed by
+Will Deacon. The other change is long avaited addition of DTS patches
+for Exynos 5250 and 5420/5422/5800.
 
-Moreover, I don't think it's required at this point, let's first get
-the basic mmc-pwrseq support in place. Then we can evolve it. :-)
+Merge plan for this patchset:
 
->
-> Also, it isn't clear to me whether the need for power/reset is a function of
-> the mmc-host, or a function of the device attached to the host.  I suspect
-> some are needed by one, some by the other.  Any by both?
+1. All iommu related patches (with 'iommu: exynos') can be merged to
+iommu tree. They don't have any direct dependencies on the DTS, DRM and
+power domain initialization change - without them the driver will simply
+not initialize, when no exynos,sysmmu nodes are provided in device tree.
+Joerg, could you merge those patches?
 
-To me the the power is coupled with the host and thus controlled by
-the mmc layer. But I guess we can discuss this in a forever long loop.
-:-)
+2. DTS and power domain patches should go to Samsung Exynos tree. Those
+patches depends on my earlier DTS patches for Exynos SoCs, which make
+this patchset really complete:
+- 'ARM: DTS: Exynos: convert to generic power domain bindings'
+  (http://www.spinics.net/lists/linux-samsung-soc/msg40584.html)
+- '[PATCH v3 0/7] Enable HDMI support on Exynos platforms'
+  (http://www.spinics.net/lists/arm-kernel/msg391148.html)
+Kukjin, could you merge those patches?
 
-They may be other resources which is coupled with an SDIO function /
-eMMC,SDIO card, such as irqs. Those shall be described in the child
-node of the host.
-I have queued the below patchset from Hans, which I believe should address this:
+3. Exynos DRM fix. This patch in my opinion should go Exynos DRM tree.
+Inki, could you merge it?
 
-https://www.mail-archive.com/linux-mmc at vger.kernel.org/msg27241.html
 
->
-> Should the two needs be kept separate?
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
-Yes, I think so.
 
-Kind regards
-Uffe
+Changelog:
+v4:
+- rebased onto v3.19-rc4 and other Exynos DTS queued patches
+- added DTS patch for Exynos 5250 & 5420/5422/5800
+
+
+v3: http://www.spinics.net/lists/linux-samsung-soc/msg39168.html
+- rebased onto "[RFC PATCH v4 0/8] Introduce automatic DMA
+  configuration for IOMMU masters"
+- added some minor fixes for iommu and dma-mapping frameworks
+
+v2: http://thread.gmane.org/gmane.linux.kernel.iommu/6472/
+- rebased onto "[RFC PATCH v3 0/7] Introduce automatic DMA
+  configuration for IOMMU masters" patches:
+  http://www.spinics.net/lists/arm-kernel/msg362076.html
+- changed initialization from bus notifiers to DT related callbacks
+- removed support for separate IO address spaces - this will be
+  discussed separately after the basic support gets merged
+- removed support for power domain notifier-based runtime power
+  management - this also will be discussed separately later
+
+v1: https://lkml.org/lkml/2014/8/5/183
+- initial version, feature complete, completely rewrote integration
+  approach
+
+
+Patch summary:
+
+Marek Szyprowski (18):
+  drm: exynos: detach from default dma-mapping domain on init
+  arm: exynos: pm_domains: add support for devices registered before
+    arch_initcall
+  ARM: dts: exynos4: add sysmmu nodes
+  ARM: dts: exynos5250: add sysmmu nodes
+  ARM: dts: exynos5420: add sysmmu nodes
+  iommu: exynos: don't read version register on every tlb operation
+  iommu: exynos: remove unused functions
+  iommu: exynos: remove useless spinlock
+  iommu: exynos: refactor function parameters to simplify code
+  iommu: exynos: remove unused functions, part 2
+  iommu: exynos: remove useless device_add/remove callbacks
+  iommu: exynos: add support for binding more than one sysmmu to master
+    device
+  iommu: exynos: add support for runtime_pm
+  iommu: exynos: rename variables to reflect their purpose
+  iommu: exynos: document internal structures
+  iommu: exynos: remove excessive includes and sort others
+    alphabetically
+  iommu: exynos: init from dt-specific callback instead of initcall
+  iommu: exynos: add callback for initializing devices from device tree
+
+ arch/arm/boot/dts/exynos4.dtsi            | 118 +++++++
+ arch/arm/boot/dts/exynos4210.dtsi         |  23 ++
+ arch/arm/boot/dts/exynos4x12.dtsi         |  82 +++++
+ arch/arm/boot/dts/exynos5250.dtsi         | 250 +++++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi         | 178 +++++++++++
+ arch/arm/mach-exynos/pm_domains.c         |   9 +-
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c |   3 +
+ drivers/iommu/exynos-iommu.c              | 490 ++++++++++++++----------------
+ 8 files changed, 884 insertions(+), 269 deletions(-)
+
+-- 
+1.9.2
