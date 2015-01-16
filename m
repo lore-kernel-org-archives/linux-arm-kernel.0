@@ -1,39 +1,75 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 16 Jan 2015 11:23:32 +0100 (CET)
-Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
-In-Reply-To: <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1501161122320.5526@nanos>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Jan 2015 11:26:51 +0100
+Subject: [PATCH v2 1/8] ARM: at91: pm: rework cpu detection
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641BFCE1327@penmbx01>
+References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421333971-7581-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <B256D81BAE5131468A838E5D7A243641BFCE1327@penmbx01>
+Message-ID: <20150116102651.GA3843@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015, Alexandre Belloni wrote:
+Hi,
 
-> There is no point in calling suspend/resume for unused
-> clocksources.
+On 16/01/2015 at 02:44:39 +0000, Yang, Wenyou wrote :
+> > -	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh.
+> > */
+> > -	if (cpu_is_at91rm9200())
+> > +	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+> > +
+> > +	if (of_machine_is_compatible("atmel,at91rm9200")) {
+> > +		/*
+> > +		 * AT91RM9200 SDRAM low-power mode cannot be used with
+> > +		 * self-refresh.
+> > +		 */
+> >  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+> > -
+> > +
+> > +		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
+> > +					    AT91RM9200_PMC_UDP;
+> > +		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
+> > +	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9g20") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9261") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9g10") ||
+> > +		   of_machine_is_compatible("atmel,at91sam9263")) {
+> > +		at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP |
+> > +					    AT91SAM926x_PMC_UDP;
+> > +	} else if (of_machine_is_compatible("atmel,at91sam9g45")) {
+> > +		at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+> > +	}
+> > +
+> About the memory controller type, I prefer to get it during the memory controller initialization, from the sram_ids[].data which defined in the setup.c,
+> As this,
+> static const struct at91_ramc_of_data at91rm9200_ramc_of_data = {
+> 	.ramc_type = AT91_MEMCTRL_MC,
+> };
+> ...
+> static struct of_device_id ramc_ids[] = {
+> 	{ .compatible = "atmel,at91rm9200-sdramc", .data = &at91rm9200_ramc_of_data},
+> 	... ...
+> 	{ /*sentinel*/ }
+> };
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  kernel/time/clocksource.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
-> index 920a4da58eb0..baea4e42ae90 100644
-> --- a/kernel/time/clocksource.c
-> +++ b/kernel/time/clocksource.c
-> @@ -493,7 +493,7 @@ void clocksource_suspend(void)
->  	struct clocksource *cs;
->  
->  	list_for_each_entry_reverse(cs, &clocksource_list, list)
-> -		if (cs->suspend)
-> +		if (cs->suspend && (cs->flags & CLOCK_SOURCE_USED))
->  			cs->suspend(cs);
+> What about you? 
 
-This might be dangerous. If the clocksource has no enable/disable
-callbacks, but suspend/resume, then you might leave it enabled across
-suspend.
+Yes, we agreed that using of_machine_is_compatible is not nice and that
+is why I remove that usage in patch 4.
 
-Thanks,
+We still have to fill the uhp_udp_mask and that would mean adding a
+match on the pmc compatible string. I would prefer not doing that. Or
+maybe we can just remove the check, I don't think it it necessary
+anymore.
 
-	tglx
+At some point in time, I would like to be able to get rid of the
+ramc_ids in mach-at91 but I'm not sure how yet.
+
+Maybe we can do what you suggest after
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316771.html
+Because then, the ram detection is local to pm.c
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
