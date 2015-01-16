@@ -1,65 +1,76 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 16 Jan 2015 16:04:54 +0100
-Subject: [PATCH 0/3] Enable myphy28lp support
-In-Reply-To: <54B90FC4.2020604@ti.com>
-References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
- <54B8FC56.8080400@st.com> <54B904C3.1080002@st.com> <54B90FC4.2020604@ti.com>
-Message-ID: <54B92896.5020607@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 15:07:49 +0000
+Subject: [PATCH] soc: tegra: Add Tegra132 SoC to the DT list of Tegra SoCs
+In-Reply-To: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
+Message-ID: <20150116150749.GA32155@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-On 01/16/2015 02:19 PM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Friday 16 January 2015 06:02 PM, Maxime Coquelin wrote:
->> On 01/16/2015 12:56 PM, Maxime Coquelin wrote:
->>> Hi Gabriel,
->>>
->>>      For the series:
->>> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
->>>
->>>      Kishon, could you take care of adding PHY driver patch for v3.20?
->> Hi Kishon,
->>
->>      Don't apply the patch, since we have 2 other PHY driver patches, I will
->> send you a pull request.
-> Send me as patches if that is okay.
-Ok. Just sent the patches.
+/me opens a delicious can of Lumbricus terrestris
+
+My comments below aren't so much about this patch alone, but more about
+the entire strategy with drivers/soc and the kind of code living there.
+
+On Fri, Jan 16, 2015 at 11:39:13AM +0000, Paul Walmsley wrote:
+> 
+> Add "nvidia,tegra132" as a compatible string that denotes a Tegra SoC.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Paul Walmsley <pwalmsley@nvidia.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> ---
+>  drivers/soc/tegra/common.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
+> index a71cb74..a952986 100644
+> --- a/drivers/soc/tegra/common.c
+> +++ b/drivers/soc/tegra/common.c
+> @@ -15,6 +15,7 @@ static const struct of_device_id tegra_machine_match[] = {
+>  	{ .compatible = "nvidia,tegra30", },
+>  	{ .compatible = "nvidia,tegra114", },
+>  	{ .compatible = "nvidia,tegra124", },
+> +	{ .compatible = "nvidia,tegra132", },
+>  	{ }
+>  };
+
+I'm rather worried by this.
+
+The only user of this table is soc_is_tegra(), which seems to guard
+several probe paths in drivers which are DT driven. Given that, I don't
+see why this is necessary at all, because the presence of the
+appropriate nodes should be sufficient to handle the early return from
+an initcall.
+
+More worryingly, if soc_is_tegra() returns true but the node isn't
+found, the drivers decide to do things. If tegra_pmc_early_init passes
+soc_is_tegra() (because we happened to match "nvidia,tegra132"), but
+doesn't find a DTB entry for the pmc, it then pokes an assumed
+hard-coded physical address.
+
+Assuming things because of the _lack_ of a node has been a major pain
+point on 32-bit as DTBs advanced and code was changed, resulting in boot
+breaking or DTB compatibility breaking over time as old and new kernels
+made conflicting assumptions.
+
+I don't want to see arm64 kernels making assumptions in that manner (nor
+would I like to see it in new code for 32-bit ARM); it always leads to
+boot breakage, and it's completely avoidable. The only thing we can know
+is what is described in the DTB.
+
+So NAK to this addition while soc_is_tegra is in use in that way, and
+NAK to any DTS patches adding any of the strings that would cause
+soc_is_tegra to return true on arm64.
+
+There's also the worrying pattern of initcalls that look for particular
+compatible strings -- why can't these use the existing DT probing
+infrastructure rather than rolling their own? It would be nice to not
+accumulate initcalls that only make sense on one platform.
 
 Thanks,
-Maxime
->
-> Thanks
-> Kishon
->
->> Best regards,
->> Maxime
->>
->>
->>> Thanks,
->>> Maxime
->>> On 01/14/2015 10:54 AM, Gabriel FERNANDEZ wrote:
->>>> The goal of this series is to enable the support of MiPHY28lp Generic PHY.
->>>>
->>>> The first patch is to update miphy28lp phy driver to access sysconfig register
->>>> offsets via syscfg dt property. It's based on Arnds review comments here
->>>> https://lkml.org/lkml/2014/11/13/161
->>>> I have updated the miphy28lp phy driver same way as Peter's implementation.
->>>>
->>>> Gabriel Fernandez (3):
->>>>     phy: miphy28lp: Pass sysconfig register offsets via syscfg dt
->>>>       property.
->>>>     ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
->>>>     ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
->>>>       USB3) PHY
->>>>
->>>>    .../devicetree/bindings/phy/phy-miphy28lp.txt      | 43 ++++++---------
->>>>    arch/arm/boot/dts/stih407-family.dtsi              | 53 +++++++++++++++++++
->>>>    arch/arm/boot/dts/stihxxx-b2120.dtsi               | 11 ++++
->>>>    arch/arm/configs/multi_v7_defconfig                |  1 +
->>>>    drivers/phy/phy-miphy28lp.c                        | 61
->>>> ++++++++++++----------
->>>>    5 files changed, 113 insertions(+), 56 deletions(-)
->>>>
+Mark.
