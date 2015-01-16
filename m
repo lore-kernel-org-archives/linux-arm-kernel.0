@@ -1,27 +1,37 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 16 Jan 2015 10:43:15 +0000
-Subject: [PATCH 0/3] Add STiH418 SoC and reference board support
-In-Reply-To: <1420816306-11305-1-git-send-email-maxime.coquelin@st.com>
-References: <1420816306-11305-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <20150116104315.GA5102@griffinp-ThinkPad-X1-Carbon-2nd>
+From: v1ron@v1ros.org (Roman Volkov)
+Date: Fri, 16 Jan 2015 13:42:24 +0300
+Subject: [PATCH] dts: vt8500: Add SDHC node to DTS file for WM8650
+Message-ID: <1421404944-2508-1-git-send-email-v1ron@v1ros.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The current kernel contains SDHC driver but not DTS node for it.
+Add missing node to make SDHC controller working by default on WM8650.
 
-> This series adds basic support to the STMicroelectronics STiH407 SoC and its
-> B2199 reference board. The STiH418 is a quad-core ARM Cortex-A9 CPU aimed at
-> UHD STB market.
-> 
-> Maxime Coquelin (3):
->   ARM: STi: Add STiH418 SoC support
->   ARM: dts: Add STiH418 SoC support
->   ARM: dts: STiH418: Add B2199 board support
+Signed-off-by: Roman Volkov <v1ron@v1ros.org>
+---
+ arch/arm/boot/dts/wm8650.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Looks good to me. For the series: -
-
-Reviewed-by: Peter Griffin <peter.griffin@linaro.org>
-
-regards,
-
-Peter
+diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
+index b1c59a7..a7c9989 100644
+--- a/arch/arm/boot/dts/wm8650.dtsi
++++ b/arch/arm/boot/dts/wm8650.dtsi
+@@ -187,6 +187,15 @@
+ 			interrupts = <43>;
+ 		};
+ 
++		sdhc at d800a000 {
++			compatible = "wm,wm8505-sdhc";
++			reg = <0xd800a000 0x1000>;
++			interrupts = <20 21>;
++			clocks = <&clksdhc>;
++			bus-width = <4>;
++			sdon-inverted;
++		};
++
+ 		fb: fb at d8050800 {
+ 			compatible = "wm,wm8505-fb";
+ 			reg = <0xd8050800 0x200>;
+-- 
+2.2.1
