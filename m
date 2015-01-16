@@ -1,43 +1,38 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 16 Jan 2015 18:40:11 +0100
-Subject: [GIT PULL] ARM: STi: Defconfig changes for v3.20, round 1
-Message-ID: <54B94CFB.4000900@st.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 Jan 2015 18:40:16 +0100
+Subject: [PATCH] ARM: dts: Fix CLK_MOUT_CAMn parent clocks assignment for
+ Trats2
+Message-ID: <1421430016-32248-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+In order to get exact 24MHz clock frequency value for the camera
+sensor and avoid rounding errors the parent clock must be CLK_XUSBXTI,
+not CLK_MOUT_MPLL_USER_T.  Currently the sensor's master clock
+frequency is too high and the sensor doesn't work properly.
 
-Please consider this first round of STi defconfig updates for v3.20.
+This fixes commit 0357a4438d531ef3cf529e80ffcd208eb8e35f55
+("ARM: dts: Specify default clocks for Exynos4 camera devices").
 
-The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-   Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 29231b4..9ae62c2 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -721,8 +721,8 @@
+ 		status = "okay";
+ 		assigned-clocks = <&clock CLK_MOUT_CAM0>,
+ 				  <&clock CLK_MOUT_CAM1>;
+-		assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>,
+-					 <&clock CLK_MOUT_MPLL_USER_T>;
++		assigned-clock-parents = <&clock CLK_XUSBXTI>,
++					 <&clock CLK_XUSBXTI>;
 
-are available in the git repository at:
-
-   git://git.stlinux.com/devel/kernel/linux-sti.git 
-tags/sti-defconfig-for-v3.20-1
-
-for you to fetch changes up to 89ae11c41e16460d5b259e8059e73f1785f23880:
-
-   ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe 
-& USB3) PHY (2015-01-16 13:00:55 +0100)
-
-----------------------------------------------------------------
-STi defconfig for v3.20, round 1.
-
-Highlights:
------------
-  - Enable STiH407 USB PicoPHY in multi_v7_defconfig
-  - Enable MiPHY28lp driver in multi_v7_defconfig
-
-----------------------------------------------------------------
-Gabriel FERNANDEZ (1):
-       ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, 
-PCIe & USB3) PHY
-
-Peter Griffin (1):
-       ARM: multi_v7_defconfig: Enable stih407 usb picophy
-
-  arch/arm/configs/multi_v7_defconfig | 2 ++
-  1 file changed, 2 insertions(+)
+ 		fimc_0: fimc at 11800000 {
+ 			status = "okay";
+--
+1.7.9.5
