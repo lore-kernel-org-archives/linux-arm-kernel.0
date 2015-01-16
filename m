@@ -1,104 +1,83 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 16 Jan 2015 11:49:35 -0600
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <20150116101903.GB21809@leverpostej>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej> <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
- <20150116101903.GB21809@leverpostej>
-Message-ID: <54B94F2F.3050303@ti.com>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Fri, 16 Jan 2015 23:20:25 +0530
+Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
+In-Reply-To: <20150116155553.GC17658@lunn.ch>
+References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
+ <54B9259C.3070403@ti.com> <20150116155553.GC17658@lunn.ch>
+Message-ID: <54B94F61.2060706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2015 04:19 AM, Mark Rutland wrote:
-> On Thu, Jan 15, 2015 at 02:42:23PM +0000, Rob Herring wrote:
->> On Thu, Jan 15, 2015 at 7:55 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Thu, Jan 15, 2015 at 01:52:01PM +0000, Mark Rutland wrote:
->>>> On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
->>>>> This patch adds the generic common bindings used to represent
->>>>> a hwlock device and use/request locks in a device-tree build.
->>>>>
->>>>> All the platform-specific hwlock driver implementations need the
->>>>> number of locks and associated base id for registering the locks
->>>>> present within the device with the driver core. This base id
->>>>> needs to be unique across multiple IP instances of a hwspinlock
->>>>> device, so that each hwlock can be represented uniquely in a
->>>>> system.
->>>>>
->>>>> The number of locks is represented by 'hwlock-num-locks' property,
->>>>> and the base id is represented by the 'hwlock-base-id' property.
->>>>> The args specifier length is dependent on each vendor-specific
->>>>> implementation and is represented through the '#hwlock-cells'
->>>>> property. Client users need to use the property 'hwlocks' for
->>>>> requesting specific lock(s).
->>>>>
->>>>> Note that the document is named hwlock.txt deliberately to keep
->>>>> it a bit more generic.
->>>>>
->>>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>> ---
->>>>> v7: Revised binding info for hwlock-base-id, it is mandatory now
->>>>>
->>>>>  .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++++++
->>>>>  1 file changed, 55 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
->>>>> new file mode 100644
->>>>> index 000000000000..8de7aaf878f9
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
->>>>> @@ -0,0 +1,55 @@
->>>>> +Generic hwlock bindings
->>>>> +=======================
->>>>> +
->>>>> +Generic bindings that are common to all the hwlock platform specific driver
->>>>> +implementations.
->>>>> +
->>>>> +The validity and need of these common properties may vary from one platform
->>>>> +implementation to another. The platform specific bindings should explicitly
->>>>> +state if an optional property is used. Please also look through the individual
->>>>> +platform specific hwlock binding documentations for identifying the applicable
->>>>> +properties.
->>>>> +
->>>>> +Common properties:
->>>>> +- #hwlock-cells:   Specifies the number of cells needed to represent a
->>>>> +                   specific lock. This property is mandatory for all
->>>>> +                   platform implementations.
->>>>> +- hwlock-num-locks:        Number of locks present in a hwlock device. This
->>>>> +                   property is needed on hwlock devices, where the number
->>>>> +                   of supported locks within a hwlock device cannot be
->>>>> +                   read from a register.
->>>>> +- hwlock-base-id:  An unique base Id for the locks for a particular hwlock
->>>>> +                   device. This property is mandatory for all platform
->>>>> +                   implementations.
->>>>
->>>> This property makes no sense. The ID encoded in the hwlock cells is
->>>> relative to the instance (identified by phandle), not global. So the DT
->>>> has no global ID space.
->>>>
->>>> Why do you think you need this?
->>>
->>> Having looked at the way this proeprty is used, NAK.
->>>
->>> If you need to carve up a Linux-internal ID space, do that dynamically.
->>> There is no need for this property.
+
+
+On 1/16/2015 9:25 PM, Andrew Lunn wrote:
+> On Fri, Jan 16, 2015 at 04:52:12PM +0200, Tomi Valkeinen wrote:
+>> Hi,
 >>
->> Better yet, don't create a Linux ID space for this. Everywhere we have
->> one, we want to get rid of it.
+>> On 15/01/15 01:15, Andrew Lunn wrote:
+>>> This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+>>> driver. This driver is used on the Belkin WRT1900AC access point and
+>>> the C code is derived from code Belkin contributed to OpenWRT.
+>>> However it has been extensively re-written, and a device tree binding
+>>> added to replace platform data.
+>>
+>> We have a TLC59108 on one of our boards, and with a quick glance it
+>> looks about the same as TLC59116, except the amount of outputs. Vignesh
+>> wrote a driver for it and was about to send it for review.
+>>
+>> However, Vignesh implemented it as a PWM driver. We use it for LCD
+>> backlight (via pwm-backlight).
+>>
+>> I'm not very familiar with LED and PWM drivers, but doesn't implementing
+>> this as a LED driver prevent us from using it as a backlight? Whereas it
+>> looks like PWM can be used as a led via pwm-leds (I think).
+>>
+> Hi Tomi
 > 
-> Agreed. A completely opaque token / desc structure would prevent a lot
-> of potential abuse and save us from painful breakage.
+> I've no idea about backlighting....
+> 
+> But the driver does fully implement brightness. So on my board:
+> 
+> echo 128 > /sys/class/leds/wrt1900ac\:white\:wan/brightness
+> 
+> will set that LED to 128/256 brightness. You have 255 steps of
+> brightness.
+> 
+> The reason i did not model it as a PWM, is that it cannot fulfil the
+> PWM interface. The configure interface is:
+> 
+> int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
+> 
+> However with this device, you have no control over the period. It is
+> fixed, from a 97-kHz clock. All you can change is the duty as a ratio
+> between 0 and 256. There is the group PWM, where you do have control
+> over the period. But as the name implies, this PWM is shared for all
+> outputs, which is not what the PWM interface expects, it wants to be
+> able to control them individually. Also, it only has a range of 24 Hz
+> to 10.73 s. Again, i have no idea about backlights, but i suspect if
+> it is driven at 24Hz, i'm going to get a headache. 
+> 
+> The LED interface can be fully implemented. So that is what i have
+> done.
 
-The regular API to acquire or release a lock on Linux does indeed use
-opaque handles, but the id space is needed for communication with other
-processors as the handles have no meaning on non-Linux processors. The
-id space is the simplest to exchange which lock to use with other
-processors compared to the device instance plus the lock number within
-that device.
+I understand that period of TLC chip cannot be changed and hence cannot
+fully implement PWM interface. But, suppose I want to control brightness
+of an LCD screen, with your current design, my LCD driver can never can do
+something like:
+	pwm_get(chip);
+	pwm_update_brightness();
+	pwm_remove();
+I will always have to rely on sysfs entries to control brightness.
+ 
+If the driver is implemented as pwm-backlight, then brightness can
+be controlled both via sysfs entries and pwm-core callbacks(in kernel).
 
-regards
-Suman
+> 
+> So i think modeling this as an LED driver is correct, and maybe you
+> need to implemented an led_bl.c driver?
+> 
+
+But, as far as I understand, leds-pwm.c does almost similar function.  
+
+Regards
+Vignesh R
