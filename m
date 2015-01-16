@@ -1,98 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 16:48:59 +0000
-Subject: [PATCH 2/3] arm64: Consolidate hotplug notifier for instruction
- emulation
-In-Reply-To: <20150116164433.GB7091@arm.com>
-References: <1421325366-13263-1-git-send-email-suzuki.poulose@arm.com>
- <1421325366-13263-3-git-send-email-suzuki.poulose@arm.com>
- <20150116160730.GY7091@arm.com>
- <20150116163254.GC32155@leverpostej>
- <20150116164433.GB7091@arm.com>
-Message-ID: <20150116164859.GE32155@leverpostej>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 Jan 2015 17:52:44 +0100
+Subject: [PATCH] clk: rockchip: fix deadlock possibility in cpuclk
+Message-ID: <355359386.nxMIlHNuqO@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 04:44:34PM +0000, Will Deacon wrote:
-> On Fri, Jan 16, 2015 at 04:32:54PM +0000, Mark Rutland wrote:
-> > On Fri, Jan 16, 2015 at 04:07:30PM +0000, Will Deacon wrote:
-> > > On Thu, Jan 15, 2015 at 12:36:05PM +0000, Suzuki K. Poulose wrote:
-> > > > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> > > > 
-> > > > As of now each insn_emulation has a cpu hotplug notifier that
-> > > > enables/disables the CPU feature bit for the functionality. This
-> > > > patch re-arranges the code, such that there is only one notifier
-> > > > that runs through the list of registered emulation hooks and runs
-> > > > their corresponding set_hw_mode.
-> > > > 
-> > > > We do nothing when a CPU is dying as we will set the appropriate bits
-> > > > as it comes back online based on the state of the hooks.
-> > > > 
-> > > > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > ---
-> > > >  Documentation/arm64/legacy_instructions.txt |    4 +
-> > > >  arch/arm64/include/asm/cpufeature.h         |    2 +
-> > > >  arch/arm64/kernel/armv8_deprecated.c        |  113 +++++++++++++++------------
-> > > >  3 files changed, 69 insertions(+), 50 deletions(-)
-> > > > 
-> > > > diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
-> > > > index a3b3da2..0a4dc26 100644
-> > > > --- a/Documentation/arm64/legacy_instructions.txt
-> > > > +++ b/Documentation/arm64/legacy_instructions.txt
-> > > > @@ -27,6 +27,10 @@ behaviours and the corresponding values of the sysctl nodes -
-> > > >    instructions. Using hardware execution generally provides better
-> > > >    performance, but at the loss of ability to gather runtime statistics
-> > > >    about the use of the deprecated instructions.
-> > > > +  Note: Emulation of a deprecated instruction depends on the availability
-> > > > +  of the feature on all the active CPUs. In case of CPU hotplug, if a new
-> > > > +  CPU doesn't support a feature, it could result in the abortion of the
-> > > > +  hotplug operation.
-> > > 
-> > > Is this true? We should be able to *emulate* the instruction anywhere,
-> > > it's the "hardware execution" setting that needs CPU support.
-> > 
-> > Not quite. In ARMv8 there are three possible cases for endianness
-> > support:
-> > 
-> > (a) Mixed endian support at all levels
-> >     ID_AA64MMFR0_EL1.BigEnd == 0b0001
-> >     ID_AA64MMFR0_EL1.BigEnd0 == 0b0000 (RES0, invalid)
-> > 
-> > (b) Mixed endian support at EL0 only
-> >     ID_AA64MMFR0_EL1.BigEnd == 0b0000
-> >     ID_AA64MMFR0_EL1.BigEnd0 == 0b0001
-> >     SCTLR_EL1.EE has a fixed value
-> > 
-> > (c) No mixed endian support at all
-> >     ID_AA64MMFR0_EL1.BigEnd == 0b0000
-> >     ID_AA64MMFR0_EL1.BigEnd0 == 0b0000
-> >     SCTLR_EL1.{EE,E0E} have fixed values
-> > 
-> > We can emulate setend in cases (a) and (b), but not (c) unless we
-> > trapped every single instruction that could access memory. I don't think
-> > that's feasible.
-> > 
-> > Also fun in case (c) is that the kernel may not be able to run on all
-> > CPUs (consider a BE kernel where some CPUs are fixed to LE at EL1).
-> > 
-> > I hope no-one builds a system where CPUs are mismatched w.r.t.
-> > endianness support.
-> 
-> Agreed, the problem here is all down to the wording.
-> Documentation/arm64/legacy_instructions.txt isn't specific to SETEND
-> emulation and saying "Emulation of a deprecated instruction depends on the
-> availability of the feature on all the active CPUs." as a blanket statement
-> doesn't make a lot of sense in isolation. It's certainly not the case for
-> SWP and CP15 barriers, for example.
-> 
-> With SETEND, we have requirements on mixed-endian support for the emulation.
-> Fine, but let's not muddy the waters around the general CPU requirements
-> for deprecated instruction emulation.
+Lockdep reported a possible deadlock between the cpuclk lock and for example
+the i2c driver.
 
-Sure. I was only contending the "We should be able to *emulate* the
-instruction anywhere" part of your statement.
+       CPU0                    CPU1
+       ----                    ----
+  lock(clk_lock);
+                               local_irq_disable();
+                               lock(&(&i2c->lock)->rlock);
+                               lock(clk_lock);
+  <Interrupt>
+    lock(&(&i2c->lock)->rlock);
 
-We should probably add _a_ note as part of the patch introducing SETEND
-emulation, but not the one above, and we can drop it from this patch.
+ *** DEADLOCK ***
 
-Mark.
+The generic clock-types of the core ccf already use spin_lock_irqsave when
+touching clock registers, so do the same for the cpuclk.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/rockchip/clk-cpu.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
+index 75c8c45..3ecdf7d 100644
+--- a/drivers/clk/rockchip/clk-cpu.c
++++ b/drivers/clk/rockchip/clk-cpu.c
+@@ -124,10 +124,11 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
+ {
+ 	const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+ 	unsigned long alt_prate, alt_div;
++	unsigned long flags = 0;
+ 
+ 	alt_prate = clk_get_rate(cpuclk->alt_parent);
+ 
+-	spin_lock(cpuclk->lock);
++	spin_lock_irqsave(cpuclk->lock, flags);
+ 
+ 	/*
+ 	 * If the old parent clock speed is less than the clock speed
+@@ -164,7 +165,7 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
+ 			cpuclk->reg_base + reg_data->core_reg);
+ 	}
+ 
+-	spin_unlock(cpuclk->lock);
++	spin_unlock_irqrestore(cpuclk->lock, flags);
+ 	return 0;
+ }
+ 
+@@ -173,6 +174,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
+ {
+ 	const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+ 	const struct rockchip_cpuclk_rate_table *rate;
++	unsigned long flags = 0;
+ 
+ 	rate = rockchip_get_cpuclk_settings(cpuclk, ndata->new_rate);
+ 	if (!rate) {
+@@ -181,7 +183,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
+ 		return -EINVAL;
+ 	}
+ 
+-	spin_lock(cpuclk->lock);
++	spin_lock_irqsave(cpuclk->lock, flags);
+ 
+ 	if (ndata->old_rate < ndata->new_rate)
+ 		rockchip_cpuclk_set_dividers(cpuclk, rate);
+@@ -201,7 +203,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
+ 	if (ndata->old_rate > ndata->new_rate)
+ 		rockchip_cpuclk_set_dividers(cpuclk, rate);
+ 
+-	spin_unlock(cpuclk->lock);
++	spin_unlock_irqrestore(cpuclk->lock, flags);
+ 	return 0;
+ }
+ 
+-- 
+2.1.1
