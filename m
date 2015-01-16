@@ -1,48 +1,35 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 16 Jan 2015 13:55:14 +0100
-Subject: [PATCH] spi: xilinx: Use standard num-cs binding
-Message-ID: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Fri, 16 Jan 2015 22:05:08 +0900
+Subject: [PATCH 3/3] ARM: dts: rockchip: add dts for ChipSPARK Rayeager
+ PX2 board
+In-Reply-To: <2706590.Kkspa3JYVn@phil>
+References: <1421289659-16627-1-git-send-email-naobsd@gmail.com>
+ <1421289659-16627-4-git-send-email-naobsd@gmail.com>
+ <2706590.Kkspa3JYVn@phil>
+Message-ID: <CAFnsNoTitoUk2n2WWqzo_=7_VN4YXdKuGC-_fF3c4tNbasQjEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use standard num-cs binding property and setup
-"xlnx,num-ss-bits" as deprecated.
+Hi,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+thank you for your review!
 
- drivers/spi/spi-xilinx.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+On Fri, Jan 16, 2015 at 1:19 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>> +     vcc_sata: sata-regulator {
+>> +             compatible = "regulator-fixed";
+>> +             enable-active-high;
+>> +             gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&sata_pwr>;
+>> +             regulator-name = "usb_5v";
+>
+> why is it named "usb_5v"?
 
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 79bd84f43430..30e5180195bb 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -338,8 +338,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 		num_cs = pdata->num_chipselect;
- 		bits_per_word = pdata->bits_per_word;
- 	} else {
--		of_property_read_u32(pdev->dev.of_node, "xlnx,num-ss-bits",
--					  &num_cs);
-+		if (of_property_read_u32(pdev->dev.of_node, "num-cs",
-+					 &num_cs)) {
-+			if (!of_property_read_u32(pdev->dev.of_node,
-+						  "xlnx,num-ss-bits",
-+						  &num_cs)) {
-+				dev_err(&pdev->dev,
-+					"property name 'xlnx,num-ss-bits' is deprecated.\n");
-+			}
-+		}
- 	}
+it's came from schematic.
 
- 	if (!num_cs) {
---
-1.8.2.3
+I think it follows same rule as "vcc_host { regulator-name =
+"host-pwr"; }" in rk3188-radxarock.dts.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/9091f481/attachment.sig>
+I'll include rest of your comments in v2.
+
+Regards,
