@@ -1,42 +1,57 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Jan 2015 10:05:51 +0100
-Subject: [PATCH] clockevents: don't suspend/resume if unused
-Message-ID: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 16 Jan 2015 10:08:13 +0100
+Subject: RFC on cpufreq implementation
+In-Reply-To: <54B7F7CD.7030903@free.fr>
+References: <54B7F7CD.7030903@free.fr>
+Message-ID: <1421399293.11224.7.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no point in calling suspend/resume for unused
-clockevents as they are already stopped and disabled.
+On czw, 2015-01-15 at 18:24 +0100, Mason wrote:
+> Hello,
+> 
+> This is a follow-up to my previous thread.
+> "How many frequencies would cpufreq optimally like to manage?"
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
+> 
+> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
+> based SoC (namely Tango4 from Sigma Designs). I'd like to get
+> some feedback on the cpufreq driver I wrote for that platform.
+> 
+> I decided to expose only a small subset of frequencies (namely
+> {999,500,333,111} MHz) because, in my tests, the ondemand gov
+> chose mostly min and max, and the intermediate frequencies not
+> so much; so I figured "2 intermediate freqs" is good enough.
+> (I'm ready to hear otherwise.)
+> 
+> I tried to use as much generic framework as possible, but I've
+> read about the clk framework, and it looks to be an even greater
+> generalization. Are new platforms encouraged to use that, rather
+> than provide a cpufreq driver? Does it work when voltage scaling
+> comes in play? (This SoC doesn't have it, but the next will.)
 
-Furthermore, it can take some time to wait for some IPs to stop counting.
+The clock framework generalizes clocks, not cpufreq. Ideally you should
+use clock framework in cpufreq driver. So instead manually setting
+divider just do something like:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Reported-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
- kernel/time/clockevents.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ret = clk_set_rate(cpu_clk, freq_exact);
+if (ret) {
+	dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+	return ret;
+}
 
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index 55449909f114..0eff982c1c11 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -525,7 +525,7 @@ void clockevents_suspend(void)
- 	struct clock_event_device *dev;
- 
- 	list_for_each_entry_reverse(dev, &clockevent_devices, list)
--		if (dev->suspend)
-+		if (dev->suspend && dev->mode != CLOCK_EVT_MODE_UNUSED)
- 			dev->suspend(dev);
- }
- 
-@@ -537,7 +537,7 @@ void clockevents_resume(void)
- 	struct clock_event_device *dev;
- 
- 	list_for_each_entry(dev, &clockevent_devices, list)
--		if (dev->resume)
-+		if (dev->resume && dev->mode != CLOCK_EVT_MODE_UNUSED)
- 			dev->resume(dev);
- }
- 
--- 
-2.1.0
+For voltage scaling you should use regulator framework.
+
+Actually I think existing cpufreq-dt could serve your purpose. Why don't
+you try it? Or look at it and use as an example.
+
+> I'm also wondering how cpufreq and cpuidle interact? Is one a
+> subset of the other? Are they orthogonal?
+
+cpuidle and cpufreq are different subsystems. They don't interact, yet.
+There are efforts to combine scheduler, cpufreq and cpuidle but this is
+future. If your SoC has some deeper low power states than developing
+cpuidle driver makes sense. If not - WFI will be used.
+
+> 
+> Regards.
