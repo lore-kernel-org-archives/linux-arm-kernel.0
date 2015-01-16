@@ -1,58 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Jan 2015 13:45:11 +0100
-Subject: [PATCH V3 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
- pin
-In-Reply-To: <CAPDyKFoLqmgTvJpFLrGZvxrfug+SyspsYaOYtf65CsZ7T991pA@mail.gmail.com>
-References: <1421405273-19117-1-git-send-email-ulf.hansson@linaro.org>
- <1421405273-19117-5-git-send-email-ulf.hansson@linaro.org>
- <CAAObsKDm1iPAWgJpQwed8KufkxKwqTAFa5espfqq+jY13r+Ymw@mail.gmail.com>
- <CAPDyKFoLqmgTvJpFLrGZvxrfug+SyspsYaOYtf65CsZ7T991pA@mail.gmail.com>
-Message-ID: <20150116124511.GG18220@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 16 Jan 2015 13:47:50 +0100
+Subject: [PATCH v3 2/7] ARM: Exynos: add support for sub-power domains
+In-Reply-To: <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
+References: <1421243091-10778-1-git-send-email-m.szyprowski@samsung.com>
+ <1421243091-10778-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAPDyKFpOvUBcEfk_DM_r83b2DLNgQv6stMrOhEj0gAMu2R3_2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 01:37:41PM +0100, Ulf Hansson wrote:
-> On 16 January 2015 at 12:34, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> > On 16 January 2015 at 11:47, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >>
-> >>  int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
-> >>  {
-> >>         struct mmc_pwrseq_simple *pwrseq;
-> >> +       int ret = 0;
-> >>
-> >>         pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
-> >>         if (!pwrseq)
-> >>                 return -ENOMEM;
-> >>
-> >> +       pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
-> >> +       if (IS_ERR(pwrseq->reset_gpio) &&
-> >> +               PTR_ERR(pwrseq->reset_gpio) != -ENOENT &&
-> >> +               PTR_ERR(pwrseq->reset_gpio) != -ENOSYS) {
-> >> +               ret = PTR_ERR(pwrseq->reset_gpio);
-> >> +               goto free;
-> >> +       }
-> >> +
-> >>         pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
-> >>         host->pwrseq = &pwrseq->pwrseq;
-> >>
-> >>         return 0;
-> >> +free:
-> >> +       kfree(&pwrseq);
-> >
-> > Hi Ulf,
-> >
-> > this kfree looks a bit fishy (there's one more instance of it in
-> > mmc_pwrseq_simple_free).
-> 
-> This is the error path, which means I need to clean up data that I
-> have allocated.
+On 14 January 2015 at 14:44, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> This patch adds support for making one power domain a sub-domain of
+> other domain. This is useful for modeling power dependences for devices
+> like TV Mixer or Camera ISP, which needs to have more than one power
+> domain enabled to be operational.
+>
+> Based on previous work by Amit Daniel Kachhap <amit.daniel@samsung.com>
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-I think Tomeu meant that the '&' must be removed.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Sascha
+I also had a look at the other patches in this patchset from a PM
+domain DT point of view. They looks good.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Kind regards
+Uffe
+
+> ---
+>  .../bindings/arm/exynos/power_domain.txt           |  2 ++
+>  arch/arm/mach-exynos/pm_domains.c                  | 28 ++++++++++++++++++++++
+>  2 files changed, 30 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> index f4445e5..1e09703 100644
+> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> @@ -22,6 +22,8 @@ Optional Properties:
+>         - pclkN, clkN: Pairs of parent of input clock and input clock to the
+>                 devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+>                 are supported currently.
+> +- power-domains: phandle pointing to the parent power domain, for more details
+> +                see Documentation/devicetree/bindings/power/power_domain.txt
+>
+>  Node of a device using power domains must have a power-domains property
+>  defined with a phandle to respective power domain.
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 20f2671..37266a8 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -161,6 +161,34 @@ no_clk:
+>                 of_genpd_add_provider_simple(np, &pd->pd);
+>         }
+>
+> +       /* Assign the child power domains to their parents */
+> +       for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+> +               struct generic_pm_domain *child_domain, *parent_domain;
+> +               struct of_phandle_args args;
+> +
+> +               args.np = np;
+> +               args.args_count = 0;
+> +               child_domain = of_genpd_get_from_provider(&args);
+> +               if (!child_domain)
+> +                       continue;
+> +
+> +               if (of_parse_phandle_with_args(np, "power-domains",
+> +                                        "#power-domain-cells", 0, &args) != 0)
+> +                       continue;
+> +
+> +               parent_domain = of_genpd_get_from_provider(&args);
+> +               if (!parent_domain)
+> +                       continue;
+> +
+> +               if (pm_genpd_add_subdomain(parent_domain, child_domain))
+> +                       pr_warn("%s failed to add subdomain: %s\n",
+> +                               parent_domain->name, child_domain->name);
+> +               else
+> +                       pr_info("%s has as child subdomain: %s.\n",
+> +                               parent_domain->name, child_domain->name);
+> +               of_node_put(np);
+> +       }
+> +
+>         return 0;
+>  }
+>  arch_initcall(exynos4_pm_init_power_domain);
+> --
+> 1.9.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
