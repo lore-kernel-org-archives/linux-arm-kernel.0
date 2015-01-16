@@ -1,95 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 10:19:03 +0000
-Subject: [PATCH v7 1/4] Documentation: dt: add common bindings for
- hwspinlock
-In-Reply-To: <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
-References: <1421269101-51105-1-git-send-email-s-anna@ti.com>
- <1421269101-51105-2-git-send-email-s-anna@ti.com>
- <20150115135201.GG16217@leverpostej>
- <20150115135556.GH16217@leverpostej>
- <CAL_JsqL2LZAooMk-V8+xeF2g6acZE21M+-OBRw8aEVa-5wVHuQ@mail.gmail.com>
-Message-ID: <20150116101903.GB21809@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jan 2015 10:20:36 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <54B831C9.3060700@redhat.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <54B831C9.3060700@redhat.com>
+Message-ID: <20150116102035.GD13634@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 02:42:23PM +0000, Rob Herring wrote:
-> On Thu, Jan 15, 2015 at 7:55 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jan 15, 2015 at 01:52:01PM +0000, Mark Rutland wrote:
-> >> On Wed, Jan 14, 2015 at 08:58:18PM +0000, Suman Anna wrote:
-> >> > This patch adds the generic common bindings used to represent
-> >> > a hwlock device and use/request locks in a device-tree build.
-> >> >
-> >> > All the platform-specific hwlock driver implementations need the
-> >> > number of locks and associated base id for registering the locks
-> >> > present within the device with the driver core. This base id
-> >> > needs to be unique across multiple IP instances of a hwspinlock
-> >> > device, so that each hwlock can be represented uniquely in a
-> >> > system.
-> >> >
-> >> > The number of locks is represented by 'hwlock-num-locks' property,
-> >> > and the base id is represented by the 'hwlock-base-id' property.
-> >> > The args specifier length is dependent on each vendor-specific
-> >> > implementation and is represented through the '#hwlock-cells'
-> >> > property. Client users need to use the property 'hwlocks' for
-> >> > requesting specific lock(s).
-> >> >
-> >> > Note that the document is named hwlock.txt deliberately to keep
-> >> > it a bit more generic.
-> >> >
-> >> > Cc: Rob Herring <robh+dt@kernel.org>
-> >> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> >> > ---
-> >> > v7: Revised binding info for hwlock-base-id, it is mandatory now
-> >> >
-> >> >  .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++++++
-> >> >  1 file changed, 55 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> >> > new file mode 100644
-> >> > index 000000000000..8de7aaf878f9
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
-> >> > @@ -0,0 +1,55 @@
-> >> > +Generic hwlock bindings
-> >> > +=======================
-> >> > +
-> >> > +Generic bindings that are common to all the hwlock platform specific driver
-> >> > +implementations.
-> >> > +
-> >> > +The validity and need of these common properties may vary from one platform
-> >> > +implementation to another. The platform specific bindings should explicitly
-> >> > +state if an optional property is used. Please also look through the individual
-> >> > +platform specific hwlock binding documentations for identifying the applicable
-> >> > +properties.
-> >> > +
-> >> > +Common properties:
-> >> > +- #hwlock-cells:   Specifies the number of cells needed to represent a
-> >> > +                   specific lock. This property is mandatory for all
-> >> > +                   platform implementations.
-> >> > +- hwlock-num-locks:        Number of locks present in a hwlock device. This
-> >> > +                   property is needed on hwlock devices, where the number
-> >> > +                   of supported locks within a hwlock device cannot be
-> >> > +                   read from a register.
-> >> > +- hwlock-base-id:  An unique base Id for the locks for a particular hwlock
-> >> > +                   device. This property is mandatory for all platform
-> >> > +                   implementations.
+On Thu, Jan 15, 2015 at 09:31:53PM +0000, Al Stone wrote:
+> On 01/15/2015 11:23 AM, Catalin Marinas wrote:
+> > On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
+> >> On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> >>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
 > >>
-> >> This property makes no sense. The ID encoded in the hwlock cells is
-> >> relative to the instance (identified by phandle), not global. So the DT
-> >> has no global ID space.
-> >>
-> >> Why do you think you need this?
-> >
-> > Having looked at the way this proeprty is used, NAK.
-> >
-> > If you need to carve up a Linux-internal ID space, do that dynamically.
-> > There is no need for this property.
+> >> I'll get right to the point: Can we please have this series queued up
+> >> for v3.20?
+> > [snip ... ]
 > 
-> Better yet, don't create a Linux ID space for this. Everywhere we have
-> one, we want to get rid of it.
+> >> 5. Platform support patches need verification and review
+> >>    * ACPI core works on at least the Foundation model, Juno, APM
+> >> Mustang, and AMD Seattle
+> >>    * There still are driver patches being discussed. See Al's summary
+> >> for details
+> >>    * As I argued above, the state of driver patches isn't going to be
+> > 
+> > We are still lacking here. To quote Al, "First version for AMD Seattle
+> > has been posted to the public linaro-acpi mailing list for initial
+> > review". Sorry but I don't follow linaro-acpi list. I don't know what's
+> > in those patches and I can't tell which subsystems they touch, whether
+> > maintainers agree with them. So in conclusion, I'm not confident the
+> > arm64 hardware ACPI story looks that great yet.
+> >  
+> 
+> This is solely my fault -- too much time on processes, email, and
+> documentation, not enough time on the Seattle patches.  And not
+> enough Seattles to go around for someone else to pick up the slack.
+> 
+> I am aware not everyone is subscribed to linaro-acpi; we use that
+> for internal review before posting more broadly, which is the only
+> reason I sent them there.
+> 
+> I'm in the middle of updating them as I have time, based on really
+> good feedback from Arnd; few of them are terribly new (the very first
+> posting was [0]) -- it's mostly a matter of rebasing, integrating
+> updates from AMD and others, and reacting to the comments.  One can
+> also see what these patches will probably look like via one of the
+> Fedora kernel trees [1].
 
-Agreed. A completely opaque token / desc structure would prevent a lot
-of potential abuse and save us from painful breakage.
+Do you have some simple branch against mainline with just the ACPI core
+patches and what's required for AMD Seattle? I have no plans to dig
+through the Fedora kernels.
 
-Mark
+-- 
+Catalin
