@@ -1,55 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 16 Jan 2015 16:57:32 -0600
-Subject: [PATCH 1/5] mfd: tps65218: make INT[12] and STATUS registers
- volatile
-In-Reply-To: <20150114170716.GL2419@atomide.com>
-References: <1419622104-25812-1-git-send-email-balbi@ti.com>
- <1419622104-25812-2-git-send-email-balbi@ti.com>
- <20150106173734.GL6502@saruman> <20150108162512.GC31926@saruman>
- <20150112164654.GB6525@saruman> <20150114170716.GL2419@atomide.com>
-Message-ID: <20150116225732.GB6254@saruman>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jan 2015 22:57:27 +0000
+Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
+In-Reply-To: <20150116225243.GN18552@atomide.com>
+References: <20150114221407.GS2419@atomide.com>
+ <20150115105035.GU11502@n2100.arm.linux.org.uk>
+ <20150115152838.GB18552@atomide.com>
+ <20150115171924.GV11502@n2100.arm.linux.org.uk>
+ <20150116162119.GK18552@atomide.com>
+ <20150116163019.GW11502@n2100.arm.linux.org.uk>
+ <20150116164105.GL18552@atomide.com>
+ <20150116172223.GX11502@n2100.arm.linux.org.uk>
+ <20150116172905.GM18552@atomide.com>
+ <20150116225243.GN18552@atomide.com>
+Message-ID: <20150116225727.GY11502@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jan 14, 2015 at 09:07:17AM -0800, Tony Lindgren wrote:
-> > > > > STATUS register can be modified by the HW, so we
-> > > > > should bypass cache because of that.
-> > > > > 
-> > > > > In the case of INT[12] registers, they are the ones
-> > > > > that actually clear the IRQ source at the time they
-> > > > > are read. If we rely on the cache for them, we will
-> > > > > never be able to clear the interrupt, which will cause
-> > > > > our IRQ line to be disabled due to IRQ throttling.
-> > > > > 
-> > > > > Fixes: 44b4dc6 mfd: tps65218: Add driver for the TPS65218 PMIC
-> > > > > Cc: <stable@vger.kernel.org> # v3.15+
-> > > > > Cc: Keerthy <j-keerthy@ti.com>
-> > > > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > > 
-> > > > ping
-> > > 
-> > > another ping. Without this and the following patch TPS65218 power button
-> > > driver which was already applied by Dmitry, won't work.
+On Fri, Jan 16, 2015 at 02:52:44PM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [150116 09:36]:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150116 09:25]:
+> > > So, the GPIO driver really needs fixing - and I'd suggest fixing it
+> > > first, before fixing the DMA problem, because the DMA problem allows
+> > > us to see the GPIO problem.
 > > 
-> > Anybody ? -rc4 is out and tps65218 is still broken because nobody has
-> > acted on these two patches. All other patches which are meant for 3.20
-> > merge window are applied and because of these pending, those patches
-> > won't work.
+> > Yes we need to fix that.
 > 
-> Lee, are you planning to pick these two drivers/mfd patches?
+> Posted a minimal fix for that one as a separate thread:
+> 
+> [PATCH 1/1] gpio: omap: Fix bad device access with setup_irq()
 
-Samuel, Lee, is someone planning on picking these two patches up ?
-v3.19 remains broken.
+Thanks, I'll throw that onto the build tree for tonights build.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/5feee76e/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
