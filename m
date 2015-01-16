@@ -1,42 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 14:11:09 +0000
-Subject: [PATCH v5 2/5] Documentation: DT: Add bindings for Spreadtrum
- SoC Platform
-In-Reply-To: <CAAfSe-teDdPzRUnvzM+NErfZwmqM04yUMgic--hyZL8-Jjd8jw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 16 Jan 2015 08:11:23 -0600
+Subject: [PATCH v5 1/5] Documentation: DT: Renamed of-serial.txt to
+ 8250.txt
+In-Reply-To: <1421402411-3479-2-git-send-email-chunyan.zhang@spreadtrum.com>
 References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1421402411-3479-3-git-send-email-chunyan.zhang@spreadtrum.com>
- <20150116102135.GC21809@leverpostej>
- <CAAfSe-teDdPzRUnvzM+NErfZwmqM04yUMgic--hyZL8-Jjd8jw@mail.gmail.com>
-Message-ID: <20150116141109.GC22569@leverpostej>
+ <1421402411-3479-2-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <CAL_JsqL9hkfuGi-BmRHTZ=F3KVL8miu2LXkftbswpVuuSx0dtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:53:16PM +0000, Lyra Zhang wrote:
-> Hi, Mark
-> 
-> >> +
-> >> +Required properties:
-> >> +- compatible: must be "sprd,sc9836-uart"
-> >> +- reg: offset and length of the register set for the device
-> >> +- interrupts: exactly one interrupt specifier
-> >> +- clocks: phandles to input clocks.
-> >
-> > The order and relevance of each should be specified. If you have
-> > multiple clocks I would strongly recommend you use clock-names to
-> > distinguish them.
-> >
-> 
-> Thank you for the recommendation.
-> but, since we haven't made the clock driver ready, for this initial
-> commit, we just let 4 UARTs share a single fixed 26 MHz clock source.
-> we'll do like you've recommended when we will submit the clock driver
-> in the future.
+On Fri, Jan 16, 2015 at 4:00 AM, Chunyan Zhang
+<chunyan.zhang@spreadtrum.com> wrote:
+> The file of-serial.txt was only for 8250 compatible UART implementations,
+> so renamed it to 8250.txt to avoid confusing other persons.
+> This is suggested by Arnd, see:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/291455.html
+>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-I'm on about the clock input lines on the UART instance, not the
-providers they come from.
+This is pretty much un-related to the rest of the series, so I will apply it.
 
-Is there only a single clock input line on each UART? Perhaps multiple
-input lines which are currently fed by the same clock?
+Rob
 
-Thanks,
-Mark.
+> ---
+>  .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
+>
+> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/8250.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/serial/of-serial.txt
+> rename to Documentation/devicetree/bindings/serial/8250.txt
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
