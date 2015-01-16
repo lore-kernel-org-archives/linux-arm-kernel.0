@@ -1,103 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Jan 2015 16:24:01 +0100
-Subject: [PATCH v4 3/4] gpio: Add find GPIO base in increasing order
-In-Reply-To: <CAAVeFuJkr9mFwJq0GdbLO7EgbffvD25bjBVdXAFZubq5Sz4MZQ@mail.gmail.com>
-References: <1417750722-14027-1-git-send-email-wangzhou.bry@gmail.com>
- <1417750722-14027-4-git-send-email-wangzhou.bry@gmail.com>
- <CAAVeFu+Hn1Fk7PDcc4wGHFyJurX0hsW1N1prnPs2j=taGQKrKw@mail.gmail.com>
- <CACRpkdZccD_FM+m3US3e40LitH4OsX-8cSS_ju+C541330PdXw@mail.gmail.com>
- <CAAVeFuJkr9mFwJq0GdbLO7EgbffvD25bjBVdXAFZubq5Sz4MZQ@mail.gmail.com>
-Message-ID: <CACRpkdYeiaWxPeeoJjX6BKDmnk2swKCnGgJCW6p9AZ3fdFVSpQ@mail.gmail.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Fri, 16 Jan 2015 08:23:38 -0700
+Subject: [Linaro-acpi] [PATCH v7 00/17] Introduce ACPI for ARM64 based
+ on ACPI 5.1
+In-Reply-To: <54B92B99.5000604@linaro.org>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <54B831C9.3060700@redhat.com>
+ <20150116102035.GD13634@e104818-lin.cambridge.arm.com>
+ <54B92B99.5000604@linaro.org>
+Message-ID: <54B92CFA.2040101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 9:17 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Wed, Jan 14, 2015 at 5:13 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Dec 10, 2014 at 9:51 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
->>> On Fri, Dec 5, 2014 at 12:38 PM, Zhou Wang <wangzhou.bry@gmail.com> wrote:
->>>> In function gpiochip_find_base, base number of a GPIO controller
->>>> is found in decreasing order. ARCH_NR_GPIOS is used to define from
->>>> which number we begin to search for base number of a GPIO controller.
->>>>
->>>> In fact, ARCH_NR_GPIOS brings us some multiplatform problems, like:
->>>> http://www.spinics.net/lists/devicetree/msg60433.html
->>>>
->>>> This patch adds the support to find base number of a GPIO controller
->>>> in increasing order. It will assign base number from 0.
->>>> A new dts property called gpio-number-forward must be add to the related
->>>> GPIO dts nodes if you want it works well.
+On 01/16/2015 08:17 AM, Al Stone wrote:
+> On 01/16/2015 03:20 AM, Catalin Marinas wrote:
+>> On Thu, Jan 15, 2015 at 09:31:53PM +0000, Al Stone wrote:
+>>> On 01/15/2015 11:23 AM, Catalin Marinas wrote:
+>>>> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
+>>>>> On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>>>>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+>>>>>
+>>>>> I'll get right to the point: Can we please have this series queued up
+>>>>> for v3.20?
+>>>> [snip ... ]
 >>>
->>> Global GPIO numbers are a Linux-only concept, so your property should
->>> be named linux,gpio-number-forward.
+>>>>> 5. Platform support patches need verification and review
+>>>>>    * ACPI core works on at least the Foundation model, Juno, APM
+>>>>> Mustang, and AMD Seattle
+>>>>>    * There still are driver patches being discussed. See Al's summary
+>>>>> for details
+>>>>>    * As I argued above, the state of driver patches isn't going to be
+>>>>
+>>>> We are still lacking here. To quote Al, "First version for AMD Seattle
+>>>> has been posted to the public linaro-acpi mailing list for initial
+>>>> review". Sorry but I don't follow linaro-acpi list. I don't know what's
+>>>> in those patches and I can't tell which subsystems they touch, whether
+>>>> maintainers agree with them. So in conclusion, I'm not confident the
+>>>> arm64 hardware ACPI story looks that great yet.
+>>>>  
 >>>
->>> But even that way I don't think I like this idea. This just adds some
->>> more mess to how the GPIO number space is constructed, and it is
->>> already quite messy as it is. You have no guarantee over the probe
->>> order of your GPIO controllers, so they may very well be probed in a
->>> different order and end up with different base numbers anytime.
+>>> This is solely my fault -- too much time on processes, email, and
+>>> documentation, not enough time on the Seattle patches.  And not
+>>> enough Seattles to go around for someone else to pick up the slack.
+>>>
+>>> I am aware not everyone is subscribed to linaro-acpi; we use that
+>>> for internal review before posting more broadly, which is the only
+>>> reason I sent them there.
+>>>
+>>> I'm in the middle of updating them as I have time, based on really
+>>> good feedback from Arnd; few of them are terribly new (the very first
+>>> posting was [0]) -- it's mostly a matter of rebasing, integrating
+>>> updates from AMD and others, and reacting to the comments.  One can
+>>> also see what these patches will probably look like via one of the
+>>> Fedora kernel trees [1].
 >>
->> Yup.
+>> Do you have some simple branch against mainline with just the ACPI core
+>> patches and what's required for AMD Seattle? I have no plans to dig
+>> through the Fedora kernels.
 >>
->> The way stuff is usually forced ordered in device tree is to use
->> aliases, e.g.:
->>
->>         aliases {
->>                 serial0 = &pb1176_serial0;
->>                 serial1 = &pb1176_serial1;
->>                 serial2 = &pb1176_serial2;
->>                 serial3 = &pb1176_serial3;
->>                 serial4 = &fpga_serial;
->>         };
->>
->> By getting the alias ID with of_alias_get_id(np, "serial")
->> a certain serial port is assigned to be
->> 0, 1, 2 ...
->>
->> I think I could accept a tweak of this patch that will register
->> GPIOs beginning from 0 if and only if the alias mechanism is
->> used.
->>
->>         aliases {
->>                 gpio0 = &foo_gpio0;
->>                 gpio1 = &expander;
->>         };
->>
->>
->> The actual Linux-specific integer base will *NOT* be in the
->> device tree, but if you know how many GPIOs are on each
->> controller the number space is still stable and predictable
->> beginning from 0. If one want to keep track of the Linux
->> number space one can do so with comments in the device
->> tree or something.
->>
->>> I know we pushed back against this kind of solution in the past, but
->>> it is still more reliable than having a property that affects how the
->>> kernel's base finding function works, and will offer us a way to
->>> eventually put ARCH_NR_GPIOS and gpiochip_find_base() to rest (at the
->>> cost of backwards-compatibility, but we just cannot do without it).
->>> Linus, do you agree?
->>
->> What do you think about the above?
->
-> It would definitely help with the probe order, but unfortunately not
-> with the fact that GPIO bases are allocated in decreasing order
-> starting from the potentially varying ARCH_NR_GPIOS. So that alone
-> will not be able to ensure stable GPIO numbers.
+> 
+> Nor was I expecting you to; I only added it as additional reference
+> material, should one be interested.
+> 
+> The version of patches sent to the linaro-acpi list are from the Linaro
+> acpi.git tree, and are precisely what you describe; those are the ones
+> being updated.
+> 
 
-What I mean is that if and only if aliases are used, we
-allocate GPIOs in ascending order starting at 0.
+My bad, not enough coffee yet.  The Linaro acpi.git tree is at:
 
-Let us remember why this is done: dynamic GPIO numbers are
-allocated in descending order because it was assumed that some
-static GPIOs are already allocated starting from 0, like on-chip
-GPIOs.
+   https://git.linaro.org/leg/acpi/acpi.git
 
-We can also make it a Kconfig option, because for a large chunk
-of systems only using device tree we can
-actually allocate from zero. Notably any ARCH_MULTIPLATFORM
-should just do this if we can make a quick survey of such systems
-and see that they don't fool around setting .base in their GPIO
-chips.
-
-Yours,
-Linus Walleij
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
