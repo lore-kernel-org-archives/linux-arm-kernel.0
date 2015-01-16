@@ -1,57 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 16 Jan 2015 10:08:13 +0100
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54B7F7CD.7030903@free.fr>
-References: <54B7F7CD.7030903@free.fr>
-Message-ID: <1421399293.11224.7.camel@AMDC1943>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 10:08:45 +0100
+Subject: [PATCH 08/28] PCI: Introduce pci_host_assign_domain_nr() to
+ assign domain
+In-Reply-To: <1421372666-12288-9-git-send-email-wangyijing@huawei.com>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <1421372666-12288-9-git-send-email-wangyijing@huawei.com>
+Message-ID: <13182982.DnZJMY2KHL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On czw, 2015-01-15 at 18:24 +0100, Mason wrote:
-> Hello,
+On Friday 16 January 2015 09:44:06 Yijing Wang wrote:
+> Introduce pci_host_assign_domain_nr() to assign domain
+> number for pci_host_bridge. Later we will remove
+> pci_bus_assign_domain_nr().
 > 
-> This is a follow-up to my previous thread.
-> "How many frequencies would cpufreq optimally like to manage?"
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
-> 
-> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
-> based SoC (namely Tango4 from Sigma Designs). I'd like to get
-> some feedback on the cpufreq driver I wrote for that platform.
-> 
-> I decided to expose only a small subset of frequencies (namely
-> {999,500,333,111} MHz) because, in my tests, the ondemand gov
-> chose mostly min and max, and the intermediate frequencies not
-> so much; so I figured "2 intermediate freqs" is good enough.
-> (I'm ready to hear otherwise.)
-> 
-> I tried to use as much generic framework as possible, but I've
-> read about the clk framework, and it looks to be an even greater
-> generalization. Are new platforms encouraged to use that, rather
-> than provide a cpufreq driver? Does it work when voltage scaling
-> comes in play? (This SoC doesn't have it, but the next will.)
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 
-The clock framework generalizes clocks, not cpufreq. Ideally you should
-use clock framework in cpufreq driver. So instead manually setting
-divider just do something like:
+I'm confused: the same code is already part of the PCI tree, but with
+Lorenzo Pieralisi listed as the patch author. The code is good,
+and I acked it in the past, but one of you is (probably by accident)
+misattributing the patch.
 
-ret = clk_set_rate(cpu_clk, freq_exact);
-if (ret) {
-	dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
-	return ret;
-}
+Assuming that the patch that is already merged in next is the right
+one, I think you should rebase your series on top of
 
-For voltage scaling you should use regulator framework.
+git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git#next
 
-Actually I think existing cpufreq-dt could serve your purpose. Why don't
-you try it? Or look at it and use as an example.
+to avoid conflicts like this one.
 
-> I'm also wondering how cpufreq and cpuidle interact? Is one a
-> subset of the other? Are they orthogonal?
-
-cpuidle and cpufreq are different subsystems. They don't interact, yet.
-There are efforts to combine scheduler, cpufreq and cpuidle but this is
-future. If your SoC has some deeper low power states than developing
-cpuidle driver makes sense. If not - WFI will be used.
-
-> 
-> Regards.
+	Arnd
