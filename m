@@ -1,52 +1,72 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 16 Jan 2015 21:17:47 +0530
-Subject: [PATCH] arch: arm: mach-davinci: cdce949.c: Remove unused function
-In-Reply-To: <CAKXHbyMc=jYXsZPCuRqP7zfgmhiER8M3=Z_9CdNoVBsV5f5jFQ@mail.gmail.com>
-References: <1417906928-5728-1-git-send-email-rickard_strandqvist@spectrumdigital.se>	<54B64375.3070406@ti.com>
- <CAKXHbyMc=jYXsZPCuRqP7zfgmhiER8M3=Z_9CdNoVBsV5f5jFQ@mail.gmail.com>
-Message-ID: <54B932A3.1040105@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Jan 2015 15:49:13 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <1809831.d9GPSfLUEN@wuerfel>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <2198633.UpIyI82Yon@wuerfel> <20150116153320.GU7091@arm.com>
+ <1809831.d9GPSfLUEN@wuerfel>
+Message-ID: <20150116154913.GW7091@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 January 2015 04:26 AM, Rickard Strandqvist wrote:
-> 2015-01-14 11:22 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
->> Hi Rickard,
->>
->> On Sunday 07 December 2014 04:32 AM, Rickard Strandqvist wrote:
->>> Remove the function cdce_set_rate() that is not used anywhere.
->>>
->>> This was partially found by using a static code analysis program called cppcheck.
->>>
->>> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
->>> ---
->>>  arch/arm/mach-davinci/cdce949.c              |   37 --------------------------
->>>  arch/arm/mach-davinci/include/mach/cdce949.h |    2 --
->>>  2 files changed, 39 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-davinci/cdce949.c b/arch/arm/mach-davinci/cdce949.c
->>> index abafb92..bccac4a 100644
->>> --- a/arch/arm/mach-davinci/cdce949.c
->>> +++ b/arch/arm/mach-davinci/cdce949.c
->>> @@ -212,43 +212,6 @@ static struct cdce_output output_list[] = {
->>>       [5]     = { cdce_y5_freqs, ARRAY_SIZE(cdce_y5_freqs) },
->>>  };
->>>
->>> -int cdce_set_rate(struct clk *clk, unsigned long rate)
->>
->> Without this function, this driver is of no use. I can see that CDCE949
->> support has remained unused for long time. I would rather see the entire
->> support including cdce949.c and cdce949.h and their references removed.
->>
->> Thanks,
->> Sekhar
->>
+On Fri, Jan 16, 2015 at 03:40:28PM +0000, Arnd Bergmann wrote:
+> On Friday 16 January 2015 15:33:20 Will Deacon wrote:
+> > On Fri, Jan 16, 2015 at 03:14:13PM +0000, Arnd Bergmann wrote:
+> > > On Friday 16 January 2015 14:55:45 Will Deacon wrote:
+> > > > On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
+> > > > > I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
+> > > > > drivers that I'm about to submit upstream with the V7 patch series
+> > > > > on the AMD Seattle server platform. There does not appear to be support
+> > > > > for the _CCA attribute in this patch series. The amd-xgbe driver will
+> > > > > setup the device domain and cache attributes based on the presence of
+> > > > > this attribute, but it requires the arch support to assign the proper
+> > > > > DMA operations in order for it to all work correctly.
+> > > > > 
+> > > > > Overriding the _CCA attribute in the driver, I was able to successfully
+> > > > > test the driver and this patch series.
+> > > > 
+> > > > Hopefully this will all be addressed when the IORT parts of ACPI have
+> > > > settled down (the current proposal allows for these attributes to be
+> > > > described as well as their interaction with things like IOMMUs).
+> > > > 
+> > > > In the meantime, are you falling back to non-coherent DMA? If so, what
+> > > > attributes have you settled on? We need to be really careful not to
+> > > > corrupt data during cache invalidatation when mapping a non-coherent
+> > > > buffer for the CPU.
+> > > 
+> > > I think in case of ACPI we should use cache-coherent as the default,
+> > > as this is what all servers will use for DMA masters.
+> > 
+> > I don't agree. The dma-coherent we have for device-tree isn't nearly
+> > expressive enough for the kind of things we want to describe and there's
+> > no reason to make the same mistake in ACPI, especially as it *is* being
+> > addressed by IORT. If we run with _CCA, then we're going to be stuck
+> > supporting something that isn't fit for purpose and which will likely be
+> > abused to describe both fixed features of the system and software
+> > configuration preferences. It also opens up a can of worms if we have to
+> > support a mixture of _CCA and IORT in the future.
+> > 
+> > Or are you suggesting that we ignore _CCA and just assume cache-coherency?
+> > In that case, how do we support systems that aren't cache coherent, where
+> > not being cache coherent includes devices that require either device or
+> > IOMMU configuration to enable cacheable transactions?
 > 
-> Hi
-> 
-> Sure, sounds nice :)
-> I see if I have time to fix it this weekend.
+> I was thinking we'd ignore _CCA because as you say a simple on/off flag
+> would not be enough to describe what we have to do for noncoherent
+> devices. I can't think of any reason why a server hardware would include
+> noncoherent devices, so if they are configurable they should be configured
+> into coherent mode by the firmware.
 
-Okay, I will wait till Monday before preparing my pull requests.
+The on-board ethernet on Seattle requires the driver to program its AXI
+attributes, so configuring it to be a coherent master actually means
+"program the same cacheable AXI settings as you have on the CPU". That
+sounds like Linux should be doing it to me, but even if the firmware takes
+a guess at "normal cacheable WBRWA", it's not clear to me whether that
+register persists across things like adapter reset.
 
-Thanks,
-Sekhar
+Tom?
+
+There's also the situation where the firmware hasn't initialised the
+register and Linux realises this during probe. What should it do then?
+
+Will
