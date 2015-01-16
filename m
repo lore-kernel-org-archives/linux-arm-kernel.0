@@ -1,29 +1,25 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Fri, 16 Jan 2015 10:57:04 +0800
-Subject: [PATCH] ARM: clk-imx6q: refine esai_ipg's parent
-Message-ID: <1421377024-29699-1-git-send-email-shengjiu.wang@freescale.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 15 Jan 2015 22:08:37 -0500
+Subject: SPCR table parsing
+Message-ID: <54B880B5.6010907@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-esai_ipg clock's parent is ahb, not ipg.
+Hi Folks,
 
-Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We're implementing support for SPCR table parsing shortly[0], since it
+will allow to deprecate supplying a "console=" (and eventually, also
+"earlycon=") on 64-bit ARM servers, where it's not always the case that
+we can assume a 16550 at a specific address. SPCR has been provided on
+x86 systems since 2000 but is not (yet) supported by Linux.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 2daef61..d04a430 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -386,7 +386,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		clk[IMX6Q_CLK_ECSPI5] = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
- 	clk[IMX6QDL_CLK_ENET]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
- 	clk[IMX6QDL_CLK_ESAI_EXTAL]   = imx_clk_gate2_shared("esai_extal",   "esai_podf",   base + 0x6c, 16, &share_count_esai);
--	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ipg",           base + 0x6c, 16, &share_count_esai);
-+	clk[IMX6QDL_CLK_ESAI_IPG]     = imx_clk_gate2_shared("esai_ipg",   "ahb",           base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_ESAI_MEM]     = imx_clk_gate2_shared("esai_mem", "ahb",             base + 0x6c, 16, &share_count_esai);
- 	clk[IMX6QDL_CLK_GPT_IPG]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
- 	clk[IMX6QDL_CLK_GPT_IPG_PER]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
--- 
-1.7.9.5
+If anyone knows of existing efforts on e.g. x86 or IA64, please get in
+touch. I expect the initial implementation to require revision 2+ modern
+server systems and possibly be limited to ARM initially.
+
+Thanks,
+
+Jon.
+
+[0] This table is now published under a non-restrictive implementation
+license and is linked from the UEFI ACPI documents webpage.
