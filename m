@@ -1,207 +1,135 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jan 2015 11:35:20 +0900
-Subject: [PATCH 08/17] ARM: shmobile: sh73a0 dtsi: Add selectable sources to
- DIV6 clocks
-In-Reply-To: <cover.1421371996.git.horms+renesas@verge.net.au>
-References: <cover.1421371996.git.horms+renesas@verge.net.au>
-Message-ID: <a1bef10ef201c2e7fd59e9a2506caaaa90109141.1421371996.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jan 2015 11:35:07 +0900
+Subject: [PATCH 4/4] drivers: bus: Add Simple Power-Managed Bus Driver
+In-Reply-To: <cover.1421371868.git.horms+renesas@verge.net.au>
+References: <cover.1421371868.git.horms+renesas@verge.net.au>
+Message-ID: <ab9ff6fe6fdd225a92ae740eceb05e12daf00ce1.1421371868.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Specifies clock sources and register bits.
+Add a driver for transparent busses that don't need a real driver (think
+"simple-bus"), where the bus controller is part of a PM domain, or under
+the control of a functional clock.  Typically, the bus controller's
+PM domain and/or clock must be enabled for child devices connected to
+the bus (either on-SoC or externally) to function.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-[geert: Drop renesas,src-shift/renesas,src-width, pad to 4 or 8 parents]
+Hence the sole purpose of this driver is to enable its clock and PM
+domain (if exist(s)), which are specified in the DT and managed from
+platform and PM domain code.
+
+Due to the child-parent relationship with devices connected to the bus,
+PM domain and clock state transitions are handled in the correct order.
+
+Currently this driver handles the Renesas Bus State Controller (BSC,
+sometimes called "LBSC within Bus Bridge", or "External Bus Interface")
+found on several Renesas ARM SoCs. Support for other bus controllers can
+easily be added by adding more compatible values.
+
+Note that this driver cannot just bind against "simple-bus", as that
+may prevent a device-specific driver from taking precedence.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 64 ++++++++++++++++++++++++++++++-------------
- 1 file changed, 45 insertions(+), 19 deletions(-)
+ drivers/bus/Kconfig         | 13 ++++++++++++
+ drivers/bus/Makefile        |  1 +
+ drivers/bus/simple-pm-bus.c | 51 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 65 insertions(+)
+ create mode 100644 drivers/bus/simple-pm-bus.c
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index ac660c4..e187f16 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -417,133 +417,159 @@
- 		vclk1_clk: vclk1_clk at e6150008 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150008 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&extcki_clk>, <&extal2_clk>, <&main_div2_clk>,
-+				 <&extalr_clk>, <&cpg_clocks SH73A0_CLK_MAIN>,
-+				 <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "vclk1";
- 		};
- 		vclk2_clk: vclk2_clk at e615000c {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615000c 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&extcki_clk>, <&extal2_clk>, <&main_div2_clk>,
-+				 <&extalr_clk>, <&cpg_clocks SH73A0_CLK_MAIN>,
-+				 <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "vclk2";
- 		};
- 		vclk3_clk: vclk3_clk at e615001c {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615001c 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&extcki_clk>, <&extal2_clk>, <&main_div2_clk>,
-+				 <&extalr_clk>, <&cpg_clocks SH73A0_CLK_MAIN>,
-+				 <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "vclk3";
- 		};
- 		zb_clk: zb_clk at e6150010 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150010 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <0>,
-+				 <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "zb";
- 		};
- 		flctl_clk: flctl_clk at e6150014 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150014 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <0>,
-+				 <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "flctlck";
- 		};
- 		sdhi0_clk: sdhi0_clk at e6150074 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150074 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&pll1_div13_clk>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sdhi0ck";
- 		};
- 		sdhi1_clk: sdhi1_clk at e6150078 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150078 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&pll1_div13_clk>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sdhi1ck";
- 		};
- 		sdhi2_clk: sdhi2_clk at e615007c {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615007c 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&pll1_div13_clk>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sdhi2ck";
- 		};
- 		fsia_clk: fsia_clk at e6150018 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150018 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&fsiack_clk>, <&fsiack_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "fsia";
- 		};
- 		fsib_clk: fsib_clk at e6150090 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150090 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&fsibck_clk>, <&fsibck_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "fsib";
- 		};
- 		sub_clk: sub_clk at e6150080 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150080 4>;
--			clocks = <&extal2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&extal2_clk>, <&extal2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "sub";
- 		};
- 		spua_clk: spua_clk at e6150084 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150084 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&extal2_clk>, <&extal2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "spua";
- 		};
- 		spuv_clk: spuv_clk at e6150094 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150094 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&extal2_clk>, <&extal2_clk>;
- 			#clock-cells = <0>;
- 			clock-output-names = "spuv";
- 		};
- 		msu_clk: msu_clk at e6150088 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150088 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <0>,
-+				 <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "msu";
- 		};
- 		hsi_clk: hsi_clk at e615008c {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615008c 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&pll1_div7_clk>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "hsi";
- 		};
- 		mfg1_clk: mfg1_clk at e6150098 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150098 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <0>,
-+				 <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "mfg1";
- 		};
- 		mfg2_clk: mfg2_clk at e615009c {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615009c 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <0>,
-+				 <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "mfg2";
- 		};
- 		dsit_clk: dsit_clk at e6150060 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150060 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <0>,
-+				 <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "dsit";
- 		};
- 		dsi0p_clk: dsi0p_clk at e6150064 {
- 			compatible = "renesas,sh73a0-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150064 4>;
--			clocks = <&pll1_div2_clk>;
-+			clocks = <&pll1_div2_clk>, <&cpg_clocks SH73A0_CLK_PLL2>,
-+				 <&cpg_clocks SH73A0_CLK_MAIN>, <&extal2_clk>,
-+				 <&extcki_clk>, <0>, <0>, <0>;
- 			#clock-cells = <0>;
- 			clock-output-names = "dsi0pck";
- 		};
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 6269608..1addb70 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -58,6 +58,19 @@ config OMAP_OCP2SCP
+ 	  OCP2SCP and in OMAP5, both USB PHY and SATA PHY is connected via
+ 	  OCP2SCP.
+ 
++config SIMPLE_PM_BUS
++	bool "Simple Power-Managed Bus Driver"
++	depends on OF && PM
++	depends on ARCH_SHMOBILE || COMPILE_TEST
++	help
++	  Driver for transparent busses that don't need a real driver (think
++	  "simple-bus"), where the bus controller is part of a PM domain, or
++	  under the control of a functional clock, and thus relies on runtime
++	  PM for managing this PM domain and/or clock.
++	  An example of such a bus controller is the Renesas Bus State
++	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
++	  "External Bus Interface") as found on several Renesas ARM SoCs.
++
+ config VEXPRESS_CONFIG
+ 	bool "Versatile Express configuration bus"
+ 	default y if ARCH_VEXPRESS
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 3cfaf2c..e023a2b 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -14,4 +14,5 @@ obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
+ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+ 
+ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
++obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+diff --git a/drivers/bus/simple-pm-bus.c b/drivers/bus/simple-pm-bus.c
+new file mode 100644
+index 0000000..e55872d
+--- /dev/null
++++ b/drivers/bus/simple-pm-bus.c
+@@ -0,0 +1,51 @@
++/*
++ * Simple Power-Managed Bus Driver
++ *
++ * Copyright (C) 2014 Glider bvba
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++
++
++static int simple_pm_bus_probe(struct platform_device *pdev)
++{
++	dev_dbg(&pdev->dev, "%s\n", __func__);
++
++	pm_runtime_enable(&pdev->dev);
++	return 0;
++}
++
++static int simple_pm_bus_remove(struct platform_device *pdev)
++{
++	dev_dbg(&pdev->dev, "%s\n", __func__);
++
++	pm_runtime_disable(&pdev->dev);
++	return 0;
++}
++
++static const struct of_device_id simple_pm_bus_of_match[] = {
++	{ .compatible = "renesas,bsc", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, simple_pm_bus_of_match);
++
++static struct platform_driver simple_pm_bus_driver = {
++	.probe = simple_pm_bus_probe,
++	.remove = simple_pm_bus_remove,
++	.driver = {
++		.name = "simple-pm-bus",
++		.of_match_table = simple_pm_bus_of_match,
++	},
++};
++
++module_platform_driver(simple_pm_bus_driver);
++
++MODULE_DESCRIPTION("Simple Power-Managed Bus Driver");
++MODULE_AUTHOR("Geert Uytterhoeven <geert+renesas@glider.be>");
++MODULE_LICENSE("GPL v2");
 -- 
 2.1.4
