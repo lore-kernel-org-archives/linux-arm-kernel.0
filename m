@@ -1,39 +1,49 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Jan 2015 10:13:07 +0100
-Subject: [PATCH v4 13/18] iommu: exynos: add support for runtime_pm
+Date: Fri, 16 Jan 2015 10:13:10 +0100
+Subject: [PATCH v4 16/18] iommu: exynos: remove excessive includes and sort
+ others alphabetically
 In-Reply-To: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421399592-7482-14-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421399592-7482-17-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes support for runtime power management for SYSMMU
-controllers, so they are enabled when master device is attached.
+Removed following unused includes: <linux/mm.h>, <linux/errno.h>,
+<linux/memblock.h> and <linux/export.h>.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/iommu/exynos-iommu.c | 14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index c6cca44d7858..f8609f40ae59 100644
+index ef7172551a39..c53cc8f61176 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -695,6 +695,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
- 		return -ENODEV;
+@@ -12,19 +12,15 @@
+ #define DEBUG
+ #endif
  
- 	list_for_each_entry(data, &owner->clients, owner_node) {
-+		pm_runtime_get_sync(data->sysmmu);
- 		ret = __sysmmu_enable(data, pagetable, domain);
- 		if (ret >= 0) {
- 			data->master = dev;
-@@ -736,6 +737,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
- 				data->master = NULL;
- 				list_del_init(&data->domain_node);
- 			}
-+			pm_runtime_put(data->sysmmu);
- 			found = true;
- 		}
- 	}
+-#include <linux/io.h>
+-#include <linux/interrupt.h>
+-#include <linux/platform_device.h>
+-#include <linux/slab.h>
+-#include <linux/pm_runtime.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+-#include <linux/mm.h>
++#include <linux/io.h>
+ #include <linux/iommu.h>
+-#include <linux/errno.h>
++#include <linux/interrupt.h>
+ #include <linux/list.h>
+-#include <linux/memblock.h>
+-#include <linux/export.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++#include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/pgtable.h>
 -- 
 1.9.2
