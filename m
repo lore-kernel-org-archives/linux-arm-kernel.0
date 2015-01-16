@@ -1,36 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jan 2015 19:44:00 +0000
-Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
- SATA port
-In-Reply-To: <54B962E0.9060504@redhat.com>
-References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
- <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
- <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
- <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
- <54B91FB4.5080707@free-electrons.com>
- <20150116153451.GA3856@sirena.org.uk> <54B962E0.9060504@redhat.com>
-Message-ID: <20150116194400.GK3856@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 16 Jan 2015 20:48:31 +0100
+Subject: [PATCH v4 3/3] ARM: dts: add I2C device nodes for Broadcom Cygnus
+In-Reply-To: <54B96559.1010007@broadcom.com>
+References: <rjui@broadcom.com>
+ <1421274213-3544-1-git-send-email-rjui@broadcom.com>
+ <1421274213-3544-4-git-send-email-rjui@broadcom.com>
+ <20150115084456.GO22880@pengutronix.de>
+ <54B96559.1010007@broadcom.com>
+Message-ID: <20150116194831.GV22880@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 08:13:36PM +0100, Hans de Goede wrote:
-> On 16-01-15 16:34, Mark Brown wrote:
+Hello,
 
-> >>As pointed by Hans my concern here was be sure that during boot the disk
-> >>are not power off. In this case which property would be accurate?
+On Fri, Jan 16, 2015 at 11:24:09AM -0800, Ray Jui wrote:
+> >> +	i2c0: i2c at 18008000 {
+> >> +		compatible = "brcm,iproc-i2c";
+> > in patch 2 you wrote the driver is for a family of SoCs, right? Then I'd
+> > make this:
+> > 
+> > 	compatible = "brcm,$mysoc-iproc-i2c", "brcm,iproc-i2c";
+> > 
+> Sorry could you please help to explain the intention here? Note the
+> iProc I2C IP can be found in various iProc family of SoCs, but to my
+> best knowledge, there hasn't been any changes of the IP in any of those
+> SoCs.
+This is just for making the device tree stable in the future. Consider
+your gentle hardware engineers "fix" a small issue for the next
+generation iproc SoC "pony" that needs an incompatible software change.
 
-> >None, the core won't do anything with the regulator until the end of
-> >init anyway.
+Then you can fix the driver without updating the device trees by
+switching to the SoC specific compatible string for "pony". And in case
+the hardware engineers didn't tell you that there is a change and the
+need for the software change is only detected when the machines are
+already shipped, you're happy if you can fix your kernel without needing
+to change the bootloader that provides the dtb.
+So start already today to add the (for now unused) compatible string.
 
-> That us simply not true, see my other mail gpio enabled regulators will
-> be turned off *at register time* unless they have regulator-boot-on set.
+> Is the compatible ID "brcm,$mysoc-iproc-i2c" only to clarify that it's
+> for a specific SoC? If so, what should the compatible ID array look
+> like? Should it be changed to the following?
+> 
+> static const struct of_device_id bcm_iproc_i2c_of_match[] = {
+> 	{ .compatible = "brcm,iproc-i2c" },
+> 	{ .compatible = "brcm,$mysoc-iproc-i2c" },
+> 	{},
+> };
+No, there is no need, see above.
 
-That's not the core, that's the specific driver (which I didn't know
-this board happened to be using).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/8761a950/attachment.sig>
+If something is still unclear, don't hesitate to ask.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
