@@ -1,163 +1,73 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 16 Jan 2015 08:58:04 +0800
-Subject: Including empty regulator nodes in axp209.dtsi is a BAD idea
-In-Reply-To: <20150115220438.GD5567@lukather>
-References: <54B4E7B5.6060304@redhat.com> <20150113164606.GA4891@lukather>
- <54B61DD3.6010105@redhat.com>
- <CAGb2v67uGV2HBKciRVGhf-vb7K=whruiaUvv8L7Lqz=8=kBnQQ@mail.gmail.com>
- <20150115220438.GD5567@lukather>
-Message-ID: <CAGb2v65AT=8J4uMTk+b7N6QLNfcbgPJjW0Jgd1B=Pjq5a+SY_g@mail.gmail.com>
+Date: Fri, 16 Jan 2015 09:01:05 +0800
+Subject: [PATCH v8 4/6] input: misc: Add ABI docs for AXP20x PEK
+In-Reply-To: <20150115173930.GD33214@dtor-ws>
+References: <1419303194-3075-1-git-send-email-wens@csie.org>
+ <1419303194-3075-5-git-send-email-wens@csie.org>
+ <CAGb2v64AvP+niDrFU-vGGsXUoKD_kv34DqEPRFUZ0fiyeWiz9A@mail.gmail.com>
+ <20150115173930.GD33214@dtor-ws>
+Message-ID: <CAGb2v65ZNvAZEE7K9Wsiv5vHO4NO3QjT0CVnnLZyb59T2OgxOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 6:04 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Jan 16, 2015 at 12:54:58AM +0800, Chen-Yu Tsai wrote:
->> Hi,
+On Fri, Jan 16, 2015 at 1:39 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> Hi Chen-Yu,
+>
+> On Fri, Jan 16, 2015 at 12:00:31AM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Dec 23, 2014 at 10:53 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> > From: Carlo Caione <carlo@caione.org>
+>> >
+>> > Add ABI entries for the PEK found on PMU X-Powers AXP202 and AXP209.
 >>
->> On Wed, Jan 14, 2015 at 3:42 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> > Hi,
->> >
->> >
->> > On 13-01-15 17:46, Maxime Ripard wrote:
->> >>
->> >> On Tue, Jan 13, 2015 at 10:39:01AM +0100, Hans de Goede wrote:
->> >>>
->> >>> Hi ChenYu, Maxime,
->> >>>
->> >>> During the review of a few dts files for new boards Maxime asked me to
->> >>> use
->> >>> axp209.dtsi to avoid the standard axp209 "boilerplate" present in most
->> >>> boards using the axp209 pmic.
->> >>>
->> >>> But axp209.dtsi includes empty regulator nodes, e.g. :
->> >>>
->> >>>                  reg_dcdc3: dcdc3 {
->> >>>                          regulator-name = "dcdc3";
->> >>>                  };
->> >>>
->> >>> This is a BAD idea, the presence of these empty nodes causes the
->> >>> axp20x-regulator driver to actually register regulators for them,
->> >>> and then on late_init the regulator subsys turns them off, since
->> >>> they have absolutely no constraints set (nor users registered)
->> >>> and the regulator subsys assumes that when devicetree is used their
->> >>> is always a compete set of constraints and that thus turning them
->> >>> off is safe.
->> >>>
->> >>> So when I switched to using axp209.dtsi for the bananapro.dts,
->> >>> and booted the bananapro this is the last message I got from the
->> >>> kernel while booting:
->> >>>
->> >>> [    2.314014] dcdc3: disabling
->> >>>
->> >>> And away went our DRAM power-supply, oops.
->> >>>
->> >>> So for dcdc2 (CPU) and dcdc3 (DRAM), the boilerplate
->> >>> should contain reasonable constraints (eg the operating range
->> >>> from the datasheet)
->> >>
->> >>
->> >> Indeed.
->> >>
->> >>> and an always-on property.
->> >>
->> >>
->> >> I disagree. The regulator disabling is a feature, and how the board is
->> >> wired is, well, up to the board.
->> >
->> >
->> > And here I was thinking you wanted to reduce the amount of boilerplate
->> > in our dts files ..
->> >
->> > IOW I disagree with your disagreeing all boards we know of have dcdc2
->> > wired to Vcpu and dcdc3 wired to Vddr, so not having this in the dtsi
->> > will lead to a lot of extra boilerplate in each dts file. We're not
->> > talking about our main dtsi file here, if we ever encounter a board
->> > which is wired in a different way, then its dts can simply not use
->> > axp209.dtsi and instead define the nodes itself, it needs to do that
->> > anyways if we do include the standard CPU and DDR constrains in the
->> > dtsi since those will not make sense either in that case.
+>> Hi Dmitry,
 >>
->> I think Maxime is only disagreeing to the "always-on" part. And I
->> somewhat agree with him, but on a technical level. It doesn't seem
->> possible to negate at the board level the "always-on" set in the dtsi,
->> or it is not obvious to me how to do so. With properties with values
->> you just set a new value. How do you "unset" a boolean flag?
+>> Would it be possible to take this patch through your tree?
 >
-> You don't, but Hans suggestion was to not use the DTSI then and define
-> the nodes yourself in your DTS.
->
-> Another solution would be if this case comes up at some point to just
-> push the always-on constraints to the boards, but assume for now that
-> all boards will want it to be always on.
->
->> As for the constraints, I think we can agree that everyone will use
->> the reference design if they choose to include the PMIC on a board.
->
-> I'm not sure to get what you mean here. The PMIC has constraints of
-> its own (the min/max voltage it can deliver), and boards will have
-> some too (ie the min/max voltage the components can handle). So I
-> guess we will end up with constraints defined at both levels.
+> Actually I folded it into the original patch adding the code so it's
+> already there.
 
-I don't know if we need to define the constraints the PMIC itself
-has. Aren't these already defined in the driver?
+Sorry I didn't look deep enough. Just looked at the commit messages.
 
-What I meant was that it's not unreasonable to assume that most boards
-using axp209 will follow the reference design, so dcdc2 powers the cpu,
-dcdc3 powers the rest of the internal logic and dll, and ldo3 powers
-avcc. And we could possibly put the the SoC constraints for these in
-axp209.dtsi. Maybe except vcc-cpu, which is different across sun[457]i.
+Thanks again.
 
 ChenYu
 
->> >> If an always-on property is needed, then it's in the DTS, not in the
->> >> AXP DTSI.
->> >>
->> >>> The ldo-s are trickier, since we simply do not know how those
->> >>> are used, I think ldo2 is used for Avcc on most boards, so it
->> >>> too should be always on, since almost any board will have some
->> >>> analog parts on it (be it the ir receiver, lradc, rtp, lvds, vga,
->> >>> or analog audio in/out). Assuming that we're willing to assume
->> >>> that ldo2 is used this way, we should give it matching constraints
->> >>> and always mark it always-on.
->> >>
->> >>
->> >> Ideally, all the drivers that have a analogic component should have a
->> >> reference to the regulator they use. But again, at the board
->> >> level. And more realistically, putting always-on should also happen at
->> >> the board level.
->> >>
->> >>> As for ldo3 - 5 I've no idea when / for what these are used, but
->> >>> if we do not know it is better to just leave them be then to turn
->> >>> them off IMHO, so we should remove the nodes for these from axp209.dtsi
->> >>>
->> >>> Anyways sorting this all out is going to take some time, so I'm
->> >>> not going to use axp209.dtsi in dts files for new boards for now.
->> >>
->> >>
->> >> I'm afraid it's an "all or nothing" situation.
->> >
->> >
->> > No it is not, the PMIC is a mfd, and we can use some of its functions
->> > fine without actually loading the regulator bits. This is already
->> > done on most boards with the axp209, even without touching the regulators
->> > it is nice to have the axp209 mfd driver loaded so that we get support
->> > for the powerbutton, and support for poweroff, esp. the latter is quite
->> > nice to have.
+> Thanks.
+>
 >>
->> I agree that a) the PMIC is an mfd, and b) we can use other bits without
->> loading the regulator bits. But if adding the regulator bits results in
->> some sort of crash or issue, just because some regulator got turned off,
->> it seems to me that the dt is not accurately describing the hardware.
->
-> Yeah, that's kind of the same argument than the one we had with
-> simplefb clocks. So I guess we can agree that we can allow the MFD
-> part alone to work, but if regulator support is introduced, then *all*
-> regulators must be described accurately.
->
-> Maxime
+>>
+>> Thanks
+>> ChenYu
+>>
+>> > Signed-off-by: Carlo Caione <carlo@caione.org>
+>> > [wens at csie.org: Fixed path for sysfs entries]
+>> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> > ---
+>> >  Documentation/ABI/testing/sysfs-driver-input-axp-pek | 11 +++++++++++
+>> >  1 file changed, 11 insertions(+)
+>> >  create mode 100644 Documentation/ABI/testing/sysfs-driver-input-axp-pek
+>> >
+>> > diff --git a/Documentation/ABI/testing/sysfs-driver-input-axp-pek b/Documentation/ABI/testing/sysfs-driver-input-axp-pek
+>> > new file mode 100644
+>> > index 000000000000..a5e671b9fa79
+>> > --- /dev/null
+>> > +++ b/Documentation/ABI/testing/sysfs-driver-input-axp-pek
+>> > @@ -0,0 +1,11 @@
+>> > +What:          /sys/class/input/input(x)/device/startup
+>> > +Date:          March 2014
+>> > +Contact:       Carlo Caione <carlo@caione.org>
+>> > +Description:   Startup time in us. Board is powered on if the button is pressed
+>> > +               for more than <startup_time>
+>> > +
+>> > +What:          /sys/class/input/input(x)/device/shutdown
+>> > +Date:          March 2014
+>> > +Contact:       Carlo Caione <carlo@caione.org>
+>> > +Description:   Shutdown time in us. Board is powered off if the button is pressed
+>> > +               for more than <shutdown_time>
+>> > --
+>> > 2.1.4
+>> >
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> Dmitry
