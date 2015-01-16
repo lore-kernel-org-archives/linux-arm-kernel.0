@@ -1,89 +1,67 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Jan 2015 10:13:11 +0100
-Subject: [PATCH v4 17/18] iommu: exynos: init from dt-specific callback instead
- of initcall
+Date: Fri, 16 Jan 2015 10:13:12 +0100
+Subject: [PATCH v4 18/18] iommu: exynos: add callback for initializing devices
+ from device tree
 In-Reply-To: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421399592-7482-18-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421399592-7482-19-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces IOMMU_OF_DECLARE-based initialization to the
-driver, which replaces subsys_initcall-based procedure.
-exynos_iommu_of_setup ensures that each sysmmu controller is probed
-before its master device.
+This patch adds implementation of of_xlate callback, which prepares
+masters device for attaching to IOMMU. This callback is called during
+creating devices from device tree.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+ drivers/iommu/exynos-iommu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index c53cc8f61176..ea2659159e63 100644
+index ea2659159e63..5432b443abfc 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -13,16 +13,21 @@
- #endif
- 
- #include <linux/clk.h>
-+#include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/iommu.h>
- #include <linux/interrupt.h>
- #include <linux/list.h>
-+#include <linux/of.h>
-+#include <linux/of_iommu.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/dma-iommu.h>
- #include <asm/pgtable.h>
- 
- typedef u32 sysmmu_iova_t;
-@@ -1084,6 +1089,8 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
- };
- 
-+static int init_done;
-+
- static int __init exynos_iommu_init(void)
- {
- 	int ret;
-@@ -1116,6 +1123,8 @@ static int __init exynos_iommu_init(void)
- 		goto err_set_iommu;
- 	}
- 
-+	init_done = true;
-+
- 	return 0;
- err_set_iommu:
- 	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
-@@ -1125,4 +1134,21 @@ err_reg_driver:
- 	kmem_cache_destroy(lv2table_kmem_cache);
- 	return ret;
+@@ -1077,6 +1077,33 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *iommu_domain,
+ 	return phys;
  }
--subsys_initcall(exynos_iommu_init);
-+
-+static int __init exynos_iommu_of_setup(struct device_node *np)
+ 
++static int exynos_iommu_of_xlate(struct device *dev,
++				 struct of_phandle_args *spec)
 +{
-+	struct platform_device *pdev;
++	struct exynos_iommu_owner *owner = dev->archdata.iommu;
++	struct platform_device *sysmmu = of_find_device_by_node(spec->np);
++	struct sysmmu_drvdata *data;
 +
-+	if (!init_done)
-+		exynos_iommu_init();
++	if (!sysmmu)
++		return -ENODEV;
 +
-+	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-+	if (IS_ERR(pdev))
-+		return PTR_ERR(pdev);
++	data = platform_get_drvdata(sysmmu);
++	if (!data)
++		return -ENODEV;
 +
-+	of_iommu_set_ops(np, &exynos_iommu_ops);
++	if (!owner) {
++		owner = kzalloc(sizeof(*owner), GFP_KERNEL);
++		if (!owner)
++			return -ENOMEM;
++
++		INIT_LIST_HEAD(&owner->clients);
++		dev->archdata.iommu = owner;
++	}
++
++	list_add_tail(&data->owner_node, &owner->clients);
 +	return 0;
 +}
 +
-+IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
-+		 exynos_iommu_of_setup);
+ static const struct iommu_ops exynos_iommu_ops = {
+ 	.domain_init = exynos_iommu_domain_init,
+ 	.domain_destroy = exynos_iommu_domain_destroy,
+@@ -1087,6 +1114,7 @@ static const struct iommu_ops exynos_iommu_ops = {
+ 	.map_sg = default_iommu_map_sg,
+ 	.iova_to_phys = exynos_iommu_iova_to_phys,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
++	.of_xlate = exynos_iommu_of_xlate,
+ };
+ 
+ static int init_done;
 -- 
 1.9.2
