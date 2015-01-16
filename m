@@ -1,69 +1,39 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Jan 2015 10:13:02 +0100
-Subject: [PATCH v4 08/18] iommu: exynos: remove useless spinlock
+Date: Fri, 16 Jan 2015 10:13:07 +0100
+Subject: [PATCH v4 13/18] iommu: exynos: add support for runtime_pm
 In-Reply-To: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421399592-7482-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421399592-7482-14-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes useless spinlocks and other unused members from
-struct exynos_iommu_owner. There is no point is protecting this
-structure by spinlock because content of this structure doesn't change
-and other structures have their own spinlocks.
+This patch fixes support for runtime power management for SYSMMU
+controllers, so they are enabled when master device is attached.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 11 -----------
- 1 file changed, 11 deletions(-)
+ drivers/iommu/exynos-iommu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 3c824114771a..aa8c4b0ae2a1 100644
+index c6cca44d7858..f8609f40ae59 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -189,9 +189,6 @@ struct exynos_iommu_owner {
- 	struct list_head client; /* entry of exynos_iommu_domain.clients */
- 	struct device *dev;
- 	struct device *sysmmu;
--	struct iommu_domain *domain;
--	void *vmm_data;         /* IO virtual memory manager's data */
--	spinlock_t lock;        /* Lock to preserve consistency of System MMU */
- };
+@@ -695,6 +695,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
+ 		return -ENODEV;
  
- struct exynos_iommu_domain {
-@@ -477,16 +474,12 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
- 
- 	BUG_ON(!has_sysmmu(dev));
- 
--	spin_lock_irqsave(&owner->lock, flags);
--
- 	data = dev_get_drvdata(owner->sysmmu);
- 
- 	ret = __sysmmu_enable(data, pgtable, domain);
- 	if (ret >= 0)
- 		data->master = dev;
- 
--	spin_unlock_irqrestore(&owner->lock, flags);
--
- 	return ret;
- }
- 
-@@ -499,16 +492,12 @@ static bool exynos_sysmmu_disable(struct device *dev)
- 
- 	BUG_ON(!has_sysmmu(dev));
- 
--	spin_lock_irqsave(&owner->lock, flags);
--
- 	data = dev_get_drvdata(owner->sysmmu);
- 
- 	disabled = __sysmmu_disable(data);
- 	if (disabled)
- 		data->master = NULL;
- 
--	spin_unlock_irqrestore(&owner->lock, flags);
--
- 	return disabled;
- }
- 
+ 	list_for_each_entry(data, &owner->clients, owner_node) {
++		pm_runtime_get_sync(data->sysmmu);
+ 		ret = __sysmmu_enable(data, pagetable, domain);
+ 		if (ret >= 0) {
+ 			data->master = dev;
+@@ -736,6 +737,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
+ 				data->master = NULL;
+ 				list_del_init(&data->domain_node);
+ 			}
++			pm_runtime_put(data->sysmmu);
+ 			found = true;
+ 		}
+ 	}
 -- 
 1.9.2
