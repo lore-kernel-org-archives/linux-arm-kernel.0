@@ -1,74 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 16:56:00 +0000
-Subject: [PATCH 3/3] arm64:  Emulate SETEND for AArch32 tasks
-In-Reply-To: <1421325366-13263-4-git-send-email-suzuki.poulose@arm.com>
-References: <1421325366-13263-1-git-send-email-suzuki.poulose@arm.com>
- <1421325366-13263-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20150116165600.GF32155@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 17:56:57 +0100
+Subject: Regression with legacy IRQ numbers caused by 9a1091ef0017
+In-Reply-To: <20150115153746.GC18552@atomide.com>
+References: <20150114221407.GS2419@atomide.com>
+ <87wq4ogl48.fsf@approximate.cambridge.arm.com>
+ <20150115153746.GC18552@atomide.com>
+Message-ID: <3822486.YZLIqXdAgt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 12:36:06PM +0000, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Thursday 15 January 2015 07:37:48 Tony Lindgren wrote:
+> * Marc Zyngier <marc.zyngier@arm.com> [150115 06:46]:
+> > On Thu, Jan 15 2015 at  2:27:56 pm GMT, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Thursday 15 January 2015 13:42:57 Marc Zyngier wrote:
+> > Probably there is a workable strategy, but my knowledge about OMAP is
+> > close to *nothing*...
 > 
-> Emulate deprecated 'setend' instruction for AArch32 bit tasks.
-> 
-> 	setend [le/be] - Sets the endianness of EL0
-> 
-> On systems with CPUs which support mixed endian at EL0, the hardware
-> support for the instruction can be enabled by setting the SCTLR_EL1.SED
-> bit. Like the other emulated instructions it is controlled by an entry in
-> /proc/sys/abi/. For more information see :
-> 	Documentation/arm64/legacy_instructions.txt
-> 
-> The instruction is emulated by setting/clearing the SPSR_EL1.E bit, which
-> will be reflected in the PSTATE.E in AArch32 context.
-> 
-> This patch also restores the native endianness for the execution of signal
-> handlers, since the process could have changed the endianness.
-> 
-> Note: All CPUs on the system should support for mixed endian at EL0. Once the
-> handler is registered a CPU which doesn't support mixed endian, cannot be
-> hotplugged in.
-> 
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  Documentation/arm64/legacy_instructions.txt |    9 +++
->  arch/arm64/Kconfig                          |   10 ++++
->  arch/arm64/include/asm/cpufeature.h         |    1 +
->  arch/arm64/include/asm/ptrace.h             |    7 +++
->  arch/arm64/kernel/armv8_deprecated.c        |   82 +++++++++++++++++++++++++++
->  arch/arm64/kernel/signal32.c                |    5 +-
->  6 files changed, 113 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
-> index 0a4dc26..92b7945 100644
-> --- a/Documentation/arm64/legacy_instructions.txt
-> +++ b/Documentation/arm64/legacy_instructions.txt
-> @@ -47,3 +47,12 @@ Default: Undef (0)
->  Node: /proc/sys/abi/cp15_barrier
->  Status: Deprecated
->  Default: Emulate (1)
-> +
-> +* SETEND
-> +Node: /proc/sys/abi/setend
-> +Status: Deprecated
-> +Default: Emulate (1)*
-> +Note: All the cpus on the system should support mixed endian at EL0
-> +(ID_AA64MMFR0_EL1:BigEnd or BigEndEL0), for this feature to be enabled.
+> I have a feeling this might bite other platforms too and we just have
+> not noticed it yet..
 
-This might read a little better as:
+I'm looking through the entire tree now, scanning for machines that have
+GIC and use IORESOURCE_IRQ or DEFINE_RES_IRQ in their platform code.
+Most platforms using GIC are completely converted to DT and have no
+hardcoded legacy IRQs.
 
-  Note: all CPUs in the system must have mixed-endian support at EL0 for
-  this feature to be enabled.
+I have checked that cns3xxx and realview are both fine by inspection.
 
-That matches the ARM ARM wording for ID_AA64MMFR0_EL1. We shouldn't need
-to mention the particular register fields here.
+The only one I'm not sure about is shmobile, which looks like it might
+suffer from the same problem. Simon/Magnus, could you verify this
+with a multiplatform kernel on any SoC that has GIC and uses devices
+that have interrupts defined in setup-*.c or board-*.c?
 
-Also, we should probably add a note at the top like:
-
-  Note: instruction emulation may not be possible in all cases. See
-  below for further information.
-
-Thanks,
-Mark.
+	Arnd
