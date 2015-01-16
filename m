@@ -1,78 +1,122 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 16 Jan 2015 09:44:16 +0800
-Subject: [PATCH 18/28] PCI/sparc: Use pci_scan_root_bridge() for simplicity
+Date: Fri, 16 Jan 2015 09:44:14 +0800
+Subject: [PATCH 16/28] PCI/powerpc: Use pci_scan_root_bridge() for simplicity
 In-Reply-To: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
 References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1421372666-12288-19-git-send-email-wangyijing@huawei.com>
+Message-ID: <1421372666-12288-17-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Now we could use pci_scan_root_bridge() to scan
-pci buses, provide sparc specific pci_host_bridge_ops.
+pci buses, provide powerpc specific pci_host_bridge_ops.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/sparc/kernel/pci.c |   30 ++++++++++++++++++++++++------
- 1 files changed, 24 insertions(+), 6 deletions(-)
+ arch/powerpc/kernel/pci-common.c |   57 ++++++++++++++++++++++++--------------
+ 1 files changed, 36 insertions(+), 21 deletions(-)
 
-diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-index d798b42..42dc21f 100644
---- a/arch/sparc/kernel/pci.c
-+++ b/arch/sparc/kernel/pci.c
-@@ -647,12 +647,31 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
- 		pci_claim_bus_resources(child_bus);
+diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+index 2cf941e..0c7fb81 100644
+--- a/arch/powerpc/kernel/pci-common.c
++++ b/arch/powerpc/kernel/pci-common.c
+@@ -767,7 +767,8 @@ int pci_proc_domain(struct pci_bus *bus)
+ 	return 1;
  }
  
-+static void pci_host_bridge_probe_mode(
-+		struct pci_host_bridge *host)
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
++static int pci_host_bridge_set_root_bus_speed(
++		struct pci_host_bridge *bridge)
+ {
+ 	if (ppc_md.pcibios_set_root_bus_speed)
+ 		return ppc_md.pcibios_set_root_bus_speed(bridge);
+@@ -775,6 +776,27 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	return 0;
+ }
+ 
++static void pci_host_bridge_probe_mode(struct pci_host_bridge *host)
 +{
-+	host->of_scan = true;
++	int mode = PCI_PROBE_NORMAL;
++	struct pci_bus *bus = host->bus;
++	struct pci_controller *hose = dev_get_drvdata(&host->dev);
++
++	/* Get probe mode and perform scan */
++	if (hose->dn && ppc_md.pci_probe_mode)
++		mode = ppc_md.pci_probe_mode(bus);
++
++	pr_debug("    probe mode: %d\n", mode);
++	if (mode == PCI_PROBE_DEVTREE)
++		host->of_scan = true;
 +}
 +
-+static void pci_host_bridge_of_scan_bus(
-+		struct pci_host_bridge *host)
++static void pci_host_bridge_of_scan_bus(struct pci_host_bridge *host)
 +{
-+	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
-+	struct device_node *node = pbm->op->dev.of_node;
++	struct pci_controller *hose = dev_get_drvdata(&host->dev);
 +
-+	pci_of_scan_bus(pbm, node, host->bus);
++	of_scan_bus(host->dn, bus);
 +}
-+
-+static struct pci_host_bridge_ops phb_ops = {
-+	.phb_of_scan_bus,
+ /* This header fixup will do the resource fixup for all devices as they are
+  * probed, but not for bridge ranges
+  */
+@@ -1577,6 +1599,12 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+ 	return of_node_get(hose->dn);
+ }
+ 
++static struct pci_host_bridge_ops *phb_ops = {
++	.phb_set_root_bus_speed = pci_host_bridge_set_root_bus_speed,
++	.phb_probe_mode = pci_host_bridge_probe_mode,
++	.phb_of_scan_bus = pci_host_bridge_of_scan_bus,
 +};
 +
- struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 				 struct device *parent)
+ /**
+  * pci_scan_phb - Given a pci_controller, setup and scan the PCI bus
+  * @hose: Pointer to the PCI host controller instance structure
+@@ -1584,9 +1612,9 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+ void pcibios_scan_phb(struct pci_controller *hose)
  {
  	LIST_HEAD(resources);
- 	struct device_node *node = pbm->op->dev.of_node;
--	struct pci_bus *bus;
 +	struct pci_host_bridge *host;
+ 	struct pci_bus *bus;
+ 	struct device_node *node = hose->dn;
+-	int mode;
  
- 	printk("PCI: Scanning PBM %s\n", node->full_name);
+ 	pr_debug("PCI: Scanning PHB %s\n", of_node_full_name(node));
  
-@@ -664,17 +683,16 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 	pbm->busn.end	= pbm->pci_last_busno;
- 	pbm->busn.flags	= IORESOURCE_BUS;
- 	pci_add_resource(&resources, &pbm->busn);
--	bus = pci_create_root_bus(parent, 
-+	host = pci_scan_root_bridge(parent,
- 			PCI_DOMBUS(pbm->index, pbm->pci_first_busno), 
--			pbm->pci_ops, pbm, &resources);
--	if (!bus) {
--		printk(KERN_ERR "Failed to create bus for %s\n",
-+			pbm->pci_ops, pbm, &resources, &phb_ops);
-+	if (!host) {
-+		printk(KERN_ERR "Failed to create host bridge for %s\n",
- 		       node->full_name);
+@@ -1602,30 +1630,17 @@ void pcibios_scan_phb(struct pci_controller *hose)
+ 	pci_add_resource(&resources, &hose->busn);
+ 
+ 	/* Create an empty bus for the toplevel */
+-	bus = pci_create_root_bus(hose->parent, 
++	host = pci_scan_root_bridge(hose->parent,
+ 			PCI_DOMBUS(hose->global_number, hose->first_busno),
+-			hose->ops, hose, &resources);
+-	if (bus == NULL) {
+-		pr_err("Failed to create bus for PCI domain %04x\n",
++			hose->ops, hose, &resources, &phb_ops);
++	if (host == NULL) {
++		pr_err("Failed to create host bridge for PCI domain %04x\n",
+ 			hose->global_number);
  		pci_free_resource_list(&resources);
- 		return NULL;
+ 		return;
  	}
+-	hose->bus = bus;
+-
+-	/* Get probe mode and perform scan */
+-	mode = PCI_PROBE_NORMAL;
+-	if (node && ppc_md.pci_probe_mode)
+-		mode = ppc_md.pci_probe_mode(bus);
+-	pr_debug("    probe mode: %d\n", mode);
+-	if (mode == PCI_PROBE_DEVTREE)
+-		of_scan_bus(node, bus);
+-
+-	if (mode == PCI_PROBE_NORMAL) {
+-		pci_bus_update_busn_res_end(bus, 255);
+-		hose->last_busno = pci_scan_child_bus(bus);
+-		pci_bus_update_busn_res_end(bus, hose->last_busno);
+-	}
++	hose->bus = host->bus;
++	hose->last_busno = host->bus->busn_res.end;
  
--	pci_of_scan_bus(pbm, node, bus);
- 	pci_bus_add_devices(bus);
- 	pci_bus_register_of_sysfs(bus);
- 
+ 	/* Platform gets a chance to do some global fixups before
+ 	 * we proceed to resource allocation
 -- 
 1.7.1
