@@ -1,78 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 16:32:54 +0000
-Subject: [PATCH 2/3] arm64: Consolidate hotplug notifier for instruction
- emulation
-In-Reply-To: <20150116160730.GY7091@arm.com>
-References: <1421325366-13263-1-git-send-email-suzuki.poulose@arm.com>
- <1421325366-13263-3-git-send-email-suzuki.poulose@arm.com>
- <20150116160730.GY7091@arm.com>
-Message-ID: <20150116163254.GC32155@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 17:35:24 +0100
+Subject: [Linaro-acpi] [PATCH v5 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <54B7F767.6060808@linaro.org>
+References: <1413553034-20956-1-git-send-email-hanjun.guo@linaro.org>
+ <2277974.2klgILPa2Q@wuerfel> <54B7F767.6060808@linaro.org>
+Message-ID: <3666560.Yq8BxWCZ3E@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 04:07:30PM +0000, Will Deacon wrote:
-> On Thu, Jan 15, 2015 at 12:36:05PM +0000, Suzuki K. Poulose wrote:
-> > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> > 
-> > As of now each insn_emulation has a cpu hotplug notifier that
-> > enables/disables the CPU feature bit for the functionality. This
-> > patch re-arranges the code, such that there is only one notifier
-> > that runs through the list of registered emulation hooks and runs
-> > their corresponding set_hw_mode.
-> > 
-> > We do nothing when a CPU is dying as we will set the appropriate bits
-> > as it comes back online based on the state of the hooks.
-> > 
-> > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  Documentation/arm64/legacy_instructions.txt |    4 +
-> >  arch/arm64/include/asm/cpufeature.h         |    2 +
-> >  arch/arm64/kernel/armv8_deprecated.c        |  113 +++++++++++++++------------
-> >  3 files changed, 69 insertions(+), 50 deletions(-)
-> > 
-> > diff --git a/Documentation/arm64/legacy_instructions.txt b/Documentation/arm64/legacy_instructions.txt
-> > index a3b3da2..0a4dc26 100644
-> > --- a/Documentation/arm64/legacy_instructions.txt
-> > +++ b/Documentation/arm64/legacy_instructions.txt
-> > @@ -27,6 +27,10 @@ behaviours and the corresponding values of the sysctl nodes -
-> >    instructions. Using hardware execution generally provides better
-> >    performance, but at the loss of ability to gather runtime statistics
-> >    about the use of the deprecated instructions.
-> > +  Note: Emulation of a deprecated instruction depends on the availability
-> > +  of the feature on all the active CPUs. In case of CPU hotplug, if a new
-> > +  CPU doesn't support a feature, it could result in the abortion of the
-> > +  hotplug operation.
+On Thursday 15 January 2015 10:22:47 Al Stone wrote:
 > 
-> Is this true? We should be able to *emulate* the instruction anywhere,
-> it's the "hardware execution" setting that needs CPU support.
+> Can I restate the position as I hear it, then?  I want to make sure
+> I'm understanding what's being said.
+> 
+> What I'm reading seems to say: if an ARMv8 vendor wants Linux support
+> in the upstream kernel, regardless of whether or not it is a mobile or
+> server product, they must submit DT-based patches until such time as
+> ACPI on arm64 is deemed "mature."  Do I have that correct?
 
-Not quite. In ARMv8 there are three possible cases for endianness
-support:
+I was specifically referring to SoC specific device drivers here.
+It's a bit unclear what a 'vendor' is in this context, but I'd hope
+that as long as we have basic support for a SoC, other people can
+build DT blobs for these machines and have them run Linux out of
+the box.
 
-(a) Mixed endian support at all levels
-    ID_AA64MMFR0_EL1.BigEnd == 0b0001
-    ID_AA64MMFR0_EL1.BigEnd0 == 0b0000 (RES0, invalid)
+> That implies to me that if I want to build an ACPI-only product, there
+> is no way to predict when or if I can get Linux support.  And, that if
+> I do want Linux support, and need ACPI for my end-users, I have to
+> maintain both sets of firmware for some unknown time into the future.
+> Is that what was meant?
 
-(b) Mixed endian support at EL0 only
-    ID_AA64MMFR0_EL1.BigEnd == 0b0000
-    ID_AA64MMFR0_EL1.BigEnd0 == 0b0001
-    SCTLR_EL1.EE has a fixed value
+The firmware is normally not written by the people that do the SoC,
+and we have very little control over what someone puts in their
+firmware. Shipping an ACPI-only firmware would still work, but has
+the danger of breaking if we ever have to make incompatible changes
+to the way we interpret the ACPI tables and we have to support users
+that can't upgrade their firmware.
 
-(c) No mixed endian support at all
-    ID_AA64MMFR0_EL1.BigEnd == 0b0000
-    ID_AA64MMFR0_EL1.BigEnd0 == 0b0000
-    SCTLR_EL1.{EE,E0E} have fixed values
+Hopefully we can quickly get to the point where we don't have to
+make incompatible changes, but I don't think that is realistic
+from the day we first merge ACPI support.
 
-We can emulate setend in cases (a) and (b), but not (c) unless we
-trapped every single instruction that could access memory. I don't think
-that's feasible.
-
-Also fun in case (c) is that the kernel may not be able to run on all
-CPUs (consider a BE kernel where some CPUs are fixed to LE at EL1).
-
-I hope no-one builds a system where CPUs are mismatched w.r.t.
-endianness support.
-
-Thanks,
-Mark.
+	Arnd
