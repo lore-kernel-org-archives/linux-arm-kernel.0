@@ -1,45 +1,59 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 16 Jan 2015 18:45:16 +0100
-Subject: [PATCH v2 0/2] clocksource: don't suspend/resume when unused
-In-Reply-To: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421427439-11699-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150116184516.735cd2de@bbrezillon>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 16 Jan 2015 12:48:11 -0500
+Subject: [RFC PATCH 00/11] Early kprobe: enable kprobes at very early
+In-Reply-To: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
+References: <1420616086-42692-1-git-send-email-wangnan0@huawei.com>
+Message-ID: <20150116174811.GA7817@home.goodmis.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015 17:57:17 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> This is a quite naive implementation to track whether a clocksource is enabled.
-> I chose not to add a member in struct clocksource and use a flag instead.
+On Wed, Jan 07, 2015 at 03:34:46PM +0800, Wang Nan wrote:
 > 
-> I found that timekeeping.c is the only consumer for clocksource and I converted
-> it to use clocksource_enable and clocksource_disable.
+> Patch 10 enables cmdline option 'ekprobe=', allows setup probe at
+> cmdline. However, currently the kprobe handler is only a simple printk.
+> 
+> Patch 11 introduces required Kconfig options to actually enable early
+> kprobes.
+> 
+> Usage of early kprobe is as follow:
+> 
+> Booting kernel with cmdline 'ekprobe=', like:
+> 
+> ... rdinit=/sbin/init ekprobe=0xc00f3c2c ekprobe=__free_pages ...
 
-To the whole series:
+Perhaps you should specify what the probe will do. For now it is only printk.
+For example:
 
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+  ekprobe=printk,__free_pages
+
+That is, here you are attaching a printk to __free_pages.
+
+Later, when you implement tracing, you could have:
+
+ ekprobe=trace,__free_pages
+
+where it will be sent to the ring buffer.
+
+This will maintain backward compatibility when you add new features. Instead
+of getting something like printk working now, and people use it for such,
+and then when you switch it over to tracing, it breaks the printk version.
+
+Also, if you plan on converting early kprobes to normal kprobes during boot,
+then it should just be kprobes=..., why add the 'e'. It being early is just
+an implementation detail, not something that should be expressed by the users
+of the facility.
+
+-- Steve
+
 
 > 
-> Changes in v2:
->  - removed the check on enable in timekeeping.c to ensure all clocksources are
->    going through clocksource_enable
->  - rework clocksource_enable to set CLOCK_SOURCE_USED when enable is successful
->    if present
+> During boot, kernel will print trace using printk:
 > 
-> Alexandre Belloni (2):
->   clocksource: track usage
->   clocksource: don't suspend/resume when unused
-> 
->  include/linux/clocksource.h |  4 ++++
->  kernel/time/clocksource.c   | 34 ++++++++++++++++++++++++++++++++--
->  kernel/time/timekeeping.c   |  8 +++-----
->  3 files changed, 39 insertions(+), 7 deletions(-)
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>  ...
+>  Hit early kprobe at __alloc_pages_nodemask+0x4
+>  Hit early kprobe at __free_pages+0x0
+>  Hit early kprobe at __alloc_pages_nodemask+0x4
+>  Hit early kprobe at __free_pages+0x0
+>  Hit early kprobe at __free_pages+0x0
+>  Hit early kprobe at __alloc_pages_nodemask+0x4
+>  ...
