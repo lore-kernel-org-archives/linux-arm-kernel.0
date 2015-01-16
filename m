@@ -1,165 +1,113 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 16 Jan 2015 18:06:15 +0100
-Subject: [PATCH] ARM: vf610: use zero based naming for GPIO nodes
-Message-ID: <1421427975-16391-1-git-send-email-stefan@agner.ch>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 16 Jan 2015 18:09:28 +0100
+Subject: [PATCH] soc: tegra: Add Tegra132 SoC to the DT list of Tegra SoCs
+In-Reply-To: <20150116150749.GA32155@leverpostej>
+References: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
+ <20150116150749.GA32155@leverpostej>
+Message-ID: <20150116170926.GA17763@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Vybrid, all peripherals are numbered starting with zero,
-including the GPIO and PORT module. However, the labels of the
-corresponding device tree nodes start with one, which is confusing.
-Fix that by renaming the labels of the gpio nodes in the device
-tree.
+On Fri, Jan 16, 2015 at 03:07:49PM +0000, Mark Rutland wrote:
+> Hi Paul,
+> 
+> /me opens a delicious can of Lumbricus terrestris
+> 
+> My comments below aren't so much about this patch alone, but more about
+> the entire strategy with drivers/soc and the kind of code living there.
+> 
+> On Fri, Jan 16, 2015 at 11:39:13AM +0000, Paul Walmsley wrote:
+> > 
+> > Add "nvidia,tegra132" as a compatible string that denotes a Tegra SoC.
+> > 
+> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> > Cc: Paul Walmsley <pwalmsley@nvidia.com>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > Cc: Alexandre Courbot <gnurou@gmail.com>
+> > ---
+> >  drivers/soc/tegra/common.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
+> > index a71cb74..a952986 100644
+> > --- a/drivers/soc/tegra/common.c
+> > +++ b/drivers/soc/tegra/common.c
+> > @@ -15,6 +15,7 @@ static const struct of_device_id tegra_machine_match[] = {
+> >  	{ .compatible = "nvidia,tegra30", },
+> >  	{ .compatible = "nvidia,tegra114", },
+> >  	{ .compatible = "nvidia,tegra124", },
+> > +	{ .compatible = "nvidia,tegra132", },
+> >  	{ }
+> >  };
+> 
+> I'm rather worried by this.
+> 
+> The only user of this table is soc_is_tegra(), which seems to guard
+> several probe paths in drivers which are DT driven. Given that, I don't
+> see why this is necessary at all, because the presence of the
+> appropriate nodes should be sufficient to handle the early return from
+> an initcall.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-We do not have a lot of GPIO usage up until now, so better fix
-this early...
+We need this to preserve backward-compatibility. There are some
+instances where any device tree nodes that could be used to guard the
+code execution were only added after the fact. So in order to keep
+systems with an old DTB running we need to continue running with hard
+coded physical addresses.
 
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi |  2 +-
- arch/arm/boot/dts/vf-colibri.dtsi         |  2 +-
- arch/arm/boot/dts/vf500.dtsi              | 10 +++++-----
- arch/arm/boot/dts/vf610-twr.dts           |  2 +-
- arch/arm/boot/dts/vfxxx.dtsi              | 20 ++++++++++----------
- 5 files changed, 18 insertions(+), 18 deletions(-)
+> More worryingly, if soc_is_tegra() returns true but the node isn't
+> found, the drivers decide to do things. If tegra_pmc_early_init passes
+> soc_is_tegra() (because we happened to match "nvidia,tegra132"), but
+> doesn't find a DTB entry for the pmc, it then pokes an assumed
+> hard-coded physical address.
 
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 56a452b..36cafbf 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -35,7 +35,7 @@
- 			regulator-name = "usbh_vbus";
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 19 GPIO_ACTIVE_LOW>;
-+			gpio = <&gpio2 19 GPIO_ACTIVE_LOW>;
- 			vin-supply = <&sys_5v0_reg>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index 95b6ff2..5c2b732 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -31,7 +31,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
--	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
-+	cd-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
- };
- 
- &fec1 {
-diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-index 2901609..68bd231 100644
---- a/arch/arm/boot/dts/vf500.dtsi
-+++ b/arch/arm/boot/dts/vf500.dtsi
-@@ -94,23 +94,23 @@
- 	interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
--&gpio1 {
-+&gpio0 {
- 	interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
--&gpio2 {
-+&gpio1 {
- 	interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
--&gpio3 {
-+&gpio2 {
- 	interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
--&gpio4 {
-+&gpio3 {
- 	interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
--&gpio5 {
-+&gpio4 {
- 	interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
- };
- 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index a0f7621..289fef2 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -123,7 +123,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
--	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
-+	cd-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index a55e1f9..d19f1ee 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -22,11 +22,11 @@
- 		serial3 = &uart3;
- 		serial4 = &uart4;
- 		serial5 = &uart5;
--		gpio0 = &gpio1;
--		gpio1 = &gpio2;
--		gpio2 = &gpio3;
--		gpio3 = &gpio4;
--		gpio4 = &gpio5;
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+		gpio2 = &gpio2;
-+		gpio3 = &gpio3;
-+		gpio4 = &gpio4;
- 		usbphy0 = &usbphy0;
- 		usbphy1 = &usbphy1;
- 	};
-@@ -216,7 +216,7 @@
- 				#gpio-range-cells = <3>;
- 			};
- 
--			gpio1: gpio at 40049000 {
-+			gpio0: gpio at 40049000 {
- 				compatible = "fsl,vf610-gpio";
- 				reg = <0x40049000 0x1000 0x400ff000 0x40>;
- 				gpio-controller;
-@@ -226,7 +226,7 @@
- 				gpio-ranges = <&iomuxc 0 0 32>;
- 			};
- 
--			gpio2: gpio at 4004a000 {
-+			gpio1: gpio at 4004a000 {
- 				compatible = "fsl,vf610-gpio";
- 				reg = <0x4004a000 0x1000 0x400ff040 0x40>;
- 				gpio-controller;
-@@ -236,7 +236,7 @@
- 				gpio-ranges = <&iomuxc 0 32 32>;
- 			};
- 
--			gpio3: gpio at 4004b000 {
-+			gpio2: gpio at 4004b000 {
- 				compatible = "fsl,vf610-gpio";
- 				reg = <0x4004b000 0x1000 0x400ff080 0x40>;
- 				gpio-controller;
-@@ -246,7 +246,7 @@
- 				gpio-ranges = <&iomuxc 0 64 32>;
- 			};
- 
--			gpio4: gpio at 4004c000 {
-+			gpio3: gpio at 4004c000 {
- 				compatible = "fsl,vf610-gpio";
- 				reg = <0x4004c000 0x1000 0x400ff0c0 0x40>;
- 				gpio-controller;
-@@ -256,7 +256,7 @@
- 				gpio-ranges = <&iomuxc 0 96 32>;
- 			};
- 
--			gpio5: gpio at 4004d000 {
-+			gpio4: gpio at 4004d000 {
- 				compatible = "fsl,vf610-gpio";
- 				reg = <0x4004d000 0x1000 0x400ff100 0x40>;
- 				gpio-controller;
--- 
-2.2.2
+And that's (currently) safe. It at least makes sure that breakage (if
+any) is restricted to Tegra boards. There are other occurrences where
+drivers don't even bother checking for this at all and simply use an
+initcall to unconditionally create a platform device which then goes
+and tries to access physical addresses on *every* board in a multi-
+platform kernel.
+
+> Assuming things because of the _lack_ of a node has been a major pain
+> point on 32-bit as DTBs advanced and code was changed, resulting in boot
+> breaking or DTB compatibility breaking over time as old and new kernels
+> made conflicting assumptions.
+
+So what are you saying? We can't support 64-bit ARM because we need to
+keep backwards-compatibility with old DTBs and weren't smart enough to
+see this through all the way three years ago?
+
+> I don't want to see arm64 kernels making assumptions in that manner (nor
+> would I like to see it in new code for 32-bit ARM); it always leads to
+> boot breakage, and it's completely avoidable. The only thing we can know
+> is what is described in the DTB.
+
+I guess we could always make this conditional on 32-bit ARM. Or we could
+decide that we don't care about DTB backwards-compatibility anymore. In
+fact we're quite likely going to break it soon anyway because of Marc's
+gic_arch_extn rework, so might as well start with a clean plate after
+that...
+
+> So NAK to this addition while soc_is_tegra is in use in that way, and
+> NAK to any DTS patches adding any of the strings that would cause
+> soc_is_tegra to return true on arm64.
+> 
+> There's also the worrying pattern of initcalls that look for particular
+> compatible strings -- why can't these use the existing DT probing
+> infrastructure rather than rolling their own? It would be nice to not
+> accumulate initcalls that only make sense on one platform.
+
+You make it sound like the "existing DT probing infrastructure" is in
+any way different from initcalls. Furthermore it's typically associated
+with a specific subsystem or class of devices, so adding custom OF init
+tables for a driver that's used on a single platform doesn't strike me
+as something that people would be willing to merge.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/9943c6f4/attachment.sig>
