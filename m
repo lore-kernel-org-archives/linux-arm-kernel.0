@@ -1,160 +1,40 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 16 Jan 2015 02:44:39 +0000
-Subject: [PATCH v2 1/8] ARM: at91: pm: rework cpu detection
-In-Reply-To: <1421333971-7581-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421333971-7581-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641BFCE1327@penmbx01>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Jan 2015 11:45:50 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Sh73a0 CCF Updates
+ for v3.20
+Message-ID: <cover.1421376276.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
-> Behalf Of Alexandre Belloni
-> Sent: Thursday, January 15, 2015 10:59 PM
-> To: Ferre, Nicolas
-> Cc: Boris Brezillon; Arnd Bergmann; linux-kernel at vger.kernel.org; Alexandre
-> Belloni; Jean-Christophe Plagniol-Villard; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH v2 1/8] ARM: at91: pm: rework cpu detection
-> 
-> Store SoC differences in a struct to remove cpu_is_* usage.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/mach-at91/pm.c | 54 ++++++++++++++++++++++++++++++-----------------
-> --
->  1 file changed, 33 insertions(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> 9b15169a1c62..79aa793d1f00 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -17,6 +17,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/sysfs.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/clk/at91_pmc.h>
-> @@ -32,6 +33,11 @@
->  #include "generic.h"
->  #include "pm.h"
-> 
-> +static struct {
-> +	unsigned long uhp_udp_mask;
-> +	int memctrl;
-> +} at91_pm_data;
-> +
->  static void (*at91_pm_standby)(void);
-> 
->  static int at91_pm_valid_state(suspend_state_t state) @@ -71,17 +77,9 @@ static
-> int at91_pm_verify_clocks(void)
->  	scsr = at91_pmc_read(AT91_PMC_SCSR);
-> 
->  	/* USB must not be using PLLB */
-> -	if (cpu_is_at91rm9200()) {
-> -		if ((scsr & (AT91RM9200_PMC_UHP |
-> AT91RM9200_PMC_UDP)) != 0) {
-> -			pr_err("AT91: PM - Suspend-to-RAM with USB still
-> active\n");
-> -			return 0;
-> -		}
-> -	} else if (cpu_is_at91sam9260() || cpu_is_at91sam9261() ||
-> cpu_is_at91sam9263()
-> -			|| cpu_is_at91sam9g20() || cpu_is_at91sam9g10()) {
-> -		if ((scsr & (AT91SAM926x_PMC_UHP |
-> AT91SAM926x_PMC_UDP)) != 0) {
-> -			pr_err("AT91: PM - Suspend-to-RAM with USB still
-> active\n");
-> -			return 0;
-> -		}
-> +	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
-> +		pr_err("AT91: PM - Suspend-to-RAM with USB still active\n");
-> +		return 0;
->  	}
-> 
->  	/* PCK0..PCK3 must be disabled, or configured to use clk32k */ @@ -
-> 149,18 +147,13 @@ static int at91_pm_enter(suspend_state_t state)
->  			 * turning off the main oscillator; reverse on wakeup.
->  			 */
->  			if (slow_clock) {
-> -				int memctrl = AT91_MEMCTRL_SDRAMC;
-> -
-> -				if (cpu_is_at91rm9200())
-> -					memctrl = AT91_MEMCTRL_MC;
-> -				else if (cpu_is_at91sam9g45())
-> -					memctrl = AT91_MEMCTRL_DDRSDR;
->  #ifdef CONFIG_AT91_SLOW_CLOCK
->  				/* copy slow_clock handler to SRAM, and call it */
->  				memcpy(slow_clock, at91_slow_clock,
-> at91_slow_clock_sz);  #endif
->  				slow_clock(at91_pmc_base, at91_ramc_base[0],
-> -					   at91_ramc_base[1], memctrl);
-> +					   at91_ramc_base[1],
-> +					   at91_pm_data.memctrl);
->  				break;
->  			} else {
->  				pr_info("AT91: PM - no slow clock mode
-> enabled ...\n"); @@ -237,10 +230,29 @@ static int __init at91_pm_init(void)
-> 
->  	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock
-> mode)" : ""));
-> 
-> -	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh.
-> */
-> -	if (cpu_is_at91rm9200())
-> +	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
-> +
-> +	if (of_machine_is_compatible("atmel,at91rm9200")) {
-> +		/*
-> +		 * AT91RM9200 SDRAM low-power mode cannot be used with
-> +		 * self-refresh.
-> +		 */
->  		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
-> -
-> +
-> +		at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
-> +					    AT91RM9200_PMC_UDP;
-> +		at91_pm_data.memctrl = AT91_MEMCTRL_MC;
-> +	} else if (of_machine_is_compatible("atmel,at91sam9260") ||
-> +		   of_machine_is_compatible("atmel,at91sam9g20") ||
-> +		   of_machine_is_compatible("atmel,at91sam9261") ||
-> +		   of_machine_is_compatible("atmel,at91sam9g10") ||
-> +		   of_machine_is_compatible("atmel,at91sam9263")) {
-> +		at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP |
-> +					    AT91SAM926x_PMC_UDP;
-> +	} else if (of_machine_is_compatible("atmel,at91sam9g45")) {
-> +		at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
-> +	}
-> +
-About the memory controller type, I prefer to get it during the memory controller initialization, from the sram_ids[].data which defined in the setup.c,
-As this,
-static const struct at91_ramc_of_data at91rm9200_ramc_of_data = {
-	.ramc_type = AT91_MEMCTRL_MC,
-};
-...
-static struct of_device_id ramc_ids[] = {
-	{ .compatible = "atmel,at91rm9200-sdramc", .data = &at91rm9200_ramc_of_data},
-	... ...
-	{ /*sentinel*/ }
-};
+Please consider these second round of Renesas ARM based SoC sh73a0 CCF updates for v3.20.
 
-What about you? 
+This pull request is based on the previous round of
+such requests, tagged as renesas-sh73a0-ccf-for-v3.20,
+which you have already pulled.
 
->  	if (at91_cpuidle_device.dev.platform_data)
->  		platform_device_register(&at91_cpuidle_device);
-> 
-> --
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Best Regards,
-Wenyou Yang
+The following changes since commit 09bd745b555c262d1e2c851777317f3adf3cf3d4:
+
+  ARM: shmobile: sh73a0: disable legacy clock initialization (2014-12-21 17:09:25 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-ccf2-for-v3.20
+
+for you to fetch changes up to 16bd794f9432b556ec797cbf16c5e575a18f7030:
+
+  clk: shmobile: fix sparse NULL pointer warning (2015-01-14 13:13:24 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Sh73a0 CCF Updates for v3.20
+
+* Fix sparse NULL pointer warning
+
+----------------------------------------------------------------
+Wei Yongjun (1):
+      clk: shmobile: fix sparse NULL pointer warning
+
+ drivers/clk/shmobile/clk-sh73a0.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
