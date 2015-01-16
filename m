@@ -1,77 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jan 2015 11:35:24 +0900
-Subject: [PATCH 12/17] ARM: shmobile: sh73a0: Add Multiplatform support
+Date: Fri, 16 Jan 2015 11:35:23 +0900
+Subject: [PATCH 11/17] ARM: shmobile: sh73a0: Introduce generic setup callback
 In-Reply-To: <cover.1421371996.git.horms+renesas@verge.net.au>
 References: <cover.1421371996.git.horms+renesas@verge.net.au>
-Message-ID: <cd2da4ef99846d240a86aa53e630012aa30f5674.1421371996.git.horms+renesas@verge.net.au>
+Message-ID: <fcbd924a694351eb1583e8fa3671c7353b43b67d.1421371996.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Enable sh73a0 Multiplatform support for the generic sh73a0
-machine vector. No board support is enabled, and the board
-code for KZM9G DT Reference is left by itself.
+Add a generic sh73a0 machine setup callback for the upcoming
+sh73a0 multiplatform case. Cache needs to be configured, and
+legacy clocks must be omitted.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig      | 5 +++++
- arch/arm/mach-shmobile/Makefile     | 4 ++--
- arch/arm/mach-shmobile/smp-sh73a0.c | 2 +-
- 3 files changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/setup-sh73a0.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 1b4fafe..08662eb 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -72,6 +72,11 @@ config ARCH_R8A7794
- 	bool "R-Car E2 (R8A77940)"
- 	select ARCH_RCAR_GEN2
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 354cab1..34b5a78 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -30,6 +30,7 @@
+ #include <linux/platform_data/sh_ipmmu.h>
+ #include <linux/platform_data/irq-renesas-intc-irqpin.h>
  
-+config ARCH_SH73A0
-+	bool "SH-Mobile AG5 (R8A73A00)"
-+	select ARCH_RMOBILE
-+	select RENESAS_INTC_IRQPIN
-+
- comment "Renesas ARM SoCs Board Type"
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+@@ -779,8 +780,6 @@ void __init sh73a0_add_early_devices(void)
+ 	shmobile_setup_console();
+ }
  
- config MACH_LAGER
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index b55cac0..8552c9d 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -7,7 +7,7 @@ obj-y				:= timer.o console.o
- 
- # CPU objects
- obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o intc-sh7372.o pm-sh7372.o
--obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o intc-sh73a0.o pm-sh73a0.o
-+obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o pm-sh73a0.o
- obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o pm-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
-@@ -68,7 +68,7 @@ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_LAGER)	+= board-lager.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
--obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
-+obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o intc-sh73a0.o
- obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
- endif
- 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index c16dbfe..2106d6b 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -33,7 +33,7 @@
- 
- #define SH73A0_SCU_BASE 0xf0000000
- 
--#ifdef CONFIG_HAVE_ARM_TWD
-+#if defined(CONFIG_HAVE_ARM_TWD) && !defined(CONFIG_ARCH_MULTIPLATFORM)
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, SH73A0_SCU_BASE + 0x600, 29);
- void __init sh73a0_register_twd(void)
+-#ifdef CONFIG_USE_OF
+-
+ void __init sh73a0_add_standard_devices_dt(void)
  {
+ 	/* clocks are setup late during boot in the case of DT */
+@@ -797,6 +796,17 @@ static void sh73a0_restart(enum reboot_mode mode, const char *cmd)
+ 	writel((1 << 31), RESCNT2);
+ }
+ 
++#ifdef CONFIG_USE_OF
++
++static void __init sh73a0_generic_init(void)
++{
++#ifdef CONFIG_CACHE_L2X0
++	/* Shared attribute override enable, 64K*8way */
++	l2x0_init(IOMEM(0xf0100000), 0x00400000, 0xc20f0fff);
++#endif
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static const char *sh73a0_boards_compat_dt[] __initdata = {
+ 	"renesas,sh73a0",
+ 	NULL,
+@@ -806,7 +816,7 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.smp		= smp_ops(sh73a0_smp_ops),
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= shmobile_init_delay,
+-	.init_machine	= sh73a0_add_standard_devices_dt,
++	.init_machine	= sh73a0_generic_init,
+ 	.init_late	= shmobile_init_late,
+ 	.restart	= sh73a0_restart,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
 -- 
 2.1.4
