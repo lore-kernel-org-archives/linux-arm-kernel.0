@@ -1,82 +1,36 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 16 Jan 2015 20:25:05 +0530
-Subject: Query: ARM64: Behavior of el1_dbg exception while executing
- el0_dbg
-In-Reply-To: <54B8FD49.2060503@redhat.com>
-References: <54AE830E.1090000@redhat.com> <20150108162312.GO11583@arm.com>
- <54AEBE45.9080203@redhat.com> <20150109154635.GG11258@arm.com>
- <54B00C39.1070809@redhat.com> <20150112173005.GK13360@arm.com>
- <54B4BF4C.2030009@redhat.com>
- <20150113155221.GG16524@e104818-lin.cambridge.arm.com>
- <54B55B95.1070402@redhat.com> <54B7EF3C.8060909@redhat.com>
- <54B8FD49.2060503@redhat.com>
-Message-ID: <54B92649.6030009@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Jan 2015 14:55:45 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <54B9240A.7060003@amd.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <54B8BB24.2020408@linaro.org> <54B9240A.7060003@amd.com>
+Message-ID: <20150116145545.GR7091@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tom,
 
-Sorry for writing so many mails...But I have one more closer information 
-which could help to further explain the behavior. See below.
+On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
+> I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
+> drivers that I'm about to submit upstream with the V7 patch series
+> on the AMD Seattle server platform. There does not appear to be support
+> for the _CCA attribute in this patch series. The amd-xgbe driver will
+> setup the device domain and cache attributes based on the presence of
+> this attribute, but it requires the arch support to assign the proper
+> DMA operations in order for it to all work correctly.
+> 
+> Overriding the _CCA attribute in the driver, I was able to successfully
+> test the driver and this patch series.
 
-On Friday 16 January 2015 05:30 PM, Pratyush Anand wrote:
-> Hi Will,
->
->
-> On Thursday 15 January 2015 10:17 PM, Pratyush Anand wrote:
->> Hi Will / Catalin,
->>
->> On Tuesday 13 January 2015 11:23 PM, Pratyush Anand wrote:
->>> I will still try to find some way to capture enable_dbg macro path.H
->>
->> I did instrumented debug tap points at all the location from where
->> enable_debug macro is called(see attached debug patch). But, I do not
->> see that, execution reaches to any of those tap points between el0_dbg
->> and el1_dbg, and tap points debug log also confirms that el1_dbg is
->> raised before el0_dbg is returned.
->
-> Probably we all missed this, ARMv8 specs is very clear about it. In
-> section "D2.1 About debug exceptions" it says:
->
-> Software Breakpoint Instruction exceptions cannot be masked. The PE
-> takes Software Breakpoint Instruction exceptions regardless of both of
-> the following:
-> ? The current Exception level.
-> ? The current Security state.
->
-> So, reception of el1_dbg while executing el0_dbg seems perfectly normal
-> to me. If you agree then I am back with the original query which I asked
-> in the beginning of the
-> thread,(http://permalink.gmane.org/gmane.linux.ports.arm.kernel/383672)
-> ie how can instruction_pointer be wrong when second el1_dbg is called
-> recursively(as follows).
->
-> [1]-> el0_dbg (After executing BRK instruction by user)
-> [2]    -> el1_dbg (when uprobe break handler at [1] executes BRK
-> instruction)
->          (At the end of this ELR_EL1 is programmed with fffffdfffc000004)
+Hopefully this will all be addressed when the IORT parts of ACPI have
+settled down (the current proposal allows for these attributes to be
+described as well as their interaction with things like IOMMUs).
 
-With new tap point debug of entry.S, I see that:
+In the meantime, are you falling back to non-coherent DMA? If so, what
+attributes have you settled on? We need to be really careful not to
+corrupt data during cache invalidatation when mapping a non-coherent
+buffer for the CPU.
 
-After this we are receiving one more exception and that is el1_inv. Now,
-as soon as enable_dbg is called in el1_inv, we receive next single step 
-exception, with ELR_EL1 value as next instruction address after 
-enable_dbg of el1_inv. EC value of ESR_EL1(0x86000007) in el1_inv is 
-0x21 ie ESR_EL1_EC_IABT_EL1 and IFSC is 0x07
-
-Hummmm..So, why did we receive here, an instruction abort in EL1 due to 
-Translation fault, third level??? I do not have that much knowledge yet, 
-to decipher it... :(
-
-
-> [3]        -> el1_dbg (when kprobe break handler at [2] enables single
-> stepping)
->          (Here ELR_EL1 was found fffffe0000092470).So When this el1_dbg
-> was received, then regs->pc  values are not same what was programmed in
-> ELR_EL1 at the return of [2].
->
-
-~Pratyush
-
-PS: Debug code is here:
-https://github.com/pratyushanand/linux.git : 
-ml_arm64_uprobe_devel_debug_el1_inv_while_kprobe_insertion_at_uprobe_breakpoint_handler
+Will
