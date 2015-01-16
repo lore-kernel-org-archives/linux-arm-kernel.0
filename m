@@ -1,59 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jan 2015 14:47:38 +0000
-Subject: [PATCH] arm64: uapi: expose our struct ucontext to the uapi
- headers
-In-Reply-To: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
-References: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20150116144737.GB10230@localhost>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 16 Jan 2015 16:52:12 +0200
+Subject: [PATCHv3 0/2] Driver for TI tlc59116 16 Channel i2c LED driver
+In-Reply-To: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
+References: <1421277308-3477-1-git-send-email-andrew@lunn.ch>
+Message-ID: <54B9259C.3070403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 01:52:14PM +0000, Will Deacon wrote:
-> arm64 defines its own ucontext structure which is incompatible with the
-> struct defined (and exposed to userspace by) the asm-generic headers.
-> 
-> glibc carries its own struct definition that is compatible with the
-> arm64 definition, but we should expose our format in the uapi headers in
-> case other libraries want to make use of the ucontext pushed as part of
-> an arm64 sigframe.
-> 
-> This patch moves the arm64 asm/ucontext.h to the uapi headers, along
-> with the necessary #include of linux/types.h.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marcus Shawcroft <marcus.shawcroft@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> I think we also need something similar for arch/arm/ unless we decide
-> that exposing the incorrect asm-generic header is harmless.
+Hi,
 
-I'm trying to understand how we got here on arm32 (arm64 pretty much
-inherited the behaviour). Before the uapi headers split, we had
-arch/arm/include/asm/ucontext.h which has an #ifdef __KERNEL__ and
-struct ucontext defined outside this block but we don't seem to have
-ever exported this header to user. Luckily, glibc uses its own
-definition which matches the kernel one.
+On 15/01/15 01:15, Andrew Lunn wrote:
+> This patchset is a driver for the TI tlc59116 16 Channel i2c LED
+> driver. This driver is used on the Belkin WRT1900AC access point and
+> the C code is derived from code Belkin contributed to OpenWRT.
+> However it has been extensively re-written, and a device tree binding
+> added to replace platform data.
 
-At some point the asm-generic gained a ucontext.h which is fine but it
-was not ending up in user space as we had an arch ucontext.h. However,
-with the uapi headers change and maybe some additional commits, we end
-up copying the uapi/asm-generic/ucontext.h to usr/include/asm/ in the
-exported headers which differs from the arch ucontext.h as the latter
-was never split in uapi/non-uapi parts (it wasn't in the
-arch/arm/include/Kbuild).
+We have a TLC59108 on one of our boards, and with a quick glance it
+looks about the same as TLC59116, except the amount of outputs. Vignesh
+wrote a driver for it and was about to send it for review.
 
->  arch/arm64/include/uapi/asm/Kbuild           | 1 +
->  arch/arm64/include/{ => uapi}/asm/ucontext.h | 8 +++++---
->  2 files changed, 6 insertions(+), 3 deletions(-)
->  rename arch/arm64/include/{ => uapi}/asm/ucontext.h (88%)
+However, Vignesh implemented it as a PWM driver. We use it for LCD
+backlight (via pwm-backlight).
 
-For this patch:
+I'm not very familiar with LED and PWM drivers, but doesn't implementing
+this as a LED driver prevent us from using it as a backlight? Whereas it
+looks like PWM can be used as a led via pwm-leds (I think).
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+ Tomi
 
-For arm32 I think we need to split ucontext.h into uapi and non-uapi
-part according to the #ifdef __KERNEL__.
 
-Catalin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/dcd6c719/attachment.sig>
