@@ -1,40 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jan 2015 11:45:50 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Sh73a0 CCF Updates
- for v3.20
-Message-ID: <cover.1421376276.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jan 2015 11:45:51 +0900
+Subject: [PATCH] clk: shmobile: fix sparse NULL pointer warning
+In-Reply-To: <cover.1421376276.git.horms+renesas@verge.net.au>
+References: <cover.1421376276.git.horms+renesas@verge.net.au>
+Message-ID: <16bd794f9432b556ec797cbf16c5e575a18f7030.1421376276.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Please consider these second round of Renesas ARM based SoC sh73a0 CCF updates for v3.20.
+Fixes the following sparse warnings:
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-sh73a0-ccf-for-v3.20,
-which you have already pulled.
+drivers/clk/shmobile/clk-sh73a0.c:57:17: warning:
+ Using plain integer as NULL pointer
 
-
-The following changes since commit 09bd745b555c262d1e2c851777317f3adf3cf3d4:
-
-  ARM: shmobile: sh73a0: disable legacy clock initialization (2014-12-21 17:09:25 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh73a0-ccf2-for-v3.20
-
-for you to fetch changes up to 16bd794f9432b556ec797cbf16c5e575a18f7030:
-
-  clk: shmobile: fix sparse NULL pointer warning (2015-01-14 13:13:24 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Sh73a0 CCF Updates for v3.20
-
-* Fix sparse NULL pointer warning
-
-----------------------------------------------------------------
-Wei Yongjun (1):
-      clk: shmobile: fix sparse NULL pointer warning
-
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  drivers/clk/shmobile/clk-sh73a0.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/shmobile/clk-sh73a0.c b/drivers/clk/shmobile/clk-sh73a0.c
+index 8574a6d..cd529cf 100644
+--- a/drivers/clk/shmobile/clk-sh73a0.c
++++ b/drivers/clk/shmobile/clk-sh73a0.c
+@@ -54,7 +54,7 @@ static struct div4_clk div4_clks[] = {
+ 	{ "m2", "pll1", CPG_FRQCRA,  0 },
+ 	{ "zx", "pll1", CPG_FRQCRB, 12 },
+ 	{ "hp", "pll1", CPG_FRQCRB,  4 },
+-	{ NULL, 0, 0, 0 },
++	{ NULL, NULL, 0, 0 },
+ };
+ 
+ static const struct clk_div_table div4_div_table[] = {
+-- 
+2.1.4
