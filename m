@@ -1,49 +1,74 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 16 Jan 2015 10:13:10 +0100
-Subject: [PATCH v4 16/18] iommu: exynos: remove excessive includes and sort
- others alphabetically
+Date: Fri, 16 Jan 2015 10:13:04 +0100
+Subject: [PATCH v4 10/18] iommu: exynos: remove unused functions, part 2
 In-Reply-To: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
 References: <1421399592-7482-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1421399592-7482-17-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1421399592-7482-11-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed following unused includes: <linux/mm.h>, <linux/errno.h>,
-<linux/memblock.h> and <linux/export.h>.
+After refactoring functions to use pointer to struct sysmmu_drvdata
+directly, some functions became useless and thus never used, so remove
+them completely.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+ drivers/iommu/exynos-iommu.c | 43 -------------------------------------------
+ 1 file changed, 43 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index ef7172551a39..c53cc8f61176 100644
+index 862261fe097b..e62cb96a742c 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -12,19 +12,15 @@
- #define DEBUG
- #endif
+@@ -457,49 +457,6 @@ static int __sysmmu_enable(struct sysmmu_drvdata *data,
+ 	return ret;
+ }
  
--#include <linux/io.h>
--#include <linux/interrupt.h>
--#include <linux/platform_device.h>
--#include <linux/slab.h>
--#include <linux/pm_runtime.h>
- #include <linux/clk.h>
- #include <linux/err.h>
--#include <linux/mm.h>
-+#include <linux/io.h>
- #include <linux/iommu.h>
--#include <linux/errno.h>
-+#include <linux/interrupt.h>
- #include <linux/list.h>
--#include <linux/memblock.h>
--#include <linux/export.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/slab.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/pgtable.h>
+-/* __exynos_sysmmu_enable: Enables System MMU
+- *
+- * returns -error if an error occurred and System MMU is not enabled,
+- * 0 if the System MMU has been just enabled and 1 if System MMU was already
+- * enabled before.
+- */
+-static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
+-				  struct iommu_domain *domain)
+-{
+-	int ret = 0;
+-	unsigned long flags;
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	struct sysmmu_drvdata *data;
+-
+-	BUG_ON(!has_sysmmu(dev));
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	ret = __sysmmu_enable(data, pgtable, domain);
+-	if (ret >= 0)
+-		data->master = dev;
+-
+-	return ret;
+-}
+-
+-static bool exynos_sysmmu_disable(struct device *dev)
+-{
+-	unsigned long flags;
+-	bool disabled = true;
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	struct sysmmu_drvdata *data;
+-
+-	BUG_ON(!has_sysmmu(dev));
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	disabled = __sysmmu_disable(data);
+-	if (disabled)
+-		data->master = NULL;
+-
+-	return disabled;
+-}
+-
+ static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
+ 					      sysmmu_iova_t iova)
+ {
 -- 
 1.9.2
