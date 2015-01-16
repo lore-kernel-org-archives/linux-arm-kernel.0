@@ -1,61 +1,59 @@
-From: thomas.lendacky@amd.com (Tom Lendacky)
-Date: Fri, 16 Jan 2015 08:45:30 -0600
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54B8BB24.2020408@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <54B8BB24.2020408@linaro.org>
-Message-ID: <54B9240A.7060003@amd.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Jan 2015 14:47:38 +0000
+Subject: [PATCH] arm64: uapi: expose our struct ucontext to the uapi
+ headers
+In-Reply-To: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
+References: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150116144737.GB10230@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2015 01:17 AM, Hanjun Guo wrote:
-> On 2015?01?16? 02:23, Catalin Marinas wrote:
->> Hi Grant,
->>
->> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
->>> On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org>
->>> wrote:
->>>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
->>>
->>> I'll get right to the point: Can we please have this series queued up
->>> for v3.20?
->>
->> Before you even ask for this, please look at the patches and realise
->> that there is a complete lack of Reviewed-by tags on the code (well,
->> apart from trivial Kconfig changes). In addition, the series touches on
->> other subsystems like clocksource, irqchip, acpi and I don't see any
->> acks from the corresponding maintainers. So even if I wanted to merge
->
-> For the ACPI part, Rafael already said that "Having looked at the
-> patches recently, I don't see any major problems in them from the ACPI
-> core perspective, so to me they are good to go." [1]
-> Is that kind of ack for this ?
->
-> Thanks
-> Hanjun
->
-> [1]:
-> http://lkml.iu.edu/hypermail/linux/kernel/1409.1/03363.html
->
+On Fri, Jan 16, 2015 at 01:52:14PM +0000, Will Deacon wrote:
+> arm64 defines its own ucontext structure which is incompatible with the
+> struct defined (and exposed to userspace by) the asm-generic headers.
+> 
+> glibc carries its own struct definition that is compatible with the
+> arm64 definition, but we should expose our format in the uapi headers in
+> case other libraries want to make use of the ucontext pushed as part of
+> an arm64 sigframe.
+> 
+> This patch moves the arm64 asm/ucontext.h to the uapi headers, along
+> with the necessary #include of linux/types.h.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marcus Shawcroft <marcus.shawcroft@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> I think we also need something similar for arch/arm/ unless we decide
+> that exposing the incorrect asm-generic header is harmless.
 
-I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
-drivers that I'm about to submit upstream with the V7 patch series
-on the AMD Seattle server platform. There does not appear to be support
-for the _CCA attribute in this patch series. The amd-xgbe driver will
-setup the device domain and cache attributes based on the presence of
-this attribute, but it requires the arch support to assign the proper
-DMA operations in order for it to all work correctly.
+I'm trying to understand how we got here on arm32 (arm64 pretty much
+inherited the behaviour). Before the uapi headers split, we had
+arch/arm/include/asm/ucontext.h which has an #ifdef __KERNEL__ and
+struct ucontext defined outside this block but we don't seem to have
+ever exported this header to user. Luckily, glibc uses its own
+definition which matches the kernel one.
 
-Overriding the _CCA attribute in the driver, I was able to successfully
-test the driver and this patch series.
+At some point the asm-generic gained a ucontext.h which is fine but it
+was not ending up in user space as we had an arch ucontext.h. However,
+with the uapi headers change and maybe some additional commits, we end
+up copying the uapi/asm-generic/ucontext.h to usr/include/asm/ in the
+exported headers which differs from the arch ucontext.h as the latter
+was never split in uapi/non-uapi parts (it wasn't in the
+arch/arm/include/Kbuild).
 
-Thanks,
-Tom
+>  arch/arm64/include/uapi/asm/Kbuild           | 1 +
+>  arch/arm64/include/{ => uapi}/asm/ucontext.h | 8 +++++---
+>  2 files changed, 6 insertions(+), 3 deletions(-)
+>  rename arch/arm64/include/{ => uapi}/asm/ucontext.h (88%)
 
+For this patch:
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+For arm32 I think we need to split ucontext.h into uapi and non-uapi
+part according to the #ifdef __KERNEL__.
+
+Catalin
