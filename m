@@ -1,47 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Jan 2015 12:29:22 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150116120518.GK3043@sirena.org.uk>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <20150115190220.GF3043@sirena.org.uk>
- <20150115200437.GF24989@titan.lakedaemon.net>
- <20150116101034.GC13634@e104818-lin.cambridge.arm.com>
- <20150116120518.GK3043@sirena.org.uk>
-Message-ID: <20150116122922.GO7091@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 16 Jan 2015 13:32:03 +0100
+Subject: [PATCH 0/3] Enable myphy28lp support
+In-Reply-To: <54B8FC56.8080400@st.com>
+References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
+ <54B8FC56.8080400@st.com>
+Message-ID: <54B904C3.1080002@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 12:05:18PM +0000, Mark Brown wrote:
-> On Fri, Jan 16, 2015 at 10:10:34AM +0000, Catalin Marinas wrote:
-> 
-> > Indeed, keeping the series as one thread is better. Apart from a
-> > slightly less misleading subject, I suggest Hanjun that he passes each
-> > patch via get_maintainer.pl and adds the corresponding Cc: lines to the
-> > commit log. I think that's a clearer way keep track of who needs to
-> > ack/review the patches.
-> 
-> I'm not saying stop sending them as part of this series, I'm saying it
-> might help to get people to look at them if they were also sent
-> disassociated from it - in the situations where I end up ignoring things
-> that look controversial but unexciting for my bit of it I know I won't
-> even bother opening the e-mails since I know it's just going to get
-> resent anyway quite often with revisions from whatever makes the rest of
-> the series controversial, I expect others will do the same.
-> 
-> Actually, another thing that might help would be if you and/or Will were
-> to prod the relevant people for review, letting them know that the
-> controversy isn't likely to affect their bits.
 
-Hmm, we *could*, but having maintainers go round poking other people to
-review patches feels like the wrong way round to me. The authors should
-be taking ownership of this series and that's half of the problem we
-had in previous versions.
+On 01/16/2015 12:56 PM, Maxime Coquelin wrote:
+> Hi Gabriel,
+>
+>     For the series:
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+>
+>     Kishon, could you take care of adding PHY driver patch for v3.20?
+Hi Kishon,
 
-It needs to be clear that Hanjun/Al/Graeme are the ones running the show,
-not just now, but (even more importantly) when people start building on
-top of the base support. If Catalin and I have to go around asking for
-review, it sets us off on the wrong foot imo.
+     Don't apply the patch, since we have 2 other PHY driver patches, I 
+will send you a pull request.
 
-Will
+Best regards,
+Maxime
+
+
+>
+> Thanks,
+> Maxime
+> On 01/14/2015 10:54 AM, Gabriel FERNANDEZ wrote:
+>> The goal of this series is to enable the support of MiPHY28lp Generic 
+>> PHY.
+>>
+>> The first patch is to update miphy28lp phy driver to access sysconfig 
+>> register
+>> offsets via syscfg dt property. It's based on Arnds review comments here
+>> https://lkml.org/lkml/2014/11/13/161
+>> I have updated the miphy28lp phy driver same way as Peter's 
+>> implementation.
+>>
+>> Gabriel Fernandez (3):
+>>    phy: miphy28lp: Pass sysconfig register offsets via syscfg dt
+>>      property.
+>>    ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+>>    ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, 
+>> PCIe &
+>>      USB3) PHY
+>>
+>>   .../devicetree/bindings/phy/phy-miphy28lp.txt      | 43 
+>> ++++++---------
+>>   arch/arm/boot/dts/stih407-family.dtsi              | 53 
+>> +++++++++++++++++++
+>>   arch/arm/boot/dts/stihxxx-b2120.dtsi               | 11 ++++
+>>   arch/arm/configs/multi_v7_defconfig                |  1 +
+>>   drivers/phy/phy-miphy28lp.c                        | 61 
+>> ++++++++++++----------
+>>   5 files changed, 113 insertions(+), 56 deletions(-)
+>>
+>
