@@ -1,45 +1,45 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 16 Jan 2015 13:13:14 -0700
-Subject: [PATCH] coresight: fix the debug AMBA bus name
-In-Reply-To: <1421315385-79209-1-git-send-email-xiakaixu@huawei.com>
-References: <1421315385-79209-1-git-send-email-xiakaixu@huawei.com>
-Message-ID: <CANLsYkwxny2_YiPrDOJ1OYeUYqSB5gc3rSe9LHvjMmTNrz9RDg@mail.gmail.com>
+Date: Fri, 16 Jan 2015 13:13:38 -0700
+Subject: [PATCH] coresight: remove the unnecessary function
+ coresight_is_bit_set()
+In-Reply-To: <1421324819-8205-1-git-send-email-xiakaixu@huawei.com>
+References: <1421324819-8205-1-git-send-email-xiakaixu@huawei.com>
+Message-ID: <CANLsYkzr28AwAP6eX4VZp-Uf5N_jJf2gmc-ks4KXwc3QEcCscg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2015 at 02:49, Kaixu Xia <xiakaixu@huawei.com> wrote:
-> The right debug AMBA bus name should be APB(Advanced Peripheral Bus),
-> so just fix it.
+On 15 January 2015 at 05:26, Kaixu Xia <xiakaixu@huawei.com> wrote:
+> This function coresight_is_bit_set() isn't called, so we should
+> remove it.
 >
 > Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 > ---
->  Documentation/trace/coresight.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  include/linux/coresight.h | 3 ---
+>  1 file changed, 3 deletions(-)
 >
-> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-> index bba7dbf..0236155 100644
-> --- a/Documentation/trace/coresight.txt
-> +++ b/Documentation/trace/coresight.txt
-> @@ -46,7 +46,7 @@ At typical coresight system would look like this:
->    | |   .        | !   | |   .        | !      | !        .   |      | SWD/
->    | |   .        | !   | |   .        | !      | !        .   |      | JTAG
->    *****************************************************************<-|
-> - *************************** AMBA Debug ABP ************************
-> + *************************** AMBA Debug APB ************************
->    *****************************************************************
->     |    .          !         .          !        !        .    |
->     |    .          *         .          *        *        .    |
-> @@ -79,7 +79,7 @@ At typical coresight system would look like this:
->            To trace port                       TPIU= Trace Port Interface Unit
->                                                SWD = Serial Wire Debug
->
-> -While on target configuration of the components is done via the ABP bus,
-> +While on target configuration of the components is done via the APB bus,
->  all trace data are carried out-of-band on the ATB bus.  The CTM provides
->  a way to aggregate and distribute signals between CoreSight components.
->
+> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+> index 5d3c543..a860933 100644
+> --- a/include/linux/coresight.h
+> +++ b/include/linux/coresight.h
+> @@ -236,7 +236,6 @@ coresight_register(struct coresight_desc *desc);
+>  extern void coresight_unregister(struct coresight_device *csdev);
+>  extern int coresight_enable(struct coresight_device *csdev);
+>  extern void coresight_disable(struct coresight_device *csdev);
+> -extern int coresight_is_bit_set(u32 val, int position, int value);
+>  extern int coresight_timeout(void __iomem *addr, u32 offset,
+>                              int position, int value);
+>  #ifdef CONFIG_OF
+> @@ -250,8 +249,6 @@ static inline void coresight_unregister(struct coresight_device *csdev) {}
+>  static inline int
+>  coresight_enable(struct coresight_device *csdev) { return -ENOSYS; }
+>  static inline void coresight_disable(struct coresight_device *csdev) {}
+> -static inline int coresight_is_bit_set(u32 val, int position, int value)
+> -                                        { return 0; }
+>  static inline int coresight_timeout(void __iomem *addr, u32 offset,
+>                                      int position, int value) { return 1; }
+>  #ifdef CONFIG_OF
 > --
 > 1.8.5.5
 >
 
-Apply - thanks.
+Applied - thanks.
