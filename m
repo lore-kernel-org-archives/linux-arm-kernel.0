@@ -1,47 +1,36 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 16 Jan 2015 16:37:10 +0800
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54B819E0.1050508@redhat.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <54B819E0.1050508@redhat.com>
-Message-ID: <54B8CDB6.60100@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 09:38:44 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Sh73a0 Multiplatform Updates for
+ v3.20
+In-Reply-To: <cover.1421371996.git.horms+renesas@verge.net.au>
+References: <cover.1421371996.git.horms+renesas@verge.net.au>
+Message-ID: <1524412.qzMh8qoUQG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?01?16? 03:49, Mark Langsdorf wrote:
-> On 01/14/2015 09:04 AM, Hanjun Guo wrote:
->> Hi,
->>
->> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
->
->> 1. Why we need ACPI on ARM64?
->>
->>    - Grant already posted a blog about this, and stated clearly
->>      why we need ACPI on ARM64:
->>
->>      http://www.secretlab.ca/archives/151
->>
->>
->> 2. What we need to do before the arm64 ACPI core patches
->>     could be merged into the kernel?
->>
->>    - Al Stone posted a TODO list and updates v2 for the
->>      progress we made:
->>      http://www.spinics.net/lists/arm-kernel/msg390069.html
->>
->>    - so from the progress we can see that we already finished
->>      most of the items, and _OSI we got a plan to fix it, RFC
->>      patch is on the way.
->>
->>
->> This patch set was tested on FVP by Fuwei, and booted ok as expected.
->> (No functional change since last version)
->
-> For what it's worth, I applied these to the latest 3.19-rc4 kernel
-> and booted that on an APM X-Gene and on pre-release AMD hardware.
-> I then ran a couple of stress tests such as kernel compiles and
-> filesystem stressers on the systems.
+On Friday 16 January 2015 11:35:25 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
+> 
+> This pull request is based on a merge of:
+> 
+> * Renesas ARM Based SoC Drivers Updates for v3.20,
+>   tagged as renesas-drivers-for-v3.20, which I have also sent
+>   a built request for.
+> 
+> * "Renesas ARM Based SoC sh73a0 CCF Updates for v3.20",
+>   tagged as renesas-sh73a0-ccf-for-v3.20.
+> 
+> It is my understnding that both of those dependencies are required in
+> order to transition to a bootable muliplatform kernel for the kzm9g board.
 
-Thanks a lot!
+Nothing wrong with the pull request, but I have a question for my
+understanding about where you are with multiplatform support. I
+see that after this pull request, only ARCH_SH7372 and ARCH_R8A7778
+are left without multiplatform support. Did I remember correctly
+that you plan to add a common clock driver for ARCH_R8A7778 next,
+move that to multiplatform and then delete all the ARCH_SHMOBILE_LEGACY
+support including ARCH_SH7372?
 
-Hanjun
+	Arnd
