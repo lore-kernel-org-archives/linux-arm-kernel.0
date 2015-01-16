@@ -1,76 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Jan 2015 15:07:49 +0000
-Subject: [PATCH] soc: tegra: Add Tegra132 SoC to the DT list of Tegra SoCs
-In-Reply-To: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1501161137351.9776@utopia.booyaka.com>
-Message-ID: <20150116150749.GA32155@leverpostej>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Jan 2015 16:08:27 +0100
+Subject: [PATCH v2] AT91, DT, usb gadget: disable pull-up on vbus-gpio
+ (PB16) to reduce power consumption
+In-Reply-To: <20150116104304.GC3843@piout.net>
+References: <54B8AE36.6090904@atmel.com>
+ <1421401839-29370-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20150116104304.GC3843@piout.net>
+Message-ID: <54B9296B.7040309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-/me opens a delicious can of Lumbricus terrestris
-
-My comments below aren't so much about this patch alone, but more about
-the entire strategy with drivers/soc and the kind of code living there.
-
-On Fri, Jan 16, 2015 at 11:39:13AM +0000, Paul Walmsley wrote:
+Le 16/01/2015 11:43, Alexandre Belloni a ?crit :
+> On 16/01/2015 at 10:50:39 +0100, Sylvain Rochet wrote :
+>> There is an external resistor divider on PB16, acting like a pull-down,
+>> the pull-up increase power consumption and prevent the vbus detect pin
+>> to reach Vss voltage, ~1.5V mesured on my board, it might not even work
+>> if the pull-up is stronger than usual.
+>>
+>> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > 
-> Add "nvidia,tegra132" as a compatible string that denotes a Tegra SoC.
+> You should have added the ack from Bo here too.
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Stacked on top of at91-3.20-dt. Thanks for this patch.
+
+Bye,
+
+>> ---
+>> Improved GPIO comment, fixed typo in commit summary.
+>>
+>>  arch/arm/boot/dts/at91sam9x5ek.dtsi | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+>> index 3a9f6fa..bd16bd3 100644
+>> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+>> @@ -53,6 +53,8 @@
+>>  			};
+>>  
+>>  			usb2: gadget at f803c000 {
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_board_usb2>;
+>>  				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
+>>  				status = "okay";
+>>  			};
+>> @@ -80,6 +82,13 @@
+>>  							<AT91_PIOD 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;	/* PD14 gpio CD pin pull up and deglitch */
+>>  					};
+>>  				};
+>> +
+>> +				usb2 {
+>> +					pinctrl_board_usb2: usb2-board {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 16 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB16 gpio vbus sense, deglitch */
+>> +					};
+>> +				};
+>>  			};
+>>  
+>>  			spi0: spi at f0000000 {
+>> -- 
+>> 2.1.4
+>>
 > 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Paul Walmsley <pwalmsley@nvidia.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> ---
->  drivers/soc/tegra/common.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/soc/tegra/common.c b/drivers/soc/tegra/common.c
-> index a71cb74..a952986 100644
-> --- a/drivers/soc/tegra/common.c
-> +++ b/drivers/soc/tegra/common.c
-> @@ -15,6 +15,7 @@ static const struct of_device_id tegra_machine_match[] = {
->  	{ .compatible = "nvidia,tegra30", },
->  	{ .compatible = "nvidia,tegra114", },
->  	{ .compatible = "nvidia,tegra124", },
-> +	{ .compatible = "nvidia,tegra132", },
->  	{ }
->  };
 
-I'm rather worried by this.
 
-The only user of this table is soc_is_tegra(), which seems to guard
-several probe paths in drivers which are DT driven. Given that, I don't
-see why this is necessary at all, because the presence of the
-appropriate nodes should be sufficient to handle the early return from
-an initcall.
-
-More worryingly, if soc_is_tegra() returns true but the node isn't
-found, the drivers decide to do things. If tegra_pmc_early_init passes
-soc_is_tegra() (because we happened to match "nvidia,tegra132"), but
-doesn't find a DTB entry for the pmc, it then pokes an assumed
-hard-coded physical address.
-
-Assuming things because of the _lack_ of a node has been a major pain
-point on 32-bit as DTBs advanced and code was changed, resulting in boot
-breaking or DTB compatibility breaking over time as old and new kernels
-made conflicting assumptions.
-
-I don't want to see arm64 kernels making assumptions in that manner (nor
-would I like to see it in new code for 32-bit ARM); it always leads to
-boot breakage, and it's completely avoidable. The only thing we can know
-is what is described in the DTB.
-
-So NAK to this addition while soc_is_tegra is in use in that way, and
-NAK to any DTS patches adding any of the strings that would cause
-soc_is_tegra to return true on arm64.
-
-There's also the worrying pattern of initcalls that look for particular
-compatible strings -- why can't these use the existing DT probing
-infrastructure rather than rolling their own? It would be nice to not
-accumulate initcalls that only make sense on one platform.
-
-Thanks,
-Mark.
+-- 
+Nicolas Ferre
