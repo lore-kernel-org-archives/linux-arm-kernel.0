@@ -1,124 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Jan 2015 11:35:16 +0900
-Subject: [PATCH] ARM: shmobile: Enable kzm9g board in multiplatform defconfig
-In-Reply-To: <cover.1421371751.git.horms+renesas@verge.net.au>
-References: <cover.1421371751.git.horms+renesas@verge.net.au>
-Message-ID: <eb4513482d1c4882e3633528ccc48d77581b7bb1.1421371751.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Jan 2015 11:35:14 +0900
+Subject: [PATCH 02/17] ARM: shmobile: kzm9g-reference dts: Sort i2c0 children
+ by unit address
+In-Reply-To: <cover.1421371996.git.horms+renesas@verge.net.au>
+References: <cover.1421371996.git.horms+renesas@verge.net.au>
+Message-ID: <f4c4d04ea3813edefdba3d769ea19fa38dcc68e9.1421371996.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
+While at it rename the ak4648 node to "codec" to describe the device's
+function instead of its model, and move its device-specific property
+after its generic properties.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 99e1226..4f9868d 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -17,6 +17,7 @@ CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
- CONFIG_ARCH_R8A7791=y
- CONFIG_ARCH_R8A7794=y
-+CONFIG_ARCH_SH73A0=y
- CONFIG_MACH_LAGER=y
- CONFIG_MACH_MARZEN=y
- CONFIG_CPU_BPREDICT_DISABLE=y
-@@ -45,7 +46,6 @@ CONFIG_CPUFREQ_DT=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -55,6 +55,7 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_SIMPLE_PM_BUS=y
- CONFIG_MTD=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-@@ -82,10 +83,13 @@ CONFIG_SMSC911X=y
- CONFIG_SMSC_PHY=y
- CONFIG_MICREL_PHY=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ST1232=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_ADXL34X=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -94,6 +98,7 @@ CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=20
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_SH_MOBILE=y
-@@ -104,14 +109,16 @@ CONFIG_SPI_SH_MSIOF=y
- CONFIG_SPI_SH_HSPI=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
-+CONFIG_GPIO_PCF857X=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
-+CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
--CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_MEDIA_SUPPORT=y
-@@ -128,10 +135,12 @@ CONFIG_VIDEO_RENESAS_VSP1=y
- CONFIG_VIDEO_ADV7180=y
- CONFIG_DRM=y
- CONFIG_DRM_RCAR_DU=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_FB_SH_MOBILE_LCDC=y
-+CONFIG_FB_SH_MOBILE_MERAM=y
- # CONFIG_LCD_CLASS_DEVICE is not set
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
-+CONFIG_BACKLIGHT_AS3711=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-@@ -142,6 +151,7 @@ CONFIG_SND_SOC_WM8978=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_R8A66597_HCD=y
- CONFIG_USB_RENESAS_USBHS=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_USB_RCAR_GEN2_PHY=y
-@@ -155,11 +165,14 @@ CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_RS5C372=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- CONFIG_RCAR_DMAC=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_IIO=y
-+CONFIG_AK8975=y
- CONFIG_PWM=y
- CONFIG_PWM_RENESAS_TPU=y
- # CONFIG_DNOTIFY is not set
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 3d912ea..8cbff4c 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -188,6 +188,13 @@
+ 
+ &i2c0 {
+ 	status = "okay";
++
++	ak4648: codec at 12 {
++		compatible = "asahi-kasei,ak4648";
++		reg = <0x12>;
++		#sound-dai-cells = <0>;
++	};
++
+ 	as3711 at 40 {
+ 		compatible = "ams,as3711";
+ 		reg = <0x40>;
+@@ -258,12 +265,6 @@
+ 			};
+ 		};
+ 	};
+-
+-	ak4648: ak4648 at 12 {
+-		#sound-dai-cells = <0>;
+-		compatible = "asahi-kasei,ak4648";
+-		reg = <0x12>;
+-	};
+ };
+ 
+ &i2c3 {
 -- 
 2.1.4
