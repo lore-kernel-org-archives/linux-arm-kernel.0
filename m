@@ -1,114 +1,78 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 16 Jan 2015 11:47:53 +0100
-Subject: [PATCH V3 4/4] mmc: pwrseq_simple: Add support for a reset GPIO pin
-In-Reply-To: <1421405273-19117-1-git-send-email-ulf.hansson@linaro.org>
-References: <1421405273-19117-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1421405273-19117-5-git-send-email-ulf.hansson@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Jan 2015 10:48:42 +0000
+Subject: [PATCH v5 4/5] arm64: Add support for Spreadtrum's Sharkl64
+ Platform in Kconfig and defconfig
+In-Reply-To: <1421402411-3479-5-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <sc9836-v5>
+ <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-5-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20150116104842.GE21809@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The need for reset GPIOs has several times been pointed out from
-erlier posted patchsets. Especially some WLAN chips which are
-attached to an SDIO interface may use a GPIO reset.
+On Fri, Jan 16, 2015 at 10:00:10AM +0000, Chunyan Zhang wrote:
+> From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+> 
+> Adds support for Spreadtrum's SoC Platform in the arm64 Kconfig and
+> defconfig files.
+> 
+> Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  arch/arm64/Kconfig           |    5 +++++
+>  arch/arm64/configs/defconfig |    1 +
+>  2 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b1f9a20..885c1f4 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -153,6 +153,11 @@ config ARCH_SEATTLE
+>  	help
+>  	  This enables support for AMD Seattle SOC Family
+>  
+> +config ARCH_SPRD
 
-The reset GPIO is asserted at initialization and prior we start the
-power up procedure. The GPIO will be de-asserted right after the power
-has been provided to the card, from the ->post_power_on() callback.
+This should presumably be ARCH_SHARKL64, so you can add other SoC
+families later. The other entries in here are already formatted that
+way.
 
-Note, the reset GPIO is optional. Thus we don't return an error even if
-we can't find a GPIO for the consumer.
+I wonder if we should have these of the form ARCH_${VENDOR}_${FAMILY}
+(e.g. ARCH_SPRD_SHARKL64) rather than just ARCH_${FAMILY} to save
+ourselves from name conflicts in future (and to make it easier to grep
+for a particular vendor's config options).
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+> +	bool "Spreadtrum SoC platform"
 
-Changes in v3:
-	- Updated commit message to make it clear that we support one reset
-	  GPIO.
+bool "Spreadtrun Sharkl64 SoC Family"
 
----
- drivers/mmc/core/pwrseq_simple.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+> +	help
+> +	  Support for Spreadtrum ARM based SoCs
 
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index 7f87bc1..42d9836 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/device.h>
- #include <linux/err.h>
-+#include <linux/gpio/consumer.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -18,31 +19,68 @@
- 
- struct mmc_pwrseq_simple {
- 	struct mmc_pwrseq pwrseq;
-+	struct gpio_desc *reset_gpio;
- };
- 
-+static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-+{
-+	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-+					struct mmc_pwrseq_simple, pwrseq);
-+
-+	if (!IS_ERR(pwrseq->reset_gpio))
-+		gpiod_set_value_cansleep(pwrseq->reset_gpio, 1);
-+}
-+
-+static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
-+{
-+	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
-+					struct mmc_pwrseq_simple, pwrseq);
-+
-+	if (!IS_ERR(pwrseq->reset_gpio))
-+		gpiod_set_value_cansleep(pwrseq->reset_gpio, 0);
-+}
-+
- static void mmc_pwrseq_simple_free(struct mmc_host *host)
- {
- 	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
- 					struct mmc_pwrseq_simple, pwrseq);
- 
-+	if (!IS_ERR(pwrseq->reset_gpio))
-+		gpiod_put(pwrseq->reset_gpio);
-+
- 	kfree(&pwrseq);
- 	host->pwrseq = NULL;
- }
- 
- static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
-+	.pre_power_on = mmc_pwrseq_simple_pre_power_on,
-+	.post_power_on = mmc_pwrseq_simple_post_power_on,
-+	.power_off = mmc_pwrseq_simple_pre_power_on,
- 	.free = mmc_pwrseq_simple_free,
- };
- 
- int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
- {
- 	struct mmc_pwrseq_simple *pwrseq;
-+	int ret = 0;
- 
- 	pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
- 	if (!pwrseq)
- 		return -ENOMEM;
- 
-+	pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
-+	if (IS_ERR(pwrseq->reset_gpio) &&
-+		PTR_ERR(pwrseq->reset_gpio) != -ENOENT &&
-+		PTR_ERR(pwrseq->reset_gpio) != -ENOSYS) {
-+		ret = PTR_ERR(pwrseq->reset_gpio);
-+		goto free;
-+	}
-+
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
- 	host->pwrseq = &pwrseq->pwrseq;
- 
- 	return 0;
-+free:
-+	kfree(&pwrseq);
-+	return ret;
- }
--- 
-1.9.1
+
+Support for the Spreadtrum Sharkl64 SoC family.
+
+Thanks,
+Mark.
+
+> +
+>  config ARCH_THUNDER
+>  	bool "Cavium Inc. Thunder SoC Family"
+>  	help
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index dd301be..c1677ca 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -33,6 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+>  # CONFIG_BLK_DEV_BSG is not set
+>  # CONFIG_IOSCHED_DEADLINE is not set
+>  CONFIG_ARCH_THUNDER=y
+> +CONFIG_ARCH_SPRD=y
+>  CONFIG_ARCH_VEXPRESS=y
+>  CONFIG_ARCH_XGENE=y
+>  CONFIG_PCI=y
+> -- 
+> 1.7.9.5
+> 
+> 
