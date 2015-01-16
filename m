@@ -1,33 +1,196 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Jan 2015 11:48:04 +0100
-Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
-In-Reply-To: <54B8EA54.5020002@linaro.org>
-References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1501161122320.5526@nanos>
- <20150116103530.GB3843@piout.net> <54B8EA54.5020002@linaro.org>
-Message-ID: <20150116104804.GE3843@piout.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 16 Jan 2015 11:47:52 +0100
+Subject: [PATCH V3 3/4] mmc: pwrseq: Initial support for the simple MMC power
+ sequence provider
+In-Reply-To: <1421405273-19117-1-git-send-email-ulf.hansson@linaro.org>
+References: <1421405273-19117-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1421405273-19117-4-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+To add the core part for the MMC power sequence, let's start by adding
+initial support for the simple MMC power sequence provider.
 
-On 16/01/2015 at 11:39:16 +0100, Daniel Lezcano wrote :
-> >Isn't that already the case?
-> >Right now, if you call clocksource_suspend, it doesn't matter whether
-> >the clocksource has an enable or not, it will be suspended. Maybe I'm
-> >mistaken but my patch doesn't seem to change that behaviour.
-> 
-> Actually, if there is no enable/disable callback, then CLOCK_SOURCE_USED
-> will be never set, hence the condition will always fail and the suspend
-> callback won't be called.
-> 
+In this initial step, the MMC power sequence node are fetched and the
+compatible string for the simple MMC power sequence provider are
+verified.
 
-It is set in clocksource_enable/disable, even if there is no
-enable/disable callback. I only found direct calls to ->enable() in
-timekeeper.c, did I miss some?
+At this point we don't parse the node for any properties, but instead
+that will be handled from following patches. Since there are no
+properties supported yet, let's just implement the ->alloc() and the
+->free() callbacks.
 
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
+Changes in v3:
+	- Updated to use the new compatible string for the simple MMC power
+	  sequence.
+
+---
+ drivers/mmc/core/Makefile        |  2 +-
+ drivers/mmc/core/pwrseq.c        | 61 +++++++++++++++++++++++++++++++++++++++-
+ drivers/mmc/core/pwrseq.h        |  2 ++
+ drivers/mmc/core/pwrseq_simple.c | 48 +++++++++++++++++++++++++++++++
+ 4 files changed, 111 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/mmc/core/pwrseq_simple.c
+
+diff --git a/drivers/mmc/core/Makefile b/drivers/mmc/core/Makefile
+index ccdd35f..b39cbd2 100644
+--- a/drivers/mmc/core/Makefile
++++ b/drivers/mmc/core/Makefile
+@@ -8,5 +8,5 @@ mmc_core-y			:= core.o bus.o host.o \
+ 				   sdio.o sdio_ops.o sdio_bus.o \
+ 				   sdio_cis.o sdio_io.o sdio_irq.o \
+ 				   quirks.o slot-gpio.o
+-mmc_core-$(CONFIG_OF)		+= pwrseq.o
++mmc_core-$(CONFIG_OF)		+= pwrseq.o pwrseq_simple.o
+ mmc_core-$(CONFIG_DEBUG_FS)	+= debugfs.o
+diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
+index bd08772..2cea00e 100644
+--- a/drivers/mmc/core/pwrseq.c
++++ b/drivers/mmc/core/pwrseq.c
+@@ -7,14 +7,73 @@
+  *
+  *  MMC power sequence management
+  */
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++
+ #include <linux/mmc/host.h>
+ 
+ #include "pwrseq.h"
+ 
++struct mmc_pwrseq_match {
++	const char *compatible;
++	int (*alloc)(struct mmc_host *host, struct device *dev);
++};
++
++static struct mmc_pwrseq_match pwrseq_match[] = {
++	{
++		.compatible = "mmc-pwrseq-simple",
++		.alloc = mmc_pwrseq_simple_alloc,
++	},
++};
++
++static struct mmc_pwrseq_match *mmc_pwrseq_find(struct device_node *np)
++{
++	struct mmc_pwrseq_match *match = ERR_PTR(-ENODEV);
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(pwrseq_match); i++) {
++		if (of_device_is_compatible(np,	pwrseq_match[i].compatible)) {
++			match = &pwrseq_match[i];
++			break;
++		}
++	}
++
++	return match;
++}
+ 
+ int mmc_pwrseq_alloc(struct mmc_host *host)
+ {
+-	return 0;
++	struct platform_device *pdev;
++	struct device_node *np;
++	struct mmc_pwrseq_match *match;
++	int ret = 0;
++
++	np = of_parse_phandle(host->parent->of_node, "mmc-pwrseq", 0);
++	if (!np)
++		return 0;
++
++	pdev = of_find_device_by_node(np);
++	if (!pdev) {
++		ret = -ENODEV;
++		goto err;
++	}
++
++	match = mmc_pwrseq_find(np);
++	if (IS_ERR(match)) {
++		ret = PTR_ERR(match);
++		goto err;
++	}
++
++	ret = match->alloc(host, &pdev->dev);
++	if (!ret)
++		dev_info(host->parent, "allocated mmc-pwrseq\n");
++
++err:
++	of_node_put(np);
++	return ret;
+ }
+ 
+ void mmc_pwrseq_pre_power_on(struct mmc_host *host)
+diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
+index 12aaf2b..bd860d8 100644
+--- a/drivers/mmc/core/pwrseq.h
++++ b/drivers/mmc/core/pwrseq.h
+@@ -27,6 +27,8 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host);
+ void mmc_pwrseq_power_off(struct mmc_host *host);
+ void mmc_pwrseq_free(struct mmc_host *host);
+ 
++int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev);
++
+ #else
+ 
+ static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
+diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+new file mode 100644
+index 0000000..7f87bc1
+--- /dev/null
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -0,0 +1,48 @@
++/*
++ *  Copyright (C) 2014 Linaro Ltd
++ *
++ * Author: Ulf Hansson <ulf.hansson@linaro.org>
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ *
++ *  Simple MMC power sequence management
++ */
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/device.h>
++#include <linux/err.h>
++
++#include <linux/mmc/host.h>
++
++#include "pwrseq.h"
++
++struct mmc_pwrseq_simple {
++	struct mmc_pwrseq pwrseq;
++};
++
++static void mmc_pwrseq_simple_free(struct mmc_host *host)
++{
++	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
++					struct mmc_pwrseq_simple, pwrseq);
++
++	kfree(&pwrseq);
++	host->pwrseq = NULL;
++}
++
++static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
++	.free = mmc_pwrseq_simple_free,
++};
++
++int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
++{
++	struct mmc_pwrseq_simple *pwrseq;
++
++	pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
++	if (!pwrseq)
++		return -ENOMEM;
++
++	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
++	host->pwrseq = &pwrseq->pwrseq;
++
++	return 0;
++}
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
