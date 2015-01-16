@@ -1,517 +1,80 @@
-From: naobsd@gmail.com (FUKAUMI Naoki)
-Date: Sat, 17 Jan 2015 02:11:56 +0900
-Subject: [PATCH v2 3/3] ARM: dts: rockchip: add dts for ChipSPARK Rayeager PX2
- board
-In-Reply-To: <1421428316-26008-1-git-send-email-naobsd@gmail.com>
-References: <1421428316-26008-1-git-send-email-naobsd@gmail.com>
-Message-ID: <1421428316-26008-4-git-send-email-naobsd@gmail.com>
+From: thomas.lendacky@amd.com (Tom Lendacky)
+Date: Fri, 16 Jan 2015 11:12:20 -0600
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150116154913.GW7091@arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <2198633.UpIyI82Yon@wuerfel> <20150116153320.GU7091@arm.com>
+ <1809831.d9GPSfLUEN@wuerfel> <20150116154913.GW7091@arm.com>
+Message-ID: <54B94674.10206@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add support for Rayeager PX2, Rockchip PX2 based development board
-made by ChipSPARK.
+On 01/16/2015 09:49 AM, Will Deacon wrote:
+> On Fri, Jan 16, 2015 at 03:40:28PM +0000, Arnd Bergmann wrote:
+>> On Friday 16 January 2015 15:33:20 Will Deacon wrote:
+>>> On Fri, Jan 16, 2015 at 03:14:13PM +0000, Arnd Bergmann wrote:
+>>>> On Friday 16 January 2015 14:55:45 Will Deacon wrote:
+>>>>> On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
+>>>>>> I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
+>>>>>> drivers that I'm about to submit upstream with the V7 patch series
+>>>>>> on the AMD Seattle server platform. There does not appear to be support
+>>>>>> for the _CCA attribute in this patch series. The amd-xgbe driver will
+>>>>>> setup the device domain and cache attributes based on the presence of
+>>>>>> this attribute, but it requires the arch support to assign the proper
+>>>>>> DMA operations in order for it to all work correctly.
+>>>>>>
+>>>>>> Overriding the _CCA attribute in the driver, I was able to successfully
+>>>>>> test the driver and this patch series.
+>>>>>
+>>>>> Hopefully this will all be addressed when the IORT parts of ACPI have
+>>>>> settled down (the current proposal allows for these attributes to be
+>>>>> described as well as their interaction with things like IOMMUs).
+>>>>>
+>>>>> In the meantime, are you falling back to non-coherent DMA? If so, what
+>>>>> attributes have you settled on? We need to be really careful not to
+>>>>> corrupt data during cache invalidatation when mapping a non-coherent
+>>>>> buffer for the CPU.
+>>>>
+>>>> I think in case of ACPI we should use cache-coherent as the default,
+>>>> as this is what all servers will use for DMA masters.
+>>>
+>>> I don't agree. The dma-coherent we have for device-tree isn't nearly
+>>> expressive enough for the kind of things we want to describe and there's
+>>> no reason to make the same mistake in ACPI, especially as it *is* being
+>>> addressed by IORT. If we run with _CCA, then we're going to be stuck
+>>> supporting something that isn't fit for purpose and which will likely be
+>>> abused to describe both fixed features of the system and software
+>>> configuration preferences. It also opens up a can of worms if we have to
+>>> support a mixture of _CCA and IORT in the future.
+>>>
+>>> Or are you suggesting that we ignore _CCA and just assume cache-coherency?
+>>> In that case, how do we support systems that aren't cache coherent, where
+>>> not being cache coherent includes devices that require either device or
+>>> IOMMU configuration to enable cacheable transactions?
+>>
+>> I was thinking we'd ignore _CCA because as you say a simple on/off flag
+>> would not be enough to describe what we have to do for noncoherent
+>> devices. I can't think of any reason why a server hardware would include
+>> noncoherent devices, so if they are configurable they should be configured
+>> into coherent mode by the firmware.
+>
+> The on-board ethernet on Seattle requires the driver to program its AXI
+> attributes, so configuring it to be a coherent master actually means
+> "program the same cacheable AXI settings as you have on the CPU". That
+> sounds like Linux should be doing it to me, but even if the firmware takes
+> a guess at "normal cacheable WBRWA", it's not clear to me whether that
+> register persists across things like adapter reset.
+>
+> Tom?
 
-Signed-off-by: FUKAUMI Naoki <naobsd@gmail.com>
----
+The registers that contain the AxDOMAIN and AxCACHE settings do not
+persist across an adapter reset.
 
-Changes in v2:
-- add missing vin-supply
-- use two chars for i2c address
-- fix ordering for nodes without address element
-- add commit messages
+Tom
 
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/rk3066a-rayeager.dts | 470 +++++++++++++++++++++++++++++++++
- 2 files changed, 471 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-rayeager.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c8a29e5..bfdc0a8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -445,6 +445,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3066a-bqcurie2.dtb \
- 	rk3066a-marsboard.dtb \
-+	rk3066a-rayeager.dtb \
- 	rk3188-radxarock.dtb \
- 	rk3288-evb-act8846.dtb \
- 	rk3288-evb-rk808.dtb \
-diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
-new file mode 100644
-index 0000000..218da9c
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
-@@ -0,0 +1,470 @@
-+/*
-+ * Copyright (c) 2014, 2015 FUKAUMI Naoki <naobsd@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3066a.dtsi"
-+
-+/ {
-+	model = "Rayeager PX2";
-+	compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
-+
-+	memory {
-+		reg = <0x60000000 0x40000000>;
-+	};
-+
-+	ir: ir-receiver {
-+		compatible = "gpio-ir-receiver";
-+		gpios = <&gpio6 1 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ir_int>;
-+	};
-+
-+	keys: gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		button at 0 {
-+			gpio-key,wakeup = <1>;
-+			gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
-+			label = "GPIO Power";
-+			linux,code = <116>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pwr_key>;
-+		};
-+	};
-+
-+	vsys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vsys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	/* input for 5V_STDBY is VSYS or DC5V, selectable by jumper J4 */
-+	vcc_stdby: 5v-stdby-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "5v_stdby";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vcc_otg: usb-otg-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&otg_drv>;
-+		regulator-name = "vcc_otg";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_stdby>;
-+	};
-+
-+	vcc_host: usb-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_drv>;
-+		regulator-name = "host-pwr";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_stdby>;
-+	};
-+
-+	vcc_sata: sata-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sata_pwr>;
-+		regulator-name = "usb_5v";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_stdby>;
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_emmc: emmc-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "emmc_vccq";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		vin-supply = <&vsys>;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_arm>;
-+};
-+
-+&emac {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
-+
-+	phy = <&phy0>;
-+	phy-supply = <&vcc_rmii>;
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
-+&emmc {
-+	broken-cd;
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_emmc>;
-+	vqmmc-supply = <&vcc_emmc>;
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	ak8963: ak8963 at 0d {
-+		compatible = "asahi-kasei,ak8975";
-+		reg = <0x0d>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <17 IRQ_TYPE_EDGE_RISING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&comp_int>;
-+	};
-+
-+	mma8452: mma8452 at 1d {
-+		compatible = "fsl,mma8452";
-+		reg = <0x1d>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <16 IRQ_TYPE_EDGE_RISING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gsensor_int>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tps: tps at 2d {
-+		reg = <0x2d>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>, <&pwr_hold>;
-+
-+		vcc1-supply = <&vsys>;
-+		vcc2-supply = <&vsys>;
-+		vcc3-supply = <&vsys>;
-+		vcc4-supply = <&vsys>;
-+		vcc5-supply = <&vcc_io>;
-+		vcc6-supply = <&vcc_io>;
-+		vcc7-supply = <&vsys>;
-+		vccio-supply = <&vsys>;
-+
-+		regulators {
-+			vcc_rtc: regulator at 0 {
-+				regulator-name = "vcc_rtc";
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: regulator at 1 {
-+				regulator-name = "vcc_io";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_arm: regulator at 2 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			vcc_ddr: regulator at 3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			vcc18: regulator at 5 {
-+				regulator-name = "vcc18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_11: regulator at 6 {
-+				regulator-name = "vdd_11";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_25: regulator at 7 {
-+				regulator-name = "vcc_25";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_wl: regulator at 8 {
-+				regulator-name = "vccio_wl";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			vcc25_hdmi: regulator at 9 {
-+				regulator-name = "vcc25_hdmi";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+			};
-+
-+			vcca_33: regulator at 10 {
-+				regulator-name = "vcca_33";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vcc_rmii: regulator at 11 {
-+				regulator-name = "vcc_rmii";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vcc28_cif: regulator at 12 {
-+				regulator-name = "vcc28_cif";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+			};
-+		};
-+	};
-+};
-+
-+#include "tps65910.dtsi"
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	bus-width = <4>;
-+	disable-wp;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_sd>;
-+};
-+
-+&mmc1 {
-+	broken-cd;
-+	bus-width = <4>;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd1_clk>, <&sd1_cmd>, <&sd1_bus4>;
-+	status = "okay";
-+	vmmc-supply = <&vccio_wl>;
-+};
-+
-+&pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
-+	ak8963 {
-+		comp_int: comp-int {
-+			rockchip,pins = <4 17 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	emac {
-+		rmii_rst: rmii-rst {
-+			rockchip,pins = <1 30 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <6 1 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	keys {
-+		pwr_key: pwr-key {
-+			rockchip,pins = <6 2 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	mma8452 {
-+		gsensor_int: gsensor-int {
-+			rockchip,pins = <4 16 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	mmc {
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <3 7 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	usb_host {
-+		host_drv: host-drv {
-+			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+
-+		hub_rst: hub-rst {
-+			rockchip,pins = <1 31 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+
-+		sata_pwr: sata-pwr {
-+			rockchip,pins = <4 22 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+
-+		sata_reset: sata-reset {
-+			rockchip,pins = <0 13 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+
-+	usb_otg {
-+		otg_drv: otg-drv {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	tps {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <6 4 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+
-+		pwr_hold: pwr-hold {
-+			rockchip,pins = <6 8 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+};
-+
-+&pwm1 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vcc_25>;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>, <&uart0_rts>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_xfer>, <&uart3_cts>, <&uart3_rts>;
-+	status = "okay";
-+};
-+
-+&usb_host {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hub_rst>, <&sata_reset>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
--- 
-2.2.2
+>
+> There's also the situation where the firmware hasn't initialised the
+> register and Linux realises this during probe. What should it do then?
+>
+> Will
+>
