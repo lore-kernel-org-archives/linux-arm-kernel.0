@@ -1,52 +1,95 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Fri, 16 Jan 2015 10:50:39 +0100
-Subject: [PATCH v2] AT91, DT,
- usb gadget: disable pull-up on vbus-gpio (PB16) to reduce power
- consumption
-In-Reply-To: <54B8AE36.6090904@atmel.com>
-References: <54B8AE36.6090904@atmel.com>
-Message-ID: <1421401839-29370-1-git-send-email-sylvain.rochet@finsecur.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 Jan 2015 10:51:29 +0100
+Subject: [PATCH v2 0/6] ARM: shmobile: sh73a0: DT PM domain support
+In-Reply-To: <20150116024724.GA31654@verge.net.au>
+References: <1421237484-16847-1-git-send-email-geert+renesas@glider.be>
+ <20150114235302.GC10479@verge.net.au>
+ <CAMuHMdVANePZ-fLzaLCEOm0vHR735C=u5_fDa4Uywi_P5ggjBg@mail.gmail.com>
+ <20150116011315.GA7830@verge.net.au>
+ <20150116024724.GA31654@verge.net.au>
+Message-ID: <CAMuHMdU4hj2p-N8abT-BSadznqF7=0-08o9F4_7+qjdvv6Whmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an external resistor divider on PB16, acting like a pull-down,
-the pull-up increase power consumption and prevent the vbus detect pin
-to reach Vss voltage, ~1.5V mesured on my board, it might not even work
-if the pull-up is stronger than usual.
+Hi Simon,
 
-Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
----
-Improved GPIO comment, fixed typo in commit summary.
+On Fri, Jan 16, 2015 at 3:47 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 16, 2015 at 10:13:15AM +0900, Simon Horman wrote:
+>> On Thu, Jan 15, 2015 at 10:32:23AM +0100, Geert Uytterhoeven wrote:
+>> > On Thu, Jan 15, 2015 at 12:53 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > > On Wed, Jan 14, 2015 at 01:11:18PM +0100, Geert Uytterhoeven wrote:
+>> > >> This patch series enables DT support for PM domains on the Renesas
+>> > >> SH-Mobile AG5 (sh73a0) SoC.
+>> > >>
+>> > >> This series builds further on the DT PM Domain support for R-Mobile A1
+>> > >> (r8a7740).  Due to the similarity of the SYSC System-Controller on the
+>> > >> various SH-Mobile/R-Mobile SoCs, and the abstraction of PM domains in
+>> > >> DT, the same driver can handle sh73a0 after some small modifications,
+>> > >> without changing the DT bindings.
+>> > >>
+>> > >> Compared to r8a7740, the only significant change is the move of the
+>> > >> memory-controller(s) to separate PM domains on sh73a0 (and also on
+>> > >> R-Mobile APE6 (r8a73a4)). Hence a provision must be made to not turn off
+>> > >> these PM domains inadvertently, cfr. the series "[PATCH 0/4] ARM:
+>> > >> shmobile: Add DT support for memory controllers" I've just sent.
+>> > >>
+>> > >> This series has been sent before, as part of the series "[PATCH RFC
+>> > >> 0/7] ARM: shmobile: sh73a0: DT PM domain support"
+>> > >> (https://lkml.org/lkml/2014/11/19/404).
+>> > >> Changes since v1 (more detailed changelogs in the individual patches):
+>> > >>   - Factored out addition of the memory-controller in a separate
+>> > >>     series.
+>> > >>
+>> > >> Dependencies:
+>> > >>   1. Patches 1-4 (DT binding doc, C code) depend on:
+>> > >>        a. The R-Mobile DT PM Domain work for r8a7740, queued in tag
+>> > >>           renesas-dt-pm-for-v3.20 of Simon's repository,
+>> > >
+>> > > In response to a request from Olof renesas-dt-pm-for-v3.20 has been
+>> > > withdrawn and the patches split between the soc-for-v3.20 and dt-for-v3.20
+>> > > branches. I am assuming that the patches that 1-4 depend on are
+>> > > now all in the soc-for-v3.20 branch. Could you check?
+>> >
+>> > OK, soc-for-v3.20 now.
+>> >
+>> > >>        b. "ARM: shmobile: R-Mobile: Fix DT refcount bugs in PM domain
+>> > >>          code"
+>> > >>          (http://www.spinics.net/lists/arm-kernel/msg391084.html),
+>> > >
+>> > > FWIW, I have squashed that patch into the patch that adds the problem
+>> > > and the result is in the soc-for-v3.20. I will to push that result
+>> > > a little later today.
+>> >
+>> > Thanks!
+>> >
+>> > >>   2. Patch 5 (dtsi) depends on:
+>> > >>        a. The multiplatform work for sh73a0, queued in branch
+>> > >>           sh73a0-multiplatform-for-v3.20 of Simon's repository,
+>> > >>        b. Series "[PATCH 0/4] ARM: shmobile: Add DT support for memory
+>> > >>           controllers"
+>> > >>         (http://marc.info/?l=linux-sh&m=142123399414888).
+>> > >
+>> > > This may be awkward to get into v3.20 unless we can adopt a looser approach
+>> > > to the dependencies.
 
- arch/arm/boot/dts/at91sam9x5ek.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> Please take a look at renesas-next-20150115-v3.19-rc1.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 3a9f6fa..bd16bd3 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -53,6 +53,8 @@
- 			};
- 
- 			usb2: gadget at f803c000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_board_usb2>;
- 				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
-@@ -80,6 +82,13 @@
- 							<AT91_PIOD 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;	/* PD14 gpio CD pin pull up and deglitch */
- 					};
- 				};
-+
-+				usb2 {
-+					pinctrl_board_usb2: usb2-board {
-+						atmel,pins =
-+							<AT91_PIOB 16 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB16 gpio vbus sense, deglitch */
-+					};
-+				};
- 			};
- 
- 			spi0: spi at f0000000 {
--- 
-2.1.4
+s/20150115/20150116/?
+
+> This series should be queued-up there.
+
+If you add patch 6 to sh-drivers-for-v3.20 and merge it in -next,
+everything is fine!
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
