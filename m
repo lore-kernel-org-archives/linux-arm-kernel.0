@@ -1,73 +1,40 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Fri, 16 Jan 2015 19:50:18 +0800
-Subject: [PATCH v5 4/5] arm64: Add support for Spreadtrum's Sharkl64
- Platform in Kconfig and defconfig
-In-Reply-To: <20150116104842.GE21809@leverpostej>
-References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1421402411-3479-5-git-send-email-chunyan.zhang@spreadtrum.com>
- <20150116104842.GE21809@leverpostej>
-Message-ID: <CAAfSe-vuSgwH2PHQdYLyfJ+KZ0C8a7D6Ry=mHaBrjpbuksaKvQ@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 16 Jan 2015 12:56:06 +0100
+Subject: [PATCH 0/3] Enable myphy28lp support
+In-Reply-To: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <54B8FC56.8080400@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark
+Hi Gabriel,
 
-On Fri, Jan 16, 2015 at 6:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jan 16, 2015 at 10:00:10AM +0000, Chunyan Zhang wrote:
->> From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
->>
->> Adds support for Spreadtrum's SoC Platform in the arm64 Kconfig and
->> defconfig files.
->>
->> Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
->> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  arch/arm64/Kconfig           |    5 +++++
->>  arch/arm64/configs/defconfig |    1 +
->>  2 files changed, 6 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index b1f9a20..885c1f4 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -153,6 +153,11 @@ config ARCH_SEATTLE
->>       help
->>         This enables support for AMD Seattle SOC Family
->>
->> +config ARCH_SPRD
->
-> This should presumably be ARCH_SHARKL64, so you can add other SoC
-> families later. The other entries in here are already formatted that
-> way.
->
-> I wonder if we should have these of the form ARCH_${VENDOR}_${FAMILY}
-> (e.g. ARCH_SPRD_SHARKL64) rather than just ARCH_${FAMILY} to save
-> ourselves from name conflicts in future (and to make it easier to grep
-> for a particular vendor's config options).
->
+     For the series:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-actually we've discussed this question before[1], and I think Arnd's
-suggestion is suitable for our case, so I changed this to use
-ARCH_SPRD instead of ARCH_SHARKL64.
+     Kishon, could you take care of adding PHY driver patch for v3.20?
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306246.html
-
-anyway, thank you very much!
-
-Chunyan
-
->> +     bool "Spreadtrum SoC platform"
+Thanks,
+Maxime
+On 01/14/2015 10:54 AM, Gabriel FERNANDEZ wrote:
+> The goal of this series is to enable the support of MiPHY28lp Generic PHY.
 >
-> bool "Spreadtrun Sharkl64 SoC Family"
+> The first patch is to update miphy28lp phy driver to access sysconfig register
+> offsets via syscfg dt property. It's based on Arnds review comments here
+> https://lkml.org/lkml/2014/11/13/161
+> I have updated the miphy28lp phy driver same way as Peter's implementation.
 >
->> +     help
->> +       Support for Spreadtrum ARM based SoCs
+> Gabriel Fernandez (3):
+>    phy: miphy28lp: Pass sysconfig register offsets via syscfg dt
+>      property.
+>    ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+>    ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
+>      USB3) PHY
 >
+>   .../devicetree/bindings/phy/phy-miphy28lp.txt      | 43 ++++++---------
+>   arch/arm/boot/dts/stih407-family.dtsi              | 53 +++++++++++++++++++
+>   arch/arm/boot/dts/stihxxx-b2120.dtsi               | 11 ++++
+>   arch/arm/configs/multi_v7_defconfig                |  1 +
+>   drivers/phy/phy-miphy28lp.c                        | 61 ++++++++++++----------
+>   5 files changed, 113 insertions(+), 56 deletions(-)
 >
-> Support for the Spreadtrum Sharkl64 SoC family.
->
-> Thanks,
-> Mark.
->
->> +
