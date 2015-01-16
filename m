@@ -1,31 +1,40 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 16 Jan 2015 13:42:27 +0100
-Subject: [PATCH 4/4] clk: pxa: add missing pxa27x clocks for Irda and
- sa1100-rtc
-In-Reply-To: <20150112235256.20842.68349@quantum> (Mike Turquette's message of
- "Mon, 12 Jan 2015 15:52:56 -0800")
-References: <1419688528-760-1-git-send-email-robert.jarzmik@free.fr>
- <1419688528-760-5-git-send-email-robert.jarzmik@free.fr>
- <20150112235256.20842.68349@quantum>
-Message-ID: <87sifax5fw.fsf@free.fr>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 Jan 2015 21:44:16 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Sh73a0 Multiplatform Updates
+ for v3.20
+In-Reply-To: <1524412.qzMh8qoUQG@wuerfel>
+References: <cover.1421371996.git.horms+renesas@verge.net.au>
+ <1524412.qzMh8qoUQG@wuerfel>
+Message-ID: <20150116124416.GB6285@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette <mturquette@linaro.org> writes:
+On Fri, Jan 16, 2015 at 09:38:44AM +0100, Arnd Bergmann wrote:
+> On Friday 16 January 2015 11:35:25 Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC sh73a0 multiplatform updates for v3.20.
+> > 
+> > This pull request is based on a merge of:
+> > 
+> > * Renesas ARM Based SoC Drivers Updates for v3.20,
+> >   tagged as renesas-drivers-for-v3.20, which I have also sent
+> >   a built request for.
+> > 
+> > * "Renesas ARM Based SoC sh73a0 CCF Updates for v3.20",
+> >   tagged as renesas-sh73a0-ccf-for-v3.20.
+> > 
+> > It is my understnding that both of those dependencies are required in
+> > order to transition to a bootable muliplatform kernel for the kzm9g board.
+> 
+> Nothing wrong with the pull request, but I have a question for my
+> understanding about where you are with multiplatform support. I
+> see that after this pull request, only ARCH_SH7372 and ARCH_R8A7778
+> are left without multiplatform support. Did I remember correctly
+> that you plan to add a common clock driver for ARCH_R8A7778 next,
+> move that to multiplatform and then delete all the ARCH_SHMOBILE_LEGACY
+> support including ARCH_SH7372?
 
-> Quoting Robert Jarzmik (2014-12-27 05:55:28)
->> Add 2 clocks which were erronously forgotten by the clock framework
->> port, namely :
->>  - sa1100-rtc
->>  - irda for pxa2xx-ir:UARTCLK
->> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Acked-by: Michael Turquette <mturquette@linaro.org>
+Hi Arnd,
 
-Thanks for the review and the ack Michael, I'll push that in pxa/for-next.
-
-Cheers.
-
---
-Robert
+yes, my understanding is that is (still) the plan.
