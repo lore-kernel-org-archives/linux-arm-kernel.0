@@ -1,100 +1,66 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 16 Jan 2015 09:44:06 +0800
-Subject: [PATCH 08/28] PCI: Introduce pci_host_assign_domain_nr() to assign
- domain
+Date: Fri, 16 Jan 2015 09:44:15 +0800
+Subject: [PATCH 17/28] PCI: Remove weak pcibios_root_bridge_prepare()
 In-Reply-To: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
 References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1421372666-12288-9-git-send-email-wangyijing@huawei.com>
+Message-ID: <1421372666-12288-18-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce pci_host_assign_domain_nr() to assign domain
-number for pci_host_bridge. Later we will remove
-pci_bus_assign_domain_nr().
+Now no one use weak pcibios_root_bridge_prepare(),
+we could remove it.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/pci.c   |   47 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h |    4 ++++
- 2 files changed, 51 insertions(+), 0 deletions(-)
+ drivers/pci/probe.c |   15 ---------------
+ include/linux/pci.h |    2 --
+ 2 files changed, 0 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index c419554..8b35e8e 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4443,6 +4443,53 @@ int pci_get_new_domain_nr(void)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 51d69c3..30323ac 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1844,18 +1844,6 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
  }
+ EXPORT_SYMBOL_GPL(pci_scan_child_bus);
  
- #ifdef CONFIG_PCI_DOMAINS_GENERIC
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host)
-+{
-+	static int use_dt_domains = -1;
-+	struct device *parent = host->dev.parent;
-+	int domain = of_get_pci_domain_nr(parent->of_node);
-+
-+	/*
-+	 * Check DT domain and use_dt_domains values.
-+	 *
-+	 * If DT domain property is valid (domain >= 0) and
-+	 * use_dt_domains != 0, the DT assignment is valid since this means
-+	 * we have not previously allocated a domain number by using
-+	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
-+	 * 1, to indicate that we have just assigned a domain number from
-+	 * DT.
-+	 *
-+	 * If DT domain property value is not valid (ie domain < 0), and we
-+	 * have not previously assigned a domain number from DT
-+	 * (use_dt_domains != 1) we should assign a domain number by
-+	 * using the:
-+	 *
-+	 * pci_get_new_domain_nr()
-+	 *
-+	 * API and update the use_dt_domains value to keep track of method we
-+	 * are using to assign domain numbers (use_dt_domains = 0).
-+	 *
-+	 * All other combinations imply we have a platform that is trying
-+	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-+	 * which is a recipe for domain mishandling and it is prevented by
-+	 * invalidating the domain value (domain = -1) and printing a
-+	 * corresponding error.
-+	 */
-+	if (domain >= 0 && use_dt_domains) {
-+		use_dt_domains = 1;
-+	} else if (domain < 0 && use_dt_domains != 1) {
-+		use_dt_domains = 0;
-+		domain = pci_get_new_domain_nr();
-+	} else {
-+		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-+			parent->of_node->full_name);
-+		domain = -1;
-+	}
-+
-+	host->domain_nr = domain;
-+}
-+
-+
- void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+-/**
+- * pcibios_root_bridge_prepare - Platform-specific host bridge setup.
+- * @bridge: Host bridge to set up.
+- *
+- * Default empty implementation.  Replace with an architecture-specific setup
+- * routine, if necessary.
+- */
+-int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	return 0;
+-}
+-
+ void __weak pcibios_add_bus(struct pci_bus *bus)
  {
- 	static int use_dt_domains = -1;
+ }
+@@ -1890,9 +1878,6 @@ static struct pci_bus *__pci_create_root_bus(
+ 	b->bridge = get_device(&bridge->dev);
+ 	if (bridge->ops && bridge->ops->phb_set_root_bus_speed)
+ 		bridge->ops->phb_set_root_bus_speed(bridge);
+-	error = pcibios_root_bridge_prepare(bridge);
+-	if (error)
+-		goto err_out;
+ 
+ 	device_enable_async_suspend(b->bridge);
+ 	pci_set_bus_of_node(b);
 diff --git a/include/linux/pci.h b/include/linux/pci.h
-index c771508..1b9c799 100644
+index 5592737..da3a071 100644
 --- a/include/linux/pci.h
 +++ b/include/linux/pci.h
-@@ -1316,11 +1316,15 @@ static inline int pci_domain_nr(struct pci_bus *bus)
- 	return bus->domain_nr;
- }
- void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host);
- #else
- static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
- 					struct device *parent)
- {
- }
-+static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
-+{
-+}
- #endif
- 
- /* some architectures require additional setup to direct VGA traffic */
+@@ -428,8 +428,6 @@ struct pci_host_bridge {
+ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+ 		     void (*release_fn)(struct pci_host_bridge *),
+ 		     void *release_data);
+-
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
+ struct pci_host_bridge *pci_create_host_bridge(
+ 		struct device *parent, u32 dombus, struct list_head *resources, 
+ 		void *sysdata, struct pci_host_bridge_ops *ops);
 -- 
 1.7.1
