@@ -1,60 +1,34 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 16 Jan 2015 13:32:03 +0100
-Subject: [PATCH 0/3] Enable myphy28lp support
-In-Reply-To: <54B8FC56.8080400@st.com>
-References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
- <54B8FC56.8080400@st.com>
-Message-ID: <54B904C3.1080002@st.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 16 Jan 2015 13:34:26 +0100
+Subject: [PATCH 1/2] clk: pxa: add pxa3xx clock driver
+In-Reply-To: <87ppar4onn.fsf@free.fr> (Robert Jarzmik's message of "Tue, 06
+ Jan 2015 21:53:00 +0100")
+References: <1420577139-30556-1-git-send-email-robert.jarzmik@free.fr>
+ <87ppar4onn.fsf@free.fr>
+Message-ID: <874mrqykdp.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-On 01/16/2015 12:56 PM, Maxime Coquelin wrote:
-> Hi Gabriel,
+> Hi Daniel,
 >
->     For the series:
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> I'd need a test to see if the pxa3xx clocks are actually working.
+> I prepared a tree in here :
+>   git fetch https://github.com/rjarzmik/linux work/clocks-pxa
 >
->     Kishon, could you take care of adding PHY driver patch for v3.20?
-Hi Kishon,
-
-     Don't apply the patch, since we have 2 other PHY driver patches, I 
-will send you a pull request.
-
-Best regards,
-Maxime
-
-
+> Could you make a run, and if it works for you, send me a copy of
+> /sys/kernel/debug/clk/clk_summary please ?
 >
-> Thanks,
-> Maxime
-> On 01/14/2015 10:54 AM, Gabriel FERNANDEZ wrote:
->> The goal of this series is to enable the support of MiPHY28lp Generic 
->> PHY.
->>
->> The first patch is to update miphy28lp phy driver to access sysconfig 
->> register
->> offsets via syscfg dt property. It's based on Arnds review comments here
->> https://lkml.org/lkml/2014/11/13/161
->> I have updated the miphy28lp phy driver same way as Peter's 
->> implementation.
->>
->> Gabriel Fernandez (3):
->>    phy: miphy28lp: Pass sysconfig register offsets via syscfg dt
->>      property.
->>    ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
->>    ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, 
->> PCIe &
->>      USB3) PHY
->>
->>   .../devicetree/bindings/phy/phy-miphy28lp.txt      | 43 
->> ++++++---------
->>   arch/arm/boot/dts/stih407-family.dtsi              | 53 
->> +++++++++++++++++++
->>   arch/arm/boot/dts/stihxxx-b2120.dtsi               | 11 ++++
->>   arch/arm/configs/multi_v7_defconfig                |  1 +
->>   drivers/phy/phy-miphy28lp.c                        | 61 
->> ++++++++++++----------
->>   5 files changed, 113 insertions(+), 56 deletions(-)
->>
->
+> I'm really curious if suspend/resume is working, as I "forgot" to include the
+> CKENA/CKENB save/restore code.
+
+Hi Marek, Ezequiel and Daniel,
+
+Would any one of you give a try to this tree (3.18-rc1 based) ? I'd like to have
+some testing before breaking all the pxa3xx platforms.
+
+Cheers.
+
+-- 
+Robert
