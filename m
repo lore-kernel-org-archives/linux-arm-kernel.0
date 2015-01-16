@@ -1,65 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Jan 2015 16:43:42 +0100
-Subject: [Linaro-acpi] [PATCH v7 00/17] Introduce ACPI for ARM64 based on
- ACPI 5.1
-In-Reply-To: <1809831.d9GPSfLUEN@wuerfel>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Fri, 16 Jan 2015 09:44:19 -0600
+Subject: [Linaro-acpi] [PATCH v7 00/17] Introduce ACPI for ARM64 based
+ on ACPI 5.1
+In-Reply-To: <54B92B99.5000604@linaro.org>
 References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <20150116153320.GU7091@arm.com> <1809831.d9GPSfLUEN@wuerfel>
-Message-ID: <2910949.nk5sbjdE0p@wuerfel>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <54B831C9.3060700@redhat.com>
+ <20150116102035.GD13634@e104818-lin.cambridge.arm.com>
+ <54B92B99.5000604@linaro.org>
+Message-ID: <54B931D3.7040109@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 January 2015 16:40:28 Arnd Bergmann wrote:
-> On Friday 16 January 2015 15:33:20 Will Deacon wrote:
-> > On Fri, Jan 16, 2015 at 03:14:13PM +0000, Arnd Bergmann wrote:
-> > > On Friday 16 January 2015 14:55:45 Will Deacon wrote:
-> > > > On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
-> > > > > I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
-> > > > > drivers that I'm about to submit upstream with the V7 patch series
-> > > > > on the AMD Seattle server platform. There does not appear to be support
-> > > > > for the _CCA attribute in this patch series. The amd-xgbe driver will
-> > > > > setup the device domain and cache attributes based on the presence of
-> > > > > this attribute, but it requires the arch support to assign the proper
-> > > > > DMA operations in order for it to all work correctly.
-> > > > > 
-> > > > > Overriding the _CCA attribute in the driver, I was able to successfully
-> > > > > test the driver and this patch series.
-> > > > 
-> > > > Hopefully this will all be addressed when the IORT parts of ACPI have
-> > > > settled down (the current proposal allows for these attributes to be
-> > > > described as well as their interaction with things like IOMMUs).
-> > > > 
-> > > > In the meantime, are you falling back to non-coherent DMA? If so, what
-> > > > attributes have you settled on? We need to be really careful not to
-> > > > corrupt data during cache invalidatation when mapping a non-coherent
-> > > > buffer for the CPU.
-> > > 
-> > > I think in case of ACPI we should use cache-coherent as the default,
-> > > as this is what all servers will use for DMA masters.
-> > 
-> > I don't agree. The dma-coherent we have for device-tree isn't nearly
-> > expressive enough for the kind of things we want to describe and there's
-> > no reason to make the same mistake in ACPI, especially as it *is* being
-> > addressed by IORT. If we run with _CCA, then we're going to be stuck
-> > supporting something that isn't fit for purpose and which will likely be
-> > abused to describe both fixed features of the system and software
-> > configuration preferences. It also opens up a can of worms if we have to
-> > support a mixture of _CCA and IORT in the future.
-> > 
-> > Or are you suggesting that we ignore _CCA and just assume cache-coherency?
-> > In that case, how do we support systems that aren't cache coherent, where
-> > not being cache coherent includes devices that require either device or
-> > IOMMU configuration to enable cacheable transactions?
-> 
-> I was thinking we'd ignore _CCA because as you say a simple on/off flag
-> would not be enough to describe what we have to do for noncoherent
-> devices. I can't think of any reason why a server hardware would include
-> noncoherent devices, so if they are configurable they should be configured
-> into coherent mode by the firmware.
 
-To clarify: I don't think we should just ignore _CCA in Linux, but instead
-see if it lists the device as coherent and warn loudly if it's configured
-as noncoherent, then set the dma-mask pointer to NULL to prevent DMA from
-being started on it.
 
-	Arnd
+On 1/16/15 09:17, Al Stone wrote:
+> On 01/16/2015 03:20 AM, Catalin Marinas wrote:
+>> On Thu, Jan 15, 2015 at 09:31:53PM +0000, Al Stone wrote:
+>>> On 01/15/2015 11:23 AM, Catalin Marinas wrote:
+>>>> On Thu, Jan 15, 2015 at 04:26:20PM +0000, Grant Likely wrote:
+>>>>> On Wed, Jan 14, 2015 at 3:04 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>>>>> This is the v7 of ACPI core patches for ARM64 based on ACPI 5.1
+>>>>>
+>>>>> I'll get right to the point: Can we please have this series queued up
+>>>>> for v3.20?
+>>>> [snip ... ]
+>>>
+>>>>> 5. Platform support patches need verification and review
+>>>>>     * ACPI core works on at least the Foundation model, Juno, APM
+>>>>> Mustang, and AMD Seattle
+>>>>>     * There still are driver patches being discussed. See Al's summary
+>>>>> for details
+>>>>>     * As I argued above, the state of driver patches isn't going to be
+>>>>
+>>>> We are still lacking here. To quote Al, "First version for AMD Seattle
+>>>> has been posted to the public linaro-acpi mailing list for initial
+>>>> review". Sorry but I don't follow linaro-acpi list. I don't know what's
+>>>> in those patches and I can't tell which subsystems they touch, whether
+>>>> maintainers agree with them. So in conclusion, I'm not confident the
+>>>> arm64 hardware ACPI story looks that great yet.
+>>>>
+>>>
+>>> This is solely my fault -- too much time on processes, email, and
+>>> documentation, not enough time on the Seattle patches.  And not
+>>> enough Seattles to go around for someone else to pick up the slack.
+>>>
+>>> I am aware not everyone is subscribed to linaro-acpi; we use that
+>>> for internal review before posting more broadly, which is the only
+>>> reason I sent them there.
+>>>
+>>> I'm in the middle of updating them as I have time, based on really
+>>> good feedback from Arnd; few of them are terribly new (the very first
+>>> posting was [0]) -- it's mostly a matter of rebasing, integrating
+>>> updates from AMD and others, and reacting to the comments.  One can
+>>> also see what these patches will probably look like via one of the
+>>> Fedora kernel trees [1].
+>>
+>> Do you have some simple branch against mainline with just the ACPI core
+>> patches and what's required for AMD Seattle? I have no plans to dig
+>> through the Fedora kernels.
+>>
+>
+> Nor was I expecting you to; I only added it as additional reference
+> material, should one be interested.
+>
+> The version of patches sent to the linaro-acpi list are from the Linaro
+> acpi.git tree, and are precisely what you describe; those are the ones
+> being updated.
+>
+
+Catalin,
+
+For Seattle, you could use the https://git.linaro.org/leg/acpi/acpi.git 
+acpi-5.1-v7, and it would also need the AHCI ACPI patch here 
+(https://lkml.org/lkml/2015/1/5/662).
+
+Thanks,
+Suravee
