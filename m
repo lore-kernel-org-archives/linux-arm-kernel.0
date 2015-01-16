@@ -1,41 +1,48 @@
-From: zhang.lyra@gmail.com (Lyra Zhang)
-Date: Fri, 16 Jan 2015 20:53:16 +0800
-Subject: [PATCH v5 2/5] Documentation: DT: Add bindings for Spreadtrum SoC
- Platform
-In-Reply-To: <20150116102135.GC21809@leverpostej>
-References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1421402411-3479-3-git-send-email-chunyan.zhang@spreadtrum.com>
- <20150116102135.GC21809@leverpostej>
-Message-ID: <CAAfSe-teDdPzRUnvzM+NErfZwmqM04yUMgic--hyZL8-Jjd8jw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 16 Jan 2015 13:55:14 +0100
+Subject: [PATCH] spi: xilinx: Use standard num-cs binding
+Message-ID: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark
+Use standard num-cs binding property and setup
+"xlnx,num-ss-bits" as deprecated.
 
->> +
->> +Required properties:
->> +- compatible: must be "sprd,sc9836-uart"
->> +- reg: offset and length of the register set for the device
->> +- interrupts: exactly one interrupt specifier
->> +- clocks: phandles to input clocks.
->
-> The order and relevance of each should be specified. If you have
-> multiple clocks I would strongly recommend you use clock-names to
-> distinguish them.
->
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Thank you for the recommendation.
-but, since we haven't made the clock driver ready, for this initial
-commit, we just let 4 UARTs share a single fixed 26 MHz clock source.
-we'll do like you've recommended when we will submit the clock driver
-in the future.
+ drivers/spi/spi-xilinx.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-Best regards,
-Chunyan
+diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
+index 79bd84f43430..30e5180195bb 100644
+--- a/drivers/spi/spi-xilinx.c
++++ b/drivers/spi/spi-xilinx.c
+@@ -338,8 +338,15 @@ static int xilinx_spi_probe(struct platform_device *pdev)
+ 		num_cs = pdata->num_chipselect;
+ 		bits_per_word = pdata->bits_per_word;
+ 	} else {
+-		of_property_read_u32(pdev->dev.of_node, "xlnx,num-ss-bits",
+-					  &num_cs);
++		if (of_property_read_u32(pdev->dev.of_node, "num-cs",
++					 &num_cs)) {
++			if (!of_property_read_u32(pdev->dev.of_node,
++						  "xlnx,num-ss-bits",
++						  &num_cs)) {
++				dev_err(&pdev->dev,
++					"property name 'xlnx,num-ss-bits' is deprecated.\n");
++			}
++		}
+ 	}
 
+ 	if (!num_cs) {
+--
+1.8.2.3
 
-
-> Otherwise this looks fine.
->
-> Mark.
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/9091f481/attachment.sig>
