@@ -1,195 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jan 2015 09:49:13 +0000
-Subject: [PATCH v7 06/17] ARM64 / ACPI: Make PCI optional for ACPI on ARM64
-In-Reply-To: <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <1421247905-3749-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150116094913.GA13634@e104818-lin.cambridge.arm.com>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Fri, 16 Jan 2015 10:50:39 +0100
+Subject: [PATCH v2] AT91, DT,
+ usb gadget: disable pull-up on vbus-gpio (PB16) to reduce power
+ consumption
+In-Reply-To: <54B8AE36.6090904@atmel.com>
+References: <54B8AE36.6090904@atmel.com>
+Message-ID: <1421401839-29370-1-git-send-email-sylvain.rochet@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 14, 2015 at 03:04:54PM +0000, Hanjun Guo wrote:
-> Since PCI is not required in ACPI spec and ARM can run without
-> it, introduce some stub functions to make PCI optional for ACPI,
-> and make ACPI core run without CONFIG_PCI on ARM64.
-> 
-> When PCI is enabled on ARM64, ACPI core will need some PCI functions
-> to make it functional, so introduce some empty functions here and
-> implement it later.
-> 
-> Since ACPI on X86 and IA64 depends on PCI and this patch only makes
-> PCI optional for ARM64, it will not break anything on X86 and IA64.
-> 
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+There is an external resistor divider on PB16, acting like a pull-down,
+the pull-up increase power consumption and prevent the vbus detect pin
+to reach Vss voltage, ~1.5V mesured on my board, it might not even work
+if the pull-up is stronger than usual.
 
-Is this patch still required, now that we have PCI for arm64? I know the
-ACPI spec doesn't require PCI but do we expect any arm64 servers aimed
-at ACPI without PCIe?
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+---
+Improved GPIO comment, fixed typo in commit summary.
 
-Anyway, that's not the main point, see more below.
+ arch/arm/boot/dts/at91sam9x5ek.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> index 872ba93..fded096 100644
-> --- a/arch/arm64/include/asm/pci.h
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -24,6 +24,12 @@
->   */
->  #define PCI_DMA_BUS_IS_PHYS	(0)
->  
-> +static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
-> +{
-> +	/* no legacy IRQ on arm64 */
-> +	return -ENODEV;
-> +}
-> +
->  extern int isa_dma_bridge_buggy;
->  
->  #ifdef CONFIG_PCI
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index ce5836c..42fb195 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -10,6 +10,7 @@
->   *
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
-> @@ -68,3 +69,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  	bus->domain_nr = domain;
->  }
->  #endif
-> +
-> +/*
-> + * raw_pci_read/write - Platform-specific PCI config space access.
-> + *
-> + * Default empty implementation.  Replace with an architecture-specific setup
-> + * routine, if necessary.
-> + */
-> +int raw_pci_read(unsigned int domain, unsigned int bus,
-> +		  unsigned int devfn, int reg, int len, u32 *val)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +int raw_pci_write(unsigned int domain, unsigned int bus,
-> +		unsigned int devfn, int reg, int len, u32 val)
-> +{
-> +	return -EINVAL;
-> +}
-> +
-> +#ifdef CONFIG_ACPI
-> +/* Root bridge scanning */
-> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> +{
-> +	/* TODO: Should be revisited when implementing PCI on ACPI */
-> +	return NULL;
-> +}
-> +#endif
-
-Do these functions have anything to do with the subject? You add them in
-arch/arm64/kernel/pci.c which is compiled only when CONFIG_PCI while the
-commit log implies that you add them to allow CONFIG_PCI to be off.
-
-When PCI is enabled and the above functions are compiled in, do they
-need to return any useful data or just -EINVAL. Are they ever called?
-
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 39f3ec1..c346011 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -43,7 +43,7 @@ acpi-y				+= processor_core.o
->  acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
->  acpi-y				+= ec.o
->  acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
-> -acpi-y				+= pci_root.o pci_link.o pci_irq.o
-> +acpi-$(CONFIG_PCI)		+= pci_root.o pci_link.o pci_irq.o
->  acpi-y				+= acpi_lpss.o
->  acpi-y				+= acpi_platform.o
->  acpi-y				+= acpi_pnp.o
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 163e82f..c5ff8ba 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -26,8 +26,13 @@
->  acpi_status acpi_os_initialize1(void);
->  int init_acpi_device_notify(void);
->  int acpi_scan_init(void);
-> +#ifdef CONFIG_PCI
->  void acpi_pci_root_init(void);
->  void acpi_pci_link_init(void);
-> +#else
-> +static inline void acpi_pci_root_init(void) {}
-> +static inline void acpi_pci_link_init(void) {}
-> +#endif
->  void acpi_processor_init(void);
->  void acpi_platform_init(void);
->  void acpi_pnp_init(void);
-
-That's a good clean-up.
-
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 360a966..1476a66 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -564,15 +564,6 @@ struct pci_ops {
->  	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
->  };
->  
-> -/*
-> - * ACPI needs to be able to access PCI config space before we've done a
-> - * PCI bus scan and created pci_bus structures.
-> - */
-> -int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
-> -		 int reg, int len, u32 *val);
-> -int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
-> -		  int reg, int len, u32 val);
-> -
->  struct pci_bus_region {
->  	dma_addr_t start;
->  	dma_addr_t end;
-> @@ -1329,6 +1320,16 @@ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
->  		      unsigned int command_bits, u32 flags);
->  void pci_register_set_vga_state(arch_set_vga_state_t func);
->  
-> +/*
-> + * ACPI needs to be able to access PCI config space before we've done a
-> + * PCI bus scan and created pci_bus structures.
-> + */
-> +int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
-> +		 int reg, int len, u32 *val);
-> +int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
-> +		  int reg, int len, u32 val);
-> +void pcibios_penalize_isa_irq(int irq, int active);
-> +
->  #else /* CONFIG_PCI is not enabled */
->  
->  /*
-> @@ -1430,6 +1431,23 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
->  						unsigned int devfn)
->  { return NULL; }
->  
-> +static inline struct pci_bus *pci_find_bus(int domain, int busnr)
-> +{ return NULL; }
-> +
-> +static inline int pci_bus_write_config_byte(struct pci_bus *bus,
-> +				unsigned int devfn, int where, u8 val)
-> +{ return -ENOSYS; }
-> +
-> +static inline int raw_pci_read(unsigned int domain, unsigned int bus,
-> +			unsigned int devfn, int reg, int len, u32 *val)
-> +{ return -ENOSYS; }
-> +
-> +static inline int raw_pci_write(unsigned int domain, unsigned int bus,
-> +			unsigned int devfn, int reg, int len, u32 val)
-> +{ return -ENOSYS; }
-
-So you implement the !CONFIG_PCI functions here to return -ENOSYS while
-the arm64 CONFIG_PCI ones would return -EINVAL. I'm confused.
-
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index 3a9f6fa..bd16bd3 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -53,6 +53,8 @@
+ 			};
+ 
+ 			usb2: gadget at f803c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_board_usb2>;
+ 				atmel,vbus-gpio = <&pioB 16 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
+ 			};
+@@ -80,6 +82,13 @@
+ 							<AT91_PIOD 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;	/* PD14 gpio CD pin pull up and deglitch */
+ 					};
+ 				};
++
++				usb2 {
++					pinctrl_board_usb2: usb2-board {
++						atmel,pins =
++							<AT91_PIOB 16 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;		/* PB16 gpio vbus sense, deglitch */
++					};
++				};
+ 			};
+ 
+ 			spi0: spi at f0000000 {
 -- 
-Catalin
+2.1.4
