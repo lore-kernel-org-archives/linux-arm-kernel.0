@@ -1,37 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Jan 2015 11:15:54 +0900
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7790: Correct mask for GIC PPI
- interrupts
-In-Reply-To: <CANqRtoQOs_VFku4+PKvyY1Gu0M56nfGXwratrP5qqVYxMCAMpA@mail.gmail.com>
-References: <1421329844-19707-1-git-send-email-geert+renesas@glider.be>
- <1421329844-19707-3-git-send-email-geert+renesas@glider.be>
- <CANqRtoQOs_VFku4+PKvyY1Gu0M56nfGXwratrP5qqVYxMCAMpA@mail.gmail.com>
-Message-ID: <20150116021551.GA19790@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Jan 2015 11:34:44 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Cleanups for v3.20
+Message-ID: <cover.1421371490.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 10:49:33AM +0900, Magnus Damm wrote:
-> Hi Geert,
-> 
-> On Thu, Jan 15, 2015 at 10:50 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
-> > R-Car H2 (r8a7790) contains four Cortex-A15 and four Cortex-A7 cores,
-> > hence the second interrupt specifier cell for Private Peripheral
-> > Interrupts should use "GIC_CPU_MASK_SIMPLE(8)", to make sure interrupts
-> > can be delivered to all 8 processor cores.
-> >
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > Untested
-> >
-> > v2:
-> >   - Drop RFC status after receiving confirmation from Liviu Dudau.
-> 
-> Thanks for your work on this.
-> 
-> I see the "untested" word above which makes me think we should test
-> both Big and Little boot modes on r8a7790. The default "Big" mode
-> where CA15 is used usually gets a lot of attention, but little mode
-> with CA7 boot should also work with the same kernel image.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-For now I have marked these as deferred pending testing.
+Please consider this second round of Renesas ARM based SoC DT cleanups for
+v3.20.
+
+
+The following changes since commit 97bf6af1f928216fd6c5a66e8a57bfa95a659672:
+
+  Linux 3.19-rc1 (2014-12-20 17:08:50 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-cleanups2-for-v3.20
+
+for you to fetch changes up to d2b541c98f5402ebb49ee1c636ef5bc31462b4ca:
+
+  ARM: shmobile: r8a7791: tidyup #sound-dai-cells settings (2015-01-13 11:01:55 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Cleanups for v3.20
+
+* Tidy up #sound-dai-cells settings
+* Drop "renesas,rcar_sound" compatible value
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a7790 dtsi: Drop "renesas,rcar_sound" compatible value
+      ARM: shmobile: r8a7791 dtsi: Drop "renesas,rcar_sound" compatible value
+
+Kuninori Morimoto (2):
+      ARM: shmobile: r8a7790: tidyup #sound-dai-cells settings
+      ARM: shmobile: r8a7791: tidyup #sound-dai-cells settings
+
+ arch/arm/boot/dts/r8a7790-lager.dts   | 1 +
+ arch/arm/boot/dts/r8a7790.dtsi        | 9 +++++++--
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
+ arch/arm/boot/dts/r8a7791.dtsi        | 9 +++++++--
+ 4 files changed, 16 insertions(+), 4 deletions(-)
