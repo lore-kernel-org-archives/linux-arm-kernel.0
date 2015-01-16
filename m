@@ -1,36 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Jan 2015 14:55:45 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <54B9240A.7060003@amd.com>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <54B8BB24.2020408@linaro.org> <54B9240A.7060003@amd.com>
-Message-ID: <20150116145545.GR7091@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 16 Jan 2015 16:04:54 +0100
+Subject: [PATCH 0/3] Enable myphy28lp support
+In-Reply-To: <54B90FC4.2020604@ti.com>
+References: <1421229299-8206-1-git-send-email-gabriel.fernandez@linaro.org>
+ <54B8FC56.8080400@st.com> <54B904C3.1080002@st.com> <54B90FC4.2020604@ti.com>
+Message-ID: <54B92896.5020607@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tom,
+Hi,
 
-On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
-> I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
-> drivers that I'm about to submit upstream with the V7 patch series
-> on the AMD Seattle server platform. There does not appear to be support
-> for the _CCA attribute in this patch series. The amd-xgbe driver will
-> setup the device domain and cache attributes based on the presence of
-> this attribute, but it requires the arch support to assign the proper
-> DMA operations in order for it to all work correctly.
-> 
-> Overriding the _CCA attribute in the driver, I was able to successfully
-> test the driver and this patch series.
+On 01/16/2015 02:19 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Friday 16 January 2015 06:02 PM, Maxime Coquelin wrote:
+>> On 01/16/2015 12:56 PM, Maxime Coquelin wrote:
+>>> Hi Gabriel,
+>>>
+>>>      For the series:
+>>> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+>>>
+>>>      Kishon, could you take care of adding PHY driver patch for v3.20?
+>> Hi Kishon,
+>>
+>>      Don't apply the patch, since we have 2 other PHY driver patches, I will
+>> send you a pull request.
+> Send me as patches if that is okay.
+Ok. Just sent the patches.
 
-Hopefully this will all be addressed when the IORT parts of ACPI have
-settled down (the current proposal allows for these attributes to be
-described as well as their interaction with things like IOMMUs).
-
-In the meantime, are you falling back to non-coherent DMA? If so, what
-attributes have you settled on? We need to be really careful not to
-corrupt data during cache invalidatation when mapping a non-coherent
-buffer for the CPU.
-
-Will
+Thanks,
+Maxime
+>
+> Thanks
+> Kishon
+>
+>> Best regards,
+>> Maxime
+>>
+>>
+>>> Thanks,
+>>> Maxime
+>>> On 01/14/2015 10:54 AM, Gabriel FERNANDEZ wrote:
+>>>> The goal of this series is to enable the support of MiPHY28lp Generic PHY.
+>>>>
+>>>> The first patch is to update miphy28lp phy driver to access sysconfig register
+>>>> offsets via syscfg dt property. It's based on Arnds review comments here
+>>>> https://lkml.org/lkml/2014/11/13/161
+>>>> I have updated the miphy28lp phy driver same way as Peter's implementation.
+>>>>
+>>>> Gabriel Fernandez (3):
+>>>>     phy: miphy28lp: Pass sysconfig register offsets via syscfg dt
+>>>>       property.
+>>>>     ARM: DT: STi: STiH407: Add DT node for MiPHY28lp
+>>>>     ARM: multi_v7_defconfig: Enable MiPHY28lp - ST's Generic (SATA, PCIe &
+>>>>       USB3) PHY
+>>>>
+>>>>    .../devicetree/bindings/phy/phy-miphy28lp.txt      | 43 ++++++---------
+>>>>    arch/arm/boot/dts/stih407-family.dtsi              | 53 +++++++++++++++++++
+>>>>    arch/arm/boot/dts/stihxxx-b2120.dtsi               | 11 ++++
+>>>>    arch/arm/configs/multi_v7_defconfig                |  1 +
+>>>>    drivers/phy/phy-miphy28lp.c                        | 61
+>>>> ++++++++++++----------
+>>>>    5 files changed, 113 insertions(+), 56 deletions(-)
+>>>>
