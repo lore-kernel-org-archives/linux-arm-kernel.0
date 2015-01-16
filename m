@@ -1,42 +1,61 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Jan 2015 11:20:04 +0000
-Subject: [PATCH] clockevents: don't suspend/resume if unused
-In-Reply-To: <20150116111706.GE12302@n2100.arm.linux.org.uk>
-References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150116092014.GA27945@gradator.net>
- <20150116111706.GE12302@n2100.arm.linux.org.uk>
-Message-ID: <20150116112003.GF12302@n2100.arm.linux.org.uk>
+Date: Fri, 16 Jan 2015 11:23:24 +0000
+Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
+In-Reply-To: <20150116103530.GB3843@piout.net>
+References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1501161122320.5526@nanos>
+ <20150116103530.GB3843@piout.net>
+Message-ID: <20150116112324.GG12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 11:17:06AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 16, 2015 at 10:20:14AM +0100, Sylvain Rochet wrote:
-> > Hello Alexandre,
+On Fri, Jan 16, 2015 at 11:35:30AM +0100, Alexandre Belloni wrote:
+> On 16/01/2015 at 11:23:32 +0100, Thomas Gleixner wrote :
+> > On Fri, 16 Jan 2015, Alexandre Belloni wrote:
 > > 
-> > 
-> > On Fri, Jan 16, 2015 at 10:05:51AM +0100, Alexandre Belloni wrote:
 > > > There is no point in calling suspend/resume for unused
-> > > clockevents as they are already stopped and disabled.
-> > > 
-> > > Furthermore, it can take some time to wait for some IPs to stop counting.
+> > > clocksources.
 > > > 
 > > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > Reported-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> > > ---
+> > >  kernel/time/clocksource.c | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
+> > > index 920a4da58eb0..baea4e42ae90 100644
+> > > --- a/kernel/time/clocksource.c
+> > > +++ b/kernel/time/clocksource.c
+> > > @@ -493,7 +493,7 @@ void clocksource_suspend(void)
+> > >  	struct clocksource *cs;
+> > >  
+> > >  	list_for_each_entry_reverse(cs, &clocksource_list, list)
+> > > -		if (cs->suspend)
+> > > +		if (cs->suspend && (cs->flags & CLOCK_SOURCE_USED))
+> > >  			cs->suspend(cs);
 > > 
-> > Indeed, this is way better from what I did.
+> > This might be dangerous. If the clocksource has no enable/disable
+> > callbacks, but suspend/resume, then you might leave it enabled across
+> > suspend.
 > > 
-> > 
-> > > +		if (dev->suspend && dev->mode != CLOCK_EVT_MODE_UNUSED)
-> > 
-> > I wonder if we should use > CLOCK_EVT_MODE_SHUTDOWN
-> > (or CLOCK_EVT_MODE_UNUSED || CLOCK_EVT_MODE_SHUTDOWN) instead of 
-> > !CLOCK_EVT_MODE_UNUSED.
 > 
-> Definitely - consider the effect of the original patch set on a clock
-> source which is being used, has PM support, but does not have an
-> ->enable callback.
+> Isn't that already the case?
+> Right now, if you call clocksource_suspend, it doesn't matter whether
+> the clocksource has an enable or not, it will be suspended. Maybe I'm
+> mistaken but my patch doesn't seem to change that behaviour.
 
-Damn it, that comment should've been on the clocksource patches...
+You change an "always suspend" problem to a "never suspend" problem
+since those clocksources which are used, but do not have an ->enable
+callback will not be marked with CLOCK_SOURCE_USED.
+
+Look at patch 1:
+
+-               if (!new->enable || new->enable(new) == 0) {
++               if (!new->enable || clocksource_enable(new) == 0) {
+
+If new->enable is NULL, clocksource_enable() won't be called, which
+means there's nothing which sets CLOCK_SOURCE_USED, which in turn
+means that ->suspend() will never be called.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
