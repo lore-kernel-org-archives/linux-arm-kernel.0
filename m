@@ -1,109 +1,86 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 16 Jan 2015 11:57:35 -0800
-Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
- thread_info->syscall
-In-Reply-To: <20150116161752.GL12302@n2100.arm.linux.org.uk>
-References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
- <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
- <20150112183955.GO13360@arm.com>
- <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
- <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
- <CACZ9PQVo0SF4Z-rdNk4e=yY17Xt9n5hAqm4ZRNLEw3jGYYcvtA@mail.gmail.com>
- <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
- <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
- <20150116155923.GK12302@n2100.arm.linux.org.uk>
- <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
- <20150116161752.GL12302@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5j+XHFNyhaBndQr1Q2uthsFP9ZQGbaw5hofDmXyKXZ-H5g@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 16 Jan 2015 20:12:29 +0000
+Subject: [RFC PATCH 0/5] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <1421392892.19175.6.camel@mhfsdcap03>
+References: <cover.1421086706.git.robin.murphy@arm.com>	
+ <1421136128.27675.58.camel@mtksdaap41> <54B80857.7060407@arm.com>
+ <1421392892.19175.6.camel@mhfsdcap03>
+Message-ID: <54B970AD.7020407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 8:17 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Jan 17, 2015 at 01:08:11AM +0900, Roman Peniaev wrote:
->> On Sat, Jan 17, 2015 at 12:59 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Sat, Jan 17, 2015 at 12:57:02AM +0900, Roman Peniaev wrote:
->> >> On Fri, Jan 16, 2015 at 7:54 AM, Kees Cook <keescook@chromium.org> wrote:
->> >> > One interesting thing I noticed (which is unchanged by this series),
->> >> > but pulling ARM_r7 during the seccomp ptrace event shows __NR_poll,
->> >> > not __NR_restart_syscall, even though it was a __NR_restart_syscall
->> >> > trap from seccomp. Is there a better place to see the actual syscall?
->> >>
->> >> As I understand we do not push new r7 to the stack, and ptrace uses the
->> >> old value.
->> >
->> > And why should we push r7 to the stack?  ptrace should be using the
->> > recorded system call number, rather than poking about on the stack
->> > itself.
+On 16/01/15 07:21, Yong Wu wrote:
+[...]
+>> Now that the server seems to be properly accessible again, I've made a
+>> branch with both series available here:
 >>
->> Probably we should not, but the behaviour comparing arm to x86 is different.
+>>     git://linux-arm.org/linux-rm iommu/dma
+>>
+>> Note that in the current state it also depends on having the ARM SMMU
+>> driver selected in the config, due to an oversight on my part :(
+>>
+>> Robin.
+>>
+> Dear Robin,
 >
-> We definitely should not, because changing the stacked value changes the
-> value in r7 after the syscall has returned.  We have guaranteed that the
-> value will be preserved across syscalls for years, so we really should
-> not be changing that.
-
-Yeah, we can't mess with the registers. I was just asking for
-clarification on how this is visible to userspace.
-
+>       We have test this patch on our SOC(mt8173),which have our own iommu
+> HW(it is not ARM SMMU), the patch could work well.
+> Tested-by:Yong Wu <yong.wu@mediatek.com>
 >
->> Also there is no any way from userspace to figure out what syscall was
->> restarted, if you do not trace each syscall enter and exit from the
->> very beginning.
+
+Thanks!
+
+>   And I have some questiones about the usage:
 >
-> Thinking about ptrace, that's been true for years.
+> 1) If we create a iommu domain by ?arch_setup_dma_ops", then we would
+> like to call the standard iommu interface, like
+> ?iommu_set_fault_handle?,
+> How can we get the "struct iommu_domain *"? (the ?dev_domain? is
+> static.)
 >
-> It really depends whether you consider the restart syscall a userspace
-> thing or a kernelspace thing.  When you consider that the vast majority
-> of syscall restarts are done internally in the kernel, and we just
-> re-issue the syscall, it immediately brings up the question "why is
-> the restart block method different?" and "should the restart block
-> method be visible to userspace?"
+> 2) If a device A call ?arch_setup_dma_ops? to create a iommu domain, and
+> a client device B would like to join this iommu domain,
+> so it call ?iommu_dma_attach_device?. then the device B want to alloc
+> the iommu memory, it call ?dma_alloc_attrs? whose first parameter should
+> be the ?struct device *?of device A. Is it designed like this in this
+> patch?
+>      (In arch/arm, ?dev->archdata.dma_ops = &iommu_dma_ops? is in
+> ?arm_iommu_attach_devce?;
+>       In this patch, this sentence is in ?arch_setup_dma_ops?).
 >
-> IMHO, it is prudent not to expose kernel internals to userspace unless
-> there is a real reason to, otherwise they become part of the userspace
-> API.
 
-I couldn't agree more, but restart_syscall is already visible to
-userspace: it can be called directly, for example. And it's visible to
-tracers.
+At this point there's not really any support for devices managing their 
+own IOMMUs - initially I've only been focusing on the case where 
+dma-mapping handles everything transparently, with legacy 32-bit 
+peripherals in mind. There's already been quite a lot of discussion over 
+the shortcomings of the current arch_setup_dma_ops model (most recently, 
+[1]), but it just-about-works on Juno where we have a single device 
+behind each IOMMU (with the exception of the USB OHCI which falls foul 
+of the domain-per-device approach and falls over because it can't 
+understand addresses from the EHCI). We really need to get IOMMU groups 
+working in order to manage domains properly, which for one thing 
+requires fixing the current situation of devices getting attached to a 
+domain before they've even been added to the bus. I've started looking 
+into that, but I suspect it's going to be long and complicated.
 
-Unfortunately, the difference here is the visibility during trace
-trap. On x86, it's exposed but on ARM, there's no way (that I can
-find) to query the "true" syscall, even though the true syscall is
-what triggers the tracer. The syscall number isn't provided by any
-element of the ptrace event system, nor through siginfo, and must be
-examined on a per-arch basis from registers.
+> 3)  void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> struct iommu_ops *iommu, bool coherent)
+>      In this function, the second and third parameter are the dma address
+> base and size, can they work currently?
+> (take a example, I set the dma_base is 0, size is 0x40000000 while
+> calling arch_setup_dma_ops,
+>   then I alloc a range iova whose size is 50*SZ_4K, the return iova is
+> 0xfffce000, it is over 0x40000000.)
+>
 
-Seccomp does, however, provide a mechanism to pass arbitrary event
-data on a TRACE event, so poll vs restart_syscall can be distinguished
-that way.
+That'll be coming from __alloc_iova using the device's dma_mask as an 
+upper limit. Whilst I'm not sure if having fixed translations per 
+dma-ranges makes sense with an IOMMU present, there does seem to be a 
+valid case for having a size smaller than the driver's dma_mask - e.g. a 
+device that just happens to have some upper address lines tied off in a 
+particular implementation - so I'll change that to properly respect the 
+dma-ranges values.
 
-It seems even strace doesn't know how to find this information. For example:
+Robin.
 
-x86:
-poll([{fd=3, events=POLLIN}], 1, 4294967295
-) = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
---- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=994, si_uid=1000} ---
---- stopped by SIGSTOP ---
---- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=994, si_uid=1000} ---
-restart_syscall(<... resuming interrupted call ...>
-
-ARM:
-poll([{fd=3, events=POLLIN}], 1, -1
-)    = ? ERESTART_RESTARTBLOCK (Interrupted by signal)
---- SIGSTOP {si_signo=SIGSTOP, si_code=SI_USER, si_pid=20563, si_uid=0} ---
---- stopped by SIGSTOP ---
---- SIGCONT {si_signo=SIGCONT, si_code=SI_USER, si_pid=20563, si_uid=0} ---
-poll([{fd=3, events=POLLIN}], 1, -1
-
-Would it make sense to add REGSET_SYSTEM_CALL to ARM? (Though this
-begs the question, "Is restart_syscall visible during a trace on
-arm64?", which I'll have to go check...)
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/7556/focus=8237
