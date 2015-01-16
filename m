@@ -1,42 +1,59 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Fri, 16 Jan 2015 15:16:28 -0800
-Subject: [PATCH 01/28] PCI: Rip out pci_bus_add_devices() from
- pci_scan_bus()
-In-Reply-To: <CAE9FiQUoocCzBKsHL_D4ypH1-DV7XxZMdREX7n=Tz1Kq3kHHeA@mail.gmail.com>
-References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
- <1421372666-12288-2-git-send-email-wangyijing@huawei.com>
- <CAE9FiQUoocCzBKsHL_D4ypH1-DV7XxZMdREX7n=Tz1Kq3kHHeA@mail.gmail.com>
-Message-ID: <CAE9FiQV97PuDWBZYRxh8R0ADnUFTbo1NO3wAufj97en0yseYSQ@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 16 Jan 2015 15:18:12 -0800
+Subject: [PATCH v4 3/3] ARM: dts: add I2C device nodes for Broadcom Cygnus
+In-Reply-To: <20150116194831.GV22880@pengutronix.de>
+References: <rjui@broadcom.com>
+ <1421274213-3544-1-git-send-email-rjui@broadcom.com>
+ <1421274213-3544-4-git-send-email-rjui@broadcom.com>
+ <20150115084456.GO22880@pengutronix.de> <54B96559.1010007@broadcom.com>
+ <20150116194831.GV22880@pengutronix.de>
+Message-ID: <54B99C34.3040106@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 3:15 PM, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Thu, Jan 15, 2015 at 5:43 PM, Yijing Wang <wangyijing@huawei.com> wrote:
->> Pci_bus_add_devices() should not be placed in pci_scan_bus().
->> Now pci device will be added to driver core once its
->> creation. All things left in pci_bus_add_devices() are
->> driver attachment and other trivial sysfs things.
->> Pci_scan_bus() should be the function responsible for
->> scanning PCI devices, not including driver attachment.
->> Other, some callers(m68k,unicore32,alpha) of pci_scan_bus()
->> will call pci_bus_size_bridges() and pci_bus_assign_resources()
->> after pci_scan_bus().
->>
->> E.g.
->> In m68k
->> mcf_pci_init()
->>         pci_scan_bus()
->>                 ...
->>                 pci_bus_add_devices() --- try to attach driver
->>         pci_fixup_irqs()
->>         pci_bus_size_bridges()
->>         pci_bus_assign_resources()
->>
->> It is not correct, resources should be assigned correctly
->> before attaching driver.
->
-No, for booting path, at that time pci drivers are *NOT* loaded yet.
 
-Thanks
 
-Yinghai
+On 1/16/2015 11:48 AM, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Fri, Jan 16, 2015 at 11:24:09AM -0800, Ray Jui wrote:
+>>>> +	i2c0: i2c at 18008000 {
+>>>> +		compatible = "brcm,iproc-i2c";
+>>> in patch 2 you wrote the driver is for a family of SoCs, right? Then I'd
+>>> make this:
+>>>
+>>> 	compatible = "brcm,$mysoc-iproc-i2c", "brcm,iproc-i2c";
+>>>
+>> Sorry could you please help to explain the intention here? Note the
+>> iProc I2C IP can be found in various iProc family of SoCs, but to my
+>> best knowledge, there hasn't been any changes of the IP in any of those
+>> SoCs.
+> This is just for making the device tree stable in the future. Consider
+> your gentle hardware engineers "fix" a small issue for the next
+> generation iproc SoC "pony" that needs an incompatible software change.
+> 
+> Then you can fix the driver without updating the device trees by
+> switching to the SoC specific compatible string for "pony". And in case
+> the hardware engineers didn't tell you that there is a change and the
+> need for the software change is only detected when the machines are
+> already shipped, you're happy if you can fix your kernel without needing
+> to change the bootloader that provides the dtb.
+> So start already today to add the (for now unused) compatible string.
+> 
+>> Is the compatible ID "brcm,$mysoc-iproc-i2c" only to clarify that it's
+>> for a specific SoC? If so, what should the compatible ID array look
+>> like? Should it be changed to the following?
+>>
+>> static const struct of_device_id bcm_iproc_i2c_of_match[] = {
+>> 	{ .compatible = "brcm,iproc-i2c" },
+>> 	{ .compatible = "brcm,$mysoc-iproc-i2c" },
+>> 	{},
+>> };
+> No, there is no need, see above.
+> 
+> If something is still unclear, don't hesitate to ask.
+> 
+> Best regards
+> Uwe
+> 
+Okay got it. Thanks for the explanation!
