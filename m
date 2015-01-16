@@ -1,45 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Jan 2015 11:26:08 +0100
-Subject: [PATCH v5 5/5] tty/serial: Add Spreadtrum sc9836-uart driver
- support
-In-Reply-To: <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1421402411-3479-6-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <2026679.CiQSN0uJXp@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 16 Jan 2015 11:33:40 +0100
+Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <1417514366.21830.22.camel@collabora.co.uk>
+References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
+ <1417514366.21830.22.camel@collabora.co.uk>
+Message-ID: <54B8E904.6090107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 January 2015 18:00:11 Chunyan Zhang wrote:
-> Add a full sc9836-uart driver for SC9836 SoC which is based on the
-> spreadtrum sharkl64 platform.
-> This driver also support earlycon.
-> This patch also replaced the spaces between the macros and their
-> values with the tabs in serial_core.h
-> 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
-> Originally-by: Lanqing Liu <lanqing.liu@spreadtrum.com>
-> 
+Hello,
 
-I see nothing wrong with the patch contents, but a few things regarding
-the submission process:
+On 2014-12-02 10:59, Sjoerd Simons wrote:
+> Hey Marek, Inki,
+>
+> On Wed, 2014-11-19 at 12:15 +0100, Marek Szyprowski wrote:
+>> Hello Everyone,
+>>
+>> This is another attempt to finally make Exynos SYSMMU driver fully
+>> integrated with DMA-mapping subsystem. The main change from previous
+>> version is a rebase onto latest "automatic DMA configuration for IOMMU
+>> masters" patches from Will Deacon.
+> Do you happen to know if anyone is working on iommu/dma-mapping patches
+> for Exynos 5 based on this patchset?
 
-- The 'Signed-off-by' lines are in the wrong order. As the person
-  sending it, your S-o-b should be the last one in the list
+Just to let all of You know - I posted a new version of this patchset with
+Exynos 5250 & 5420/5422/5800 DTS patches:
 
-- You have too many people on 'To'. Please send the patch only to
-  the person you expect to apply it, and put the other people that
-  may be interested on Cc. A lot of the people who got this mail
-  are probably not interested and you can drop them completely.
+http://lists.linaro.org/pipermail/linaro-mm-sig/2015-January/004327.html
 
-- Now that everything is reviewed, split the series according to
-  subsystem maintainers and send it separately: patches 1,2 and 5
-  should go to GregKH as one series, the rest should go to
-  'arm at kernel.org'.
-
-- For some reason I did not get patch 4. Can you check if that
-  made it to the mailing list?
-
-Feel free to add my 'Acked-by: Arnd Bergmann <arnd@arndb.de>' to
-the patches you send to Greg.
-
-	Arnd
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
