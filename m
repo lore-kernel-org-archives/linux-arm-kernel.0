@@ -1,58 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Jan 2015 12:07:42 +0100
-Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
-In-Reply-To: <54B8EF15.4000602@linaro.org>
-References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1501161122320.5526@nanos>
- <20150116103530.GB3843@piout.net> <54B8EA54.5020002@linaro.org>
- <20150116104804.GE3843@piout.net> <54B8EF15.4000602@linaro.org>
-Message-ID: <20150116110742.GJ3843@piout.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 16 Jan 2015 12:08:48 +0100
+Subject: [PATCH v2] ARM: shmobile: sh73a0 dtsi: Add Cortex-A9 TWD node
+Message-ID: <1421406528-26704-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/2015 at 11:59:33 +0100, Daniel Lezcano wrote :
-> On 01/16/2015 11:48 AM, Alexandre Belloni wrote:
-> >Hi,
-> >
-> >On 16/01/2015 at 11:39:16 +0100, Daniel Lezcano wrote :
-> >>>Isn't that already the case?
-> >>>Right now, if you call clocksource_suspend, it doesn't matter whether
-> >>>the clocksource has an enable or not, it will be suspended. Maybe I'm
-> >>>mistaken but my patch doesn't seem to change that behaviour.
-> >>
-> >>Actually, if there is no enable/disable callback, then CLOCK_SOURCE_USED
-> >>will be never set, hence the condition will always fail and the suspend
-> >>callback won't be called.
-> >>
-> >
-> >It is set in clocksource_enable/disable, even if there is no
-> >enable/disable callback.
-> 
-> Ah, right. But shouldn't we set the flag only if the callback is present and
-> succeed as Boris mentioned it ?
-> 
+Add a node for the Private Timer and Watchdog, as found in the Cortex-A9
+MPCore.
 
-What Boris was suggesting was that if the enable exist, set it only if
-it succeed. Which gives something like that:
+Without this, there's no clocksource available during early kernel
+initialization, before cmt1 is initialized, leading to a lock-up if
+CONFIG_CPU_IDLE=y.
 
-int clocksource_enable(struct clocksource *cs)
-{
-	int ret = 0;
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+As the TWD driver does not support DT without CCF, this should NOT be
+applied to a branch that still has kzm9g-reference support, as this
+would lead to another lock-up.
+Hence the first choice "dt-for-v3.20" is NOT OK.
+"sh73a0-multiplatform-for-v3.20" is OK.
 
-	if (cs->enable)
-		ret = cs->enable(cs);
+v2:
+  - The clock is twd_clk
+---
+ arch/arm/boot/dts/sh73a0.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-	if (!ret)
-		cs->flags |= CLOCK_SOURCE_USED;
-
-	return 0;
-}
-
-I will use that version in v2.
-
-
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 121bbeba8f3f6695..9aa55d52b556b4b1 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -11,6 +11,7 @@
+ /include/ "skeleton.dtsi"
+ 
+ #include <dt-bindings/clock/sh73a0-clock.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+@@ -37,6 +38,13 @@
+ 		};
+ 	};
+ 
++	timer at f0000600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0xf0000600 0x20>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++		clocks = <&twd_clk>;
++	};
++
+ 	gic: interrupt-controller at f0001000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
