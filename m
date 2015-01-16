@@ -1,49 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Jan 2015 15:38:58 +0000
-Subject: [PATCH] arm64: uapi: expose our struct ucontext to the uapi
- headers
-In-Reply-To: <20150116153715.GV7091@arm.com>
-References: <1421416334-12588-1-git-send-email-will.deacon@arm.com>
- <20150116144737.GB10230@localhost> <1730317.ngMhCvdNtF@wuerfel>
- <20150116153505.GH13634@e104818-lin.cambridge.arm.com>
- <20150116153715.GV7091@arm.com>
-Message-ID: <20150116153857.GI13634@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 16:40:28 +0100
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150116153320.GU7091@arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <2198633.UpIyI82Yon@wuerfel> <20150116153320.GU7091@arm.com>
+Message-ID: <1809831.d9GPSfLUEN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 03:37:15PM +0000, Will Deacon wrote:
-> On Fri, Jan 16, 2015 at 03:35:06PM +0000, Catalin Marinas wrote:
-> > On Fri, Jan 16, 2015 at 03:26:15PM +0000, Arnd Bergmann wrote:
-> > > On Friday 16 January 2015 14:47:38 Catalin Marinas wrote:
-> > > > However,
-> > > > with the uapi headers change and maybe some additional commits, we end
-> > > > up copying the uapi/asm-generic/ucontext.h to usr/include/asm/ in the
-> > > > exported headers which differs from the arch ucontext.h as the latter
-> > > > was never split in uapi/non-uapi parts (it wasn't in the
-> > > > arch/arm/include/Kbuild).
+On Friday 16 January 2015 15:33:20 Will Deacon wrote:
+> On Fri, Jan 16, 2015 at 03:14:13PM +0000, Arnd Bergmann wrote:
+> > On Friday 16 January 2015 14:55:45 Will Deacon wrote:
+> > > On Fri, Jan 16, 2015 at 02:45:30PM +0000, Tom Lendacky wrote:
+> > > > I have tested ACPI-enablement patches for the amd-xgbe/amd-xgbe-phy
+> > > > drivers that I'm about to submit upstream with the V7 patch series
+> > > > on the AMD Seattle server platform. There does not appear to be support
+> > > > for the _CCA attribute in this patch series. The amd-xgbe driver will
+> > > > setup the device domain and cache attributes based on the presence of
+> > > > this attribute, but it requires the arch support to assign the proper
+> > > > DMA operations in order for it to all work correctly.
+> > > > 
+> > > > Overriding the _CCA attribute in the driver, I was able to successfully
+> > > > test the driver and this patch series.
 > > > 
-> > > Are you sure? When I look at the build/usr/include/asm directory, I
-> > > only see wrappers like this one
+> > > Hopefully this will all be addressed when the IORT parts of ACPI have
+> > > settled down (the current proposal allows for these attributes to be
+> > > described as well as their interaction with things like IOMMUs).
 > > > 
-> > > #include <asm-generic/auxvec.h>  // inside usr/include/asm/auxvec.h
-> > > 
-> > > and the include/uapi/asm-generic/auxvec.h gets copied to usr/asm-generic/auxvec.h
-> > > 
-> > > However, I don't see this wrapper done for the arm or arm64 version
-> > > of ucontext.h: we get a copy of the generic file in usr/include/asm/ucontext.h
-> > > but no wrapper for it because arch/arm*/include/uapi/asm/Kbuild does not
-> > > list ucontext.h.
+> > > In the meantime, are you falling back to non-coherent DMA? If so, what
+> > > attributes have you settled on? We need to be really careful not to
+> > > corrupt data during cache invalidatation when mapping a non-coherent
+> > > buffer for the CPU.
 > > 
-> > I think you are right, maybe I just got confused with
-> > usr/include/asm-generic/ucontext.h which doesn't matter as user space
-> > should not include it.
+> > I think in case of ACPI we should use cache-coherent as the default,
+> > as this is what all servers will use for DMA masters.
 > 
-> Right; but exporting our own structure is still useful from a userspace
-> perspective, otherwise they have to follow glibc's lead and define their
-> own compatible layout.
+> I don't agree. The dma-coherent we have for device-tree isn't nearly
+> expressive enough for the kind of things we want to describe and there's
+> no reason to make the same mistake in ACPI, especially as it *is* being
+> addressed by IORT. If we run with _CCA, then we're going to be stuck
+> supporting something that isn't fit for purpose and which will likely be
+> abused to describe both fixed features of the system and software
+> configuration preferences. It also opens up a can of worms if we have to
+> support a mixture of _CCA and IORT in the future.
+> 
+> Or are you suggesting that we ignore _CCA and just assume cache-coherency?
+> In that case, how do we support systems that aren't cache coherent, where
+> not being cache coherent includes devices that require either device or
+> IOMMU configuration to enable cacheable transactions?
 
-That's fine, I think the patch still make sense (but not as urgent as we
-haven't broken anything).
+I was thinking we'd ignore _CCA because as you say a simple on/off flag
+would not be enough to describe what we have to do for noncoherent
+devices. I can't think of any reason why a server hardware would include
+noncoherent devices, so if they are configurable they should be configured
+into coherent mode by the firmware.
 
--- 
-Catalin
+	Arnd
