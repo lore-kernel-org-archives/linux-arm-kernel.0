@@ -1,42 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 16 Jan 2015 08:11:23 -0600
-Subject: [PATCH v5 1/5] Documentation: DT: Renamed of-serial.txt to
- 8250.txt
-In-Reply-To: <1421402411-3479-2-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1421402411-3479-2-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <CAL_JsqL9hkfuGi-BmRHTZ=F3KVL8miu2LXkftbswpVuuSx0dtA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 16 Jan 2015 15:27:00 +0100
+Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
+ SATA port
+In-Reply-To: <20150116123705.GM3043@sirena.org.uk>
+References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
+ <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
+ <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
+ <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
+Message-ID: <54B91FB4.5080707@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 16, 2015 at 4:00 AM, Chunyan Zhang
-<chunyan.zhang@spreadtrum.com> wrote:
-> The file of-serial.txt was only for 8250 compatible UART implementations,
-> so renamed it to 8250.txt to avoid confusing other persons.
-> This is suggested by Arnd, see:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/291455.html
->
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+Hi Mark and Hans,
 
-This is pretty much un-related to the rest of the series, so I will apply it.
+On 16/01/2015 13:37, Mark Brown wrote:
+> On Fri, Jan 16, 2015 at 11:10:18AM +0100, Hans de Goede wrote:
+>> On 16-01-15 10:27, Gregory CLEMENT wrote:
+> 
+>>>>> +	reg_sata0: pwr-sata0 {
+>>>>> +		compatible = "regulator-fixed";
+>>>>> +		regulator-name = "pwr_en_sata0";
+>>>>> +		enable-active-high;
+>>>>> +		regulator-always-on;
+> 
+>>>> done, but we're not using a power on delay anyways.
+> 
+>>> But if regulator-always-on prevent to switch it off in
+>>> suspend then yes using regulator-boot-on is better.
+> 
+>> AFAIK regulator-always-on means exactly that and thus likely
+>> is not what you want. As for using regulator-off-in-suspend
+>> that is not necessary as the suspend method for the acpi
+>> driver will already turn it off.
+> 
+> regulator-always-on is a bit fuzzy for suspend, if the regulator has
+> suspend control it'll kick in - it's really about the Linux refcounting
+> while it's running.  What's more concerning here is that the quick
+> sample of the regulators flagged as always on like the above that I
+> looked at in the patch don't seem to have any enable control in the DT
+> so this will have absolutely no effect.
 
-Rob
+Actually the reg_sata[0-4] are controlled by gpio, so there is a mean
+to enable/disable them. For the reg_5v_sata[0-4] and reg_12v_sata[0-4]
+they depend on their respective reg_sata and I just propagated the
+regulator-always-on, this was maybe a mistake.
 
-> ---
->  .../bindings/serial/{of-serial.txt => 8250.txt}    |    0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/serial/{of-serial.txt => 8250.txt} (100%)
->
-> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/8250.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/serial/of-serial.txt
-> rename to Documentation/devicetree/bindings/serial/8250.txt
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+>> It is probably a good idea to use regulator-boot-on and
+>> then test things this way, and if that works use
+>> regulator-boot-on.
+> 
+> No, it's unlikely that boot-on makes sense here - it's there for cases
+> where we can't read back the hardware state at power on.  Generally
+> drivers should work regardless of the initial state of the regulator
+> (and modular drivers will actually break if they try to rely on boot-on
+> since we clean up unused regulators at boot).
+
+As pointed by Hans my concern here was be sure that during boot the disk
+are not power off. In this case which property would be accurate?
+
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
