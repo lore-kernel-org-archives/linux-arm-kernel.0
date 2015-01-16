@@ -1,53 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 16 Jan 2015 13:37:41 +0100
-Subject: [PATCH V3 4/4] mmc: pwrseq_simple: Add support for a reset GPIO
- pin
-In-Reply-To: <CAAObsKDm1iPAWgJpQwed8KufkxKwqTAFa5espfqq+jY13r+Ymw@mail.gmail.com>
-References: <1421405273-19117-1-git-send-email-ulf.hansson@linaro.org>
- <1421405273-19117-5-git-send-email-ulf.hansson@linaro.org>
- <CAAObsKDm1iPAWgJpQwed8KufkxKwqTAFa5espfqq+jY13r+Ymw@mail.gmail.com>
-Message-ID: <CAPDyKFoLqmgTvJpFLrGZvxrfug+SyspsYaOYtf65CsZ7T991pA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 16 Jan 2015 13:42:27 +0100
+Subject: [PATCH 4/4] clk: pxa: add missing pxa27x clocks for Irda and
+ sa1100-rtc
+In-Reply-To: <20150112235256.20842.68349@quantum> (Mike Turquette's message of
+ "Mon, 12 Jan 2015 15:52:56 -0800")
+References: <1419688528-760-1-git-send-email-robert.jarzmik@free.fr>
+ <1419688528-760-5-git-send-email-robert.jarzmik@free.fr>
+ <20150112235256.20842.68349@quantum>
+Message-ID: <87sifax5fw.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 January 2015 at 12:34, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> On 16 January 2015 at 11:47, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>
->>  int mmc_pwrseq_simple_alloc(struct mmc_host *host, struct device *dev)
->>  {
->>         struct mmc_pwrseq_simple *pwrseq;
->> +       int ret = 0;
->>
->>         pwrseq = kzalloc(sizeof(struct mmc_pwrseq_simple), GFP_KERNEL);
->>         if (!pwrseq)
->>                 return -ENOMEM;
->>
->> +       pwrseq->reset_gpio = gpiod_get_index(dev, "reset", 0, GPIOD_OUT_HIGH);
->> +       if (IS_ERR(pwrseq->reset_gpio) &&
->> +               PTR_ERR(pwrseq->reset_gpio) != -ENOENT &&
->> +               PTR_ERR(pwrseq->reset_gpio) != -ENOSYS) {
->> +               ret = PTR_ERR(pwrseq->reset_gpio);
->> +               goto free;
->> +       }
->> +
->>         pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
->>         host->pwrseq = &pwrseq->pwrseq;
->>
->>         return 0;
->> +free:
->> +       kfree(&pwrseq);
+Mike Turquette <mturquette@linaro.org> writes:
+
+> Quoting Robert Jarzmik (2014-12-27 05:55:28)
+>> Add 2 clocks which were erronously forgotten by the clock framework
+>> port, namely :
+>>  - sa1100-rtc
+>>  - irda for pxa2xx-ir:UARTCLK
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 >
-> Hi Ulf,
->
-> this kfree looks a bit fishy (there's one more instance of it in
-> mmc_pwrseq_simple_free).
+> Acked-by: Michael Turquette <mturquette@linaro.org>
 
-This is the error path, which means I need to clean up data that I
-have allocated.
+Thanks for the review and the ack Michael, I'll push that in pxa/for-next.
 
-mmc_pwrseq_simple_free() is called when host drivers ->remove()
-callback invokes mmc_free_host(). In that case the host->pwrseq has
-been assigned.
+Cheers.
 
-Kind regards
-Uffe
+--
+Robert
