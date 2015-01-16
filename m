@@ -1,71 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Jan 2015 15:27:00 +0100
-Subject: [PATCH v4 4/4] ARM: mvebu: Armada 385 GP: Add regulators to the
- SATA port
-In-Reply-To: <20150116123705.GM3043@sirena.org.uk>
-References: <1421330978-9694-1-git-send-email-gregory.clement@free-electrons.com>
- <1421330978-9694-5-git-send-email-gregory.clement@free-electrons.com>
- <54B8C933.7020502@redhat.com> <54B8D97B.3090908@free-electrons.com>
- <54B8E38A.6020709@redhat.com> <20150116123705.GM3043@sirena.org.uk>
-Message-ID: <54B91FB4.5080707@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 15:27:49 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Sh73a0 Multiplatform Updates for
+ v3.20
+In-Reply-To: <20150116124416.GB6285@verge.net.au>
+References: <cover.1421371996.git.horms+renesas@verge.net.au>
+ <1524412.qzMh8qoUQG@wuerfel> <20150116124416.GB6285@verge.net.au>
+Message-ID: <1624379.BZHQTL5QDD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark and Hans,
-
-On 16/01/2015 13:37, Mark Brown wrote:
-> On Fri, Jan 16, 2015 at 11:10:18AM +0100, Hans de Goede wrote:
->> On 16-01-15 10:27, Gregory CLEMENT wrote:
+On Friday 16 January 2015 21:44:16 Simon Horman wrote:
+> On Fri, Jan 16, 2015 at 09:38:44AM +0100, Arnd Bergmann wrote:
+> > I see that after this pull request, only ARCH_SH7372 and ARCH_R8A7778
+> > are left without multiplatform support. Did I remember correctly
+> > that you plan to add a common clock driver for ARCH_R8A7778 next,
+> > move that to multiplatform and then delete all the ARCH_SHMOBILE_LEGACY
+> > support including ARCH_SH7372?
 > 
->>>>> +	reg_sata0: pwr-sata0 {
->>>>> +		compatible = "regulator-fixed";
->>>>> +		regulator-name = "pwr_en_sata0";
->>>>> +		enable-active-high;
->>>>> +		regulator-always-on;
+> Hi Arnd,
 > 
->>>> done, but we're not using a power on delay anyways.
-> 
->>> But if regulator-always-on prevent to switch it off in
->>> suspend then yes using regulator-boot-on is better.
-> 
->> AFAIK regulator-always-on means exactly that and thus likely
->> is not what you want. As for using regulator-off-in-suspend
->> that is not necessary as the suspend method for the acpi
->> driver will already turn it off.
-> 
-> regulator-always-on is a bit fuzzy for suspend, if the regulator has
-> suspend control it'll kick in - it's really about the Linux refcounting
-> while it's running.  What's more concerning here is that the quick
-> sample of the regulators flagged as always on like the above that I
-> looked at in the patch don't seem to have any enable control in the DT
-> so this will have absolutely no effect.
+> yes, my understanding is that is (still) the plan.
 
-Actually the reg_sata[0-4] are controlled by gpio, so there is a mean
-to enable/disable them. For the reg_5v_sata[0-4] and reg_12v_sata[0-4]
-they depend on their respective reg_sata and I just propagated the
-regulator-always-on, this was maybe a mistake.
+Ok, thanks for the confirmation. 
 
-> 
->> It is probably a good idea to use regulator-boot-on and
->> then test things this way, and if that works use
->> regulator-boot-on.
-> 
-> No, it's unlikely that boot-on makes sense here - it's there for cases
-> where we can't read back the hardware state at power on.  Generally
-> drivers should work regardless of the initial state of the regulator
-> (and modular drivers will actually break if they try to rely on boot-on
-> since we clean up unused regulators at boot).
-
-As pointed by Hans my concern here was be sure that during boot the disk
-are not power off. In this case which property would be accurate?
-
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
