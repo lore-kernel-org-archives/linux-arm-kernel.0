@@ -1,114 +1,72 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 16 Jan 2015 12:43:15 +0100
-Subject: RFC on cpufreq implementation
-In-Reply-To: <54B8F19F.8060108@free.fr>
-References: <54B7F7CD.7030903@free.fr> <1421399293.11224.7.camel@AMDC1943>
- <54B8F19F.8060108@free.fr>
-Message-ID: <1421408595.7058.8.camel@AMDC1943>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 16 Jan 2015 12:45:21 +0100
+Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
+In-Reply-To: <20150116110742.GJ3843@piout.net>
+References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1501161122320.5526@nanos>
+ <20150116103530.GB3843@piout.net> <54B8EA54.5020002@linaro.org>
+ <20150116104804.GE3843@piout.net> <54B8EF15.4000602@linaro.org>
+ <20150116110742.GJ3843@piout.net>
+Message-ID: <20150116114521.GQ3843@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pi?, 2015-01-16 at 12:10 +0100, Mason wrote:
-> On 16/01/2015 10:08, Krzysztof Kozlowski wrote:
+On 16/01/2015 at 12:07:42 +0100, Alexandre Belloni wrote :
+> On 16/01/2015 at 11:59:33 +0100, Daniel Lezcano wrote :
+> > On 01/16/2015 11:48 AM, Alexandre Belloni wrote:
+> > >Hi,
+> > >
+> > >On 16/01/2015 at 11:39:16 +0100, Daniel Lezcano wrote :
+> > >>>Isn't that already the case?
+> > >>>Right now, if you call clocksource_suspend, it doesn't matter whether
+> > >>>the clocksource has an enable or not, it will be suspended. Maybe I'm
+> > >>>mistaken but my patch doesn't seem to change that behaviour.
+> > >>
+> > >>Actually, if there is no enable/disable callback, then CLOCK_SOURCE_USED
+> > >>will be never set, hence the condition will always fail and the suspend
+> > >>callback won't be called.
+> > >>
+> > >
+> > >It is set in clocksource_enable/disable, even if there is no
+> > >enable/disable callback.
+> > 
+> > Ah, right. But shouldn't we set the flag only if the callback is present and
+> > succeed as Boris mentioned it ?
+> > 
 > 
-> > On 2015-01-15 at 18:24 +0100, Mason wrote:
-> >  
-> >> This is a follow-up to my previous thread.
-> >> "How many frequencies would cpufreq optimally like to manage?"
-> >> http://thread.gmane.org/gmane.linux.ports.arm.kernel/373669
-> >>
-> >> As I originally wrote, I'm running 3.14 on an ARM Cortex-A9
-> >> based SoC (namely Tango4 from Sigma Designs). I'd like to get
-> >> some feedback on the cpufreq driver I wrote for that platform.
-> >>
-> >> I decided to expose only a small subset of frequencies (namely
-> >> {999,500,333,111} MHz) because, in my tests, the ondemand gov
-> >> chose mostly min and max, and the intermediate frequencies not
-> >> so much; so I figured "2 intermediate freqs" is good enough.
-> >> (I'm ready to hear otherwise.)
+> What Boris was suggesting was that if the enable exist, set it only if
+> it succeed. Which gives something like that:
 > 
-> I'll take a closer look at other drivers, but I'd like to hear
-> opinions on the subject.
-> 
-> >> I tried to use as much generic framework as possible, but I've
-> >> read about the clk framework, and it looks to be an even greater
-> >> generalization. Are new platforms encouraged to use that, rather
-> >> than provide a cpufreq driver? Does it work when voltage scaling
-> >> comes in play? (This SoC doesn't have it, but the next will.)
-> >
-> > The clock framework generalizes clocks, not cpufreq. Ideally you should
-> > use clock framework in cpufreq driver. So instead manually setting
-> > divider just do something like:
-> >
-> > ret = clk_set_rate(cpu_clk, freq_exact);
-> > if (ret) {
-> > 	dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
-> > 	return ret;
-> > }
-> 
-> I will give clk a closer look.
-> 
-> > For voltage scaling you should use regulator framework.
-> 
-> OK. I'm also interested in frequency-throttling when temperatures
-> rise beyond specific thresholds. What subsystem ties sensors and
-> cpufreq together?
-
-I believe thermal.
-
-> 
-> > Actually I think existing cpufreq-dt could serve your purpose. Why don't
-> > you try it? Or look at it and use as an example.
-> 
-> Will do. I've heard of device tree, but know nothing about it.
-
-Indeed it is driver meant to be used with Device Tree but beside DT code
-it nicely shows how to scale the frequency CPU. If you don't use DT then
-you can use only the set_target() as starting point.
-
-On 3.14 the "cpufreq-dt" could be called "cpufreq-cpu0".
-
-> 
-> >> I'm also wondering how cpufreq and cpuidle interact? Is one a
-> >> subset of the other? Are they orthogonal?
-> >
-> > cpuidle and cpufreq are different subsystems. They don't interact, yet.
-> > There are efforts to combine scheduler, cpufreq and cpuidle but this is
-> > future. If your SoC has some deeper low power states than developing
-> > cpuidle driver makes sense. If not - WFI will be used.
-> 
-> AFAIU, there are no deeper power states on the Cortex-A9.
-> 
-> I didn't find where WFI is called :-(
-> 
-> In kernel/cpu/idle.c (file seems to have been removed in 3.15)
-> cpu_idle_loop() calls arch_cpu_idle()
-> http://lxr.free-electrons.com/source/kernel/cpu/idle.c?v=3.14#L98
-> 
-> In arch/kernel/process.c
-> http://lxr.free-electrons.com/source/arch/arm/kernel/process.c?v=3.14#L173
-> /*
->   * Called from the core idle loop.
->   */
-> void arch_cpu_idle(void)
+> int clocksource_enable(struct clocksource *cs)
 > {
-> 	if (cpuidle_idle_call())
-> 		default_idle();
+> 	int ret = 0;
+> 
+> 	if (cs->enable)
+> 		ret = cs->enable(cs);
+> 
+> 	if (!ret)
+> 		cs->flags |= CLOCK_SOURCE_USED;
+> 
+> 	return 0;
+
+Obviously, that is
+
+return ret;
+
+
+
 > }
 > 
-> default_idle calls cpu_do_idle (by default), a macro for cpu_v7_do_idle
-> which executes dsb+wfi, BUT...
+> I will use that version in v2.
 > 
-> ifndef CONFIG_CPU_IDLE then
-> static inline int cpuidle_idle_call(void) { return -ENODEV; }
 > 
-> Does that mean I MUST define CONFIG_CPU_IDLE if I want the idle
-> loop to call wfi (to save power), even if I don't have a cpuidle
-> driver?
+> -- 
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-On current kernels you don't have to. But on 3.14... seems yes.
-
-Best regards,
-Krzysztof
-> 
-> Regards.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
