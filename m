@@ -1,83 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 16 Jan 2015 17:52:44 +0100
-Subject: [PATCH] clk: rockchip: fix deadlock possibility in cpuclk
-Message-ID: <355359386.nxMIlHNuqO@phil>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 16 Jan 2015 16:54:22 +0000
+Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150116122922.GO7091@arm.com>
+References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
+ <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
+ <20150115190220.GF3043@sirena.org.uk>
+ <20150115200437.GF24989@titan.lakedaemon.net>
+ <20150116101034.GC13634@e104818-lin.cambridge.arm.com>
+ <20150116120518.GK3043@sirena.org.uk>
+ <20150116122922.GO7091@arm.com>
+Message-ID: <20150116165422.GE3856@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lockdep reported a possible deadlock between the cpuclk lock and for example
-the i2c driver.
+On Fri, Jan 16, 2015 at 12:29:22PM +0000, Will Deacon wrote:
+> On Fri, Jan 16, 2015 at 12:05:18PM +0000, Mark Brown wrote:
 
-       CPU0                    CPU1
-       ----                    ----
-  lock(clk_lock);
-                               local_irq_disable();
-                               lock(&(&i2c->lock)->rlock);
-                               lock(clk_lock);
-  <Interrupt>
-    lock(&(&i2c->lock)->rlock);
+> > Actually, another thing that might help would be if you and/or Will were
+> > to prod the relevant people for review, letting them know that the
+> > controversy isn't likely to affect their bits.
 
- *** DEADLOCK ***
+> Hmm, we *could*, but having maintainers go round poking other people to
+> review patches feels like the wrong way round to me. The authors should
+> be taking ownership of this series and that's half of the problem we
+> had in previous versions.
 
-The generic clock-types of the core ccf already use spin_lock_irqsave when
-touching clock registers, so do the same for the cpuclk.
+> It needs to be clear that Hanjun/Al/Graeme are the ones running the show,
+> not just now, but (even more importantly) when people start building on
+> top of the base support. If Catalin and I have to go around asking for
+> review, it sets us off on the wrong foot imo.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-cpu.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
-index 75c8c45..3ecdf7d 100644
---- a/drivers/clk/rockchip/clk-cpu.c
-+++ b/drivers/clk/rockchip/clk-cpu.c
-@@ -124,10 +124,11 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
- {
- 	const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
- 	unsigned long alt_prate, alt_div;
-+	unsigned long flags = 0;
- 
- 	alt_prate = clk_get_rate(cpuclk->alt_parent);
- 
--	spin_lock(cpuclk->lock);
-+	spin_lock_irqsave(cpuclk->lock, flags);
- 
- 	/*
- 	 * If the old parent clock speed is less than the clock speed
-@@ -164,7 +165,7 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
- 			cpuclk->reg_base + reg_data->core_reg);
- 	}
- 
--	spin_unlock(cpuclk->lock);
-+	spin_unlock_irqrestore(cpuclk->lock, flags);
- 	return 0;
- }
- 
-@@ -173,6 +174,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
- {
- 	const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
- 	const struct rockchip_cpuclk_rate_table *rate;
-+	unsigned long flags = 0;
- 
- 	rate = rockchip_get_cpuclk_settings(cpuclk, ndata->new_rate);
- 	if (!rate) {
-@@ -181,7 +183,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
- 		return -EINVAL;
- 	}
- 
--	spin_lock(cpuclk->lock);
-+	spin_lock_irqsave(cpuclk->lock, flags);
- 
- 	if (ndata->old_rate < ndata->new_rate)
- 		rockchip_cpuclk_set_dividers(cpuclk, rate);
-@@ -201,7 +203,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
- 	if (ndata->old_rate > ndata->new_rate)
- 		rockchip_cpuclk_set_dividers(cpuclk, rate);
- 
--	spin_unlock(cpuclk->lock);
-+	spin_unlock_irqrestore(cpuclk->lock, flags);
- 	return 0;
- }
- 
--- 
-2.1.1
+That's true in general but equally right now it's also fairly clear that
+this isn't going anywhere immediately (and one might assume potentially
+may end up needing substantial rework) for arm64 related reasons which
+creates a bit of stop energy that's more easily unblocked by the arm64
+maintainers than others.  From that point of view I guess just giving
+the ACPI folks something to point at to indicate that the remaining
+issues on the architecture side aren't likely to affect the relevant
+code would probably help also.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/5f375ae2/attachment.sig>
