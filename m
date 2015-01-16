@@ -1,32 +1,63 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 16 Jan 2015 17:15:48 +0100
-Subject: [PATCHv2 3/3] ARM: mvebu: use arm_coherent_dma_ops and re-enable
- hardware I/O coherency
-In-Reply-To: <1421424689-5971-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1421424689-5971-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1421424689-5971-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150116161548.GD17658@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Jan 2015 16:17:52 +0000
+Subject: [PATCH 1/2] ARM: entry-common: fix forgotten set of
+ thread_info->syscall
+In-Reply-To: <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
+References: <1420986751-30364-1-git-send-email-r.peniaev@gmail.com>
+ <1420986751-30364-2-git-send-email-r.peniaev@gmail.com>
+ <20150112183955.GO13360@arm.com>
+ <CACZ9PQXW9G4Vw-dcPwkdVE=uoYmDYEQnJWDnnpup1LxC3s5QPg@mail.gmail.com>
+ <CAGXu5jLO-YSaF8P9o3jcXP4VZCPYVshz73krnchYuv9pPGY6Sw@mail.gmail.com>
+ <CACZ9PQVo0SF4Z-rdNk4e=yY17Xt9n5hAqm4ZRNLEw3jGYYcvtA@mail.gmail.com>
+ <CAGXu5j+O6znN=7-gc3PqwqFA5MFRPLGBUzabOmQjWn_9WTjvpg@mail.gmail.com>
+ <CACZ9PQUEprgKrpHazDULA5mf-OaoX=MAjEeWdspZTXT_+iUKWw@mail.gmail.com>
+ <20150116155923.GK12302@n2100.arm.linux.org.uk>
+ <CACZ9PQUVFtCQg6XjDbokEPy_R2fZcHiq6+EEUZnx4FVfpfZxJg@mail.gmail.com>
+Message-ID: <20150116161752.GL12302@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas
-
-In patch 1/3 you add a comment here saying why you have turned it off.
-This hunk turns it back on again. But i don't see the comment being
-removed?
-
-Thanks
-	Andrew
-
-> @@ -253,7 +206,7 @@ static int coherency_type(void)
->   */
->  int coherency_available(void)
->  {
-> -	return false;
-> +	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
->  }
->  
->  int __init coherency_init(void)
-> -- 
-> 2.1.0
+On Sat, Jan 17, 2015 at 01:08:11AM +0900, Roman Peniaev wrote:
+> On Sat, Jan 17, 2015 at 12:59 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sat, Jan 17, 2015 at 12:57:02AM +0900, Roman Peniaev wrote:
+> >> On Fri, Jan 16, 2015 at 7:54 AM, Kees Cook <keescook@chromium.org> wrote:
+> >> > One interesting thing I noticed (which is unchanged by this series),
+> >> > but pulling ARM_r7 during the seccomp ptrace event shows __NR_poll,
+> >> > not __NR_restart_syscall, even though it was a __NR_restart_syscall
+> >> > trap from seccomp. Is there a better place to see the actual syscall?
+> >>
+> >> As I understand we do not push new r7 to the stack, and ptrace uses the
+> >> old value.
+> >
+> > And why should we push r7 to the stack?  ptrace should be using the
+> > recorded system call number, rather than poking about on the stack
+> > itself.
 > 
+> Probably we should not, but the behaviour comparing arm to x86 is different.
+
+We definitely should not, because changing the stacked value changes the
+value in r7 after the syscall has returned.  We have guaranteed that the
+value will be preserved across syscalls for years, so we really should
+not be changing that.
+
+> Also there is no any way from userspace to figure out what syscall was
+> restarted, if you do not trace each syscall enter and exit from the
+> very beginning.
+
+Thinking about ptrace, that's been true for years.
+
+It really depends whether you consider the restart syscall a userspace
+thing or a kernelspace thing.  When you consider that the vast majority
+of syscall restarts are done internally in the kernel, and we just
+re-issue the syscall, it immediately brings up the question "why is
+the restart block method different?" and "should the restart block
+method be visible to userspace?"
+
+IMHO, it is prudent not to expose kernel internals to userspace unless
+there is a real reason to, otherwise they become part of the userspace
+API.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
