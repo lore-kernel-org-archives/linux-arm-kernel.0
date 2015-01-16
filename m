@@ -1,46 +1,52 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Fri, 16 Jan 2015 16:44:40 +0100
-Subject: [PATCH v3 00/19] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <54B8E904.6090107@samsung.com>
-References: <1416395748-10731-1-git-send-email-m.szyprowski@samsung.com>
- <1417514366.21830.22.camel@collabora.co.uk> <54B8E904.6090107@samsung.com>
-Message-ID: <1421423080.2450.229.camel@collabora.co.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 16 Jan 2015 21:17:47 +0530
+Subject: [PATCH] arch: arm: mach-davinci: cdce949.c: Remove unused function
+In-Reply-To: <CAKXHbyMc=jYXsZPCuRqP7zfgmhiER8M3=Z_9CdNoVBsV5f5jFQ@mail.gmail.com>
+References: <1417906928-5728-1-git-send-email-rickard_strandqvist@spectrumdigital.se>	<54B64375.3070406@ti.com>
+ <CAKXHbyMc=jYXsZPCuRqP7zfgmhiER8M3=Z_9CdNoVBsV5f5jFQ@mail.gmail.com>
+Message-ID: <54B932A3.1040105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-01-16 at 11:33 +0100, Marek Szyprowski wrote:
-> Hello,
+On Thursday 15 January 2015 04:26 AM, Rickard Strandqvist wrote:
+> 2015-01-14 11:22 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>> Hi Rickard,
+>>
+>> On Sunday 07 December 2014 04:32 AM, Rickard Strandqvist wrote:
+>>> Remove the function cdce_set_rate() that is not used anywhere.
+>>>
+>>> This was partially found by using a static code analysis program called cppcheck.
+>>>
+>>> Signed-off-by: Rickard Strandqvist <rickard_strandqvist@spectrumdigital.se>
+>>> ---
+>>>  arch/arm/mach-davinci/cdce949.c              |   37 --------------------------
+>>>  arch/arm/mach-davinci/include/mach/cdce949.h |    2 --
+>>>  2 files changed, 39 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-davinci/cdce949.c b/arch/arm/mach-davinci/cdce949.c
+>>> index abafb92..bccac4a 100644
+>>> --- a/arch/arm/mach-davinci/cdce949.c
+>>> +++ b/arch/arm/mach-davinci/cdce949.c
+>>> @@ -212,43 +212,6 @@ static struct cdce_output output_list[] = {
+>>>       [5]     = { cdce_y5_freqs, ARRAY_SIZE(cdce_y5_freqs) },
+>>>  };
+>>>
+>>> -int cdce_set_rate(struct clk *clk, unsigned long rate)
+>>
+>> Without this function, this driver is of no use. I can see that CDCE949
+>> support has remained unused for long time. I would rather see the entire
+>> support including cdce949.c and cdce949.h and their references removed.
+>>
+>> Thanks,
+>> Sekhar
+>>
 > 
-> On 2014-12-02 10:59, Sjoerd Simons wrote:
-> > Hey Marek, Inki,
-> >
-> > On Wed, 2014-11-19 at 12:15 +0100, Marek Szyprowski wrote:
-> >> Hello Everyone,
-> >>
-> >> This is another attempt to finally make Exynos SYSMMU driver fully
-> >> integrated with DMA-mapping subsystem. The main change from previous
-> >> version is a rebase onto latest "automatic DMA configuration for IOMMU
-> >> masters" patches from Will Deacon.
-> > Do you happen to know if anyone is working on iommu/dma-mapping patches
-> > for Exynos 5 based on this patchset?
+> Hi
 > 
-> Just to let all of You know - I posted a new version of this patchset with
-> Exynos 5250 & 5420/5422/5800 DTS patches:
-> 
-> http://lists.linaro.org/pipermail/linaro-mm-sig/2015-January/004327.html
+> Sure, sounds nice :)
+> I see if I have time to fix it this weekend.
 
-Great thanks!. As there are quite a few dependencies, do you happen to
-have a public git tree with the combined work in ? Would make testing a
-lot simpler.
+Okay, I will wait till Monday before preparing my pull requests.
 
--- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/fb6a2234/attachment-0001.bin>
+Thanks,
+Sekhar
