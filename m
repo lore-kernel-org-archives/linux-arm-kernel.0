@@ -1,52 +1,75 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 16 Jan 2015 09:11:06 -0800
-Subject: [PATCH] clk: rockchip: fix deadlock possibility in cpuclk
-In-Reply-To: <355359386.nxMIlHNuqO@phil>
-References: <355359386.nxMIlHNuqO@phil>
-Message-ID: <CAD=FV=Xc_yabbrC0c0i-wJS+7eW3gq+pHDa81uxNin55jUciNg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Jan 2015 18:11:23 +0100
+Subject: [PATCH v2 0/8] AT91 cleanup for 3.20 #2
+In-Reply-To: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1421333971-7581-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <54B9463B.2020304@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Le 15/01/2015 15:59, Alexandre Belloni a ?crit :
+> This patch sets is based on AT91 cleanup for 3.20 #1
+> and depends on AT91 DT for 3.20 #1 because it uses the added SRAM nodes.
+> 
+> The first two patches rework the pm code to get rid of cpu_is_xxx (they will be
+> dropped soon) and use the SRAM from the genpool instead of relying on the remap
+> done by at91_init_sram.
+> 
+> The 3rd and 4th patches a reworking the pm code further to move at91_pm_init in
+> the .init_machine of the SoCs instead of arch_initcall, to get ready for
+> multiplatform.
+> 
+> Then the following patches get rid of at91_init_sram, taking .map_io for almost
+> all SoCs but the sama5d4 (more cleanups coming soon for that part).
+> 
+> The final patch moves at91rm9200_idle to clk/at91/pmc.c and allows to almost
+> empty arch/arm/mach-at91/at91rm9200.c (It is actually empty once "Atmel System
+> Timer cleanups" is applied).
+> 
+> Changes in v2:
+>  - added patch 3 and 4 to remove the calls to of_machine_is_compatible()
+> 
+> Alexandre Belloni (8):
+>   ARM: at91: pm: rework cpu detection
+>   ARM: at91: pm: use the mmio-sram pool to access SRAM
+>   ARM: at91: pm: add UDP and UHP checks to newer SoCs
+>   ARM: at91: pm: prepare for multiplatform
+>   ARM: at91: remove useless map_io
+>   ARM: at91: sama5d4: remove useless call to at91_init_sram
+>   ARM: at91: remove unused at91_init_sram
+>   ARM: at91: move at91rm9200_idle() to clk/at91/pmc.c
 
-On Fri, Jan 16, 2015 at 8:52 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Lockdep reported a possible deadlock between the cpuclk lock and for example
-> the i2c driver.
->
->        CPU0                    CPU1
->        ----                    ----
->   lock(clk_lock);
->                                local_irq_disable();
->                                lock(&(&i2c->lock)->rlock);
->                                lock(clk_lock);
->   <Interrupt>
->     lock(&(&i2c->lock)->rlock);
->
->  *** DEADLOCK ***
->
-> The generic clock-types of the core ccf already use spin_lock_irqsave when
-> touching clock registers, so do the same for the cpuclk.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/rockchip/clk-cpu.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
-> index 75c8c45..3ecdf7d 100644
-> --- a/drivers/clk/rockchip/clk-cpu.c
-> +++ b/drivers/clk/rockchip/clk-cpu.c
-> @@ -124,10 +124,11 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
->  {
->         const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
->         unsigned long alt_prate, alt_div;
-> +       unsigned long flags = 0;
+Okay for the whole series. I'm looking forward including the upcoming
+one as well.
 
-nit: I don't often see flags initted to 0 here when using
-spin_lock_irqsave().  I don't think it's needed...
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I doubt it really matters though, and this looks fine to me.
+All stacked on top of at91-3.20-cleanup.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Thanks, bye.
 
--Doug
+
+>  arch/arm/mach-at91/Kconfig           |   1 +
+>  arch/arm/mach-at91/at91rm9200.c      |  15 -----
+>  arch/arm/mach-at91/at91sam9260.c     |  27 ---------
+>  arch/arm/mach-at91/at91sam9261.c     |   9 ---
+>  arch/arm/mach-at91/at91sam9263.c     |   7 ---
+>  arch/arm/mach-at91/at91sam9g45.c     |   7 ---
+>  arch/arm/mach-at91/at91sam9n12.c     |   6 --
+>  arch/arm/mach-at91/at91sam9rl.c      |  18 ------
+>  arch/arm/mach-at91/at91sam9x5.c      |   6 --
+>  arch/arm/mach-at91/board-dt-rm9200.c |  11 ++++
+>  arch/arm/mach-at91/board-dt-sam9.c   |  27 +++++++++
+>  arch/arm/mach-at91/board-dt-sama5.c  |   1 +
+>  arch/arm/mach-at91/generic.h         |  15 ++++-
+>  arch/arm/mach-at91/pm.c              | 110 ++++++++++++++++++++++++++---------
+>  arch/arm/mach-at91/sama5d3.c         |   6 --
+>  arch/arm/mach-at91/sama5d4.c         |   1 -
+>  arch/arm/mach-at91/setup.c           |  20 -------
+>  drivers/clk/at91/pmc.c               |   9 +++
+>  18 files changed, 146 insertions(+), 150 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
