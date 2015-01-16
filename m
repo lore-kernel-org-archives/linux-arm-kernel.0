@@ -1,39 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Jan 2015 11:49:21 +0000
-Subject: [PATCH v7 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150115205139.GG24989@titan.lakedaemon.net>
-References: <1421247905-3749-1-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6v_BvCQqp8d=LaQ8HeaOU1Zh_HPpwFTdwOjHUbqXsnQ8g@mail.gmail.com>
- <20150115182346.GE2329@e104818-lin.cambridge.arm.com>
- <20150115190220.GF3043@sirena.org.uk>
- <20150115200437.GF24989@titan.lakedaemon.net>
- <20150115203159.GG3043@sirena.org.uk>
- <20150115205139.GG24989@titan.lakedaemon.net>
-Message-ID: <20150116114921.GJ3043@sirena.org.uk>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Fri, 16 Jan 2015 19:50:18 +0800
+Subject: [PATCH v5 4/5] arm64: Add support for Spreadtrum's Sharkl64
+ Platform in Kconfig and defconfig
+In-Reply-To: <20150116104842.GE21809@leverpostej>
+References: <1421402411-3479-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1421402411-3479-5-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20150116104842.GE21809@leverpostej>
+Message-ID: <CAAfSe-vuSgwH2PHQdYLyfJ+KZ0C8a7D6Ry=mHaBrjpbuksaKvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 15, 2015 at 03:51:39PM -0500, Jason Cooper wrote:
-> On Thu, Jan 15, 2015 at 08:31:59PM +0000, Mark Brown wrote:
+Hi, Mark
 
-> > Just changing the subject lines to be more suitable would help, but
-> > given the painful thread it's probably worth going the extra step if
-> > the lack of these reviews is a causing problems - I know that even with
-> > a suitable subject line if I'm busy then I'm fairly likely to zone out
-> > something in the middle a big series that doesn't seem to be going
-> > anywhere.
+On Fri, Jan 16, 2015 at 6:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jan 16, 2015 at 10:00:10AM +0000, Chunyan Zhang wrote:
+>> From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+>>
+>> Adds support for Spreadtrum's SoC Platform in the arm64 Kconfig and
+>> defconfig files.
+>>
+>> Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+>> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> ---
+>>  arch/arm64/Kconfig           |    5 +++++
+>>  arch/arm64/configs/defconfig |    1 +
+>>  2 files changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index b1f9a20..885c1f4 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -153,6 +153,11 @@ config ARCH_SEATTLE
+>>       help
+>>         This enables support for AMD Seattle SOC Family
+>>
+>> +config ARCH_SPRD
+>
+> This should presumably be ARCH_SHARKL64, so you can add other SoC
+> families later. The other entries in here are already formatted that
+> way.
+>
+> I wonder if we should have these of the form ARCH_${VENDOR}_${FAMILY}
+> (e.g. ARCH_SPRD_SHARKL64) rather than just ARCH_${FAMILY} to save
+> ourselves from name conflicts in future (and to make it easier to grep
+> for a particular vendor's config options).
+>
 
-> True, I was merely expressing a preference.  A lot of series containing
-> irqchip changes tend to have build dependencies outside of
-> drivers/irqchip. So I like to see the whole picture to decide how best
-> to handle the patches.
+actually we've discussed this question before[1], and I think Arnd's
+suggestion is suitable for our case, so I changed this to use
+ARCH_SPRD instead of ARCH_SHARKL64.
 
-Right, I didn't mean stop sending things as part of this series but
-rather send them separately as well.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150116/0d905485/attachment.sig>
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/306246.html
+
+anyway, thank you very much!
+
+Chunyan
+
+>> +     bool "Spreadtrum SoC platform"
+>
+> bool "Spreadtrun Sharkl64 SoC Family"
+>
+>> +     help
+>> +       Support for Spreadtrum ARM based SoCs
+>
+>
+> Support for the Spreadtrum Sharkl64 SoC family.
+>
+> Thanks,
+> Mark.
+>
+>> +
