@@ -1,41 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 16 Jan 2015 10:17:54 +0100
-Subject: [RFC 2/2] clocksource: don't suspend/resume when unused
-In-Reply-To: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1421399874-29119-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1421399874-29119-3-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Jan 2015 10:18:59 +0100
+Subject: [PATCH 10/28] PCI: Save sysdata in pci_host_bridge drvdata
+In-Reply-To: <1421372666-12288-11-git-send-email-wangyijing@huawei.com>
+References: <1421372666-12288-1-git-send-email-wangyijing@huawei.com>
+ <1421372666-12288-11-git-send-email-wangyijing@huawei.com>
+Message-ID: <18973877.BYCS6vtzoq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no point in calling suspend/resume for unused
-clocksources.
+On Friday 16 January 2015 09:44:08 Yijing Wang wrote:
+> @@ -2066,11 +2064,11 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
+>  {
+>         struct pci_host_bridge *host;
+>  
+> -       host = pci_create_host_bridge(parent, db, resources);
+> +       host = pci_create_host_bridge(parent, db, resources, sysdata);
+>         if (!host)
+>                 return NULL;
+>  
+> -       return __pci_scan_root_bus(host, ops, sysdata);
+> +       return __pci_scan_root_bus(host, ops);
+>  }
+>  EXPORT_SYMBOL(pci_scan_root_bus);
+> 
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- kernel/time/clocksource.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+How about keeping the sysdata out of the pci_create_host_bridge interface, and
+refactoring it so that the call sequence becomes
 
-diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
-index 920a4da58eb0..baea4e42ae90 100644
---- a/kernel/time/clocksource.c
-+++ b/kernel/time/clocksource.c
-@@ -493,7 +493,7 @@ void clocksource_suspend(void)
- 	struct clocksource *cs;
- 
- 	list_for_each_entry_reverse(cs, &clocksource_list, list)
--		if (cs->suspend)
-+		if (cs->suspend && (cs->flags & CLOCK_SOURCE_USED))
- 			cs->suspend(cs);
- }
- 
-@@ -505,7 +505,7 @@ void clocksource_resume(void)
- 	struct clocksource *cs;
- 
- 	list_for_each_entry(cs, &clocksource_list, list)
--		if (cs->resume)
-+		if (cs->resume && (cs->flags & CLOCK_SOURCE_USED))
- 			cs->resume(cs);
- 
- 	clocksource_resume_watchdog();
--- 
-2.1.0
+	host = pci_create_host_bridge(parent, db, resources);
+	host->sysdata = sysdata;
+	__pci_scan_root_bus(host, ops);
+
+This way, we can make sysdata completely option. I assume that more of the
+fields we have in sysdata today can get moved into pci_host_bridge
+over time, so a host bridge driver can just assign those members individually
+between pci_create_host_bridge and __pci_scan_root_bus.
+
+	Arnd
